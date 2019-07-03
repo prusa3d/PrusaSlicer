@@ -580,6 +580,85 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloats { 28. });
 
+    def = this->add("filament_enable_toolchange_temp", coBools);
+    def->label = L("Toolchange temperature enabled");
+    def->tooltip = L("Determines whether toolchange temperatures will be applied");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBools { false });
+
+    def = this->add("filament_enable_toolchange_part_fan", coBools);
+    def->label = L("Use part fan to cool hotend");
+    def->tooltip = L("Experimental setting.  May enable the hotend to cool down faster during toolchanges");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBools { false });
+
+    def = this->add("filament_toolchange_part_fan_speed", coInts);
+    def->label = L("Toolchange part fan speed");
+    def->tooltip = L("Experimental setting.  Fan speeds that are too high can clash with the hotend's PID routine.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 50 });
+   
+    def = this->add("filament_use_skinnydip", coBools);
+    def->label = L("Enable Skinnydip string reduction");
+    def->tooltip = L("Skinnydip performs a secondary dip into the meltzone to burn off fine strings of filament");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBools { false });
+
+    def = this->add("filament_melt_zone_pause", coInts);
+    def->label = L("Pause in melt zone");
+    def->tooltip = L("Stay in melt zone for this amount of time before extracting the filament.  Not usually necessary.");
+    def->sidetext = L("milliseconds");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 0 });
+
+    def = this->add("filament_cooling_zone_pause", coInts);
+    def->label = L("Pause before extraction ");
+    def->tooltip = L("Can be useful to avoid bondtech gears deforming hot tips, but not ordinarily needed");
+    def->sidetext = L("milliseconds");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 0 });
+
+
+    def = this->add("filament_dip_insertion_speed", coFloats);
+    def->label = L("Speed to move into melt zone");
+    def->tooltip = L("usually not necessary to change this");
+    def->sidetext = L("mm/sec");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats { 33. });
+
+    def = this->add("filament_dip_extraction_speed", coFloats);
+    def->label = L("Speed to extract from melt zone");
+    def->tooltip = L("usually not necessary to change this");
+    def->sidetext = L("mm/sec");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats { 70. });
+
+
+    def = this->add("filament_toolchange_temp", coInts);
+    def->label = L("Toolchange temperature");
+    def->tooltip = L("To further reduce stringing, it can be helpful to set a lower temperature just prior to extracting filament from the hotend.");
+    def->sidetext = L("°C");
+    def->min = 175;
+    def->max = 285;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInts { 200 });
+
+    
+    def = this->add("filament_skinnydip_distance", coFloats);
+    def->label = L("Insertion distance");
+    def->tooltip = L("For stock extruders, usually 40-42mm.  For bondtech extruder upgrade, usually 30-32mm.  Start with a low value and gradually increase it until strings are gone.  If there are blobs on your wipe tower, your value is too high.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats { 31. });
+
     def = this->add("filament_loading_speed_start", coFloats);
     def->label = L("Loading speed at the start");
     def->tooltip = L("Speed used at the very beginning of loading phase.");

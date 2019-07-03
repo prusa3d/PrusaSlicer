@@ -29,6 +29,7 @@ TODO LIST
 
 #ifdef _MSC_VER 
 #define strcasecmp _stricmp
+#define snprintf _snprintf
 #endif
 
 
@@ -286,6 +287,64 @@ public:
 		m_current_tool = tool;
 		return *this;
 	}
+	
+	//add skinnydip move (dip in, pause, dip out, pause)
+	Writer& skinnydip_move(float distance, float downspeed, int meltpause, float upspeed, int coolpause) 
+	{
+               this->append("; SKINNYDIP START\n");
+	       char all[320] ="";
+               snprintf(all, 80, "G1 E%.4f F%.0f\n", distance, downspeed*60 );
+	       this->append(all);
+	       snprintf(all, 80, "G4 P%d\n", meltpause);
+	       this->append(all);
+	       snprintf(all, 80,  "G1 E-%.4f F%.0f\n", distance, upspeed*60);
+	       this->append(all);
+	       snprintf(all, 80, "G4 P%d\n", coolpause);
+	       this->append(all);
+               this->append("; SKINNYDIP END\n");
+               return *this;
+	}
+
+	//add toolchange_temp
+	Writer& wait_for_toolchange_temp(int tc_temp, bool fan_on, int fan_speed) 
+	{
+	    char all[128];
+            if (fan_on == true){
+            sprintf(all, "M106 S%u ;Part fan on to cool hotend\n",(unsigned int)(255.0 * fan_speed / 100.0));
+	    this->append(all);
+            }
+
+	    sprintf(all, "M109 S%d ;SKINNYDIP TOOLCHANGE WAIT_FOR_TEMP\n", tc_temp);
+	    this->append(all);
+
+	    if (fan_on == true){
+	    sprintf(all, "M106 S0 ;Fan off\n"); //turn off fan
+	    this->append(all);
+	    }
+            return *this;
+
+	}
+
+	//begin toolchange_temp
+	Writer& begin_toolchange_temp(int tc_temp) 
+	{
+	    char tdbuf[128];
+	    sprintf(tdbuf, "M104 S%d  ;SKINNYDIP BEGIN TOOLCHANGE TEMP\n", tc_temp);
+	    m_gcode += tdbuf;
+            return *this;
+
+	}
+
+	//restore toolchange_temp
+	Writer& restore_pre_toolchange_temp(int tc_temp) 
+	{
+	    char tdbuf[128];
+	    sprintf(tdbuf, "M104 S%d  ;RESTORE PRE-TOOLCHANGE TEMP\n", tc_temp);
+	    m_gcode += tdbuf;
+            return *this;
+
+	}
+
 
 	// Set extruder temperature, don't wait by default.
 	Writer& set_extruder_temp(int temperature, bool wait = false)
@@ -845,6 +904,15 @@ void WipeTowerPrusaMM::toolchange_Unload(
     float old_x = writer.x();
     float turning_point = (!m_left_to_right ? xl : xr );
     float total_retraction_distance = m_cooling_tube_retraction + m_cooling_tube_length/2.f - 15.f; // the 15mm is reserved for the first part after ramming
+    
+    // add wait for toolchange temp (SKINNYDIP)
+    if (m_filpar[m_current_tool].filament_enable_toolchange_temp == true) {
+    writer.wait_for_toolchange_temp(m_filpar[m_current_tool].filament_toolchange_temp, 
+				    m_filpar[m_current_tool].filament_enable_toolchange_part_fan,
+				    m_filpar[m_current_tool].filament_toolchange_part_fan_speed);
+    }
+    
+
     writer.suppress_preview()
           .retract(15.f, m_filpar[m_current_tool].unloading_speed_start * 60.f) // feedrate 5000mm/min = 83mm/s
           .retract(0.70f * total_retraction_distance, 1.0f * m_filpar[m_current_tool].unloading_speed * 60.f)
@@ -857,13 +925,22 @@ void WipeTowerPrusaMM::toolchange_Unload(
           .load_move_x_advanced(old_x,         -0.10f * total_retraction_distance, 0.3f * m_filpar[m_current_tool].unloading_speed)
           .travel(old_x, writer.y()) // in case previous move was shortened to limit feedrate*/
           .resume_preview();
+
+    //restore toolchange temp
+    if (m_filpar[m_current_tool].filament_enable_toolchange_temp == true) {
+    writer.restore_pre_toolchange_temp(m_filpar[m_current_tool].temperature);
+    }
+
+
     if (new_temperature != 0 && (new_temperature != m_old_temperature || m_is_first_layer) ) { 	// Set the extruder temperature, but don't wait.
         // If the required temperature is the same as last time, don't emit the M104 again (if user adjusted the value, it would be reset)
         // However, always change temperatures on the first layer (this is to avoid issues with priming lines turned off).
 		writer.set_extruder_temp(new_temperature, false);
         m_old_temperature = new_temperature;
+
     }
 
+         
     // Cooling:
     const int& number_of_moves = m_filpar[m_current_tool].cooling_moves;
     if (number_of_moves > 0) {
@@ -873,7 +950,7 @@ void WipeTowerPrusaMM::toolchange_Unload(
         float speed_inc = (final_speed - initial_speed) / (2.f * number_of_moves - 1.f);
 
         writer.suppress_preview()
-              .travel(writer.x(), writer.y() + y_step);
+        .travel(writer.x(), writer.y() + y_step);
         old_x = writer.x();
         turning_point = xr-old_x > old_x-xl ? xr : xl;
         for (int i=0; i<number_of_moves; ++i) {
@@ -882,20 +959,38 @@ void WipeTowerPrusaMM::toolchange_Unload(
             speed += speed_inc;
             writer.load_move_x_advanced(old_x, -m_cooling_tube_length, speed);
         }
+        writer.resume_preview();
+    
     }
 
-    // let's wait is necessary:
+
+    //Generate a skinnydip move
+    if (m_filpar[m_current_tool].filament_use_skinnydip == true) {
+    writer.suppress_preview()
+          .skinnydip_move(m_filpar[m_current_tool].filament_skinnydip_distance, 
+                     m_filpar[m_current_tool].filament_dip_insertion_speed,
+		     m_filpar[m_current_tool].filament_melt_zone_pause,
+                     m_filpar[m_current_tool].filament_dip_extraction_speed,
+             	     m_filpar[m_current_tool].filament_cooling_zone_pause)
+          .resume_preview();
+    }
+
+
+    // let's wait if necessary:
     writer.wait(m_filpar[m_current_tool].delay);
+
+
+
     // we should be at the beginning of the cooling tube again - let's move to parking position:
     writer.retract(-m_cooling_tube_length/2.f+m_parking_pos_retraction-m_cooling_tube_retraction, 2000);
 
-	// this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
+// this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
     // the perimeter_width will later be subtracted, it is there to not load while moving over just extruded material
 	writer.travel(end_of_ramming.x, end_of_ramming.y + (y_step/m_extra_spacing-m_perimeter_width) / 2.f + m_perimeter_width, 2400.f);
 
 	writer.resume_preview()
 		  .flush_planner_queue();
-}
+} // of toolchange unload
 
 // Change the tool, set a speed override for soluble and flex materials.
 void WipeTowerPrusaMM::toolchange_Change(

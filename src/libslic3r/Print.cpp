@@ -209,6 +209,13 @@ bool Print::invalidate_state_by_config_options(const std::vector<t_config_option
             || opt_key == "filament_loading_speed"
             || opt_key == "filament_loading_speed_start"
             || opt_key == "filament_unloading_speed"
+            || opt_key == "filament_use_skinnydip"        // skinnydip params start
+            || opt_key == "filament_skinnydip_distance"
+            || opt_key == "filament_melt_zone_pause"
+            || opt_key == "filament_cooling_zone_pause"
+            || opt_key == "filament_toolchange_temp"    
+            || opt_key == "filament_dip_insertion_speed"    
+            || opt_key == "filament_dip_extraction_speed"    //skinnydip params end
             || opt_key == "filament_unloading_speed_start"
             || opt_key == "filament_toolchange_delay"
             || opt_key == "filament_cooling_moves"
@@ -1816,13 +1823,24 @@ void Print::_make_wipe_tower()
             m_config.filament_loading_speed.get_at(i),
             m_config.filament_loading_speed_start.get_at(i),
             m_config.filament_unloading_speed.get_at(i),
-            m_config.filament_unloading_speed_start.get_at(i),
+            m_config.filament_unloading_speed_start.get_at(i),  
             m_config.filament_toolchange_delay.get_at(i),
             m_config.filament_cooling_moves.get_at(i),
             m_config.filament_cooling_initial_speed.get_at(i),
             m_config.filament_cooling_final_speed.get_at(i),
             m_config.filament_ramming_parameters.get_at(i),
-            m_config.nozzle_diameter.get_at(i));
+            m_config.nozzle_diameter.get_at(i),
+            m_config.filament_enable_toolchange_temp.get_at(i),
+            m_config.filament_toolchange_temp.get_at(i),
+            m_config.filament_enable_toolchange_part_fan.get_at(i),
+            m_config.filament_toolchange_part_fan_speed.get_at(i),
+            m_config.filament_use_skinnydip.get_at(i),
+            m_config.filament_skinnydip_distance.get_at(i),
+            m_config.filament_melt_zone_pause.get_at(i),
+            m_config.filament_cooling_zone_pause.get_at(i),
+            m_config.filament_dip_insertion_speed.get_at(i),
+            m_config.filament_dip_extraction_speed.get_at(i));
+	    
 
     m_wipe_tower_data.priming = Slic3r::make_unique<WipeTower::ToolChangeResult>(
         wipe_tower.prime(this->skirt_first_layer_height(), m_wipe_tower_data.tool_ordering.all_extruders(), false));
