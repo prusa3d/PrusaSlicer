@@ -3231,7 +3231,7 @@ void PrintObjectSupportMaterial::generate_toolpaths(
                     // Base flange (the 1st layer).
                     filler = filler_interface.get();
                     filler->angle = Geometry::deg2rad(float(m_object_config->support_material_angle.value + 90.));
-                    density = 0.5f;
+                    density = m_object_config->first_layer_support_material_density;
                     flow = m_first_layer_flow;
                     // use the proper spacing for first layer as we don't need to align
                     // its pattern to the other layers

@@ -2133,6 +2133,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("first_layer_support_material_density", coFloat);
+    def->label = L("First layer density");
+    def->category = L("Support material");
+    def->tooltip = L("Density of first layer support lines.  Set to 1.0 for solid first layer supports.");
+    def->sidetext = L("");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.5));
+
     def = this->add("support_material_threshold", coInt);
     def->label = L("Overhang threshold");
     def->category = L("Support material");
