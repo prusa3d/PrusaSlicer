@@ -515,6 +515,7 @@ bool PrintObject::invalidate_state_by_config_options(const std::vector<t_config_
             || opt_key == "support_material_xy_spacing"
             || opt_key == "support_material_spacing"
             || opt_key == "support_material_synchronize_layers"
+            || opt_key == "support_material_inflate_first_layer"
             || opt_key == "support_material_threshold"
             || opt_key == "support_material_with_sheath"
             || opt_key == "dont_support_bridges"

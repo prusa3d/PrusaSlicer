@@ -432,6 +432,7 @@ public:
     ConfigOptionFloat               support_material_spacing;
     ConfigOptionFloat               support_material_speed;
     ConfigOptionBool                support_material_synchronize_layers;
+    ConfigOptionBool                support_material_inflate_first_layer;
     // Overhang angle threshold.
     ConfigOptionInt                 support_material_threshold;
     ConfigOptionBool                support_material_with_sheath;
@@ -472,6 +473,7 @@ protected:
         OPT_PTR(support_material_spacing);
         OPT_PTR(support_material_speed);
         OPT_PTR(support_material_synchronize_layers);
+        OPT_PTR(support_material_inflate_first_layer);
         OPT_PTR(support_material_xy_spacing);
         OPT_PTR(support_material_threshold);
         OPT_PTR(support_material_with_sheath);

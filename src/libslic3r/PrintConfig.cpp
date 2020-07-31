@@ -2135,6 +2135,13 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("support_material_inflate_first_layer", coBool);
+    def->label = L("Inflate first layer");
+    def->category = L("Support material");
+    def->tooltip = L("Inflate the first layer under the support/raft to help stabilize the support column");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("support_material_threshold", coInt);
     def->label = L("Overhang threshold");
     def->category = L("Support material");

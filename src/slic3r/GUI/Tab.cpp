@@ -1383,6 +1383,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("support_material_xy_spacing");
         optgroup->append_single_option_line("dont_support_bridges");
         optgroup->append_single_option_line("support_material_synchronize_layers");
+        optgroup->append_single_option_line("support_material_inflate_first_layer");
 
     page = add_options_page(L("Speed"), "time");
         optgroup = page->new_optgroup(L("Speed for print moves"));

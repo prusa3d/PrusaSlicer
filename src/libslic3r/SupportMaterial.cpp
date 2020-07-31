@@ -2155,7 +2155,7 @@ PrintObjectSupportMaterial::MyLayersPtr PrintObjectSupportMaterial::generate_raf
 {
     // How much to inflate the support columns to be stable. This also applies to the 1st layer, if no raft layers are to be printed.
     const float inflate_factor_fine      = float(scale_((m_slicing_params.raft_layers() > 1) ? 0.5 : EPSILON));
-    const float inflate_factor_1st_layer = float(scale_(3.)) - inflate_factor_fine;
+    const float inflate_factor_1st_layer = m_object_config->support_material_inflate_first_layer ? float(scale_(3.)) - inflate_factor_fine : 0;
     MyLayer       *contacts      = top_contacts    .empty() ? nullptr : top_contacts    .front();
     MyLayer       *interfaces    = interface_layers.empty() ? nullptr : interface_layers.front();
     MyLayer       *columns_base  = base_layers     .empty() ? nullptr : base_layers     .front();
