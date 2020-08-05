@@ -1480,7 +1480,6 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Output file"));
         optgroup->append_single_option_line("gcode_comments");
-        optgroup->append_single_option_line("gcode_label_objects");
         Option option = optgroup->get_option("output_filename_format");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
@@ -2152,6 +2151,7 @@ void TabPrinter::build_fff()
 
         optgroup = page->new_optgroup(L("Print Host upload"));
         build_printhost(optgroup.get());
+        optgroup->append_single_option_line("gcode_label_objects");
 
         optgroup = page->new_optgroup(L("Firmware"));
         optgroup->append_single_option_line("gcode_flavor");
