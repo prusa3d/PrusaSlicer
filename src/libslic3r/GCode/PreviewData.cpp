@@ -63,16 +63,33 @@ void GCodePreviewData::Range::update_from(const RangeBase& other)
     max_val = std::max(max_val, other.max());
 }
 
-float GCodePreviewData::RangeBase::step_size() const
+float GCodePreviewData::RangeBase::step_size(bool geometric_scale) const
 {
-    return (max() - min()) / static_cast<float>(range_rainbow_colors.size() - 1);
+    if (geometric_scale)
+    {
+        float min_range = min();
+        if (min_range == 0)
+            min_range = 0.001f;
+        return (log(max() / min_range) / static_cast<float>(range_rainbow_colors.size() - 1));
+    }
+    else
+        return (max() - min()) / static_cast<float>(range_rainbow_colors.size() - 1);
 }
 
-Color GCodePreviewData::RangeBase::get_color_at(float value) const
+Color GCodePreviewData::RangeBase::get_color_at(float value, bool geometric_scale) const
 {
     // Input value scaled to the color range
-    float step = step_size();
-    const float global_t = (step != 0.0f) ? std::max(0.0f, value - min()) / step : 0.0f; // lower limit of 0.0f
+    float step = step_size(geometric_scale);
+    float global_t;
+    if (geometric_scale)
+    {
+        float min_range = min();
+        if (min_range == 0)
+            min_range = 0.001f;
+        global_t = (step != 0.0f) ? std::max(0.0f, log(value / min_range)) / step : 0.0f; // lower limit of 0.0f
+    }
+    else
+        global_t = (step != 0.0f) ? std::max(0.0f, value - min()) / step : 0.0f; // lower limit of 0.0f
 
     constexpr std::size_t color_max_idx = range_rainbow_colors.size() - 1;
 
@@ -245,6 +262,8 @@ void GCodePreviewData::reset()
     ranges.feedrate.reset();
     ranges.fan_speed.reset();
     ranges.volumetric_rate.reset();
+    ranges.fan_speed.reset();
+    ranges.layer_time.reset();
     extrusion.layers.clear();
     travel.polylines.clear();
     retraction.positions.clear();
@@ -279,6 +298,16 @@ Color GCodePreviewData::get_feedrate_color(float feedrate) const
 Color GCodePreviewData::get_fan_speed_color(float fan_speed) const
 {
     return ranges.fan_speed.get_color_at(fan_speed);
+}
+
+Color GCodePreviewData::get_layer_time_color(float layer_time) const
+{
+    return ranges.layer_time.get_color_at(layer_time);
+}
+
+Color GCodePreviewData::get_layer_time_log_color(float layer_time) const
+{
+    return ranges.layer_time.get_color_at(layer_time, true);
 }
 
 Color GCodePreviewData::get_volumetric_rate_color(float rate) const
@@ -354,6 +383,10 @@ std::string GCodePreviewData::get_legend_title() const
         return L("Speed (mm/s)");
     case Extrusion::FanSpeed:
         return L("Fan Speed (%)");
+    case Extrusion::LayerTime:
+        return L("Layer Time");
+    case Extrusion::LayerTimeLog:
+        return L("Layer Time (log)");
     case Extrusion::VolumetricRate:
         return L("Volumetric flow rate (mm³/s)");
     case Extrusion::Tool:
@@ -372,11 +405,23 @@ GCodePreviewData::LegendItemsList GCodePreviewData::get_legend_items(const std::
 {
     struct Helper
     {
-        static void FillListFromRange(LegendItemsList& list, const RangeBase& range, unsigned int decimals, float scale_factor)
+        static std::string _get_time_ms(float time_in_secs)
+        {
+            int minutes = (int)(time_in_secs / 60.0f);
+            time_in_secs -= (float)minutes * 60.0f;
+            char buffer[64];
+            if (minutes > 0)
+                ::sprintf(buffer, "%dm %ds", minutes, (int)time_in_secs);
+            else
+                ::sprintf(buffer, "%.*fs", 1, time_in_secs);
+            return buffer;
+        }
+        
+        static void FillListFromRange(LegendItemsList& list, const RangeBase& range, unsigned int decimals, float scale_factor, bool istime = false, bool geometric_scale = false)
         {
             list.reserve(range_rainbow_colors.size());
 
-            float step = range.step_size();
+            float step = range.step_size(geometric_scale);
             if (step == 0.0f)
             {
                 char buf[1024];
@@ -388,7 +433,23 @@ GCodePreviewData::LegendItemsList GCodePreviewData::get_legend_items(const std::
                 for (int i = static_cast<int>(range_rainbow_colors.size()) - 1; i >= 0; --i)
                 {
                     char buf[1024];
-                    sprintf(buf, "%.*f", decimals, scale_factor * (range.min() + (float)i * step));
+                    if (geometric_scale)
+                    {
+                        float min_range = range.min();
+                        if (min_range == 0)
+                            min_range = 0.001f;
+                        if (istime)
+                            sprintf(buf, "%s", _get_time_ms(scale_factor * exp(log(min_range) + (float)i * step)).c_str());
+                        else
+                            sprintf(buf, "%.*f", decimals, scale_factor * exp(log(min_range) + (float)i * step));
+                    }
+                    else
+                    {
+                        if (istime)
+                            sprintf(buf, "%s", _get_time_ms(scale_factor * (range.min() + (float)i * step)).c_str());
+                        else
+                            sprintf(buf, "%.*f", decimals, scale_factor * (range.min() + (float)i * step));
+                     }
                     list.emplace_back(buf, range_rainbow_colors[i]);
                 }
             }
@@ -432,6 +493,16 @@ GCodePreviewData::LegendItemsList GCodePreviewData::get_legend_items(const std::
             Helper::FillListFromRange(items, ranges.fan_speed, 0, 1.0f);
             break;
         }
+    case Extrusion::LayerTime:
+    {
+        Helper::FillListFromRange(items, ranges.layer_time, 1, 1.0f, true);
+        break;
+    }
+    case Extrusion::LayerTimeLog:
+    {
+        Helper::FillListFromRange(items, ranges.layer_time, 1, 1.0f, true, true);
+        break;
+    }
     case Extrusion::VolumetricRate:
         {
             Helper::FillListFromRange(items, ranges.volumetric_rate, 3, 1.0f);

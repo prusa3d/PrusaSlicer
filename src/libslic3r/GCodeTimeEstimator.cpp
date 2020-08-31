@@ -73,7 +73,7 @@ namespace Slic3r {
 
     float GCodeTimeEstimator::Block::Trapezoid::speed_from_distance(float initial_feedrate, float distance, float acceleration)
     {
-        // to avoid invalid negative numbers due to numerical imprecision 
+        // to avoid invalid negative numbers due to numerical imprecision
         float value = std::max(0.0f, sqr(initial_feedrate) + 2.0f * acceleration * distance);
         return ::sqrt(value);
     }
@@ -107,7 +107,7 @@ namespace Slic3r {
         float cruise_distance = distance - accelerate_distance - decelerate_distance;
 
         // Not enough space to reach the nominal feedrate.
-        // This means no cruising, and we'll have to use intersection_distance() to calculate when to abort acceleration 
+        // This means no cruising, and we'll have to use intersection_distance() to calculate when to abort acceleration
         // and start braking in order to reach the exit_feedrate exactly at the end of this block.
         if (cruise_distance < 0.0f)
         {
@@ -122,7 +122,7 @@ namespace Slic3r {
 
     float GCodeTimeEstimator::Block::max_allowable_speed(float acceleration, float target_velocity, float distance)
     {
-        // to avoid invalid negative numbers due to numerical imprecision 
+        // to avoid invalid negative numbers due to numerical imprecision
         float value = std::max(0.0f, sqr(target_velocity) - 2.0f * acceleration * distance);
         return ::sqrt(value);
     }
@@ -163,7 +163,7 @@ namespace Slic3r {
     void GCodeTimeEstimator::add_gcode_line(const std::string& gcode_line)
     {
         PROFILE_FUNC();
-        m_parser.parse_line(gcode_line, 
+        m_parser.parse_line(gcode_line,
             [this](GCodeReader &reader, const GCodeReader::GCodeLine &line)
         { this->_process_gcode_line(reader, line); });
     }
@@ -449,8 +449,8 @@ namespace Slic3r {
 
     void GCodeTimeEstimator::set_acceleration(float acceleration_mm_sec2)
     {
-        m_state.acceleration = (m_state.max_acceleration == 0) ? 
-            acceleration_mm_sec2 : 
+        m_state.acceleration = (m_state.max_acceleration == 0) ?
+            acceleration_mm_sec2 :
             // Clamp the acceleration with the maximum.
             std::min(m_state.max_acceleration, acceleration_mm_sec2);
     }
@@ -519,20 +519,20 @@ namespace Slic3r {
     float GCodeTimeEstimator::get_filament_load_time(unsigned int id_extruder)
     {
         return
-            (m_state.filament_load_times.empty() || id_extruder == m_state.extruder_id_unloaded) ? 
+            (m_state.filament_load_times.empty() || id_extruder == m_state.extruder_id_unloaded) ?
                 0 :
                 (m_state.filament_load_times.size() <= id_extruder) ?
-                    m_state.filament_load_times.front() : 
+                    m_state.filament_load_times.front() :
                     m_state.filament_load_times[id_extruder];
     }
 
     float GCodeTimeEstimator::get_filament_unload_time(unsigned int id_extruder)
     {
         return
-            (m_state.filament_unload_times.empty() || id_extruder == m_state.extruder_id_unloaded) ? 
+            (m_state.filament_unload_times.empty() || id_extruder == m_state.extruder_id_unloaded) ?
                 0 :
                 (m_state.filament_unload_times.size() <= id_extruder) ?
-                    m_state.filament_unload_times.front() : 
+                    m_state.filament_unload_times.front() :
                     m_state.filament_unload_times[id_extruder];
     }
 
@@ -635,7 +635,7 @@ namespace Slic3r {
         set_minimum_feedrate(DEFAULT_MINIMUM_FEEDRATE);
         set_minimum_travel_feedrate(DEFAULT_MINIMUM_TRAVEL_FEEDRATE);
         set_extrude_factor_override_percentage(DEFAULT_EXTRUDE_FACTOR_OVERRIDE_PERCENTAGE);
-        
+
         for (unsigned char a = X; a < Num_Axis; ++a)
         {
             EAxis axis = (EAxis)a;
@@ -808,6 +808,8 @@ namespace Slic3r {
             m_time += block_time;
             if (block.g1_line_id >= 0)
 	            m_g1_times.emplace_back(block.g1_line_id, m_time);
+            if (block.no_delta_Z)
+                _add_block_to_layer_time(block.z, block_time);
 
 #if ENABLE_MOVE_STATS
             MovesStatsMap::iterator it = _moves_stats.find(block.move_type);
@@ -1017,6 +1019,9 @@ namespace Slic3r {
             delta_pos[a] = new_pos[a] - get_axis_position((EAxis)a);
             max_abs_delta = std::max(max_abs_delta, std::abs(delta_pos[a]));
         }
+        block.z = new_pos[Z];
+        // test if we can really attribute a layer to the block
+        block.no_delta_Z == delta_pos[Z] == 0;
 
         // is it a move ?
         if (max_abs_delta == 0.0f)
@@ -1039,7 +1044,7 @@ namespace Slic3r {
             if (m_curr.abs_axis_feedrate[a] > 0.0f)
                 min_feedrate_factor = std::min(min_feedrate_factor, get_axis_max_feedrate((EAxis)a) / m_curr.abs_axis_feedrate[a]);
         }
-        
+
         block.feedrate.cruise = min_feedrate_factor * m_curr.feedrate;
 
         if (min_feedrate_factor < 1.0f)
@@ -1650,6 +1655,41 @@ namespace Slic3r {
     {
         return std::to_string((int)(::roundf(time_in_secs / 60.0f)));
     }
+
+    void GCodeTimeEstimator::reset_layers()
+    {
+        m_layers.clear();
+    }
+
+    void GCodeTimeEstimator::_add_block_to_layer_time(float z, float time)
+    {
+        int j = 0;
+        bool layer_found = false;
+        while (j < (int)m_layers.size())
+        {
+            if (m_layers[j].z == z) {
+                m_layers[j].time += time;
+                layer_found = true;
+            }
+            j++;
+        }
+        if (!layer_found) {
+            m_layers.push_back({ z, time });
+        }
+    }
+
+    float GCodeTimeEstimator::get_layer_time(float z)
+    {
+        int j = 0;
+        while (j < (int)m_layers.size())
+        {
+            if (z == m_layers[j].z) {
+                return m_layers[j].time;
+            }
+            j++;
+        }
+        return 0;
+     }
 
 #if ENABLE_MOVE_STATS
     void GCodeTimeEstimator::_log_moves_stats() const

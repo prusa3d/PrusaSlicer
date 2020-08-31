@@ -772,18 +772,19 @@ void GCode::do_export(Print* print, const char* path, GCodePreviewData* preview_
     BOOST_LOG_TRIVIAL(debug) << "Time estimator post processing" << log_memory_info();
     GCodeTimeEstimator::post_process(path_tmp, 60.0f, remaining_times_enabled ? &normal_data : nullptr, (remaining_times_enabled && m_silent_time_estimator_enabled) ? &silent_data : nullptr);
 
+    // starts analyzer calculations
+    if (m_enable_analyzer) {
+        BOOST_LOG_TRIVIAL(debug) << "Preparing G-code preview data" << log_memory_info();
+        GCodeTimeEstimator* time_estimator = &m_normal_time_estimator;
+        m_analyzer.calc_gcode_preview_data(*preview_data, *time_estimator, [print]() { print->throw_if_canceled(); });
+        m_analyzer.reset();
+    }
+
     if (remaining_times_enabled)
     {
         m_normal_time_estimator.reset();
         if (m_silent_time_estimator_enabled)
             m_silent_time_estimator.reset();
-    }
-
-    // starts analyzer calculations
-    if (m_enable_analyzer) {
-        BOOST_LOG_TRIVIAL(debug) << "Preparing G-code preview data" << log_memory_info();
-        m_analyzer.calc_gcode_preview_data(*preview_data, [print]() { print->throw_if_canceled(); });
-        m_analyzer.reset();
     }
 
     if (rename_file(path_tmp, path))
