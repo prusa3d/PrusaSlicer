@@ -36,6 +36,11 @@ std::string PresetHints::cooling_description(const Preset &preset)
                                           "fan will run at a proportionally decreasing speed between %2%%% and %3%%%."))) 
                                           % fan_below_layer_time % max_fan_speed % min_fan_speed).str();
         }
+        else if (max_fan_speed == min_fan_speed) {
+            out += "\n" + (boost::format(_utf8(L("If estimated layer time is greater, but still below ~%1%s, "
+                                          "fan will run at %2%%%.")))
+                                          % fan_below_layer_time % max_fan_speed).str();
+        }
         out += "\n" + _utf8(L("During the other layers, fan")) + " ";
     } else {
         out = _utf8(L("Fan")) + " ";
