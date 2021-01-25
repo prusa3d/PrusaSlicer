@@ -246,7 +246,6 @@ void PresetUpdater::priv::sync_version() const
 	BOOST_LOG_TRIVIAL(info) << format("Downloading %1% online version from: `%2%`", SLIC3R_APP_NAME, version_check_url);
 
 	Http::get(version_check_url)
-		.size_limit(SLIC3R_VERSION_BODY_MAX)
 		.on_progress([this](Http::Progress, bool &cancel) {
 			cancel = this->cancel;
 		})
@@ -258,21 +257,38 @@ void PresetUpdater::priv::sync_version() const
 				error);
 		})
 		.on_complete([&](std::string body, unsigned /* http_status */) {
-			boost::trim(body);
-			const auto nl_pos = body.find_first_of("\n\r");
-			if (nl_pos != std::string::npos) {
-				body.resize(nl_pos);
+			boost::property_tree::ptree root;
+			std::stringstream json_stream(body);
+			boost::property_tree::read_json(json_stream, root);
+			bool i_am_pre = false;
+			std::string best_pre = "1";
+			std::string best_release = "1";
+			std::string best_pre_url;
+			std::string best_release_url;
+			for (auto json_version : root) {
+				std::string tag = json_version.second.get<std::string>("tag_name");
+				if (SLIC3R_VERSION_FULL == tag)
+					i_am_pre = json_version.second.get<bool>("prerelease");
+				if (json_version.second.get<bool>("prerelease")) {
+					if (best_pre < tag) {
+						best_pre = tag;
+						best_pre_url = json_version.second.get<std::string>("html_url");
+					}
+				} else {
+					if (best_release < tag) {
+						best_release = tag;
+						best_release_url = json_version.second.get<std::string>("html_url");
+					}
+				}
 			}
 
-			if (! Semver::parse(body)) {
-				BOOST_LOG_TRIVIAL(warning) << format("Received invalid contents from `%1%`: Not a correct semver: `%2%`", SLIC3R_APP_NAME, body);
+			if ((i_am_pre ? best_pre : best_release) <= SLIC3R_VERSION_FULL)
 				return;
-			}
 
-			BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME, body);
+			BOOST_LOG_TRIVIAL(info) << format("Got %1% online version: `%2%`. Sending to GUI thread...", SLIC3R_APP_NAME, i_am_pre? best_pre:best_release);
 
 			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
-			evt->SetString(GUI::from_u8(body));
+			evt->SetString(i_am_pre ? best_pre : best_release);
 			GUI::wxGetApp().QueueEvent(evt);
 		})
 		.perform_sync();
@@ -308,13 +324,13 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors)
 		const auto idx_url = vendor.config_update_url + "/" + INDEX_FILENAME;
 		const std::string idx_path = (cache_path / (vendor.id + ".idx")).string();
 		const std::string idx_path_temp = idx_path + "-update";
-		//check if idx_url is leading to our site 
-		if (! boost::starts_with(idx_url, "http://files.prusa3d.com/wp-content/uploads/repository/") &&
-		    ! boost::starts_with(idx_url, "https://files.prusa3d.com/wp-content/uploads/repository/"))
-		{
-			BOOST_LOG_TRIVIAL(warning) << "unsafe url path for vendor \"" << vendor.name << "\" rejected: " << idx_url;
-			continue;
-		}
+		//check if idx_url is leading to a safe site 
+		//if (! boost::starts_with(idx_url, "http://files.my_company.com/wp-content/uploads/repository/")
+		//	&& ! boost::starts_with(idx_url, "https://files.my_company.com/wp-content/uploads/repository/"))
+		//{
+		//	BOOST_LOG_TRIVIAL(warning) << "unsafe url path for vendor \"" << vendor.name << "\" rejected: " << idx_url;
+		//	continue;
+		//}
 		if (!get_file(idx_url, idx_path_temp)) { continue; }
 		if (cancel) { return; }
 
@@ -416,7 +432,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 		}
 
 		// Perform a basic load and check the version of the installed preset bundle.
-		auto vp = VendorProfile::from_ini(bundle_path, false);
+		VendorProfile vp = VendorProfile::from_ini(bundle_path, false);
 
 		// Getting a recommended version from the latest index, wich may have been downloaded
 		// from the internet, or installed / updated from the installation resources.
@@ -457,7 +473,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 		}
 
 		if (recommended->config_version < vp.config_version) {
-			BOOST_LOG_TRIVIAL(warning) << format("Recommended config version for the currently running PrusaSlicer is older than the currently installed config for vendor %1%. This should not happen.", idx.vendor());
+			BOOST_LOG_TRIVIAL(warning) << format("Recommended config version for the currently running SuperSlicer is older than the currently installed config for vendor %1%. This should not happen.", idx.vendor());
 			continue;
 		}
 
@@ -528,7 +544,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 					found = true;
 				} else {
 					BOOST_LOG_TRIVIAL(warning) << format("The recommended config version for vendor `%1%` in resources does not match the recommended\n"
-			                                             " config version for this version of PrusaSlicer. Corrupted installation?", idx.vendor());
+			                                             " config version for this version of SuperSlicer. Corrupted installation?", idx.vendor());
 				}
 			}
 		}
@@ -712,7 +728,7 @@ void PresetUpdater::slic3r_update_notify()
 
 PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3r_version, bool no_notification) const
 {
- 	if (! p->enabled_config_update) { return R_NOOP; }
+	if (! p->enabled_config_update) { return R_NOOP; }
 
 	auto updates = p->get_config_updates(old_slic3r_version);
 	if (updates.incompats.size() > 0) {
@@ -802,30 +818,30 @@ PresetUpdater::UpdateResult PresetUpdater::config_update(const Semver& old_slic3
 		if (no_notification) {
 			BOOST_LOG_TRIVIAL(info) << format("Update of %1% bundles available. Asking for confirmation ...", p->waiting_updates.updates.size());
 
-			std::vector<GUI::MsgUpdateConfig::Update> updates_msg;
+		std::vector<GUI::MsgUpdateConfig::Update> updates_msg;
 			for (const auto& update : updates.updates) {
-				std::string changelog_url = update.version.config_version.prerelease() == nullptr ? update.changelog_url : std::string();
-				updates_msg.emplace_back(update.vendor, update.version.config_version, update.version.comment, std::move(changelog_url));
-			}
+			std::string changelog_url = update.version.config_version.prerelease() == nullptr ? update.changelog_url : std::string();
+			updates_msg.emplace_back(update.vendor, update.version.config_version, update.version.comment, std::move(changelog_url));
+		}
 
-			GUI::MsgUpdateConfig dlg(updates_msg);
+		GUI::MsgUpdateConfig dlg(updates_msg);
 
-			const auto res = dlg.ShowModal();
-			if (res == wxID_OK) {
-				BOOST_LOG_TRIVIAL(debug) << "User agreed to perform the update";
-				p->perform_updates(std::move(updates));
+		const auto res = dlg.ShowModal();
+		if (res == wxID_OK) {
+			BOOST_LOG_TRIVIAL(debug) << "User agreed to perform the update";
+			p->perform_updates(std::move(updates));
 
-				// Reload global configuration
+			// Reload global configuration
 				auto* app_config = GUI::wxGetApp().app_config;
-				GUI::wxGetApp().preset_bundle->load_presets(*app_config);
-				GUI::wxGetApp().load_current_presets();
-				return R_UPDATE_INSTALLED;
+			GUI::wxGetApp().preset_bundle->load_presets(*app_config);
+			GUI::wxGetApp().load_current_presets();
+			return R_UPDATE_INSTALLED;
 			}
 			else {
-				BOOST_LOG_TRIVIAL(info) << "User refused the update";
-				return R_UPDATE_REJECT;
-			}
-		} else {
+			BOOST_LOG_TRIVIAL(info) << "User refused the update";
+			return R_UPDATE_REJECT;
+		}
+	} else {
 			p->set_waiting_updates(updates);
 			GUI::wxGetApp().plater()->get_notification_manager()->push_notification(GUI::NotificationType::PresetUpdateAvailable);
 		}

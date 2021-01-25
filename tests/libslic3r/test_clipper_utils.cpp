@@ -10,6 +10,29 @@
 
 using namespace Slic3r;
 
+SCENARIO("test clipper limits", "[ClipperUtils]") {
+    GIVEN("100mm square") {
+        WHEN("offset") {
+            Slic3r::Polygon   square{ Point::new_scale(200, 100), Point::new_scale(200, 200), Point::new_scale(100, 200), Point::new_scale(100, 100) };
+            THEN("offset 100") {
+                REQUIRE(offset(square, scale_(100)).size() == 1);
+            }
+            THEN("offset 1000") {
+                REQUIRE(offset(square, scale_(1000)).size() == 1);
+            }
+            THEN("offset 10000") {
+                REQUIRE(offset(square, scale_(10000)).size() == 1);
+            }
+            THEN("offset 100000") {
+                REQUIRE(offset(square, scale_(100000)).size() == 1);
+            }
+            THEN("offset 1000000") {
+                REQUIRE(offset(square, scale_(1000000)).size() == 1);
+            }
+        }
+    }
+}
+
 SCENARIO("Various Clipper operations - xs/t/11_clipper.t", "[ClipperUtils]") {
 	// CCW oriented contour
 	Slic3r::Polygon   square{ { 200, 100 }, {200, 200}, {100, 200}, {100, 100} };
@@ -245,8 +268,8 @@ size_t count_polys(const ExPolygons& expolys)
 TEST_CASE("Traversing Clipper PolyTree", "[ClipperUtils]") {
     // Create a polygon representing unit box
     Polygon unitbox;
-    const auto UNIT = coord_t(1. / SCALING_FACTOR);
-    unitbox.points = { Vec2crd{0, 0}, Vec2crd{UNIT, 0}, Vec2crd{UNIT, UNIT}, Vec2crd{0, UNIT}};
+    const coord_t UNIT = coord_t(1. / SCALING_FACTOR);
+    unitbox.points = Points{Point{0, 0}, Point{UNIT, coord_t(0)}, Point{UNIT, UNIT}, Point{coord_t(0), UNIT}};
     
     Polygon box_frame = unitbox;
     box_frame.scale(20, 10);

@@ -423,7 +423,7 @@ void ObjectManipulation::Show(const bool show)
 		// Show all lines of the panel. Some of these lines will be hidden in the lines below.
 		m_og->Show(show);
 
-        if (show && wxGetApp().get_mode() != comSimple) {
+        if (show && wxGetApp().get_mode() != comSimple && wxGetApp().app_config->get("objects_always_expert") != "1") {
             // Show the label and the name of the STL in simple mode only.
             // Label "Name: "
             m_main_grid_sizer->Show(size_t(0), false);
@@ -434,7 +434,8 @@ void ObjectManipulation::Show(const bool show)
 
 	if (show) {
 		// Show the "World Coordinates" / "Local Coordintes" Combo in Advanced / Expert mode only.
-		bool show_world_local_combo = wxGetApp().plater()->canvas3D()->get_selection().is_single_full_instance() && wxGetApp().get_mode() != comSimple;
+		bool show_world_local_combo = wxGetApp().plater()->canvas3D()->get_selection().is_single_full_instance() 
+            && (wxGetApp().get_mode() != comSimple || wxGetApp().app_config->get("objects_always_expert") == "1");
 		m_word_local_combo->Show(show_world_local_combo);
         m_empty_str->Show(!show_world_local_combo);
 	}
@@ -487,7 +488,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
     m_new_rotate_label_string = L("Rotation");
     m_new_scale_label_string  = L("Scale factors");
 
-    if (wxGetApp().get_mode() == comSimple)
+    if (wxGetApp().get_mode() == comSimple && wxGetApp().app_config->get("objects_always_expert") != "1")
         m_world_coordinates = true;
 
     ObjectList* obj_list = wxGetApp().obj_list();

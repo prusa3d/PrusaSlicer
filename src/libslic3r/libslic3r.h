@@ -26,12 +26,12 @@
 #include "Technologies.hpp"
 #include "Semver.hpp"
 
-#if 1
+#if 0
 // Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
 using coord_t = int32_t;
 #else
 //FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
-typedef int64_t coord_t;
+using coord_t = int64_t;
 #endif
 
 using coordf_t = double;
@@ -47,21 +47,32 @@ static constexpr double EPSILON = 1e-4;
 // int32_t fits an interval of (-2147.48mm, +2147.48mm)
 // with int64_t we don't have to worry anymore about the size of the int.
 static constexpr double SCALING_FACTOR = 0.000001;
+#ifdef __linux__
+static constexpr double UNSCALING_FACTOR = 1000000;
+#else
+static constexpr double UNSCALING_FACTOR = 1 / SCALING_FACTOR;
+#endif
 // RESOLUTION, SCALED_RESOLUTION: Used as an error threshold for a Douglas-Peucker polyline simplification algorithm.
-static constexpr double RESOLUTION = 0.0125;
-#define                 SCALED_RESOLUTION (RESOLUTION / SCALING_FACTOR)
-static constexpr double PI = 3.141592653589793238;
+//#define RESOLUTION 0.0125
+//#define SCALED_RESOLUTION 12500
+//#define SCALED_RESOLUTION (RESOLUTION / SCALING_FACTOR)
+static constexpr coordf_t RESOLUTION = 0.0125;
+#ifdef __linux__
+static constexpr coord_t SCALED_RESOLUTION = 12500;
+#else
+static constexpr coord_t SCALED_RESOLUTION = 0.0125 * UNSCALING_FACTOR;
+#endif
+//for creating circles (for brim_ear)
+#define POLY_SIDES 24
+#define PI 3.141592653589793238
 // When extruding a closed loop, the loop is interrupted and shortened a bit to reduce the seam.
 static constexpr double LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER = 0.15;
 // Maximum perimeter length for the loop to apply the small perimeter speed. 
-#define                 SMALL_PERIMETER_LENGTH  ((6.5 / SCALING_FACTOR) * 2 * PI)
+//#define                 SMALL_PERIMETER_LENGTH  ((6.5 / SCALING_FACTOR) * 2 * PI)
 static constexpr double INSET_OVERLAP_TOLERANCE = 0.4;
-// 3mm ring around the top / bottom / bridging areas.
-//FIXME This is quite a lot.
-static constexpr double EXTERNAL_INFILL_MARGIN = 3.;
 //FIXME Better to use an inline function with an explicit return type.
 //inline coord_t scale_(coordf_t v) { return coord_t(floor(v / SCALING_FACTOR + 0.5f)); }
-#define scale_(val) ((val) / SCALING_FACTOR)
+#define scale_(val) (coord_t)((val) / SCALING_FACTOR)
 
 #define SCALED_EPSILON scale_(EPSILON)
 
@@ -91,6 +102,12 @@ extern Semver SEMVER;
 template<typename T, typename Q>
 inline T unscale(Q v) { return T(v) * T(SCALING_FACTOR); }
 
+inline double unscaled(double v) { return v * SCALING_FACTOR; }
+inline coordf_t unscale_(coord_t v) { return v * SCALING_FACTOR; }
+inline coord_t scale_t(coordf_t v) { return (coord_t)(v * UNSCALING_FACTOR); }
+inline double scale_d(coordf_t v) { return (v * UNSCALING_FACTOR); }
+inline double scale_d(coord_t v) { return (double(v) * UNSCALING_FACTOR); }
+
 enum Axis { 
 	X=0,
 	Y,
@@ -102,7 +119,6 @@ enum Axis {
 	UNKNOWN_AXIS = NUM_AXES,
 	NUM_AXES_WITH_UNKNOWN,
 };
-
 template <typename T>
 inline void append(std::vector<T>& dest, const std::vector<T>& src)
 {

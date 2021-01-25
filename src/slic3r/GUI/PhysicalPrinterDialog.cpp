@@ -244,6 +244,7 @@ PhysicalPrinterDialog::~PhysicalPrinterDialog()
     }
 }
 
+/* TODO: test for validity vs currnt method
 void PhysicalPrinterDialog::update_printers()
 {
     wxBusyCursor wait;
@@ -262,6 +263,40 @@ void PhysicalPrinterDialog::update_printers()
     Choice *choice = dynamic_cast<Choice*>(rs);
     choice->set_values(printers);
     printers.empty() ? rs->disable() : rs->enable();
+}*/
+
+void PhysicalPrinterDialog::update_printers()
+{
+    std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
+
+    wxArrayString printers;
+    Field* rs = m_optgroup->get_field("printhost_port");
+    if (!host->get_printers(printers)) {
+        std::vector<std::string> slugs;
+
+        Choice* choice = dynamic_cast<Choice*>(rs);
+        choice->set_values(slugs);
+
+        rs->disable();
+    } else {
+        std::vector<std::string> slugs;
+        for (int i = 0; i < printers.size(); i++) {
+            slugs.push_back(printers[i].ToStdString());
+        }
+
+        Choice* choice = dynamic_cast<Choice*>(rs);
+        choice->set_values(slugs);
+        boost::any val = choice->get_value();
+        boost::any any_string_type = std::string("");
+        auto value_idx = std::find(slugs.begin(), slugs.end(), m_config->opt<ConfigOptionString>("printhost_port")->value);
+        if ((val.empty() || (any_string_type.type() == val.type() && boost::any_cast<std::string>(val) == "")) && !slugs.empty() && value_idx == slugs.end()) {
+            change_opt_value(*m_config, "printhost_port", slugs[0]);
+            choice->set_value(slugs[0],false);
+        } else if(value_idx != slugs.end() ){
+            choice->set_value(m_config->option<ConfigOptionString>("printhost_port")->value, false);
+        }
+        rs->enable();
+    }
 }
 
 void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgroup)
@@ -478,15 +513,21 @@ void PhysicalPrinterDialog::update()
             m_optgroup->show_field(opt_key, auth_type == AuthorizationType::atUserPassword);
     }
 
-    m_optgroup->show_field("printhost_port", supports_multiple_printers);
-    m_printhost_port_browse_btn->Show(supports_multiple_printers);
+    {
+        std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
+        if (m_printhost_test_btn)
+            m_printhost_test_btn->Enable(host->can_test());
 
-    update_printhost_buttons();
+        if (m_printhost_browse_btn)
+            m_printhost_browse_btn->Enable(host->has_auto_discovery());
 
-    this->SetSize(this->GetBestSize());
+        m_printhost_port_browse_btn->Enable(supports_multiple_printers);
+
+        m_optgroup->show_field("printhost_port", supports_multiple_printers);
+    }
+
     this->Layout();
 }
-
 
 wxString PhysicalPrinterDialog::get_printer_name()
 {

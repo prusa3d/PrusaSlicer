@@ -113,6 +113,7 @@ bool BackgroundSlicingProcess::select_technology(PrinterTechnology tech)
 		switch (tech) {
 		case ptFFF: m_print = m_fff_print; break;
 		case ptSLA: m_print = m_sla_print; break;
+        case ptSLS: m_print = m_fff_print; break;
         default: assert(false); break;
 		}
 		changed = true;
@@ -216,7 +217,7 @@ void BackgroundSlicingProcess::process_sla()
         if (! m_export_path.empty()) {
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
 
-            const std::string export_path = m_sla_print->print_statistics().finalize_output_path(m_export_path);
+        	const std::string export_path = m_sla_print->print_statistics().finalize_output_path(m_export_path);
 
             Zipper zipper(export_path);
             m_sla_archive.export_print(zipper, *m_sla_print);
@@ -224,8 +225,15 @@ void BackgroundSlicingProcess::process_sla()
             if (m_thumbnail_cb != nullptr)
             {
                 ThumbnailsList thumbnails;
-                m_thumbnail_cb(thumbnails, current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true);
-//                m_thumbnail_cb(thumbnails, current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, false, true, true); // renders also supports and pad
+                std::vector<Vec2d> good_sizes;
+                for (const Vec2d &size : current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values)
+                    if (size.x() > 0 && size.y() > 0)
+                        good_sizes.push_back(size);
+                m_thumbnail_cb(thumbnails, good_sizes,
+                    true, // printable_only
+                    !m_sla_print->printer_config().thumbnails_with_support.value, // parts_only
+                    m_sla_print->printer_config().thumbnails_with_bed.value, // show_bed
+                    true); // transparent_background
                 for (const ThumbnailData& data : thumbnails)
                 {
                     if (data.is_valid())
@@ -259,7 +267,7 @@ void BackgroundSlicingProcess::thread_proc()
 	lck.unlock();
 	m_condition.notify_one();
 	for (;;) {
-		assert(m_state == STATE_IDLE || m_state == STATE_CANCELED || m_state == STATE_FINISHED);
+		//assert(m_state == STATE_IDLE || m_state == STATE_CANCELED || m_state == STATE_FINISHED);
 		// Wait until a new task is ready to be executed, or this thread should be finished.
 		lck.lock();
 		m_condition.wait(lck, [this](){ return m_state == STATE_STARTED || m_state == STATE_EXIT; });
@@ -275,6 +283,7 @@ void BackgroundSlicingProcess::thread_proc()
 			switch(m_print->technology()) {
 				case ptFFF: this->process_fff(); break;
                 case ptSLA: this->process_sla(); break;
+                case ptSLS: this->process_fff(); break;
 				default: m_print->process(); break;
 			}
 		} catch (CanceledException & /* ex */) {
@@ -427,7 +436,7 @@ bool BackgroundSlicingProcess::empty() const
 	return m_print->empty();
 }
 
-std::string BackgroundSlicingProcess::validate()
+std::pair<PrintBase::PrintValidationError, std::string> BackgroundSlicingProcess::validate()
 {
 	assert(m_print != nullptr);
 	return m_print->validate();
@@ -539,27 +548,34 @@ void BackgroundSlicingProcess::prepare_upload()
 			throw Slic3r::RuntimeError(_utf8(L("Copying of the temporary G-code to the output G-code failed")));
 		}
 		run_post_process_scripts(source_path.string(), m_fff_print->full_print_config());
-        m_upload_job.upload_data.upload_path = m_fff_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
-    } else {
-        m_upload_job.upload_data.upload_path = m_sla_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
+		m_upload_job.upload_data.upload_path = m_fff_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
+    } else if (m_print == m_sla_print) {
+		m_upload_job.upload_data.upload_path = m_sla_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
         
         Zipper zipper{source_path.string()};
         m_sla_archive.export_print(zipper, *m_sla_print, m_upload_job.upload_data.upload_path.string());
         if (m_thumbnail_cb != nullptr)
         {
             ThumbnailsList thumbnails;
-            m_thumbnail_cb(thumbnails, current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true);
-//            m_thumbnail_cb(thumbnails, current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, false, true, true); // renders also supports and pad
+            std::vector<Vec2d> good_sizes;
+            for (const Vec2d &size : current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values)
+                if (size.x() > 0 && size.y() > 0)
+                    good_sizes.push_back(size);
+            m_thumbnail_cb(thumbnails, good_sizes, 
+                true, // printable_only
+                !m_sla_print->printer_config().thumbnails_with_support.value, // parts_only
+                m_sla_print->printer_config().thumbnails_with_bed.value, // show_bed
+                true); // transparent_background
             for (const ThumbnailData& data : thumbnails)
             {
                 if (data.is_valid())
                     write_thumbnail(zipper, data);
-            }
+	}
         }
         zipper.finalize();
     }
 
-    m_print->set_status(100, (boost::format(_utf8(L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"))) % m_upload_job.printhost->get_host()).str());
+	m_print->set_status(100, (boost::format(_utf8(L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"))) % m_upload_job.printhost->get_host()).str());
 
 	m_upload_job.upload_data.source_path = std::move(source_path);
 

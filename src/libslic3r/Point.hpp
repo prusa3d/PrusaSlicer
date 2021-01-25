@@ -21,14 +21,14 @@ typedef Point Vector;
 
 // Eigen types, to replace the Slic3r's own types in the future.
 // Vector types with a fixed point coordinate base type.
-typedef Eigen::Matrix<coord_t,  2, 1, Eigen::DontAlign> Vec2crd;
-typedef Eigen::Matrix<coord_t,  3, 1, Eigen::DontAlign> Vec3crd;
-typedef Eigen::Matrix<int,      2, 1, Eigen::DontAlign> Vec2i;
-typedef Eigen::Matrix<int,      3, 1, Eigen::DontAlign> Vec3i;
+typedef Eigen::Matrix<int32_t, 2, 1, Eigen::DontAlign> Vec2i32;
+typedef Eigen::Matrix<int32_t, 3, 1, Eigen::DontAlign> Vec3i32;
 typedef Eigen::Matrix<int32_t,  2, 1, Eigen::DontAlign> Vec2i32;
-typedef Eigen::Matrix<int64_t,  2, 1, Eigen::DontAlign> Vec2i64;
+typedef Eigen::Matrix<int64_t, 2, 1, Eigen::DontAlign> Vec2i64;
 typedef Eigen::Matrix<int32_t,  3, 1, Eigen::DontAlign> Vec3i32;
-typedef Eigen::Matrix<int64_t,  3, 1, Eigen::DontAlign> Vec3i64;
+typedef Eigen::Matrix<int64_t, 3, 1, Eigen::DontAlign> Vec3i64;
+typedef Vec2i64 Vec2crd;
+typedef Vec3i64 Vec3crd;
 
 // Vector types with a double coordinate base type.
 typedef Eigen::Matrix<float,    2, 1, Eigen::DontAlign> Vec2f;
@@ -62,6 +62,8 @@ inline int64_t cross2(const Vec2i64 &v1, const Vec2i64 &v2) { return v1(0) * v2(
 inline float   cross2(const Vec2f   &v1, const Vec2f   &v2) { return v1(0) * v2(1) - v1(1) * v2(0); }
 inline double  cross2(const Vec2d   &v1, const Vec2d   &v2) { return v1(0) * v2(1) - v1(1) * v2(0); }
 
+inline coordf_t dot(const Vec2d &v1, const Vec2d &v2) { return v1.x() * v2.x() + v1.y() * v2.y(); }
+inline coordf_t dot(const Vec2d &v) { return v.x() * v.x() + v.y() * v.y(); }
 template<typename T, int Options>
 inline Eigen::Matrix<T, 2, 1, Eigen::DontAlign> perp(const Eigen::MatrixBase<Eigen::Matrix<T, 2, 1, Options>> &v) { return Eigen::Matrix<T, 2, 1, Eigen::DontAlign>(- v.y(), v.x()); }
 
@@ -98,12 +100,13 @@ public:
     Point(int64_t x, int64_t y) : Vec2crd(coord_t(x), coord_t(y)) {}
     Point(double x, double y) : Vec2crd(coord_t(lrint(x)), coord_t(lrint(y))) {}
     Point(const Point &rhs) { *this = rhs; }
-	explicit Point(const Vec2d& rhs) : Vec2crd(coord_t(lrint(rhs.x())), coord_t(lrint(rhs.y()))) {}
-	// This constructor allows you to construct Point from Eigen expressions
+    explicit Point(const Vec2d& rhs) : Vec2crd(coord_t(lrint(rhs.x())), coord_t(lrint(rhs.y()))) {}
+    // This constructor allows you to construct Point from Eigen expressions
     template<typename OtherDerived>
     Point(const Eigen::MatrixBase<OtherDerived> &other) : Vec2crd(other) {}
     static Point new_scale(coordf_t x, coordf_t y) { return Point(coord_t(scale_(x)), coord_t(scale_(y))); }
-    static Point new_scale(const Vec2d &v) { return Point(coord_t(scale_(v.x())), coord_t(scale_(v.y()))); }
+    static Point new_scale(const Point &p) { return Point(coord_t(scale_(p.x())), coord_t(scale_(p.y()))); }
+    static Point new_scale(const Vec2d &p) { return Point(scale_(p.x()), scale_(p.y())); }
 
     // This method allows you to assign Eigen expressions to MyVectorType
     template<typename OtherDerived>
@@ -132,15 +135,28 @@ public:
     Point  rotated(double angle) const { Point res(*this); res.rotate(angle); return res; }
     Point  rotated(double cos_a, double sin_a) const { Point res(*this); res.rotate(cos_a, sin_a); return res; }
     Point  rotated(double angle, const Point &center) const { Point res(*this); res.rotate(angle, center); return res; }
-    int    nearest_point_index(const Points &points) const;
-    int    nearest_point_index(const PointConstPtrs &points) const;
-    int    nearest_point_index(const PointPtrs &points) const;
+    int32_t    nearest_point_index(const Points &points) const;
+    int32_t    nearest_point_index(const PointConstPtrs &points) const;
+    int32_t    nearest_point_index(const PointPtrs &points) const;
     bool   nearest_point(const Points &points, Point* point) const;
     double ccw(const Point &p1, const Point &p2) const;
     double ccw(const Line &line) const;
     double ccw_angle(const Point &p1, const Point &p2) const;
     Point  projection_onto(const MultiPoint &poly) const;
     Point  projection_onto(const Line &line) const;
+    Point  interpolate(const double percent, const Point &p) const;
+
+    double distance_to(const Point &point) const { return (point - *this).cast<double>().norm(); }
+    double distance_to_square(const Point &point) const {
+        double dx = double(point.x() - this->x());
+        double dy = double(point.y() - this->y());
+        return dx*dx + dy*dy;
+    }
+    double distance_to(const Line &line) const;
+    bool coincides_with(const Point &point) const { return this->x() == point.x() && this->y() == point.y(); }
+    bool coincides_with_epsilon(const Point &point) const {
+        return std::abs(this->x() - point.x()) < SCALED_EPSILON && std::abs(this->y() - point.y()) < SCALED_EPSILON;
+    }
 };
 
 inline bool is_approx(const Point &p1, const Point &p2, coord_t epsilon = coord_t(SCALED_EPSILON))
@@ -232,7 +248,7 @@ public:
 		}
 		if (m_grid_resolution > 0)
 			++ m_grid_log2;
-		m_grid_resolution = 1 << m_grid_log2;
+		m_grid_resolution = ((coord_t)1) << m_grid_log2;
 		assert(m_grid_resolution >= gridres);
 		assert(gridres > m_grid_resolution / 2);
     }
@@ -438,10 +454,10 @@ namespace boost { namespace polygon {
 namespace cereal {
 //	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2crd &v) { archive(v.x(), v.y()); }
 //	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3crd &v) { archive(v.x(), v.y(), v.z()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i   &v) { archive(v.x(), v.y()); }
-	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i   &v) { archive(v.x(), v.y(), v.z()); }
-//	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i64 &v) { archive(v.x(), v.y()); }
-//	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i64 &v) { archive(v.x(), v.y(), v.z()); }
+	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i32   &v) { archive(v.x(), v.y()); }
+	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i32  &v) { archive(v.x(), v.y(), v.z()); }
+	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2i64 &v) { archive(v.x(), v.y()); }
+	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3i64 &v) { archive(v.x(), v.y(), v.z()); }
 	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2f   &v) { archive(v.x(), v.y()); }
 	template<class Archive> void serialize(Archive& archive, Slic3r::Vec3f   &v) { archive(v.x(), v.y(), v.z()); }
 	template<class Archive> void serialize(Archive& archive, Slic3r::Vec2d   &v) { archive(v.x(), v.y()); }

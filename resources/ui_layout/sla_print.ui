@@ -1,0 +1,63 @@
+
+page:Layers and perimeters:layers
+group:Layers
+	setting:layer_height
+	setting:faded_layers
+
+page:Supports:support
+group:Supports
+	setting:supports_enable
+group:Support head
+	setting:support_head_front_diameter
+	setting:support_head_penetration
+	setting:support_head_width
+group:Support pillar
+	setting:support_pillar_diameter
+	setting:support_pillar_connection_mode
+	setting:support_buildplate_only
+# TODO: This parameter is not used at the moment.
+# setting:support_pillar_widening_factor
+	setting:support_base_diameter
+	setting:support_base_height
+	setting:support_base_safety_distance
+# Mirrored parameter from Pad page for toggling elevation on the same page
+	setting:pad_around_object
+	setting:support_object_elevation
+group:Connection of the support sticks and junctions
+	setting:support_critical_angle
+	setting:support_max_bridge_length
+	setting:support_max_pillar_link_distance
+group:Automatic generation
+	setting:support_points_density_relative
+	setting:support_points_minimal_distance
+
+page:Pad:pad
+group:Pad
+	setting:pad_enable
+	setting:pad_wall_thickness
+	setting:pad_wall_height
+	setting:pad_brim_size
+	setting:pad_max_merge_distance
+# TODO: Disabling this parameter for the beta release
+# setting:pad_edge_radius
+	setting:pad_wall_slope
+	setting:pad_around_object
+	setting:pad_around_object_everywhere
+	setting:pad_object_gap
+	setting:pad_object_connector_stride
+	setting:pad_object_connector_width
+	setting:pad_object_connector_penetration
+
+page:Advanced:wrench
+group:Slicing
+	setting:slice_closing_radius
+
+page:Output options:output+page_white
+group:Output file
+	setting:full_width:output_filename_format
+
+page:Dependencies:wrench
+group:Profile dependencies
+	setting:color:compatible_printers
+	setting:full_width:compatible_printers_condition
+	parent_preset_description

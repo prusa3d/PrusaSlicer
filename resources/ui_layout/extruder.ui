@@ -1,0 +1,39 @@
+
+page:idx:Extruder:funnel
+group:Name and Size
+	setting:idx:tool_name
+	setting:idx:nozzle_diameter
+	update_nozzle_diameter
+group:Layer height limits
+	setting:idx:min_layer_height
+	setting:idx:max_layer_height
+group:Offsets (for multi-extruder printers)
+	setting:idx:extruder_offset
+	setting:idx:extruder_temperature_offset
+	setting:idx:extruder_fan_offset
+group:Retraction
+	setting:idx:retract_length
+	setting:idx:retract_lift
+	line:Only lift Z
+		setting:idx:retract_lift_above
+		setting:idx:retract_lift_below
+	end_line
+	line:Lift z enforcement
+		setting:idx:retract_lift_first_layer
+		setting:idx:retract_lift_top
+	end_line
+	line:Retraction Speed
+		setting:idx:retract_speed
+		setting:idx:label$Deretraction:deretract_speed
+	end_line
+	setting:idx:retract_restart_extra
+	setting:idx:retract_before_travel
+	setting:idx:retract_layer_change
+	setting:idx:wipe
+	setting:idx:retract_before_wipe
+	setting:idx:wipe_extra_perimeter
+group:Retraction when tool is disabled (advanced settings for multi-extruder setups)
+	setting:idx:retract_length_toolchange
+	setting:idx:retract_restart_extra_toolchange
+group:Preview
+	reset_to_filament_color

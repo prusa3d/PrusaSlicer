@@ -54,7 +54,15 @@
 #include "../Utils/Process.hpp"
 #include "../Utils/MacDarkMode.hpp"
 #include "slic3r/Config/Snapshot.hpp"
+#include "CalibrationBedDialog.hpp"
+#include "CalibrationBridgeDialog.hpp"
+#include "CalibrationCubeDialog.hpp"
+#include "CalibrationFlowDialog.hpp"
+#include "CalibrationOverBridgeDialog.hpp"
+#include "CalibrationTempDialog.hpp"
+#include "CalibrationRetractionDialog.hpp"
 #include "ConfigSnapshotDialog.hpp"
+#include "FreeCADDialog.hpp"
 #include "FirmwareDialog.hpp"
 #include "Preferences.hpp"
 #include "Tab.hpp"
@@ -130,7 +138,7 @@ public:
             memDC.SelectObject(bitmap);
 
             memDC.SetFont(m_action_font);
-            memDC.SetTextForeground(wxColour(237, 107, 33));
+            memDC.SetTextForeground(wxColour(0, 102, 255));
             memDC.DrawText(text, int(m_scale * 60), m_action_line_y_position);
 
             memDC.SelectObject(wxNullBitmap);
@@ -181,7 +189,7 @@ public:
         // load bitmap for logo
         BitmapCache bmp_cache;
         int logo_size = lround(width * 0.25);
-        wxBitmap logo_bmp = *bmp_cache.load_svg(wxGetApp().is_editor() ? "prusa_slicer_logo" : "add_gcode", logo_size, logo_size);
+        wxBitmap logo_bmp = *bmp_cache.load_svg(wxGetApp().is_editor() ? "super_slicer_logo" : "add_gcode", logo_size, logo_size);
 
         wxCoord margin = int(m_scale * 20);
 
@@ -240,14 +248,13 @@ private:
             title = wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME;
 
             // dynamically get the version to display
-            version = _L("Version") + " " + std::string(SLIC3R_VERSION);
+            version = _L("Version") + " " + std::string(SLIC3R_VERSION_FULL);
 
             // credits infornation
-            credits =   title + " " +
-                        _L("is based on Slic3r by Alessandro Ranellucci and the RepRap community.") + "\n\n" +
+            credits =   title + " " + _L("is based on PrusaSlicer by Prusa and Slic3r by Alessandro Ranellucci and the RepRap community.") + "\n\n" +
                         title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + "\n\n" +
-                        _L("Contributions by Vojtech Bubnik, Enrico Turri, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.") + "\n\n" +
-                        _L("Artwork model by Nora Al-Badri and Jan Nikolai Nelles");
+                        _L("Contributions by Vojtech Bubnik, Enrico Turri, Durand Remi, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.") + "\n\n" +
+                        _L("Artwork model by Durand Remi");
 
             title_font = version_font = credits_font = init_font;
         }
@@ -690,8 +697,8 @@ bool GUI_App::init_opengl()
 void GUI_App::init_app_config()
 {
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
-    SetAppName(SLIC3R_APP_KEY);
-//	SetAppName(SLIC3R_APP_KEY "-beta");
+//	SetAppName(SLIC3R_APP_KEY);
+	SetAppName(SLIC3R_APP_KEY "-alpha");
 //	SetAppDisplayName(SLIC3R_APP_NAME);
 
 	// Set the Slic3r data directory at the Slic3r XS module.
@@ -795,7 +802,7 @@ bool GUI_App::on_init_inner()
         }
     }
 
-    app_config->set("version", SLIC3R_VERSION);
+    app_config->set("version", SLIC3R_VERSION_FULL);
     app_config->save();
 
     wxInitAllImageHandlers();
@@ -815,7 +822,7 @@ bool GUI_App::on_init_inner()
         }
 
         // create splash screen with updated bmp
-        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("prusa_slicer_logo", nullptr, 400), 
+        scrn = new SplashScreen(bmp.IsOk() ? bmp : create_scaled_bitmap("super_slicer_logo", nullptr, 400), 
                                 wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos);
 #ifndef __linux__
         wxYield();
@@ -843,14 +850,14 @@ bool GUI_App::on_init_inner()
 
         preset_updater = new PresetUpdater();
         Bind(EVT_SLIC3R_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
-            app_config->set("version_online", into_u8(evt.GetString()));
-            app_config->save();
+        app_config->set("version_online", into_u8(evt.GetString()));
+        app_config->save();
             if (this->plater_ != nullptr) {
-                if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(into_u8(evt.GetString()))) {
+                //if (*Semver::parse(SLIC3R_VERSION_FULL) < *Semver::parse(into_u8(evt.GetString()))) {
                     this->plater_->get_notification_manager()->push_notification(NotificationType::NewAppAvailable);
-                }
+                //}
             }
-            });
+        });
     }
     else {
 #ifdef __WXMSW__ 
@@ -864,6 +871,7 @@ bool GUI_App::on_init_inner()
     // initialize label colors and fonts
     init_label_colours();
     init_fonts();
+    wxImage::AddHandler(new wxJPEGHandler());
 
     // If load_language() fails, the application closes.
     load_language(wxString(), true);
@@ -958,14 +966,14 @@ bool GUI_App::on_init_inner()
             once = false;
 
             if (preset_updater != nullptr) {
-                check_updates(false);
+			check_updates(false);
 
-                CallAfter([this] {
-                    config_wizard_startup();
-                    preset_updater->slic3r_update_notify();
-                    preset_updater->sync(preset_bundle);
-                    });
-            }
+			CallAfter([this] {
+				config_wizard_startup();
+				preset_updater->slic3r_update_notify();
+				preset_updater->sync(preset_bundle);
+				});
+        }
 
 #ifdef _WIN32
             //sets window property to mainframe so other instances can indentify it
@@ -1214,6 +1222,77 @@ void GUI_App::keyboard_shortcuts()
     dlg.ShowModal();
 }
 
+void GUI_App::change_calibration_dialog(const wxDialog* have_to_destroy, wxDialog* new_one){
+    std::string str;
+    if (have_to_destroy == nullptr) {
+        wxDialog* to_destroy = nullptr;
+        {
+            //hove to ensure that this release is "atomic"
+            std::unique_lock<std::mutex> lock(not_modal_dialog_mutex);
+            to_destroy = not_modal_dialog;
+            not_modal_dialog = nullptr;
+        }
+        if (to_destroy != nullptr) {
+            to_destroy->Destroy();
+        }
+    } else {
+        //hove to ensure that these two command are "atomic"
+        std::unique_lock<std::mutex> lock(not_modal_dialog_mutex);
+        if (not_modal_dialog == have_to_destroy) {
+            not_modal_dialog = nullptr;
+        }
+    }
+    if (new_one != nullptr) {
+        {
+            //hove to ensure that these command are "atomic"
+            std::unique_lock<std::mutex> lock(not_modal_dialog_mutex);
+            if (not_modal_dialog != nullptr)
+                not_modal_dialog->Destroy();
+            not_modal_dialog = new_one;
+        }
+        new_one->Show();
+    }
+    std::cout << str;
+    
+}
+
+void GUI_App::html_dialog()
+{
+    change_calibration_dialog(nullptr, new HtmlDialog(this, mainframe,"Introduction to calibrations", "/calibration/introduction.html"));
+}
+void GUI_App::bed_leveling_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationBedDialog(this, mainframe));
+}
+void GUI_App::flow_ratio_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationFlowDialog(this, mainframe));
+}
+void GUI_App::over_bridge_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationOverBridgeDialog(this, mainframe));
+}
+void GUI_App::bridge_tuning_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationBridgeDialog(this, mainframe));
+}
+void GUI_App::filament_temperature_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationTempDialog(this, mainframe));
+}
+void GUI_App::calibration_cube_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationCubeDialog(this, mainframe));
+}
+void GUI_App::calibration_retraction_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationRetractionDialog(this, mainframe));
+}
+void GUI_App::freecad_script_dialog()
+{
+    change_calibration_dialog(nullptr, new FreeCADDialog(this, mainframe));
+}
+
 // static method accepting a wxWindow object as first parameter
 bool GUI_App::catch_error(std::function<void()> cb,
     //                       wxMessageDialog* message_dialog,
@@ -1399,7 +1478,7 @@ bool GUI_App::select_language()
 
     // Some valid language should be selected since the application start up.
     const wxLanguage current_language = wxLanguage(m_wxLocale->GetLanguage());
-    int 		     init_selection   		= -1;
+    int init_selection = -1;
     int 			 init_selection_alt     = -1;
     int 			 init_selection_default = -1;
     for (size_t i = 0; i < language_infos.size(); ++ i) {
@@ -1415,7 +1494,7 @@ bool GUI_App::select_language()
         	// This will be the default selection if the active language does not match any dictionary.
         	init_selection_default = i;
         names.Add(language_infos[i]->Description);
-    }
+        }
     if (init_selection == -1)
     	// This is the dictionary matching the active language.
     	init_selection = init_selection_alt;
@@ -1439,8 +1518,8 @@ bool GUI_App::select_language()
 			app_config->set("translation_language", new_language_info->CanonicalName.ToUTF8().data());            
 			app_config->save();
     		return true;
-    	}
     }
+        }
 
     return false;
 }
@@ -1450,21 +1529,21 @@ bool GUI_App::select_language()
 bool GUI_App::load_language(wxString language, bool initial)
 {
     if (initial) {
-    	// There is a static list of lookup path prefixes in wxWidgets. Add ours.
-	    wxFileTranslationsLoader::AddCatalogLookupPathPrefix(from_u8(localization_dir()));
-    	// Get the active language from PrusaSlicer.ini, or empty string if the key does not exist.
+        // There is a static list of lookup path prefixes in wxWidgets. Add ours.
+        wxFileTranslationsLoader::AddCatalogLookupPathPrefix(from_u8(localization_dir()));
+        // Get the active language from PrusaSlicer.ini, or empty string if the key does not exist.
         language = app_config->get("translation_language");
         if (! language.empty())
-        	BOOST_LOG_TRIVIAL(trace) << boost::format("translation_language provided by PrusaSlicer.ini: %1%") % language;
+            BOOST_LOG_TRIVIAL(trace) << boost::format("translation_language provided by SuperSlicer.ini: %1%") % language;
 
         // Get the system language.
         {
-	        const wxLanguage lang_system = wxLanguage(wxLocale::GetSystemLanguage());
-	        if (lang_system != wxLANGUAGE_UNKNOWN) {
-				m_language_info_system = wxLocale::GetLanguageInfo(lang_system);
-	        	BOOST_LOG_TRIVIAL(trace) << boost::format("System language detected (user locales and such): %1%") % m_language_info_system->CanonicalName.ToUTF8().data();
-	        }
-		}
+            const wxLanguage lang_system = wxLanguage(wxLocale::GetSystemLanguage());
+            if (lang_system != wxLANGUAGE_UNKNOWN) {
+                m_language_info_system = wxLocale::GetLanguageInfo(lang_system);
+                BOOST_LOG_TRIVIAL(trace) << boost::format("System language detected (user locales and such): %1%") % m_language_info_system->CanonicalName.ToUTF8().data();
+            }
+        }
         {
 	    	// Allocating a temporary locale will switch the default wxTranslations to its internal wxTranslations instance.
 	    	wxLocale temp_locale;
@@ -1491,29 +1570,29 @@ bool GUI_App::load_language(wxString language, bool initial)
 		}
     }
 
-	const wxLanguageInfo *language_info = language.empty() ? nullptr : wxLocale::FindLanguageInfo(language);
-	if (! language.empty() && (language_info == nullptr || language_info->CanonicalName.empty())) {
-		// Fix for wxWidgets issue, where the FindLanguageInfo() returns locales with undefined ANSII code (wxLANGUAGE_KONKANI or wxLANGUAGE_MANIPURI).
-		language_info = nullptr;
-    	BOOST_LOG_TRIVIAL(error) << boost::format("Language code \"%1%\" is not supported") % language.ToUTF8().data();
-	}
+    const wxLanguageInfo *language_info = language.empty() ? nullptr : wxLocale::FindLanguageInfo(language);
+    if (! language.empty() && (language_info == nullptr || language_info->CanonicalName.empty())) {
+        // Fix for wxWidgets issue, where the FindLanguageInfo() returns locales with undefined ANSII code (wxLANGUAGE_KONKANI or wxLANGUAGE_MANIPURI).
+        language_info = nullptr;
+        BOOST_LOG_TRIVIAL(error) << boost::format("Language code \"%1%\" is not supported") % language.ToUTF8().data();
+    }
 
-	if (language_info != nullptr && language_info->LayoutDirection == wxLayout_RightToLeft) {
-    	BOOST_LOG_TRIVIAL(trace) << boost::format("The following language code requires right to left layout, which is not supported by PrusaSlicer: %1%") % language_info->CanonicalName.ToUTF8().data();
-		language_info = nullptr;
-	}
+    if (language_info != nullptr && language_info->LayoutDirection == wxLayout_RightToLeft) {
+        BOOST_LOG_TRIVIAL(trace) << boost::format("The following language code requires right to left layout, which is not supported by SuperSlicer: %1%") % language_info->CanonicalName.ToUTF8().data();
+        language_info = nullptr;
+    }
 
     if (language_info == nullptr) {
         // PrusaSlicer does not support the Right to Left languages yet.
         if (m_language_info_system != nullptr && m_language_info_system->LayoutDirection != wxLayout_RightToLeft)
             language_info = m_language_info_system;
         if (m_language_info_best != nullptr && m_language_info_best->LayoutDirection != wxLayout_RightToLeft)
-        	language_info = m_language_info_best;
-	    if (language_info == nullptr)
-			language_info = wxLocale::GetLanguageInfo(wxLANGUAGE_ENGLISH_US);
-    }
+            language_info = m_language_info_best;
+        if (language_info == nullptr)
+            language_info = wxLocale::GetLanguageInfo(wxLANGUAGE_ENGLISH_US);
+}
 
-	BOOST_LOG_TRIVIAL(trace) << boost::format("Switching wxLocales to %1%") % language_info->CanonicalName.ToUTF8().data();
+    BOOST_LOG_TRIVIAL(trace) << boost::format("Switching wxLocales to %1%") % language_info->CanonicalName.ToUTF8().data();
 
     // Alternate language code.
     wxLanguage language_dict = wxLanguage(language_info->Language);
@@ -1546,19 +1625,19 @@ bool GUI_App::load_language(wxString language, bool initial)
 
     if (! wxLocale::IsAvailable(language_info->Language)) {
     	// Loading the language dictionary failed.
-    	wxString message = "Switching PrusaSlicer to language " + language_info->CanonicalName + " failed.";
+    	wxString message = "Switching SuperSlicer to language " + language_info->CanonicalName + " failed.";
 #if !defined(_WIN32) && !defined(__APPLE__)
         // likely some linux system
         message += "\nYou may need to reconfigure the missing locales, likely by running the \"locale-gen\" and \"dpkg-reconfigure locales\" commands.\n";
 #endif
         if (initial)
         	message + "\n\nApplication will close.";
-        wxMessageBox(message, "PrusaSlicer - Switching language failed", wxOK | wxICON_ERROR);
+		wxMessageBox(message, "SuperSlicer - Switching language failed", wxOK | wxICON_ERROR);
         if (initial)
 			std::exit(EXIT_FAILURE);
 		else
 			return false;
-    }
+            }
 
     // Release the old locales, create new locales.
     //FIXME wxWidgets cause havoc if the current locale is deleted. We just forget it causing memory leaks for now.
@@ -1570,7 +1649,7 @@ bool GUI_App::load_language(wxString language, bool initial)
     wxTranslations::Get()->SetLanguage(language_dict);
     m_wxLocale->AddCatalog(SLIC3R_APP_KEY);
     m_imgui->set_language(into_u8(language_info->CanonicalName));
-    //FIXME This is a temporary workaround, the correct solution is to switch to "C" locale during file import / export only.
+	//FIXME This is a temporary workaround, the correct solution is to switch to "C" locale during file import / export only.
     wxSetlocale(LC_NUMERIC, "C");
     Preset::update_suffix_modified((" (" + _L("modified") + ")").ToUTF8().data());
 	return true;
@@ -1712,8 +1791,8 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
                 // the dialog needs to be destroyed before the call to recreate_GUI()
                 // or sometimes the application crashes into wxDialogBase() destructor
                 // so we put it into an inner scope
-                PreferencesDialog dlg(mainframe);
-                dlg.ShowModal();
+            PreferencesDialog dlg(mainframe);
+            dlg.ShowModal();
                 app_layout_changed = dlg.settings_layout_changed();
                 if (dlg.seq_top_layer_only_changed())
                     this->plater_->refresh_print();
@@ -1816,7 +1895,7 @@ bool GUI_App::check_unsaved_changes(const wxString &header)
         }
     }
 
-    return true;
+        return true;
 }
 
 bool GUI_App::check_print_host_queue()
@@ -1860,7 +1939,7 @@ void GUI_App::load_current_presets(bool check_printer_presets_ /*= true*/)
     // check printer_presets for the containing information about "Print Host upload"
     // and create physical printer from it, if any exists
     if (check_printer_presets_)
-        check_printer_presets();
+    check_printer_presets();
 
     PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
 	this->plater()->set_printer_technology(printer_technology);
@@ -2283,8 +2362,8 @@ void GUI_App::associate_3mf_files()
     ::GetModuleFileNameW(nullptr, app_path, sizeof(app_path));
 
     std::wstring prog_path = L"\"" + std::wstring(app_path) + L"\"";
-    std::wstring prog_id = L"Prusa.Slicer.1";
-    std::wstring prog_desc = L"PrusaSlicer";
+    std::wstring prog_id = L"SuperSlicer.1";
+    std::wstring prog_desc = L"SuperSlicer";
     std::wstring prog_command = prog_path + L" \"%1\"";
     std::wstring reg_base = L"Software\\Classes";
     std::wstring reg_extension = reg_base + L"\\.3mf";

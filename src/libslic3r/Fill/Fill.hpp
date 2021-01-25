@@ -28,6 +28,8 @@ public:
     FillParams   params;
 };
 
+void make_fill(LayerRegion &layerm, ExtrusionEntityCollection &out);
+
 } // namespace Slic3r
 
 #endif // slic3r_Fill_hpp_

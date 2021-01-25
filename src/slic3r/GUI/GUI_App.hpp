@@ -122,7 +122,7 @@ private:
 	wxFont			m_normal_font;
 	wxFont			m_code_font;
 
-    int             m_em_unit; // width of a "m"-symbol in pixels for current system font
+    int          m_em_unit; // width of a "m"-symbol in pixels for current system font
                                // Note: for 100% Scale m_em_unit = 10 -> it's a good enough coefficient for a size setting of controls
 
     std::unique_ptr<wxLocale> 	  m_wxLocale;
@@ -133,7 +133,7 @@ private:
 
     OpenGLManager m_opengl_mgr;
 
-    std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
+	std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
 
     std::unique_ptr<ImGuiWrapper> m_imgui;
     std::unique_ptr<PrintHostJobQueue> m_printhost_job_queue;
@@ -160,8 +160,8 @@ public:
     // load configs, STLs etc.
     void            post_init();
     static std::string get_gl_info(bool format_as_html, bool extensions);
-    wxGLContext*    init_glcontext(wxGLCanvas& canvas);
-    bool            init_opengl();
+    wxGLContext* init_glcontext(wxGLCanvas& canvas);
+    bool init_opengl();
 
     static unsigned get_colour_approx_luma(const wxColour &colour);
     static bool     dark_mode();
@@ -190,6 +190,17 @@ public:
     void            recreate_GUI(const wxString& message);
     void            system_info();
     void            keyboard_shortcuts();
+    void            change_calibration_dialog(const wxDialog* have_to_destroy = nullptr, wxDialog* new_one = nullptr);
+    void            html_dialog();
+    void            bed_leveling_dialog();
+    void            flow_ratio_dialog();
+    void            filament_temperature_dialog();
+    void            bridge_tuning_dialog();
+    void            over_bridge_dialog();
+    void            calibration_cube_dialog();
+	void            calibration_retraction_dialog();
+    void            freecad_script_dialog();
+    //void            support_tuning(); //have to do multiple, in a submenu
     void            load_project(wxWindow *parent, wxString& input_file) const;
     void            import_model(wxWindow *parent, wxArrayString& input_files) const;
     void            load_gcode(wxWindow* parent, wxString& input_file) const;
@@ -243,6 +254,8 @@ public:
     PresetUpdater*  preset_updater{ nullptr };
     MainFrame*      mainframe{ nullptr };
     Plater*         plater_{ nullptr };
+    std::mutex      not_modal_dialog_mutex;
+    wxDialog*       not_modal_dialog = nullptr;
 
 	PresetUpdater* get_preset_updater() { return preset_updater; }
 

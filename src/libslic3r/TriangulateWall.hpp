@@ -5,7 +5,7 @@
 
 namespace Slic3r {
 
-using Wall = std::pair<std::vector<Vec3d>, std::vector<Vec3i>>;
+using Wall = std::pair<std::vector<Vec3d>, std::vector<Vec3i32>>;
 
 Wall triangulate_wall(
     const Polygon &       lower,

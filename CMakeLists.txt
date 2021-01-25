@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(PrusaSlicer)
+project(SuperSlicer)
 
 include("version.inc")
 include(GNUInstallDirs)
@@ -22,11 +22,11 @@ else()
         endif()
 endif()
 
-option(SLIC3R_STATIC 			"Compile PrusaSlicer with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
-option(SLIC3R_GUI    			"Compile PrusaSlicer with GUI components (OpenGL, wxWidgets)" 1)
-option(SLIC3R_FHS               "Assume PrusaSlicer is to be installed in a FHS directory structure" 0)
+option(SLIC3R_STATIC 			"Compile SuperSlicer with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
+option(SLIC3R_GUI    			"Compile SuperSlicer with GUI components (OpenGL, wxWidgets)" 1)
+option(SLIC3R_FHS               "Assume SuperSlicer is to be installed in a FHS directory structure" 0)
 option(SLIC3R_WX_STABLE         "Build against wxWidgets stable (3.0) as oppsed to dev (3.1) on Linux" 0)
-option(SLIC3R_PROFILE 			"Compile PrusaSlicer with an invasive Shiny profiler" 0)
+option(SLIC3R_PROFILE 			"Compile SuperSlicer with an invasive Shiny profiler" 0)
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
 option(SLIC3R_MSVC_PDB          "Generate PDB files on MSVC in Release mode" 1)
@@ -239,13 +239,13 @@ add_definitions(-DwxUSE_UNICODE -D_UNICODE -DUNICODE -DWXINTL_NO_GETTEXT_MACRO)
 add_definitions(-DwxNO_UNSAFE_WXSTRING_CONV)
 
 if (SLIC3R_PROFILE)
-    message("PrusaSlicer will be built with a Shiny invasive profiler")
+    message("SuperSlicer will be built with a Shiny invasive profiler")
     add_definitions(-DSLIC3R_PROFILE)
 endif ()
 
 # Disable optimization even with debugging on.
 if (0)
-    message(STATUS "Perl compiled without optimization. Disabling optimization for the PrusaSlicer build.")
+    message(STATUS "Perl compiled without optimization. Disabling optimization for the SuperSlicer build.")
     message("Old CMAKE_CXX_FLAGS_RELEASE: ${CMAKE_CXX_FLAGS_RELEASE}")
     message("Old CMAKE_CXX_FLAGS_RELWITHDEBINFO: ${CMAKE_CXX_FLAGS_RELEASE}")
     message("Old CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS_RELEASE}")
@@ -272,6 +272,10 @@ if(NOT WIN32)
 endif()
 set(_boost_components "system;filesystem;thread;log;locale;regex;chrono;atomic;date_time")
 find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS ${_boost_components})
+# boost compile only in release & debug. We have to force the release version for RELWITHDEBINFO compilation
+if (MSVC)
+  set_target_properties(${Boost_LIBRARIES} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
+endif()
 
 add_library(boost_libs INTERFACE)
 add_library(boost_headeronly INTERFACE)
@@ -421,7 +425,7 @@ set(L10N_DIR "${SLIC3R_RESOURCES_DIR}/localization")
 add_custom_target(gettext_make_pot
     COMMAND xgettext --keyword=L --keyword=_L --keyword=_u8L --keyword=L_CONTEXT:1,2c --keyword=_L_PLURAL:1,2 --add-comments=TRN --from-code=UTF-8 --debug
         -f "${L10N_DIR}/list.txt"
-        -o "${L10N_DIR}/PrusaSlicer.pot"
+        -o "${L10N_DIR}/SuperSlicer.pot"
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Generate pot file from strings in the source tree"
 )
@@ -429,10 +433,10 @@ add_custom_target(gettext_po_to_mo
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     COMMENT "Generate localization po files (binary) from mo files (texts)"
 )
-file(GLOB L10N_PO_FILES "${L10N_DIR}/*/PrusaSlicer*.po")
+file(GLOB L10N_PO_FILES "${L10N_DIR}/*/SuperSlicer*.po")
 foreach(po_file ${L10N_PO_FILES})
     GET_FILENAME_COMPONENT(po_dir "${po_file}" DIRECTORY)
-    SET(mo_file "${po_dir}/PrusaSlicer.mo")
+    SET(mo_file "${po_dir}/SuperSlicer.mo")
     add_custom_command(
         TARGET gettext_po_to_mo PRE_BUILD
         COMMAND msgfmt ARGS -o ${mo_file} ${po_file}
@@ -486,9 +490,9 @@ function(prusaslicer_copy_dlls target)
 endfunction()
 
 
-# libslic3r, PrusaSlicer GUI and the PrusaSlicer executable.
+# libslic3r, SuperSlicer GUI and the SuperSlicer executable.
 add_subdirectory(src)
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PrusaSlicer_app_console)
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT SuperSlicer_app_console)
 
 # Perl bindings, currently only used for the unit / integration tests of libslic3r.
 # Also runs the unit / integration tests.
@@ -511,12 +515,12 @@ if (WIN32)
     install(DIRECTORY "${SLIC3R_RESOURCES_DIR}/" DESTINATION "${CMAKE_INSTALL_PREFIX}/resources")
 elseif (SLIC3R_FHS)
     # CMAKE_INSTALL_FULL_DATAROOTDIR: read-only architecture-independent data root (share)
-    set(SLIC3R_FHS_RESOURCES "${CMAKE_INSTALL_FULL_DATAROOTDIR}/PrusaSlicer")
+    set(SLIC3R_FHS_RESOURCES "${CMAKE_INSTALL_FULL_DATAROOTDIR}/SuperSlicer")
     install(DIRECTORY "${SLIC3R_RESOURCES_DIR}/" DESTINATION "${SLIC3R_FHS_RESOURCES}")
-    install(FILES src/platform/unix/PrusaSlicer.desktop DESTINATION ${SLIC3R_FHS_RESOURCES}/applications)
+    install(FILES src/platform/unix/SuperSlicer.desktop DESTINATION ${SLIC3R_FHS_RESOURCES}/applications)
     install(FILES src/platform/unix/PrusaGcodeviewer.desktop DESTINATION ${SLIC3R_FHS_RESOURCES}/applications)
 else ()
-    install(FILES src/platform/unix/PrusaSlicer.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/resources/applications)
+    install(FILES src/platform/unix/SuperSlicer.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/resources/applications)
     install(FILES src/platform/unix/PrusaGcodeviewer.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/resources/applications)
     install(DIRECTORY "${SLIC3R_RESOURCES_DIR}/" DESTINATION "${CMAKE_INSTALL_PREFIX}/resources")
 endif ()

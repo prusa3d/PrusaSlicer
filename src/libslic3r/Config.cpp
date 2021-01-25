@@ -23,6 +23,39 @@
 
 namespace Slic3r {
 
+
+std::string toString(OptionCategory opt) {
+    switch (opt) {
+    case none: return "";
+    case perimeter: return "Perimeters & Shell";
+    case slicing: return "Slicing";
+    case infill: return "Infill";
+    case ironing: return "Ironing PP";
+    case skirtBrim: return "Skirt & Brim";
+    case support: return "Support material";
+    case width: return "Width & Flow";
+    case speed: return "Speed";
+    case extruders: return "Multiple extruders";
+    case output: return "Output options";
+    case notes: return "Notes";
+    case dependencies: return "Dependencies";
+    case filament: return "Filament";
+    case cooling: return "Cooling";
+    case advanced: return "Advanced";
+    case filoverride: return "Filament overrides";
+    case customgcode: return "Custom G-code";
+    case general: return "General";
+    case limits: return "Machine limits";
+    case mmsetup: return "Single Extruder MM Setup";
+    case firmware: return "Firmware";
+    case pad: return "Pad";
+    case padSupp: return "Pad and Support";
+    case wipe: return "Wipe Options";
+    case milling: return "milling";
+    }
+    return "error";
+}
+
 // Escape \n, \r and backslash
 std::string escape_string_cstyle(const std::string &str)
 {
@@ -315,16 +348,16 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
     };
 
     // get the unique categories
-    std::set<std::string> categories;
+    std::set<OptionCategory> categories;
     for (const auto& opt : this->options) {
         const ConfigOptionDef& def = opt.second;
         if (filter(def))
             categories.insert(def.category);
     }
     
-    for (auto category : categories) {
-        if (category != "") {
-            out << category << ":" << std::endl;
+    for (OptionCategory category : categories) {
+        if (category != OptionCategory::none) {
+            out << toString(category) << ":" << std::endl;
         } else if (categories.size() > 1) {
             out << "Misc options:" << std::endl;
         }
@@ -396,6 +429,20 @@ void ConfigBase::apply_only(const ConfigBase &other, const t_config_option_keys 
         // If the key is not in the parameter definition, or this ConfigBase is a static type and it does not support the parameter,
         // an exception is thrown if not ignore_nonexistent.
         ConfigOption *my_opt = this->option(opt_key, true);
+        // If we didn't find an option, look for any other option having this as an alias.
+        if (my_opt == nullptr) {
+            const ConfigDef       *def = this->def();
+            for (const auto &opt : def->options) {
+                for (const t_config_option_key &opt_key2 : opt.second.aliases) {
+                    if (opt_key2 == opt_key) {
+                        my_opt = this->option(opt.first, true);
+                        break;
+                    }
+                }
+                if (my_opt != nullptr)
+                    break;
+            }
+        }
         if (my_opt == nullptr) {
             // opt_key does not exist in this ConfigBase and it cannot be created, because it is not defined by this->def().
             // This is only possible if other is of DynamicConfig type.
@@ -407,8 +454,13 @@ void ConfigBase::apply_only(const ConfigBase &other, const t_config_option_keys 
 		if (other_opt == nullptr) {
             // The key was not found in the source config, therefore it will not be initialized!
 //			printf("Not found, therefore not initialized: %s\n", opt_key.c_str());
-		} else
-            my_opt->set(other_opt);
+        } else {
+            try {
+                my_opt->set(other_opt);
+            } catch (ConfigurationException e) {
+                throw ConfigurationException(std::string(e.what()) + ", when ConfigBase::apply_only on " + opt_key);
+            }
+        }
     }
 }
 
@@ -480,10 +532,11 @@ bool ConfigBase::set_deserialize_nothrow(const t_config_option_key &opt_key_src,
     return this->set_deserialize_raw(opt_key, value, append);
 }
 
-void ConfigBase::set_deserialize(const t_config_option_key &opt_key_src, const std::string &value_src, bool append)
+void ConfigBase::set_deserialize(const t_config_option_key& opt_key_src, const std::string& value_src, bool append)
 {
-	if (! this->set_deserialize_nothrow(opt_key_src, value_src, append))
-		throw BadOptionTypeException(format("ConfigBase::set_deserialize() failed for parameter \"%1%\", value \"%2%\"", opt_key_src,  value_src));
+    if (!this->set_deserialize_nothrow(opt_key_src, value_src, append)) {
+        throw BadOptionTypeException(format("ConfigBase::set_deserialize() failed for parameter \"%1%\", value \"%2%\"", opt_key_src, value_src));
+    }
 }
 
 void ConfigBase::set_deserialize(std::initializer_list<SetDeserializeItem> items)
@@ -527,8 +580,10 @@ bool ConfigBase::set_deserialize_raw(const t_config_option_key &opt_key_src, con
     }
     
     ConfigOption *opt = this->option(opt_key, true);
-    assert(opt != nullptr);
-    return opt->deserialize(value, append);
+    if (opt == nullptr)
+        throw new UnknownOptionException(opt_key);
+    bool ok= opt->deserialize(value, append);
+    return ok;
 }
 
 // Return an absolute value of a possibly relative config variable.
@@ -537,23 +592,59 @@ double ConfigBase::get_abs_value(const t_config_option_key &opt_key) const
 {
     // Get stored option value.
     const ConfigOption *raw_opt = this->option(opt_key);
-    assert(raw_opt != nullptr);
+    if (raw_opt == nullptr) {
+        std::stringstream ss; ss << "You can't define an option that need " << opt_key << " without defining it!";
+        throw std::runtime_error(ss.str());
+    }
     if (raw_opt->type() == coFloat)
         return static_cast<const ConfigOptionFloat*>(raw_opt)->value;
+    if (raw_opt->type() == coInt)
+        return static_cast<const ConfigOptionInt*>(raw_opt)->value;
+    if (raw_opt->type() == coBool)
+        return static_cast<const ConfigOptionBool*>(raw_opt)->value?1:0;
+    const ConfigOptionDef* opt_def = nullptr;
+    const ConfigOptionPercent* cast_opt = nullptr;
     if (raw_opt->type() == coFloatOrPercent) {
+        if(!static_cast<const ConfigOptionFloatOrPercent*>(raw_opt)->percent)
+            return static_cast<const ConfigOptionFloatOrPercent*>(raw_opt)->value;
         // Get option definition.
         const ConfigDef *def = this->def();
         if (def == nullptr)
             throw NoDefinitionException(opt_key);
-        const ConfigOptionDef *opt_def = def->get(opt_key);
+        opt_def = def->get(opt_key);
+        cast_opt = static_cast<const ConfigOptionFloatOrPercent*>(raw_opt);
         assert(opt_def != nullptr);
+    }
+    if (raw_opt->type() == coPercent) {
+        // Get option definition.
+        const ConfigDef* def = this->def();
+        if (def == nullptr)
+            throw NoDefinitionException(opt_key);
+        opt_def = def->get(opt_key);
+        assert(opt_def != nullptr);
+        cast_opt = static_cast<const ConfigOptionPercent*>(raw_opt);
+    }
+    if (opt_def != nullptr) {
+        //if over no other key, it's most probably a simple %
+        if (opt_def->ratio_over == "")
+            return cast_opt->get_abs_value(1);
+        if (opt_def->ratio_over == "nozzle_diameter") {
+            //use the first... i guess.
+            //TODO: find a better way, like a "current_extruder_idx" config option.
+            if (this->option(opt_def->ratio_over) == nullptr) {
+                std::stringstream ss; ss << "ConfigBase::get_abs_value(): " << opt_key << " need nozzle_diameter but can't acess it. Please use get_abs_value(nozzle_diam).";
+                throw std::runtime_error(ss.str());
+            }
+            return cast_opt->get_abs_value(static_cast<const ConfigOptionFloats*>(this->option(opt_def->ratio_over))->values[0]);
+        }
         // Compute absolute value over the absolute value of the base option.
         //FIXME there are some ratio_over chains, which end with empty ratio_with.
         // For example, XXX_extrusion_width parameters are not handled by get_abs_value correctly.
-        return opt_def->ratio_over.empty() ? 0. : 
-            static_cast<const ConfigOptionFloatOrPercent*>(raw_opt)->get_abs_value(this->get_abs_value(opt_def->ratio_over));
+        return opt_def->ratio_over.empty() ? 0. :
+            cast_opt->get_abs_value(this->get_abs_value(opt_def->ratio_over));
     }
-    throw Slic3r::RuntimeError("ConfigBase::get_abs_value(): Not a valid option type for get_abs_value()");
+    std::stringstream ss; ss << "ConfigBase::get_abs_value(): "<< opt_key<<" has not a valid option type for get_abs_value()";
+    throw Slic3r::RuntimeError(ss.str());
 }
 
 // Return an absolute value of a possibly relative config variable.
@@ -619,16 +710,20 @@ void ConfigBase::load(const boost::property_tree::ptree &tree)
 void ConfigBase::load_from_gcode_file(const std::string &file)
 {
     // Read a 64k block from the end of the G-code.
-	boost::nowide::ifstream ifs(file);
-	{
-		const char slic3r_gcode_header[] = "; generated by Slic3r ";
+    boost::nowide::ifstream ifs(file);
+    {
+        const char slic3r_gcode_header[] = "; generated by Slic3r ";
+        const char slic3rpp_gcode_header[] = "; generated by Slic3r++ ";
+        const char superslicer_gcode_header[] = "; generated by SuperSlicer ";
         const char prusaslicer_gcode_header[] = "; generated by PrusaSlicer ";
-		std::string firstline;
-		std::getline(ifs, firstline);
-		if (strncmp(slic3r_gcode_header, firstline.c_str(), strlen(slic3r_gcode_header)) != 0 &&
+        std::string firstline;
+        std::getline(ifs, firstline);
+        if (strncmp(slic3r_gcode_header, firstline.c_str(), strlen(slic3r_gcode_header)) != 0 &&
+            strncmp(slic3rpp_gcode_header, firstline.c_str(), strlen(slic3rpp_gcode_header)) != 0 &&
+            strncmp(superslicer_gcode_header, firstline.c_str(), strlen(superslicer_gcode_header)) != 0 &&
             strncmp(prusaslicer_gcode_header, firstline.c_str(), strlen(prusaslicer_gcode_header)) != 0)
-			throw Slic3r::RuntimeError("Not a PrusaSlicer / Slic3r PE generated g-code.");
-	}
+			throw Slic3r::RuntimeError("Not a PrusaSlicer / SuperSlicer generated g-code.");
+    }
     ifs.seekg(0, ifs.end);
 	auto file_length = ifs.tellg();
 	auto data_length = std::min<std::fstream::pos_type>(65535, file_length);
@@ -688,8 +783,9 @@ size_t ConfigBase::load_from_gcode_string(const char* str)
         if (key == nullptr)
             break;
         try {
-            this->set_deserialize(std::string(key, key_end), std::string(value, end));
-            ++num_key_value_pairs;
+            //change it from set_deserialize to set_deserialize_nothrow to allow bad/old config to swtch to default value.
+            if(this->set_deserialize_nothrow(std::string(key, key_end), std::string(value, end)))
+                ++num_key_value_pairs;
         }
         catch (UnknownOptionException & /* e */) {
             // ignore
@@ -779,7 +875,14 @@ ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key, bool cre
 const ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key) const
 {
     auto it = options.find(opt_key);
-    return (it == options.end()) ? nullptr : it->second.get();
+    if (it == options.end()) {
+        //if not find, try with the parent config.
+        if (parent != nullptr)
+            return parent->option(opt_key);
+        else
+            return nullptr;
+    }else 
+        return it->second.get();
 }
 
 void DynamicConfig::read_cli(const std::vector<std::string> &tokens, t_config_option_keys* extra, t_config_option_keys* keys)

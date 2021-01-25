@@ -178,29 +178,45 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 		case coEnum:{
 			if (opt_key == "top_fill_pattern" ||
 				opt_key == "bottom_fill_pattern" ||
-				opt_key == "fill_pattern")
-				config.set_key_value(opt_key, new ConfigOptionEnum<InfillPattern>(boost::any_cast<InfillPattern>(value))); 
-			else if (opt_key.compare("ironing_type") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<IroningType>(boost::any_cast<IroningType>(value))); 
-			else if (opt_key.compare("gcode_flavor") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<GCodeFlavor>(boost::any_cast<GCodeFlavor>(value))); 
-			else if (opt_key.compare("machine_limits_usage") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<MachineLimitsUsage>(boost::any_cast<MachineLimitsUsage>(value))); 
-			else if (opt_key.compare("support_material_pattern") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<SupportMaterialPattern>(boost::any_cast<SupportMaterialPattern>(value)));
-			else if (opt_key.compare("seam_position") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<SeamPosition>(boost::any_cast<SeamPosition>(value)));
-			else if (opt_key.compare("host_type") == 0)
-				config.set_key_value(opt_key, new ConfigOptionEnum<PrintHostType>(boost::any_cast<PrintHostType>(value)));
+				opt_key == "solid_fill_pattern" ||
+				opt_key == "fill_pattern" ||
+				opt_key == "brim_ears_pattern" ||
+				opt_key == "support_material_interface_pattern")
+				config.set_key_value(opt_key, new ConfigOptionEnum<InfillPattern>(boost::any_cast<InfillPattern>(value)));
+			else if (opt_key.compare("complete_objects_sort") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<CompleteObjectSort>(boost::any_cast<CompleteObjectSort>(value)));
 			else if (opt_key.compare("display_orientation") == 0)
 				config.set_key_value(opt_key, new ConfigOptionEnum<SLADisplayOrientation>(boost::any_cast<SLADisplayOrientation>(value)));
+			else if (opt_key.compare("gcode_flavor") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<GCodeFlavor>(boost::any_cast<GCodeFlavor>(value)));
+			else if (opt_key.compare("host_type") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<PrintHostType>(boost::any_cast<PrintHostType>(value)));
+			else if (opt_key =="infill_connection" || opt_key =="infill_connection_solid"
+					|| opt_key =="infill_connection_top" || opt_key =="infill_connection_bottom")
+				config.set_key_value(opt_key, new ConfigOptionEnum<InfillConnection>(boost::any_cast<InfillConnection>(value)));
+			else if (opt_key.compare("infill_dense_algo") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<DenseInfillAlgo>(boost::any_cast<DenseInfillAlgo>(value)));
+			else if (opt_key.compare("ironing_type") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<IroningType>(boost::any_cast<IroningType>(value)));
+			else if (opt_key.compare("machine_limits_usage") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<MachineLimitsUsage>(boost::any_cast<MachineLimitsUsage>(value)));
+			else if (opt_key.compare("no_perimeter_unsupported_algo") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<NoPerimeterUnsupportedAlgo>(boost::any_cast<NoPerimeterUnsupportedAlgo>(value)));
+			else if (opt_key == "printhost_authorization_type")
+				config.set_key_value(opt_key, new ConfigOptionEnum<AuthorizationType>(boost::any_cast<AuthorizationType>(value)));
+            else if (opt_key.compare("seam_position") == 0 || opt_key.compare("perimeter_loop_seam") == 0)
+                config.set_key_value(opt_key, new ConfigOptionEnum<SeamPosition>(boost::any_cast<SeamPosition>(value)));
+            else if (opt_key.compare("support_material_contact_distance_type") == 0)
+                config.set_key_value(opt_key, new ConfigOptionEnum<SupportZDistanceType>(boost::any_cast<SupportZDistanceType>(value)));
+			else if (opt_key.compare("support_material_pattern") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<SupportMaterialPattern>(boost::any_cast<SupportMaterialPattern>(value)));
             else if(opt_key.compare("support_pillar_connection_mode") == 0)
                 config.set_key_value(opt_key, new ConfigOptionEnum<SLAPillarConnectionMode>(boost::any_cast<SLAPillarConnectionMode>(value)));
-            else if(opt_key == "printhost_authorization_type")
-                config.set_key_value(opt_key, new ConfigOptionEnum<AuthorizationType>(boost::any_cast<AuthorizationType>(value)));
+			else if (opt_key.compare("wipe_advanced_algo") == 0)
+				config.set_key_value(opt_key, new ConfigOptionEnum<WipeAlgo>(boost::any_cast<WipeAlgo>(value)));
 			}
 			break;
-		case coPoints:{
+        case coPoints:{
 			if (opt_key == "bed_shape" || opt_key == "thumbnails") {
 				config.option<ConfigOptionPoints>(opt_key)->values = boost::any_cast<std::vector<Vec2d>>(value);
 				break;
@@ -264,7 +280,7 @@ void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, cons
 
     wxCheckListBoxComboPopup* popup = new wxCheckListBoxComboPopup;
     if (popup != nullptr) {
-		// FIXME If the following line is removed, the combo box popup list will not react to mouse clicks.
+        // FIXME If the following line is removed, the combo box popup list will not react to mouse clicks.
         //  On the other side, with this line the combo box popup cannot be closed by clicking on the combo button on Windows 10.
         comboCtrl->UseAltPopupWindow();
 
@@ -272,12 +288,12 @@ void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, cons
 
 		// the following line messes up the popup size the first time it is shown on wxWidgets 3.1.3
 //		comboCtrl->EnablePopupAnimation(false);
-		comboCtrl->SetPopupControl(popup);
+        comboCtrl->SetPopupControl(popup);
 		wxString title = from_u8(text);
 		max_width = std::max(max_width, 60 + comboCtrl->GetTextExtent(title).x);
 		popup->SetStringValue(title);
-		popup->Bind(wxEVT_CHECKLISTBOX, [popup](wxCommandEvent& evt) { popup->OnCheckListBox(evt); });
-		popup->Bind(wxEVT_LISTBOX, [popup](wxCommandEvent& evt) { popup->OnListBoxSelection(evt); });
+        popup->Bind(wxEVT_CHECKLISTBOX, [popup](wxCommandEvent& evt) { popup->OnCheckListBox(evt); });
+        popup->Bind(wxEVT_LISTBOX, [popup](wxCommandEvent& evt) { popup->OnListBoxSelection(evt); });
         popup->Bind(wxEVT_KEY_DOWN, [popup](wxKeyEvent& evt) { popup->OnKeyEvent(evt); });
         popup->Bind(wxEVT_KEY_UP, [popup](wxKeyEvent& evt) { popup->OnKeyEvent(evt); });
 
@@ -292,25 +308,25 @@ void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, cons
 			max_width = std::max(max_width, 60 + popup->GetTextExtent(label).x);
 			popup->Append(label);
 			popup->Check(i / 2, items_str[i + 1] == "1");
-		}
+        }
 
 		comboCtrl->SetMinClientSize(wxSize(max_width, -1));
-	}
+        }
 }
 
 unsigned int combochecklist_get_flags(wxComboCtrl* comboCtrl)
 {
 	unsigned int flags = 0;
 
-	wxCheckListBoxComboPopup* popup = wxDynamicCast(comboCtrl->GetPopupControl(), wxCheckListBoxComboPopup);
+    wxCheckListBoxComboPopup* popup = wxDynamicCast(comboCtrl->GetPopupControl(), wxCheckListBoxComboPopup);
 	if (popup != nullptr) {
 		for (unsigned int i = 0; i < popup->GetCount(); ++i) {
-			if (popup->IsChecked(i))
-				flags |= 1 << i;
-		}
-	}
+            if (popup->IsChecked(i))
+                flags |= 1 << i;
+        }
+    }
 
-	return flags;
+    return flags;
 }
 
 void combochecklist_set_flags(wxComboCtrl* comboCtrl, unsigned int flags)

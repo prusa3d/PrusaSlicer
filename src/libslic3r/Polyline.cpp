@@ -7,6 +7,7 @@
 #include "Polygon.hpp"
 #include <iostream>
 #include <utility>
+#include <algorithm>
 
 namespace Slic3r {
 
@@ -241,8 +242,12 @@ ThickLines ThickPolyline::thicklines() const
     ThickLines lines;
     if (this->points.size() >= 2) {
         lines.reserve(this->points.size() - 1);
-        for (size_t i = 0; i + 1 < this->points.size(); ++ i)
-            lines.emplace_back(this->points[i], this->points[i + 1], this->width[2 * i], this->width[2 * i + 1]);
+        for (size_t i = 0; i < this->points.size() - 1; ++i) {
+            ThickLine line(this->points[i], this->points[i + 1]);
+            line.a_width = this->width[i];
+            line.b_width = this->width[i + 1];
+            lines.push_back(line);
+        }
     }
     return lines;
 }
@@ -259,6 +264,103 @@ Lines3 Polyline3::lines() const
         }
     }
     return lines;
+}
+
+void concatThickPolylines(ThickPolylines& pp) {
+    bool changes = true;
+    while (changes){
+        changes = false;
+        //concat polyline if only 2 polyline at a point
+        for (size_t i = 0; i < pp.size(); ++i) {
+            ThickPolyline *polyline = &pp[i];
+            if (polyline->first_point().coincides_with(polyline->last_point())) {
+                polyline->endpoints.first = false;
+                polyline->endpoints.second = false;
+                continue;
+            }
+
+            size_t id_candidate_first_point = -1;
+            size_t id_candidate_last_point = -1;
+            size_t nbCandidate_first_point = 0;
+            size_t nbCandidate_last_point = 0;
+            // find another polyline starting here
+            for (size_t j = 0; j < pp.size(); ++j) {
+                if (j == i) continue;
+                ThickPolyline *other = &pp[j];
+                if (polyline->last_point().coincides_with(other->last_point())) {
+                    id_candidate_last_point = j;
+                    nbCandidate_last_point++;
+                }
+                if (polyline->last_point().coincides_with(other->first_point())) {
+                    id_candidate_last_point = j;
+                    nbCandidate_last_point++;
+                }
+                if (polyline->first_point().coincides_with(other->last_point())) {
+                    id_candidate_first_point = j;
+                    nbCandidate_first_point++;
+                }
+                if (polyline->first_point().coincides_with(other->first_point())) {
+                    id_candidate_first_point = j;
+                    nbCandidate_first_point++;
+                }
+            }
+            if (id_candidate_last_point == id_candidate_first_point && nbCandidate_first_point == 1 && nbCandidate_last_point == 1) {
+                if (polyline->first_point().coincides_with(pp[id_candidate_first_point].first_point())) pp[id_candidate_first_point].reverse();
+                // it's a trap! it's a  loop!
+                polyline->points.insert(polyline->points.end(), pp[id_candidate_first_point].points.begin() + 1, pp[id_candidate_first_point].points.end());
+                polyline->width.insert(polyline->width.end(), pp[id_candidate_first_point].width.begin() + 1, pp[id_candidate_first_point].width.end());
+                pp.erase(pp.begin() + id_candidate_first_point);
+                changes = true;
+                polyline->endpoints.first = false;
+                polyline->endpoints.second = false;
+            } else {
+
+                if (nbCandidate_first_point == 1) {
+                    if (polyline->first_point().coincides_with(pp[id_candidate_first_point].first_point())) pp[id_candidate_first_point].reverse();
+                    //concat at front
+                    polyline->width[0] = std::max(polyline->width.front(), pp[id_candidate_first_point].width.back());
+                    polyline->points.insert(polyline->points.begin(), pp[id_candidate_first_point].points.begin(), pp[id_candidate_first_point].points.end() - 1);
+                    polyline->width.insert(polyline->width.begin(), pp[id_candidate_first_point].width.begin(), pp[id_candidate_first_point].width.end() - 1);
+                    polyline->endpoints.first = pp[id_candidate_first_point].endpoints.first;
+                    pp.erase(pp.begin() + id_candidate_first_point);
+                    changes = true;
+                    if (id_candidate_first_point < i) {
+                        i--;
+                        polyline = &pp[i];
+                    }
+                    if (id_candidate_last_point > id_candidate_first_point) {
+                        id_candidate_last_point--;
+                    }
+                } else if (nbCandidate_first_point == 0) {
+                    //update endpoint
+                    polyline->endpoints.first = true;
+                }
+                if (nbCandidate_last_point == 1) {
+                    if (polyline->last_point().coincides_with(pp[id_candidate_last_point].last_point())) pp[id_candidate_last_point].reverse();
+                    //concat at back
+                    polyline->width[polyline->width.size() - 1] = std::max(polyline->width.back(), pp[id_candidate_last_point].width.front());
+                    polyline->points.insert(polyline->points.end(), pp[id_candidate_last_point].points.begin() + 1, pp[id_candidate_last_point].points.end());
+                    polyline->width.insert(polyline->width.end(), pp[id_candidate_last_point].width.begin() + 1, pp[id_candidate_last_point].width.end());
+                    polyline->endpoints.second = pp[id_candidate_last_point].endpoints.second;
+                    pp.erase(pp.begin() + id_candidate_last_point);
+                    changes = true;
+                    if (id_candidate_last_point < i) {
+                        i--;
+                        polyline = &pp[i];
+                    }
+                } else if (nbCandidate_last_point == 0) {
+                    //update endpoint
+                    polyline->endpoints.second = true;
+                }
+
+                if (polyline->last_point().coincides_with(polyline->first_point())) {
+                    //the concat has created a loop : update endpoints
+                    polyline->endpoints.first = false;
+                    polyline->endpoints.second = false;
+                }
+            }
+        }
+    }
 }
 
 }

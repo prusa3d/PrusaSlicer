@@ -248,6 +248,7 @@ use Slic3r::Test;
         $config->set('slowdown_below_layer_time', [ 0 ]);
         $config->set('bridge_fan_speed', [ 100 ]);
         $config->set('bridge_flow_ratio', 33);  # arbitrary value
+        $config->set('over_bridge_flow_ratio', 110);  # arbitrary value
         $config->set('overhangs', 1);
         my $print = Slic3r::Test::init_print('overhang', config => $config);
         my %layer_speeds = ();  # print Z => [ speeds ]
@@ -290,6 +291,7 @@ use Slic3r::Test;
     $config->set('layer_height', 0.4);
     $config->set('first_layer_height', 0.35);
     $config->set('extra_perimeters', 1);
+    $config->set('only_one_perimeter_top', 1);
     $config->set('cooling', [ 0 ]);                 # to prevent speeds from being altered
     $config->set('first_layer_speed', '100%');      # to prevent speeds from being altered
     $config->set('perimeter_speed', 99);

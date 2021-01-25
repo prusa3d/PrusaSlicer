@@ -58,8 +58,7 @@ void MeshClipper::render_cut()
 void MeshClipper::recalculate_triangles()
 {
     if (! m_tms) {
-        m_tms.reset(new TriangleMeshSlicer);
-        m_tms->init(m_mesh, [](){});
+        m_tms.reset(new TriangleMeshSlicer(m_mesh));
     }
 
     const Transform3f& instance_matrix_no_translation_no_scaling = m_trafo.get_matrix(true,false,true).cast<float>();
@@ -73,7 +72,7 @@ void MeshClipper::recalculate_triangles()
     // Now do the cutting
     std::vector<ExPolygons> list_of_expolys;
     m_tms->set_up_direction(up.cast<float>());
-    m_tms->slice(std::vector<float>{height_mesh}, SlicingMode::Regular, 0.f, &list_of_expolys, [](){});
+    m_tms->slice(std::vector<float>{height_mesh}, SlicingMode::Regular, &list_of_expolys, [](){});
     m_triangles2d = triangulate_expolygons_2f(list_of_expolys[0], m_trafo.get_matrix().matrix().determinant() < 0.);
 
     // Rotate the cut into world coords:

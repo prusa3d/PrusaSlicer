@@ -258,10 +258,11 @@ void cut_drainholes(std::vector<ExPolygons> & obj_slices,
     
     mesh.require_shared_vertices();
     
-    TriangleMeshSlicer slicer(&mesh);
+    TriangleMeshSlicer slicer(closing_radius, 0);
+    slicer.init(&mesh, thr);
     
-    std::vector<ExPolygons> hole_slices;
-    slicer.slice(slicegrid, SlicingMode::Regular, closing_radius, &hole_slices, thr);
+    std::vector<ExPolygons> hole_slices;    
+    slicer.slice(slicegrid, SlicingMode::Regular, &hole_slices, thr);
     
     if (obj_slices.size() != hole_slices.size())
         BOOST_LOG_TRIVIAL(warning)

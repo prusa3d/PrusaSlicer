@@ -36,6 +36,7 @@ class ModelMaterial;
 class ModelObject;
 class ModelVolume;
 class ModelWipeTower;
+class PrintBase;
 class Print;
 class SLAPrint;
 class TriangleSelector;
@@ -71,9 +72,9 @@ private:
 	ModelConfigObject& operator=(const ModelConfigObject &rhs) = default;
     ModelConfigObject& operator=(ModelConfigObject &&rhs) = default;
 
-    template<class Archive> void serialize(Archive &ar) {
+	template<class Archive> void serialize(Archive &ar) {
         ar(cereal::base_class<ModelConfig>(this));
-    }
+	}
 };
 
 namespace Internal {
@@ -260,10 +261,10 @@ public:
     Model*                  get_model() { return m_model; }
     const Model*            get_model() const { return m_model; }
 
-    ModelVolume*            add_volume(const TriangleMesh &mesh);
-    ModelVolume*            add_volume(TriangleMesh &&mesh);
-    ModelVolume*            add_volume(const ModelVolume &volume);
-    ModelVolume*            add_volume(const ModelVolume &volume, TriangleMesh &&mesh);
+    ModelVolume*            add_volume(const TriangleMesh &mesh, bool centered = true);
+    ModelVolume*            add_volume(TriangleMesh &&mesh, bool centered = true);
+    ModelVolume*            add_volume(const ModelVolume &volume, bool centered = true);
+    ModelVolume*            add_volume(const ModelVolume &volume, TriangleMesh &&mesh, bool centered = true);
     void                    delete_volume(size_t idx);
     void                    clear_volumes();
     bool                    is_multiparts() const { return volumes.size() > 1; }
@@ -486,6 +487,7 @@ enum class ModelVolumeType : int {
     PARAMETER_MODIFIER,
     SUPPORT_ENFORCER,
     SUPPORT_BLOCKER,
+    SEAM_POSITION,
 };
 
 enum class EnforcerBlockerType : int8_t {
@@ -587,7 +589,8 @@ public:
 	bool                is_modifier()           const { return m_type == ModelVolumeType::PARAMETER_MODIFIER; }
 	bool                is_support_enforcer()   const { return m_type == ModelVolumeType::SUPPORT_ENFORCER; }
 	bool                is_support_blocker()    const { return m_type == ModelVolumeType::SUPPORT_BLOCKER; }
-	bool                is_support_modifier()   const { return m_type == ModelVolumeType::SUPPORT_BLOCKER || m_type == ModelVolumeType::SUPPORT_ENFORCER; }
+    bool                is_support_modifier()   const { return m_type == ModelVolumeType::SUPPORT_BLOCKER || m_type == ModelVolumeType::SUPPORT_ENFORCER; }
+    bool                is_seam_position()      const { return m_type == ModelVolumeType::SEAM_POSITION; }
     t_model_material_id material_id() const { return m_material_id; }
     void                set_material_id(t_model_material_id material_id);
     ModelMaterial*      material() const;
@@ -1013,7 +1016,7 @@ public:
     TriangleMesh  mesh() const;
     
     // Croaks if the duplicated objects do not fit the print bed.
-    void duplicate_objects_grid(size_t x, size_t y, coordf_t dist);
+    void 		  duplicate_objects_grid(size_t x, size_t y, coordf_t dist);
 
     bool 		  looks_like_multipart_object() const;
     void 		  convert_multipart_object(unsigned int max_extruders);
@@ -1040,7 +1043,7 @@ private:
 	template<class Archive> void serialize(Archive &ar) {
 		Internal::StaticSerializationWrapper<ModelWipeTower> wipe_tower_wrapper(wipe_tower);
 		ar(materials, objects, wipe_tower_wrapper);
-    }
+	}
 };
 
 #undef OBJECTBASE_DERIVED_COPY_MOVE_CLONE

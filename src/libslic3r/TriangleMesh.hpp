@@ -22,7 +22,7 @@ class TriangleMesh
 {
 public:
     TriangleMesh() : repaired(false) {}
-    TriangleMesh(const Pointf3s &points, const std::vector<Vec3i> &facets);
+    TriangleMesh(const Pointf3s &points, const std::vector<Vec3i32> &facets);
     explicit TriangleMesh(const indexed_triangle_set &M);
 	void clear() { this->stl.clear(); this->its.clear(); this->repaired = false; }
     bool ReadSTLFile(const char* input_file) { return stl_open(&stl, input_file); }
@@ -85,6 +85,9 @@ public:
     indexed_triangle_set its;
     bool repaired;
 
+/// --- for tests  ----- ///
+    Pointf3s vertices();
+    
 private:
     std::deque<uint32_t> find_unvisited_neighbors(std::vector<unsigned char> &facet_visited) const;
 };
@@ -175,9 +178,12 @@ enum class SlicingMode : uint32_t {
 class TriangleMeshSlicer
 {
 public:
+    float closing_radius;
+    float model_precision;
+
     typedef std::function<void()> throw_on_cancel_callback_type;
-    TriangleMeshSlicer() : mesh(nullptr) {}
-	TriangleMeshSlicer(const TriangleMesh* mesh) { this->init(mesh, [](){}); }
+    TriangleMeshSlicer(float closing_radius, float model_precision) : mesh(nullptr), closing_radius(closing_radius), model_precision(model_precision) {}
+    TriangleMeshSlicer(const TriangleMesh* mesh) : mesh(mesh), closing_radius(0), model_precision(0) { this->init(mesh, []() {}); }
     void init(const TriangleMesh *mesh, throw_on_cancel_callback_type throw_on_cancel);
     void slice(
         const std::vector<float> &z, SlicingMode mode, size_t alternate_mode_first_n_layers, SlicingMode alternate_mode,
@@ -185,11 +191,11 @@ public:
     void slice(const std::vector<float> &z, SlicingMode mode, std::vector<Polygons>* layers, throw_on_cancel_callback_type throw_on_cancel) const
         { return this->slice(z, mode, 0, mode, layers, throw_on_cancel); }
     void slice(
-        const std::vector<float> &z, SlicingMode mode, size_t alternate_mode_first_n_layers, SlicingMode alternate_mode, const float closing_radius,
+        const std::vector<float> &z, SlicingMode mode, size_t alternate_mode_first_n_layers, SlicingMode alternate_mode,
         std::vector<ExPolygons>* layers, throw_on_cancel_callback_type throw_on_cancel) const;
-    void slice(const std::vector<float> &z, SlicingMode mode, const float closing_radius, 
+    void slice(const std::vector<float> &z, SlicingMode mode, 
         std::vector<ExPolygons>* layers, throw_on_cancel_callback_type throw_on_cancel) const
-        { this->slice(z, mode, 0, mode, closing_radius, layers, throw_on_cancel); }
+        { this->slice(z, mode, 0, mode, layers, throw_on_cancel); }
     enum FacetSliceType {
         NoSlice = 0,
         Slicing = 1,
@@ -213,9 +219,9 @@ private:
 
     void _slice_do(size_t facet_idx, std::vector<IntersectionLines>* lines, boost::mutex* lines_mutex, const std::vector<float> &z) const;
     void make_loops(std::vector<IntersectionLine> &lines, Polygons* loops) const;
-    void make_expolygons(const Polygons &loops, const float closing_radius, ExPolygons* slices) const;
+    void make_expolygons(const Polygons &loops, ExPolygons* slices) const;
     void make_expolygons_simple(std::vector<IntersectionLine> &lines, ExPolygons* slices) const;
-    void make_expolygons(std::vector<IntersectionLine> &lines, const float closing_radius, ExPolygons* slices) const;
+    void make_expolygons(std::vector<IntersectionLine> &lines, ExPolygons* slices) const;
 };
 
 inline void slice_mesh(
@@ -237,8 +243,9 @@ inline void slice_mesh(
     TriangleMeshSlicer::throw_on_cancel_callback_type thr = nullptr)
 {
     if (mesh.empty()) return;
-    TriangleMeshSlicer slicer(&mesh);
-    slicer.slice(z, SlicingMode::Regular, closing_radius, &layers, thr);
+    TriangleMeshSlicer slicer(closing_radius, 0);
+    slicer.init(&mesh, [](){});
+    slicer.slice(z, SlicingMode::Regular, &layers, thr);
 }
 
 TriangleMesh make_cube(double x, double y, double z);

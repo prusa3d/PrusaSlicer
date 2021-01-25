@@ -25,7 +25,7 @@
 
 namespace Slic3r { namespace GUI {
 
-wxString double_to_string(double const value, const int max_precision /*= 4*/)
+wxString double_to_string(double const value, const int max_precision /*= 8*/)
 {
 // Style_NoTrailingZeroes does not work on OSX. It also does not work correctly with some locales on Windows.
 //	return wxNumberFormatter::ToString(value, max_precision, wxNumberFormatter::Style_NoTrailingZeroes);
@@ -94,6 +94,7 @@ void Field::PostInitialize()
 	case coFloats:
 	case coStrings:	
 	case coBools:		
+	case coPoints:
 	case coInts: {
 		auto tag_pos = m_opt_id.find("#");
 		if (tag_pos != std::string::npos)
@@ -306,8 +307,19 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 }
                 show_error(m_parent, _(L("Invalid numeric input.")));
                 set_value(double_to_string(val), true);
-            }
-            else if (((m_opt.sidetext.rfind("mm/s") != std::string::npos && val > m_opt.max) ||
+            } else {
+
+                //at least check min, as we can want a 0 min
+                if (m_opt.min > val)
+                {
+                    if (!check_value) {
+                        m_value.clear();
+                        break;
+                    }
+                    show_error(m_parent, _(L("Input value is out of range")));
+                    if (m_opt.min > val) val = m_opt.min;
+                    set_value(double_to_string(val), true);
+                } else if (((m_opt.sidetext.rfind("mm/s") != std::string::npos && val > m_opt.max) ||
                      (m_opt.sidetext.rfind("mm ") != std::string::npos && val > 1)) &&
                      (m_value.empty() || std::string(str.ToUTF8().data()) != boost::any_cast<std::string>(m_value)))
             {
@@ -331,6 +343,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
 				else
 					set_value(stVal, false); // it's no needed but can be helpful, when inputted value contained "," instead of "."
             }
+        }
         }
     
         m_value = std::string(str.ToUTF8().data());
@@ -879,6 +892,9 @@ void SpinCtrl::propagate_value()
 void SpinCtrl::msw_rescale()
 {
     Field::msw_rescale();
+    auto size = wxSize(wxDefaultSize);
+    if (m_opt.height >= 0) size.SetHeight(m_opt.height * m_em_unit);
+    if (m_opt.width >= 0) size.SetWidth(m_opt.width * m_em_unit);
 
     wxSpinCtrl* field = dynamic_cast<wxSpinCtrl*>(window);
     if (parent_is_custom_ctrl)
@@ -1058,6 +1074,32 @@ void Choice::set_value(const std::string& value, bool change_event)  //! Redunda
 	m_disable_change_event = false;
 }
 
+template<class T>
+int Choice::idx_from_enum_value(int val) {
+    if (!m_opt.enum_values.empty()) {
+        std::string key;
+        t_config_enum_values map_names = ConfigOptionEnum<T>::get_enum_values();
+        for (auto it : map_names) {
+            if (val == it.second) {
+                key = it.first;
+                break;
+            }
+        }
+
+        size_t idx = 0;
+        for (auto el : m_opt.enum_values)
+        {
+            if (el.compare(key) == 0)
+                break;
+            ++idx;
+        }
+
+        return idx == m_opt.enum_values.size() ? 0 : idx;
+    }
+    else
+        return 0;
+}
+
 void Choice::set_value(const boost::any& value, bool change_event)
 {
 	m_disable_change_event = !change_event;
@@ -1096,31 +1138,42 @@ void Choice::set_value(const boost::any& value, bool change_event)
 	}
 	case coEnum: {
 		int val = boost::any_cast<int>(value);
-		if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern")
-		{
-			if (!m_opt.enum_values.empty()) {
-				std::string key;
-				t_config_enum_values map_names = ConfigOptionEnum<InfillPattern>::get_enum_values();				
-				for (auto it : map_names) {
-					if (val == it.second) {
-						key = it.first;
-						break;
-					}
-				}
-
-				size_t idx = 0;
-				for (auto el : m_opt.enum_values)
-				{
-					if (el == key)
-						break;
-					++idx;
-				}
-
-				val = idx == m_opt.enum_values.size() ? 0 : idx;
-			}
-			else
-				val = 0;
-		}
+        if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "solid_fill_pattern"
+            || m_opt_id == "fill_pattern" || m_opt_id == "support_material_interface_pattern" || m_opt_id == "brim_ears_pattern")
+            val = idx_from_enum_value<InfillPattern>(val);
+        else if (m_opt_id.compare("complete_objects_sort") == 0)
+            val = idx_from_enum_value<CompleteObjectSort>(val);
+        else if (m_opt_id.compare("display_orientation") == 0)
+            val = idx_from_enum_value<SLADisplayOrientation>(val);
+        else if (m_opt_id.compare("gcode_flavor") == 0)
+            val = idx_from_enum_value<GCodeFlavor>(val);
+        else if (m_opt_id.compare("host_type") == 0)
+            val = idx_from_enum_value<PrintHostType>(val);
+        else if (m_opt_id =="infill_connection" || m_opt_id =="infill_connection_solid"
+                || m_opt_id =="infill_connection_top" || m_opt_id =="infill_connection_bottom")
+            val = idx_from_enum_value<InfillConnection>(val);
+        else if (m_opt_id.compare("infill_dense_algo") == 0)
+            val = idx_from_enum_value<DenseInfillAlgo>(val);
+        else if (m_opt_id == "ironing_type")
+            val = idx_from_enum_value<IroningType>(val);
+        else if (m_opt_id.compare("machine_limits_usage") == 0)
+            val = idx_from_enum_value<MachineLimitsUsage>(val);
+        else if (m_opt_id.compare("no_perimeter_unsupported_algo") == 0)
+            val = idx_from_enum_value<NoPerimeterUnsupportedAlgo>(val);
+        else if (m_opt_id.compare("perimeter_loop_seam") == 0)
+            val = idx_from_enum_value<SeamPosition>(val);
+        else if (m_opt_id == "printhost_authorization_type")
+            val = idx_from_enum_value<AuthorizationType>(val);
+        else if (m_opt_id.compare("seam_position") == 0)
+            val = idx_from_enum_value<SeamPosition>(val);
+        else if (m_opt_id.compare("support_material_contact_distance_type") == 0)
+            val = idx_from_enum_value<SupportZDistanceType>(val);
+        else if (m_opt_id.compare("support_material_pattern") == 0)
+            val = idx_from_enum_value<SupportMaterialPattern>(val);
+        else if (m_opt_id.compare("support_pillar_connection_mode") == 0)
+            val = idx_from_enum_value<SLAPillarConnectionMode>(val);
+        else if (m_opt_id.compare("wipe_advanced_algo") == 0)
+            val = idx_from_enum_value<WipeAlgo>(val);
 		field->SetSelection(val);
 		break;
 	}
@@ -1151,6 +1204,20 @@ void Choice::set_values(const std::vector<std::string>& values)
 	m_disable_change_event = false;
 }
 
+template<class T>
+void Choice::convert_to_enum_value(int ret_enum) {
+    if (!m_opt.enum_values.empty()) {
+        std::string key = m_opt.enum_values[ret_enum];
+        t_config_enum_values map_names = ConfigOptionEnum<T>::get_enum_values();
+        int value = map_names.at(key);
+
+        m_value = static_cast<T>(value);
+    }
+    else
+        m_value = static_cast<T>(m_opt.default_value.get()->getInt());
+}
+
+//TODO: check if used (from prusa)
 void Choice::set_values(const wxArrayString &values)
 {
 	if (values.empty())
@@ -1184,39 +1251,45 @@ boost::any& Choice::get_value()
 			return m_value = boost::any(ret_str);
 
 	if (m_opt.type == coEnum)
-	{
-		int ret_enum = field->GetSelection(); 
-		if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern")
-		{
-			if (!m_opt.enum_values.empty()) {
-				std::string key = m_opt.enum_values[ret_enum];
-				t_config_enum_values map_names = ConfigOptionEnum<InfillPattern>::get_enum_values();
-				int value = map_names.at(key);
-
-				m_value = static_cast<InfillPattern>(value);
-			}
-			else
-				m_value = static_cast<InfillPattern>(0);
-		}
-		else if (m_opt_id.compare("ironing_type") == 0)
-			m_value = static_cast<IroningType>(ret_enum);
-		else if (m_opt_id.compare("gcode_flavor") == 0)
-			m_value = static_cast<GCodeFlavor>(ret_enum);
-		else if (m_opt_id.compare("machine_limits_usage") == 0)
-			m_value = static_cast<MachineLimitsUsage>(ret_enum);
-		else if (m_opt_id.compare("support_material_pattern") == 0)
-			m_value = static_cast<SupportMaterialPattern>(ret_enum);
-		else if (m_opt_id.compare("seam_position") == 0)
-			m_value = static_cast<SeamPosition>(ret_enum);
-		else if (m_opt_id.compare("host_type") == 0)
-			m_value = static_cast<PrintHostType>(ret_enum);
-		else if (m_opt_id.compare("display_orientation") == 0)
-			m_value = static_cast<SLADisplayOrientation>(ret_enum);
+    {
+        int ret_enum = field->GetSelection(); 
+        if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "solid_fill_pattern" 
+            || m_opt_id == "support_material_interface_pattern" || m_opt_id == "fill_pattern" || m_opt_id == "brim_ears_pattern")
+            convert_to_enum_value<InfillPattern>(ret_enum);
+        else if (m_opt_id.compare("complete_objects_sort") == 0)
+            convert_to_enum_value<CompleteObjectSort>(ret_enum);
+        else if (m_opt_id.compare("display_orientation") == 0)
+            convert_to_enum_value<SLADisplayOrientation>(ret_enum);
+        else if (m_opt_id.compare("gcode_flavor") == 0)
+            convert_to_enum_value<GCodeFlavor>(ret_enum);
+        else if (m_opt_id.compare("host_type") == 0)
+            convert_to_enum_value<PrintHostType>(ret_enum);
+        else if (m_opt_id =="infill_connection" || m_opt_id =="infill_connection_solid"
+                || m_opt_id =="infill_connection_top" || m_opt_id =="infill_connection_bottom")
+            convert_to_enum_value<InfillConnection>(ret_enum);
+        else if (m_opt_id.compare("infill_dense_algo") == 0)
+            convert_to_enum_value<DenseInfillAlgo>(ret_enum);
+        else if (m_opt_id == "ironing_type")
+            convert_to_enum_value<IroningType>(ret_enum);
+        else if (m_opt_id.compare("machine_limits_usage") == 0)
+            convert_to_enum_value<MachineLimitsUsage>(ret_enum);
+        else if (m_opt_id.compare("no_perimeter_unsupported_algo") == 0)
+            convert_to_enum_value<NoPerimeterUnsupportedAlgo>(ret_enum);
+        else if (m_opt_id.compare("perimeter_loop_seam") == 0)
+            convert_to_enum_value<SeamPosition>(ret_enum);
+        else if (m_opt_id == "printhost_authorization_type")
+            convert_to_enum_value<AuthorizationType>(ret_enum);
+        else if (m_opt_id.compare("seam_position") == 0)
+            convert_to_enum_value<SeamPosition>(ret_enum);
+        else if (m_opt_id.compare("support_material_contact_distance_type") == 0)
+            convert_to_enum_value<SupportZDistanceType>(ret_enum);
+        else if (m_opt_id.compare("support_material_pattern") == 0)
+            convert_to_enum_value<SupportMaterialPattern>(ret_enum);
         else if (m_opt_id.compare("support_pillar_connection_mode") == 0)
-            m_value = static_cast<SLAPillarConnectionMode>(ret_enum);
-		else if (m_opt_id == "printhost_authorization_type")
-			m_value = static_cast<AuthorizationType>(ret_enum);
-	}
+            convert_to_enum_value<SLAPillarConnectionMode>(ret_enum);
+        else if (m_opt_id.compare("wipe_advanced_algo") == 0)
+            convert_to_enum_value<WipeAlgo>(ret_enum);
+    }
     else if (m_opt.gui_type == "f_enum_open") {
         const int ret_enum = field->GetSelection();
         if (ret_enum < 0 || m_opt.enum_values.empty() || m_opt.type == coStrings ||
@@ -1296,9 +1369,16 @@ void ColourPicker::BUILD()
     if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
 	// Validate the color
-	wxString clr_str(m_opt.get_default_value<ConfigOptionStrings>()->get_at(m_opt_idx));
-	wxColour clr(clr_str);
-	if (clr_str.IsEmpty() || !clr.IsOk()) {
+    wxColour clr = wxTransparentColour;
+    if (m_opt.type == coStrings)
+        clr = wxColour{wxString{ m_opt.get_default_value<ConfigOptionStrings>()->get_at(m_opt_idx) }};
+    if (m_opt.type == coString)
+        clr = wxColour{ wxString{ m_opt.get_default_value<ConfigOptionString>()->value } };
+    if (m_opt.type == coInts)
+        clr = wxColour{ (unsigned long)m_opt.get_default_value<ConfigOptionInts>()->get_at(m_opt_idx) };
+    if (m_opt.type == coInt)
+        clr = wxColour{ (unsigned long)m_opt.get_default_value<ConfigOptionInt>()->value };
+	if (!clr.IsOk()) {
 		clr = wxTransparentColour;
 	}
 
@@ -1313,7 +1393,7 @@ void ColourPicker::BUILD()
 
 	temp->Bind(wxEVT_COLOURPICKER_CHANGED, ([this](wxCommandEvent e) { on_change_field(); }), temp->GetId());
 
-	temp->SetToolTip(get_tooltip_text(clr_str));
+	temp->SetToolTip(get_tooltip_text(clr.GetAsString()));
 }
 
 void ColourPicker::set_undef_value(wxColourPickerCtrl* field)
@@ -1558,9 +1638,9 @@ void SliderCtrl::BUILD()
 
 	auto temp = new wxBoxSizer(wxHORIZONTAL);
 
-	auto def_val = m_opt.get_default_value<ConfigOptionInt>()->value;
-	auto min = m_opt.min == INT_MIN ? 0 : m_opt.min;
-	auto max = m_opt.max == INT_MAX ? 100 : m_opt.max;
+	int def_val = m_opt.get_default_value<ConfigOptionInt>()->value;
+    int min = m_opt.min == INT_MIN ? 0 : int(m_opt.min);
+    int max = m_opt.max == INT_MAX ? 100 : int(m_opt.max);
 
 	m_slider = new wxSlider(m_parent, wxID_ANY, def_val * m_scale,
 							min * m_scale, max * m_scale,

@@ -8,7 +8,7 @@
 	<rect x="1" y="5" fill="#FFFFFF" width="14" height="1"/>
 	<rect x="1" y="1" fill="#FFFFFF" width="14" height="1"/>
 	<rect x="1" y="13" fill="#FFFFFF" width="14" height="2"/>
-	<rect x="3" y="4" fill="#ED6B21" width="4" height="4"/>
-	<polygon fill="#ED6B21" points="5,9 4,8 6,8 	"/>
+	<rect x="3" y="4" fill="#2172eb" width="4" height="4"/>
+	<polygon fill="#2172eb" points="5,9 4,8 6,8 	"/>
 </g>
 </svg>

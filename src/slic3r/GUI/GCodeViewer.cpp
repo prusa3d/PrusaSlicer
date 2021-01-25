@@ -20,8 +20,12 @@
 #include <imgui/imgui_internal.h>
 
 #include <GL/glew.h>
+#include <boost/locale/generator.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/cstdio.hpp>
+#include <boost/nowide/fstream.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 #include <wx/progdlg.h>
 #include <wx/numformatter.h>
 
@@ -128,7 +132,7 @@ bool GCodeViewer::Path::matches(const GCodeProcessor::MoveVertex& move) const
         return type == move.type && move.position[2] <= first.position[2] && role == move.extrusion_role && height == round_to_nearest(move.height, 2) &&
             width == round_to_nearest(move.width, 2) && feedrate == move.feedrate && fan_speed == move.fan_speed &&
             volumetric_rate == round_to_nearest(move.volumetric_rate(), 2) && extruder_id == move.extruder_id &&
-            cp_color_id == move.cp_color_id;
+            cp_color_id == move.cp_color_id && extruder_temp == move.temperature;
 #endif // ENABLE_TOOLPATHS_WIDTH_HEIGHT_FROM_GCODE
     }
     case EMoveType::Travel: {
@@ -159,19 +163,39 @@ void GCodeViewer::TBuffer::add_path(const GCodeProcessor::MoveVertex& move, unsi
 #if ENABLE_TOOLPATHS_WIDTH_HEIGHT_FROM_GCODE
     paths.push_back({ move.type, move.extrusion_role, endpoint, endpoint, move.delta_extruder,
         round_to_nearest(move.height, 2), round_to_nearest(move.width, 2), move.feedrate, move.fan_speed,
-        move.volumetric_rate(), move.extruder_id, move.cp_color_id });
+        move.volumetric_rate(), move.extruder_id, move.cp_color_id, move.layer_duration, move.time, move.temperature });
 #else
     paths.push_back({ move.type, move.extrusion_role, endpoint, endpoint, move.delta_extruder,
         round_to_nearest(move.height, 2), round_to_nearest(move.width, 2), move.feedrate, move.fan_speed,
-        round_to_nearest(move.volumetric_rate(), 2), move.extruder_id, move.cp_color_id });
+        round_to_nearest(move.volumetric_rate(), 2), move.extruder_id, move.cp_color_id, move.layer_duration, move.time, move.temperature });
 #endif // ENABLE_TOOLPATHS_WIDTH_HEIGHT_FROM_GCODE
 }
 
-GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value) const
+float GCodeViewer::Extrusions::Range::step_size(bool log) const
+{
+    if (log)
+    {
+        float min_range = min;
+        if (min_range == 0)
+            min_range = 0.001f;
+        return (std::log(max / min_range) / (static_cast<float>(Range_Colors.size()) - 1.0f));
+    } else
+        return (max - min) / (static_cast<float>(Range_Colors.size()) - 1.0f);
+}
+
+GCodeViewer::Color GCodeViewer::Extrusions::Range::get_color_at(float value, bool log) const
 {
     // Input value scaled to the colors range
-    const float step = step_size();
-    const float global_t = (step != 0.0f) ? std::max(0.0f, value - min) / step : 0.0f; // lower limit of 0.0f
+    const float step = step_size(log);
+    float global_t;
+    if (log)
+    {
+        float min_range = min;
+        if (min_range == 0)
+            min_range = 0.001f;
+        global_t = (step != 0.0f) ? std::max(0.0f, std::log(value / min_range)) / step : 0.0f; // lower limit of 0.0f
+    } else
+        global_t = (step != 0.0f) ? std::max(0.0f, value - min) / step : 0.0f; // lower limit of 0.0f
 
     const size_t color_max_idx = Range_Colors.size() - 1;
 
@@ -236,7 +260,7 @@ void GCodeViewer::SequentialView::Marker::render() const
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::SetNextWindowBgAlpha(0.25f);
     imgui.begin(std::string("ToolPosition"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
-    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Tool position") + ":");
+    imgui.text_colored(ImGuiWrapper::COL_BLUE_LIGHT, _u8L("Tool position") + ":");
     ImGui::SameLine();
     char buf[1024];
     sprintf(buf, "X: %.2f, Y: %.2f, Z: %.2f", m_world_position(0), m_world_position(1), m_world_position(2));
@@ -255,25 +279,6 @@ void GCodeViewer::SequentialView::Marker::render() const
     imgui.end();
     ImGui::PopStyleVar();
 }
-
-const std::vector<GCodeViewer::Color> GCodeViewer::Extrusion_Role_Colors {{
-    { 0.75f, 0.75f, 0.75f },   // erNone
-    { 1.00f, 0.90f, 0.30f },   // erPerimeter
-    { 1.00f, 0.49f, 0.22f },   // erExternalPerimeter
-    { 0.12f, 0.12f, 1.00f },   // erOverhangPerimeter
-    { 0.69f, 0.19f, 0.16f },   // erInternalInfill
-    { 0.59f, 0.33f, 0.80f },   // erSolidInfill
-    { 0.94f, 0.25f, 0.25f },   // erTopSolidInfill
-    { 1.00f, 0.55f, 0.41f },   // erIroning
-    { 0.30f, 0.50f, 0.73f },   // erBridgeInfill
-    { 1.00f, 1.00f, 1.00f },   // erGapFill
-    { 0.00f, 0.53f, 0.43f },   // erSkirt
-    { 0.00f, 1.00f, 0.00f },   // erSupportMaterial
-    { 0.00f, 0.50f, 0.00f },   // erSupportMaterialInterface
-    { 0.70f, 0.89f, 0.67f },   // erWipeTower
-    { 0.37f, 0.82f, 0.58f },   // erCustom
-    { 0.00f, 0.00f, 0.00f }    // erMixed
-}};
 
 const std::vector<GCodeViewer::Color> GCodeViewer::Options_Colors {{
     { 0.803f, 0.135f, 0.839f },   // Retractions
@@ -397,9 +402,16 @@ void GCodeViewer::refresh(const GCodeProcessor::Result& gcode_result, const std:
         // update tool colors
         m_tool_colors = decode_colors(str_tool_colors);
 
+
     // ensure at least one (default) color is defined
     if (m_tool_colors.empty())
         m_tool_colors.push_back(decode_color("#FF8000"));
+    if (m_view_type == EViewType::Filament && !gcode_result.filament_colors.empty())
+        // update tool colors from config stored in the gcode
+        m_filament_colors = decode_colors(gcode_result.filament_colors);
+    else
+        // update tool colors
+        m_filament_colors = decode_colors(str_tool_colors);
 
     // update ranges for coloring / legend
     m_extrusions.reset_ranges();
@@ -417,7 +429,11 @@ void GCodeViewer::refresh(const GCodeProcessor::Result& gcode_result, const std:
             m_extrusions.ranges.height.update_from(round_to_nearest(curr.height, 2));
             m_extrusions.ranges.width.update_from(round_to_nearest(curr.width, 2));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
+            if(curr.layer_duration > 0.f)
+                m_extrusions.ranges.layer_duration.update_from(curr.layer_duration);
+            m_extrusions.ranges.elapsed_time.update_from(curr.time);
             m_extrusions.ranges.volumetric_rate.update_from(round_to_nearest(curr.volumetric_rate(), 2));
+            m_extrusions.ranges.extruder_temp.update_from(curr.temperature);
             [[fallthrough]];
         }
         case EMoveType::Travel:
@@ -471,7 +487,8 @@ void GCodeViewer::reset()
     m_paths_bounding_box = BoundingBoxf3();
     m_max_bounding_box = BoundingBoxf3();
     m_tool_colors = std::vector<Color>();
-    m_extruders_count = 0;
+
+    m_extruders_count = 0;    m_filament_colors = std::vector<Color>();
     m_extruder_ids = std::vector<unsigned char>();
     m_extrusions.reset_role_visibility_flags();
     m_extrusions.reset_ranges();
@@ -489,39 +506,39 @@ void GCodeViewer::reset()
 void GCodeViewer::render() const
 {
     auto init_gl_data = [this]() {
-        // initializes opengl data of TBuffers
-        for (size_t i = 0; i < m_buffers.size(); ++i) {
-            TBuffer& buffer = m_buffers[i];
+            // initializes opengl data of TBuffers
+            for (size_t i = 0; i < m_buffers.size(); ++i) {
+                TBuffer& buffer = m_buffers[i];
             switch (buffer_type(i)) {
-            default: { break; }
-            case EMoveType::Tool_change:
-            case EMoveType::Color_change:
-            case EMoveType::Pause_Print:
-            case EMoveType::Custom_GCode:
-            case EMoveType::Retract:
+                default: { break; }
+                case EMoveType::Tool_change:
+                case EMoveType::Color_change:
+                case EMoveType::Pause_Print:
+                case EMoveType::Custom_GCode:
+                case EMoveType::Retract:
             case EMoveType::Unretract: {
-                buffer.shader = wxGetApp().is_glsl_version_greater_or_equal_to(1, 20) ? "options_120" : "options_110";
-                break;
-            }
+                    buffer.shader = wxGetApp().is_glsl_version_greater_or_equal_to(1, 20) ? "options_120" : "options_110";
+                    break;
+                }
             case EMoveType::Wipe:
             case EMoveType::Extrude: {
-                buffer.shader = "gouraud_light";
-                break;
-            }
+                    buffer.shader = "gouraud_light";
+                    break;
+                }
             case EMoveType::Travel: {
-                buffer.shader = "toolpaths_lines";
-                break;
+                    buffer.shader = "toolpaths_lines";
+                    break;
+                }
+                }
             }
-            }
-        }
 
-        // initializes tool marker
-        m_sequential_view.marker.init();
+            // initializes tool marker
+            m_sequential_view.marker.init();
 
-        // initializes point sizes
-        std::array<int, 2> point_sizes;
-        ::glGetIntegerv(GL_ALIASED_POINT_SIZE_RANGE, point_sizes.data());
-        m_detected_point_sizes = { static_cast<float>(point_sizes[0]), static_cast<float>(point_sizes[1]) };
+            // initializes point sizes
+            std::array<int, 2> point_sizes;
+            ::glGetIntegerv(GL_ALIASED_POINT_SIZE_RANGE, point_sizes.data());
+            m_detected_point_sizes = { static_cast<float>(point_sizes[0]), static_cast<float>(point_sizes[1]) };
         m_gl_data_initialized = true;
     };
 
@@ -532,7 +549,7 @@ void GCodeViewer::render() const
     // OpenGL data must be initialized after the glContext has been created.
     // This is ensured when this method is called by GLCanvas3D::_render_gcode().
     if (!m_gl_data_initialized)
-        init_gl_data();
+    init_gl_data();
 
     if (m_roles.empty())
         return;
@@ -540,8 +557,8 @@ void GCodeViewer::render() const
     glsafe(::glEnable(GL_DEPTH_TEST));
     render_toolpaths();
     if (m_sequential_view.current.last != m_sequential_view.endpoints.last) {
-        m_sequential_view.marker.set_world_position(m_sequential_view.current_position);
-        m_sequential_view.marker.render();
+    m_sequential_view.marker.set_world_position(m_sequential_view.current_position);
+    m_sequential_view.marker.render();
     }
     render_shells();
     render_legend();
@@ -959,6 +976,58 @@ void GCodeViewer::init()
 {
     if (m_initialized)
         return;
+
+    //load Extrusion colors
+    {
+        this->Extrusion_Role_Colors = {
+            { 0.75f, 0.75f, 0.75f },   // erNone
+            { 1.00f, 0.90f, 0.30f },   // erPerimeter
+            { 1.00f, 0.49f, 0.22f },   // erExternalPerimeter
+            { 0.12f, 0.12f, 1.00f },   // erOverhangPerimeter
+            { 0.69f, 0.19f, 0.16f },   // erInternalInfill
+            { 0.59f, 0.33f, 0.80f },   // erSolidInfill
+            { 0.94f, 0.25f, 0.25f },   // erTopSolidInfill
+            { 1.00f, 0.55f, 0.41f },   // erIroning
+            { 0.30f, 0.50f, 0.73f },   // erBridgeInfill
+            { 0.00f, 1.00f, 0.40f },   // erThinWall
+            { 1.00f, 1.00f, 1.00f },   // erGapFill
+            { 0.00f, 0.53f, 0.43f },   // erSkirt
+            { 0.00f, 1.00f, 0.00f },   // erSupportMaterial
+            { 0.00f, 0.50f, 0.00f },   // erSupportMaterialInterface
+            { 0.70f, 0.89f, 0.67f },   // erWipeTower
+            { 0.70f, 0.70f, 0.70f },   // erMilling
+            { 0.37f, 0.82f, 0.58f },   // erCustom
+            { 0.00f, 0.00f, 0.00f }    // erMixed
+        };
+
+
+        //try to load colors from ui file
+        boost::property_tree::ptree tree_colors;
+        boost::filesystem::path path_colors = boost::filesystem::path(resources_dir()) / "ui_layout" / "colors.ini";
+        try {
+            boost::nowide::ifstream ifs;
+            ifs.imbue(boost::locale::generator()("en_US.UTF-8"));
+            ifs.open(path_colors.string());
+            boost::property_tree::read_ini(ifs, tree_colors);
+
+            for (int i = 0; i < Extrusion_Role_Colors.size(); i++) {
+                std::string color_code = tree_colors.get<std::string>(ExtrusionEntity::role_to_string((ExtrusionRole)i));
+                if (color_code.length() > 5) {
+                    wxColour color;
+                    color.Set((color_code[0] == '#') ? color_code : ("#" + color_code));
+                    Extrusion_Role_Colors[i][0] = color.Red() / 256.f;
+                    Extrusion_Role_Colors[i][1] = color.Green() / 256.f;
+                    Extrusion_Role_Colors[i][2] = color.Blue() / 256.f;
+                }
+            }
+        }
+        catch (const std::ifstream::failure & err) {
+            trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()).c_str());
+        }
+        catch (const std::runtime_error & err) {
+            trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()).c_str());
+        }
+    }
 
     // initializes non opengl data of TBuffers
     for (size_t i = 0; i < m_buffers.size(); ++i) {
@@ -1438,7 +1507,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
             float z = static_cast<double>(curr.position[2]);
             if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z)
                 options_zs.emplace_back(curr.position[2]);
-        }
+    }
     }
 
     // move the wipe toolpaths half height up to render them on proper position
@@ -1621,17 +1690,17 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
             else
                 m_layers.get_endpoints().back().last = i;
             // extruder ids
-            m_extruder_ids.emplace_back(move.extruder_id);
+        m_extruder_ids.emplace_back(move.extruder_id);
             // roles
-            if (i > 0)
-                m_roles.emplace_back(move.extrusion_role);
-        }
+        if (i > 0)
+            m_roles.emplace_back(move.extrusion_role);
+    }
         else if (move.type == EMoveType::Travel) {
             if (i - last_travel_s_id > 1 && !m_layers.empty())
                 m_layers.get_endpoints().back().last = i;
 
             last_travel_s_id = i;
-        }
+    }
     }
 
     // set layers z range
@@ -1741,8 +1810,13 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::Width:          { color = m_extrusions.ranges.width.get_color_at(path.width); break; }
         case EViewType::Feedrate:       { color = m_extrusions.ranges.feedrate.get_color_at(path.feedrate); break; }
         case EViewType::FanSpeed:       { color = m_extrusions.ranges.fan_speed.get_color_at(path.fan_speed); break; }
+        case EViewType::LayerTime:      { color = m_extrusions.ranges.layer_duration.get_color_at(path.layer_time); break; }
+        case EViewType::LayerTimeLog:   { color = m_extrusions.ranges.layer_duration.get_color_at(path.layer_time, true); break; }
+        case EViewType::Chronology:     { color = m_extrusions.ranges.elapsed_time.get_color_at(path.elapsed_time); break; }
         case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
         case EViewType::Tool:           { color = m_tool_colors[path.extruder_id]; break; }
+        case EViewType::Filament:       { color = m_filament_colors[path.extruder_id]; break; }
+        case EViewType::ExtruderTemp:   { color = m_extrusions.ranges.extruder_temp.get_color_at(path.extruder_temp); break; }
         case EViewType::ColorPrint:     {
             if (path.cp_color_id >= static_cast<unsigned char>(m_tool_colors.size())) {
                 color = { 0.5f, 0.5f, 0.5f };
@@ -1776,13 +1850,13 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
     };
 
     auto is_travel_in_layers_range = [this](size_t path_id, size_t min_id, size_t max_id) {
-        auto is_in_z_range = [](const Path& path, double min_z, double max_z) {
-            auto in_z_range = [min_z, max_z](double z) {
+    auto is_in_z_range = [](const Path& path, double min_z, double max_z) {
+        auto in_z_range = [min_z, max_z](double z) {
                 return min_z - EPSILON < z&& z < max_z + EPSILON;
-            };
-
-            return in_z_range(path.first.position[2]) || in_z_range(path.last.position[2]);
         };
+
+        return in_z_range(path.first.position[2]) || in_z_range(path.last.position[2]);
+    };
 
         const TBuffer& buffer = m_buffers[buffer_id(EMoveType::Travel)];
         if (path_id >= buffer.paths.size())
@@ -1860,6 +1934,10 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                 }
             }
         }
+    }
+    if (global_endpoints.first > global_endpoints.last) {
+        global_endpoints = { 0 , m_moves_count };
+        top_layer_endpoints = global_endpoints;
     }
 
     // update current sequential position
@@ -2237,7 +2315,7 @@ void GCodeViewer::render_legend() const
                     pos = ImGui::GetCursorScreenPos();
                     float width = std::max(1.0f, percent_bar_size * percent / max_percent);
                     draw_list->AddRectFilled({ pos.x, pos.y + 2.0f }, { pos.x + width, pos.y + icon_size - 2.0f },
-                        ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT));
+                        ImGui::GetColorU32(ImGuiWrapper::COL_BLUE_LIGHT));
                     ImGui::Dummy({ percent_bar_size, icon_size });
                     ImGui::SameLine();
                     char buf[64];
@@ -2265,11 +2343,28 @@ void GCodeViewer::render_legend() const
         else if (range.count == 2) {
             append_range_item(static_cast<int>(Range_Colors.size()) - 1, range.max, decimals);
             append_range_item(0, range.min, decimals);
-        }
-        else {
+        } else {
             float step_size = range.step_size();
             for (int i = static_cast<int>(Range_Colors.size()) - 1; i >= 0; --i) {
-                append_range_item(i, range.min + static_cast<float>(i) * step_size, decimals);
+                append_range_item(i, range.min + static_cast<float>(i)* step_size, decimals);
+            }
+        }
+    };
+
+    auto append_range_time = [this, draw_list, &imgui, append_item](const Extrusions::Range& range, bool is_log) {
+        if (range.count == 1)
+            // single item use case
+            append_item(EItemType::Rect, Range_Colors[0], get_time_dhms(range.min));
+        else if (range.count == 2) {
+            append_item(EItemType::Rect, Range_Colors[static_cast<int>(Range_Colors.size()) - 1], get_time_dhms(range.max));
+            append_item(EItemType::Rect, Range_Colors[0], get_time_dhms(range.min));
+        } else {
+            float step_size = range.step_size(is_log);
+            for (int i = static_cast<int>(Range_Colors.size()) - 1; i >= 0; --i) {
+                if(!is_log)
+                    append_item(EItemType::Rect, Range_Colors[i], get_time_dhms(range.min + static_cast<float>(i)* step_size));
+                else
+                    append_item(EItemType::Rect, Range_Colors[i], get_time_dhms(std::exp(std::log(range.min) + static_cast<float>(i) * step_size)));
             }
         }
     };
@@ -2387,9 +2482,14 @@ void GCodeViewer::render_legend() const
     case EViewType::Width:          { imgui.title(_u8L("Width (mm)")); break; }
     case EViewType::Feedrate:       { imgui.title(_u8L("Speed (mm/s)")); break; }
     case EViewType::FanSpeed:       { imgui.title(_u8L("Fan Speed (%)")); break; }
+    case EViewType::LayerTime:      { imgui.title(_u8L("Layer Time")); break; }
+    case EViewType::LayerTimeLog:   { imgui.title(_u8L("Layer Time (log)")); break; }
+    case EViewType::Chronology:     { imgui.title(_u8L("Chronology")); break; }
     case EViewType::VolumetricRate: { imgui.title(_u8L("Volumetric flow rate (mm³/s)")); break; }
     case EViewType::Tool:           { imgui.title(_u8L("Tool")); break; }
+    case EViewType::Filament:       { imgui.title(_u8L("Filament")); break; }
     case EViewType::ColorPrint:     { imgui.title(_u8L("Color Print")); break; }
+    case EViewType::ExtruderTemp:   { imgui.title(_u8L("Temperature")); break; }
     default: { break; }
     }
 
@@ -2420,12 +2520,23 @@ void GCodeViewer::render_legend() const
     case EViewType::Width:          { append_range(m_extrusions.ranges.width, 3); break; }
     case EViewType::Feedrate:       { append_range(m_extrusions.ranges.feedrate, 1); break; }
     case EViewType::FanSpeed:       { append_range(m_extrusions.ranges.fan_speed, 0); break; }
+    case EViewType::LayerTime:      { append_range_time(m_extrusions.ranges.layer_duration, false); break; }
+    case EViewType::LayerTimeLog:   { append_range_time(m_extrusions.ranges.layer_duration, true); break; }
+    case EViewType::Chronology:     { append_range_time(m_extrusions.ranges.elapsed_time, false); break; }
     case EViewType::VolumetricRate: { append_range(m_extrusions.ranges.volumetric_rate, 3); break; }
     case EViewType::Tool:
     {
         // shows only extruders actually used
         for (unsigned char i : m_extruder_ids) {
             append_item(EItemType::Rect, m_tool_colors[i], _u8L("Extruder") + " " + std::to_string(i + 1));
+        }
+        break;
+    }
+    case EViewType::Filament:
+    {
+        // shows only filament actually used
+        for (unsigned char i : m_extruder_ids) {
+            append_item(EItemType::Rect, m_filament_colors[i], _u8L("Filament") + " " + std::to_string(i + 1));
         }
         break;
     }
@@ -2483,9 +2594,9 @@ void GCodeViewer::render_legend() const
                 }
             }
         }
-
         break;
     }
+    case EViewType::ExtruderTemp: { append_range(m_extrusions.ranges.extruder_temp, 3); break; }
     default: { break; }
     }
 
@@ -2599,8 +2710,8 @@ void GCodeViewer::render_legend() const
             for (const PartialTime& item : partial_times) {
                 switch (item.type)
                 {
-                case PartialTime::EType::Print:       { labels.push_back(_u8L("Print")); break; }
-                case PartialTime::EType::Pause:       { labels.push_back(_u8L("Pause")); break; }
+                case PartialTime::EType::Print: { labels.push_back(_u8L("Print")); break; }
+                case PartialTime::EType::Pause: { labels.push_back(_u8L("Pause")); break; }
                 case PartialTime::EType::ColorChange: { labels.push_back(_u8L("Color change")); break; }
                 }
                 times.push_back(short_time(get_time_dhms(item.times.second)));
@@ -2834,7 +2945,7 @@ void GCodeViewer::render_statistics() const
     auto add_time = [this, &imgui](const std::string& label, int64_t time) {
         char buf[1024];
         sprintf(buf, "%lld ms (%s)", time, get_time_dhms(static_cast<float>(time) * 0.001f).c_str());
-        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
+        imgui.text_colored(ImGuiWrapper::COL_BLUE_LIGHT, label);
         ImGui::SameLine(offset);
         imgui.text(buf);
     };
@@ -2852,7 +2963,7 @@ void GCodeViewer::render_statistics() const
         static const float inv_mb = 1.0f / mb;
         static const float gb = 1024.0f * mb;
         static const float inv_gb = 1.0f / gb;
-        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
+        imgui.text_colored(ImGuiWrapper::COL_BLUE_LIGHT, label);
         ImGui::SameLine(offset);
         if (static_cast<float>(memory) < mb)
             imgui.text(format_string("KB", inv_kb));
@@ -2865,7 +2976,7 @@ void GCodeViewer::render_statistics() const
     auto add_counter = [this, &imgui](const std::string& label, int64_t counter) {
         char buf[1024];
         sprintf(buf, "%lld", counter);
-        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, label);
+        imgui.text_colored(ImGuiWrapper::COL_BLUE_LIGHT, label);
         ImGui::SameLine(offset);
         imgui.text(buf);
     };

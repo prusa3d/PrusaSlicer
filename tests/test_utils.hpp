@@ -18,4 +18,10 @@ inline Slic3r::TriangleMesh load_model(const std::string &obj_filename)
     return mesh;
 }
 
+inline std::string get_model_path(const std::string &obj_filename)
+{
+    std::string fpath = TEST_DATA_DIR PATH_SEPARATOR + obj_filename;
+    return fpath;
+}
+
 #endif // SLIC3R_TEST_UTILS

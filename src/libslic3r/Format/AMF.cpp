@@ -1052,20 +1052,19 @@ bool load_amf(const char* path, DynamicPrintConfig* config, Model* model, bool c
         return false;
 }
 
-bool store_amf(const char* path, Model* model, const DynamicPrintConfig* config, bool fullpath_sources)
+bool store_amf(std::string &path, Model *model, const DynamicPrintConfig *config, bool fullpath_sources)
 {
-    if ((path == nullptr) || (model == nullptr))
+    if ((path.empty()) || (model == nullptr))
         return false;
 
     // forces ".zip.amf" extension
-    std::string export_path = path;
-    if (!boost::iends_with(export_path, ".zip.amf"))
-        export_path = boost::filesystem::path(export_path).replace_extension(".zip.amf").string();
+    if (!boost::iends_with(path, ".zip.amf"))
+        path = boost::filesystem::path(path).replace_extension(".zip.amf").string();
 
     mz_zip_archive archive;
     mz_zip_zero_struct(&archive);
 
-    if (!open_zip_writer(&archive, export_path)) return false;
+    if (!open_zip_writer(&archive, path)) return false;
 
     std::stringstream stream;
     // https://en.cppreference.com/w/cpp/types/numeric_limits/max_digits10
@@ -1287,7 +1286,7 @@ bool store_amf(const char* path, Model* model, const DynamicPrintConfig* config,
             code_tree.put("<xmlattr>.print_z"   , code.print_z  );
             code_tree.put("<xmlattr>.type"      , static_cast<int>(code.type));
             code_tree.put("<xmlattr>.extruder"  , code.extruder );
-            code_tree.put("<xmlattr>.color"     , code.color    );
+            code_tree.put("<xmlattr>.info"      , code.color    );
             code_tree.put("<xmlattr>.extra"     , code.extra    );
 
             // add gcode field data for the old version of the PrusaSlicer
@@ -1326,20 +1325,20 @@ bool store_amf(const char* path, Model* model, const DynamicPrintConfig* config,
 
     stream << "</amf>\n";
 
-    std::string internal_amf_filename = boost::ireplace_last_copy(boost::filesystem::path(export_path).filename().string(), ".zip.amf", ".amf");
+    std::string internal_amf_filename = boost::ireplace_last_copy(boost::filesystem::path(path).filename().string(), ".zip.amf", ".amf");
     std::string out = stream.str();
 
     if (!mz_zip_writer_add_mem(&archive, internal_amf_filename.c_str(), (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION))
     {
         close_zip_writer(&archive);
-        boost::filesystem::remove(export_path);
+        boost::filesystem::remove(path);
         return false;
     }
 
     if (!mz_zip_writer_finalize_archive(&archive))
     {
         close_zip_writer(&archive);
-        boost::filesystem::remove(export_path);
+        boost::filesystem::remove(path);
         return false;
     }
 

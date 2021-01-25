@@ -5,11 +5,11 @@
 <g id="cross">
 	<g>
 		
-			<line fill="none" stroke="#ED6B21" stroke-width="2" stroke-linecap="round" stroke-miterlimit="10" x1="14" y1="2" x2="2" y2="14"/>
+			<line fill="none" stroke="#2172eb" stroke-width="2" stroke-linecap="round" stroke-miterlimit="10" x1="14" y1="2" x2="2" y2="14"/>
 	</g>
 	<g>
 		
-			<line fill="none" stroke="#ED6B21" stroke-width="2" stroke-linecap="round" stroke-miterlimit="10" x1="2" y1="2" x2="14" y2="14"/>
+			<line fill="none" stroke="#2172eb" stroke-width="2" stroke-linecap="round" stroke-miterlimit="10" x1="2" y1="2" x2="14" y2="14"/>
 	</g>
 </g>
 </svg>

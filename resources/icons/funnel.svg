@@ -4,7 +4,7 @@
 	 viewBox="0 0 16 16" enable-background="new 0 0 16 16" xml:space="preserve">
 <g id="extruder_x2B_funnel">
 	<rect x="1" y="1" display="none" fill="#808080" width="14" height="6"/>
-	<line fill="none" stroke="#ED6B21" stroke-linecap="round" stroke-miterlimit="10" x1="8" y1="9.37" x2="8" y2="15"/>
+	<line fill="none" stroke="#2172eb" stroke-linecap="round" stroke-miterlimit="10" x1="8" y1="9.37" x2="8" y2="15"/>
 	<polygon display="none" fill="#808080" points="5,7 5,8 8,10 11,8 11,7 	"/>
 	<g>
 		<path fill="#808080" d="M14,2l0,4h-3c-0.55,0-1,0.45-1,1v0.47L8,8.8L6,7.46V7c0-0.55-0.45-1-1-1L2,6l0-4H14 M14,1H2

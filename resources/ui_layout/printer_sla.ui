@@ -1,0 +1,61 @@
+
+page:General:printer
+group:Size and coordinates
+	bed_shape
+	setting:max_print_height
+group:Display
+	setting:display_width
+	setting:display_height
+	line:Number of pixels in
+		setting:label$X:display_pixels_x
+		setting:label$Y:display_pixels_y
+	end_line
+	setting:display_orientation
+# FIXME: This should be on one line in the UI
+	line:Display mirroring
+		setting:label$horizontal:display_mirror_x
+		setting:label$vertical:display_mirror_y
+	end_line
+group:Tilt
+	line:Tilt time
+		setting:fast_tilt_time
+		setting:slow_tilt_time
+	end_line
+	setting:area_fill
+group:Corrections
+	line:Printer scaling correction
+		setting:label$XY:id$0:relative_correction
+		setting:label$Z:id$1:relative_correction
+	end_line
+	setting:absolute_correction
+	setting:first_layer_size_compensation
+	setting:elephant_foot_min_width
+	setting:gamma_correction
+group:Exposure
+	setting:min_exposure_time
+	setting:max_exposure_time
+	setting:min_initial_exposure_time
+	setting:max_initial_exposure_time
+group:Thumbnails
+	line:Size for Gcode
+		setting:id$0:label$Small:thumbnails
+		setting:id$1:label$Big:thumbnails
+	end_line
+	line:Color override
+		setting:label$:sidetext_width$1:thumbnails_custom_color
+		setting:label$:label_width$1:thumbnails_color
+	end_line
+	line:Options
+		setting:thumbnails_with_bed
+		setting:thumbnails_with_support
+	end_line
+group:Print Host upload
+	build_printhost
+
+page:Notes:note.png
+group:nolabel:Notes
+		setting:full_width:height$25:printer_notes
+
+page:Dependencies:wrench.png
+	group:Profile dependencies
+		parent_preset_description

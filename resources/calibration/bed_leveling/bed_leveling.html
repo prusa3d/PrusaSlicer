@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Bed Level Calibration</title>
+</head>
+<body>
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Bed Level Calibration</h1>
+</td>
+<td style="text-align: right;">need: nothing</td>
+</tr>
+</tbody>
+</table>
+<p>This calibration is the first one to do because it's required to make a print stick well on the build plate.</p>
+<p>This calibration is made to do the fine tuning. Please roughly level the printer before you start and move the nozzle to 0.2mm above the bed. You must be able to move a paper between the nozzle and the plate, but you have to be able to feel the nozzle touching it. After that, you should be able to level the bed to within a ~0.1mm precision.</p>
+<h2>How it works</h2>
+<p>First, select your printer and your default print profile with the filament profile for the filament you have. Note that this calibration only works with your first extruder if you have multiple ones.</p>
+<p>When clicking on the Generate button, the program will create and slice the test print. You have to send it to your printer and print it. After the print ends, check the result of the five patches against the photos below. You will have to tune your printer/firmware to correct the height if needed.</p>
+<p>Read the notes and advice below for more information.</p>
+<h2>Results</h2>
+<table width="100%">
+<tbody>
+<tr>
+<td><img src="./low_ll.jpg" width="100" height="200" /></td>
+<td><img src="./low_l.jpg" width="100" height="200" /></td>
+<td><img src="./low.jpg" width="100" height="200" /></td>
+<td><img src="./good.jpg" width="100" height="200" /></td>
+<td><img src="./high.jpg" width="100" height="200" /></td>
+<td><img src="./high_h.jpg" width="100" height="200" /></td>
+<td><img src="./high_hh.jpg" width="100" height="200" /></td>
+</tr>
+<tr>
+<td style="text-align: center;">Too far away</td>
+<td style="text-align: center;">Too far</td>
+<td style="text-align: center;">Too far:<br />You can spot<br />a little gap</td>
+<td style="text-align: center;">Perfect</td>
+<td style="text-align: center;">Too near</td>
+<td style="text-align: center;">Warning!<br />It's too near:<br />check the thickness<br />with your fingers!</td>
+<td style="text-align: center;">Far too near<br />Dangerous<br />for the bed</td>
+</tr>
+</table>
+<h2>How to tune your printer</h2>
+<p><strong>If your printer has bed screws</strong>, use them to raise or lower the bed corresponding to the patch that needs adjustment. Don't forget to re-print the test after the adjustment to verify the compensation. Be careful, as most of the time, a half-turn corresponds to 0.2mm of height adjustment, which is typically the same as the height of the first layer. If you raise the bed, never turn more than that and usually only adjust by quarter-turn at most.</p>
+<p><strong>If it does not have bed screws</strong>, you have to use the software or modify the firmware configuration. Refer to the manual for your printer.</p>
+<h2>Advice</h2>
+<p>If your filament has a hard time sticking to the bed, you can try to:</p>
+<ul>
+<li>Increase the first layer width, it will increase the squish (pressure) without any over-extrusion. You can go as high as 200% nozzle width, but 150% should be enough. (Advanced setting, print -> width)</li>
+<li>Reduce the first layer printing speed to give it time to stick. (Advanced setting, print -> speed)</li>
+<li>You can disable/enable z-hop for the first layer by increasing "only lift z"-&gt; above Z" to a higher value than your first layer height. Enabling it may pull the filament from the bed and disabling may let the nozzle hit the bed &amp; push the deposited filament, so you have to test to find the optimal value. (Advanced setting, printer -> extruder)</li>
+</ul>
+<h2>Notes</h2>
+<p>This test uses your current first layer height, but you may want to increase it up to 80% of your nozzle height (before using 'generate') if it's the first time you are levelling your bed in order to reduce the risk of a nozzle crash.</p>
+<p>If after the filament flow calibration it appears that the flow was very wrong, you may want to redo this calibration another time.</p>
+<p>Most of the calibrations need to be done in the right order. This is the first one to do. But if you want to achieve good results you need to calibrate your extruder, e.g.: if you ask it to extrude 100mm of filament, that's exactly the length of the filament that the extruder needs to push into the nozzle.</p>
+<p>This test sets the setting "Complete Individual Objects" to true, so you may want to reset your print settings afterwards.</p>
+<p>Licence for models used for this calibration test: CC BY-SA 3.0</p>
+</body>
+</html>

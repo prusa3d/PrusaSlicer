@@ -1,5 +1,7 @@
 # Localization and translation guide
 
+note: this guide was done for PrusaSlicer. You can use PrusaSlicer .pom file for SuperSlicer but some fields will be missed.
+
 The purpose of this guide is to describe how to contribute to the PrusaSlicer translations. We use GNUgettext for extracting string resources from the project and PoEdit for editing translations.
 
 Those can be downloaded here: 

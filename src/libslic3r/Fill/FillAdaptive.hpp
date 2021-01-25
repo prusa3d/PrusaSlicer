@@ -65,7 +65,7 @@ protected:
 	    unsigned int                     thickness_layers,
 	    const std::pair<float, Point>   &direction,
 	    ExPolygon                        expolygon,
-	    Polylines                       &polylines_out) override;
+	    Polylines                       &polylines_out) const override;
     // Let the G-code export reoder the infill lines.
     //FIXME letting the G-code exporter to reorder infill lines of Adaptive Cubic Infill
     // may not be optimal as the internal infill lines may get extruded before the long infill

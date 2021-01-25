@@ -126,6 +126,25 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
     // Load the header
     const auto &vendor_section = get_or_throw(tree, "vendor")->second;
     res.name = get_or_throw(vendor_section, "name")->second.data();
+    auto full_name_node = vendor_section.find("full_name");
+    res.full_name = (full_name_node == vendor_section.not_found()) ? res.name : full_name_node->second.data();
+    const auto technologies_field = vendor_section.get<std::string>("technologies", "");
+    std::vector<std::string> technologies;
+    if (Slic3r::unescape_strings_cstyle(technologies_field, technologies) && !technologies.empty()) {
+        for (const std::string &technology : technologies) {
+            if (technology == "FFF")
+                res.technologies.push_back(PrinterTechnology::ptFFF);
+            else if (technology == "SLA")
+                res.technologies.push_back(PrinterTechnology::ptSLA);
+            else if (technology == "SLS")
+                res.technologies.push_back(PrinterTechnology::ptSLS);
+            else
+                BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: Malformed technologies field: `%2%`") % id % technologies_field;
+        }
+    } else {
+        //default to FFF if not present
+        res.technologies.push_back(PrinterTechnology::ptFFF);
+    }
 
     auto config_version_str = get_or_throw(vendor_section, "config_version")->second.data();
     auto config_version = Semver::parse(config_version_str);
@@ -144,6 +163,18 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
     const auto changelog_url = vendor_section.find("changelog_url");
     if (changelog_url != vendor_section.not_found()) {
         res.changelog_url = changelog_url->second.data();
+    }
+
+    //get family column size
+    auto family_size = tree.find("family_size");
+    if (family_size != tree.not_found()) {
+        for (auto it = family_size->second.begin(); it != family_size->second.end(); ++it) {
+            try {
+                res.family_2_line_size[it->first] = atoi(it->second.data().c_str());
+            } catch (const std::runtime_error & err) {
+                printf("Error, can't set the line width for family %s:\n%s\n", it->first.c_str(), err.what());
+            }
+        }
     }
 
     if (! load_all) {
@@ -171,11 +202,7 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
                 const auto from_pre_map = pre_family_model_map.find(model.id);
                 if (from_pre_map != pre_family_model_map.end()) { model.family = from_pre_map->second; }
             }
-#if 0
-            // Remove SLA printers from the initial alpha.
-            if (model.technology == ptSLA)
-                continue;
-#endif
+
             section.second.get<std::string>("variants", "");
             const auto variants_field = section.second.get<std::string>("variants", "");
             std::vector<std::string> variants;
@@ -200,8 +227,11 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
             }
             model.bed_model   = section.second.get<std::string>("bed_model", "");
             model.bed_texture = section.second.get<std::string>("bed_texture", "");
+            model.thumbnail = section.second.get<std::string>("thumbnail", "");
+
+            //save it
             if (! model.id.empty() && ! model.variants.empty())
-                res.models.push_back(std::move(model));
+                res.models.emplace_back(std::move(model));
         }
     }
 
@@ -290,6 +320,10 @@ void Preset::normalize(DynamicPrintConfig &config)
                 static_cast<ConfigOptionStrings*>(opt)->values.resize(n, std::string());
         }
     }
+    auto *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
+    if (milling_diameter != nullptr)
+        // Loaded the FFF Printer settings. Verify, that all extruder dependent values have enough values.
+        config.set_num_milling((unsigned int)milling_diameter->values.size());
 }
 
 std::string Preset::remove_invalid_keys(DynamicPrintConfig &config, const DynamicPrintConfig &default_config)
@@ -370,6 +404,9 @@ bool is_compatible_with_printer(const PresetWithVendorProfile &preset, const Pre
     const ConfigOption *opt = active_printer.preset.config.option("nozzle_diameter");
     if (opt)
         config.set_key_value("num_extruders", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
+    opt = active_printer.preset.config.option("milling_diameter");
+    if (opt)
+        config.set_key_value("num_milling", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
     return is_compatible_with_printer(preset, active_printer, &config);
 }
 
@@ -381,75 +418,222 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
         const std::string &model = config.opt_string("printer_model");
         const std::string &variant = config.opt_string("printer_variant");
         if (model.empty() || variant.empty())
-        	return;
+            return;
         is_visible = app_config.get_variant(vendor->id, model, variant);
     } else if (type == TYPE_FILAMENT || type == TYPE_SLA_MATERIAL) {
-    	const std::string &section_name = (type == TYPE_FILAMENT) ? AppConfig::SECTION_FILAMENTS : AppConfig::SECTION_MATERIALS;
-    	if (app_config.has_section(section_name)) {
-    		// Check whether this profile is marked as "installed" in PrusaSlicer.ini, 
-    		// or whether a profile is marked as "installed", which this profile may have been renamed from.
-	    	const std::map<std::string, std::string> &installed = app_config.get_section(section_name);
-	    	auto has = [&installed](const std::string &name) {
-	    		auto it = installed.find(name);
-				return it != installed.end() && ! it->second.empty();
-	    	};
-	    	is_visible = has(this->name);
-	    	for (auto it = this->renamed_from.begin(); ! is_visible && it != this->renamed_from.end(); ++ it)
-	    		is_visible = has(*it);
-	    }
+        const std::string &section_name = (type == TYPE_FILAMENT) ? AppConfig::SECTION_FILAMENTS : AppConfig::SECTION_MATERIALS;
+        if (app_config.has_section(section_name)) {
+            // Check whether this profile is marked as "installed" in PrusaSlicer.ini, 
+            // or whether a profile is marked as "installed", which this profile may have been renamed from.
+            const std::map<std::string, std::string> &installed = app_config.get_section(section_name);
+            auto has = [&installed](const std::string &name) {
+                auto it = installed.find(name);
+                return it != installed.end() && ! it->second.empty();
+            };
+            is_visible = has(this->name);
+            for (auto it = this->renamed_from.begin(); ! is_visible && it != this->renamed_from.end(); ++ it)
+                is_visible = has(*it);
+        }
     }
 }
 
 const std::vector<std::string>& Preset::print_options()
-{
+{    
     static std::vector<std::string> s_opts {
-        "layer_height", "first_layer_height", "perimeters", "spiral_vase", "slice_closing_radius", 
-        "top_solid_layers", "top_solid_min_thickness", "bottom_solid_layers", "bottom_solid_min_thickness",
-        "extra_perimeters", "ensure_vertical_shell_thickness", "avoid_crossing_perimeters", "thin_walls", "overhangs",
-        "seam_position", "external_perimeters_first", "fill_density", "fill_pattern", "top_fill_pattern", "bottom_fill_pattern",
-        "infill_every_layers", "infill_only_where_needed", "solid_infill_every_layers", "fill_angle", "bridge_angle",
+        "layer_height", 
+        "first_layer_height", "perimeters", "spiral_vase", "slice_closing_radius",
+        "top_solid_layers",
+        "top_solid_min_thickness",
+        "bottom_solid_layers",
+        "bottom_solid_min_thickness",
+        "extra_perimeters",
+        "extra_perimeters_odd_layers",
+        "extra_perimeters_overhangs",
+        "only_one_perimeter_top", "ensure_vertical_shell_thickness", 
+        "allow_empty_layers",
+        "avoid_crossing_perimeters", 
+        "avoid_crossing_not_first_layer",
+        "thin_perimeters", "thin_perimeters_all",
+        "thin_walls",
+        "overhangs_speed",
+        "overhangs_width",
+        "overhangs_width_speed", 
+        "overhangs_reverse",
+        "overhangs_reverse_threshold",
+        "seam_position", 
+        "external_perimeters_first",
+        "external_perimeters_vase",
+        "external_perimeters_nothole",
+        "external_perimeters_hole",
+        "fill_density"
+        , "fill_pattern"
+        , "fill_top_flow_ratio"
+        , "fill_smooth_width"
+        , "fill_smooth_distribution"
+        , "top_fill_pattern"
+        , "bottom_fill_pattern"
+        , "solid_fill_pattern",
+        "infill_every_layers", "infill_only_where_needed", "solid_infill_every_layers",
+        "ironing",
+        "ironing_type",
+        "ironing_flowrate",
+        "ironing_speed",
+        "ironing_spacing",
+        "fill_angle",
+        "fill_angle_increment",
+        "bridge_angle", 
         "solid_infill_below_area", "only_retract_when_crossing_perimeters", "infill_first", 
-    	"ironing", "ironing_type", "ironing_flowrate", "ironing_speed", "ironing_spacing",
-        "max_print_speed", "max_volumetric_speed", "avoid_crossing_perimeters_max_detour",
+        "max_print_speed",
+        "max_volumetric_speed", 
+        "avoid_crossing_perimeters_max_detour",
 #ifdef HAS_PRESSURE_EQUALIZER
-        "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative",
+        "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative", 
 #endif /* HAS_PRESSURE_EQUALIZER */
-        "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "infill_speed", "solid_infill_speed",
+        "min_width_top_surface",
+        "perimeter_speed",
+        "small_perimeter_speed",
+        "small_perimeter_min_length",
+        "small_perimeter_max_length",
+        "external_perimeter_speed", "infill_speed", "solid_infill_speed", 
         "top_solid_infill_speed", "support_material_speed", "support_material_xy_spacing", "support_material_interface_speed",
-        "bridge_speed", "gap_fill_speed", "travel_speed", "first_layer_speed", "perimeter_acceleration", "infill_acceleration",
-        "bridge_acceleration", "first_layer_acceleration", "default_acceleration", "skirts", "skirt_distance", "skirt_height", "draft_shield",
-        "min_skirt_length", "brim_width", "support_material", "support_material_auto", "support_material_threshold", "support_material_enforce_layers",
-        "raft_layers", "support_material_pattern", "support_material_with_sheath", "support_material_spacing",
-        "support_material_synchronize_layers", "support_material_angle", "support_material_interface_layers",
-        "support_material_interface_spacing", "support_material_interface_contact_loops", "support_material_contact_distance",
-        "support_material_buildplate_only", "dont_support_bridges", "notes", "complete_objects", "extruder_clearance_radius",
-        "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "perimeter_extruder",
-        "infill_extruder", "solid_infill_extruder", "support_material_extruder", "support_material_interface_extruder",
-        "ooze_prevention", "standby_temperature_delta", "interface_shells", "extrusion_width", "first_layer_extrusion_width",
-        "perimeter_extrusion_width", "external_perimeter_extrusion_width", "infill_extrusion_width", "solid_infill_extrusion_width",
-        "top_infill_extrusion_width", "support_material_extrusion_width", "infill_overlap", "infill_anchor", "infill_anchor_max", "bridge_flow_ratio", "clip_multipart_objects",
-        "elefant_foot_compensation", "xy_size_compensation", "threads", "resolution", "wipe_tower", "wipe_tower_x", "wipe_tower_y",
-        "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_bridging", "single_extruder_multi_material_priming",
-        "wipe_tower_no_sparse_layers", "compatible_printers", "compatible_printers_condition", "inherits"
+        "bridge_speed",
+        "bridge_speed_internal",
+        "gap_fill",
+        "gap_fill_min_area",
+        "gap_fill_overlap",
+        "gap_fill_speed",
+        "travel_speed", "first_layer_speed", "perimeter_acceleration", "infill_acceleration",
+        "bridge_acceleration", "first_layer_acceleration", "default_acceleration", 
+        "duplicate_distance",
+        "skirts", "skirt_distance", "skirt_height",
+        "skirt_extrusion_width",
+        "min_skirt_length",
+        "draft_shield",
+        "brim_inside_holes",
+        "brim_width",
+        "brim_width_interior",
+        "brim_ears",
+        "brim_ears_detection_length",
+        "brim_ears_max_angle",
+        "brim_ears_pattern",
+        "brim_offset",
+        "support_material", "support_material_auto", "support_material_threshold", "support_material_enforce_layers", 
+        "raft_layers", "support_material_pattern", "support_material_with_sheath", "support_material_spacing", 
+        "support_material_interface_pattern",
+        "support_material_synchronize_layers", "support_material_angle", "support_material_interface_layers", 
+        "support_material_interface_spacing", "support_material_interface_contact_loops"
+        , "support_material_contact_distance_type"
+        , "support_material_contact_distance_top"
+        , "support_material_contact_distance_bottom" 
+        , "support_material_buildplate_only", "dont_support_bridges", "notes", 
+        "complete_objects",
+        "complete_objects_one_skirt",
+        "complete_objects_sort",
+        "extruder_clearance_radius", 
+        "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "perimeter_extruder", 
+        "infill_extruder", "solid_infill_extruder", "support_material_extruder", "support_material_interface_extruder", 
+        "ooze_prevention", "standby_temperature_delta", "interface_shells", "extrusion_width", "first_layer_extrusion_width", 
+        "perimeter_extrusion_width", "external_perimeter_extrusion_width", "infill_extrusion_width", "solid_infill_extrusion_width", 
+        "top_infill_extrusion_width", "support_material_extrusion_width", "infill_overlap", "bridge_flow_ratio", 
+        "infill_anchor",
+        "infill_anchor_max",
+        "clip_multipart_objects",
+        "over_bridge_flow_ratio",
+        "bridge_overlap",
+        "first_layer_flow_ratio",
+        "clip_multipart_objects", "enforce_full_fill_volume", "external_infill_margin", "bridged_infill_margin",
+        "first_layer_size_compensation",
+        "xy_size_compensation",
+        "xy_inner_size_compensation",
+        "hole_size_compensation",
+        "hole_size_threshold",
+        "hole_to_polyhole",
+        "threads", "resolution",
+        "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_bridging",
+        "wipe_tower_brim",
+        "single_extruder_multi_material_priming", 
+        "wipe_tower_no_sparse_layers",
+        "compatible_printers", "compatible_printers_condition", "inherits", 
+        "infill_dense", "infill_dense_algo",
+        "no_perimeter_unsupported_algo",
+        "support_material_solid_first_layer",
+        "exact_last_layer_height",
+        "perimeter_loop",
+        "perimeter_loop_seam",
+        "seam_angle_cost",
+        "seam_travel_cost",
+        "infill_connection", "infill_connection_solid", "infill_connection_top", "infill_connection_bottom",
+        "first_layer_infill_speed",
+        "thin_walls_min_width",
+        "thin_walls_overlap",
+        "thin_walls_speed"
+        , "model_precision"
+        , "curve_smoothing_precision"
+        , "curve_smoothing_cutoff_dist"
+        , "curve_smoothing_angle_convex"
+        , "curve_smoothing_angle_concave",
+        "print_extrusion_multiplier",
+        "print_retract_length",
+        "print_temperature",
+        "print_retract_lift",
+        "external_perimeter_cut_corners",
+        "external_perimeter_overlap",
+        "perimeter_bonding",
+        "perimeter_overlap",
+        "milling_after_z",
+        "milling_post_process",
+        "milling_extra_size",
+        "milling_speed",
+        "thin_walls_merge",
     };
     return s_opts;
 }
 
 const std::vector<std::string>& Preset::filament_options()
-{
+{    
     static std::vector<std::string> s_opts {
-        "filament_colour", "filament_diameter", "filament_type", "filament_soluble", "filament_notes", "filament_max_volumetric_speed",
+        "filament_colour", "filament_diameter", "filament_type", "filament_soluble", "filament_notes",
+        "filament_max_speed",
+        "filament_max_volumetric_speed",
+        "filament_max_wipe_tower_speed",
         "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
-        "filament_unloading_speed", "filament_unloading_speed_start", "filament_unload_time", "filament_toolchange_delay", "filament_cooling_moves",
+        "filament_unloading_speed", "filament_toolchange_delay", "filament_unloading_speed_start", "filament_unload_time", "filament_cooling_moves",
         "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
-        "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", "fan_always_on", "cooling", "min_fan_speed",
-        "max_fan_speed", "bridge_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed",
+        "filament_shrink",
+        "filament_use_skinnydip",  // skinnydip params start
+        "filament_use_fast_skinnydip",
+        "filament_skinnydip_distance",
+        "filament_melt_zone_pause",
+        "filament_cooling_zone_pause",
+        "filament_toolchange_temp",
+        "filament_enable_toolchange_temp",
+        "filament_enable_toolchange_part_fan",
+        "filament_toolchange_part_fan_speed",
+        "filament_dip_insertion_speed",
+        "filament_dip_extraction_speed",  //skinnydip params end
+        "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", 
+        "full_fan_speed_layer",
+        "cooling",
+        "fan_always_on", 
+        "min_fan_speed",
+        "max_fan_speed", 
+        "bridge_fan_speed",
+        "top_fan_speed",
+        "disable_fan_first_layers",
+        "fan_below_layer_time", 
+        "slowdown_below_layer_time",
+        "max_speed_reduction",
+        "min_print_speed",
         "start_filament_gcode", "end_filament_gcode",
+        "external_perimeter_fan_speed",
         // Retract overrides
         "filament_retract_length", "filament_retract_lift", "filament_retract_lift_above", "filament_retract_lift_below", "filament_retract_speed", "filament_deretract_speed", "filament_retract_restart_extra", "filament_retract_before_travel",
-        "filament_retract_layer_change", "filament_wipe", "filament_retract_before_wipe",
+        "filament_retract_layer_change", "filament_wipe", "filament_wipe_extra_perimeter", "filament_retract_before_wipe",
         // Profile compatibility
         "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits"
+        //merill adds
+        , "filament_wipe_advanced_pigment"
+        , "chamber_temperature"
     };
     return s_opts;
 }
@@ -459,36 +643,56 @@ const std::vector<std::string>& Preset::machine_limits_options()
     static std::vector<std::string> s_opts;
     if (s_opts.empty()) {
         s_opts = {
-			"machine_max_acceleration_extruding", "machine_max_acceleration_retracting",
-		    "machine_max_acceleration_x", "machine_max_acceleration_y", "machine_max_acceleration_z", "machine_max_acceleration_e",
-		    "machine_max_feedrate_x", "machine_max_feedrate_y", "machine_max_feedrate_z", "machine_max_feedrate_e",
-		    "machine_min_extruding_rate", "machine_min_travel_rate",
-		    "machine_max_jerk_x", "machine_max_jerk_y", "machine_max_jerk_z", "machine_max_jerk_e",
-		};
-	}
-	return s_opts;
+            "machine_max_acceleration_extruding",
+            "machine_max_acceleration_retracting",
+            "machine_max_acceleration_travel",
+            "machine_max_acceleration_x", "machine_max_acceleration_y", "machine_max_acceleration_z", "machine_max_acceleration_e",
+            "machine_max_feedrate_x", "machine_max_feedrate_y", "machine_max_feedrate_z", "machine_max_feedrate_e",
+            "machine_min_extruding_rate", "machine_min_travel_rate",
+            "machine_max_jerk_x", "machine_max_jerk_y", "machine_max_jerk_z", "machine_max_jerk_e",
+            "z_step"
+        };
+    }
+    return s_opts;
 }
 
 const std::vector<std::string>& Preset::printer_options()
-{
+{    
     static std::vector<std::string> s_opts;
     if (s_opts.empty()) {
         s_opts = {
             "printer_technology",
-            "bed_shape", "bed_custom_texture", "bed_custom_model", "z_offset", "gcode_flavor", "use_relative_e_distances",
+            "bed_shape", "bed_custom_texture", "bed_custom_model", "z_offset",
+            "fan_kickstart",
+            "fan_speedup_overhangs",
+            "fan_speedup_time",
+            "gcode_flavor", "use_relative_e_distances",
             "use_firmware_retraction", "use_volumetric_e", "variable_layer_height",
+            "min_length",
             //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
-            "host_type", "print_host", "printhost_apikey", "printhost_cafile",
+            "host_type", "print_host", "printhost_apikey", "printhost_cafile", "printhost_port",
             "single_extruder_multi_material", "start_gcode", "end_gcode", "before_layer_gcode", "layer_gcode", "toolchange_gcode",
-            "color_change_gcode", "pause_print_gcode", "template_custom_gcode",
+
+            "color_change_gcode", "pause_print_gcode", "template_custom_gcode",            "feature_gcode",
             "between_objects_gcode", "printer_vendor", "printer_model", "printer_variant", "printer_notes", "cooling_tube_retraction",
-            "cooling_tube_length", "high_current_on_filament_swap", "parking_pos_retraction", "extra_loading_move", "max_print_height",
+            "cooling_tube_length", "high_current_on_filament_swap", "parking_pos_retraction", "extra_loading_move", "max_print_height", 
             "default_print_profile", "inherits",
-            "remaining_times", "silent_mode", 
-            "machine_limits_usage", "thumbnails"
+            "remaining_times",
+            "silent_mode", 
+            "machine_limits_usage",
+            "thumbnails",
+            "thumbnails_color",
+            "thumbnails_custom_color",
+            "thumbnails_with_bed",
+            "wipe_advanced",
+            "wipe_advanced_nozzle_melted_volume",
+            "wipe_advanced_multiplier",
+            "wipe_advanced_algo",
+            "time_estimation_compensation",
         };
         s_opts.insert(s_opts.end(), Preset::machine_limits_options().begin(), Preset::machine_limits_options().end());
         s_opts.insert(s_opts.end(), Preset::nozzle_options().begin(), Preset::nozzle_options().end());
+        s_opts.insert(s_opts.end(), Preset::milling_options().begin(), Preset::milling_options().end());
     }
     return s_opts;
 }
@@ -497,7 +701,12 @@ const std::vector<std::string>& Preset::printer_options()
 // of the nozzle_diameter vector.
 const std::vector<std::string>& Preset::nozzle_options()
 {
-	return print_config_def.extruder_option_keys();
+    return print_config_def.extruder_option_keys();
+}
+
+const std::vector<std::string>& Preset::milling_options()
+{
+    return print_config_def.milling_option_keys();
 }
 
 const std::vector<std::string>& Preset::sla_print_options()
@@ -591,15 +800,20 @@ const std::vector<std::string>& Preset::sla_printer_options()
             "fast_tilt_time", "slow_tilt_time", "area_fill",
             "relative_correction",
             "absolute_correction",
-            "elefant_foot_compensation",
-            "elefant_foot_min_width",
+            "first_layer_size_compensation",
+            "elephant_foot_min_width",
             "gamma_correction",
             "min_exposure_time", "max_exposure_time",
             "min_initial_exposure_time", "max_initial_exposure_time",
             //FIXME the print host keys are left here just for conversion from the Printer preset to Physical Printer preset.
-            "print_host", "printhost_apikey", "printhost_cafile",
+            "print_host", "printhost_apikey", "printhost_cafile", "printhost_port",
             "printer_notes",
-            "inherits"
+            "inherits",
+            "thumbnails",
+            "thumbnails_color",
+            "thumbnails_custom_color",
+            "thumbnails_with_bed",
+            "thumbnails_with_support"
         };
     }
     return s_opts;
@@ -723,7 +937,7 @@ static bool profile_print_params_same(const DynamicPrintConfig &cfg_old, const D
                              "print_settings_id", "filament_settings_id", "sla_print_settings_id", "sla_material_settings_id", "printer_settings_id",
                              "printer_model", "printer_variant", "default_print_profile", "default_filament_profile", "default_sla_print_profile", "default_sla_material_profile",
                              //FIXME remove the print host keys?
-                             "print_host", "printhost_apikey", "printhost_cafile" })
+                             "print_host", "printhost_apikey", "printhost_cafile", "printhost_port" })
         diff.erase(std::remove(diff.begin(), diff.end(), key), diff.end());
     // Preset with the same name as stored inside the config exists.
     return diff.empty();
@@ -759,19 +973,19 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             return std::make_pair(&(*this->find_preset_internal(edited.name)), false);
     }
     // Is there a preset already loaded with the name stored inside the config?
-    std::deque<Preset>::iterator it       = this->find_preset_internal(original_name);
-    bool                         found    = it != m_presets.end() && it->name == original_name;
+    std::deque<Preset>::iterator it = this->find_preset_internal(original_name);
+    bool                         found = it != m_presets.end() && it->name == original_name;
     if (! found) {
     	// Try to match the original_name against the "renamed_from" profile names of loaded system profiles.
 		it = this->find_preset_renamed(original_name);
 		found = it != m_presets.end();
     }
     if (found && profile_print_params_same(it->config, cfg)) {
-        // The preset exists and it matches the values stored inside config.
+	        // The preset exists and it matches the values stored inside config.
         if (select == LoadAndSelect::Always)
-            this->select_preset(it - m_presets.begin());
+	            this->select_preset(it - m_presets.begin());
         return std::make_pair(&(*it), false);
-    }
+	    }
     if (! found && select != LoadAndSelect::Never && ! inherits.empty()) {
         // Try to use a system profile as a base to select the system profile
         // and override its settings with the loaded ones.
@@ -797,10 +1011,10 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             return std::make_pair(&(*it), this->get_edited_preset().is_dirty);
         }
         if (inherits.empty()) {
-            // Update the "inherits" field.
-            // There is a profile with the same name already loaded. Should we update the "inherits" field?
+    // Update the "inherits" field.
+        // There is a profile with the same name already loaded. Should we update the "inherits" field?
             inherits = it->vendor ? it->name : it->inherits();
-        }
+    }
     }
 
     // The external preset does not match an internal preset, load the external preset.
@@ -1083,6 +1297,9 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
     const ConfigOption *opt = active_printer.preset.config.option("nozzle_diameter");
     if (opt)
         config.set_key_value("num_extruders", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
+    opt = active_printer.preset.config.option("milling_diameter");
+    if (opt)
+        config.set_key_value("num_milling", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
     bool some_compatible = false;
     for (size_t idx_preset = m_num_default_presets; idx_preset < m_presets.size(); ++ idx_preset) {
         bool    selected        = idx_preset == m_idx_selected;
@@ -1137,7 +1354,7 @@ void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& 
     for (int i = 0; i < int(opt_cur->values.size()); i++)
     {
         int init_id = i <= opt_init_max_id ? i : 0;
-        if (opt_cur->values[i] != opt_init->values[init_id])
+        if (opt_init_max_id < 0 || opt_cur->values[i] != opt_init->values[init_id])
             vec.emplace_back(opt_key + "#" + std::to_string(i));
     }
 }
@@ -1380,14 +1597,14 @@ const std::vector<std::string>& PhysicalPrinter::printer_options()
             "preset_name",
             "printer_technology",
 //            "printer_model",
-            "host_type",
-            "print_host",
+            "host_type", 
+            "print_host", 
             "printhost_apikey",
             "printhost_cafile",
             "printhost_port",
             "printhost_authorization_type",
             // HTTP digest authentization (RFC 2617)
-            "printhost_user",
+            "printhost_user", 
             "printhost_password"
         };
     }
@@ -1395,10 +1612,11 @@ const std::vector<std::string>& PhysicalPrinter::printer_options()
 }
 
 static constexpr auto legacy_print_host_options = {
-    "print_host",
-    "printhost_apikey",
-    "printhost_cafile",
-};
+            "print_host",
+            "printhost_apikey",
+            "printhost_cafile",
+            "printhost_port"
+        };
 
 std::vector<std::string> PhysicalPrinter::presets_with_print_host_information(const PrinterPresetCollection& printer_presets)
 {
@@ -1431,7 +1649,8 @@ bool PhysicalPrinter::has_empty_config() const
             config.opt_string("printhost_cafile"  ).empty() && 
             config.opt_string("printhost_port"    ).empty() &&
             config.opt_string("printhost_user"    ).empty() && 
-            config.opt_string("printhost_password").empty();
+            config.opt_string("printhost_password").empty() && 
+            config.opt_string("printhost_port"    ).empty();
 }
 
 void PhysicalPrinter::update_preset_names_in_config()
@@ -1905,7 +2124,7 @@ namespace PresetUtils {
         if (pm != nullptr && !pm->bed_model.empty()) {
             out = Slic3r::data_dir() + "/vendor/" + preset.vendor->id + "/" + pm->bed_model;
             if (!boost::filesystem::exists(boost::filesystem::path(out)))
-                out = Slic3r::resources_dir() + "/profiles/" + preset.vendor->id + "/" + pm->bed_model;
+            out = Slic3r::resources_dir() + "/profiles/" + preset.vendor->id + "/" + pm->bed_model;
         }
         return out;
     }
@@ -1917,7 +2136,7 @@ namespace PresetUtils {
         if (pm != nullptr && !pm->bed_texture.empty()) {
             out = Slic3r::data_dir() + "/vendor/" + preset.vendor->id + "/" + pm->bed_texture;
             if (!boost::filesystem::exists(boost::filesystem::path(out)))
-                out = Slic3r::resources_dir() + "/profiles/" + preset.vendor->id + "/" + pm->bed_texture;
+            out = Slic3r::resources_dir() + "/profiles/" + preset.vendor->id + "/" + pm->bed_texture;
         }
         return out;
     }

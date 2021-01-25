@@ -2,6 +2,9 @@
 #include "Model.hpp"
 #include "ModelArrange.hpp"
 #include "Geometry.hpp"
+#include "Polygon.hpp"
+#include "ClipperUtils.hpp"
+#include "Print.hpp"
 #include "MTUtils.hpp"
 #include "TriangleSelector.hpp"
 
@@ -417,7 +420,7 @@ void Model::convert_multipart_object(unsigned int max_extruders)
     //FIXME copy the config etc?
 
     unsigned int extruder_counter = 0;
-	for (const ModelObject* o : this->objects)
+    for (const ModelObject* o : this->objects)
     	for (const ModelVolume* v : o->volumes) {
             // If there are more than one object, put all volumes together 
             // Each object may contain any number of volumes and instances
@@ -435,9 +438,9 @@ void Model::convert_multipart_object(unsigned int max_extruders)
             if (o->instances.empty()) {
             	copy_volume(object->add_volume(*v))->set_transformation(trafo_volume);
             } else {
-            	for (const ModelInstance* i : o->instances)
-                    // ...so, transform everything to a common reference system (world)
-                	copy_volume(object->add_volume(*v))->set_transformation(i->get_transformation() * trafo_volume);                    
+                for (const ModelInstance* i : o->instances)
+                        // ...so, transform everything to a common reference system (world)
+                    copy_volume(object->add_volume(*v))->set_transformation(i->get_transformation() * trafo_volume);                    
             }
         }
 
@@ -618,39 +621,39 @@ void ModelObject::assign_new_unique_ids_recursive()
 //    return new ModelObject(parent, *this, true);
 //}
 
-ModelVolume* ModelObject::add_volume(const TriangleMesh &mesh)
+ModelVolume* ModelObject::add_volume(const TriangleMesh &mesh, bool centered)
 {
     ModelVolume* v = new ModelVolume(this, mesh);
     this->volumes.push_back(v);
-    v->center_geometry_after_creation();
+    if(centered) v->center_geometry_after_creation();
     this->invalidate_bounding_box();
     return v;
 }
 
-ModelVolume* ModelObject::add_volume(TriangleMesh &&mesh)
+ModelVolume* ModelObject::add_volume(TriangleMesh &&mesh, bool centered)
 {
     ModelVolume* v = new ModelVolume(this, std::move(mesh));
     this->volumes.push_back(v);
-    v->center_geometry_after_creation();
+    if(centered) v->center_geometry_after_creation();
     this->invalidate_bounding_box();
     return v;
 }
 
-ModelVolume* ModelObject::add_volume(const ModelVolume &other)
+ModelVolume* ModelObject::add_volume(const ModelVolume &other, bool centered)
 {
     ModelVolume* v = new ModelVolume(this, other);
     this->volumes.push_back(v);
 	// The volume should already be centered at this point of time when copying shared pointers of the triangle mesh and convex hull.
-//	v->center_geometry_after_creation();
-//    this->invalidate_bounding_box();
+//    if(centered) v->center_geometry_after_creation();
+//    if(centered) this->invalidate_bounding_box();
     return v;
 }
 
-ModelVolume* ModelObject::add_volume(const ModelVolume &other, TriangleMesh &&mesh)
+ModelVolume* ModelObject::add_volume(const ModelVolume &other, TriangleMesh &&mesh, bool centered)
 {
     ModelVolume* v = new ModelVolume(this, other, std::move(mesh));
     this->volumes.push_back(v);
-    v->center_geometry_after_creation();
+    if(centered) v->center_geometry_after_creation();
     this->invalidate_bounding_box();
     return v;
 }
@@ -855,8 +858,10 @@ const BoundingBoxf3& ModelObject::raw_bounding_box() const
 
         const Transform3d& inst_matrix = this->instances.front()->get_transformation().get_matrix(true);
         for (const ModelVolume *v : this->volumes)
+        {
             if (v->is_model_part())
                 m_raw_bounding_box.merge(v->mesh().transformed_bounding_box(inst_matrix * v->get_matrix()));
+        }
     }
 	return m_raw_bounding_box;
 }
@@ -870,7 +875,7 @@ BoundingBoxf3 ModelObject::instance_bounding_box(size_t instance_idx, bool dont_
     {
         if (v->is_model_part())
             bb.merge(v->mesh().transformed_bounding_box(inst_matrix * v->get_matrix()));
-    }
+        }
     return bb;
 }
 
@@ -1212,7 +1217,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, coordf_t z, bool keep_upper, b
                 vol->name	= volume->name;
                 // Don't copy the config's ID.
                 vol->config.assign_config(volume->config);
-                assert(vol->config.id().valid());
+    			assert(vol->config.id().valid());
 	    		assert(vol->config.id() != volume->config.id());
                 vol->set_material(volume->material_id(), *volume->material());
 
@@ -1652,6 +1657,8 @@ ModelVolumeType ModelVolume::type_from_string(const std::string &s)
 		return ModelVolumeType::SUPPORT_ENFORCER;
     if (s == "SupportBlocker")
 		return ModelVolumeType::SUPPORT_BLOCKER;
+    if (s == "SeamPosition")
+		return ModelVolumeType::SEAM_POSITION;
     assert(s == "0");
     // Default value if invalud type string received.
 	return ModelVolumeType::MODEL_PART;
@@ -1664,6 +1671,7 @@ std::string ModelVolume::type_to_string(const ModelVolumeType t)
 	case ModelVolumeType::PARAMETER_MODIFIER: return "ParameterModifier";
 	case ModelVolumeType::SUPPORT_ENFORCER:   return "SupportEnforcer";
 	case ModelVolumeType::SUPPORT_BLOCKER:    return "SupportBlocker";
+	case ModelVolumeType::SEAM_POSITION:      return "SeamPosition";
     default:
         assert(false);
         return "ModelPart";
@@ -1866,15 +1874,16 @@ void ModelInstance::transform_polygon(Polygon* polygon) const
     polygon->scale(get_scaling_factor(X), get_scaling_factor(Y)); // scale around polygon origin
 }
 
+
 arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
 {
 //    static const double SIMPLIFY_TOLERANCE_MM = 0.1;
-    
+
     Vec3d rotation = get_rotation();
-    rotation.z()   = 0.;
+    rotation.z() = 0.;
     Transform3d trafo_instance =
         Geometry::assemble_transform(Vec3d::Zero(), rotation,
-                                     get_scaling_factor(), get_mirror());
+            get_scaling_factor(), get_mirror());
 
     Polygon p = get_object()->convex_hull_2d(trafo_instance);
 
@@ -1885,11 +1894,11 @@ arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
 //        pp = p.simplify(scaled<double>(SIMPLIFY_TOLERANCE_MM));
 //        if (!pp.empty()) p = pp.front();
 //    }
-   
+
     arrangement::ArrangePolygon ret;
     ret.poly.contour = std::move(p);
-    ret.translation  = Vec2crd{scaled(get_offset(X)), scaled(get_offset(Y))};
-    ret.rotation     = get_rotation(Z);
+    ret.translation = Vec2crd{ scaled(get_offset(X)), scaled(get_offset(Y)) };
+    ret.rotation = get_rotation(Z);
 
     return ret;
 }

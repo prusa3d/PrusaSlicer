@@ -88,7 +88,7 @@ public:
         return Sel(std::min(int(Sel::modelOnly), std::max(0, sel)));
     }
     
-    Vec2i get_marchsq_windowsize() const
+    Vec2i32 get_marchsq_windowsize() const
     {
         enum { Accurate, Balanced, Fast};
         
@@ -117,7 +117,7 @@ public:
     TriangleMesh       mesh;
     DynamicPrintConfig profile;
     wxString           path;
-    Vec2i              win = {2, 2};
+    Vec2i32              win = {2, 2};
     std::string        err;
     
     priv(Plater *plt): plater{plt} {}

@@ -20,23 +20,27 @@ public:
     void simplify(double tolerance);
     void group(std::vector<SurfacesPtr> *retval);
     template <class T> bool any_internal_contains(const T &item) const {
-        for (const Surface &surface : this->surfaces) if (surface.is_internal() && surface.expolygon.contains(item)) return true;
+        for (const Surface &surface : this->surfaces) if (surface.has_pos_internal() && surface.expolygon.contains(item)) return true;
         return false;
     }
     template <class T> bool any_bottom_contains(const T &item) const {
-        for (const Surface &surface : this->surfaces) if (surface.is_bottom() && surface.expolygon.contains(item)) return true;
+        for (const Surface &surface : this->surfaces) if (surface.has_pos_bottom() && surface.expolygon.contains(item)) return true;
         return false;
     }
-    SurfacesPtr filter_by_type(const SurfaceType type);
-    SurfacesPtr filter_by_types(const SurfaceType *types, int ntypes);
+    SurfacesConstPtr filter_by_type(const SurfaceType type) const;
+    SurfacesConstPtr filter_by_type_flag(const SurfaceType allowed, const SurfaceType not_allowed = stNone) const;
+    SurfacesConstPtr filter_by_types(const SurfaceType *types, int ntypes) const;
     void keep_type(const SurfaceType type);
+    void keep_type_flag(const SurfaceType flags_needed, const SurfaceType flags_to_remove = stNone);
     void keep_types(const SurfaceType *types, int ntypes);
+    void keep_types_flag(const SurfaceType flags_to_keep, const SurfaceType flags_to_remove = stNone);
     void remove_type(const SurfaceType type);
     void remove_types(const SurfaceType *types, int ntypes);
-    void filter_by_type(SurfaceType type, Polygons* polygons);
+    void filter_by_type(const SurfaceType type, Polygons* polygons) const;
+    void filter_by_type_flag(Polygons* polygons, const SurfaceType flags_needed, const SurfaceType flags_not_allowed = stNone) const;
     void set_type(SurfaceType type) {
-    	for (Surface &surface : this->surfaces)
-    		surface.surface_type = type;
+        for (Surface &surface : this->surfaces)
+            surface.surface_type = type;
     }
 
     void clear() { surfaces.clear(); }

@@ -105,12 +105,13 @@ sub copyright_info
     my (%params) = @_;
     my %tag = Slic3r::tags($params{format});
     my $out =
+        'Copyright &copy; 2018 Durand Rémi. <br />' .
         'Copyright &copy; 2016 Vojtech Bubnik, Prusa Research. <br />' .
         'Copyright &copy; 2011-2016 Alessandro Ranellucci. <br />' .
         '<a href="http://slic3r.org/">Slic3r</a> is licensed under the ' .
         '<a href="http://www.gnu.org/licenses/agpl-3.0.html">GNU Affero General Public License, version 3</a>.' .
         '<br /><br /><br />' .
-        'Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Y. Sapir, Mike Sheldrake and numerous others. ' .
+        'Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Y. Sapir, Mike Sheldrake, Durand Rémi and numerous others. ' .
         'Manual by Gary Hodgson. Inspired by the RepRap community. <br />' .
         'Slic3r logo designed by Corey Daniels, <a href="http://www.famfamfam.com/lab/icons/silk/">Silk Icon Set</a> designed by Mark James. ';
     return $out;

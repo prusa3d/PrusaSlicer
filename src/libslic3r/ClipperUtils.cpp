@@ -220,7 +220,7 @@ ClipperLib::Paths Slic3rMultiPoints_to_ClipperPaths(const Polylines &input)
     return retval;
 }
 
-ClipperLib::Paths _offset(ClipperLib::Paths &&input, ClipperLib::EndType endType, const float delta, ClipperLib::JoinType joinType, double miterLimit)
+ClipperLib::Paths _offset(ClipperLib::Paths &&input, ClipperLib::EndType endType, const double delta, ClipperLib::JoinType joinType, double miterLimit)
 {
     // scale input
     scaleClipperPolygons(input);
@@ -231,7 +231,7 @@ ClipperLib::Paths _offset(ClipperLib::Paths &&input, ClipperLib::EndType endType
         co.ArcTolerance = miterLimit;
     else
         co.MiterLimit = miterLimit;
-    float delta_scaled = delta * float(CLIPPER_OFFSET_SCALE);
+    double delta_scaled = delta * float(CLIPPER_OFFSET_SCALE);
     co.ShortestEdgeLength = double(std::abs(delta_scaled * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR));
     co.AddPaths(input, joinType, endType);
     ClipperLib::Paths retval;
@@ -242,7 +242,7 @@ ClipperLib::Paths _offset(ClipperLib::Paths &&input, ClipperLib::EndType endType
     return retval;
 }
 
-ClipperLib::Paths _offset(ClipperLib::Path &&input, ClipperLib::EndType endType, const float delta, ClipperLib::JoinType joinType, double miterLimit)
+ClipperLib::Paths _offset(ClipperLib::Path &&input, ClipperLib::EndType endType, const double delta, ClipperLib::JoinType joinType, double miterLimit)
 {
     ClipperLib::Paths paths;
     paths.emplace_back(std::move(input));
@@ -252,12 +252,12 @@ ClipperLib::Paths _offset(ClipperLib::Path &&input, ClipperLib::EndType endType,
 // This is a safe variant of the polygon offset, tailored for a single ExPolygon:
 // a single polygon with multiple non-overlapping holes.
 // Each contour and hole is offsetted separately, then the holes are subtracted from the outer contours.
-ClipperLib::Paths _offset(const Slic3r::ExPolygon &expolygon, const float delta,
+ClipperLib::Paths _offset(const Slic3r::ExPolygon &expolygon, const double delta,
     ClipperLib::JoinType joinType, double miterLimit)
 {
 //    printf("new ExPolygon offset\n");
     // 1) Offset the outer contour.
-    const float delta_scaled = delta * float(CLIPPER_OFFSET_SCALE);
+    const double delta_scaled = delta * float(CLIPPER_OFFSET_SCALE);
     ClipperLib::Paths contours;
     {
         ClipperLib::Path input = Slic3rMultiPoint_to_ClipperPath(expolygon.contour);
@@ -312,10 +312,10 @@ ClipperLib::Paths _offset(const Slic3r::ExPolygon &expolygon, const float delta,
 // This is a safe variant of the polygons offset, tailored for multiple ExPolygons.
 // It is required, that the input expolygons do not overlap and that the holes of each ExPolygon don't intersect with their respective outer contours.
 // Each ExPolygon is offsetted separately, then the offsetted ExPolygons are united.
-ClipperLib::Paths _offset(const Slic3r::ExPolygons &expolygons, const float delta,
+ClipperLib::Paths _offset(const Slic3r::ExPolygons &expolygons, const double delta,
     ClipperLib::JoinType joinType, double miterLimit)
 {
-    const float delta_scaled = delta * float(CLIPPER_OFFSET_SCALE);
+    const double delta_scaled = delta * float(CLIPPER_OFFSET_SCALE);
     // Offsetted ExPolygons before they are united.
     ClipperLib::Paths contours_cummulative;
     contours_cummulative.reserve(expolygons.size());
@@ -419,7 +419,7 @@ ClipperLib::Paths _offset(const Slic3r::ExPolygons &expolygons, const float delt
 }
 
 ClipperLib::Paths
-_offset2(const Polygons &polygons, const float delta1, const float delta2,
+_offset2(const Polygons &polygons, const double delta1, const double delta2,
     const ClipperLib::JoinType joinType, const double miterLimit)
 {
     // read input
@@ -435,8 +435,8 @@ _offset2(const Polygons &polygons, const float delta1, const float delta2,
     } else {
         co.MiterLimit = miterLimit;
     }
-    float delta_scaled1 = delta1 * float(CLIPPER_OFFSET_SCALE);
-    float delta_scaled2 = delta2 * float(CLIPPER_OFFSET_SCALE);
+    double delta_scaled1 = delta1 * float(CLIPPER_OFFSET_SCALE);
+    double delta_scaled2 = delta2 * float(CLIPPER_OFFSET_SCALE);
     co.ShortestEdgeLength = double(std::max(std::abs(delta_scaled1), std::abs(delta_scaled2)) * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR);
     
     // perform first offset
@@ -456,7 +456,7 @@ _offset2(const Polygons &polygons, const float delta1, const float delta2,
 }
 
 Polygons
-offset2(const Polygons &polygons, const float delta1, const float delta2,
+offset2(const Polygons &polygons, const double delta1, const double delta2,
     const ClipperLib::JoinType joinType, const double miterLimit)
 {
     // perform offset
@@ -467,7 +467,7 @@ offset2(const Polygons &polygons, const float delta1, const float delta2,
 }
 
 ExPolygons
-offset2_ex(const Polygons &polygons, const float delta1, const float delta2,
+offset2_ex(const Polygons &polygons, const double delta1, const double delta2,
     const ClipperLib::JoinType joinType, const double miterLimit)
 {
     // perform offset
@@ -479,8 +479,8 @@ offset2_ex(const Polygons &polygons, const float delta1, const float delta2,
 
 //FIXME Vojtech: This functon may likely be optimized to avoid some of the Slic3r to Clipper 
 // conversions and unnecessary Clipper calls.
-ExPolygons offset2_ex(const ExPolygons &expolygons, const float delta1,
-    const float delta2, ClipperLib::JoinType joinType, double miterLimit)
+ExPolygons offset2_ex(const ExPolygons &expolygons, const double delta1,
+    const double delta2, ClipperLib::JoinType joinType, double miterLimit)
 {
     Polygons polys;
     for (const ExPolygon &expoly : expolygons)

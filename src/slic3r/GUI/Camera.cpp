@@ -321,7 +321,11 @@ void Camera::rotate_local_around_target(const Vec3d& rotation_rad)
 
 double Camera::min_zoom() const
 {
+#if ENABLE_THUMBNAIL_GENERATOR
     return 0.7 * calc_zoom_to_bounding_box_factor(m_scene_box);
+#else
+    return 0.7 * calc_zoom_to_bounding_box_factor(m_scene_box);
+#endif
 }
 
 std::pair<double, double> Camera::calc_tight_frustrum_zs_around(const BoundingBoxf3& box) const

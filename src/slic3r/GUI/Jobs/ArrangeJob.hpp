@@ -3,6 +3,7 @@
 
 #include "PlaterJob.hpp"
 #include "libslic3r/Arrange.hpp"
+#include "libslic3r/Print.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -10,14 +11,12 @@ class ArrangeJob : public PlaterJob
 {
     using ArrangePolygon = arrangement::ArrangePolygon;
     using ArrangePolygons = arrangement::ArrangePolygons;
-
+    
     ArrangePolygons m_selected, m_unselected, m_unprintable;
     
     // clear m_selected and m_unselected, reserve space for next usage
     void clear_input();
-
-    // Prepare all objects on the bed regardless of the selection
-    void prepare_all();
+    
     
     // Prepare the selected and unselected items separately. If nothing is
     // selected, behaves as if everything would be selected.
@@ -30,6 +29,11 @@ protected:
     void on_exception(const std::exception_ptr &) override;
     
 public:
+    // Prepare all objects on the bed regardless of the selection
+    //put on public to be accessed by calibrations
+    void prepare_all();
+
+
     ArrangeJob(std::shared_ptr<ProgressIndicator> pri, Plater *plater)
         : PlaterJob{std::move(pri), plater}
     {}

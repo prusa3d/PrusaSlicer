@@ -105,7 +105,7 @@ void BedShape::append_option_line(ConfigOptionsGroupShp optgroup, Parameter para
         def.type = coPoints;
         def.set_default_value(new ConfigOptionPoints{ Vec2d(200, 200) });
         def.min = 0;
-        def.max = 1200;
+        def.max = 100000;
         def.label = get_option_label(param);
         def.tooltip = L("Size in X and Y of the rectangular plate.");
 
@@ -115,8 +115,8 @@ void BedShape::append_option_line(ConfigOptionsGroupShp optgroup, Parameter para
     else if (param == Parameter::RectOrigin) {
         def.type = coPoints;
         def.set_default_value(new ConfigOptionPoints{ Vec2d(0, 0) });
-        def.min = -600;
-        def.max = 600;
+        def.min = -100000;
+        def.max = 100000;
         def.label = get_option_label(param);
         def.tooltip = L("Distance of the 0,0 G-code coordinate from the front left corner of the rectangle.");
         
@@ -291,7 +291,7 @@ ConfigOptionsGroupShp BedShapePanel::init_shape_options_page(const wxString& tit
     wxPanel* panel = new wxPanel(m_shape_options_book);
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _(L("Settings")));
 
-    optgroup->label_width = 10;
+    optgroup->title_width = 10;
     optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
@@ -314,7 +314,7 @@ wxPanel* BedShapePanel::init_texture_panel()
     wxPanel* panel = new wxPanel(this);
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _(L("Texture")));
 
-    optgroup->label_width = 10;
+    optgroup->title_width = 10;
     optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
@@ -394,7 +394,7 @@ wxPanel* BedShapePanel::init_model_panel()
     wxPanel* panel = new wxPanel(this);
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _(L("Model")));
 
-    optgroup->label_width = 10;
+    optgroup->title_width = 10;
     optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };

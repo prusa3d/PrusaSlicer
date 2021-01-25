@@ -22,7 +22,8 @@ Polyline Polygon::split_at_vertex(const Point &point) const
 }
 
 // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
-Polyline Polygon::split_at_index(int index) const
+Polyline
+Polygon::split_at_index(size_t index) const
 {
     Polyline polyline;
     polyline.points.reserve(this->points.size() + 1);
@@ -298,6 +299,34 @@ void Polygon::densify(float min_length, std::vector<float>* lengths_ptr)
     assert(points.size() == lengths.size() - 1);
 }
 
+size_t Polygon::remove_collinear(coord_t max_offset){
+    size_t nb_del = 0;
+    if (points.size() < 3) return 0;
+
+    coord_t min_dist = max_offset * max_offset;
+    while (points.size() > 2 && Line::distance_to_squared(points[0], points.back(), points[1]) < min_dist){
+        //colinear! delete!
+        points.erase(points.begin());
+        nb_del++;
+    }
+    for (size_t idx = 1; idx < points.size()-1; ) {
+        //if (Line(previous, points[idx + 1]).distance_to(points[idx]) < SCALED_EPSILON){
+        if (Line::distance_to_squared(points[idx], points[idx-1], points[idx + 1]) < min_dist){
+            //colinear! delete!
+            points.erase(points.begin() + idx);
+            nb_del++;
+        } else {
+            idx++;
+        }
+    }
+    while (points.size() > 2 && Line::distance_to_squared(points.back(), points[points.size()-2], points.front()) < min_dist) {
+        //colinear! delete!
+        points.erase(points.end()-1);
+        nb_del++;
+    }
+
+    return nb_del;
+}
 BoundingBox get_extents(const Polygon &poly) 
 { 
     return poly.bounding_box();
@@ -438,45 +467,14 @@ bool remove_small(Polygons &polys, double min_area)
     return modified;
 }
 
-void remove_collinear(Polygon &poly)
+void remove_collinear(Polygon &poly, coord_t max_offset)
 {
-    if (poly.points.size() > 2) {
-        // copy points and append both 1 and last point in place to cover the boundaries
-        Points pp;
-        pp.reserve(poly.points.size()+2);
-        pp.push_back(poly.points.back());
-        pp.insert(pp.begin()+1, poly.points.begin(), poly.points.end());
-        pp.push_back(poly.points.front());
-        // delete old points vector. Will be re-filled in the loop
-        poly.points.clear();
-
-        size_t i = 0;
-        size_t k = 0;
-        while (i < pp.size()-2) {
-            k = i+1;
-            const Point &p1 = pp[i];
-            while (k < pp.size()-1) {
-                const Point &p2 = pp[k];
-                const Point &p3 = pp[k+1];
-                Line l(p1, p3);
-                if(l.distance_to(p2) < SCALED_EPSILON) {
-                    k++;
-                } else {
-                    if(i > 0) poly.points.push_back(p1); // implicitly removes the first point we appended above
-                    i = k;
-                    break;
-                }
-            }
-            if(k > pp.size()-2) break; // all remaining points are collinear and can be skipped
-        }
-        poly.points.push_back(pp[i]);
-    }
+    poly.remove_collinear(max_offset);
 }
-
-void remove_collinear(Polygons &polys)
+void remove_collinear(Polygons &polys, coord_t max_offset)
 {
-	for (Polygon &poly : polys)
-		remove_collinear(poly);
+    for (Polygon &poly : polys)
+        poly.remove_collinear(max_offset);
 }
 
 }

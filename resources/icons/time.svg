@@ -8,9 +8,9 @@
 			S11.87,1,8,1L8,1z"/>
 	</g>
 	<g>
-		<line fill="none" stroke="#ED6B21" stroke-linecap="round" stroke-miterlimit="10" x1="5" y1="4" x2="8" y2="8"/>
+		<line fill="none" stroke="#2172eb" stroke-linecap="round" stroke-miterlimit="10" x1="5" y1="4" x2="8" y2="8"/>
 	</g>
 	
-		<line fill="none" stroke="#ED6B21" stroke-width="1.5" stroke-linecap="round" stroke-miterlimit="10" x1="11.5" y1="8" x2="8" y2="8"/>
+		<line fill="none" stroke="#2172eb" stroke-width="1.5" stroke-linecap="round" stroke-miterlimit="10" x1="11.5" y1="8" x2="8" y2="8"/>
 </g>
 </svg>

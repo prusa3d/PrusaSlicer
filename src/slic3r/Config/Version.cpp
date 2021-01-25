@@ -52,8 +52,8 @@ bool Version::is_slic3r_supported(const Semver &slic3r_version) const
 		// Released config is always supported.
 		return true;
 	else if (prerelease_slic3r == nullptr)
-		// Released slic3r only supports released configs.
-		return false;
+		// Released slic3r only supports released configs unless it's far ahead.
+		return slic3r_version >= min_slic3r_version;
 	// Compare the pre-release status of Slic3r against the config.
 	// If the prerelease status of slic3r is lexicographically lower or equal 
 	// to the prerelease status of the config, accept it.

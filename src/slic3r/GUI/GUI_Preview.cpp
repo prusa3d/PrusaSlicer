@@ -9,6 +9,8 @@
 #include "GLCanvas3D.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "DoubleSlider.hpp"
+
+#include "BitmapCache.hpp"
 #include "Plater.hpp"
 #include "MainFrame.hpp"
 
@@ -19,10 +21,20 @@
 #include <wx/choice.h>
 #include <wx/combo.h>
 #include <wx/checkbox.h>
+#include <wx/display.h>
+
+#include <boost/locale.hpp>
+#include <boost/locale/generator.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/nowide/fstream.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 // this include must follow the wxWidgets ones or it won't compile on Windows -> see http://trac.wxwidgets.org/ticket/2421
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/FileParserError.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -176,7 +188,7 @@ Preview::Preview(
 {
     if (init(parent, model))
         load_print();
-}
+    }
 
 bool Preview::init(wxWindow* parent, Model* model)
 {
@@ -189,6 +201,16 @@ bool Preview::init(wxWindow* parent, Model* model)
 #else
     SetBackgroundColour(GetParent()->GetBackgroundColour());
 #endif // _WIN32 
+
+    //get display size to see if we have to compress the labels
+    const auto idx = wxDisplay::GetFromWindow(parent);
+    wxDisplay display(idx != wxNOT_FOUND ? idx : 0u);
+    wxRect screen = display.GetClientArea();
+    this->m_width_screen = ScreenWidth::large;
+    if (screen.width < 1900)
+        m_width_screen = ScreenWidth::medium;
+    if (screen.width < 1600)
+        m_width_screen = ScreenWidth::tiny;
 
     m_canvas_widget = OpenGLManager::create_wxglcanvas(*this);
     if (m_canvas_widget == nullptr)
@@ -208,20 +230,25 @@ bool Preview::init(wxWindow* parent, Model* model)
     m_bottom_toolbar_panel = new wxPanel(this);
     m_label_view_type = new wxStaticText(m_bottom_toolbar_panel, wxID_ANY, _L("View"));
     m_choice_view_type = new wxChoice(m_bottom_toolbar_panel, wxID_ANY);
-    m_choice_view_type->Append(_L("Feature type"));
+    m_choice_view_type->Append(_L(m_width_screen == tiny ? "Feature": "Feature type"));
     m_choice_view_type->Append(_L("Height"));
     m_choice_view_type->Append(_L("Width"));
     m_choice_view_type->Append(_L("Speed"));
-    m_choice_view_type->Append(_L("Fan speed"));
-    m_choice_view_type->Append(_L("Volumetric flow rate"));
+    m_choice_view_type->Append(_L(m_width_screen == tiny ? "Fan" : "Fan speed"));
+    m_choice_view_type->Append(_L(m_width_screen == tiny ? "time" : "Layer time"));
+    m_choice_view_type->Append(_L(m_width_screen == tiny ? "Log time" : "Layer time (log)"));
+    m_choice_view_type->Append(_L(m_width_screen == tiny ? "Chrono" : "Chronology"));
+    m_choice_view_type->Append(_L(m_width_screen == tiny ? "Vol. flow" :"Volumetric flow rate"));
     m_choice_view_type->Append(_L("Tool"));
-    m_choice_view_type->Append(_L("Color Print"));
+    m_choice_view_type->Append(_L("Filament"));
+    m_choice_view_type->Append(_L(m_width_screen == tiny ? "Color":"Color Print"));
+    m_choice_view_type->Append(_L((m_width_screen == tiny ? "Temp" : "Temperature")));
     m_choice_view_type->SetSelection(0);
 
     m_label_show = new wxStaticText(m_bottom_toolbar_panel, wxID_ANY, _L("Show"));
-
     m_combochecklist_features = new wxComboCtrl();
-    m_combochecklist_features->Create(m_bottom_toolbar_panel, wxID_ANY, _L("Feature types"), wxDefaultPosition, wxDefaultSize, wxCB_READONLY);
+    m_combochecklist_features->Create(m_bottom_toolbar_panel, wxID_ANY, _L("Feature types"), wxDefaultPosition,
+        wxSize((m_width_screen == large ? 35: (m_width_screen == medium ?20:15)) * wxGetApp().em_unit(), -1), wxCB_READONLY);
     std::string feature_items = GUI::into_u8(
         _L("Unknown") + "|1|" +
         _L("Perimeter") + "|1|" +
@@ -230,13 +257,15 @@ bool Preview::init(wxWindow* parent, Model* model)
         _L("Internal infill") + "|1|" +
         _L("Solid infill") + "|1|" +
         _L("Top solid infill") + "|1|" +
-        _L("Ironing") + "|1|" +
         _L("Bridge infill") + "|1|" +
+        _L("Internal bridge infill") + "|1|" +
+        _L("Thin wall") + "|1|" +
         _L("Gap fill") + "|1|" +
         _L("Skirt") + "|1|" +
         _L("Support material") + "|1|" +
-        _L("Support material interface") + "|1|" +
+        _L(m_width_screen == large? "Support material interface": "Sup. mat. interface") + "|1|" +
         _L("Wipe tower") + "|1|" +
+        _L("Mill") + "|1|" +
         _L("Custom") + "|1"
     );
     Slic3r::GUI::create_combochecklist(m_combochecklist_features, GUI::into_u8(_L("Feature types")), feature_items);
@@ -255,7 +284,7 @@ bool Preview::init(wxWindow* parent, Model* model)
         get_option_type_string(OptionType::Shells) + "|0|" +
         get_option_type_string(OptionType::ToolMarker) + "|1|" +
         get_option_type_string(OptionType::Legend) + "|1"
-    );
+);
     Slic3r::GUI::create_combochecklist(m_combochecklist_options, GUI::into_u8(_L("Options")), options_items);
 
     m_left_sizer = new wxBoxSizer(wxVERTICAL);
@@ -320,13 +349,12 @@ void Preview::set_number_extruders(unsigned int number_extruders)
 {
     if (m_number_extruders != number_extruders) {
         m_number_extruders = number_extruders;
-        int tool_idx = m_choice_view_type->FindString(_(L("Tool")));
-        int type = (number_extruders > 1) ? tool_idx /* color by a tool number */  : 0; // color by a feature type
+        int type = (number_extruders > 1) ? (int)GCodeViewer::EViewType::Tool /* color by a tool number */ : 0; // color by a feature type
         m_choice_view_type->SetSelection(type);
         if (0 <= type && (type < static_cast<int>(GCodeViewer::EViewType::Count)))
             m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
 
-        m_preferred_color_mode = (type == tool_idx) ? "tool_or_feature" : "feature";
+        //m_preferred_color_mode = (type == tool_idx) ? "tool_or_feature" : "feature";
     }
 }
 #endif // !ENABLE_PREVIEW_TYPE_CHANGE
@@ -471,17 +499,20 @@ void Preview::on_size(wxSizeEvent& evt)
 void Preview::on_choice_view_type(wxCommandEvent& evt)
 {
 #if !ENABLE_PREVIEW_TYPE_CHANGE
-    m_preferred_color_mode = (m_choice_view_type->GetStringSelection() == L("Tool")) ? "tool" : "feature";
+    //m_preferred_color_mode = (m_choice_view_type->GetStringSelection() == L("Tool")) ? "tool" : "feature";
 #endif // !ENABLE_PREVIEW_TYPE_CHANGE
     int selection = m_choice_view_type->GetCurrentSelection();
 #if ENABLE_PREVIEW_TYPE_CHANGE
     if (0 <= selection && selection < static_cast<int>(GCodeViewer::EViewType::Count)) {
-        m_canvas->set_toolpath_view_type(static_cast<GCodeViewer::EViewType>(selection));
+        this->m_last_choice = static_cast<GCodeViewer::EViewType>(selection);
+        m_canvas->set_toolpath_view_type(this->m_last_choice);
         m_keep_current_preview_type = true;
     }
 #else
-    if (0 <= selection && selection < static_cast<int>(GCodeViewer::EViewType::Count))
-        m_canvas->set_toolpath_view_type(static_cast<GCodeViewer::EViewType>(selection));
+    if (0 <= selection && selection < static_cast<int>(GCodeViewer::EViewType::Count)) {
+        this->m_last_choice = static_cast<GCodeViewer::EViewType>(selection);
+        m_canvas->set_toolpath_view_type(this->m_last_choice);
+    }
 #endif // ENABLE_PREVIEW_TYPE_CHANGE
 
     refresh_print();
@@ -527,21 +558,22 @@ void Preview::on_combochecklist_options(wxCommandEvent& evt)
 void Preview::update_view_type(bool keep_volumes)
 {
     const DynamicPrintConfig& config = wxGetApp().preset_bundle->project_config;
+    bool has_color_print = !wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes.empty()/*&&
+                             (wxGetApp().extruders_edited_cnt()==1 || !slice_completed) */;
+     bool has_multi_tool = config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values.size() > 1;
 
-    const wxString& choice = !wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes.empty() /*&&
-                             (wxGetApp().extruders_edited_cnt()==1 || !slice_completed) */? 
-                                _L("Color Print") :
-                                config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values.size() > 1 ?
-                                    _L("Tool") : 
-                                    _L("Feature type");
-
-    int type = m_choice_view_type->FindString(choice);
-    if (m_choice_view_type->GetSelection() != type) {
-        m_choice_view_type->SetSelection(type);
-        if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count))
-            m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
-        m_preferred_color_mode = "feature";
-    }
+     if (!m_has_switched_to_color && has_color_print) {
+         m_last_choice = GCodeViewer::EViewType::ColorPrint;
+         m_has_switched_to_color = true;
+     } else if (!m_has_switched_to_extruders && has_multi_tool) {
+         m_last_choice = GCodeViewer::EViewType::Tool;
+         m_has_switched_to_extruders = true;
+     }
+     if (m_last_choice != m_canvas->get_gcode_view_preview_type()) {
+         m_canvas->set_gcode_view_preview_type(m_last_choice);
+         m_choice_view_type->SetSelection((int)m_last_choice);
+     }
+     //m_preferred_color_mode = "feature";
 
     reload_print(keep_volumes);
 }
@@ -900,10 +932,32 @@ void Preview::load_print_as_fff(bool keep_z_range)
         if (!gcode_preview_data_valid) {
             color_print_values = wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes;
             colors.push_back("#808080"); // gray color for pause print or custom G-code 
-        }
     }
-    else if (gcode_preview_data_valid || gcode_view_type == GCodeViewer::EViewType::Tool) {
-        colors = wxGetApp().plater()->get_extruder_colors_from_plater_config(m_gcode_result);
+    }
+    else if (gcode_view_type == GCodeViewer::EViewType::Filament)
+
+    {
+        const ConfigOptionStrings* extruders_opt = dynamic_cast<const ConfigOptionStrings*>(m_config->option("extruder_colour"));
+        const ConfigOptionStrings* filamemts_opt = dynamic_cast<const ConfigOptionStrings*>(m_config->option("filament_colour"));
+        unsigned int colors_count = std::max((unsigned int)extruders_opt->values.size(), (unsigned int)filamemts_opt->values.size());
+
+        unsigned char rgb[3];
+        for (unsigned int i = 0; i < colors_count; ++i)
+        {
+            std::string color = m_config->opt_string("filament_colour", i);
+            if (!BitmapCache::parse_color(color, rgb))
+            {
+                color = "#FFFFFF";
+            }
+
+            colors.emplace_back(color);
+        }
+        color_print_values.clear();
+    }
+    else if (gcode_preview_data_valid || (gcode_view_type == GCodeViewer::EViewType::Tool))
+
+    {
+        colors = wxGetApp().plater()->get_extruder_colors_from_plater_config();
         color_print_values.clear();
     }
 
@@ -949,7 +1003,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
             if (0 <= type && type < static_cast<int>(GCodeViewer::EViewType::Count)) {
                 m_choice_view_type->SetSelection(type);
                 m_canvas->set_gcode_view_preview_type(static_cast<GCodeViewer::EViewType>(type));
-            }
+}
         }
     }
 #endif // ENABLE_PREVIEW_TYPE_CHANGE
@@ -1025,15 +1079,15 @@ wxString Preview::get_option_type_string(OptionType type) const
     {
     case OptionType::Travel:        { return _L("Travel"); }
     case OptionType::Wipe:          { return _L("Wipe"); }
-    case OptionType::Retractions:   { return _L("Retractions"); }
-    case OptionType::Unretractions: { return _L("Deretractions"); }
-    case OptionType::ToolChanges:   { return _L("Tool changes"); }
-    case OptionType::ColorChanges:  { return _L("Color changes"); }
-    case OptionType::PausePrints:   { return _L("Print pauses"); }
-    case OptionType::CustomGCodes:  { return _L("Custom G-codes"); }
+    case OptionType::Retractions:   { return _L(m_width_screen == tiny ? "Retr." : "Retractions"); }
+    case OptionType::Unretractions: { return _L(m_width_screen == tiny ? "Dere." : "Deretractions"); }
+    case OptionType::ToolChanges:   { return _L(m_width_screen == tiny ? "Tool/C" : "Tool changes"); }
+    case OptionType::ColorChanges:  { return _L(m_width_screen == tiny ? "Col/C" : "Color changes"); }
+    case OptionType::PausePrints:   { return _L(m_width_screen == tiny ? "Pause" : "Print pauses"); }
+    case OptionType::CustomGCodes:  { return _L(m_width_screen == tiny ? "Custom" : "Custom G-codes"); }
     case OptionType::Shells:        { return _L("Shells"); }
-    case OptionType::ToolMarker:    { return _L("Tool marker"); }
-    case OptionType::Legend:        { return _L("Legend/Estimated printing time"); }
+    case OptionType::ToolMarker:    { return _L(m_width_screen == tiny ? "Marker" : "Tool marker"); }
+    case OptionType::Legend:        { return _L(m_width_screen == tiny ? "Legend" : "Legend/Estimated printing time"); }
     default:                        { return ""; }
     }
 }

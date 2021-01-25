@@ -1,0 +1,6 @@
+min_slic3r_version = 2.2.0
+0.0.5 remove resolution to use default, disable fan_mover
+0.0.4 2.3 adaptation (seam, thumbanils, ...)
+0.0.3 superslicer: remove top_fan_speed
+0.0.2 Update from DocJeeves settings, adding afterburner / mobius difference
+0.0.1 Initial version

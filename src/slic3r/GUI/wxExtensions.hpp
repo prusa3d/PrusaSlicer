@@ -1,6 +1,8 @@
 #ifndef slic3r_GUI_wxExtensions_hpp_
 #define slic3r_GUI_wxExtensions_hpp_
 
+#include "libslic3r/PrintConfig.hpp"
+
 #include <wx/checklst.h>
 #include <wx/combo.h>
 #include <wx/dataview.h>

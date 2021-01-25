@@ -67,12 +67,13 @@ public:
     Polygons simplify_p(double tolerance) const;
     ExPolygons simplify(double tolerance) const;
     void simplify(double tolerance, ExPolygons* expolygons) const;
-    void medial_axis(double max_width, double min_width, ThickPolylines* polylines) const;
+    void remove_point_too_near(const coord_t tolerance);
     void medial_axis(double max_width, double min_width, Polylines* polylines) const;
 //    void get_trapezoids(Polygons* polygons) const;
 //    void get_trapezoids(Polygons* polygons, double angle) const;
     void get_trapezoids2(Polygons* polygons) const;
     void get_trapezoids2(Polygons* polygons, double angle) const;
+    void get_trapezoids3_half(Polygons* polygons, float spacing) const;
     void triangulate(Polygons* polygons) const;
     // Triangulate into triples of points.
     void triangulate_pp(Points *triangles) const;
@@ -96,6 +97,28 @@ inline size_t number_polygons(const ExPolygons &expolys)
     for (ExPolygons::const_iterator it = expolys.begin(); it != expolys.end(); ++ it)
         n_polygons += it->holes.size() + 1;
     return n_polygons;
+}
+
+
+inline ExPolygon to_expolygon(const Polygon &other)
+{
+    ExPolygon ex;
+    ex.contour = other;
+    return ex;
+}
+
+inline ExPolygon to_expolygon(Polygon &&other)
+{
+    ExPolygon ex;
+    ex.contour = std::move(other);
+    return ex;
+}
+
+inline ExPolygons to_expolygon(const Polygons &other)
+{
+    ExPolygons exs;
+    for (const Polygon &po : other) exs.emplace_back(to_expolygon(po));
+    return exs;
 }
 
 inline Lines to_lines(const ExPolygon &src) 

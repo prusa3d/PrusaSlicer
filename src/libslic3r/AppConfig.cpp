@@ -24,7 +24,7 @@ namespace Slic3r {
 
 static const std::string VENDOR_PREFIX = "vendor:";
 static const std::string MODEL_PREFIX = "model:";
-static const std::string VERSION_CHECK_URL = "https://files.prusa3d.com/wp-content/uploads/repository/PrusaSlicer-settings-master/live/PrusaSlicer.version";
+static const std::string VERSION_CHECK_URL = "https://api.github.com/repos/supermerill/superslicer/releases";
 
 const std::string AppConfig::SECTION_FILAMENTS = "filaments";
 const std::string AppConfig::SECTION_MATERIALS = "sla_materials";
@@ -60,10 +60,14 @@ void AppConfig::set_defaults()
         if (get("drop_project_action").empty())
             set("drop_project_action", "1");
 
+        if (get("freecad_path").empty())
+            set("freecad_path", ".");
+
+
         if (get("version_check").empty())
             set("version_check", "1");
         if (get("preset_update").empty())
-            set("preset_update", "1");
+            set("preset_update", "0");
 
         if (get("export_sources_full_pathnames").empty())
             set("export_sources_full_pathnames", "0");
@@ -139,6 +143,9 @@ void AppConfig::set_defaults()
     if (get("use_perspective_camera").empty())
         set("use_perspective_camera", "1");
 
+    if (get("objects_always_expert").empty())
+        set("objects_always_expert", "1");
+
     if (get("use_free_camera").empty())
         set("use_free_camera", "0");
 
@@ -178,7 +185,7 @@ std::string AppConfig::load()
         // we will rethrow this exception from the place of load() call, if returned value wouldn't be empty
         /*
         throw Slic3r::RuntimeError(
-        	_utf8(L("Error parsing PrusaSlicer config file, it is probably corrupted. "
+        	_utf8(L("Error parsing SuperSlicer config file, it is probably corrupted. "
                     "Try to manually delete the file to recover from the error. Your user profiles will not be affected.")) + 
         	"\n\n" + AppConfig::config_path() + "\n\n" + ex.what());
         */
@@ -413,7 +420,6 @@ void AppConfig::update_skein_dir(const std::string &dir)
 /*
 std::string AppConfig::get_last_output_dir(const std::string &alt) const
 {
-	
     const auto it = m_storage.find("");
     if (it != m_storage.end()) {
         const auto it2 = it->second.find("last_output_path");

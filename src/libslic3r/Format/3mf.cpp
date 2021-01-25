@@ -48,8 +48,10 @@ const std::string MODEL_FILE = "3D/3dmodel.model"; // << this is the only format
 const std::string CONTENT_TYPES_FILE = "[Content_Types].xml";
 const std::string RELATIONSHIPS_FILE = "_rels/.rels";
 const std::string THUMBNAIL_FILE = "Metadata/thumbnail.png";
-const std::string PRINT_CONFIG_FILE = "Metadata/Slic3r_PE.config";
-const std::string MODEL_CONFIG_FILE = "Metadata/Slic3r_PE_model.config";
+const std::string PRINT_CONFIG_FILE = "Metadata/SuperSlicer.config";
+const std::string MODEL_CONFIG_FILE = "Metadata/SuperSlicer_model.config";
+const std::string PRINT_PRUSA_CONFIG_FILE = "Metadata/Slic3r_PE.config";
+const std::string MODEL_PRUSA_CONFIG_FILE = "Metadata/Slic3r_PE_model.config";
 const std::string LAYER_HEIGHTS_PROFILE_FILE = "Metadata/Slic3r_PE_layer_heights_profile.txt";
 const std::string LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config_ranges.xml";
 const std::string SLA_SUPPORT_POINTS_FILE = "Metadata/Slic3r_PE_sla_support_points.txt";
@@ -616,6 +618,7 @@ namespace Slic3r {
         }
 
         // we then loop again the entries to read other files stored in the archive
+        bool print_config_parsed = false, model_config_parsed = false;
         for (mz_uint i = 0; i < num_entries; ++i)
         {
             if (mz_zip_reader_file_stat(&archive, i, &stat))
@@ -647,6 +650,7 @@ namespace Slic3r {
                 {
                     // extract slic3r print config file
                     _extract_print_config_from_archive(archive, stat, config, filename);
+                    print_config_parsed = true;
                 }
                 if (boost::algorithm::iequals(name, CUSTOM_GCODE_PER_PRINT_Z_FILE))
                 {
@@ -654,6 +658,32 @@ namespace Slic3r {
                     _extract_custom_gcode_per_print_z_from_archive(archive, stat);
                 }
                 else if (boost::algorithm::iequals(name, MODEL_CONFIG_FILE))
+                {
+                    // extract slic3r model config file
+                    if (!_extract_model_config_from_archive(archive, stat, model))
+                    {
+                        close_zip_reader(&archive);
+                        add_error("Archive does not contain a valid model config");
+                        return false;
+                    }
+                    model_config_parsed = true;
+                }
+            }
+        }
+        //parsed prusa files if superslicer not found
+        for (mz_uint i = 0; i < num_entries; ++i)
+        {
+            if (mz_zip_reader_file_stat(&archive, i, &stat))
+            {
+                std::string name(stat.m_filename);
+                std::replace(name.begin(), name.end(), '\\', '/');
+
+                //TODO use special methods to convert them better?
+                if (!print_config_parsed && boost::algorithm::iequals(name, PRINT_PRUSA_CONFIG_FILE))
+                {
+                    // extract slic3r print config file
+                    _extract_print_config_from_archive(archive, stat, config, filename);
+                } else if (!model_config_parsed && boost::algorithm::iequals(name, MODEL_PRUSA_CONFIG_FILE))
                 {
                     // extract slic3r model config file
                     if (!_extract_model_config_from_archive(archive, stat, model))
@@ -1220,8 +1250,8 @@ namespace Slic3r {
 
                 pt::ptree tree = code.second;
                 double print_z          = tree.get<double>      ("<xmlattr>.print_z" );
-                int extruder            = tree.get<int>         ("<xmlattr>.extruder");
-                std::string color       = tree.get<std::string> ("<xmlattr>.color"   );
+                int extruder            = tree.get<int>         ("<xmlattr>.extruder", 0);
+                std::string color       = tree.get<std::string> ("<xmlattr>.color"   ,"" );
 
                 CustomGCode::Type   type;
                 std::string         extra;
@@ -1229,7 +1259,7 @@ namespace Slic3r {
                 {
                     // It means that data was saved in old version (2.2.0 and older) of PrusaSlicer
                     // read old data ... 
-                    std::string gcode       = tree.get<std::string> ("<xmlattr>.gcode");
+                    std::string gcode       = tree.get<std::string> ("<xmlattr>.gcode", "");
                     // ... and interpret them to the new data
                     type  = gcode == "M600"           ? CustomGCode::ColorChange : 
                             gcode == "M601"           ? CustomGCode::PausePrint  :   
@@ -1240,7 +1270,7 @@ namespace Slic3r {
                 else
                 {
                     type  = static_cast<CustomGCode::Type>(tree.get<int>("<xmlattr>.type"));
-                    extra = tree.get<std::string>("<xmlattr>.extra");
+                    extra = tree.get<std::string>("<xmlattr>.extra", "");
                 }
                 m_model->custom_gcode_per_print_z.gcodes.push_back(CustomGCode::Item{print_z, type, extruder, color, extra}) ;
             }
@@ -2664,13 +2694,13 @@ namespace Slic3r {
         return true;
     }
 
-    bool _3MF_Exporter::_add_print_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig &config)
+    bool _3MF_Exporter::_add_print_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig& config)
     {
         char buffer[1024];
         sprintf(buffer, "; %s\n\n", header_slic3r_generated().c_str());
         std::string out = buffer;
 
-        for (const std::string &key : config.keys())
+        for (const std::string& key : config.keys())
             if (key != "compatible_printers")
                 out += "; " + key + " = " + config.opt_serialize(key) + "\n";
 
@@ -2683,17 +2713,43 @@ namespace Slic3r {
             }
         }
 
+        //add prusa print config
+        out = buffer;
+
+        for (std::string key : config.keys())
+            if (key != "compatible_printers") {
+                std::string value = config.opt_serialize(key);
+                config.to_prusa(key, value);
+                if(!key.empty())
+                    out += "; " + key + " = " + value + "\n";
+            }
+
+        if (!out.empty())
+        {
+            if (!mz_zip_writer_add_mem(&archive, PRINT_PRUSA_CONFIG_FILE.c_str(), (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION))
+            {
+                add_error("Unable to add prusa print config file to archive");
+                return false;
+            }
+        }
+
         return true;
     }
 
     bool _3MF_Exporter::_add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, const IdToObjectDataMap &objects_data)
     {
         std::stringstream stream;
+        std::stringstream stream_prusa;
         // Store mesh transformation in full precision, as the volumes are stored transformed and they need to be transformed back
         // when loaded as accurately as possible.
 		stream << std::setprecision(std::numeric_limits<double>::max_digits10);
         stream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
         stream << "<" << CONFIG_TAG << ">\n";
+
+        stream_prusa << std::setprecision(std::numeric_limits<double>::max_digits10);
+        stream_prusa << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        stream_prusa << "<" << CONFIG_TAG << ">\n";
+
 
         for (const IdToObjectDataMap::value_type& obj_metadata : objects_data)
         {
@@ -2702,15 +2758,18 @@ namespace Slic3r {
             {
                 // Output of instances count added because of github #3435, currently not used by PrusaSlicer
                 stream << " <" << OBJECT_TAG << " " << ID_ATTR << "=\"" << obj_metadata.first << "\" " << INSTANCESCOUNT_ATTR << "=\"" << obj->instances.size() << "\">\n";
+                stream_prusa << " <" << OBJECT_TAG << " " << ID_ATTR << "=\"" << obj_metadata.first << "\" " << INSTANCESCOUNT_ATTR << "=\"" << obj->instances.size() << "\">\n";
 
                 // stores object's name
-                if (!obj->name.empty())
+                if (!obj->name.empty()) {
                     stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"name\" " << VALUE_ATTR << "=\"" << xml_escape(obj->name) << "\"/>\n";
+                    stream_prusa << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"name\" " << VALUE_ATTR << "=\"" << xml_escape(obj->name) << "\"/>\n";
+                }
 
                 // stores object's config data
-                for (const std::string& key : obj->config.keys())
-                {
+                for (const std::string& key : obj->config.keys()) {
                     stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << obj->config.opt_serialize(key) << "\"/>\n";
+                    stream_prusa << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << obj->config.opt_serialize(key) << "\"/>\n";
                 }
 
                 for (const ModelVolume* volume : obj_metadata.second.object->volumes)
@@ -2725,20 +2784,30 @@ namespace Slic3r {
                             stream << "  <" << VOLUME_TAG << " ";
                             stream << FIRST_TRIANGLE_ID_ATTR << "=\"" << it->second.first_triangle_id << "\" ";
                             stream << LAST_TRIANGLE_ID_ATTR << "=\"" << it->second.last_triangle_id << "\">\n";
+                            stream_prusa << "  <" << VOLUME_TAG << " ";
+                            stream_prusa << FIRST_TRIANGLE_ID_ATTR << "=\"" << it->second.first_triangle_id << "\" ";
+                            stream_prusa << LAST_TRIANGLE_ID_ATTR << "=\"" << it->second.last_triangle_id << "\">\n";
 
                             // stores volume's name
-                            if (!volume->name.empty())
+                            if (!volume->name.empty()) {
                                 stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << NAME_KEY << "\" " << VALUE_ATTR << "=\"" << xml_escape(volume->name) << "\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << NAME_KEY << "\" " << VALUE_ATTR << "=\"" << xml_escape(volume->name) << "\"/>\n";
+                            }
 
                             // stores volume's modifier field (legacy, to support old slicers)
-                            if (volume->is_modifier())
+                            if (volume->is_modifier()) {
                                 stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MODIFIER_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MODIFIER_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+                            }
                             // stores volume's type (overrides the modifier field above)
-                            stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << VOLUME_TYPE_KEY << "\" " << 
+                            stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << VOLUME_TYPE_KEY << "\" " <<
+                                VALUE_ATTR << "=\"" << ModelVolume::type_to_string(volume->type()) << "\"/>\n";
+                            stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << VOLUME_TYPE_KEY << "\" " <<
                                 VALUE_ATTR << "=\"" << ModelVolume::type_to_string(volume->type()) << "\"/>\n";
 
                             // stores volume's local matrix
                             stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MATRIX_KEY << "\" " << VALUE_ATTR << "=\"";
+                            stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << MATRIX_KEY << "\" " << VALUE_ATTR << "=\"";
                             Transform3d matrix = volume->get_matrix() * volume->source.transform.get_matrix();
                             for (int r = 0; r < 4; ++r)
                             {
@@ -2747,9 +2816,13 @@ namespace Slic3r {
                                     stream << matrix(r, c);
                                     if ((r != 3) || (c != 3))
                                         stream << " ";
+                                    stream_prusa << matrix(r, c);
+                                    if ((r != 3) || (c != 3))
+                                        stream_prusa << " ";
                                 }
                             }
                             stream << "\"/>\n";
+                            stream_prusa << "\"/>\n";
 
                             // stores volume's source data
                             {
@@ -2766,30 +2839,52 @@ namespace Slic3r {
                                 }
                                 if (volume->source.is_converted_from_inches)
                                     stream << prefix << SOURCE_IN_INCHES << "\" " << VALUE_ATTR << "=\"1\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << SOURCE_FILE_KEY << "\" " << VALUE_ATTR << "=\"" << input_file << "\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << SOURCE_OBJECT_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.object_idx << "\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << SOURCE_VOLUME_ID_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.volume_idx << "\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << SOURCE_OFFSET_X_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(0) << "\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << SOURCE_OFFSET_Y_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(1) << "\"/>\n";
+                                stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << SOURCE_OFFSET_Z_KEY << "\" " << VALUE_ATTR << "=\"" << volume->source.mesh_offset(2) << "\"/>\n";
                             }
 
                             // stores volume's config data
-                            for (const std::string& key : volume->config.keys())
+                            for (std::string key : volume->config.keys())
                             {
+                                //superslicer config
                                 stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
+                                //now the prusa config
+                                std::string value = volume->config.opt_serialize(key);
+                                volume->config.to_prusa(key, value);
+                                if (!key.empty())
+                                    stream_prusa << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                             }
 
                             stream << "  </" << VOLUME_TAG << ">\n";
+                            stream_prusa << "  </" << VOLUME_TAG << ">\n";
                         }
                     }
                 }
 
                 stream << " </" << OBJECT_TAG << ">\n";
+                stream_prusa << " </" << OBJECT_TAG << ">\n";
             }
         }
 
         stream << "</" << CONFIG_TAG << ">\n";
+        stream_prusa << "</" << CONFIG_TAG << ">\n";
 
         std::string out = stream.str();
 
         if (!mz_zip_writer_add_mem(&archive, MODEL_CONFIG_FILE.c_str(), (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION))
         {
             add_error("Unable to add model config file to archive");
+            return false;
+        }
+
+        out = stream_prusa.str();
+        if (!mz_zip_writer_add_mem(&archive, MODEL_PRUSA_CONFIG_FILE.c_str(), (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION))
+        {
+            add_error("Unable to add prusa model config file to archive");
             return false;
         }
 
@@ -2814,6 +2909,7 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
             code_tree.put("<xmlattr>.type"      , static_cast<int>(code.type));
             code_tree.put("<xmlattr>.extruder"  , code.extruder );
             code_tree.put("<xmlattr>.color"     , code.color    );
+            code_tree.put("<xmlattr>.info"      , code.color    );
             code_tree.put("<xmlattr>.extra"     , code.extra    );
 
             // add gcode field data for the old version of the PrusaSlicer

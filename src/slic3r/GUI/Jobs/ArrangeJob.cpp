@@ -2,6 +2,7 @@
 
 #include "libslic3r/MTUtils.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Print.hpp"
 
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -158,14 +159,15 @@ void ArrangeJob::on_exception(const std::exception_ptr &eptr)
 void ArrangeJob::process()
 {
     static const auto arrangestr = _(L("Arranging"));
-
+    
     const GLCanvas3D::ArrangeSettings &settings =
         static_cast<const GLCanvas3D*>(m_plater->canvas3D())->get_arrange_settings();
-
+    
+    double min_dist_computed = PrintConfig::min_object_distance(&m_plater->current_print()->full_print_config());
     arrangement::ArrangeParams params;
     params.allow_rotations  = settings.enable_rotation;
-    params.min_obj_distance = scaled(settings.distance);
-
+    params.min_obj_distance = scaled(std::max(double(settings.distance), min_dist_computed * 2 ));
+    
     auto count = unsigned(m_selected.size() + m_unprintable.size());
     Points bedpts = get_bed_shape(*m_plater->config());
     

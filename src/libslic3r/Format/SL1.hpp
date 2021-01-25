@@ -42,14 +42,14 @@ void import_sla_archive(const std::string &zipfname, DynamicPrintConfig &out);
 
 void import_sla_archive(
     const std::string &      zipfname,
-    Vec2i                    windowsize,
+    Vec2i32                  windowsize,
     TriangleMesh &           out,
     DynamicPrintConfig &     profile,
     std::function<bool(int)> progr = [](int) { return true; });
 
 inline void import_sla_archive(
     const std::string &      zipfname,
-    Vec2i                    windowsize,
+    Vec2i32                  windowsize,
     TriangleMesh &           out,
     std::function<bool(int)> progr = [](int) { return true; })
 {

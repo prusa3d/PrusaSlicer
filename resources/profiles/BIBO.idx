@@ -1,7 +1,9 @@
 min_slic3r_version = 2.3.0-beta2
-0.0.3 Removed obsolete host keys.
-min_slic3r_version = 2.2.0-alpha3
-0.0.2 General print quality improvements
+0.0.5-susi remove resolution to use default
+0.0.5 General print quality improvements (??)
+0.0.4 superslicer: remove top_fan_speed
+0.0.3 slic3r++ adaptation: overlapping & top pattern.
+0.0.2 changed flow ratio from float to %
 0.0.1 Multiple Print models were unified into a single one.
 0.0.1-beta2 Bed model and textures added. Materials all use the BOBO2 identifier. deretract speed set to 0 to use retract speed.
 0.0.1-beta1 Added new printer profiles for ditto printing. New retraction settings, new materials. Removed some settings which do not apply. More start gcode improvements.
@@ -11,6 +13,6 @@ min_slic3r_version = 2.2.0-alpha3
 0.0.1-alpha8 Available to community Early adopters for testing. Corrected filament settings to prevent duplicates, and reworked start and end gcode.
 # The following line (max_slic3r_version) forces the users of PrusaSlicer 2.2.0-alpha3 and newer to update the profiles to 0.0.1-alpha12 and newer,
 # so they will see the print bed.
-max_slic3r_version = 2.2.0-alpha2
-min_slic3r_version = 2.2.0-alpha0
+max_slic3r_version = 12.2.0
+min_slic3r_version = 2.1.0
 0.0.1-alpha Initial version

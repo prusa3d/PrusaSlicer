@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <numeric>
 #include <utility>
-#include <unordered_map>
+#include <boost/unordered_map.hpp>
 #include <stdexcept>
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
@@ -44,6 +44,7 @@
 namespace Slic3r {
 namespace GUI {
 
+#define MAIN_VENDOR "None"
 
 using Config::Snapshot;
 using Config::SnapshotDB;
@@ -173,7 +174,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
     , vendor_id(vendor.id)
     , width(0)
 {
-    const auto &models = vendor.models;
+    const std::vector<VendorProfile::PrinterModel> &models = vendor.models;
 
     auto *sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -192,27 +193,30 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
 
     bool is_variants = false;
 
-    for (const auto &model : models) {
+    for (const VendorProfile::PrinterModel &model : models) {
         if (! filter(model)) { continue; }
 
         wxBitmap bitmap;
         int bitmap_width = 0;
         auto load_bitmap = [](const wxString& bitmap_file, wxBitmap& bitmap, int& bitmap_width)->bool {
-            if (wxFileExists(bitmap_file)) {
-                bitmap.LoadFile(bitmap_file, wxBITMAP_TYPE_PNG);
-                bitmap_width = bitmap.GetWidth();
+        if (wxFileExists(bitmap_file)) {
+            bitmap.LoadFile(bitmap_file, wxBITMAP_TYPE_PNG);
+            bitmap_width = bitmap.GetWidth();
                 return true;
             }
             return false;
         };
-        if (!load_bitmap(GUI::from_u8(Slic3r::data_dir() + "/vendor/" + vendor.id + "/" + model.id + "_thumbnail.png"), bitmap, bitmap_width)) {
-            if (!load_bitmap(GUI::from_u8(Slic3r::resources_dir() + "/profiles/" + vendor.id + "/" + model.id + "_thumbnail.png"), bitmap, bitmap_width)) {
-                BOOST_LOG_TRIVIAL(warning) << boost::format("Can't find bitmap file `%1%` for vendor `%2%`, printer `%3%`, using placeholder icon instead")
+        std::string icon_path = (model.thumbnail.empty()) ?
+            ("/" + model.id + "_thumbnail.png") :
+            ("/" + model.thumbnail);
+        if (!load_bitmap(GUI::from_u8(Slic3r::data_dir() + "/vendor/" + vendor.id + icon_path), bitmap, bitmap_width)) {
+            if (!load_bitmap(GUI::from_u8(Slic3r::resources_dir() + "/profiles/" + vendor.id + icon_path), bitmap, bitmap_width)) {
+            BOOST_LOG_TRIVIAL(warning) << boost::format("Can't find bitmap file `%1%` for vendor `%2%`, printer `%3%`, using placeholder icon instead")
                     % (Slic3r::resources_dir() + "/profiles/" + vendor.id + "/" + model.id + "_thumbnail.png")
-                    % vendor.id
-                    % model.id;
+                % vendor.id
+                % model.id;
                 load_bitmap(Slic3r::var(PRINTER_PLACEHOLDER), bitmap, bitmap_width);
-            }
+        }
         }
         auto *title = new wxStaticText(this, wxID_ANY, from_u8(model.name), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
         title->SetFont(font_name);
@@ -482,7 +486,7 @@ PagePrinters::PagePrinters(ConfigWizard *parent,
     unsigned indent,
     Technology technology)
     : ConfigWizardPage(parent, std::move(title), std::move(shortname), indent)
-    , technology(technology)
+    , technology((Technology)(uint8_t)technology)
     , install(false)   // only used for 3rd party vendors
 {
     enum {
@@ -491,11 +495,10 @@ PagePrinters::PagePrinters(ConfigWizard *parent,
 
     AppConfig *appconfig = &this->wizard_p()->appconfig_new;
 
-    const auto families = vendor.families();
-    for (const auto &family : families) {
+    const t_config_option_keys families = vendor.families();
+    for (const std::string &family : families) {
         const auto filter = [&](const VendorProfile::PrinterModel &model) {
-            return ((model.technology == ptFFF && technology & T_FFF)
-                    || (model.technology == ptSLA && technology & T_SLA))
+            return (model.technology == technology)
                 && model.family == family;
         };
 
@@ -504,7 +507,10 @@ PagePrinters::PagePrinters(ConfigWizard *parent,
         }
 
         const auto picker_title = family.empty() ? wxString() : from_u8((boost::format(_utf8(L("%s Family"))) % family).str());
-        auto *picker = new PrinterPicker(this, vendor, picker_title, MAX_COLS, *appconfig, filter);
+        uint8_t max_cols = MAX_COLS;
+        if (vendor.family_2_line_size.find(family) != vendor.family_2_line_size.end())
+            max_cols = vendor.family_2_line_size.at(family);
+        auto *picker = new PrinterPicker(this, vendor, picker_title, max_cols, *appconfig, filter);
 
         picker->Bind(EVT_PRINTER_PICK, [this, appconfig](const PrinterPickerEvent &evt) {
             appconfig->set_variant(evt.vendor_id, evt.model_id, evt.variant_name, evt.enable);
@@ -555,12 +561,16 @@ std::set<std::string> PagePrinters::get_selected_models()
 
 void PagePrinters::set_run_reason(ConfigWizard::RunReason run_reason)
 {
+#ifdef ALLOW_PRUSA_FIRST
     if (technology == T_FFF
         && (run_reason == ConfigWizard::RR_DATA_EMPTY || run_reason == ConfigWizard::RR_DATA_LEGACY)
         && printer_pickers.size() > 0 
         && printer_pickers[0]->vendor_id == PresetBundle::PRUSA_BUNDLE) {
         printer_pickers[0]->select_one(0, true);
     }
+#else
+    //didn't select the first prusa even if it's the first start: let the user choose
+#endif
 }
 
 
@@ -1142,7 +1152,7 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     boldfont.SetWeight(wxFONTWEIGHT_BOLD);
 
     auto *box_slic3r = new wxCheckBox(this, wxID_ANY, _L("Check for application updates"));
-    box_slic3r->SetValue(app_config->get("version_check") == "1");
+    box_slic3r->SetValue(false);// app_config->get("version_check") == "1"); // default to no, becasue the conf is never updated anyway. Remove that change if corrected later.
     append(box_slic3r);
     append_text(wxString::Format(_L(
         "If enabled, %s checks for new application versions online. When a new version becomes available, "
@@ -1152,7 +1162,7 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     append_spacer(VERTICAL_SPACING);
 
     auto *box_presets = new wxCheckBox(this, wxID_ANY, _L("Update built-in Presets automatically"));
-    box_presets->SetValue(app_config->get("preset_update") == "1");
+    box_presets->SetValue(false);// app_config->get("preset_update") == "1"); // default to no, becasue the conf is never updated anyway. Remove that change if corrected later.
     append(box_presets);
     append_text(wxString::Format(_L(
         "If enabled, %s downloads updates of built-in system presets in the background."
@@ -1189,8 +1199,8 @@ PageReloadFromDisk::PageReloadFromDisk(ConfigWizard* parent)
 PageFilesAssociation::PageFilesAssociation(ConfigWizard* parent)
     : ConfigWizardPage(parent, _L("Files association"), _L("Files association"))
 {
-    cb_3mf = new wxCheckBox(this, wxID_ANY, _L("Associate .3mf files to PrusaSlicer"));
-    cb_stl = new wxCheckBox(this, wxID_ANY, _L("Associate .stl files to PrusaSlicer"));
+    cb_3mf = new wxCheckBox(this, wxID_ANY, _L("Associate .3mf files to SuperSlicer"));
+    cb_stl = new wxCheckBox(this, wxID_ANY, _L("Associate .stl files to SuperSlicer"));
 //    cb_gcode = new wxCheckBox(this, wxID_ANY, _L("Associate .gcode files to PrusaSlicer G-code Viewer"));
 
     append(cb_3mf);
@@ -1203,7 +1213,7 @@ PageFilesAssociation::PageFilesAssociation(ConfigWizard* parent)
 PageMode::PageMode(ConfigWizard *parent)
     : ConfigWizardPage(parent, _L("View mode"), _L("View mode"))
 {
-    append_text(_L("PrusaSlicer's user interfaces comes in three variants:\nSimple, Advanced, and Expert.\n"
+    append_text(_L("SuperSlicer's user interfaces comes in three variants:\nSimple, Advanced, and Expert.\n"
         "The Simple mode shows only the most frequently used settings relevant for regular 3D printing. "
         "The other two offer progressively more sophisticated fine-tuning, "
         "they are suitable for advanced and expert users, respectively."));
@@ -1250,6 +1260,7 @@ void PageMode::serialize_mode(AppConfig *app_config) const
     app_config->set("use_inches", check_inch->GetValue() ? "1" : "0");
 }
 
+#ifdef ALLOW_PRUSA_FIRST
 PageVendors::PageVendors(ConfigWizard *parent)
     : ConfigWizardPage(parent, _L("Other Vendors"), _L("Other Vendors"))
 {
@@ -1284,6 +1295,7 @@ PageVendors::PageVendors(ConfigWizard *parent)
         append(cbox);
     }
 }
+#endif
 
 PageFirmware::PageFirmware(ConfigWizard *parent)
     : ConfigWizardPage(parent, _L("Firmware Type"), _L("Firmware"), 1)
@@ -1394,21 +1406,16 @@ void PageDiameters::apply_custom_config(DynamicPrintConfig &config)
     auto *opt_filam = new ConfigOptionFloats(1, spin_filam->GetValue());
     config.set_key_value("filament_diameter", opt_filam);
 
-    auto set_extrusion_width = [&config, opt_nozzle](const char *key, double dmr) {
-        char buf[64];
-        sprintf(buf, "%.2lf", dmr * opt_nozzle->values.front() / 0.4);
-        config.set_key_value(key, new ConfigOptionFloatOrPercent(atof(buf), false));
-    };
+    config.set_key_value("support_material_extrusion_width", new ConfigOptionFloatOrPercent(95, false));
+    config.set_key_value("top_infill_extrusion_width", new ConfigOptionFloatOrPercent(100, false));
+    config.set_key_value("first_layer_extrusion_width", new ConfigOptionFloatOrPercent(140, false));
+    config.set_key_value("extrusion_width", new ConfigOptionFloatOrPercent(110, false));
+    config.set_key_value("perimeter_extrusion_width", new ConfigOptionFloatOrPercent(110, false));
+    config.set_key_value("external_perimeter_extrusion_width", new ConfigOptionFloatOrPercent(105, false));
+    config.set_key_value("infill_extrusion_width", new ConfigOptionFloatOrPercent(110, false));
+    config.set_key_value("solid_infill_extrusion_width", new ConfigOptionFloatOrPercent(110, false));
+    config.set_key_value("solid_infill_extrusion_width", new ConfigOptionFloatOrPercent(110, false));
 
-    set_extrusion_width("support_material_extrusion_width",   0.35);
-    set_extrusion_width("top_infill_extrusion_width",		  0.40);
-    set_extrusion_width("first_layer_extrusion_width",		  0.42);
-
-    set_extrusion_width("extrusion_width",					  0.45);
-    set_extrusion_width("perimeter_extrusion_width",		  0.45);
-    set_extrusion_width("external_perimeter_extrusion_width", 0.45);
-    set_extrusion_width("infill_extrusion_width",			  0.45);
-    set_extrusion_width("solid_infill_extrusion_width",       0.45);
 }
 
 PageTemperatures::PageTemperatures(ConfigWizard *parent)
@@ -1472,7 +1479,7 @@ void PageTemperatures::apply_custom_config(DynamicPrintConfig &config)
 
 ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
     : wxPanel(parent)
-    , bg(ScalableBitmap(parent, "PrusaSlicer_192px_transparent.png", 192))
+    , bg(ScalableBitmap(parent, "Slic3r_192px_transparent.png", 192))
     , bullet_black(ScalableBitmap(parent, "bullet_black.png"))
     , bullet_blue(ScalableBitmap(parent, "bullet_blue.png"))
     , bullet_white(ScalableBitmap(parent, "bullet_white.png"))
@@ -1657,7 +1664,7 @@ void ConfigWizardIndex::on_mouse_move(wxMouseEvent &evt)
 
     const ssize_t item_hover_new = pos.y / item_height();
 
-    if (item_hover_new < ssize_t(items.size()) && item_hover_new != item_hover) {
+	if (item_hover_new < ssize_t(items.size()) && item_hover_new != item_hover) {
         item_hover = item_hover_new;
         Refresh();
     }
@@ -1756,17 +1763,6 @@ const std::string& Materials::get_material_vendor(const Preset *preset)
 
 // priv
 
-static const std::unordered_map<std::string, std::pair<std::string, std::string>> legacy_preset_map {{
-    { "Original Prusa i3 MK2.ini",                           std::make_pair("MK2S", "0.4") },
-    { "Original Prusa i3 MK2 MM Single Mode.ini",            std::make_pair("MK2SMM", "0.4") },
-    { "Original Prusa i3 MK2 MM Single Mode 0.6 nozzle.ini", std::make_pair("MK2SMM", "0.6") },
-    { "Original Prusa i3 MK2 MultiMaterial.ini",             std::make_pair("MK2SMM", "0.4") },
-    { "Original Prusa i3 MK2 MultiMaterial 0.6 nozzle.ini",  std::make_pair("MK2SMM", "0.6") },
-    { "Original Prusa i3 MK2 0.25 nozzle.ini",               std::make_pair("MK2S", "0.25") },
-    { "Original Prusa i3 MK2 0.6 nozzle.ini",                std::make_pair("MK2S", "0.6") },
-    { "Original Prusa i3 MK3.ini",                           std::make_pair("MK3",  "0.4") },
-}};
-
 void ConfigWizard::priv::load_pages()
 {
     wxWindowUpdateLocker freeze_guard(q);
@@ -1777,16 +1773,21 @@ void ConfigWizard::priv::load_pages()
     index->clear();
 
     index->add_page(page_welcome);
-
+#ifdef ALLOW_PRUSA_FIRST
     // Printers
     index->add_page(page_fff);
     index->add_page(page_msla);
     index->add_page(page_vendors);
     for (const auto &pages : pages_3rdparty) {
-        for ( PagePrinters* page : { pages.second.first, pages.second.second })
+        for (PagePrinters* page : { pages.second.first, pages.second.second })
             if (page && page->install)
                 index->add_page(page);
     }
+#else
+    for (PagePrinters *page : pages_vendors) {
+        index->add_page(page);
+    }
+#endif
 
     index->add_page(page_custom);
     if (page_custom->custom_wanted()) {
@@ -1831,7 +1832,7 @@ void ConfigWizard::priv::init_dialog_size()
         9*disp_rect.width / 10,
         9*disp_rect.height / 10);
 
-    const int width_hint = index->GetSize().GetWidth() + page_fff->get_width() + 30 * em();    // XXX: magic constant, I found no better solution
+    const int width_hint = index->GetSize().GetWidth() + 900+/*page_fff->get_width()*/ + 30 * em();    // XXX: magic constant, I found no better solution
     if (width_hint < window_rect.width) {
         window_rect.x += (window_rect.width - width_hint) / 2;
         window_rect.width = width_hint;
@@ -1846,21 +1847,7 @@ void ConfigWizard::priv::load_vendors()
 
     // Load up the set of vendors / models / variants the user has had enabled up till now
     AppConfig *app_config = wxGetApp().app_config;
-    if (! app_config->legacy_datadir()) {
-        appconfig_new.set_vendors(*app_config);
-    } else {
-        // In case of legacy datadir, try to guess the preference based on the printer preset files that are present
-        const auto printer_dir = fs::path(Slic3r::data_dir()) / "printer";
-        for (auto &dir_entry : boost::filesystem::directory_iterator(printer_dir))
-            if (Slic3r::is_ini_file(dir_entry)) {
-                auto needle = legacy_preset_map.find(dir_entry.path().filename().string());
-                if (needle == legacy_preset_map.end()) { continue; }
-
-                const auto &model = needle->second.first;
-                const auto &variant = needle->second.second;
-                appconfig_new.set_variant("PrusaResearch", model, variant, true);
-            }
-    }
+    appconfig_new.set_vendors(*app_config);
 
     // Initialize the is_visible flag in printer Presets
     for (auto &pair : bundles) {
@@ -1920,9 +1907,22 @@ void ConfigWizard::priv::enable_next(bool enable)
 void ConfigWizard::priv::set_start_page(ConfigWizard::StartPage start_page)
 {
     switch (start_page) {
-        case ConfigWizard::SP_PRINTERS: 
+        case ConfigWizard::SP_PRINTERS:
+#ifdef ALLOW_PRUSA_FIRST
             index->go_to(page_fff); 
             btn_next->SetFocus();
+#else
+            if(pages_vendors.empty())
+            {
+                index->go_to(page_welcome);
+                btn_next->SetFocus();
+            }
+            else
+            {
+                index->go_to(pages_vendors.front());
+                btn_next->SetFocus();
+            }
+#endif
             break;
         case ConfigWizard::SP_FILAMENTS:
             index->go_to(page_filaments);
@@ -1939,6 +1939,7 @@ void ConfigWizard::priv::set_start_page(ConfigWizard::StartPage start_page)
     }
 }
 
+#ifdef ALLOW_PRUSA_FIRST
 void ConfigWizard::priv::create_3rdparty_pages()
 {
     for (const auto &pair : bundles) {
@@ -1972,6 +1973,7 @@ void ConfigWizard::priv::create_3rdparty_pages()
         pages_3rdparty.insert({vendor->id, {pageFFF, pageSLA}});
     }
 }
+#endif
 
 void ConfigWizard::priv::set_run_reason(RunReason run_reason)
 {
@@ -2169,6 +2171,7 @@ void ConfigWizard::priv::select_default_materials_for_printer_models(Technology 
 			            appconfig_new.set(appconfig_section, material, "1");
     };
 
+#ifdef ALLOW_PRUSA_FIRST
     PagePrinters* page_printers = technology & T_FFF ? page_fff : page_msla;
     select_default_materials_for_printer_page(page_printers, technology);
 
@@ -2178,11 +2181,21 @@ void ConfigWizard::priv::select_default_materials_for_printer_models(Technology 
         if (page_printers)
             select_default_materials_for_printer_page(page_printers, technology);
     }
+#else
+    for (PagePrinters* page_printers : pages_vendors)
+    {
+        if (technology == page_printers->technology) {
+            select_default_materials_for_printer_page(page_printers, technology);
+        }
+    }
+
+#endif
 
     update_materials(technology);
     ((technology & T_FFF) ? page_filaments : page_sla_materials)->reload_presets();
 }
 
+#ifdef ALLOW_PRUSA_FIRST
 void ConfigWizard::priv::on_3rdparty_install(const VendorProfile *vendor, bool install)
 {
     auto it = pages_3rdparty.find(vendor->id);
@@ -2201,6 +2214,7 @@ void ConfigWizard::priv::on_3rdparty_install(const VendorProfile *vendor, bool i
 
     load_pages();
 }
+#endif
 
 bool ConfigWizard::priv::on_bnt_finish()
 {
@@ -2447,7 +2461,7 @@ void ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
             if (bundle.second.is_prusa_bundle) { continue; }
 
             const auto config = enabled_vendors.find(bundle.first);
-			if (config == enabled_vendors.end()) { continue; }
+            if (config == enabled_vendors.end()) { continue; }
             for (const auto &model : bundle.second.vendor_profile->models) {
                 const auto model_it = config->second.find(model.id);
                 if (model_it != config->second.end() && model_it->second.size() > 0) {
@@ -2474,6 +2488,13 @@ void ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     preset_bundle->export_selections(*app_config);
 }
 
+
+static const boost::unordered_map<PrinterTechnology, std::string> tech_to_string{ {
+    { PrinterTechnology::ptFFF, "FFF" },
+    { PrinterTechnology::ptSLA, "SLA" },
+    { PrinterTechnology::ptSLS, "SLS" },
+    } };
+
 void ConfigWizard::priv::update_presets_in_config(const std::string& section, const std::string& alias_key, bool add)
 {
     const PresetAliases& aliases = section == AppConfig::SECTION_FILAMENTS ? aliases_fff : aliases_sla;
@@ -2495,19 +2516,33 @@ void ConfigWizard::priv::update_presets_in_config(const std::string& section, co
 
 bool ConfigWizard::priv::check_fff_selected()
 {
+#ifdef ALLOW_PRUSA_FIRST
     bool ret = page_fff->any_selected();
     for (const auto& printer: pages_3rdparty)
         if (printer.second.first)               // FFF page
             ret |= printer.second.first->any_selected();
+#else
+    bool ret = false;
+    for (const PagePrinters *printer : pages_vendors)
+        if (printer->technology == T_FFF)
+            ret |= printer->any_selected();
+#endif
     return ret;
 }
 
 bool ConfigWizard::priv::check_sla_selected()
 {
+#ifdef ALLOW_PRUSA_FIRST
     bool ret = page_msla->any_selected();
     for (const auto& printer: pages_3rdparty)
         if (printer.second.second)               // SLA page
             ret |= printer.second.second->any_selected();
+#else
+    bool ret = false;
+    for (const PagePrinters *printer : pages_vendors)
+        if (printer->technology == T_SLA)
+            ret |= printer->any_selected();
+#endif
     return ret;
 }
 
@@ -2542,7 +2577,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     topsizer->AddSpacer(INDEX_MARGIN);
     topsizer->Add(p->hscroll, 1, wxEXPAND);
 
-    p->btn_sel_all = new wxButton(this, wxID_ANY, _L("Select all standard printers"));
+    p->btn_sel_all = new wxButton(this, wxID_ANY, _L("Select all standard printers in this page"));
     p->btnsizer->Add(p->btn_sel_all);
 
     p->btn_prev = new wxButton(this, wxID_ANY, _L("< &Back"));
@@ -2561,17 +2596,37 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 
     p->add_page(p->page_welcome = new PageWelcome(this));
 
+#ifdef ALLOW_PRUSA_FIRST
     p->page_fff = new PagePrinters(this, _L("Prusa FFF Technology Printers"), "Prusa FFF", *vendor_prusa, 0, T_FFF);
     p->add_page(p->page_fff);
 
     p->page_msla = new PagePrinters(this, _L("Prusa MSLA Technology Printers"), "Prusa MSLA", *vendor_prusa, 0, T_SLA);
     p->add_page(p->page_msla);
 
-	// Pages for 3rd party vendors
-	p->create_3rdparty_pages();   // Needs to be done _before_ creating PageVendors
-	p->add_page(p->page_vendors = new PageVendors(this));
-	p->add_page(p->page_custom = new PageCustom(this));
-	p->custom_printer_selected = p->page_custom->custom_wanted();
+    // Pages for 3rd party vendors
+    p->create_3rdparty_pages();   // Needs to be done _before_ creating PageVendors
+    p->add_page(p->page_vendors = new PageVendors(this));
+    p->add_page(p->page_custom = new PageCustom(this));
+    p->custom_printer_selected = p->page_custom->custom_wanted();
+#else
+    std::vector<std::string> sorted_vendors;
+    for (const auto &vendor : p->bundles) sorted_vendors.push_back(vendor.first);
+    std::sort(sorted_vendors.begin(), sorted_vendors.end());
+
+    for (const std::string &vendor_name : sorted_vendors) {
+        const Bundle &vendor = p->bundles[vendor_name];
+        bool first = true;
+        for (const PrinterTechnology &tech : vendor.vendor_profile->technologies) {
+            wxString name = _(L(vendor.vendor_profile->name));
+            name.Replace("{technology}", tech_to_string.at(tech));
+            wxString description = _(L(vendor.vendor_profile->full_name));
+            description.Replace("{technology}", tech_to_string.at(tech));
+            p->pages_vendors.push_back(new PagePrinters(this, description, name, *vendor.vendor_profile, (uint32_t)(vendor.vendor_profile->technologies.size()>1 && !first ? 1 : 0), (Technology)(uint8_t)tech));
+            p->add_page(p->pages_vendors.back());
+            first = false;
+        }
+    }
+#endif
 
     p->any_sla_selected = p->check_sla_selected();
     p->any_fff_selected = p->check_fff_selected();
@@ -2583,6 +2638,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     p->add_page(p->page_sla_materials = new PageMaterials(this, &p->sla_materials,
         _L("SLA Material Profiles Selection") + " ", _L("SLA Materials"), _L("Type:") ));
 
+    p->add_page(p->page_custom   = new PageCustom(this));
     
     p->add_page(p->page_update   = new PageUpdate(this));
     p->add_page(p->page_reload_from_disk = new PageReloadFromDisk(this));
@@ -2636,11 +2692,19 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     });
 
     p->btn_sel_all->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &) {
+#ifdef ALLOW_PRUSA_FIRST
         p->any_sla_selected = true;
         p->load_pages();
         p->page_fff->select_all(true, false);
         p->page_msla->select_all(true, false);
         p->index->go_to(p->page_mode);
+#else
+        ConfigWizardPage *page = p->index->active_page();
+        PagePrinters *page_printers = dynamic_cast<PagePrinters*>(page);
+        if (page_printers)
+            page_printers->select_all(true, false);
+        p->index->go_to(p->page_update);
+#endif
     });
 
     p->index->Bind(EVT_INDEX_PAGE, [this](const wxCommandEvent &) {
@@ -2719,8 +2783,14 @@ void ConfigWizard::on_dpi_changed(const wxRect &suggested_rect)
                                     p->btn_next->GetId(),
                                     p->btn_prev->GetId() });
 
-    for (auto printer_picker: p->page_fff->printer_pickers)
+#ifdef ALLOW_PRUSA_FIRST
+    for (auto printer_picker : p->page_fff->printer_pickers)
         msw_buttons_rescale(this, em, printer_picker->get_button_indexes());
+#else
+    for (PagePrinters* page : p->pages_vendors)
+        for (PrinterPicker* printer_picker : page->printer_pickers)
+            msw_buttons_rescale(this, em, printer_picker->get_button_indexes());
+#endif
 
     p->init_dialog_size();
 

@@ -495,7 +495,7 @@ CopyFileResult check_copy(const std::string &origin, const std::string &copy)
     } while (f1.good() && f2.good());
 
     // All data has been read and compared equal.
-    return (f1.eof() && f2.eof() && fsize == 0) ? SUCCESS : FAIL_FILES_DIFFERENT;
+    return (f1.eof() && f2.eof() && size_t(fsize) == 0) ? SUCCESS : FAIL_FILES_DIFFERENT;
 }
 
 // Ignore system and hidden files, which may be created by the DropBox synchronisation process.

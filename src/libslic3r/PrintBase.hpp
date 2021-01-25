@@ -324,6 +324,7 @@ protected:
     ModelObject                  *m_model_object;
 };
 
+
 /**
  * @brief Printing involves slicing and export of device dependent instructions.
  *
@@ -351,8 +352,10 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     virtual std::vector<ObjectID> print_object_ids() const = 0;
 
+    enum PrintValidationError {pveNone, pveWrongPosition, pveNoPrint, pveWrongSettings};
+
     // Validate the print, return empty string if valid, return error if process() cannot (or should not) be started.
-    virtual std::string     validate() const { return std::string(); }
+    virtual std::pair<PrintValidationError, std::string> validate() const { return { PrintValidationError::pveNone, std::string() }; }
 
     enum ApplyStatus {
         // No change after the Print::apply() call.

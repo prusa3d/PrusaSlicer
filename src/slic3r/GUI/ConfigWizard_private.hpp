@@ -245,7 +245,8 @@ struct PagePrinters: ConfigWizardPage
         wxString title,
         wxString shortname,
         const VendorProfile &vendor,
-        unsigned indent, Technology technology);
+        uint32_t indent, 
+        Technology technology);
 
     void select_all(bool select, bool alternates = false);
     int get_width() const;
@@ -562,8 +563,6 @@ struct ConfigWizard::priv
     wxButton *btn_cancel = nullptr;
 
     PageWelcome      *page_welcome = nullptr;
-    PagePrinters     *page_fff = nullptr;
-    PagePrinters     *page_msla = nullptr;
     PageMaterials    *page_filaments = nullptr;
     PageMaterials    *page_sla_materials = nullptr;
     PageCustom       *page_custom = nullptr;
@@ -575,8 +574,14 @@ struct ConfigWizard::priv
 #endif // _WIN32
 #endif // ENABLE_CUSTOMIZABLE_FILES_ASSOCIATION_ON_WIN
     PageMode         *page_mode = nullptr;
+#ifdef ALLOW_PRUSA_FIRST
+    PagePrinters     *page_fff = nullptr;
+    PagePrinters     *page_msla = nullptr;
     PageVendors      *page_vendors = nullptr;
     Pages3rdparty     pages_3rdparty;
+#else
+    std::vector<PagePrinters*> pages_vendors;
+#endif
 
     // Custom setup pages
     PageFirmware     *page_firmware = nullptr;
@@ -601,7 +606,9 @@ struct ConfigWizard::priv
     void add_page(ConfigWizardPage *page);
     void enable_next(bool enable);
     void set_start_page(ConfigWizard::StartPage start_page);
+#ifdef ALLOW_PRUSA_FIRST
     void create_3rdparty_pages();
+#endif
     void set_run_reason(RunReason run_reason);
     void update_materials(Technology technology);
 
@@ -609,7 +616,9 @@ struct ConfigWizard::priv
     void on_printer_pick(PagePrinters *page, const PrinterPickerEvent &evt);
     void select_default_materials_for_printer_model(const VendorProfile::PrinterModel &printer_model, Technology technology);
     void select_default_materials_for_printer_models(Technology technology, const std::set<const VendorProfile::PrinterModel*> &printer_models);
+#ifdef ALLOW_PRUSA_FIRST
     void on_3rdparty_install(const VendorProfile *vendor, bool install);
+#endif
 
     bool on_bnt_finish();
     bool check_and_install_missing_materials(Technology technology, const std::string &only_for_model_id = std::string());

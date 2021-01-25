@@ -132,7 +132,7 @@ sla::Contour3D _volumeToMesh(const Grid &grid,
     ret.faces4.reserve(quads.size());
 
     for (auto &v : points) ret.points.emplace_back(to_vec3d(v));
-    for (auto &v : triangles) ret.faces3.emplace_back(to_vec3i(v));
+    for (auto &v : triangles) ret.faces3.emplace_back(to_vec3i32(v));
     for (auto &v : quads) ret.faces4.emplace_back(to_vec4i(v));
 
     return ret;

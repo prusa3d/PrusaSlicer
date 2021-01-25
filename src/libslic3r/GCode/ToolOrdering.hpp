@@ -37,7 +37,7 @@ public:
 
     // This function goes through all infill entities, decides which ones will be used for wiping and
     // marks them by the extruder id. Returns volume that remains to be wiped on the wipe tower:
-    float mark_wiping_extrusions(const Print& print, unsigned int old_extruder, unsigned int new_extruder, float volume_to_wipe);
+    float mark_wiping_extrusions(const Print& print, uint16_t old_extruder, uint16_t new_extruder, float volume_to_wipe);
 
     void ensure_perimeters_infills_order(const Print& print);
 
@@ -81,24 +81,24 @@ public:
     bool operator< (const LayerTools &rhs) const { return print_z < rhs.print_z; }
     bool operator==(const LayerTools &rhs) const { return print_z == rhs.print_z; }
 
-    bool is_extruder_order(unsigned int a, unsigned int b) const;
-    bool has_extruder(unsigned int extruder) const { return std::find(this->extruders.begin(), this->extruders.end(), extruder) != this->extruders.end(); }
+    bool is_extruder_order(uint16_t a, uint16_t b) const;
+    bool has_extruder(uint16_t extruder) const { return std::find(this->extruders.begin(), this->extruders.end(), extruder) != this->extruders.end(); }
 
     // Return a zero based extruder from the region, or extruder_override if overriden.
-    unsigned int perimeter_extruder(const PrintRegion &region) const;
-    unsigned int infill_extruder(const PrintRegion &region) const;
-    unsigned int solid_infill_extruder(const PrintRegion &region) const;
+    uint16_t perimeter_extruder(const PrintRegion &region) const;
+    uint16_t infill_extruder(const PrintRegion &region) const;
+    uint16_t solid_infill_extruder(const PrintRegion &region) const;
 	// Returns a zero based extruder this eec should be printed with, according to PrintRegion config or extruder_override if overriden.
-	unsigned int extruder(const ExtrusionEntityCollection &extrusions, const PrintRegion &region) const;
+    uint16_t extruder(const ExtrusionEntityCollection &extrusions, const PrintRegion &region) const;
 
     coordf_t 					print_z	= 0.;
     bool 						has_object = false;
     bool						has_support = false;
     // Zero based extruder IDs, ordered to minimize tool switches.
-    std::vector<unsigned int> 	extruders;
+    std::vector<uint16_t> 	    extruders;
     // If per layer extruder switches are inserted by the G-code preview slider, this value contains the new (1 based) extruder, with which the whole object layer is being printed with.
     // If not overriden, it is set to 0.
-    unsigned int 				extruder_override = 0;
+    uint16_t 				    extruder_override = 0;
     // Will there be anything extruded on this layer for the wipe tower?
     // Due to the support layers possibly interleaving the object layers,
     // wipe tower will be disabled for some support only layers.
@@ -129,11 +129,11 @@ public:
 
     // For the use case when each object is printed separately
     // (print.config.complete_objects is true).
-    ToolOrdering(const PrintObject &object, unsigned int first_extruder, bool prime_multi_material = false);
+    ToolOrdering(const PrintObject &object, uint16_t first_extruder, bool prime_multi_material = false);
 
     // For the use case when all objects are printed at once.
     // (print.config.complete_objects is false).
-    ToolOrdering(const Print &print, unsigned int first_extruder, bool prime_multi_material = false);
+    ToolOrdering(const Print &print, uint16_t first_extruder, bool prime_multi_material = false);
 
     void 				clear() { m_layer_tools.clear(); }
 
@@ -150,7 +150,7 @@ public:
     unsigned int   		last_extruder() const { return m_last_printing_extruder; }
 
     // For a multi-material print, the printing extruders are ordered in the order they shall be primed.
-    const std::vector<unsigned int>& all_extruders() const { return m_all_printing_extruders; }
+    const std::vector<uint16_t>& all_extruders() const { return m_all_printing_extruders; }
 
     // Find LayerTools with the closest print_z.
     const LayerTools&	tools_for_layer(coordf_t print_z) const;
@@ -162,24 +162,24 @@ public:
     std::vector<LayerTools>::const_iterator end()   const { return m_layer_tools.end(); }
     bool 				empty()       const { return m_layer_tools.empty(); }
     std::vector<LayerTools>& layer_tools() { return m_layer_tools; }
-    bool 				has_wipe_tower() const { return ! m_layer_tools.empty() && m_first_printing_extruder != (unsigned int)-1 && m_layer_tools.front().wipe_tower_partitions > 0; }
+    bool 				has_wipe_tower() const { return ! m_layer_tools.empty() && m_first_printing_extruder != (uint16_t)-1 && m_layer_tools.front().wipe_tower_partitions > 0; }
 
 private:
     void				initialize_layers(std::vector<coordf_t> &zs);
-    void 				collect_extruders(const PrintObject &object, const std::vector<std::pair<double, unsigned int>> &per_layer_extruder_switches);
-    void				reorder_extruders(unsigned int last_extruder_id);
+    void 				collect_extruders(const PrintObject &object, const std::vector<std::pair<double, uint16_t>> &per_layer_extruder_switches);
+    void				reorder_extruders(uint16_t last_extruder_id);
     void 				fill_wipe_tower_partitions(const PrintConfig &config, coordf_t object_bottom_z, coordf_t max_layer_height);
     void 				collect_extruder_statistics(bool prime_multi_material);
 
-    std::vector<LayerTools>    m_layer_tools;
+    std::vector<LayerTools>     m_layer_tools;
     // First printing extruder, including the multi-material priming sequence.
-    unsigned int               m_first_printing_extruder = (unsigned int)-1;
+    uint16_t                    m_first_printing_extruder = (uint16_t)-1;
     // Final printing extruder.
-    unsigned int               m_last_printing_extruder  = (unsigned int)-1;
+    uint16_t                    m_last_printing_extruder  = (uint16_t)-1;
     // All extruders, which extrude some material over m_layer_tools.
-    std::vector<unsigned int>  m_all_printing_extruders;
+    std::vector<uint16_t>       m_all_printing_extruders;
 
-    const PrintConfig*         m_print_config_ptr = nullptr;
+    const PrintConfig*          m_print_config_ptr = nullptr;
 };
 
 

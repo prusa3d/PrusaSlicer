@@ -7,8 +7,8 @@
     #include <Windows.h>
     #include <wchar.h>
     #ifdef SLIC3R_GUI
-    extern "C"
-    {
+    extern "C" 
+    { 
         // Let the NVIDIA and AMD know we want to use their graphics card
         // on a dual graphics card system.
         __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
@@ -17,11 +17,6 @@
     #endif /* SLIC3R_GUI */
 #endif /* WIN32 */
 
-#include <cstdio>
-#include <string>
-#include <cstring>
-#include <iostream>
-#include <math.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/nowide/args.hpp>
@@ -112,7 +107,7 @@ int CLI::run(int argc, char **argv)
 #ifdef _WIN32
             false;
 #else
-            // On Unix systems, the prusa-slicer binary may be symlinked to give the application a different meaning.
+            // On Unix systems, the superslicer binary may be symlinked to give the application a different meaning.
             boost::algorithm::iends_with(boost::filesystem::path(argv[0]).filename().string(), "gcodeviewer");
 #endif // _WIN32
 
@@ -145,7 +140,7 @@ int CLI::run(int argc, char **argv)
         }
         m_print_config.apply(config);
     }
-
+        
     // are we starting as gcodeviewer ?
     for (auto it = m_actions.begin(); it != m_actions.end(); ++it) {
         if (*it == "gcodeviewer") {
@@ -240,8 +235,7 @@ int CLI::run(int argc, char **argv)
     // Loop through transform options.
     bool user_center_specified = false;
     Points bed = get_bed_shape(m_print_config);
-    ArrangeParams arrange_cfg;
-    arrange_cfg.min_obj_distance = scaled(min_object_distance(m_print_config));
+    int dups = 1;
     
     for (auto const &opt_key : m_transforms) {
         if (opt_key == "merge") {
@@ -250,13 +244,15 @@ int CLI::run(int argc, char **argv)
                 for (ModelObject *o : model.objects)
                     m.add_object(*o);
             // Rearrange instances unless --dont-arrange is supplied
-            if (! m_config.opt_bool("dont_arrange")) {
-                m.add_default_instances();
-                if (this->has_print_action())
-                    arrange_objects(m, bed, arrange_cfg);
-                else
-                    arrange_objects(m, InfiniteBed{}, arrange_cfg);
-            }
+            //should be done later
+            //TODO: test it!
+            //if (! m_config.opt_bool("dont_arrange")) {
+            //    m.add_default_instances();
+            //    if (this->has_print_action())
+            //        arrange_objects(m, bed, arrange_cfg);
+            //    else
+            //        arrange_objects(m, InfiniteBed{}, arrange_cfg);
+            //}
             m_models.clear();
             m_models.emplace_back(std::move(m));
         } else if (opt_key == "duplicate") {
@@ -266,20 +262,9 @@ int CLI::run(int argc, char **argv)
                     [](ModelObject* o){ return o->instances.empty(); }
                 );
                 
-                int dups = m_config.opt_int("duplicate");
+                dups = m_config.opt_int("duplicate");
                 if (!all_objects_have_instances) model.add_default_instances();
                 
-                try {
-                    if (dups > 1) {
-                        // if all input objects have defined position(s) apply duplication to the whole model
-                        duplicate(model, size_t(dups), bed, arrange_cfg);
-                    } else {
-                        arrange_objects(model, bed, arrange_cfg);
-                    }
-                } catch (std::exception &ex) {
-                    boost::nowide::cerr << "error: " << ex.what() << std::endl;
-                    return 1;
-                }
             }
         } else if (opt_key == "duplicate_grid") {
             std::vector<int> &ints = m_config.option<ConfigOptionInts>("duplicate_grid")->values;
@@ -482,7 +467,19 @@ int CLI::run(int argc, char **argv)
                 });
 
                 PrintBase  *print = (printer_technology == ptFFF) ? static_cast<PrintBase*>(&fff_print) : static_cast<PrintBase*>(&sla_print);
+                
                 if (! m_config.opt_bool("dont_arrange")) {
+                    ArrangeParams arrange_cfg;
+                    arrange_cfg.min_obj_distance = scaled(PrintConfig::min_object_distance(&m_print_config)) * 2;
+                    if (dups > 1) {
+                            try {
+                            // if all input objects have defined position(s) apply duplication to the whole model
+                            duplicate(model, size_t(dups), bed, arrange_cfg);
+                        } catch (std::exception & ex) {
+                            boost::nowide::cerr << "error: " << ex.what() << std::endl;
+                            return 1;
+                        }
+                    }
                     if (user_center_specified) {
                         Vec2d c = m_config.option<ConfigOptionPoint>("center")->value;
                         arrange_objects(model, InfiniteBed{scaled(c)}, arrange_cfg);
@@ -494,9 +491,9 @@ int CLI::run(int argc, char **argv)
                         fff_print.auto_assign_extruders(mo);
                 }
                 print->apply(model, m_print_config);
-                std::string err = print->validate();
-                if (! err.empty()) {
-                    boost::nowide::cerr << err << std::endl;
+                std::pair<PrintBase::PrintValidationError, std::string> err = print->validate();
+                if (err.first != PrintBase::PrintValidationError::pveNone) {
+                    boost::nowide::cerr << err.second << std::endl;
                     return 1;
                 }
                 if (print->empty())
@@ -509,7 +506,7 @@ int CLI::run(int argc, char **argv)
                             // The outfile is processed by a PlaceholderParser.
                             outfile = fff_print.export_gcode(outfile, nullptr, nullptr);
                             outfile_final = fff_print.print_statistics().finalize_output_path(outfile);
-                        } else {
+                        } else if (printer_technology == ptSLA) {
                             outfile = sla_print.output_filepath(outfile);
                             // We need to finalize the filename beforehand because the export function sets the filename inside the zip metadata
                             outfile_final = sla_print.print_statistics().finalize_output_path(outfile);
@@ -682,7 +679,7 @@ void CLI::print_help(bool include_print_options, PrinterTechnology printer_techn
 #endif /* SLIC3R_GUI */
         << std::endl
         << "https://github.com/prusa3d/PrusaSlicer" << std::endl << std::endl
-        << "Usage: prusa-slicer [ ACTIONS ] [ TRANSFORM ] [ OPTIONS ] [ file.stl ... ]" << std::endl
+        << "Usage: superslicer [ ACTIONS ] [ TRANSFORM ] [ OPTIONS ] [ file.stl ... ]" << std::endl
         << std::endl
         << "Actions:" << std::endl;
     cli_actions_config_def.print_cli_help(boost::nowide::cout, false);
@@ -719,10 +716,10 @@ void CLI::print_help(bool include_print_options, PrinterTechnology printer_techn
 bool CLI::export_models(IO::ExportFormat format)
 {
     for (Model &model : m_models) {
-        const std::string path = this->output_filepath(model, format);
+        std::string path = this->output_filepath(model, format);
         bool success = false;
         switch (format) {
-            case IO::AMF: success = Slic3r::store_amf(path.c_str(), &model, nullptr, false); break;
+            case IO::AMF: success = Slic3r::store_amf(path, &model, nullptr, false); break;
             case IO::OBJ: success = Slic3r::store_obj(path.c_str(), &model);          break;
             case IO::STL: success = Slic3r::store_stl(path.c_str(), &model, true);    break;
             case IO::TMF: success = Slic3r::store_3mf(path.c_str(), &model, nullptr, false); break;

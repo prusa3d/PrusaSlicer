@@ -119,11 +119,11 @@ class TPPLPoly {
             return points;
         }
         
-        TPPLPoint& operator[] (int i) {
+        TPPLPoint& operator[] (size_t i) {
             return points[i];
         }
 
-        const TPPLPoint& operator[] (int i) const {
+        const TPPLPoint& operator[] (size_t i) const {
             return points[i];
         }
         

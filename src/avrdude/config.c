@@ -233,7 +233,7 @@ TOKEN * hexnumber(char * text)
 TOKEN * string(char * text)
 {
   struct token_t * tkn;
-  int len;
+  size_t len;
 
   tkn = new_token(TKN_STRING);
   if (tkn == NULL) {

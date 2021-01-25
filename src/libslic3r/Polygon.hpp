@@ -43,7 +43,7 @@ public:
     Lines lines() const override;
     Polyline split_at_vertex(const Point &point) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
-    Polyline split_at_index(int index) const;
+    Polyline split_at_index(size_t index) const;
     // Split a closed polygon into an open polyline, with the split point duplicated at both ends.
     Polyline split_at_first_point() const { return this->split_at_index(0); }
     Points   equally_spaced_points(double distance) const { return this->split_at_first_point().equally_spaced_points(distance); }
@@ -69,6 +69,9 @@ public:
     // Projection of a point onto the polygon.
     Point point_projection(const Point &point) const;
     std::vector<float> parameter_by_length() const;
+    /// remove points that are (almost) on an existing line from previous & next point.
+    /// return number of point removed
+    size_t remove_collinear(coord_t max_offset);
 };
 
 inline bool operator==(const Polygon &lhs, const Polygon &rhs) { return lhs.points == rhs.points; }
@@ -102,8 +105,8 @@ extern bool        remove_sticks(Polygons &polys);
 // Remove polygons with less than 3 edges.
 extern bool        remove_degenerate(Polygons &polys);
 extern bool        remove_small(Polygons &polys, double min_area);
-extern void 	   remove_collinear(Polygon &poly);
-extern void 	   remove_collinear(Polygons &polys);
+extern void 	   remove_collinear(Polygon &poly, coord_t max_offset = SCALED_EPSILON);
+extern void 	   remove_collinear(Polygons &polys, coord_t max_offset = SCALED_EPSILON);
 
 // Append a vector of polygons at the end of another vector of polygons.
 inline void        polygons_append(Polygons &dst, const Polygons &src) { dst.insert(dst.end(), src.begin(), src.end()); }
@@ -163,9 +166,9 @@ inline Lines to_lines(const Polygon &poly)
     Lines lines;
     lines.reserve(poly.points.size());
     if (poly.points.size() > 2) {
-        for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
-            lines.push_back(Line(*it, *(it + 1)));
-        lines.push_back(Line(poly.points.back(), poly.points.front()));
+    for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
+        lines.push_back(Line(*it, *(it + 1)));
+    lines.push_back(Line(poly.points.back(), poly.points.front()));
     }
     return lines;
 }

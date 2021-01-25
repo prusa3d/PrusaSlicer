@@ -4,9 +4,10 @@
 #include <libslic3r/Arrange.hpp>
 
 namespace Slic3r {
-
+    
 class Model;
 class ModelInstance;
+class PrintBase;
 using ModelInstancePtrs = std::vector<ModelInstance*>;
 
 using arrangement::ArrangePolygon;
@@ -37,7 +38,7 @@ bool arrange_objects(Model &              model,
                      VirtualBedFn         vfn = throw_if_out_of_bed)
 {
     ModelInstancePtrs instances;
-    auto&& input = get_arrange_polys(model, instances);
+    ArrangePolygons input = get_arrange_polys(model, instances);
     arrangement::arrange(input, bed, params);
     
     return apply_arrange_polys(input, instances, vfn);

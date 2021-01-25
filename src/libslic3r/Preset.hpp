@@ -30,10 +30,15 @@ class VendorProfile
 {
 public:
     std::string                     name;
+    std::string                     full_name;
+    std::vector<PrinterTechnology>  technologies;
     std::string                     id;
     Semver                          config_version;
     std::string                     config_update_url;
     std::string                     changelog_url;
+
+    //families
+    std::map<std::string, uint8_t> family_2_line_size;
 
     struct PrinterVariant {
         PrinterVariant() {}
@@ -52,6 +57,7 @@ public:
         // Vendor & Printer Model specific print bed model & texture.
         std::string 			 	bed_model;
         std::string 				bed_texture;
+        std::string 				thumbnail;
 
         PrinterVariant*       variant(const std::string &name) {
             for (auto &v : this->variants)
@@ -209,6 +215,9 @@ public:
     // Resize the extruder specific fields, initialize them with the content of the 1st extruder.
     void                set_num_extruders(unsigned int n) { this->config.set_num_extruders(n); }
 
+    // Resize the milling specific fields, initialize them with the content of the 1st extruder.
+    void                set_num_milling(unsigned int n) { this->config.set_num_milling(n); }
+
     // Sort lexicographically by a preset name. The preset name shall be unique across a single PresetCollection.
     bool                operator<(const Preset &other) const { return this->name < other.name; }
 
@@ -218,7 +227,8 @@ public:
     static const std::vector<std::string>&  printer_options();
     // Nozzle options of the printer options.
     static const std::vector<std::string>&  nozzle_options();
-    // Printer machine limits, those are contained in printer_options().
+
+    static const std::vector<std::string>&  milling_options();    // Printer machine limits, those are contained in printer_options().
     static const std::vector<std::string>&  machine_limits_options();
 
     static const std::vector<std::string>&  sla_printer_options();

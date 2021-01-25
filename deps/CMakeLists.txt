@@ -1,12 +1,12 @@
 #
-# This CMake project downloads, configures and builds PrusaSlicer dependencies on Unix and Windows.
+# This CMake project downloads, configures and builds Slic3r++ dependencies on Unix and Windows.
 #
 # When using this script, it's recommended to perform an out-of-source build using CMake.
 #
 # All the dependencies are installed in a `destdir` directory in the root of the build directory,
 # in a traditional Unix-style prefix structure. The destdir can be used directly by CMake
-# when building PrusaSlicer - to do this, set the CMAKE_PREFIX_PATH to ${destdir}/usr/local.
-# Warning: On UNIX/Linux, you also need to set -DSLIC3R_STATIC=1 when building PrusaSlicer.
+# when building Slic3r - to do this, set the CMAKE_PREFIX_PATH to ${destdir}/usr/local.
+# Warning: On UNIX/Linux, you also need to set -DSlic3r_STATIC=1 when building Slic3r.
 #
 # For better clarity of console output, it's recommended to _not_ use a parallelized build
 # for the top-level command, ie. use `make -j 1` or `ninja -j 1` to force single-threaded top-level
@@ -20,7 +20,7 @@
 # therefore, unfortunatelly, the installation cannot be copied/moved elsewhere without re-installing wxWidgets.
 #
 
-project(PrusaSlicer-deps)
+project(Slic3r-deps)
 cmake_minimum_required(VERSION 3.2)
 
 include(ExternalProject)
@@ -45,9 +45,8 @@ endif()
 # Slic3r compiles with a different version which will cause runtime errors.
 # option(DEP_BUILD_IGL_STATIC "Build IGL as a static library. Might cause link errors and increase binary size." OFF)
 
-message(STATUS "PrusaSlicer deps DESTDIR: ${DESTDIR}")
-message(STATUS "PrusaSlicer deps debug build: ${DEP_DEBUG}")
-
+message(STATUS "Slic3r deps DESTDIR: ${DESTDIR}")
+message(STATUS "Slic3r deps debug build: ${DEP_DEBUG}")
 find_package(Git REQUIRED)
 
 get_property(_is_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
@@ -62,7 +61,7 @@ function(prusaslicer_add_cmake_project projectname)
 
     set(_gen "")
     set(_build_j "-j${NPROC}")
-    if (MSVC)
+if (MSVC)
         set(_gen CMAKE_GENERATOR "${DEP_MSVC_GEN}" CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}")
         set(_build_j "/m")
     endif ()

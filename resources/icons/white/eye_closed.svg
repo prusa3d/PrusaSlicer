@@ -8,6 +8,6 @@
 	
 		<circle fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" cx="8" cy="8" r="1"/>
 	
-		<line fill="none" stroke="#ED6B21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" x1="2" y1="14" x2="14" y2="2"/>
+		<line fill="none" stroke="#2172eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" x1="2" y1="14" x2="14" y2="2"/>
 </g>
 </svg>

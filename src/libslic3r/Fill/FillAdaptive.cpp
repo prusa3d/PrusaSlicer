@@ -301,7 +301,7 @@ std::pair<double, double> adaptive_fill_line_spacing(const PrintObject &print_ob
         bool                     nonempty               = config.fill_density > 0;
         bool                     has_adaptive_infill    = nonempty && config.fill_pattern == ipAdaptiveCubic;
         bool                     has_support_infill     = nonempty && config.fill_pattern == ipSupportCubic;
-        double                   infill_extrusion_width = config.infill_extrusion_width.percent ? default_infill_extrusion_width * 0.01 * config.infill_extrusion_width : config.infill_extrusion_width;
+        double                   infill_extrusion_width = config.infill_extrusion_width.get_abs_value(max_nozzle_diameter);
         region_fill_data.push_back(RegionFillData({
             has_adaptive_infill ? Tristate::Maybe : Tristate::No,
             has_support_infill ? Tristate::Maybe : Tristate::No,
@@ -521,37 +521,37 @@ static void export_infill_lines_to_svg(const ExPolygon &expoly, const Polylines 
     static constexpr double trim_length = scale_(0.4);
     for (Polyline polyline : polylines)
         if (! polyline.empty()) {
-            Vec2d a = polyline.points.front().cast<double>();
-            Vec2d d = polyline.points.back().cast<double>();
-            if (polyline.size() == 2) {
-                Vec2d v = d - a;
-                double l = v.norm();
-                if (l > 2. * trim_length) {
-                    a += v * trim_length / l;
-                    d -= v * trim_length / l;
-                    polyline.points.front() = a.cast<coord_t>();
-                    polyline.points.back() = d.cast<coord_t>();
-                } else
-                    polyline.points.clear();
-            } else if (polyline.size() > 2) {
-                Vec2d b = polyline.points[1].cast<double>();
-                Vec2d c = polyline.points[polyline.points.size() - 2].cast<double>();
-                Vec2d v = b - a;
-                double l = v.norm();
-                if (l > trim_length) {
-                    a += v * trim_length / l;
-                    polyline.points.front() = a.cast<coord_t>();
-                } else
-                    polyline.points.erase(polyline.points.begin());
-                v = d - c;
-                l = v.norm();
-                if (l > trim_length)
-                    polyline.points.back() = (d - v * trim_length / l).cast<coord_t>();
-                else
-                    polyline.points.pop_back();
-            }
-            svg.draw(polyline, "black");
+        Vec2d a = polyline.points.front().cast<double>();
+        Vec2d d = polyline.points.back().cast<double>();
+        if (polyline.size() == 2) {
+            Vec2d v = d - a;
+            double l = v.norm();
+            if (l > 2. * trim_length) {
+                a += v * trim_length / l;
+                d -= v * trim_length / l;
+                polyline.points.front() = a.cast<coord_t>();
+                polyline.points.back() = d.cast<coord_t>();
+            } else
+                polyline.points.clear();
+        } else if (polyline.size() > 2) {
+            Vec2d b = polyline.points[1].cast<double>();
+            Vec2d c = polyline.points[polyline.points.size() - 2].cast<double>();
+            Vec2d v = b - a;
+            double l = v.norm();
+            if (l > trim_length) {
+                a += v * trim_length / l;
+                polyline.points.front() = a.cast<coord_t>();
+            } else
+                polyline.points.erase(polyline.points.begin());
+            v = d - c;
+            l = v.norm();
+            if (l > trim_length)
+                polyline.points.back() = (d - v * trim_length / l).cast<coord_t>();
+            else
+                polyline.points.pop_back();
         }
+        svg.draw(polyline, "black");
+    }
     svg.draw(pts, "magenta");
 }
 #endif /* ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT */
@@ -849,7 +849,7 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                     }
                     return std::make_pair(static_cast<Polyline*>(nullptr), false);
                 };
-                auto collinear_front = collinear_segment(poly.points.front(), poly.points.back(),  &poly);
+                auto collinear_front = collinear_segment(poly.points.front(), poly.points.back(), &poly);
                 auto collinear_back  = collinear_segment(poly.points.back(),  poly.points.front(), &poly);
                 assert(! collinear_front.first || ! collinear_back.first || collinear_front.first != collinear_back.first);
                 if (collinear_front.first) {
@@ -917,18 +917,18 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                     rtree.query(bgi::nearest(mk_rtree_point(pt), 1) && bgi::satisfies(filter_t_joint), std::back_inserter(closest));
                     std::optional<size_t> out;
                     if (! closest.empty()) {
-                        const Polyline &pl = lines[closest.front().second];
-                        if (pl.points.empty()) {
-                            // The closest infill line was already dropped as it was too short.
-                            // Such an infill line should not make a T-joint anyways.
-    #if 0 // #ifndef NDEBUG
-                            const auto &seg = closest.front().first;
-                            struct Linef { Vec2d a; Vec2d b; };
-                            Linef l { { bg::get<0, 0>(seg), bg::get<0, 1>(seg) }, { bg::get<1, 0>(seg), bg::get<1, 1>(seg) } };
-                            assert(line_alg::distance_to_squared(l, Vec2d(pt.cast<double>())) > 1000 * 1000);
-    #endif // NDEBUG
-                        } else if (((Line)pl).distance_to_squared(pt) <= 1000 * 1000)
-                            out = closest.front().second;
+                    const Polyline &pl = lines[closest.front().second];
+                    if (pl.points.empty()) {
+                        // The closest infill line was already dropped as it was too short.
+                        // Such an infill line should not make a T-joint anyways.
+#if 0 // #ifndef NDEBUG
+                        const auto &seg = closest.front().first;
+                        struct Linef { Vec2d a; Vec2d b; };
+                        Linef l { { bg::get<0, 0>(seg), bg::get<0, 1>(seg) }, { bg::get<1, 0>(seg), bg::get<1, 1>(seg) } };
+                        assert(line_alg::distance_to_squared(l, Vec2d(pt.cast<double>())) > 1000 * 1000);
+#endif // NDEBUG
+                    } else if (((Line)pl).distance_to_squared(pt) <= 1000 * 1000)
+                        out = closest.front().second;
                     }
                     return out;
                 };
@@ -1314,11 +1314,11 @@ bool has_no_collinear_lines(const Polylines &polylines)
 #endif
 
 void Filler::_fill_surface_single(
-    const FillParams              &params,
+    const FillParams &             params,
     unsigned int                   thickness_layers,
     const std::pair<float, Point> &direction,
     ExPolygon                      expolygon,
-    Polylines                     &polylines_out)
+    Polylines                     &polylines_out) const
 {
     assert (this->adapt_fill_octree);
 
@@ -1388,7 +1388,7 @@ void Filler::_fill_surface_single(
     const auto hook_length     = coordf_t(std::min<float>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length)));
     const auto hook_length_max = coordf_t(std::min<float>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length_max)));
 
-    Polylines all_polylines_with_hooks = all_polylines.size() > 1 ? connect_lines_using_hooks(std::move(all_polylines), expolygon, this->spacing, hook_length, hook_length_max) : std::move(all_polylines);
+    Polylines all_polylines_with_hooks = all_polylines.size() > 1 ? connect_lines_using_hooks(std::move(all_polylines), expolygon, this->get_spacing(), hook_length, hook_length_max) : std::move(all_polylines);
 
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
     {
@@ -1397,10 +1397,10 @@ void Filler::_fill_surface_single(
     }
 #endif /* ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT */
 
-    if (params.dont_connect() || all_polylines_with_hooks.size() <= 1)
+    if (params.connection == InfillConnection::icNotConnected || all_polylines_with_hooks.size() <= 1)
         append(polylines_out, chain_polylines(std::move(all_polylines_with_hooks)));
     else
-        connect_infill(std::move(all_polylines_with_hooks), expolygon, polylines_out, this->spacing, params);
+        connect_infill(std::move(all_polylines_with_hooks), expolygon, polylines_out, this->get_spacing(), params);
 
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
     {

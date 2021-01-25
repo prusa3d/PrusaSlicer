@@ -25,7 +25,9 @@ public:
     CoolingBuffer(GCode &gcodegen);
     void        reset();
     void        set_current_extruder(unsigned int extruder_id) { m_current_extruder = extruder_id; }
-    std::string process_layer(const std::string &gcode, size_t layer_id);
+    /// process the laer :check the time and apply fan / speed change
+    /// append_time_only: if he layer is only support, then you can put this at true to not process the layer but just append its time to the next one.
+    std::string process_layer(const std::string &gcode, size_t layer_id, bool append_time_only = false);
     GCode* 	    gcodegen() { return &m_gcodegen; }
 
 private:
@@ -43,6 +45,11 @@ private:
     std::vector<char>   m_axis;
     std::vector<float>  m_current_pos;
     unsigned int        m_current_extruder;
+
+    //saved previous unslowed layer 
+    std::map<size_t, float> saved_layer_time_support;
+    std::map<size_t, float> saved_layer_time_object;
+
 
     // Old logic: proportional.
     bool                m_cooling_logic_proportional = false;

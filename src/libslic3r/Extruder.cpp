@@ -3,19 +3,31 @@
 
 namespace Slic3r {
 
-Extruder::Extruder(unsigned int id, GCodeConfig *config) :
+Tool::Tool(uint16_t id, GCodeConfig* config) :
     m_id(id),
     m_config(config)
 {
     reset();
-    
+}
+
+Extruder::Extruder(uint16_t id, GCodeConfig* config) :
+    Tool(id, config)
+{
+
     // cache values that are going to be called often
     m_e_per_mm3 = this->extrusion_multiplier();
-    if (! m_config->use_volumetric_e)
+    if (!m_config->use_volumetric_e)
         m_e_per_mm3 /= this->filament_crossection();
 }
 
-double Extruder::extrude(double dE)
+Mill::Mill(uint16_t mill_id, GCodeConfig* config) :
+    Tool(mill_id, config)
+{
+    m_mill_id = mill_id;
+    m_id = mill_id + (uint16_t)config->retract_length.values.size();
+}
+
+double Tool::extrude(double dE)
 {
     // in case of relative E distances we always reset to 0 before any output
     if (m_config->use_relative_e_distances)
@@ -34,7 +46,7 @@ double Extruder::extrude(double dE)
    The restart_extra argument sets the extra length to be used for
    unretraction. If we're actually performing a retraction, any restart_extra
    value supplied will overwrite the previous one if any. */
-double Extruder::retract(double length, double restart_extra)
+double Tool::retract(double length, double restart_extra)
 {
     // in case of relative E distances we always reset to 0 before any output
     if (m_config->use_relative_e_distances)
@@ -49,7 +61,7 @@ double Extruder::retract(double length, double restart_extra)
     return to_retract;
 }
 
-double Extruder::unretract()
+double Tool::unretract()
 {
     double dE = m_retracted + m_restart_extra;
     this->extrude(dE);
@@ -59,7 +71,7 @@ double Extruder::unretract()
 }
 
 // Used filament volume in mm^3.
-double Extruder::extruded_volume() const
+double Tool::extruded_volume() const
 {
     return m_config->use_volumetric_e ? 
         m_absolute_E + m_retracted :
@@ -67,11 +79,82 @@ double Extruder::extruded_volume() const
 }
 
 // Used filament length in mm.
-double Extruder::used_filament() const
+double Tool::used_filament() const
 {
     return m_config->use_volumetric_e ?
         this->extruded_volume() / this->filament_crossection() :
         m_absolute_E + m_retracted;
+}
+
+double Tool::filament_diameter() const
+{
+    return 0;
+}
+
+double Tool::filament_density() const
+{
+    return 0;
+}
+
+double Tool::filament_cost() const
+{
+    return 0;
+}
+
+double Tool::extrusion_multiplier() const
+{
+    return 0;
+}
+
+// Return a "retract_before_wipe" percentage as a factor clamped to <0, 1>
+double Tool::retract_before_wipe() const
+{
+    return 0;
+}
+
+double Tool::retract_length() const
+{
+    return 0;
+}
+
+double Tool::retract_lift() const
+{
+    return 0;
+}
+
+int Tool::retract_speed() const
+{
+    return 0;
+}
+
+int Tool::deretract_speed() const
+{
+    return 0;
+}
+
+double Tool::retract_restart_extra() const
+{
+    return 0;
+}
+
+double Tool::retract_length_toolchange() const
+{
+    return 0;
+}
+
+double Tool::retract_restart_extra_toolchange() const
+{
+    return 0;
+}
+
+int Tool::temp_offset() const
+{
+    return 0;
+}
+
+int Tool::fan_offset() const
+{
+    return 0;
 }
 
 double Extruder::filament_diameter() const
@@ -134,6 +217,20 @@ double Extruder::retract_length_toolchange() const
 double Extruder::retract_restart_extra_toolchange() const
 {
     return m_config->retract_restart_extra_toolchange.get_at(m_id);
+}
+
+int Extruder::temp_offset() const
+{
+    return m_config->extruder_temperature_offset.get_at(m_id);
+}
+
+int Extruder::fan_offset() const
+{
+    return m_config->extruder_fan_offset.get_at(m_id);
+}
+
+double Mill::retract_lift() const {
+    return m_config->milling_z_lift.get_at(m_mill_id);
 }
 
 }

@@ -1,0 +1,67 @@
+
+page:General:printer
+group:Size and coordinates
+	bed_shape
+	setting:max_print_height
+	setting:z_offset
+	setting:z_step
+group:extruders_count_event:milling_count_event:Capabilities
+	extruders_count
+	setting:single_extruder_multi_material
+	milling_count
+group:Print Host upload
+	print_host_upload_description
+group:silent_mode_event:Firmware
+	setting:gcode_flavor
+	setting:silent_mode
+	setting:remaining_times
+group:Cooling fan
+	line:Speedup
+		setting:label$Speedup time:fan_speedup_time
+		setting:label$Only for overhangs:fan_speedup_overhangs
+	end_line
+	setting:label$Kickstart duration:fan_kickstart
+group:Thumbnails
+	line:Size for Gcode
+		setting:id$0:label$Small:thumbnails
+		setting:id$1:label$Big:thumbnails
+	end_line
+	line:Color override
+		setting:label$:sidetext_width$1:thumbnails_custom_color
+		setting:label$:label_width$1:thumbnails_color
+	end_line
+	setting:thumbnails_with_bed
+group:Advanced
+	setting:use_relative_e_distances
+	setting:use_firmware_retraction
+	setting:use_volumetric_e
+	setting:min_length
+	setting:variable_layer_height
+
+page:Custom G-code:cog
+height:15
+group:nolabel:Start G-code
+	setting:full_width:start_gcode
+group:nolabel:End G-code
+	setting:full_width:end_gcode
+group:nolabel:Before layer change G-code
+	setting:full_width:before_layer_gcode
+group:nolabel:After layer change G-code
+	setting:full_width:layer_gcode
+group:nolabel:Tool change G-code
+	setting:full_width:toolchange_gcode
+group:nolabel:Between objects G-code (for sequential printing)
+	setting:full_width:between_objects_gcode
+group:nolabel:Between extrusion role change G-code
+	setting:full_width:feature_gcode
+height:0
+
+page:Notes:note.png
+group:nolabel:Notes
+		setting:full_width:height$25:printer_notes
+
+page:Dependencies:wrench.png
+	group:Profile dependencies
+		parent_preset_description
+
+unregular_pages

@@ -331,21 +331,26 @@ inline std::string get_time_dhms(float time_in_secs)
     return buffer;
 }
 
+// Returns the given time is seconds in format DDd HHh MMm
 inline std::string get_time_dhm(float time_in_secs)
 {
-    int days = (int)(time_in_secs / 86400.0f);
-    time_in_secs -= (float)days * 86400.0f;
-    int hours = (int)(time_in_secs / 3600.0f);
-    time_in_secs -= (float)hours * 3600.0f;
-    int minutes = (int)(time_in_secs / 60.0f);
-
     char buffer[64];
-    if (days > 0)
-        ::sprintf(buffer, "%dd %dh %dm", days, hours, minutes);
-    else if (hours > 0)
-        ::sprintf(buffer, "%dh %dm", hours, minutes);
-    else if (minutes > 0)
-        ::sprintf(buffer, "%dm", minutes);
+
+    int minutes = (int)std::round(time_in_secs / 60.);
+    if (minutes <= 0) {
+        ::sprintf(buffer, "%ds", (int)time_in_secs);
+    } else {
+        int days = minutes / 1440;
+        minutes -= days * 1440;
+        int hours = minutes / 60;
+        minutes -= hours * 60;
+        if (days > 0)
+            ::sprintf(buffer, "%dd %dh %dm", days, hours, minutes);
+        else if (hours > 0)
+            ::sprintf(buffer, "%dh %dm", hours, minutes);
+        else
+            ::sprintf(buffer, "%dm", minutes);
+    }
 
     return buffer;
 }

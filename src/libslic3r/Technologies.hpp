@@ -15,7 +15,7 @@
 #define ENABLE_RENDER_STATISTICS 0
 // Shows an imgui dialog with camera related data
 #define ENABLE_CAMERA_STATISTICS 0
-// Render the picking pass instead of the main scene (use [T] key to toggle between regular rendering and picking pass only rendering)
+//  Render the picking pass instead of the main scene (use [T] key to toggle between regular rendering and picking pass only rendering)
 #define ENABLE_RENDER_PICKING_PASS 0
 // Enable extracting thumbnails from selected gcode and save them as png files
 #define ENABLE_THUMBNAIL_GENERATOR_DEBUG 0
@@ -28,6 +28,7 @@
 // Enable G-Code viewer comparison between toolpaths height and width detected from gcode and calculated at gcode generation 
 #define ENABLE_GCODE_VIEWER_DATA_CHECKING 0
 
+//#define DEBUG_EXTRUSION_OUTPUT 0
 
 //=================
 // 2.2.0.rc1 techs

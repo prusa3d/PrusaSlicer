@@ -15,7 +15,6 @@
 #include "MeshUtils.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GCodeViewer.hpp"
-
 #include "libslic3r/Slicing.hpp"
 
 #include <float.h>
@@ -199,7 +198,7 @@ class GLCanvas3D
     public:
         EState state;
         float band_width;
-        float strength;
+        //float strength;
         int last_object_id;
         float last_z;
         LayerHeightEditActionType last_action;
@@ -209,7 +208,7 @@ class GLCanvas3D
 
         void init();
 
-        void set_config(const DynamicPrintConfig* config);
+		void set_config(const DynamicPrintConfig* config);
         void select_object(const Model &model, int object_id);
 
         bool is_allowed() const;
@@ -312,12 +311,13 @@ class GLCanvas3D
             ToolpathOutside,
             SlaSupportsOutside,
             SomethingNotShown,
+            PrintWarning,
             ObjectClashed
         };
 
         // Sets a warning of the given type to be active/inactive. If several warnings are active simultaneously,
         // only the last one is shown (decided by the order in the enum above).
-        void activate(WarningTexture::Warning warning, bool state, const GLCanvas3D& canvas);
+        void activate(WarningTexture::Warning warning, bool state, const GLCanvas3D& canvas, std::string str_override = "");
         void render(const GLCanvas3D& canvas) const;
 
         // function used to get an information for rescaling of the warning
@@ -380,7 +380,7 @@ class GLCanvas3D
         std::string m_text;
         std::chrono::steady_clock::time_point m_start_time;
         // Indicator that the mouse is inside an ImGUI dialog, therefore the tooltip should be suppressed.
-        bool m_in_imgui = false;
+        bool 		m_in_imgui = false;
 
     public:
         bool is_empty() const { return m_text.empty(); }
@@ -756,17 +756,22 @@ public:
     bool are_labels_shown() const { return m_labels.is_shown(); }
     void show_labels(bool show) { m_labels.show(show); }
 
+
     bool is_using_slope() const { return m_slope.is_used(); }
     void use_slope(bool use) { m_slope.use(use); }
-    void set_slope_normal_angle(float angle_in_deg) { m_slope.set_normal_angle(angle_in_deg); }
+    void set_slope_normal_angle(float angle_in_deg) { m_slope.set_normal_angle(angle_in_deg); }    void show_print_warning(std::string str) { 
+        if (str.empty())
+            m_warning_texture.activate(WarningTexture::Warning::PrintWarning, false, *this);
+        else 
+            m_warning_texture.activate(WarningTexture::Warning::PrintWarning, true, *this, str); 
+    }
 
     ArrangeSettings get_arrange_settings() const
     {
         const ArrangeSettings &settings = get_arrange_settings(this);
         ArrangeSettings ret = settings;
         if (&settings == &m_arrange_settings_fff_seq_print) {
-            ret.distance = std::max(ret.distance,
-                                    float(min_object_distance(*m_config)));
+            ret.distance = std::max(ret.distance, float(PrintConfig::min_object_distance(m_config)));
         }
 
         return ret;

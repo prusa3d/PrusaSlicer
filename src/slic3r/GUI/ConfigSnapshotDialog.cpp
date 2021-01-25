@@ -48,12 +48,12 @@ static wxString generate_html_row(const Config::Snapshot &snapshot, bool row_eve
         text += " (" + wxString::FromUTF8(snapshot.comment.data()) + ")";
     text += "</b></font><br>";
     // End of row header.
-    text += _(L("PrusaSlicer version")) + ": " + snapshot.slic3r_version_captured.to_string() + "<br>";
+    text += _(L("SuperSlicer version")) + ": " + snapshot.slic3r_version_captured.to_string() + "<br>";
     bool has_fff = ! snapshot.print.empty() || ! snapshot.filaments.empty();
     bool has_sla = ! snapshot.sla_print.empty() || ! snapshot.sla_material.empty();
     if (has_fff || ! has_sla) {
-        text += _(L("print")) + ": " + snapshot.print + "<br>";
-        text += _(L("filaments")) + ": " + snapshot.filaments.front() + "<br>";
+    text += _(L("print")) + ": " + snapshot.print + "<br>";
+    text += _(L("filaments")) + ": " + snapshot.filaments.front() + "<br>";
     }
     if (has_sla) {
         text += _(L("SLA print")) + ": " + snapshot.sla_print + "<br>";
@@ -64,9 +64,9 @@ static wxString generate_html_row(const Config::Snapshot &snapshot, bool row_eve
     bool compatible = true;
     for (const Config::Snapshot::VendorConfig &vc : snapshot.vendor_configs) {
         text += _(L("vendor")) + ": " + vc.name +", " + _(L("version")) + ": " + vc.version.config_version.to_string() + 
-				", " + _(L("min PrusaSlicer version")) + ": " + vc.version.min_slic3r_version.to_string();
+				", " + _(L("min SuperSlicer version")) + ": " + vc.version.min_slic3r_version.to_string();
         if (vc.version.max_slic3r_version != Semver::inf())
-            text += ", " + _(L("max PrusaSlicer version")) + ": " + vc.version.max_slic3r_version.to_string();
+            text += ", " + _(L("max SuperSlicer version")) + ": " + vc.version.max_slic3r_version.to_string();
         text += "<br>";
         for (const std::pair<std::string, std::set<std::string>> &model : vc.models_variants_installed) {
             text += _(L("model")) + ": " + model.first + ", " + _(L("variants")) + ": ";

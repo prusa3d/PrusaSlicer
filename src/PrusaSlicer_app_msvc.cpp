@@ -10,8 +10,8 @@
 
 
 #ifdef SLIC3R_GUI
-extern "C"
-{
+extern "C" 
+{ 
     // Let the NVIDIA and AMD know we want to use their graphics card
     // on a dual graphics card system.
     __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
@@ -43,20 +43,20 @@ public:
     std::string vendor;
     std::string renderer;
 
+    bool         success = false;
     HINSTANCE   hOpenGL = nullptr;
-    bool 		success = false;
 
     bool load_opengl_dll()
     {
         MSG      msg     = {0};
-        WNDCLASS wc      = {0};
+        WNDCLASS wc      = {0}; 
         wc.lpfnWndProc   = OpenGLVersionCheck::supports_opengl2_wndproc;
         wc.hInstance     = (HINSTANCE)GetModuleHandle(nullptr);
         wc.hbrBackground = (HBRUSH)(COLOR_BACKGROUND);
-        wc.lpszClassName = L"PrusaSlicer_opengl_version_check";
+        wc.lpszClassName = L"slic3r_opengl_version_check";
         wc.style = CS_OWNDC;
         if (RegisterClass(&wc)) {
-            HWND hwnd = CreateWindowW(wc.lpszClassName, L"PrusaSlicer_opengl_version_check", WS_OVERLAPPEDWINDOW, 0, 0, 640, 480, 0, 0, wc.hInstance, (LPVOID)this);
+            HWND hwnd = CreateWindowW(wc.lpszClassName, L"slic3r_opengl_version_check", WS_OVERLAPPEDWINDOW, 0, 0, 640, 480, 0, 0, wc.hInstance, (LPVOID)this);
             if (hwnd) {
                 message_pump_exit = false;
                 while (GetMessage(&msg, NULL, 0, 0 ) > 0 && ! message_pump_exit)
@@ -66,7 +66,7 @@ public:
         return this->success;
     }
 
-    void unload_opengl_dll()
+    void unload_opengl_dll() 
     {
         if (this->hOpenGL) {
             BOOL released = FreeLibrary(this->hOpenGL);
@@ -115,15 +115,15 @@ protected:
             return;
         }
 
-        typedef HGLRC 		(WINAPI *Func_wglCreateContext)(HDC);
-        typedef BOOL 		(WINAPI *Func_wglMakeCurrent  )(HDC, HGLRC);
-        typedef BOOL     	(WINAPI *Func_wglDeleteContext)(HGLRC);
-        typedef GLubyte* 	(WINAPI *Func_glGetString     )(GLenum);
+        typedef HGLRC(WINAPI* Func_wglCreateContext)(HDC);
+        typedef BOOL(WINAPI* Func_wglMakeCurrent)(HDC, HGLRC);
+        typedef BOOL(WINAPI* Func_wglDeleteContext)(HGLRC);
+        typedef GLubyte* (WINAPI* Func_glGetString)(GLenum);
 
         Func_wglCreateContext 	wglCreateContext = (Func_wglCreateContext)GetProcAddress(hOpenGL, "wglCreateContext");
-        Func_wglMakeCurrent 	wglMakeCurrent 	 = (Func_wglMakeCurrent)  GetProcAddress(hOpenGL, "wglMakeCurrent");
+        Func_wglMakeCurrent 	wglMakeCurrent = (Func_wglMakeCurrent)GetProcAddress(hOpenGL, "wglMakeCurrent");
         Func_wglDeleteContext 	wglDeleteContext = (Func_wglDeleteContext)GetProcAddress(hOpenGL, "wglDeleteContext");
-        Func_glGetString 		glGetString 	 = (Func_glGetString)	  GetProcAddress(hOpenGL, "glGetString");
+        Func_glGetString 		glGetString = (Func_glGetString)GetProcAddress(hOpenGL, "glGetString");
 
         if (wglCreateContext == nullptr || wglMakeCurrent == nullptr || wglDeleteContext == nullptr || glGetString == nullptr) {
             printf("Failed loading the system opengl32.dll: The library is invalid.\n");
@@ -135,16 +135,16 @@ protected:
             sizeof(PIXELFORMATDESCRIPTOR),
             1,
             PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
-            PFD_TYPE_RGBA,            	// The kind of framebuffer. RGBA or palette.
-            32,                        	// Color depth of the framebuffer.
+            PFD_TYPE_RGBA,                // The kind of framebuffer. RGBA or palette.
+            32,                            // Color depth of the framebuffer.
             0, 0, 0, 0, 0, 0,
             0,
             0,
             0,
             0, 0, 0, 0,
-            24,                        	// Number of bits for the depthbuffer
-            8,                        	// Number of bits for the stencilbuffer
-            0,                        	// Number of Aux buffers in the framebuffer.
+            24,                            // Number of bits for the depthbuffer
+            8,                            // Number of bits for the stencilbuffer
+            0,                            // Number of Aux buffers in the framebuffer.
             PFD_MAIN_PLANE,
             0,
             0, 0, 0
@@ -152,7 +152,7 @@ protected:
 
         HDC ourWindowHandleToDeviceContext = ::GetDC(hWnd);
         // Gdi32.dll
-        int letWindowsChooseThisPixelFormat = ::ChoosePixelFormat(ourWindowHandleToDeviceContext, &pfd);
+        int letWindowsChooseThisPixelFormat = ::ChoosePixelFormat(ourWindowHandleToDeviceContext, &pfd); 
         // Gdi32.dll
         SetPixelFormat(ourWindowHandleToDeviceContext, letWindowsChooseThisPixelFormat, &pfd);
         // Opengl32.dll
@@ -212,7 +212,7 @@ extern "C" {
 #ifdef SLIC3R_WRAPPER_NOCONSOLE
 int APIENTRY wWinMain(HINSTANCE /* hInstance */, HINSTANCE /* hPrevInstance */, PWSTR /* lpCmdLine */, int /* nCmdShow */)
 {
-    int 	  argc;
+    int       argc;
     wchar_t **argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
 #else
 int wmain(int argc, wchar_t **argv)
@@ -243,7 +243,7 @@ int wmain(int argc, wchar_t **argv)
 
 #ifdef SLIC3R_GUI
     OpenGLVersionCheck opengl_version_check;
-    bool load_mesa =
+    bool load_mesa = 
         // Forced from the command line.
         force_mesa ||
         // Running over a rempote desktop, and the RemoteFX is not enabled, therefore Windows will only provide SW OpenGL 1.1 context.
@@ -275,32 +275,32 @@ int wmain(int argc, wchar_t **argv)
         if (hInstance_OpenGL == nullptr) {
             printf("MESA OpenGL library was not loaded\n");
         } else
-            printf("MESA OpenGL library was loaded sucessfully\n");
+            printf("MESA OpenGL library was loaded sucessfully\n");        
     }
 #endif /* SLIC3R_GUI */
 
 
     wchar_t path_to_slic3r[MAX_PATH + 1] = { 0 };
     wcscpy(path_to_slic3r, path_to_exe);
-    wcscat(path_to_slic3r, L"PrusaSlicer.dll");
-//	printf("Loading Slic3r library: %S\n", path_to_slic3r);
+    wcscat(path_to_slic3r, L"SuperSlicer.dll");
+//    printf("Loading SuperSlicer library: %S\n", path_to_slic3r);
     HINSTANCE hInstance_Slic3r = LoadLibraryExW(path_to_slic3r, nullptr, 0);
     if (hInstance_Slic3r == nullptr) {
-        printf("PrusaSlicer.dll was not loaded\n");
+        printf("SuperSlicer.dll was not loaded, error code: %d\n", GetLastError());
         return -1;
     }
 
     // resolve function address here
-    slic3r_main = (Slic3rMainFunc)GetProcAddress(hInstance_Slic3r,
+    slic3r_main = (Slic3rMainFunc)GetProcAddress(hInstance_Slic3r, 
 #ifdef _WIN64
         // there is just a single calling conversion, therefore no mangling of the function name.
         "slic3r_main"
-#else	// stdcall calling convention declaration
+#else    // stdcall calling convention declaration
         "_slic3r_main@8"
 #endif
         );
     if (slic3r_main == nullptr) {
-        printf("could not locate the function slic3r_main in PrusaSlicer.dll\n");
+        printf("could not locate the function slic3r_main in slic3r.dll\n");
         return -1;
     }
     // argc minus the trailing nullptr of the argv

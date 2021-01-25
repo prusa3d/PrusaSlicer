@@ -23,6 +23,7 @@ public:
     void        reset_once_modifiers()  { m_use_external_mp_once = false; m_disabled_once = false; }
 
     void        init_layer(const Layer &layer);
+    bool        is_init() { return m_init; }
 
     Polyline    travel_to(const GCode& gcodegen, const Point& point)
     {
@@ -56,6 +57,8 @@ private:
     // this flag disables avoid_crossing_perimeters just for the next travel move
     // we enable it by default for the first travel move in print
     bool           m_disabled_once { true };
+
+    bool m_init{ false };
 
     // Used for detection of line or polyline is inside of any polygon.
     EdgeGrid::Grid m_grid_lslice;

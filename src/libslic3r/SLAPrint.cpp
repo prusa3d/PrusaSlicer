@@ -496,7 +496,7 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
         if (new_objects)
             update_apply_status(false);
     }
-
+    
     if(m_objects.empty()) {
         m_printer_input = {};
         m_print_statistics = {};
@@ -617,7 +617,7 @@ std::string SLAPrint::output_filename(const std::string &filename_base) const
     return this->PrintBase::output_filename(m_print_config.output_filename_format.value, ".sl1", filename_base, &config);
 }
 
-std::string SLAPrint::validate() const
+std::pair<PrintBase::PrintValidationError, std::string> SLAPrint::validate() const
 {
     for(SLAPrintObject * po : m_objects) {
 
@@ -627,8 +627,8 @@ std::string SLAPrint::validate() const
         if(supports_en &&
            mo->sla_points_status == sla::PointsStatus::UserModified &&
            mo->sla_support_points.empty())
-            return L("Cannot proceed without support points! "
-                     "Add support points or disable support generation.");
+            return { PrintBase::PrintValidationError::pveWrongSettings, L("Cannot proceed without support points! "
+                     "Add support points or disable support generation.") };
 
         sla::SupportTreeConfig cfg = make_support_cfg(po->config());
 
@@ -638,21 +638,21 @@ std::string SLAPrint::validate() const
         sla::PadConfig::EmbedObject &builtinpad = padcfg.embed_object;
         
         if(supports_en && !builtinpad.enabled && elv < cfg.head_fullwidth())
-            return L(
+            return { PrintBase::PrintValidationError::pveWrongSettings, L(
                 "Elevation is too low for object. Use the \"Pad around "
-                "object\" feature to print the object without elevation.");
+                "object\" feature to print the object without elevation.") };
         
         if(supports_en && builtinpad.enabled &&
            cfg.pillar_base_safety_distance_mm < builtinpad.object_gap_mm) {
-            return L(
+            return { PrintBase::PrintValidationError::pveWrongSettings, L(
                 "The endings of the support pillars will be deployed on the "
                 "gap between the object and the pad. 'Support base safety "
                 "distance' has to be greater than the 'Pad object gap' "
-                "parameter to avoid this.");
+                "parameter to avoid this.") };
         }
         
         std::string pval = padcfg.validate();
-        if (!pval.empty()) return pval;
+        if (!pval.empty()) return { PrintBase::PrintValidationError::pveWrongSettings, pval };
     }
 
     double expt_max = m_printer_config.max_exposure_time.getFloat();
@@ -660,16 +660,16 @@ std::string SLAPrint::validate() const
     double expt_cur = m_material_config.exposure_time.getFloat();
 
     if (expt_cur < expt_min || expt_cur > expt_max)
-        return L("Exposition time is out of printer profile bounds.");
+        return { PrintBase::PrintValidationError::pveWrongSettings, L("Exposition time is out of printer profile bounds.") };
 
     double iexpt_max = m_printer_config.max_initial_exposure_time.getFloat();
     double iexpt_min = m_printer_config.min_initial_exposure_time.getFloat();
     double iexpt_cur = m_material_config.initial_exposure_time.getFloat();
 
     if (iexpt_cur < iexpt_min || iexpt_cur > iexpt_max)
-        return L("Initial exposition time is out of printer profile bounds.");
+        return { PrintBase::PrintValidationError::pveWrongSettings, L("Initial exposition time is out of printer profile bounds.") };
 
-    return "";
+    return { PrintBase::PrintValidationError::pveNone, "" };
 }
 
 void SLAPrint::set_printer(SLAPrinter *arch)
@@ -811,8 +811,8 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "material_correction",
         "relative_correction",
         "absolute_correction",
-        "elefant_foot_compensation",
-        "elefant_foot_min_width",
+        "first_layer_size_compensation",
+        "elephant_foot_min_width",
         "gamma_correction"
     };
 
@@ -845,7 +845,12 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "bottle_cost",
         "bottle_volume",
         "bottle_weight",
-        "material_density"
+        "material_density",
+        "thumbnails",
+        "thumbnails_color",
+        "thumbnails_custom_color",
+        "thumbnails_with_bed",
+        "thumbnails_with_support"
     };
 
     std::vector<SLAPrintStep> steps;
@@ -1053,7 +1058,7 @@ Vec3d SLAPrint::relative_correction() const
         corr(X) = printer_config().relative_correction.values[0];
         corr(Y) = printer_config().relative_correction.values[0];
         corr(Z) = printer_config().relative_correction.values.back();
-    }
+    } 
 
     if(material_config().material_correction.values.size() >= 2) {
         corr(X) *= material_config().material_correction.values[0];
@@ -1256,7 +1261,7 @@ void SLAPrint::StatusReporter::operator()(SLAPrint &         p,
     BOOST_LOG_TRIVIAL(info)
         << st << "% " << msg << (logmsg.empty() ? "" : ": ") << logmsg
         << log_memory_info();
-
+    
     p.set_status(int(std::round(st)), msg, flags);
 }
 

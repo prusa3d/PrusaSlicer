@@ -3,15 +3,13 @@
 
 #include "libslic3r.h"
 #include "BoundingBox.hpp"
+#include "MedialAxis.hpp"
 #include "ExPolygon.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 
 // Serialization through the Cereal library
 #include <cereal/access.hpp>
-
-#define BOOST_VORONOI_USE_GMP 1
-#include "boost/polygon/voronoi.hpp"
 
 namespace ClipperLib {
 class PolyNode;
@@ -34,14 +32,24 @@ enum Orientation
 // As the points are limited to 30 bits + signum,
 // the temporaries u, v, w are limited to 61 bits + signum,
 // and d is limited to 63 bits + signum and we are good.
-static inline Orientation orient(const Point &a, const Point &b, const Point &c)
-{
+//note: now coord_t is int64_t, so the algorithm is now adjusted to fallback to double is too big.
+static inline Orientation orient(const Point &a, const Point &b, const Point &c) {
     // BOOST_STATIC_ASSERT(sizeof(coord_t) * 2 == sizeof(int64_t));
-    int64_t u = int64_t(b(0)) * int64_t(c(1)) - int64_t(b(1)) * int64_t(c(0));
-    int64_t v = int64_t(a(0)) * int64_t(c(1)) - int64_t(a(1)) * int64_t(c(0));
-    int64_t w = int64_t(a(0)) * int64_t(b(1)) - int64_t(a(1)) * int64_t(b(0));
-    int64_t d = u - v + w;
-    return (d > 0) ? ORIENTATION_CCW : ((d == 0) ? ORIENTATION_COLINEAR : ORIENTATION_CW);
+    // BOOST_STATIC_ASSERT(sizeof(coord_t) == sizeof(int64_t));
+    if (a.x() <= 0xffffffff && b.x() <= 0xffffffff && c.x() <= 0xffffffff &&
+        a.y() <= 0xffffffff && b.y() <= 0xffffffff && c.y() <= 0xffffffff) {
+        int64_t u = int64_t(b(0)) * int64_t(c(1)) - int64_t(b(1)) * int64_t(c(0));
+        int64_t v = int64_t(a(0)) * int64_t(c(1)) - int64_t(a(1)) * int64_t(c(0));
+        int64_t w = int64_t(a(0)) * int64_t(b(1)) - int64_t(a(1)) * int64_t(b(0));
+        int64_t d = u - v + w;
+        return (d > 0) ? ORIENTATION_CCW : ((d == 0) ? ORIENTATION_COLINEAR : ORIENTATION_CW);
+    } else {
+        double u = double(b(0)) * double(c(1)) - double(b(1)) * double(c(0));
+        double v = double(a(0)) * double(c(1)) - double(a(1)) * double(c(0));
+        double w = double(a(0)) * double(b(1)) - double(a(1)) * double(b(0));
+        double d = u - v + w;
+        return (d > 0) ? ORIENTATION_CCW : ((d == 0) ? ORIENTATION_COLINEAR : ORIENTATION_CW);
+    }
 }
 
 // Return orientation of the polygon by checking orientation of the left bottom corner of the polygon
@@ -126,11 +134,11 @@ inline bool segments_intersect(
         const Slic3r::Point &ip1, const Slic3r::Point &ip2,
         const Slic3r::Point &jp1, const Slic3r::Point &jp2) -> std::pair<int, int>
     {
-        Vec2i64 iv   = (ip2 - ip1).cast<int64_t>();
-        Vec2i64 vij1 = (jp1 - ip1).cast<int64_t>();
-        Vec2i64 vij2 = (jp2 - ip1).cast<int64_t>();
-        int64_t tij1 = cross2(iv, vij1);
-        int64_t tij2 = cross2(iv, vij2);
+	Vec2i64 iv   = (ip2 - ip1).cast<int64_t>();
+	Vec2i64 vij1 = (jp1 - ip1).cast<int64_t>();
+	Vec2i64 vij2 = (jp2 - ip1).cast<int64_t>();
+	int64_t tij1 = cross2(iv, vij1);
+	int64_t tij2 = cross2(iv, vij2);
         return std::make_pair(
             // signum
             (tij1 > 0) ? 1 : ((tij1 < 0) ? -1 : 0),
@@ -203,40 +211,40 @@ inline double ray_point_distance(const Line &iline, const Point &ipt)
 // Based on Liang-Barsky function by Daniel White @ http://www.skytopia.com/project/articles/compsci/clipping.html
 template<typename T>
 inline bool liang_barsky_line_clipping_interval(
-    // Start and end points of the source line, result will be stored there as well.
+	// Start and end points of the source line, result will be stored there as well.
     const Eigen::Matrix<T, 2, 1, Eigen::DontAlign>                  &x0,
     const Eigen::Matrix<T, 2, 1, Eigen::DontAlign>                  &v,
-    // Bounding box to clip with.
+	// Bounding box to clip with.
     const BoundingBoxBase<Eigen::Matrix<T, 2, 1, Eigen::DontAlign>> &bbox,
     std::pair<double, double>                                       &out_interval)
 {
     double t0 = 0.0;
     double t1 = 1.0;
-    // Traverse through left, right, bottom, top edges.
+	// Traverse through left, right, bottom, top edges.
     auto clip_side = [&x0, &v, &bbox, &t0, &t1](double p, double q) -> bool {
-        if (p == 0) {
-            if (q < 0)
-                // Line parallel to the bounding box edge is fully outside of the bounding box.
-                return false;
-            // else don't clip
-        } else {
-            double r = q / p;
-            if (p < 0) {
-                if (r > t1)
-                    // Fully clipped.
-                    return false;
-                if (r > t0)
-                    // Partially clipped.
-                    t0 = r;
-            } else {
-                assert(p > 0);
-                if (r < t0)
-                    // Fully clipped.
-                    return false;
-                if (r < t1)
-                    // Partially clipped.
-                    t1 = r;
-            }
+		if (p == 0) {
+			if (q < 0)
+				// Line parallel to the bounding box edge is fully outside of the bounding box.
+				return false;
+			// else don't clip
+		} else {
+	        double r = q / p;
+			if (p < 0) {
+				if (r > t1)
+            		// Fully clipped.
+            		return false;
+				if (r > t0)
+            		// Partially clipped.
+            		t0 = r;
+			} else {
+				assert(p > 0);
+				if (r < t0)
+            		// Fully clipped.
+            		return false;
+				if (r < t1)
+            		// Partially clipped.
+            		t1 = r;
+			}
         }
         return true;
     };
@@ -263,7 +271,7 @@ inline bool liang_barsky_line_clipping(
     Eigen::Matrix<T, 2, 1, Eigen::DontAlign> v = x1 - x0;
     std::pair<double, double> interval;
     if (liang_barsky_line_clipping_interval(x0, v, bbox, interval)) {
-        // Clipped successfully.
+    // Clipped successfully.
         x1  = x0 + interval.second * v;
         x0 += interval.first * v;
         return true;
@@ -341,13 +349,6 @@ template<typename T> T angle_to_0_2PI(T angle)
     return angle;
 }
 
-/// Find the center of the circle corresponding to the vector of Points as an arc.
-Point circle_center_taubin_newton(const Points::const_iterator& input_start, const Points::const_iterator& input_end, size_t cycles = 20);
-inline Point circle_center_taubin_newton(const Points& input, size_t cycles = 20) { return circle_center_taubin_newton(input.cbegin(), input.cend(), cycles); }
-
-/// Find the center of the circle corresponding to the vector of Pointfs as an arc.
-Vec2d circle_center_taubin_newton(const Vec2ds::const_iterator& input_start, const Vec2ds::const_iterator& input_end, size_t cycles = 20);
-inline Vec2d circle_center_taubin_newton(const Vec2ds& input, size_t cycles = 20) { return circle_center_taubin_newton(input.cbegin(), input.cend(), cycles); }
 
 void simplify_polygons(const Polygons &polygons, double tolerance, Polygons* retval);
 
@@ -357,36 +358,6 @@ bool arrange(
     size_t num_parts, const Vec2d &part_size, coordf_t gap, const BoundingBoxf* bed_bounding_box, 
     // output
     Pointfs &positions);
-
-class VoronoiDiagram : public boost::polygon::voronoi_diagram<double> {
-public:
-    typedef double                                          coord_type;
-    typedef boost::polygon::point_data<coordinate_type>     point_type;
-    typedef boost::polygon::segment_data<coordinate_type>   segment_type;
-    typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
-};
-
-class MedialAxis {
-public:
-    Lines lines;
-    const ExPolygon* expolygon;
-    double max_width;
-    double min_width;
-    MedialAxis(double _max_width, double _min_width, const ExPolygon* _expolygon = NULL)
-        : expolygon(_expolygon), max_width(_max_width), min_width(_min_width) {};
-    void build(ThickPolylines* polylines);
-    void build(Polylines* polylines);
-    
-private:
-    using VD = VoronoiDiagram;
-    VD vd;
-    std::set<const VD::edge_type*> edges, valid_edges;
-    std::map<const VD::edge_type*, std::pair<coordf_t,coordf_t> > thickness;
-    void process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline);
-    bool validate_edge(const VD::edge_type* edge);
-    const Line& retrieve_segment(const VD::cell_type* cell) const;
-    const Point& retrieve_endpoint(const VD::cell_type* cell) const;
-};
 
 // Sets the given transform by assembling the given transformations in the following order:
 // 1) mirror
@@ -517,6 +488,16 @@ inline bool is_rotation_ninety_degrees(const Vec3d &rotation)
 {
     return is_rotation_ninety_degrees(rotation.x()) && is_rotation_ninety_degrees(rotation.y()) && is_rotation_ninety_degrees(rotation.z());
 }
+
+//------------for tests------------//
+
+/// Find the center of the circle corresponding to the vector of Points as an arc.
+Point circle_center_taubin_newton(const Points::const_iterator& input_start, const Points::const_iterator& input_end, size_t cycles = 20);
+inline Point circle_center_taubin_newton(const Points& input, size_t cycles = 20) { return circle_center_taubin_newton(input.cbegin(), input.cend(), cycles); }
+
+/// Find the center of the circle corresponding to the vector of Pointfs as an arc.
+Vec2d circle_center_taubin_newton(const Vec2ds::const_iterator& input_start, const Vec2ds::const_iterator& input_end, size_t cycles = 20);
+inline Vec2d circle_center_taubin_newton(const Vec2ds& input, size_t cycles = 20) { return circle_center_taubin_newton(input.cbegin(), input.cend(), cycles); }
 
 } }
 

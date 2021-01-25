@@ -4,7 +4,7 @@
 namespace Slic3r {
 
 // 1-based extruder identifier for this region and role.
-unsigned int PrintRegion::extruder(FlowRole role) const
+uint16_t PrintRegion::extruder(FlowRole role) const
 {
     size_t extruder = 0;
     if (role == frPerimeter || role == frExternalPerimeter)
@@ -51,7 +51,7 @@ Flow PrintRegion::flow(FlowRole role, double layer_height, bool bridge, bool fir
     // Get the configured nozzle_diameter for the extruder associated to the flow role requested.
     // Here this->extruder(role) - 1 may underflow to MAX_INT, but then the get_at() will follback to zero'th element, so everything is all right.
     double nozzle_diameter = m_print->config().nozzle_diameter.get_at(this->extruder(role) - 1);
-    return Flow::new_from_config_width(role, config_width, (float)nozzle_diameter, (float)layer_height, bridge ? (float)m_config.bridge_flow_ratio : 0.0f);
+    return Flow::new_from_config_width(role, config_width, (float)nozzle_diameter, (float)layer_height, bridge ? (float)m_config.bridge_flow_ratio.get_abs_value(1) : 0.0f);
 }
 
 coordf_t PrintRegion::nozzle_dmr_avg(const PrintConfig &print_config) const
@@ -63,10 +63,10 @@ coordf_t PrintRegion::nozzle_dmr_avg(const PrintConfig &print_config) const
 
 coordf_t PrintRegion::bridging_height_avg(const PrintConfig &print_config) const
 {
-    return this->nozzle_dmr_avg(print_config) * sqrt(m_config.bridge_flow_ratio.value);
+    return this->nozzle_dmr_avg(print_config) * sqrt(m_config.bridge_flow_ratio.get_abs_value(1));
 }
 
-void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_config, const PrintRegionConfig &region_config, std::vector<unsigned int> &object_extruders)
+void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_config, const PrintObjectConfig &object_config, const PrintRegionConfig &region_config, std::vector<uint16_t> &object_extruders)
 {
     // These checks reflect the same logic used in the GUI for enabling/disabling extruder selection fields.
     auto num_extruders = (int)print_config.nozzle_diameter.size();
@@ -74,7 +74,7 @@ void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_con
     	int i = std::max(0, extruder_id - 1);
         object_extruders.emplace_back((i >= num_extruders) ? 0 : i);
     };
-    if (region_config.perimeters.value > 0 || print_config.brim_width.value > 0)
+    if (region_config.perimeters.value > 0 || object_config.brim_width.value > 0)
     	emplace_extruder(region_config.perimeter_extruder);
     if (region_config.fill_density.value > 0)
     	emplace_extruder(region_config.infill_extruder);
@@ -82,7 +82,7 @@ void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_con
     	emplace_extruder(region_config.solid_infill_extruder);
 }
 
-void PrintRegion::collect_object_printing_extruders(std::vector<unsigned int> &object_extruders) const
+void PrintRegion::collect_object_printing_extruders(std::vector<uint16_t> &object_extruders) const
 {
     // PrintRegion, if used by some PrintObject, shall have all the extruders set to an existing printer extruder.
     // If not, then there must be something wrong with the Print::apply() function.
@@ -92,7 +92,8 @@ void PrintRegion::collect_object_printing_extruders(std::vector<unsigned int> &o
     assert(this->config().infill_extruder       <= num_extruders);
     assert(this->config().solid_infill_extruder <= num_extruders);
 #endif
-    collect_object_printing_extruders(print()->config(), this->config(), object_extruders);
+    for(const PrintObject * obj : this->m_print->objects())
+        collect_object_printing_extruders(print()->config(), obj->config(), this->config(), object_extruders);
 }
 
 }

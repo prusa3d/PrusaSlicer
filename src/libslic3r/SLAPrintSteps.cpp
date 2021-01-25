@@ -86,8 +86,8 @@ void SLAPrint::Steps::apply_printer_corrections(SLAPrintObject &po, SliceOrigin 
     if (o == soSupport && !po.m_supportdata) return;
     
     auto faded_lyrs = size_t(po.m_config.faded_layers.getInt());
-    double min_w = m_print->m_printer_config.elefant_foot_min_width.getFloat() / 2.;
-    double start_efc = m_print->m_printer_config.elefant_foot_compensation.getFloat();
+    double min_w = m_print->m_printer_config.elephant_foot_min_width.getFloat() / 2.;
+    double start_efc = m_print->m_printer_config.first_layer_size_compensation.getFloat();
     
     double doffs = m_print->m_printer_config.absolute_correction.getFloat();
     coord_t clpr_offs = scaled(doffs);
@@ -252,19 +252,21 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     for(auto it = slindex_it; it != po.m_slice_index.end(); ++it)
         po.m_model_height_levels.emplace_back(it->slice_level());
     
-    TriangleMeshSlicer slicer(&mesh);
     
     po.m_model_slices.clear();
     float closing_r  = float(po.config().slice_closing_radius.value);
     auto  thr        = [this]() { m_print->throw_if_canceled(); };
     auto &slice_grid = po.m_model_height_levels;
-    slicer.slice(slice_grid, SlicingMode::Regular, closing_r, &po.m_model_slices, thr);
+    TriangleMeshSlicer slicer(closing_r, 0);
+    slicer.init(&mesh, thr);
+    slicer.slice(slice_grid, SlicingMode::Regular, &po.m_model_slices, thr);
     
     if (po.m_hollowing_data && ! po.m_hollowing_data->interior.empty()) {
         po.m_hollowing_data->interior.repair(true);
-        TriangleMeshSlicer interior_slicer(&po.m_hollowing_data->interior);
+        TriangleMeshSlicer interior_slicer(closing_r, 0);
+        interior_slicer.init(&po.m_hollowing_data->interior, thr);
         std::vector<ExPolygons> interior_slices;
-        interior_slicer.slice(slice_grid, SlicingMode::Regular, closing_r, &interior_slices, thr);
+        interior_slicer.slice(slice_grid, SlicingMode::Regular, &interior_slices, thr);
 
         sla::ccr::for_each(size_t(0), interior_slices.size(),
                            [&po, &interior_slices] (size_t i) {

@@ -336,8 +336,8 @@ void EdgeGrid::Grid::create_from_m_contours(coord_t resolution)
 		const Slic3r::Points &pts = *m_contours[visitor.i];
 		for (visitor.j = 0; visitor.j < pts.size(); ++ visitor.j)
 			this->visit_cells_intersecting_line(pts[visitor.j], pts[(visitor.j + 1 == pts.size()) ? 0 : visitor.j + 1], visitor);
-	}
-}
+						}
+						}
 
 #if 0
 // Divide, round to a grid coordinate.
@@ -737,11 +737,11 @@ void EdgeGrid::Grid::calculate_sdf()
 									// Set the signum depending on whether the vertex is convex or reflex.
 									int64_t det = int64_t(v_seg_prev(0)) * int64_t(v_seg(1)) - int64_t(v_seg_prev(1)) * int64_t(v_seg(0));
 									assert(det != 0);
-									d_min = dabs;
+									d_min = float(dabs);
 									// Fill in an unsigned vector towards the zero iso surface.
 									float *l = &L[(corner_r * ncols + corner_c) << 1];
-									l[0] = std::abs(v_pt(0));
-									l[1] = std::abs(v_pt(1));
+									l[0] = float(std::abs(v_pt(0)));
+									l[1] = float(std::abs(v_pt(1)));
 								#ifdef _DEBUG
 									double dabs2 = sqrt(l[0]*l[0]+l[1]*l[1]);
 									assert(std::abs(dabs-dabs2) < 1e-4 * std::max(dabs, dabs2));
@@ -760,7 +760,7 @@ void EdgeGrid::Grid::calculate_sdf()
 							double d = double(d_seg) / sqrt(double(l2_seg));
 							double dabs = std::abs(d);
 							if (dabs < d_min) {
-								d_min = dabs;
+								d_min = float(dabs);
 								// Fill in an unsigned vector towards the zero iso surface.
 								float *l = &L[(corner_r * ncols + corner_c) << 1];
 								float linv = float(d_seg) / float(l2_seg);
@@ -875,22 +875,22 @@ void EdgeGrid::Grid::calculate_sdf()
 	for (size_t r = 0; r < nrows; ++ r) {
 		if (r > 0)
 			for (size_t c = 0; c < ncols; ++ c)
-				danielsson_vstep(r, c, -int(ncols));
+				danielsson_vstep(int(r), int(c), -int(ncols));
 //				PROPAGATE_DANIELSSON_SINGLE_VSTEP3(-int(ncols), c != 0, c + 1 != ncols);
 		for (size_t c = 1; c < ncols; ++ c)
-			danielsson_hstep(r, c, -1);
+			danielsson_hstep(int(r), int(c), -1);
 		for (int c = int(ncols) - 2; c >= 0; -- c)
-			danielsson_hstep(r, c, +1);
+			danielsson_hstep(int(r), int(c), +1);
 	}
 	// Bottom to top propagation.
 	for (int r = int(nrows) - 2; r >= 0; -- r) {
 		for (size_t c = 0; c < ncols; ++ c)
-			danielsson_vstep(r, c, +ncols);
+			danielsson_vstep(int(r), int(c), +int(ncols));
 //			PROPAGATE_DANIELSSON_SINGLE_VSTEP3(+int(ncols), c != 0, c + 1 != ncols);
 		for (size_t c = 1; c < ncols; ++ c)
-			danielsson_hstep(r, c, -1);
+			danielsson_hstep(int(r), int(c), -1);
 		for (int c = int(ncols) - 2; c >= 0; -- c)
-			danielsson_hstep(r, c, +1);
+			danielsson_hstep(int(r), int(c), +1);
 	}
 
 	// Update signed distance field from absolte vectors to the iso-surface.
@@ -1084,8 +1084,8 @@ EdgeGrid::Grid::ClosestPointResult EdgeGrid::Grid::closest_point(const Point &pt
 	// Signum of the distance field at pt.
 	int sign_min = 0;
 	double l2_seg_min = 1.;
-	for (int r = bbox.min(1); r <= bbox.max(1); ++ r) {
-		for (int c = bbox.min(0); c <= bbox.max(0); ++ c) {
+	for (size_t r = bbox.min.y(); r <= bbox.max.y(); ++ r) {
+		for (size_t c = bbox.min.x(); c <= bbox.max.x(); ++ c) {
 			const Cell &cell = m_cells[r * m_cols + c];
 			for (size_t i = cell.begin; i < cell.end; ++ i) {
 				const size_t          contour_idx = m_cell_data[i].first;
@@ -1312,9 +1312,9 @@ Polygons EdgeGrid::Grid::contours_simplified(coord_t offset, bool fill_holes) co
 	// 1) Collect the lines.
 	std::vector<Line> lines;
 	EndPointMapType start_point_to_line_idx;
-	for (int r = 0; r <= int(m_rows); ++ r) {
-		for (int c = 0; c <= int(m_cols); ++ c) {
-			int  addr    = (r + 1) * cell_cols + c + 1;
+	for (coord_t r = 0; r <= coord_t(m_rows); ++ r) {
+		for (coord_t c = 0; c <= coord_t(m_cols); ++ c) {
+			size_t  addr    = (r + 1) * cell_cols + c + 1;
 			bool left    = cell_inside[addr - 1];
 			bool top     = cell_inside[addr - cell_cols];
 			bool current = cell_inside[addr];

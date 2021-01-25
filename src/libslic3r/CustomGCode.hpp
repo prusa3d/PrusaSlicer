@@ -24,11 +24,11 @@ struct Item
     bool operator<(const Item& rhs) const { return this->print_z < rhs.print_z; }
     bool operator==(const Item& rhs) const
     {
-        return (rhs.print_z   == this->print_z    ) &&
-               (rhs.type      == this->type       ) &&
-               (rhs.extruder  == this->extruder   ) &&
-               (rhs.color     == this->color      ) &&
-               (rhs.extra     == this->extra      );
+        return (rhs.print_z     == this->print_z    ) &&
+               (rhs.type        == this->type       ) &&
+               (rhs.extruder    == this->extruder   ) &&
+               (rhs.color       == this->color      ) &&
+               (rhs.extra       == this->extra      );
     }
     bool operator!=(const Item& rhs) const { return ! (*this == rhs); }
     
@@ -83,7 +83,7 @@ extern void check_mode_for_custom_gcode_per_print_z(Info& info);
 
 // Return pairs of <print_z, 1-based extruder ID> sorted by increasing print_z from custom_gcode_per_print_z.
 // print_z corresponds to the first layer printed with the new extruder.
-std::vector<std::pair<double, unsigned int>> custom_tool_changes(const Info& custom_gcode_per_print_z, size_t num_extruders);
+std::vector<std::pair<double, uint16_t>> custom_tool_changes(const Info& custom_gcode_per_print_z, size_t num_extruders);
 
 } // namespace CustomGCode
 

@@ -40,7 +40,7 @@ Contour3D::Contour3D(const IndexedMesh &emesh) {
 
 Contour3D &Contour3D::merge(const Contour3D &ctr)
 {
-    auto N = coord_t(points.size());
+    int32_t N = int32_t(points.size());
     auto N_f3 = faces3.size();
     auto N_f4 = faces4.size();
     
@@ -49,11 +49,16 @@ Contour3D &Contour3D::merge(const Contour3D &ctr)
     faces4.insert(faces4.end(), ctr.faces4.begin(), ctr.faces4.end());
     
     for(size_t n = N_f3; n < faces3.size(); n++) {
-        auto& idx = faces3[n]; idx.x() += N; idx.y() += N; idx.z() += N;
+        Vec3i32& idx = faces3[n]; 
+        idx.x() += N; 
+        idx.y() += N; 
+        idx.z() += N;
     }
     
     for(size_t n = N_f4; n < faces4.size(); n++) {
-        auto& idx = faces4[n]; for (int k = 0; k < 4; k++) idx(k) += N;
+        Vec4i& idx = faces4[n]; 
+        for (int k = 0; k < 4; k++) 
+            idx(k) += int(N);
     }        
     
     return *this;
@@ -77,7 +82,7 @@ void Contour3D::to_obj(std::ostream &stream)
         stream << "v " << p.transpose() << "\n";
     
     for(auto& f : faces3) 
-        stream << "f " << (f + Vec3i(1, 1, 1)).transpose() << "\n";
+        stream << "f " << (f + Vec3i32(1, 1, 1)).transpose() << "\n";
     
     for(auto& f : faces4)
         stream << "f " << (f + Vec4i(1, 1, 1, 1)).transpose() << "\n";
@@ -93,7 +98,7 @@ void Contour3D::from_obj(std::istream &stream)
     for (size_t i = 0; i < coords.size(); i += 4)
         points.emplace_back(coords[i], coords[i + 1], coords[i + 2]);
     
-    Vec3i triangle;
+    Vec3i32 triangle;
     Vec4i quad;
     size_t v = 0;
     while(v < data.vertices.size()) {
@@ -114,7 +119,7 @@ void Contour3D::from_obj(std::istream &stream)
 TriangleMesh to_triangle_mesh(const Contour3D &ctour) {
     if (ctour.faces4.empty()) return {ctour.points, ctour.faces3};
     
-    std::vector<Vec3i> triangles;
+    std::vector<Vec3i32> triangles;
     
     triangles.reserve(ctour.faces3.size() + 2 * ctour.faces4.size());
     std::copy(ctour.faces3.begin(), ctour.faces3.end(),
@@ -132,7 +137,7 @@ TriangleMesh to_triangle_mesh(Contour3D &&ctour) {
     if (ctour.faces4.empty())
         return {std::move(ctour.points), std::move(ctour.faces3)};
     
-    std::vector<Vec3i> triangles;
+    std::vector<Vec3i32> triangles;
     
     triangles.reserve(ctour.faces3.size() + 2 * ctour.faces4.size());
     std::copy(ctour.faces3.begin(), ctour.faces3.end(),

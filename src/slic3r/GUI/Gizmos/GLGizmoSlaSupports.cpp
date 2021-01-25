@@ -69,7 +69,7 @@ void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const S
 
     if (m_state == On && mo && mo->id() != m_old_mo_id) {
         disable_editing_mode();
-        reload_cache();
+            reload_cache();
         m_old_mo_id = mo->id();
         m_c->instances_hider()->show_supports(true);
     }
@@ -893,7 +893,7 @@ void GLGizmoSlaSupports::on_set_state()
             // Only take the snapshot when the USER opens the gizmo. Common gizmos
             // data are not yet available, the CallAfter will postpone taking the
             // snapshot until they are. No, it does not feel right.
-            wxGetApp().CallAfter([this]() {
+        wxGetApp().CallAfter([this]() {
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _(L("SLA gizmo turned on")));
             });
         }

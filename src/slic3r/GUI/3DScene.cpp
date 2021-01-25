@@ -62,7 +62,7 @@ void glAssertRecentCallImpl(const char* file_name, unsigned int line, const char
     case GL_OUT_OF_MEMORY:      sErr = "Out Of Memory";     break;
     default:                    sErr = "Unknown";           break;
     }
-    BOOST_LOG_TRIVIAL(error) << "OpenGL error in " << file_name << ":" << line << ", function " << function_name << "() : " << (int)err << " - " << sErr;
+	BOOST_LOG_TRIVIAL(error) << "OpenGL error in " << file_name << ":" << line << ", function " << function_name << "() : " << (int)err << " - " << sErr;
     assert(false);
 }
 #endif // HAS_GLSAFE
@@ -156,17 +156,17 @@ void GLIndexedVertexArray::load_mesh_full_shading(const TriangleMesh& mesh)
     }
     else {
 #endif // ENABLE_SMOOTH_NORMALS
-        this->vertices_and_normals_interleaved.reserve(this->vertices_and_normals_interleaved.size() + 3 * 3 * 2 * mesh.facets_count());
+    this->vertices_and_normals_interleaved.reserve(this->vertices_and_normals_interleaved.size() + 3 * 3 * 2 * mesh.facets_count());
 
-        unsigned int vertices_count = 0;
-        for (int i = 0; i < (int)mesh.stl.stats.number_of_facets; ++i) {
+    unsigned int vertices_count = 0;
+    for (int i = 0; i < (int)mesh.stl.stats.number_of_facets; ++i) {
             const stl_facet& facet = mesh.stl.facet_start[i];
-            for (int j = 0; j < 3; ++j)
-                this->push_geometry(facet.vertex[j](0), facet.vertex[j](1), facet.vertex[j](2), facet.normal(0), facet.normal(1), facet.normal(2));
+        for (int j = 0; j < 3; ++j)
+            this->push_geometry(facet.vertex[j](0), facet.vertex[j](1), facet.vertex[j](2), facet.normal(0), facet.normal(1), facet.normal(2));
 
-            this->push_triangle(vertices_count, vertices_count + 1, vertices_count + 2);
-            vertices_count += 3;
-        }
+        this->push_triangle(vertices_count, vertices_count + 1, vertices_count + 2);
+        vertices_count += 3;
+    }
 #if ENABLE_SMOOTH_NORMALS
     }
 #endif // ENABLE_SMOOTH_NORMALS
@@ -258,8 +258,8 @@ void GLIndexedVertexArray::render(
     const std::pair<size_t, size_t>& tverts_range,
     const std::pair<size_t, size_t>& qverts_range) const
 {
-    assert(this->vertices_and_normals_interleaved_VBO_id != 0);
-    assert(this->triangle_indices_VBO_id != 0 || this->quad_indices_VBO_id != 0);
+//    assert(this->vertices_and_normals_interleaved_VBO_id != 0);
+//    assert(this->triangle_indices_VBO_id != 0 || this->quad_indices_VBO_id != 0);
 
     // Render using the Vertex Buffer Objects.
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->vertices_and_normals_interleaved_VBO_id));
@@ -355,9 +355,9 @@ void GLVolume::set_render_color()
         else {
             if (force_native_color)
                 set_render_color(color, 4);
-            else
+        else
                 set_render_color(NEUTRAL_COLOR, 4);
-        }
+    }
     }
     else {
         if (hover == HS_Select)
@@ -389,8 +389,8 @@ void GLVolume::set_color_from_model_volume(const ModelVolume *model_volume)
 {
     if (model_volume->is_modifier()) {
         color[0] = 0.2f;
-        color[1] = 1.0f;
-        color[2] = 0.2f;
+        color[1] = 0.2f;
+        color[2] = 1.0f;
     }
     else if (model_volume->is_support_blocker()) {
         color[0] = 1.0f;
@@ -399,6 +399,11 @@ void GLVolume::set_color_from_model_volume(const ModelVolume *model_volume)
     }
     else if (model_volume->is_support_enforcer()) {
         color[0] = 0.2f;
+        color[1] = 1.0f;
+        color[2] = 0.2f;
+    }
+    else if (model_volume->is_seam_position()) {
+        color[0] = 0.9f;
         color[1] = 0.2f;
         color[2] = 1.0f;
     }
@@ -596,7 +601,7 @@ void GLVolumeCollection::load_object_auxiliary(
 #else
         v.indexed_vertex_array.load_mesh(mesh);
 #endif // ENABLE_SMOOTH_NORMALS
-        v.indexed_vertex_array.finalize_geometry(opengl_initialized);
+	    v.indexed_vertex_array.finalize_geometry(opengl_initialized);
         v.composite_id = GLVolume::CompositeID(obj_idx, -int(milestone), (int)instance_idx.first);
         v.geometry_id = std::pair<size_t, size_t>(timestamp, model_instance.id().id);
         // Create a copy of the convex hull mesh for each instance. Use a move operator on the last instance.
@@ -633,7 +638,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
         // We'll now create the box with jagged edge. y-coordinates of the pre-generated model are shifted so that the front
         // edge has y=0 and centerline of the back edge has y=depth:
         Pointf3s points;
-        std::vector<Vec3i> facets;
+        std::vector<Vec3i32> facets;
         float out_points_idx[][3] = { { 0, -depth, 0 }, { 0, 0, 0 }, { 38.453f, 0, 0 }, { 61.547f, 0, 0 }, { 100.0f, 0, 0 }, { 100.0f, -depth, 0 }, { 55.7735f, -10.0f, 0 }, { 44.2265f, 10.0f, 0 },
         { 38.453f, 0, 1 }, { 0, 0, 1 }, { 0, -depth, 1 }, { 100.0f, -depth, 1 }, { 100.0f, 0, 1 }, { 61.547f, 0, 1 }, { 55.7735f, -10.0f, 1 }, { 44.2265f, 10.0f, 1 } };
         int out_facets_idx[][3] = { { 0, 1, 2 }, { 3, 4, 5 }, { 6, 5, 0 }, { 3, 5, 6 }, { 6, 2, 7 }, { 6, 0, 2 }, { 8, 9, 10 }, { 11, 12, 13 }, { 10, 11, 14 }, { 14, 11, 13 }, { 15, 8, 14 },
@@ -1580,8 +1585,7 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionLoop &extrusion_loop, flo
 }
 
 // Fill in the qverts and tverts with quads and triangles for the extrusion_multi_path.
-void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath &extrusion_multi_path, float print_z, const Point &copy, GLVolume &volume)
-{
+void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath &extrusion_multi_path, float print_z, const Point &copy, GLVolume &volume) {
     Lines               lines;
     std::vector<double> widths;
     std::vector<double> heights;
@@ -1597,37 +1601,34 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath &extrusion_mult
     thick_lines_to_verts(lines, widths, heights, false, print_z, volume);
 }
 
-void _3DScene::extrusionentity_to_verts(const ExtrusionEntityCollection &extrusion_entity_collection, float print_z, const Point &copy, GLVolume &volume)
-{
-    for (const ExtrusionEntity *extrusion_entity : extrusion_entity_collection.entities)
-        extrusionentity_to_verts(extrusion_entity, print_z, copy, volume);
+// Fill in the qverts and tverts with quads and triangles for the extrusion_multi_path.
+void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath3D &extrusion_multi_path, float print_z, const Point &copy, GLVolume &volume) {
+    Lines               lines;
+    std::vector<double> widths;
+    std::vector<double> heights;
+    for (const ExtrusionPath3D &extrusion_path : extrusion_multi_path.paths) {
+        Polyline            polyline = extrusion_path.polyline;
+        polyline.remove_duplicate_points();
+        polyline.translate(copy);
+        Lines lines_this = polyline.lines();
+        append(lines, lines_this);
+        widths.insert(widths.end(), lines_this.size(), extrusion_path.width);
+        heights.insert(heights.end(), lines_this.size(), extrusion_path.height);
+    }
+    thick_lines_to_verts(lines, widths, heights, false, print_z, volume);
 }
 
-void _3DScene::extrusionentity_to_verts(const ExtrusionEntity *extrusion_entity, float print_z, const Point &copy, GLVolume &volume)
+void ExtrusionToVert::use(const ExtrusionPath &path) { _3DScene::extrusionentity_to_verts(path, print_z, copy, volume); }
+void ExtrusionToVert::use(const ExtrusionPath3D &path3D) { _3DScene::extrusionentity_to_verts(path3D, print_z, copy, volume); }
+void ExtrusionToVert::use(const ExtrusionMultiPath &multipath) { _3DScene::extrusionentity_to_verts(multipath, print_z, copy, volume); }
+void ExtrusionToVert::use(const ExtrusionMultiPath3D &multipath3D) { _3DScene::extrusionentity_to_verts(multipath3D, print_z, copy, volume); }
+void ExtrusionToVert::use(const ExtrusionLoop &loop) { _3DScene::extrusionentity_to_verts(loop, print_z, copy, volume); }
+void ExtrusionToVert::use(const ExtrusionEntityCollection &collection) { for (const ExtrusionEntity *extrusion_entity : collection.entities) extrusion_entity->visit(*this); }
+
+void _3DScene::extrusionentity_to_verts(const ExtrusionEntity &extrusion_entity, float print_z, const Point &copy, GLVolume &volume)
 {
-    if (extrusion_entity != nullptr) {
-        auto *extrusion_path = dynamic_cast<const ExtrusionPath*>(extrusion_entity);
-        if (extrusion_path != nullptr)
-            extrusionentity_to_verts(*extrusion_path, print_z, copy, volume);
-        else {
-            auto *extrusion_loop = dynamic_cast<const ExtrusionLoop*>(extrusion_entity);
-            if (extrusion_loop != nullptr)
-                extrusionentity_to_verts(*extrusion_loop, print_z, copy, volume);
-            else {
-                auto *extrusion_multi_path = dynamic_cast<const ExtrusionMultiPath*>(extrusion_entity);
-                if (extrusion_multi_path != nullptr)
-                    extrusionentity_to_verts(*extrusion_multi_path, print_z, copy, volume);
-                else {
-                    auto *extrusion_entity_collection = dynamic_cast<const ExtrusionEntityCollection*>(extrusion_entity);
-                    if (extrusion_entity_collection != nullptr)
-                        extrusionentity_to_verts(*extrusion_entity_collection, print_z, copy, volume);
-                    else {
-                        throw Slic3r::RuntimeError("Unexpected extrusion_entity type in to_verts()");
-                    }
-                }
-            }
-        }
-    }
+    ExtrusionToVert visitor(print_z, copy, volume);
+    extrusion_entity.visit(visitor);
 }
 
 void _3DScene::polyline3_to_verts(const Polyline3& polyline, double width, double height, GLVolume& volume)

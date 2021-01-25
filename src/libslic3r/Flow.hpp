@@ -10,8 +10,8 @@ namespace Slic3r {
 
 class PrintObject;
 
-// Extra spacing of bridge threads, in mm.
-#define BRIDGE_EXTRA_SPACING 0.05
+// Extra spacing of bridge threads, in mult of nozzle_width/extrusion_width. 0.05 for 0.4
+#define BRIDGE_EXTRA_SPACING_MULT 0.125
 
 // Overlap factor of perimeter lines. Currently no overlap.
 #ifdef HAS_PERIMETER_LINE_OVERLAP
@@ -66,6 +66,8 @@ public:
     float nozzle_diameter;
     // Is it a bridge?
     bool  bridge;
+    // % of spacing taken into account 1=>all/default, 0=> width=spacing
+    float spacing_ratio = 1;
     
     Flow(float _w, float _h, float _nd, bool _bridge = false) :
         width(_w), height(_h), nozzle_diameter(_nd), bridge(_bridge) {}
@@ -85,11 +87,15 @@ public:
 
     bool operator==(const Flow &rhs) const { return this->width == rhs.width && this->height == rhs.height && this->nozzle_diameter == rhs.nozzle_diameter && this->bridge == rhs.bridge; }
     
-    static Flow new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent &width, float nozzle_diameter, float height, float bridge_flow_ratio);
+    static Flow new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent &width, float nozzle_diameter, float height, float bridge_flow_ratio = 0);
     // Create a flow from the spacing of extrusion lines.
     // This method is used exclusively to calculate new flow of 100% infill, where the extrusion width was allowed to scale
     // to fit a region with integer number of lines.
     static Flow new_from_spacing(float spacing, float nozzle_diameter, float height, bool bridge);
+
+    static float overlap(float height) {
+        return (float)(height * (1. - 0.25 * PI));
+    }
 
     // Sane extrusion width defautl based on nozzle diameter.
     // The defaults were derived from manual Prusa MK3 profiles.

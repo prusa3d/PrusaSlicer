@@ -91,7 +91,7 @@ class OptionsGroup {
 public:
     const bool		staticbox {true};
     const wxString	title;
-    size_t			label_width = 20 ;// {200};
+    size_t			title_width = 20;// {200};
     wxSizer*		sizer {nullptr};
 	OG_CustomCtrl*  custom_ctrl{ nullptr };
     column_t		extra_column {nullptr};
@@ -109,7 +109,8 @@ public:
     
     wxFont			sidetext_font {wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT) };
     wxFont			label_font {wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT) };
-	int				sidetext_width{ -1 };
+    int             sidetext_width{ -1 };
+    int             label_width{ -1 };
 	int				sublabel_width{ -1 };
 
     /// Returns a copy of the pointer of the parent wxWindow.
@@ -162,7 +163,7 @@ public:
 
     void            clear_fields_except_of(const std::vector<std::string> left_fields);
 
-    void            hide_labels() { label_width = 0; }
+    void            hide_labels() { label_width = 0; title_width = 0;}
 
 	OptionsGroup(	wxWindow* _parent, const wxString& title, bool is_tab_opt = false, 
                     column_t extra_clmn = nullptr);
@@ -175,7 +176,10 @@ public:
 protected:
 	std::map<t_config_option_key, Option>	m_options;
     wxWindow*				m_parent {nullptr};
-    std::vector<ConfigOptionMode>           m_options_mode;
+    // vector: an entry per line
+    //map : mode -> items idx in the line
+    std::vector<std::map<ConfigOptionMode, std::vector<size_t>>> m_options_mode;
+    std::vector<wxSizer*>                   m_line_sizer;
     std::vector<wxWindow*>                  m_extra_column_item_ptrs;
 
     std::vector<Line>                       m_lines;

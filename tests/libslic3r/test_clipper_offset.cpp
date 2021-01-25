@@ -12,7 +12,7 @@ using namespace Slic3r;
 // #define TESTS_EXPORT_SVGS
 
 SCENARIO("Constant offset", "[ClipperUtils]") {
-	coord_t s = 1000000;
+	int32_t s = 1000000;
 	GIVEN("20mm box") {
 		ExPolygon box20mm;
 		box20mm.contour.points = { Vec2crd{ 0, 0 }, Vec2crd{ 20 * s, 0 }, Vec2crd{ 20 * s, 20 * s}, Vec2crd{ 0, 20 * s} };

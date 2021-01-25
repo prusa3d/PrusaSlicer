@@ -54,8 +54,10 @@ public:
     void draw_outline(const Surface &surface, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
     void draw(const Surfaces &surfaces, std::string fill = "grey", const float fill_opacity=1.f);
     void draw_outline(const Surfaces &surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
-    void draw(const SurfacesPtr &surfaces, std::string fill = "grey", const float fill_opacity=1.f);
-    void draw_outline(const SurfacesPtr &surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
+    void draw(const SurfacesPtr& surfaces, std::string fill = "grey", const float fill_opacity = 1.f);
+    void draw_outline(const SurfacesPtr& surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
+    void draw(const SurfacesConstPtr& surfaces, std::string fill = "grey", const float fill_opacity = 1.f);
+    void draw_outline(const SurfacesConstPtr& surfaces, std::string stroke_outer = "black", std::string stroke_holes = "blue", coordf_t stroke_width = 0);
  
     void draw(const Polygon &polygon, std::string fill = "grey");
     void draw_outline(const Polygon &polygon, std::string stroke = "black", coordf_t stroke_width = 0);

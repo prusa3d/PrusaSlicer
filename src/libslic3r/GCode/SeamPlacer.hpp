@@ -41,7 +41,7 @@ class SeamPlacer {
 public:
     void init(const Print& print);
 
-    Point get_seam(const Layer& layer, const SeamPosition seam_position,
+    Point get_seam(const Layer& layer, SeamPosition seam_position,
                    const ExtrusionLoop& loop, Point last_pos,
                    coordf_t nozzle_diameter, const PrintObject* po,
                    bool was_clockwise, const EdgeGrid::Grid* lower_layer_edge_grid);
@@ -69,6 +69,9 @@ private:
 
     //std::map<const PrintObject*, Point>  m_last_seam_position;
     SeamHistory  m_seam_history;
+    
+    // if it's expected, we need to randomized at the external periemter.
+    bool external_perimeters_first;
 
     // Get indices of points inside enforcers and blockers.
     void get_enforcers_and_blockers(size_t layer_id,

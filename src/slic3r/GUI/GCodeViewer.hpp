@@ -23,7 +23,7 @@ class GCodeViewer
     using IndexBuffer = std::vector<unsigned int>;
     using MultiIndexBuffer = std::vector<IndexBuffer>;
 
-    static const std::vector<Color> Extrusion_Role_Colors;
+    std::vector<Color> Extrusion_Role_Colors;
     static const std::vector<Color> Options_Colors;
     static const std::vector<Color> Travel_Colors;
     static const Color              Wipe_Color;
@@ -139,6 +139,9 @@ class GCodeViewer
         float volumetric_rate{ 0.0f };
         unsigned char extruder_id{ 0 };
         unsigned char cp_color_id{ 0 };
+        float layer_time{ 0.0f };
+        float elapsed_time{ 0.0f };
+        float extruder_temp{ 0.0f };
 
         bool matches(const GCodeProcessor::MoveVertex& move) const;
         size_t vertices_count() const { return last.s_id - first.s_id + 1; }
@@ -262,8 +265,8 @@ class GCodeViewer
             }
             void reset() { min = FLT_MAX; max = -FLT_MAX; count = 0; }
 
-            float step_size() const { return (max - min) / (static_cast<float>(Range_Colors.size()) - 1.0f); }
-            Color get_color_at(float value) const;
+            float step_size(bool log = false) const;
+            Color get_color_at(float value, bool log = false) const;
         };
 
         struct Ranges
@@ -278,13 +281,24 @@ class GCodeViewer
             Range fan_speed;
             // Color mapping by volumetric extrusion rate.
             Range volumetric_rate;
+            // Color mapping by fan speed.
+            Range extruder_temp;
+            // Color mapping by layer time.
+            Range layer_duration;
+            // Color mapping by time.
+            Range elapsed_time;
+
+
 
             void reset() {
                 height.reset();
                 width.reset();
                 feedrate.reset();
                 fan_speed.reset();
-                volumetric_rate.reset();
+                //volumetric_rate.reset();
+                extruder_temp.reset();
+                layer_duration.reset();
+                elapsed_time.reset();
             }
         };
 
@@ -454,9 +468,14 @@ public:
         Width,
         Feedrate,
         FanSpeed,
+        LayerTime,
+        LayerTimeLog,
+        Chronology,
         VolumetricRate,
         Tool,
+        Filament,
         ColorPrint,
+        ExtruderTemp,
         Count
     };
 
@@ -471,6 +490,7 @@ private:
     // bounding box of toolpaths + marker tools
     BoundingBoxf3 m_max_bounding_box;
     std::vector<Color> m_tool_colors;
+    std::vector<Color> m_filament_colors;
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;
     std::vector<ExtrusionRole> m_roles;

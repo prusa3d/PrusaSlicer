@@ -6,29 +6,31 @@
 
 namespace Slic3r {
 
+FillHoneycomb::Cache FillHoneycomb::cache{};
+
 void FillHoneycomb::_fill_surface_single(
     const FillParams                &params, 
     unsigned int                     thickness_layers,
     const std::pair<float, Point>   &direction, 
     ExPolygon                        expolygon,
-    Polylines                       &polylines_out)
+    Polylines                       &polylines_out) const
 {
     // cache hexagons math
-    CacheID cache_id(params.density, this->spacing);
-    Cache::iterator it_m = this->cache.find(cache_id);
-    if (it_m == this->cache.end()) {
-        it_m = this->cache.insert(it_m, std::pair<CacheID, CacheData>(cache_id, CacheData()));
-        CacheData &m        = it_m->second;
-        coord_t min_spacing = coord_t(scale_(this->spacing));
-        m.distance          = coord_t(min_spacing / params.density);
-        m.hex_side          = coord_t(m.distance / (sqrt(3)/2));
-        m.hex_width         = m.distance * 2; // $m->{hex_width} == $m->{hex_side} * sqrt(3);
-        coord_t hex_height  = m.hex_side * 2;
-        m.pattern_height    = hex_height + m.hex_side;
-        m.y_short           = coord_t(m.distance * sqrt(3)/3);
-        m.x_offset          = min_spacing / 2;
-        m.y_offset          = coord_t(m.x_offset * sqrt(3)/3);
-        m.hex_center        = Point(m.hex_width/2, m.hex_side);
+    CacheID cache_id(params.density, this->get_spacing());
+    Cache::iterator it_m = FillHoneycomb::cache.find(cache_id);
+    if (it_m == FillHoneycomb::cache.end()) {
+        it_m = FillHoneycomb::cache.insert(it_m, std::pair<CacheID, CacheData>(cache_id, CacheData()));
+        CacheData &m = it_m->second;
+        coord_t min_spacing = coord_t(scale_(this->get_spacing()));
+        m.distance          = coord_t(double(min_spacing) / params.density);
+        m.hex_side          = coord_t(double(m.distance) / (sqrt(3)/2));
+        m.hex_width = m.distance * 2; // $m->{hex_width} == $m->{hex_side} * sqrt(3);
+        coord_t hex_height = m.hex_side * 2;
+        m.pattern_height = hex_height + m.hex_side;
+        m.y_short           = coord_t(double(m.distance) * sqrt(3)/3);
+        m.x_offset = min_spacing / 2;
+        m.y_offset          = coord_t(double(m.x_offset) * sqrt(3)/3);
+        m.hex_center = Point(m.hex_width/2, m.hex_side);
     }
     CacheData &m = it_m->second;
 
@@ -74,10 +76,10 @@ void FillHoneycomb::_fill_surface_single(
     }
     
     all_polylines = intersection_pl(std::move(all_polylines), to_polygons(expolygon));
-    if (params.dont_connect() || all_polylines.size() <= 1)
+    if (params.connection == icNotConnected || all_polylines.size() <= 1)
         append(polylines_out, chain_polylines(std::move(all_polylines)));
     else
-        connect_infill(std::move(all_polylines), expolygon, polylines_out, this->spacing, params);
+        connect_infill(std::move(all_polylines), expolygon, polylines_out, this->get_spacing(), params);
 }
 
 } // namespace Slic3r

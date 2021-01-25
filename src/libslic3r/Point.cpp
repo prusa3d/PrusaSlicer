@@ -57,7 +57,7 @@ void Point::rotate(double angle, const Point &center)
     (*this)(1) = (coord_t)round( (double)center(1) + c * dy + s * dx );
 }
 
-int Point::nearest_point_index(const Points &points) const
+int32_t Point::nearest_point_index(const Points &points) const
 {
     PointConstPtrs p;
     p.reserve(points.size());
@@ -66,23 +66,23 @@ int Point::nearest_point_index(const Points &points) const
     return this->nearest_point_index(p);
 }
 
-int Point::nearest_point_index(const PointConstPtrs &points) const
+int32_t Point::nearest_point_index(const PointConstPtrs &points) const
 {
-    int idx = -1;
+    int32_t idx = -1;
     double distance = -1;  // double because long is limited to 2147483647 on some platforms and it's not enough
     
     for (PointConstPtrs::const_iterator it = points.begin(); it != points.end(); ++it) {
         /* If the X distance of the candidate is > than the total distance of the
            best previous candidate, we know we don't want it */
-        double d = sqr<double>((*this)(0) - (*it)->x());
+        double d = sqr<double>(double((*this).x() - (*it)->x()));
         if (distance != -1 && d > distance) continue;
         
         /* If the Y distance of the candidate is > than the total distance of the
            best previous candidate, we know we don't want it */
-        d += sqr<double>((*this)(1) - (*it)->y());
+        d += sqr<double>(double((*this).y() - (*it)->y()));
         if (distance != -1 && d > distance) continue;
         
-        idx = it - points.begin();
+        idx = (int32_t)(it - points.begin());
         distance = d;
         
         if (distance < EPSILON) break;
@@ -91,7 +91,30 @@ int Point::nearest_point_index(const PointConstPtrs &points) const
     return idx;
 }
 
-int Point::nearest_point_index(const PointPtrs &points) const
+/* distance to the closest point of line */
+double
+Point::distance_to(const Line &line) const {
+    const double dx = double(line.b.x() - line.a.x());
+    const double dy = double(line.b.y() - line.a.y());
+
+    const double l2 = dx*dx + dy*dy;  // avoid a sqrt
+    if (l2 == 0.0) return this->distance_to(line.a);   // line.a == line.b case
+
+    // Consider the line extending the segment, parameterized as line.a + t (line.b - line.a).
+    // We find projection of this point onto the line. 
+    // It falls where t = [(this-line.a) . (line.b-line.a)] / |line.b-line.a|^2
+    const double t = ((this->x() - line.a.x()) * dx + (this->y() - line.a.y()) * dy) / l2;
+    if (t < 0.0)      return this->distance_to(line.a);  // beyond the 'a' end of the segment
+    else if (t > 1.0) return this->distance_to(line.b);  // beyond the 'b' end of the segment
+    Point projection(
+        line.a.x() + t * dx,
+        line.a.y() + t * dy
+        );
+    return this->distance_to(projection);
+}
+
+
+int32_t Point::nearest_point_index(const PointPtrs &points) const
 {
     PointConstPtrs p;
     p.reserve(points.size());
@@ -188,6 +211,19 @@ BoundingBox get_extents(const std::vector<Points> &pts)
     for (const Points &p : pts)
         bbox.merge(get_extents(p));
     return bbox;
+}
+
+/// This method create a new point on the line defined by this and p2.
+/// The new point is place at position defined by |p2-this| * percent, starting from this
+/// \param percent the proportion of the segment length to place the point
+/// \param p2 the second point, forming a segment with this
+/// \return a new point, == this if percent is 0 and == p2 if percent is 1
+Point Point::interpolate(const double percent, const Point &p2) const
+{
+    Point p_out;
+    p_out.x() = coord_t(this->x()*(1 - percent) + p2.x()*(percent));
+    p_out.y() = coord_t(this->y()*(1 - percent) + p2.y()*(percent));
+    return p_out;
 }
 
 std::ostream& operator<<(std::ostream &stm, const Vec2d &pointf)

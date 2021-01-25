@@ -16,7 +16,7 @@ class IndexedMesh;
 /// other meshes of this type and converting to and from other mesh formats.
 struct Contour3D {
     std::vector<Vec3d> points;
-    std::vector<Vec3i> faces3;
+    std::vector<Vec3i32> faces3;
     std::vector<Vec4i> faces4;
     
     Contour3D() = default;

@@ -9,18 +9,25 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
 	PlaceholderParser 	parser;
 	auto 				config = DynamicPrintConfig::full_print_config();
 
+    // To test the "first_layer_extrusion_width" over "nozzle_diameter" chain.
 	config.set_deserialize( {
 		{ "printer_notes", "  PRINTER_VENDOR_PRUSA3D  PRINTER_MODEL_MK2  " },
 	    { "nozzle_diameter", "0.6;0.6;0.6;0.6" },
 	    { "temperature", "357;359;363;378" }
 	});
-    // To test the "first_layer_extrusion_width" over "first_layer_heigth" over "layer_height" chain.
-    config.option<ConfigOptionFloatOrPercent>("first_layer_height")->value = 150.;
-    config.option<ConfigOptionFloatOrPercent>("first_layer_height")->percent = true;
+    config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width")->value = 150.;
+    config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width")->percent = true;
     // To let the PlaceholderParser throw when referencing first_layer_speed if it is set to percent, as the PlaceholderParser does not know
     // a percent to what.
     config.option<ConfigOptionFloatOrPercent>("first_layer_speed")->value = 50.;
     config.option<ConfigOptionFloatOrPercent>("first_layer_speed")->percent = true;
+
+
+    config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width")->value = 150.;
+    config.option<ConfigOptionFloatOrPercent>("first_layer_extrusion_width")->percent = true;
+
+    config.option<ConfigOptionFloatOrPercent>("support_material_xy_spacing")->value = 50.;
+    config.option<ConfigOptionFloatOrPercent>("support_material_xy_spacing")->percent = true;
 
     parser.apply_config(config);
 	parser.set("foo", 0);
@@ -50,10 +57,12 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("math: int(-13.4)") { REQUIRE(parser.process("{int(-13.4)}") == "-13"); }
 
     // Test the "coFloatOrPercent" and "xxx_extrusion_width" substitutions.
-    // first_layer_extrusion_width ratio_over first_layer_heigth ratio_over layer_height
     SECTION("perimeter_extrusion_width") { REQUIRE(std::stod(parser.process("{perimeter_extrusion_width}")) == Approx(0.67500001192092896)); }
+    // first_layer_extrusion_width ratio_over nozzle_diameter, 150% of 0.6 is 0.9
     SECTION("first_layer_extrusion_width") { REQUIRE(std::stod(parser.process("{first_layer_extrusion_width}")) == Approx(0.9)); }
-    SECTION("support_material_xy_spacing") { REQUIRE(std::stod(parser.process("{support_material_xy_spacing}")) == Approx(0.3375)); }
+    // support_material_xy_spacing is ratio over external_perimeter_extrusion_width
+    // external_perimeter_extrusion_width is at 0 by default, and so will be 1.05f * nozzle = 0.63 do 50% of that is 0.315
+    SECTION("support_material_xy_spacing") { REQUIRE(std::stod(parser.process("{support_material_xy_spacing}")) == Approx(0.315)); }
     // external_perimeter_speed over perimeter_speed
     SECTION("external_perimeter_speed") { REQUIRE(std::stod(parser.process("{external_perimeter_speed}")) == Approx(30.)); }
     // infill_overlap over perimeter_extrusion_width

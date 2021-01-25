@@ -129,9 +129,9 @@ public:
 	void 		set_task(const PrintBase::TaskParams &params);
 	// After calling apply, the empty() call will report whether there is anything to slice.
 	bool 		empty() const;
-	// Validate the print. Returns an empty string if valid, returns an error message if invalid.
+	// Validate the print. Returns a {PrintValidationError::None,empty string} if valid, returns an error message if invalid.
 	// Call validate before calling start().
-	std::string validate();
+	std::pair<PrintBase::PrintValidationError, std::string> validate();
 
 	// Set the export path of the G-code.
 	// Once the path is set, the G-code 

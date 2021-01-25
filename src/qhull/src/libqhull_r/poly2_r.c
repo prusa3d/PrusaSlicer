@@ -1851,7 +1851,7 @@ void qh_initialhull(qhT *qh, setT *vertices) {
     }
   }
   if (minangle < qh_MAXnarrow && !qh->NOnarrow) {
-    realT diff= 1.0 + minangle;
+    realT diff= 1.0f + minangle;
 
     qh->NARROWhull= True;
     qh_option(qh, "_narrow-hull", NULL, &diff);

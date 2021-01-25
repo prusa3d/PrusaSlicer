@@ -16,7 +16,7 @@ namespace GUI {
     {
         std::vector<Vec3f> positions;
         std::vector<Vec3f> normals;
-        std::vector<Vec3i> triangles;
+        std::vector<Vec3i32> triangles;
     };
 
     class GLModel

@@ -35,7 +35,7 @@ BridgeDetector::BridgeDetector(
 void BridgeDetector::initialize()
 {
     // 5 degrees stepping
-    this->resolution = PI/36.0; 
+    this->resolution = PI/(36.0*5); 
     // output angle not known
     this->angle = -1.;
 
@@ -46,10 +46,10 @@ void BridgeDetector::initialize()
     // Detect what edges lie on lower slices by turning bridge contour and holes
     // into polylines and then clipping them with each lower slice's contour.
     // Currently _edges are only used to set a candidate direction of the bridge (see bridge_direction_candidates()).
-	Polygons contours;
-	contours.reserve(this->lower_slices.size());
-	for (const ExPolygon &expoly : this->lower_slices)
-		contours.push_back(expoly.contour);
+    Polygons contours;
+    contours.reserve(this->lower_slices.size());
+    for (const ExPolygon &expoly : this->lower_slices)
+        contours.push_back(expoly.contour);
     this->_edges = intersection_pl(to_polylines(grown), contours);
     
     #ifdef SLIC3R_DEBUG
@@ -119,6 +119,7 @@ bool BridgeDetector::detect_angle(double bridge_direction_override)
         }
 
         double total_length = 0;
+        uint32_t nbLines = 0;
         double max_length = 0;
         {
             Lines clipped_lines = intersection_ln(lines, clip_area);
@@ -129,10 +130,11 @@ bool BridgeDetector::detect_angle(double bridge_direction_override)
                     double len = line.length();
                     total_length += len;
                     max_length = std::max(max_length, len);
+                    nbLines++;
                 }
             }        
         }
-        if (total_length == 0.)
+        if (total_length == 0. || nbLines == 0)
             continue;
 
         have_coverage = true;
@@ -143,6 +145,7 @@ bool BridgeDetector::detect_angle(double bridge_direction_override)
         // $directions_coverage{$angle} = sum(map $_->area, @{$self->coverage($angle)}) // 0;
         // max length of bridged lines
         candidates[i_angle].max_length = max_length;
+        candidates[i_angle].mean_length = total_length / nbLines;
     }
 
     // if no direction produced coverage, then there's no bridge direction
@@ -153,10 +156,12 @@ bool BridgeDetector::detect_angle(double bridge_direction_override)
     std::sort(candidates.begin(), candidates.end());
     
     // if any other direction is within extrusion width of coverage, prefer it if shorter
+    // shorter = shorter max length, or if in espilon (10) range, the shorter mean length.
     // TODO: There are two options here - within width of the angle with most coverage, or within width of the currently perferred?
     size_t i_best = 0;
     for (size_t i = 1; i < candidates.size() && candidates[i_best].coverage - candidates[i].coverage < this->spacing; ++ i)
-        if (candidates[i].max_length < candidates[i_best].max_length)
+        if (candidates[i].max_length < candidates[i_best].max_length ||
+            (candidates[i].max_length < candidates[i_best].max_length - 10 && candidates[i].mean_length < candidates[i_best].mean_length))
             i_best = i;
 
     this->angle = candidates[i_best].angle;
@@ -207,8 +212,8 @@ std::vector<double> BridgeDetector::bridge_direction_candidates() const
     return angles;
 }
 
-Polygons BridgeDetector::coverage(double angle) const
-{
+Polygons BridgeDetector::coverage(double angle, bool precise) const {
+
     if (angle == -1)
         angle = this->angle;
 
@@ -217,26 +222,65 @@ Polygons BridgeDetector::coverage(double angle) const
     if (angle != -1) {
         // Get anchors, convert them to Polygons and rotate them.
         Polygons anchors = to_polygons(this->_anchor_regions);
-        polygons_rotate(anchors, PI/2.0 - angle);
-        
+        polygons_rotate(anchors, PI / 2.0 - angle);
+        //same for region which do not need bridging
+        //Polygons supported_area = diff(this->lower_slices.expolygons, this->_anchor_regions, true);
+        //polygons_rotate(anchors, PI / 2.0 - angle);
+
         for (ExPolygon expolygon : this->expolygons) {
             // Clone our expolygon and rotate it so that we work with vertical lines.
-            expolygon.rotate(PI/2.0 - angle);            
+            expolygon.rotate(PI / 2.0 - angle);
             // Outset the bridge expolygon by half the amount we used for detecting anchors;
             // we'll use this one to generate our trapezoids and be sure that their vertices
             // are inside the anchors and not on their contours leading to false negatives.
             for (ExPolygon &expoly : offset_ex(expolygon, 0.5f * float(this->spacing))) {
                 // Compute trapezoids according to a vertical orientation
                 Polygons trapezoids;
-                expoly.get_trapezoids2(&trapezoids, PI/2.0);
-                for (const Polygon &trapezoid : trapezoids) {
-                    // not nice, we need a more robust non-numeric check
+                if (!precise) expoly.get_trapezoids2(&trapezoids, PI / 2);
+                else expoly.get_trapezoids3_half(&trapezoids, float(this->spacing));
+                for (Polygon &trapezoid : trapezoids) {
                     size_t n_supported = 0;
-                    for (const Line &supported_line : intersection_ln(trapezoid.lines(), anchors))
-                        if (supported_line.length() >= this->spacing)
-                            ++ n_supported;
-                    if (n_supported >= 2) 
+                    if (!precise) {
+                        // not nice, we need a more robust non-numeric check
+                        // imporvment 1: take into account when we go in the supported area.
+                        for (const Line &supported_line : intersection_ln(trapezoid.lines(), anchors))
+                            if (supported_line.length() >= this->spacing)
+                                ++n_supported;
+                    } else {
+                        Polygons intersects = intersection(Polygons{trapezoid}, anchors);
+                        n_supported = intersects.size();
+
+                        if (n_supported >= 2) {
+                            // trim it to not allow to go outside of the intersections
+                            BoundingBox center_bound = intersects[0].bounding_box();
+                            coord_t min_y = center_bound.center()(1), max_y = center_bound.center()(1);
+                            for (Polygon &poly_bound : intersects) {
+                                center_bound = poly_bound.bounding_box();
+                                if (min_y > center_bound.center()(1)) min_y = center_bound.center()(1);
+                                if (max_y < center_bound.center()(1)) max_y = center_bound.center()(1);
+                            }
+                            coord_t min_x = trapezoid[0](0), max_x = trapezoid[0](0);
+                            for (Point &p : trapezoid.points) {
+                                if (min_x > p(0)) min_x = p(0);
+                                if (max_x < p(0)) max_x = p(0);
+                            }
+                            //add what get_trapezoids3 has removed (+EPSILON)
+                            min_x -= (this->spacing / 4 + 1);
+                            max_x += (this->spacing / 4 + 1);
+                            coord_t mid_x = (min_x + max_x) / 2;
+                            for (Point &p : trapezoid.points) {
+                                if (p(1) < min_y) p(1) = min_y;
+                                if (p(1) > max_y) p(1) = max_y;
+                                if (p(0) > min_x && p(0) < mid_x) p(0) = min_x;
+                                if (p(0) < max_x && p(0) > mid_x) p(0) = max_x;
+                            }
+                        }
+                    }
+
+                    if (n_supported >= 2) {
+                        //add it
                         covered.push_back(std::move(trapezoid));
+                    }
                 }
             }
         }
@@ -246,7 +290,7 @@ Polygons BridgeDetector::coverage(double angle) const
         covered = union_(covered);
         // Intersect trapezoids with actual bridge area to remove extra margins and append it to result.
         polygons_rotate(covered, -(PI/2.0 - angle));
-    	covered = intersection(covered, to_polygons(this->expolygons));
+        //covered = intersection(covered, to_polygons(this->expolygons));
 #if 0
         {
             my @lines = map @{$_->lines}, @$trapezoids;

@@ -56,11 +56,13 @@ static const std::map<const char, std::string> font_icons_large = {
 
 const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.333f, 0.333f, 0.333f, 1.0f };
 const ImVec4 ImGuiWrapper::COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.757f, 0.404f, 0.216f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = { 1.0f, 0.49f, 0.216f, 1.0f };
+//const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.757f, 0.404f, 0.216f, 1.0f };
+//const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = { 1.0f, 0.49f, 0.216f, 1.0f };
+const ImVec4 ImGuiWrapper::COL_BLUE_DARK         = { 0.0f, 0.28f, 0.78f, 1.0f }; //0047c7
+const ImVec4 ImGuiWrapper::COL_BLUE_LIGHT        = { 0.13f, 0.45f, 0.92f, 1.0f }; //2172eb
 const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.133f, 0.133f, 0.133f, 0.8f };
-const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
-const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
+const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_BLUE_DARK;
+const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_BLUE_LIGHT;
 const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = ImGuiWrapper::COL_BUTTON_HOVERED;
 
 ImGuiWrapper::ImGuiWrapper()
@@ -1059,7 +1061,7 @@ void ImGuiWrapper::init_style()
     // Window
     style.WindowRounding = 4.0f;
     set_color(ImGuiCol_WindowBg, COL_WINDOW_BACKGROUND);
-    set_color(ImGuiCol_TitleBgActive, COL_ORANGE_DARK);
+    set_color(ImGuiCol_TitleBgActive, COL_BLUE_DARK);
 
     // Generics
     set_color(ImGuiCol_FrameBg, COL_GREY_DARK);
@@ -1067,7 +1069,7 @@ void ImGuiWrapper::init_style()
     set_color(ImGuiCol_FrameBgActive, COL_GREY_LIGHT);
 
     // Text selection
-    set_color(ImGuiCol_TextSelectedBg, COL_ORANGE_DARK);
+    set_color(ImGuiCol_TextSelectedBg, COL_BLUE_DARK);
 
     // Buttons
     set_color(ImGuiCol_Button, COL_BUTTON_BACKGROUND);
@@ -1075,24 +1077,24 @@ void ImGuiWrapper::init_style()
     set_color(ImGuiCol_ButtonActive, COL_BUTTON_ACTIVE);
 
     // Checkbox
-    set_color(ImGuiCol_CheckMark, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_CheckMark, COL_BLUE_LIGHT);
 
     // ComboBox items
-    set_color(ImGuiCol_Header, COL_ORANGE_DARK);
-    set_color(ImGuiCol_HeaderHovered, COL_ORANGE_LIGHT);
-    set_color(ImGuiCol_HeaderActive, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_Header, COL_BLUE_DARK);
+    set_color(ImGuiCol_HeaderHovered, COL_BLUE_LIGHT);
+    set_color(ImGuiCol_HeaderActive, COL_BLUE_LIGHT);
 
     // Slider
-    set_color(ImGuiCol_SliderGrab, COL_ORANGE_DARK);
-    set_color(ImGuiCol_SliderGrabActive, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_SliderGrab, COL_BLUE_DARK);
+    set_color(ImGuiCol_SliderGrabActive, COL_BLUE_LIGHT);
 
     // Separator
-    set_color(ImGuiCol_Separator, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_Separator, COL_BLUE_LIGHT);
 
     // Tabs
-    set_color(ImGuiCol_Tab, COL_ORANGE_DARK);
-    set_color(ImGuiCol_TabHovered, COL_ORANGE_LIGHT);
-    set_color(ImGuiCol_TabActive, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_Tab, COL_BLUE_DARK);
+    set_color(ImGuiCol_TabHovered, COL_BLUE_LIGHT);
+    set_color(ImGuiCol_TabActive, COL_BLUE_LIGHT);
     set_color(ImGuiCol_TabUnfocused, COL_GREY_DARK);
     set_color(ImGuiCol_TabUnfocusedActive, COL_GREY_LIGHT);
 }

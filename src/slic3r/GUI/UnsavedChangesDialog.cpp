@@ -950,22 +950,44 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     case coEnum: {
         if (opt_key == "top_fill_pattern" ||
             opt_key == "bottom_fill_pattern" ||
-            opt_key == "fill_pattern")
+            opt_key == "fill_pattern" ||
+            opt_key == "solid_fill_pattern" ||
+            opt_key == "brim_ears_pattern" ||
+            opt_key == "support_material_interface_pattern")
             return get_string_from_enum<InfillPattern>(opt_key, config, true);
-        if (opt_key == "gcode_flavor")
-            return get_string_from_enum<GCodeFlavor>(opt_key, config);
-        if (opt_key == "machine_limits_usage")
-            return get_string_from_enum<MachineLimitsUsage>(opt_key, config);
-        if (opt_key == "ironing_type")
-            return get_string_from_enum<IroningType>(opt_key, config);
-        if (opt_key == "support_material_pattern")
-            return get_string_from_enum<SupportMaterialPattern>(opt_key, config);
-        if (opt_key == "seam_position")
-            return get_string_from_enum<SeamPosition>(opt_key, config);
+        if (opt_key == "complete_objects_sort")
+            return get_string_from_enum<CompleteObjectSort>(opt_key, config);
         if (opt_key == "display_orientation")
             return get_string_from_enum<SLADisplayOrientation>(opt_key, config);
+        if (opt_key == "gcode_flavor")
+            return get_string_from_enum<GCodeFlavor>(opt_key, config);
+        if (opt_key == "host_type")
+            return get_string_from_enum<PrintHostType>(opt_key, config);
+        if (opt_key =="infill_connection" || opt_key =="infill_connection_solid"
+                || opt_key =="infill_connection_top" || opt_key =="infill_connection_bottom")
+            return get_string_from_enum<InfillConnection>(opt_key, config);
+        if (opt_key == "infill_dense_algo")
+            return get_string_from_enum<DenseInfillAlgo>(opt_key, config);
+        if (opt_key == "ironing_type")
+            return get_string_from_enum<IroningType>(opt_key, config);
+        if (opt_key == "machine_limits_usage")
+            return get_string_from_enum<MachineLimitsUsage>(opt_key, config);
+        if (opt_key == "no_perimeter_unsupported_algo")
+            return get_string_from_enum<NoPerimeterUnsupportedAlgo>(opt_key, config);
+        if (opt_key == "perimeter_loop_seam")
+            return get_string_from_enum<SeamPosition>(opt_key, config, true);
+        if (opt_key == "printhost_authorization_type")
+            return get_string_from_enum<AuthorizationType>(opt_key, config);
+        if (opt_key == "seam_position")
+            return get_string_from_enum<SeamPosition>(opt_key, config);
+        if (opt_key == "support_material_contact_distance_type")
+            return get_string_from_enum<SupportZDistanceType>(opt_key, config);
+        if (opt_key == "support_material_pattern")
+            return get_string_from_enum<SupportMaterialPattern>(opt_key, config);
         if (opt_key == "support_pillar_connection_mode")
             return get_string_from_enum<SLAPillarConnectionMode>(opt_key, config);
+        if (opt_key == "wipe_advanced_algo")
+            return get_string_from_enum<WipeAlgo>(opt_key, config);
         break;
     }
     case coPoints: {
@@ -1077,9 +1099,10 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
             wxString new_val = from_u8((boost::format("%1%") % new_config.opt<ConfigOptionStrings>("extruder_colour")->values.size()).str());
 
             ItemData item_data = { "extruders_count", local_label, old_val, new_val, type };
-            m_items_map.emplace(m_tree_model->AddOption(type, _L("General"), _L("Capabilities"), local_label, old_val, new_val, category_icon_map.at("General")), item_data);
-
+            if(wxGetApp().get_tab(type)->get_page_count() > 0)
+                m_items_map.emplace(m_tree_model->AddOption(type, _L(wxGetApp().get_tab(type)->get_page(0)->title()), _L("Capabilities"), local_label, old_val, new_val, category_icon_map.at(wxGetApp().get_tab(type)->get_page(0)->title())), item_data);
         }
+        //TODO same for milling head?
 
         for (const std::string& opt_key : dirty_options) {
             const Search::Option& option = searcher.get_option(opt_key);

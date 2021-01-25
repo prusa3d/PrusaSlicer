@@ -21,7 +21,7 @@ using boost::polygon::voronoi_diagram;
 
 using namespace Slic3r;
 
-using VD = Geometry::VoronoiDiagram;
+using VD = Slic3r::VoronoiDiagram;
 
 // https://svn.boost.org/trac10/ticket/12067
 // This bug seems to be confirmed.

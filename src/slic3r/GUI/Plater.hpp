@@ -24,7 +24,9 @@ namespace Slic3r {
 
 class Model;
 class ModelObject;
+
 class ModelInstance;
+class PrintBase;
 class Print;
 class SLAPrint;
 enum SLAPrintObjectStep : unsigned int;
@@ -32,7 +34,7 @@ enum SLAPrintObjectStep : unsigned int;
 using ModelInstancePtrs = std::vector<ModelInstance*>;
 
 namespace UndoRedo {
-    class Stack;
+	class Stack;
     struct Snapshot;
 }
 
@@ -135,6 +137,7 @@ public:
     Print& fff_print();
     const SLAPrint& sla_print() const;
     SLAPrint& sla_print();
+    const PrintBase* current_print() const;
 
     void new_project();
     void load_project();
@@ -147,9 +150,9 @@ public:
     void reload_gcode_from_disk();
     void refresh_print();
 
-    std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
+    std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model = true, bool load_config = true, bool update_dirs = true, bool imperial_units = false);
     // To be called when providing a list of files to the GUI slic3r on command line.
-    std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
+    std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool update_dirs = true, bool imperial_units = false);
 #if ENABLE_DRAG_AND_DROP_FIX
     // to be called on drag and drop
     bool load_files(const wxArrayString& filenames);
@@ -332,7 +335,7 @@ public:
 
     void bring_instance_forward();
 
-    // ROII wrapper for suppressing the Undo / Redo snapshot to be taken.
+	// ROII wrapper for suppressing the Undo / Redo snapshot to be taken.
 	class SuppressSnapshots
 	{
 	public:

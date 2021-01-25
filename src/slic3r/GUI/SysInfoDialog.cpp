@@ -36,7 +36,7 @@ std::string get_main_info(bool format_as_html)
 
     if (!format_as_html)
         out << b_start << (wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME) << b_end << line_end;
-    out << b_start << "Version:   "             << b_end << SLIC3R_VERSION << line_end;
+    out << b_start << "Version:   "             << b_end << SLIC3R_VERSION_FULL << line_end;
     out << b_start << "Build:     " << b_end << (wxGetApp().is_editor() ? SLIC3R_BUILD_ID : GCODEVIEWER_BUILD_ID) << line_end;
     out << line_end;
     out << b_start << "Operating System:    "   << b_end << wxPlatformInfo::Get().GetOperatingSystemFamilyName() << line_end;
@@ -92,7 +92,7 @@ SysInfoDialog::SysInfoDialog()
 	main_sizer->Add(hsizer, 1, wxEXPAND | wxALL, 10);
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().is_editor() ? "PrusaSlicer_192px.png" : "PrusaSlicer-gcodeviewer_192px.png", 192);
+    m_logo_bmp = ScalableBitmap(this, wxGetApp().is_editor() ? "Slic3r_192px.png" : "PrusaSlicer-gcodeviewer_192px.png", 192);
     m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bmp.bmp());
 	hsizer->Add(m_logo, 0, wxALIGN_CENTER_VERTICAL);
     

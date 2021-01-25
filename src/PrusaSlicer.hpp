@@ -21,6 +21,8 @@ class CLI {
 public:
     int run(int argc, char **argv);
 
+    DynamicPrintConfig& full_print_config() { return m_print_config; }
+
 private:
     DynamicPrintAndCLIConfig    m_config;
     DynamicPrintConfig			m_print_config;
@@ -33,7 +35,7 @@ private:
     bool setup(int argc, char **argv);
     
     /// Prints usage of the CLI.
-    void print_help(bool include_print_options = false, PrinterTechnology printer_technology = ptAny) const;
+    void print_help(bool include_print_options = false, PrinterTechnology printer_technology = ptFFF | ptSLA | ptSLS) const;
     
     /// Exports loaded models to a file of the specified format, according to the options affecting output filename.
     bool export_models(IO::ExportFormat format);

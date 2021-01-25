@@ -43,7 +43,7 @@
 
 namespace Slic3r {
 
-TriangleMesh::TriangleMesh(const Pointf3s &points, const std::vector<Vec3i> &facets) : repaired(false)
+TriangleMesh::TriangleMesh(const Pointf3s &points, const std::vector<Vec3i32>& facets) : repaired(false)
 {
     stl_file &stl = this->stl;
     stl.stats.type = inmemory;
@@ -601,7 +601,7 @@ TriangleMesh TriangleMesh::convex_hull_3d() const
 
     // Let's collect results:
     Pointf3s dst_vertices;
-    std::vector<Vec3i> facets;
+    std::vector<Vec3i32> facets;
     auto facet_list = qhull.facetList().toStdVector();
     for (const orgQhull::QhullFacet& facet : facet_list)
     {   // iterate through facets
@@ -626,9 +626,10 @@ std::vector<ExPolygons> TriangleMesh::slice(const std::vector<double> &z)
 {
     // convert doubles to floats
     std::vector<float> z_f(z.begin(), z.end());
-    TriangleMeshSlicer mslicer(this);
+    TriangleMeshSlicer mslicer(0.0004f,0);
     std::vector<ExPolygons> layers;
-    mslicer.slice(z_f, SlicingMode::Regular, 0.0004f, &layers, [](){});
+    mslicer.init(this, []() {});
+    mslicer.slice(z_f, SlicingMode::Regular, &layers, []() {});
     return layers;
 }
 
@@ -636,7 +637,7 @@ void TriangleMesh::require_shared_vertices()
 {
     BOOST_LOG_TRIVIAL(trace) << "TriangleMeshSlicer::require_shared_vertices - start";
     assert(stl_validate(&this->stl));
-    if (! this->repaired) 
+    if (!this->repaired) 
         this->repair();
     if (this->its.vertices.empty()) {
         BOOST_LOG_TRIVIAL(trace) << "TriangleMeshSlicer::require_shared_vertices - stl_generate_shared_vertices";
@@ -838,7 +839,7 @@ void TriangleMeshSlicer::slice(
                 if ((line_idx & 0x0ffff) == 0)
                     throw_on_cancel();
 
-                Polygons   &polygons  = (*layers)[line_idx];
+                Polygons &polygons = (*layers)[line_idx];
                 this->make_loops(lines[line_idx], &polygons);
 
                 auto this_mode = line_idx < alternate_mode_first_n_layers ? alternate_mode : mode;
@@ -944,7 +945,7 @@ void TriangleMeshSlicer::_slice_do(size_t facet_idx, std::vector<IntersectionLin
 }
 
 void TriangleMeshSlicer::slice(
-    const std::vector<float> &z, SlicingMode mode, size_t alternate_mode_first_n_layers, SlicingMode alternate_mode, const float closing_radius, 
+    const std::vector<float> &z, SlicingMode mode, size_t alternate_mode_first_n_layers, SlicingMode alternate_mode,
     std::vector<ExPolygons>* layers, throw_on_cancel_callback_type throw_on_cancel) const
 {
     std::vector<Polygons> layers_p;
@@ -953,12 +954,12 @@ void TriangleMeshSlicer::slice(
         alternate_mode_first_n_layers,
         (alternate_mode == SlicingMode::PositiveLargestContour) ? SlicingMode::Positive : alternate_mode,
         &layers_p, throw_on_cancel);
-    
+
 	BOOST_LOG_TRIVIAL(debug) << "TriangleMeshSlicer::make_expolygons in parallel - start";
 	layers->resize(z.size());
 	tbb::parallel_for(
 		tbb::blocked_range<size_t>(0, z.size()),
-		[&layers_p, mode, alternate_mode_first_n_layers, alternate_mode, closing_radius, layers, throw_on_cancel, this]
+		[&layers_p, mode, alternate_mode_first_n_layers, alternate_mode, layers, throw_on_cancel, this]
         (const tbb::blocked_range<size_t>& range) {
     		for (size_t layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
 #ifdef SLIC3R_TRIANGLEMESH_DEBUG
@@ -966,7 +967,7 @@ void TriangleMeshSlicer::slice(
 #endif
                 throw_on_cancel();
                 ExPolygons &expolygons = (*layers)[layer_id];
-    			this->make_expolygons(layers_p[layer_id], closing_radius, &expolygons);
+    			this->make_expolygons(layers_p[layer_id], &expolygons);
                 const auto this_mode = layer_id < alternate_mode_first_n_layers ? alternate_mode : mode;
     			if (this_mode == SlicingMode::PositiveLargestContour)
 					keep_largest_contour_only(expolygons);
@@ -1725,7 +1726,7 @@ void TriangleMeshSlicer::make_expolygons_simple(std::vector<IntersectionLine> &l
 #endif
 }
 
-void TriangleMeshSlicer::make_expolygons(const Polygons &loops, const float closing_radius, ExPolygons* slices) const
+void TriangleMeshSlicer::make_expolygons(const Polygons &loops, ExPolygons* slices) const
 {
     /*
         Input loops are not suitable for evenodd nor nonzero fill types, as we might get
@@ -1776,11 +1777,19 @@ void TriangleMeshSlicer::make_expolygons(const Polygons &loops, const float clos
     //        p_slices = diff(p_slices, *loop);
     //}
 
+    //remove point in the same plane (have to do that before the safety offset to avoid working on a distored polygon)
+    Polygons filered_polys = loops;
+    if (this->model_precision > 0){
+        for (Polygon &hole : filered_polys){
+            hole.remove_collinear(scale_(this->model_precision));
+        }
+    }
+
     // Perform a safety offset to merge very close facets (TODO: find test case for this)
     // 0.0499 comes from https://github.com/slic3r/Slic3r/issues/959
 //    double safety_offset = scale_(0.0499);
     // 0.0001 is set to satisfy GH #520, #1029, #1364
-    double safety_offset = scale_(closing_radius);
+    double safety_offset = scale_(this->closing_radius);
 
     /* The following line is commented out because it can generate wrong polygons,
        see for example issue #661 */
@@ -1796,16 +1805,16 @@ void TriangleMeshSlicer::make_expolygons(const Polygons &loops, const float clos
     
     // append to the supplied collection
     if (safety_offset > 0)
-        expolygons_append(*slices, offset2_ex(union_(loops, false), +safety_offset, -safety_offset));
+        expolygons_append(*slices, offset2_ex(union_(filered_polys, false), +safety_offset, -safety_offset));
     else
-        expolygons_append(*slices, union_ex(loops, false));
+        expolygons_append(*slices, union_ex(filered_polys, false));
 }
 
-void TriangleMeshSlicer::make_expolygons(std::vector<IntersectionLine> &lines, const float closing_radius, ExPolygons* slices) const
+void TriangleMeshSlicer::make_expolygons(std::vector<IntersectionLine> &lines, ExPolygons* slices) const
 {
     Polygons pp;
     this->make_loops(lines, &pp);
-    this->make_expolygons(pp, closing_radius, slices);
+    this->make_expolygons(pp, slices);
 }
 
 void TriangleMeshSlicer::cut(float z, TriangleMesh* upper, TriangleMesh* lower) const
@@ -1838,11 +1847,11 @@ void TriangleMeshSlicer::cut(float z, TriangleMesh* upper, TriangleMesh* lower) 
         if (min_z > z || (min_z == z && max_z > z)) {
             // facet is above the cut plane and does not belong to it
             if (upper != nullptr)
-				stl_add_facet(&upper->stl, facet);
+                stl_add_facet(&upper->stl, facet);
         } else if (max_z < z || (max_z == z && min_z < z)) {
             // facet is below the cut plane and does not belong to it
             if (lower != nullptr)
-				stl_add_facet(&lower->stl, facet);
+                stl_add_facet(&lower->stl, facet);
         } else if (min_z < z && max_z > z) {
             // Facet is cut by the slicing plane.
 
@@ -1939,6 +1948,22 @@ void TriangleMeshSlicer::cut(float z, TriangleMesh* upper, TriangleMesh* lower) 
     stl_get_size(&lower->stl);
 }
 
+Pointf3s TriangleMesh::vertices()
+{
+    Pointf3s tmp{};
+    if (this->repaired) {
+        if (this->its.vertices.empty())
+            stl_generate_shared_vertices(&this->stl, this->its); // build the list of vertices
+        for (auto i = 0; i < this->its.vertices.size(); i++) {
+            const auto& v = this->its.vertices[i];
+            tmp.emplace_back(Vec3d(v.x(), v.y(), v.z()));
+        }
+    } else {
+        BOOST_LOG_TRIVIAL(warning) << "TriangleMesh", "vertices() requires repair()";
+    }
+    return tmp;
+}
+
 // Generate the vertex list for a cube solid of arbitrary size in X/Y/Z.
 TriangleMesh make_cube(double x, double y, double z) 
 {
@@ -1954,8 +1979,8 @@ TriangleMesh make_cube(double x, double y, double z)
             {1, 7, 6}, {1, 6, 2}, {2, 6, 5},
             {2, 5, 3}, {4, 0, 3}, {4, 3, 5}
         });
-	mesh.repair();
-	return mesh;
+    mesh.repair();
+    return mesh;
 }
 
 // Generate the mesh for a cylinder and return it, using 
@@ -1966,8 +1991,8 @@ TriangleMesh make_cylinder(double r, double h, double fa)
 	size_t n_steps    = (size_t)ceil(2. * PI / fa);
 	double angle_step = 2. * PI / n_steps;
 
-	Pointf3s			vertices;
-	std::vector<Vec3i>	facets;
+	Pointf3s             vertices;
+    std::vector<Vec3i32> facets;
 	vertices.reserve(2 * n_steps + 2);
 	facets.reserve(4 * n_steps);
 
@@ -1980,23 +2005,23 @@ TriangleMesh make_cylinder(double r, double h, double fa)
     // top and bottom.
     // Special case: Last line shares 2 vertices with the first line.
 	Vec2d p = Eigen::Rotation2Dd(0.) * Eigen::Vector2d(0, r);
-	vertices.emplace_back(Vec3d(p(0), p(1), 0.));
-	vertices.emplace_back(Vec3d(p(0), p(1), h));
-	for (size_t i = 1; i < n_steps; ++i) {
+    vertices.emplace_back(Vec3d(p(0), p(1), 0.));
+    vertices.emplace_back(Vec3d(p(0), p(1), h));
+    for (size_t i = 1; i < n_steps; ++i) {
         p = Eigen::Rotation2Dd(angle_step * i) * Eigen::Vector2d(0, r);
         vertices.emplace_back(Vec3d(p(0), p(1), 0.));
         vertices.emplace_back(Vec3d(p(0), p(1), h));
         int id = (int)vertices.size() - 1;
         facets.emplace_back( 0, id - 1, id - 3); // top
         facets.emplace_back(id,      1, id - 2); // bottom
-		facets.emplace_back(id, id - 2, id - 3); // upper-right of side
+        facets.emplace_back(id, id - 2, id - 3); // upper-right of side
         facets.emplace_back(id, id - 3, id - 1); // bottom-left of side
     }
     // Connect the last set of vertices with the first.
-	int id = (int)vertices.size() - 1;
+    size_t id = vertices.size() - 1;
     facets.emplace_back( 0, 2, id - 1);
     facets.emplace_back( 3, 1,     id);
-	facets.emplace_back(id, 2,      3);
+    facets.emplace_back(id, 2,      3);
     facets.emplace_back(id, id - 1, 2);
     
 	TriangleMesh mesh(std::move(vertices), std::move(facets));
@@ -2015,51 +2040,51 @@ TriangleMesh make_sphere(double radius, double fa)
 	float sectorStep  = float(2. * M_PI / sectorCount);
 	float stackStep   = float(M_PI / stackCount);
 
-	Pointf3s vertices;
-	vertices.reserve((stackCount - 1) * sectorCount + 2);
-	for (int i = 0; i <= stackCount; ++ i) {
-		// from pi/2 to -pi/2
-		double stackAngle = 0.5 * M_PI - stackStep * i;
-		double xy = radius * cos(stackAngle);
-		double z  = radius * sin(stackAngle);
-		if (i == 0 || i == stackCount)
-			vertices.emplace_back(Vec3d(xy, 0., z));
-		else
-			for (int j = 0; j < sectorCount; ++ j) {
-				// from 0 to 2pi
-				double sectorAngle = sectorStep * j;
-				vertices.emplace_back(Vec3d(xy * cos(sectorAngle), xy * sin(sectorAngle), z));
-			}
-	}
+    Pointf3s vertices;
+    vertices.reserve((stackCount - 1) * sectorCount + 2);
+    for (int i = 0; i <= stackCount; ++ i) {
+        // from pi/2 to -pi/2
+        double stackAngle = 0.5 * M_PI - stackStep * i;
+        double xy = radius * cos(stackAngle);
+        double z  = radius * sin(stackAngle);
+        if (i == 0 || i == stackCount)
+            vertices.emplace_back(Vec3d(xy, 0., z));
+        else
+            for (int j = 0; j < sectorCount; ++ j) {
+                // from 0 to 2pi
+                double sectorAngle = sectorStep * j;
+                vertices.emplace_back(Vec3d(xy * cos(sectorAngle), xy * sin(sectorAngle), z));
+    }
+    }
 
-	std::vector<Vec3i> facets;
-	facets.reserve(2 * (stackCount - 1) * sectorCount);
-	for (int i = 0; i < stackCount; ++ i) {
-		// Beginning of current stack.
-		int k1 = (i == 0) ? 0 : (1 + (i - 1) * sectorCount);
-		int k1_first = k1;
-		// Beginning of next stack.
-		int k2 = (i == 0) ? 1 : (k1 + sectorCount);
-		int k2_first = k2;
-		for (int j = 0; j < sectorCount; ++ j) {
-			// 2 triangles per sector excluding first and last stacks
-			int k1_next = k1;
-			int k2_next = k2;
-			if (i != 0) {
-				k1_next = (j + 1 == sectorCount) ? k1_first : (k1 + 1);
+    std::vector<Vec3i32> facets;
+    facets.reserve(2 * (stackCount - 1) * sectorCount);
+    for (int i = 0; i < stackCount; ++ i) {
+        // Beginning of current stack.
+        int k1 = (i == 0) ? 0 : (1 + (i - 1) * sectorCount);
+        int k1_first = k1;
+        // Beginning of next stack.
+        int k2 = (i == 0) ? 1 : (k1 + sectorCount);
+        int k2_first = k2;
+        for (int j = 0; j < sectorCount; ++ j) {
+            // 2 triangles per sector excluding first and last stacks
+            int k1_next = k1;
+            int k2_next = k2;
+            if (i != 0) {
+                k1_next = (j + 1 == sectorCount) ? k1_first : (k1 + 1);
 				facets.emplace_back(k1, k2, k1_next);
-			}
-			if (i + 1 != stackCount) {
-				k2_next = (j + 1 == sectorCount) ? k2_first : (k2 + 1);
+            }
+            if (i + 1 != stackCount) {
+                k2_next = (j + 1 == sectorCount) ? k2_first : (k2 + 1);
 				facets.emplace_back(k1_next, k2, k2_next);
 			}
-			k1 = k1_next;
-			k2 = k2_next;
-		}
-	}
+            k1 = k1_next;
+            k2 = k2_next;
+    }
+        }
 	TriangleMesh mesh(std::move(vertices), std::move(facets));
 	mesh.repair();
 	return mesh;
-}
+    }
 
 }

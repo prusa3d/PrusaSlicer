@@ -19,7 +19,7 @@ bool SVG::open(const char* afilename)
         "      <polyline fill=\"darkblue\" points=\"0,0 10,5 0,10 1,5\" />\n"
         "   </marker>\n"
         );
-    fprintf(this->f, "<rect fill='white' stroke='none' x='0' y='0' width='%f' height='%f'/>\n", 2000.f, 2000.f);
+    //fprintf(this->f, "<rect fill='white' stroke='none' x='0' y='0' width='%f' height='%f'/>\n", 2000.f, 2000.f);
     return true;
 }
 
@@ -42,7 +42,7 @@ bool SVG::open(const char* afilename, const BoundingBox &bbox, const coord_t bbo
         "      <polyline fill=\"darkblue\" points=\"0,0 10,5 0,10 1,5\" />\n"
         "   </marker>\n",
         h, w);
-    fprintf(this->f, "<rect fill='white' stroke='none' x='0' y='0' width='%f' height='%f'/>\n", w, h);
+    //fprintf(this->f, "<rect fill='white' stroke='none' x='0' y='0' width='%f' height='%f'/>\n", w, h);
     return true;
 }
 
@@ -151,11 +151,26 @@ void SVG::draw(const SurfacesPtr &surfaces, std::string fill, const float fill_o
 
 void SVG::draw_outline(const SurfacesPtr &surfaces, std::string stroke_outer, std::string stroke_holes, coordf_t stroke_width)
 {
-    for (SurfacesPtr::const_iterator it = surfaces.begin(); it != surfaces.end(); ++ it)
+    for (SurfacesPtr::const_iterator it = surfaces.begin(); it != surfaces.end(); ++it)
         draw_outline(*(*it), stroke_outer, stroke_holes, stroke_width);
 }
 
-void SVG::draw(const Polygon &polygon, std::string fill)
+void
+SVG::draw(const SurfacesConstPtr& surfaces, std::string fill, const float fill_opacity)
+{
+    for (SurfacesConstPtr::const_iterator it = surfaces.begin(); it != surfaces.end(); ++it)
+        this->draw(*(*it), fill, fill_opacity);
+}
+
+void
+SVG::draw_outline(const SurfacesConstPtr& surfaces, std::string stroke_outer, std::string stroke_holes, coordf_t stroke_width)
+{
+    for (SurfacesConstPtr::const_iterator it = surfaces.begin(); it != surfaces.end(); ++it)
+        draw_outline(*(*it), stroke_outer, stroke_holes, stroke_width);
+}
+
+void
+SVG::draw(const Polygon &polygon, std::string fill)
 {
     this->fill = fill;
     this->path(this->get_path_d(polygon, true), !fill.empty(), 0, 1.f);

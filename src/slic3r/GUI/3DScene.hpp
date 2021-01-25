@@ -31,6 +31,7 @@ enum  SLAPrintObjectStep : unsigned int;
 class DynamicPrintConfig;
 class ExtrusionPath;
 class ExtrusionMultiPath;
+class ExtrusionMultiPath3D;
 class ExtrusionLoop;
 class ExtrusionEntity;
 class ExtrusionEntityCollection;
@@ -605,13 +606,27 @@ struct _3DScene
     static void extrusionentity_to_verts(const ExtrusionPath& extrusion_path, float print_z, const Point& copy, GLVolume& volume);
     static void extrusionentity_to_verts(const ExtrusionLoop& extrusion_loop, float print_z, const Point& copy, GLVolume& volume);
     static void extrusionentity_to_verts(const ExtrusionMultiPath& extrusion_multi_path, float print_z, const Point& copy, GLVolume& volume);
-    static void extrusionentity_to_verts(const ExtrusionEntityCollection& extrusion_entity_collection, float print_z, const Point& copy, GLVolume& volume);
-    static void extrusionentity_to_verts(const ExtrusionEntity* extrusion_entity, float print_z, const Point& copy, GLVolume& volume);
+    static void extrusionentity_to_verts(const ExtrusionMultiPath3D& extrusion_multi_path, float print_z, const Point& copy, GLVolume& volume);
+    static void extrusionentity_to_verts(const ExtrusionEntity &extrusion_entity, float print_z, const Point& copy, GLVolume& volume);
     static void polyline3_to_verts(const Polyline3& polyline, double width, double height, GLVolume& volume);
     static void point3_to_verts(const Vec3crd& point, double width, double height, GLVolume& volume);
 };
 
 static constexpr float BedEpsilon = 3.f * float(EPSILON);
+
+class ExtrusionToVert : public ExtrusionVisitorConst {
+    float print_z;
+    const Point &copy;
+    GLVolume &volume;
+public:
+    ExtrusionToVert(float print_z, const Point &copy, GLVolume &volume) : print_z(print_z), copy(copy), volume(volume) {}
+    virtual void use(const ExtrusionPath &path) override;
+    virtual void use(const ExtrusionPath3D &path3D) override;
+    virtual void use(const ExtrusionMultiPath &multipath) override;
+    virtual void use(const ExtrusionMultiPath3D &multipath) override;
+    virtual void use(const ExtrusionLoop &loop) override;
+    virtual void use(const ExtrusionEntityCollection &collection) override;
+};
 
 }
 

@@ -14,6 +14,7 @@ class PresetUpdater;
 
 namespace GUI {
 
+//#define ALLOW_PRUSA_FIRST 1
 
 class ConfigWizard: public DPIDialog
 {

@@ -25,14 +25,15 @@ endif ()
 
 if (${DEPS_BITS} EQUAL 32)
     set(DEP_MSVC_GEN "Visual Studio ${DEP_VS_VER}")
-    set(DEP_PLATFORM "Win32")
+#    set(DEP_PLATFORM "Win32")
 else ()
     if (DEP_VS_VER LESS 16)
         set(DEP_MSVC_GEN "Visual Studio ${DEP_VS_VER} Win64")
     else ()
         set(DEP_MSVC_GEN "Visual Studio ${DEP_VS_VER}")
+        set(DEP_PLATFORM "x64")
     endif ()
-    set(DEP_PLATFORM "x64")
+#    set(DEP_PLATFORM "x64")
 endif ()
 
 if (${DEP_DEBUG})
@@ -55,7 +56,7 @@ endmacro()
 
 ExternalProject_Add(dep_boost
     EXCLUDE_FROM_ALL 1
-    URL "https://dl.bintray.com/boostorg/release/1.75.0/source/boost_1_75_0.tar.gz"
+    URL "https://github.com/supermerill/SuperSlicer_deps/releases/download/1.75/boost_1_75_0.tar.gz"
     URL_HASH SHA256=aeb26f80e80945e82ee93e5939baebdca47b9dee80a07d3144be1e1a6a66dd6a
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND bootstrap.bat
@@ -85,7 +86,9 @@ ExternalProject_Add(dep_tbb
     URL "https://github.com/wjakob/tbb/archive/a0dc9bf76d0120f917b641ed095360448cabc85b.tar.gz"
     URL_HASH SHA256=0545cb6033bd1873fcae3ea304def720a380a88292726943ae3b9b207f322efe
     CMAKE_GENERATOR "${DEP_MSVC_GEN}"
-    CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}"
+    if (DEP_VS_VER MORE 15)
+        CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}"
+    endif()
     CMAKE_ARGS
         -DCMAKE_DEBUG_POSTFIX=_debug
         -DTBB_BUILD_SHARED=OFF
@@ -119,7 +122,9 @@ ExternalProject_Add(dep_cereal
     URL "https://github.com/USCiLab/cereal/archive/v1.2.2.tar.gz"
 #    URL_HASH SHA256=c6dd7a5701fff8ad5ebb45a3dc8e757e61d52658de3918e38bab233e7fd3b4ae
     CMAKE_GENERATOR "${DEP_MSVC_GEN}"
-    CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}"
+    if (DEP_VS_VER MORE 15)
+		CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}"
+    endif()
     CMAKE_ARGS
         -DJUST_INSTALL_CEREAL=on
         "-DCMAKE_INSTALL_PREFIX:PATH=${DESTDIR}\\usr\\local"
@@ -130,9 +135,12 @@ ExternalProject_Add(dep_cereal
 ExternalProject_Add(dep_nlopt
     EXCLUDE_FROM_ALL 1
     URL "https://github.com/stevengj/nlopt/archive/v2.5.0.tar.gz"
+#    URL_HASH SHA256=c81bf6d981c328f3e634709dc84746e32ff5cfb715f698ead2de4d57e30a0e70
     URL_HASH SHA256=c6dd7a5701fff8ad5ebb45a3dc8e757e61d52658de3918e38bab233e7fd3b4ae
     CMAKE_GENERATOR "${DEP_MSVC_GEN}"
-    CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}"
+    if (DEP_VS_VER MORE 15)
+        CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}"
+    endif()
     CMAKE_ARGS
         -DBUILD_SHARED_LIBS=OFF
         -DNLOPT_PYTHON=OFF

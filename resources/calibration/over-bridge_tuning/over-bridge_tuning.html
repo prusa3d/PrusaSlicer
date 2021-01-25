@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Ironing Pattern Calibration</title>
+</head>
+<body>
+
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Ironing Pattern Calibration</h1>
+</td>
+<td style="text-align: right;"><strong>
+	<table><tr><td>needs:</td><td style="text-align: left;">Temperature</td></tr>
+	<tr><td></td><td>Flow</td></tr></table>
+	</strong>
+</tr>
+</tbody>
+</table>
+
+<p><strong>You need to do the filament flow calibration and the bridge flow ratio before this one.</strong> It's better if you have done the filament temperature.</p>
+<p>This calibration method will print test samples with various levels of over-bridge flow ratio, between 100 and 125. Choose the lowest value on which the top surface is smooth without rough "holes". Began with the over-bridge calibraiton.</p>
+<p>If the over-bridge calibration is not conclusive (same holes on all samples), then set it to 110% and use the top flow calibration. This setting is a bit more unpredictable so it's best to not move it far away from 100%.</p>
+<h2>Results</h2>
+<table width="100%">
+<tbody>
+<h4>Exemple:</h4>
+<tr>
+<td><img src="./100.jpg" width="150" height="100" /></td>
+<td><img src="./105.jpg" width="150" height="100" /></td>
+<td><img src="./110.jpg" width="150" height="100" /></td>
+<td><img src="./115.jpg" width="150" height="100" /></td>
+<td><img src="./120.jpg" width="150" height="100" /></td>
+</tr>
+<tr>
+<td style="text-align: center;">not flat</td>
+<td style="text-align: center;">not flat</td>
+<td style="text-align: center;">not flat</td>
+<td style="text-align: center;">flat</td>
+<td style="text-align: center;">Flat</td>
+</tr>
+</table>
+Here, we can see that artifacts exist until the over-bridge flow was set to 115. It was flat from the flow calibration, if it's not now, it's because the bridges below the top surfaces are dropping a bit, and so it leaves more volume to fill afterwards. Here, 115 should be enough, but 120 is a more safe bet.
+
+<h2>Advice</h2>
+<p>TODO</p>
+</ul>
+<h2>Notes</h2>
+<p>This test set the setting "complete individual objects" to true, so you may want to reset your print settings afterwards</p>
+<p>Licence for models used for this calibration test: CC BY-SA 3.0</p>
+</body>
+</html>

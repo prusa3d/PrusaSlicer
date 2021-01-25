@@ -7,6 +7,8 @@
 #include <wx/string.h>
 #include <wx/event.h>
 #include <wx/dialog.h>
+#include <wx/combobox.h>
+#include <wx/arrstr.h>
 
 #include "GUI.hpp"
 #include "GUI_Utils.hpp"

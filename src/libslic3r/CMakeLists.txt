@@ -62,6 +62,8 @@ add_library(libslic3r STATIC
     Fill/FillLine.hpp
     Fill/FillRectilinear.cpp
     Fill/FillRectilinear.hpp
+    Fill/FillSmooth.cpp
+    Fill/FillSmooth.hpp
     Flow.cpp
     Flow.hpp
     format.hpp
@@ -83,6 +85,8 @@ add_library(libslic3r STATIC
     GCode/ThumbnailData.hpp
     GCode/CoolingBuffer.cpp
     GCode/CoolingBuffer.hpp
+    GCode/FanMover.cpp
+    GCode/FanMover.hpp
     GCode/PostProcessor.cpp
     GCode/PostProcessor.hpp
 #    GCode/PressureEqualizer.cpp
@@ -120,6 +124,10 @@ add_library(libslic3r STATIC
     "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h"
     Line.cpp
     Line.hpp
+    MedialAxis.cpp
+    MedialAxis.hpp
+    Milling/MillingPostProcess.cpp
+    Milling/MillingPostProcess.hpp
     Model.cpp
     Model.hpp
     ModelArrange.hpp

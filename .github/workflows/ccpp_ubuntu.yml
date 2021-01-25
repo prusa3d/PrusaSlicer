@@ -1,0 +1,83 @@
+name: C/C++ CI ubuntu
+
+on:
+  push:
+    branches:
+      - CI
+
+jobs:
+  build:
+
+    runs-on: ubuntu-18.04
+    
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: 'CI'
+    - name: change date in version
+      run: sed -i "s/+UNKNOWN/_$(date '+%F')/" version.inc
+    - name: update clock
+      run: sudo hwclock -s
+    - name: update apt
+      run: sudo apt update
+    - name: install gtk2 glew
+      run: sudo apt install libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev
+    - name: mkdir in deps
+      run: mkdir deps/build
+    - name: cmake deps
+      working-directory: ./deps/build
+      run: cmake ..
+    - name: make deps
+      working-directory: ./deps/build
+      run: make
+    - name: rename wxscintilla
+      working-directory: ./deps/build/destdir/usr/local/lib
+      run: cp libwxscintilla-3.1.a libwx_gtk2u_scintilla-3.1.a
+    - name: ls libs
+      working-directory: ./deps/build
+      run: ls ./destdir/usr/local/lib
+    - name: clean deps
+      working-directory: ./deps/build
+      run: rm -rf dep_*
+    - name: mkdir build
+      run: mkdir build
+    - name: cmake
+      working-directory: ./build
+      run: cmake .. -DCMAKE_PREFIX_PATH="/home/runner/work/SuperSlicer/SuperSlicer/deps/build/destdir/usr/local" -DSLIC3R_STATIC=1
+    - name: make SuperSlicer
+      working-directory: ./build
+      run: make SuperSlicer
+    - name: create directory and copy into it
+      working-directory: ./build
+      run: |
+        mkdir package
+        mkdir package/bin
+    - name: copy resources
+      working-directory: ./build
+      run: cp -Rf ../resources package/resources
+    - name: copy bin
+      working-directory: ./build
+      run: cp -f src/superslicer package/bin/superslicer
+    - name: create sh from echo
+      working-directory: ./build/package
+      run: |
+        echo -e '#!/bin/bash\nDIR=$(readlink -f "$0" | xargs dirname)\nexport LD_LIBRARY_PATH="$DIR/bin"\nexec "$DIR/bin/superslicer" "$@"' >superslicer
+        chmod u+x superslicer
+        tar -cvf ../SuperSlicer.tar .
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: nightly_linux.tar
+        path: build/SuperSlicer.tar
+    - name: build appimage
+      working-directory: ./build/package
+      run: |
+        chmod +x ../../src/platform/unix/build_appimage.sh
+        ../../src/platform/unix/build_appimage.sh SuperSlicer_ubu64.AppImage
+    - name: Upload appimage
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: SuperSlicer-AppImage.tar
+        path: build/package/SuperSlicer_ubu64.AppImage
+        
+        

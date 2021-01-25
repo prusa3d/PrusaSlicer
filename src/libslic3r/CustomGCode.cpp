@@ -18,7 +18,7 @@ extern void update_custom_gcode_per_print_z_from_config(Info& info, DynamicPrint
     if (info.gcodes.empty() && ! colorprint_heights->values.empty()) {
 		// Convert the old colorprint_heighs only if there is no equivalent data in a new format.
         const std::vector<std::string>& colors = ColorPrintColors::get();
-        const auto& colorprint_values = colorprint_heights->values;
+	    const auto& colorprint_values = colorprint_heights->values;
         info.gcodes.clear();
         info.gcodes.reserve(colorprint_values.size());
         int i = 0;
@@ -56,14 +56,14 @@ extern void check_mode_for_custom_gcode_per_print_z(Info& info)
 
 // Return pairs of <print_z, 1-based extruder ID> sorted by increasing print_z from custom_gcode_per_print_z.
 // print_z corresponds to the first layer printed with the new extruder.
-std::vector<std::pair<double, unsigned int>> custom_tool_changes(const Info& custom_gcode_per_print_z, size_t num_extruders)
+std::vector<std::pair<double, uint16_t>> custom_tool_changes(const Info& custom_gcode_per_print_z, size_t num_extruders)
 {
-    std::vector<std::pair<double, unsigned int>> custom_tool_changes;
+    std::vector<std::pair<double, uint16_t>> custom_tool_changes;
     for (const Item& custom_gcode : custom_gcode_per_print_z.gcodes)
         if (custom_gcode.type == ToolChange) {
             // If extruder count in PrinterSettings was changed, use default (0) extruder for extruders, more than num_extruders
             assert(custom_gcode.extruder >= 0);
-            custom_tool_changes.emplace_back(custom_gcode.print_z, static_cast<unsigned int>(size_t(custom_gcode.extruder) > num_extruders ? 1 : custom_gcode.extruder));
+            custom_tool_changes.emplace_back(custom_gcode.print_z, static_cast<uint16_t>(size_t(custom_gcode.extruder) > num_extruders ? 1 : custom_gcode.extruder));
         }
     return custom_tool_changes;
 }

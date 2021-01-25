@@ -87,9 +87,9 @@ int main(int argc, char const *argv[])
     };
 
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
-    const auto size = file.tellg();
+    const std::streampos size = file.tellg();
 
-    if (size == 0) {
+    if (size == std::streampos{ 0 }) {
         return 0;
     }
 

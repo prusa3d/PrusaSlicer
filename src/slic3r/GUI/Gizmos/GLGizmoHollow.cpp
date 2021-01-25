@@ -517,9 +517,9 @@ void GLGizmoHollow::on_render_input_window(float x, float y, float bottom_limit)
     double closing_d_max = opts[2].second->max;
     ConfigOptionMode closing_d_mode = opts[2].second->mode;
 
-    m_desc["offset"] = _(opts[0].second->label) + ":";
-    m_desc["quality"] = _(opts[1].second->label) + ":";
-    m_desc["closing_distance"] = _(opts[2].second->label) + ":";
+    m_desc["offset"] = _(opts[0].second->get_full_label()) + ":";
+    m_desc["quality"] = _(opts[1].second->get_full_label()) + ":";
+    m_desc["closing_distance"] = _(opts[2].second->get_full_label()) + ":";
 
 
 RENDER_AGAIN:

@@ -3,6 +3,7 @@
 
 #include <wx/dataview.h>
 #include <vector>
+#include "libslic3r/Config.hpp"
 
 #include "ExtraRenderers.hpp"
 
@@ -53,7 +54,7 @@ class ObjectDataViewModelNode
     MyObjectTreeModelNodePtrArray   m_children;
     wxBitmap                        m_empty_bmp;
     size_t                          m_volumes_cnt = 0;
-    std::vector< std::string >      m_opt_categories;
+    std::vector< Slic3r::OptionCategory >      m_opt_categories;
     t_layer_height_range            m_layer_range = { 0.0f, 0.0f };
 
     wxString				        m_name;
@@ -217,7 +218,7 @@ public:
     void        set_printable_icon(PrintIndicator printable);
 
     void        update_settings_digest_bitmaps();
-    bool        update_settings_digest(const std::vector<std::string>& categories);
+    bool        update_settings_digest(const std::vector<Slic3r::OptionCategory>& categories);
     int         volume_type() const { return int(m_volume_type); }
     void        msw_rescale();
 
@@ -342,7 +343,7 @@ public:
     wxDataViewItem  GetLayerRootItem(const wxDataViewItem &item) const;
     bool    IsSettingsItem(const wxDataViewItem &item) const;
     void    UpdateSettingsDigest(   const wxDataViewItem &item,
-                                    const std::vector<std::string>& categories);
+                                    const std::vector<Slic3r::OptionCategory>& categories);
 
     bool    IsPrintable(const wxDataViewItem &item) const;
     void    UpdateObjectPrintable(wxDataViewItem parent_item);

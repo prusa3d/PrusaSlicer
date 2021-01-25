@@ -23,7 +23,7 @@
 #include <boost/log/trivial.hpp>
 
 
-// Store the print/filament/printer presets into a "presets" subdirectory of the Slic3rPE config dir.
+// Store the print/filament/printer presets into a "presets" subdirectory of the SuperSlicer config dir.
 // This breaks compatibility with the upstream Slic3r if the --datadir is used to switch between the two versions.
 // #define SLIC3R_PROFILE_USE_PRESETS_SUBDIR
 
@@ -500,6 +500,7 @@ DynamicPrintConfig PresetBundle::full_config_secure() const
     config.erase("print_host");
     config.erase("printhost_apikey");
     config.erase("printhost_cafile");
+    config.erase("printhost_port");
     return config;
 }
 

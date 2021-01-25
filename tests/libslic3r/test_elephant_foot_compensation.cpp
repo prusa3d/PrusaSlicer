@@ -518,12 +518,12 @@ SCENARIO("Elephant foot compensation", "[ElephantFoot]") {
     GIVEN("Rectangle with a narrow part sticking out") {				
 		// Rectangle
 		ExPolygon expoly;
-		coord_t scaled_w = coord_t(scale_(10));
+		int32_t scaled_w = int32_t(scale_(10)); //should be coord_t but it's eaisier to create that way
 		expoly.contour.points = { Vec2crd{ 0, 0 }, Vec2crd{ 0, scaled_w, }, Vec2crd{ scaled_w, scaled_w }, Vec2crd{ scaled_w, 0 } };
 		// Narrow part
 		ExPolygon expoly2;
-		coord_t scaled_h = coord_t(scale_(0.8));
-		expoly2.contour.points = { { scaled_w - coord_t(SCALED_EPSILON), scaled_w / 2 }, { scaled_w - coord_t(SCALED_EPSILON), scaled_w / 2 + scaled_h, },
+        int32_t scaled_h = int32_t(scale_(0.8));
+		expoly2.contour.points = { { scaled_w - int32_t(SCALED_EPSILON), scaled_w / 2 }, { scaled_w - int32_t(SCALED_EPSILON), scaled_w / 2 + scaled_h, },
 								   { 2 * scaled_w, scaled_w / 2 + scaled_h }, { 2 * scaled_w, scaled_w / 2 } };
 		// Rectangle with the narrow part.
 		expoly = union_ex({ expoly, expoly2 }).front();

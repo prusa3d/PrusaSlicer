@@ -62,6 +62,8 @@ void PressureEqualizer::reset()
     // Don't regulate the pressure in infill.
     m_max_volumetric_extrusion_rate_slopes[erBridgeInfill].negative = 0;
     m_max_volumetric_extrusion_rate_slopes[erBridgeInfill].positive = 0;
+    m_max_volumetric_extrusion_rate_slopes[erInternalBridgeInfill].negative = 0;
+    m_max_volumetric_extrusion_rate_slopes[erInternalBridgeInfill].positive = 0;
     // Don't regulate the pressure in gap fill.
     m_max_volumetric_extrusion_rate_slopes[erGapFill].negative = 0;
     m_max_volumetric_extrusion_rate_slopes[erGapFill].positive = 0;

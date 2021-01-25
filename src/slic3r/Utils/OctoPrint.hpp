@@ -3,6 +3,7 @@
 
 #include <string>
 #include <wx/string.h>
+#include <wx/arrstr.h>
 #include <boost/optional.hpp>
 
 #include "PrintHost.hpp"

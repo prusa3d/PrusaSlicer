@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Filament Temperature Calibration</title>
+</head>
+<body>
+
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Filament Temperature Calibration</h1>
+</td>
+<td style="text-align: right;"><strong>
+	<table><tr><td>needs:</td><td style="text-align: left;">Flow</td></tr>
+	</table>
+	</strong>
+</tr>
+</tbody>
+</table>
+
+<p><strong>You need to have done the bed level calibration before this one,</strong> and it's preferable to have also done the flow calibration.
+This calibration will help you to choose the right temperature in respect of bonding, overhangs and oozing.
+Note that this test is dependant of the cooling you selected. You can print this multiple time with more or less cooling to find the sweet spot.</p>
+<p>This test will print a tower, printed with a different temperature setting for each floor. The floor in the middle will be printed with the current temperature selected in your filament configuration. The ground floor, touching the build plate, will ergo be printed with the highest and the top floor with the lowest temperature. You can choose the delta of temperature between each test and the number of tests (how many tests below the current temperature and how many tests hotter than the current) but you can let them as-is to begin.</p>
+<h2>Results / observation</h2>
+<p>The goal is to choose the highest temperature possible that doesn't produce artifacts.</p>
+<p>First, you have to analyse the tower. Each floor has the according to the temperature written on it.</p>
+<table width="100%">
+<tbody>
+<tr>
+<td><img src="./temp_tower_180.jpg" width="400" height="100" /></td>
+<td>too cold, it can't be extruded</td>
+<td>
+</tr>
+<tr>
+<td><img src="./temp_tower_195.jpg" width="400" height="100" /></td>
+<td>good</td>
+</tr>
+<tr>
+<td><img src="./temp_tower_210.jpg" width="400" height="100" /></td>
+<td>good</td>
+</tr>
+<tr>
+<td><img src="./temp_tower_225.jpg" width="400" height="100" /></td>
+<td>too hot, you can see some ooze</td>
+</tr>
+<tr>
+<td><img src="./temp_tower_240.jpg" width="400" height="100" /></td>
+<td>too hot, you can see some ooze</td>
+</tr>
+</tbody>
+</table>
+<p>Here you can see that the floor printed with 210 degree celsius is the hottest we can print without disintegration problems (regarding the heat; the bad quality in the pictures is due to high speed). Also, I succeeded to break (with difficulty) a chunk of the 195 degree floor because of missing layer adhesion ; so it was printed to low in temperature. I advise doing the same test.</p>
+<h2>Results: destruction</h2>
+<p>Finally, you want to tear the tower apart to see if the lower temperatures have adverse effects on layer bonding. It shouldn't be possible to tear layers apart with your bare hands. If a floor can be easily delayered, then this floor temperature is definitely too low (or you have had too much cooling due to the fan blowing too much), so you should choose a higher temperature or try again with less cooling. When trying to break one, don't put your hands on the ends of the tower but on the tested floor and the next one, leaving only the bridge gaps between them.</p>
+<h2>How to tune your printer</h2>
+<p>Change the temperature in your filament setting (extruder -> other layers), then save it. The first layer temperature is often 5 degrees higher to help with bed adhesion, so you should also change it, especially if it's lower than the new one.</p>
+</ul>
+<h2>Notes</h2>
+<p>Most of the calibrations need to be done in the <strong>correct</strong> order. This one should be the third.</p>
+<p>The temperature numbers will only be shown between 180 and 285. Higher or lower values won't be displayed but the test will be conducted successfully, you just have to remember them.</p>
+<p>This tower is made with the 3D model <a href="https://www.thingiverse.com/thing:2729076">created by gaaZolee</a> with the CC BY-SA 3.0 licence.<p>
+</body>
+</html>

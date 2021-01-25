@@ -9,6 +9,6 @@
 	<rect x="7.5" y="9.5" transform="matrix(-1.836970e-16 1 -1 -1.836970e-16 22.5 6.5)" fill="#808080" width="1" height="10"/>
 	<rect x="10.5" y="11.5" transform="matrix(-1.836970e-16 1 -1 -1.836970e-16 24.5 1.5)" fill="#808080" width="2" height="3"/>
 	<rect x="3.5" y="11.5" transform="matrix(-1.836970e-16 1 -1 -1.836970e-16 17.5 8.5)" fill="#808080" width="2" height="3"/>
-	<rect x="3" y="1" fill="#ED6B21" width="10" height="10"/>
+	<rect x="3" y="1" fill="#2172eb" width="10" height="10"/>
 </g>
 </svg>

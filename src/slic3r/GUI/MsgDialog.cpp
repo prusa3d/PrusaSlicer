@@ -53,7 +53,7 @@ MsgDialog::MsgDialog(wxWindow *parent, const wxString &title, const wxString &he
 	rightsizer->Add(btn_sizer, 0, wxALIGN_RIGHT);
 
 	if (! bitmap.IsOk()) {
-		bitmap = create_scaled_bitmap("PrusaSlicer_192px.png", this, 192);
+		bitmap = create_scaled_bitmap("Slic3r_192px.png", this, 192);
 	}
 
 	logo = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap);
@@ -101,7 +101,7 @@ ErrorDialog::ErrorDialog(wxWindow *parent, const wxString &msg, bool monospaced_
 	btn_sizer->Add(btn_ok, 0, wxRIGHT, HORIZ_SPACING);
 
 	// Use a small bitmap with monospaced font, as the error text will not be wrapped.
-	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, monospaced_font ? 48 : 192));
+	logo->SetBitmap(create_scaled_bitmap("Slic3r_192px.png", this, monospaced_font ? 48 : 192));
 
     SetMaxSize(wxSize(-1, CONTENT_MAX_HEIGHT*wxGetApp().em_unit()));
 	Fit();

@@ -549,8 +549,9 @@ ExPolygon elephant_foot_compensation(const ExPolygon &input_expoly, double min_c
 	Point 		bbox_size = bbox.size();
 	ExPolygon   out;
 	if (bbox_size.x() < min_contour_width_compensated + SCALED_EPSILON ||
-		bbox_size.y() < min_contour_width_compensated + SCALED_EPSILON ||
-		input_expoly.area() < min_contour_width_compensated * min_contour_width_compensated * 5.)
+		bbox_size.y() < min_contour_width_compensated + SCALED_EPSILON )
+        //this is a hidden switch that will create strange behavior for the user. That's why i deactivate it.
+        //|| input_expoly.area() < min_contour_width_compensated * min_contour_width_compensated * 5.)
 	{
 		// The contour is tiny. Don't correct it.
 		out = input_expoly;

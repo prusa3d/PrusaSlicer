@@ -52,11 +52,12 @@ public:
 	class MyLayer
 	{
 	public:
-		MyLayer() :
-			layer_type(sltUnknown),
-			print_z(0.),
-			bottom_z(0.),
-			height(0.),
+        MyLayer() :
+            layer_type(sltUnknown),
+            print_z(0.),
+            bottom_z(0.),
+            height(0.),
+            height_block(0.),
 			idx_object_layer_above(size_t(-1)),
 			idx_object_layer_below(size_t(-1)),
 			bridging(false),
@@ -77,6 +78,7 @@ public:
 			print_z 				= 0.;
 			bottom_z 				= 0.;
 			height 					= 0.;
+            height_block            = 0.;
 			idx_object_layer_above  = size_t(-1);
 			idx_object_layer_below  = size_t(-1);
 			bridging 				= false;
@@ -119,9 +121,11 @@ public:
 		coordf_t print_z;
 		// Bottom Z of this layer. For soluble layers, bottom_z + height = print_z,
 		// otherwise bottom_z + gap + height = print_z.
-		coordf_t bottom_z;
-		// Layer height in unscaled coordinates.
-    	coordf_t height;
+        coordf_t bottom_z;
+        // Layer height in unscaled coordinates.
+        coordf_t height;
+        // Layer height for collision in unscaled coordinates.
+        coordf_t height_block;
     	// Index of a PrintObject layer_id supported by this layer. This will be set for top contact layers.
     	// If this is not a contact layer, it will be set to size_t(-1).
     	size_t 	 idx_object_layer_above;

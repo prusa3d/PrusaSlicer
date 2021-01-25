@@ -455,7 +455,7 @@ static bool need_wipe(const GCode          &gcodegen,
 {
     const ExPolygons               &lslices        = gcodegen.layer()->lslices;
     const std::vector<BoundingBox> &lslices_bboxes = gcodegen.layer()->lslices_bboxes;
-    bool z_lift_enabled = gcodegen.config().retract_lift.get_at(gcodegen.writer().extruder()->id()) > 0.;
+    bool z_lift_enabled = gcodegen.config().retract_lift.get_at(gcodegen.writer().tool()->id()) > 0.;
     bool wipe_needed    = false;
 
     // If the original unmodified path doesn't have any intersection with boundary, then it is entirely inside the object otherwise is entirely
@@ -483,10 +483,10 @@ static bool need_wipe(const GCode          &gcodegen,
 // called by get_perimeter_spacing() / get_perimeter_spacing_external()
 static inline float get_default_perimeter_spacing(const PrintObject &print_object)
 {
-    std::vector<unsigned int> printing_extruders = print_object.object_extruders();
+    std::vector<uint16_t> printing_extruders = print_object.object_extruders();
     assert(!printing_extruders.empty());
     float avg_extruder = 0;
-    for(unsigned int extruder_id : printing_extruders)
+    for(uint16_t extruder_id : printing_extruders)
         avg_extruder += float(scale_(print_object.print()->config().nozzle_diameter.get_at(extruder_id)));
     avg_extruder /= printing_extruders.size();
     return avg_extruder;
@@ -498,7 +498,7 @@ static float get_perimeter_spacing(const Layer &layer)
     size_t regions_count     = 0;
     float  perimeter_spacing = 0.f;
     for (const LayerRegion *layer_region : layer.regions())
-        if (layer_region != nullptr && !layer_region->slices.empty()) {
+        if (layer_region != nullptr && !layer_region->slices().empty()) {
             perimeter_spacing += layer_region->flow(frPerimeter).scaled_spacing();
             ++regions_count;
         }
@@ -519,7 +519,7 @@ static float get_perimeter_spacing_external(const Layer &layer)
     for (const PrintObject *object : layer.object()->print()->objects())
         if (const Layer *l = object->get_layer_at_printz(layer.print_z, EPSILON); l)
             for (const LayerRegion *layer_region : l->regions())
-                if (layer_region != nullptr && !layer_region->slices.empty()) {
+                if (layer_region != nullptr && !layer_region->slices().empty()) {
                     perimeter_spacing += layer_region->flow(frPerimeter).scaled_spacing();
                     ++ regions_count;
                 }
@@ -805,14 +805,14 @@ static ExPolygons get_boundary(const Layer &layer)
     size_t      polygons_count    = 0;
     for (const LayerRegion *layer_region : layer.regions())
         for (const Surface &surface : layer_region->fill_surfaces.surfaces)
-            if (surface.is_top()) ++polygons_count;
+            if (surface.has_pos_top()) ++polygons_count;
 
     if (polygons_count > 0) {
         ExPolygons top_layer_polygons;
         top_layer_polygons.reserve(polygons_count);
         for (const LayerRegion *layer_region : layer.regions())
             for (const Surface &surface : layer_region->fill_surfaces.surfaces)
-                if (surface.is_top()) top_layer_polygons.emplace_back(surface.expolygon);
+                if (surface.has_pos_top()) top_layer_polygons.emplace_back(surface.expolygon);
 
         top_layer_polygons = union_ex(top_layer_polygons);
         return diff_ex(boundary, offset_ex(top_layer_polygons, -perimeter_offset));
@@ -981,6 +981,7 @@ void AvoidCrossingPerimeters::init_layer(const Layer &layer)
     m_grid_lslice.set_bbox(bbox_slice);
     //FIXME 1mm grid?
     m_grid_lslice.create(layer.lslices, coord_t(scale_(1.)));
+    m_init = true;
 }
 
 #if 0

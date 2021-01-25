@@ -162,19 +162,21 @@ void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r
     if (verbose_gcode())
         config.set_key_value("gcode_comments", new ConfigOptionBool(true));
 
-    for (const TriangleMesh &t : meshes) {
+	for (const TriangleMesh &t : meshes) {
 		ModelObject *object = model.add_object();
 		object->name += "object.stl";
-		object->add_volume(std::move(t));
+		object->add_volume(t);
 		object->add_instance();
 	}
-    arrange_objects(model, InfiniteBed{}, ArrangeParams{ scaled(min_object_distance(config))});
+
 	for (ModelObject *mo : model.objects) {
         mo->ensure_on_bed();
 		print.auto_assign_extruders(mo);
     }
 
 	print.apply(model, config);
+    arrange_objects(model, InfiniteBed{}, ArrangeParams{ scaled(print.config().min_object_distance()) });
+    print.apply(model, config);
     print.validate();
     print.set_status_silent();
 }
@@ -245,7 +247,7 @@ std::string gcode(Print & print)
     print.set_status_silent();
     print.process();
     print.export_gcode(temp.string(), nullptr, nullptr);
-    std::ifstream t(temp.string());
+	std::ifstream t(temp.string());
 	std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
 	boost::nowide::remove(temp.string().c_str());
 	return str;

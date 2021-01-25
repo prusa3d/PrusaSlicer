@@ -48,7 +48,8 @@ TEST_CASE("Support point generator should be deterministic if seeded",
     autogencfg.head_diameter = float(2 * supportcfg.head_front_radius_mm);
     sla::SupportPointGenerator point_gen{emesh, autogencfg, [] {}, [](int) {}};
     
-    TriangleMeshSlicer slicer{&mesh};
+    TriangleMeshSlicer slicer{ CLOSING_RADIUS , 0}; 
+    slicer.init(&mesh, [] {});
     
     auto   bb      = mesh.bounding_box();
     double zmin    = bb.min.z();
@@ -58,7 +59,7 @@ TEST_CASE("Support point generator should be deterministic if seeded",
     
     auto slicegrid = grid(float(gnd), float(zmax), layer_h);
     std::vector<ExPolygons> slices;
-    slicer.slice(slicegrid, SlicingMode::Regular, CLOSING_RADIUS, &slices, []{});
+    slicer.slice(slicegrid, SlicingMode::Regular, &slices, []{});
     
     point_gen.seed(0);
     point_gen.execute(slices, slicegrid);

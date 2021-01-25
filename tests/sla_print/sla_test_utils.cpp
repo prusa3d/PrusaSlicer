@@ -94,7 +94,8 @@ void test_supports(const std::string          &obj_filename,
         mesh.require_shared_vertices();
     }
     
-    TriangleMeshSlicer slicer{&mesh};
+    TriangleMeshSlicer slicer{ CLOSING_RADIUS,0 };
+    slicer.init(&mesh, [] {});
     
     auto   bb      = mesh.bounding_box();
     double zmin    = bb.min.z();
@@ -103,7 +104,7 @@ void test_supports(const std::string          &obj_filename,
     auto   layer_h = 0.05f;
     
     out.slicegrid = grid(float(gnd), float(zmax), layer_h);
-    slicer.slice(out.slicegrid, SlicingMode::Regular, CLOSING_RADIUS, &out.model_slices, []{});
+    slicer.slice(out.slicegrid, SlicingMode::Regular, &out.model_slices, []{});
     sla::cut_drainholes(out.model_slices, out.slicegrid, CLOSING_RADIUS, drainholes, []{});
     
     // Create the special index-triangle mesh with spatial indexing which

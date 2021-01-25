@@ -11,11 +11,11 @@ void FillPlanePath::_fill_surface_single(
     unsigned int                     thickness_layers,
     const std::pair<float, Point>   &direction, 
     ExPolygon                        expolygon,
-    Polylines                       &polylines_out)
+    Polylines                       &polylines_out) const
 {
     expolygon.rotate(- direction.first);
 
-	coord_t distance_between_lines = coord_t(scale_(this->spacing) / params.density);
+	coord_t distance_between_lines = coord_t(scale_(this->get_spacing()) / params.density);
     
     // align infill across layers using the object's bounding box
     // Rotated bounding box of the whole object.
@@ -24,8 +24,8 @@ void FillPlanePath::_fill_surface_single(
     Point shift = this->_centered() ? 
         bounding_box.center() :
         bounding_box.min;
-    expolygon.translate(-shift.x(), -shift.y());
-    bounding_box.translate(-shift.x(), -shift.y());
+    expolygon.translate(-double(shift.x()), -double(shift.y()));
+    bounding_box.translate(-double(shift.x()), -double(shift.y()));
 
     Pointfs pts = _generate(
         coord_t(ceil(coordf_t(bounding_box.min.x()) / distance_between_lines)),
@@ -49,10 +49,10 @@ void FillPlanePath::_fill_surface_single(
         if (params.dont_connect() || params.density > 0.5 || polylines.size() <= 1)
             chained = chain_polylines(std::move(polylines));
         else
-            connect_infill(std::move(polylines), expolygon, chained, this->spacing, params);
+            connect_infill(std::move(polylines), expolygon, chained, this->get_spacing(), params);
         // paths must be repositioned and rotated back
         for (Polyline &pl : chained) {
-            pl.translate(shift.x(), shift.y());
+            pl.translate(double(shift.x()), double(shift.y()));
             pl.rotate(direction.first);
         }
         append(polylines_out, std::move(chained));
@@ -60,7 +60,7 @@ void FillPlanePath::_fill_surface_single(
 }
 
 // Follow an Archimedean spiral, in polar coordinates: r=a+b\theta
-Pointfs FillArchimedeanChords::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y)
+Pointfs FillArchimedeanChords::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y) const
 {
     // Radius to achieve.
     coordf_t rmax = std::sqrt(coordf_t(max_x)*coordf_t(max_x)+coordf_t(max_y)*coordf_t(max_y)) * std::sqrt(2.) + 1.5;
@@ -114,7 +114,7 @@ static inline Point hilbert_n_to_xy(const size_t n)
             ++ ndigits;
         }
     }
-    int state = (ndigits & 1) ? 4 : 0;
+    int state    = (ndigits & 1) ? 4 : 0;
     coord_t x = 0;
     coord_t y = 0;
     for (int i = (int)ndigits - 1; i >= 0; -- i) {
@@ -127,7 +127,7 @@ static inline Point hilbert_n_to_xy(const size_t n)
     return Point(x, y);
 }
 
-Pointfs FillHilbertCurve::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y)
+Pointfs FillHilbertCurve::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y) const
 {
     // Minimum power of two square to fit the domain.
     size_t sz = 2;
@@ -150,7 +150,7 @@ Pointfs FillHilbertCurve::_generate(coord_t min_x, coord_t min_y, coord_t max_x,
     return line;
 }
 
-Pointfs FillOctagramSpiral::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y)
+Pointfs FillOctagramSpiral::_generate(coord_t min_x, coord_t min_y, coord_t max_x, coord_t max_y) const
 {
     // Radius to achieve.
     coordf_t rmax = std::sqrt(coordf_t(max_x)*coordf_t(max_x)+coordf_t(max_y)*coordf_t(max_y)) * std::sqrt(2.) + 1.5;

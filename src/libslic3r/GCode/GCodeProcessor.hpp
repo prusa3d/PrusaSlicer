@@ -207,6 +207,7 @@ namespace Slic3r {
             float max_acceleration; // mm/s^2
             float extrude_factor_override_percentage;
             float time; // s
+            float time_acceleration;
             std::string line_m73_mask;
             State curr;
             State prev;
@@ -270,7 +271,9 @@ namespace Slic3r {
             float height{ 0.0f }; // mm
             float mm3_per_mm{ 0.0f };
             float fan_speed{ 0.0f }; // percentage
+            float layer_duration{ 0.0f }; // s
             float time{ 0.0f }; // s
+            float temperature{ 0.0f }; // deg
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
         };
@@ -296,6 +299,7 @@ namespace Slic3r {
             SettingsIds settings_ids;
             size_t extruders_count;
             std::vector<std::string> extruder_colors;
+            std::vector<std::string> filament_colors;
             PrintEstimatedTimeStatistics time_statistics;
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -396,6 +400,7 @@ namespace Slic3r {
         EPositioningType m_global_positioning_type;
         EPositioningType m_e_local_positioning_type;
         std::vector<Vec3f> m_extruder_offsets;
+        std::vector<std::string> m_extruder_names;
         GCodeFlavor m_flavor;
 
         AxisCoords m_start_position; // mm
@@ -421,6 +426,7 @@ namespace Slic3r {
         unsigned int m_g1_line_id;
         unsigned int m_layer_id;
         CpColor m_cp_color;
+        float m_temperature;
 #if ENABLE_VOLUMETRIC_EXTRUSION_PROCESSING
         bool m_use_volumetric_e;
 #endif // ENABLE_VOLUMETRIC_EXTRUSION_PROCESSING
@@ -429,7 +435,7 @@ namespace Slic3r {
         {
             Unknown,
             PrusaSlicer,
-            Slic3rPE,
+            SuperSlicer,            Slic3rPE,
             Slic3r,
             Cura,
             Simplify3D,
@@ -536,6 +542,9 @@ namespace Slic3r {
         // Set extruder to relative mode
         void process_M83(const GCodeReader::GCodeLine& line);
 
+        // Set extruder temp
+        void process_M104_M109(const GCodeReader::GCodeLine& line);
+
         // Set fan speed
         void process_M106(const GCodeReader::GCodeLine& line);
 
@@ -581,6 +590,8 @@ namespace Slic3r {
         // Processes T line (Select Tool)
         void process_T(const GCodeReader::GCodeLine& line);
         void process_T(const std::string_view command);
+        void process_T(uint8_t command);
+        void process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeLine& line);
 
         void store_move_vertex(EMoveType type);
 

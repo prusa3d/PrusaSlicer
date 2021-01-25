@@ -24,9 +24,9 @@ float Flow::auto_extrusion_width(FlowRole role, float nozzle_diameter)
     case frSupportMaterial:
     case frSupportMaterialInterface:
     case frTopSolidInfill:
-        return nozzle_diameter;
-    default:
     case frExternalPerimeter:
+        return 1.05f * nozzle_diameter;
+    default:
     case frPerimeter:
     case frSolidInfill:
     case frInfill:
@@ -92,15 +92,11 @@ double Flow::extrusion_width(const std::string& opt_key, const ConfigOptionFloat
     	auto opt_layer_height = config.option(opt_key_layer_height);
     	if (opt_layer_height == nullptr)
     		throw_on_missing_variable(opt_key, opt_key_layer_height);
-    	double layer_height = opt_layer_height->getFloat();
-    	if (first_layer && static_cast<const ConfigOptionFloatOrPercent*>(opt_layer_height)->percent) {
-    		// first_layer_height depends on layer_height.
-	    	opt_layer_height = config.option("layer_height");
-	    	if (opt_layer_height == nullptr)
-	    		throw_on_missing_variable(opt_key, "layer_height");
-	    	layer_height *= 0.01 * opt_layer_height->getFloat();
-    	}
-		return opt->get_abs_value(layer_height);
+        // first_layer_height depends on first_printing_extruder
+        auto opt_nozzle_diameters = config.option<ConfigOptionFloats>("nozzle_diameter");
+        if (opt_nozzle_diameters == nullptr)
+            throw_on_missing_variable(opt_key, "nozzle_diameter");
+		return opt->get_abs_value(float(opt_nozzle_diameters->get_at(first_printing_extruder)));
 	}
 
 	if (opt->value == 0.) {
@@ -135,12 +131,12 @@ Flow Flow::new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent
             // optimization to avoid sqrt()
             nozzle_diameter :
             sqrt(bridge_flow_ratio) * nozzle_diameter;
-    } else if (! width.percent && width.value == 0.) {
+    } else if (! width.percent && width.value <= 0.) {
         // If user left option to 0, calculate a sane default width.
         w = auto_extrusion_width(role, nozzle_diameter);
     } else {
         // If user set a manual value, use it.
-        w = float(width.get_abs_value(height));
+        w = float(width.get_abs_value(nozzle_diameter));
     }
     
     return Flow(w, height, nozzle_diameter, bridge_flow_ratio > 0);
@@ -156,7 +152,7 @@ Flow Flow::new_from_spacing(float spacing, float nozzle_diameter, float height, 
     // For normal extrusons, extrusion width is wider than the spacing due to the rounding and squishing of the extrusions.
     // For bridge extrusions, the extrusions are placed with a tiny BRIDGE_EXTRA_SPACING gaps between the threads.
     float width = float(bridge ?
-        (spacing - BRIDGE_EXTRA_SPACING) : 
+        (spacing - BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter) :
 #ifdef HAS_PERIMETER_LINE_OVERLAP
         (spacing + PERIMETER_LINE_OVERLAP_FACTOR * height * (1. - 0.25 * PI));
 #else
@@ -176,7 +172,7 @@ float Flow::spacing() const
     float min_flow_spacing = this->width - this->height * (1. - 0.25 * PI);
     float res = this->width - PERIMETER_LINE_OVERLAP_FACTOR * (this->width - min_flow_spacing);
 #else
-    float res = float(this->bridge ? (this->width + BRIDGE_EXTRA_SPACING) : (this->width - this->height * (1. - 0.25 * PI)));
+    float res = float(this->bridge ? (this->width + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter) : (this->width - this->height * (1. - 0.25 * PI) * spacing_ratio));
 #endif
 //    assert(res > 0.f);
 	if (res <= 0.f)
@@ -192,7 +188,7 @@ float Flow::spacing(const Flow &other) const
     assert(this->height == other.height);
     assert(this->bridge == other.bridge);
     float res = float(this->bridge ? 
-        0.5 * this->width + 0.5 * other.width + BRIDGE_EXTRA_SPACING :
+        0.5 * this->width + 0.5 * other.width + BRIDGE_EXTRA_SPACING_MULT * nozzle_diameter :
         0.5 * this->spacing() + 0.5 * other.spacing());
 //    assert(res > 0.f);
 	if (res <= 0.f)
@@ -230,12 +226,16 @@ Flow support_material_flow(const PrintObject *object, float layer_height)
 Flow support_material_1st_layer_flow(const PrintObject *object, float layer_height)
 {
     const auto &width = (object->print()->config().first_layer_extrusion_width.value > 0) ? object->print()->config().first_layer_extrusion_width : object->config().support_material_extrusion_width;
+    float slice_height = layer_height;
+    if (layer_height <= 0.f && !object->print()->config().nozzle_diameter.empty()){
+        slice_height = (float)(object->config().first_layer_height.get_abs_value(object->print()->config().nozzle_diameter.get_at(0)));
+    }
     return Flow::new_from_config_width(
         frSupportMaterial,
         // The width parameter accepted by new_from_config_width is of type ConfigOptionFloatOrPercent, the Flow class takes care of the percent to value substitution.
         (width.value > 0) ? width : object->config().extrusion_width,
-        float(object->print()->config().nozzle_diameter.get_at(object->config().support_material_extruder-1)),
-        (layer_height > 0.f) ? layer_height : float(object->config().first_layer_height.get_abs_value(object->config().layer_height.value)),
+        float(object->print()->config().nozzle_diameter.get_at(object->config().support_material_extruder - 1)),
+        slice_height,
         // bridge_flow_ratio
         0.f);
 }

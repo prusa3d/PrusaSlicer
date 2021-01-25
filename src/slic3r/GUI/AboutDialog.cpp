@@ -16,7 +16,7 @@ AboutDialogLogo::AboutDialogLogo(wxWindow* parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
 {
     this->SetBackgroundColour(*wxWHITE);
-    this->logo = wxBitmap(from_u8(Slic3r::var("PrusaSlicer_192px.png")), wxBITMAP_TYPE_PNG);
+    this->logo = wxBitmap(from_u8(Slic3r::var("Slic3r_192px.png")), wxBITMAP_TYPE_PNG);
     this->SetMinSize(this->logo.GetSize());
     
     this->Bind(wxEVT_PAINT, &AboutDialogLogo::onRepaint, this);
@@ -82,9 +82,9 @@ void CopyrightsDialog::fill_entries()
 {
     m_entries = {
         { "wxWidgets"       , "2019 wxWidgets"                              , "https://www.wxwidgets.org/" },
-        { "OpenGL"          , "1997-2019 The Khronos™ Group Inc"            , "https://www.opengl.org/" },
+        { "OpenGL"          , "1997-2019 The Khronos Group Inc"            , "https://www.opengl.org/" },
         { "GNU gettext"     , "1998, 2019 Free Software Foundation, Inc."   , "https://www.gnu.org/software/gettext/" },
-        { "PoEdit"          , "2019 Václav Slavík"                          , "https://poedit.net/" },
+        { "PoEdit"          , "2019 Vaclav Slava­k"                          , "https://poedit.net/" },
         { "ImGUI"           , "2014-2019 Omar Cornut"                       , "https://github.com/ocornut/imgui" },
         { "Eigen"           , ""                                            , "http://eigen.tuxfamily.org" },
         { "ADMesh"          , "1995, 1996  Anthony D. Martin; "
@@ -216,7 +216,7 @@ AboutDialog::AboutDialog()
 	main_sizer->Add(hsizer, 0, wxEXPAND | wxALL, 20);
 
     // logo
-    m_logo_bitmap = ScalableBitmap(this, wxGetApp().is_editor() ? "PrusaSlicer_192px.png" : "PrusaSlicer-gcodeviewer_192px.png", 192);
+    m_logo_bitmap = ScalableBitmap(this, wxGetApp().is_editor() ? "Slic3r_192px.png" : "PrusaSlicer-gcodeviewer_192px.png", 192);
     m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bitmap.bmp());
 	hsizer->Add(m_logo, 1, wxALIGN_CENTER_VERTICAL);
     
@@ -235,7 +235,7 @@ AboutDialog::AboutDialog()
     
     // version
     {
-        auto version_string = _L("Version") + " " + std::string(SLIC3R_VERSION);
+        auto version_string = _L("Version")+ " " + std::string(SLIC3R_VERSION_FULL);
         wxStaticText* version = new wxStaticText(this, wxID_ANY, version_string.c_str(), wxDefaultPosition, wxDefaultSize);
         wxFont version_font = GetFont();
         #ifdef __WXMSW__
@@ -264,13 +264,14 @@ AboutDialog::AboutDialog()
         // TRN "Slic3r _is licensed under the_ License"
         const std::string is_lecensed_str = _utf8(L("is licensed under the"));
         const std::string license_str = _utf8(L("GNU Affero General Public License, version 3"));
-        const std::string based_on_str = _utf8(L("PrusaSlicer is based on Slic3r by Alessandro Ranellucci and the RepRap community."));
-        const std::string contributors_str = _utf8(L("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik and numerous others."));
+        const std::string based_on_str = _utf8(L("SuperSlicer is based on PrusaSlicer which is based on Slic3r by Alessandro Ranellucci and the RepRap community."));
+        const std::string contributors_str = _utf8(L("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik, Durand Rémi and numerous others."));
         const auto text = from_u8(
             (boost::format(
             "<html>"
             "<body bgcolor= %1% link= %2%>"
             "<font color=%3%>"
+            "%5% &copy; 2018-2020 Durand Rémi. <br />"
             "%4% &copy; 2016-2020 Prusa Research. <br />"
             "%5% &copy; 2011-2018 Alessandro Ranellucci. <br />"
             "<a href=\"http://slic3r.org/\">Slic3r</a> %6% "

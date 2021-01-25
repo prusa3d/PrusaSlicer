@@ -67,7 +67,7 @@ SCENARIO("Print: Changing number of solid surfaces does not cause all surfaces t
 		    for (const LayerRegion *region : layer.regions()) {
 		        // for each region, iterate over the fill surfaces
 		        for (const Surface &surface : region->fill_surfaces.surfaces)
-		            CHECK(surface.is_solid());
+		            CHECK(surface.has_fill_solid());
 		    }
 		};
         print.process();

@@ -25,12 +25,12 @@ public:
     explicit Polyline(Points &&points) : MultiPoint(std::move(points)) {}
     Polyline& operator=(const Polyline &other) { points = other.points; return *this; }
     Polyline& operator=(Polyline &&other) { points = std::move(other.points); return *this; }
-	static Polyline new_scale(const std::vector<Vec2d> &points) {
-		Polyline pl;
-		pl.points.reserve(points.size());
-		for (const Vec2d &pt : points)
-			pl.points.emplace_back(Point::new_scale(pt(0), pt(1)));
-		return pl;
+    static Polyline new_scale(const std::vector<Vec2d> &points) {
+        Polyline pl;
+        pl.points.reserve(points.size());
+        for (const Vec2d &pt : points)
+            pl.points.emplace_back(Point::new_scale(pt(0), pt(1)));
+        return pl;
     }
     
     void append(const Point &point) { this->points.push_back(point); }
@@ -142,19 +142,34 @@ const Point& leftmost_point(const Polylines &polylines);
 
 bool remove_degenerate(Polylines &polylines);
 
+
+/// ThickPolyline : a polyline with a width for each point
+/// This class has a vector of coordf_t, it must be the same size as points.
+/// it's used to store the size of the line at this point.
+/// Also, the endpoint let us know if the front() and back() of the polyline 
+/// join something or is a dead-end.
 class ThickPolyline : public Polyline {
 public:
+    enum StartPos : int8_t{tpspBegin = -1, tpspBoth = 0, tpspEnd = 1};
+    /// width size must be == point size
+    std::vector<coordf_t> width;
+    /// if true => it's an endpoint, if false it join an other ThickPolyline. first is at front(), second is at back()
+    std::pair<bool, bool> endpoints;
+    //if it's important to begin at a specific bit.
+    StartPos start_at = tpspBoth;
+
     ThickPolyline() : endpoints(std::make_pair(false, false)) {}
     ThickLines thicklines() const;
     void reverse() {
         Polyline::reverse();
         std::reverse(this->width.begin(), this->width.end());
         std::swap(this->endpoints.first, this->endpoints.second);
+        start_at = StartPos(-start_at);
     }
-
-    std::vector<coordf_t> width;
-    std::pair<bool,bool>  endpoints;
 };
+
+/// concatenate poylines if possible and refresh the endpoints
+void concatThickPolylines(ThickPolylines &polylines);
 
 class Polyline3 : public MultiPoint3
 {

@@ -1,0 +1,236 @@
+#logs
+page:Layers and perimeters:layers
+group:Layer height
+	setting:layer_height
+	setting:first_layer_height
+group:Vertical shells
+	setting:label$perimeters yeah!:width$5:perimeters
+	setting:spiral_vase
+	recommended_thin_wall_thickness_description
+group:Horizontal shells
+	line:Solid layers
+		setting:top_solid_layers
+		setting:label$Bottom:bottom_solid_layers
+	end_line
+	line:Minimum shell thickness
+		setting:top_solid_min_thickness
+		setting:bottom_solid_min_thickness
+	end_line
+	top_bottom_shell_thickness_explanation
+	setting:enforce_full_fill_volume
+group:Quality (slower slicing)
+	setting:full_lablel:extra_perimeters
+	setting:full_lablel:extra_perimeters_odd_layers
+	setting:only_one_perimeter_top
+	setting:ensure_vertical_shell_thickness
+	setting:avoid_crossing_perimeters
+	setting:thin_perimeters
+	line:Thin walls
+		setting:thin_walls
+		setting:thin_walls_min_width
+		setting:thin_walls_overlap
+	end_line
+	line:Overhangs
+		setting:overhangs
+		setting:overhangs_width
+	end_line
+	setting:no_perimeter_unsupported_algo
+group:Advanced
+	line:Gap Fill
+		setting:gap_fill
+		setting:gap_fill_min_area
+	end_line
+	line:Seam
+		setting:seam_position
+		setting:seam_travel
+	end_line
+	line:External Perimeter
+		setting:external_perimeters_first
+		setting:external_perimeters_vase
+	end_line
+	line:Looping perimeter
+		setting:perimeter_loop
+		setting:perimeter_loop_seam
+	end_line
+
+page:Infill:infill
+group:Infill
+	setting:fill_density
+	setting:fill_pattern
+	setting:full_label:top_fill_pattern
+	setting:full_label:bottom_fill_pattern
+	setting:solid_fill_pattern
+	setting:infill_not_connected
+group:Reducing printing time
+	setting:infill_every_layers
+	setting:infill_only_where_needed
+	line:Supporting dense layer
+		setting:infill_dense
+		setting:infill_dense_algo
+	end_line
+group:Advanced
+	setting:solid_infill_every_layers
+	setting:solid_infill_below_area
+	setting:full_label:fill_angle
+	setting:full_label:bridge_angle
+	line:Anchor solid infill by X mm
+		setting:external_infill_margin
+		setting:bridged_infill_margin
+	end_line
+	setting:only_retract_when_crossing_perimeters
+	setting:infill_first
+group:Advanced Infill
+	line:Ironing tuning
+		setting:fill_smooth_width
+		setting:fill_smooth_distribution
+	end_line
+
+page:Skirt and brim:skirt+brim
+group:Skirt
+	setting:skirts
+	setting:skirt_distance
+	setting:skirt_height
+	setting:draft_shield
+	setting:min_skirt_length
+group:Brim
+	setting:brim_width
+	setting:brim_inside_holes
+	setting:brim_width_interior
+	line:Brim ears
+		setting:brim_ears
+		setting:brim_ears_max_angle
+	end_line
+
+page:Support Material:support
+group:Support material
+	setting:support_material
+	setting:support_material_auto
+	setting:support_material_threshold
+	setting:support_material_enforce_layers
+group:Raft
+	setting:support_material_solid_first_layer
+	setting:raft_layers
+group:Options for support material and raft
+	line:Z-offset
+		setting:support_material_contact_distance_type
+		setting:support_material_contact_distance_top
+		setting:support_material_contact_distance_bottom
+	end_line
+	setting:support_material_pattern
+	setting:support_material_with_sheath
+	setting:support_material_spacing
+	setting:support_material_angle
+	setting:support_material_buildplate_only
+	setting:support_material_xy_spacing
+	setting:dont_support_bridges
+	setting:support_material_synchronize_layers
+group:Options for support material interface
+	setting:support_material_interface_pattern
+	setting:support_material_interface_layers
+	setting:support_material_interface_spacing
+	setting:support_material_interface_contact_loops
+
+page:Speed:time
+group:Speed for print moves
+	setting:full_label:perimeter_speed
+	setting:full_label:external_perimeter_speed
+	setting:full_label:small_perimeter_speed
+	setting:full_label:infill_speed
+	setting:full_label:solid_infill_speed
+	setting:full_label:top_solid_infill_speed
+	setting:full_label:support_material_speed
+	setting:full_label:support_material_interface_speed
+	setting:bridge_speed
+	setting:gap_fill_speed
+group:Speed for non-print moves
+	setting:travel_speed
+group:Modifiers
+	setting:full_label:first_layer_speed
+	setting:full_label:first_layer_infill_speed
+group:Acceleration control (advanced)
+	setting:perimeter_acceleration
+	setting:infill_acceleration
+	setting:bridge_acceleration
+	setting:first_layer_acceleration
+	setting:default_acceleration
+group:Autospeed (advanced)
+	setting:max_print_speed
+	setting:max_volumetric_speed
+
+page:Multiple Extruders:funnel
+group:Extruders
+	setting:perimeter_extruder
+	setting:infill_extruder
+	setting:solid_infill_extruder
+	setting:support_material_extruder
+	setting:support_material_interface_extruder
+group:Ooze prevention
+	setting:ooze_prevention
+	setting:standby_temperature_delta
+group:Wipe tower
+	setting:wipe_tower
+	setting:full_label:wipe_tower_x
+	setting:full_label:wipe_tower_y
+	setting:wipe_tower_width
+	setting:wipe_tower_rotation_angle
+	setting:wipe_tower_bridging
+	setting:wipe_tower_no_sparse_layers
+	setting:single_extruder_multi_material_priming
+group:Advanced
+	setting:interface_shells
+
+	
+page:Advanced:wrench
+group:Extrusion width
+	setting:extrusion_width
+	setting:first_layer_extrusion_width
+	setting:perimeter_extrusion_width
+	setting:external_perimeter_extrusion_width
+	setting:infill_extrusion_width
+	setting:solid_infill_extrusion_width
+	setting:top_infill_extrusion_width
+	setting:support_material_extrusion_width
+group:Overlap
+	setting:infill_overlap
+	setting:bridge_overlap
+group:Flow
+	line:Flow ratio
+		setting:bridge_flow_ratio
+		setting:over_bridge_flow_ratio
+		setting:fill_top_flow_ratio
+	end_line
+group:Filtering
+	setting:resolution
+	setting:model_precision
+	setting:slice_closing_radius
+group:Modifying slices
+	setting:full_label:xy_size_compensation
+	setting:full_label:first_layer_size_compensation
+	setting:full_label:hole_size_compensation
+	setting:hole_to_polyhole
+group:Other
+	setting:clip_multipart_objects
+
+page:Output options:output+page_white
+group:Sequential printing
+	setting:complete_objects
+	line:Extruder clearance (mm)
+		setting:width$6:extruder_clearance_radius
+		setting:width$6:extruder_clearance_height
+	end_line
+group:Output file
+	setting:gcode_comments
+	setting:gcode_label_objects
+	setting:full_width:output_filename_format
+group:Post-processing scripts
+	setting:full_width:height$5:post_process
+
+page:Notes:note
+group:nolabel:Notes
+	setting:full_width:height$25:notes
+
+page:Dependencies:wrench
+group:Profile dependencies
+	setting:compatible_printers
+	setting:full_width:color:compatible_printers_condition
+	parent_preset_description

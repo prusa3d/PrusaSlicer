@@ -1,0 +1,32 @@
+#logs
+page:Material:resin
+group:material_density_event:Material
+    setting:bottle_cost
+    setting:bottle_volume
+    setting:bottle_weight
+    setting:material_density
+
+group:Layers
+    setting:initial_layer_height
+
+group:Exposure
+    setting:exposure_time
+    setting:initial_exposure_time
+
+group:label_width$19:Corrections
+    line:material_correction
+		setting:label$XY:id$0:width$6:material_correction
+		setting:label$Z:id$1:width$6:material_correction
+	end_line
+
+page:Notes:note
+group:label_width$0:nolabel:Notes
+    setting:full_width:height$25:material_notes
+
+page:Dependencies:wrench
+group:Profile dependencies
+    setting:color:compatible_printers
+    setting:full_width:compatible_printers_condition
+    setting:color:compatible_prints
+    setting:full_width:compatible_prints_condition
+	parent_preset_description

@@ -36,7 +36,7 @@ using t_kill_focus = std::function<void(const std::string&)>;
 using t_change = std::function<void(const t_config_option_key&, const boost::any&)>;
 using t_back_to_init = std::function<void(const std::string&)>;
 
-wxString double_to_string(double const value, const int max_precision = 4);
+wxString double_to_string(double const value, const int max_precision = 8);
 wxString get_thumbnails_string(const std::vector<Vec2d>& values);
 
 class Field {
@@ -342,6 +342,11 @@ public:
 
 class Choice : public Field {
 	using Field::Field;
+protected:
+    //used by get_value when it's an enum
+    //convert the value from the select to the enum value. store it in m_value
+    template<class T> void convert_to_enum_value(int idx_val);
+    template<class T> int idx_from_enum_value(int enum_val);
 public:
 	Choice(const ConfigOptionDef& opt, const t_config_option_key& id) : Field(opt, id) {}
 	Choice(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
@@ -428,6 +433,7 @@ public:
 		x_textctrl->Disable();
 		y_textctrl->Disable(); }
 	wxSizer*		getSizer() override { return sizer; }
+	//for height
 	wxWindow*		getWindow() override { return dynamic_cast<wxWindow*>(x_textctrl); }
 };
 

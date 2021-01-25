@@ -59,6 +59,7 @@ public:
 	bool				m_is_modified_values{ false };
 	bool				m_is_nonsys_values{ true };
 
+	std::vector<std::string> descriptions;
 public:
 	std::vector <ConfigOptionsGroupShp> m_optgroups;
 	DynamicPrintConfig* m_config;
@@ -77,7 +78,7 @@ public:
     void        refresh();
 	Field*		get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
 	bool		set_value(const t_config_option_key& opt_key, const boost::any& value);
-	ConfigOptionsGroupShp	new_optgroup(const wxString& title, int noncommon_label_width = -1);
+	ConfigOptionsGroupShp	new_optgroup(const wxString& title, int noncommon_title_width = -1);
 
 	bool		set_item_colour(const wxColour *clr) {
 		if (m_item_color != clr) {
@@ -124,7 +125,7 @@ protected:
 	wxScrolledWindow*	m_page_view {nullptr};
 	wxBoxSizer*			m_page_sizer {nullptr};
 
-    ModeSizer*			m_mode_sizer;
+    ModeSizer*     m_mode_sizer;
 
    	struct PresetDependencies {
 		Preset::Type type	  = Preset::TYPE_INVALID;
@@ -239,7 +240,7 @@ protected:
 public:
 	PresetBundle*		m_preset_bundle;
 	bool				m_show_btn_incompatible_presets = false;
-	PresetCollection*	m_presets;
+	PresetCollection*	m_presets = nullptr;
 	DynamicPrintConfig*	m_config;
 	ogStaticText*		m_parent_preset_description_line = nullptr;
 	ScalableButton*		m_detach_preset_btn	= nullptr;
@@ -278,7 +279,7 @@ public:
 	void        rebuild_page_tree();
     void		update_btns_enabling();
     void		update_preset_choice();
-    // Select a new preset, possibly delete the current one.
+	// Select a new preset, possibly delete the current one.
 	void		select_preset(std::string preset_name = "", bool delete_current = false, const std::string& last_selected_ph_printer_name = "");
 	bool		may_discard_current_dirty_preset(PresetCollection* presets = nullptr, const std::string& new_printer_name = "");
     bool        may_switch_to_SLA_preset();
@@ -322,6 +323,8 @@ public:
     void            update_visibility();
     virtual void    msw_rescale();
     virtual void	sys_color_changed();
+	size_t          get_page_count() { return m_pages.size(); }
+	PageShp         get_page(size_t idx) { return m_pages[idx]; }
 	Field*			get_field(const t_config_option_key& opt_key, int opt_index = -1) const;
 	std::pair<OG_CustomCtrl*, bool*> get_custom_ctrl_with_blinking_ptr(const t_config_option_key& opt_key, int opt_index = -1);
 
@@ -358,6 +361,8 @@ protected:
 	void			fill_icon_descriptions();
 	void			set_tooltips_text();
 
+	bool create_pages(std::string setting_type_name, int idx = -1);
+
     ConfigManipulation m_config_manipulation;
     ConfigManipulation get_config_manipulation();
 };
@@ -369,7 +374,7 @@ public:
 // 		Tab(parent, _(L("Print Settings")), L("print")) {}
         Tab(parent, _(L("Print Settings")), Slic3r::Preset::TYPE_PRINT) {}
 	~TabPrint() {}
-
+	
 	void		build() override;
 	void		reload_config() override;
 	void		update_description_lines() override;
@@ -378,19 +383,20 @@ public:
 	void		clear_pages() override;
     bool 		supports_printer_technology(const PrinterTechnology tech) override { return tech == ptFFF; }
 
-private:
 	ogStaticText*	m_recommended_thin_wall_thickness_description_line = nullptr;
+	ogStaticText*	m_recommended_extrusion_width_description_line = nullptr; 
 	ogStaticText*	m_top_bottom_shell_thickness_explanation = nullptr;
 	bool			m_support_material_overhangs_queried = false;
 };
 
 class TabFilament : public Tab
 {
-private:
+public:
 	ogStaticText*	m_volumetric_speed_description_line {nullptr};
 	ogStaticText*	m_cooling_description_line {nullptr};
-
+	ogStaticText*	m_machine_limits_descr {nullptr};
     void            add_filament_overrides_page();
+protected:
     void            update_filament_overrides_page();
 	void 			update_volumetric_flow_preset_hints();
 
@@ -412,28 +418,37 @@ public:
 
 class TabPrinter : public Tab
 {
-private:
-	bool		m_has_single_extruder_MM_page = false;
-	bool		m_use_silent_mode = false;
-	void		append_option_line(ConfigOptionsGroupShp optgroup, const std::string opt_key);
-	bool		m_rebuild_kinematics_page = false;
 	ogStaticText* m_machine_limits_description_line {nullptr};
 	void 		update_machine_limits_description(const MachineLimitsUsage usage);
 
-	ogStaticText*	m_fff_print_host_upload_description_line {nullptr};
-	ogStaticText*	m_sla_print_host_upload_description_line {nullptr};
 
     std::vector<PageShp>			m_pages_fff;
     std::vector<PageShp>			m_pages_sla;
 
 public:
+	ogStaticText* m_fff_print_host_upload_description_line{ nullptr };
+	ogStaticText* m_sla_print_host_upload_description_line{ nullptr };
+//    void build_printhost(ConfigOptionsGroup *optgroup);
+
+    bool		m_has_single_extruder_MM_page = false;
+	uint8_t		m_last_gcode_flavor = uint8_t(255);
+	bool		m_use_silent_mode = false;
+    void		append_option_line_kinematics(ConfigOptionsGroupShp optgroup, const std::string opt_key, const std::string override_units = "");
+    bool		m_rebuild_kinematics_page = false;
+
 	ScalableButton*	m_reset_to_filament_color = nullptr;
 
-	size_t		m_extruders_count;
+	size_t		m_extruders_count = 0;
 	size_t		m_extruders_count_old = 0;
-	size_t		m_initial_extruders_count;
-	size_t		m_sys_extruders_count;
+	size_t		m_initial_extruders_count = 0;
+	size_t		m_sys_extruders_count = 0;
+
 	size_t		m_cache_extruder_count = 0;
+	size_t		m_milling_count = 0;
+	size_t		m_milling_count_old = 0;
+	size_t		m_initial_milling_count;
+	size_t		m_sys_milling_count = 0;
+	size_t		m_cache_milling_count = 0;
 
     PrinterTechnology               m_printer_technology = ptFFF;
 
@@ -443,7 +458,6 @@ public:
 	~TabPrinter() {}
 
 	void		build() override;
-	void		build_print_host_upload_group(Page* page);
     void		build_fff();
     void		build_sla();
 	void		reload_config() override;
@@ -454,7 +468,9 @@ public:
     void		update_fff();
     void		update_sla();
     void        update_pages(); // update m_pages according to printer technology
+    void        update_printers();
 	void		extruders_count_changed(size_t extruders_count);
+	void		milling_count_changed(size_t extruders_count);
 	PageShp		build_kinematics_page();
 	void		build_unregular_pages();
 	void		on_preset_loaded() override;

@@ -175,7 +175,7 @@ SCENARIO("Config accessor functions perform as expected.", "[Config]") {
 
         WHEN("getX called on an unset option.") {
             THEN("The default is returned.") {
-                REQUIRE(config.opt_float("layer_height") == 0.3);
+                REQUIRE(config.opt_float("layer_height") == 0.2);
                 REQUIRE(config.opt_int("raft_layers") == 0);
                 REQUIRE(config.opt_bool("support_material") == false);
             }

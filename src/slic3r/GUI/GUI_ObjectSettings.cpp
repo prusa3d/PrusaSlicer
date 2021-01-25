@@ -87,7 +87,7 @@ bool ObjectSettings::update_settings_list()
 
     if (!cat_options.empty())
     {
-	    std::vector<std::string> categories;
+	    std::vector<Slic3r::OptionCategory> categories;
         categories.reserve(cat_options.size());
 
         auto extra_column = [config, this](wxWindow* parent, const Line& line)
@@ -123,8 +123,8 @@ bool ObjectSettings::update_settings_list()
         {
             categories.push_back(cat.first);
 
-            auto optgroup = std::make_shared<ConfigOptionsGroup>(m_og->ctrl_parent(), _(cat.first), config, false, extra_column);
-            optgroup->label_width = 15;
+            auto optgroup = std::make_shared<ConfigOptionsGroup>(m_og->ctrl_parent(), _(toString(cat.first)), config, false, extra_column);
+            optgroup->title_width = 15;
             optgroup->sidetext_width = 5;
 
             optgroup->m_on_change = [this, config](const t_config_option_key& opt_id, const boost::any& value) {
@@ -141,14 +141,20 @@ bool ObjectSettings::update_settings_list()
                 ctrl->SetBitmapHover(m_bmp_delete_focus.bmp());
             };
 
-            const bool is_extruders_cat = cat.first == "Extruders";
+            const bool is_extruders_cat = cat.first == OptionCategory::extruders;
             for (auto& opt : cat.second)
             {
                 Option option = optgroup->get_option(opt);
                 option.opt.width = 12;
                 if (is_extruders_cat)
                     option.opt.max = wxGetApp().extruders_edited_cnt();
+                //use the full label in the gui item
+                std::string label = option.opt.label;
+                option.opt.label = option.opt.get_full_label();
+                //create the gui item
                 optgroup->append_single_option_line(option);
+                //restore label, in case of it's used afterwards.
+                option.opt.label = label;
             }
             optgroup->activate();
             for (auto& opt : cat.second)

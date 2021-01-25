@@ -1,7 +1,9 @@
 // Polygon offsetting using Voronoi diagram prodiced by boost::polygon.
 
 #include "VoronoiOffset.hpp"
-
+#ifndef NDEBUG
+#include "Geometry.hpp"
+#endif /* NDEBUG */
 #include <cmath>
 
 // #define VORONOI_DEBUG_OUT
@@ -12,7 +14,7 @@
 
 namespace Slic3r {
 
-using VD = Geometry::VoronoiDiagram;
+using VD = VoronoiDiagram;
 
 namespace detail {
     // Intersect a circle with a ray, return the two parameters.
@@ -197,7 +199,7 @@ namespace detail {
 } // namespace detail
 
 Polygons voronoi_offset(
-    const Geometry::VoronoiDiagram  &vd,
+    const VoronoiDiagram  &vd,
     const Lines                     &lines,
     double                           offset_distance,
     double                           discretization_error)

@@ -25,10 +25,13 @@ inline ExtrusionEntitiesPtr filter_by_extrusion_role(const ExtrusionEntitiesPtr 
 class ExtrusionEntityCollection : public ExtrusionEntity
 {
 public:
-    ExtrusionEntity* clone() const override;
+    virtual ExtrusionEntityCollection* clone() const override { return new ExtrusionEntityCollection(*this); }
     // Create a new object, initialize it with this object using the move semantics.
-	ExtrusionEntity* clone_move() override { return new ExtrusionEntityCollection(std::move(*this)); }
+	virtual ExtrusionEntityCollection* clone_move() override { return new ExtrusionEntityCollection(std::move(*this)); }
 
+
+    /// Owned ExtrusionEntities and descendent ExtrusionEntityCollections.
+    /// Iterating over this needs to check each child to see if it, too is a collection.
     ExtrusionEntitiesPtr entities;     // we own these entities
     bool no_sort;
     ExtrusionEntityCollection(): no_sort(false) {}
@@ -39,6 +42,8 @@ public:
     ExtrusionEntityCollection& operator=(ExtrusionEntityCollection &&other)
         { this->entities = std::move(other.entities); this->no_sort = other.no_sort; return *this; }
     ~ExtrusionEntityCollection() { clear(); }
+
+    /// Operator to convert and flatten this collection to a single vector of ExtrusionPaths.
     explicit operator ExtrusionPaths() const;
     
     bool is_collection() const override { return true; }
@@ -56,7 +61,7 @@ public:
     void swap (ExtrusionEntityCollection &c);
     void append(const ExtrusionEntity &entity) { this->entities.emplace_back(entity.clone()); }
     void append(ExtrusionEntity &&entity) { this->entities.emplace_back(entity.clone_move()); }
-    void append(const ExtrusionEntitiesPtr &entities) {
+    void append(const ExtrusionEntitiesPtr &entities) { 
         this->entities.reserve(this->entities.size() + entities.size());
         for (const ExtrusionEntity *ptr : entities)
             this->entities.emplace_back(ptr->clone());
@@ -82,8 +87,13 @@ public:
     void replace(size_t i, const ExtrusionEntity &entity);
     void remove(size_t i);
     static ExtrusionEntityCollection chained_path_from(const ExtrusionEntitiesPtr &extrusion_entities, const Point &start_near, ExtrusionRole role = erMixed);
-    ExtrusionEntityCollection chained_path_from(const Point &start_near, ExtrusionRole role = erMixed) const 
-    	{ return this->no_sort ? *this : chained_path_from(this->entities, start_near, role); }
+    ExtrusionEntityCollection chained_path_from(const Point &start_near, ExtrusionRole role = erNone) const {
+        if (role == erNone) role = this->role();
+        if( this->no_sort || (role == erMixed) )
+            return *this;
+        else
+            return chained_path_from(this->entities, start_near, role); 
+    }
     void reverse() override;
     const Point& first_point() const override { return this->entities.front()->first_point(); }
     const Point& last_point() const override { return this->entities.back()->last_point(); }
@@ -98,6 +108,8 @@ public:
         { Polygons out; this->polygons_covered_by_width(out, scaled_epsilon); return out; }
     Polygons polygons_covered_by_spacing(const float scaled_epsilon = 0.f) const
         { Polygons out; this->polygons_covered_by_spacing(out, scaled_epsilon); return out; }
+
+    /// Recursively count paths and loops contained in this collection 
     size_t items_count() const;
     /// Returns a flattened copy of this ExtrusionEntityCollection. That is, all of the items in its entities vector are not collections.
     /// You should be iterating over flatten().entities if you are interested in the underlying ExtrusionEntities (and don't care about hierarchy).
@@ -121,6 +133,34 @@ public:
         throw Slic3r::RuntimeError("Calling length() on a ExtrusionEntityCollection");
         return 0.;        
     }
+    virtual void visit(ExtrusionVisitor &visitor) { visitor.use(*this); };
+    virtual void visit(ExtrusionVisitorConst &visitor) const { visitor.use(*this); };
+};
+
+//// visitors /////
+
+class CountEntities : public ExtrusionVisitorConst {
+public:
+    size_t count(const ExtrusionEntity &coll) { coll.visit(*this); return leaf_number; }
+    size_t leaf_number = 0;
+    virtual void default_use(const ExtrusionEntity &entity) override { ++leaf_number; }
+    virtual void use(const ExtrusionEntityCollection &coll) override;
+};
+
+class FlatenEntities : public ExtrusionVisitorConst {
+    ExtrusionEntityCollection to_fill;
+    bool preserve_ordering;
+public:
+    FlatenEntities(bool preserve_ordering) : preserve_ordering(preserve_ordering) {}
+    FlatenEntities(ExtrusionEntityCollection pattern, bool preserve_ordering) : preserve_ordering(preserve_ordering) {
+        to_fill.no_sort = pattern.no_sort;
+    }
+    ExtrusionEntityCollection get() {
+        return to_fill;
+    };
+    ExtrusionEntityCollection&& flatten(const ExtrusionEntityCollection &to_flatten) &&;
+    virtual void default_use(const ExtrusionEntity &entity) override { to_fill.append(entity); }
+    virtual void use(const ExtrusionEntityCollection &coll) override;
 };
 
 } // namespace Slic3r

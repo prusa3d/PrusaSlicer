@@ -61,6 +61,8 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, bool can_start_pr
         wxString recent_group = from_u8(app_config->get("recent", CONFIG_KEY_GROUP));
         if (! recent_group.empty())
             combo_groups->SetValue(recent_group);
+        else
+            combo_groups->SetSelection(0);
     }
 
     btn_sizer->Add(CreateStdDialogButtonSizer(wxOK | wxCANCEL));

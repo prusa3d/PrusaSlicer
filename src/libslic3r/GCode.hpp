@@ -2,20 +2,22 @@
 #define slic3r_GCode_hpp_
 
 #include "libslic3r.h"
+#include "EdgeGrid.hpp"
 #include "ExPolygon.hpp"
 #include "GCodeWriter.hpp"
 #include "Layer.hpp"
 #include "Point.hpp"
+#include "Print.hpp"
 #include "PlaceholderParser.hpp"
 #include "PrintConfig.hpp"
 #include "GCode/AvoidCrossingPerimeters.hpp"
 #include "GCode/CoolingBuffer.hpp"
+#include "GCode/FanMover.hpp"
 #include "GCode/SpiralVase.hpp"
 #include "GCode/ToolOrdering.hpp"
 #include "GCode/WipeTower.hpp"
 #include "GCode/SeamPlacer.hpp"
 #include "GCode/GCodeProcessor.hpp"
-#include "EdgeGrid.hpp"
 #include "GCode/ThumbnailData.hpp"
 
 #include <memory>
@@ -117,13 +119,13 @@ public:
     static const std::vector<std::string>& get() { return Colors; }
 };
 
-class GCode {
+class GCode : ExtrusionVisitorConst  {
 public:        
     GCode() : 
     	m_origin(Vec2d::Zero()),
         m_enable_loop_clipping(true), 
         m_enable_cooling_markers(false), 
-        m_enable_extrusion_role_markers(false),
+        m_enable_extrusion_role_markers(false), 
         m_last_processor_extrusion_role(erNone),
         m_layer_count(0),
         m_layer_index(-1), 
@@ -143,7 +145,8 @@ public:
         m_brim_done(false),
         m_second_layer_things_done(false),
         m_silent_time_estimator_enabled(false),
-        m_last_obj_copy(nullptr, Point(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max()))
+        m_last_obj_copy(nullptr, Point(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max())),
+        m_last_too_small(ExtrusionRole::erNone)
         {}
     ~GCode() {}
 
@@ -157,6 +160,7 @@ public:
     void            set_origin(const coordf_t x, const coordf_t y) { this->set_origin(Vec2d(x, y)); }
     const Point&    last_pos() const { return m_last_pos; }
     Vec2d           point_to_gcode(const Point &point) const;
+    Vec3d           point_to_gcode(const Point &point, coord_t z_offset) const;
     Point           gcode_to_point(const Vec2d &point) const;
     const FullPrintConfig &config() const { return m_config; }
     const Layer*    layer() const { return m_layer; }
@@ -168,6 +172,7 @@ public:
     // inside the generated string and after the G-code export finishes.
     std::string     placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override = nullptr);
     bool            enable_cooling_markers() const { return m_enable_cooling_markers; }
+    std::string     extrusion_role_to_string_for_parser(const ExtrusionRole &);
 
     // For Perl bindings, to be used exclusively by unit tests.
     unsigned int    layer_count() const { return m_layer_count; }
@@ -176,6 +181,9 @@ public:
 
     // append full config to the given string
     static void append_full_config(const Print& print, std::string& str);
+
+    // called by porcess_layer, do the color change / custom gcode
+    std::string emit_custom_gcode_per_print_z(const CustomGCode::Item* custom_gcode, unsigned int first_extruder_id, const Print& print, PrintStatistics& stats);
 
     // Object and support extrusions of the same PrintObject at the same print_z.
     // public, so that it could be accessed by free helper functions from GCode.cpp
@@ -192,30 +200,48 @@ public:
 private:
     void            _do_export(Print &print, FILE *file, ThumbnailsGeneratorCallback thumbnail_cb);
 
+    void            _init_multiextruders(FILE* file, Print& print, GCodeWriter& writer, ToolOrdering& tool_ordering, const std::string& custom_gcode);
+
     static std::vector<LayerToPrint>        		                   collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> collect_layers_to_print(const Print &print);
     void            process_layer(
         // Write into the output file.
         FILE                            *file,
         const Print                     &print,
+        PrintStatistics                 &print_stat,
         // Set of object & print layers of the same PrintObject and with the same print_z.
         const std::vector<LayerToPrint> &layers,
         const LayerTools  				&layer_tools,
-		// Pairs of PrintObject index and its instance index.
-		const std::vector<const PrintInstance*> *ordering,
+        // Pairs of PrintObject index and its instance index.
+        const std::vector<const PrintInstance*> *ordering,
         // If set to size_t(-1), then print all copies of all objects.
         // Otherwise print a single copy of a single object.
-        const size_t                     single_object_idx = size_t(-1));
+        size_t                     single_object_idx = size_t(-1)
+        );
 
     void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
     bool            last_pos_defined() const { return m_last_pos_defined; }
-    void            set_extruders(const std::vector<unsigned int> &extruder_ids);
+    void            set_extruders(const std::vector<uint16_t> &extruder_ids);
     std::string     preamble();
     std::string     change_layer(coordf_t print_z);
-    std::string     extrude_entity(const ExtrusionEntity &entity, std::string description = "", double speed = -1., std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid = nullptr);
-    std::string     extrude_loop(ExtrusionLoop loop, std::string description, double speed = -1., std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid = nullptr);
-    std::string     extrude_multi_path(ExtrusionMultiPath multipath, std::string description = "", double speed = -1.);
-    std::string     extrude_path(ExtrusionPath path, std::string description = "", double speed = -1.);
+    std::string     visitor_gcode;
+    std::string     visitor_comment;
+    double          visitor_speed;
+    std::unique_ptr<EdgeGrid::Grid> *visitor_lower_layer_edge_grid;
+    virtual void use(const ExtrusionPath &path) override { visitor_gcode += extrude_path(path, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionPath3D &path3D) override { visitor_gcode += extrude_path_3D(path3D, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionMultiPath &multipath) override { visitor_gcode += extrude_multi_path(multipath, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionMultiPath3D &multipath) override { visitor_gcode += extrude_multi_path3D(multipath, visitor_comment, visitor_speed); };
+    virtual void use(const ExtrusionLoop &loop) override { visitor_gcode += extrude_loop(loop, visitor_comment, visitor_speed, visitor_lower_layer_edge_grid); };
+    virtual void use(const ExtrusionEntityCollection &collection) override;
+    std::string     extrude_entity(const ExtrusionEntity &entity, const std::string &description, double speed = -1., std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid = nullptr);
+    std::string     extrude_loop(const ExtrusionLoop &loop, const std::string &description, double speed = -1., std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid = nullptr);
+    std::string     extrude_loop_vase(const ExtrusionLoop &loop, const std::string &description, double speed = -1., std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid = nullptr);
+    std::string     extrude_multi_path(const ExtrusionMultiPath &multipath, const std::string &description, double speed = -1.);
+    std::string     extrude_multi_path3D(const ExtrusionMultiPath3D &multipath, const std::string &description, double speed = -1.);
+    std::string     extrude_path(const ExtrusionPath &path, const std::string &description, double speed = -1.);
+    std::string     extrude_path_3D(const ExtrusionPath3D &path, const std::string &description, double speed = -1.);
+    void            split_at_seam_pos(ExtrusionLoop &loop, std::unique_ptr<EdgeGrid::Grid> *lower_layer_edge_grid, bool was_clockwise);
 
     // Extruding multiple objects with soluble / non-soluble / combined supports
     // on a multi-material printer, trying to minimize tool switches.
@@ -235,13 +261,17 @@ private:
                 ExtrusionEntitiesPtr perimeters;
             	// Non-owned references to LayerRegion::fills::entities
                 ExtrusionEntitiesPtr infills;
+                // Non-owned references to LayerRegion::ironing::entities
+                ExtrusionEntitiesPtr ironings;
 
                 std::vector<const WipingExtrusions::ExtruderPerCopy*> infills_overrides;
                 std::vector<const WipingExtrusions::ExtruderPerCopy*> perimeters_overrides;
+                std::vector<const WipingExtrusions::ExtruderPerCopy*> ironings_overrides;
 
 	            enum Type {
 	            	PERIMETERS,
-	            	INFILL,
+                    INFILL,
+                    IRONING,
 	            };
 
                 // Appends perimeter/infill entities and writes don't indices of those that are not to be extruder as part of perimeter/infill wiping
@@ -281,14 +311,15 @@ private:
 		const size_t                     				 single_object_instance_idx);
 
     std::string     extrude_perimeters(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region, std::unique_ptr<EdgeGrid::Grid> &lower_layer_edge_grid);
-    std::string     extrude_infill(const Print &print, const std::vector<ObjectByExtruder::Island::Region> &by_region, bool ironing);
+    std::string     extrude_infill(const Print& print, const std::vector<ObjectByExtruder::Island::Region>& by_region, bool is_infill_first);
+    std::string     extrude_ironing(const Print& print, const std::vector<ObjectByExtruder::Island::Region>& by_region);
     std::string     extrude_support(const ExtrusionEntityCollection &support_fills);
 
     std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = erNone);
     std::string     retract(bool toolchange = false);
     std::string     unretract() { return m_writer.unlift() + m_writer.unretract(); }
-    std::string     set_extruder(unsigned int extruder_id, double print_z);
+    std::string     set_extruder(unsigned int extruder_id, double print_z, bool no_toolchange = false);
 
     // Cache for custom seam enforcers/blockers for each layer.
     SeamPlacer                          m_seam_placer;
@@ -345,6 +376,9 @@ private:
     Point                               m_last_pos;
     bool                                m_last_pos_defined;
 
+    // a previous extrusion path that is too small to be extruded, have to fusion it into the next call.
+    ExtrusionPath                       m_last_too_small;
+
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
 #ifdef HAS_PRESSURE_EQUALIZER
@@ -361,14 +395,22 @@ private:
     // Index of a last object copy extruded.
     std::pair<const PrintObject*, Point> m_last_obj_copy;
 
+    // ordered list of object, to give them a unique id.
+    std::vector<const PrintObject*> m_ordered_objects;
+    // gcode for the start/end of the current object block.
+    // as the retraction/unretraction can be written after the start/end of the algoruihtmblock, it has to be delayed.
+    std::string m_gcode_label_objects_start;
+    std::string m_gcode_label_objects_end;
+    void _add_object_change_labels(std::string &gcode);
+
     bool m_silent_time_estimator_enabled;
 
     // Processor
     GCodeProcessor m_processor;
 
     // Write a string into a file.
-    void _write(FILE* file, const std::string& what) { this->_write(file, what.c_str()); }
-    void _write(FILE* file, const char *what);
+    void _write(FILE* file, const std::string& what, bool flush = false) { this->_write(file, what.c_str(), flush); }
+    void _write(FILE* file, const char *what, bool flush = false);
 
     // Write a string into a file. 
     // Add a newline, if the string does not end with a newline already.
@@ -378,7 +420,13 @@ private:
     // Formats and write into a file the given data. 
     void _write_format(FILE* file, const char* format, ...);
 
-    std::string _extrude(const ExtrusionPath &path, std::string description = "", double speed = -1);
+    //some post-processing on the file, with their data class
+    std::unique_ptr<FanMover> m_fan_mover;
+    void _post_process(std::string& what, bool flush = true);
+
+    std::string _extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
+    std::string _before_extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
+    std::string _after_extrude(const ExtrusionPath &path);
     void print_machine_envelope(FILE *file, Print &print);
     void _print_first_layer_bed_temperature(FILE *file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
     void _print_first_layer_extruder_temperatures(FILE *file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);

@@ -182,8 +182,11 @@ void OptionsGroup::append_line(const Line& line)
 		m_options.emplace(opt.opt_id, opt);
 
 	// add mode value for current line to m_options_mode
-    if (!option_set.empty())
-        m_options_mode.push_back(option_set[0].opt.mode);
+    if (!option_set.empty()){
+        m_line_sizer.emplace_back();
+        m_options_mode.emplace_back();
+        m_options_mode.back()[option_set[0].opt.mode].push_back(-1);
+    }
 }
 
 void OptionsGroup::activate_line(Line& line)
@@ -212,15 +215,15 @@ void OptionsGroup::activate_line(Line& line)
 		}
     }
 
-	auto option_set = line.get_options();
-	bool is_legend_line = option_set.front().opt.gui_type == "legend";
+    const std::vector<Option>& option_set = line.get_options();
+    bool is_legend_line = option_set.front().opt.gui_type == "legend";
 
     if (!custom_ctrl && m_use_custom_ctrl) {
         custom_ctrl = new OG_CustomCtrl(is_legend_line || !staticbox ? this->parent() : static_cast<wxWindow*>(this->stb), this);
-		if (is_legend_line)
-			sizer->Add(custom_ctrl, 0, wxEXPAND | wxLEFT, wxOSX ? 0 : 10);
-		else
-            sizer->Add(custom_ctrl, 0, wxEXPAND | wxALL, wxOSX || !staticbox ? 0 : 5);
+        if (is_legend_line)
+            sizer->Add(custom_ctrl, 0, wxEXPAND | wxLEFT, wxOSX ? 0 : 10);
+        else
+        sizer->Add(custom_ctrl, 0, wxEXPAND | wxALL, wxOSX || !staticbox ? 0 : 5);
     }
 
 	// Set sidetext width for a better alignment of options in line
@@ -230,7 +233,7 @@ void OptionsGroup::activate_line(Line& line)
 	}
 
 	// if we have a single option with no label, no sidetext just add it directly to sizer
-    if (option_set.size() == 1 && label_width == 0 && option_set.front().opt.full_width &&
+    if (option_set.size() == 1 && title_width == 0 && option_set.front().opt.full_width &&
         option_set.front().opt.label.empty() &&
 		option_set.front().opt.sidetext.size() == 0 && option_set.front().side_widget == nullptr && 
 		line.get_extra_widgets().size() == 0) {
@@ -250,16 +253,16 @@ void OptionsGroup::activate_line(Line& line)
     if (custom_ctrl)
         m_use_custom_ctrl_as_parent = true;
 
-	// if we have an extra column, build it
+    // if we have an extra column, build it
 	if (extra_column)
-	{
-		m_extra_column_item_ptrs.push_back(extra_column(this->ctrl_parent(), line));
-		grid_sizer->Add(m_extra_column_item_ptrs.back(), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 3);
-	}
+    {
+        m_extra_column_item_ptrs.push_back(extra_column(this->ctrl_parent(), line));
+        grid_sizer->Add(m_extra_column_item_ptrs.back(), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 3);
+    }
 
-	// Build a label if we have it
-	wxStaticText* label=nullptr;
-    if (label_width != 0) {
+    // Build a label if we have it
+    wxStaticText* label=nullptr;
+    if (title_width != 0) {
         if (custom_ctrl) {
             if (line.near_label_widget)
                 line.near_label_widget_win = line.near_label_widget(this->ctrl_parent());
@@ -275,10 +278,10 @@ void OptionsGroup::activate_line(Line& line)
                 label_style |= staticbox ? 0 : wxST_ELLIPSIZE_END;
 #endif /* __WXGTK__ */
                 label = new wxStaticText(this->ctrl_parent(), wxID_ANY, line.label + (line.label.IsEmpty() ? "" : ": "),
-                    wxDefaultPosition, wxSize(label_width * wxGetApp().em_unit(), -1), label_style);
+                    wxDefaultPosition, wxSize(title_width * wxGetApp().em_unit(), -1), label_style);
                 label->SetBackgroundStyle(wxBG_STYLE_PAINT);
                 label->SetFont(wxGetApp().normal_font());
-                label->Wrap(label_width * wxGetApp().em_unit()); // avoid a Linux/GTK bug
+                label->Wrap(title_width * wxGetApp().em_unit()); // avoid a Linux/GTK bug
             }
             if (!line.near_label_widget)
                 grid_sizer->Add(label, 0, (staticbox ? 0 : wxALIGN_RIGHT | wxRIGHT) | wxALIGN_CENTER_VERTICAL, line.label.IsEmpty() ? 0 : 5);
@@ -294,7 +297,7 @@ void OptionsGroup::activate_line(Line& line)
         }
     }
 
-	// If there's a widget, build it and add the result to the sizer.
+    // If there's a widget, build it and add the result to the sizer.
 	if (line.widget != nullptr) {
 		auto wgt = line.widget(this->ctrl_parent());
         if (custom_ctrl)
@@ -326,29 +329,41 @@ void OptionsGroup::activate_line(Line& line)
         return;
 	}
 
+	m_line_sizer.back() = sizer;
+	wxSizer* sizer_tmp = sizer;
     for (auto opt : option_set) {
 		ConfigOptionDef option = opt.opt;
-		wxSizer* sizer_tmp = sizer;
 		// add label if any
 		if (!option.label.empty() && !custom_ctrl) {
 //!			To correct translation by context have to use wxGETTEXT_IN_CONTEXT macro from wxWidget 3.1.1
-			wxString str_label = (option.label == L_CONTEXT("Top", "Layers") || option.label == L_CONTEXT("Bottom", "Layers")) ?
-				_CTX(option.label, "Layers") :
-				_(option.label);
-			label = new wxStaticText(this->ctrl_parent(), wxID_ANY, str_label + ": ", wxDefaultPosition, //wxDefaultSize); 
-				wxSize(sublabel_width != -1 ? sublabel_width * wxGetApp().em_unit() : -1, -1), wxALIGN_RIGHT);
-			label->SetBackgroundStyle(wxBG_STYLE_PAINT);
-            label->SetFont(wxGetApp().normal_font());
-			sizer_tmp->Add(label, 0, wxALIGN_CENTER_VERTICAL, 0);
-		}
+			std::string opt_label = (option.label.empty() || option.label.back() != '_') ? option.label : option.label.substr(0, option.label.size() - 1);
+			wxString str_label = (opt_label == L_CONTEXT("Top", "Layers") || opt_label == L_CONTEXT("Bottom", "Layers")) ?
+								_CTX(opt_label, "Layers") :
+								_(opt_label);
 
-		// add field
-		const Option& opt_ref = opt;
-		auto& field = build_field(opt_ref);
+            bool no_dots = str_label.empty() || option.label.back() == '_';
+			label = new wxStaticText(this->ctrl_parent(), wxID_ANY, 
+				(no_dots ? "" : (str_label + ":")), wxDefaultPosition, //wxDefaultSize);
+				(option.label_width >= 0) ? ((option.label_width != 0) ? wxSize(option.label_width*wxGetApp().em_unit(), -1) : wxDefaultSize) :
+					((label_width > 0) ? wxSize(label_width * wxGetApp().em_unit(), -1) : (wxDefaultSize))
+				, wxALIGN_RIGHT);
+            label->SetBackgroundStyle(wxBG_STYLE_PAINT);
+            label->SetFont(wxGetApp().normal_font());
+			if (option.label_width > 0 || label_width >0) {
+				label->Wrap((option.label_width > 0 ? option.label_width : label_width)* wxGetApp().em_unit()); // avoid a Linux/GTK bug
+			}
+            m_options_mode.back()[opt.opt.mode].push_back(sizer_tmp->GetItemCount());
+            sizer_tmp->Add(label, 0, wxALIGN_CENTER_VERTICAL, 0);
+        }
+
+        // add field
+        const Option& opt_ref = opt;
+        auto& field = build_field(opt_ref);
         if (!custom_ctrl) {
             if (option_set.size() == 1 && option_set.front().opt.full_width)
             {
                 const auto v_sizer = new wxBoxSizer(wxVERTICAL);
+            m_options_mode.back()[opt.opt.mode].push_back(sizer_tmp->GetItemCount());
                 sizer_tmp->Add(v_sizer, 1, wxEXPAND);
                 is_sizer_field(field) ?
                     v_sizer->Add(field->getSizer(), 0, wxEXPAND) :
@@ -356,25 +371,44 @@ void OptionsGroup::activate_line(Line& line)
                 break;
             }
 
+            m_options_mode.back()[opt.opt.mode].push_back(sizer_tmp->GetItemCount());
             is_sizer_field(field) ?
                 sizer_tmp->Add(field->getSizer(), 0, wxALIGN_CENTER_VERTICAL, 0) :
                 sizer_tmp->Add(field->getWindow(), 0, wxALIGN_CENTER_VERTICAL, 0);
 
             // add sidetext if any
-            if (!option.sidetext.empty() || sidetext_width > 0) {
-                auto sidetext = new wxStaticText(this->ctrl_parent(), wxID_ANY, _(option.sidetext), wxDefaultPosition,
-                    wxSize(sidetext_width != -1 ? sidetext_width * wxGetApp().em_unit() : -1, -1), wxALIGN_LEFT);
+            if ((!option.sidetext.empty() || sidetext_width > 0) && option.sidetext_width != 0){
+                wxString textstring;
+                if(!option.sidetext.empty())
+                    if (option.sidetext.at(option.sidetext.size() - 1) != '_') {
+                        textstring = _(option.sidetext);
+                    } else {
+                        textstring = option.sidetext.substr(0, option.sidetext.size() - 1);
+                    }
+                wxSize wxsize{ -1,-1 };
+                if (option.sidetext_width >= 0) {
+                    if (option.sidetext_width != 0)
+                        wxsize = wxSize{ option.sidetext_width * wxGetApp().em_unit(), -1 };
+                } else if (sidetext_width > 0)
+                    wxsize = wxSize{ sidetext_width * wxGetApp().em_unit(),-1 };
+                wxStaticText *sidetext = new wxStaticText(	this->ctrl_parent(), wxID_ANY, textstring,
+												    wxDefaultPosition, wxsize
+												    /*wxDefaultSize*/, wxALIGN_LEFT);
                 sidetext->SetBackgroundStyle(wxBG_STYLE_PAINT);
                 sidetext->SetFont(wxGetApp().normal_font());
+                m_options_mode.back()[opt.opt.mode].push_back(sizer_tmp->GetItemCount());
                 sizer_tmp->Add(sidetext, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 4);
+
             }
 
             // add side widget if any
             if (opt.side_widget != nullptr) {
+            m_options_mode.back()[opt.opt.mode].push_back(sizer_tmp->GetItemCount());
                 sizer_tmp->Add(opt.side_widget(this->ctrl_parent())/*!.target<wxWindow>()*/, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 1);    //! requires verification
             }
 
             if (opt.opt_id != option_set.back().opt_id) //! istead of (opt != option_set.back())
+            m_options_mode.back()[opt.opt.mode].push_back(sizer_tmp->GetItemCount());
                 sizer_tmp->AddSpacer(6);
         }
 	}
@@ -580,6 +614,9 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 	if (opt_key == "extruders_count") {
 		auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("nozzle_diameter"));
 		value = int(nozzle_diameter->values.size());
+	} else if (opt_key == "milling_count") {
+		auto   *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
+		value = int(milling_diameter->values.size());
 	}
     else if (m_opt_map.find(opt_key) == m_opt_map.end() ||
 		    // This option don't have corresponded field
@@ -637,25 +674,50 @@ void ConfigOptionsGroup::Show(const bool show)
 #endif /* __WXGTK__ */
 }
 
+std::vector<size_t> get_visible_idx(const std::map<ConfigOptionMode, std::vector<size_t>>& map, ConfigOptionMode mode) {
+    std::vector<size_t> ret;
+    for (const auto& entry : map) {
+        if (entry.first <= mode)
+            ret.insert(ret.end(), entry.second.begin(), entry.second.end());
+    }
+    return ret;
+}
+std::vector<size_t> get_invisible_idx(const std::map<ConfigOptionMode, std::vector<size_t>>& map, ConfigOptionMode mode) {
+    std::vector<size_t> ret;
+    for (const auto& entry : map) {
+        if (entry.first > mode)
+            ret.insert(ret.end(), entry.second.begin(), entry.second.end());
+    }
+    return ret;
+}
+
 bool ConfigOptionsGroup::is_visible(ConfigOptionMode mode)
 {
     if (m_options_mode.empty())
         return true;
-    if (m_options_mode.size() == 1)
-        return m_options_mode[0] <= mode;
+
+    int opt_mode_size = m_options_mode.size();
+    if (opt_mode_size == 1 && m_options_mode[0].size() == 1 && m_options_mode[0].begin()->second.size() == 1)
+        return get_invisible_idx(m_options_mode[0], mode).empty();
 
     size_t hidden_row_cnt = 0;
-    for (auto opt_mode : m_options_mode)
-        if (opt_mode > mode)
+    for (size_t i = 0; i < opt_mode_size; i++) {
+        if ((m_options_mode[i].size() == 1
+            && m_options_mode[i].begin()->second.size() == 1
+            && m_options_mode[i].begin()->second[0] == (size_t)-1
+            && m_options_mode[i].begin()->first > mode)
+            || get_visible_idx(m_options_mode[i], mode).empty()) {
             hidden_row_cnt++;
+        }
+    }
 
-    return hidden_row_cnt != m_options_mode.size();
+    return hidden_row_cnt != opt_mode_size;
 }
 
 bool ConfigOptionsGroup::update_visibility(ConfigOptionMode mode)
 {
-	if (m_options_mode.empty() || !m_grid_sizer)
-		return true;
+    if (m_options_mode.empty() || !m_grid_sizer)
+        return true;
 
     if (custom_ctrl) {
         bool show = custom_ctrl->update_visibility(mode);
@@ -665,23 +727,35 @@ bool ConfigOptionsGroup::update_visibility(ConfigOptionMode mode)
 
 	int opt_mode_size = m_options_mode.size();
 	if (m_grid_sizer->GetEffectiveRowsCount() != opt_mode_size &&
-		opt_mode_size == 1)
-		return m_options_mode[0] <= mode;
+        opt_mode_size == 1 && m_options_mode[0].size() == 1 && m_options_mode[0].begin()->second.size() == 1)
+        return get_invisible_idx(m_options_mode[0], mode).empty();
 
 	Show(true);
 
-    int coef = 0;
+    ConfigOptionMode best_mode = ConfigOptionMode::comExpert;
+    for (const auto& map : m_options_mode)
+        for (const auto& entry : map)
+            if (entry.first <= best_mode)
+                best_mode = entry.first;
+
+    int idx_item = 0;
     int hidden_row_cnt = 0;
     const int cols = m_grid_sizer->GetCols();
-    for (auto opt_mode : m_options_mode) {
-		const bool show = opt_mode <= mode;
-        if (!show) {
+    assert(opt_mode_size == m_line_sizer.size());
+    for (int i = 0; i < opt_mode_size; i++) {
+        if ((m_options_mode[i].size() == 1 
+            && m_options_mode[i].begin()->second.size() == 1 
+            && m_options_mode[i].begin()->second[0] == (size_t)-1 
+            && m_options_mode[i].begin()->first > mode) 
+                || get_visible_idx(m_options_mode[i], mode).empty()) {
             hidden_row_cnt++;
-            for (int i = 0; i < cols; ++i)
-                m_grid_sizer->Show(coef + i, show);
-        }
-        coef+= cols;
-	}
+            for (size_t idx =0; idx < cols; idx++)
+                m_grid_sizer->Show(idx_item + idx, false);
+        }else
+            for (size_t idx : get_invisible_idx(m_options_mode[i], mode))
+                if(idx != (size_t)-1) m_line_sizer[i]->Show(idx, false);
+        idx_item += cols;
+    }
 
     if (hidden_row_cnt == opt_mode_size) {
         sizer->ShowItems(false);
@@ -792,6 +866,7 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
         case coInts:
             ret = config.option<ConfigOptionIntsNullable>(opt_key)->get_at(idx);
             break;
+        case coPoints:
         default:
             break;
         }
@@ -864,43 +939,48 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 	case coEnum:{
 		if (opt_key == "top_fill_pattern" ||
 			opt_key == "bottom_fill_pattern" ||
-			opt_key == "fill_pattern" ) {
+			opt_key == "solid_fill_pattern" ||
+			opt_key == "fill_pattern" ||
+			opt_key == "brim_ears_pattern" ||
+            opt_key == "support_material_interface_pattern") {
 			ret = static_cast<int>(config.option<ConfigOptionEnum<InfillPattern>>(opt_key)->value);
-		}
-		else if (opt_key == "ironing_type") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<IroningType>>(opt_key)->value);
-		}
-		else if (opt_key == "gcode_flavor") {
+		} else if (opt_key == "complete_objects_sort") {
+			ret = static_cast<int>(config.option<ConfigOptionEnum<CompleteObjectSort>>(opt_key)->value);
+        } else if (opt_key == "display_orientation") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<SLADisplayOrientation>>(opt_key)->value);
+		} else if (opt_key == "gcode_flavor") {
 			ret = static_cast<int>(config.option<ConfigOptionEnum<GCodeFlavor>>(opt_key)->value);
-		}
-		else if (opt_key == "machine_limits_usage") {
+        } else if (opt_key == "host_type") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<PrintHostType>>(opt_key)->value);
+        } else if (opt_key =="infill_connection" || opt_key =="infill_connection_solid"
+                || opt_key =="infill_connection_top" || opt_key =="infill_connection_bottom") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<InfillConnection>>(opt_key)->value);
+        } else if (opt_key == "infill_dense_algo") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<DenseInfillAlgo>>(opt_key)->value);
+        } else if (opt_key == "ironing_type") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<IroningType>>(opt_key)->value);
+		} else if (opt_key == "machine_limits_usage") {
 			ret = static_cast<int>(config.option<ConfigOptionEnum<MachineLimitsUsage>>(opt_key)->value);
-		}
-		else if (opt_key == "support_material_pattern") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<SupportMaterialPattern>>(opt_key)->value);
-		}
-		else if (opt_key == "seam_position") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<SeamPosition>>(opt_key)->value);
-		}
-		else if (opt_key == "host_type") {
-			ret = static_cast<int>(config.option<ConfigOptionEnum<PrintHostType>>(opt_key)->value);
-		}
-        else if (opt_key == "display_orientation") {
-            ret  = static_cast<int>(config.option<ConfigOptionEnum<SLADisplayOrientation>>(opt_key)->value);
-        }
-        else if (opt_key == "support_pillar_connection_mode") {
+        } else if (opt_key == "no_perimeter_unsupported_algo") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<NoPerimeterUnsupportedAlgo>>(opt_key)->value);
+        } else if (opt_key == "printhost_authorization_type") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<AuthorizationType>>(opt_key)->value);
+        } else if (opt_key == "seam_position" || opt_key == "perimeter_loop_seam") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<SeamPosition>>(opt_key)->value);
+        } else if (opt_key == "support_material_contact_distance_type"){
+            ret = static_cast<int>(config.option<ConfigOptionEnum<SupportZDistanceType>>(opt_key)->value);
+        } else if (opt_key == "support_material_pattern") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<SupportMaterialPattern>>(opt_key)->value);
+        } else if (opt_key == "support_pillar_connection_mode") {
             ret  = static_cast<int>(config.option<ConfigOptionEnum<SLAPillarConnectionMode>>(opt_key)->value);
-        }
-        else if (opt_key == "printhost_authorization_type") {
-            ret  = static_cast<int>(config.option<ConfigOptionEnum<AuthorizationType>>(opt_key)->value);
+        } else if (opt_key == "wipe_advanced_algo") {
+            ret = static_cast<int>(config.option<ConfigOptionEnum<WipeAlgo>>(opt_key)->value);
         }
 	}
 		break;
 	case coPoints:
 		if (opt_key == "bed_shape")
 			ret = config.option<ConfigOptionPoints>(opt_key)->values;
-        if (opt_key == "thumbnails")
-            ret = get_thumbnails_string(config.option<ConfigOptionPoints>(opt_key)->values);
 		else
 			ret = config.option<ConfigOptionPoints>(opt_key)->get_at(idx);
 		break;

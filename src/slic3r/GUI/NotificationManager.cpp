@@ -6,6 +6,8 @@
 #include "GLCanvas3D.hpp"
 #include "ImGuiWrapper.hpp"
 
+#include "libslic3r/AppConfig.hpp"
+
 #include "wxExtensions.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -733,7 +735,7 @@ bool NotificationManager::PopNotification::on_text_click()
 	if(m_data.callback != nullptr)
 		return m_data.callback(m_evt_handler);
 	return false;
-}
+	}
 void NotificationManager::PopNotification::update(const NotificationData& n)
 {
 	m_text1          = n.text1;
