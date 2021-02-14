@@ -2572,13 +2572,13 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     if (m_writer.extrusion_axis().empty()) e_per_mm = 0;
 
     // set speed
-    if (speed == -1) {
+    if (is_bridge(path.role())) {
+        speed = m_config.get_abs_value("bridge_speed");
+    } else if (speed == -1) {
         if (path.role() == erPerimeter) {
             speed = m_config.get_abs_value("perimeter_speed");
         } else if (path.role() == erExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
-        } else if (path.role() == erOverhangPerimeter || path.role() == erBridgeInfill) {
-            speed = m_config.get_abs_value("bridge_speed");
         } else if (path.role() == erInternalInfill) {
             speed = m_config.get_abs_value("infill_speed");
         } else if (path.role() == erSolidInfill) {
