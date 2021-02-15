@@ -568,6 +568,8 @@ public:
     ConfigOptionBool                external_perimeters_first;
     ConfigOptionBool                extra_perimeters;
     ConfigOptionFloat               fill_angle;
+    ConfigOptionFloat               top_fill_angle;
+    ConfigOptionFloat               bottom_fill_angle;
     ConfigOptionPercent             fill_density;
     ConfigOptionEnum<InfillPattern> fill_pattern;
     ConfigOptionEnum<FuzzySkinType> fuzzy_skin;
@@ -625,6 +627,8 @@ protected:
         OPT_PTR(external_perimeters_first);
         OPT_PTR(extra_perimeters);
         OPT_PTR(fill_angle);
+        OPT_PTR(top_fill_angle);
+        OPT_PTR(bottom_fill_angle);
         OPT_PTR(fill_density);
         OPT_PTR(fill_pattern);
         OPT_PTR(fuzzy_skin);
