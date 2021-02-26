@@ -677,6 +677,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     for (size_t i = 0; i < extruders_count; ++i) {
         m_extruder_colors[i] = static_cast<unsigned char>(i);
     }
+    m_extruder_temps.resize(extruders_count);
 
     m_filament_diameters.resize(config.filament_diameter.values.size());
     for (size_t i = 0; i < config.filament_diameter.values.size(); ++i) {
@@ -775,6 +776,7 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     for (size_t i = 0; i < m_result.extruder_colors.size(); ++i) {
         m_extruder_colors[i] = static_cast<unsigned char>(i);
     }
+    m_extruder_temps.resize(m_result.extruders_count);
 
     const ConfigOptionFloats* filament_load_time = config.option<ConfigOptionFloats>("filament_load_time");
     if (filament_load_time != nullptr) {
@@ -910,6 +912,7 @@ void GCodeProcessor::reset()
     for (size_t i = 0; i < Min_Extruder_Count; ++i) {
         m_extruder_colors[i] = static_cast<unsigned char>(i);
     }
+    m_extruder_temps.resize(Min_Extruder_Count);
 
     m_filament_diameters = std::vector<float>(Min_Extruder_Count, 1.75f);
     m_extruded_last_z = 0.0f;
@@ -1123,9 +1126,11 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line)
                 case 1:   { process_M1(line); break; }   // Sleep or Conditional stop
                 case 82:  { process_M82(line); break; }  // Set extruder to absolute mode
                 case 83:  { process_M83(line); break; }  // Set extruder to relative mode
+                case 104: { process_M104(line); break; } // Set temperature
                 case 106: { process_M106(line); break; } // Set fan speed
                 case 107: { process_M107(line); break; } // Disable fan
                 case 108: { process_M108(line); break; } // Set tool (Sailfish)
+                case 109: { process_M109(line); break; } // Set temperature and wait
                 case 132: { process_M132(line); break; } // Recall stored home offsets
                 case 135: { process_M135(line); break; } // Set tool (MakerWare)
                 case 201: { process_M201(line); break; } // Set max printing acceleration
@@ -2211,6 +2216,11 @@ void GCodeProcessor::process_M83(const GCodeReader::GCodeLine& line)
     m_e_local_positioning_type = EPositioningType::Relative;
 }
 
+void GCodeProcessor::process_M104(const GCodeReader::GCodeLine& line)
+{
+    process_M109(line);
+}
+
 void GCodeProcessor::process_M106(const GCodeReader::GCodeLine& line)
 {
     if (!line.has('P')) {
@@ -2241,6 +2251,26 @@ void GCodeProcessor::process_M108(const GCodeReader::GCodeLine& line)
     size_t pos = cmd.find("T");
     if (pos != std::string::npos)
         process_T(cmd.substr(pos));
+}
+
+void GCodeProcessor::process_M109(const GCodeReader::GCodeLine& line)
+{
+    if (!line.has('F')) {
+        float new_temp;
+        if (line.has_value('S', new_temp) ||
+            // This code is shared with M104 which doesn't have R so
+            // check command here
+            (line.cmd_is("M109") && line.has_value('R', new_temp))) {
+            float val;
+            if (line.has_value('T', val)) {
+                size_t eid = (size_t)val;
+                if (eid < m_extruder_temps.size())
+                    m_extruder_temps[eid] = new_temp;
+            } else {
+                m_extruder_temps[m_extruder_id] = new_temp;
+            }
+        }
+    }
 }
 
 void GCodeProcessor::process_M132(const GCodeReader::GCodeLine& line)
@@ -2531,6 +2561,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_height,
         m_mm3_per_mm,
         m_fan_speed,
+        m_extruder_temps[m_extruder_id],
         static_cast<float>(m_result.moves.size())
     };
     m_result.moves.emplace_back(vertex);
