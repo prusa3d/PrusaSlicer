@@ -44,7 +44,7 @@ enum class MachineLimitsUsage {
 };
 
 enum PrintHostType {
-    htOctoPrint, htDuet, htFlashAir, htAstroBox, htRepetier
+    htOctoPrint, htDuet, htFlashAir, htAstroBox, htRepetier, htMKS
 };
 
 enum AuthorizationType {
@@ -157,6 +157,8 @@ template<> inline const t_config_enum_values& ConfigOptionEnum<PrintHostType>::g
         keys_map["flashair"]        = htFlashAir;
         keys_map["astrobox"]        = htAstroBox;
         keys_map["repetier"]        = htRepetier;
+        keys_map["mks"]             = htMKS;
+
     }
     return keys_map;
 }
