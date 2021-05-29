@@ -571,6 +571,7 @@ bool PrintObject::invalidate_state_by_config_options(
 		} else if (
                opt_key == "clip_multipart_objects"
             || opt_key == "elefant_foot_compensation"
+            || opt_key == "elefant_foot_compensation_layers"
             || opt_key == "support_material_contact_distance" 
             || opt_key == "xy_size_compensation") {
             steps.emplace_back(posSlice);
@@ -1968,17 +1969,17 @@ end:
         	// Only enable Elephant foot compensation if printing directly on the print bed.
             float(scale_(m_config.elefant_foot_compensation.value)) :
         	0.f;
-        // Uncompensated slices for the first layer in case the Elephant foot compensation is applied.
-	    ExPolygons  lslices_1st_layer;
 	    tbb::parallel_for(
 	        tbb::blocked_range<size_t>(0, m_layers.size()),
-			[this, upscaled, clipped, xy_compensation_scaled, elephant_foot_compensation_scaled, &lslices_1st_layer]
+			[this, upscaled, clipped, xy_compensation_scaled, elephant_foot_compensation_scaled]
 				(const tbb::blocked_range<size_t>& range) {
 	            for (size_t layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
 	                m_print->throw_if_canceled();
 	                Layer *layer = m_layers[layer_id];
 	                // Apply size compensation and perform clipping of multi-part objects.
-	                float elfoot = (layer_id == 0) ? elephant_foot_compensation_scaled : 0.f;
+                    float elfoot = elephant_foot_compensation_scaled > 0 && layer_id < m_config.elefant_foot_compensation_layers.value ? 
+                        elephant_foot_compensation_scaled - (elephant_foot_compensation_scaled / m_config.elefant_foot_compensation_layers.value) * layer_id : 
+                        0.f;
 	                if (layer->m_regions.size() == 1) {
 	                	assert(! upscaled);
 	                	assert(! clipped);
@@ -1986,8 +1987,8 @@ end:
 	                    // Single region, growing or shrinking.
 	                    LayerRegion *layerm = layer->m_regions.front();
 	                    if (elfoot > 0) {
-		                    // Apply the elephant foot compensation and store the 1st layer slices without the Elephant foot compensation applied.
-		                    lslices_1st_layer = to_expolygons(std::move(layerm->slices.surfaces));
+                            ExPolygons expolygons = to_expolygons(std::move(layerm->slices.surfaces));
+
 		                    float delta = xy_compensation_scaled;
 	                        if (delta > elfoot) {
 	                            delta -= elfoot;
@@ -1997,11 +1998,9 @@ end:
 							layerm->slices.set(
 								union_ex(
 									Slic3r::elephant_foot_compensation(
-										(delta == 0.f) ? lslices_1st_layer : offset_ex(lslices_1st_layer, delta), 
+										(delta == 0.f) ? expolygons : offset_ex(expolygons, delta), 
 	                            		layerm->flow(frExternalPerimeter), unscale<double>(elfoot))),
 								stInternal);
-							if (xy_compensation_scaled != 0.f)
-								lslices_1st_layer = offset_ex(std::move(lslices_1st_layer), xy_compensation_scaled);
 	                    } else if (xy_compensation_scaled != 0.f) {
 	                        // Apply the XY compensation.
 	                        layerm->slices.set(
@@ -2034,8 +2033,7 @@ end:
 	                        Polygons trimming;
 	                        static const float eps = float(scale_(m_config.slice_closing_radius.value) * 1.5);
 	                        if (elfoot > 0.f) {
-	                        	lslices_1st_layer = offset_ex(layer->merged(eps), std::min(xy_compensation_scaled, 0.f) - eps);
-								trimming = to_polygons(Slic3r::elephant_foot_compensation(lslices_1st_layer,
+								trimming = to_polygons(Slic3r::elephant_foot_compensation(offset_ex(layer->merged(eps), std::min(xy_compensation_scaled, 0.f) - eps),
 									layer->m_regions.front()->flow(frExternalPerimeter), unscale<double>(elfoot)));
 	                        } else
 		                        trimming = offset(layer->merged(float(SCALED_EPSILON)), xy_compensation_scaled - float(SCALED_EPSILON));
@@ -2047,12 +2045,6 @@ end:
 	                layer->make_slices();
 	            }
 	        });
-	    if (elephant_foot_compensation_scaled > 0.f && ! m_layers.empty()) {
-	    	// The Elephant foot has been compensated, therefore the 1st layer's lslices are shrank with the Elephant foot compensation value.
-	    	// Store the uncompensated value there.
-	    	assert(m_layers.front()->id() == 0);
-			m_layers.front()->lslices = std::move(lslices_1st_layer);
-		}
 	}
 
     m_print->throw_if_canceled();
