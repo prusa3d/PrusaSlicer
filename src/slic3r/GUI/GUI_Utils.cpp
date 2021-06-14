@@ -113,7 +113,7 @@ int get_dpi_for_window(const wxWindow *window)
         if (hdc == NULL) { return DPI_DEFAULT; }
         return GetDeviceCaps(hdc, LOGPIXELSX);
     }
-#elif defined __linux__
+#elif defined(__linux__) || defined(__FreeBSD__)
     // TODO
     return DPI_DEFAULT;
 #elif defined __APPLE__
