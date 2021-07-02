@@ -1166,7 +1166,7 @@ void GCode::_do_export(Print& print, FILE* file, ThumbnailsGeneratorCallback thu
     print.throw_if_canceled();
 
     // adds tags for time estimators
-    if (print.config().remaining_times.value)
+    if (print.config().remaining_times.value || print.config().print_remaining_times.value)
 #if ENABLE_VALIDATE_CUSTOM_GCODE
         _write_format(file, ";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::First_Line_M73_Placeholder).c_str());
 #else
@@ -1473,7 +1473,7 @@ void GCode::_do_export(Print& print, FILE* file, ThumbnailsGeneratorCallback thu
     _write(file, m_writer.postamble());
 
     // adds tags for time estimators
-    if (print.config().remaining_times.value)
+    if (print.config().remaining_times.value || print.config().print_remaining_times.value)
 #if ENABLE_VALIDATE_CUSTOM_GCODE
         _write_format(file, ";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Last_Line_M73_Placeholder).c_str());
 #else

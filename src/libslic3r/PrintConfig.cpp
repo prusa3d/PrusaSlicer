@@ -1516,6 +1516,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("print_remaining_times", coBool);
+    def->label = L("Print remaining times");
+    def->tooltip = L("Emit M117 [percent printed]% [remaining time in minutes]min at 1 minute"
+        " intervals into the G-code to let the display show accurate remaining time."
+        " Marlin and RepRap support M117 print.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("silent_mode", coBool);
     def->label = L("Supports stealth mode");
     def->tooltip = L("The firmware supports stealth mode");

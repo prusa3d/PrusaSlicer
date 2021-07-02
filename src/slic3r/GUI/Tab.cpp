@@ -2307,6 +2307,7 @@ void TabPrinter::build_fff()
 
         optgroup->append_single_option_line("silent_mode");
         optgroup->append_single_option_line("remaining_times");
+        optgroup->append_single_option_line("print_remaining_times");
 
         optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value) {
             wxTheApp->CallAfter([this, opt_key, value]() {

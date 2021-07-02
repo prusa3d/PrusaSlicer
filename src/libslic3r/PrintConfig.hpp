@@ -660,6 +660,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               parking_pos_retraction))
     ((ConfigOptionBool,                remaining_times))
     ((ConfigOptionBool,                silent_mode))
+    ((ConfigOptionBool,                print_remaining_times))
     ((ConfigOptionFloat,               extra_loading_move))
     ((ConfigOptionString,              color_change_gcode))
     ((ConfigOptionString,              pause_print_gcode))
