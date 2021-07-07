@@ -1179,7 +1179,7 @@ void Tab::update_wiping_button_visibility() {
 
     auto wiping_dialog_button = wxGetApp().sidebar().get_wiping_dialog_button();
     if (wiping_dialog_button) {
-        wiping_dialog_button->Show(wipe_tower_enabled && multiple_extruders);
+        wiping_dialog_button->Show(multiple_extruders);
         wiping_dialog_button->GetParent()->Layout();
     }
 }
