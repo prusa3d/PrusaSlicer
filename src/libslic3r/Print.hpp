@@ -443,6 +443,10 @@ struct PrintStatistics
     double                          total_used_filament;
     double                          total_extruded_volume;
     double                          total_cost;
+    std::vector<double>             individual_extruded_volume;
+    std::vector<double>             individual_used_filament;
+    std::vector<double>             individual_weight;
+    std::vector<double>             individual_cost;
     int                             total_toolchanges;
     double                          total_weight;
     double                          total_wipe_tower_cost;

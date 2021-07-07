@@ -632,8 +632,16 @@ namespace DoExport {
         double total_used_filament   = 0.0;
         double total_weight          = 0.0;
         double total_cost            = 0.0;
+        
+        /* filament statistics per extruder */
+        std::vector<double> individual_extruded_volume(12, 0.0);
+        std::vector<double> individual_used_filament(12, 0.0);
+        std::vector<double> individual_weight(12, 0.0);
+        std::vector<double> individual_cost(12, 0.0);
+        
         for (auto volume : result.print_statistics.volumes_per_extruder) {
             total_extruded_volume += volume.second;
+            
 
             size_t extruder_id = volume.first;
             auto extruder = std::find_if(extruders.begin(), extruders.end(), [extruder_id](const Extruder& extr) { return extr.id() == extruder_id; });
@@ -645,12 +653,22 @@ namespace DoExport {
             total_used_filament += volume.second/s;
             total_weight        += weight;
             total_cost          += weight * extruder->filament_cost() * 0.001;
+            
+            individual_extruded_volume.at(extruder_id) = volume.second;
+            individual_used_filament.at(extruder_id) = volume.second/s;
+            individual_weight.at(extruder_id) = weight;
+            individual_cost.at(extruder_id) = (weight * extruder->filament_cost() * 0.001);
         }
 
         print_statistics.total_extruded_volume = total_extruded_volume;
         print_statistics.total_used_filament   = total_used_filament;
         print_statistics.total_weight          = total_weight;
         print_statistics.total_cost            = total_cost;
+        
+        print_statistics.individual_extruded_volume = individual_extruded_volume;
+        print_statistics.individual_used_filament = individual_used_filament;
+        print_statistics.individual_weight = individual_weight;
+        print_statistics.individual_cost = individual_cost;
 
         print_statistics.filament_stats = result.print_statistics.volumes_per_extruder;
     }
