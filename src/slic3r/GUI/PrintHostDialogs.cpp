@@ -34,13 +34,13 @@ namespace Slic3r {
 namespace GUI {
 
 static const char *CONFIG_KEY_PATH  = "printhost_path";
-static const char *CONFIG_KEY_PRINT = "printhost_print";
+static const char *CONFIG_KEY_UPLOAD_ACTION = "printhost_upload_action";
 static const char *CONFIG_KEY_GROUP = "printhost_group";
 
-PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, bool can_start_print, const wxArrayString &groups)
-    : MsgDialog(static_cast<wxWindow*>(wxGetApp().mainframe), _L("Send G-Code to printer host"), _L("Upload to Printer Host with the following filename:"), wxID_NONE)
+PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, std::set<PrintHostPostUploadAction> post_actions, const wxArrayString &groups)
+    : MsgDialog(static_cast<wxWindow*>(wxGetApp().mainframe), _(L("Send G-Code to printer host")), _(L("Upload to Printer Host with the following filename:")), wxID_NONE)
     , txt_filename(new wxTextCtrl(this, wxID_ANY))
-    , box_print(can_start_print ? new wxCheckBox(this, wxID_ANY, _L("Start printing after upload")) : nullptr)
+    , choice_post_action(!post_actions.empty() ? new wxChoice(this, wxID_ANY) : nullptr)
     , combo_groups(!groups.IsEmpty() ? new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, groups, wxCB_READONLY) : nullptr)
 {
 #ifdef __APPLE__
@@ -54,9 +54,48 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, bool can_start_pr
     content_sizer->Add(txt_filename, 0, wxEXPAND);
     content_sizer->Add(label_dir_hint);
     content_sizer->AddSpacer(VERT_SPACING);
-    if (box_print != nullptr) {
-        content_sizer->Add(box_print, 0, wxBOTTOM, 2*VERT_SPACING);
-        box_print->SetValue(app_config->get("recent", CONFIG_KEY_PRINT) == "1");
+
+    if (choice_post_action != nullptr) {
+        auto *action_sizer = new wxBoxSizer(wxHORIZONTAL);
+        auto *label_post_action = new wxStaticText(this, wxID_ANY, _(L("Action after upload:")));
+        action_sizer->Add(label_post_action, 1, wxCENTER);
+        action_sizer->Add(choice_post_action, 0, wxEXPAND | wxCENTER);
+        content_sizer->Add(action_sizer, 0, wxBOTTOM, 2*VERT_SPACING);
+
+        // "None" is a must have option
+        post_actions.insert(PrintHostPostUploadAction::None);
+
+        int choice_idx = 0;
+        for (PrintHostPostUploadAction action : post_actions) {
+            switch (action) {
+                case PrintHostPostUploadAction::None:
+                    choice_post_action->Append(_L("None"));
+                    break;
+                case PrintHostPostUploadAction::StartPrint:
+                    choice_post_action->Append(_L("Start Print"));
+                    break;
+                case PrintHostPostUploadAction::StartSimulation:
+                    choice_post_action->Append(_L("Start Simulation"));
+                    break;
+            }
+
+            choice_idx_to_post_action.insert(std::pair{choice_idx, action});
+            post_action_to_choice_idx.insert(std::pair{int(action), choice_idx});
+            choice_idx++;
+        }
+        int recentAction = int(PrintHostPostUploadAction::None);
+        try {
+            recentAction = std::stoi(app_config->get("recent", CONFIG_KEY_UPLOAD_ACTION));
+        } catch (const std::exception &ex) {
+            // invalid / empty configuration should not lead to an error
+            BOOST_LOG_TRIVIAL(warning) << boost::format("Recently used post-upload-action \"%1%\" is not valid") % app_config->get("recent", CONFIG_KEY_UPLOAD_ACTION);
+        }
+
+        // check if recent action is contained in the list, otherwise fallback to "None"
+        auto itIdx = post_action_to_choice_idx.find(recentAction);
+        choice_post_action->SetSelection(itIdx != post_action_to_choice_idx.end()
+            ? itIdx->second
+            : post_action_to_choice_idx.find(int(PrintHostPostUploadAction::None))->second);
     }
     
     if (combo_groups != nullptr) {
@@ -128,9 +167,16 @@ fs::path PrintHostSendDialog::filename() const
     return into_path(txt_filename->GetValue());
 }
 
-bool PrintHostSendDialog::start_print() const
+PrintHostPostUploadAction PrintHostSendDialog::post_action() const
 {
-    return box_print != nullptr ? box_print->GetValue() : false;
+    if (choice_post_action != nullptr) {
+        auto match = choice_idx_to_post_action.find(choice_post_action->GetSelection());
+        if (match != choice_idx_to_post_action.end()) {
+            return match->second;
+        }
+    }
+
+    return PrintHostPostUploadAction::None;
 }
 
 std::string PrintHostSendDialog::group() const
@@ -156,8 +202,8 @@ void PrintHostSendDialog::EndModal(int ret)
                 
 		AppConfig *app_config = wxGetApp().app_config;
 		app_config->set("recent", CONFIG_KEY_PATH, into_u8(path));
-        app_config->set("recent", CONFIG_KEY_PRINT, start_print() ? "1" : "0");
-        
+        app_config->set("recent", CONFIG_KEY_UPLOAD_ACTION, std::to_string(int(post_action())));
+
         if (combo_groups != nullptr) {
             wxString group = combo_groups->GetValue();
             app_config->set("recent", CONFIG_KEY_GROUP, into_u8(group));

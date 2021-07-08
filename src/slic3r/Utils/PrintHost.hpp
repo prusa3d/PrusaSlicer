@@ -16,6 +16,11 @@ namespace Slic3r {
 
 class DynamicPrintConfig;
 
+enum class PrintHostPostUploadAction {
+    None,
+    StartPrint,
+    StartSimulation
+};
 
 struct PrintHostUpload
 {
@@ -24,7 +29,7 @@ struct PrintHostUpload
     
     std::string group;
     
-    bool start_print = false;
+    PrintHostPostUploadAction post_action = PrintHostPostUploadAction::None;
 };
 
 
@@ -44,7 +49,7 @@ public:
     virtual bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const = 0;
     virtual bool has_auto_discovery() const = 0;
     virtual bool can_test() const = 0;
-    virtual bool can_start_print() const = 0;
+    virtual std::set<PrintHostPostUploadAction> get_post_upload_actions() const = 0;
     // A print host usually does not support multiple printers, with the exception of Repetier server.
     virtual bool supports_multiple_printers() const { return false; }
     virtual std::string get_host() const = 0;

@@ -13,8 +13,8 @@
 
 class wxButton;
 class wxTextCtrl;
+class wxChoice;
 class wxComboBox;
-class wxCheckBox;
 class wxDataViewListCtrl;
 
 
@@ -28,16 +28,19 @@ namespace GUI {
 class PrintHostSendDialog : public GUI::MsgDialog
 {
 public:
-    PrintHostSendDialog(const boost::filesystem::path &path, bool can_start_print, const wxArrayString& groups);
+    PrintHostSendDialog(const boost::filesystem::path &path, std::set<PrintHostPostUploadAction> post_actions, const wxArrayString& groups);
     boost::filesystem::path filename() const;
-    bool start_print() const;
+    PrintHostPostUploadAction post_action() const;
     std::string group() const;
 
     virtual void EndModal(int ret) override;
 private:
     wxTextCtrl *txt_filename;
-    wxCheckBox *box_print;
+    wxChoice *choice_post_action;
     wxComboBox *combo_groups;
+
+    std::map<int, PrintHostPostUploadAction> choice_idx_to_post_action;
+    std::map<int, int> post_action_to_choice_idx;
 };
 
 

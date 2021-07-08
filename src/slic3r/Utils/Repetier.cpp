@@ -115,7 +115,7 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
         % url
         % upload_filename.string()
         % upload_parent_path.string()
-        % upload_data.start_print
+        % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
         % upload_data.group;
 
     auto http = Http::post(std::move(url));
