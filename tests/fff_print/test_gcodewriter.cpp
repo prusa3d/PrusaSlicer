@@ -68,28 +68,28 @@ SCENARIO("lift() is not ignored after unlift() at normal values of Z", "[GCodeWr
     }
 }
 
-SCENARIO("set_speed emits values with fixed-point output.", "[GCodeWriter]") {
+SCENARIO("set_speed emits values with floating-point output, 8 significant digits.", "[GCodeWriter]") {
 
     GIVEN("GCodeWriter instance") {
         GCodeWriter writer;
-        WHEN("set_speed is called to set speed to 99999.123") {
-            THEN("Output string is G1 F99999.123") {
-                REQUIRE_THAT(writer.set_speed(99999.123), Catch::Equals("G1 F99999.123\n"));
+        WHEN("set_speed is called to set speed to 12345.678") {
+            THEN("Output string is G1 F12345.678") {
+                REQUIRE_THAT(writer.set_speed(12345.678), Catch::Equals("G1 F12345.678\n"));
             }
         }
         WHEN("set_speed is called to set speed to 1") {
-            THEN("Output string is G1 F1.000") {
-                REQUIRE_THAT(writer.set_speed(1.0), Catch::Equals("G1 F1.000\n"));
+            THEN("Output string is G1 F1") {
+                REQUIRE_THAT(writer.set_speed(1.0), Catch::Equals("G1 F1\n"));
             }
         }
-        WHEN("set_speed is called to set speed to 203.200022") {
-            THEN("Output string is G1 F203.200") {
-                REQUIRE_THAT(writer.set_speed(203.200022), Catch::Equals("G1 F203.200\n"));
+        WHEN("set_speed is called to set speed to 203.2000022") {
+            THEN("Output string is G1 F203.2") {
+                REQUIRE_THAT(writer.set_speed(203.2000022), Catch::Equals("G1 F203.2\n"));
             }
         }
-        WHEN("set_speed is called to set speed to 203.200522") {
-            THEN("Output string is G1 F203.201") {
-                REQUIRE_THAT(writer.set_speed(203.200522), Catch::Equals("G1 F203.201\n"));
+        WHEN("set_speed is called to set speed to 12345.200522") {
+            THEN("Output string is G1 F12345.201") {
+                REQUIRE_THAT(writer.set_speed(203.200522), Catch::Equals("G1 F12345.201\n"));
             }
         }
     }
