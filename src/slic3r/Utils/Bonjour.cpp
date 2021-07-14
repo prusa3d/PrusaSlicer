@@ -555,6 +555,7 @@ struct Bonjour::priv
 	priv(std::string &&service);
 
 	std::string strip_service_dn(const std::string &service_name) const;
+	template <typename OutputIt> void fill_outbound_interface_options(asio::io_service &io, OutputIt it);
 	void udp_receive(udp::endpoint from, size_t bytes);
 	void lookup_perform();
 };
@@ -579,6 +580,17 @@ std::string Bonjour::priv::strip_service_dn(const std::string &service_name) con
 		return service_name.substr(0, needle - 1);
 	} else {
 		return service_name;
+	}
+}
+
+template<typename OutputIt> void Bonjour::priv::fill_outbound_interface_options(asio::io_service &io, OutputIt it)
+{
+	asio::ip::udp::resolver resolver(io);
+	auto results = resolver.resolve(asio::ip::udp::v4(), asio::ip::host_name(), "");
+	for (auto const &r : results) {
+		auto const addr = r.endpoint().address().to_v4();
+		if (addr.is_loopback()) continue;
+		*it++ = asio::ip::multicast::outbound_interface(addr);
 	}
 }
 
@@ -630,11 +642,17 @@ void Bonjour::priv::lookup_perform()
 
 	try {
 		boost::asio::io_service io_service;
-		udp::socket socket(io_service);
-		socket.open(udp::v4());
+		udp::socket socket(io_service, udp::v4());
 		socket.set_option(udp::socket::reuse_address(true));
+
 		udp::endpoint mcast(BonjourRequest::MCAST_IP4, BonjourRequest::MCAST_PORT);
-		socket.send_to(asio::buffer(brq->data), mcast);
+
+		std::vector<asio::ip::multicast::outbound_interface> outbound_ifs;
+		fill_outbound_interface_options(io_service, std::back_inserter(outbound_ifs));
+		for (auto const &option : outbound_ifs) {
+			socket.set_option(option);
+			socket.send_to(asio::buffer(brq->data), mcast);
+		}
 
 		bool expired = false;
 		bool retry = false;
@@ -668,7 +686,10 @@ void Bonjour::priv::lookup_perform()
 				socket.cancel();
 			} else if (retry) {
 				retry = false;
-				socket.send_to(asio::buffer(brq->data), mcast);
+				for (auto const& option : outbound_ifs) {
+					socket.set_option(option);
+					socket.send_to(asio::buffer(brq->data), mcast);
+				}
 			} else {
 				buffer.resize(DnsMessage::MAX_SIZE);
 				socket.async_receive_from(asio::buffer(buffer, buffer.size()), recv_from, recv_handler);
