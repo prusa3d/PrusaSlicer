@@ -1406,10 +1406,6 @@ void PrintObject::bridge_over_infill()
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
         const PrintRegion &region = this->printing_region(region_id);
         
-        // skip bridging in case there are no voids
-        if (region.config().fill_density.value == 100)
-            continue;
-
 		for (LayerPtrs::iterator layer_it = m_layers.begin(); layer_it != m_layers.end(); ++ layer_it) {
             // skip first layer
 			if (layer_it == m_layers.begin())
@@ -1418,6 +1414,18 @@ void PrintObject::bridge_over_infill()
             Layer       *layer       = *layer_it;
             LayerRegion *layerm      = layer->m_regions[region_id];
             Flow         bridge_flow = layerm->bridging_flow(frSolidInfill);
+
+            // Minimum width of a void for the extrusion above to be treated as a bridge.
+            const float min_void_width = float(bridge_flow.scaled_width()) * 3.f;
+
+            // Skip bridging if the infill voids are small enough.
+            const float fill_density = region.config().fill_density.value / 100.0;
+            if (fill_density > 0.0) {
+                // Estimate the infill void width from infill density and extrusion width.
+                const float infill_extrusion_width = layerm->flow(frInfill).scaled_width();
+                if (min_void_width > (infill_extrusion_width / fill_density - infill_extrusion_width))
+                    continue;
+            }
 
             // extract the stInternalSolid surfaces that might be transformed into bridges
             Polygons internal_solid;
@@ -1451,10 +1459,7 @@ void PrintObject::bridge_over_infill()
                 //FIXME Vojtech: The offset2 function is not a geometric offset, 
                 // therefore it may create 1) gaps, and 2) sharp corners, which are outside the original contour.
                 // The gaps will be filled by a separate region, which makes the infill less stable and it takes longer.
-                {
-                    float min_width = float(bridge_flow.scaled_width()) * 3.f;
-                    to_bridge_pp = offset2(to_bridge_pp, -min_width, +min_width);
-                }
+                to_bridge_pp = offset2(to_bridge_pp, -min_void_width, +min_void_width);
                 
                 if (to_bridge_pp.empty()) continue;
                 
@@ -1800,11 +1805,10 @@ void PrintObject::discover_horizontal_shells()
             const PrintRegionConfig &region_config = layerm->region().config();
             if (region_config.solid_infill_every_layers.value > 0 && region_config.fill_density.value > 0 &&
                 (i % region_config.solid_infill_every_layers) == 0) {
-                // Insert a solid internal layer. Mark stInternal surfaces as stInternalSolid or stInternalBridge.
-                SurfaceType type = (region_config.fill_density == 100) ? stInternalSolid : stInternalBridge;
+                // Insert a solid internal layer.
                 for (Surface &surface : layerm->fill_surfaces.surfaces)
                     if (surface.surface_type == stInternal)
-                        surface.surface_type = type;
+                        surface.surface_type = stInternalSolid;
             }
 
             // If ensure_vertical_shell_thickness, then the rest has already been performed by discover_vertical_shells().
