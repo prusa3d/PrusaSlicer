@@ -699,6 +699,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def = this->add("external_perimeter_fan_speed", coInts);
+    def->label = L("External perimeter fan speed");
+    def->tooltip = L("When set to a non-zero value this fan speed is used only for external perimeters (visible ones). "
+                    "When set to zero the normal fan speed is used on external perimeters. "
+                    "External perimeters can benefit from higher fan speed to improve surface finish, "
+                    "while internal perimeters, infill, etc. benefit from lower fan speed to improve layer adhesion.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 0 });
+
     def = this->add("external_perimeter_speed", coFloatOrPercent);
     def->label = L("External perimeters");
     def->category = L("Speed");
