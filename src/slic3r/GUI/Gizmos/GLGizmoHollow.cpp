@@ -626,7 +626,7 @@ RENDER_AGAIN:
 
     ImGui::Separator();
 
-    float diameter_upper_cap = 15.;
+    float diameter_upper_cap = 25.;
     if (m_new_hole_radius > diameter_upper_cap)
         m_new_hole_radius = diameter_upper_cap;
     m_imgui->text(m_desc.at("hole_diameter"));
