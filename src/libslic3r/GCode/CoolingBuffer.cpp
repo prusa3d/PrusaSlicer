@@ -693,7 +693,10 @@ std::string CoolingBuffer::apply_layer_cooldown(
     int  fan_speed          = -1;
     bool bridge_fan_control = false;
     int  bridge_fan_speed   = 0;
-    auto change_extruder_set_fan = [ this, layer_id, layer_time, &new_gcode, &fan_speed, &bridge_fan_control, &bridge_fan_speed ]() {
+    int  external_perimeter_fan_speed = 0;
+    bool in_external_perimeter = false;
+    auto change_extruder_set_fan = [ this, layer_id, layer_time, &new_gcode, &fan_speed, &bridge_fan_control, &bridge_fan_speed, &external_perimeter_fan_speed, &in_external_perimeter]() {
+        in_external_perimeter = false;
         const FullPrintConfig &config = m_gcodegen.config();
 #define EXTRUDER_CONFIG(OPT) config.OPT.get_at(m_current_extruder)
         int min_fan_speed = EXTRUDER_CONFIG(min_fan_speed);
@@ -707,6 +710,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             disable_fan_first_layers = 1;
         }
         if (int(layer_id) >= disable_fan_first_layers) {
+            external_perimeter_fan_speed    = EXTRUDER_CONFIG(external_perimeter_fan_speed);
             int   max_fan_speed             = EXTRUDER_CONFIG(max_fan_speed);
             float slowdown_below_layer_time = float(EXTRUDER_CONFIG(slowdown_below_layer_time));
             float fan_below_layer_time      = float(EXTRUDER_CONFIG(fan_below_layer_time));
@@ -720,6 +724,9 @@ std::string CoolingBuffer::apply_layer_cooldown(
                     double t = (layer_time - slowdown_below_layer_time) / (fan_below_layer_time - slowdown_below_layer_time);
                     fan_speed_new = int(floor(t * min_fan_speed + (1. - t) * max_fan_speed) + 0.5);
                 }
+                // Use the higher of the adjusted speeds if both external perimeter and automatic cooling are enabled.
+                if (external_perimeter_fan_speed && fan_speed_new > external_perimeter_fan_speed)
+                    external_perimeter_fan_speed = fan_speed_new;
             }
             bridge_fan_speed   = EXTRUDER_CONFIG(bridge_fan_speed);
             if (int(layer_id) >= disable_fan_first_layers && int(layer_id) + 1 < full_fan_speed_layer) {
@@ -727,6 +734,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 float factor = float(int(layer_id + 1) - disable_fan_first_layers) / float(full_fan_speed_layer - disable_fan_first_layers);
                 fan_speed_new    = std::clamp(int(float(fan_speed_new) * factor + 0.5f), 0, 255);
                 bridge_fan_speed = std::clamp(int(float(bridge_fan_speed) * factor + 0.5f), 0, 255);
+                external_perimeter_fan_speed = std::clamp(int(float(external_perimeter_fan_speed) * factor + 0.5f), 0, 255);
             }
 #undef EXTRUDER_CONFIG
             bridge_fan_control = bridge_fan_speed > fan_speed_new;
@@ -734,6 +742,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             bridge_fan_control = false;
             bridge_fan_speed   = 0;
             fan_speed_new      = 0;
+            external_perimeter_fan_speed = 0;
         }
         if (fan_speed_new != fan_speed) {
             fan_speed = fan_speed_new;
@@ -748,6 +757,16 @@ std::string CoolingBuffer::apply_layer_cooldown(
     for (const CoolingLine *line : lines) {
         const char *line_start  = gcode.c_str() + line->line_start;
         const char *line_end    = gcode.c_str() + line->line_end;
+
+        // Adjust the fan speed for external perimeters only when the setting is enabled and we would need to adjust the speed.
+        bool adjust_fan_speed_on_external_perimeter = !!external_perimeter_fan_speed && fan_speed != external_perimeter_fan_speed;
+
+        if (adjust_fan_speed_on_external_perimeter) {
+            bool prev_in_external_perimeter = in_external_perimeter;
+            in_external_perimeter = line->type & CoolingLine::TYPE_EXTERNAL_PERIMETER;
+            adjust_fan_speed_on_external_perimeter = in_external_perimeter != prev_in_external_perimeter;
+        }
+
         if (line_start > pos)
             new_gcode.append(pos, line_start - pos);
         if (line->type & CoolingLine::TYPE_SET_TOOL) {
@@ -764,8 +783,12 @@ std::string CoolingBuffer::apply_layer_cooldown(
             if (bridge_fan_control)
                 new_gcode += m_gcodegen.writer().set_fan(fan_speed, true);
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
-            // Just remove this comment.
+            if (adjust_fan_speed_on_external_perimeter)
+                new_gcode += m_gcodegen.writer().set_fan(fan_speed, true);
         } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE | CoolingLine::TYPE_HAS_F)) {
+            if (adjust_fan_speed_on_external_perimeter)
+                new_gcode += m_gcodegen.writer().set_fan(external_perimeter_fan_speed, true);
+
             // Find the start of a comment, or roll to the end of line.
             const char *end = line_start;
             for (; end < line_end && *end != ';'; ++ end);
