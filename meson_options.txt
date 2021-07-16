@@ -1,0 +1,16 @@
+
+option('static',    type: 'boolean',    value: false,   description: 'Compile PrusaSlicer with static libraries (Boost, TBB, glew)')
+option('gui',       type: 'boolean',    value: true,    description: 'Compile PrusaSlicer with GUI components (OpenGL, wxWidgets)')
+option('fhs',       type: 'boolean',    value: false,   description: 'Assume PrusaSlicer is to be installed in a FHS directory structure')
+option('wx-stable', type: 'boolean',    value: false,   description: 'Build against wxWidgets stable (3.0) as oppsed to dev (3.1) on Linux')
+option('wx-gtk',    type: 'integer',    value: 2,       description: 'GTK version to build against on Linux. 2 or 3.')
+option('profile',   type: 'boolean',    value: false,   description: 'Compile PrusaSlicer with an invasive Shiny profiler')
+option('pch',       type: 'boolean',    value: false,   description: 'Use precompiled headers')
+option('msvc-pdb',  type: 'boolean',    value: true,    description: 'Generate PDB files on MSVC in Release mode')
+option('perl-xs',   type: 'boolean',    value: false,   description: 'Compile XS Perl module and enable Perl unit and integration tests')
+option('asan',      type: 'boolean',    value: false,   description: 'Enable ASan on Clang and GCC')
+
+# option('msbuild_parallel', type: 'boolean', value: true,  description: 'Compile on Visual Studio in parallel')
+
+option('sandboxes', type: 'boolean',    value: false,   description: 'Build development sandboxes')
+option('tests',     type: 'boolean',    value: true,    description: 'Build unit tests')

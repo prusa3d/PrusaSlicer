@@ -1,0 +1,106 @@
+name: CI Windows x64
+
+on:
+  push:
+    branches:
+      - CI
+
+jobs:
+  build_dep:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: 'CI'
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: mkdir in deps
+      run: mkdir deps/build
+    - name: cmake and make deps
+      working-directory: ./deps/build
+      run: |
+        cmake .. -G "Visual Studio 16 2019" -A x64
+        msbuild /m ALL_BUILD.vcxproj
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: deps_win
+        path: ./deps/build/destdir/
+
+  build:
+    runs-on: windows-latest
+    needs: build_dep
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: update submodule profiles
+      working-directory: ./resources/profiles
+      run: git submodule update
+    - name: change date in version
+      shell: powershell
+      run: (Get-Content version.inc) | Foreach-Object {$_ -replace "\+UNKNOWN", ("_" + [datetime]::Today.ToString("yyyy-MM-dd"))} | Set-Content version.inc
+    - name: mkdir in deps directory
+      run: mkdir deps/destdir
+    - name: download deps
+      uses: actions/download-artifact@v1
+      with:
+        name: deps_win
+        path: deps/destdir
+    - name: echo dir deps
+      run: dir deps
+    - name: echo dir deps destdir
+      run: dir deps/destdir
+    - name: mkdir
+      run: mkdir build
+    - name: cmake
+      working-directory: ./build
+      run: cmake .. -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="d:\a\SuperSlicer\SuperSlicer\deps\destdir\usr\local"
+    - name: make
+      working-directory: ./build
+      run: msbuild /m /P:Configuration=Release INSTALL.vcxproj
+    - name: create directory and copy into it
+      working-directory: ./build
+      run: ls
+    - name: create directory and copy into it
+      working-directory: ./build
+      shell: powershell
+        #todo: add the opengl folder
+      run: mkdir package
+    - name: copy from release
+      working-directory: ./build
+      shell: powershell
+      run: '(new-object System.Net.WebClient).DownloadFile("https://github.com/supermerill/SuperSlicer/releases/download/2.2.53.3/SuperSlicer_2.2.53.3_win64_20201005.zip", "SuperSlicer_2.2.53.3_win64_20201005.zip")'
+    - name: unzip
+      working-directory: ./build
+      shell: cmd
+      run: '"C:/Program Files/7-Zip/7z.exe" x SuperSlicer_2.2.53.3_win64_20201005.zip'
+    - name: copy old release content
+      working-directory: ./build
+      shell: cmd
+      run: xcopy /RCYIE SuperSlicer_2.2.53.3_win64_20201005\* package\
+    - name: copy new resources
+      working-directory: ./build
+      shell: cmd
+      run: xcopy /RCYIE ..\resources package\resources
+    - name: copy dll
+      working-directory: ./build
+      shell: cmd
+      run: xcopy /RCYIE src\release\*.dll package\
+    - name: copy exe
+      working-directory: ./build
+      shell: cmd
+      run: xcopy /RCYIE src\release\*.exe package\
+    - name: copy ms runtime
+      working-directory: ./build
+      shell: cmd
+      run: xcopy /RCYIE c:\windows\system32\VCRUNTIME140* package\
+#    - name: create zip
+#      working-directory: ./build
+#      shell: cmd
+#      run: '"C:/Program Files/7-Zip/7z.exe" a -tzip nightly.zip *'
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: nightly_win64
+        path: build/package/

@@ -1,0 +1,126 @@
+name: CI macos
+
+on:
+  push:
+    branches:
+      - CI
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: 'CI'
+    - name: update submodule profiles
+      working-directory: ./resources/profiles
+      run: git submodule update
+    - name: change date in version
+      run: |
+        sed "s/+UNKNOWN/_$(date '+%F')/" version.inc > version.date.inc
+        mv version.date.inc version.inc
+    - name: mkdir in deps
+      run: mkdir deps/build
+    - name: cmake deps
+      working-directory: ./deps/build
+      run: cmake .. -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13"
+    - name: make deps
+      working-directory: ./deps/build
+      run: make
+    - name: ls libs
+      working-directory: ./deps/build
+      run: ls ./destdir/usr/local/lib
+    - name: rename wxscintilla
+      working-directory: ./deps/build/destdir/usr/local/lib
+      run: cp libwxscintilla-3.1.a libwx_osx_cocoau_scintilla-3.1.a
+    - name: ls libs
+      working-directory: ./deps/build
+      run: ls ./destdir/usr/local/lib
+    - name: clean deps
+      working-directory: ./deps/build
+      run: rm -rf dep_*
+    - name: mkdir build
+      run: mkdir build
+    - name: cmake
+      working-directory: ./build
+      run: cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" -DSLIC3R_STATIC=1
+    - name: make SuperSlicer
+      working-directory: ./build
+      run: make Slic3r
+    - name: ls build
+      working-directory: ./build
+      run: |
+        ls -al src
+        ls -al .
+    - name: update Info.plist
+      working-directory: ./build/src
+      run: sed "s/+UNKNOWN/_$(date '+%F')/" Info.plist >Info.date.plist
+    - name: create directory and copy into it
+      working-directory: ./build
+      run: |
+        mkdir pack
+        mkdir pack/SuperSlicer
+        mkdir pack/SuperSlicer/SuperSlicer.app
+        mkdir pack/SuperSlicer/SuperSlicer.app/Contents
+        mkdir pack/SuperSlicer/SuperSlicer.app/Contents/_CodeSignature
+        mkdir pack/SuperSlicer/SuperSlicer.app/Contents/Frameworks
+        mkdir pack/SuperSlicer/SuperSlicer.app/Contents/MacOS
+    - name: copy Resources
+      working-directory: ./build
+      run: |
+        cp -Rf ../resources pack/SuperSlicer/SuperSlicer.app/Contents/Resources
+        cp pack/SuperSlicer/SuperSlicer.app/Contents/Resources/icons/SuperSlicer.icns pack/SuperSlicer/SuperSlicer.app/Contents/resources/SuperSlicer.icns
+        cp src/Info.date.plist pack/SuperSlicer/SuperSlicer.app/Contents/Info.plist
+        echo -n -e 'APPL????\x0a' > PkgInfo
+        cp PkgInfo pack/SuperSlicer/SuperSlicer.app/Contents/PkgInfo
+#        echo -n -e '\xff\xfeAPPL\x3f\x00\x3f\x00\x3f\x00\x3f\x00\x0a\x00' > PkgInfo
+    - name: copy bin and do not let it lower case
+      working-directory: ./build
+      run: |
+        cp -f src/superslicer pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
+        chmod u+x pack/SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
+        tar -cvf SuperSlicer.tar pack/SuperSlicer
+    - name: create dmg
+      working-directory: ./build
+      run: |
+        hdiutil create -ov -fs HFS+ -volname "SuperSlicer" -srcfolder "pack/SuperSlicer" temp.dmg
+        hdiutil convert temp.dmg -format UDZO -o SuperSlicer.dmg
+#    - name: signing Resources (creating CodeResources inside _CodeSignature)
+#      working-directory: .
+#      run: codesign -s <identity> Resources
+# maybe i should just try to do that on a separate pc and copy the file here, more secure as a signing process.
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: nightly_macos.tar
+        path: build/SuperSlicer.tar
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: nightly_macos.dmg
+        path: build/SuperSlicer.dmg
+# build again, but the debug one this time
+#    - name: cmake
+#      working-directory: ./build
+#      run: cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local" -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" -DSLIC3R_STATIC=1
+#    - name: make slic3r
+#      working-directory: ./build
+#      run: make slic3r
+#    - name: copy bin and do not let it lower case
+#      working-directory: ./build
+#      run: |
+#        cp -f src/superslicer SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
+#        chmod u+x SuperSlicer/SuperSlicer.app/Contents/MacOS/SuperSlicer
+#        tar -cvf SuperSlicer.tar SuperSlicer
+#    - name: create dmg
+#      working-directory: ./build
+#      run: |
+#        rm SuperSlicer.dmg
+#        hdiutil create -ov -fs HFS+ -volname "SuperSlicer" -srcfolder "SuperSlicer" temp.dmg
+#        hdiutil convert temp.dmg -format UDZO -o SuperSlicer.dmg
+#    - name: Upload artifact
+#      uses: actions/upload-artifact@v1.0.0
+#      with:
+#        name: nightly_macos_DEBUG.dmg

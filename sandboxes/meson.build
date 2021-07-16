@@ -1,0 +1,5 @@
+# subdir('aabb-evaluation')
+subdir('meshboolean')
+subdir('opencsg')
+# subdir('openvdb')
+# subdir('slasupporttree')

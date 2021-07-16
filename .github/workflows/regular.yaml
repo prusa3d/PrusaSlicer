@@ -1,0 +1,51 @@
+name: Regular CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [
+          # ubuntu-18.04,
+          ubuntu-20.04,
+          windows-latest
+        ]
+
+    name: Build PrusaSlicer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - if: contains(matrix.os, 'ubuntu')
+      name: Install Ubuntu dependencies
+      run: ./.github/workflows/install_dependencies_ubuntu.sh ${{ matrix.os }}
+
+
+    - if: contains(matrix.os, 'windows')
+      name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - if: contains(matrix.os, 'windows')
+      name: Build internal dependencies (on Windows)
+      run: |
+        mkdir deps/_build
+        cd deps/_build
+          cmake .. -G "Visual Studio 16 2019" -DDESTDIR="c:\src\PrusaSlicer-deps"
+          msbuild /m ALL_BUILD.vcxproj
+        cd ../..
+
+
+    - if: contains(matrix.os, 'ubuntu')
+      name: ccache
+      uses: hendrikmuhs/ccache-action@v1
+
+    - name: Build PrusaSlicer
+      run: ./.github/workflows/build_prusaslicer.sh ${{ matrix.os }}
+
+    - name: Run tests
+      run: |
+        cd _build
+          ctest -V
+        cd
