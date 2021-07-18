@@ -242,8 +242,11 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
     }
     
     // Traverse children and build the final collection.
-	Point zero_point(0, 0);
-	std::vector<std::pair<size_t, bool>> chain = chain_extrusion_entities(coll.entities, &zero_point);
+    Point start_point(0, 0);
+    if (!coll.entities.empty())
+        start_point = Point(coll.entities.front()->as_polyline().first_point().x(), coll.entities.front()->as_polyline().first_point().y());
+
+    std::vector<std::pair<size_t, bool>> chain = chain_extrusion_entities(coll.entities, &start_point);
     ExtrusionEntityCollection out;
     for (const std::pair<size_t, bool> &idx : chain) {
 		assert(coll.entities[idx.first] != nullptr);
