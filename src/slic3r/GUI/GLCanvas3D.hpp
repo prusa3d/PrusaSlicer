@@ -196,6 +196,7 @@ class GLCanvas3D
         };
 
         static const float THICKNESS_BAR_WIDTH;
+
     private:
 
         bool                        m_enabled{ false };
@@ -445,6 +446,9 @@ public:
         float accuracy           = 0.65f; // Unused currently
         bool  enable_rotation    = false;
     };
+
+    // TODO(ibash) make this disable warning notifications
+    static void set_warning_freeze(bool freeze) { /* noop */ }
 
 private:
     wxGLCanvas* m_canvas;

@@ -127,6 +127,7 @@ std::map<std::string, std::string> SettingsFactory::CATEGORY_ICON =
     { L("Layers and Perimeters"), "layers"      },
     { L("Infill")               , "infill"      },
     { L("Ironing")              , "ironing"     },
+    { L("Filament")             , "spool"       },
     { L("Fuzzy Skin")           , "fuzzy_skin"  },
     { L("Support material")     , "support"     },
     { L("Speed")                , "time"        },

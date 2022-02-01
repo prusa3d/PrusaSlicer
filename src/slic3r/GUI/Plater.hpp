@@ -157,7 +157,7 @@ public:
     const SLAPrint& sla_print() const;
     SLAPrint& sla_print();
 
-    void new_project();
+    bool new_project(std::string project_name = "");
     void load_project();
     void load_project(const wxString& filename);
     void add_model(bool imperial_units = false);
@@ -201,7 +201,7 @@ public:
     void select_all();
     void deselect_all();
     void remove(size_t obj_idx);
-    void reset();
+    void reset(std::string name = "");
     void reset_with_confirm();
     void delete_object_from_model(size_t obj_idx);
     void remove_selected();

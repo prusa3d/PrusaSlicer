@@ -1440,6 +1440,33 @@ void MainFrame::init_menubar_as_editor()
 #endif // __APPLE__
     }
 
+    // calibration menu
+    wxMenu* calibrationMenu = nullptr;
+    if (wxGetApp().is_editor())
+    {
+        calibrationMenu = new wxMenu();
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Introduction")), _(L("How to use this menu and calibrations.")),
+            [this](wxCommandEvent&) { wxGetApp().html_dialog(); });
+        calibrationMenu->AppendSeparator();
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Bed/Extruder levelling")), _(L("Create a test print to help you to level your printer bed.")),
+            [this](wxCommandEvent&) { wxGetApp().bed_leveling_dialog(); });
+        calibrationMenu->AppendSeparator();
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Filament Flow calibration")), _(L("Create a test print to help you to set your filament extrusion multiplier.")),
+            [this](wxCommandEvent&) { wxGetApp().flow_ratio_dialog(); });
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Filament temperature calibration")), _(L("Create a test print to help you to set your filament temperature.")),
+            [this](wxCommandEvent&) { wxGetApp().filament_temperature_dialog(); });
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Extruder retraction calibration")), _(L("Create a test print to help you to set your retraction length.")),
+            [this](wxCommandEvent&) { wxGetApp().calibration_retraction_dialog(); });
+        calibrationMenu->AppendSeparator();
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Bridge flow calibration")), _(L("Create a test print to help you to set your bridge flow ratio.")),
+            [this](wxCommandEvent&) { wxGetApp().bridge_tuning_dialog(); });
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Ironing pattern calibration")), _(L("Create a test print to help you to set your over-bridge flow ratio and ironing pattern.")),
+            [this](wxCommandEvent&) { wxGetApp().over_bridge_dialog(); });
+        calibrationMenu->AppendSeparator();
+        append_menu_item(calibrationMenu, wxID_ANY, _(L("Calibration cube")), _(L("Print a calibration cube, for various calibration goals.")),
+            [this](wxCommandEvent&) { wxGetApp().calibration_cube_dialog(); });
+    }
+
     // Help menu
     auto helpMenu = generate_help_menu();
 
@@ -1451,6 +1478,7 @@ void MainFrame::init_menubar_as_editor()
     if (editMenu) m_menubar->Append(editMenu, _L("&Edit"));
     m_menubar->Append(windowMenu, _L("&Window"));
     if (viewMenu) m_menubar->Append(viewMenu, _L("&View"));
+    if (calibrationMenu) m_menubar->Append(calibrationMenu, _L("C&alibration"));
     // Add additional menus from C++
     wxGetApp().add_config_menu(m_menubar);
     m_menubar->Append(helpMenu, _L("&Help"));

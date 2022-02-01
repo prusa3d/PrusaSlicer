@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Calibration de la temp&eacute;rature du filament</title>
+</head>
+<body>
+
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Calibration de la temp&eacute;rature du filament</h1>
+</td>
+<td style="text-align: right;"><strong>
+	<table><tr><td>besoins:</td><td style="text-align: left;">D&eacute;bit</td></tr>
+	</table>
+	</strong>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Vous devez avoir fait l'&eacute;talonnage du niveau du plateau avant cet &eacute;talonnage,</strong> et il est pr&eacute;f&eacute;rable d'avoir &eacute;galement fait l'&eacute;talonnage du d&eacute;bit.
+Cet &eacute;talonnage vous aidera &agrave; choisir la bonne temp&eacute;rature en fonction du collage, des surplombs et du suintement.
+Notez que ce test d&eacute;pend du refroidissement que vous avez choisi. Vous pouvez l'imprimer plusieurs fois avec plus ou moins de refroidissement pour trouver le point id&eacute;al.</p>
+<p>Ce test va imprimer une tour, imprim&eacute;e avec un r&eacute;glage de temp&eacute;rature diff&eacute;rent pour chaque &eacute;tage. L'&eacute;tage du milieu sera imprim&eacute; avec la temp&eacute;rature actuelle s&eacute;lectionn&eacute;e dans votre configuration de filament. Le premier &eacute;tage, qui touche la plaque de construction, sera donc imprim&eacute; avec la temp&eacute;rature la plus &eacute;lev&eacute;e et l'&eacute;tage sup&eacute;rieur avec la temp&eacute;rature la plus basse. Vous pouvez choisir le delta de temp&eacute;rature entre chaque test et le nombre de tests (combien de tests en dessous de la temp&eacute;rature actuelle et combien de tests plus chauds que l'actuelle) mais vous pouvez aussi les laisser tels quels pour commencer.</p>
+<h2>R&eacute;sultats / observation</h2>
+<p>L'objectif est de choisir la temp&eacute;rature la plus &eacute;lev&eacute;e possible qui ne produise pas d'artefacts.</p>
+<p>D'abord, vous devez analyser la tour. Sur chaque &eacute;tage, il est &eacute;crit "la temp&eacute;rature".</p>
+<table width="100%">
+<tbody>
+<tr>
+<td><img src="./temp_tower_180.jpg" width="400" height="100" /></td>
+<td>trop froid, il ne peut pas &ecirc;tre extrud&eacute;</td>
+<td>
+</tr>
+<tr>
+<td><img src="./temp_tower_195.jpg" width="400" height="100" /></td>
+<td>bon</td>
+</tr>
+<tr>
+<td><img src="./temp_tower_210.jpg" width="400" height="100" /></td>
+<td>bon</td>
+</tr>
+<tr>
+<td><img src="./temp_tower_225.jpg" width="400" height="100" /></td>
+<td>trop chaud, on peut voir un peu de suintement.</td>
+</tr>
+<tr>
+<td><img src="./temp_tower_240.jpg" width="400" height="100" /></td>
+<td>trop chaud, on peut voir un peu de suintement.</td>
+</tr>
+</tbody>
+</table>
+<p>Vous pouvez voir ici que la base imprim&eacute;e &agrave; 210 degr&eacute;s Celsius est le plus chaud que nous puissions imprimer sans probl&egrave;me de d&eacute;sint&eacute;gration (en ce qui concerne la chaleur ; la mauvaise qualit&eacute; des photos est due &agrave; la vitesse &eacute;lev&eacute;e). De plus, j'ai r&eacute;ussi &agrave; casser (avec difficult&eacute;) un morceau du sol &agrave; 195 degr&eacute;s &agrave; cause d'un manque d'adh&eacute;rence des couches ; il a donc &eacute;t&eacute; imprim&eacute; &agrave; trop basse temp&eacute;rature. Je conseille de faire le m&ecirc;me test.</p>
+<h2>R&eacute;sultats : destruction</h2>
+<p>Enfin, vous voulez d&eacute;chirer la tour pour voir si les temp&eacute;ratures plus basses ont des effets n&eacute;gatifs sur la liaison des couches. Il ne devrait pas &ecirc;tre possible de d&eacute;chirer les couches &agrave; mains nues. Si un &eacute;tage peut &ecirc;tre facilement retard&eacute;, alors la temp&eacute;rature de cet &eacute;tage est certainement trop basse (ou vous avez eu trop de refroidissement en raison du ventilateur qui souffle trop fort), vous devez donc choisir une temp&eacute;rature plus &eacute;lev&eacute;e ou r&eacute;essayer avec moins de refroidissement. Lorsque vous essayez d'en briser un, ne mettez pas vos mains sur les extr&eacute;mit&eacute;s de la tour, mais sur l'&eacute;tage test&eacute; et le suivant, en ne laissant que les espaces entre les ponts.</p>
+<h2>Comment r&eacute;gler votre imprimante</h2>
+<p>Modifiez la temp&eacute;rature dans le r&eacute;glage de votre filament (extrudeuse -> autres couches), puis enregistrez-la. La temp&eacute;rature de la premi&egrave;re couche est souvent sup&eacute;rieure de 5 degr&eacute;s pour faciliter l'adh&eacute;sion du lit, vous devez donc &eacute;galement la modifier, surtout si elle est inf&eacute;rieure &agrave; la nouvelle temp&eacute;rature.</p>
+</ul>
+<h2>Notes</h2>
+<p>La plupart des calibrations doivent &ecirc;tre effectu&eacute;es dans l'ordre <strong>exacte</strong>. Celui-ci devrait &ecirc;tre le troisi&egrave;me.</p>
+<p>Les chiffres de la temp&eacute;rature ne seront affich&eacute;s qu'entre 180 et 285. Les valeurs sup&eacute;rieures ou inf&eacute;rieures ne seront pas affich&eacute;es mais le test sera effectu&eacute; avec succ&egrave;s, il suffit de s'en souvenir..</p>
+<p>Cette tour est r&eacute;alis&eacute;e avec le mod&egrave;le 3D <a href="https://www.thingiverse.com/thing:2729076">cr&eacute;&eacute; par gaaZolee</a> avec la license CC BY-SA 3.0.<p>
+</body>
+</html>

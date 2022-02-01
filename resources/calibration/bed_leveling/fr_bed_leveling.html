@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Calibration de la hauteur du plateau</title>
+</head>
+<body>
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Calibration de la hauteur du plateau</h1>
+</td>
+<td style="text-align: right;">besoin : rien</td>
+</tr>
+</tbody>
+</table>
+<p>Cette calibration est la premi&egrave;re &agrave; faire car elle est n&eacute;cessaire pour qu'une impression adh&egrave;re bien au plateau d'impression.</p>
+<p>Cette calibration est faite pour effectuer un r&eacute;glage fin. Veuillez mettre l'imprimante &agrave; niveau avant de commencer et placer la buse &agrave; 0,2 mm au-dessus du plateau. Vous devez &ecirc;tre capable de d&eacute;placer un papier entre la buse et le plateau, mais vous devez &ecirc;tre capable de sentir la buse la toucher. Apr&egrave;s cela, vous devriez &ecirc;tre capable de niveler le plateau avec une pr&eacute;cision de ~0,1mm.</p>
+<h2>Comment cela fonctionne</h2>
+<p>Tout d'abord, s&eacute;lectionnez votre imprimante et votre profil d'impression par d&eacute;faut avec le profil de filament pour le filament que vous avez. Notez que cette calibration ne fonctionne qu'avec votre premi&egrave;re extrudeuse si vous en avez plusieurs.</p>
+<p>En cliquant sur le bouton G&eacute;n&eacute;rer, le programme va cr&eacute;er et d&eacute;couper l'impression de test. Vous devez l'envoyer &agrave; votre imprimante et l'imprimer. Une fois l'impression termin&eacute;e, v&eacute;rifiez le r&eacute;sultat des cinq plaques par rapport aux photos ci-dessous. Vous devrez r&eacute;gler votre imprimante/logiciel pour corriger la hauteur si n&eacute;cessaire.</p>
+<p>Pour plus d'informations, lisez les notes et conseils ci-dessous.</p>
+<h2>R&eacute;sultats</h2>
+<table width="100%">
+<tbody>
+<tr>
+<td><img src="./low_ll.jpg" width="100" height="200" /></td>
+<td><img src="./low_l.jpg" width="100" height="200" /></td>
+<td><img src="./low.jpg" width="100" height="200" /></td>
+<td><img src="./good.jpg" width="100" height="200" /></td>
+<td><img src="./high.jpg" width="100" height="200" /></td>
+<td><img src="./high_h.jpg" width="100" height="200" /></td>
+<td><img src="./high_hh.jpg" width="100" height="200" /></td>
+</tr>
+<tr>
+<td style="text-align: center;">Beaucoup trop loin</td>
+<td style="text-align: center;">Trop loin</td>
+<td style="text-align: center;">Trop loin:<br />Vous pouvez rep&eacute;rer<br />un petit &eacute;cart</td>
+<td style="text-align: center;">Parfait</td>
+<td style="text-align: center;">Trop pr&egrave;s</td>
+<td style="text-align: center;">Avertissement!<br />C'est trop pr&egrave;s:<br />v&eacute;rifier l'&eacute;paisseur<br />avec vos doigts!</td>
+<td style="text-align: center;">Beaucoup trop pr&egrave;s<br />Dangerous<br />for the bed</td>
+</tr>
+</table>
+<h2>Comment r&eacute;gler votre imprimante</h2>
+<p><strong>Si votre imprimante a des vis de plateau</strong>, Utilisez-les pour lever ou abaisser le plateau correspondant &agrave; la pi&egrave;ce &agrave; ajuster. N'oubliez pas de r&eacute;imprimer le test apr&egrave;s l'ajustement pour v&eacute;rifier la compensation. Faites attention, car la plupart du temps, un demi-tour correspond &agrave; 0,2 mm de r&eacute;glage en hauteur, ce qui correspond g&eacute;n&eacute;ralement &agrave; la hauteur de la premi&egrave;re couche. Si vous &eacute;levez le plateau, ne tournez jamais plus que cela et ne r&eacute;glez g&eacute;n&eacute;ralement qu'un quart de tour au maximum.</p>
+<p><strong>S'il n'y a pas de vis de plateau</strong>, vous devez utiliser le logiciel ou modifier la configuration du micrologiciel. Reportez-vous au manuel de votre imprimante.</p>
+<h2>Conseils</h2>
+<p>Si votre filament a du mal &agrave; adh&eacute;rer au plateau, vous pouvez essayer :</p>
+<ul>
+<li>Augmentez la largeur de la premi&egrave;re couche, cela augmentera la pression sans aucune surextrusion. Vous pouvez aller jusqu'&agrave; 200% de largeur de buse, mais 150% devrait suffire. (Param&egrave;tres Avanc&eacute;s, R&eacute;glage de l'impression -> largeur)</li>
+<li>R&eacute;duisez la vitesse d'impression de la premi&egrave;re couche pour lui donner le temps de se coller. (Param&egrave;tres avanc&eacute;s, impression -> vitesse)</li>
+<li>Vous pouvez d&eacute;sactiver/activer le z-hop pour la premi&egrave;re couche en augmentant "only lift z"-&gt ; above Z" &agrave; une valeur sup&eacute;rieure &agrave; la hauteur de votre premi&egrave;re couche. L'activer peut tirer le filament du plateau et le d&eacute;sactiver peut laisser la buse frotter le plateau &gt ; pousser le filament d&eacute;pos&eacute;, vous devez donc faire des essais pour trouver la valeur optimale. (Param&egrave;tres avanc&eacute;s, imprimante -> extrudeuse)</li>
+</ul>
+<h2>Notes</h2>
+<p>Ce test utilise la hauteur actuelle de votre premi&egrave;re couche, mais vous pouvez l'augmenter jusqu'&agrave; 80 % de la hauteur de votre buse (avant d'utiliser 'g&eacute;n&eacute;rer') si c'est la premi&egrave;re fois que vous nivelez votre plateau afin de r&eacute;duire le risque d'un accident de collision avec la buse.</p>
+<p>Si, apr&egrave;s l'&eacute;talonnage du d&eacute;bit du filament, il apparaît que le d&eacute;bit &eacute;tait tr&egrave;s mauvais, vous voudrez peut-&ecirc;tre refaire cet &eacute;talonnage une autre fois.</p>
+<p>La plupart des calibrations doivent &ecirc;tre effectu&eacute;s dans le bon ordre. C'est le premier &agrave; faire. Mais si vous voulez obtenir de bons r&eacute;sultats, vous devez calibrer votre extrudeuse. Par exemple, si vous lui demandez d'extruder 100 mm de filament, c'est exactement la longueur de filament que l'extrudeuse doit pousser dans la buse.</p>
+<p>Ce test d&eacute;finit le param&egrave;tre "Compl&eacute;ter les objets individuels" sur vrai, donc vous pouvez vouloir r&eacute;initialiser vos param&egrave;tres d'impression par la suite.</p>
+<p>Licence pour les mod&egrave;les utilis&eacute;s pour cet essai de calibration: CC BY-SA 3.0</p>
+</body>
+</html>

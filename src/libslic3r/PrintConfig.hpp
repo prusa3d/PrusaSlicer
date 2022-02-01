@@ -561,6 +561,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                perimeter_speed))
     // Total number of perimeters.
     ((ConfigOptionInt,                  perimeters))
+    ((ConfigOptionPercent,              print_extrusion_multiplier))
+    ((ConfigOptionInt,                  print_temperature))
     ((ConfigOptionFloatOrPercent,       small_perimeter_speed))
     ((ConfigOptionFloat,                solid_infill_below_area))
     ((ConfigOptionInt,                  solid_infill_extruder))
@@ -1187,6 +1189,9 @@ namespace cereal {
         archive(cnt);
         for (auto it = config.cbegin(); it != config.cend(); ++it) {
             const Slic3r::ConfigOptionDef* optdef = Slic3r::print_config_def.get(it->first);
+            if (optdef == nullptr) {
+              continue;
+            }
             assert(optdef != nullptr);
             assert(optdef->serialization_key_ordinal > 0);
             archive(optdef->serialization_key_ordinal);

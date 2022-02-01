@@ -1,0 +1,2 @@
+voron_design_cube_v7.amf is under GPL V3, made by vorondesign (https://github.com/VoronDesign/Voron-2)
+xyzCalibration_cube is under CC BY-SA 3.0, made by iDig3Dprinting (https://www.thingiverse.com/thing:1278865)

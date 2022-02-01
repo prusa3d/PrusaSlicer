@@ -833,6 +833,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats { 1. });
 
+    def = this->add("print_extrusion_multiplier", coPercent);
+    def->label = L("Extrusion multiplier");
+    def->category = L("Filament");
+    def->tooltip = L("This factor changes the amount of flow proportionally. You may need to tweak "
+        "this setting to get nice surface finish and correct single wall widths. "
+        "Usual values are between 90% and 110%. If you think you need to change this more, "
+        "check filament diameter and your firmware E steps."
+        " This print setting is multiplied by the extrusion_multiplier from the filament tab."
+        " Its only purpose is to offer the same functionality but on a per-object basis.");
+    def->sidetext = L("%");
+    def->mode = comSimple;
+    def->min = 2;
+    def->set_default_value(new ConfigOptionPercent(100));
+
     def = this->add("extrusion_width", coFloatOrPercent);
     def->label = L("Default extrusion width");
     def->category = L("Extrusion Width");
@@ -2794,6 +2808,13 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = max_temp;
     def->set_default_value(new ConfigOptionInts { 200 });
+
+    def = this->add("print_temperature", coInt);
+    def->label = L("Temperature");
+    def->category = L("Filament");
+    def->tooltip = L("Override the temperature of the extruder. Avoid making too many changes, it won't stop for cooling/heating. 0 to disable. May only work on Height range modifiers.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("thick_bridges", coBool);
     def->label = L("Thick bridges");

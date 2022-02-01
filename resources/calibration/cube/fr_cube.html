@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Cube d'&eacute;talonnage</title>
+</head>
+<body>
+
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Cube d'&eacute;talonnage</h1>
+</td>
+<td style="text-align: right;"><strong>
+	<table><tr><td>besoins:</td><td style="text-align: left;">Plateau</td></tr>
+	<tr><td></td><td>D&eacute;bit</td></tr><tr><td></td><td>Temp&eacute;rature</td></tr></table>
+	</strong>
+</tr>
+</tbody>
+</table>
+
+<p>Cette page vous permet d'imprimer votre cube d'&eacute;talonnage pr&eacute;f&eacute;r&eacute;. C'est utile pour voir si votre imprimante est pr&eacute;cise et pour calibrer certains param&egrave;tres. La premi&egrave;re chose &agrave; faire est de s&eacute;lectionner votre objectif.</p>
+<h2>Objectif : pr&eacute;cision dimensionnelle</h2>
+<p>Vous devez imprimer deux cubes, avec des tailles diff&eacute;rentes. Si l'impr&eacute;cision dimensionnelle s'&eacute;chelonne avec la taille des cubes, alors c'est le pas/mm de vos <strong>moteurs pas-&agrave;-pas</strong> qui doit &ecirc;tre ajust&eacute; (note : si c'est le cas, vous devriez aussi ajuster le d&eacute;bit, et peut-&ecirc;tre refaire quelques calibrations si le changement est important). S'il n'y a pas d'&eacute;chelle, vous pouvez la corriger en ajustant votre <strong>Compensation en XY</strong> (onglet "Couche"). Avec le cube Voron, vous pouvez &eacute;galement tester la calibration des trous, car ceux-ci sont souvent trop petits. Le trou sur le dessus devrait &ecirc;tre juste (sur la version 30mm) pour qu'un roulement puisse &ecirc;tre int&eacute;gr&eacute; dedans.</p>
+<h2>Objectif : chevauchement du remplissage et du p&eacute;rim&egrave;tre</h2>
+<p>Ce test a pour but de voir si le motif du remplissage peut &ecirc;tre vu sur les p&eacute;rim&egrave;tres. Essayez de le r&eacute;duire au maximum, mais v&eacute;rifiez le remplissage plein sup&eacute;rieur, car il peut cr&eacute;er des artefacts s'il est trop faible. C'est mieux avec le cube standard, car vous avez une surface sup&eacute;rieure plus grande.</p>
+<!-- <h2>Objectif : chevauchement du p&eacute;rim&egrave;tre ext&eacute;rieur</h2> -->
+<!-- <p>Comme le p&eacute;rim&egrave;tre externe est imprim&eacute; en dernier, la position r&eacute;elle d&eacute;pend de la position et de l'&eacute;coulement de l'ensemble de la couche. Vous devez donc vous assurer que votre flux est parfait avant de faire ce test. La principale diff&eacute;rence se situe entre les couches de remplissage pleines et les couches de remplissage &eacute;parses, car la couche pleine peut pousser le p&eacute;rim&egrave;tre externe vers l'ext&eacute;rieur. Diminuer le chevauchement remplissage/p&eacute;rim&egrave;tre, diminuer le chevauchement du p&eacute;rim&egrave;tre externe peut aider &agrave; r&eacute;duire cet effet.</p> -->
+<h2>Notes</h2>
+<p>Ces tests devraient &ecirc;tre les derniers.</p>
+<p>La taille par d&eacute;faut du cube standard est de 20 mm et la taille standard du cube Voron est de 30 mm..</p>
+<p>Licence pour le cube d'&eacute;talonnage standard: CC BY-SA 3.0, <a href="https://www.thingiverse.com/thing:1278865">r&eacute;alis&eacute; par iDig3Dprinting</a></p>
+<p>Licence pour le cube d'&eacute;talonnage de voron: GPL V3, <a href="https://github.com/VoronDesign/Voron-2">r&eacute;alis&eacute; par vorondesign</a></p>
+</body>
+</html>

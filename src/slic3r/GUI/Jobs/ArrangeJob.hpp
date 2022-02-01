@@ -21,9 +21,6 @@ class ArrangeJob : public PlaterJob
     // clear m_selected and m_unselected, reserve space for next usage
     void clear_input();
 
-    // Prepare all objects on the bed regardless of the selection
-    void prepare_all();
-
     // Prepare the selected and unselected items separately. If nothing is
     // selected, behaves as if everything would be selected.
     void prepare_selected();
@@ -36,9 +33,10 @@ protected:
 
     void on_exception(const std::exception_ptr &) override;
 
-    void process() override;
-
 public:
+    // Prepare all objects on the bed regardless of the selection
+    void prepare_all();
+
     ArrangeJob(std::shared_ptr<ProgressIndicator> pri, Plater *plater)
         : PlaterJob{std::move(pri), plater}
     {}
@@ -47,6 +45,8 @@ public:
     {
         return int(m_selected.size() + m_unprintable.size());
     }
+
+    void process() override;
 
     void finalize() override;
 };

@@ -2432,6 +2432,7 @@ GCode::LayerResult GCode::process_layer(
                 this->set_origin(unscale(offset));
                 if (instance_to_print.object_by_extruder.support != nullptr && !print_wipe_extrusions) {
                     m_layer = layer_to_print.support_layer;
+                    gcode += this->set_print_temperature();
                     m_object_layer_over_raft = false;
                     gcode += this->extrude_support(
                         // support_extrusion_role is erSupportMaterial, erSupportMaterialInterface or erMixed for all extrusion paths.
@@ -2750,6 +2751,7 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
     for (const ObjectByExtruder::Island::Region &region : by_region)
         if (! region.perimeters.empty()) {
             m_config.apply(print.get_print_region(&region - &by_region.front()).config());
+            gcode += this->set_print_temperature();
 
             // plan_perimeters tries to place seams, it needs to have the lower_layer_edge_grid calculated already.
             if (m_layer->lower_layer && ! lower_layer_edge_grid)
@@ -2781,6 +2783,7 @@ std::string GCode::extrude_infill(const Print &print, const std::vector<ObjectBy
                     extrusions.emplace_back(ee);
             if (! extrusions.empty()) {
                 m_config.apply(print.get_print_region(&region - &by_region.front()).config());
+                gcode += this->set_print_temperature();
                 chain_and_reorder_extrusion_entities(extrusions, &m_last_pos);
                 for (const ExtrusionEntity *fill : extrusions) {
                     auto *eec = dynamic_cast<const ExtrusionEntityCollection*>(fill);
@@ -2826,6 +2829,22 @@ std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fill
         }
     }
     return gcode;
+}
+
+std::string GCode::set_print_temperature()
+{
+  std::string gcode = "";
+  auto extruder_id = m_writer.extruder()->id();
+
+  if (m_config.print_temperature > 0) {
+    gcode = m_writer.set_temperature(m_config.print_temperature.value, false, extruder_id);
+  } else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(extruder_id) > 0) {
+    gcode = m_writer.set_temperature(m_config.first_layer_temperature.get_at(extruder_id), false, extruder_id);
+  } else if (m_config.temperature.get_at(extruder_id) > 0) {
+    gcode = m_writer.set_temperature(m_config.temperature.get_at(extruder_id), false, extruder_id);
+  }
+
+  return gcode;
 }
 
 bool GCode::GCodeOutputStream::is_error() const 
@@ -2934,7 +2953,9 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
     }
 
     // calculate extrusion length per distance unit
-    double e_per_mm = m_writer.extruder()->e_per_mm3() * path.mm3_per_mm;
+    double e_per_mm = m_writer.extruder()->e_per_mm3()
+        * path.mm3_per_mm
+        * this->config().print_extrusion_multiplier.get_abs_value(1);
     if (m_writer.extrusion_axis().empty())
         // gcfNoExtrusion
         e_per_mm = 0;

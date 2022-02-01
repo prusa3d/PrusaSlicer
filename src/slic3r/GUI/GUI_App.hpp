@@ -230,6 +230,16 @@ public:
     void            recreate_GUI(const wxString& message);
     void            system_info();
     void            keyboard_shortcuts();
+    void            change_calibration_dialog(const wxDialog* have_to_destroy = nullptr, wxDialog* new_one = nullptr);
+    void            html_dialog();
+    void            bed_leveling_dialog();
+    void            flow_ratio_dialog();
+    void            filament_temperature_dialog();
+    void            bridge_tuning_dialog();
+    void            over_bridge_dialog();
+    void            calibration_cube_dialog();
+	  void            calibration_retraction_dialog();
+
     void            load_project(wxWindow *parent, wxString& input_file) const;
     void            import_model(wxWindow *parent, wxArrayString& input_files) const;
     void            load_gcode(wxWindow* parent, wxString& input_file) const;
@@ -295,6 +305,8 @@ public:
     PresetUpdater*  preset_updater{ nullptr };
     MainFrame*      mainframe{ nullptr };
     Plater*         plater_{ nullptr };
+    std::mutex      not_modal_dialog_mutex;
+    wxDialog*       not_modal_dialog = nullptr;
 
 	PresetUpdater*  get_preset_updater() { return preset_updater; }
 

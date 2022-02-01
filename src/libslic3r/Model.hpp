@@ -40,6 +40,7 @@ class ModelMaterial;
 class ModelObject;
 class ModelVolume;
 class ModelWipeTower;
+class PrintBase;
 class Print;
 class SLAPrint;
 class TriangleSelector;

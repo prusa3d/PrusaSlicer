@@ -5,6 +5,7 @@
 #include "Model.hpp"
 #include "ModelArrange.hpp"
 #include "Geometry/ConvexHull.hpp"
+#include "Print.hpp"
 #include "MTUtils.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "TriangleSelector.hpp"

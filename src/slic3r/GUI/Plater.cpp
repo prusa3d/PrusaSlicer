@@ -1822,7 +1822,7 @@ struct Plater::priv
     void remove(size_t obj_idx);
     void delete_object_from_model(size_t obj_idx);
     void delete_all_objects_from_model();
-    void reset();
+    void reset(std::string name = "");
     void mirror(Axis axis);
     void split_object();
     void split_volume();
@@ -2998,13 +2998,13 @@ void Plater::priv::delete_all_objects_from_model()
     model.custom_gcode_per_print_z.gcodes.clear();
 }
 
-void Plater::priv::reset()
+void Plater::priv::reset(std::string name)
 {
-    Plater::TakeSnapshot snapshot(q, _L("Reset Project"), UndoRedo::SnapshotType::ProjectSeparator);
+    Plater::TakeSnapshot snapshot(q, _L(name.empty()? "Reset Project" : name), UndoRedo::SnapshotType::ProjectSeparator);
 
 	clear_warnings();
 
-    set_project_filename(wxEmptyString);
+    set_project_filename(name.empty() ? wxString(wxEmptyString) : _L(name));
 
     if (view3D->is_layers_editing_enabled())
         view3D->enable_layers_editing(false);
@@ -5053,10 +5053,10 @@ Print&          Plater::fff_print()         { return p->fff_print; }
 const SLAPrint& Plater::sla_print() const   { return p->sla_print; }
 SLAPrint&       Plater::sla_print()         { return p->sla_print; }
 
-void Plater::new_project()
+bool Plater::new_project(std::string project_name)
 {
     if (int saved_project = p->save_project_if_dirty(_L("Creating a new project while the current project is modified.")); saved_project == wxID_CANCEL)
-        return;
+        return false;
     else {
         wxString header = _L("Creating a new project while some presets are modified.") + "\n" + 
                           (saved_project == wxID_YES ? _L("You can keep presets modifications to the new project or discard them") :
@@ -5067,16 +5067,17 @@ void Plater::new_project()
         if (saved_project == wxID_NO)
             act_buttons |= ab::SAVE;
         if (!wxGetApp().check_and_keep_current_preset_changes(_L("Creating a new project"), header, act_buttons))
-            return;
+            return false;
     }
 
     p->select_view_3D("3D");
     take_snapshot(_L("New Project"), UndoRedo::SnapshotType::ProjectSeparator);
     Plater::SuppressSnapshots suppress(this);
-    reset();
+    p->reset(project_name);
     reset_project_dirty_initial_presets();
     wxGetApp().update_saved_preset_from_current_preset();
     update_project_dirty_from_presets();
+    return true;
 }
 
 void Plater::load_project()
@@ -5455,7 +5456,7 @@ void Plater::select_all() { p->select_all(); }
 void Plater::deselect_all() { p->deselect_all(); }
 
 void Plater::remove(size_t obj_idx) { p->remove(obj_idx); }
-void Plater::reset() { p->reset(); }
+void Plater::reset(std::string name) { p->reset(name); }
 void Plater::reset_with_confirm()
 {
     if (p->model.objects.empty() ||

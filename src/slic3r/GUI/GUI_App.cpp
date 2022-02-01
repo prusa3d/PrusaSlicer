@@ -57,6 +57,13 @@
 #include "../Utils/Process.hpp"
 #include "../Utils/MacDarkMode.hpp"
 #include "slic3r/Config/Snapshot.hpp"
+#include "CalibrationBedDialog.hpp"
+#include "CalibrationBridgeDialog.hpp"
+#include "CalibrationCubeDialog.hpp"
+#include "CalibrationFlowDialog.hpp"
+#include "CalibrationOverBridgeDialog.hpp"
+#include "CalibrationTempDialog.hpp"
+#include "CalibrationRetractionDialog.hpp"
 #include "ConfigSnapshotDialog.hpp"
 #include "FirmwareDialog.hpp"
 #include "Preferences.hpp"
@@ -1737,6 +1744,73 @@ void GUI_App::keyboard_shortcuts()
 {
     KBShortcutsDialog dlg;
     dlg.ShowModal();
+}
+
+void GUI_App::change_calibration_dialog(const wxDialog* have_to_destroy, wxDialog* new_one){
+    std::string str;
+    if (have_to_destroy == nullptr) {
+        wxDialog* to_destroy = nullptr;
+        {
+            //hove to ensure that this release is "atomic"
+            std::unique_lock<std::mutex> lock(not_modal_dialog_mutex);
+            to_destroy = not_modal_dialog;
+            not_modal_dialog = nullptr;
+        }
+        if (to_destroy != nullptr) {
+            to_destroy->Destroy();
+        }
+    } else {
+        //hove to ensure that these two command are "atomic"
+        std::unique_lock<std::mutex> lock(not_modal_dialog_mutex);
+        if (not_modal_dialog == have_to_destroy) {
+            not_modal_dialog = nullptr;
+        }
+    }
+    if (new_one != nullptr) {
+        {
+            //hove to ensure that these command are "atomic"
+            std::unique_lock<std::mutex> lock(not_modal_dialog_mutex);
+            if (not_modal_dialog != nullptr)
+                not_modal_dialog->Destroy();
+            not_modal_dialog = new_one;
+        }
+        new_one->Show();
+    }
+    std::cout << str;
+    
+}
+
+void GUI_App::html_dialog()
+{
+    change_calibration_dialog(nullptr, new HtmlDialog(this, mainframe,"Introduction to calibrations", "/calibration", "introduction.html"));
+}
+void GUI_App::bed_leveling_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationBedDialog(this, mainframe));
+}
+void GUI_App::flow_ratio_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationFlowDialog(this, mainframe));
+}
+void GUI_App::over_bridge_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationOverBridgeDialog(this, mainframe));
+}
+void GUI_App::bridge_tuning_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationBridgeDialog(this, mainframe));
+}
+void GUI_App::filament_temperature_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationTempDialog(this, mainframe));
+}
+void GUI_App::calibration_cube_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationCubeDialog(this, mainframe));
+}
+void GUI_App::calibration_retraction_dialog()
+{
+    change_calibration_dialog(nullptr, new CalibrationRetractionDialog(this, mainframe));
 }
 
 // static method accepting a wxWindow object as first parameter

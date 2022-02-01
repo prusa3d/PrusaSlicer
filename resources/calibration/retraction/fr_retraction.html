@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Calibrage de la r&eacute;traction</title>
+</head>
+<body>
+
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Calibrage de la r&eacute;traction</h1>
+</td>
+<td style="text-align: right;"><strong>
+	<table><tr><td>besoins :</td><td style="text-align: left;">D&eacute;bit</td><td style="text-align: left;">Temp</td></tr>
+	</table>
+	</strong>
+</tr>
+</tbody>
+</table>
+
+<h2>Commentaire</h2>
+<p>Il est pr&eacute;f&eacute;rable d'avoir fait l'&eacute;talonnage du d&eacute;bit et de la temp&eacute;rature.
+Cette calibration vous aidera &agrave; choisir la bonne longueur de r&eacute;traction pour votre extrudeuse et le filament actuel.</p>
+<p>Ce test imprimera une pi&egrave;ce d'essai avec une longueur de r&eacute;traction croissante pour chaque millim&egrave;tre imprim&eacute; dans l'axe z.</p>
+<h3>Pas et hauteur</h3>
+<p> Si vous avez une extrudeuse en direct drive, il est pr&eacute;f&eacute;rable d'essayer avec un incr&eacute;ment de 0,1 mm et une hauteur d'environ 15 mm, car il n'est pas courant d'avoir besoin de plus d'un mm de r&eacute;traction.</h2>
+<p> Si vous avez une extrudeuse de type Bowden, il est pr&eacute;f&eacute;rable d'essayer avec un incr&eacute;ment de 0,5 mm et une hauteur d'environ 15 mm, car il n'est pas rare d'avoir besoin de plus de 6 mm de r&eacute;traction. Vous pouvez &eacute;galement utiliser un incr&eacute;ment de 0,2 mm et une hauteur sup&eacute;rieure. Faites attention, car une longueur de r&eacute;traction &eacute;lev&eacute;e augmentera consid&eacute;rablement le risque d'obstruction de la buse si vous en avez beaucoup.</h2>
+<h3>Temp&eacute;rature de d&eacute;part et &eacute;tape de diminution de la temp&eacute;rature</h3>
+<p>Par d&eacute;faut, il utilise la temp&eacute;rature actuelle pour un seul test. Il n'est donc pas n&eacute;cessaire d'y toucher, &agrave; moins que vous ne souhaitiez &eacute;galement optimiser la temp&eacute;rature pour &eacute;viter la formation de cordes.</p>
+<p>Dans l'&eacute;talonnage de la temp&eacute;rature, vous avez obtenu un intervalle de temp&eacute;rature o&ugrave; votre impression est "suffisamment bonne".</p>
+<p>Ici, vous voulez commencer &agrave; la temp&eacute;rature la plus &eacute;lev&eacute;e acceptable. Si vous l'avez d&eacute;j&agrave; d&eacute;finie dans la temp&eacute;rature de votre filament, vous pouvez conserver "actuelle" comme param&egrave;tre de la temp&eacute;rature de d&eacute;part. Si vous ne l'avez pas encore d&eacute;fini, s&eacute;lectionnez la temp&eacute;rature maximale dans le champ 'Temp&eacute;rature de d&eacute;part'.</p>
+<p>Apr&egrave;s cela, choisissez une option dans le champ "Dim. Temp&eacute;rature" qui ne r&eacute;duira pas la temp&eacute;rature trop bas. "3x10" signifie qu'il imprimera trois tests, le premier &agrave; la temp&eacute;rature maximale et les autres avec une temp&eacute;rature inf&eacute;rieure de 10C.</p>
+<h3>Supprimer le ralentissement du filament</h3>
+Ce bouton modifiera vos param&egrave;tres dans filament/cooling pour d&eacute;sactiver toutes les fonctions qui se d&eacute;clenchent lorsqu'une couche est trop petite pour pouvoir se refroidir &agrave; temps. Avec ces algorithmes d&eacute;sactiv&eacute;s, votre impression sera plus difficile en termes de r&eacute;traction, c'est donc un bon test de stress. Pour les r&eacute;activer, supprimez toutes les modifications de l'onglet filament (la petite "fl&egrave;che arri&egrave;re" orange).
+<h3>R&eacute;sultats</h3>
+<p>Lorsque les pi&egrave;ces d'essai sont imprim&eacute;es, vous pouvez compter le millim&egrave;tre gr&acirc;ce aux stries situ&eacute;es sur les cot&eacute;s des tours d'impression. Je les compte avec mon ongle. Quand vous &ecirc;tes &agrave; la hauteur o&ugrave; il n'y a plus de cordes, vous pouvez noter le nombre de millim&egrave;tres. Multipliez-le par votre param&egrave;tre de pas (0,1, 0,2, 0,5 ou 1) et vous avez votre nombre de longueur de r&eacute;traction. Vous pouvez ajouter 20% de longueur suppl&eacute;mentaire pour avoir une petite marge.</p>
+<p>Si vous disposez de plusieurs tirages &agrave; des temp&eacute;ratures diff&eacute;rentes, vous devez choisir le meilleur tirage, celui qui pr&eacute;sente le moins de fil, &agrave; moins que la diminution du filage ne soit pas assez importante pour justifier la baisse de temp&eacute;rature.
+<h2>Example</h2>
+<table width="100%">
+<tbody>
+<tr>
+<td><img src="./retraction.jpg" width="480" height="270" /></td>
+<td>Dans cette impression, le dernier petit cordon se produit &agrave; la hauteur de ~10. Comme j'ai utilis&eacute; un pas de 0,5, cela signifie que j'ai besoin d'au moins 5mm de r&eacute;traction, mais je vais le r&eacute;gler &agrave; 6 pour &ecirc;tre s&ucirc;r d'enlever presque tous les fil.</td>
+<td>
+</tr>
+</tbody>
+</table>
+<p> </p>
+<h2>Notes</h2>
+<p>La vitesse de r&eacute;traction doit &ecirc;tre r&eacute;gl&eacute;e &agrave; la valeur maximale que votre extrudeuse, vos pilotes et votre firmware peuvent supporter de mani&egrave;re fiable, avec une marge de s&eacute;curit&eacute;. 50mm/s pour la r&eacute;traction et 20mm/s pour la d&eacute;traction est un bon d&eacute;but pour le PLA.</p>
+<p>Licence pour les mod&egrave;les utilis&eacute;s pour cet essai de calibration: CC BY-SA 3.0</p>
+</body>
+</html>

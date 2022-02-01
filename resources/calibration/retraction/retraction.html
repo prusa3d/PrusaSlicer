@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Retraction Calibration</title>
+</head>
+<body>
+
+<table width="100%">
+<tbody>
+<tr>
+<td style="text-align: center;">
+<h1>Retraction Calibration</h1>
+</td>
+<td style="text-align: right;"><strong>
+	<table><tr><td>needs:</td><td style="text-align: left;">Flow</td><td style="text-align: left;">Temp</td></tr>
+	</table>
+	</strong>
+</tr>
+</tbody>
+</table>
+
+<h2>How to</h2>
+<p>It's preferable to have done the flow and temperature calibration.
+This calibration will help you to choose the right retraction length for your extruder and the current filament.</p>
+<p>This test will print a test piece with an increasing retraction length for each millimetre printed in the z axis.</p>
+<h3>Step & Height</h3>
+<p> If you have a direct extruder, it's best to try with a 0.1mm increment and ~ 15 mm height, as it's not common to need more than a mm of retraction.</h2>
+<p> If you have a Bowden extruder, it's best to try with a 0.5mm increment and ~ 15 mm height, as it's not uncommon to need more than 6mm of retraction. You can also use a 0.2 mm increment and a higher height. Be careful, as a high retraction length will greatly increase the risk of a nozzle clog if you have many of them.</h2>
+<h3>Start temp & Decrease temp step</h3>
+<p>By default, it uses the current temp for only one test. So you don't have to touch it unless you also want to optimise the temperature to prevent stringing.</p>
+<p>In the temperature calibration, you got an interval of temperature where your print is "good enough".</p>
+<p>Here, you want to start at the highest temperature acceptable. If you already set it into your filament temperature, you can keep "current" as the Start temp parameter. If you haven't set it yet, select the maximum temperature in the Start temp combo box field.</p>
+<p>After that, choose an option in the "Temp decr" field that won't reduce the temperature too low. "3x10" means that it will print three tests, with the first one at the max temp and each other ones with 10C less temperature.</p>
+<h3>Remove filament slowdown</h3>
+This button will change your settings in filament/cooling to disable all features that trigger when a layer is too small to be able to cool down in time. With these algorithms disabled, your print will be more challenging in terms of retraction, so it's a good stress test. To re-enable them, remove all modifications from the filament tab (the little orange 'back arrow").
+<h3>Results</h3>
+<p>When the test pieces are printed, you can count the millimetre with the ridges on the sides of the print towers. I count them with my nail. When you're at the height where there are no more strings, you can write down the millimetre number. Multiply it by your step parameter (0.1, 0.2, 0.5 or 1) and you have your retraction length number. You can add 20% more length to have a little margin.</p>
+<p>If you have multiple prints with different temperatures, you need to choose the best print, the one with the least amount of stringing, unless the decrease in stringing isn't big enough to warrant the decrease in temperature.
+<h2>Example</h2>
+<table width="100%">
+<tbody>
+<tr>
+<td><img src="./retraction.jpg" width="480" height="270" /></td>
+<td>In this print, the last little string happen at the height of ~10. As I've used a 0.5 step, it means that I need at least 5mm of retraction, but I'll set it to 6 to be sure to remove almost all stringing.</td>
+<td>
+</tr>
+</tbody>
+</table>
+<p> </p>
+<h2>Notes</h2>
+<p>The retraction speed should be set to the maximum value your extruder/drivers/firmware can reliably support, with a safety margin. 50mm/s for retraction and 20mm/s for unretraction is a good start for pla.</p>
+<p>Licence for models used for this calibration test: CC BY-SA 3.0</p>
+</body>
+</html>
