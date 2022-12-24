@@ -1302,6 +1302,17 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.8));
 
+    def = this->add("fuzzy_skin_displacement_map", coString);
+    def->label = L("Fuzzy skin displacement map");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("The fuzzy skin value will be from the mapped pixel brightness rather than random. "
+                     "The mapping is similar to cylindrical mapping within the scope of each perimeter, "
+                     "but the pixel offset is constant (based on fuzzy_skin_point_dist) "
+                     "to avoid changes in image scale along the Z axis.");
+    def->sidetext = L("Greyscale PNG file path (if used, point distance is mm per pixel)");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString());
+
     def = this->add("gap_fill_enabled", coBool);
     def->label = L("Fill gaps");
     def->category = L("Layers and Perimeters");

@@ -176,7 +176,8 @@ void Layer::make_perimeters()
 		                && config.infill_overlap              == other_config.infill_overlap
                         && config.fuzzy_skin                  == other_config.fuzzy_skin
                         && config.fuzzy_skin_thickness        == other_config.fuzzy_skin_thickness
-                        && config.fuzzy_skin_point_dist       == other_config.fuzzy_skin_point_dist)
+                        && config.fuzzy_skin_point_dist       == other_config.fuzzy_skin_point_dist
+                        && config.fuzzy_skin_displacement_map == other_config.fuzzy_skin_displacement_map)
 		            {
 			 			other_layerm->perimeters.clear();
 			 			other_layerm->fills.clear();

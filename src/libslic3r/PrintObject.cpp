@@ -648,6 +648,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "fuzzy_skin"
             || opt_key == "fuzzy_skin_thickness"
             || opt_key == "fuzzy_skin_point_dist"
+            || opt_key == "fuzzy_skin_displacement_map"
             || opt_key == "overhangs"
             || opt_key == "thin_walls"
             || opt_key == "thick_bridges") {

@@ -45,6 +45,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         ExtrusionEntityCollection loops;
         ExtrusionEntityCollection gap_fill;
         SurfaceCollection         fill_surfaces;
+        double z = 0.0;
         PerimeterGenerator        perimeter_generator(
             &slices, 
             1., // layer height
@@ -54,7 +55,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
             static_cast<const PrintConfig*>(&config),
             false, // spiral_vase
             // output:
-            &loops, &gap_fill, &fill_surfaces);
+            &loops, &gap_fill, &fill_surfaces, z);
         perimeter_generator.process();
 
         THEN("expected number of collections") {

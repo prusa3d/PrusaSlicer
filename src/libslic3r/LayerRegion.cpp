@@ -89,7 +89,8 @@ void LayerRegion::make_perimeters(const SurfaceCollection &slices, SurfaceCollec
         // output:
         &this->perimeters,
         &this->thin_fills,
-        fill_surfaces
+        fill_surfaces,
+        this->layer()->print_z
     );
     
     if (this->layer()->lower_layer != nullptr)

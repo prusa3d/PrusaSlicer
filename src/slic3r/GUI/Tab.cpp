@@ -1456,6 +1456,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("fuzzy_skin", category_path + "fuzzy-skin-type");
         optgroup->append_single_option_line("fuzzy_skin_thickness", category_path + "fuzzy-skin-thickness");
         optgroup->append_single_option_line("fuzzy_skin_point_dist", category_path + "fuzzy-skin-point-distance");
+        optgroup->append_single_option_line("fuzzy_skin_displacement_map", category_path + "fuzzy-skin-displacement-map");
 
     page = add_options_page(L("Infill"), "infill");
         category_path = "infill_42#";
