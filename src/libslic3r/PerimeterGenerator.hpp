@@ -11,43 +11,6 @@
 
 namespace Slic3r {
 
-class BackendImage
-{
-  private:
-    // PNGDescr* descr;
-    png::ImageGreyscale image;
-    std::string image_path;
-    bool LoadPng(std::string path);
-    bool Clamp(size_t& x, size_t& y);
-    bool busy;
-    bool error_shown; // Another thread already has shown an error so don't try load again (prevent multiple error dialogs).
-    bool dump(); // dump rgb values as CSV for debugging (HUGE stdout dump)
-  public:
-    BackendImage() :
-        // descr(nullptr),
-        error_shown(false),
-        busy(false)
-    {}
-    ~BackendImage() {
-        /*
-        if (descr != nullptr) {
-            delete descr;
-        }
-        */
-    }
-    bool LoadGreyscalePng(std::string path);
-    bool LoadFile(std::string path);
-    std::string path();
-    size_t GetWidth();
-    size_t GetHeight();
-     
-    uint8_t GetRed(size_t x, size_t y);
-    uint8_t GetGreen(size_t x, size_t y);
-    uint8_t GetBlue(size_t x, size_t y);
-    bool IsOk();
-    void Destroy();
-};
-
 class PerimeterGenerator {
 public:
     // Inputs:

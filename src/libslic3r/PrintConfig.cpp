@@ -1309,7 +1309,7 @@ void PrintConfigDef::init_fff_params()
                      "The mapping is similar to cylindrical mapping within the scope of each perimeter, "
                      "but the pixel offset is constant (based on fuzzy_skin_point_dist) "
                      "to avoid changes in image scale along the Z axis.");
-    def->sidetext = L("Greyscale PNG file path (if used, point distance is mm per pixel)");
+    def->sidetext = L("PNG file path (If used, point distance is mm per pixel where small decimals on big models may use more than 16G RAM).");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionString());
 

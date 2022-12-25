@@ -6,8 +6,6 @@
 
 #include <cmath>
 #include <cassert>
-#include <fstream>
-#include <vector>
 // typedef unsigned char Byte;
 
 // Get the correct sleep function:
@@ -143,149 +141,7 @@ public:
     bool is_internal_contour() const;
 };
 
-bool BackendImage::LoadGreyscalePng(std::string path) {
-    this->busy = true; // every return (and throw) statement must set this to false.
-    this->error_shown = false;
-    // Private since format-specific
-    // Load data using STL: See <https://stackoverflow.com/a/21802936/4541104>
-    std::vector <uint8_t> vec; // since ImageGreyscale uses template class Image with uint8_t for PxT (pixel type)
-    std::ifstream file(path, std::ios::binary);
-    if (file.fail()) {
-        this->image_path = "";
-        this->busy = false;
-        throw ConfigurationError(
-            "The fuzzy_skin_displacement_map \""
-            + path + "\" does not exist. Change the path and re-slice to clear the invalid state."
-        );        
-        // return false;
-    }
-    file.unsetf(std::ios::skipws); // Do not skip \n
-    std::streampos fileSize;
-    file.seekg(0, std::ios::end);
-    fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
-    vec.reserve(fileSize);
-    vec.insert(vec.begin(),
-               std::istream_iterator<uint8_t>(file),
-               std::istream_iterator<uint8_t>());
-    // Now translate the bytes to a png structure if that is proper:
-    png::ReadBuf        rb{static_cast<void*>(vec.data()), fileSize}; // pre-C++11: (void*)&pixels_[0]
-    if (!png::decode_png(rb, this->image)) {
-        this->image_path = "";
-        this->busy = false;
-        this->error_shown = true;
-        throw ConfigurationError(
-            std::string("Error: fuzzy_skin_displacement_map=\"")
-            + path + "\" wasn't recognized as an 8-bit Greyscale PNG file. Change the path and re-slice to clear the invalid state."
-        );
-        // return false;
-    }
-    this->image_path = path;
-    // this->dump(); // for debug only
-    this->busy = false;
-    return true;    
-}
-
-bool BackendImage::LoadFile(std::string path)
-{
-    double delay = .1;
-    double total_delay = 0.0;
-    double delay_timeout = 100; // how many seconds to wait for other thread(s)
-    while (this->busy) {
-        // wait for the other thread.
-        if (total_delay >= delay_timeout) {
-            std::cerr << "[BackendImage::LoadFile] waiting for other thread(s) timed out." << std::endl;
-            // FIXME: Find a way to avoid IsOK() is false after this if the image was still loading in another thread and will have succeeded.
-            break;
-        }
-        sleep(delay);
-        total_delay += delay;
-    }
-    if (total_delay > 0.0) {
-        if (this->path() == path) {
-            // Another thread already loaded the correct image.
-            return true;
-        }
-        else if (this->IsOk()) {
-            // Another thread probably already loaded the correct image.
-            return true;
-        }
-        else if (this->error_shown) {
-            // Assume another thread already failed,
-            //   otherwise the caller may throw more than once
-            //   (display more than one error dialog) when the path is
-            //   not blank but this->path() is blank (this->IsOk() is false).
-            return false;
-        }
-    }
-    // TODO: Support other formats if another headless (non-wx) image loader besides libpng is in the project.
-    return this->LoadGreyscalePng(path);
-}
-bool BackendImage::dump() {
-    std::cerr<<"[BackendImage] \"" << this->path() << "\" (OK:" << (this->IsOk()?"true":"false") << ") dump:" <<std::endl;
-    if (!this->IsOk()) return false;
-    for (size_t y=0; y<this->GetHeight(); y++) {
-        for (size_t x=0; x<this->GetWidth(); x++) {
-            std::cout << (x==0?"":",") << std::to_string(this->GetRed(x, y));
-        }
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-    return true;
-}
-std::string BackendImage::path()
-{
-    return this->image_path;
-}
-size_t BackendImage::GetWidth()
-{
-    return this->image.cols;
-}
-size_t BackendImage::GetHeight()
-{
-    return this->image.rows;
-}
-bool BackendImage::Clamp(size_t& x, size_t& y) {
-    bool was_in_bounds = true;
-    if (x >= this->GetWidth()) {
-        was_in_bounds = false;
-        x %= this->GetWidth();
-    }
-    if (y >= this->GetHeight()) {
-        was_in_bounds = false;
-        y %= this->GetHeight();
-    }
-    return was_in_bounds;
-}
-uint8_t BackendImage::GetRed(size_t x, size_t y)
-{
-    this->Clamp(x, y);
-    return this->image.get(y, x);
-}
-uint8_t BackendImage::GetGreen(size_t x, size_t y)
-{
-    this->Clamp(x, y);
-    return this->image.get(y, x);
-}
-uint8_t BackendImage::GetBlue(size_t x, size_t y)
-{
-    this->Clamp(x, y);
-    return this->image.get(y, x);
-}
-bool BackendImage::IsOk()
-{
-    if (this->image_path == "") {
-        return false;
-    }
-    return true;
-}
-void BackendImage::Destroy()
-{
-    std::vector<uint8_t>().swap(this->image.buf);  // Swap buf with a new a tmp vector to reduce the buffer capacity (memory usage).
-    this->image_path = "";
-}
-
-BackendImage displacement_img;
+png::BackendPng displacement_img;
 
 // Thanks Cura developers for this function. PrusaSlicer community member Poikilos implemented displacement_img.
 static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuzzy_skin_point_dist, const double z)
@@ -312,12 +168,12 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
     if (mapped) {
         resolution = fuzzy_skin_point_dist; // A lower value can sharpen edges, but if a 1024x1024 image uses too high of a divisor (like 32 for a 200mm high model using 16MB RAM) the program will have increased slicing time by 32x (and likely have an OOM crash)!
         pixel_y = pixel_v;
-        // pixel_y = (double)(((int)(pixel_v+.5)) % displacement_img.GetHeight()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
-        // pixel_y = displacement_img.GetHeight() - pixel_y; // Flip it so the bottom pixel (GetHeight()-1) is at the first layer(s) (z=~0) of the print.
+        pixel_y = static_cast<double>((static_cast<int>(pixel_v+.5)) % displacement_img.GetHeight()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
+        pixel_y = displacement_img.GetHeight() - pixel_y; // Flip it so the bottom pixel (GetHeight()-1) is at the first layer(s) (z=~0) of the print.
         // std::cerr << "z=" << z << " / fuzzy_skin_point_dist=" << fuzzy_skin_point_dist << " and mapped becomes " << pixel_y << "" << std::endl; // debug only (and messy since multithreaded)
     }
     else {
-        dist_left_over = double(rand()) * (min_dist_between_points / 2) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
+        dist_left_over = double(rand()) * (min_dist_between_points / 2.) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
     }
     double total_dist = 0.0; // Keep track of total travel for displacement_img mapping.
     for (Point &p1 : poly.points)
@@ -331,7 +187,7 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
                 p0pa_dist += resolution)
             {
                 pixel_x = (double)((int)(pixel_u+.5) % displacement_img.GetWidth()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
-                double value = double(displacement_img.GetBlue((int)(pixel_x+.5), (int)(pixel_y+.5))) / 255.0;
+                double value = double(displacement_img.GetLuma((int)(pixel_x+.5), (int)(pixel_y+.5))) / 255.0;
                 double r = (1.0 - value) * (fuzzy_skin_thickness * 2.) - fuzzy_skin_thickness;
                 // Adding +.5 before casting to int is effectively the same as rounding.
                 // Using GetBlue, GetRed or GetGreen doesn't matter since the image should have been loaded as gray.
@@ -371,7 +227,7 @@ using PerimeterGeneratorLoops = std::vector<PerimeterGeneratorLoop>;
 static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perimeter_generator, const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls)
 {
     std::string this_displacement_map_path = perimeter_generator.config->fuzzy_skin_displacement_map.value;
-    if (this_displacement_map_path != displacement_img.path()) {
+    if (this_displacement_map_path != displacement_img.GetPath()) {
         if (this_displacement_map_path != "") {
             displacement_img.LoadFile(this_displacement_map_path);
             /*

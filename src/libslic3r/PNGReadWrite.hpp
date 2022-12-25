@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <istream>
+#include <png.h>
 
 namespace Slic3r { namespace png {
 
@@ -28,7 +29,7 @@ using ImageGreyscale = Image<uint8_t>;
 // TODO (if needed): implement transformation of rgb images into grayscale...
 bool decode_png(IStream &stream, ImageGreyscale &out_img);
 
-// TODO (if needed)
+// Use BackendPng instead. Image<RGB> gets messy to load since static_cast<png_bytep>(...) on this doesn't work.
 // struct RGB { uint8_t r, g, b; };
 // using ImageRGB = Image<RGB>;
 // bool decode_png(IStream &stream, ImageRGB &img);
@@ -38,6 +39,50 @@ bool decode_png(IStream &stream, ImageGreyscale &out_img);
 struct ReadBuf { const void *buf = nullptr; const size_t sz = 0; };
 
 bool is_png(const ReadBuf &pngbuf);
+
+/// Implement a drop-in replacement, in most or all use cases, for wxImage but for backend use.
+/// This class is based on the decode_png and elements from Image implementations, both from PNGReadWrite.*.
+class BackendPng {
+private:
+    png_struct *png = nullptr;
+    png_info *info = nullptr;
+    std::string image_path;
+    size_t m_pixel_size = 0;
+    size_t m_stride;
+    size_t cols;
+    size_t rows;
+    bool m_color;
+    bool error_shown = false;
+    bool busy = false;
+    std::vector<uint8_t> buf;
+    bool reinitialize(bool force);
+    bool load_png_file(std::string path);
+    bool load_png_stream(IStream &in_buf, std::string optional_stated_path, bool next_busy);
+    bool load_png_stream(const ReadBuf& in_buff, std::string optional_stated_path, bool next_busy);
+    bool clamp(size_t& x, size_t& y);
+    std::string get_type_message(png_byte color_type);
+    bool dump();
+public:
+    BackendPng() = default;
+    BackendPng(const BackendPng&) = delete;
+    BackendPng(BackendPng&&) = delete;
+    BackendPng& operator=(const BackendPng&) = delete;
+    BackendPng& operator=(BackendPng&&) = delete;
+    void Destroy();
+    ~BackendPng()
+    {
+        this->Destroy();
+    }
+    bool IsOk();
+    std::string GetPath();
+    bool LoadFile(std::string path);
+    size_t GetWidth();
+    size_t GetHeight();
+    uint8_t GetRed(size_t x, size_t y);
+    uint8_t GetGreen(size_t x, size_t y);
+    uint8_t GetBlue(size_t x, size_t y);
+    uint8_t GetLuma(size_t x, size_t y);
+};
 
 template<class Img> bool decode_png(const ReadBuf &in_buf, Img &out_img)
 {
