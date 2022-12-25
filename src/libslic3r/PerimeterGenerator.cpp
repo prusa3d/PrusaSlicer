@@ -154,7 +154,8 @@ bool BackendImage::LoadGreyscalePng(std::string path) {
         this->image_path = "";
         this->busy = false;
         throw ConfigurationError(
-            "The fuzzy_skin_displacement_map \""+path+"\" does not exist. Change the path and re-slice to clear the invalid data."
+            "The fuzzy_skin_displacement_map \""
+            + path + "\" does not exist. Change the path and re-slice to clear the invalid state."
         );        
         // return false;
     }
@@ -175,7 +176,7 @@ bool BackendImage::LoadGreyscalePng(std::string path) {
         this->error_shown = true;
         throw ConfigurationError(
             std::string("Error: fuzzy_skin_displacement_map=\"")
-            + path + "\" wasn't recognized as an 8-bit Greyscale PNG file. Change the path and re-slice to clear the invalid data."
+            + path + "\" wasn't recognized as an 8-bit Greyscale PNG file. Change the path and re-slice to clear the invalid state."
         );
         // return false;
     }
