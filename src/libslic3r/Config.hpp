@@ -16,6 +16,7 @@
 #include "clonable_ptr.hpp"
 #include "Exception.hpp"
 #include "Point.hpp"
+#include "PNGReadWrite.hpp" // ideally some kind of cache or interface (IBackendImage or something) would be used instead of BackendPng directly.
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/trim.hpp>
@@ -80,6 +81,10 @@ extern bool         unescape_string_cstyle(const std::string &str, std::string &
 extern bool         unescape_strings_cstyle(const std::string &str, std::vector<std::string> &out);
 
 extern std::string  escape_ampersand(const std::string& str);
+
+extern std::map<std::string, png::BackendPng> config_images;
+// ^ consider: std::map<std::string, shared_ptr<BackendPng>> config_images; // use `new` and pointers but let delete get called automatically
+extern png::BackendPng no_image; // A non-loaded image (IsOK() should always be false) for avoiding returning nullptr.
 
 namespace ConfigHelpers {
 	inline bool looks_like_enum_value(std::string value)
@@ -2065,9 +2070,50 @@ public:
 
     static size_t load_from_gcode_string_legacy(ConfigBase& config, const char* str, ConfigSubstitutionContext& substitutions);
 
+    /*!
+    Get a pointer to the displacement map. The return is always non-null.
+    If the param is false but the function was not properly called on the main thread
+    beforehand with true, an exception will be raised (It will appear in the GUI, but it
+    is an implementation error and should be fixed before release).
+
+    @param opt_key_str The string equivalent to the opt_key that will also be used as the
+                       caching key in config_images.
+    @param main_thread If true, the call must be made outside of a multithreading context.
+                       In threads should be called with false to avoid multithreading issues,
+                       by forcing an exception if not already loaded.
+    */
+    const png::BackendPng* opt_image(std::string opt_key_str, bool main_thread) const {
+        // ConfigOption* path_opt = this->option("fuzzy_skin_displacement_map", false);
+        // if (path_opt == nullptr) {
+        //     return &no_image;
+        // }
+        // std::string path = dynamic_cast<std::string>(path_opt->get()); // incorrect?
+        const std::string& path = this->opt_string(opt_key_str).empty()
+                                      ? std::string("") // print_config_def.get("fuzzy_skin_displacement_map")->get_default_value<ConfigOptionString>()->value
+                                      : this->opt_string(opt_key_str);
+        if (path == "") {
+            return &no_image;
+        }
+
+        auto pos = config_images.find(path); // std::map<string, png::BackendImage>::const_iterator pos =
+        if (pos == config_images.end()) {
+            if (!main_thread) {
+                throw ConfigurationError(opt_key_str + " has a new value."
+                                         " opt_image(\"" + opt_key_str + "\", true) must"
+                                         " be accessed within the main thread first to preload it"
+                                         " (This is a problem with implementation not a runtime error).");
+                // return nullptr;
+            }
+            config_images[path] = png::BackendPng();
+            config_images[path].LoadFile(path);
+        }
+        // else Some other function should clear config_images cache in case the same image file changed on storage.
+        return &config_images[path];
+    }
 private:
     // Set a configuration value from a string.
     bool set_deserialize_raw(const t_config_option_key& opt_key_src, const std::string& value, ConfigSubstitutionContext& substitutions, bool append);
+    // png::BackendPng m_displacement_img;  //!< This must be loaded from fuzzy_skin_displacement_map (see apply_config; Using a cached image accessed by the option key may be better).
 };
 
 // Configuration store with dynamic number of configuration values.

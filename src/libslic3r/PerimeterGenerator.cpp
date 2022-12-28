@@ -3,6 +3,7 @@
 #include "ExtrusionEntityCollection.hpp"
 #include "ShortestPath.hpp"
 #include "PNGReadWrite.hpp"
+#include "Print.hpp" // PrintObject declaration etc
 
 #include <cmath>
 #include <cassert>
@@ -141,10 +142,75 @@ public:
     bool is_internal_contour() const;
 };
 
-png::BackendPng displacement_img;
+static inline double surface_offset(double offset, double max_offset, double fuzzy_skin_thickness) {
+    return (offset) * (fuzzy_skin_thickness * 2.) / max_offset - fuzzy_skin_thickness;
+}
 
-// Thanks Cura developers for this function. PrusaSlicer community member Poikilos implemented displacement_img.
-static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuzzy_skin_point_dist, const double z)
+/*!
+Map a surface point to a 2d U (horizontal) value on a texture map, but expressed in millimeters due to the value's usage in PrusaSlicer.
+The side matters since the texture should be wrapped around the whole object, not just one side, starting with the left,
+to match the behavior of cube maps as used in the graphics field.
+To reduce the number of calculations, the U value is not conformed to 0.0 to 1.0 like usual U values.
+It is not 3D cube mapping but it will work for any point that is neither on the top nor bottom
+(It would work but visibly behave like square mapping rather than cube mapping in those cases).
+
+@param center The center of the bounding_box, pre-calculated for caching or customization.
+@param bounding_box The extents of the model from a top view.
+@param flat_point The surface point from a top view (variance in depth relative to center only matters if it puts the point in a different side).
+*/
+static inline double cubemap_side_u(const Point& center, const BoundingBox& bounding_box, const Point& flat_point) {
+    double angle_rad = atan2(flat_point.y() - center.y(), flat_point.x() - center.x());
+    double angle_deg = angle_rad * 180. / 3.14159;
+    // -180 < angle_deg <= 180.
+    // int side = 0;
+    double previous_sides_total_length = 0.0;
+    double relative_offset;
+    if (angle_deg > 135. || angle_deg <= -135.) { // left (side 0)
+        relative_offset = bounding_box.size().y() - (flat_point.y() - bounding_box.min.y());
+        // ^ inverse since the left side *of* the left side is at the back, which has a larger y value than the front.
+    } else if (angle_deg < -45.) { // front (2nd side in cube mapping)
+        // side = 1;
+        previous_sides_total_length = bounding_box.size().y(); // left's length is its y size.
+        relative_offset = flat_point.x() - bounding_box.min.x();
+    }
+    else if (angle_deg <= 45.) { // right
+        // side = 2;
+        previous_sides_total_length =
+            bounding_box.size().y() // left's length is its y size.
+            + bounding_box.size().x() // front's length is its x size (width).
+        ;
+        relative_offset = flat_point.y() - bounding_box.min.y();
+    } else { // (angle_deg > 45. && angle_deg <= 135) { // back
+        // side = 3;
+        previous_sides_total_length =
+            bounding_box.size().y() * 2. // length of left + right (same, so * 2)
+            + bounding_box.size().x() // front's length is its x size (width).
+        ;
+        relative_offset = bounding_box.size().x() - (flat_point.x() - bounding_box.min.x());
+        // ^ inverse since the left side *of* the back is the right.
+    }
+    return previous_sides_total_length + relative_offset;
+}
+
+/*!
+\brief Create a fuzzy polygon from an existing polygon.
+
+Create a fuzzy polygon from an existing polygon. If a displacement map is used
+(object->config().displacement_img().IsOk()), the spacing is fuzzy_skin_point_dist per pixel.
+In that case z is used with fuzzy_skin_point_dist to determine the y pixel in the displacement map.
+Otherwise, distance between points gets a random change of +- 1/4 and z is ignored.
+
+Thanks Cura developers for this function. PrusaSlicer community member Poikilos initially implemented displacement_img and cube mapping.
+
+@param poly The original polygon (a single perimeter).
+@param fuzzy_skin_thickness The maximum random amount to affect the depth of the surface (total of in or out change).
+@param z The location of the perimeter starting from the bottom of the model (used only for mapping).
+@param object The PrintObject* used to access the bounding_box. Both that and displacement_img are used for mapping, but only if
+              displacement_img->IsOk() (loaded/unloaded from fuzzy_skin_displacement_map path by apply_config).
+@param displacement_img The map used when fuzzy map is enabled in PrintRegionConfig (not in PrintObjectConfig in object)
+                        requiring this extra argument in every deeper call.
+*/
+static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuzzy_skin_point_dist, const double z, const PrintObject* object, const png::BackendPng* displacement_img)
 {
     // This function must recieve scaled<double>(value) for each double argument, such as to improve float accuracy.
     const double min_dist_between_points = fuzzy_skin_point_dist * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
@@ -164,12 +230,25 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
     // ^ Note: z and fuzzy_skin_point_dist must both have been scaled using scale<double>(value) for this to work correctly.
     double pixel_x = 0.0;
     double pixel_y = 0.0;
-    bool mapped = displacement_img.IsOk();  // Check if the option is being used at all.
+    BoundingBox bounding_box;
+    bool mapped = (displacement_img != nullptr) && displacement_img->IsOk();  // Check if the option is being used at all.
+    if (object == nullptr) {
+        if (mapped) {
+            mapped = false;
+            std::cerr << "Error: object is nullptr but displacement_img IsOk. This should never happen"
+                " (and object should only be nullptr in test(s)), and mapping has been set back to false." << std::endl;
+        }
+    }
+
+    Point center;
     if (mapped) {
+        // Only access `object` if mapped (or tests that set object to nullptr will cause an exception).
+        bounding_box = object->bounding_box();
+        center = bounding_box.center();
         resolution = fuzzy_skin_point_dist; // A lower value can sharpen edges, but if a 1024x1024 image uses too high of a divisor (like 32 for a 200mm high model using 16MB RAM) the program will have increased slicing time by 32x (and likely have an OOM crash)!
         pixel_y = pixel_v;
-        pixel_y = static_cast<double>((static_cast<int>(pixel_v+.5)) % displacement_img.GetHeight()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
-        pixel_y = displacement_img.GetHeight() - pixel_y; // Flip it so the bottom pixel (GetHeight()-1) is at the first layer(s) (z=~0) of the print.
+        pixel_y = static_cast<double>((static_cast<int>(pixel_v+.5)) % displacement_img->GetHeight()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
+        pixel_y = displacement_img->GetHeight() - pixel_y; // Flip it so the bottom pixel (GetHeight()-1) is at the first layer(s) (z=~0) of the print.
         // std::cerr << "z=" << z << " / fuzzy_skin_point_dist=" << fuzzy_skin_point_dist << " and mapped becomes " << pixel_y << "" << std::endl; // debug only (and messy since multithreaded)
     }
     else {
@@ -180,22 +259,28 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
     { // 'a' is the (next) new point between p0 and p1
         Vec2d  p0p1      = (p1 - *p0).cast<double>();
         double p0p1_size = p0p1.norm();
-        // so that p0p1_size - dist_last_point evaulates to dist_left_over - p0p1_size
+        // so that p0p1_size - dist_last_point evaluates to dist_left_over - p0p1_size
         double dist_last_point = dist_left_over + p0p1_size * 2.;
         if (mapped) {
             for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
                 p0pa_dist += resolution)
             {
-                pixel_x = (double)((int)(pixel_u+.5) % displacement_img.GetWidth()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
-                double value = double(displacement_img.GetLuma((int)(pixel_x+.5), (int)(pixel_y+.5))) / 255.0;
-                double r = (1.0 - value) * (fuzzy_skin_thickness * 2.) - fuzzy_skin_thickness;
-                // Adding +.5 before casting to int is effectively the same as rounding.
-                // Using GetBlue, GetRed or GetGreen doesn't matter since the image should have been loaded as gray.
-                // max is 255 since it is image data (assumes 1 byte per channel as is expected in most cases including all known wx cases).
-                // Future: Check if loaded as RGB, and in that case, use it as a normal map instead (usefulness of that would need to be determined).
-                out.emplace_back(*p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+                // First get the side for cubic mapping.
+                // a. Get the flat (non-fuzzy, or .5 offset) point first, to determine the 2D in-between point for mapping.
+                double radius = surface_offset(.5, 1.0, fuzzy_skin_thickness); // The initial value is a "neutral" radius, *only* for calculating flat_point.
+                Point flat_point = *p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * radius).cast<coord_t>();
+                // ^ should be the same math as below.
+                // b. determine the face:
+                pixel_u = cubemap_side_u(center, bounding_box, flat_point) / fuzzy_skin_point_dist;
+                pixel_x = (double)((int)(pixel_u+.5) % displacement_img->GetWidth()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
+                radius = surface_offset(255.0 - double(displacement_img->GetLuma((int)(pixel_x+.5), (int)(pixel_y+.5))), 255.0, fuzzy_skin_thickness);
+                // ^ Adding +.5 before casting to int is effectively the same as rounding.
+                // ^ Using GetBlue, GetRed or GetGreen doesn't matter since the image should have been loaded as gray.
+                // ^ max is 255 since it is image data (assumes 1 byte per channel as is expected in most cases including all known wx cases).
+                // ^ inverse (255 - luma) due to existing behavior of surface_offset (code was moved to there unmodified from 'else' case below).
+                out.emplace_back(*p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * radius).cast<coord_t>());
                 dist_last_point = p0pa_dist;
-                pixel_u = total_dist / fuzzy_skin_point_dist;
+                // pixel_u = total_dist / fuzzy_skin_point_dist; // This would always start at the seam, which is only reliable in models with double two-way symmetry where seam is "Aligned".
                 total_dist += resolution;
             }
         }
@@ -203,8 +288,8 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
             for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
                 p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX))
             {
-                double r = double(rand()) * (fuzzy_skin_thickness * 2.) / double(RAND_MAX) - fuzzy_skin_thickness;
-                out.emplace_back(*p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+                double radius = surface_offset(rand(), double(RAND_MAX), fuzzy_skin_thickness);
+                out.emplace_back(*p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * radius).cast<coord_t>());
                 dist_last_point = p0pa_dist;
             }
         }
@@ -224,33 +309,8 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
 
 using PerimeterGeneratorLoops = std::vector<PerimeterGeneratorLoop>;
 
-static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perimeter_generator, const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls)
+static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perimeter_generator, const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls, const PrintObject* object)
 {
-    std::string this_displacement_map_path = perimeter_generator.config->fuzzy_skin_displacement_map.value;
-    if (this_displacement_map_path != displacement_img.GetPath()) {
-        if (this_displacement_map_path != "") {
-            displacement_img.LoadFile(this_displacement_map_path);
-            /*
-            This check is too strict: It causes large images to fail due to multi-threading issues (probably state of IsOk() when called after delay_timeout).
-            if (!displacement_img.LoadFile(this_displacement_map_path))
-            {
-                // cerr << "[traverse_loops] Error: Loading fuzzy_skin_displacement_map=\""
-                //     << this_displacement_map_path
-                //     << "\" failed." << endl;
-                throw ConfigurationError(
-                    std::string("Error: fuzzy_skin_displacement_map=\"")
-                    + this_displacement_map_path + "\" wasn't recognized as an 8-bit Greyscale PNG file. Change the path and re-slice to clear the invalid data."
-                );
-            }
-            else {
-                cerr << "[traverse_loops] Loaded fuzzy_skin_displacement_map=\"" << this_displacement_map_path << "\"" << std::endl;
-            }
-            */
-        }
-        else {
-            displacement_img.Destroy();
-        }
-    }
     // loops is an arrayref of ::Loop objects
     // turn each one into an ExtrusionLoop object
     ExtrusionEntityCollection   coll;
@@ -275,7 +335,14 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
         const Polygon &polygon = loop.fuzzify ? fuzzified : loop.polygon;
         if (loop.fuzzify) {
             fuzzified = loop.polygon;
-            fuzzy_polygon(fuzzified, scaled<double>(perimeter_generator.config->fuzzy_skin_thickness.value), scaled<double>(perimeter_generator.config->fuzzy_skin_point_dist.value), scaled<double>(perimeter_generator.z_of_current_layer));
+            fuzzy_polygon(
+                fuzzified,
+                scaled<double>(perimeter_generator.config->fuzzy_skin_thickness.value),
+                scaled<double>(perimeter_generator.config->fuzzy_skin_point_dist.value),
+                scaled<double>(perimeter_generator.z_of_current_layer),
+                object,
+                perimeter_generator.config->opt_image("fuzzy_skin_displacement_map", false)
+            );
         }
         if (perimeter_generator.config->overhangs && perimeter_generator.layer_id > perimeter_generator.object_config->raft_layers
             && ! ((perimeter_generator.object_config->support_material || perimeter_generator.object_config->support_material_enforce_layers > 0) && 
@@ -337,7 +404,7 @@ static ExtrusionEntityCollection traverse_loops(const PerimeterGenerator &perime
         } else {
             const PerimeterGeneratorLoop &loop = loops[idx.first];
             assert(thin_walls.empty());
-            ExtrusionEntityCollection children = traverse_loops(perimeter_generator, loop.children, thin_walls);
+            ExtrusionEntityCollection children = traverse_loops(perimeter_generator, loop.children, thin_walls, object);
             out.entities.reserve(out.entities.size() + children.entities.size() + 1);
             ExtrusionLoop *eloop = static_cast<ExtrusionLoop*>(coll.entities[idx.first]);
             coll.entities[idx.first] = nullptr;
@@ -397,8 +464,10 @@ void PerimeterGenerator::process()
         m_lower_slices_polygons = offset(*this->lower_slices, float(scale_(+nozzle_diameter/2)));
     }
 
-    // we need to process each island separately because we might have different
-    // extra perimeters for each one
+    // We need to process each island separately because we might have different
+    // extra perimeters for each one.
+    // - this->object should only be accessed if a map is used, otherwise test(s) must be modified
+    //   to generate an object and ensure `object` param of the PerimeterGenerator constructor is not nullptr.
     for (const Surface &surface : this->slices->surfaces) {
         // detect how many perimeters must be generated for this island
         int        loop_number = this->config->perimeters + surface.extra_perimeters - 1;  // 0-indexed loops
@@ -556,7 +625,7 @@ void PerimeterGenerator::process()
                 }
             }
             // at this point, all loops should be in contours[0]
-            ExtrusionEntityCollection entities = traverse_loops(*this, contours.front(), thin_walls);
+            ExtrusionEntityCollection entities = traverse_loops(*this, contours.front(), thin_walls, this->object);
             // if brim will be printed, reverse the order of perimeters so that
             // we continue inwards after having finished the brim
             // TODO: add test for perimeter order

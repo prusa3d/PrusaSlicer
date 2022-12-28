@@ -29,6 +29,9 @@
 
 namespace Slic3r {
 
+std::map<std::string, png::BackendPng> config_images;
+png::BackendPng no_image; // A non-loaded image (IsOK() should always be false) for avoiding returning nullptr.
+
 // Escape \n, \r and backslash
 std::string escape_string_cstyle(const std::string &str)
 {
@@ -460,6 +463,22 @@ void ConfigBase::apply_only(const ConfigBase &other, const t_config_option_keys 
 		} else
             my_opt->set(other_opt);
     }
+    // ConfigOption *path_opt = this->option("fuzzy_skin_displacement_map", false); // tries to use deleted = operator?
+    // std::string path_opt = "/home/owner/Maps/wall/Bricks076A_1K-JPG/Bricks076A_1K_Displacement-512-RGBA.png"; // this->option("fuzzy_skin_displacement_map", false)->value;
+    // dynamic_cast<std::string>(*this->option("fuzzy_skin_displacement_map"))->value;
+    /*
+    if (path_opt != nullptr) {
+        std::string this_displacement_map_path = path_opt;
+        if (this_displacement_map_path != displacement_img.GetPath()) {
+            if (this_displacement_map_path != "") {
+                this->m_displacement_img.LoadFile(this_displacement_map_path);
+            }
+            else {
+                m_displacement_img.Destroy();
+            }
+        }
+    }
+    */
 }
 
 // Are the two configs equal? Ignoring options not present in both configs.

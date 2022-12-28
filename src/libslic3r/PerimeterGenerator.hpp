@@ -8,6 +8,7 @@
 #include "PrintConfig.hpp"
 #include "SurfaceCollection.hpp"
 #include "PNGReadWrite.hpp"
+#include "Print.hpp" // PrintObject declaration etc
 
 namespace Slic3r {
 
@@ -23,7 +24,8 @@ public:
     Flow                         overhang_flow;
     Flow                         solid_infill_flow;
     const PrintRegionConfig     *config;
-    const PrintObjectConfig     *object_config;
+    const PrintObjectConfig     *object_config; // Deprecate since object is here now (Would require refactoring in several files)?
+    const PrintObject           *object;
     const PrintConfig           *print_config;
     // Outputs:
     ExtrusionEntityCollection   *loops;
@@ -31,28 +33,32 @@ public:
     SurfaceCollection           *fill_surfaces;
     const double                 z_of_current_layer;
     
-    PerimeterGenerator(
+    PerimeterGenerator( // also used in test_perimeters
         // Input:
         const SurfaceCollection*    slices,
         double                      layer_height,
         Flow                        flow,
         const PrintRegionConfig*    config,
-        const PrintObjectConfig*    object_config,
+        // const PrintObjectConfig*    object_config,
+        const PrintObject*          object, // must not be null if map such as fuzzy_skin_displacement_map is used
         const PrintConfig*          print_config,
         const bool                  spiral_vase,
+        double                      z,
+
         // Output:
         // Loops with the external thin walls
         ExtrusionEntityCollection*  loops,
         // Gaps without the thin walls
         ExtrusionEntityCollection*  gap_fill,
         // Infills without the gap fills
-        SurfaceCollection*          fill_surfaces,
-        double                      z
+        SurfaceCollection*          fill_surfaces
         )
         : slices(slices), lower_slices(nullptr), layer_height(layer_height),
             layer_id(-1), perimeter_flow(flow), ext_perimeter_flow(flow),
             overhang_flow(flow), solid_infill_flow(flow),
-            config(config), object_config(object_config), print_config(print_config),
+            config(config), print_config(print_config),
+            object_config(&object->config()),
+            object(object),
             m_spiral_vase(spiral_vase),
             m_scaled_resolution(scaled<double>(print_config->gcode_resolution.value)),
             loops(loops), gap_fill(gap_fill), fill_surfaces(fill_surfaces),

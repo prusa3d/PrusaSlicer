@@ -40,8 +40,12 @@ struct ReadBuf { const void *buf = nullptr; const size_t sz = 0; };
 
 bool is_png(const ReadBuf &pngbuf);
 
-/// Implement a drop-in replacement, in most or all use cases, for wxImage but for backend use.
-/// This class is based on the decode_png and elements from Image implementations, both from PNGReadWrite.*.
+/*!
+Implement a drop-in replacement, in most or all use cases, for wxImage but for backend use.
+This class is based on the decode_png and elements from Image implementations, both from PNGReadWrite.*.
+If this class is extended, it should imitate wxImage as much as possible for consistency between GUI and
+CLI code. Otherwise an interface should be created and this would be the backend implementation of that.
+*/
 class BackendPng {
 private:
     png_struct *png = nullptr;
@@ -59,29 +63,29 @@ private:
     bool load_png_file(std::string path);
     bool load_png_stream(IStream &in_buf, std::string optional_stated_path, bool next_busy);
     bool load_png_stream(const ReadBuf& in_buff, std::string optional_stated_path, bool next_busy);
-    bool clamp(size_t& x, size_t& y);
-    std::string get_type_message(png_byte color_type);
-    bool dump();
+    bool clamp(size_t& x, size_t& y) const;
+    std::string get_type_message(png_byte color_type) const;
+    bool dump() const;
 public:
     BackendPng() = default;
     BackendPng(const BackendPng&) = delete;
-    BackendPng(BackendPng&&) = delete;
-    BackendPng& operator=(const BackendPng&) = delete;
-    BackendPng& operator=(BackendPng&&) = delete;
+    // (BackendPng&&) = delete;
+    // BackendPng& operator=(const BackendPng&) = delete;
+    // BackendPng& operator=(BackendPng&&) = delete;
     void Destroy();
     ~BackendPng()
     {
         this->Destroy();
     }
-    bool IsOk();
-    std::string GetPath();
+    bool IsOk() const;
+    std::string GetPath() const;
     bool LoadFile(std::string path);
-    size_t GetWidth();
-    size_t GetHeight();
-    uint8_t GetRed(size_t x, size_t y);
-    uint8_t GetGreen(size_t x, size_t y);
-    uint8_t GetBlue(size_t x, size_t y);
-    uint8_t GetLuma(size_t x, size_t y);
+    size_t GetWidth() const;
+    size_t GetHeight() const;
+    uint8_t GetRed(size_t x, size_t y) const;
+    uint8_t GetGreen(size_t x, size_t y) const;
+    uint8_t GetBlue(size_t x, size_t y) const;
+    uint8_t GetLuma(size_t x, size_t y) const;
 };
 
 template<class Img> bool decode_png(const ReadBuf &in_buf, Img &out_img)

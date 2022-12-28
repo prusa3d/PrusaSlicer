@@ -74,7 +74,7 @@ static void png_read_callback(png_struct *png_ptr,
 }
 
 
-bool BackendPng::IsOk() {
+bool BackendPng::IsOk() const {
     //if (this->image_path == "") {
     if (this->m_pixel_size < 1) {
         return false;
@@ -88,7 +88,7 @@ bool BackendPng::IsOk() {
     return true;
 }
 
-bool BackendPng::dump() {
+bool BackendPng::dump() const {
     std::cerr<<"[BackendImage] \"" << this->GetPath() << "\" (OK:" << (this->IsOk()?"true":"false") << ") dump:" <<std::endl;
     if (!this->IsOk()) return false;
     for (size_t y=0; y<this->GetHeight(); y++) {
@@ -110,8 +110,7 @@ bool BackendPng::dump() {
     return true;
 }
 
-std::string BackendPng::GetPath()
-{
+std::string BackendPng::GetPath() const {
     return this->image_path;
 }
 
@@ -134,11 +133,16 @@ bool BackendPng::reinitialize(bool force) {
         png_destroy_read_struct(&png, nullptr, nullptr);
         this->png = nullptr;
     }
+    /*
     if (info) {
         std::cerr << "[reinitialize] Error: Unexpected png info will be deleted." << std::endl;
         delete this->info;
         this->info = nullptr;
     }
+    // Don't do this. The compiler says:
+    // - "invalid use of incomplete type ‘struct png_info_def’" "png.h:484:16: note: forward declaration of ‘struct png_info_def’"
+    // - "neither the destructor nor the class-specific ‘operator delete’ will be called, even if they are declared when the class is defined"
+    */
     this->image_path = "";
     this->m_pixel_size = 0; // cause IsOk() to return false.
     this->error_shown = false;
@@ -146,8 +150,7 @@ bool BackendPng::reinitialize(bool force) {
     return true;
 }
 
-void BackendPng::Destroy()
-{
+void BackendPng::Destroy() {
     this->reinitialize(true);
 }
 
@@ -338,8 +341,7 @@ bool BackendPng::load_png_stream(const ReadBuf &in_buf, std::string optional_sta
     return this->load_png_stream(stream, optional_stated_path, next_busy);
 }
 
-bool BackendPng::LoadFile(std::string path)
-{
+bool BackendPng::LoadFile(std::string path) {
     if (this->image_path == path) {
         // another thread must have already loaded it.
         return true;
@@ -358,7 +360,9 @@ bool BackendPng::LoadFile(std::string path)
             return false; // Another thread already failed to load the image.
         }
         if (total_delay >= delay_timeout) {
-            std::cerr << "[BackendImage::LoadFile] waiting for other thread(s) timed out." << std::endl;
+            std::cerr << "[BackendImage::LoadFile] waiting for other thread(s) timed out."
+                         " To avoid this, implement caching (for example, see config_images)"
+                         " and use the main thread only (for example, see image_opt)." << std::endl;
             // FIXME: Find a way to avoid IsOK() is false after this if the image was still loading in another thread and will have succeeded.
             break;
         }
@@ -391,17 +395,15 @@ bool BackendPng::LoadFile(std::string path)
 }
 
 
-size_t BackendPng::GetWidth()
-{
+size_t BackendPng::GetWidth() const {
     return this->cols;
 }
 
-size_t BackendPng::GetHeight()
-{
+size_t BackendPng::GetHeight() const {
     return this->rows;
 }
 
-bool BackendPng::clamp(size_t& x, size_t& y) {
+bool BackendPng::clamp(size_t& x, size_t& y) const {
     bool was_in_bounds = true;
     if (x >= this->GetWidth()) {
         was_in_bounds = false;
@@ -414,7 +416,7 @@ bool BackendPng::clamp(size_t& x, size_t& y) {
     return was_in_bounds;
 }
 
-std::string BackendPng::get_type_message(png_byte color_type) {
+std::string BackendPng::get_type_message(png_byte color_type) const {
     std::string type_msg = "";
     if (color_type == PNG_COLOR_TYPE_PALETTE) {
         type_msg = " with indexed color";
@@ -432,7 +434,7 @@ std::string BackendPng::get_type_message(png_byte color_type) {
     return type_msg;
 }
 
-uint8_t BackendPng::GetRed(size_t x, size_t y) {
+uint8_t BackendPng::GetRed(size_t x, size_t y) const {
     // PNG stores each pixel in RGBA order unless png_set_bgr is called,
     //   or png_set_swap_alpha is called to move A to beginning
     //   (See <http://www.libpng.org/pub/png/libpng-1.2.5-manual.html>).
@@ -440,17 +442,21 @@ uint8_t BackendPng::GetRed(size_t x, size_t y) {
     return buf[y * this->m_stride + x * this->m_pixel_size];
 }
 
-uint8_t BackendPng::GetGreen(size_t x, size_t y) {
+uint8_t BackendPng::GetGreen(size_t x, size_t y) const {
     this->clamp(x, y);
+    if (!this->m_color)
+        return buf[y * this->m_stride + x * this->m_pixel_size];
     return buf[y * this->m_stride + x * this->m_pixel_size + 1];
 }
 
-uint8_t BackendPng::GetBlue(size_t x, size_t y) {
+uint8_t BackendPng::GetBlue(size_t x, size_t y) const {
     this->clamp(x, y);
+    if (!this->m_color)
+        return buf[y * this->m_stride + x * this->m_pixel_size];
     return buf[y * this->m_stride + x * this->m_pixel_size + 2];
 }
 
-uint8_t BackendPng::GetLuma(size_t x, size_t y) {
+uint8_t BackendPng::GetLuma(size_t x, size_t y) const {
     this->clamp(x, y);
     if (this->m_pixel_size < 3) { // GRAY or GRAY_ALPHA
         return buf[y * this->m_stride + x * this->m_pixel_size];

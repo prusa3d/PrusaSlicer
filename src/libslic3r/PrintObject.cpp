@@ -147,6 +147,8 @@ void PrintObject::make_perimeters()
         if (! region.config().extra_perimeters || region.config().perimeters == 0 || region.config().fill_density == 0 || this->layer_count() < 2)
             continue;
 
+        //const png::BackendPng* tmp =
+        region.config().opt_image("fuzzy_skin_displacement_map", true);  // Preload the image in each region before threading (opt_image caches 1 per path).
         BOOST_LOG_TRIVIAL(debug) << "Generating extra perimeters for region " << region_id << " in parallel - start";
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size() - 1),
