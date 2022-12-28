@@ -157,10 +157,11 @@ It is not 3D cube mapping but it will work for any point that is neither on the 
 @param center The center of the bounding_box, pre-calculated for caching or customization.
 @param bounding_box The extents of the model from a top view.
 @param flat_point The surface point from a top view (variance in depth relative to center only matters if it puts the point in a different side).
+@param normal_radians The normal of the flat_point expressed in radians from the top view (X-Y plane).
 */
-static inline double cubemap_side_u(const Point& center, const BoundingBox& bounding_box, const Point& flat_point) {
-    double angle_rad = atan2(flat_point.y() - center.y(), flat_point.x() - center.x());
-    double angle_deg = angle_rad * 180. / 3.14159;
+static inline double cubemap_side_u(const Point& center, const BoundingBox& bounding_box, const Point& flat_point, const double normal_radians) {
+    // double normal_radians = atan2(flat_point.y() - center.y(), flat_point.x() - center.x());
+    double angle_deg = normal_radians * 180. / 3.14159;
     // -180 < angle_deg <= 180.
     // int side = 0;
     double previous_sides_total_length = 0.0;
@@ -255,6 +256,7 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
         dist_left_over = double(rand()) * (min_dist_between_points / 2.) / double(RAND_MAX); // the distance to be traversed on the line before making the first new point
     }
     double total_dist = 0.0; // Keep track of total travel for displacement_img mapping.
+    const double rand_max_d = double(RAND_MAX);
     for (Point &p1 : poly.points)
     { // 'a' is the (next) new point between p0 and p1
         Vec2d  p0p1      = (p1 - *p0).cast<double>();
@@ -269,9 +271,11 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
                 // a. Get the flat (non-fuzzy, or .5 offset) point first, to determine the 2D in-between point for mapping.
                 double radius = surface_offset(.5, 1.0, fuzzy_skin_thickness); // The initial value is a "neutral" radius, *only* for calculating flat_point.
                 Point flat_point = *p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * radius).cast<coord_t>();
+                Point normal_point = *p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * (radius+1.0)).cast<coord_t>();
                 // ^ should be the same math as below.
+                double normal_radians = atan2(normal_point.y() - flat_point.y(), normal_point.x() - flat_point.x());
                 // b. determine the face:
-                pixel_u = cubemap_side_u(center, bounding_box, flat_point) / fuzzy_skin_point_dist;
+                pixel_u = cubemap_side_u(center, bounding_box, flat_point, normal_radians) / fuzzy_skin_point_dist;
                 pixel_x = (double)((int)(pixel_u+.5) % displacement_img->GetWidth()); // +.5 to round; "Clamp" the texture using the "repeat" method (in graphics terms).
                 radius = surface_offset(255.0 - double(displacement_img->GetLuma((int)(pixel_x+.5), (int)(pixel_y+.5))), 255.0, fuzzy_skin_thickness);
                 // ^ Adding +.5 before casting to int is effectively the same as rounding.
@@ -288,7 +292,7 @@ static void fuzzy_polygon(Polygon &poly, double fuzzy_skin_thickness, double fuz
             for (double p0pa_dist = dist_left_over; p0pa_dist < p0p1_size;
                 p0pa_dist += min_dist_between_points + double(rand()) * range_random_point_dist / double(RAND_MAX))
             {
-                double radius = surface_offset(rand(), double(RAND_MAX), fuzzy_skin_thickness);
+                double radius = surface_offset(rand(), rand_max_d, fuzzy_skin_thickness);
                 out.emplace_back(*p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * radius).cast<coord_t>());
                 dist_last_point = p0pa_dist;
             }
