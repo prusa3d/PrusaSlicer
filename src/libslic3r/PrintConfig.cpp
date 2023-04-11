@@ -3396,6 +3396,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("z_clearance", coFloat);
+    def->label = L("Z clearance");
+    def->tooltip = L("This is a minimum height for lift after retraction. It prevents nozzle crash to glass clips, etc. "
+                   "Set to a bit more then such objects, if there is head movement over clips.");
+    def->sidetext = L("mm");
+    def->mode = comAdvanced;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("perimeter_generator", coEnum);
     def->label = L("Perimeter generator");
     def->category = L("Layers and Perimeters");
