@@ -412,7 +412,8 @@ wxBoxSizer* Preview::create_layers_slider_sizer()
     m_layers_slider = new DoubleSlider::Control(this, wxID_ANY, 0, 0, 0, 100);
 
     m_layers_slider->SetDrawMode(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA,
-        wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("complete_objects"));
+        wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("complete_objects")
+     || wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("parallel_objects"));
     m_layers_slider->enable_action_icon(wxGetApp().is_editor());
 
     sizer->Add(m_layers_slider, 0, wxEXPAND, 0);
@@ -536,7 +537,9 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     m_layers_slider->SetTicksValues(ticks_info_from_model);
 
     bool sla_print_technology = plater->printer_technology() == ptSLA;
-    bool sequential_print = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("complete_objects");
+    bool sequential_print = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("complete_objects")
+                         || wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("parallel_objects");
+    
     m_layers_slider->SetDrawMode(sla_print_technology, sequential_print);
     if (sla_print_technology)
         m_layers_slider->SetLayersTimes(plater->sla_print().print_statistics().layers_times);

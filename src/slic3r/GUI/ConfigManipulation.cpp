@@ -213,6 +213,16 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             }
         }
     }
+
+    if (config->option<ConfigOptionBool>("complete_objects")->value && config->option<ConfigOptionBool>("parallel_objects")->value) {
+        MessageDialog dialog(m_msg_dlg_parent, "Choose either 'Complete' or 'By laer range'", _L("Sequential printing"), wxICON_WARNING | wxOK);
+        dialog.ShowModal();
+
+        DynamicPrintConfig new_conf = *config;
+        new_conf.set_key_value("complete_objects", new ConfigOptionBool(false));
+        new_conf.set_key_value("parallel_objects", new ConfigOptionBool(false));
+        apply(config, &new_conf);
+    }
 }
 
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
@@ -316,7 +326,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "ironing_type", "ironing_flowrate", "ironing_spacing", "ironing_speed" })
     	toggle_field(el, has_ironing);
 
-    bool have_sequential_printing = config->opt_bool("complete_objects");
+    bool have_sequential_printing = config->opt_bool("complete_objects") || config->opt_bool("parallel_objects");
     for (auto el : { "extruder_clearance_radius", "extruder_clearance_height" })
         toggle_field(el, have_sequential_printing);
 

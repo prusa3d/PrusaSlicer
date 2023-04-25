@@ -758,6 +758,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("parallel_objects", coBool);
+    def->label = L("Print objects by layer range");
+    def->tooltip = L("This feature will complete each object height range before moving to next one (first layers will be still printed one by one. "
+                   "It could prevent stringing and excessive extruder movements. " 
+                   "To prevent collision put nozzle radius (probably with sock) and height of heatblock in the fields below (with margins). "
+				   "This option doesn't work with object instances!");
+    def->set_default_value(new ConfigOptionBool(false));
+    
     def = this->add("cooling", coBools);
     def->label = L("Enable auto cooling");
     def->tooltip = L("This flag enables the automatic cooling logic that adjusts print speed "

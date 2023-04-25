@@ -210,6 +210,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             osteps.emplace_back(posSlice);
         } else if (
                opt_key == "complete_objects"
+            || opt_key == "parallel_objects"
             || opt_key == "filament_type"
             || opt_key == "first_layer_temperature"
             || opt_key == "filament_loading_speed"
@@ -524,10 +525,10 @@ std::string Print::validate(std::vector<std::string>* warnings) const
     if (extruders.empty())
         return _u8L("The supplied settings will cause an empty print.");
 
-    if (m_config.complete_objects) {
+    if (m_config.complete_objects || m_config.parallel_objects) {
         if (!sequential_print_horizontal_clearance_valid(*this, const_cast<Polygons*>(&m_sequential_print_clearance_contours)))
             return _u8L("Some objects are too close; your extruder will collide with them.");
-        if (!sequential_print_vertical_clearance_valid(*this))
+        if (!m_config.parallel_objects && !sequential_print_vertical_clearance_valid(*this))
             return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
     }
     else
@@ -542,7 +543,7 @@ std::string Print::validate(std::vector<std::string>* warnings) const
         for (const PrintObject *object : m_objects)
             total_copies_count += object->instances().size();
         // #4043
-        if (total_copies_count > 1 && ! m_config.complete_objects.value)
+        if (total_copies_count > 1 && (! m_config.complete_objects.value || !m_config.parallel_objects.value))
             return _u8L("Only a single object may be printed at a time in Spiral Vase mode. "
                      "Either remove all but the last object, or enable sequential mode by \"complete_objects\".");
         assert(m_objects.size() == 1);
@@ -623,7 +624,7 @@ std::string Print::validate(std::vector<std::string>* warnings) const
             return _u8L("Ooze prevention is only supported with the wipe tower when 'single_extruder_multi_material' is off.");
         if (m_config.use_volumetric_e)
             return _u8L("The Wipe Tower currently does not support volumetric E (use_volumetric_e=0).");
-        if (m_config.complete_objects && extruders.size() > 1)
+        if ((m_config.complete_objects || m_config.parallel_objects) && extruders.size() > 1)
             return _u8L("The Wipe Tower is currently not supported for multimaterial sequential prints.");
         
         if (m_objects.size() > 1) {
@@ -977,7 +978,7 @@ void Print::process()
         if (this->has_wipe_tower()) {
             //this->set_status(95, _u8L("Generating wipe tower"));
             this->_make_wipe_tower();
-        } else if (! this->config().complete_objects.value) {
+        } else if (! this->config().complete_objects.value /*&& !this->config().parallel_objects.value*/) {
         	// Initialize the tool ordering, so it could be used by the G-code preview slider for planning tool changes and filament switches.
         	m_tool_ordering = ToolOrdering(*this, -1, false);
             if (m_tool_ordering.empty() || m_tool_ordering.last_extruder() == unsigned(-1))
