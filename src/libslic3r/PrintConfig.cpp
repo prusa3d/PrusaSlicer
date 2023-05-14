@@ -1073,7 +1073,7 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Extrusion Width");
     def->tooltip = L("Set this to a non-zero value to set a manual extrusion width for external perimeters. "
                    "If left zero, default extrusion width will be used if set, otherwise a sum of "
-                   "layer height and nozzle diameter will be used. "
+                   "nozzle diameter and layer height * 0.5 will be used."
                    "If expressed as percentage (for example 200%), it will be computed over layer height.");
     def->sidetext = L("mm or %");
     def->min = 0;
@@ -3260,7 +3260,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Support material");
     def->category = L("Extrusion Width");
     def->tooltip = L("Set this to a non-zero value to set a manual extrusion width for support material. "
-                   "If left zero, default extrusion width will be used if set, otherwise nozzle diameter will be used. "
+                   "If left zero, default extrusion width will be used if set, otherwise the sum of "
+                   "nozzle diameter and layer height * 0.5 will be used."
                    "If expressed as percentage (for example 90%) it will be computed over layer height.");
     def->sidetext = L("mm or %");
     def->min = 0;
