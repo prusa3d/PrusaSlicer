@@ -30,10 +30,11 @@ float Flow::auto_extrusion_width(FlowRole role, float nozzle_diameter, float hei
     switch (role) {
     case frTopSolidInfill:
         return nozzle_diameter;
-    default:
     case frSupportMaterial:
     case frSupportMaterialInterface:
     case frExternalPerimeter:
+        return height > .0f ? 0.5f * height + nozzle_diameter : 1.125f * nozzle_diameter;
+    default:
     case frPerimeter:
     case frSolidInfill:
     case frInfill:
