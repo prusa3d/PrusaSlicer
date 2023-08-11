@@ -213,6 +213,16 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             }
         }
     }
+
+    if (config->option<ConfigOptionInt>("skirts")->value > 0 && config->option<ConfigOptionInt>("draft_shield_loops")->value > config->option<ConfigOptionInt>("skirts")->value) {
+        MessageDialog dialog(m_msg_dlg_parent, "Draft shield loops can not be more than skirt loops", _L("Draft shield"), wxICON_WARNING | wxOK);
+        dialog.ShowModal();
+
+        DynamicPrintConfig new_conf = *config;
+        new_conf.set_key_value("draft_shield_loops", new ConfigOptionInt(config->option<ConfigOptionInt>("skirts")->value));
+        apply(config, &new_conf);
+    }
+
 }
 
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
@@ -265,9 +275,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_default_acceleration);
 
     bool have_skirt = config->opt_int("skirts") > 0;
-    toggle_field("skirt_height", have_skirt && config->opt_enum<DraftShield>("draft_shield") != dsEnabled);
-    for (auto el : { "skirt_distance", "draft_shield", "min_skirt_length" })
+    for (auto el : {"skirt_distance", "draft_shield", "draft_shield_loops", "min_skirt_length"})
         toggle_field(el, have_skirt);
+
+    toggle_field("draft_shield_loops", config->opt_enum<DraftShield>("draft_shield") != dsDisabled);
 
     bool have_brim = config->opt_enum<BrimType>("brim_type") != btNoBrim;
     for (auto el : { "brim_width", "brim_separation" })

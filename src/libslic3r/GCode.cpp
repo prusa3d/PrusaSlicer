@@ -2283,7 +2283,12 @@ LayerResult GCodeGenerator::process_layer(
             m_avoid_crossing_perimeters.use_external_mp();
             Flow layer_skirt_flow = print.skirt_flow().with_height(float(m_skirt_done.back() - (m_skirt_done.size() == 1 ? 0. : m_skirt_done[m_skirt_done.size() - 2])));
             double mm3_per_mm = layer_skirt_flow.mm3_per_mm();
-            for (size_t i = loops.first; i < loops.second; ++i) {
+
+            size_t i_start = loops.first;
+            if (print.config().draft_shield != dsDisabled && layer.id() > 0)
+                i_start = loops.second - print.config().draft_shield_loops.value;
+
+            for (size_t i = i_start; i < loops.second; ++i) {
                 // Adjust flow according to this layer's layer height.
                 //FIXME using the support_material_speed of the 1st object printed.
                 gcode += this->extrude_skirt(dynamic_cast<const ExtrusionLoop&>(*print.skirt().entities[i]),
