@@ -266,8 +266,11 @@ OverhangSpeeds calculate_overhang_speed(const ExtrusionAttributes  &attributes,
                                              interpolate_speed(speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
     const float curled_base_speed = interpolate_speed(speed_sections, attributes.width * attributes.overhang_attributes->proximity_to_curled_lines);
 
-    const float fan_speed         = std::min(interpolate_speed(fan_speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
+    float fan_speed         = std::min(interpolate_speed(fan_speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
                                              interpolate_speed(fan_speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
+    const float external_perimeter_fan_speed = config.external_perimeter_fan_speed.get_at(extruder_id);
+    if (attributes.role.is_external_perimeter() && external_perimeter_fan_speed > fan_speed)
+        fan_speed = external_perimeter_fan_speed;
 
     OverhangSpeeds overhang_speeds = {std::min(curled_base_speed, extrusion_speed), fan_speed};
     if (!config.enable_dynamic_overhang_speeds) {
