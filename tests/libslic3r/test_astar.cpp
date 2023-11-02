@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/AStar.hpp"
@@ -6,6 +6,7 @@
 #include "libslic3r/PointGrid.hpp"
 
 using namespace Slic3r;
+using Catch::Matchers::WithinRel;
 
 TEST_CASE("Testing basic invariants of AStar", "[AStar]") {
     struct DummyTracer {
@@ -397,7 +398,7 @@ TEST_CASE("Zero heuristic function should result in dijsktra's algo", "[AStar]")
     // arrive to the source within less hops than the full number of nodes.
     for (size_t i = 0, k = 0; i < graph.nodes.size(); ++i, k = 0) {
         GraphTracer::QNode *q = &graph.nodes[i];
-        REQUIRE(q->g == Approx(ref_distances[i]));
+        REQUIRE_THAT(q->g, WithinRel(ref_distances[i]));
         while (k++ < graph.nodes.size() && q->parent != astar::Unassigned)
             q = &graph.nodes[q->parent];
 

@@ -389,7 +389,7 @@ bool contains_regex(const std::string &data, const std::string &pattern)
 
 } } // namespace Slic3r::Test
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 SCENARIO("init_print functionality", "[test_data]") {
 	GIVEN("A default config") {

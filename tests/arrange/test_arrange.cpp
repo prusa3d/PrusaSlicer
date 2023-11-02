@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include "test_utils.hpp"
 
 #include <libslic3r/Execution/ExecutionSeq.hpp>
@@ -39,6 +39,8 @@
 #include <boost/geometry/algorithms/convert.hpp>
 
 #include <random>
+
+using Catch::Matchers::WithinRel;
 
 template<class ArrItem = Slic3r::arr2::ArrangeItem>
 static std::vector<ArrItem> prusa_parts(double infl = 0.) {
@@ -930,7 +932,7 @@ TEST_CASE("Optimal nfp position search with GravityKernel using RectangleItem an
 
                 Slic3r::Vec2crd D = bed.center - item.shape.center();
                 REQUIRE(item.translation == D);
-                REQUIRE(score == Approx(0.).margin(EPSILON));
+                REQUIRE_THAT(score, WithinRel(0., EPSILON));
             }
         }
     }
@@ -1063,7 +1065,7 @@ TEMPLATE_TEST_CASE("Test if allowed item rotations are considered", "[arrange2]"
     bool packed = pack(strategy, bed, itm);
 
     REQUIRE(packed);
-    REQUIRE(get_rotation(itm) == Approx(PI));
+    REQUIRE_THAT(get_rotation(itm), WithinRel(PI));
 }
 
 //TEST_CASE("NFP optimizing test", "[arrange2]") {

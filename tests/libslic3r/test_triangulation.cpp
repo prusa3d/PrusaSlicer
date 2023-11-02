@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <libslic3r/Triangulation.hpp>
 #include <libslic3r/SVG.hpp> // only debug visualization

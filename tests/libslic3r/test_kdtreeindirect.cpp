@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "libslic3r/KDTreeIndirect.hpp"
 #include "libslic3r/Execution/ExecutionSeq.hpp"

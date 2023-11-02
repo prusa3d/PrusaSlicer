@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <test_utils.hpp>
 
 #include <libslic3r/QuadricEdgeCollapse.hpp>
@@ -240,7 +240,7 @@ TEST_CASE("Simplify frog_legs.obj to 5% by Quadric edge collapse", "[its][quadri
 }
 
 #include <libigl/igl/qslim.h>
-TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
+TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim")
 {
     std::string  obj_filename    = "frog_legs.obj";
     TriangleMesh mesh            = load_model(obj_filename);

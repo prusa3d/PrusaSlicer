@@ -1,4 +1,4 @@
-#include "catch2/catch.hpp"
+#include <catch2/catch_all.hpp>
 #include "test_utils.hpp"
 
 #include <random>
@@ -12,6 +12,8 @@
 #include "libslic3r/SLAPrint.hpp"
 
 #include "libslic3r/Format/3mf.hpp"
+
+using Catch::Matchers::WithinRel;
 
 class RandomArrangeSettings: public Slic3r::arr2::ArrangeSettingsView {
     Slic3r::arr2::ArrangeSettingsDb::Values m_v;
@@ -143,7 +145,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
             std::swap(sz.x(), sz.y());
 
         double d_obj = settings.get_distance_from_objects();
-        REQUIRE(sz.y() == Approx(2. * bb1.size().y() + d_obj));
+        REQUIRE_THAT(sz.y(), WithinRel(2. * bb1.size().y() + d_obj, 0.00001));
     }
 
     SECTION("Selected cube (different object), needs to go beside existing") {
@@ -177,7 +179,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
             std::swap(sz.x(), sz.y());
 
         double d_obj = settings.get_distance_from_objects();
-        REQUIRE(sz.y() == Approx(2. * bb1.size().y() + d_obj));
+        REQUIRE_THAT(sz.y(), WithinRel(2. * bb1.size().y() + d_obj, 0.00001));
     }
 
     SECTION("Four cubes needs to touch each other after arrange") {
@@ -229,8 +231,8 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
         REQUIRE(c == bounding_box(bed).center());
 
         float d_obj = settings.get_distance_from_objects();
-        REQUIRE(pilebb.size().x() == Approx(2. * 20. + d_obj));
-        REQUIRE(pilebb.size().y() == Approx(2. * 20. + d_obj));
+        REQUIRE_THAT(pilebb.size().x(), WithinRel(2. * 20. + d_obj));
+        REQUIRE_THAT(pilebb.size().y(), WithinRel(2. * 20. + d_obj));
     }
 }
 
