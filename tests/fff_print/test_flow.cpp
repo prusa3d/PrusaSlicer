@@ -157,18 +157,18 @@ SCENARIO("Flow: Flow math for non-bridges", "[Flow]") {
         // Spacing for non-bridges is has some overlap
         THEN("External perimeter flow has spacing fixed to 1.125 * nozzle_diameter") {
             auto flow = Flow::new_from_config_width(frExternalPerimeter, ConfigOptionFloatOrPercent(0, false), nozzle_diameter, layer_height);
-            REQUIRE_THAT(flow.spacing(), WithinRel(1.125 * nozzle_diameter - layer_height * (1.0 - PI / 4.0), 0.00001));
+            REQUIRE_THAT(flow.spacing(), WithinRel(1.125 * nozzle_diameter - layer_height * (1.0 - PI / 4.0), EPSILON));
         }
 
         THEN("Internal perimeter flow has spacing fixed to 1.125 * nozzle_diameter") {
             auto flow = Flow::new_from_config_width(frPerimeter, ConfigOptionFloatOrPercent(0, false), nozzle_diameter, layer_height);
-            REQUIRE_THAT(flow.spacing(), WithinRel(1.125 *nozzle_diameter - layer_height * (1.0 - PI / 4.0), 0.00001));
+            REQUIRE_THAT(flow.spacing(), WithinRel(1.125 *nozzle_diameter - layer_height * (1.0 - PI / 4.0), EPSILON));
         }
         THEN("Spacing for supplied width is 0.8927f") {
             auto flow = Flow::new_from_config_width(frExternalPerimeter, width, nozzle_diameter, layer_height);
-            REQUIRE_THAT(flow.spacing(), WithinRel(width.value - layer_height * (1.0 - PI / 4.0), 0.00001));
+            REQUIRE_THAT(flow.spacing(), WithinRel(width.value - layer_height * (1.0 - PI / 4.0), EPSILON));
             flow = Flow::new_from_config_width(frPerimeter, width, nozzle_diameter, layer_height);
-            REQUIRE_THAT(flow.spacing(), WithinRel(width.value - layer_height * (1.0 - PI / 4.0), 0.00001));
+            REQUIRE_THAT(flow.spacing(), WithinRel(width.value - layer_height * (1.0 - PI / 4.0), EPSILON));
         }
     }
     /// Check the min/max
@@ -220,7 +220,7 @@ SCENARIO("Flow: Flow math for bridges", "[Flow]") {
                 REQUIRE_THAT(flow.width(), WithinRel(nozzle_diameter));
             }
             THEN("Bridge spacing is same as nozzle diameter + BRIDGE_EXTRA_SPACING") {
-                REQUIRE_THAT(flow.spacing(), WithinRel(nozzle_diameter + BRIDGE_EXTRA_SPACING, 0.00001));
+                REQUIRE_THAT(flow.spacing(), WithinRel(nozzle_diameter + BRIDGE_EXTRA_SPACING, EPSILON));
             }
         }
     }

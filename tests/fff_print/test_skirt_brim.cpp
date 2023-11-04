@@ -91,8 +91,8 @@ SCENARIO("Original Slic3r Skirt/Brim tests", "[SkirtBrim]") {
                 double support_speed = config.opt<Slic3r::ConfigOptionFloat>("support_material_speed")->value * MM_PER_MIN;
 			    Slic3r::GCodeReader parser;
                 parser.parse_buffer(gcode, [&brim_generated, support_speed] (Slic3r::GCodeReader& self, const Slic3r::GCodeReader::GCodeLine& line) {
-                    if (WithinRel(0.3, 0.00001).match(self.z()) || WithinRel(0.3, 0.00001).match(line.new_Z(self))) {
-                        if (line.extruding(self) && WithinRel(support_speed, 0.00001).match(self.f())) {
+                    if (WithinRel(0.3, EPSILON).match(self.z()) || WithinRel(0.3, EPSILON).match(line.new_Z(self))) {
+                        if (line.extruding(self) && WithinRel(support_speed, EPSILON).match(self.f())) {
                             brim_generated = true;
                         }
                     }

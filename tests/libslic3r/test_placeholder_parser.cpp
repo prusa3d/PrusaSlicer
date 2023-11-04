@@ -102,13 +102,13 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("math: ternary3") { REQUIRE(parser.process("{12 == 13 ? 1 - 1 * unknown_symbol : 2 * 2}") == "4"); }
     SECTION("math: ternary4") { REQUIRE(parser.process("{12 == 2 * 6 ? 1 - 1 : 2 * unknown_symbol}") == "0"); }
     SECTION("math: ternary nested") { REQUIRE(parser.process("{12 == 2 * 6 ? 3 - 1 != 2 ? does_not_exist : 0 * 0 - 0 / 1 + 12345 : bull ? 3 - cokoo : 2 * unknown_symbol}") == "12345"); }
-    SECTION("math: interpolate_table(13.84375892476, (0, 0), (20, 20))") { REQUIRE_THAT(std::stod(parser.process("{interpolate_table(13.84375892476, (0, 0), (20, 20))}")), WithinRel(13.84375892476, 0.00001)); }
+    SECTION("math: interpolate_table(13.84375892476, (0, 0), (20, 20))") { REQUIRE_THAT(std::stod(parser.process("{interpolate_table(13.84375892476, (0, 0), (20, 20))}")), WithinRel(13.84375892476, EPSILON)); }
     SECTION("math: interpolate_table(13, (0, 0), (20, 20), (30, 20))") { REQUIRE_THAT(std::stod(parser.process("{interpolate_table(13, (0, 0), (20, 20), (30, 20))}")), WithinRel(13.)); }
     SECTION("math: interpolate_table(25, (0, 0), (20, 20), (30, 20))") { REQUIRE_THAT(std::stod(parser.process("{interpolate_table(25, (0, 0), (20, 20), (30, 20))}")), WithinRel(20.)); }
 
     // Test the "coFloatOrPercent" and "xxx_extrusion_width" substitutions.
     // first_layer_extrusion_width ratio_over first_layer_heigth.
-    SECTION("perimeter_extrusion_width") { REQUIRE_THAT(std::stod(parser.process("{perimeter_extrusion_width}")), WithinRel(0.67500001192092896, 0.00001)); }
+    SECTION("perimeter_extrusion_width") { REQUIRE_THAT(std::stod(parser.process("{perimeter_extrusion_width}")), WithinRel(0.67500001192092896, EPSILON)); }
     SECTION("first_layer_extrusion_width") { REQUIRE_THAT(std::stod(parser.process("{first_layer_extrusion_width}")), WithinRel(0.9)); }
     SECTION("support_material_xy_spacing") { REQUIRE_THAT(std::stod(parser.process("{support_material_xy_spacing}")), WithinRel(0.3375)); }
     // external_perimeter_speed over perimeter_speed

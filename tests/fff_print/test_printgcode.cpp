@@ -122,7 +122,7 @@ SCENARIO( "PrintGCode basic functionality", "[PrintGCode]") {
                 reader.parse_buffer(gcode, [&final_z] (GCodeReader& self, const GCodeReader::GCodeLine& line) {
                     final_z = std::max(final_z, static_cast<double>(self.z())); // record the highest Z point we reach
                 });
-                REQUIRE_THAT(final_z, WithinRel(20.1, 0.00001));
+                REQUIRE_THAT(final_z, WithinRel(20.1, EPSILON));
             }
             THEN("Z height resets on object change") {
                 double final_z = 0.0;

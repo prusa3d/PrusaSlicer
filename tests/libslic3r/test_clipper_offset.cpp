@@ -187,7 +187,7 @@ SCENARIO("Constant offset", "[ClipperUtils]") {
 #endif
 					THEN("Area matches") {
 						REQUIRE(output.size() == 1);
-						REQUIRE_THAT(output.front().area(), WithinRel(area_offsetted, 0.00001));
+						REQUIRE_THAT(output.front().area(), WithinRel(area_offsetted, EPSILON));
 					}
 				}
 			}
@@ -206,7 +206,7 @@ SCENARIO("Constant offset", "[ClipperUtils]") {
 #endif
 					THEN("Area matches") {
 						REQUIRE(output.size() == 1);
-						REQUIRE_THAT(output.front().area(), WithinRel(area_offsetted, 0.00001));
+						REQUIRE_THAT(output.front().area(), WithinRel(area_offsetted, EPSILON));
 					}
 				}
 			}

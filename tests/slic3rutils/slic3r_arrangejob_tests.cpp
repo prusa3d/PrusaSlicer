@@ -145,7 +145,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
             std::swap(sz.x(), sz.y());
 
         double d_obj = settings.get_distance_from_objects();
-        REQUIRE_THAT(sz.y(), WithinRel(2. * bb1.size().y() + d_obj, 0.00001));
+        REQUIRE_THAT(sz.y(), WithinRel(2. * bb1.size().y() + d_obj, EPSILON));
     }
 
     SECTION("Selected cube (different object), needs to go beside existing") {
@@ -179,7 +179,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
             std::swap(sz.x(), sz.y());
 
         double d_obj = settings.get_distance_from_objects();
-        REQUIRE_THAT(sz.y(), WithinRel(2. * bb1.size().y() + d_obj, 0.00001));
+        REQUIRE_THAT(sz.y(), WithinRel(2. * bb1.size().y() + d_obj, EPSILON));
     }
 
     SECTION("Four cubes needs to touch each other after arrange") {
