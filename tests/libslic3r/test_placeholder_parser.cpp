@@ -5,6 +5,7 @@
 
 using namespace Slic3r;
 using Catch::Matchers::WithinRel;
+using Catch::Matchers::WithinAbs;
 
 SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
 	PlaceholderParser 	parser;
@@ -71,7 +72,7 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("math: 2*3/6") { REQUIRE(parser.process("{2*3/6}") == "1"); }
     SECTION("math: 2*3/12") { REQUIRE(parser.process("{2*3/12}") == "0"); }
     SECTION("math: 2.*3/12") { REQUIRE_THAT(std::stod(parser.process("{2.*3/12}")), WithinRel(0.5)); }
-    SECTION("math: 10 % 2.5") { REQUIRE_THAT(std::stod(parser.process("{10%2.5}")), WithinRel(0.)); }
+    SECTION("math: 10 % 2.5") { REQUIRE_THAT(std::stod(parser.process("{10%2.5}")), WithinAbs(0., EPSILON)); }
     SECTION("math: 11 % 2.5") { REQUIRE_THAT(std::stod(parser.process("{11%2.5}")), WithinRel(1.)); }
     SECTION("math: 2*(3-12)") { REQUIRE(parser.process("{2*(3-12)}") == "-18"); }
     SECTION("math: 2*foo*(3-12)") { REQUIRE(parser.process("{2*foo*(3-12)}") == "0"); }

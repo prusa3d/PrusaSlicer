@@ -8,6 +8,7 @@
 
 using namespace Slic3r;
 using Catch::Matchers::WithinRel;
+using Catch::Matchers::WithinAbs;
 
 TEST_CASE("Building a tree over a box, ray caster and closest query", "[AABBIndirect]")
 {
@@ -49,7 +50,7 @@ TEST_CASE("Building a tree over a box, ray caster and closest query", "[AABBIndi
     REQUIRE_THAT(squared_distance, WithinRel(5. * 5.));
     REQUIRE_THAT(closest_point.x(), WithinRel(0.3));
     REQUIRE_THAT(closest_point.y(), WithinRel(0.5));
-    REQUIRE_THAT(closest_point.z(), WithinRel(0.));
+    REQUIRE_THAT(closest_point.z(), WithinAbs(0., EPSILON));
 
     squared_distance = AABBTreeIndirect::squared_distance_to_indexed_triangle_set(
 		tmesh.its.vertices, tmesh.its.indices,
@@ -76,10 +77,10 @@ TEST_CASE("Creating a several 2d lines, testing closest point query", "[AABBIndi
     Vec2d hit_point_out;
     auto sqr_dist = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, Vec2d(0.0, 0.0), hit_idx_out,
             hit_point_out);
-    REQUIRE_THAT(sqr_dist, WithinRel(0.0));
+    REQUIRE_THAT(sqr_dist, WithinAbs(0.0, EPSILON));
     REQUIRE((hit_idx_out == 0 || hit_idx_out == 3));
-    REQUIRE_THAT(hit_point_out.x(), WithinRel(0.0));
-    REQUIRE_THAT(hit_point_out.y(), WithinRel(0.0));
+    REQUIRE_THAT(hit_point_out.x(), WithinAbs(0.0, EPSILON));
+    REQUIRE_THAT(hit_point_out.y(), WithinAbs(0.0, EPSILON));
 
     sqr_dist = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, Vec2d(1.5, 0.5), hit_idx_out,
             hit_point_out);

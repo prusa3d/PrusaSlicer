@@ -41,6 +41,7 @@
 #include <random>
 
 using Catch::Matchers::WithinRel;
+using Catch::Matchers::WithinAbs;
 
 template<class ArrItem = Slic3r::arr2::ArrangeItem>
 static std::vector<ArrItem> prusa_parts(double infl = 0.) {
@@ -932,7 +933,7 @@ TEST_CASE("Optimal nfp position search with GravityKernel using RectangleItem an
 
                 Slic3r::Vec2crd D = bed.center - item.shape.center();
                 REQUIRE(item.translation == D);
-                REQUIRE_THAT(score, WithinRel(0., EPSILON));
+                REQUIRE_THAT(score, WithinAbs(0., EPSILON));
             }
         }
     }

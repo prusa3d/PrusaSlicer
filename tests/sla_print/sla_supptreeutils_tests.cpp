@@ -8,6 +8,7 @@
 #include "libslic3r/SLA/SupportTreeUtilsLegacy.hpp"
 
 using Catch::Matchers::WithinRel;
+using Catch::Matchers::WithinAbs;
 
 // Test pair hash for 'nums' random number pairs.
 template <class I, class II> void test_pairhash()
@@ -137,7 +138,7 @@ TEST_CASE("Pillar search dumb case", "[suptreeutils]") {
         REQUIRE(conn);
 //        REQUIRE(conn.path.size() == 1);
         REQUIRE_THAT(conn.pillar_base->pos.z(), WithinRel(ground_level(sm)));
-        REQUIRE_THAT(conn.pillar_base->r_top, WithinRel(0.));
+        REQUIRE_THAT(conn.pillar_base->r_top, WithinAbs(0., EPSILON));
     }
 
     SECTION("with zero init direction") {
