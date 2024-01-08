@@ -753,6 +753,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              retract_length))
     ((ConfigOptionFloats,              retract_length_toolchange))
     ((ConfigOptionFloats,              retract_lift))
+    ((ConfigOptionFloat,               z_clearance))
     ((ConfigOptionFloats,              retract_lift_above))
     ((ConfigOptionFloats,              retract_lift_below))
     ((ConfigOptionFloats,              retract_restart_extra))

@@ -248,7 +248,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "travel_speed"
             || opt_key == "travel_speed_z"
             || opt_key == "first_layer_speed"
-            || opt_key == "z_offset") {
+            || opt_key == "z_offset"
+            || opt_key == "z_clearance") {
             steps.emplace_back(psWipeTower);
             steps.emplace_back(psSkirtBrim);
         } else if (opt_key == "filament_soluble") {
