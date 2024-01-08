@@ -1,7 +1,7 @@
 #ifndef SLA_TEST_UTILS_HPP
 #define SLA_TEST_UTILS_HPP
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <test_utils.hpp>
 
 // Debug

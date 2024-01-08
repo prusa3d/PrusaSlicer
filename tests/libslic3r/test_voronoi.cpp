@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <test_utils.hpp>
 
 #include <libslic3r/Polygon.hpp>
@@ -24,6 +24,8 @@ using boost::polygon::voronoi_diagram;
 using namespace Slic3r;
 
 using VD = Geometry::VoronoiDiagram;
+
+using Catch::Matchers::WithinRel;
 
 // https://svn.boost.org/trac10/ticket/12067
 // This bug seems to be confirmed.
@@ -69,7 +71,7 @@ TEST_CASE("Voronoi missing edges - points 12067", "[Voronoi]")
         vd, pts, Lines());
 #endif
 
-//    REQUIRE(closest_point.z() == Approx(1.));
+//    REQUIRE_THAT(closest_point.z(), WithinRel(1.));
 }
 
 // https://svn.boost.org/trac10/ticket/12707

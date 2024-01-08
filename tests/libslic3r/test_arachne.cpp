@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "libslic3r/Arachne/WallToolPaths.hpp"
 #include "libslic3r/ClipperUtils.hpp"

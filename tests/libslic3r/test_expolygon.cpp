@@ -1,10 +1,11 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/ExPolygon.hpp"
 
 using namespace Slic3r;
+using Catch::Matchers::WithinRel;
 
 static inline bool points_close(const Point &p1, const Point &p2)
 {
@@ -30,7 +31,7 @@ SCENARIO("Basics", "[ExPolygon]") {
             REQUIRE(expolygon.is_valid());
         }
         THEN("expolygon area") {
-            REQUIRE(expolygon.area() == Approx(100*100-20*20));
+            REQUIRE_THAT(expolygon.area(), WithinRel(100.0*100-20*20));
         }
         WHEN("Expolygon scaled") {
             ExPolygon expolygon2 = expolygon;

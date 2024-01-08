@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <libslic3r/libslic3r.h>
 #include <libslic3r/Algorithm/RegionExpansion.hpp>
@@ -8,6 +8,7 @@
 #include <libslic3r/SVG.cpp>
 
 using namespace Slic3r;
+using Catch::Matchers::WithinRel;
 
 //#define DEBUG_TEMP_DIR "d:\\temp\\"
 
@@ -27,7 +28,7 @@ SCENARIO("Region expansion basics", "[RegionExpansion]") {
                 REQUIRE(expanded.size() == 1);
             }
             THEN("The area of the anchor is 10mm2") {
-                REQUIRE(area(expanded.front()) == Approx(expansion * ten));
+                REQUIRE_THAT(area(expanded.front()), WithinRel(expansion * ten));
             }
         };
 
@@ -61,8 +62,8 @@ SCENARIO("Region expansion basics", "[RegionExpansion]") {
                 REQUIRE(expanded.front().size() == 2);
             }
             THEN("The area of each anchor is 10mm2") {
-                REQUIRE(area(expanded.front().front()) == Approx(expansion * ten));
-                REQUIRE(area(expanded.front().back()) == Approx(expansion * ten));
+                REQUIRE_THAT(area(expanded.front().front()), WithinRel(expansion * ten));
+                REQUIRE_THAT(area(expanded.front().back()), WithinRel(expansion * ten));
             }
         }
 
@@ -77,8 +78,8 @@ SCENARIO("Region expansion basics", "[RegionExpansion]") {
                 REQUIRE(expanded.front().size() == 2);
             }
             THEN("The area of each anchor is 100mm2") {
-                REQUIRE(area(expanded.front().front()) == Approx(sqr<double>(ten)));
-                REQUIRE(area(expanded.front().back()) == Approx(sqr<double>(ten)));
+                REQUIRE_THAT(area(expanded.front().front()), WithinRel(sqr<double>(ten)));
+                REQUIRE_THAT(area(expanded.front().back()), WithinRel(sqr<double>(ten)));
             }
         }
     }
@@ -247,7 +248,7 @@ SCENARIO("Region expansion basics", "[RegionExpansion]") {
             THEN("The anchor expands into a single region with two holes, fully covering the boundary") {
                 REQUIRE(expanded.size() == 1);
                 REQUIRE(expanded.front().size() == 3);
-                REQUIRE(area(expanded.front()) == Approx(area(boundary)));
+                REQUIRE_THAT(area(expanded.front()), WithinRel(area(boundary)));
             }
         }
     }

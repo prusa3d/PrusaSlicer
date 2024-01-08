@@ -1,10 +1,11 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <test_utils.hpp>
 
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/MeshBoolean.hpp>
 
 using namespace Slic3r;
+using Catch::Matchers::WithinRel;
 
 TEST_CASE("CGAL and TriangleMesh conversions", "[MeshBoolean]") {
     TriangleMesh sphere = make_sphere(1.);
@@ -19,7 +20,7 @@ TEST_CASE("CGAL and TriangleMesh conversions", "[MeshBoolean]") {
     REQUIRE(M.its.vertices.size() == sphere.its.vertices.size());
     REQUIRE(M.its.indices.size() == sphere.its.indices.size());
     
-    REQUIRE(M.volume() == Approx(sphere.volume()));
+    REQUIRE_THAT(M.volume(), WithinRel(sphere.volume()));
     
     REQUIRE(! MeshBoolean::cgal::does_self_intersect(M));
 }

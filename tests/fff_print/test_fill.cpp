@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <numeric>
 #include <sstream>
@@ -19,6 +19,7 @@
 
 using namespace Slic3r;
 using namespace std::literals;
+using Catch::Matchers::WithinRel;
 
 bool test_if_solid_surface_filled(const ExPolygon& expolygon, double flow_spacing, double angle = 0, double density = 1.0);
 
@@ -26,7 +27,7 @@ bool test_if_solid_surface_filled(const ExPolygon& expolygon, double flow_spacin
 TEST_CASE("Fill: adjusted solid distance") {
     int surface_width = 250;
     int distance = Slic3r::Flow::solid_spacing(surface_width, 47);
-    REQUIRE(distance == Approx(50));
+    REQUIRE_THAT(distance, WithinRel(50));
     REQUIRE(surface_width % distance == 0);
 }
 #endif
