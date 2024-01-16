@@ -320,6 +320,8 @@ private:
         GCodeProcessor   &m_processor;
     };
     void            _do_export(Print &print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb);
+    void            _set_print_object_origin(Slic3r::Print& print, std::vector<const Slic3r::PrintInstance*>::const_iterator& print_object_instance_sequential_active);
+    void            _move_to_print_object(GCodeGenerator::GCodeOutputStream& file, const size_t finished_objects);
 
     static ObjectsLayerToPrint         		                     collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, ObjectsLayerToPrint>> collect_layers_to_print(const Print &print);
