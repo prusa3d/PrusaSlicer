@@ -599,6 +599,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                thick_bridges))
     ((ConfigOptionFloat,               xy_size_compensation))
     ((ConfigOptionBool,                wipe_into_objects))
+    //Perimeters reverse
+    ((ConfigOptionBool,                overhangs_reverse))
+    ((ConfigOptionBool,                internal_perimeters_reverse))
+    ((ConfigOptionBool,                infill_reverse))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(

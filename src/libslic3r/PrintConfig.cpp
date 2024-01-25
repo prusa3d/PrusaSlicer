@@ -3482,6 +3482,27 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->set_default_value(new ConfigOptionFloatOrPercent(85, true));
 
+    def = this->add("overhangs_reverse", coBool);
+    def->label = L("Reverse overhang perimeters directions every layer");
+    def->category = L("Advanced");
+    def->tooltip = L("Extrude each layer overhang perimeters in opposite direction, improving quality.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("internal_perimeters_reverse", coBool);
+    def->label = L("Reverse internal perimeter directions every layer");
+    def->category = L("Advanced");
+    def->tooltip = L("Extrude each layer internal perimeters in opposite direction, reduce internal stress and warping.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("infill_reverse", coBool);
+    def->label = L("Reverse infill direction every layer");
+    def->category = L("Advanced");
+    def->tooltip = L("Extrude each layer infill in opposite direction, reduce internal stress and warping.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
     // Declare retract values for filament profile, overriding the printer's extruder profile.
     for (const char *opt_key : {
         // floats
