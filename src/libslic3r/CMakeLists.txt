@@ -143,6 +143,8 @@ set(SLIC3R_SOURCES
     Format/SL1_SVG.cpp
     Format/AnycubicSLA.hpp
     Format/AnycubicSLA.cpp
+    Format/GOO.hpp
+    Format/GOO.cpp
     Format/STEP.hpp
     Format/STEP.cpp
     Format/SVG.hpp
