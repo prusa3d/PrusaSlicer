@@ -1,4 +1,5 @@
 ///|/ Copyright (c) Prusa Research 2017 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2024 Felix Reißmann @Felix-Rm
 ///|/ Copyright (c) 2021 Martin Budden
 ///|/ Copyright (c) 2021 Ilya @xorza
 ///|/ Copyright (c) 2019 John Drake @foxox
@@ -617,6 +618,30 @@ static std::vector<std::string> s_Preset_sla_material_options {
     "material_density",
     "exposure_time",
     "initial_exposure_time",
+    "exposure_pwm",
+    "initial_exposure_pwm",
+    "sla_initial_primary_lift_distance",
+    "sla_initial_secondary_lift_distance",
+    "sla_initial_primary_lift_speed",
+    "sla_initial_secondary_lift_speed",
+    "sla_initial_primary_retract_distance",
+    "sla_initial_secondary_retract_distance",
+    "sla_initial_primary_retract_speed",
+    "sla_initial_secondary_retract_speed",
+    "sla_initial_wait_before_lift",
+    "sla_initial_wait_after_lift",
+    "sla_initial_wait_after_retract",
+    "sla_primary_lift_distance",
+    "sla_secondary_lift_distance",
+    "sla_primary_lift_speed",
+    "sla_secondary_lift_speed",
+    "sla_primary_retract_distance",
+    "sla_secondary_retract_distance",
+    "sla_primary_retract_speed",
+    "sla_secondary_retract_speed",
+    "sla_wait_before_lift",
+    "sla_wait_after_lift",
+    "sla_wait_after_retract",
     "material_correction",
     "material_correction_x",
     "material_correction_y",

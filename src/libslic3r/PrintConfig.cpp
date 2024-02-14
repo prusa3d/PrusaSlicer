@@ -1,4 +1,5 @@
 ///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Tomáš Mészáros @tamasmeszaros, Oleksandra Iushchenko @YuSanka, Pavel Mikuš @Godrak, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2024 Felix Reißmann @Felix-Rm
 ///|/ Copyright (c) 2023 Pedro Lamas @PedroLamas
 ///|/ Copyright (c) 2023 Mimoja @Mimoja
 ///|/ Copyright (c) 2020 - 2021 Sergey Kovalev @RandoMan70
@@ -4218,6 +4219,176 @@ void PrintConfigDef::init_sla_params()
     def->sidetext = L("s");
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(15));
+
+    def = this->add("exposure_pwm", coInt);
+    def->label = L("Exposure PWM");
+    def->tooltip = L("Exposure PWM");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 255;
+    def->set_default_value(new ConfigOptionInt(255));
+
+    def = this->add("initial_exposure_pwm", coInt);
+    def->label = L("Initial exposure PWM");
+    def->tooltip = L("Initial exposure PWM");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 255;
+    def->set_default_value(new ConfigOptionInt(255));
+
+    def = this->add("sla_initial_primary_lift_distance", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Initial primary lift distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(3));
+
+    def = this->add("sla_initial_secondary_lift_distance", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Initial secondary lift distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(4));
+
+    def = this->add("sla_initial_primary_lift_speed", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Initial primary lift speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(70));
+
+    def = this->add("sla_initial_secondary_lift_speed", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Initial secondary lift speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(200));
+
+    def = this->add("sla_initial_primary_retract_distance", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Initial primary retract distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(5.5));
+
+    def = this->add("sla_initial_secondary_retract_distance", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Initial secondary retract distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(1.5));
+
+    def = this->add("sla_initial_primary_retract_speed", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Initial primary retract speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(200));
+
+    def = this->add("sla_initial_secondary_retract_speed", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Initial secondary retract speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(70));
+
+    def = this->add("sla_initial_wait_before_lift", coFloat);
+    def->label = L("Initial wait before lift");
+    def->tooltip = L("Initial wait before lift");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(1));
+
+    def = this->add("sla_initial_wait_after_lift", coFloat);
+    def->label = L("Initial wait after lift");
+    def->tooltip = L("Initial wait after lift");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(1));
+
+    def = this->add("sla_initial_wait_after_retract", coFloat);
+    def->label = L("Initial wait after retract");
+    def->tooltip = L("Initial wait after retract");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(2));
+
+    def = this->add("sla_primary_lift_distance", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Primary lift distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(3));
+
+    def = this->add("sla_secondary_lift_distance", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Secondary lift distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(4));
+
+    def = this->add("sla_primary_lift_speed", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Primary lift speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(70));
+
+    def = this->add("sla_secondary_lift_speed", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Secondary lift speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(200));
+
+    def = this->add("sla_primary_retract_distance", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Primary retract distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(5.5));
+
+    def = this->add("sla_secondary_retract_distance", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Secondary retract distance");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(1.5));
+
+    def = this->add("sla_primary_retract_speed", coFloat);
+    def->label = L("Primary");
+    def->tooltip = L("Primary retract speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(200));
+
+    def = this->add("sla_secondary_retract_speed", coFloat);
+    def->label = L("Secondary");
+    def->tooltip = L("Secondary retract speed");
+    def->sidetext = L("mm/min");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(70));
+
+    def = this->add("sla_wait_before_lift", coFloat);
+    def->label = L("Wait before lift");
+    def->tooltip = L("Wait before lift");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("sla_wait_after_lift", coFloat);
+    def->label = L("Wait after lift");
+    def->tooltip = L("Wait after lift");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("sla_wait_after_retract", coFloat);
+    def->label = L("Wait after retract");
+    def->tooltip = L("Wait after retract");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(1));
 
     def = this->add("material_correction", coFloats);
     def->full_label = L("Correction for expansion");

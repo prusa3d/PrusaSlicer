@@ -1,4 +1,5 @@
 ///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Tomáš Mészáros @tamasmeszaros, Pavel Mikuš @Godrak, David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral, Enrico Turri @enricoturri1966
+///|/ Copyright (c) 2024 Felix Reißmann @Felix-Rm
 ///|/ Copyright (c) 2023 Pedro Lamas @PedroLamas
 ///|/ Copyright (c) 2020 Sergey Kovalev @RandoMan70
 ///|/ Copyright (c) 2021 Martin Budden
@@ -1197,6 +1198,30 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                       material_density))
     ((ConfigOptionFloat,                       exposure_time))
     ((ConfigOptionFloat,                       initial_exposure_time))
+    ((ConfigOptionInt,                         exposure_pwm))
+    ((ConfigOptionInt,                         initial_exposure_pwm))
+    ((ConfigOptionFloat,                       sla_initial_primary_lift_distance))
+    ((ConfigOptionFloat,                       sla_initial_primary_lift_speed))
+    ((ConfigOptionFloat,                       sla_initial_primary_retract_distance))
+    ((ConfigOptionFloat,                       sla_initial_primary_retract_speed))
+    ((ConfigOptionFloat,                       sla_initial_secondary_lift_distance))
+    ((ConfigOptionFloat,                       sla_initial_secondary_lift_speed))
+    ((ConfigOptionFloat,                       sla_initial_secondary_retract_distance))
+    ((ConfigOptionFloat,                       sla_initial_secondary_retract_speed))
+    ((ConfigOptionFloat,                       sla_initial_wait_before_lift))
+    ((ConfigOptionFloat,                       sla_initial_wait_after_lift))
+    ((ConfigOptionFloat,                       sla_initial_wait_after_retract))
+    ((ConfigOptionFloat,                       sla_primary_lift_distance))
+    ((ConfigOptionFloat,                       sla_primary_lift_speed))
+    ((ConfigOptionFloat,                       sla_primary_retract_distance))
+    ((ConfigOptionFloat,                       sla_primary_retract_speed))
+    ((ConfigOptionFloat,                       sla_secondary_lift_distance))
+    ((ConfigOptionFloat,                       sla_secondary_lift_speed))
+    ((ConfigOptionFloat,                       sla_secondary_retract_distance))
+    ((ConfigOptionFloat,                       sla_secondary_retract_speed))
+    ((ConfigOptionFloat,                       sla_wait_before_lift))
+    ((ConfigOptionFloat,                       sla_wait_after_lift))
+    ((ConfigOptionFloat,                       sla_wait_after_retract))
     ((ConfigOptionFloats,                      material_correction))
     ((ConfigOptionFloat,                       material_correction_x))
     ((ConfigOptionFloat,                       material_correction_y))
