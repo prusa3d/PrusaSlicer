@@ -27,9 +27,24 @@ cmake \
 libglu1-mesa-dev \
 libgtk-3-dev \
 libdbus-1-dev \
+texinfo \
 
 ```
 The names of the packages may be different on different distros.
+
+#### 0b. Compiler 
+
+You need at least g++ > 9 to compile PrusaSlicer.
+If you are building on an oldstable system, you may need to update your compiler. On Ubuntu, do:
+
+```shell
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo apt update
+sudo apt install gcc-9 g++-9
+
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 60 --slave /usr/bin/g++ g++ /usr/bin/g++-9
+
+```
 
 #### 1. Cloning the repository
 
@@ -51,7 +66,7 @@ PrusaSlicer uses CMake and the build is quite simple, the only tricky part is re
     mkdir build
     cd build
     cmake .. -DDEP_WX_GTK3=ON
-    make
+    make # add a suitable -j value for your workstation if desired
     cd ../..
 
 
@@ -65,7 +80,7 @@ Now when the dependencies are compiled, all that is needed is to tell CMake that
     mkdir build
     cd build
     cmake .. -DSLIC3R_STATIC=1 -DSLIC3R_GTK=3 -DSLIC3R_PCH=OFF -DCMAKE_PREFIX_PATH=$(pwd)/../deps/build/destdir/usr/local
-    make -j4
+    make -j4 # or a suitable -j value for your workstation
 
 And that's it. It is now possible to run the freshly built PrusaSlicer binary:
 
