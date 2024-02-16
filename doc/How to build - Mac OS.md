@@ -3,12 +3,12 @@
 
 To build PrusaSlicer on Mac OS, you will need the following software:
 
-- XCode
+- Xcode
 - CMake
 - git
 - gettext
 
-XCode is available through Apple's App Store, the other three tools are available on
+Xcode is available through Apple's App Store, the other three tools are available on
 [brew](https://brew.sh/) (use `brew install cmake git gettext` to install them).
 
 ### Dependencies
@@ -51,12 +51,12 @@ To start the build, use
 
 where `N` is the number of CPU cores, so, for example `make -j4` for a 4-core machine.
 
-Alternatively, if you would like to use XCode GUI, modify the `cmake` command to include the `-GXcode` option:
+Alternatively, if you would like to use Xcode GUI, modify the `cmake` command to include the `-GXcode` option:
 
     cmake .. -GXcode -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local"
 
 and then open the `PrusaSlicer.xcodeproj` file.
-This should open up XCode where you can perform build using the GUI or perform other tasks.
+This should open up Xcode where you can perform build using the GUI or perform other tasks.
 
 ### Note on Mac OS X SDKs
 
@@ -73,7 +73,7 @@ on both the dependencies bundle as well as PrusaSlicer itself.
 
 Official macOS PrusaSlicer builds are currently (as of PrusaSlicer 2.5) built against SDK 10.12 to ensure compatibility with older Macs.
 
-_Warning:_ XCode may be set such that it rejects SDKs bellow some version (silently, more or less).
+_Warning:_ Xcode may be set such that it rejects SDKs below some version (silently, more or less).
 This is set in the property list file
 
     /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Info.plist

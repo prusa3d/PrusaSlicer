@@ -45,7 +45,7 @@ namespace {
 		bool res = GUI::create_process(path, std::wstring(), msg);
 		if (!res) {
 			std::string full_message = GUI::format(_u8L("Running downloaded instaler of %1% has failed:\n%2%"), SLIC3R_APP_NAME, msg);
-			BOOST_LOG_TRIVIAL(error) << full_message; // lm: maybe UI error msg?  // dk: bellow. (maybe some general show error evt would be better?)
+			BOOST_LOG_TRIVIAL(error) << full_message; // lm: maybe UI error msg?  // dk: below. (maybe some general show error evt would be better?)
 			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
 			evt->SetString(full_message);
 			GUI::wxGetApp().QueueEvent(evt);

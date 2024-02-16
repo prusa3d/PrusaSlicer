@@ -274,7 +274,7 @@ check_if_three_edges_are_ccw(const VD::edge_type  &edge_first,
         // The first two edges are collinear, so the third edge must be on the right side on the first of them.
         return orientation_of_two_edges(edge_first, edge_third, segment_begin, segment_end) == CGAL::Orientation::RIGHT_TURN;
     } else if (orientation == CGAL::Orientation::LEFT_TURN) {
-        // CCW oriented angle between vectors (common_pt, pt1) and (common_pt, pt2) is bellow PI.
+        // CCW oriented angle between vectors (common_pt, pt1) and (common_pt, pt2) is below PI.
         // So we need to check if test_pt isn't between them.
         CGAL::Orientation orientation1 = orientation_of_two_edges(edge_first, edge_third, segment_begin, segment_end);
         CGAL::Orientation orientation2 = orientation_of_two_edges(edge_second, edge_third, segment_begin, segment_end);

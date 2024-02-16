@@ -1065,7 +1065,7 @@ static ExPolygons get_boundary(const Layer &layer)
 #ifdef INCLUDE_SUPPORTS_IN_BOUNDARY
         append(boundary, inner_offset(support_layer->support_islands.expolygons, 1.5 * perimeter_spacing));
 #endif
-        auto *layer_below = layer.object()->get_first_layer_bellow_printz(layer.print_z, EPSILON);
+        auto *layer_below = layer.object()->get_first_layer_below_printz(layer.print_z, EPSILON);
         if (layer_below)
             append(boundary, inner_offset(layer_below->lslices, 1.5 * perimeter_spacing));
         // After calling inner_offset it is necessary to call union_ex because of the possibility of intersection ExPolygons
@@ -1111,7 +1111,7 @@ static Polygons get_boundary_external(const Layer &layer)
             for (const ExPolygon &island : l->lslices)
                 append(holes_per_obj, island.holes);
         if (support_layer) {
-            auto *layer_below = object->get_first_layer_bellow_printz(layer.print_z, EPSILON);
+            auto *layer_below = object->get_first_layer_below_printz(layer.print_z, EPSILON);
             if (layer_below)
                 for (const ExPolygon &island : layer_below->lslices)
                     append(holes_per_obj, island.holes);
