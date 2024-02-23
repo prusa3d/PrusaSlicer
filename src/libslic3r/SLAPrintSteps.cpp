@@ -1,7 +1,9 @@
 ///|/ Copyright (c) Prusa Research 2019 - 2023 Tomáš Mészáros @tamasmeszaros, Oleksandra Iushchenko @YuSanka, Pavel Mikuš @Godrak, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2024 Felix Reißmann @Felix-Rm
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+
 #include <libslic3r/Exception.hpp>
 #include <libslic3r/SLAPrintSteps.hpp>
 #include <libslic3r/MeshBoolean.hpp>
@@ -1138,6 +1140,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     const double fast_tilt = printer_config.fast_tilt_time.getFloat();// 5.0;
     const double slow_tilt = printer_config.slow_tilt_time.getFloat();// 8.0;
     const double hv_tilt   = printer_config.high_viscosity_tilt_time.getFloat();// 10.0;
+    const bool is_printer_with_tilt = !(std::isnan(fast_tilt) || std::isnan(slow_tilt) || std::isnan(hv_tilt));
 
     const double init_exp_time = material_config.initial_exposure_time.getFloat();
     const double exp_time      = material_config.exposure_time.getFloat();
@@ -1163,7 +1166,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     // Going to parallel:
     auto printlayerfn = [this,
             // functions and read only vars
-            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time, is_prusa_print, first_slow_layers, below, above,
+            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time, is_prusa_print, first_slow_layers, below, above, is_printer_with_tilt
 
             // write vars
             &layers_info](size_t sliced_layer_cnt)
@@ -1244,47 +1247,49 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
         double layer_times = 0.0;
         bool is_fast_layer = false;
 
-        if (is_prusa_print) {
-            is_fast_layer = int(sliced_layer_cnt) < first_slow_layers || layer_area <= display_area * area_fill;
-            const int l_height_nm = 1000000 * l_height;
+        if (is_printer_with_tilt) {
+            if (is_prusa_print) {
+                is_fast_layer = int(sliced_layer_cnt) < first_slow_layers || layer_area <= display_area * area_fill;
+                const int l_height_nm = 1000000 * l_height;
 
-            layer_times = layer_peel_move_time(l_height_nm, is_fast_layer ? below : above) +
-                            (is_fast_layer ? below : above).delay_before_exposure_ms +
-                            (is_fast_layer ? below : above).delay_after_exposure_ms +
-                            refresh_delay_ms * 5 +                  // ~ 5x frame display wait
-                            124;                                    // Magical constant to compensate remaining computation delay in exposure thread
+                layer_times = layer_peel_move_time(l_height_nm, is_fast_layer ? below : above) +
+                                (is_fast_layer ? below : above).delay_before_exposure_ms +
+                                (is_fast_layer ? below : above).delay_after_exposure_ms +
+                                refresh_delay_ms * 5 +                  // ~ 5x frame display wait
+                                124;                                    // Magical constant to compensate remaining computation delay in exposure thread
 
-            layer_times *= 0.001; // All before calculations are made in ms, but we need it in s
+                layer_times *= 0.001; // All before calculations are made in ms, but we need it in s
+            }
+            else {
+                is_fast_layer = layer_area <= display_area*area_fill;
+                const double tilt_time = material_config.material_print_speed == slamsSlow              ? slow_tilt :
+                                        material_config.material_print_speed == slamsHighViscosity     ? hv_tilt   :
+                                        is_fast_layer ? fast_tilt : slow_tilt;
+
+                layer_times += tilt_time;
+
+                //// Per layer times (magical constants cuclulated from FW)
+                static double exposure_safe_delay_before{ 3.0 };
+                static double exposure_high_viscosity_delay_before{ 3.5 };
+                static double exposure_slow_move_delay_before{ 1.0 };
+
+                if (material_config.material_print_speed == slamsSlow)
+                    layer_times += exposure_safe_delay_before;
+                else if (material_config.material_print_speed == slamsHighViscosity)
+                    layer_times += exposure_high_viscosity_delay_before;
+                else if (!is_fast_layer)
+                    layer_times += exposure_slow_move_delay_before;
+
+                // Increase layer time for "magic constants" from FW
+                layer_times += (
+                    l_height * 5  // tower move
+                    + 120 / 1000  // Magical constant to compensate remaining computation delay in exposure thread
+                );
+            }
+
+            // We are done with tilt time, but we haven't added the exposure time yet.
+            layer_times += std::max(exp_time, init_exp_time - sliced_layer_cnt * delta_fade_time);
         }
-        else {
-            is_fast_layer = layer_area <= display_area*area_fill;
-            const double tilt_time = material_config.material_print_speed == slamsSlow              ? slow_tilt :
-                                     material_config.material_print_speed == slamsHighViscosity     ? hv_tilt   :
-                                     is_fast_layer ? fast_tilt : slow_tilt;
-
-            layer_times += tilt_time;
-
-            //// Per layer times (magical constants cuclulated from FW)
-            static double exposure_safe_delay_before{ 3.0 };
-            static double exposure_high_viscosity_delay_before{ 3.5 };
-            static double exposure_slow_move_delay_before{ 1.0 };
-
-            if (material_config.material_print_speed == slamsSlow)
-                layer_times += exposure_safe_delay_before;
-            else if (material_config.material_print_speed == slamsHighViscosity)
-                layer_times += exposure_high_viscosity_delay_before;
-            else if (!is_fast_layer)
-                layer_times += exposure_slow_move_delay_before;
-
-            // Increase layer time for "magic constants" from FW
-            layer_times += (
-                l_height * 5  // tower move
-                + 120 / 1000  // Magical constant to compensate remaining computation delay in exposure thread
-            );
-        }
-
-        // We are done with tilt time, but we haven't added the exposure time yet.
-        layer_times += std::max(exp_time, init_exp_time - sliced_layer_cnt * delta_fade_time);
 
         // Collect values for this layer.
         layers_info[sliced_layer_cnt] = std::make_tuple(layer_times, layer_area * SCALING_FACTOR * SCALING_FACTOR, is_fast_layer, models_volume, supports_volume);

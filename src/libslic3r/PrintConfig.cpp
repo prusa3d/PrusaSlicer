@@ -3998,32 +3998,32 @@ void PrintConfigDef::init_sla_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionEnum<SLADisplayOrientation>(sladoPortrait));
 
-    def = this->add("fast_tilt_time", coFloat);
+    def = this->add_nullable("fast_tilt_time", coFloat);
     def->label = L("Fast");
     def->full_label = L("Fast tilt");
     def->tooltip = L("Time of the fast tilt");
     def->sidetext = L("s");
     def->min = 0;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(5.));
+    def->set_default_value(new ConfigOptionFloatNullable(5.));
 
-    def = this->add("slow_tilt_time", coFloat);
+    def = this->add_nullable("slow_tilt_time", coFloat);
     def->label = L("Slow");
     def->full_label = L("Slow tilt");
     def->tooltip = L("Time of the slow tilt");
     def->sidetext = L("s");
     def->min = 0;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(8.));
+    def->set_default_value(new ConfigOptionFloatNullable(8.));
 
-    def = this->add("high_viscosity_tilt_time", coFloat);
+    def = this->add_nullable("high_viscosity_tilt_time", coFloat);
     def->label = L("High viscosity");
     def->full_label = L("Tilt for high viscosity resin");
     def->tooltip = L("Time of the super slow tilt");
     def->sidetext = L("s");
     def->min = 0;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(10.));
+    def->set_default_value(new ConfigOptionFloatNullable(10.));
 
     def = this->add("area_fill", coFloat);
     def->label = L("Area fill threshold");
