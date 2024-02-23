@@ -4105,6 +4105,15 @@ void PrintConfigDef::init_sla_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(1.0));
 
+    def = this->add("time_estimate_correction", coFloat);
+    def->label = L("Time estimate correction");
+    def->full_label = L("Time estimate correction");
+    def->tooltip  = L("This time will be added for every layer when calculating the printing time estimate. "
+                      "It may correct for any additional delays in the printing process.");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.0));
 
     // SLA Material settings.
 

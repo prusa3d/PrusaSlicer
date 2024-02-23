@@ -1123,6 +1123,23 @@ static int layer_peel_move_time(int layer_height_nm, ExposureProfile p)
     return int(tilt + tower);
 }
 
+namespace {
+template<typename T> static T constrain(T value, T min, T max) {
+    if (value < min)
+        return min;
+    else if (value > max)
+        return max;
+    else
+        return value;
+}
+
+static float constrained_map(float value, float min, float max, float out_min, float out_max) {
+    value = constrain(value, min, max);
+    float t = (value - min) / (max - min);
+    return out_min * (1 - t) + out_max * t;
+}
+}
+
 // Merging the slices from all the print objects into one slice grid and
 // calculating print statistics from the merge result.
 void SLAPrint::Steps::merge_slices_and_eval_stats() {
@@ -1145,6 +1162,8 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     const double init_exp_time = material_config.initial_exposure_time.getFloat();
     const double exp_time      = material_config.exposure_time.getFloat();
 
+    const double time_estimate_correction = printer_config.time_estimate_correction.getFloat();
+
     const int fade_layers_cnt = m_print->m_default_object_config.faded_layers.getInt();// 10 // [3;20]
 
     ExposureProfile below(material_config, 0);
@@ -1166,7 +1185,8 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     // Going to parallel:
     auto printlayerfn = [this,
             // functions and read only vars
-            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time, is_prusa_print, first_slow_layers, below, above, is_printer_with_tilt
+            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time, is_prusa_print, first_slow_layers, below, above,
+            is_printer_with_tilt, time_estimate_correction, fade_layers_cnt,
 
             // write vars
             &layers_info](size_t sliced_layer_cnt)
@@ -1289,6 +1309,38 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
 
             // We are done with tilt time, but we haven't added the exposure time yet.
             layer_times += std::max(exp_time, init_exp_time - sliced_layer_cnt * delta_fade_time);
+        } else {
+            bool first_layer = sliced_layer_cnt == 0;
+
+            double layer_exposure_time = constrained_map(sliced_layer_cnt,
+                0, fade_layers_cnt, init_exp_time, exp_time);
+
+            // NOTE: Following times are in minutes and are therefore multiplied by 60
+            double primary_lift_time =
+                (first_layer ? material_config.sla_initial_primary_lift_distance : material_config.sla_primary_lift_distance) /
+                (first_layer ? material_config.sla_initial_primary_lift_speed : material_config.sla_primary_lift_speed) * 60;
+            double secondary_lift_time =
+                (first_layer ? material_config.sla_initial_secondary_lift_distance : material_config.sla_secondary_lift_distance) /
+                (first_layer ? material_config.sla_initial_secondary_lift_speed : material_config.sla_secondary_lift_speed) * 60;
+            double primary_retract_time =
+                (first_layer ? material_config.sla_initial_primary_retract_distance : material_config.sla_primary_retract_distance) /
+                (first_layer ? material_config.sla_initial_primary_retract_speed : material_config.sla_primary_retract_speed) * 60;
+            double secondary_retract_time =
+                (first_layer ? material_config.sla_initial_secondary_retract_distance : material_config.sla_secondary_retract_distance) /
+                (first_layer ? material_config.sla_initial_secondary_retract_speed : material_config.sla_secondary_retract_speed) * 60;
+
+            double wait_times =
+                (first_layer ? material_config.sla_initial_wait_before_lift : material_config.sla_wait_before_lift) +
+                (first_layer ? material_config.sla_initial_wait_after_lift : material_config.sla_wait_after_lift) +
+                (first_layer ? material_config.sla_initial_wait_after_retract : material_config.sla_wait_after_retract);
+
+            layer_times = layer_exposure_time +
+                primary_lift_time + secondary_lift_time +
+                primary_retract_time + secondary_retract_time +
+                wait_times + time_estimate_correction;
+
+            // NOTE: All faded layers are considered slow layers
+            is_fast_layer = sliced_layer_cnt > fade_layers_cnt;
         }
 
         // Collect values for this layer.
