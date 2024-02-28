@@ -914,6 +914,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("first_internal_on_overhangs", coBool);
+    def->label = L("Internal perimeters first on overhangs");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Print contour perimeters from the innermost to the outermost one for layers with overhengs. "
+                   "It overrides \"External perimeters first\" option.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("extra_perimeters", coBool);
     def->label = L("Extra perimeters if needed");
     def->category = L("Layers and Perimeters");

@@ -688,6 +688,7 @@ void Layer::make_perimeters()
     		                && config.opt_serialize("perimeter_extrusion_width") == other_config.opt_serialize("perimeter_extrusion_width")
     		                && config.thin_walls                  == other_config.thin_walls
     		                && config.external_perimeters_first   == other_config.external_perimeters_first
+                            && config.first_internal_on_overhangs == other_config.first_internal_on_overhangs
     		                && config.infill_overlap              == other_config.infill_overlap
                             && config.fuzzy_skin                  == other_config.fuzzy_skin
                             && config.fuzzy_skin_thickness        == other_config.fuzzy_skin_thickness

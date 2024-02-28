@@ -120,15 +120,19 @@ void LayerRegion::make_perimeters(
         auto fill_expolygons_begin = uint32_t(fill_expolygons.size());
         if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne && !spiral_vase)
             PerimeterGenerator::process_arachne(
+        
+        ExtrusionEntityCollection srf_perimeters;
+        ExtrusionEntityCollection srf_thin_fills;
+        ExPolygons srf_fill_ex_polys;
                 // input:
                 params,
                 surface,
                 lower_slices,
                 lower_layer_polygons_cache,
                 // output:
-                m_perimeters,
-                m_thin_fills,
-                fill_expolygons);
+                srf_perimeters,
+                srf_thin_fills,
+                srf_fill_ex_polys);
         else
             PerimeterGenerator::process_classic(
                 // input:
@@ -137,9 +141,47 @@ void LayerRegion::make_perimeters(
                 lower_slices,
                 lower_layer_polygons_cache,
                 // output:
-                m_perimeters,
-                m_thin_fills,
-                fill_expolygons);
+                srf_perimeters,
+                srf_thin_fills,
+                srf_fill_ex_polys);
+
+        if (params.config.external_perimeters_first && params.config.first_internal_on_overhangs) {
+            for (ExtrusionEntity* ent: srf_perimeters){
+                ExtrusionEntityCollection col = *(ExtrusionEntityCollection*)ent;
+                for (ExtrusionEntity* ent : col) {
+                    if (ent->is_loop()){
+                        ExtrusionLoop loop = *(ExtrusionLoop*)ent;
+                        for (ExtrusionPath path: loop.paths){
+                            if (path.role().is_bridge()){
+                                for (ExtrusionEntity* ent: srf_perimeters.entities){
+                                    ExtrusionEntityCollection ent1;
+                                    for (ExtrusionEntity* loop: boost::adaptors::reverse(((ExtrusionEntityCollection*)ent)->entities))
+                                        ent1.entities.push_back(loop->clone());
+                                    m_perimeters.entities.push_back(ent1.clone());
+                                 }
+                                for (ExtrusionEntity* ent : srf_thin_fills.entities){
+                                    ExtrusionEntityCollection ent1;
+                                    for (ExtrusionEntity* ent2: boost::adaptors::reverse(((ExtrusionEntityCollection*)ent)->entities))
+                                        ent1.entities.push_back(ent2->clone());
+                                    m_thin_fills.entities.push_back(ent1.clone());
+                                }
+                                for (ExPolygon poly : boost::adaptors::reverse(srf_fill_ex_polys))
+                                    fill_expolygons.push_back(poly);
+                                goto cont;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (ExtrusionEntity* ent: srf_perimeters.entities)
+            m_perimeters.entities.push_back(ent->clone());
+        for (ExtrusionEntity* ent : srf_thin_fills.entities)
+            m_thin_fills.entities.push_back(ent->clone());
+        for (ExPolygon poly : srf_fill_ex_polys)
+            fill_expolygons.push_back(poly);
+    cont:
+
         perimeter_and_gapfill_ranges.emplace_back(
             ExtrusionRange{ perimeters_begin, uint32_t(m_perimeters.size()) }, 
             ExtrusionRange{ gap_fills_begin,  uint32_t(m_thin_fills.size()) });
