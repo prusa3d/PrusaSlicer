@@ -7,9 +7,10 @@ To build PrusaSlicer on Mac OS, you will need the following software:
 - CMake
 - git
 - gettext
+- texinfo
 
 XCode is available through Apple's App Store, the other three tools are available on
-[brew](https://brew.sh/) (use `brew install cmake git gettext` to install them).
+[brew](https://brew.sh/) (use `brew install cmake git gettext texinfo` to install them).
 
 ### Dependencies
 
