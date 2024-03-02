@@ -49,7 +49,7 @@ void FillConcentric::_fill_surface_single(
     size_t iPathFirst = polylines_out.size();
     Point last_pos(0, 0);
     for (const Polygon &loop : loops) {
-        polylines_out.emplace_back(loop.split_at_index(nearest_point_index(loop.points, last_pos)));
+        polylines_out.emplace_back(loop.split_at_index(rand() % loop.points.size()));
         last_pos = polylines_out.back().last_point();
     }
 
@@ -107,7 +107,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
 
             ThickPolyline thick_polyline = Arachne::to_thick_polyline(*extrusion);
             if (extrusion->is_closed)
-                thick_polyline.start_at_index(nearest_point_index(thick_polyline.points, last_pos));
+                thick_polyline.start_at_index(rand() % thick_polyline.points.size());
             thick_polylines_out.emplace_back(std::move(thick_polyline));
             last_pos = thick_polylines_out.back().last_point();
         }
