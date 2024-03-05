@@ -2481,13 +2481,13 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("skirt_height", coInt);
     def->label = L("Skirt height");
-    def->tooltip = L("Height of skirt expressed in layers.");
+    def->tooltip = L("Height of skirt expressed in layers. For draft shield it's layers will all loops.");
     def->sidetext = L("layers");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(1));
 
     def = this->add("draft_shield", coEnum);
-    def->label = L("Draft shield");
+    def->label = L("");
     def->tooltip = L("With draft shield active, the skirt will be printed skirt_distance from the object, possibly intersecting brim.\n"
                      "Enabled = skirt is as tall as the highest printed object.\n"
                      "Limited = skirt is as tall as specified by skirt_height.\n"
@@ -2499,6 +2499,13 @@ void PrintConfigDef::init_fff_params()
     });
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<DraftShield>(dsDisabled));
+
+    def = this->add("draft_shield_loops", coInt);
+    def->label = L("loops");
+    def->tooltip = L("Number of loops for the draft shield. Skirt height layers have all loops.");
+    def->min = 1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
 
     def = this->add("skirts", coInt);
     def->label = L("Loops (minimum)");

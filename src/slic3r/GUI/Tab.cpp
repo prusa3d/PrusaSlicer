@@ -1530,7 +1530,13 @@ void TabPrint::build()
         optgroup->append_single_option_line("skirts", category_path + "skirt");
         optgroup->append_single_option_line("skirt_distance", category_path + "skirt");
         optgroup->append_single_option_line("skirt_height", category_path + "skirt");
-        optgroup->append_single_option_line("draft_shield", category_path + "skirt");
+        
+        line = { L("Draft shield"), "" };
+        line.label_path = category_path + "skirt";
+        line.append_option(optgroup->get_option("draft_shield"));
+        line.append_option(optgroup->get_option("draft_shield_loops"));
+        optgroup->append_line(line);
+
         optgroup->append_single_option_line("min_skirt_length", category_path + "skirt");
 
         optgroup = page->new_optgroup(L("Brim"));
