@@ -2445,10 +2445,10 @@ void GUI_App::update_mode()
 {
     sidebar().update_mode();
 
-#ifdef _WIN32 //_MSW_DARK_MODE
+#ifdef _MSW_DARK_MODE
     if (!wxGetApp().tabs_as_menu())
         dynamic_cast<Notebook*>(mainframe->m_tabpanel)->UpdateMode();
-#endif
+#endif  //_MSW_DARK_MODE
 
     for (auto tab : tabs_list)
         tab->update_mode();
