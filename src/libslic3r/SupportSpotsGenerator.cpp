@@ -32,8 +32,13 @@
 #include <functional>
 #include <limits>
 #include <math.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/concurrent_vector.h>
 #include <oneapi/tbb/parallel_for.h>
+#else
+#include <tbb/concurrent_vector.h>
+#include <tbb/parallel_for.h>
+#endif
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>

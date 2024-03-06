@@ -20,7 +20,11 @@
 #include <sstream>
 #include <unordered_map>
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/scalable_allocator.h>
+#endif
 
 
 #include <Eigen/Geometry> 

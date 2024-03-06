@@ -5,8 +5,13 @@
 #ifndef slic3r_SupportLayer_hpp_
 #define slic3r_SupportLayer_hpp_
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
 #include <oneapi/tbb/spin_mutex.h>
+#else
+#include <tbb/scalable_allocator.h>
+#include <tbb/spin_mutex.h>
+#endif
 // for Slic3r::deque
 #include "../libslic3r.h"
 #include "../ClipperUtils.hpp"
