@@ -879,6 +879,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloats,             wiping_volumes_matrix))
     ((ConfigOptionFloats,             wiping_volumes_extruders))
     ((ConfigOptionFloat,              z_offset))
+    ((ConfigOptionFloat,              init_z_rotate))
 )
 
 PRINT_CONFIG_CLASS_DERIVED_DEFINE0(
