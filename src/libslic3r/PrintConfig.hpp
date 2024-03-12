@@ -662,6 +662,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                top_solid_min_thickness))
     ((ConfigOptionFloatOrPercent,       top_solid_infill_speed))
     ((ConfigOptionBool,                 wipe_into_infill))
+    // SuperSlicer
+    ((ConfigOptionEnum<InfillPattern>,  solid_fill_pattern))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
