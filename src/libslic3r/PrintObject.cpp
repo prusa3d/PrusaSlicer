@@ -2499,7 +2499,7 @@ void PrintObject::bridge_over_infill()
                         for (const Surface *surface : internal_solids) {
                             if (cs.original_surface == surface) {
                                 Surface tmp{*surface, {}};
-                                tmp.surface_type = stInternalBridge;
+                                tmp.surface_type = region->needs_bridge_over_infill() ? stInternalBridge : stInternalSolid;
                                 tmp.bridge_angle = cs.bridge_angle;
                                 for (const ExPolygon &ep : union_ex(cs.new_polys)) {
                                     new_surfaces.emplace_back(tmp, ep);
@@ -2817,8 +2817,8 @@ void PrintObject::discover_horizontal_shells()
             if (region_config.solid_infill_every_layers.value > 0 && region_config.fill_density.value > 0 &&
                 (i % region_config.solid_infill_every_layers) == 0) {
                 // Insert a solid internal layer. Mark stInternal surfaces as stInternalSolid or stInternalBridge.
-                SurfaceType type = (region_config.fill_density == 100 || region_config.solid_infill_every_layers == 1) ? stInternalSolid :
-                                                                                                                         stInternalBridge;
+                SurfaceType type = (!layerm->needs_bridge_over_infill() || region_config.solid_infill_every_layers == 1) ? stInternalSolid :
+                                                                                                                      stInternalBridge;
                 for (Surface &surface : layerm->m_fill_surfaces.surfaces)
                     if (surface.surface_type == stInternal)
                         surface.surface_type = type;
