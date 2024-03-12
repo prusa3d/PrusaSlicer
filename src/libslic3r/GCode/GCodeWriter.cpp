@@ -51,6 +51,11 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
         print_config.machine_max_acceleration_extruding.values.front() : 0));
     m_max_travel_acceleration = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode && supports_separate_travel_acceleration(print_config.gcode_flavor.value)) ?
         print_config.machine_max_acceleration_travel.values.front() : 0));
+
+    m_max_jerk_x = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
+        print_config.machine_max_jerk_x.values.front() : 0));
+    m_max_jerk_y = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
+        print_config.machine_max_jerk_y.values.front() : 0));
 }
 
 void GCodeWriter::set_extruders(std::vector<unsigned int> extruder_ids)
@@ -209,6 +214,32 @@ std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned i
     if (this->config.gcode_comments) gcode << " ; adjust acceleration";
     gcode << "\n";
     
+    return gcode.str();
+}
+
+std::string GCodeWriter::set_jerk(unsigned int jerk)
+{
+    if (jerk == 0 || jerk == m_last_jerk)
+        return {};
+    
+    // Clamp the acceleration to the allowed maximum.
+    int jerk_x = jerk, jerk_y = jerk;
+    if (m_max_jerk_x > 0 && jerk > m_max_jerk_x)
+        jerk_x = m_max_jerk_x;
+    if (m_max_jerk_y > 0 && jerk > m_max_jerk_y)
+        jerk_y = m_max_jerk_y;
+    
+    m_last_jerk = jerk;
+
+    std::ostringstream gcode;
+    if (FLAVOR_IS(gcfRepRapFirmware))
+        gcode << "M566 X" << jerk_x << " Y" << jerk_y;
+    else
+        gcode << "M205 X" << jerk_x << " Y" << jerk_y;
+
+    if (this->config.gcode_comments) gcode << " ; adjust jerk";
+    gcode << "\n";
+
     return gcode.str();
 }
 

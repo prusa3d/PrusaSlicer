@@ -1612,17 +1612,56 @@ void TabPrint::build()
         optgroup->append_single_option_line("first_layer_speed");
         optgroup->append_single_option_line("first_layer_speed_over_raft");
 
-        optgroup = page->new_optgroup(L("Acceleration control (advanced)"));
-        optgroup->append_single_option_line("external_perimeter_acceleration");
-        optgroup->append_single_option_line("perimeter_acceleration");
-        optgroup->append_single_option_line("top_solid_infill_acceleration");
-        optgroup->append_single_option_line("solid_infill_acceleration");
-        optgroup->append_single_option_line("infill_acceleration");
-        optgroup->append_single_option_line("bridge_acceleration");
-        optgroup->append_single_option_line("first_layer_acceleration");
-        optgroup->append_single_option_line("first_layer_acceleration_over_raft");
-        optgroup->append_single_option_line("travel_acceleration");
-        optgroup->append_single_option_line("default_acceleration");
+        optgroup = page->new_optgroup(L("Acceleration/jerk control (advanced)"));
+        line = { L("External perimeters"), "" };
+        line.append_option(optgroup->get_option("external_perimeter_acceleration"));
+        line.append_option(optgroup->get_option("external_perimeter_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("Perimeters"), "" };
+        line.append_option(optgroup->get_option("perimeter_acceleration"));
+        line.append_option(optgroup->get_option("perimeter_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("Top solid infill"), "" };
+        line.append_option(optgroup->get_option("top_solid_infill_acceleration"));
+        line.append_option(optgroup->get_option("top_solid_infill_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("Solid infill"), "" };
+        line.append_option(optgroup->get_option("solid_infill_acceleration"));
+        line.append_option(optgroup->get_option("solid_infill_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("Infill"), "" };
+        line.append_option(optgroup->get_option("infill_acceleration"));
+        line.append_option(optgroup->get_option("infill_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("Bridge"), "" };
+        line.append_option(optgroup->get_option("bridge_acceleration"));
+        line.append_option(optgroup->get_option("bridge_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("First layer"), "" };
+        line.append_option(optgroup->get_option("first_layer_acceleration"));
+        line.append_option(optgroup->get_option("first_layer_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("First object layer over raft interface"), "" };
+        line.append_option(optgroup->get_option("first_layer_acceleration_over_raft"));
+        line.append_option(optgroup->get_option("first_layer_jerk_over_raft"));
+        optgroup->append_line(line);
+
+        line = { L("Travel"), "" };
+        line.append_option(optgroup->get_option("travel_acceleration"));
+        line.append_option(optgroup->get_option("travel_jerk"));
+        optgroup->append_line(line);
+
+        line = { L("Default"), "" };
+        line.append_option(optgroup->get_option("default_acceleration"));
+        line.append_option(optgroup->get_option("default_jerk"));
+        optgroup->append_line(line);
 
         optgroup = page->new_optgroup(L("Autospeed (advanced)"));
         optgroup->append_single_option_line("max_print_speed", "max-volumetric-speed_127176");

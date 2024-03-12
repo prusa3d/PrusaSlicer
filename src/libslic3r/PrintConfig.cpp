@@ -526,13 +526,22 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0.));
 
     def = this->add("bridge_acceleration", coFloat);
-    def->label = L("Bridge");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for bridges. "
                    "Set zero to disable acceleration control for bridges.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("bridge_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for bridges. "
+                   "Set zero to disable jerk control for bridges.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("bridge_angle", coFloat);
     def->label = L("Bridging angle");
@@ -782,7 +791,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(5.));
 
     def = this->add("default_acceleration", coFloat);
-    def->label = L("Default");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will be reset to after "
                    "the role-specific acceleration values are used (perimeter/infill). "
                    "Set zero to prevent resetting acceleration at all.");
@@ -790,6 +799,16 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("default_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will be reset to after "
+                   "the role-specific jerk values are used (perimeter/infill). "
+                   "Set zero to prevent resetting jerk at all.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("default_filament_profile", coStrings);
     def->label = L("Default filament profile");
@@ -1317,7 +1336,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipStars));
 
     def = this->add("first_layer_acceleration", coFloat);
-    def->label = L("First layer");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for first layer. Set zero "
                    "to disable acceleration control for first layer.");
     def->sidetext = L("mm/s²");
@@ -1326,13 +1345,31 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("first_layer_acceleration_over_raft", coFloat);
-    def->label = L("First object layer over raft interface");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for first layer of object above raft interface. Set zero "
                    "to disable acceleration control for first layer of object above raft interface.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("first_layer_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for first layer. Set zero "
+                   "to disable jerk control for first layer.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("first_layer_jerk_over_raft", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for first layer of object above raft interface. Set zero "
+                   "to disable jerk control for first layer of object above raft interface.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("first_layer_bed_temperature", coInts);
     def->label = L("First layer");
@@ -1520,7 +1557,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(0));
 
     def = this->add("infill_acceleration", coFloat);
-    def->label = L("Infill");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for infill. Set zero to disable "
                      "acceleration control for infill.");
     def->sidetext = L("mm/s²");
@@ -1529,7 +1566,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("solid_infill_acceleration", coFloat);
-    def->label = L("Solid infill");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for solid infill. Set zero to use "
                      "the value for infill.");
     def->sidetext = L("mm/s²");
@@ -1538,7 +1575,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("top_solid_infill_acceleration", coFloat);
-    def->label = L("Top solid infill");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for top solid infill. Set zero to use "
                      "the value for solid infill.");
     def->sidetext = L("mm/s²");
@@ -1547,13 +1584,49 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("travel_acceleration", coFloat);
-    def->label = L("Travel");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for travel moves. Set zero to disable "
                      "acceleration control for travel.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("infill_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for infill. Set zero to disable "
+                     "jerk control for infill.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("solid_infill_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for solid infill. Set zero to use "
+                     "the value for infill.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("top_solid_infill_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for top solid infill. Set zero to use "
+                     "the value for solid infill.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("travel_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for travel moves. Set zero to disable "
+                     "jerk control for travel.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("infill_every_layers", coInt);
     def->label = L("Combine infill every");
@@ -2113,7 +2186,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(-2.));
 
     def = this->add("perimeter_acceleration", coFloat);
-    def->label = L("Perimeters");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for perimeters. "
                      "Set zero to disable acceleration control for perimeters.");
     def->sidetext = L("mm/s²");
@@ -2121,12 +2194,28 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("external_perimeter_acceleration", coFloat);
-    def->label = L("External perimeters");
+    def->label = L("Acceleration");
     def->tooltip = L("This is the acceleration your printer will use for external perimeters. "
                      "Set zero to use the value for perimeters.");
     def->sidetext = L("mm/s²");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("perimeter_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the jerk your printer will use for perimeters. "
+                     "Set zero to disable jerk control for perimeters.");
+    def->sidetext = L("mm/s");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("external_perimeter_jerk", coInt);
+    def->label = L("Jerk");
+    def->tooltip = L("This is the acceleration your printer will use for external perimeters. "
+                     "Set zero to use the value for perimeters.");
+    def->sidetext = L("mm/s");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
 
     def = this->add("perimeter_extruder", coInt);
     def->label = L("Perimeter extruder");

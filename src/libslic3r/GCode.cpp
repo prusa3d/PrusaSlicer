@@ -2861,6 +2861,8 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
 
     // reset acceleration
     gcode += m_writer.set_print_acceleration(fast_round_up<unsigned int>(m_config.default_acceleration.value));
+    //reset jerk
+    gcode += m_writer.set_jerk(fast_round_up<unsigned int>(m_config.default_jerk.value));
 
     if (m_wipe.enabled()) {
         // Wipe will hide the seam.
@@ -2909,6 +2911,8 @@ std::string GCodeGenerator::extrude_skirt(
 
     // reset acceleration
     gcode += m_writer.set_print_acceleration(fast_round_up<unsigned int>(m_config.default_acceleration.value));
+    // reset jerk
+    gcode += m_writer.set_jerk(fast_round_up<unsigned int>(m_config.default_jerk.value));
 
     if (m_wipe.enabled())
         // Wipe will hide the seam.
@@ -2934,6 +2938,8 @@ std::string GCodeGenerator::extrude_multi_path(const ExtrusionMultiPath &multipa
     m_wipe.set_path(std::move(smooth_path), true);
     // reset acceleration
     gcode += m_writer.set_print_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
+    // reset jerk
+    gcode += m_writer.set_jerk(m_config.default_jerk.value);
     return gcode;
 }
 
@@ -2958,6 +2964,8 @@ std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, bool reverse
     m_wipe.set_path(std::move(smooth_path));
     // reset acceleration
     gcode += m_writer.set_print_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
+    // reset jerk
+    gcode += m_writer.set_jerk(m_config.default_jerk.value);
     return gcode;
 }
 
@@ -3179,6 +3187,31 @@ std::string GCodeGenerator::_extrude(
         gcode += m_writer.set_print_acceleration((unsigned int)floor(acceleration + 0.5));
     }
 
+    // adjust jerk
+    if (m_config.default_jerk.value > 0) {
+        int jerk;
+        if (this->on_first_layer() && m_config.first_layer_jerk.value > 0) {
+            jerk = m_config.first_layer_jerk.value;
+        } else if (this->object_layer_over_raft() && m_config.first_layer_jerk_over_raft.value > 0) {
+            jerk = m_config.first_layer_jerk_over_raft.value;
+        } else if (m_config.bridge_jerk.value > 0 && path_attr.role.is_bridge()) {
+            jerk = m_config.bridge_jerk.value;
+        } else if (m_config.top_solid_infill_jerk > 0 && path_attr.role == ExtrusionRole::TopSolidInfill) {
+            jerk = m_config.top_solid_infill_jerk.value;
+        } else if (m_config.solid_infill_jerk > 0 && path_attr.role.is_solid_infill()) {
+            jerk = m_config.solid_infill_jerk.value;
+        } else if (m_config.infill_jerk.value > 0 && path_attr.role.is_infill()) {
+            jerk = m_config.infill_jerk.value;
+        } else if (m_config.external_perimeter_jerk > 0 && path_attr.role.is_external_perimeter()) {
+            jerk = m_config.external_perimeter_jerk.value;
+        } else if (m_config.perimeter_jerk.value > 0 && path_attr.role.is_perimeter()) {
+            jerk = m_config.perimeter_jerk.value;
+        } else {
+            jerk = m_config.default_jerk.value;
+        }
+        gcode += m_writer.set_jerk(jerk);
+    }
+
     // calculate extrusion length per distance unit
     double e_per_mm = m_writer.extruder()->e_per_mm3() * path_attr.mm3_per_mm;
     if (m_writer.extrusion_axis().empty())
@@ -3374,6 +3407,8 @@ std::string GCodeGenerator::generate_travel_gcode(
     // generate G-code for the travel move
     // use G1 because we rely on paths being straight (G0 may make round paths)
     gcode += this->m_writer.set_travel_acceleration(acceleration);
+    if (m_config.default_jerk > 0 && m_config.travel_jerk > 0)
+        gcode += this->m_writer.set_jerk(m_config.travel_jerk);
 
     Vec3d previous_point{this->point_to_gcode(travel.front())};
     for (const Vec3crd& point : travel) {
@@ -3390,6 +3425,8 @@ std::string GCodeGenerator::generate_travel_gcode(
         gcode += this->m_writer.set_travel_acceleration(acceleration);
     }
 
+    if (m_config.default_jerk > 0 && m_config.travel_jerk > 0)
+        gcode += this->m_writer.set_jerk(m_config.default_jerk);
     return gcode;
 }
 

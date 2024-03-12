@@ -264,6 +264,12 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
                     "bridge_acceleration", "first_layer_acceleration" })
         toggle_field(el, have_default_acceleration);
 
+    bool have_default_jerk = config->opt_int("default_jerk") > 0;
+    for (auto el : { "perimeter_jerk", "infill_jerk", "top_solid_infill_jerk",
+                    "solid_infill_jerk", "external_perimeter_jerk", "external_perimeter_jerk",
+                    "bridge_jerk", "first_layer_jerk", "travel_jerk" })
+        toggle_field(el, have_default_jerk);
+
     bool have_skirt = config->opt_int("skirts") > 0;
     toggle_field("skirt_height", have_skirt && config->opt_enum<DraftShield>("draft_shield") != dsEnabled);
     for (auto el : { "skirt_distance", "draft_shield", "min_skirt_length" })
@@ -309,7 +315,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("support_material_speed", have_support_material || have_brim || have_skirt);
 
     toggle_field("raft_contact_distance", have_raft && !have_support_soluble);
-    for (auto el : { "raft_expansion", "first_layer_acceleration_over_raft", "first_layer_speed_over_raft" })
+    for (auto el : { "raft_expansion", "first_layer_acceleration_over_raft", "first_layer_jerk_over_raft", "first_layer_speed_over_raft" })
         toggle_field(el, have_raft);
 
     bool has_ironing = config->opt_bool("ironing");
