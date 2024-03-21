@@ -84,6 +84,7 @@ enum InfillPattern : int {
     ipLightning,
     ipEnsuring,
     ipCount,
+    ipAlterCentric
 };
 
 enum class IroningType {

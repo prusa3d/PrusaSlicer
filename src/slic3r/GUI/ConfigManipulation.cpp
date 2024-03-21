@@ -188,7 +188,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     if (config->option<ConfigOptionPercent>("fill_density")->value == 100) {
         const int fill_pattern = config->option<ConfigOptionEnum<InfillPattern>>("fill_pattern")->value;
         if (bool correct_100p_fill = config->option_def("top_fill_pattern")->enum_def->enum_to_index(fill_pattern).has_value(); 
-            ! correct_100p_fill) {
+            ! correct_100p_fill && fill_pattern != ipAlterCentric) {
             // get fill_pattern name from enum_labels for using this one at dialog_msg
             const ConfigOptionDef *fill_pattern_def = config->option_def("fill_pattern");
             assert(fill_pattern_def != nullptr);

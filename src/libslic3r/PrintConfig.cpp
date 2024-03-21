@@ -130,6 +130,7 @@ static const t_config_enum_values s_keys_map_InfillPattern {
     { "cubic",              ipCubic },
     { "line",               ipLine },
     { "concentric",         ipConcentric },
+    { "altercentric",       ipAlterCentric },
     { "honeycomb",          ipHoneycomb },
     { "3dhoneycomb",        ip3DHoneycomb },
     { "gyroid",             ipGyroid },
@@ -882,6 +883,7 @@ void PrintConfigDef::init_fff_params()
     def->aliases = def_top_fill_pattern->aliases;
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipMonotonic));
 
+        { "altercentric",       L("AlterCentric") },
     def = this->add("external_perimeter_extrusion_width", coFloatOrPercent);
     def->label = L("External perimeters");
     def->category = L("Extrusion Width");
@@ -1329,6 +1331,7 @@ void PrintConfigDef::init_fff_params()
         { "cubic",              L("Cubic")},
         { "line",               L("Line")},
         { "concentric",         L("Concentric")},
+        { "altercentric",       L("AlterCentric")},	
         { "honeycomb",          L("Honeycomb")},
         { "3dhoneycomb",        L("3D Honeycomb")},
         { "gyroid",             L("Gyroid")},
