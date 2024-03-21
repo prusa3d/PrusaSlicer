@@ -566,6 +566,26 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(1));
 
+    def = this->add("first_layer_flow_ratio", coFloat);
+    def->label = L("First layer flow ratio");
+    def->category = L("Advanced");
+    def->tooltip = L("This factor affects the amount of plastic for first layer. "
+                   "You can decrease it slightly (e.g. 0.85) to prevent rough first layer and sticking to the nozzle, "
+                   "or increase a bit to improve sticking to unflat bed (though it's better to have autoleveling or flat bed).");
+    def->min = 0.5;
+    def->max = 1.5;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1));
+
+    def = this->add("top_layer_flow_ratio", coFloat);
+    def->label = L("Top layer flow ratio");
+    def->category = L("Advanced");
+    def->tooltip = L("This factor affects the amount of plastic for top layer. Play with this parameter to get smooth surface.");
+    def->min = 0.5;
+    def->max = 1.5;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1));
+
     def = this->add("bridge_speed", coFloat);
     def->label = L("Bridges");
     def->category = L("Speed");
