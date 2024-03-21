@@ -1,0 +1,21 @@
+min_slic3r_version = 2.7.2
+0.3.1 test version for 2.7.2
+0.3.0 added 0.3mm and 0.5mm nozzle, renames profiles
+0.2.2 updated default print profiles for Klipper, external_perimeters_first = 0, seam_position = aligned
+0.2.1 updates default Duet thumbnail format
+0.2.0 corrects Duet 320 and 420 profiles
+0.1.9 corrects Klipper start code
+0.1.8 corrects start script
+0.1.7 added Caribou Klipper family
+0.1.6 corrected retract_lift_below
+0.1.5 corrected max layer height, added inherits for bigger nozzles
+0.1.1 corrceted inherit for ESUN ABS
+0.1.0 changed fan settings for PETG and XPETG matt
+0.0.8 changed thumbnail size for Duet
+0.0.7 updated profile for Caribou parts, changed thumbnail color, added ESUN ABS
+0.0.6 updated pictures
+0.0.5 added Esun ABS, generate thumnails
+0.0.4 changed default fan speed and flow rate for some filaments
+0.0.3 changed bridge_flow_ratio from % to absolute; updated start gcode
+0.0.2 updated start scripts
+0.0.1 Initial Version
