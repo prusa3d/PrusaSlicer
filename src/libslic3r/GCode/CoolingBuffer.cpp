@@ -810,7 +810,10 @@ std::string CoolingBuffer::apply_layer_cooldown(
 #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
         int min_fan_speed = EXTRUDER_CONFIG(min_fan_speed);
         int fan_speed_new = EXTRUDER_CONFIG(fan_always_on) ? min_fan_speed : 0;
-        std::pair<int, int> custom_fan_speed_limits{fan_speed_new, 100 };
+        struct {
+            int   min;
+            float factor;
+        } custom_fan_speed_limits{fan_speed_new, 1.0};
         int disable_fan_first_layers = EXTRUDER_CONFIG(disable_fan_first_layers);
         // Is the fan speed ramp enabled?
         int full_fan_speed_layer = EXTRUDER_CONFIG(full_fan_speed_layer);
@@ -827,22 +830,22 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 if (layer_time < slowdown_below_layer_time) {
                     // Layer time very short. Enable the fan to a full throttle.
                     fan_speed_new = max_fan_speed;
-                    custom_fan_speed_limits.first = fan_speed_new;
+                    custom_fan_speed_limits.min = fan_speed_new;
                 } else if (layer_time < fan_below_layer_time) {
                     // Layer time quite short. Enable the fan proportionally according to the current layer time.
                     assert(layer_time >= slowdown_below_layer_time);
                     double t = (layer_time - slowdown_below_layer_time) / (fan_below_layer_time - slowdown_below_layer_time);
                     fan_speed_new = int(floor(t * min_fan_speed + (1. - t) * max_fan_speed) + 0.5);
-                    custom_fan_speed_limits.first = fan_speed_new;
+                    custom_fan_speed_limits.min = fan_speed_new;
                 }
             }
             bridge_fan_speed   = EXTRUDER_CONFIG(bridge_fan_speed);
-            if (int(layer_id) >= disable_fan_first_layers && int(layer_id) + 1 < full_fan_speed_layer) {
+            if (int(layer_id) + 1 < full_fan_speed_layer) {
                 // Ramp up the fan speed from disable_fan_first_layers to full_fan_speed_layer.
                 float factor = float(int(layer_id + 1) - disable_fan_first_layers) / float(full_fan_speed_layer - disable_fan_first_layers);
                 fan_speed_new    = std::clamp(int(float(fan_speed_new) * factor + 0.5f), 0, 100);
                 bridge_fan_speed = std::clamp(int(float(bridge_fan_speed) * factor + 0.5f), 0, 100);
-                custom_fan_speed_limits.second = fan_speed_new;
+                custom_fan_speed_limits = {fan_speed_new, factor};
             }
 #undef EXTRUDER_CONFIG
             bridge_fan_control = bridge_fan_speed > fan_speed_new;
@@ -850,19 +853,18 @@ std::string CoolingBuffer::apply_layer_cooldown(
             bridge_fan_control = false;
             bridge_fan_speed   = 0;
             fan_speed_new      = 0;
-            custom_fan_speed_limits.second = 0;
+            custom_fan_speed_limits = {0, 0.0};
         }
         if (fan_speed_new != m_fan_speed) {
             m_fan_speed = fan_speed_new;
             new_gcode  += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed);
         }
-        custom_fan_speed_limits.first = std::min(custom_fan_speed_limits.first, custom_fan_speed_limits.second);
         return custom_fan_speed_limits;
     };
 
     const char         *pos               = gcode.c_str();
     int                 current_feedrate  = 0;
-    std::pair<int,int> fan_speed_limits = change_extruder_set_fan();
+    auto fan_speed_limits = change_extruder_set_fan();
     for (const CoolingLine *line : lines) {
         const char *line_start  = gcode.c_str() + line->line_start;
         const char *line_end    = gcode.c_str() + line->line_end;
@@ -877,7 +879,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             }
             new_gcode.append(line_start, line_end - line_start);
         } else if (line->type & CoolingLine::TYPE_SET_FAN_SPEED) {
-            int new_speed = std::clamp(line->fan_speed, fan_speed_limits.first, fan_speed_limits.second);
+            int new_speed = std::max(int(line->fan_speed * fan_speed_limits.factor + 0.5), fan_speed_limits.min);
             if (m_fan_speed != new_speed) {
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, new_speed);
                 m_fan_speed = new_speed;
