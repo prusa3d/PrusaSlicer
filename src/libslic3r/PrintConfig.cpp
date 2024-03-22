@@ -486,6 +486,16 @@ void PrintConfigDef::init_fff_params()
     def->max = 300;
     def->set_default_value(new ConfigOptionInts { 0 });
 
+    def = this->add("chamber_temperature", coInts);
+    def->label = L("Chamber");
+    def->full_label = L("Chamber temperature");
+    def->tooltip = L("Chamber temperature. Note that this setting doesn't do anything, but you can access it in Start G-code, Tool change G-code and the other ones, like for other temperature settings.");
+    def->sidetext = L("°C");
+    def->min = 0;
+    def->max = 300;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts{ 0 });
+
     def = this->add("before_layer_gcode", coString);
     def->label = L("Before layer change G-code");
     def->tooltip = L("This custom code is inserted at every layer change, right before the Z move. "

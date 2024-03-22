@@ -94,6 +94,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "overhang_fan_speed_1",
         "overhang_fan_speed_2",
         "overhang_fan_speed_3",
+        "chamber_temperature",
         "colorprint_heights",
         "cooling",
         "default_acceleration",

@@ -490,7 +490,9 @@ static std::vector<std::string> s_Preset_filament_options {
     "filament_retract_layer_change", "filament_wipe", "filament_retract_before_wipe", "filament_retract_length_toolchange", "filament_retract_restart_extra_toolchange", "filament_travel_ramping_lift",
     "filament_travel_slope", "filament_travel_max_lift", "filament_travel_lift_before_obstacle",
     // Profile compatibility
-    "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits"
+    "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
+    // SuperSlicer
+    "chamber_temperature",
 };
 
 static std::vector<std::string> s_Preset_machine_limits_options {
