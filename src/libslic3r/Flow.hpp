@@ -116,7 +116,7 @@ public:
 
     // Sane extrusion width defautl based on nozzle diameter.
     // The defaults were derived from manual Prusa MK3 profiles.
-    static float auto_extrusion_width(FlowRole role, float nozzle_diameter);
+    static float auto_extrusion_width(FlowRole role, float nozzle_diameter, float height = .0f);
 
     // Extrusion width from full config, taking into account the defaults (when set to zero) and ratios (percentages).
     // Precise value depends on layer index (1st layer vs. other layers vs. variable layer height),

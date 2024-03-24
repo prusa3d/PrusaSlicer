@@ -154,14 +154,14 @@ SCENARIO("Flow: Flow math for non-bridges", "[Flow]") {
         float layer_height		= 0.4f;
 
         // Spacing for non-bridges is has some overlap
-        THEN("External perimeter flow has spacing fixed to 1.125 * nozzle_diameter") {
+        THEN("External perimeter flow has spacing fixed to layer_height + nozzle_diameter") {
             auto flow = Flow::new_from_config_width(frExternalPerimeter, ConfigOptionFloatOrPercent(0, false), nozzle_diameter, layer_height);
-            REQUIRE(flow.spacing() == Approx(1.125 * nozzle_diameter - layer_height * (1.0 - PI / 4.0)));
+            REQUIRE(flow.spacing() == Approx(nozzle_diameter + layer_height * PI / 4.0));
         }
 
-        THEN("Internal perimeter flow has spacing fixed to 1.125 * nozzle_diameter") {
+        THEN("Internal perimeter flow has spacing fixed to layer_height + nozzle_diameter") {
             auto flow = Flow::new_from_config_width(frPerimeter, ConfigOptionFloatOrPercent(0, false), nozzle_diameter, layer_height);
-            REQUIRE(flow.spacing() == Approx(1.125 *nozzle_diameter - layer_height * (1.0 - PI / 4.0)));
+            REQUIRE(flow.spacing() == Approx(nozzle_diameter + layer_height * PI / 4.0));
         }
         THEN("Spacing for supplied width is 0.8927f") {
             auto flow = Flow::new_from_config_width(frExternalPerimeter, width, nozzle_diameter, layer_height);
@@ -178,14 +178,14 @@ SCENARIO("Flow: Flow math for non-bridges", "[Flow]") {
             layer_height = 0.15f;
             THEN("Max width is set.") {
                 auto flow = Flow::new_from_config_width(frPerimeter, ConfigOptionFloatOrPercent(0, false), nozzle_diameter, layer_height);
-                REQUIRE(flow.width() == Approx(1.125 * nozzle_diameter));
+                REQUIRE(flow.width() == Approx(layer_height + nozzle_diameter));
             }
         }
         WHEN("Layer height is set to 0.25") {
             layer_height = 0.25f;
             THEN("Min width is set.") {
                 auto flow = Flow::new_from_config_width(frPerimeter, ConfigOptionFloatOrPercent(0, false), nozzle_diameter, layer_height);
-                REQUIRE(flow.width() == Approx(1.125 * nozzle_diameter));
+                REQUIRE(flow.width() == Approx(layer_height + nozzle_diameter));
             }
         }
     }

@@ -25,19 +25,20 @@ FlowErrorNegativeFlow::FlowErrorNegativeFlow() :
     FlowError("Flow::mm3_per_mm() produced negative flow. Did you set some extrusion width too small?") {}
 
 // This static method returns a sane extrusion width default.
-float Flow::auto_extrusion_width(FlowRole role, float nozzle_diameter)
+float Flow::auto_extrusion_width(FlowRole role, float nozzle_diameter, float height)
 {
     switch (role) {
-    case frSupportMaterial:
-    case frSupportMaterialInterface:
     case frTopSolidInfill:
         return nozzle_diameter;
-    default:
+    case frSupportMaterial:
+    case frSupportMaterialInterface:
     case frExternalPerimeter:
+        return height > .0f ? 0.5f * height + nozzle_diameter : 1.125f * nozzle_diameter;
+    default:
     case frPerimeter:
     case frSolidInfill:
     case frInfill:
-        return 1.125f * nozzle_diameter;
+        return height > .0f ? height + nozzle_diameter : 1.125f * nozzle_diameter;
     }
 }
 
@@ -85,33 +86,35 @@ double Flow::extrusion_width(const std::string& opt_key, const ConfigOptionFloat
 	}
 #endif
 
-	if (opt->value == 0.) {
-		// The role specific extrusion width value was set to zero, try the role non-specific extrusion width.
-		opt = config.option<ConfigOptionFloatOrPercent>("extrusion_width");
-		if (opt == nullptr)
-    		throw_on_missing_variable(opt_key, "extrusion_width");
-    	// Use the "layer_height" instead of "first_layer_height".
-    	first_layer = false;
-	}
-
-	if (opt->percent) {
-		auto opt_key_layer_height = first_layer ? "first_layer_height" : "layer_height";
-        auto opt_layer_height = config.option(opt_key_layer_height);
-    	if (opt_layer_height == nullptr)
-    		throw_on_missing_variable(opt_key, opt_key_layer_height);
-        assert(! first_layer || ! static_cast<const ConfigOptionFloatOrPercent*>(opt_layer_height)->percent);
-		return opt->get_abs_value(opt_layer_height->getFloat());
-	}
-
-	if (opt->value == 0.) {
-        // If user left option to 0, calculate a sane default width.
-    	auto opt_nozzle_diameters = config.option<ConfigOptionFloats>("nozzle_diameter");
-    	if (opt_nozzle_diameters == nullptr)
-    		throw_on_missing_variable(opt_key, "nozzle_diameter");
-        return auto_extrusion_width(opt_key_to_flow_role(opt_key), float(opt_nozzle_diameters->get_at(first_printing_extruder)));
+    if (opt->value == 0.) {
+        // The role specific extrusion width value was set to zero, try the role non-specific extrusion width.
+        opt = config.option<ConfigOptionFloatOrPercent>("extrusion_width");
+        if (opt == nullptr)
+            throw_on_missing_variable(opt_key, "extrusion_width");
+        // Use the "layer_height" instead of "first_layer_height".
+        first_layer = false;
     }
 
-	return opt->value;
+    if (!opt->percent && opt->value != 0.)
+        return opt->value;
+
+    auto opt_key_layer_height = first_layer ? "first_layer_height" : "layer_height";
+    auto opt_layer_height = config.option(opt_key_layer_height);
+    if (opt_layer_height == nullptr)
+        throw_on_missing_variable(opt_key, opt_key_layer_height);
+
+    if (opt->percent) {
+        assert(! first_layer || ! static_cast<const ConfigOptionFloatOrPercent*>(opt_layer_height)->percent);
+        return opt->get_abs_value(opt_layer_height->getFloat());
+    }
+
+    auto opt_nozzle_diameters = config.option<ConfigOptionFloats>("nozzle_diameter");
+    if (opt_nozzle_diameters == nullptr)
+        throw_on_missing_variable(opt_key, "nozzle_diameter");
+
+    // If user left option to 0, calculate a sane default width.
+    return auto_extrusion_width(opt_key_to_flow_role(opt_key), float(opt_nozzle_diameters->get_at(first_printing_extruder)),
+        opt->get_abs_value(opt_layer_height->getFloat()));
 }
 
 // Used to provide hints to the user on default extrusion width values, and to provide reasonable values to the PlaceholderParser.
@@ -130,7 +133,7 @@ Flow Flow::new_from_config_width(FlowRole role, const ConfigOptionFloatOrPercent
     float w;
     if (! width.percent && width.value == 0.) {
         // If user left option to 0, calculate a sane default width.
-        w = auto_extrusion_width(role, nozzle_diameter);
+        w = auto_extrusion_width(role, nozzle_diameter, height);
     } else {
         // If user set a manual value, use it.
         w = float(width.get_abs_value(height));
