@@ -406,6 +406,255 @@ std::vector<double> smooth_height_profile(const std::vector<double>& profile, co
     return gauss_blur(profile, smoothing_params);
 }
 
+// Find z coordinates that have total horizontal surfaces of at least the given area
+// surfaces that are close together in z are combined
+static std::vector<coordf_t> find_horizontal_surface_zs(const ModelObject& object, coordf_t area_threshold, coordf_t z_merge_threshold, coordf_t horizontal_threshold = 1e-5) {
+    // get mesh for object
+    assert(!object.instances.empty());
+    TriangleMesh mesh = object.raw_mesh();
+    const ModelInstance& first_instance = *object.instances.front();
+    mesh.transform(first_instance.get_matrix(), first_instance.is_left_handed());
+
+    // find horizontal faces
+    struct HorizontalSurface {
+        coordf_t z;
+        coordf_t area;
+    };
+    std::vector<HorizontalSurface> horizontals;
+    for (stl_triangle_vertex_indices face : mesh.its.indices) {
+		stl_vertex vertex[3] = { mesh.its.vertices[face[0]], mesh.its.vertices[face[1]], mesh.its.vertices[face[2]] };
+		stl_vertex normal = face_normal_normalized(vertex);
+        bool is_horizontal = abs(normal(2)) > 1. - horizontal_threshold;
+        if (is_horizontal) {
+            coordf_t z = (vertex[0](2) + vertex[1](2) + vertex[2](2)) / 3.;
+            coordf_t area = 0.5 * (vertex[1] - vertex[0]).cross(vertex[2] - vertex[1]).norm();
+            horizontals.push_back(HorizontalSurface({z, area}));
+        }
+    }
+    std::sort(horizontals.begin(), horizontals.end(), [](auto& x, auto& y){ return x.z < y.z; });
+
+    // combine horizontal surfaces, see if they pass the area threshold
+    std::vector<coordf_t> zs;
+    coordf_t area = 0, start_z = 0, end_z = 0., weighted_z = 0.;
+    for (const HorizontalSurface& item : horizontals) {
+        if (item.z > start_z + z_merge_threshold) {
+            if (area >= area_threshold) {
+                coordf_t z = weighted_z / area;
+                zs.push_back(z);
+            }
+            start_z = item.z;
+            area = 0.;
+            weighted_z = 0.;
+        }
+        area += item.area;
+        end_z = item.z;
+        weighted_z += item.area * item.z;
+    }
+    if (area >= area_threshold) {
+        coordf_t z = weighted_z / area;
+        zs.push_back(z);
+    }
+
+    return zs;
+}
+
+// Modify a layer height profile such that layers start and exactly at given zs
+static std::vector<coordf_t> layer_height_profile_snap_to(const std::vector<coordf_t>& profile, const SlicingParameters& slicing_params, const std::vector<coordf_t>& target_zs) {
+    std::vector<coordf_t> new_profile;
+
+    coordf_t print_z = 0.;
+
+    if (slicing_params.first_object_layer_height_fixed()) {
+        coordf_t height = slicing_params.first_object_layer_height;
+        new_profile.push_back(0.);
+        new_profile.push_back(height);
+        print_z += height;
+        new_profile.push_back(print_z);
+        new_profile.push_back(height);
+    }
+
+    size_t idx_profile = 0;
+    for (coordf_t target_z : target_zs) {
+        if (target_z < print_z + slicing_params.min_layer_height) {
+            // we need at least one layer
+            continue;
+        }
+        size_t start_idx_profile = idx_profile;
+        coordf_t start_z = print_z;
+        coordf_t min_height = std::numeric_limits<coordf_t>::infinity(), max_height = 0.;
+        size_t num_layers = 0;
+        
+        // compute layers using the loop from generate_object_layers
+        coordf_t height;
+        size_t prev_idx_profile = idx_profile;
+        coordf_t slice_z;
+        while (print_z < target_z) {
+            height = slicing_params.min_layer_height;
+            slice_z = print_z + 0.5 * slicing_params.min_layer_height;
+            if (idx_profile < profile.size()) {
+                size_t next = idx_profile + 2;
+                for (;;) {
+                    if (next >= profile.size() || slice_z < profile[next])
+                        break;
+                    min_height = std::min(min_height, profile[next + 1]);
+                    max_height = std::max(max_height, profile[next + 1]);
+                    idx_profile = next;
+                    next += 2;
+                }
+                coordf_t z1 = profile[idx_profile];
+                coordf_t h1 = profile[idx_profile + 1];
+                height = h1;
+                if (next < profile.size()) {
+                    coordf_t z2 = profile[next];
+                    coordf_t h2 = profile[next + 1];
+                    height = lerp(h1, h2, (slice_z - z1) / (z2 - z1));
+                    assert(height >= slicing_params.min_layer_height - EPSILON && height <= slicing_params.max_layer_height + EPSILON);
+                }
+            }
+            min_height = std::min(min_height, height);
+            max_height = std::max(max_height, height);
+            prev_idx_profile = idx_profile;
+            print_z += height;
+            num_layers++;
+        }
+
+        // Compute scaling factor
+        // note: print_z >= target_z, and print_z - height < target_z, so scale2 <= 1 <= scale1
+        coordf_t profile_difference = print_z - start_z;
+        coordf_t target_difference = target_z - start_z;
+        double scale1 = target_difference / (profile_difference - height);
+        double scale2 = target_difference / profile_difference;
+        assert(scale1 >= 1.0 || num_layers == 1);
+        assert(scale2 <= 1.0);
+        bool can_use_scale1 = num_layers > 1 && scale1 * max_height <= slicing_params.max_layer_height;
+        bool can_use_scale2 = scale2 * min_height >= slicing_params.min_layer_height;
+
+        if (idx_profile < profile.size() && (can_use_scale1 || can_use_scale2)) {
+            double scale;
+            if (can_use_scale1 && (!can_use_scale2 || abs(scale1 - 1.0) <= abs(scale2 - 1.0))) {
+                scale = scale1;
+                idx_profile = prev_idx_profile;
+            } else {
+                scale = scale2;
+            }
+
+            // Add the steps in the profile between start_idx_profile and idx_profile.
+            // But scale all layer heights to h' = scale*h.
+            // Scale locations relative to start_scale_z.
+            // This is offset by 0.5*min_layer_height, because that is the point at which layer heights are determined.
+            // The original layer that starts at (start_z + dz) would have height h if
+            //   z = start_z + dz + 0.5 * min_layer_height
+            // Its scaled version is at (start_z + scale*dz), and has height h' = scale*h if 
+            //   z' = start_z + scale*dz + 0.5 * min_layer_height
+            //      = scale * (z1 - start_slice_z) + start_slice_z
+            coordf_t start_slice_z = start_z + 0.5 * slicing_params.min_layer_height;
+            // Don't look at points after the last slice_z we considered in the loop above
+            coordf_t scaled_prev_slice_z = start_slice_z + scale * (slice_z - start_slice_z);
+            coordf_t last_slice_z = std::min(target_z, scaled_prev_slice_z);
+            for (size_t idx = start_idx_profile; idx < profile.size(); idx += 2) {
+                coordf_t z1 = scale * (profile[idx] - start_slice_z) + start_slice_z;
+                coordf_t h1 = scale * profile[idx + 1];
+                coordf_t z2, h2;
+                size_t next = idx + 2;
+                if (next < profile.size()) {
+                    z2 = scale * (profile[next] - start_slice_z) + start_slice_z;
+                    h2 = scale * profile[next + 1];
+                } else {
+                    z2 = last_slice_z;
+                    h2 = h1;
+                }
+                if (z2 < start_slice_z) {
+                    // Note: We start adding elements to the profile at start_slice_z, not start_z,
+                    // because start_z might be outside min_height..max_height.
+                    // after scaling we could end up with invalid layer heights.
+                    continue;
+                } else if (z1 < start_slice_z) {
+                    // First element, somewhere between z1 and z2
+                    coordf_t z = start_slice_z;
+                    coordf_t h = lerp(h1, h2, (z - z1) / (z2 - z1));
+                    assert(h >= slicing_params.min_layer_height - EPSILON && h <= slicing_params.max_layer_height + EPSILON);
+                    new_profile.push_back(z);
+                    new_profile.push_back(h);
+                } else {
+                    assert(h1 >= slicing_params.min_layer_height - EPSILON && h1 <= slicing_params.max_layer_height + EPSILON);
+                    new_profile.push_back(z1);
+                    new_profile.push_back(h1);
+                }
+                if (z2 >= last_slice_z || next > idx_profile) {
+                    // Last element
+                    coordf_t z = std::min(z2, last_slice_z);
+                    if (z > z1) {
+                        coordf_t h = lerp(h1, h2, (z - z1) / (z2 - z1));
+                        assert(h >= slicing_params.min_layer_height - EPSILON && h <= slicing_params.max_layer_height + EPSILON);
+                        new_profile.push_back(z);
+                        new_profile.push_back(h);
+                    }
+                    break;
+                }
+            }
+        } else {
+            // no way to scale existing profile, fall back to constant layer height
+            double mean_height = profile_difference / num_layers;
+            double height1 = target_difference / (num_layers - 1);
+            double height2 = target_difference / num_layers;
+            bool can_use_height1 = num_layers > 1 && height1 <= slicing_params.max_layer_height + EPSILON;
+            bool can_use_height2 = height2 >= slicing_params.min_layer_height - EPSILON;
+            double height;
+            if (can_use_height1 && (!can_use_height2 || abs(height1 - mean_height) <= abs(height2 - mean_height))) {
+                height = height1;
+            } else if (can_use_height2) {
+                height = height2;
+            } else {
+                // It is not possible to use a constant layer height and end up at target_z either,
+                // fall back to at least have a valid layer height.
+                height = mean_height;
+            }
+            new_profile.push_back(start_z);
+            new_profile.push_back(height);
+            new_profile.push_back(target_z);
+            new_profile.push_back(height);
+        }
+
+        // after adjustment, we are at target_z
+        print_z = target_z;
+    }
+
+    // copy remaining profile without any scaling
+    for (size_t idx = idx_profile; idx < profile.size(); idx += 2) {
+        coordf_t z1 = profile[idx];
+        coordf_t h1 = profile[idx + 1];
+        coordf_t z2, h2;
+        size_t next = idx + 2;
+        if (next < profile.size()) {
+            z2 = profile[next];
+            h2 = profile[next + 1];
+        } else {
+            z2 = z1 + 1;
+            h2 = h1;
+        }
+        if (z2 < print_z) {
+            continue;
+        } else if (z1 < print_z) {
+            coordf_t z = print_z;
+            coordf_t h = lerp(h1, h2, (z - z1) / (z2 - z1));
+            new_profile.push_back(z);
+            new_profile.push_back(h);
+        } else {
+            new_profile.push_back(z1);
+            new_profile.push_back(h1);
+        }
+    }
+
+    return new_profile;
+}
+
+std::vector<coordf_t> layer_height_profile_snap_to_horizontal(const std::vector<coordf_t>& profile, const SlicingParameters& slicing_params, const ModelObject& object) {
+    const coordf_t area_threshold = 1.;
+    const coordf_t z_merge_threshold = slicing_params.min_layer_height;
+    std::vector<coordf_t> zs = find_horizontal_surface_zs(object, area_threshold, z_merge_threshold);
+    return layer_height_profile_snap_to(profile, slicing_params, zs);
+}
+
 void adjust_layer_height_profile(
     const SlicingParameters     &slicing_params,
     std::vector<coordf_t> 		&layer_height_profile,

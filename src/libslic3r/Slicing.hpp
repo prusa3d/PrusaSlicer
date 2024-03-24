@@ -154,6 +154,10 @@ std::vector<double> smooth_height_profile(
     const std::vector<double>& profile, const SlicingParameters& slicing_params,
     const HeightProfileSmoothingParams& smoothing_params);
 
+std::vector<coordf_t> layer_height_profile_snap_to_horizontal(
+    const std::vector<coordf_t>& profile, const SlicingParameters& slicing_params,
+    const ModelObject& object);
+
 enum LayerHeightEditActionType : unsigned int {
     LAYER_HEIGHT_EDIT_ACTION_INCREASE = 0,
     LAYER_HEIGHT_EDIT_ACTION_DECREASE = 1,
