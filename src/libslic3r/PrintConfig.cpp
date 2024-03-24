@@ -545,6 +545,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.));
 
+    def = this->add("bridge_density", coPercent);
+    def->label = L("Bridge density");
+    def->category = L("Strength");
+    def->tooltip = L("Density of external bridges. 100% means solid bridge. Default is 100%.");
+    def->sidetext = L("%");
+    def->min = 10;
+    def->max = 100;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionPercent(100));
+
     def = this->add("bridge_fan_speed", coInts);
     def->label = L("Bridges fan speed");
     def->tooltip = L("This fan speed is enforced during all bridges and overhangs.");

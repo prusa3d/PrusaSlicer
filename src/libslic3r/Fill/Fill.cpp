@@ -136,6 +136,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 	std::vector<std::vector<const SurfaceFillParams*>> 	region_to_surface_params(layer.regions().size(), std::vector<const SurfaceFillParams*>());
     SurfaceFillParams									params;
     bool 												has_internal_voids = false;
+	const PrintObjectConfig&							object_config = layer.object()->config();
 	for (size_t region_id = 0; region_id < layer.regions().size(); ++ region_id) {
 		const LayerRegion  &layerm = *layer.regions()[region_id];
 		region_to_surface_params[region_id].assign(layerm.fill_surfaces().size(), nullptr);
@@ -172,7 +173,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        params.bridge = is_bridge || Fill::use_bridge_flow(params.pattern);
 				params.flow   = params.bridge ?
 					// Always enable thick bridges for internal bridges.
-					layerm.bridging_flow(extrusion_role, surface.is_bridge() && ! surface.is_external()) :
+					layerm.bridging_flow(extrusion_role, (surface.is_bridge() && !surface.is_external()) || object_config.thick_bridges) :
 					layerm.flow(extrusion_role, (surface.thickness == -1) ? layer.height : surface.thickness);
 
 				// Calculate flow spacing for infill pattern generation.
@@ -520,6 +521,12 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
 			f->spacing = surface_fill.params.spacing;
 			surface_fill.surface.expolygon = std::move(expoly);
+
+			if(surface_fill.params.bridge && surface_fill.surface.is_external() && surface_fill.params.density > 99.0){
+				params.density = layerm.region().config().bridge_density.get_abs_value(1.0);
+				params.dont_adjust = true;
+			}
+
             Polylines      polylines;
             ThickPolylines thick_polylines;
 			try {
