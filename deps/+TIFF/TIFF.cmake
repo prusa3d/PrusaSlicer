@@ -10,6 +10,7 @@ add_cmake_project(TIFF
         -Dzstd:BOOL=OFF
         -Dpixarlog:BOOL=OFF
         -Dlibdeflate:BOOL=OFF
+        -Dlerc:BOOL=OFF
 )
 
 set(DEP_TIFF_DEPENDS ZLIB PNG JPEG OpenGL)
