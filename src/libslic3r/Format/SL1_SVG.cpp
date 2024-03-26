@@ -22,6 +22,8 @@ namespace Slic3r {
 
 namespace {
 
+enum class PolyType { Contour, Hole };
+
 size_t constexpr coord_t_bufsize = 40;
 
 // A fast and locale independent implementation of int=>str
@@ -82,7 +84,7 @@ void transform(ExPolygon &ep, const sla::RasterBase::Trafo &tr, const BoundingBo
 }
 
 // Append the svg string representation of a Polygon to the input 'buf'
-void append_svg(std::string &buf, const Polygon &poly)
+void append_svg(std::string &buf, const Polygon &poly, PolyType type)
 {
     if (poly.points.empty())
         return;
@@ -91,24 +93,29 @@ void append_svg(std::string &buf, const Polygon &poly)
 
     char intbuf[coord_t_bufsize];
 
-    buf += "<path d=\"M "sv;
+    buf += "<path slic3r:type=\""sv;
+    buf += type == PolyType::Contour ? "contour"sv : "hole"sv;
+    buf += "\" d=\"M "sv;
     buf += decimal_from(c.x(), intbuf);
-    buf += " "sv;
+    buf += ' ';
     buf += decimal_from(c.y(), intbuf);
-    buf += " l "sv;
+    buf += " l"sv;
 
     for (const Point &p : poly) {
         Point d = p - c;
         if (d.x() == 0 && d.y() == 0)
             continue;
-        buf += " "sv;
+        buf += ' ';
         buf += decimal_from(d.x(), intbuf);
-        buf += " "sv;
+        buf += ' ';
         buf += decimal_from(d.y(), intbuf);
         c = p;
     }
     buf += " z\""sv; // mark path as closed
-    buf += " />\n"sv;
+
+    buf += " fill=\""sv;
+    buf += type == PolyType::Contour ? "white"sv : "black"sv;
+    buf += "\" />\n"sv;
 }
 
 } // namespace
@@ -143,13 +150,18 @@ public:
         // Notice the header also defines the fill-rule as nonzero which should
         // generate correct results for our ExPolygons.
 
+        // reduce initial reallocations
+        m_svg.reserve(1024 * 1024);
+
         // Add svg header.
-        m_svg =
-            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
-            "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.0//EN\" \"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd\">\n"
-            "<svg height=\"" + hf + "mm" + "\" width=\"" + wf + "mm" + "\" viewBox=\"0 0 " + w + " " + h +
-            "\" style=\"fill: white; stroke: none; fill-rule: nonzero\" "
-            "xmlns=\"http://www.w3.org/2000/svg\" xmlns:svg=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\n";
+        m_svg = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+                "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.0//EN\" "
+                "\"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd\">\n"
+                "<svg height=\"" + hf + "mm" + "\" width=\"" + wf + "mm" + "\" viewBox=\"0 0 " + w + " " + h +
+                "\" style=\"background: black; fill: white; stroke: none; fill-rule: nonzero\" "
+                "xmlns=\"http://www.w3.org/2000/svg\" xmlns:svg=\"http://www.w3.org/2000/svg\" "
+                "xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+                "xmlns:slic3r=\"http://slic3r.org/namespaces/slic3r\">\n";
     }
 
     void draw(const ExPolygon& poly) override
@@ -171,9 +183,9 @@ public:
                 for (auto &p : h)
                     p = {std::round(p.x() * m_sc.x()), std::round(p.y() * m_sc.y())};
 
-            append_svg(m_svg, cpoly.contour);
+            append_svg(m_svg, cpoly.contour, PolyType::Contour);
             for (auto &h : cpoly.holes)
-                append_svg(m_svg, h);
+                append_svg(m_svg, h, PolyType::Hole);
         }
     }
 
