@@ -66,6 +66,13 @@ namespace Slic3r {
 
 	CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(NotifyReleaseMode)
 
+	static const t_config_enum_values s_keys_map_DockSidebar = {
+		{"right", DockSidebarRight},
+		{"left",  DockSidebarLeft},		
+    };
+
+	CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DockSidebar)
+
 namespace GUI {
 
 PreferencesDialog::PreferencesDialog(wxWindow* parent) :
@@ -131,6 +138,11 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
 	}
 	
+	// set Field for dock_sidebar to its value
+    if (m_optgroup_gui && m_optgroup_gui->get_field("dock_sidebar") != nullptr) {
+        boost::any val = s_keys_map_DockSidebar.at(wxGetApp().app_config->get("dock_sidebar"));
+        m_optgroup_gui->get_field("dock_sidebar")->set_value(val, false);
+    }
 
 	if (wxGetApp().is_editor()) {
 		auto app_config = get_app_config();
@@ -513,6 +525,15 @@ void PreferencesDialog::build()
 			}
 			refresh_og(m_optgroup_gui);
 		}
+		if (opt_key == "dock_sidebar") {
+            int val_int = boost::any_cast<int>(value);
+            for (const auto &item : s_keys_map_DockSidebar) {
+                if (item.second == val_int) {
+                    m_values[opt_key] = item.first;
+                    return;
+                }
+            }
+        }
 
 		if (auto it = m_values.find(opt_key); it != m_values.end()) {
 			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
@@ -534,8 +555,16 @@ void PreferencesDialog::build()
 	if (is_editor) {
 		append_bool_option(m_optgroup_gui, "show_collapse_button",
 			L("Show sidebar collapse/expand button"),
-			L("If enabled, the button for the collapse sidebar will be appeared in top right corner of the 3D Scene"),
+			L("If enabled, the button for the collapse sidebar will appear next to the sidebar in the top corner."),
 			app_config->get_bool("show_collapse_button"));
+
+		append_enum_option<DockSidebar>(m_optgroup_gui, "dock_sidebar",
+			L("Dock sidebar"),
+			L("Where the sidebar is docked: Left = Left of the 3D Scene. Right = Right of the 3D Scene."),
+			new ConfigOptionEnum<DockSidebar>(static_cast<DockSidebar>(s_keys_map_DockSidebar.at(app_config->get("dock_sidebar")))),
+			{	{ "right", L("Right") },
+				{ "left", L("Left") },			  
+			});
 /*
 		append_bool_option(m_optgroup_gui, "suppress_hyperlinks",
 			L("Suppress to open hyperlink in browser"),
@@ -610,6 +639,10 @@ void PreferencesDialog::build()
 		// set Field for notify_release to its value to activate the object
 		boost::any val = s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release"));
 		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
+
+	    // set Field for dock_sidebar to its value to activate the object
+        boost::any sidebarLocationVal = s_keys_map_DockSidebar.at(app_config->get("dock_sidebar"));
+        m_optgroup_gui->get_field("dock_sidebar")->set_value(sidebarLocationVal, false);
 
 		create_icon_size_slider();
 		m_icon_size_sizer->ShowItems(app_config->get_bool("use_custom_toolbar_size"));
@@ -891,6 +924,10 @@ void PreferencesDialog::revert(wxEvent&)
 			m_settings_layout_changed = false;
 			continue;
 		}
+        if (key == "dock_sidebar") {
+            m_optgroup_gui->set_value(key, s_keys_map_DockSidebar.at(app_config->get(key)));
+            continue;
+        }
 
 		for (auto opt_group : { m_optgroup_general, m_optgroup_camera, m_optgroup_gui, m_optgroup_other
 #ifdef _WIN32

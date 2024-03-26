@@ -132,6 +132,7 @@ public:
     void                    collapse(bool collapse);
     void                    check_and_update_searcher(bool respect_mode = false);
     void                    update_ui_from_settings();
+    void                    dock();
 
 #ifdef _MSW_DARK_MODE
     void                    show_mode_sizer(bool show);
@@ -143,7 +144,7 @@ public:
 
 private:
     struct priv;
-    std::unique_ptr<priv> p;
+    std::unique_ptr<priv> p;    
 };
 
 class Plater: public wxPanel

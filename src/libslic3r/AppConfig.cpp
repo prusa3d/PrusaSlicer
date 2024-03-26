@@ -148,6 +148,9 @@ void AppConfig::set_defaults()
        if (get("notify_release").empty())
            set("notify_release", "all"); // or "none" or "release"
 
+       if (get("dock_sidebar").empty())
+           set("dock_sidebar", "right"); // Default dock to original UI design.
+
 #if ENABLE_ENVIRONMENT_MAP
         if (get("use_environment_map").empty())
             set("use_environment_map", "0");

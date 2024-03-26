@@ -712,7 +712,7 @@ struct Sidebar::priv
     priv(Plater *plater) : plater(plater) {}
     ~priv();
 
-    void show_preset_comboboxes();
+    void show_preset_comboboxes();    
 
 #ifdef _WIN32
     wxString btn_reslice_tip;
@@ -1664,6 +1664,7 @@ void Sidebar::update_ui_from_settings()
     p->plater->set_current_canvas_as_dirty();
     p->plater->get_current_canvas3D()->request_extra_frame();
     p->object_list->apply_volumes_order();
+    dock();
 }
 
 std::vector<PlaterPresetComboBox*>& Sidebar::combos_filament()
@@ -1681,6 +1682,28 @@ std::string& Sidebar::get_search_line()
     // update searcher before show imGui search dialog on the plater, if printer technology or mode was changed
     check_and_update_searcher(true);
     return p->searcher.search_string();
+}
+
+void Sidebar::dock()
+{
+    wxSizer* sizer = p->plater->GetSizer();
+    std::string dock_sidebar = wxGetApp().app_config->get("dock_sidebar");
+
+    // Detach existing sidebar dock (if any).
+    sizer->Detach(this);
+
+    if (dock_sidebar == "right") {
+        sizer->Add(this, 0, wxEXPAND | wxLEFT | wxRIGHT, 0);       
+        // Set collapse button styling to match.
+        p->plater->get_collapse_toolbar().set_horizontal_orientation(GLToolbar::Layout::HO_Right);
+    }
+    else {  // Else, dock left
+        sizer->Prepend(this, 0, wxEXPAND | wxLEFT | wxRIGHT, 0);
+        // Set collapse button styling to match.
+        p->plater->get_collapse_toolbar().set_horizontal_orientation(GLToolbar::Layout::HO_Left);
+    }
+
+    sizer->Layout();
 }
 
 // Plater::DropTarget
@@ -2126,7 +2149,7 @@ const std::regex Plater::priv::pattern_zip(".*zip", std::regex::icase);
 
 Plater::priv::priv(Plater *q, MainFrame *main_frame)
     : q(q)
-    , main_frame(main_frame)
+    , main_frame(main_frame)    
     , config(Slic3r::DynamicPrintConfig::new_from_defaults_keys({
         "bed_shape", "bed_custom_texture", "bed_custom_model", "complete_objects", "duplicate_distance", "extruder_clearance_radius", "skirts", "skirt_distance",
         "brim_width", "brim_separation", "brim_type", "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
@@ -2190,7 +2213,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     panel_sizer->Add(view3D, 1, wxEXPAND | wxALL, 0);
     panel_sizer->Add(preview, 1, wxEXPAND | wxALL, 0);
     hsizer->Add(panel_sizer, 1, wxEXPAND | wxALL, 0);
-    hsizer->Add(sidebar, 0, wxEXPAND | wxLEFT | wxRIGHT, 0);
+    
     q->SetSizer(hsizer);
 
     menus.init(q);
@@ -2394,7 +2417,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         bring_instance_forward();
     });
 	wxGetApp().other_instance_message_handler()->init(this->q);
-
+        
     // collapse sidebar according to saved value
     if (wxGetApp().is_editor()) {
         bool is_collapsed = get_config_bool("collapsed_sidebar");
@@ -2496,7 +2519,6 @@ void Plater::priv::update_ui_from_settings()
 
     view3D->get_canvas3d()->update_ui_from_settings();
     preview->get_canvas3d()->update_ui_from_settings();
-
     sidebar->update_ui_from_settings();
 }
 
@@ -4788,8 +4810,8 @@ bool Plater::priv::init_collapse_toolbar()
     if (!collapse_toolbar.init(background_data))
         return false;
 
-    collapse_toolbar.set_layout_type(GLToolbar::Layout::Vertical);
-    collapse_toolbar.set_horizontal_orientation(GLToolbar::Layout::HO_Right);
+    std::string dock_sidebar = wxGetApp().app_config->get("dock_sidebar");
+    collapse_toolbar.set_layout_type(GLToolbar::Layout::Vertical);    
     collapse_toolbar.set_vertical_orientation(GLToolbar::Layout::VO_Top);
     collapse_toolbar.set_border(5.0f);
     collapse_toolbar.set_separator_size(5);

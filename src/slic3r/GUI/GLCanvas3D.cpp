@@ -6418,11 +6418,12 @@ void GLCanvas3D::_render_undoredo_toolbar()
 void GLCanvas3D::_render_collapse_toolbar() const
 {
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
+    std::string dock_sidebar = wxGetApp().app_config->get("dock_sidebar");
 
     const Size cnv_size = get_canvas_size();
     const float band = m_layers_editing.is_enabled() ? (wxGetApp().imgui()->get_style_scaling() * LayersEditing::THICKNESS_BAR_WIDTH) : 0.0;
     const float top  = 0.5f * (float)cnv_size.get_height();
-    const float left = 0.5f * (float)cnv_size.get_width() - collapse_toolbar.get_width() - band;
+    const float left = (dock_sidebar == "right") ? 0.5f * (float)cnv_size.get_width() - collapse_toolbar.get_width() - band : -0.5f * (float)cnv_size.get_width();
 
     collapse_toolbar.set_position(top, left);
     collapse_toolbar.render(*this);
