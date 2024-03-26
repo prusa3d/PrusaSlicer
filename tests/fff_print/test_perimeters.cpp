@@ -65,6 +65,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
                 perimeter_generator_params,
                 surface,
                 nullptr,
+                nullptr,
                 // cache:
                 lower_layer_polygons_cache,
                 // output:

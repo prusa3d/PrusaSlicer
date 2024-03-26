@@ -1472,6 +1472,12 @@ void TabPrint::build()
 	    optgroup->append_line(line);
 
         optgroup = page->new_optgroup(L("Quality (slower slicing)"));
+        line = { L("Only one perimeter"), "" };
+        line.label_path = category_path + "only-one-perimeter-top-bottom";
+        line.append_option(optgroup->get_option("only_one_perimeter_first_layer"));
+        line.append_option(optgroup->get_option("only_one_perimeter_top"));
+        line.append_option(optgroup->get_option("min_width_top_surface"));
+        optgroup->append_line(line);
         optgroup->append_single_option_line("extra_perimeters", category_path + "extra-perimeters-if-needed");
         optgroup->append_single_option_line("extra_perimeters_on_overhangs", category_path + "extra-perimeters-on-overhangs");
         optgroup->append_single_option_line("avoid_crossing_curled_overhangs", category_path + "avoid-crossing-curled-overhangs");

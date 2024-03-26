@@ -566,6 +566,32 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(1));
 
+    def = this->add("only_one_perimeter_first_layer", coBool);
+    def->label = L("On First layer");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Use only one perimeter on first layer, to give more space to the top infill pattern.");
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("only_one_perimeter_top", coBool);
+    def->label = L("On top surfaces");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Use only one perimeter on flat top surface, to give more space to the top infill pattern");
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("min_width_top_surface", coFloatOrPercent);
+    def->label = L("Minimum top width for infill");
+    def->category =  L("Layers and Perimeters");
+    def->tooltip = L("If a top surface has to be printed and it's partially covered by another layer, it won't be considered at a top layer where its width is below this value."
+        " This can be useful to not let the 'one perimeter on top' trigger on surface that should be covered only by perimeters."
+        " This value can be a mm or a % of the perimeter extrusion width."
+        "\nWarning: If enabled, artifacts can be created is you have some thin features on the next layer, like letters. Set this setting to 0 to remove these artifacts.");
+    def->sidetext = L("mm or %");
+    def->ratio_over = "perimeter_extrusion_width";
+    def->min = 0;
+    def->max_literal = 15;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
+
     def = this->add("bridge_speed", coFloat);
     def->label = L("Bridges");
     def->category = L("Speed");
