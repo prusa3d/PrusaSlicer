@@ -205,6 +205,7 @@ SCENARIO("Infill does not exceed perimeters", "[Fill]")
             { "fill_pattern",           pattern },
             { "top_fill_pattern",       pattern },
             { "bottom_fill_pattern",    pattern },
+            { "solid_fill_pattern",     pattern },
             { "perimeters",             1 },
             { "skirts",                 0 },
             { "fill_density",           0.2 },
