@@ -3476,48 +3476,37 @@ void GCodeViewer::render_legend(float& legend_height)
                     imgui.set_requires_extra_frame();
                 }
             }
-
-            if (!time.empty()) {
-                ImGui::SameLine(offsets[0]);
-                imgui.text(time);
-                ImGui::SameLine(offsets[1]);
-                pos = ImGui::GetCursorScreenPos();
-                const float width = std::max(1.0f, percent_bar_size * percent / max_percent);
-                draw_list->AddRectFilled({ pos.x, pos.y + 2.0f }, { pos.x + width, pos.y + icon_size - 2.0f },
-                    ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT));
-                ImGui::Dummy({ percent_bar_size, icon_size });
-                ImGui::SameLine();
-                char buf[64];
-                ::sprintf(buf, "%.1f%%", 100.0f * percent);
-                ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
-                ImGui::SameLine(offsets[2]);
-                imgui.text(format("%1$.2f %2%", used_filament_m, (imperial_units ? inches : metres)));
-                ImGui::SameLine(offsets[3]);
-                imgui.text(format("%1$.2f %2%", used_filament_g, grams));
-            }
         }
         else {
             imgui.text(label);
-            if (!time.empty()) {
-                ImGui::SameLine(offsets[0]);
-                imgui.text(time);
-                ImGui::SameLine(offsets[1]);
-                pos = ImGui::GetCursorScreenPos();
-                const float width = std::max(1.0f, percent_bar_size * percent / max_percent);
-                draw_list->AddRectFilled({ pos.x, pos.y + 2.0f }, { pos.x + width, pos.y + icon_size - 2.0f },
-                    ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT));
-                ImGui::Dummy({ percent_bar_size, icon_size });
-                ImGui::SameLine();
-                char buf[64];
-                ::sprintf(buf, "%.1f%%", 100.0f * percent);
-                ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
-            }
-            else if (used_filament_m > 0.0) {
-                ImGui::SameLine(offsets[0]);
-                imgui.text(format("%1$.2f %2%", used_filament_m, (imperial_units ? inches : metres)));
-                ImGui::SameLine(offsets[1]);
-                imgui.text(format("%1$.2f %2%", used_filament_g, grams));
-            }
+        }
+
+        int offsetsIndex = 0;
+
+        // draw time
+        if (!time.empty()) {
+            ImGui::SameLine(offsets[offsetsIndex++]);
+            imgui.text(time);
+        }
+        // draw percent
+        if (percent > 0.0f) {
+            ImGui::SameLine(offsets[offsetsIndex++]);
+            pos = ImGui::GetCursorScreenPos();
+            const float width = std::max(1.0f, percent_bar_size * std::min(max_percent, percent) / max_percent);
+            draw_list->AddRectFilled({pos.x, pos.y + 2.0f}, {pos.x + width, pos.y + icon_size - 2.0f},
+                ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT));
+            ImGui::Dummy({percent_bar_size, icon_size});
+        }
+        // draw used filament
+        if (used_filament_m > 0.0) {
+            ImGui::SameLine();
+            char buf[64];
+            ::sprintf(buf, "%.1f%%", 100.0f * percent);
+            ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
+            ImGui::SameLine(offsets[offsetsIndex++]);
+            imgui.text(format("%1$.2f %2%", used_filament_m, (imperial_units ? inches : metres)));
+            ImGui::SameLine(offsets[offsetsIndex++]);
+            imgui.text(format("%1$.2f %2%", used_filament_g, grams));
         }
 
         if (!visible)
@@ -3696,12 +3685,7 @@ void GCodeViewer::render_legend(float& legend_height)
         }
 
         std::string longest_percentage_string;
-        for (double item : percents) {
-            char buffer[64];
-            ::sprintf(buffer, "%.2f %%", item);
-            if (::strlen(buffer) > longest_percentage_string.length())
-                longest_percentage_string = buffer;
-        }
+        longest_percentage_string = "100.0%";
         longest_percentage_string += "            ";
         if (_u8L("Percentage").length() > longest_percentage_string.length())
             longest_percentage_string = _u8L("Percentage");
@@ -3800,6 +3784,10 @@ void GCodeViewer::render_legend(float& legend_height)
         case EViewType::FeatureType:
         {
             max_time_percent = std::max(max_time_percent, time_mode.travel_time / time_mode.time);
+            float total_time = 0;
+            float total_percent = 0;
+            double total_used_filaments_m = 0;
+            double total_used_filaments_g = 0;
 
             for (size_t i = 0; i < m_roles.size(); ++i) {
                 GCodeExtrusionRole role = m_roles[i];
@@ -3815,11 +3803,26 @@ void GCodeViewer::render_legend(float& legend_height)
                         wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                     }
                 );
+                if (visible) {
+                    auto [time, _] = role_time_and_percent(role);
+                    total_time += time;
+                    total_percent += percents[i];
+                    total_used_filaments_m += used_filaments_m[i];
+                    total_used_filaments_g += used_filaments_g[i];
+                }
             }
 
-            if (m_buffers[buffer_id(EMoveType::Travel)].visible)
+            if (m_buffers[buffer_id(EMoveType::Travel)].visible) {
+                float travel_percent = time_mode.travel_time / time_mode.time;
                 append_item(EItemType::Line, Travel_Colors[0], _u8L("Travel"), true, short_time_ui(get_time_dhms(time_mode.travel_time)),
-                    time_mode.travel_time / time_mode.time, max_time_percent, offsets, 0.0f, 0.0f);
+                    travel_percent, max_time_percent, offsets, 0.0f, 0.0f);
+                total_time += time_mode.travel_time;
+                total_percent += travel_percent;
+            }
+
+            ImGui::Separator();
+            append_item(EItemType::Circle, ColorRGBA::WHITE(), _u8L("Total"), true, short_time_ui(get_time_dhms(total_time)), total_percent,
+                max_time_percent, offsets, total_used_filaments_m, total_used_filaments_g);
 
             break;
         }
