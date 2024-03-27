@@ -25,7 +25,6 @@ IGL_INLINE void igl::connect_boundary_to_infinity(
   Eigen::Matrix<typename DerivedFO::Scalar,Eigen::Dynamic,Eigen::Dynamic> O;
   boundary_facets(F,O);
   FO.resize(F.rows()+O.rows(),F.cols());
-  typedef Eigen::Matrix<typename DerivedFO::Scalar,Eigen::Dynamic,1> VectorXI;
   FO.topLeftCorner(F.rows(),F.cols()) = F;
   FO.bottomLeftCorner(O.rows(),O.cols()) = O.rowwise().reverse();
   FO.bottomRightCorner(O.rows(),1).setConstant(inf_index);

@@ -193,9 +193,7 @@ void stl_fix_normal_directions(stl_file *stl)
         		norm_sw[facet_num] = 1; // Record this one as being fixed.
         		++ checked;
       		}
-      		stl_normal *temp = head->next;	// Delete this facet from the list.
-      		head->next = head->next->next;
-      		// pool.destroy(temp);
+      		head->next = head->next->next; // Delete this facet from the list
     	} else { // If we ran out of facets to fix: All of the facets in this part have been fixed.
       		++ stl->stats.number_of_parts;
       		if (checked >= int(stl->stats.number_of_facets))

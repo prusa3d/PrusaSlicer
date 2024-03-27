@@ -259,7 +259,6 @@ std::vector<WaveSeed> wave_seeds(
     // Multiple pieces of a single src may intersect the same boundary.
     WaveSeeds out;
     out.reserve(segments.size());
-    int iseed = 0;
     for (const ClipperLib_Z::Path &path : segments) {
         assert(path.size() >= 2);
         const ClipperLib_Z::IntPoint &front = path.front();
@@ -267,7 +266,6 @@ std::vector<WaveSeed> wave_seeds(
         // Both ends of a seed segment are supposed to be inside a single boundary expolygon.
         // Thus as long as the seed contour is not closed, it should be open at a boundary point.
         assert((front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end) || 
-            //(front.z() < 0 && back.z() < 0));
             // Hope that at least one end of an open polyline is clipped by the boundary, thus an intersection point is created.
             (front.z() < 0 || back.z() < 0));
         const Intersection *intersection = nullptr;
@@ -302,7 +300,6 @@ std::vector<WaveSeed> wave_seeds(
             if (boundary_id >= 0)
                 out.push_back({ uint32_t(front.z() - idx_boundary_end), uint32_t(boundary_id), ClipperZUtils::from_zpath(path) });
         }
-        ++ iseed;
     }
 
     if (sorted)
