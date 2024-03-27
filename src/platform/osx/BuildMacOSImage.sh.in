@@ -1,0 +1,83 @@
+#!/bin/bash
+
+#
+# This script can download and compile dependencies, compile CaribouSlicer
+# and optional build a .tgz and an appimage.
+#
+# Original script from SuperSclier by supermerill https://github.com/supermerill/SuperSlicer
+#
+# Change log:
+#
+# 20 Nov 2023, wschadow, branding and minor changes
+# 01 Jan 2024, wschadow, debranding for the Prusa version, added build options
+#
+
+export ROOT=`pwd`
+export NCORES=`sysctl -n hw.ncpu`
+
+while getopts ":iha" opt; do
+  case ${opt} in
+    i )
+        export BUILD_IMAGE="1"
+        ;;
+    a )
+        export BUILD_APP="1"
+        ;;
+    h ) echo "Usage: ./BuildMacOSImage.sh [-i][-a][-h]"
+        echo "   -i: generate DMG image (optional)"
+    	echo "   -a: generate App (optional)"
+        echo "   -h: help"
+        exit 0
+        ;;
+  esac
+done
+
+if [[ -n "$BUILD_APP" ]]
+then
+    echo -e "\n[8/9] Generating macOS app ..."
+
+    # update Info.plist
+    pushd src > /dev/null
+    sed "s/+UNKNOWN/_$(date '+%F')/" Info.plist >Info.date.plist
+    popd > /dev/null
+
+    # create directory and copy into it
+    if [ -d "pack" ]
+    then
+        rm -rf pack
+    fi
+    mkdir pack
+    mkdir pack/@SLIC3R_APP_KEY@
+    mkdir pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app
+    mkdir pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents
+    mkdir pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/_CodeSignature
+    mkdir pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/Frameworks
+    mkdir pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/MacOS
+
+    # copy Resources
+    cp -Rf ../resources pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/Resources
+    cp pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/Resources/icons/@SLIC3R_APP_KEY@.icns pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/resources/@SLIC3R_APP_KEY@.icns
+    cp src/Info.date.plist pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/Info.plist
+    echo -n -e 'APPL????\x0a' > PkgInfo
+    cp PkgInfo pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/PkgInfo
+    # remove unneeded po from resources
+    find pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/Resources/localization -name "*.po" -type f -delete
+
+    # copy bin and do not let it lower case
+    cp -f src/@SLIC3R_APP_NAME@ pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/MacOS/@SLIC3R_APP_KEY@
+    chmod u+x pack/@SLIC3R_APP_KEY@/@SLIC3R_APP_KEY@.app/Contents/MacOS/@SLIC3R_APP_KEY@
+    tar -czvf @SLIC3R_APP_KEY@-@SLIC3R_VERSION@-macOS.tgz pack/@SLIC3R_APP_KEY@ &>/dev/null
+
+    echo -e "\n... done\n"
+fi   
+
+if [[ -n "$BUILD_IMAGE" ]]
+then
+    echo -e "\n[9/9] Creating DMG Image for distribution ...\n"
+
+    # create dmg
+    hdiutil create -ov -fs HFS+ -volname "@SLIC3R_APP_KEY@" -srcfolder "pack/@SLIC3R_APP_KEY@" temp.dmg
+    hdiutil convert temp.dmg -format UDZO -o @SLIC3R_APP_KEY@-@SLIC3R_VERSION@.dmg
+    rm -f temp.dmg
+    echo -e "\n... done\n"
+fi
