@@ -32,6 +32,11 @@ namespace Slic3r {
 		NotifyReleaseNone
 	};
 
+	enum CameraNavStyle {
+		CameraNavDefault,
+		CameraNavTouchpad,
+	};
+
 namespace GUI {
 
 class ConfigOptionsGroup;

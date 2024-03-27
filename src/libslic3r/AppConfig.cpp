@@ -198,6 +198,9 @@ void AppConfig::set_defaults()
     if (get("reverse_mouse_wheel_zoom").empty())
         set("reverse_mouse_wheel_zoom", "0");
 
+    if (get("camera_navigation_style").empty())
+        set("camera_navigation_style", "default");          // allowed values - "default", "touchpad"
+
     if (get("show_splash_screen").empty())
         set("show_splash_screen", "1");
 

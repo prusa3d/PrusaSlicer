@@ -64,7 +64,13 @@ namespace Slic3r {
 		{"none",        NotifyReleaseNone},
 	};
 
+	static const t_config_enum_values s_keys_map_CameraNavStyle = {
+		{"default",     CameraNavDefault},
+		{"touchpad",    CameraNavTouchpad},
+	};
+
 	CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(NotifyReleaseMode)
+	CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CameraNavStyle)
 
 namespace GUI {
 
@@ -461,6 +467,15 @@ void PreferencesDialog::build()
 	// Add "Camera" tab
 	m_optgroup_camera = create_options_tab(L("Camera"), tabs);
 	m_optgroup_camera->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+		if (opt_key == "camera_navigation_style") {
+			int val_int = boost::any_cast<int>(value);
+			for(const auto& item : s_keys_map_CameraNavStyle) {
+				if (item.second == val_int) {
+					m_values[opt_key] = item.first;
+					return;
+				}
+			}
+		}
 		if (auto it = m_values.find(opt_key);it != m_values.end()) {
 			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
 			return;
@@ -483,7 +498,21 @@ void PreferencesDialog::build()
 		L("If enabled, reverses the direction of zoom with mouse wheel"),
 		app_config->get_bool("reverse_mouse_wheel_zoom"));
 
+	append_enum_option<CameraNavStyle>(m_optgroup_camera, "camera_navigation_style",
+		L("Camera navigation style"),
+		L("Style of camera controls in 3D view: Default or Touchpad friendly"),
+		new ConfigOptionEnum<CameraNavStyle>(static_cast<CameraNavStyle>(s_keys_map_CameraNavStyle.at(app_config->get("camera_navigation_style")))),
+		{ { "default", L("Default") },
+		  { "touchpad", L("Touchpad") }
+		});
+
+
+
 	activate_options_tab(m_optgroup_camera);
+
+	// set Field for camera_navigation_style to its value to activate the object
+	boost::any val = s_keys_map_CameraNavStyle.at(app_config->get("camera_navigation_style"));
+	m_optgroup_camera->get_field("camera_navigation_style")->set_value(val, false);
 
 	// Add "GUI" tab
 	m_optgroup_gui = create_options_tab(L("GUI"), tabs);

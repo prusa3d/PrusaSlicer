@@ -536,6 +536,7 @@ private:
     bool m_multisample_allowed;
     bool m_moving;
     bool m_tab_down;
+    bool m_camera_moving;
     ECursorType m_cursor_type;
     GLSelectionRectangle m_rectangle_selection;
     std::vector<int> m_hover_volume_idxs;
@@ -865,6 +866,9 @@ public:
     void on_mouse(wxMouseEvent& evt);
     void on_paint(wxPaintEvent& evt);
     void on_set_focus(wxFocusEvent& evt);
+
+    bool is_camera_rotate(const wxMouseEvent& evt) const;
+    bool is_camera_pan(const wxMouseEvent& evt) const;
 
     Size get_canvas_size() const;
     Vec2d get_local_mouse_position() const;
