@@ -709,6 +709,7 @@ bool PrintObject::invalidate_state_by_config_options(
             steps.emplace_back(posSupportMaterial);
         } else if (
                opt_key == "perimeters"
+            || opt_key == "extra_perimeter_odd_even"
             || opt_key == "extra_perimeters"
             || opt_key == "extra_perimeters_on_overhangs"
             || opt_key == "first_layer_extrusion_width"
@@ -809,6 +810,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "infill_only_where_needed"
             || opt_key == "infill_every_layers"
             || opt_key == "solid_infill_every_layers"
+            || opt_key == "ensure_vertical_shell_thickness"
             || opt_key == "bottom_solid_min_thickness"
             || opt_key == "top_solid_layers"
             || opt_key == "top_solid_min_thickness"
@@ -1476,7 +1478,8 @@ void PrintObject::discover_vertical_shells()
 	                        ++ i) {
                             at_least_one_top_projected = true;
 	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
-                            combine_holes(cache.holes);
+                            if (region_config.ensure_vertical_shell_thickness.value)
+                                combine_holes(cache.holes);
                             combine_shells(cache.top_surfaces);
 	                    }
                         if (!at_least_one_top_projected && i < int(cache_top_botom_regions.size())) {
@@ -1505,7 +1508,8 @@ void PrintObject::discover_vertical_shells()
 	                        -- i) {
                                 at_least_one_bottom_projected = true;
 	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
-							combine_holes(cache.holes);
+							if (region_config.ensure_vertical_shell_thickness.value)
+								combine_holes(cache.holes);
                             combine_shells(cache.bottom_surfaces);
 	                    }
 

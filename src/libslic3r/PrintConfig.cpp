@@ -255,6 +255,13 @@ static t_config_enum_values s_keys_map_PerimeterGeneratorType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimeterGeneratorType)
 
+static t_config_enum_values s_keys_map_ExtraPerimeter {
+    { "None", int(ExtraPerimeter::None) },
+    { "Odd",  int(ExtraPerimeter::Odd)  },
+    { "Even", int(ExtraPerimeter::Even) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ExtraPerimeter)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -852,6 +859,14 @@ void PrintConfigDef::init_fff_params()
     def->height = 120;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionStrings { "; Filament-specific end gcode \n;END gcode for filament\n" });
+
+    def = this->add("ensure_vertical_shell_thickness", coBool);
+    def->label = L("Ensure vertical shell thickness");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Add solid infill near sloping surfaces to guarantee the vertical shell thickness "
+                   "(top+bottom solid layers).");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
 
     auto def_top_fill_pattern = def = this->add("top_fill_pattern", coEnum);
     def->label = L("Top fill pattern");
@@ -2217,6 +2232,14 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 10000;
     def->set_default_value(new ConfigOptionInt(3));
+
+    def = this->add("extra_perimeter_odd_even", coEnum);
+    def->label = L("Add extra perimeter on");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("It increases infill bonding to perimeter. Reduce shell thickness will be turned on.");
+    def->sidetext = L("layers");
+    def->set_enum<ExtraPerimeter>({"None", "Odd", "Even"});
+    def->set_default_value(new ConfigOptionEnum<ExtraPerimeter>(ExtraPerimeter::None));
 
     def = this->add("post_process", coStrings);
     def->label = L("Post-processing scripts");

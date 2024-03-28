@@ -77,6 +77,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
 
     if (config->opt_bool("spiral_vase") &&
         ! (config->opt_int("perimeters") == 1 && 
+           config->option<ConfigOptionEnum<ExtraPerimeter>>("extra_perimeter_odd_even")->value == ExtraPerimeter::None &&
            config->opt_int("top_solid_layers") == 0 &&
            fill_density == 0 &&
            ! config->opt_bool("support_material") &&
@@ -85,6 +86,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     {
         wxString msg_text = _(L("The Spiral Vase mode requires:\n"
                                 "- one perimeter\n"
+                                "- no extra perimeter on odd/even layers\n"
                                 "- no top solid layers\n"
                                 "- 0% fill density\n"
                                 "- no support material\n"
@@ -98,6 +100,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         bool support = true;
         if (!is_global_config || answer == wxID_YES) {
             new_conf.set_key_value("perimeters", new ConfigOptionInt(1));
+            new_conf.set_key_value("extra_perimeter_odd_even", new ConfigOptionEnum<ExtraPerimeter>(ExtraPerimeter::None));
             new_conf.set_key_value("top_solid_layers", new ConfigOptionInt(0));
             new_conf.set_key_value("fill_density", new ConfigOptionPercent(0));
             new_conf.set_key_value("support_material", new ConfigOptionBool(false));
@@ -213,6 +216,16 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             }
         }
     }
+    if (config->option<ConfigOptionEnum<ExtraPerimeter>>("extra_perimeter_odd_even")->value != ExtraPerimeter::None &&
+        config->option<ConfigOptionBool>("ensure_vertical_shell_thickness")->value) {
+        MessageDialog dialog(m_msg_dlg_parent, "'Extra perimeters on either layer is incompatinle with 'Ensure verstical shell thickness'", _L("Perimeters"), wxICON_WARNING | wxOK);
+        dialog.ShowModal();
+
+        DynamicPrintConfig new_conf = *config;
+        new_conf.set_key_value("extra_perimeter_odd_even", new ConfigOptionEnum<ExtraPerimeter>(ExtraPerimeter::None));
+        new_conf.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionBool(false));
+        apply(config, &new_conf);
+    }
 }
 
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
@@ -249,8 +262,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
                     "infill_speed", "bridge_speed" })
         toggle_field(el, have_infill || has_solid_infill);
 
-    toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill);
-    toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill);
+    toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill && config->opt_bool("ensure_vertical_shell_thickness"));
+    toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill && config->opt_bool("ensure_vertical_shell_thickness"));
 
     // Gap fill is newly allowed in between perimeter lines even for empty infill (see GH #1476).
     toggle_field("gap_fill_speed", have_perimeters);

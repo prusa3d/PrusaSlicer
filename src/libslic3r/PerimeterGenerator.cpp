@@ -1115,6 +1115,9 @@ void PerimeterGenerator::process_arachne(
     // extra perimeters for each one
     // detect how many perimeters must be generated for this island
     int        loop_number = params.config.perimeters + surface.extra_perimeters - 1; // 0-indexed loops
+    if (params.config.extra_perimeter_odd_even != ExtraPerimeter::None && params.layer_id % 2 == static_cast<int>(params.config.extra_perimeter_odd_even.value) - 1)
+        loop_number++;
+
     ExPolygons last        = offset_ex(surface.expolygon.simplify_p(params.scaled_resolution), - float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
     Polygons   last_p      = to_polygons(last);
 
@@ -1376,6 +1379,9 @@ void PerimeterGenerator::process_classic(
     // extra perimeters for each one
     // detect how many perimeters must be generated for this island
     int        loop_number = params.config.perimeters + surface.extra_perimeters - 1;  // 0-indexed loops
+
+    if (params.config.extra_perimeter_odd_even != ExtraPerimeter::None && params.layer_id % 2 == static_cast<int>(params.config.extra_perimeter_odd_even.value) - 1)
+        loop_number++;
     ExPolygons last        = union_ex(surface.expolygon.simplify_p(params.scaled_resolution));
     ExPolygons gaps;
     if (loop_number >= 0) {
