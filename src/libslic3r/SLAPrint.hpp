@@ -553,6 +553,7 @@ public:
                       const ThumbnailsList &thumbnails,
                       const std::string    &projectname = "");
     
+    PrintObjects            objects() { return m_objects; }
 private:
     
     // Implement same logic as in SLAPrintObject
