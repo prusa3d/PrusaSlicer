@@ -752,6 +752,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              travel_max_lift))
     ((ConfigOptionFloats,              travel_slope))
     ((ConfigOptionBools,               travel_lift_before_obstacle))
+    ((ConfigOptionFloats,              extrusion_regression_a))//x^2
+    ((ConfigOptionFloats,              extrusion_regression_b))//x
+    ((ConfigOptionFloats,              extrusion_regression_c))//c
+    ((ConfigOptionBool,                extrusion_regression_show))
     ((ConfigOptionPercents,            retract_before_wipe))
     ((ConfigOptionFloats,              retract_length))
     ((ConfigOptionFloats,              retract_length_toolchange))

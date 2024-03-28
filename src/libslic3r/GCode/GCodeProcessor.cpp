@@ -2558,7 +2558,19 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     if (line.has_x()) g1_axes[X] = (double)line.x();
     if (line.has_y()) g1_axes[Y] = (double)line.y();
     if (line.has_z()) g1_axes[Z] = (double)line.z();
-    if (line.has_e()) g1_axes[E] = (double)line.e();
+    if (line.has_e()){
+
+        std::string_view cmnt = line.comment();
+        g1_axes[E] = (double)line.e();
+        int st = cmnt.find("_K_");
+        if (st >= 0) {
+            st += 3;
+            int eol = cmnt.find("\n");
+            std::string es(cmnt.substr(st, eol));
+            double k = atof(es.c_str());
+            g1_axes[E] = g1_axes[E].value() / k ;
+        }
+    }
     std::optional<double> g1_feedrate = std::nullopt;
     if (line.has_f()) g1_feedrate = (double)line.f();
     process_G1(g1_axes, g1_feedrate);

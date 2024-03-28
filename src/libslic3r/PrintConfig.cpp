@@ -995,6 +995,34 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats { 1. });
 
+    def = this->add("extrusion_regression_a", coFloats);
+    def->label = L("A factor");
+    def->tooltip = L("A factor (X^2) of quadratic polynomial");
+    def->sidetext = L("*X^2");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats { 0. });
+
+    def = this->add("extrusion_regression_b", coFloats);
+    def->label = L("B factor");
+    def->tooltip = L("B factor (X) of quadratic polynomial");
+    def->sidetext = L("*X+");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats { 0. });
+
+    def = this->add("extrusion_regression_c", coFloats);
+    def->label = L("C factor");
+    def->tooltip = L("C factor (constant) of quadratic polynomial");
+    def->sidetext = L("+");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats { 1. });
+
+    def = this->add("extrusion_regression_show", coBool);
+    def->label = L("Show commanded extrusion");
+    def->tooltip = L("Show extrusion amount that was sent to extruder motor. "
+                    "It exceeds expected amount to compensate underextrusion caused by gear slippage.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool { false });
+
     def = this->add("extrusion_width", coFloatOrPercent);
     def->label = L("Default extrusion width");
     def->category = L("Extrusion Width");
@@ -3567,6 +3595,7 @@ void PrintConfigDef::init_extruder_option_keys()
     // ConfigOptionFloats, ConfigOptionPercents, ConfigOptionBools, ConfigOptionStrings
     m_extruder_option_keys = {
         "nozzle_diameter", "min_layer_height", "max_layer_height", "extruder_offset",
+        "extrusion_regression_a", "extrusion_regression_b", "extrusion_regression_c","extrusion_regression_show",
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed",
         "retract_before_wipe", "retract_restart_extra", "retract_before_travel", "wipe",
         "travel_slope", "travel_max_lift", "travel_ramping_lift", "travel_lift_before_obstacle",

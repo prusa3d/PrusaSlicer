@@ -468,6 +468,7 @@ private:
     // Back-pointer to Print (const).
     const Print*                        m_print;
 
+    double                              _regress(double x);
     std::string                         _extrude(
         const ExtrusionAttributes &attribs, const Geometry::ArcWelder::Path &path, const std::string_view description, double speed = -1);
     void                                print_machine_envelope(GCodeOutputStream &file, const Print &print);

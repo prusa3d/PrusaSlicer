@@ -3258,6 +3258,24 @@ double cap_speed(
     return speed;
 }
 
+// https://arachnoid.com/polysolve/
+double GCodeGenerator::_regress(double x) {
+  double terms[3];
+
+  int extr_id = this->m_writer.extruder()->id();
+  terms[0] = m_writer.config.extrusion_regression_c.get_at(extr_id);
+  terms[1] = m_writer.config.extrusion_regression_b.get_at(extr_id);
+  terms[2] = m_writer.config.extrusion_regression_a.get_at(extr_id);
+
+  double t = 1;
+  double r = 0;
+  for (double c : terms) {
+    r += c * t;
+    t *= x;
+  }
+  return r;
+}
+
 std::string GCodeGenerator::_extrude(
     const ExtrusionAttributes       &path_attr,
     const Geometry::ArcWelder::Path &path,
@@ -3499,15 +3517,37 @@ std::string GCodeGenerator::_extrude(
             }
             if (radius == 0) {
                 // Extrude line segment.
-                if (const double line_length = (p - prev).norm(); line_length > 0)
-                    gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
+                if (const double line_length = (p - prev).norm(); line_length > 0) {
+                    
+                    double dE = e_per_mm * line_length;
+                    double tm = line_length/speed;
+                    double k = _regress(dE / tm);
+                    std::string ln = m_writer.extrude_to_xy(p, dE * k, comment);
+
+                    if (k > 1) {
+                        std::string ee = (!this->config().extrusion_regression_show ? ";_K_" : ";K:") + std::to_string(std::round(k * 1000000) / 1000000) + "\n";
+                        int i = ln.find("\n");
+                        ln = ln.replace(i, strlen("\n"),ee);
+                    }
+                    gcode += ln;
+				}
             } else {
                 double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
                 assert(angle > 0);
                 const double line_length = angle * std::abs(radius);
                 const double dE          = e_per_mm * line_length;
                 assert(dE > 0);
-                gcode += m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
+
+                double tm = line_length/speed;
+                double k = _regress(dE / (line_length/speed));
+                std::string ln = m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE * k, comment);
+
+                if (k > 1 && !this->config().extrusion_regression_show) {
+                    std::string ee = (!this->config().extrusion_regression_show ? ";_K_" : ";K:") + std::to_string(std::round(k * 1000000) / 1000000) + "\n";
+                    int i = ln.find("\n");
+                    ln = ln.replace(i, strlen("\n"),ee);
+                }
+                gcode += ln;
             }
             prev = p;
             prev_exact = p_exact;
