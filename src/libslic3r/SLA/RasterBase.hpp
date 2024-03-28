@@ -1,4 +1,5 @@
 ///|/ Copyright (c) Prusa Research 2020 - 2022 Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2024 Felix Reißmann @felix-rm
 ///|/ Copyright (c) 2022 ole00 @ole00
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
@@ -106,6 +107,11 @@ struct PNGRasterEncoder {
 };
 
 struct PPMRasterEncoder {
+    EncodedRaster operator()(const void *ptr, size_t w, size_t h, size_t num_components);
+};
+
+// Run-Length-Encoding RasterEncoder for GOO file format
+struct GOORLERasterEncoder {
     EncodedRaster operator()(const void *ptr, size_t w, size_t h, size_t num_components);
 };
 

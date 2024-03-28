@@ -1,4 +1,5 @@
 ///|/ Copyright (c) Prusa Research 2017 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2024 Felix Reißmann @felix-rm
 ///|/ Copyright (c) 2021 Martin Budden
 ///|/ Copyright (c) 2021 Ilya @xorza
 ///|/ Copyright (c) 2019 John Drake @foxox
@@ -53,6 +54,8 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/exception/diagnostic_information.hpp>
+
+#include <initializer_list>
 
 #include "wxExtensions.hpp"
 #include "PresetComboBoxes.hpp"
@@ -2952,6 +2955,27 @@ void TabPrinter::build_sla()
     line.append_option(optgroup->get_option("fast_tilt_time"));
     line.append_option(optgroup->get_option("slow_tilt_time"));
     line.append_option(optgroup->get_option("high_viscosity_tilt_time"));
+    line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup)](wxWindow* parent) {
+        wxWindow* check_box = CheckBox::GetNewWin(parent);
+        wxGetApp().UpdateDarkUI(check_box);
+
+        check_box->Bind(wxEVT_CHECKBOX, [this, optgroup_wk](wxCommandEvent& evt) {
+            const bool is_checked = evt.IsChecked();
+            if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+                for (const std::string& opt_key : {"fast_tilt_time", "slow_tilt_time", "high_viscosity_tilt_time"})
+                    if (Field* field = optgroup_sh->get_fieldc(opt_key, 0); field != nullptr) {
+                        field->toggle(is_checked);
+                        if (is_checked)
+                            field->set_last_meaningful_value();
+                        else
+                            field->set_na_value();
+                    }
+            }
+
+            toggle_options();
+        });
+        return check_box;
+    };
     optgroup->append_line(line);
     optgroup->append_single_option_line("area_fill");
 
@@ -2967,6 +2991,7 @@ void TabPrinter::build_sla()
     optgroup->append_single_option_line("elefant_foot_compensation");
     optgroup->append_single_option_line("elefant_foot_min_width");
     optgroup->append_single_option_line("gamma_correction");
+    optgroup->append_single_option_line("time_estimate_correction");
     
     optgroup = page->new_optgroup(L("Exposure"));
     optgroup->append_single_option_line("min_exposure_time");
@@ -5346,6 +5371,44 @@ void TabSLAMaterial::build()
     optgroup = page->new_optgroup(L("Exposure"));
     optgroup->append_single_option_line("exposure_time");
     optgroup->append_single_option_line("initial_exposure_time");
+    optgroup->append_single_option_line("exposure_pwm");
+    optgroup->append_single_option_line("initial_exposure_pwm");
+
+    auto add_line_with_padded_options = [](ConfigOptionsGroupShp& optgroup, auto const& label, auto const& first_option_name, auto const&... option_names){
+        auto line = Line{label, ""};
+
+        auto add_option_to_line = [&](bool first, auto const& option_name){
+            auto option = optgroup->get_option(option_name);
+
+            // NOTE: Add some padding between option columns
+            //       Using line.full_width and option.opt.width does not seem to work here
+            if(!first)
+                option.opt.label = "      " + option.opt.label;
+            line.append_option(option);
+        };
+
+        add_option_to_line(true, first_option_name);
+        (add_option_to_line(false, option_names), ...);
+        optgroup->append_line(line);
+    };
+
+    optgroup = page->new_optgroup(L("Initial Lift and Retract"));
+    add_line_with_padded_options(optgroup, L("Initial lift distance"), "sla_initial_primary_lift_distance", "sla_initial_secondary_lift_distance");
+    add_line_with_padded_options(optgroup, L("Initial lift speed"), "sla_initial_primary_lift_speed", "sla_initial_secondary_lift_speed");
+    add_line_with_padded_options(optgroup, L("Initial retract distance"), "sla_initial_primary_retract_distance", "sla_initial_secondary_retract_distance");
+    add_line_with_padded_options(optgroup, L("Initial retract speed"), "sla_initial_primary_retract_speed", "sla_initial_secondary_retract_speed");
+    optgroup->append_single_option_line("sla_initial_wait_before_lift");
+    optgroup->append_single_option_line("sla_initial_wait_after_lift");
+    optgroup->append_single_option_line("sla_initial_wait_after_retract");
+
+    optgroup = page->new_optgroup(L("Lift and Retract"));
+    add_line_with_padded_options(optgroup, L("Lift distance"), "sla_primary_lift_distance", "sla_secondary_lift_distance");
+    add_line_with_padded_options(optgroup, L("Lift speed"), "sla_primary_lift_speed", "sla_secondary_lift_speed");
+    add_line_with_padded_options(optgroup, L("Retract distance"), "sla_primary_retract_distance", "sla_secondary_retract_distance");
+    add_line_with_padded_options(optgroup, L("Retract speed"), "sla_primary_retract_speed", "sla_secondary_retract_speed");
+    optgroup->append_single_option_line("sla_wait_before_lift");
+    optgroup->append_single_option_line("sla_wait_after_lift");
+    optgroup->append_single_option_line("sla_wait_after_retract");
 
     optgroup = page->new_optgroup(L("Corrections"));
     auto line = Line{ m_config->def()->get("material_correction")->full_label, "" };
