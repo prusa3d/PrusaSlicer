@@ -4,7 +4,7 @@
 
 BitmapToggleButton::BitmapToggleButton(wxWindow* parent, const wxString& label, wxWindowID id)
 {
-    const long style = wxBORDER_NONE | wxBU_EXACTFIT | wxBU_LEFT;
+    const long style = wxBORDER_NONE | wxBU_EXACTFIT | wxBU_LEFT | wxBU_NOTEXT;
     if (label.IsEmpty())
         wxBitmapToggleButton::Create(parent, id, wxNullBitmap, wxDefaultPosition, wxDefaultSize, style);
     else {

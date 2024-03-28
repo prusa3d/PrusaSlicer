@@ -31,6 +31,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/ConfigSnapshotDialog.hpp
     GUI/3DScene.cpp
     GUI/3DScene.hpp
+    GUI/Accessibility.cpp
     GUI/format.hpp
     GUI/GLShadersManager.hpp
     GUI/GLShadersManager.cpp
