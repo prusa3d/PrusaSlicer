@@ -437,6 +437,8 @@ private:
 
     std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> m_adaptive_fill_octrees;
     FillLightning::GeneratorPtr m_lightning_generator;
+//Orca
+    void apply_conical_overhang();
 };
 
 

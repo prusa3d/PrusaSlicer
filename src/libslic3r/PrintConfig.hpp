@@ -599,6 +599,9 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                thick_bridges))
     ((ConfigOptionFloat,               xy_size_compensation))
     ((ConfigOptionBool,                wipe_into_objects))
+    // Orca
+    ((ConfigOptionFloat,               make_overhang_printable_angle))
+    ((ConfigOptionFloat,               make_overhang_printable_hole_size))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -662,6 +665,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                top_solid_min_thickness))
     ((ConfigOptionFloatOrPercent,       top_solid_infill_speed))
     ((ConfigOptionBool,                 wipe_into_infill))
+    // Orca
+    ((ConfigOptionBool,                 make_overhang_printable))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(

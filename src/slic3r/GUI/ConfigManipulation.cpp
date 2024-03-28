@@ -345,6 +345,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("min_feature_size", have_arachne);
     toggle_field("min_bead_width", have_arachne);
     toggle_field("thin_walls", !have_arachne);
+    //Orca
+    bool have_make_overhang_printable = config->opt_bool("make_overhang_printable");
+    toggle_field("make_overhang_printable_angle", have_make_overhang_printable);
+    toggle_field("make_overhang_printable_hole_size", have_make_overhang_printable);
 }
 
 void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
