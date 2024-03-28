@@ -16,6 +16,43 @@
 
 namespace Slic3r {
 
+namespace {
+
+Point find_extrusion_sharpest_corner(const Arachne::ExtrusionLine *extrusion)
+{
+    Point p(0,0);
+
+    if (!extrusion->is_closed || extrusion->empty())
+        return p;
+
+    size_t idx_c = 0;
+    size_t idx_n = 0;
+    size_t idx_p = 0;
+    const ThickPolyline thick_polyline = Arachne::to_thick_polyline(*extrusion);
+    const Points &points = thick_polyline.points;
+    double max_angle = 0;
+
+    for (idx_c = 0; idx_c < points.size(); ++idx_c) {
+        idx_p = Slic3r::prev_idx_modulo(idx_c, points.size());
+        idx_n = Slic3r::next_idx_modulo(idx_c, points.size());
+
+        const Point &pp = points[idx_p];
+        const Point &pc = points[idx_c];
+        const Point &pn = points[idx_n];
+
+        double a = std::abs(angle(pc - pp, pn - pc));
+
+        if (max_angle < a) {
+            max_angle = a;
+            p = pc;
+        }
+    }
+
+    return p;
+}
+
+}
+
 void FillConcentric::_fill_surface_single(
     const FillParams                &params,
     unsigned int                     thickness_layers,
@@ -100,7 +137,7 @@ void FillConcentric::_fill_surface_single(const FillParams              &params,
 
         // Split paths using a nearest neighbor search.
         size_t firts_poly_idx = thick_polylines_out.size();
-        Point  last_pos(0, 0);
+        Point  last_pos = find_extrusion_sharpest_corner(all_extrusions[0]);
         for (const Arachne::ExtrusionLine *extrusion : all_extrusions) {
             if (extrusion->empty())
                 continue;
