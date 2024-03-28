@@ -566,6 +566,21 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(1));
 
+    def = this->add("max_overhang_perimeter_length_before_enforcing_nozzle_extrusion_width", coFloat);
+    def->label = L("Reduce overhang perimeter extrusion width after");
+    def->category = L("Advanced");
+    def->tooltip = L("Reduces the overhang perimeter width after this length. "
+                   "When using large default extrusion widths, the risk of sagging is high, "
+                   "when the overhang section exceeds this length, the extrusion width for"
+                   "the layer region will be reduced to the nozzle diameter value. This causes "
+                   "that the separation between overhang perimeters is reduced and the amount of "
+                   "perimeters increased. If solid infil is also large, consider reducing the "
+                   "bridge flow ratio accordingly to also fill the gap between perimeters.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(30));
+
     def = this->add("bridge_speed", coFloat);
     def->label = L("Bridges");
     def->category = L("Speed");
@@ -4797,6 +4812,9 @@ std::string validate(const FullPrintConfig &cfg)
     // --bridge-flow-ratio
     if (cfg.bridge_flow_ratio <= 0)
         return "Invalid value for --bridge-flow-ratio";
+
+    if (cfg.max_overhang_perimeter_length_before_enforcing_nozzle_extrusion_width < 0)
+        return "Invalid value for --max-overhang-perimeter-length-before-enforcing-nozzle-extrusion-width";
 
     // extruder clearance
     if (cfg.extruder_clearance_radius <= 0)

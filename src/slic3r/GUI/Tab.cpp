@@ -1681,6 +1681,7 @@ void TabPrint::build()
 
         optgroup = page->new_optgroup(L("Flow"));
         optgroup->append_single_option_line("bridge_flow_ratio");
+        optgroup->append_single_option_line("max_overhang_perimeter_length_before_enforcing_nozzle_extrusion_width");
 
         optgroup = page->new_optgroup(L("Slicing"));
         optgroup->append_single_option_line("slice_closing_radius");

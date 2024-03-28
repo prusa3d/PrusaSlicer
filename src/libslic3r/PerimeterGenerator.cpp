@@ -14,6 +14,7 @@
 #include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
+#include "Flow.hpp"
 #include "Geometry/MedialAxis.hpp"
 #include "KDTreeIndirect.hpp"
 #include "MultiPoint.hpp"
@@ -512,7 +513,7 @@ struct PerimeterGeneratorArachneExtrusion
     bool fuzzify = false;
 };
 
-static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::Parameters &params, const Polygons &lower_slices_polygons_cache, std::vector<PerimeterGeneratorArachneExtrusion> &pg_extrusions)
+static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::Parameters &params, const Polygons &lower_slices_polygons_cache, std::vector<PerimeterGeneratorArachneExtrusion> &pg_extrusions, bool &has_long_overhang)
 {
     ExtrusionEntityCollection extrusion_coll;
     for (PerimeterGeneratorArachneExtrusion &pg_extrusion : pg_extrusions) {
@@ -566,8 +567,36 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
             // get overhang paths by checking what parts of this loop fall
             // outside the grown lower slices (thus where the distance between
             // the loop centerline and original lower slices is >= half nozzle diameter
-            extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference), role_overhang,
-                                   params.overhang_flow);
+
+            auto overhangzpaths = clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference);
+
+            if(!overhangzpaths.empty()) {
+
+                double max_path_length = 0;
+
+                for(auto & zpath : overhangzpaths){
+
+                    double length = 0;
+
+                    for(size_t i=0; i<zpath.size()-1; i++) {
+                        auto dx = unscaled(zpath[i+1].x() - zpath[i].x());
+                        auto dy = unscaled(zpath[i+1].y() - zpath[i].y());
+
+                        length += std::sqrt(dx*dx + dy*dy);
+                    }
+
+                    if(length > max_path_length) {
+                        max_path_length = length;
+                    }
+                }
+
+                if(max_path_length > params.config.max_overhang_perimeter_length_before_enforcing_nozzle_extrusion_width) {
+                    has_long_overhang = true;
+                }
+
+                extrusion_paths_append(paths, overhangzpaths, role_overhang,
+                                       params.overhang_flow);
+            }
 
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
@@ -1078,13 +1107,24 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
 
 // Thanks, Cura developers, for implementing an algorithm for generating perimeters with variable width (Arachne) that is based on the paper
 // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling"
-void PerimeterGenerator::process_arachne(
+
+using namespace PerimeterGenerator;
+
+enum class ArachneMode {
+    Normal,
+    InterruptOnLongOverhangPerimeters
+};
+
+// Implementation of Arachne
+// return false: region has overhangs and was interrupted (see interrupt_on_overhang_perimeters input parameter)
+bool process_arachne_impl(
     // Inputs:
     const Parameters           &params,
     const Surface              &surface,
     const ExPolygons           *lower_slices,
     // Cache:
     Polygons                   &lower_slices_polygons_cache,
+    ArachneMode                mode,
     // Output:
     // Loops with the external thin walls
     ExtrusionEntityCollection  &out_loops,
@@ -1269,8 +1309,14 @@ void PerimeterGenerator::process_arachne(
         }
     }
 
-    if (ExtrusionEntityCollection extrusion_coll = traverse_extrusions(params, lower_slices_polygons_cache, ordered_extrusions); !extrusion_coll.empty())
+    bool has_long_overhangs = false;
+
+    if (ExtrusionEntityCollection extrusion_coll = traverse_extrusions(params, lower_slices_polygons_cache, ordered_extrusions, has_long_overhangs); !extrusion_coll.empty()) {
+        if(has_long_overhangs && mode == ArachneMode::InterruptOnLongOverhangPerimeters) {
+            return false;
+        }
         out_loops.append(extrusion_coll);
+    }
 
     ExPolygons    infill_contour = union_ex(wallToolPaths.getInnerContour());
     const coord_t spacing        = (perimeters.size() == 1) ? ext_perimeter_spacing2 : perimeter_spacing;
@@ -1314,15 +1360,73 @@ void PerimeterGenerator::process_arachne(
             ExtrusionEntityCollection &this_islands_perimeters = static_cast<ExtrusionEntityCollection&>(*out_loops.entities.back());
             ExtrusionEntitiesPtr       old_entities;
             old_entities.swap(this_islands_perimeters.entities);
-            for (ExtrusionPaths &paths : extra_perimeters) 
+            for (ExtrusionPaths &paths : extra_perimeters)
                 this_islands_perimeters.append(std::move(paths));
             append(this_islands_perimeters.entities, old_entities);
             infill_areas = diff_ex(infill_areas, filled_area);
         }
     }
-    
+
     append(out_fill_expolygons, std::move(infill_areas));
+
+    return true;
 }
+
+void PerimeterGenerator::process_arachne(
+    // Inputs:
+    const Parameters           &params,
+    const Surface              &surface,
+    const ExPolygons           *lower_slices,
+    // Cache:
+    Polygons                   &lower_slices_polygons_cache,
+    // Output:
+    // Loops with the external thin walls
+    ExtrusionEntityCollection  &out_loops,
+    // Gaps without the thin walls
+    ExtrusionEntityCollection  & out_gap_fill,
+    // Infills without the gap fills
+    ExPolygons                 &out_fill_expolygons)
+{
+
+    double perimeter_to_nozzle_extrusion_width_ratio = params.perimeter_flow.width() / params.perimeter_flow.nozzle_diameter();
+    double ext_perimeter_to_nozzle_extrusion_width_ratio = params.ext_perimeter_flow.width() / params.ext_perimeter_flow.nozzle_diameter();
+
+    // only activate extra support for overhang perimeters over this threshold (for perimeters and external perimeters)
+    bool reduce_overhang_perimeter_extrusion_width = perimeter_to_nozzle_extrusion_width_ratio > 1.2 ||
+            ext_perimeter_to_nozzle_extrusion_width_ratio > 1.2;
+
+    if(reduce_overhang_perimeter_extrusion_width) {
+        bool success = process_arachne_impl(params, surface, lower_slices,
+                                                lower_slices_polygons_cache, ArachneMode::InterruptOnLongOverhangPerimeters,
+                                                out_loops, out_gap_fill, out_fill_expolygons);
+
+        if(!success) {
+            auto scaleFlowWidthToNozzle = [](const Flow & originalflow) {
+                return Flow(originalflow.nozzle_diameter(), originalflow.height(), originalflow.nozzle_diameter());
+            };
+
+            Parameters fallbackparams = params; // deep-copy of parameters
+
+            // scale also the overhang and solidinfil in these layer regions
+            fallbackparams.perimeter_flow = scaleFlowWidthToNozzle(params.perimeter_flow);
+            fallbackparams.ext_perimeter_flow = scaleFlowWidthToNozzle(params.ext_perimeter_flow);
+            fallbackparams.overhang_flow = Flow(params.overhang_flow.nozzle_diameter(), params.overhang_flow.nozzle_diameter(), params.overhang_flow.nozzle_diameter());
+            fallbackparams.solid_infill_flow = scaleFlowWidthToNozzle(params.solid_infill_flow);
+
+            process_arachne_impl(fallbackparams, surface, lower_slices,
+                                 lower_slices_polygons_cache, ArachneMode::Normal,
+                                 out_loops, out_gap_fill, out_fill_expolygons);
+
+        }
+    }
+    else { // standard implementation
+        process_arachne_impl(params, surface, lower_slices,
+                             lower_slices_polygons_cache, ArachneMode::Normal,
+                             out_loops, out_gap_fill, out_fill_expolygons);
+    }
+}
+
+
 
 void PerimeterGenerator::process_classic(
     // Inputs:
