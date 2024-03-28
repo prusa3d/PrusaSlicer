@@ -236,6 +236,7 @@ static std::vector<PrintObjectRegions::LayerRangeRegions>::const_iterator layer_
 }
 
 static std::vector<std::vector<ExPolygons>> slices_to_regions(
+    const PrintConfig                                        &print_config,
     ModelVolumePtrs                                           model_volumes,
     const PrintObjectRegions                                 &print_object_regions,
     const std::vector<float>                                 &zs,
@@ -396,6 +397,21 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
                     throw_on_cancel_callback();
                 }
             });
+    }
+
+    // filament shrink
+    for (const std::unique_ptr<PrintRegion>& pr : print_object_regions.all_regions) {
+        if (pr.get()) {
+            std::vector<ExPolygons>& region_polys = slices_by_region[pr->print_object_region_id()];
+            const size_t extruder_id = pr->extruder(FlowRole::frPerimeter) - 1;
+            double scale = print_config.filament_shrink.get_at(extruder_id) / 100;
+            if (scale != 1) {
+                scale = 1 / scale;
+                for (ExPolygons& polys : region_polys)
+                    for (ExPolygon& poly : polys)
+                        poly.scale(scale);
+            }
+        }
     }
 
     return slices_by_region;
@@ -700,7 +716,11 @@ void PrintObject::slice_volumes()
     }
 
     std::vector<float>                   slice_zs      = zs_from_layers(m_layers);
-    std::vector<std::vector<ExPolygons>> region_slices = slices_to_regions(this->model_object()->volumes, *m_shared_regions, slice_zs,
+    std::vector<std::vector<ExPolygons>> region_slices = slices_to_regions(
+        print->config(),
+        this->model_object()->volumes,
+        *m_shared_regions,
+        slice_zs,
         slice_volumes_inner(
             print->config(), this->config(), this->trafo_centered(),
             this->model_object()->volumes, m_shared_regions->layer_ranges, slice_zs, throw_on_cancel_callback),

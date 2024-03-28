@@ -825,6 +825,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInts,               fan_below_layer_time))
     ((ConfigOptionStrings,            filament_colour))
     ((ConfigOptionStrings,            filament_notes))
+    ((ConfigOptionPercents,           filament_shrink))
     ((ConfigOptionFloat,              first_layer_acceleration))
     ((ConfigOptionInts,               first_layer_bed_temperature))
     ((ConfigOptionFloatOrPercent,     first_layer_extrusion_width))
