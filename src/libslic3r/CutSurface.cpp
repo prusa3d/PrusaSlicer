@@ -1891,7 +1891,7 @@ uint32_t priv::get_closest_point_index(const SearchData &sd,
         const Polygon   &poly  = (id.polygon_index == 0) ?
                                            shape.contour :
                                            shape.holes[id.polygon_index - 1];
-        Vec2i p_ = p.cast<int>();
+        Point p_ = p.cast<coord_t>();
         return p_ == poly[id.point_index];
     };
 

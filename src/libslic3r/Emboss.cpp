@@ -338,8 +338,8 @@ bool Emboss::divide_segments_for_close_point(ExPolygons &expolygons, double dist
                 const Points &poly_pts = poly.points;
                 const Point &line_a = poly_pts[id.point_index];
                 const Point &line_b = (!ids.is_last_point(id)) ? poly_pts[id.point_index + 1] : poly_pts.front();
-                assert(line_a == lines[index].a.cast<int>());
-                assert(line_b == lines[index].b.cast<int>());
+                assert(line_a == lines[index].a.cast<coord_t>());
+                assert(line_b == lines[index].b.cast<coord_t>());
                 if (p == line_a || p == line_b) continue;
 
                 divs.emplace_back(p, index);
@@ -819,8 +819,8 @@ const Glyph* get_glyph(
 }
 
 Point to_point(const stbtt__point &point) {
-    return Point(static_cast<int>(std::round(point.x / SHAPE_SCALE)),
-                 static_cast<int>(std::round(point.y / SHAPE_SCALE)));
+    return Point(static_cast<coord_t>(std::round(point.x / SHAPE_SCALE)),
+                 static_cast<coord_t>(std::round(point.y / SHAPE_SCALE)));
 }
 
 } // namespace
