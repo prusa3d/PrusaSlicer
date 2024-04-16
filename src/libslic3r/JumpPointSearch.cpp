@@ -23,7 +23,11 @@
 #include <unordered_map>
 #include <vector>
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/scalable_allocator.h>
+#endif
 
 //#define DEBUG_FILES
 #ifdef DEBUG_FILES
