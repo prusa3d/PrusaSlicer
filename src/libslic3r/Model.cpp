@@ -382,7 +382,8 @@ bool Model::center_instances_around_point(const Vec2d &point)
     BoundingBoxf3 bb;
     for (ModelObject *o : this->objects)
         for (size_t i = 0; i < o->instances.size(); ++ i)
-            bb.merge(o->instance_bounding_box(i, false));
+            if (o->instances[i]->is_printable())
+                bb.merge(o->instance_bounding_box(i, false));
 
     Vec2d shift2 = point - to_2d(bb.center());
 	if (std::abs(shift2(0)) < EPSILON && std::abs(shift2(1)) < EPSILON)
