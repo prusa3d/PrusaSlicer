@@ -166,8 +166,9 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		                    (surface.is_top() ? ExtrusionRole::TopSolidInfill : ExtrusionRole::SolidInfill) :
 							ExtrusionRole::InternalInfill);
 		        params.bridge_angle = float(surface.bridge_angle);
-		        params.angle 		= float(Geometry::deg2rad(region_config.fill_angle.value));
-		        
+		        params.angle = float(Geometry::deg2rad(!surface.is_external() ? layerm.region().config().fill_angle.value :
+								(surface.is_top() ? layerm.region().config().top_fill_angle.value : layerm.region().config().bottom_fill_angle.value)));
+
 		        // Calculate the actual flow we'll be using for this infill.
 		        params.bridge = is_bridge || Fill::use_bridge_flow(params.pattern);
 				params.flow   = params.bridge ?
