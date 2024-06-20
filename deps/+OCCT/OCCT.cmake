@@ -12,7 +12,6 @@ add_cmake_project(OCCT
         -DUSE_FREETYPE=OFF
 	    -DUSE_FFMPEG=OFF
 	    -DUSE_VTK=OFF
-	    -DUSE_FREETYPE=OFF
 	    -DBUILD_MODULE_ApplicationFramework=OFF
         #-DBUILD_MODULE_DataExchange=OFF
         -DBUILD_MODULE_Draw=OFF
