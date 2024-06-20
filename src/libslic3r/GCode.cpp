@@ -701,7 +701,8 @@ namespace DoExport {
 	                if (region.config().get_abs_value("infill_speed") == 0 ||
 	                    region.config().get_abs_value("solid_infill_speed") == 0 ||
 	                    region.config().get_abs_value("top_solid_infill_speed") == 0 ||
-                        region.config().get_abs_value("bridge_speed") == 0)
+                        region.config().get_abs_value("bridge_speed") == 0 ||
+                        region.config().get_abs_value("gap_fill_speed") == 0)
                     {
                         // Minimal volumetric flow should not be calculated over ironing extrusions.
                         // Use following lambda instead of the built-it method.
