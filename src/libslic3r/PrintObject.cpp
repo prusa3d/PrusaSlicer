@@ -823,6 +823,7 @@ bool PrintObject::invalidate_state_by_config_options(
         } else if (
                opt_key == "top_fill_pattern"
             || opt_key == "bottom_fill_pattern"
+            || opt_key == "solid_fill_pattern"
             || opt_key == "external_fill_link_max_length"
             || opt_key == "fill_angle"
             || opt_key == "infill_anchor"

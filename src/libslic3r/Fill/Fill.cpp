@@ -319,7 +319,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
     {
         for (size_t surface_fill_id = 0; surface_fill_id < surface_fills.size(); ++surface_fill_id)
             if (SurfaceFill &fill = surface_fills[surface_fill_id]; fill.surface.surface_type == stInternalSolid) {
-                fill.params.pattern = ipEnsuring;
+                fill.params.pattern = layer.regions()[fill.region_id]->region().config().solid_fill_pattern.value;
             }
     }
 
