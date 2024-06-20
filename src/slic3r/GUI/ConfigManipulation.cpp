@@ -249,8 +249,8 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
                     "infill_speed", "bridge_speed" })
         toggle_field(el, have_infill || has_solid_infill);
 
-    toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill);
-    toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill);
+    toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill && config->opt_bool("ensure_vertical_shell_thickness"));
+    toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill && config->opt_bool("ensure_vertical_shell_thickness"));
 
     // Gap fill is newly allowed in between perimeter lines even for empty infill (see GH #1476).
     toggle_field("gap_fill_speed", have_perimeters);
