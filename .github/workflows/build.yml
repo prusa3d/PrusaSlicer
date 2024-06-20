@@ -1,0 +1,130 @@
+name: Build Test
+
+on:
+  push:
+    branches: [ "master", "workflow" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 0. Prerequisities
+      run: sudo apt-get install -y git build-essential autoconf cmake libglu1-mesa-dev libgtk-3-dev libdbus-1-dev
+    - name: 1. Cloning the repository
+      uses: actions/checkout@v3
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}
+    - name: Determine dependency hash
+      id: dephash
+      run: echo dephash=$(git rev-parse HEAD:deps) >> $GITHUB_OUTPUT
+    - name: Cache Dependencies
+      id: cache-dependencies
+      uses: actions/cache@v3
+      with:
+        path: deps/build/destdir
+        key: dependencycache-${{ runner.os }}-${{ steps.dephash.outputs.dephash }}
+    - name: Cache Download Files
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      id: cache-download
+      uses: actions/cache@v3
+      with:
+        path: deps/download
+        key: downloadcache-${{ runner.os }}-${{ github.run_id }}
+        restore-keys: |
+          downloadcache-${{ runner.os }}
+    - name: Download GMP
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p deps/download/GMP
+        test -r deps/download/GMP/gmp-6.2.1.tar.bz2 || curl -o deps/download/GMP/gmp-6.2.1.tar.bz2 https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2
+    - name: 2. Building dependencies
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        cd deps
+        mkdir -p build
+        cd build
+        cmake .. -DDEP_WX_GTK3=ON -DDEP_DOWNLOAD_DIR=$(pwd)/../download
+        make
+        cd ../..
+    - name: 3. Building PrusaSlicer
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        mkdir build
+        cd build
+        cmake .. -DSLIC3R_STATIC=1 -DSLIC3R_GTK=3 -DSLIC3R_PCH=OFF -DCMAKE_PREFIX_PATH=$(pwd)/../deps/build/destdir/usr/local
+        make -j $(nproc)
+  macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}
+    - name: Determine dependency hash
+      id: dephash
+      run: echo dephash=$(git rev-parse HEAD:deps) >> $GITHUB_OUTPUT
+    - name: Cache Dependencies
+      id: cache-dependencies
+      uses: actions/cache@v3
+      with:
+        path: deps/build/destdir
+        key: dependencycache-${{ runner.os }}-${{ steps.dephash.outputs.dephash }}
+    - name: Cache Download Files
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      id: cache-download
+      uses: actions/cache@v3
+      with:
+        path: deps/download
+        key: downloadcache-${{ runner.os }}-${{ github.run_id }}
+        restore-keys: |
+          downloadcache-${{ runner.os }}
+    - name: Download GMP
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p deps/download/GMP
+        test -r deps/download/GMP/gmp-6.2.1.tar.bz2 || curl -o deps/download/GMP/gmp-6.2.1.tar.bz2 https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2
+    - name: Dependencies
+      if: steps.cache-dependencies.outputs.cache-hit != 'true'
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix zstd)/lib/
+        cd deps
+        mkdir build
+        cd build
+        cmake .. -DDEP_DOWNLOAD_DIR=$(pwd)/../download
+        make
+        cd ../..
+    - name: Building PrusaSlicer
+      run: |
+        export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
+        export LIBRARY_PATH=$LIBRARY_PATH:$(brew --prefix zstd)/lib/
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_PREFIX_PATH=$(pwd)/../deps/build/destdir/usr/local
+        make -j $(sysctl -n hw.logicalcpu)
+  windows:
+    runs-on: windows-2019
+    steps:
+    - uses: actions/checkout@v3
+    - name: Relocate workspace
+      run: |
+        md c:\PrusaSlicer
+        xcopy . c:\PrusaSlicer /s/h
+        #- name: Download GMP
+        ##if: steps.cache-dependencies.outputs.cache-hit != 'true'
+        #run: |
+        #md c:\PrusaSlicer\deps
+        #mkdir -p deps/download/GMP
+        #test -r deps/download/GMP/gmp-6.2.1.tar.bz2 || curl -o deps/download/GMP/gmp-6.2.1.tar.bz2 https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2
+    - name: Run the automatic build script
+      run: |
+        c:
+        cd \PrusaSlicer
+        #./build_win.bat -d=..\PrusaSlicer-deps -r=none -v 17
+        ./build_win.bat -d=..\PrusaSlicer-deps -r=none -v 16
