@@ -252,12 +252,10 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
 std::vector<std::string> VendorProfile::families() const
 {
     std::vector<std::string> res;
-    unsigned num_familiies = 0;
 
     for (auto &model : models) {
         if (std::find(res.begin(), res.end(), model.family) == res.end()) {
             res.push_back(model.family);
-            num_familiies++;
         }
     }
 

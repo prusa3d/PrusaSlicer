@@ -334,7 +334,7 @@ SCENARIO("Perimeters", "[Perimeters]")
             const double nozzle_dmr                 = config.opt<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
             const double filament_dmr               = config.opt<ConfigOptionFloats>("filament_diameter")->get_at(0);
             const double bridge_mm_per_mm           = sqr(nozzle_dmr / filament_dmr) * config.opt_float("bridge_flow_ratio");
-            parser.parse_buffer(gcode, [&layer_speeds, &fan_speed, perimeter_speed, external_perimeter_speed, bridge_speed, nozzle_dmr, filament_dmr, bridge_mm_per_mm]
+            parser.parse_buffer(gcode, [&layer_speeds, &fan_speed, perimeter_speed, external_perimeter_speed, bridge_speed, bridge_mm_per_mm]
                 (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
             {
                 if (line.cmd_is("M107"))

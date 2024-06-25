@@ -221,12 +221,9 @@ void GLGizmoSeam::update_from_model_object()
     const ModelObject* mo = m_c->selection_info()->model_object();
     m_triangle_selectors.clear();
 
-    int volume_id = -1;
     for (const ModelVolume* mv : mo->volumes) {
         if (! mv->is_model_part())
             continue;
-
-        ++volume_id;
 
         // This mesh does not account for the possible Z up SLA offset.
         const TriangleMesh* mesh = &mv->mesh();

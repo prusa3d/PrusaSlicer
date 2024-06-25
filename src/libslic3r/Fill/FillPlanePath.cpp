@@ -153,7 +153,6 @@ static void generate_archimedean_chords(coord_t min_x, coord_t min_y, coord_t ma
     coordf_t b = 1./(2.*M_PI);
     coordf_t theta = 0.;
     coordf_t r = 1;
-    Pointfs out;
     //FIXME Vojtech: If used as a solid infill, there is a gap left at the center.
     output.add_point({ 0, 0 });
     output.add_point({ 1, 0 });
@@ -223,12 +222,10 @@ static void generate_hilbert_curve(coord_t min_x, coord_t min_y, coord_t max_x, 
 {
     // Minimum power of two square to fit the domain.
     size_t sz = 2;
-    size_t pw = 1;
     {
         size_t sz0 = std::max(max_x + 1 - min_x, max_y + 1 - min_y);
         while (sz < sz0) {
             sz = sz << 1;
-            ++ pw;
         }
     }
 

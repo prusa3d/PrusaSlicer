@@ -932,13 +932,11 @@ void LoopInterfaceProcessor::generate(SupportGeneratorLayerExtruded &top_contact
 
     // Grid size and bit shifts for quick and exact to/from grid coordinates manipulation.
     coord_t circle_grid_resolution = 1;
-    coord_t circle_grid_powerof2 = 0;
     {
         // epsilon to account for rounding errors
         coord_t circle_grid_resolution_non_powerof2 = coord_t(2. * circle_distance + 3.);
         while (circle_grid_resolution < circle_grid_resolution_non_powerof2) {
             circle_grid_resolution <<= 1;
-            ++ circle_grid_powerof2;
         }
     }
 

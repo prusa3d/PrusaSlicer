@@ -56,7 +56,7 @@ IGL_INLINE void igl::qslim_optimal_collapse_edge_callbacks(
     )> & post_collapse)
 {
   typedef std::tuple<Eigen::MatrixXd,Eigen::RowVectorXd,double> Quadric;
-  cost_and_placement = [&quadrics,&v1,&v2](
+  cost_and_placement = [&quadrics](
     const int e,
     const Eigen::MatrixXd & V,
     const Eigen::MatrixXi & /*F*/,
