@@ -322,9 +322,9 @@ void CreateObjectJob::process(Ctl &ctl)
     Points bed_shape_;
     bed_shape_.reserve(m_input.bed_shape.size());
     for (const Vec2d &p : m_input.bed_shape)
-        bed_shape_.emplace_back(p.cast<int>());
+        bed_shape_.emplace_back(p.cast<coord_t>());
     Slic3r::Polygon bed(bed_shape_);
-    if (!bed.contains(bed_coor.cast<int>()))
+    if (!bed.contains(bed_coor.cast<coord_t>()))
         // mouse pose is out of build plate so create object in center of plate
         bed_coor = bed.centroid().cast<double>();
 
