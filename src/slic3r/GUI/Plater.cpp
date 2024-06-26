@@ -613,9 +613,11 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         "extruder_colour", "filament_colour", "material_colour", "max_print_height", "printer_model", "printer_notes", "printer_technology",
         // These values are necessary to construct SlicingParameters by the Canvas3D variable layer height editor.
         "layer_height", "first_layer_height", "min_layer_height", "max_layer_height",
-        "brim_width", "perimeters", "perimeter_extruder", "fill_density", "infill_extruder", "top_solid_layers", 
-        "support_material", "support_material_extruder", "support_material_interface_extruder", 
-        "support_material_contact_distance", "support_material_bottom_contact_distance", "raft_layers"
+        "brim_width", "perimeters", "perimeter_extruder", "fill_density", "infill_extruder", "top_solid_layers",
+        "support_material", "support_material_extruder", "support_material_interface_extruder",
+        "support_material_contact_distance", "support_material_bottom_contact_distance", "raft_layers",
+        // SuperSlicer
+        "init_z_rotate",
         }))
     , sidebar(new Sidebar(q))
     , notification_manager(std::make_unique<NotificationManager>(q))
@@ -1306,9 +1308,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
             else {
                 model = Slic3r::Model::read_from_file(path.string(), nullptr, nullptr, only_if(load_config, Model::LoadAttribute::CheckVersion));
-                for (auto obj : model.objects)
+                for (auto obj : model.objects) {
                     if (obj->name.empty())
                         obj->name = fs::path(obj->input_file).filename().string();
+                    obj->rotate(Geometry::deg2rad(config->opt_float("init_z_rotate")), Axis::Z);
+                }
             }
         } catch (const ConfigurationError &e) {
             std::string message = GUI::format(_L("Failed loading file \"%1%\" due to an invalid configuration."), filename.string()) + "\n\n" + e.what();

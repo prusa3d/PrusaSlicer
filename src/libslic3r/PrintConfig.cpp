@@ -3587,6 +3587,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("init_z_rotate", coFloat);
+    def->label = L("Preferred orientation");
+    def->tooltip = L("Rotate objects around Z axis while adding them to the bed.");
+    def->sidetext = L("°");
+    def->min = -360;
+    def->max = 360;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
     def = this->add("perimeter_generator", coEnum);
     def->label = L("Perimeter generator");
     def->category = L("Layers and Perimeters");
