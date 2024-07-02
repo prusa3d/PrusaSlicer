@@ -6223,7 +6223,7 @@ static void ShowExampleMenuFile()
         ImGui::EndMenu();
     }
     if (ImGui::MenuItem("Save", "Ctrl+S")) {}
-    if (ImGui::MenuItem("Save As..")) {}
+    if (ImGui::MenuItem("Save As..", "Ctrl+Shift+S")) {}
 
     ImGui::Separator();
     if (ImGui::BeginMenu("Options"))
