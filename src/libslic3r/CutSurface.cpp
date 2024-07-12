@@ -12,6 +12,14 @@ auto access_pmap(std::optional<T> opt) -> T {
 template <typename Pair>
 auto access_pmap(Pair pair) { return pair.first; }
 
+template <typename T>
+auto access_pmap(std::optional<T> opt) -> T {
+    return opt.value();
+}
+
+template <typename Pair>
+auto access_pmap(Pair pair) { return pair.first; }
+
 /// models_input.obj - Check transormation of model to each others
 /// projection_center.obj - circle representing center of projection with correct distance
 /// {M} .. model index
