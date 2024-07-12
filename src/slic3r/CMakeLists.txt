@@ -391,6 +391,7 @@ set(SLIC3R_GUI_SOURCES
 )
 
 find_package(NanoSVG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
@@ -447,6 +448,8 @@ target_link_libraries(
     NanoSVG::nanosvgrast
     stb_dxt
     fastfloat
+    OpenSSL::SSL
+    OpenSSL::Crypto
 )
 
 if (MSVC)
