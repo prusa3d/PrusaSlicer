@@ -6,9 +6,9 @@ if (MSVC)
                 ${_dstdir}/include/mpf2mpfr.h)
 
     if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
-        list(APPEND _output ${_dstdir}/lib/mpfr-6.lib
+        list(APPEND _output ${_dstdir}/lib/mpfr.lib
                             ${_dstdir}/bin/mpfr-6.dll)
-        set(_mpfrlib winarm64/mpfr-6.lib)
+        set(_mpfrlib winarm64/mpfr.lib)
         set(_mpfrdll winarm64/mpfr-6.dll)
     else()
         list(APPEND _output ${_dstdir}/lib/libmpfr-4.lib
