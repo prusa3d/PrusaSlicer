@@ -1,6 +1,20 @@
 diff -ur build.orig/cmake/lib/webview/CMakeLists.txt build/cmake/lib/webview/CMakeLists.txt
 --- wxWidgets.orig/build/cmake/lib/webview/CMakeLists.txt	2024-06-14 19:02:36.000000000 +0200
 +++ wxWidgets/build/cmake/lib/webview/CMakeLists.txt	2024-07-01 16:21:52.922737200 +0200
+@@ -15,7 +15,11 @@
+     if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+         set(WEBVIEW2_ARCH x86)
+     else()
+-        set(WEBVIEW2_ARCH x64)
++        if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
++            set(WEBVIEW2_ARCH arm64)
++        else()
++            set(WEBVIEW2_ARCH x64)
++        endif()
+     endif()
+ 
+     add_custom_command(TARGET ${target} POST_BUILD
+
 @@ -46,9 +46,9 @@
  elseif(WXMSW)
      if(wxUSE_WEBVIEW_EDGE)
