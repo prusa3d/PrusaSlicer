@@ -85,13 +85,6 @@ int CLI::run(int argc, char **argv)
     // Save the thread ID of the main thread.
     save_main_thread_id();
 
-#ifdef __WXGTK__
-    // On Linux, wxGTK has no support for Wayland, and the app crashes on
-    // startup if gtk3 is used. This env var has to be set explicitly to
-    // instruct the window manager to fall back to X server mode.
-    ::setenv("GDK_BACKEND", "x11", /* replace */ true);
-#endif
-
 	// Switch boost::filesystem to utf8.
     try {
         boost::nowide::nowide_filesystem();
@@ -117,7 +110,7 @@ int CLI::run(int argc, char **argv)
 
     m_extra_config.apply(m_config, true);
     m_extra_config.normalize_fdm();
-    
+
     PrinterTechnology printer_technology = get_printer_technology(m_config);
 
     bool							start_gui			= m_actions.empty() &&
@@ -173,7 +166,7 @@ int CLI::run(int argc, char **argv)
         m_print_config.apply(config);
     }
 
-    bool has_config_from_profiles = m_profiles_sharing.empty() && 
+    bool has_config_from_profiles = m_profiles_sharing.empty() &&
                                     (!m_config.opt_string("print-profile").empty()                              ||
                                      !m_config.option<ConfigOptionStrings>("material-profile")->values.empty()  ||
                                      !m_config.opt_string("printer-profile").empty()                        );
@@ -351,7 +344,7 @@ int CLI::run(int argc, char **argv)
     // Initialize full print configs for both the FFF and SLA technologies.
     FullPrintConfig    fff_print_config;
     SLAFullPrintConfig sla_print_config;
-    
+
     // Synchronize the default parameters and the ones received on the command line.
     if (printer_technology == ptFFF) {
         fff_print_config.apply(m_print_config, true);
@@ -359,17 +352,17 @@ int CLI::run(int argc, char **argv)
     } else {
         assert(printer_technology == ptSLA);
         sla_print_config.output_filename_format.value = "[input_filename_base].sl1";
-        
+
         // The default bed shape should reflect the default display parameters
         // and not the fff defaults.
         double w = sla_print_config.display_width.getFloat();
         double h = sla_print_config.display_height.getFloat();
         sla_print_config.bed_shape.values = { Vec2d(0, 0), Vec2d(w, 0), Vec2d(w, h), Vec2d(0, h) };
-        
+
         sla_print_config.apply(m_print_config, true);
         m_print_config.apply(sla_print_config, true);
     }
-    
+
     {
         std::string validity = m_print_config.validate();
         if (! validity.empty()) {
@@ -377,7 +370,7 @@ int CLI::run(int argc, char **argv)
             return 1;
         }
     }
-    
+
     // Loop through transform options.
     bool user_center_specified = false;
     arr2::ArrangeBed bed = arr2::to_arrange_bed(get_bed_shape(m_print_config));
@@ -406,10 +399,10 @@ int CLI::run(int argc, char **argv)
                     model.objects.begin(), model.objects.end(),
                     [](ModelObject* o){ return o->instances.empty(); }
                 );
-                
+
                 int dups = m_config.opt_int("duplicate");
                 if (!all_objects_have_instances) model.add_default_instances();
-                
+
                 try {
                     if (dups > 1) {
                         // if all input objects have defined position(s) apply duplication to the whole model
@@ -879,7 +872,7 @@ bool CLI::setup(int argc, char **argv)
         set_data_dir(get_default_datadir());
     } else
         set_data_dir(provided_datadir);
-    
+
     //FIXME Validating at this stage most likely does not make sense, as the config is not fully initialized yet.
     if (!validity.empty()) {
         boost::nowide::cerr << "error: " << validity << std::endl;
@@ -1019,8 +1012,8 @@ bool CLI::processed_profiles_sharing()
 
             if (ret.empty())
                 boost::nowide::cerr <<  "Printer_model '" << m_config.opt_string("printer_model") <<
-                                        "' with printer_variant '" << m_config.opt_string("printer_variant") << 
-                                        "' wasn't found among installed printers." << std::endl << 
+                                        "' with printer_variant '" << m_config.opt_string("printer_variant") <<
+                                        "' wasn't found among installed printers." << std::endl <<
                                         "Or the request can be wrong." << std::endl;
         }
 */
@@ -1033,7 +1026,7 @@ bool CLI::processed_profiles_sharing()
 
             if (ret.empty())
                 boost::nowide::cerr <<  "Printer profile '" << m_config.opt_string("printer-profile") <<
-                                        "' wasn't found among installed printers." << std::endl << 
+                                        "' wasn't found among installed printers." << std::endl <<
                                         "Or the request can be wrong." << std::endl;
         }
         else {
@@ -1077,9 +1070,9 @@ bool CLI::processed_profiles_sharing()
 bool CLI::check_and_load_input_profiles(PrinterTechnology& printer_technology)
 {
     Slic3r::DynamicPrintConfig config = {};
-    std::string ret = Slic3r::load_full_print_config(m_config.opt_string("print-profile"), 
+    std::string ret = Slic3r::load_full_print_config(m_config.opt_string("print-profile"),
                                                      m_config.option<ConfigOptionStrings>("material-profile")->values,
-                                                     m_config.opt_string("printer-profile"), 
+                                                     m_config.opt_string("printer-profile"),
                                                      config, printer_technology);
     if (!ret.empty()) {
         boost::nowide::cerr << ret << std::endl;
