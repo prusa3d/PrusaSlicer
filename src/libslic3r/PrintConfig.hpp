@@ -1,3 +1,4 @@
+// clang-format off
 ///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Tomáš Mészáros @tamasmeszaros, Pavel Mikuš @Godrak, David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral, Enrico Turri @enricoturri1966
 ///|/ Copyright (c) 2023 Pedro Lamas @PedroLamas
 ///|/ Copyright (c) 2020 Sergey Kovalev @RandoMan70
@@ -180,7 +181,7 @@ enum TowerSpeeds : int {
     tsLayer8,
     tsLayer11,
     tsLayer14,
-    tsLayer18, 
+    tsLayer18,
     tsLayer22,
     tsLayer24,
 };
@@ -844,7 +845,7 @@ static inline std::string get_extrusion_axis(const GCodeConfig &cfg)
 }
 
 PRINT_CONFIG_CLASS_DERIVED_DEFINE(
-    PrintConfig, 
+    PrintConfig,
     (MachineEnvelopeConfig, GCodeConfig),
 
     ((ConfigOptionBool,               avoid_crossing_curled_overhangs))
@@ -1171,6 +1172,31 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                       material_density))
     ((ConfigOptionFloat,                       exposure_time))
     ((ConfigOptionFloat,                       initial_exposure_time))
+    ((ConfigOptionFloat,                       bot_light_off_time))
+    ((ConfigOptionFloat,                       light_off_time))
+    ((ConfigOptionFloat,                       bot_lift_distance))
+    ((ConfigOptionFloat,                       lift_distance))
+    ((ConfigOptionFloat,                       bot_retract_height))
+    ((ConfigOptionFloat,                       retract_height))
+    ((ConfigOptionFloat,                       bot_lift_speed))
+    ((ConfigOptionFloat,                       lift_speed))
+    ((ConfigOptionFloat,                       sla_bot_retract_speed))
+    ((ConfigOptionFloat,                       sla_retract_speed))
+    ((ConfigOptionPercent,                     bot_light_intensity))
+    ((ConfigOptionPercent,                     light_intensity))
+    ((ConfigOptionFloat,                       rest_time_after_lift))
+    ((ConfigOptionFloat,                       rest_time_after_retract))
+    ((ConfigOptionBool,                        tsmc_bot_enable))
+    ((ConfigOptionBool,                        tsmc_enable))
+    ((ConfigOptionFloat,                       tsmc_bot_lift_distance))
+    ((ConfigOptionFloat,                       tsmc_lift_distance))
+    ((ConfigOptionFloat,                       tsmc_bot_lift_speed))
+    ((ConfigOptionFloat,                       tsmc_lift_speed))
+    ((ConfigOptionFloat,                       tsmc_retract_height))
+    ((ConfigOptionFloat,                       tsmc_rest_time_after_lift))
+    ((ConfigOptionFloat,                       tsmc_bot_retract_height))
+    ((ConfigOptionFloat,                       tsmc_sla_bot_retract_speed))
+    ((ConfigOptionFloat,                       tsmc_sla_retract_speed))
     ((ConfigOptionFloats,                      material_correction))
     ((ConfigOptionFloat,                       material_correction_x))
     ((ConfigOptionFloat,                       material_correction_y))

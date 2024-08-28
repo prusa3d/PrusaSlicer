@@ -125,6 +125,8 @@ set(SLIC3R_SOURCES
     Format/3mf.hpp
     Format/AMF.cpp
     Format/AMF.hpp
+    Format/CTB.hpp
+    Format/CTB.cpp
     Format/OBJ.cpp
     Format/OBJ.hpp
     Format/objparser.cpp
@@ -568,7 +570,7 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC 
+add_library(libslic3r_cgal STATIC
     CutSurface.hpp CutSurface.cpp
     Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
     IntersectionPoints.hpp IntersectionPoints.cpp
@@ -607,6 +609,7 @@ target_include_directories(libslic3r PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} PUBLIC 
 target_include_directories(libslic3r PUBLIC ${EXPAT_INCLUDE_DIRS})
 
 find_package(JPEG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 target_link_libraries(libslic3r
     libnest2d
@@ -619,6 +622,8 @@ target_link_libraries(libslic3r
     libexpat
     glu-libtess
     qhull
+    OpenSSL::SSL
+    OpenSSL::Crypto
     semver
     TBB::tbb
     TBB::tbbmalloc
