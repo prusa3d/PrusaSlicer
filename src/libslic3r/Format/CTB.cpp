@@ -613,22 +613,12 @@ void CtbSLAArchive::export_print(
     unencrypted_format_layer_pointers layer_pointers{};
 
     // This is all zeros- just use the size
-<<<<<<< HEAD
-    int reserved_size = 384;
-    std::string disclaimer_text =
-        "Layout and record format for the ctb and cbddlp file types are the copyrighted "
-        "programs "
-        "or codes of CBD Technology (China) "
-        "Inc..The Customer or User shall not in any manner reproduce, distribute, modify, "
-        "decompile, disassemble, decrypt, extract, "
-=======
     int reserved_size = 384;
     const std::string disclaimer_text =
         "Layout and record format for the ctb and cbddlp file types are the copyrighted programs "
         "or codes of CBD Technology (China) "
         "Inc..The Customer or User shall not in any manner reproduce, distribute, modify, "
         "decompile, disassemble, decrypt, extract, "
->>>>>>> 032b9866b (Move some includes to .cpp file to try and fix some RAM usage on windows build)
         "reverse engineer, lease, assign, or sublicense the said programs or codes.";
 
     auto &cfg = print.full_print_config();

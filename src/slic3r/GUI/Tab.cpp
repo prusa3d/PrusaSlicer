@@ -5829,11 +5829,10 @@ void TabSLAMaterial::build() {
 
     optgroup->append_single_option_line("light_intensity");
     optgroup->append_single_option_line("rest_time_after_lift");
-    optgroup->append_single_option_line("rest_time_after_lift2");
     optgroup->append_single_option_line("rest_time_after_retract");
 
     // TODO: Try to figure out how to make the config options disappear if TSMC disabled
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->on_change = [this](t_config_option_key opt_key, boost::any value) {
         DynamicPrintConfig new_conf = *m_config;
 
         if (opt_key == "tsmc_enable") {

@@ -904,7 +904,7 @@ bool SLAPrint::invalidate_state_by_config_options(
 
     // Cache the plenty of parameters, which influence the final rasterization only,
     // or they are only notes not influencing the rasterization step.
-    static std::unordered_set<std::string> steps_rasterize = {
+    static constexpr StaticSet steps_rasterize = {
          "min_exposure_time"sv,
          "max_exposure_time"sv,
          "exposure_time"sv,
@@ -944,7 +944,6 @@ bool SLAPrint::invalidate_state_by_config_options(
          "bot_light_intensity"sv,
          "light_intensity"sv,
          "rest_time_after_lift"sv,
-         "rest_time_after_lift2"sv,
          "rest_time_after_retract"sv,
          "tsmc_bot_enable"sv,
          "tsmc_enable"sv,
@@ -956,6 +955,7 @@ bool SLAPrint::invalidate_state_by_config_options(
          "tsmc_retract_height"sv,
          "tsmc_sla_retract_speed"sv,
          "tsmc_sla_bot_retract_speed"sv,
+         "tsmc_rest_time_after_lift"sv,
          "display_width"sv,
          "display_height"sv,
          "display_pixels_x"sv,
