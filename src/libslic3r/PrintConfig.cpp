@@ -2784,6 +2784,28 @@ void PrintConfigDef::init_fff_params()
                    "It won't work when printing more than one single object.");
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("spiral_vase_starting_flow_rate", coPercent);
+    def->label = "Spiral starting flow rate";
+    def->tooltip = L("Sets the starting flow rate while transitioning from the last bottom layer to the spiral. "
+                    "Normally the spiral transition scales the flow ratio from 0% to 100% during the first loop "
+                    "which can in some cases lead to under extrusion at the start of the spiral.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->set_default_value(new ConfigOptionPercent(0));
+    def->mode = comAdvanced;
+
+    def = this->add("spiral_vase_finishing_flow_rate", coPercent);
+    def->label = "Spiral finishing flow rate";
+    def->tooltip = L("Sets the finishing flow rate while ending the spiral. "
+                    "Normally the spiral transition scales the flow ratio from 100% to 0% during the last loop "
+                    "which can in some cases lead to under extrusion at the end of the spiral.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->set_default_value(new ConfigOptionPercent(0));
+    def->mode = comAdvanced;
+
     def = this->add("standby_temperature_delta", coInt);
     def->label = L("Temperature variation");
     // TRN PrintSettings : "Ooze prevention" > "Temperature variation"

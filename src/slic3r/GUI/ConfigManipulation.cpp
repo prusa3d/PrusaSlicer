@@ -345,6 +345,9 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("min_feature_size", have_arachne);
     toggle_field("min_bead_width", have_arachne);
     toggle_field("thin_walls", !have_arachne);
+
+    toggle_field("spiral_vase_starting_flow_rate", has_spiral_vase);
+    toggle_field("spiral_vase_finishing_flow_rate", has_spiral_vase);
 }
 
 void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
