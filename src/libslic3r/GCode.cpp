@@ -3354,6 +3354,11 @@ std::string GCodeGenerator::_extrude(
         m_pending_pre_extrusion_gcode.clear();
     }
 
+    if (m_pending_pre_extrusion_lower.has_value()) {
+        gcode += m_writer.get_travel_to_z_gcode(m_pending_pre_extrusion_lower.value(), "Lower back to part.");
+        m_pending_pre_extrusion_lower.reset();
+    }
+
     // adjust acceleration
     if (m_config.default_acceleration.value > 0) {
         double acceleration;
@@ -3837,6 +3842,13 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
         toolchange_gcode_parsed = placeholder_parser_process("toolchange_gcode", toolchange_gcode, extruder_id, &config);
         gcode += toolchange_gcode_parsed;
         check_add_eol(gcode);
+    }
+
+    if (print_z > 0.0) { // ignore lift if this is the first toolchange
+        // Lift the tool right before the change so we don't contaminate colors
+        double lift = EXTRUDER_CONFIG(travel_max_lift);
+        gcode += m_writer.get_travel_to_z_gcode(print_z + lift, "Move up before tool change");
+        m_pending_pre_extrusion_lower = print_z;
     }
 
     // We inform the writer about what is happening, but we may not use the resulting gcode.
