@@ -3320,6 +3320,13 @@ std::string GCodeGenerator::_extrude(
             gcode += this->retract_and_wipe();
             gcode += m_writer.multiple_extruders ? "" : m_label_objects.maybe_change_instance(m_writer);
             gcode += this->m_writer.travel_to_xy(this->point_to_gcode(path.front().point), comment);
+
+            if (!m_pending_pre_extrusion_gcode.empty()) {
+                // There is G-Code that is due to be inserted before an extrusion starts. Insert it before lowering.
+                gcode += m_pending_pre_extrusion_gcode;
+                m_pending_pre_extrusion_gcode.clear();
+            }
+
             gcode += this->m_writer.get_travel_to_z_gcode(z, comment);
         } else if ( this->last_position != path.front().point) {
             std::string comment = "move to first ";
@@ -3352,11 +3359,6 @@ std::string GCodeGenerator::_extrude(
         // There is G-Code that is due to be inserted before an extrusion starts. Insert it.
         gcode += m_pending_pre_extrusion_gcode;
         m_pending_pre_extrusion_gcode.clear();
-    }
-
-    if (m_pending_pre_extrusion_lower.has_value()) {
-        gcode += m_writer.get_travel_to_z_gcode(m_pending_pre_extrusion_lower.value(), "Lower back to part.");
-        m_pending_pre_extrusion_lower.reset();
     }
 
     // adjust acceleration
@@ -3840,23 +3842,24 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
         config.set_key_value("toolchange_z",      new ConfigOptionFloat(print_z));
         config.set_key_value("max_layer_z",       new ConfigOptionFloat(m_max_layer_z));
         toolchange_gcode_parsed = placeholder_parser_process("toolchange_gcode", toolchange_gcode, extruder_id, &config);
-        gcode += toolchange_gcode_parsed;
-        check_add_eol(gcode);
+        check_add_eol(toolchange_gcode_parsed);
     }
 
     if (print_z > 0.0) { // ignore lift if this is the first toolchange
         // Lift the tool right before the change so we don't contaminate colors
-        double lift = EXTRUDER_CONFIG(travel_max_lift);
-        gcode += m_writer.get_travel_to_z_gcode(print_z + lift, "Move up before tool change");
-        m_pending_pre_extrusion_lower = print_z;
+        gcode += m_writer.get_travel_to_z_gcode(print_z + EXTRUDER_CONFIG(travel_max_lift), "Move up before tool change");
     }
+
+    // add the remaining gcode before the next extrusion so the toolchange happens over the correct area
+    std::string pre_extrusion_gcode;
 
     // We inform the writer about what is happening, but we may not use the resulting gcode.
     std::string toolchange_command = m_writer.toolchange(extruder_id);
-    if (! custom_gcode_changes_tool(toolchange_gcode_parsed, m_writer.toolchange_prefix(), extruder_id))
-        gcode += toolchange_command;
-    else {
+    if (!custom_gcode_changes_tool(toolchange_gcode_parsed, m_writer.toolchange_prefix(), extruder_id)) {
+        pre_extrusion_gcode += toolchange_command;
+    } else {
         // user provided his own toolchange gcode, no need to do anything
+        pre_extrusion_gcode += toolchange_gcode_parsed;
     }
 
     // Set the temperature if the wipe tower didn't (not needed for non-single extruder MM)
@@ -3864,7 +3867,7 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
         int temp = (m_layer_index <= 0 ? m_config.first_layer_temperature.get_at(extruder_id) :
                                          m_config.temperature.get_at(extruder_id));
 
-        gcode += m_writer.set_temperature(temp, false);
+        pre_extrusion_gcode += m_writer.set_temperature(temp, false);
     }
 
     this->placeholder_parser().set("current_extruder", extruder_id);
@@ -3878,15 +3881,18 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
         config.set_key_value("layer_z",   new ConfigOptionFloat(this->writer().get_position().z() - m_config.z_offset.value));
         config.set_key_value("max_layer_z", new ConfigOptionFloat(m_max_layer_z));
         config.set_key_value("filament_extruder_id", new ConfigOptionInt(int(extruder_id)));
-        gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id, &config);
-        check_add_eol(gcode);
+        pre_extrusion_gcode += this->placeholder_parser_process("start_filament_gcode", start_filament_gcode, extruder_id, &config);
+        check_add_eol(pre_extrusion_gcode);
     }
     // Set the new extruder to the operating temperature.
     if (m_ooze_prevention.enable)
-        gcode += m_ooze_prevention.post_toolchange(*this);
+        pre_extrusion_gcode += m_ooze_prevention.post_toolchange(*this);
 
     // The position is now known after the tool change.
     this->last_position = std::nullopt;
+
+    assert(m_pending_pre_extrusion_gcode == NULL);
+    m_pending_pre_extrusion_gcode = pre_extrusion_gcode;
 
     return gcode;
 }

@@ -453,8 +453,6 @@ private:
     bool                                m_second_layer_things_done;
     // G-code that is due to be written before the next extrusion
     std::string                         m_pending_pre_extrusion_gcode;
-    // Tool should be lowered before the next extrusion
-    std::optional<float>                m_pending_pre_extrusion_lower;
     // Pointer to currently exporting PrintObject and instance index.
     GCode::PrintObjectInstance          m_current_instance;
 
