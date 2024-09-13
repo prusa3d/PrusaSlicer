@@ -154,25 +154,6 @@ bool extract_local_archive_repository( ArchiveRepository::RepositoryManifest& ma
 	return true;
 }
 
-void deserialize_string(const std::string& opt, std::vector<std::string>& result)
-{
-	std::string val;
-	for (size_t i = 0; i < opt.length(); i++) {
-		if (std::isspace(opt[i])) {
-			continue;
-		}
-		if (opt[i] != ';') {
-			val += opt[i];
-		}
-		else {
-			result.emplace_back(std::move(val));
-		}
-	}
-	if (!val.empty()) {
-		result.emplace_back(std::move(val));
-	}
-}
-
 std::string escape_string(const std::string& unescaped)
 {
 	std::string ret_val;
