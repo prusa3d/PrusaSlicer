@@ -80,8 +80,8 @@ private:
     const std::vector<std::vector<WipeTower::ToolChangeResult>> &m_tool_changes;
     const WipeTower::ToolChangeResult                           &m_final_purge;
     // Current layer index.
-    int                                                          m_layer_idx;
-    int                                                          m_tool_change_idx;
+    size_t                                                      m_layer_idx;
+    size_t                                                      m_tool_change_idx;
     double                                                       m_last_wipe_tower_print_z;
 };
 

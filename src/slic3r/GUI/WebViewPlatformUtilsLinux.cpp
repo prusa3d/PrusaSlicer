@@ -59,9 +59,7 @@ void remove_webview_credentials(wxWebView* web_view)
 namespace {
 void delete_cookie_callback (GObject* source_object, GAsyncResult* result, void* user_data)
 {
-    WebKitCookieManager *cookie_manager = WEBKIT_COOKIE_MANAGER(source_object);
     GError* err = nullptr;
-    gboolean b = webkit_cookie_manager_delete_cookie_finish(cookie_manager, result, &err);
     if (err) {
         BOOST_LOG_TRIVIAL(error) << "Error deleting cookies: " << err->message;
         g_error_free(err);
