@@ -12,7 +12,7 @@
 #include "slic3r/GUI/Jobs/EmbossJob.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
-#include "libslic3r/Point.hpp"      
+#include "libslic3r/Point.hpp"
 #include "libslic3r/SVG.hpp"      // debug store
 #include "libslic3r/Geometry.hpp" // covex hull 2d
 #include "libslic3r/Timer.hpp" // covex hull 2d
@@ -27,7 +27,7 @@
 
 #include <wx/display.h> // detection of change DPI
 #include <boost/log/trivial.hpp>
-
+#include <boost/nowide/fstream.hpp> // boost::nowide::ofstream stream
 #include <GL/glew.h>
 #include <chrono> // measure enumeration of fonts
 #include <sstream> // save for svg
