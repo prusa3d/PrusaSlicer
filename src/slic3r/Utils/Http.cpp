@@ -24,7 +24,7 @@
 #ifdef OPENSSL_CERT_OVERRIDE
 #include <openssl/x509.h>
 #endif
-
+#include <boost/nowide/fstream.hpp>  // boost::nowide::ifstream file
 #include <libslic3r/libslic3r.h>
 #include <libslic3r/Utils.hpp>
 #include <slic3r/GUI/I18N.hpp>
