@@ -27,6 +27,7 @@
 
 #include <wx/display.h> // detection of change DPI
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/fstream.hpp>
 
 #include <GL/glew.h>
 #include <chrono> // measure enumeration of fonts

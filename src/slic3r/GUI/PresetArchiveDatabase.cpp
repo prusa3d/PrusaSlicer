@@ -16,6 +16,7 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/nowide/fstream.hpp>
 #include <cctype>
 #include <curl/curl.h>
 #include <iostream>
