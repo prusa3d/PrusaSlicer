@@ -1472,7 +1472,7 @@ void PrinterPickWebViewDialog::request_compatible_printers_SLA()
 {
     const Preset& selected_printer = wxGetApp().preset_bundle->printers.get_selected_preset();
     std::string printer_model_serialized = selected_printer.config.option("printer_model")->serialize();
-    
+
     std::string vendor_repo_prefix;
     if (selected_printer.vendor) {
         vendor_repo_prefix = selected_printer.vendor->repo_prefix;
@@ -1531,9 +1531,9 @@ void LoginWebViewDialog::on_navigation_request(wxWebViewEvent &evt)
         evt.Veto();
         m_ret_val = into_u8(url);
         EndModal(wxID_OK);
-    } else if (url.Find(L"accounts.google.com") != wxString::npos
-        || url.Find(L"appleid.apple.com") != wxString::npos
-        || url.Find(L"facebook.com") != wxString::npos) {         
+    } else if ((size_t)url.Find(L"accounts.google.com") != wxString::npos
+        || (size_t)url.Find(L"appleid.apple.com") != wxString::npos
+        || (size_t)url.Find(L"facebook.com") != wxString::npos) {
         auto& sc = Utils::ServiceConfig::instance();
         if (!m_evt_sent && !url.starts_with(GUI::from_u8(sc.account_url()))) {
             wxCommandEvent* evt = new wxCommandEvent(EVT_OPEN_EXTERNAL_LOGIN);
