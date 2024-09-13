@@ -294,7 +294,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     const bool has_organic_supports = support_material_style == smsOrganic && 
                                      (config->opt_bool("support_material") || 
                                       config->opt_int("support_material_enforce_layers") > 0);
-    for (const std::string& key : { "support_tree_angle", "support_tree_angle_slow", "support_tree_branch_diameter",
+    for (const std::string key : { "support_tree_angle", "support_tree_angle_slow", "support_tree_branch_diameter",
                                     "support_tree_branch_diameter_angle", "support_tree_branch_diameter_double_wall", 
                                     "support_tree_tip_diameter", "support_tree_branch_distance", "support_tree_top_rate" })
         toggle_field(key, has_organic_supports);
