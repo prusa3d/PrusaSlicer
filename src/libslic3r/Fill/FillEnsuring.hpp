@@ -7,8 +7,11 @@
 
 #include "FillBase.hpp"
 #include "FillRectilinear.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
+class PrintRegionConfig;
+class Surface;
 
 ThickPolylines make_fill_polylines(
     const Fill *fill, const Surface *surface, const FillParams &params, bool stop_vibrations, bool fill_gaps, bool connect_extrusions);

@@ -1,15 +1,31 @@
 #ifndef slic3r_LayerRegion_hpp_
 #define slic3r_LayerRegion_hpp_
 
+#include <assert.h>
+#include <stdint.h>
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+
 #include "BoundingBox.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "SurfaceCollection.hpp"
 #include "libslic3r/Algorithm/RegionExpansion.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/Surface.hpp"
 
 
 namespace Slic3r {
 
 class Layer;
+class PrintObject;
+
 using LayerPtrs = std::vector<Layer*>;
 class PrintRegion;
 

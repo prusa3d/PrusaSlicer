@@ -6,18 +6,33 @@
 #define NFP_CPP
 
 #include "NFP.hpp"
-#include "CircularEdgeIterator.hpp"
 
+#include "CircularEdgeIterator.hpp"
 #include "NFPConcave_Tesselate.hpp"
+#include "libslic3r/Arrange/Core/Beds.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/libslic3r.h"
 
 #if !defined(_MSC_VER) && defined(__SIZEOF_INT128__) && !defined(__APPLE__)
 namespace Slic3r { using LargeInt = __int128; }
 #else
 #include <boost/multiprecision/integer.hpp>
+
 namespace Slic3r { using LargeInt = boost::multiprecision::int128_t; }
 #endif
 
 #include <boost/rational.hpp>
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <utility>
+#include <vector>
+#include <cassert>
 
 namespace Slic3r {
 

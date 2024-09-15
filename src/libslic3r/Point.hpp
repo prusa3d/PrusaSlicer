@@ -12,26 +12,34 @@
 #ifndef slic3r_Point_hpp_
 #define slic3r_Point_hpp_
 
-#include "libslic3r.h"
+#include <oneapi/tbb/scalable_allocator.h>
+#include <assert.h>
 #include <cstddef>
 #include <vector>
 #include <cmath>
 #include <string>
 #include <sstream>
 #include <unordered_map>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <optional>
+#include <type_traits>
+#include <utility>
+#include <cassert>
 
-#include <oneapi/tbb/scalable_allocator.h>
-
-
-#include <Eigen/Geometry> 
-
+#include "libslic3r.h"
 #include "LocalesUtils.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 class BoundingBox;
 class BoundingBoxf;
 class Point;
+
 using Vector = Point;
 
 // Base template for eigen derived vectors
@@ -610,6 +618,7 @@ static bool apply(T &val, const MinMax<T> &limit)
 // start Boost
 #include <boost/version.hpp>
 #include <boost/polygon/polygon.hpp>
+
 namespace boost { namespace polygon {
     template <>
     struct geometry_concept<Slic3r::Point> { using type = point_concept; };
@@ -637,6 +646,7 @@ namespace boost { namespace polygon {
 // end Boost
 
 #include <cereal/cereal.hpp>
+
 // Serialization through the Cereal library
 namespace cereal {
 //    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2crd &v) { archive(v.x(), v.y()); }

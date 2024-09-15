@@ -4,6 +4,10 @@
 ///|/
 #include "ArrangeSettingsDb_AppCfg.hpp"
 
+#include "LocalesUtils.hpp"
+#include "libslic3r/AppConfig.hpp"
+#include "libslic3r/Arrange/ArrangeSettingsView.hpp"
+
 namespace Slic3r {
 
 ArrangeSettingsDb_AppCfg::ArrangeSettingsDb_AppCfg(AppConfig *appcfg) : m_appcfg{appcfg}

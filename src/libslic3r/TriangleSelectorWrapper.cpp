@@ -3,7 +3,16 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "TriangleSelectorWrapper.hpp"
+
+#include <igl/Hit.h>
 #include <memory>
+#include <utility>
+#include <vector>
+
+#include "admesh/stl.h"
+#include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/TriangleSelector.hpp"
 
 namespace Slic3r {
 

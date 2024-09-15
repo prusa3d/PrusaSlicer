@@ -7,15 +7,19 @@
 #ifndef slic3r_Slicing_hpp_
 #define slic3r_Slicing_hpp_
 
+#include <assert.h>
 #include <cstring>
 #include <map>
 #include <set>
 #include <type_traits>
 #include <vector>
+#include <utility>
+#include <cassert>
 
 #include "Point.hpp"
 #include "libslic3r.h"
 #include "Utils.hpp"
+#include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r
 {

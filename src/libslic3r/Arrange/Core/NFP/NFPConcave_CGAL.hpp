@@ -7,6 +7,8 @@
 
 #include <libslic3r/ExPolygon.hpp>
 
+#include "libslic3r/Polygon.hpp"
+
 namespace Slic3r {
 
 Polygons convex_decomposition_cgal(const Polygon &expoly);

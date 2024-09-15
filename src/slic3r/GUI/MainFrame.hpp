@@ -92,9 +92,6 @@ class MainFrame : public DPIFrame
     wxMenuBar*  m_menubar{ nullptr };
     TopBarMenus m_bar_menus;
 
-#if 0
-    wxMenuItem* m_menu_item_repeat { nullptr }; // doesn't used now
-#endif
     wxMenuItem* m_menu_item_reslice_now { nullptr };
     wxSizer*    m_main_sizer{ nullptr };
 

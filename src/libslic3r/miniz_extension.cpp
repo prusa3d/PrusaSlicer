@@ -2,12 +2,17 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <exception>
+#include <cstdio>
 
 #include "miniz_extension.hpp"
+#include "miniz.h"
 
 #if defined(_MSC_VER) || defined(__MINGW64__)
 #include "boost/nowide/cstdio.hpp"
+#endif
+
+#if defined(__linux__)
+#include <features.h>
 #endif
 
 #include "libslic3r/I18N.hpp"

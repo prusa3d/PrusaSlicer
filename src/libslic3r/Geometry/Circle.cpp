@@ -4,11 +4,14 @@
 ///|/
 #include "Circle.hpp"
 
-#include "../Polygon.hpp"
-
+#include <boost/log/trivial.hpp>
 #include <numeric>
 #include <random>
-#include <boost/log/trivial.hpp>
+#include <algorithm>
+#include <limits>
+#include <vector>
+
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r { namespace Geometry {
 

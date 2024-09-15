@@ -6,12 +6,15 @@
 #ifndef slic3r_SupportMaterial_hpp_
 #define slic3r_SupportMaterial_hpp_
 
+#include <vector>
+
 #include "../Flow.hpp"
 #include "../PrintConfig.hpp"
 #include "../Slicing.hpp"
-
 #include "SupportLayer.hpp"
 #include "SupportParameters.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

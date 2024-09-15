@@ -8,14 +8,22 @@
 // to decide whether to pause the print after the priming towers are extruded
 // to let the operator remove them from the print bed.
 
+#include <algorithm>
+#include <vector>
+#include <cstddef>
+
 #include "../BoundingBox.hpp"
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
 #include "../Layer.hpp"
 #include "../Print.hpp"
-
 #include "PrintExtents.hpp"
 #include "WipeTower.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
 

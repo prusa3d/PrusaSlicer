@@ -242,7 +242,8 @@ void UserAccountCommunication::set_username(const std::string& username)
 {
     m_username = username;
     {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
+        // We don't need mutex lock here, as credentials are guarded by own mutex in m_session
+        //std::lock_guard<std::mutex> lock(m_session_mutex);
         if (is_secret_store_ok()) {
             std::string tokens;
             if (m_remember_session) {
@@ -292,7 +293,8 @@ void UserAccountCommunication::set_remember_session(bool b)
 std::string UserAccountCommunication::get_access_token()
 {
     {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
+        // We don't need mutex lock here, as credentials are guarded by own mutex in m_session
+        //std::lock_guard<std::mutex> lock(m_session_mutex);
         return m_session->get_access_token();
     }
 }
@@ -300,7 +302,8 @@ std::string UserAccountCommunication::get_access_token()
 std::string UserAccountCommunication::get_shared_session_key()
 {
     {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
+        // We don't need mutex lock here, as credentials are guarded by own mutex in m_session
+        //std::lock_guard<std::mutex> lock(m_session_mutex);
         return m_session->get_shared_session_key();
     }
 }
@@ -321,8 +324,11 @@ void UserAccountCommunication::on_uuid_map_success()
     }
 }
 
-wxString UserAccountCommunication::get_login_redirect_url() {
-    const std::string AUTH_HOST = "https://account.prusa3d.com";
+// Generates and stores Code Verifier - second call deletes previous one.
+wxString UserAccountCommunication::generate_login_redirect_url()
+{
+    auto& sc = Utils::ServiceConfig::instance();
+    const std::string AUTH_HOST = sc.account_url();
     const std::string CLIENT_ID = client_id();
     const std::string REDIRECT_URI = "prusaslicer://login";
     CodeChalengeGenerator ccg;
@@ -334,13 +340,29 @@ wxString UserAccountCommunication::get_login_redirect_url() {
     BOOST_LOG_TRIVIAL(info) << "code challenge: " << code_challenge;
 
     wxString url = GUI::format_wxstr(L"%1%/o/authorize/?embed=1&client_id=%2%&response_type=code&code_challenge=%3%&code_challenge_method=S256&scope=basic_info&redirect_uri=%4%&language=%5%", AUTH_HOST, CLIENT_ID, code_challenge, REDIRECT_URI, language);
+    return url;
+}
+wxString UserAccountCommunication::get_login_redirect_url(const std::string& service/* = std::string()*/) const
+{
+    auto& sc = Utils::ServiceConfig::instance();
+    const std::string AUTH_HOST = sc.account_url();
+    const std::string CLIENT_ID = client_id();
+    const std::string REDIRECT_URI = "prusaslicer://login";
+    CodeChalengeGenerator ccg;
+    std::string code_challenge = ccg.generate_chalenge(m_code_verifier);
+    wxString language = GUI::wxGetApp().current_language_code();
+    language = language.SubString(0, 1);
 
+    std::string params = GUI::format("embed=1&client_id=%1%&response_type=code&code_challenge=%2%&code_challenge_method=S256&scope=basic_info&redirect_uri=%3%&language=%4%", CLIENT_ID, code_challenge, REDIRECT_URI, language);
+    params = Http::url_encode(params);
+    wxString url = GUI::format_wxstr(L"%1%/login/%2%?next=/o/authorize/?%3%", AUTH_HOST, service, params);
     return url;
 }
 void UserAccountCommunication::login_redirect()
 {
-    wxString url = get_login_redirect_url();
-    wxQueueEvent(m_evt_handler,new OpenPrusaAuthEvent(GUI::EVT_OPEN_PRUSAAUTH, std::move(url)));
+    wxString url1 = generate_login_redirect_url();
+    wxString url2 = url1 + L"&choose_account=1";
+    wxQueueEvent(m_evt_handler,new OpenPrusaAuthEvent(GUI::EVT_OPEN_PRUSAAUTH, {std::move(url1), std::move(url2)}));
 }
 
 bool UserAccountCommunication::is_logged()
@@ -456,6 +478,10 @@ void UserAccountCommunication::enqueue_refresh()
             BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
             return;
         }
+        if (m_session->is_enqueued(UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN)) {
+            BOOST_LOG_TRIVIAL(debug) << "User Account: Token refresh already enqueued, skipping...";
+            return;
+        }
         m_session->enqueue_refresh({});
     }
     wakeup_session_thread();
@@ -487,11 +513,24 @@ void UserAccountCommunication::init_session_thread()
     });
 }
 
-void UserAccountCommunication::on_activate_window(bool active)
+void UserAccountCommunication::on_activate_app(bool active)
 {
     {
         std::lock_guard<std::mutex> lck(m_thread_stop_mutex);
         m_window_is_active = active;
+    }
+    auto now = std::time(nullptr);
+    BOOST_LOG_TRIVIAL(info) << "UserAccountCommunication activate: active " << active;
+#ifndef _NDEBUG
+    // constexpr auto refresh_threshold = 110 * 60;
+    constexpr auto refresh_threshold = 60;
+#else
+    constexpr auto refresh_threshold = 60;
+#endif
+    if (active && m_next_token_refresh_at > 0 && m_next_token_refresh_at - now < refresh_threshold) {
+        BOOST_LOG_TRIVIAL(info) << "Enqueue access token refresh on activation";
+        m_token_timer->Stop();
+        enqueue_refresh();
     }
 }
 
@@ -508,12 +547,16 @@ void UserAccountCommunication::set_refresh_time(int seconds)
 {
     assert(m_token_timer);
     m_token_timer->Stop();
-    int miliseconds = std::max(seconds * 1000 - 66666, 60000);
-    m_token_timer->StartOnce(miliseconds);
+    const auto prior_expiration_secs = 5 * 60;
+    int milliseconds = std::max((seconds - prior_expiration_secs) * 1000, 60000);
+    m_next_token_refresh_at = std::time(nullptr) + milliseconds / 1000;
+    m_token_timer->StartOnce(milliseconds);
 }
+
 
 void UserAccountCommunication::on_token_timer(wxTimerEvent& evt)
 {
+    BOOST_LOG_TRIVIAL(info) << "UserAccountCommunication: Token refresh timer fired";
     enqueue_refresh();
 }
 void UserAccountCommunication::on_polling_timer(wxTimerEvent& evt)

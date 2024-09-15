@@ -2,12 +2,18 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <algorithm>
+#include <cmath>
+#include <cassert>
+#include <cstdlib>
+
 #include "../ClipperUtils.hpp"
 #include "../ExPolygon.hpp"
 #include "../ShortestPath.hpp"
-#include "../Surface.hpp"
-
 #include "FillLine.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r {
 
@@ -80,7 +86,7 @@ void FillLine::_fill_surface_single(
     size_t n_polylines_out_old = polylines_out.size();
 
     // connect lines
-    if (! params.dont_connect() && ! polylines.empty()) { // prevent calling leftmost_point() on empty collections
+    if (! polylines.empty()) { // prevent calling leftmost_point() on empty collections
         // offset the expolygon by max(min_spacing/2, extra)
         ExPolygon expolygon_off;
         {

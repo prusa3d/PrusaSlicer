@@ -1,6 +1,11 @@
 #ifndef libslic3r_ModelVisibility_hpp_
 #define libslic3r_ModelVisibility_hpp_
 
+#include <stddef.h>
+#include <functional>
+#include <vector>
+#include <cstddef>
+
 #include "libslic3r/KDTreeIndirect.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Model.hpp"

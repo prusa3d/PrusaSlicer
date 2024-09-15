@@ -10,6 +10,7 @@
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <iostream>
 
 #include "format.hpp"
@@ -176,26 +177,21 @@ void FileGet::priv::get_perform()
 	}
 	
 	boost::filesystem::path dest_path = m_dest_folder / m_filename;
-
-	wxString temp_path_wstring(m_tmp_path.wstring());
-	
-	//std::cout << "dest_path: " << dest_path.string() << std::endl;
-	//std::cout << "m_tmp_path: " << m_tmp_path.string() << std::endl;
 	
 	BOOST_LOG_TRIVIAL(info) << GUI::format("Starting download from %1% to %2%. Temp path is %3%",m_url, dest_path, m_tmp_path);
 
 	FILE* file;
 	// open file for writting
 	if (m_written == 0)
-		file = fopen(temp_path_wstring.c_str(), "wb");
+		file = boost::nowide::fopen(m_tmp_path.string().c_str(), "wb");
 	else 
-		file = fopen(temp_path_wstring.c_str(), "ab");
+		file = boost::nowide::fopen(m_tmp_path.string().c_str(), "ab");
 
 	//assert(file != NULL);
 	if (file == NULL) {
 		wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
 		// TRN %1% = file path
-		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%"), temp_path_wstring));
+		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%"), m_tmp_path.string()));
 		evt->SetInt(m_id);
 		m_evt_handler->QueueEvent(evt);
 		return;

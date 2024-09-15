@@ -3,7 +3,12 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "EdgeCache.hpp"
+
+#include <iterator>
+
 #include "CircularEdgeIterator.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Line.hpp"
 
 namespace Slic3r { namespace arr2 {
 

@@ -7,15 +7,23 @@
 #ifndef slic3r_PerimeterGenerator_hpp_
 #define slic3r_PerimeterGenerator_hpp_
 
-#include "libslic3r.h"
 #include <vector>
+
+#include "libslic3r.h"
 #include "ExtrusionEntityCollection.hpp"
 #include "Flow.hpp"
 #include "Polygon.hpp"
 #include "PrintConfig.hpp"
 #include "SurfaceCollection.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
+class ExtrusionEntityCollection;
+class Surface;
+struct ThickPolyline;
 
 namespace PerimeterGenerator
 {

@@ -4,7 +4,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "SLAPrint.hpp"
-#include "SLAPrintSteps.hpp"
+#include "SLAPrintSteps.hpp" // IWYU pragma: keep
 #include "CSGMesh/CSGMeshCopy.hpp"
 #include "CSGMesh/PerformCSGMeshBooleans.hpp"
 #include "format.hpp"

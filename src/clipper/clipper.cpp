@@ -48,7 +48,7 @@
 #include <ostream>
 #include <functional>
 #include <assert.h>
-#include <libslic3r/Int128.hpp>
+#include <Int128.hpp>
 
 #ifdef CLIPPERLIB_NAMESPACE_PREFIX
 namespace CLIPPERLIB_NAMESPACE_PREFIX {

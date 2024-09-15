@@ -2,22 +2,29 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <limits>
-
 #include <libslic3r/SLA/Rotfinder.hpp>
-
 #include <libslic3r/Execution/ExecutionTBB.hpp>
-#include <libslic3r/Execution/ExecutionSeq.hpp>
-
 #include <libslic3r/Optimize/BruteforceOptimizer.hpp>
-#include <libslic3r/Optimize/NLoptOptimizer.hpp>
-
-#include "libslic3r/SLAPrint.hpp"
-#include "libslic3r/PrintConfig.hpp"
-
 #include <libslic3r/Geometry.hpp>
-
+#include <limits>
 #include <thread>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <iterator>
+#include <vector>
+#include <cinttypes>
+#include <cstdlib>
+
+#include "libslic3r/PrintConfig.hpp"
+#include "admesh/stl.h"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Execution/Execution.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/Optimize/Optimizer.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r { namespace sla {
 

@@ -5,13 +5,30 @@
 #ifndef ARR2_SCENE_HPP
 #define ARR2_SCENE_HPP
 
+#include <stddef.h>
+#include <boost/variant.hpp>
+#include <boost/variant/variant.hpp>
 #include <any>
 #include <string_view>
+#include <algorithm>
+#include <functional>
+#include <memory>
+#include <set>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <cstddef>
 
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/AnyPtr.hpp"
 #include "libslic3r/Arrange/ArrangeSettingsView.hpp"
 #include "libslic3r/Arrange/SegmentedRectangleBed.hpp"
+#include "libslic3r/Arrange/Core/Beds.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r { namespace arr2 {
 

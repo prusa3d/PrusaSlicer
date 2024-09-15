@@ -455,6 +455,12 @@ void OptionsSearcher::update_dialog_position()
 
 void OptionsSearcher::check_and_hide_dialog()
 {
+#ifdef __linux__
+    // Temporary linux specific workaround:
+    // has_focus(search_dialog) always returns false
+    // That's why search dialog will be hidden whole the time
+    return;
+#endif
     if (search_dialog && search_dialog->IsShown() && !has_focus(search_dialog))
         show_dialog(false);
 }
@@ -468,7 +474,7 @@ void OptionsSearcher::set_focus_to_parent()
 void OptionsSearcher::show_dialog(bool show /*= true*/)
 {
     if (search_dialog && !show) {
-        search_dialog->EndModal(wxID_CLOSE);
+        search_dialog->Hide();
         return;
     }
 
@@ -522,9 +528,13 @@ void OptionsSearcher::process_key_down_from_input(wxKeyEvent& e)
 {
     int key = e.GetKeyCode();
     if (key == WXK_ESCAPE)
-        search_dialog->EndModal(wxID_CLOSE);
-    else if (search_dialog && (key == WXK_UP || key == WXK_DOWN || key == WXK_NUMPAD_ENTER || key == WXK_RETURN))
+        search_dialog->Hide();
+    else if (search_dialog && (key == WXK_UP || key == WXK_DOWN || key == WXK_NUMPAD_ENTER || key == WXK_RETURN)) {
         search_dialog->KeyDown(e);
+#ifdef __linux__
+        search_dialog->SetFocus();
+#endif // __linux__
+    }
 }
 
 void OptionsSearcher::set_search_input(TextInput* input_ctrl)
@@ -667,7 +677,7 @@ void SearchDialog::ProcessSelection(wxDataViewItem selection)
 {
     if (!selection.IsOk())
         return;
-    this->EndModal(wxID_CLOSE);
+    this->Hide();
 
     // If call GUI::wxGetApp().sidebar.jump_to_option() directly from here,
     // then mainframe will not have focus and found option will not be "active" (have cursor) as a result

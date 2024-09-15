@@ -3,19 +3,37 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "SL1_SVG.hpp"
-#include "SLA/RasterBase.hpp"
-#include "libslic3r/LocalesUtils.hpp"
+
+#include <LocalesUtils.hpp>
+
+#include "libslic3r/SLA/RasterBase.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Format/ZipperArchiveImport.hpp"
+#include "libslic3r/Format/SL1.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Zipper.hpp"
+#include "libslic3r/libslic3r.h"
 
 #define NANOSVG_IMPLEMENTATION
-#include "nanosvg/nanosvg.h"
-
-#include <limits>
 #include <cstdint>
 #include <algorithm>
 #include <string_view>
+#include <array>
+#include <cmath>
+#include <iterator>
+#include <type_traits>
+#include <utility>
+#include <cstddef>
+
+#include "nanosvg/nanosvg.h"
+
+namespace Slic3r {
+class SLAPrint;
+}  // namespace Slic3r
+
 using namespace std::literals;
 
 namespace Slic3r {

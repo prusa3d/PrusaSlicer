@@ -5,13 +5,16 @@
 #ifndef SLA_SPATINDEX_HPP
 #define SLA_SPATINDEX_HPP
 
+#include <libslic3r/BoundingBox.hpp>
+#include <stddef.h>
 #include <memory>
 #include <utility>
 #include <vector>
-
 #include <Eigen/Geometry>
+#include <functional>
+#include <cstddef>
 
-#include <libslic3r/BoundingBox.hpp>
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 namespace sla {

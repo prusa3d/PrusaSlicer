@@ -8,12 +8,16 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <cmath>
+#include <limits>
+#include <cstdlib>
+#include <cstring>
+
 #include "Geometry.hpp"
 #include "Line.hpp"
-#include "Polyline.hpp"
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

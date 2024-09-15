@@ -5,14 +5,16 @@
 #ifndef GUI_THREAD_HPP
 #define GUI_THREAD_HPP
 
+#include <boost/thread.hpp>
+#include <tbb/task_scheduler_observer.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <oneapi/tbb/task_scheduler_observer.h>
+#include <boost/thread/thread.hpp>
 #include <utility>
 #include <string>
 #include <thread>
 #include <random>
-#include <boost/thread.hpp>
-
-#include <tbb/task_scheduler_observer.h>
-#include <tbb/enumerable_thread_specific.h>
+#include <optional>
 
 namespace Slic3r {
 

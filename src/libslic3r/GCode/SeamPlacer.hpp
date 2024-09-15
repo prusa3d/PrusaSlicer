@@ -37,7 +37,6 @@ struct Params
     double concave_visibility_modifier{};
     Perimeters::PerimeterParams perimeter;
     Slic3r::ModelInfo::Visibility::Params visibility;
-    SeamPosition seam_preference;
     bool staggered_inner_seams;
 };
 

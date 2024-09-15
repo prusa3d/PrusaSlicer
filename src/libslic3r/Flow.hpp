@@ -10,6 +10,10 @@
 #ifndef slic3r_Flow_hpp_
 #define slic3r_Flow_hpp_
 
+#include <assert.h>
+#include <string>
+#include <cassert>
+
 #include "libslic3r.h"
 #include "Config.hpp"
 #include "Exception.hpp"
@@ -18,6 +22,8 @@
 namespace Slic3r {
 
 class PrintObject;
+class ConfigOptionFloatOrPercent;
+class ConfigOptionResolver;
 
 // Extra spacing of bridge threads, in mm.
 #define BRIDGE_EXTRA_SPACING 0.05

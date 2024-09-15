@@ -23,6 +23,9 @@
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
 
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif
 #include "imgui/imgui_internal.h"
 #include "slic3r/GUI/MsgDialog.hpp"
 

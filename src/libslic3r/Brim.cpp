@@ -3,26 +3,42 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "clipper/clipper_z.hpp"
+#include <boost/thread/lock_guard.hpp>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <algorithm>
+#include <numeric>
+#include <unordered_set>
+#include <mutex>
+#include <cmath>
+#include <functional>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstddef>
 
+#include "clipper/clipper_z.hpp"
 #include "ClipperUtils.hpp"
 #include "EdgeGrid.hpp"
 #include "Layer.hpp"
 #include "Print.hpp"
 #include "ShortestPath.hpp"
 #include "libslic3r.h"
-
-#include <algorithm>
-#include <numeric>
-#include <unordered_set>
-#include <mutex>
-
-#include <tbb/parallel_for.h>
-#include <boost/thread/lock_guard.hpp>
-
-#ifndef NDEBUG
-    // #define BRIM_DEBUG_TO_SVG
-#endif
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/PrintBase.hpp"
+#include "libslic3r/PrintConfig.hpp"
 
 #if defined(BRIM_DEBUG_TO_SVG)
     #include "SVG.hpp"

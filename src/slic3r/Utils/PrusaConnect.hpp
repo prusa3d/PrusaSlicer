@@ -2,6 +2,7 @@
 #define slic3r_PrusaConnect_hpp_
 
 #include "PrintHost.hpp"
+#include "ServiceConfig.hpp"
 #include "libslic3r/PrintConfig.hpp"
 /*
 #include <string>
@@ -32,7 +33,7 @@ public:
     bool has_auto_discovery() const override { return true; }
     bool can_test() const override { return true; }
     PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint | PrintHostPostUploadAction::QueuePrint; }
-    std::string get_host() const override { return "https://connect.prusa3d.com"; }
+    std::string get_host() const override { return Utils::ServiceConfig::instance().connect_url(); }
     bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override;
     //const std::string& get_apikey() const { return m_apikey; }
     //const std::string& get_cafile() const { return m_cafile; }

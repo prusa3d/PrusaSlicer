@@ -5,11 +5,14 @@
 #ifndef slic3r_PrincipalComponents2D_hpp_
 #define slic3r_PrincipalComponents2D_hpp_
 
+#include <vector>
+#include <tuple>
+
 #include "AABBTreeLines.hpp"
 #include "BoundingBox.hpp"
 #include "libslic3r.h"
-#include <vector>
 #include "Polygon.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 

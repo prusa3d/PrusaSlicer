@@ -1,14 +1,18 @@
 #ifndef slic3r_GCode_Wipe_hpp_
 #define slic3r_GCode_Wipe_hpp_
 
-#include "SmoothPath.hpp"
+#include <math.h>
+#include <cassert>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cmath>
 
+#include "SmoothPath.hpp"
 #include "../Geometry/ArcWelder.hpp"
 #include "../Point.hpp"
 #include "../PrintConfig.hpp"
-
-#include <cassert>
-#include <optional>
 
 namespace Slic3r {
 

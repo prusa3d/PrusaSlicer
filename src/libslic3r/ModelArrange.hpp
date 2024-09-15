@@ -6,11 +6,21 @@
 #define MODELARRANGE_HPP
 
 #include <libslic3r/Arrange/Scene.hpp>
+#include <stddef.h>
+#include <vector>
+#include <cstddef>
+
+#include "libslic3r/Arrange/Core/Beds.hpp"
 
 namespace Slic3r {
 
 class Model;
 class ModelInstance;
+
+namespace arr2 {
+class ArrangeSettingsView;
+}  // namespace arr2
+
 using ModelInstancePtrs = std::vector<ModelInstance*>;
 
 //void duplicate(Model &model, ArrangePolygons &copies, VirtualBedFn);

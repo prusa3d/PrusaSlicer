@@ -75,7 +75,7 @@ public:
     Plater(const Plater &) = delete;
     Plater &operator=(Plater &&) = delete;
     Plater &operator=(const Plater &) = delete;
-    ~Plater() = default;
+    ~Plater();
 
     bool is_project_dirty() const;
     bool is_presets_dirty() const;

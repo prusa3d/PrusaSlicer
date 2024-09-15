@@ -13,6 +13,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/nowide/convert.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <curl/curl.h>
 
@@ -45,7 +46,7 @@ namespace {
 		bool res = GUI::create_process(path, std::wstring(), msg);
 		if (!res) {
 			std::string full_message = GUI::format(_u8L("Running downloaded instaler of %1% has failed:\n%2%"), SLIC3R_APP_NAME, msg);
-			BOOST_LOG_TRIVIAL(error) << full_message; // lm: maybe UI error msg?  // dk: bellow. (maybe some general show error evt would be better?)
+			BOOST_LOG_TRIVIAL(error) << full_message;
 			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
 			evt->SetString(full_message);
 			GUI::wxGetApp().QueueEvent(evt);
@@ -165,7 +166,7 @@ AppUpdater::priv::priv() :
 	if (!downloads_path.empty()) {
 		m_default_dest_folder = std::move(downloads_path);
 	}
-	BOOST_LOG_TRIVIAL(trace) << "App updater default download path: " << m_default_dest_folder; //lm:Is this an error? // dk: changed to trace
+	BOOST_LOG_TRIVIAL(trace) << "App updater default download path: " << m_default_dest_folder;
 	
 }
 
@@ -221,8 +222,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	boost::filesystem::path tmp_path = dest_path;
 	tmp_path += format(".%1%%2%", std::to_string(GUI::GLCanvas3D::timestamp_now()), ".download");
 	FILE* file;
-	wxString temp_path_wstring(tmp_path.wstring());
-	file = fopen(temp_path_wstring.c_str(), "wb");
+	file = boost::nowide::fopen(tmp_path.string().c_str(), "wb");
 	assert(file != NULL);
 	if (file == NULL) {
 	    std::string line1 = GUI::format(_u8L("Download from %1% couldn't start:"), data.url);
@@ -236,7 +236,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	}
 
 	std::string error_message;
-	bool res = http_get_file(data.url, 130 * 1024 * 1024 //2.4.0 windows installer is 65MB //lm:I don't know, but larger. The binaries will grow. // dk: changed to 130, to have 100% more space. We should put this information into version file. 
+	bool res = http_get_file(data.url, 256 * 1024 * 1024  
 		// on_progress
 		, [&last_gui_progress, expected_size](Http::Progress progress) {
 			// size check
@@ -333,10 +333,6 @@ void AppUpdater::priv::version_check(const std::string& version_check_url)
 		}
 		, error_message
 	);
-	//lm:In case the internet is not available, it will report no updates if run by user.
-	// We might save a flag that we don't know or try to run the version_check again, reporting
-	// the failure.
-	// dk: changed to download version every time. Dialog will show if m_triggered_by_user.
 	if (!res) {
 		std::string message = GUI::format("Downloading %1% version file has failed:\n%2%", SLIC3R_APP_NAME, error_message);
 		BOOST_LOG_TRIVIAL(error) << message;
@@ -390,19 +386,21 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 #else
 			"release:linux"
 #endif
-//lm:Related to the ifdefs. We should also support BSD, which behaves similar to Linux in most cases.
-// Unless you have a reason not to, I would consider doing _WIN32, elif __APPLE__, else ... Not just here.
-// dk: so its ok now or we need to specify BSD?
 			) {
 			for (const auto& data : section.second) {
 				if (data.first == "url") {
 					new_data.url = data.second.data();
 					new_data.target_path = m_default_dest_folder / AppUpdater::get_filename_from_url(new_data.url);
 					BOOST_LOG_TRIVIAL(info) << format("parsing version string: url: %1%", new_data.url);
-				} else if (data.first == "size"){
+				} else if (data.first == "size") {
 					new_data.size = std::stoi(data.second.data());
 					BOOST_LOG_TRIVIAL(info) << format("parsing version string: expected size: %1%", new_data.size);
-				}
+				} else if (data.first == "action") {
+                    std::string action = data.second.data();
+                    if (action == "browser") {
+                        new_data.action = AppUpdaterURLAction::AUUA_OPEN_IN_BROWSER;
+                    }
+                }
 			}
 		}
 

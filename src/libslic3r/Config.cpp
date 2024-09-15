@@ -19,36 +19,34 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "Config.hpp"
-#include "format.hpp"
-#include "Utils.hpp"
-#include "LocalesUtils.hpp"
 
-#include <assert.h>
-#include <fstream>
-#include <iostream>
-#include <iomanip>
-#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/erase.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/config.hpp>
-#include <boost/foreach.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/nowide/cstdlib.hpp>
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/property_tree/ini_parser.hpp>
-#include <boost/format.hpp>
-#include <string.h>
-
 #include <LibBGCode/binarize/binarize.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/multi_index_container.hpp>
+#include <cereal/cereal.hpp>
+#include <core/core.hpp>
+#include <iostream>
+#include <iomanip>
+#include <cstddef>
+#include <set>
+#include <cstdlib>
+#include <cstring>
 
-//FIXME for GCodeFlavor and gcfMarlin (for forward-compatibility conversion)
-// This is not nice, likely it would be better to pass the ConfigSubstitutionContext to handle_legacy().
-#include "PrintConfig.hpp"
+#include "format.hpp"
+#include "Utils.hpp"
+#include "LocalesUtils.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Semver.hpp"
 
 namespace Slic3r {
 
@@ -378,6 +376,9 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
         return wrapped.str();
     };
 
+    // List of opt_keys that should be hidden from the CLI help.
+    const std::vector<std::string> silent_options = { "webdev", "single_instance_on_url" };
+
     // get the unique categories
     std::set<std::string> categories;
     for (const auto& opt : this->options) {
@@ -396,6 +397,9 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
         for (const auto& opt : this->options) {
             const ConfigOptionDef& def = opt.second;
 			if (def.category != category || def.cli == ConfigOptionDef::nocli || !filter(def))
+                continue;
+
+            if (std::find(silent_options.begin(), silent_options.end(), opt.second.opt_key) != silent_options.end())
                 continue;
             
             // get all possible variations: --foo, --foobar, -f...
@@ -1431,7 +1435,8 @@ t_config_option_keys DynamicConfig::equal(const DynamicConfig &other) const
 
 }
 
-#include <cereal/types/polymorphic.hpp>
+#include <cereal/types/polymorphic.hpp> // IWYU pragma: keep
+
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOption)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<double>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<int>)

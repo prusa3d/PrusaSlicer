@@ -6,10 +6,16 @@
 #define OPENVDBUTILS_HPP
 
 #include <libslic3r/TriangleMesh.hpp>
+#include <functional>
+#include <memory>
+
+#include "admesh/stl.h"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 struct VoxelGrid;
+
 struct VoxelGridDeleter { void operator()(VoxelGrid *ptr); };
 using VoxelGridPtr = std::unique_ptr<VoxelGrid, VoxelGridDeleter>;
 

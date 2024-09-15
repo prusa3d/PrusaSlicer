@@ -3,12 +3,14 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "AABBMesh.hpp"
-#include <Execution/ExecutionTBB.hpp>
 
 #include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/TriangleMesh.hpp>
+#include <igl/Hit.h>
+#include <algorithm>
 
-#include <numeric>
+#include "admesh/stl.h"
+#include "libslic3r/Point.hpp"
 
 #ifdef SLIC3R_HOLE_RAYCASTER
 #include <libslic3r/SLA/Hollowing.hpp>

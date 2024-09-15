@@ -1,5 +1,14 @@
 #include "libslic3r/GCode/SeamRear.hpp"
-#include "libslic3r/GCode/SeamGeometry.hpp"
+
+#include <algorithm>
+#include <optional>
+#include <utility>
+
+#include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/GCode/SeamChoice.hpp"
+#include "libslic3r/GCode/SeamPerimeters.hpp"
+#include "libslic3r/GCode/SeamShells.hpp"
 
 namespace Slic3r::Seams::Rear {
 using Perimeters::PointType;

@@ -2,8 +2,8 @@
 
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
-#include "libslic3r/LocalesUtils.hpp"
 
+#include <LocalesUtils.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include <cereal/types/string.hpp> 
 #include <cereal/types/vector.hpp> 

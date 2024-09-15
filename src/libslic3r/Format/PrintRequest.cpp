@@ -5,7 +5,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem.hpp>
-#include <fast_float/fast_float.h>
+#include <fast_float.h>
 
 #include "libslic3r/Exception.hpp"
 #include "libslic3r/Model.hpp"

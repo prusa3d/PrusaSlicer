@@ -5,8 +5,11 @@
 #ifndef SLICESTOTRIANGLEMESH_HPP
 #define SLICESTOTRIANGLEMESH_HPP
 
+#include <vector>
+
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/ExPolygon.hpp"
+#include "admesh/stl.h"
 
 namespace Slic3r {
 

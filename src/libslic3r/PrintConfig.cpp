@@ -20,22 +20,28 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PrintConfig.hpp"
-#include "Config.hpp"
-#include "I18N.hpp"
-#include "format.hpp"
 
-#include "SLA/SupportTree.hpp"
-#include "GCode/Thumbnails.hpp"
-
-#include <set>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/thread.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/lexical_cast/bad_lexical_cast.hpp>
+#include <boost/preprocessor/cat.hpp>
+#include <cereal/cereal.hpp>
+#include <set>
+#include <cmath>
+#include <optional>
+#include <string_view>
 
-#include <float.h>
+#include "Config.hpp"
+#include "I18N.hpp"
+#include "format.hpp"
+#include "libslic3r/GCode/Thumbnails.hpp"
+#include "libslic3r/SLA/SupportTreeStrategies.hpp"
+#include "libslic3r/enum_bitmask.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
@@ -140,7 +146,8 @@ static const t_config_enum_values s_keys_map_InfillPattern {
     { "octagramspiral",     ipOctagramSpiral },
     { "adaptivecubic",      ipAdaptiveCubic },
     { "supportcubic",       ipSupportCubic },
-    { "lightning",          ipLightning }
+    { "lightning",          ipLightning },
+    { "zigzag",             ipZigZag }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(InfillPattern)
 
@@ -1364,6 +1371,12 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBools { false });
 
+    def = this->add("filament_abrasive", coBools);
+    def->label = L("Abrasive material");
+    def->tooltip = L("This flag means that the material is abrasive and requires a hardened nozzle. The value is used by the printer to check it.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBools { false });
+
     def = this->add("filament_cost", coFloats);
     def->label = L("Cost");
     def->tooltip = L("Enter your filament cost per kg here. This is only for statistical information.");
@@ -1470,7 +1483,8 @@ void PrintConfigDef::init_fff_params()
         { "octagramspiral",     L("Octagram Spiral")},
         { "adaptivecubic",      L("Adaptive Cubic")},
         { "supportcubic",       L("Support Cubic")},
-        { "lightning",          L("Lightning")}
+        { "lightning",          L("Lightning")},
+        { "zigzag",             L("Zig Zag")}
     });
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipStars));
 
@@ -2541,6 +2555,12 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Steeper ramp before obstacles");
     def->tooltip = L("If enabled, PrusaSlicer detects obstacles along the travel path and makes the slope steeper "
                      "in case an obstacle might be hit during the initial phase of the travel.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBools{false});
+
+    def = this->add("nozzle_high_flow", coBools);
+    def->label = L("High flow nozzle");
+    def->tooltip = L("High flow nozzles allow higher print speeds.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBools{false});
 
@@ -3709,7 +3729,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_before_wipe", "retract_restart_extra", "retract_before_travel", "wipe",
         "travel_slope", "travel_max_lift", "travel_ramping_lift", "travel_lift_before_obstacle",
         "retract_layer_change", "retract_length_toolchange", "retract_restart_extra_toolchange", "extruder_colour",
-        "default_filament_profile"
+        "default_filament_profile", "nozzle_high_flow"
     };
 
     m_extruder_retract_keys = {
@@ -5646,6 +5666,10 @@ CLIMiscConfigDef::CLIMiscConfigDef()
                      "or an existing PrusaSlicer window is activated. "
                      "Overrides the \"single_instance\" configuration value from application preferences.");
 
+    def = this->add("single_instance_on_url", coBool);
+    def->label = "Single instance mode for prusaslicer url"; // Not translated on purpose - for internal use only.
+    def->tooltip = "Works as single_instance but only if prusaslicer url is present.";
+
     def = this->add("datadir", coString);
     def->label = L("Data directory");
     def->tooltip = L("Load and store settings at the given directory. This is useful for maintaining different profiles or including configurations from a network storage.");
@@ -5660,6 +5684,10 @@ CLIMiscConfigDef::CLIMiscConfigDef()
     def->tooltip = L("Sets logging sensitivity. 0:fatal, 1:error, 2:warning, 3:info, 4:debug, 5:trace\n"
                      "For example. loglevel=2 logs fatal, error and warning level messages.");
     def->min = 0;
+
+    def = this->add("webdev", coBool);
+    def->label = "Enable webdev tools"; // Not translated on purpose - for internal use only.
+    def->tooltip = "Enable webdev tools";
 
 #if (defined(_MSC_VER) || defined(__MINGW32__)) && defined(SLIC3R_GUI)
     def = this->add("sw_renderer", coBool);
@@ -6114,6 +6142,7 @@ bool is_XL_printer(const PrintConfig &cfg)
 
 } // namespace Slic3r
 
-#include <cereal/types/polymorphic.hpp>
+#include <cereal/types/polymorphic.hpp> // IWYU pragma: keep
+
 CEREAL_REGISTER_TYPE(Slic3r::DynamicPrintConfig)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::DynamicConfig, Slic3r::DynamicPrintConfig)

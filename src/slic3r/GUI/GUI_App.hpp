@@ -416,7 +416,7 @@ public:
     // return true if preset vas invisible and we have to installed it to make it selectable
     bool            select_printer_preset(const Preset* printer_preset);
     bool            select_filament_preset(const Preset* filament_preset, size_t extruder_index);
-    void            search_and_select_filaments(const std::string& material, size_t extruder_index, std::string& out_message);
+    void            search_and_select_filaments(const std::string& material, bool avoid_abrasive, size_t extruder_index, std::string& out_message);
     void            handle_script_message(std::string msg) {}
     void            request_model_download(std::string import_json) {}
     void            download_project(std::string project_id) {}

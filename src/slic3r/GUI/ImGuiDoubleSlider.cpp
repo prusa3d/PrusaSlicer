@@ -5,6 +5,10 @@
 
 #include "ImGuiDoubleSlider.hpp"
 
+#include <algorithm>
+
+#include "slic3r/GUI/ImGuiPureWrap.hpp"
+
 namespace DoubleSlider {
 
 const ImU32 tooltip_bg_clr  = ImGui::ColorConvertFloat4ToU32(ImGuiPureWrap::COL_GREY_LIGHT);
@@ -45,8 +49,15 @@ static bool behavior(ImGuiID id, const ImRect& region,
     if (ImGui::ItemHoverable(mouse_wheel_responsive_region, id)) {
         if (change_on_mouse_move)
             v_new = v_min + (ImS32)(v_range * mouse_pos_ratio + 0.5f);
-        else 
-            v_new = ImClamp(*out_value + (ImS32)(context.IO.MouseWheel/* * accer*/), v_min, v_max);
+        else {
+            float mw = context.IO.MouseWheel;
+#if defined(__APPLE__)
+            if (mw > 0.f) mw = 1.f;
+            if (mw < 0.f) mw = -1.f;
+#endif
+            const float accer = context.IO.KeyCtrl || context.IO.KeyShift ? 5.f : 1.f;
+            v_new = ImClamp(*out_value + (ImS32)(mw * accer), v_min, v_max);
+        }
     }
 
     // drag behavior
@@ -305,6 +316,16 @@ bool ImGuiControl::IsLClickOnThumb()
     return false;
 }
 
+bool ImGuiControl::IsLClickOnHoveredPos()
+{
+    if (m_lclick_on_hovered_pos) {
+        // Discard left mouse click at hovered tick to avoud reuse it on next frame
+        m_lclick_on_hovered_pos = false;
+        return true;
+    }
+    return false;
+}
+
 void ImGuiControl::draw_scroll_line(const ImRect& scroll_line, const ImRect& slideable_region)
 {
     if (m_cb_draw_scroll_line)
@@ -531,8 +552,8 @@ bool ImGuiControl::draw_slider( int* higher_pos, int* lower_pos,
         ImGui::ItemHoverable(m_regions.lower_thumb, id) && context.IO.MouseClicked[0])
         m_selection = ssLower;
 
-    // detect left click on selected thumb
     {
+        // detect left click on selected thumb
         const ImRect& active_thumb = m_selection == ssHigher ? m_regions.higher_thumb : m_regions.lower_thumb;
         if (ImGui::ItemHoverable(active_thumb, id) && context.IO.MouseClicked[0]) {
             m_active_thumb = active_thumb;
@@ -549,6 +570,19 @@ bool ImGuiControl::draw_slider( int* higher_pos, int* lower_pos,
         if (ImGui::ItemHoverable(active_thumb, id) && ImGui::IsMouseDragging(0)) {
             // invalidate active thumb clicking
             m_active_thumb = ImRect(0.f, 0.f, 0.f, 0.f);
+        }
+
+        // detect left click on hovered region
+        if (ImGui::ItemHoverable(m_hovered_region, id) && context.IO.MouseClicked[0]) {
+            // clear active ID to avoid a process of behavior()
+            if (context.ActiveId == id && context.ActiveIdSource == ImGuiInputSource_Mouse)
+                ImGui::ClearActiveID();
+        }
+        else if (ImGui::ItemHoverable(m_hovered_region, id) && context.IO.MouseReleased[0]) {
+            const ImRect& slideable_region = m_selection == ssHigher ? m_regions.higher_slideable_region : m_regions.lower_slideable_region;
+            if (lclicked_on_thumb(id, slideable_region, m_min_pos, m_max_pos, m_hovered_region, m_flags)) {
+                m_lclick_on_hovered_pos = true;
+            }
         }
     }
 

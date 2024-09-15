@@ -10,6 +10,20 @@
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/SLA/Pad.hpp>
 #include <libslic3r/MTUtils.hpp>
+#include <assert.h>
+#include <oneapi/tbb/spin_mutex.h>
+#include <stddef.h>
+#include <algorithm>
+#include <mutex>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+
+#include "admesh/stl.h"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/SLA/JobController.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 namespace sla {

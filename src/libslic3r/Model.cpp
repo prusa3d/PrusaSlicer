@@ -42,7 +42,7 @@
 
 #include "SVG.hpp"
 #include <Eigen/Dense>
-#include "GCode/GCodeWriter.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
 
 namespace Slic3r {
 

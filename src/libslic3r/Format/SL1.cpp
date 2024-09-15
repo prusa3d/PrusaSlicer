@@ -16,8 +16,8 @@
 #include "libslic3r/MTUtils.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
-#include "libslic3r/miniz_extension.hpp"
-#include "libslic3r/LocalesUtils.hpp"
+#include "libslic3r/miniz_extension.hpp" // IWYU pragma: keep
+#include <LocalesUtils.hpp>
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Utils/JsonUtils.hpp"
 

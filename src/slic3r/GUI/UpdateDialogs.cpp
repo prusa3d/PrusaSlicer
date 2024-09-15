@@ -99,7 +99,7 @@ bool MsgUpdateSlic3r::disable_version_check() const
 
  wxSize AppUpdateAvailableDialog::AUAD_size;
 // AppUpdater
-AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user)
+AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user, bool browser_on_next)
 	: MsgDialog(nullptr, _(L("App Update available")), wxString::Format(_(L("New version of %s is available.\nDo you wish to download it?")), SLIC3R_APP_NAME))
 {
 	auto* versions = new wxFlexGridSizer(1, 0, VERT_SPACING);
@@ -116,6 +116,12 @@ AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, co
 	}
 	content_sizer->AddSpacer(VERT_SPACING);
 	
+    if (browser_on_next)
+    {
+        content_sizer->Add(new wxStaticText(this, wxID_ANY, _L("Clicking \'Next\' will open a browser window where you can select which variant of PrusaSlicer you want to download.")));
+        content_sizer->AddSpacer(VERT_SPACING);
+    }
+
 	AUAD_size = content_sizer->GetSize();
 	
 

@@ -1,7 +1,11 @@
 #include "libslic3r/GCode/SeamShells.hpp"
-#include "libslic3r/ClipperUtils.hpp"
-#include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/parallel_for.h>
+
+#include <algorithm>
+#include <optional>
+#include <utility>
+
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/GCode/SeamGeometry.hpp"
 
 namespace Slic3r::Seams::Shells::Impl {
 

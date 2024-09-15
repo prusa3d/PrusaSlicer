@@ -3,9 +3,16 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "Print.hpp"
-#include "ToolOrdering.hpp"
-#include "Layer.hpp"
+#include "libslic3r/Print.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/GCode/ToolOrdering.hpp"
+#include "libslic3r/CustomGCode.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Model.hpp"
+#include "tcbspan/span.hpp"
 
 // #define SLIC3R_DEBUG
 
@@ -16,12 +23,12 @@
     #undef NDEBUG
 #endif
 
+#include <boost/log/trivial.hpp>
+#include <libslic3r/libslic3r.h>
 #include <cassert>
 #include <limits>
-
-#include <boost/log/trivial.hpp>
-
-#include <libslic3r.h>
+#include <cmath>
+#include <cstring>
 
 namespace Slic3r {
 

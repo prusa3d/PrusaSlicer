@@ -6,13 +6,16 @@
 #ifndef SLARASTER_CPP
 #define SLARASTER_CPP
 
-#include <functional>
-
 #include <libslic3r/SLA/RasterBase.hpp>
 #include <libslic3r/SLA/AGGRaster.hpp>
-
 // minz image write:
 #include <miniz.h>
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <cstdlib>
+
+#include "agg/agg_gamma_functions.h"
 
 namespace Slic3r { namespace sla {
 

@@ -21,13 +21,14 @@
 #include "DoubleSliderForLayers.hpp"
 #include "ExtruderSequenceDialog.hpp"
 #include "Plater.hpp"
+#include "Tab.hpp"
 #include "MainFrame.hpp"
 #include "MsgDialog.hpp"
 #include "format.hpp"
 
 #include <wx/listbook.h>
 #include <wx/notebook.h>
-#include <wx/glcanvas.h>
+#include <wx/glcanvas.h> // IWYU pragma: keep
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/choice.h>
@@ -456,7 +457,7 @@ void Preview::create_sliders()
                     return "";
 
                 value = into_u8(dlg.GetValue());
-                valid = true;// GUI::Tab::validate_custom_gcode("Custom G-code", value); // !ysFIXME validate_custom_gcode
+                valid = Tab::validate_custom_gcode("Custom G-code", value);
             } while (!valid);
             return value;
         });

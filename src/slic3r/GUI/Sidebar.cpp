@@ -31,7 +31,7 @@
 #include <wx/bmpcbox.h>
 #include <wx/statbox.h>
 #include <wx/statbmp.h>
-#include <wx/wupdlock.h>
+#include <wx/wupdlock.h> // IWYU pragma: keep
 #include "wx/generic/stattextg.h"
 #ifdef _WIN32
 #include <wx/richtooltip.h>
@@ -1048,8 +1048,7 @@ void Sidebar::update_sliced_info_sizer()
                 m_sliced_info->SetTextAndShow(siEstimatedTime, info_text, new_label);
             }
 
-            // if there is a wipe tower, insert number of toolchanges info into the array:
-            m_sliced_info->SetTextAndShow(siWTNumberOfToolchanges, is_wipe_tower ? wxString::Format("%.d", ps.total_toolchanges) : "N/A");
+            m_sliced_info->SetTextAndShow(siWTNumberOfToolchanges, ps.total_toolchanges > 0 ? wxString::Format("%.d", ps.total_toolchanges) : "N/A");
 
             // Hide non-FFF sliced info parameters
             m_sliced_info->SetTextAndShow(siMaterial_unit, "N/A");

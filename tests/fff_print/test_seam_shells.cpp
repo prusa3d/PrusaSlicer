@@ -52,7 +52,7 @@ TEST_CASE_METHOD(ProjectionFixture, "Project to geometry does not match", "[Seam
     REQUIRE(result.size() == 1);
     REQUIRE(result[0].polygon.size() == 4);
 
-    const Polygon expanded{expand(extrusions.front().polygon, extrusion_width / 2.0).front()};
+    const Polygon expanded{expand(extrusions.front().polygon, scaled(extrusion_width / 2.0)).front()};
 
     // The extrusion is expanded and returned.
     CHECK(result[0].polygon == expanded);

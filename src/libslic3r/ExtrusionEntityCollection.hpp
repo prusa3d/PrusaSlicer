@@ -7,9 +7,19 @@
 #ifndef slic3r_ExtrusionEntityCollection_hpp_
 #define slic3r_ExtrusionEntityCollection_hpp_
 
+#include <stddef.h>
+#include <iterator>
+#include <utility>
+#include <vector>
+#include <cstddef>
+
 #include "libslic3r.h"
 #include "Exception.hpp"
 #include "ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
 

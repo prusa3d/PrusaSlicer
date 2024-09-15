@@ -12,15 +12,27 @@
 #ifndef slic3r_TriangleMesh_hpp_
 #define slic3r_TriangleMesh_hpp_
 
-#include "libslic3r.h"
 #include <admesh/stl.h>
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <cereal/cereal.hpp>
 #include <functional>
 #include <vector>
+#include <Eigen/Geometry>
+#include <array>
+#include <utility>
+#include <cassert>
+#include <cinttypes>
+#include <cstddef>
+
+#include "libslic3r.h"
 #include "BoundingBox.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
@@ -104,6 +116,7 @@ public:
     explicit TriangleMesh(const indexed_triangle_set &M);
     explicit TriangleMesh(indexed_triangle_set &&M, const RepairedMeshErrors& repaired_errors = RepairedMeshErrors());
     void clear() { this->its.clear(); m_stats.clear(); }
+    void from_facets(std::vector<stl_facet> &&facets, bool repair = true);
     bool ReadSTLFile(const char* input_file, bool repair = true);
     bool write_ascii(const char* output_file);
     bool write_binary(const char* output_file);
@@ -385,6 +398,7 @@ inline BoundingBoxf3 bounding_box(const indexed_triangle_set& its, const Transfo
 
 // Serialization through the Cereal library
 #include <cereal/access.hpp>
+
 namespace cereal {
     template <class Archive> struct specialize<Archive, Slic3r::TriangleMesh, cereal::specialization::non_member_load_save> {};
     template<class Archive> void load(Archive &archive, Slic3r::TriangleMesh &mesh) {

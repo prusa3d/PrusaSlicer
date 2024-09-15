@@ -5,22 +5,30 @@
 #ifndef SIMPLEARRANGEITEM_HPP
 #define SIMPLEARRANGEITEM_HPP
 
-#include "libslic3r/Arrange/Core/PackingContext.hpp"
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "libslic3r/Arrange/Core/PackingContext.hpp"
 #include "libslic3r/Arrange/Core/NFP/NFPArrangeItemTraits.hpp"
 #include "libslic3r/Arrange/Core/NFP/NFP.hpp"
-
 #include "libslic3r/Arrange/Arrange.hpp"
 #include "libslic3r/Arrange/Tasks/ArrangeTask.hpp"
 #include "libslic3r/Arrange/Tasks/FillBedTask.hpp"
 #include "libslic3r/Arrange/Tasks/MultiplySelectionTask.hpp"
-
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
-
 #include "MutableItemTraits.hpp"
+#include "libslic3r/Arrange/Core/ArrangeItemTraits.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r { namespace arr2 {
+struct InfiniteBed;
 
 class SimpleArrangeItem {
     Polygon m_shape;

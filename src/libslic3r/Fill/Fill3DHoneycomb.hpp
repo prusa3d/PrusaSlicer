@@ -7,12 +7,15 @@
 #define slic3r_Fill3DHoneycomb_hpp_
 
 #include <map>
+#include <utility>
 
-#include "../libslic3r.h"
-
+#include "libslic3r/libslic3r.h"
 #include "FillBase.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
+class Point;
 
 class Fill3DHoneycomb : public Fill
 {

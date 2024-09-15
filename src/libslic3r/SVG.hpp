@@ -10,12 +10,24 @@
 #ifndef slic3r_SVG_hpp_
 #define slic3r_SVG_hpp_
 
+#include <stdio.h>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cstdio>
+
 #include "libslic3r.h"
-#include "clipper.hpp"
+#include "libslic3r/clipper.hpp"
 #include "ExPolygon.hpp"
 #include "Line.hpp"
 #include "TriangleMesh.hpp"
 #include "Surface.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/MultiPoint.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
 

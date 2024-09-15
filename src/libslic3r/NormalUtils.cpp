@@ -4,6 +4,12 @@
 ///|/
 #include "NormalUtils.hpp"
 
+#include <cmath>
+#include <cstddef>
+
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Point.hpp"
+
 using namespace Slic3r;
 
 Vec3f NormalUtils::create_triangle_normal(

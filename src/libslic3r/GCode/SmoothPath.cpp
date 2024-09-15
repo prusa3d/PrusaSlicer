@@ -1,7 +1,17 @@
 #include "SmoothPath.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <utility>
+#include <cassert>
+
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
+#include "libslic3r/Geometry/ArcWelder.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r::GCode {
 

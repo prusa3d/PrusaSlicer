@@ -2,10 +2,35 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <cfloat>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+
 #include "Model.hpp"
 #include "Print.hpp"
-
-#include <cfloat>
+#include "admesh/stl.h"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/CustomGCode.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/PlaceholderParser.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintBase.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Slicing.hpp"
+#include "libslic3r/TriangleSelector.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

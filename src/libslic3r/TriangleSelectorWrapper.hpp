@@ -8,8 +8,10 @@
 #include "TriangleSelector.hpp"
 #include "Model.hpp"
 #include "AABBTreeIndirect.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
+class TriangleMesh;
 
 //NOTE: We need to replace the FacetsAnnotation struct for support storage (or extend/add another)
 // Problems: Does not support negative volumes, strange usage for supports computed from extrusion -

@@ -1,11 +1,22 @@
+min_slic3r_version = 2.8.1-rc0
+2.1.0 Added new parameters for nozzle checks (abrasive filaments, high flow nozzles), updated related start g-codes. Enabled overhang fan speed overrides for specific filaments (MK4S).
 min_slic3r_version = 2.8.0-alpha0
+2.0.5 Fixed an issue in configuration wizard.
+2.0.4 Added VOXELPLA filaments. Updated compatible condition for some specific filament profiles.
+2.0.3 Added printer profiles for Original Prusa MK4S and MK3.9S. Added profiles for high flow nozzles (MK4/MK3.9/XL). Reorganized configuration wizard. 
+2.0.2 Added filament profile for Prusament Woodfill. Updated FW version notification.
+2.0.1 Updated FW version notifications.
 2.0.0 Updated version for PS2.8.0.
 2.0.0-alpha1 Updated FW version notification. Added ROSA3D filaments. Updated print profiles.
 2.0.0-alpha0 Initial bundle for PS2.8.0-alpha.
 max_slic3r_version = 2.7.9
 min_slic3r_version = 2.7.5-rc
+1.14.2 Updated FW version notification.
+1.14.1 Updated FW version notifications.
 1.14.0 Added new settings for SLA material profiles.
 min_slic3r_version = 2.7.3-beta1
+1.13.6 Updated FW version notification.
+1.13.5 Updated FW version notifications.
 1.13.4 Updated FW version notification. Added ROSA3D filaments. Updated print profiles.
 1.13.3 Updated FW version notification.
 1.13.2 Added material profiles for Prusament Resin Flex Anatomic Red and Prusament Resin Flex Gingiva Mask.

@@ -5,10 +5,17 @@
 #ifndef SLA_CLUSTERING_HPP
 #define SLA_CLUSTERING_HPP
 
-#include <vector>
-
 #include <libslic3r/Point.hpp>
 #include <libslic3r/SLA/SpatIndex.hpp>
+#include <stddef.h>
+#include <vector>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <cstddef>
+
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r { namespace sla {
 

@@ -3,11 +3,16 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "TriangleSetSampling.hpp"
+
+#include <boost/random/uniform_real_distribution.hpp>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
 #include <map>
 #include <random>
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
-#include <boost/random/uniform_real_distribution.hpp>
+#include <algorithm>
+#include <cmath>
+
+#include "admesh/stl.h"
 
 namespace Slic3r {
 

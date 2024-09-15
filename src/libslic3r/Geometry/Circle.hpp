@@ -5,9 +5,20 @@
 #ifndef slic3r_Geometry_Circle_hpp_
 #define slic3r_Geometry_Circle_hpp_
 
-#include "../Point.hpp"
-
+#include <assert.h>
+#include <stddef.h>
 #include <Eigen/Geometry>
+#include <cmath>
+#include <iterator>
+#include <optional>
+#include <type_traits>
+#include <cassert>
+#include <complex>
+#include <cstddef>
+
+#include "../Point.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r { namespace Geometry {
 

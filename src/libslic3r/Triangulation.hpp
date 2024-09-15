@@ -5,11 +5,13 @@
 #ifndef libslic3r_Triangulation_hpp_
 #define libslic3r_Triangulation_hpp_
 
-#include <vector>
-#include <set>
 #include <libslic3r/Point.hpp>
 #include <libslic3r/Polygon.hpp>
 #include <libslic3r/ExPolygon.hpp>
+#include <vector>
+#include <set>
+#include <cstdint>
+#include <utility>
 
 namespace Slic3r {
 

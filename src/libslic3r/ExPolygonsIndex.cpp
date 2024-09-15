@@ -1,4 +1,13 @@
 #include "ExPolygonsIndex.hpp"
+
+#include <algorithm>
+#include <utility>
+#include <cassert>
+
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Polygon.hpp"
+
 using namespace Slic3r;
 
 // IMPROVE: use one dimensional vector for polygons offset with searching by std::lower_bound

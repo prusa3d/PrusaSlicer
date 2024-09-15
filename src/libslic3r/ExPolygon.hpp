@@ -12,15 +12,29 @@
 #ifndef slic3r_ExPolygon_hpp_
 #define slic3r_ExPolygon_hpp_
 
+#include <assert.h>
+#include <oneapi/tbb/scalable_allocator.h>
+#include <stdint.h>
+#include <vector>
+#include <algorithm>
+#include <cstddef>
+#include <initializer_list>
+#include <iterator>
+#include <utility>
+#include <cassert>
+#include <cinttypes>
+
 #include "Point.hpp"
 #include "libslic3r.h"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
-#include <vector>
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Line.hpp"
 
 namespace Slic3r {
 
 class ExPolygon;
+
 using ExPolygons = std::vector<ExPolygon>;
 
 class ExPolygon
@@ -493,6 +507,7 @@ bool        remove_small_and_small_holes(ExPolygons &expolygons, double min_area
 
 // start Boost
 #include <boost/polygon/polygon.hpp>
+
 namespace boost { namespace polygon {
     template <>
         struct polygon_traits<Slic3r::ExPolygon> {

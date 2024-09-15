@@ -247,7 +247,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Threads REQUIRED)
 
     find_package(DBus REQUIRED)
-    include_directories(${DBUS_INCLUDE_DIRS})
 endif()
 
 if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUXX)
@@ -340,11 +339,7 @@ if (APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=partial-availability -Werror=unguarded-availability -Werror=unguarded-availability-new")
 endif ()
 
-# Where all the bundled libraries reside?
-set(LIBDIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(LIBDIR_BIN ${CMAKE_CURRENT_BINARY_DIR}/src)
-# For the bundled boost libraries (boost::nowide)
-include_directories(${LIBDIR})
 # For generated header files
 include_directories(${LIBDIR_BIN}/platform)
 
@@ -378,6 +373,8 @@ endif()
 set(MINIMUM_BOOST_VERSION "1.66.0")
 set(_boost_components "system;filesystem;thread;log;locale;regex;chrono;atomic;date_time;iostreams;nowide")
 find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS ${_boost_components})
+
+find_package(Eigen3 3.3.7 REQUIRED)
 
 add_library(boost_libs INTERFACE)
 add_library(boost_headeronly INTERFACE)
@@ -458,16 +455,6 @@ else()
 endif()
 
 ## OPTIONAL packages
-
-# Find eigen3 or use bundled version
-if (NOT SLIC3R_STATIC)
-    find_package(Eigen3 3.3)
-endif ()
-if (NOT EIGEN3_FOUND)
-    set(EIGEN3_FOUND 1)
-    set(EIGEN3_INCLUDE_DIR ${LIBDIR}/eigen/)
-endif ()
-include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 # Find expat. We have our overriden FindEXPAT which exports libexpat target
 # no matter what.
@@ -623,7 +610,8 @@ function(prusaslicer_copy_dlls target)
         VERBATIM)
 endfunction()
 
-
+add_subdirectory(build-utils)
+add_subdirectory(bundled_deps)
 # libslic3r, PrusaSlicer GUI and the PrusaSlicer executable.
 add_subdirectory(src)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PrusaSlicer_app_console)
@@ -665,4 +653,4 @@ else ()
     install(DIRECTORY "${SLIC3R_RESOURCES_DIR}/" DESTINATION "${CMAKE_INSTALL_PREFIX}/resources")
 endif ()
 
-configure_file(${LIBDIR}/platform/unix/fhs.hpp.in ${LIBDIR_BIN}/platform/unix/fhs.hpp)
+configure_file(src/platform/unix/fhs.hpp.in ${LIBDIR_BIN}/platform/unix/fhs.hpp)

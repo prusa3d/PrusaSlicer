@@ -3,6 +3,10 @@
 
 #include "SquareGrid.hpp"
 
+#include <cassert>
+
+#include "libslic3r/Point.hpp"
+
 using namespace Slic3r::Arachne;
 
 

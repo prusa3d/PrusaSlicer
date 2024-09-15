@@ -15,7 +15,7 @@
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Config.hpp"
 
-#include <boost/nowide/fstream.hpp>
+#include <boost/nowide/fstream.hpp> // IWYU pragma: keep
 #include <boost/nowide/convert.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
@@ -139,20 +139,35 @@ bool contains_path_dir(const std::string& p, const std::string& dir_name)
     if (p.empty() || dir_name.empty()) 
        return false;
     boost::filesystem::path path(p + (p[p.size()-1] == '/' ? "" : "/") + dir_name);
-    if (boost::filesystem::exists(path) && boost::filesystem::is_directory(path)) {
+    boost::system::error_code ec;
+    if (boost::filesystem::exists(path, ec) && !ec) {
         //BOOST_LOG_TRIVIAL(debug) << path.string() << " " << std::oct << boost::filesystem::status(path).permissions();
-        return true; //boost::filesystem::status(path).permissions() & boost::filesystem::owner_write;
+        return boost::filesystem::is_directory(path); //boost::filesystem::status(path).permissions() & boost::filesystem::owner_write;
     } else
         BOOST_LOG_TRIVIAL(debug) << path.string() << " doesnt exists";
     return false;
 }
+
+boost::filesystem::path get_existing_dir(const std::string& sub, const std::string& dir_name)
+{
+    assert(!sub.empty() && !dir_name.empty());
+    boost::filesystem::path path = boost::filesystem::path(sub) / dir_name;
+    boost::system::error_code ec;
+    if (!boost::filesystem::exists(path, ec) || ec) {
+        return boost::filesystem::path();
+    }
+    if (!boost::filesystem::is_directory(path, ec) || ec) {
+        return boost::filesystem::path();
+    }    
+    return path;
+}
 // Creates directory in path if not exists yet
 void create_dir(const boost::filesystem::path& path)
 {
-    if (boost::filesystem::exists(path))
+    boost::system::error_code ec;
+    if (boost::filesystem::exists(path, ec) && !ec)
         return;
     BOOST_LOG_TRIVIAL(debug)<< "creating " << path.string();
-    boost::system::error_code ec;
     boost::filesystem::create_directory(path, ec);
     if (ec)
         BOOST_LOG_TRIVIAL(error)<< "create directory failed: " << ec.message();
@@ -193,7 +208,7 @@ bool copy_icon(const std::string& icon_path, const std::string& dest_path)
 bool create_desktop_file(const std::string& path, const std::string& data)
 {    
     BOOST_LOG_TRIVIAL(debug) <<".desktop to "<< path;
-    std::ofstream output(path);
+    boost::nowide::ofstream output(path);
     output << data;
     struct stat buffer;
     if (stat(path.c_str(), &buffer) == 0)
@@ -514,12 +529,12 @@ void DesktopIntegrationDialog::perform_downloader_desktop_integration()
     std::string version(SLIC3R_VERSION);
     if (version.find("alpha") != std::string::npos)
     {
-        version_suffix = "-alpha";
+        version_suffix = "_alpha";
         name_suffix = " - alpha";
     }
     else if (version.find("beta") != std::string::npos)
     {
-        version_suffix = "-beta";
+        version_suffix = "_beta";
         name_suffix = " - beta";
     }
 
@@ -626,6 +641,38 @@ void DesktopIntegrationDialog::undo_downloader_registration()
         std::remove(path.c_str());  
     }
     // There is no need to undo xdg-mime default command. It is done automatically when desktop file is deleted.
+}
+void DesktopIntegrationDialog::undo_downloader_registration_rigid()
+{
+    // Try ro find any PrusaSlicerURLProtocol.desktop files including alpha and beta and get rid of them
+
+    // $XDG_DATA_HOME defines the base directory relative to which user specific data files should be stored. 
+    // If $XDG_DATA_HOME is either not set or empty, a default equal to $HOME/.local/share should be used. 
+    // $XDG_DATA_DIRS defines the preference-ordered set of base directories to search for data files in addition to the $XDG_DATA_HOME base directory.
+    // The directories in $XDG_DATA_DIRS should be seperated with a colon ':'.
+    // If $XDG_DATA_DIRS is either not set or empty, a value equal to /usr/local/share/:/usr/share/ should be used. 
+    std::vector<std::string>target_candidates;
+    target_candidates.emplace_back(GUI::into_u8(wxFileName::GetHomeDir()) + "/.local/share");
+    resolve_path_from_var("XDG_DATA_HOME", target_candidates);
+    resolve_path_from_var("XDG_DATA_DIRS", target_candidates);
+    for (const std::string cand : target_candidates) {
+        boost::filesystem::path apps_path = get_existing_dir(cand, "applications");
+        if (apps_path.empty()) {
+            continue;
+        }
+        for (const std::string& suffix : {"" , "-beta", "-alpha" , "_beta", "_alpha"}) {
+            boost::filesystem::path file_path = apps_path / GUI::format("PrusaSlicerURLProtocol%1%.desktop", suffix);
+            boost::system::error_code ec;
+            if (!boost::filesystem::exists(file_path, ec) || ec) {
+                continue;
+            }
+            if (!boost::filesystem::remove(file_path, ec) || ec) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to remove file " << file_path << " ec: " << ec.message();
+                continue;
+            } 
+            BOOST_LOG_TRIVIAL(info) << "Desktop File removed: " << file_path;
+        }
+    }
 }
 
 DesktopIntegrationDialog::DesktopIntegrationDialog(wxWindow *parent)

@@ -1,7 +1,11 @@
 #include <random>
+#include <algorithm>
+#include <limits>
+#include <utility>
 
 #include "libslic3r/GCode/SeamRandom.hpp"
-#include "libslic3r/GCode/SeamGeometry.hpp"
+#include "libslic3r/GCode/SeamChoice.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r::Seams::Random {
 using Perimeters::PointType;

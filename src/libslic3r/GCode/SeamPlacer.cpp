@@ -38,7 +38,11 @@ ObjectLayerPerimeters get_perimeters(
         const Perimeters::LayerInfos layer_infos{Perimeters::get_layer_infos(
             print_object->layers(), params.perimeter.elephant_foot_compensation
         )};
-        const std::vector<Geometry::BoundedPolygons> projected{Geometry::project_to_geometry(extrusions, params.max_distance)};
+        const std::vector<Geometry::BoundedPolygons> projected{
+            print_object->config().seam_position == spRandom ?
+            Geometry::convert_to_geometry(extrusions) :
+            Geometry::project_to_geometry(extrusions, params.max_distance)
+        };
         Perimeters::LayerPerimeters perimeters{Perimeters::create_perimeters(projected, layer_infos, painting, params.perimeter)};
 
         throw_if_canceled();
@@ -70,7 +74,7 @@ ObjectSeams precalculate_seams(
     ObjectSeams result;
 
     for (auto &[print_object, layer_perimeters] : seam_data) {
-        switch (params.seam_preference) {
+        switch (print_object->config().seam_position.value) {
         case spAligned: {
             const Transform3d transformation{print_object->trafo_centered()};
             const ModelVolumePtrs &volumes{print_object->model_object()->volumes};
@@ -97,7 +101,8 @@ ObjectSeams precalculate_seams(
             break;
         }
         case spNearest: {
-            throw std::runtime_error("Cannot precalculate seams for nearest position!");
+            // Do not precalculate anything.
+            break;
         }
         }
         throw_if_canceled();
@@ -122,7 +127,6 @@ Params Placer::get_params(const DynamicPrintConfig &config) {
     params.perimeter.convex_threshold = Slic3r::Geometry::deg2rad(10.0);
     params.perimeter.concave_threshold = Slic3r::Geometry::deg2rad(15.0);
 
-    params.seam_preference = config.opt_enum<SeamPosition>("seam_position");
     params.staggered_inner_seams = config.opt_bool("staggered_inner_seams");
 
     params.max_nearest_detour = 1.0;
@@ -159,14 +163,18 @@ void Placer::init(
     }
 
     ObjectLayerPerimeters perimeters{get_perimeters(objects, params, object_painting, throw_if_canceled)};
-    this->params = params;
+    ObjectLayerPerimeters perimeters_for_precalculation;
 
-    if (this->params.seam_preference != spNearest) {
-        this->seams_per_object =
-            precalculate_seams(params, std::move(perimeters), throw_if_canceled);
-    } else {
-        this->perimeters_per_layer = std::move(perimeters);
+    for (auto &[print_object, layer_perimeters] : perimeters) {
+        if (print_object->config().seam_position.value == spNearest) {
+            this->perimeters_per_layer[print_object] = std::move(layer_perimeters);
+        } else {
+            perimeters_for_precalculation[print_object] = std::move(layer_perimeters);
+        }
     }
+
+    this->params = params;
+    this->seams_per_object = precalculate_seams(params, std::move(perimeters_for_precalculation), throw_if_canceled);
 
     BOOST_LOG_TRIVIAL(debug) << "SeamPlacer: init: end";
 }
@@ -360,7 +368,7 @@ Point Placer::place_seam(const Layer *layer, const ExtrusionLoop &loop, const Po
     const double loop_width{loop.paths.empty() ? 0.0 : loop.paths.front().width()};
 
 
-    if (this->params.seam_preference == spNearest) {
+    if (po->config().seam_position.value == spNearest) {
         const std::vector<Perimeters::BoundedPerimeter> &perimeters{this->perimeters_per_layer.at(po)[layer_index]};
         const auto [seam_choice, perimeter_index] = place_seam_near(perimeters, loop, last_pos, this->params.max_nearest_detour);
         return finalize_seam_position(loop_polygon, seam_choice, perimeters[perimeter_index].perimeter, loop_width, do_staggering);

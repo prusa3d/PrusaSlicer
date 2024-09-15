@@ -2,12 +2,6 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <functional>
-#include <optional>
-#include <numeric>
-#include <unordered_set>
-#include <random>
-
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
@@ -15,19 +9,32 @@
 #include <libslic3r/AABBTreeIndirect.hpp>
 #include <libslic3r/AABBMesh.hpp>
 #include <libslic3r/ClipperUtils.hpp>
-#include <libslic3r/QuadricEdgeCollapse.hpp>
-#include <libslic3r/SLA/SupportTreeMesher.hpp>
 #include <libslic3r/Execution/ExecutionSeq.hpp>
 #include <libslic3r/Model.hpp>
-
 #include <libslic3r/MeshBoolean.hpp>
-
 #include <boost/log/trivial.hpp>
-
-#include <libslic3r/MTUtils.hpp>
 #include <libslic3r/I18N.hpp>
+#include <functional>
+#include <numeric>
+#include <unordered_set>
+#include <random>
+#include <cmath>
+#include <mutex>
+#include <string>
+#include <cassert>
+#include <cinttypes>
+
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Execution/Execution.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/SLA/JobController.hpp"
+#include "libslic3r/SLA/Pad.hpp"
 
 namespace Slic3r {
+struct VoxelGrid;
+
 namespace sla {
 
 struct Interior {

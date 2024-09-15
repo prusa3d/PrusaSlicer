@@ -4,11 +4,13 @@
 ///|/
 #include <libslic3r/SLA/ConcaveHull.hpp>
 #include <libslic3r/SLA/SpatIndex.hpp>
+#include <cmath>
+#include <iterator>
+#include <limits>
 
-#include <libslic3r/MTUtils.hpp>
-#include <libslic3r/ClipperUtils.hpp>
-
-#include <boost/log/trivial.hpp>
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Line.hpp"
 
 namespace Slic3r {
 namespace sla {

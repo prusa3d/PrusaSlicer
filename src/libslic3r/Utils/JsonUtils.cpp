@@ -1,6 +1,9 @@
 #include "JsonUtils.hpp"
+
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/property_tree/json_parser.hpp>
 #include <regex>
+#include <sstream>
 
 namespace Slic3r {
 
