@@ -6,11 +6,15 @@
 #ifndef slic3r_FillGyroid_hpp_
 #define slic3r_FillGyroid_hpp_
 
-#include "../libslic3r.h"
+#include <utility>
 
+#include "libslic3r/libslic3r.h"
 #include "FillBase.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
+class Point;
 
 class FillGyroid : public Fill
 {

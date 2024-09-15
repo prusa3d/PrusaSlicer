@@ -50,6 +50,7 @@
 #include "Plater.hpp"
 #include "../Utils/Process.hpp"
 #include "format.hpp"
+#include "slic3r/GUI/InstanceCheck.hpp" // IWYU pragma: keep
 
 #include <fstream>
 #include <string_view>
@@ -187,8 +188,8 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     wxAcceleratorEntry entries[100];
 
     int id = 0;
-    for (const auto* entry : entries_cache)
-        entries[id++].Set(entry->GetFlags(), entry->GetKeyCode(), entry->GetMenuItem()->GetId());
+    //for (const auto* entry : entries_cache)
+    //    entries[id++].Set(entry->GetFlags(), entry->GetKeyCode(), entry->GetMenuItem()->GetId());
 
 #if _WIN32
     // This is needed on Windows to fake the CTRL+# of the window menu when using the numpad
@@ -854,11 +855,9 @@ void MainFrame::show_printer_webview_tab(DynamicPrintConfig* dpc)
         if (dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(dpc->option("printhost_authorization_type"))->value == AuthorizationType::atKeyPassword) {
             set_printer_webview_api_key(dpc->opt_string("printhost_apikey"));
         }
-#if 0 // The user password authentication is not working in prusa link as of now.
         else {
-            mset_printer_webview_credentials(dpc->opt_string("printhost_user"), dpc->opt_string("printhost_password"));
+            set_printer_webview_credentials(dpc->opt_string("printhost_user"), dpc->opt_string("printhost_password"));
         }
-#endif // 0
         // add printer or change url
         if (get_printer_webview_tab_added()) {
             set_printer_webview_tab_url(from_u8(url));
@@ -902,7 +901,9 @@ void MainFrame::set_printer_webview_tab_url(const wxString& url)
         add_printer_webview_tab(url);
         return;
     }
-    m_printer_webview->clear();
+    // TODO: this will reset already filled credential when bundle loaded,
+    //  what's the reason of clearing credentials here?
+    //m_printer_webview->clear();
     m_printer_webview->set_default_url(url);
 
     if (m_tabpanel->GetSelection() == m_tabpanel->FindPage(m_printer_webview)) {
@@ -1623,7 +1624,7 @@ void MainFrame::init_menubar_as_editor()
     // Help menu
     auto helpMenu = generate_help_menu();
 
-#ifndef __APPLE__
+#if 0//ndef__APPLE__
     // append menus for Menu button from TopBar
 
     m_bar_menus.AppendMenuItem(fileMenu, _L("&File"));
@@ -1659,9 +1660,11 @@ void MainFrame::init_menubar_as_editor()
 
     SetMenuBar(m_menubar);
 
+#ifdef __APPLE__
     init_macos_application_menu(m_menubar, this);
-
 #endif // __APPLE__
+
+#endif
 
     if (plater()->printer_technology() == ptSLA)
         update_menubar();

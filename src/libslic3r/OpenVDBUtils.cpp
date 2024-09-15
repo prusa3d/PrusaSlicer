@@ -11,6 +11,13 @@
 #endif // _MSC_VER
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/MeshToVolume.h>
+#include <openvdb/Grid.h>
+#include <openvdb/Metadata.h>
+#include <openvdb/Types.h>
+#include <openvdb/math/Transform.h>
+#include <openvdb/math/Vec3.h>
+#include <openvdb/math/Vec4.h>
+#include <openvdb/tools/Morphology.h>
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif // _MSC_VER
@@ -19,6 +26,14 @@
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/FastSweeping.h>
+#include <algorithm>
+#include <optional>
+#include <utility>
+#include <vector>
+#include <cstddef>
+
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

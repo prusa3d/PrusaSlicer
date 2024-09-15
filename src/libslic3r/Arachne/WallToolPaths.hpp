@@ -4,14 +4,23 @@
 #ifndef CURAENGINE_WALLTOOLPATHS_H
 #define CURAENGINE_WALLTOOLPATHS_H
 
-#include <memory>
-
 #include <ankerl/unordered_dense.h>
+#include <stddef.h>
+#include <memory>
+#include <utility>
+#include <vector>
+#include <cstddef>
 
 #include "BeadingStrategy/BeadingStrategyFactory.hpp"
 #include "utils/ExtrusionLine.hpp"
 #include "../Polygon.hpp"
 #include "../PrintConfig.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
+
+namespace boost {
+template <class T> struct hash;
+}  // namespace boost
 
 namespace Slic3r::Arachne
 {

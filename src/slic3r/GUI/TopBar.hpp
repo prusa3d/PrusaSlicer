@@ -2,7 +2,7 @@
 #define slic3r_TopBar_hpp_
 
 #include <wx/bookctrl.h>
-#include "wxExtensions.hpp"
+#include <wx/panel.h>
 #include "Widgets/TextInput.hpp"
 
 class TopBarMenus;
@@ -12,12 +12,19 @@ wxDECLARE_EVENT(wxCUSTOMEVT_TOPBAR_SEL_CHANGED, wxCommandEvent);
 
 class TopBarItemsCtrl : public wxControl
 {
-    class Button : public ScalableButton
+    class Button : public wxPanel
     {
         bool        m_is_selected{ false };
         wxColour    m_background_color;
         wxColour    m_foreground_color;
         wxBitmapBundle  m_bmp_bundle = wxBitmapBundle();
+
+    protected:
+        wxString    m_label;
+        std::string m_icon_name;
+        int         m_px_cnt            { 16 };
+        bool        m_has_down_arrow    { false };
+        wxBitmapBundle  m_dd_bmp_bundle = wxBitmapBundle();
 
     public:
         Button() {};
@@ -33,7 +40,7 @@ class TopBarItemsCtrl : public wxControl
         void set_hovered (bool hovered);
         void render();
 
-        void sys_color_changed() override;
+        void sys_color_changed();
         void SetBitmapBundle(wxBitmapBundle bmp_bundle) { m_bmp_bundle = bmp_bundle; }
     };
 
@@ -45,6 +52,7 @@ class TopBarItemsCtrl : public wxControl
         ButtonWithPopup(wxWindow*           parent,
                         const wxString&     label,
                         const std::string&  icon_name = "",
+                        const int           px_cnt = 16,
                         wxSize              size = wxDefaultSize);
         ButtonWithPopup(wxWindow*           parent,
                         const std::string&  icon_name,

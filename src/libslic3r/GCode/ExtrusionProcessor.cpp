@@ -1,14 +1,31 @@
 #include "ExtrusionProcessor.hpp"
-#include <string>
 
-namespace Slic3r { namespace ExtrusionProcessor {
+#include <cassert>
+#include <iterator>
+#include <map>
+#include <optional>
+#include <cstddef>
+
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Polygon.hpp"
+
+namespace Slic3r::ExtrusionProcessor {
 
 ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath                             &path,
                                                           const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
                                                           const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines)
 {
-    std::vector<ExtendedPoint>           extended_points = estimate_points_properties<true, true, true, true>(path.polyline.points,
-                                                                                                    unscaled_prev_layer, path.width());
+    ExtrusionProcessor::PropertiesEstimationConfig config{};
+    config.add_corners = true;
+    config.prev_layer_boundary_offset = true;
+    config.flow_width = path.width();
+    std::vector<ExtendedPoint> extended_points = estimate_points_properties<true>(
+        path.polyline.points, unscaled_prev_layer, config
+    );
+
     std::vector<std::pair<float, float>> calculated_distances(extended_points.size());
 
     for (size_t i = 0; i < extended_points.size(); i++) {
@@ -108,9 +125,28 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
         } else if (auto *loop = dynamic_cast<const ExtrusionLoop *>(e)) {
             ExtrusionLoop new_loop = *loop;
             new_loop.paths.clear();
-            for (const ExtrusionPath &p : loop->paths) {
-                auto paths = calculate_and_split_overhanging_extrusions(p, unscaled_prev_layer, prev_layer_curled_lines);
-                new_loop.paths.insert(new_loop.paths.end(), paths.begin(), paths.end());
+
+            ExtrusionPaths paths{loop->paths};
+            if (!paths.empty()) {
+                ExtrusionPath& first_path{paths.front()};
+                ExtrusionPath& last_path{paths.back()};
+
+                if (first_path.attributes() == last_path.attributes()) {
+                    if (first_path.polyline.size() > 1 && last_path.polyline.size() > 2) {
+                        const Line start{first_path.polyline.front(), *std::next(first_path.polyline.begin())};
+                        const Line end{last_path.polyline.back(), *std::next(last_path.polyline.rbegin())};
+
+                        if (std::abs(start.direction() - end.direction()) < 1e-5) {
+                            first_path.polyline.points.front() = *std::next(last_path.polyline.points.rbegin());
+                            last_path.polyline.points.pop_back();
+                        }
+                    }
+                }
+            }
+
+            for (const ExtrusionPath &p : paths) {
+                auto resulting_paths = calculate_and_split_overhanging_extrusions(p, unscaled_prev_layer, prev_layer_curled_lines);
+                new_loop.paths.insert(new_loop.paths.end(), resulting_paths.begin(), resulting_paths.end());
             }
             result.append(new_loop);
         } else if (auto *mp = dynamic_cast<const ExtrusionMultiPath *>(e)) {
@@ -136,57 +172,85 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
     return result;
 };
 
-
-std::pair<float,float> calculate_overhang_speed(const ExtrusionAttributes &attributes,
-                              const FullPrintConfig     &config,
-                              size_t                     extruder_id,
-                              float                      external_perim_reference_speed,
-                              float                      default_speed)
+static std::map<float, float> calc_print_speed_sections(const ExtrusionAttributes &attributes,
+                                                        const FullPrintConfig     &config,
+                                                        const float                external_perimeter_reference_speed,
+                                                        const float                default_speed)
 {
-    assert(attributes.overhang_attributes.has_value());
-    std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {
-        {100, ConfigOptionFloatOrPercent{default_speed, false}}};
+    struct OverhangWithSpeed
+    {
+        int                        percent;
+        ConfigOptionFloatOrPercent print_speed;
+    };
+
+    std::vector<OverhangWithSpeed> overhangs_with_speeds = {{100, ConfigOptionFloatOrPercent{default_speed, false}}};
     if (config.enable_dynamic_overhang_speeds) {
-        overhangs_with_speeds = {{0, config.overhang_speed_0},
-                                 {25, config.overhang_speed_1},
-                                 {50, config.overhang_speed_2},
-                                 {75, config.overhang_speed_3},
+        overhangs_with_speeds = {{  0, config.overhang_speed_0},
+                                 { 25, config.overhang_speed_1},
+                                 { 50, config.overhang_speed_2},
+                                 { 75, config.overhang_speed_3},
                                  {100, ConfigOptionFloatOrPercent{default_speed, false}}};
     }
 
-    std::vector<std::pair<int, ConfigOptionInts>> overhang_with_fan_speeds = {{100, ConfigOptionInts{0}}};
-    if (config.enable_dynamic_fan_speeds.get_at(extruder_id)) {
-        overhang_with_fan_speeds = {{0, config.overhang_fan_speed_0},
-                                    {25, config.overhang_fan_speed_1},
-                                    {50, config.overhang_fan_speed_2},
-                                    {75, config.overhang_fan_speed_3},
-                                    {100, ConfigOptionInts{0}}};
-    }
-
-    float                  speed_base = external_perim_reference_speed > 0 ? external_perim_reference_speed : default_speed;
+    const float            speed_base = external_perimeter_reference_speed > 0 ? external_perimeter_reference_speed : default_speed;
     std::map<float, float> speed_sections;
-    for (size_t i = 0; i < overhangs_with_speeds.size(); i++) {
-        float distance = attributes.width * (1.0 - (overhangs_with_speeds[i].first / 100.0));
-        float speed    = overhangs_with_speeds[i].second.percent ? (speed_base * overhangs_with_speeds[i].second.value / 100.0) :
-                                                                   overhangs_with_speeds[i].second.value;
-        if (speed < EPSILON)
+    for (OverhangWithSpeed &overhangs_with_speed : overhangs_with_speeds) {
+        const float distance = attributes.width * (1.f - (float(overhangs_with_speed.percent) / 100.f));
+        float       speed    = float(overhangs_with_speed.print_speed.get_abs_value(speed_base));
+
+        if (speed < EPSILON) {
             speed = speed_base;
+        }
+
         speed_sections[distance] = speed;
     }
 
+    return speed_sections;
+}
+
+static std::map<float, float> calc_fan_speed_sections(const ExtrusionAttributes &attributes,
+                                                      const FullPrintConfig     &config,
+                                                      const size_t               extruder_id)
+{
+    struct OverhangWithFanSpeed
+    {
+        int              percent;
+        ConfigOptionInts fan_speed;
+    };
+
+    std::vector<OverhangWithFanSpeed> overhang_with_fan_speeds = {{100, ConfigOptionInts{0}}};
+    if (config.enable_dynamic_fan_speeds.get_at(extruder_id)) {
+        overhang_with_fan_speeds = {{  0, config.overhang_fan_speed_0},
+                                    { 25, config.overhang_fan_speed_1},
+                                    { 50, config.overhang_fan_speed_2},
+                                    { 75, config.overhang_fan_speed_3},
+                                    {100, ConfigOptionInts{0}}};
+    }
+
     std::map<float, float> fan_speed_sections;
-    for (size_t i = 0; i < overhang_with_fan_speeds.size(); i++) {
-        float distance               = attributes.width * (1.0 - (overhang_with_fan_speeds[i].first / 100.0));
-        float fan_speed              = overhang_with_fan_speeds[i].second.get_at(extruder_id);
+    for (OverhangWithFanSpeed &overhang_with_fan_speed : overhang_with_fan_speeds) {
+        float distance               = attributes.width * (1.f - (float(overhang_with_fan_speed.percent) / 100.f));
+        float fan_speed              = float(overhang_with_fan_speed.fan_speed.get_at(extruder_id));
         fan_speed_sections[distance] = fan_speed;
     }
+
+    return fan_speed_sections;
+}
+
+OverhangSpeeds calculate_overhang_speed(const ExtrusionAttributes  &attributes,
+                                        const FullPrintConfig      &config,
+                                        const size_t                extruder_id,
+                                        const float                 external_perimeter_reference_speed,
+                                        const float                 default_speed,
+                                        const std::optional<float> &current_fan_speed)
+{
+    assert(attributes.overhang_attributes.has_value());
 
     auto interpolate_speed = [](const std::map<float, float> &values, float distance) {
         auto upper_dist = values.lower_bound(distance);
         if (upper_dist == values.end()) {
             return values.rbegin()->second;
-        }
-        if (upper_dist == values.begin()) {
+        } else if (upper_dist == values.begin()) {
             return upper_dist->second;
         }
 
@@ -195,22 +259,29 @@ std::pair<float,float> calculate_overhang_speed(const ExtrusionAttributes &attri
         return (1.0f - t) * lower_dist->second + t * upper_dist->second;
     };
 
-    float extrusion_speed   = std::min(interpolate_speed(speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
-                                       interpolate_speed(speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
-    float curled_base_speed = interpolate_speed(speed_sections,
-                                                attributes.width * attributes.overhang_attributes->proximity_to_curled_lines);
-    float final_speed       = std::min(curled_base_speed, extrusion_speed);
-    float fan_speed = std::min(interpolate_speed(fan_speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
-                               interpolate_speed(fan_speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
+    const std::map<float, float> speed_sections     = calc_print_speed_sections(attributes, config, external_perimeter_reference_speed, default_speed);
+    const std::map<float, float> fan_speed_sections = calc_fan_speed_sections(attributes, config, extruder_id);
 
+    const float extrusion_speed   = std::min(interpolate_speed(speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
+                                             interpolate_speed(speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
+    const float curled_base_speed = interpolate_speed(speed_sections, attributes.width * attributes.overhang_attributes->proximity_to_curled_lines);
+
+    const float fan_speed         = std::min(interpolate_speed(fan_speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
+                                             interpolate_speed(fan_speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
+
+    OverhangSpeeds overhang_speeds = {std::min(curled_base_speed, extrusion_speed), fan_speed};
     if (!config.enable_dynamic_overhang_speeds) {
-        final_speed = -1;
-    }
-    if (!config.enable_dynamic_fan_speeds.get_at(extruder_id)) {
-        fan_speed = -1;
+        overhang_speeds.print_speed = -1;
     }
 
-    return {final_speed, fan_speed};
+    if (!config.enable_dynamic_fan_speeds.get_at(extruder_id)) {
+        overhang_speeds.fan_speed = -1;
+    } else if (current_fan_speed.has_value() && (fan_speed < *current_fan_speed) && (*current_fan_speed - fan_speed) <= MIN_FAN_SPEED_NEGATIVE_CHANGE_TO_EMIT) {
+        // Always allow the fan speed to be increased without any hysteresis, but the speed will be decreased only when it exceeds a limit for minimum change.
+        overhang_speeds.fan_speed = *current_fan_speed;
+    }
+
+    return overhang_speeds;
 }
 
-}} // namespace Slic3r::ExtrusionProcessor
+} // namespace Slic3r::ExtrusionProcessor

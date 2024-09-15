@@ -2,25 +2,39 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <numeric>
-#include "Emboss.hpp"
-#include <stdio.h>
-#include <numeric>
-#include <cstdlib>
 #include <boost/nowide/convert.hpp>
 #include <boost/log/trivial.hpp>
-#include <ClipperUtils.hpp> // union_ex + for boldness(polygon extend(offset))
+#include <numeric>
+#include <cstdlib>
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <iterator>
+#include <limits>
+
+#include "Emboss.hpp"
 #include "IntersectionPoints.hpp"
+#include "admesh/stl.h"
+#include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/EmbossShape.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/TextConfiguration.hpp"
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
-#include "imgui/imstb_truetype.h" // stbtt_fontinfo
+
+#include <libslic3r/Triangulation.hpp> // CGAL project
+
+// Explicit horror include (used to be implicit) - libslic3r "officialy" does not depend on imgui.
+#include "../../bundled_deps/imgui/imgui/imstb_truetype.h" // stbtt_fontinfo
 #include "Utils.hpp" // ScopeGuard
-
-#include <Triangulation.hpp> // CGAL project
 #include "libslic3r.h"
-
 // to heal shape
-#include "ExPolygonsIndex.hpp"
+#include "libslic3r/ClipperUtils.hpp" // union_ex + for boldness(polygon extend(offset))
+#include "libslic3r/ExPolygonsIndex.hpp"
 #include "libslic3r/AABBTreeLines.hpp" // search structure for found close points
 #include "libslic3r/Line.hpp"
 #include "libslic3r/BoundingBox.hpp"
@@ -56,6 +70,7 @@ namespace {
 // for debug purpose only
 // NOTE: check scale when store svg !!
 #include "libslic3r/SVG.hpp" // for visualize_heal
+
 Points get_unique_intersections(const Slic3r::IntersectionsLines &intersections); // fast forward declaration
 static std::string visualize_heal_svg_filepath = "C:/data/temp/heal.svg";
 void               visualize_heal(const std::string &svg_filepath, const ExPolygons &expolygons)
@@ -1347,7 +1362,6 @@ ExPolygonsWithIds Emboss::text2vshapes(FontFileWithCache &font_with_cache, const
     return result;
 }
 
-#include <boost/range/adaptor/reversed.hpp>
 unsigned Emboss::get_count_lines(const std::wstring& ws)
 {
     if (ws.empty())
@@ -2049,6 +2063,7 @@ double Emboss::get_align_y_offset_in_mm(FontProp::VerticalAlign align, unsigned 
 
 #ifdef REMOVE_SPIKES
 #include <Geometry.hpp>
+
 void remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc)
 {
     enum class Type {

@@ -5,10 +5,13 @@
 #ifndef slic3r_Tesselate_hpp_
 #define slic3r_Tesselate_hpp_
 
-#include <vector>
 #include <admesh/stl.h>
+#include <vector>
 
 #include "ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

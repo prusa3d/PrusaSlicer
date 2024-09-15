@@ -5,12 +5,21 @@
 #ifndef slic3r_WxFontUtils_hpp_
 #define slic3r_WxFontUtils_hpp_
 
+#include <boost/bimap.hpp>
+#include <wx/font.h>
 #include <memory>
 #include <optional>
 #include <string_view>
-#include <boost/bimap.hpp>
-#include <wx/font.h>
+#include <string>
+
 #include "libslic3r/Emboss.hpp"
+#include "libslic3r/TextConfiguration.hpp"
+
+namespace Slic3r {
+namespace Emboss {
+struct FontFile;
+}  // namespace Emboss
+}  // namespace Slic3r
 
 namespace Slic3r::GUI {
 

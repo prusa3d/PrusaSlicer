@@ -23,6 +23,17 @@
 #define slic3r_Config_hpp_
 
 #include <assert.h>
+#include <float.h>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/format/format_fwd.hpp>
+#include <boost/functional/hash.hpp>
+#include <boost/property_tree/ptree_fwd.hpp>
+#include <cereal/access.hpp>
+#include <cereal/types/base_class.hpp>
+#include <ctype.h>
+#include <boost/container_hash/hash.hpp>
+#include <cereal/cereal.hpp>
 #include <map>
 #include <climits>
 #include <limits>
@@ -35,20 +46,22 @@
 #include <string_view>
 #include <type_traits>
 #include <vector>
-#include <float.h>
+#include <algorithm>
+#include <cmath>
+#include <initializer_list>
+#include <memory>
+#include <optional>
+#include <utility>
+#include <variant>
+#include <cassert>
+#include <cctype>
+#include <cfloat>
+
 #include "libslic3r.h"
 #include "clonable_ptr.hpp"
 #include "Exception.hpp"
 #include "Point.hpp"
-
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/format/format_fwd.hpp>
-#include <boost/functional/hash.hpp>
-#include <boost/property_tree/ptree_fwd.hpp>
-
-#include <cereal/access.hpp>
-#include <cereal/types/base_class.hpp>
+#include "LocalesUtils.hpp"
 
 namespace Slic3r {
     struct FloatOrPercent
@@ -254,6 +267,7 @@ enum ForwardCompatibilitySubstitutionRule
 class  ConfigDef;
 class  ConfigOption;
 class  ConfigOptionDef;
+
 // For forward definition of ConfigOption in ConfigOptionUniquePtr, we have to define a custom deleter.
 struct ConfigOptionDeleter { void operator()(ConfigOption* p); };
 using  ConfigOptionUniquePtr = std::unique_ptr<ConfigOption, ConfigOptionDeleter>;

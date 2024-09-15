@@ -12,27 +12,29 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "libslic3r.h"
-#include "Exception.hpp"
-#include "Geometry.hpp"
-#include "ClipperUtils.hpp"
-#include "ExPolygon.hpp"
-#include "Line.hpp"
-#include "clipper.hpp"
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/constants.hpp>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <list>
-#include <map>
-#include <numeric>
-#include <set>
 #include <utility>
-#include <stack>
 #include <vector>
+#include <array>
+#include <complex>
 
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/log/trivial.hpp>
+#include "libslic3r.h"
+#include "Geometry.hpp"
+#include "ClipperUtils.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/MultiPoint.hpp"
+#include "libslic3r/Polygon.hpp"
+
+namespace boost {
+namespace polygon {
+template <typename T> class point_data;
+}  // namespace polygon
+}  // namespace boost
 
 #if defined(_MSC_VER) && defined(__clang__)
 #define BOOST_NO_CXX17_HDR_STRING_VIEW

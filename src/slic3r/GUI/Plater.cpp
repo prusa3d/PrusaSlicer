@@ -30,7 +30,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/optional.hpp>
-#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/fstream.hpp> // IWYU pragma: keep
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/trivial.hpp>
@@ -123,8 +123,10 @@
 #include "Gizmos/GLGizmoCut.hpp"
 #include "FileArchiveDialog.hpp"
 #include "UserAccount.hpp"
+#include "UserAccountUtils.hpp"
 #include "DesktopIntegrationDialog.hpp"
 #include "WebViewDialog.hpp"
+#include "ConfigWizardWebViewPage.hpp"
 #include "PresetArchiveDatabase.hpp"
 
 #ifdef __APPLE__
@@ -271,6 +273,9 @@ struct Plater::priv
     std::unique_ptr<NotificationManager> notification_manager;
     std::unique_ptr<UserAccount> user_account;
     std::unique_ptr<PresetArchiveDatabase>  preset_archive_database;
+    // Login dialog needs to be kept somewhere.
+    // It is created inside evt Bind. But it might be closed from another event.
+    LoginWebViewDialog* login_dialog { nullptr };
 
     ProjectDirtyStateManager dirty_state;
      
@@ -874,14 +879,43 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
             user_account->on_login_code_recieved(evt.data);
         });
         this->q->Bind(EVT_OPEN_PRUSAAUTH, [this](OpenPrusaAuthEvent& evt) {
-            BOOST_LOG_TRIVIAL(info)  << "open login browser: " << evt.data;
+            BOOST_LOG_TRIVIAL(info)  << "open login browser: " << evt.data.first;
             std::string dialog_msg;
-            LoginWebViewDialog dialog(this->q, dialog_msg, evt.data);
-            if (dialog.ShowModal() != wxID_OK) {
-                return;
+            login_dialog = new LoginWebViewDialog(this->q, dialog_msg, evt.data.first, this->q);
+            if (login_dialog->ShowModal() == wxID_OK) {
+                user_account->on_login_code_recieved(dialog_msg);
             }
-            user_account->on_login_code_recieved(dialog_msg);
+            if (login_dialog != nullptr) {
+                this->q->RemoveChild(login_dialog);
+                login_dialog->Destroy();
+                login_dialog = nullptr;
+            }
         });
+
+        auto open_external_login = [this](wxCommandEvent& evt){
+             DownloaderUtils::Worker::perform_url_register();
+#if defined(__linux__)
+            // Remove all desktop files registering prusaslicer:// url done by previous versions.
+            DesktopIntegrationDialog::undo_downloader_registration_rigid();
+#if defined(SLIC3R_DESKTOP_INTEGRATION)
+            if (DownloaderUtils::Worker::perform_registration_linux) 
+                DesktopIntegrationDialog::perform_downloader_desktop_integration();
+#endif // SLIC3R_DESKTOP_INTEGRATION                
+#endif // __linux__
+            std::string service;
+            if (evt.GetString().Find(L"accounts.google.com") != wxString::npos) {
+                service = "google";
+            } else if (evt.GetString().Find(L"appleid.apple.com") != wxString::npos) {
+                service  = "apple";
+            } else if (evt.GetString().Find(L"facebook.com") != wxString::npos) {
+                service = "facebook";
+            }
+            wxString url = user_account->get_login_redirect_url(service);
+            wxGetApp().open_login_browser_with_dialog(into_u8(url));
+        };
+
+        this->q->Bind(EVT_OPEN_EXTERNAL_LOGIN_WIZARD, open_external_login);
+        this->q->Bind(EVT_OPEN_EXTERNAL_LOGIN, open_external_login);
     
         this->q->Bind(EVT_UA_LOGGEDOUT, [this](UserAccountSuccessEvent& evt) {
             user_account->clear();
@@ -894,21 +928,25 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
             sidebar->update_printer_presets_combobox();
             wxGetApp().update_wizard_login_page();
             this->show_action_buttons(this->ready_to_slice);
-
-             LogoutWebViewDialog dlg(this->q);
-            dlg.ShowModal();
         });
 
         this->q->Bind(EVT_UA_ID_USER_SUCCESS, [this](UserAccountSuccessEvent& evt) {
+            if (login_dialog != nullptr) {
+                login_dialog->EndModal(wxID_CANCEL);
+            }
             // There are multiple handlers and we want to notify all
             evt.Skip();
+            std::string who = user_account->get_username();
             std::string username;
             if (user_account->on_user_id_success(evt.data, username)) {
-                std::string text = format(_u8L("Logged to Prusa Account as %1%."), username);
-                // login notification
-                this->notification_manager->close_notification_of_type(NotificationType::UserAccountID);
-                // show connect tab
-                this->notification_manager->push_notification(NotificationType::UserAccountID, NotificationManager::NotificationLevel::ImportantNotificationLevel, text);
+                // Do not show notification on refresh.
+                if (who != username) {
+                    std::string text = format(_u8L("Logged to Prusa Account as %1%."), username);
+                    // login notification
+                    this->notification_manager->close_notification_of_type(NotificationType::UserAccountID);
+                    // show connect tab
+                    this->notification_manager->push_notification(NotificationType::UserAccountID, NotificationManager::NotificationLevel::ImportantNotificationLevel, text);
+                }
                 this->main_frame->add_connect_webview_tab();
                 // Update User name in TopBar
                 this->main_frame->refresh_account_menu();
@@ -2055,6 +2093,22 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
     if (full_config.has("binary_gcode")) // needed for SLA
         full_config.set("binary_gcode", bool(full_config.opt_bool("binary_gcode") & wxGetApp().app_config->get_bool("use_binary_gcode_when_supported")));
 
+    const Preset &selected_printer = wxGetApp().preset_bundle->printers.get_selected_preset();
+    std::string printer_model_serialized = full_config.option("printer_model")->serialize();
+    std::string vendor_repo_prefix;
+    if (selected_printer.vendor) {
+        vendor_repo_prefix = selected_printer.vendor->repo_prefix;
+    } else if (std::string inherits = selected_printer.inherits(); !inherits.empty()) {
+        const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
+        if (parent && parent->vendor) {
+            vendor_repo_prefix = parent->vendor->repo_prefix;
+        }
+    }
+    if (printer_model_serialized.find(vendor_repo_prefix) == 0) {
+        printer_model_serialized = printer_model_serialized.substr(vendor_repo_prefix.size());
+        boost::trim_left(printer_model_serialized);
+        full_config.set("printer_model", printer_model_serialized);
+    }
     // If the update_background_process() was not called by the timer, kill the timer,
     // so the update_restart_background_process() will not be called again in vain.
     background_process_timer.Stop();
@@ -3644,7 +3698,9 @@ bool Plater::priv::can_show_upload_to_connect() const
             vendor_id = parent->vendor->id;
         }
     }    
-    return vendor_id.compare(0, 5, "Prusa") == 0;
+    // Upload to Connect should show only for prusa printers
+    // Some vendors might have prefixed name due to repository id.
+    return vendor_id.find("Prusa") != std::string::npos;
 } 
 
 void Plater::priv::show_action_buttons(const bool ready_to_slice_) const
@@ -3974,6 +4030,8 @@ Plater::Plater(wxWindow *parent, MainFrame *main_frame)
 {
     // Initialization performed in the private c-tor
 }
+
+Plater::~Plater() = default;
 
 bool Plater::is_project_dirty() const { return p->is_project_dirty(); }
 bool Plater::is_presets_dirty() const { return p->is_presets_dirty(); }
@@ -5553,6 +5611,8 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
             TriangleMesh vols_mesh(mesh);
             mesh = TriangleMesh();
             for (const ModelInstance* i : mo.instances) {
+                if (!i->is_printable())
+                    continue;
                 TriangleMesh m = vols_mesh;
                 m.transform(i->get_matrix(), true);
                 mesh.merge(m);
@@ -5568,8 +5628,10 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
 
         const SLAPrintObject *object = this->p->sla_print.get_print_object_by_model_object_id(mo.id());
 
-        if (!object || !object->get_mesh_to_print() || object->get_mesh_to_print()->empty())
-            mesh = mesh_to_export_fff(mo, instance_id);
+        if (!object || !object->get_mesh_to_print() || object->get_mesh_to_print()->empty()) {
+            if (!extended)
+                mesh = mesh_to_export_fff(mo, instance_id);
+        }
         else {
             const Transform3d mesh_trafo_inv = object->trafo().inverse();
             const bool is_left_handed = object->is_left_handed();
@@ -6012,10 +6074,11 @@ void Plater::connect_gcode()
 */
     const Preset* selected_printer_preset = &wxGetApp().preset_bundle->printers.get_selected_preset();
 
-    const std::string filename = p->user_account->get_keyword_from_json(dialog_msg, "filename");
-    const std::string team_id = p->user_account->get_keyword_from_json(dialog_msg, "team_id");
+     boost::property_tree::ptree ptree;
+    const std::string filename = UserAccountUtils::get_keyword_from_json(ptree, dialog_msg, "filename");
+     const std::string team_id = UserAccountUtils::get_keyword_from_json(ptree, dialog_msg, "team_id");
 
-    std::string data_subtree = p->user_account->get_print_data_from_json(dialog_msg, "data");
+    std::string data_subtree = UserAccountUtils::get_print_data_from_json(dialog_msg, "data");
     if (filename.empty() || team_id.empty() || data_subtree.empty()) {
         std::string msg = _u8L("Failed to read response from Prusa Connect server. Upload is cancelled.");
         BOOST_LOG_TRIVIAL(error) << msg;
@@ -6406,7 +6469,6 @@ void Plater::force_print_bed_update()
 
 void Plater::on_activate(bool active)
 {
-    this->p->user_account->on_activate_window(active);
     if (active) {
 	    this->p->show_delayed_error_message();
     }

@@ -69,18 +69,29 @@ namespace instance_check_internal
 		//if (argc < 2)
 		//	return ret;
 		std::vector<std::string> arguments { argv[0] };
+		bool send_if_url = false;
+		bool has_url = false;
         for (int i = 1; i < argc; ++i) {
 			const std::string token = argv[i];
+			if (token.find("prusaslicer://") == 0) {
+				BOOST_LOG_TRIVIAL(info) << "url found: " << token;
+				has_url = true;
+			}
 			// Processing of boolean command line arguments shall match DynamicConfig::read_cli().
 			if (token == "--single-instance")
 				ret.should_send = true;
 			else if (token == "--no-single-instance")
 				ret.should_send = false;
+			else if (token == "--single-instance-on-url")
+				send_if_url = true;
 			else
 				arguments.emplace_back(token);
 		} 
+		if (send_if_url && has_url) {
+			ret.should_send = true;
+		}
 		ret.cl_string = escape_strings_cstyle(arguments);
-		BOOST_LOG_TRIVIAL(debug) << "single instance: " << 
+		BOOST_LOG_TRIVIAL(info) << "single instance: " << 
             (ret.should_send.has_value() ? (*ret.should_send ? "true" : "false") : "undefined") <<
 			". other params: " << ret.cl_string;
 		return ret;

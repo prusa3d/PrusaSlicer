@@ -1,9 +1,15 @@
 #ifndef libslic3r_SeamAligned_hpp_
 #define libslic3r_SeamAligned_hpp_
 
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <vector>
+
 #include "libslic3r/GCode/SeamPerimeters.hpp"
 #include "libslic3r/GCode/SeamChoice.hpp"
 #include "libslic3r/Point.hpp"
+#include "libslic3r/GCode/SeamShells.hpp"
 
 namespace Slic3r::ModelInfo {
     struct Visibility;

@@ -3,15 +3,18 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "ShortEdgeCollapse.hpp"
-#include "libslic3r/NormalUtils.hpp"
 
-#include <unordered_map>
-#include <unordered_set>
+#include <boost/random/uniform_int_distribution.hpp>
+#include <ankerl/unordered_dense.h>
 #include <random>
 #include <algorithm>
-#include <boost/random/uniform_int_distribution.hpp>
+#include <utility>
+#include <vector>
 
-#include <ankerl/unordered_dense.h>
+#include "libslic3r/NormalUtils.hpp"
+#include "admesh/stl.h"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 namespace Slic3r {
 

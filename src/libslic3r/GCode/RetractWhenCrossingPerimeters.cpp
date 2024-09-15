@@ -2,11 +2,19 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <algorithm>
+#include <cassert>
+
 #include "../ClipperUtils.hpp"
 #include "../Layer.hpp"
 #include "../Polyline.hpp"
-
 #include "RetractWhenCrossingPerimeters.hpp"
+#include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Surface.hpp"
 
 namespace Slic3r {
 

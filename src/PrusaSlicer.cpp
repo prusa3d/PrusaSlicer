@@ -68,6 +68,7 @@
 
 #ifdef SLIC3R_GUI
     #include "slic3r/GUI/GUI_Init.hpp"
+    #include "slic3r/Utils/ServiceConfig.hpp"
 #endif /* SLIC3R_GUI */
 
 using namespace Slic3r;
@@ -181,6 +182,9 @@ int CLI::run(int argc, char **argv)
         return 1;
 
 #ifdef SLIC3R_GUI
+    if (m_config.has("webdev")) {
+        Utils::ServiceConfig::instance().set_webdev_enabled(m_config.opt_bool("webdev"));
+    }
     std::vector<std::string>::iterator it;
     bool opengl_aa = false;
     it = std::find(m_actions.begin(), m_actions.end(), "opengl-aa");

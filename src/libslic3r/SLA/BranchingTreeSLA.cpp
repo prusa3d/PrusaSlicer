@@ -4,16 +4,29 @@
 ///|/
 #include "BranchingTreeSLA.hpp"
 
-#include "libslic3r/Execution/ExecutionTBB.hpp"
-
-#include "libslic3r/KDTreeIndirect.hpp"
-
-#include "SupportTreeUtils.hpp"
-#include "BranchingTree/PointCloud.hpp"
-
-#include "Pad.hpp"
-
+#include <boost/container/vector.hpp>
+#include <boost/geometry.hpp>
+#include <boost/log/trivial.hpp>
 #include <map>
+#include <algorithm>
+#include <mutex>
+#include <optional>
+#include <utility>
+#include <vector>
+#include <cstddef>
+
+#include "libslic3r/Execution/ExecutionTBB.hpp"
+#include "libslic3r/KDTreeIndirect.hpp"
+#include "SupportTreeUtils.hpp"
+#include "libslic3r/BranchingTree/PointCloud.hpp"
+#include "Pad.hpp"
+#include "libslic3r/BranchingTree/BranchingTree.hpp"
+#include "libslic3r/Execution/Execution.hpp"
+#include "libslic3r/Execution/ExecutionSeq.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/SLA/SupportTree.hpp"
+#include "libslic3r/SLA/SupportTreeBuilder.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r { namespace sla {
 

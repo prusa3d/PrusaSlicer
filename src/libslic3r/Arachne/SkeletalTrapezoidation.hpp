@@ -5,11 +5,11 @@
 #define SKELETAL_TRAPEZOIDATION_H
 
 #include <boost/polygon/voronoi.hpp>
-
+#include <ankerl/unordered_dense.h>
 #include <memory> // smart pointers
 #include <utility> // pair
-
-#include <ankerl/unordered_dense.h>
+#include <list>
+#include <vector>
 
 #include "utils/HalfEdgeGraph.hpp"
 #include "utils/PolygonsSegmentIndex.hpp"
@@ -20,6 +20,10 @@
 #include "libslic3r/Arachne/BeadingStrategy/BeadingStrategy.hpp"
 #include "SkeletalTrapezoidationGraph.hpp"
 #include "../Geometry/Voronoi.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 //#define ARACHNE_DEBUG
 //#define ARACHNE_DEBUG_VORONOI

@@ -895,9 +895,16 @@ void ViewerImpl::reset()
 #endif // ENABLE_OPENGL_ES
 }
 
+// On some graphic cards texture buffers using GL_RGB32F format do not work, see:
+// https://dev.prusa3d.com/browse/SPE-2411
+// https://github.com/prusa3d/PrusaSlicer/issues/12908
+// To let all drivers be happy, we use GL_RGBA32F format, so we need to add an extra (currently unused) float
+// to position and heights_widths_angles vectors
+using Vec4 = std::array<float, 4>;
+
 static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, float travels_radius, float wipes_radius, BitSet<>& valid_lines_bitset,
-    std::vector<Vec3>* positions = nullptr, std::vector<Vec3>* heights_widths_angles = nullptr, bool update_bitset = false) {
-    static constexpr const Vec3 ZERO = { 0.0f, 0.0f, 0.0f };
+    std::vector<Vec4>* positions = nullptr, std::vector<Vec4>* heights_widths_angles = nullptr, bool update_bitset = false) {
+  static constexpr const Vec3 ZERO = { 0.0f, 0.0f, 0.0f };
     if (positions == nullptr && heights_widths_angles == nullptr)
         return;
     if (vertices.empty())
@@ -930,7 +937,8 @@ static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, floa
         }
         
         if (positions != nullptr) {
-            Vec3 position = v.position;
+            // the last component is a dummy float to comply with GL_RGBA32F format
+            Vec4 position = { v.position[0], v.position[1], v.position[2], 0.0f };
             if (move_type == EMoveType::Extrude)
                 // push down extrusion vertices by half height to render them at the right z
                 position[2] -= 0.5f * v.height;
@@ -952,9 +960,9 @@ static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, floa
                 height = v.height;
                 width = v.width;
             }
-
+            // the last component is a dummy float to comply with GL_RGBA32F format
             heights_widths_angles->push_back({ height, width,
-                std::atan2(prev_line[0] * this_line[1] - prev_line[1] * this_line[0], dot(prev_line, this_line)) });
+                std::atan2(prev_line[0] * this_line[1] - prev_line[1] * this_line[0], dot(prev_line, this_line)), 0.0f });
         }
     }
 }
@@ -1033,8 +1041,9 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
         m_settings.time_mode = ETimeMode::Normal;
 
     // buffers to send to gpu
-    std::vector<Vec3> positions;
-    std::vector<Vec3> heights_widths_angles;
+    // the last component is a dummy float to comply with GL_RGBA32F format
+    std::vector<Vec4> positions;
+    std::vector<Vec4> heights_widths_angles;
     positions.reserve(m_vertices.size());
     heights_widths_angles.reserve(m_vertices.size());
     extract_pos_and_or_hwa(m_vertices, m_travels_radius, m_wipes_radius, m_valid_lines_bitset, &positions, &heights_widths_angles, true);
@@ -1056,14 +1065,14 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
         // create and fill positions buffer
         glsafe(glGenBuffers(1, &m_positions_buf_id));
         glsafe(glBindBuffer(GL_TEXTURE_BUFFER, m_positions_buf_id));
-        glsafe(glBufferData(GL_TEXTURE_BUFFER, positions.size() * sizeof(Vec3), positions.data(), GL_STATIC_DRAW));
+        glsafe(glBufferData(GL_TEXTURE_BUFFER, positions.size() * sizeof(Vec4), positions.data(), GL_STATIC_DRAW));
         glsafe(glGenTextures(1, &m_positions_tex_id));
         glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_positions_tex_id));
 
         // create and fill height, width and angles buffer
         glsafe(glGenBuffers(1, &m_heights_widths_angles_buf_id));
         glsafe(glBindBuffer(GL_TEXTURE_BUFFER, m_heights_widths_angles_buf_id));
-        glsafe(glBufferData(GL_TEXTURE_BUFFER, heights_widths_angles.size() * sizeof(Vec3), heights_widths_angles.data(), GL_DYNAMIC_DRAW));
+        glsafe(glBufferData(GL_TEXTURE_BUFFER, heights_widths_angles.size() * sizeof(Vec4), heights_widths_angles.data(), GL_DYNAMIC_DRAW));
         glsafe(glGenTextures(1, &m_heights_widths_angles_tex_id));
         glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_heights_widths_angles_tex_id));
 
@@ -1887,10 +1896,10 @@ void ViewerImpl::render_segments(const Mat4x4& view_matrix, const Mat4x4& projec
 
     glsafe(glActiveTexture(GL_TEXTURE0));
     glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_positions_tex_id));
-    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, m_positions_buf_id));
+    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, m_positions_buf_id));
     glsafe(glActiveTexture(GL_TEXTURE1));
     glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_heights_widths_angles_tex_id));
-    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, m_heights_widths_angles_buf_id));
+    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, m_heights_widths_angles_buf_id));
     glsafe(glActiveTexture(GL_TEXTURE2));
     glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_colors_tex_id));
     glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, m_colors_buf_id));
@@ -1974,10 +1983,10 @@ void ViewerImpl::render_options(const Mat4x4& view_matrix, const Mat4x4& project
 
     glsafe(glActiveTexture(GL_TEXTURE0));
     glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_positions_tex_id));
-    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, m_positions_buf_id));
+    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, m_positions_buf_id));
     glsafe(glActiveTexture(GL_TEXTURE1));
     glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_heights_widths_angles_tex_id));
-    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, m_heights_widths_angles_buf_id));
+    glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, m_heights_widths_angles_buf_id));
     glsafe(glActiveTexture(GL_TEXTURE2));
     glsafe(glBindTexture(GL_TEXTURE_BUFFER, m_colors_tex_id));
     glsafe(glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, m_colors_buf_id));

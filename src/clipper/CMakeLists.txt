@@ -9,4 +9,6 @@ add_library(clipper STATIC
     clipper_z.hpp
 )
 
-target_link_libraries(clipper TBB::tbb TBB::tbbmalloc)
+target_link_libraries(clipper PRIVATE TBB::tbb TBB::tbbmalloc int128)
+target_link_libraries(clipper PUBLIC Eigen3::Eigen)
+target_include_directories(clipper PUBLIC .)

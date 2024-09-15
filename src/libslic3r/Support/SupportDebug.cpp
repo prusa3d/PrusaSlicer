@@ -4,11 +4,16 @@
 ///|/
 #if 1 //#ifdef SLIC3R_DEBUG
 
+#include <algorithm>
+
 #include "../ClipperUtils.hpp"
 #include "../SVG.hpp"
 #include "../Layer.hpp"
-
 #include "SupportLayer.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r::FFFSupport {
 

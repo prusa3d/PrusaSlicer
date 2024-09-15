@@ -8,9 +8,9 @@
 #include <oneapi/tbb/scalable_allocator.h>
 #include <oneapi/tbb/spin_mutex.h>
 // for Slic3r::deque
-#include "../libslic3r.h"
-#include "../ClipperUtils.hpp"
-#include "../Polygon.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r::FFFSupport {
 

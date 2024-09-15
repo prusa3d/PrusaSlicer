@@ -7,6 +7,12 @@
 
 #include <libslic3r/ExPolygon.hpp>
 #include <libslic3r/Arrange/Core/Beds.hpp>
+#include <stdint.h>
+#include <boost/variant.hpp>
+#include <cinttypes>
+
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r {
 

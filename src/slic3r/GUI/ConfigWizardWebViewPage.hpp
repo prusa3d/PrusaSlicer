@@ -2,15 +2,18 @@
 #define slic3r_ConfigWizardWebViewPage_hpp_
 
 #include "ConfigWizard_private.hpp"
-#include "Event.hpp"
+#include <wx/event.h>
 
 class wxWebView;
 class wxWebViewEvent;
+
+wxDECLARE_EVENT(EVT_OPEN_EXTERNAL_LOGIN_WIZARD, wxCommandEvent);
 
 namespace Slic3r { 
 namespace GUI {
 
 wxDECLARE_EVENT(EVT_LOGIN_VIA_WIZARD, Event<std::string>);
+
 /*
 struct ConfigWizardPage: wxPanel
 {
@@ -61,6 +64,7 @@ private:
     wxStaticText *m_text{nullptr};
     bool m_load_error_page{false};
     bool m_vetoed{false};
+    bool m_evt_sent{false};
 };
 
 }} // namespace Slic3r::GUI

@@ -13,7 +13,29 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "Exception.hpp"
+#include <libqhullcpp/Qhull.h>
+#include <libqhullcpp/QhullFacetList.h>
+#include <libqhullcpp/QhullVertexSet.h>
+#include <boost/log/trivial.hpp>
+#include <boost/nowide/cstdio.hpp>
+#include <boost/predef/other/endian.h>
+#include <libqhull_r/user_r.h>
+#include <libqhullcpp/QhullFacet.h>
+#include <libqhullcpp/QhullPoint.h>
+#include <libqhullcpp/QhullVertex.h>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <cmath>
+#include <vector>
+#include <utility>
+#include <algorithm>
+#include <iterator>
+#include <map>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 #include "TriangleMesh.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "MeshSplitImpl.hpp"
@@ -24,29 +46,10 @@
 #include "Execution/ExecutionTBB.hpp"
 #include "Execution/ExecutionSeq.hpp"
 #include "Utils.hpp"
-
-#include <libqhullcpp/Qhull.h>
-#include <libqhullcpp/QhullFacetList.h>
-#include <libqhullcpp/QhullVertexSet.h>
-
-#include <cmath>
-#include <deque>
-#include <queue>
-#include <vector>
-#include <utility>
-#include <algorithm>
-#include <type_traits>
-
-#include <boost/log/trivial.hpp>
-#include <boost/nowide/cstdio.hpp>
-#include <boost/predef/other/endian.h>
-
-#include <tbb/concurrent_vector.h>
-
-#include <Eigen/Core>
-#include <Eigen/Dense>
-
-#include <assert.h>
+#include "admesh/stl.h"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
@@ -192,6 +195,24 @@ static void trianglemesh_repair_on_import(stl_file &stl)
         stl_check_facets_exact(&stl);
 
     BOOST_LOG_TRIVIAL(debug) << "TriangleMesh::repair() finished";
+}
+
+void TriangleMesh::from_facets(std::vector<stl_facet> &&facets, bool repair)
+{
+    stl_file stl;
+    stl.stats.type                = inmemory;
+    stl.stats.number_of_facets    = uint32_t(facets.size());
+    stl.stats.original_num_facets = int(stl.stats.number_of_facets);
+
+    stl_allocate(&stl);
+    stl.facet_start               = std::move(facets);
+
+    if (repair) {
+        trianglemesh_repair_on_import(stl);
+    }
+
+    stl_generate_shared_vertices(&stl, this->its);
+    fill_initial_stats(this->its, this->m_stats);
 }
 
 bool TriangleMesh::ReadSTLFile(const char* input_file, bool repair)

@@ -5,11 +5,14 @@
 #ifndef ARRANGESETTINGSDB_APPCFG_HPP
 #define ARRANGESETTINGSDB_APPCFG_HPP
 
+#include <string>
+
 #include "ArrangeSettingsView.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r {
+class AppConfig;
 
 class ArrangeSettingsDb_AppCfg: public arr2::ArrangeSettingsDb
 {

@@ -7,9 +7,11 @@
 #include <libslic3r/Arrange/SceneBuilder.hpp>
 #include <libslic3r/Arrange/Items/ArrangeItem.hpp>
 #include <libslic3r/Arrange/Tasks/MultiplySelectionTask.hpp>
-
 #include <libslic3r/Model.hpp>
-#include <libslic3r/Geometry/ConvexHull.hpp>
+#include <utility>
+
+#include "libslic3r/Arrange/ArrangeSettingsView.hpp"
+#include "libslic3r/Arrange/Scene.hpp"
 
 namespace Slic3r {
 

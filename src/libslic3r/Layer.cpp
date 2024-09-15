@@ -9,6 +9,15 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "Layer.hpp"
+
+#include <boost/log/trivial.hpp>
+#include <clipper/clipper_z.hpp>
+#include <cstdint>
+#include <iterator>
+#include <numeric>
+#include <tuple>
+#include <cassert>
+
 #include "ClipperZUtils.hpp"
 #include "ClipperUtils.hpp"
 #include "Point.hpp"
@@ -17,9 +26,14 @@
 #include "ShortestPath.hpp"
 #include "SVG.hpp"
 #include "BoundingBox.hpp"
-#include "clipper/clipper.hpp"
-
-#include <boost/log/trivial.hpp>
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/SurfaceCollection.hpp"
+#include "libslic3r/Utils.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

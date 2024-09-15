@@ -1,8 +1,21 @@
 #ifndef libslic3r_SeamRear_hpp_
 #define libslic3r_SeamRear_hpp_
 
+#include <cstddef>
+#include <vector>
+
 #include "libslic3r/GCode/SeamPerimeters.hpp"
 #include "libslic3r/GCode/SeamChoice.hpp"
+#include "libslic3r/Point.hpp"
+
+namespace Slic3r {
+namespace Seams {
+namespace Perimeters {
+struct BoundedPerimeter;
+}  // namespace Perimeters
+struct SeamPerimeterChoice;
+}  // namespace Seams
+}  // namespace Slic3r
 
 namespace Slic3r::Seams::Rear {
 namespace Impl {

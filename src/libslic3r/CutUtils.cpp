@@ -4,14 +4,22 @@
 ///|/
 
 #include "CutUtils.hpp"
+
+#include <boost/log/trivial.hpp>
+#include <cmath>
+#include <string>
+#include <utility>
+#include <cassert>
+#include <cstddef>
+
 #include "Geometry.hpp"
 #include "libslic3r.h"
 #include "Model.hpp"
 #include "TriangleMeshSlicer.hpp"
-#include "TriangleSelector.hpp"
-#include "ObjectID.hpp"
-
-#include <boost/log/trivial.hpp>
+#include "admesh/stl.h"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 namespace Slic3r {
 

@@ -5,9 +5,12 @@
 #ifndef slic3r_FindReplace_hpp_
 #define slic3r_FindReplace_hpp_
 
-#include "../PrintConfig.hpp"
-
 #include <boost/regex.hpp>
+#include <boost/regex/v5/regex.hpp>
+#include <string>
+#include <vector>
+
+#include "../PrintConfig.hpp"
 
 namespace Slic3r {
 

@@ -1,8 +1,16 @@
 #include <boost/log/trivial.hpp>
+#include <igl/Hit.h>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <cmath>
+#include <cstdlib>
 
 #include "libslic3r/ShortEdgeCollapse.hpp"
 #include "libslic3r/GCode/ModelVisibility.hpp"
 #include "libslic3r/AABBTreeIndirect.hpp"
+#include "admesh/stl.h"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r::ModelInfo {
 namespace Impl {

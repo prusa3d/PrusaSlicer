@@ -1,5 +1,7 @@
 #include "libslic3r/GCode/SeamChoice.hpp"
 
+#include <vector>
+
 namespace Slic3r::Seams {
 std::optional<SeamChoice> maybe_choose_seam_point(
     const Perimeters::Perimeter &perimeter, const SeamPicker &seam_picker

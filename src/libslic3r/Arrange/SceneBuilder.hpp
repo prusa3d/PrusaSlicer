@@ -5,9 +5,29 @@
 #ifndef SCENEBUILDER_HPP
 #define SCENEBUILDER_HPP
 
-#include "Scene.hpp"
+#include <assert.h>
+#include <stddef.h>
+#include <algorithm>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
 
+#include "Scene.hpp"
 #include "Core/ArrangeItemTraits.hpp"
+#include "libslic3r/AnyPtr.hpp"
+#include "libslic3r/Arrange/Core/Beds.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

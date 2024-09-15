@@ -40,6 +40,7 @@ public:
     std::string                     config_update_url;
     std::string                     changelog_url;
     std::string                     repo_id;
+    std::string                     repo_prefix;
     bool                            templates_profile { false };
 
     struct PrinterVariant {

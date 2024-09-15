@@ -5,13 +5,21 @@
 #ifndef slic3r_GCodeReader_hpp_
 #define slic3r_GCodeReader_hpp_
 
-#include "libslic3r.h"
+#include <stdint.h>
+#include <string.h>
 #include <cmath>
 #include <cstdlib>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
+#include <cinttypes>
+#include <cstring>
+
+#include "libslic3r.h"
 #include "PrintConfig.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 

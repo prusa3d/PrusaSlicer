@@ -19,7 +19,8 @@
 
 #include <regex>
 #include <wx/numformatter.h>
-#include <wx/tooltip.h>
+#include <wx/bookctrl.h> // IWYU pragma: keep
+#include <wx/tooltip.h> // IWYU pragma: keep
 #include <wx/notebook.h>
 #include <wx/listbook.h>
 #include <wx/tokenzr.h>

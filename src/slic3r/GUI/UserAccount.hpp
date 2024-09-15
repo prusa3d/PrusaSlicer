@@ -38,8 +38,9 @@ public:
     bool is_logged();
     void do_login();
     void do_logout();
-    wxString get_login_redirect_url() { return m_communication->get_login_redirect_url();  }
-
+    wxString generate_login_redirect_url() { return m_communication->generate_login_redirect_url();  }
+    wxString get_login_redirect_url(const std::string& service = std::string()) { return m_communication->get_login_redirect_url(service);  }
+    
     void set_remember_session(bool remember);
     void toggle_remember_session();
     bool get_remember_session();
@@ -59,20 +60,13 @@ public:
     bool on_connect_printers_success(const std::string& data, AppConfig* app_config, bool& out_printers_changed);
     bool on_connect_uiid_map_success(const std::string& data, AppConfig* app_config, bool& out_printers_changed);
 
-    void on_activate_window(bool active) { m_communication->on_activate_window(active); }
+    void on_activate_app(bool active) { m_communication->on_activate_app(active); }
 
     std::string get_username() const { return m_username; }
     std::string get_access_token();
     std::string get_shared_session_key();
     const ConnectPrinterStateMap& get_printer_state_map() const { return m_printer_map; }
     boost::filesystem::path get_avatar_path(bool logged) const;
-
-    // standalone utility methods
-    std::string get_nozzle_from_json(const std::string& message) const;
-    std::string get_keyword_from_json(const std::string& json, const std::string& keyword) const;
-    std::string get_print_data_from_json(const std::string &json, const std::string &keyword) const;
-    void fill_supported_printer_models_from_json(const std::string& json, std::vector<std::string>& result) const;
-    void fill_material_from_json(const std::string& json, std::vector<std::string>& result) const;
 
     const std::map<std::string, ConnectPrinterState>& get_printer_state_table() const { return printer_state_table; }
 

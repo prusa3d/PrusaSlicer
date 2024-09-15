@@ -2,10 +2,15 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <algorithm>
+#include <cassert>
+
 #include "../Print.hpp"
 #include "../PrintConfig.hpp"
 #include "../Slicing.hpp"
 #include "SupportParameters.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r::FFFSupport {
 

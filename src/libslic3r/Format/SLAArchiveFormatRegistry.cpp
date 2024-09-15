@@ -3,15 +3,15 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include <set>
-#include <mutex>
 #include <memory>
 
 #include "SL1.hpp"
 #include "SL1_SVG.hpp"
 #include "AnycubicSLA.hpp"
-#include "I18N.hpp"
-
+#include "libslic3r/I18N.hpp"
 #include "SLAArchiveFormatRegistry.hpp"
+#include "libslic3r/Format/SLAArchiveReader.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

@@ -44,7 +44,7 @@
 #include "libslic3r.h"
 #include "Utils.hpp"
 #include "PlaceholderParser.hpp"
-#include "GCode/Thumbnails.hpp"
+#include "libslic3r/GCode/Thumbnails.hpp"
 
 #include "PresetBundle.hpp"
 
@@ -163,6 +163,13 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
         // For backward compatibility assume all profiles without repo_id are from "prod" repo
         // DK: "No, dont!"
         res.repo_id = "";
+    }
+
+    const auto repo_prefix = vendor_section.find("repo_prefix");
+    if (repo_prefix != vendor_section.not_found()) {
+         res.repo_prefix = repo_prefix->second.data();
+    } else {
+        res.repo_prefix = "";
     }
 
     if (! load_all) {
@@ -486,7 +493,7 @@ static std::vector<std::string> s_Preset_print_options {
 };
 
 static std::vector<std::string> s_Preset_filament_options {
-    "filament_colour", "filament_diameter", "filament_type", "filament_soluble", "filament_notes", "filament_max_volumetric_speed", "filament_infill_max_speed", "filament_infill_max_crossing_speed",
+    "filament_colour", "filament_diameter", "filament_type", "filament_soluble", "filament_abrasive", "filament_notes", "filament_max_volumetric_speed", "filament_infill_max_speed", "filament_infill_max_crossing_speed",
     "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
     "filament_unloading_speed", "filament_unloading_speed_start", "filament_unload_time", "filament_toolchange_delay", "filament_cooling_moves", "filament_stamping_loading_speed", "filament_stamping_distance",
     "filament_cooling_initial_speed", "filament_purge_multiplier", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
@@ -525,7 +532,8 @@ static std::vector<std::string> s_Preset_printer_options {
     "cooling_tube_length", "high_current_on_filament_swap", "parking_pos_retraction", "extra_loading_move", "multimaterial_purging",
     "max_print_height", "default_print_profile", "inherits",
     "remaining_times", "silent_mode",
-    "machine_limits_usage", "thumbnails", "thumbnails_format"
+    "machine_limits_usage", "thumbnails", "thumbnails_format",
+    "nozzle_high_flow"
 };
 
 static std::vector<std::string> s_Preset_sla_print_options {

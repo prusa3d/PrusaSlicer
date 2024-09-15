@@ -1,5 +1,6 @@
 #include "Secrets.hpp"
-#include <stdio.h>
+
+#include <cstdio>
 #if wxUSE_SECRETSTORE 
 #include <wx/secretstore.h>
 #endif

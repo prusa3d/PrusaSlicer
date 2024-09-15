@@ -13,15 +13,8 @@ wxDEFINE_EVENT(wxCUSTOMEVT_TOPBAR_SEL_CHANGED, wxCommandEvent);
 
 using namespace Slic3r::GUI;
 
-#ifdef __APPLE__
-#define down_arrow L"\u25BC";
-#else
-#define down_arrow L"\u23f7";
-#endif
-
-
 TopBarItemsCtrl::Button::Button(wxWindow* parent, const wxString& label, const std::string& icon_name, const int px_cnt, wxSize size_def)
-:ScalableButton(parent, wxID_ANY, icon_name, label, size_def, wxDefaultPosition, wxNO_BORDER, px_cnt)
+:wxPanel(parent, wxID_ANY, wxDefaultPosition, size_def, wxBORDER_NONE | wxTAB_TRAVERSAL)
 #ifdef _WIN32
 ,m_background_color(wxGetApp().get_window_default_clr())
 #else
@@ -29,6 +22,11 @@ TopBarItemsCtrl::Button::Button(wxWindow* parent, const wxString& label, const s
 #endif
 ,m_foreground_color(wxGetApp().get_label_clr_default())
 ,m_bmp_bundle(icon_name.empty() ? wxBitmapBundle() : *get_bmp_bundle(icon_name, px_cnt))
+,m_label(label)
+,m_icon_name(icon_name)
+,m_px_cnt(px_cnt)
+,m_has_down_arrow(!icon_name.empty())
+,m_dd_bmp_bundle(m_has_down_arrow ? *get_bmp_bundle("drop_down") : wxBitmapBundle())
 {
     int btn_margin = em_unit(this);
     int x, y;
@@ -54,6 +52,15 @@ TopBarItemsCtrl::Button::Button(wxWindow* parent, const wxString& label, const s
     Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) { set_hovered(false); event.Skip(); });
 
     Bind(wxEVT_PAINT,        [this](wxPaintEvent&) { render(); });
+#ifdef __linux__
+    Bind(wxEVT_LEFT_UP,      [this](wxMouseEvent& event) {
+#else
+    Bind(wxEVT_LEFT_DOWN,    [this](wxMouseEvent& event) {
+#endif
+        wxCommandEvent evt(wxEVT_BUTTON, GetId());
+        GetEventHandler()->AddPendingEvent(evt);
+        event.Skip();
+    });
 }
 
 void TopBarItemsCtrl::Button::set_selected(bool selected)
@@ -67,14 +74,6 @@ void TopBarItemsCtrl::Button::set_selected(bool selected)
 #else
                                          wxTransparentColor;
 #endif
-
-#ifdef __linux__
-    this->SetBackgroundColour(m_background_color);
-    this->SetForegroundColour(m_foreground_color);
-
-    this->Refresh();
-    this->Update();
-#endif // __linux__
 }
 
 void TopBarItemsCtrl::Button::set_hovered(bool hovered)
@@ -94,10 +93,6 @@ void TopBarItemsCtrl::Button::set_hovered(bool hovered)
                                             wxTransparentColor;
 #endif
 
-#ifdef __linux__
-    this->SetBackgroundColour(m_background_color);
-#endif // __linux__
-
     this->Refresh();
     this->Update();
 }
@@ -106,14 +101,6 @@ void TopBarItemsCtrl::Button::render()
 {
     const wxRect rc(GetSize());
     wxPaintDC dc(this);
-
-#ifdef _WIN32
-    // Draw default background
-
-    dc.SetPen(wxGetApp().get_window_default_clr());
-    dc.SetBrush(wxGetApp().get_window_default_clr());
-    dc.DrawRectangle(rc);
-#endif
 
     int em = em_unit(this);
 
@@ -125,18 +112,14 @@ void TopBarItemsCtrl::Button::render()
 
     wxPoint pt = { 0, 0 };
 
-    wxString text = GetLabelText();
+    wxString text = m_label;
 
     if (m_bmp_bundle.IsOk()) {
         wxSize szIcon = get_preferred_size(m_bmp_bundle, this);
         pt.x = text.IsEmpty() ? ((rc.width - szIcon.x) / 2) : em;
         pt.y = (rc.height - szIcon.y) / 2;
-#ifdef __WXGTK3__
-        dc.DrawBitmap(m_bmp_bundle.GetBitmap(szIcon), pt, true);
-#else
         dc.DrawBitmap(m_bmp_bundle.GetBitmapFor(this), pt, true);
-#endif
-        pt.x += szIcon.x;
+        pt.x += szIcon.x + int(0.5 * em);
     }
 
     // Draw text
@@ -145,35 +128,44 @@ void TopBarItemsCtrl::Button::render()
         wxSize labelSize = dc.GetTextExtent(text);
         if (labelSize.x > rc.width)
             text = wxControl::Ellipsize(text, dc, wxELLIPSIZE_END, rc.width);
-        pt.x += (rc.width - pt.x - labelSize.x) / 2;
+        if (!m_bmp_bundle.IsOk())
+            pt.x += (rc.width - pt.x - labelSize.x) / 2;
         pt.y = (rc.height - labelSize.y) / 2;
 
         dc.SetTextForeground(m_foreground_color);
         dc.SetFont(GetFont());
         dc.DrawText(text, pt);
+
+        pt.x += labelSize.x + int(0.5 * em);
+
+        // Draw down_arrow if needed
+
+        if (m_dd_bmp_bundle.IsOk()) {
+            wxSize szIcon = get_preferred_size(m_dd_bmp_bundle, this);
+            pt.y = (rc.height - szIcon.y) / 2;
+            dc.DrawBitmap(m_dd_bmp_bundle.GetBitmapFor(this), pt, true);
+        }
     }
 }
 
 void TopBarItemsCtrl::Button::sys_color_changed()
 {
-    ScalableButton::sys_color_changed();
+    m_bmp_bundle = m_icon_name.empty() ? wxBitmapBundle() : *get_bmp_bundle(m_icon_name, m_px_cnt);
+
 #ifdef _WIN32
     m_background_color = wxGetApp().get_window_default_clr();
 #endif
     m_foreground_color = wxGetApp().get_label_clr_default();
 }
 
-#ifdef __linux__
-const int icon_sz = 20;
-#else
-const int icon_sz = 24;
-#endif
+const int login_icon_sz = 24;
 
-TopBarItemsCtrl::ButtonWithPopup::ButtonWithPopup(wxWindow* parent, const wxString& label, const std::string& icon_name, wxSize size)
-    :TopBarItemsCtrl::Button(parent, label, icon_name, icon_sz, size)
+TopBarItemsCtrl::ButtonWithPopup::ButtonWithPopup(wxWindow* parent, const wxString& label, const std::string& icon_name, const int px_cnt, wxSize size)
+    :TopBarItemsCtrl::Button(parent, label, icon_name, px_cnt, size)
 {
     if (size != wxDefaultSize)
         m_fixed_width = size.x * 0.1;
+
     this->SetLabel(label);
 }
 
@@ -188,39 +180,32 @@ void TopBarItemsCtrl::ButtonWithPopup::SetLabel(const wxString& label)
     int btn_height = GetMinSize().GetHeight();
 
     if (label.IsEmpty()) {
-        ScalableButton::SetLabel(label);
+        m_label = label;
         SetMinSize(wxSize(btn_height, btn_height));
         return;
     }
 
+    const int em = em_unit(this);
+
     const int label_width   = GetTextExtent(text).GetWidth();
-    bool resize_and_layout{ false };
+    int       width_margins = int(0.1 * em * (m_px_cnt + 16 + 25));
+
+    this->SetMinSize(wxSize(label_width + width_margins, btn_height));
+
     if (m_fixed_width != wxDefaultCoord) {
-        const int text_width = m_fixed_width * em_unit(this) - 2 * btn_height;
-        if (label_width > text_width || GetMinSize().GetWidth() <= btn_height) {
+        const int text_width = m_fixed_width * em_unit(this) - width_margins;
+        if (label_width > text_width) {
             wxWindowDC wdc(this);
             text = wxControl::Ellipsize(text, wdc, wxELLIPSIZE_END, text_width);
-            resize_and_layout = true;
+
+            SetMinSize(wxSize(m_fixed_width * em_unit(this), btn_height));
+            SetSize(wxSize(m_fixed_width * em_unit(this), btn_height));
         }
     }
-    else if (GetMinSize().GetWidth() <= btn_height)
-#ifdef _WIN32
-        this->SetMinSize(wxSize(-1, btn_height));
-#elif __APPLE__
-        this->SetMinSize(wxSize(label_width + 3 * btn_height, btn_height));
-#else
-        this->SetMinSize(wxSize(label_width + 2 * btn_height, btn_height));
-#endif
 
-    wxString full_label = "  " + text + "  ";
-#ifndef __linux__
-    full_label += down_arrow;
-#endif
-    ScalableButton::SetLabel(full_label);
-    if (resize_and_layout) {
-        SetMinSize(wxSize(m_fixed_width * em_unit(this), btn_height));
-        GetParent()->Layout();
-    }
+    m_label = text;
+    Refresh();
+    GetParent()->Layout();
 }
 
 void TopBarItemsCtrl::UpdateAccountButton(bool avatar/* = false*/)
@@ -228,37 +213,21 @@ void TopBarItemsCtrl::UpdateAccountButton(bool avatar/* = false*/)
     TopBarMenus::UserAccountInfo  user_account = m_menus->get_user_account_info();
     const wxString user_name = user_account.is_logged ? from_u8(user_account.user_name) : _L("Log in");
     m_account_btn->SetToolTip(user_name);
-#ifdef __linux__
     if (avatar) {
         if (user_account.is_logged) {
-            ScalableBitmap new_logo(this, user_account.avatar_path, wxSize(icon_sz, icon_sz));
-            if (new_logo.IsOk())
-                m_account_btn->SetBitmap_(new_logo);
-            else
-                m_account_btn->SetBitmap_("user");
-        }
-        else {
-            m_account_btn->SetBitmap_("user");
-        }
-    }
-#else
-    if (avatar) {
-        if (user_account.is_logged) {
-            ScalableBitmap new_logo(this, user_account.avatar_path, wxSize(icon_sz, icon_sz));
+            ScalableBitmap new_logo(this, user_account.avatar_path, wxSize(login_icon_sz, login_icon_sz));
             if (new_logo.IsOk())
                 m_account_btn->SetBitmapBundle(new_logo.bmp());
             else
-                m_account_btn->SetBitmapBundle(*get_bmp_bundle("user", icon_sz));
+                m_account_btn->SetBitmapBundle(*get_bmp_bundle("user", login_icon_sz));
         }
         else {
-            m_account_btn->SetBitmapBundle(*get_bmp_bundle("user", icon_sz));
+            m_account_btn->SetBitmapBundle(*get_bmp_bundle("user", login_icon_sz));
         }
     }
-#endif
 
     m_account_btn->SetLabel(m_collapsed_btns ? "" : user_name);
     this->Layout();
-//    m_account_btn->Refresh();
 }
 
 void TopBarItemsCtrl::UnselectPopupButtons()
@@ -275,7 +244,7 @@ void TopBarItemsCtrl::CreateSearch()
     // than this max size will be used as a default control size and can't be resized.
     // So, set initial size for some minimum value
     m_search = new ::TextInput(this, wxGetApp().searcher().default_string, "", "search", wxDefaultPosition, wxSize(2 * em_unit(this), -1), wxTE_PROCESS_ENTER);
-    m_search->SetMaxSize(wxSize(42*em_unit(this), -1));
+    m_search->SetMaxSize(wxSize(/*42*/30*em_unit(this), -1));
     wxGetApp().UpdateDarkUI(m_search);
 
     m_search->Bind(wxEVT_TEXT, [](wxEvent& e)
@@ -368,7 +337,7 @@ void TopBarItemsCtrl::UpdateSearch(const wxString& search)
 void TopBarItemsCtrl::update_margins()
 {
     int em = em_unit(this);
-    m_btn_margin  = std::lround(0.9 * em);
+    m_btn_margin  = std::lround(0.5 * em);
 }
 
 wxPoint TopBarItemsCtrl::ButtonWithPopup::get_popup_pos()
@@ -436,7 +405,7 @@ TopBarItemsCtrl::TopBarItemsCtrl(wxWindow *parent, TopBarMenus* menus/* = nullpt
     this->SetSizer(m_sizer);
 
     wxBoxSizer* left_sizer = new wxBoxSizer(wxHORIZONTAL);
-
+/*
 #ifdef __APPLE__
     auto logo = new wxStaticBitmap(this, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 40));
     left_sizer->Add(logo, 0, wxALIGN_CENTER_VERTICAL | wxALL, m_btn_margin);
@@ -449,11 +418,11 @@ TopBarItemsCtrl::TopBarItemsCtrl(wxWindow *parent, TopBarMenus* menus/* = nullpt
         m_menus->Popup(this, &m_menus->main, m_menu_btn->get_popup_pos());
     });
 #endif
-
+*/
     if (m_cb_settings_btn) {
         m_settings_btn = new Button(this, _L("Settings"/*, "settings"*/));
         m_settings_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) { m_cb_settings_btn(); });
-        left_sizer->Add(m_settings_btn, 0, wxALIGN_CENTER_VERTICAL);
+        left_sizer->Add(m_settings_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, m_btn_margin);
     }
 
     m_buttons_sizer = new wxFlexGridSizer(1, m_btn_margin, m_btn_margin);
@@ -480,7 +449,7 @@ TopBarItemsCtrl::TopBarItemsCtrl(wxWindow *parent, TopBarMenus* menus/* = nullpt
         m_menus->Popup(this, &m_menus->workspaces, m_workspace_btn->get_popup_pos());
     });
 
-    m_account_btn = new ButtonWithPopup(this, _L("Log in"), "user", wxSize(180, -1));
+    m_account_btn = new ButtonWithPopup(this, _L("Log in"), "user", login_icon_sz, wxSize(180, -1));
     right_sizer->Add(m_account_btn, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_RIGHT | wxRIGHT, m_btn_margin);
     
     m_account_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
@@ -498,14 +467,7 @@ TopBarItemsCtrl::TopBarItemsCtrl(wxWindow *parent, TopBarMenus* menus/* = nullpt
 void TopBarItemsCtrl::UpdateMode()
 {
     wxBitmapBundle bmp = *m_menus->get_workspace_bitmap();
-#ifdef __linux__
-    m_workspace_btn->SetBitmap(bmp);
-    m_workspace_btn->SetBitmapCurrent(bmp);
-    m_workspace_btn->SetBitmapPressed(bmp);
-#else
     m_workspace_btn->SetBitmapBundle(bmp);
-#endif
-
     m_workspace_btn->SetLabel(m_collapsed_btns ? "" : m_menus->get_workspace_name());
 
     this->Layout();
@@ -611,7 +573,7 @@ bool TopBarItemsCtrl::InsertPage(size_t n, const wxString& text, bool bSelect/* 
 
 void TopBarItemsCtrl::RemovePage(size_t n)
 {
-    ScalableButton* btn = m_pageButtons[n];
+    auto btn = m_pageButtons[n];
     m_pageButtons.erase(m_pageButtons.begin() + n);
     m_buttons_sizer->Remove(n);
 
@@ -626,7 +588,7 @@ void TopBarItemsCtrl::RemovePage(size_t n)
 
 void TopBarItemsCtrl::SetPageText(size_t n, const wxString& strText)
 {
-    ScalableButton* btn = m_pageButtons[n];
+    auto btn = m_pageButtons[n];
     btn->SetLabel(strText);
     update_btns_width();
     UpdateSearchSizeAndPosition();
@@ -634,7 +596,7 @@ void TopBarItemsCtrl::SetPageText(size_t n, const wxString& strText)
 
 wxString TopBarItemsCtrl::GetPageText(size_t n) const
 {
-    ScalableButton* btn = m_pageButtons[n];
+    auto btn = m_pageButtons[n];
     return btn->GetLabel();
 }
 

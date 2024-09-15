@@ -6,16 +6,23 @@
 #ifndef slic3r_GCode_PressureEqualizer_hpp_
 #define slic3r_GCode_PressureEqualizer_hpp_
 
-#include "../libslic3r.h"
-#include "../PrintConfig.hpp"
-#include "../ExtrusionRole.hpp"
-
+#include <assert.h>
+#include <stddef.h>
 #include <queue>
+#include <algorithm>
+#include <cmath>
+#include <string>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
 
 namespace Slic3r {
 
 struct LayerResult;
-
 class GCodeG1Formatter;
 
 //#define PRESSURE_EQUALIZER_STATISTIC
@@ -128,8 +135,9 @@ private:
         float       feedrate()      const { return pos_end[4]; }
         float       time()          const { return dist_xyz() / feedrate(); }
         float       time_inv()      const { return feedrate() / dist_xyz(); }
-        float       volumetric_correction_avg() const { 
-            float avg_correction = 0.5f * (volumetric_extrusion_rate_start + volumetric_extrusion_rate_end) / volumetric_extrusion_rate; 
+        float       volumetric_correction_avg() const {
+            // Cap the correction to 0.05 - 1.00000001 to avoid zero feedrate.
+            float avg_correction = std::max(0.05f, 0.5f * (volumetric_extrusion_rate_start + volumetric_extrusion_rate_end) / volumetric_extrusion_rate);
             assert(avg_correction > 0.f);
             assert(avg_correction <= 1.00000001f);
             return avg_correction;

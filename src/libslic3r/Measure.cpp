@@ -2,16 +2,24 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <boost/container/small_vector.hpp>
+#include <algorithm>
+#include <array>
+#include <iterator>
+#include <limits>
+#include <set>
+#include <cinttypes>
+
 #include "libslic3r/libslic3r.h"
 #include "Measure.hpp"
 #include "MeasureUtils.hpp"
-
 #include "libslic3r/Geometry/Circle.hpp"
 #include "libslic3r/SurfaceMesh.hpp"
-
-
-#include <numeric>
-#include <tbb/parallel_for.h>
+#include "admesh/stl.h"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 #define DEBUG_EXTRACT_ALL_FEATURES_AT_ONCE 0
 

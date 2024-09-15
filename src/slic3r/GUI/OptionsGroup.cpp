@@ -17,10 +17,11 @@
 #include "format.hpp"
 
 #include <utility>
-#include <wx/bookctrl.h>
+#include <wx/bookctrl.h> // IWYU pragma: keep
 #include <wx/numformatter.h>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
+#include "slic3r/GUI/Search.hpp" // IWYU pragma: keep
 #include "libslic3r/Exception.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"

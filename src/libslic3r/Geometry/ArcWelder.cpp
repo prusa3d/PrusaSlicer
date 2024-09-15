@@ -26,15 +26,16 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ArcWelder.hpp"
-#include "Circle.hpp"
 
-#include "../MultiPoint.hpp"
-#include "../Polygon.hpp"
-
-#include <numeric>
-#include <random>
-#include <boost/log/trivial.hpp>
 #include <boost/container/small_vector.hpp>
+#include <array>
+#include <cstdint>
+#include <iterator>
+
+#include "Circle.hpp"
+#include "../MultiPoint.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r { namespace Geometry { namespace ArcWelder {
 

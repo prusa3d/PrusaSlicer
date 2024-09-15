@@ -1,8 +1,9 @@
 #ifndef libslic3r_SeamShells_hpp_
 #define libslic3r_SeamShells_hpp_
 
-#include <vector>
 #include <tcbspan/span.hpp>
+#include <vector>
+#include <cstddef>
 
 #include "libslic3r/GCode/SeamPerimeters.hpp"
 #include "libslic3r/Polygon.hpp"

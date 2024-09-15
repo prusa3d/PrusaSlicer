@@ -11,13 +11,32 @@
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "TreeSupport.hpp"
+
+#include <boost/log/trivial.hpp>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/partitioner.h>
+#include <oneapi/tbb/task_arena.h>
+#include <cassert>
+#include <chrono>
+#include <optional>
+#include <string_view>
+#include <cmath>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <numeric>
+#include <ratio>
+#include <tuple>
+#include <unordered_set>
+#include <cstdlib>
+
 #include "TreeSupportCommon.hpp"
 #include "SupportCommon.hpp"
 #include "OrganicSupport.hpp"
-
 #include "../AABBTreeIndirect.hpp"
 #include "../BuildVolume.hpp"
-#include "../ClipperUtils.hpp"
 #include "../EdgeGrid.hpp"
 #include "../Layer.hpp"
 #include "../Print.hpp"
@@ -25,18 +44,21 @@
 #include "../Polygon.hpp"
 #include "../Polyline.hpp"
 #include "../MutablePolygon.hpp"
-
-#include <cassert>
-#include <chrono>
-#include <fstream>
-#include <optional>
-#include <stdio.h>
-#include <string>
-#include <string_view>
-
-#include <boost/log/trivial.hpp>
-
-#include <tbb/parallel_for.h>
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/MultiMaterialSegmentation.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Support/SupportLayer.hpp"
+#include "libslic3r/Support/SupportParameters.hpp"
+#include "libslic3r/Support/TreeModelVolumes.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/TriangleSelector.hpp"
+#include "libslic3r/Utils.hpp"
 
 // #define TREESUPPORT_DEBUG_SVG
 

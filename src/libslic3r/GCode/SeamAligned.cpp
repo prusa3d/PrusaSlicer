@@ -1,7 +1,17 @@
 #include "libslic3r/GCode/SeamAligned.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <stdexcept>
+#include <utility>
+
 #include "libslic3r/GCode/SeamGeometry.hpp"
 #include "libslic3r/GCode/ModelVisibility.hpp"
-#include <fstream>
+#include "libslic3r/KDTreeIndirect.hpp"
+#include "libslic3r/Line.hpp"
+#include "tcbspan/span.hpp"
 
 namespace Slic3r::Seams::Aligned {
 using Perimeters::PointType;

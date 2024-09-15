@@ -7,12 +7,19 @@
 #ifndef slic3r_ToolOrdering_hpp_
 #define slic3r_ToolOrdering_hpp_
 
-#include "../libslic3r.h"
-
+#include <boost/container/small_vector.hpp>
+#include <stdint.h>
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
 #include <utility>
 #include <cstddef>
+#include <algorithm>
+#include <map>
+#include <vector>
+#include <cinttypes>
 
-#include <boost/container/small_vector.hpp>
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r {
 
@@ -20,8 +27,13 @@ class Print;
 class PrintObject;
 class LayerTools;
 class ToolOrdering;
-namespace CustomGCode { struct Item; }
+
+namespace CustomGCode {
+struct Item;
+}  // namespace CustomGCode
 class PrintRegion;
+class ExtrusionEntity;
+class ExtrusionEntityCollection;
 
 // Object of this class holds information about whether an extrusion is printed immediately
 // after a toolchange (as part of infill/perimeter wiping) or not. One extrusion can be a part

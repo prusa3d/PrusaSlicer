@@ -15,19 +15,20 @@
 
 #include <boost/nowide/cstdio.hpp>
 
-#include "../libslic3r.h"
-#include "../Exception.hpp"
-#include "../Model.hpp"
-#include "../GCode.hpp"
-#include "../PrintConfig.hpp"
-#include "../Utils.hpp"
-#include "../I18N.hpp"
-#include "../Geometry.hpp"
-#include "../CustomGCode.hpp"
-#include "../LocalesUtils.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/GCode.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Utils.hpp"
+#include "libslic3r/I18N.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/CustomGCode.hpp"
+#include "libslic3r/miniz_extension.hpp"
 
 #include "AMF.hpp"
 
+#include <LocalesUtils.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 namespace pt = boost::property_tree;
@@ -36,7 +37,6 @@ namespace pt = boost::property_tree;
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/fstream.hpp>
-#include "miniz_extension.hpp"
 
 #if 0
 // Enable debugging and assert in this file.

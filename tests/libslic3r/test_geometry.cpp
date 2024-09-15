@@ -12,7 +12,6 @@
 #include "libslic3r/ShortestPath.hpp"
 
 //#include <random>
-//#include "libnest2d/tools/benchmark.h"
 #include "libslic3r/SVG.hpp"
 
 #include "../data/prusaparts.hpp"

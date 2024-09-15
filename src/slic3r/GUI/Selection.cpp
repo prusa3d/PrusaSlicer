@@ -19,7 +19,7 @@
 
 #include "slic3r/Utils/UndoRedo.hpp"
 
-#include "libslic3r/LocalesUtils.hpp"
+#include <LocalesUtils.hpp>
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/BuildVolume.hpp"
@@ -1205,6 +1205,10 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         double max_z = 0.0;
         for (unsigned int i : m_list) {
             const GLVolume& v = *(*m_volumes)[i];
+            if (v.convex_hull() == nullptr) {
+                // E.g. negative meshes do not have a convex hull... (hotfix for SPE-2361)
+                continue;
+            }
             TriangleMesh hull_3d = *v.convex_hull();
             hull_3d.transform(v.world_matrix());
             max_z = std::max(max_z, hull_3d.bounding_box().size().z());
@@ -1249,6 +1253,10 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         if (!to_remove.empty())
             remove_volumes(m_mode, to_remove);
     }
+
+    // FIXME: It should really only account for the model parts when scaling to fit. Not for modifiers,
+    // support enforcers / blockers and negative meshes.
+
 
     switch (volume.type())
     {

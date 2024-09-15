@@ -158,6 +158,9 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 			update_color(color_pickres[mode], palette[mode]);
 	}
 
+	// invalidate this flag before show preferences
+	m_settings_layout_changed = false;
+
 	this->ShowModal();
 }
 
@@ -787,7 +790,6 @@ void PreferencesDialog::accept(wxEvent&)
 	if (auto it = m_values.find("seq_top_layer_only"); it != m_values.end())
 		m_seq_top_layer_only_changed = app_config->get("seq_top_layer_only") != it->second;
 
-	m_settings_layout_changed = false;
 	for (const std::string& key : { "old_settings_layout_mode",
 								    "dlg_settings_layout_mode" })
 	{

@@ -4,6 +4,7 @@
 #include "libslic3r/AABBTreeIndirect.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Model.hpp"
+#include "admesh/stl.h"
 
 namespace Slic3r::Seams::ModelInfo {
 class Painting

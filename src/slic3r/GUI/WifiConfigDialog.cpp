@@ -14,6 +14,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/nowide/cstdio.hpp>
 
 #include "Widgets/ComboBox.hpp"
 
@@ -294,7 +295,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
 
     m_used_path = boost::nowide::widen(file_path.string());
     FILE* file;
-    file = fopen(file_path.string().c_str(), "w");
+    file = boost::nowide::fopen(file_path.string().c_str(), "w");
     if (file == NULL) {
         BOOST_LOG_TRIVIAL(error) << "Failed to write to file " << file_path;
         // TODO show error

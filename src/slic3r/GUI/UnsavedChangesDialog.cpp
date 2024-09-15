@@ -17,6 +17,7 @@
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Color.hpp"
+#include "slic3r/GUI/Sidebar.hpp" // IWYU pragma: keep
 #include "format.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"

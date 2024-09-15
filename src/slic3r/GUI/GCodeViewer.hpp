@@ -14,7 +14,7 @@
 
 #include "LibVGCode/LibVGCodeWrapper.hpp"
 // needed for tech VGCODE_ENABLE_COG_AND_TOOL_MARKERS
-#include <libvgcode/include/Types.hpp>
+#include "../../src/libvgcode/include/Types.hpp"
 
 #include <cstdint>
 #include <float.h>
