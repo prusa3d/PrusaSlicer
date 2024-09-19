@@ -80,13 +80,16 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
     const bool transition_out = last_layer && m_config.use_relative_e_distances.value;
     const bool smooth_spiral  = m_smooth_spiral && m_config.use_relative_e_distances.value;
 
+    const float starting_flowrate  = float(m_config.spiral_vase_starting_flow_rate.value / 100);
+    const float finishing_flowrate = float(m_config.spiral_vase_finishing_flow_rate.value / 100);
+
     const AABBTreeLines::LinesDistancer previous_layer_distancer = get_layer_distancer(m_previous_layer);
     Vec2f                               last_point               = m_previous_layer.empty() ? Vec2f::Zero() : m_previous_layer.back();
     float                               len                      = 0.f;
 
     std::string        new_gcode, transition_gcode;
     std::vector<Vec2f> current_layer;
-    m_reader.parse_buffer(gcode, [z, total_layer_length, layer_height, transition_in, transition_out, smooth_spiral, max_xy_smoothing = m_max_xy_smoothing,
+    m_reader.parse_buffer(gcode, [z, total_layer_length, layer_height, transition_in, transition_out,starting_flowrate, finishing_flowrate, smooth_spiral, max_xy_smoothing = m_max_xy_smoothing,
                                   &len, &last_point, &new_gcode, &transition_gcode, &current_layer, &previous_layer_distancer]
         (GCodeReader &reader, GCodeReader::GCodeLine line) {
         if (line.cmd_is("G1")) {
@@ -100,15 +103,19 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
                 if (const float dist_XY = line.dist_XY(reader); dist_XY > 0 && line.extruding(reader)) { // Exclude wipe and retract
                     len += dist_XY;
                     const float factor = len / total_layer_length;
-                    if (transition_in)
-                        // Transition layer, interpolate the amount of extrusion from zero to the final value.
-                        line.set(reader, E, line.e() * factor, 5);
+                    if (transition_in) {
+                        // Transition layer, interpolate the amount of extrusion starting from spiral_vase_starting_flow_rate to 100%.
+                        float starting_e_factor = starting_flowrate + (factor * (1.f - starting_flowrate));
+                        line.set(reader, E, line.e() * starting_e_factor, 5);
+                    }
                     else if (transition_out) {
                         // We want the last layer to ramp down extrusion, but without changing z height!
                         // So clone the line before we mess with its Z and duplicate it into a new layer that ramps down E
                         // We add this new layer at the very end
+                        // As with transition_in, the amount is ramped down from 100% to spiral_vase_finishing_flow_rate
                         GCodeReader::GCodeLine transition_line(line);
-                        transition_line.set(reader, E, line.e() * (1.f - factor), 5);
+                        float finishing_e_factor = finishing_flowrate + ((1.f -factor) * (1.f - finishing_flowrate));
+                        transition_line.set(reader, E, line.e() * finishing_e_factor, 5);
                         transition_gcode += transition_line.raw() + '\n';
                     }
 

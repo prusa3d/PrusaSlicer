@@ -860,6 +860,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionString,              color_change_gcode))
     ((ConfigOptionString,              pause_print_gcode))
     ((ConfigOptionString,              template_custom_gcode))
+    ((ConfigOptionPercent,             spiral_vase_finishing_flow_rate))
+    ((ConfigOptionPercent,             spiral_vase_starting_flow_rate))
 )
 
 static inline std::string get_extrusion_axis(const GCodeConfig &cfg)
