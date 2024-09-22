@@ -73,7 +73,7 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
         m_db->set_distance_from_objects(settings.d_obj);
     }
 
-    if (m_imgui->slider_float(_L("Spacing from bed"), &settings.d_bed,
+    if (m_imgui->slider_float(_L("Spacing from bed edge"), &settings.d_bed,
                               dbed_min, dbed_max, "%5.2f")) {
         settings.d_bed = std::max(dbed_min, settings.d_bed);
         m_db->set_distance_from_bed(settings.d_bed);
