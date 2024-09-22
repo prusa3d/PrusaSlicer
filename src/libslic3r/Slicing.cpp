@@ -315,6 +315,13 @@ std::vector<double> layer_height_profile_adaptive(const SlicingParameters& slici
         }
         */
         
+        for (auto const& [range,options] : object.layer_config_ranges){
+            if ( print_z >= range.first && print_z <= range.second) {
+                    height = options.opt_float("layer_height");
+                    break;
+            };
+        };
+
         layer_height_profile.push_back(print_z);
         layer_height_profile.push_back(height);
         print_z += height;
