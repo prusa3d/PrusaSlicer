@@ -142,7 +142,7 @@ static wxIcon main_frame_icon(GUI_App::EAppMode app_mode)
 MainFrame::MainFrame(const int font_point_size) :
 DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_STYLE, "mainframe", font_point_size),
     m_printhost_queue_dlg(new PrintHostQueueDialog(this))
-    , m_recent_projects(9)
+    , m_recent_projects(15)
     , m_settings_dialog(this)
     , diff_dialog(this)
 {
@@ -1336,7 +1336,7 @@ void MainFrame::init_menubar_as_editor()
             [this](){return m_plater != nullptr; }, this);
 
         wxMenu* recent_projects_menu = new wxMenu();
-        wxMenuItem* recent_projects_submenu = append_submenu(fileMenu, recent_projects_menu, wxID_ANY, _L("Recent projects"), "");
+        wxMenuItem* recent_projects_submenu = append_submenu(fileMenu, recent_projects_menu, wxID_ANY, _L("Recent files"), "");
         m_recent_projects.UseMenu(recent_projects_menu);
         Bind(wxEVT_MENU, [this](wxCommandEvent& evt) {
             size_t file_id = evt.GetId() - wxID_FILE1;
@@ -1361,7 +1361,7 @@ void MainFrame::init_menubar_as_editor()
                     wxGetApp().app_config->set_recent_projects(recent_projects);
                 }
             }
-            }, wxID_FILE1, wxID_FILE9);
+            }, wxID_FILE1, wxID_FILE1 + m_recent_projects.GetMaxFiles() - 1);
 
         std::vector<std::string> recent_projects = wxGetApp().app_config->get_recent_projects();
         std::reverse(recent_projects.begin(), recent_projects.end());

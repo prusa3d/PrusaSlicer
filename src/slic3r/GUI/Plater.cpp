@@ -4126,8 +4126,10 @@ void Plater::add_model(bool imperial_units/* = false*/)
         return;
 
     std::vector<fs::path> paths;
-    for (const auto &file : input_files)
+    for (const auto &file : input_files) {
         paths.emplace_back(into_path(file));
+        wxGetApp().mainframe->add_to_recent_projects(file);
+    }
 
     wxString snapshot_label;
     assert(! paths.empty());
