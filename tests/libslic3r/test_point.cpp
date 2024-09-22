@@ -33,7 +33,7 @@ TEST_CASE("Distance to line", "[Point]") {
 
 TEST_CASE("Distance to diagonal line", "[Point]") {
     const Line line{{50, 50}, {125, -25}};
-    CHECK(std::abs(line.distance_to(Point{100, 0})) == Approx(0));
+    CHECK(std::abs(line.distance_to(Point{100, 0})) == Approx(0).margin(std::numeric_limits<float>::epsilon()));
 }
 
 TEST_CASE("Perp distance to line does not overflow", "[Point]") {
