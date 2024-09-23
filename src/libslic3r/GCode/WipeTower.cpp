@@ -621,8 +621,8 @@ void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
 
     m_filpar[idx].material = config.filament_type.get_at(idx);
     m_filpar[idx].is_soluble = config.wipe_tower_extruder == 0 ? config.filament_soluble.get_at(idx) : (idx != size_t(config.wipe_tower_extruder - 1));
-    m_filpar[idx].temperature = config.temperature.get_at(idx);
-    m_filpar[idx].first_layer_temperature = config.first_layer_temperature.get_at(idx);
+    m_filpar[idx].temperature = config.temperature.get_at(idx) + config.temperature_offset.value;
+    m_filpar[idx].first_layer_temperature = config.first_layer_temperature.get_at(idx) + config.temperature_offset.value;
     m_filpar[idx].filament_minimal_purge_on_wipe_tower = config.filament_minimal_purge_on_wipe_tower.get_at(idx);
 
     // If this is a single extruder MM printer, we will use all the SE-specific config values.
