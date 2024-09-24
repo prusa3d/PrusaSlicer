@@ -6,13 +6,24 @@
 #ifndef slic3r_ConflictChecker_hpp_
 #define slic3r_ConflictChecker_hpp_
 
-#include "libslic3r/Print.hpp"
-
 #include <queue>
 #include <vector>
 #include <optional>
+#include <map>
+#include <string>
+#include <utility>
+
+#include "libslic3r/Print.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
+class ExtrusionEntityCollection;
 
 struct LineWithID
 {

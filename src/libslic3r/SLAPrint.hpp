@@ -6,22 +6,48 @@
 #ifndef slic3r_SLAPrint_hpp_
 #define slic3r_SLAPrint_hpp_
 
+#include <boost/functional/hash.hpp>
+#include <stdlib.h>
 #include <cstdint>
 #include <mutex>
 #include <set>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "PrintBase.hpp"
 #include "SLA/SupportTree.hpp"
 #include "Point.hpp"
 #include "Format/SLAArchiveWriter.hpp"
-#include "GCode/ThumbnailData.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/CSGMesh/CSGMesh.hpp"
 #include "libslic3r/MeshBoolean.hpp"
 #include "libslic3r/OpenVDBUtils.hpp"
-
-#include <boost/functional/hash.hpp>
+#include "admesh/stl.h"
+#include "libslic3r/AnyPtr.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/SLA/Hollowing.hpp"
+#include "libslic3r/SLA/Pad.hpp"
+#include "libslic3r/SLA/SupportPoint.hpp"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
+namespace sla {
+struct JobController;
+}  // namespace sla
 
 enum SLAPrintStep : unsigned int {
     slapsMergeSlicesAndEval,
@@ -406,13 +432,15 @@ struct SLAPrintStatistics
 {
     SLAPrintStatistics() { clear(); }
     double                          estimated_print_time;
+    double                          estimated_print_time_tolerance;
     double                          objects_used_material;
     double                          support_used_material;
     size_t                          slow_layers_count;
     size_t                          fast_layers_count;
     double                          total_cost;
     double                          total_weight;
-    std::vector<double>             layers_times;
+    std::vector<double>             layers_times_running_total;
+    std::vector<double>             layers_areas;
 
     // Config with the filled in print statistics.
     DynamicConfig           config() const;
@@ -423,13 +451,15 @@ struct SLAPrintStatistics
 
     void clear() {
         estimated_print_time = 0.;
+        estimated_print_time_tolerance = 0.;
         objects_used_material = 0.;
         support_used_material = 0.;
         slow_layers_count = 0;
         fast_layers_count = 0;
         total_cost = 0.;
         total_weight = 0.;
-        layers_times.clear();
+        layers_times_running_total.clear();
+        layers_areas.clear();
     }
 };
 

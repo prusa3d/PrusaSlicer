@@ -1,9 +1,20 @@
 #include "Wipe.hpp"
-#include "../GCode.hpp"
 
 #include <string_view>
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <cinttypes>
 
-#include <Eigen/Geometry>
+#include "../GCode.hpp"
+#include "libslic3r/Extruder.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
+#include "libslic3r/GCode/SmoothPath.hpp"
+#include "libslic3r/Geometry/ArcWelder.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/libslic3r.h"
 
 using namespace std::string_view_literals;
 
@@ -21,9 +32,9 @@ void Wipe::init(const PrintConfig &config, const std::vector<unsigned int> &extr
         if (config.wipe.get_at(id)) {
             // Wipe length to extrusion ratio.
             const double xy_to_e = this->calc_xy_to_e_ratio(config, id);
-            wipe_xy = std::max(wipe_xy, xy_to_e * config.retract_length.get_at(id));
+            wipe_xy = std::max(wipe_xy, config.retract_length.get_at(id) / xy_to_e);
             if (multimaterial)
-                wipe_xy = std::max(wipe_xy, xy_to_e * config.retract_length_toolchange.get_at(id));
+                wipe_xy = std::max(wipe_xy, config.retract_length_toolchange.get_at(id) / xy_to_e);
         }
 
     if (wipe_xy == 0)
@@ -32,40 +43,23 @@ void Wipe::init(const PrintConfig &config, const std::vector<unsigned int> &extr
         this->enable(wipe_xy);
 }
 
-void Wipe::set_path(SmoothPath &&path, bool reversed)
-{
+void Wipe::set_path(SmoothPath &&path) {
     this->reset_path();
 
-    if (this->enabled() && ! path.empty()) {
-        if (reversed) {
-            m_path = std::move(path.back().path);
-            Geometry::ArcWelder::reverse(m_path);
-            int64_t len = Geometry::ArcWelder::estimate_path_length(m_path);
-            for (auto it = std::next(path.rbegin()); len < m_wipe_len_max && it != path.rend(); ++ it) {
-                if (it->path_attributes.role.is_bridge())
-                    break; // Do not perform a wipe on bridges.
-                assert(it->path.size() >= 2);
-                assert(m_path.back().point == it->path.back().point);
-                if (m_path.back().point != it->path.back().point)
-                    // ExtrusionMultiPath is interrupted in some place. This should not really happen.
-                    break;
-                len += Geometry::ArcWelder::estimate_path_length(it->path);
-                m_path.insert(m_path.end(), it->path.rbegin() + 1, it->path.rend());
-            }
-        } else {
-            m_path = std::move(path.front().path);
-            int64_t len = Geometry::ArcWelder::estimate_path_length(m_path);
-            for (auto it = std::next(path.begin()); len < m_wipe_len_max && it != path.end(); ++ it) {
-                if (it->path_attributes.role.is_bridge())
-                    break; // Do not perform a wipe on bridges.
-                assert(it->path.size() >= 2);
-                assert(m_path.back().point == it->path.front().point);
-                if (m_path.back().point != it->path.front().point)
-                    // ExtrusionMultiPath is interrupted in some place. This should not really happen.
-                    break;
-                len += Geometry::ArcWelder::estimate_path_length(it->path);
-                m_path.insert(m_path.end(), it->path.begin() + 1, it->path.end());
-            }
+    if (this->enabled() && !path.empty()) {
+        const coord_t wipe_len_max_scaled = scaled(m_wipe_len_max);
+        m_path = std::move(path.front().path);
+        int64_t len = Geometry::ArcWelder::estimate_path_length(m_path);
+        for (auto it = std::next(path.begin()); len < wipe_len_max_scaled && it != path.end(); ++it) {
+            if (it->path_attributes.role.is_bridge())
+                break; // Do not perform a wipe on bridges.
+            assert(it->path.size() >= 2);
+            assert(m_path.back().point == it->path.front().point);
+            if (m_path.back().point != it->path.front().point)
+                // ExtrusionMultiPath is interrupted in some place. This should not really happen.
+                break;
+            len += Geometry::ArcWelder::estimate_path_length(it->path);
+            m_path.insert(m_path.end(), it->path.begin() + 1, it->path.end());
         }
     }
 
@@ -164,7 +158,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             return done;
         };
         // Start with the current position, which may be different from the wipe path start in case of loop clipping.
-        Vec2d prev = gcodegen.point_to_gcode_quantized(gcodegen.last_pos());
+        Vec2d prev = gcodegen.point_to_gcode_quantized(*gcodegen.last_position);
         auto  it   = this->path().begin();
         Vec2d p    = gcodegen.point_to_gcode(it->point + m_offset);
         ++ it;
@@ -192,7 +186,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             // add tag for processor
             assert(p == GCodeFormatter::quantize(p));
             gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
-            gcodegen.set_last_pos(gcodegen.gcode_to_point(p));
+            gcodegen.last_position = gcodegen.gcode_to_point(p);
         }
     }
 
@@ -204,7 +198,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
 // Make a little move inwards before leaving loop after path was extruded,
 // thus the current extruder position is at the end of a path and the path
 // may not be closed in case the loop was clipped to hide a seam.
-std::optional<Point> wipe_hide_seam(const SmoothPath &path, bool is_hole, double wipe_length)
+std::optional<Point> wipe_hide_seam(const SmoothPath &path, const bool path_reversed, const double wipe_length)
 {
     assert(! path.empty());
     assert(path.front().path.size() >= 2);
@@ -228,7 +222,7 @@ std::optional<Point> wipe_hide_seam(const SmoothPath &path, bool is_hole, double
                     // Wipe move cannot be calculated, the loop is not long enough. This should not happen due to the longer_than() test above.
                     return {};
             }
-            if (std::optional<Point> p = sample_path_point_at_distance_from_end(path, wipe_length); p)
+            if (std::optional<Point> p = sample_path_point_at_distance_from_start(path, wipe_length); p)
                 p_prev = *p;
             else
                 // Wipe move cannot be calculated, the loop is not long enough. This should not happen due to the longer_than() test above.
@@ -239,7 +233,7 @@ std::optional<Point> wipe_hide_seam(const SmoothPath &path, bool is_hole, double
         double angle_inside = angle(p_next - p_current, p_prev - p_current);
         assert(angle_inside >= -M_PI && angle_inside <= M_PI);
         // 3rd of this angle will be taken, thus make the angle monotonic before interpolation.
-        if (is_hole) {
+        if (path_reversed) {
             if (angle_inside > 0)
                 angle_inside -= 2.0 * M_PI;
         } else {
@@ -248,7 +242,7 @@ std::optional<Point> wipe_hide_seam(const SmoothPath &path, bool is_hole, double
         }
         // Rotate the forward segment inside by 1/3 of the wedge angle.
         auto v_rotated = Eigen::Rotation2D(angle_inside) * (p_next - p_current).cast<double>().normalized();
-        return std::make_optional<Point>(p_current + (v_rotated * wipe_length).cast<coord_t>());
+        return p_current + (v_rotated * wipe_length).cast<coord_t>();
     }
 
     return {};

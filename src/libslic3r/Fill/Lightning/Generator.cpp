@@ -2,11 +2,25 @@
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "Generator.hpp"
-#include "TreeNode.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <utility>
+#include <cassert>
+
+#include "TreeNode.hpp"
 #include "../../ClipperUtils.hpp"
 #include "../../Layer.hpp"
 #include "../../Print.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/EdgeGrid.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Fill/Lightning/Layer.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Surface.hpp"
 
 /* Possible future tasks/optimizations,etc.:
  * - Improve connecting heuristic to favor connecting to shorter trees

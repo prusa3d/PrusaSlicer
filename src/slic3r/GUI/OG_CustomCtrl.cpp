@@ -203,7 +203,7 @@ wxPoint OG_CustomCtrl::get_pos(const Line& line, Field* field_in/* = nullptr*/)
                 if (opt.opt.gui_type == ConfigOptionDef::GUIType::legend)
                     h_pos += 2 * blinking_button_width;
 
-                h_pos += field->getWindow()->GetSize().x + m_h_gap;
+                h_pos += (opt.opt.width >= 0 ? opt.opt.width * m_em_unit : field->getWindow()->GetSize().x) + m_h_gap;
 
                 if (option_set.size() == 1 && option_set.front().opt.full_width)
                     break;
@@ -664,7 +664,7 @@ void OG_CustomCtrl::CtrlLine::render(wxDC& dc, wxCoord v_pos)
                         h_pos += child->GetWindow()->GetSize().x + ctrl->m_h_gap;
             }
             else if (field->getWindow())
-                h_pos += field->getWindow()->GetSize().x + ctrl->m_h_gap;
+                h_pos += (opt.opt.width >= 0 ? opt.opt.width * ctrl->m_em_unit : field->getWindow()->GetSize().x) + ctrl->m_h_gap;
         }
 
         // add field

@@ -19,11 +19,6 @@ struct BlockingWait
 {
     // Timeout to wait for the arrival of new element into the queue.
     unsigned timeout_ms = 0;
-
-    // An optional atomic flag to set true if an incoming element gets
-    // consumed. The flag will be atomically set to true when popping the
-    // front of the queue.
-    std::atomic<bool> *pop_flag = nullptr;
 };
 
 // A thread safe queue for one producer and one consumer.
@@ -35,10 +30,22 @@ class ThreadSafeQueueSPSC
     std::queue<T, Container<T, ContainerArgs...>> m_queue;
     mutable std::mutex m_mutex;
     std::condition_variable m_cond_var;
+
 public:
 
+    // Forward arguments to the underlying queue
+    template<class...Qargs>
+    ThreadSafeQueueSPSC(Qargs &&...qargs)
+        : m_queue{Container<T, ContainerArgs...>{std::forward<Qargs>(qargs)...}} {}
+
+    ThreadSafeQueueSPSC(const ThreadSafeQueueSPSC&) = delete;
+    ThreadSafeQueueSPSC(ThreadSafeQueueSPSC&&) = delete;
+    ThreadSafeQueueSPSC& operator=(const ThreadSafeQueueSPSC&) = delete;
+    ThreadSafeQueueSPSC& operator=(ThreadSafeQueueSPSC &&) = delete;
+
     // Consume one element, block if the queue is empty.
-    template<class Fn> bool consume_one(const BlockingWait &blkw, Fn &&fn)
+    template<class Fn>
+    bool consume_one(const BlockingWait &blkw, Fn &&fn)
     {
         static_assert(!std::is_reference_v<T>, "");
         static_assert(std::is_default_constructible_v<T>, "");
@@ -63,13 +70,10 @@ public:
                 el = m_queue.front();
 
             m_queue.pop();
-
-            if (blkw.pop_flag)
-                // The optional flag is set before the lock us unlocked.
-                blkw.pop_flag->store(true);
         }
 
         fn(el);
+
         return true;
     }
 
@@ -96,7 +100,8 @@ public:
     }
 
     // Push element into the queue.
-    template<class...TArgs> void push(TArgs&&...el)
+    template<class...TArgs>
+    void push(TArgs&&...el)
     {
         std::lock_guard lk{m_mutex};
         m_queue.emplace(std::forward<TArgs>(el)...);

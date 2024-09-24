@@ -81,27 +81,26 @@ public:
 	virtual void	init() override;
 	void			open_next() { retrieve_data(); }
 protected:
-	virtual void	set_next_window_size(ImGuiWrapper& imgui) override;
+	virtual void	set_next_window_size() override;
 	virtual void	count_spaces() override;
 	virtual void	count_lines() override;
 	virtual bool	on_text_click() override;
-	virtual void	render_text(ImGuiWrapper& imgui,
+	virtual void	render_text(const float win_size_x, const float win_size_y,
+								const float win_pos_x, const float win_pos_y) override;
+	virtual void	render_close_button(
 								const float win_size_x, const float win_size_y,
 								const float win_pos_x, const float win_pos_y) override;
-	virtual void	render_close_button(ImGuiWrapper& imgui,
-								const float win_size_x, const float win_size_y,
-								const float win_pos_x, const float win_pos_y) override;
-	virtual void	render_minimize_button(ImGuiWrapper& imgui,
+	virtual void	render_minimize_button(
 								const float win_pos_x, const float win_pos_y) override {}
-	void			render_preferences_button(ImGuiWrapper& imgui,
+	void			render_preferences_button(
 								const float win_pos_x, const float win_pos_y);
-	void			render_right_arrow_button(ImGuiWrapper& imgui,
+	void			render_right_arrow_button(
 								const float win_size_x, const float win_size_y,
 								const float win_pos_x, const float win_pos_y);
-	void			render_documentation_button(ImGuiWrapper& imgui,
+	void			render_documentation_button(
 								const float win_size_x, const float win_size_y,
 								const float win_pos_x, const float win_pos_y);
-	void			render_logo(ImGuiWrapper& imgui,
+	void			render_logo(
 								const float win_size_x, const float win_size_y,
 								const float win_pos_x, const float win_pos_y);
 	// recursion counter -1 tells to retrieve same hint as last time

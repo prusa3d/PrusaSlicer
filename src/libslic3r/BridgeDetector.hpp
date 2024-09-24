@@ -6,6 +6,15 @@
 #ifndef slic3r_BridgeDetector_hpp_
 #define slic3r_BridgeDetector_hpp_
 
+#include <cmath>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <algorithm>
+#include <limits>
+#include <tuple>
+#include <utility>
+
 #include "ClipperUtils.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
@@ -14,10 +23,6 @@
 #include "PrincipalComponents2D.hpp"
 #include "libslic3r.h"
 #include "ExPolygon.hpp"
-#include <cmath>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 namespace Slic3r {
 

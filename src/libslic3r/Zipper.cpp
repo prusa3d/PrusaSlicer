@@ -2,13 +2,14 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <exception>
+#include <boost/log/trivial.hpp>
+#include <cstring>
 
 #include "Exception.hpp"
 #include "Zipper.hpp"
 #include "miniz_extension.hpp"
-#include <boost/log/trivial.hpp>
 #include "I18N.hpp"
+#include "miniz.h"
 
 #if defined(_MSC_VER) &&  _MSC_VER <= 1800 || __cplusplus < 201103L
     #define SLIC3R_NORETURN

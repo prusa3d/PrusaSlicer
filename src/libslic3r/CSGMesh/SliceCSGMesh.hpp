@@ -49,6 +49,8 @@ inline void collect_nonempty_indices(csg::CSGType                   op,
 
 } // namespace detail
 
+// Slice the input csgrange and return the corresponding layers as a vector of ExPolygons.
+// All boolean operations are performed on the 2D slices.
 template<class ItCSG>
 std::vector<ExPolygons> slice_csgmesh_ex(
     const Range<ItCSG>          &csgrange,

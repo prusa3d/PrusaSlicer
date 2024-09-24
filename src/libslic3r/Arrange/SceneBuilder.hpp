@@ -5,9 +5,29 @@
 #ifndef SCENEBUILDER_HPP
 #define SCENEBUILDER_HPP
 
-#include "Scene.hpp"
+#include <assert.h>
+#include <stddef.h>
+#include <algorithm>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
 
+#include "Scene.hpp"
 #include "Core/ArrangeItemTraits.hpp"
+#include "libslic3r/AnyPtr.hpp"
+#include "libslic3r/Arrange/Core/Beds.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
@@ -24,6 +44,9 @@ namespace arr2 {
 
 using SelectionPredicate = std::function<bool()>;
 
+// Objects implementing this interface should know how to present the wipe tower
+// as an Arrangeable. If the wipe tower is not present, the overloads of visit() shouldn't do
+// anything. (See MissingWipeTowerHandler)
 class WipeTowerHandler
 {
 public:
@@ -34,6 +57,9 @@ public:
     virtual void set_selection_predicate(SelectionPredicate pred) = 0;
 };
 
+// Something that has a bounding box and can be displaced by arbitrary 2D offset and rotated
+// by arbitrary rotation. Used as targets to place on virtual beds. Normally this would correspond
+// to ModelInstances but the same functionality was needed in more contexts.
 class VBedPlaceable {
 public:
     virtual ~VBedPlaceable() = default;
@@ -42,11 +68,11 @@ public:
     virtual void displace(const Vec2d &transl, double rot) = 0;
 };
 
-// An interface to handle virtual beds for ModelInstances. A ModelInstance
+// An interface to handle virtual beds for VBedPlaceable objects. A VBedPlaceable
 // may be assigned to a logical bed identified by an integer index value (zero
-// is the actual physical bed). The ModelInstance may still be outside of it's
+// is the actual physical bed). The VBedPlaceable may still be outside of it's
 // bed, regardless of being assigned to it. The handler object should provide
-// means to read the assigned bed index of a ModelInstance, to assign a
+// means to read the assigned bed index of a VBedPlaceable, to assign a
 // different bed index and to provide a trafo that maps it to the physical bed
 // given a logical bed index. The reason is that the arrangement expects items
 // to be in the coordinate system of the physical bed.
@@ -55,15 +81,15 @@ class VirtualBedHandler
 public:
     virtual ~VirtualBedHandler() = default;
 
-    // Returns the bed index on which the given ModelInstance is sitting.
+    // Returns the bed index on which the given VBedPlaceable is sitting.
     virtual int get_bed_index(const VBedPlaceable &obj) const = 0;
 
-    // The returned trafo can be used to move the outline of the ModelInstance
+    // The returned trafo can be used to displace the VBedPlaceable
     // to the coordinate system of the physical bed, should that differ from
     // the coordinate space of a logical bed.
     virtual Transform3d get_physical_bed_trafo(int bed_index) const = 0;
 
-    // Assign the ModelInstance to the given bed index. Note that this
+    // Assign the VBedPlaceable to the given bed index. Note that this
     // method can return false, indicating that the given bed is not available
     // to be occupied (e.g. the handler has a limited amount of logical bed)
     virtual bool assign_bed(VBedPlaceable &obj, int bed_idx) = 0;
@@ -76,6 +102,7 @@ public:
     static std::unique_ptr<VirtualBedHandler> create(const ExtendedBed &bed);
 };
 
+// Holds the info about which object (ID) is selected/unselected
 class SelectionMask
 {
 public:
@@ -114,6 +141,7 @@ public:
     bool is_wipe_tower() const override { return m_wp; }
 };
 
+// Common part of any Arrangeable which is a wipe tower
 struct ArrangeableWipeTowerBase: public Arrangeable
 {
     ObjectID oid;
@@ -166,13 +194,15 @@ class SceneBuilder;
 
 struct InstPos { size_t obj_idx = 0, inst_idx = 0; };
 
+// Implementing ArrangeableModel interface for PrusaSlicer's Model, ModelObject, ModelInstance data
+// hierarchy
 class ArrangeableSlicerModel: public ArrangeableModel
 {
 protected:
     AnyPtr<Model> m_model;
-    AnyPtr<WipeTowerHandler> m_wth;
-    AnyPtr<VirtualBedHandler> m_vbed_handler;
-    AnyPtr<const SelectionMask> m_selmask;
+    AnyPtr<WipeTowerHandler> m_wth; // Determines how wipe tower is handled
+    AnyPtr<VirtualBedHandler> m_vbed_handler; // Determines how virtual beds are handled
+    AnyPtr<const SelectionMask> m_selmask;  // Determines which objects are selected/unselected
 
 private:
     friend class SceneBuilder;
@@ -199,6 +229,7 @@ public:
     const Model &get_model() const { return *m_model; }
 };
 
+// SceneBuilder implementation for PrusaSlicer API.
 class SceneBuilder: public SceneBuilderBase<SceneBuilder>
 {
 protected:
@@ -412,6 +443,7 @@ public:
     }
 };
 
+// Arrangeable interface implementation for ModelInstances
 template<class InstPtr, class VBedHPtr>
 class ArrangeableModelInstance : public Arrangeable, VBedPlaceable
 {
@@ -454,6 +486,7 @@ public:
 extern template class ArrangeableModelInstance<ModelInstance, VirtualBedHandler>;
 extern template class ArrangeableModelInstance<const ModelInstance, const VirtualBedHandler>;
 
+// Arrangeable implementation for an SLAPrintObject to be able to arrange with the supports and pad
 class ArrangeableSLAPrintObject : public Arrangeable
 {
     const SLAPrintObject *m_po;
@@ -491,6 +524,7 @@ public:
     int  priority() const override { return m_arrbl->priority(); }
 };
 
+// Extension of ArrangeableSlicerModel for SLA
 class ArrangeableSLAPrint : public ArrangeableSlicerModel {
     const SLAPrint *m_slaprint;
 
@@ -622,6 +656,8 @@ public:
 extern template class ArrangeableFullModel<Model, ModelDuplicate, VirtualBedHandler>;
 extern template class ArrangeableFullModel<const Model, const ModelDuplicate, const VirtualBedHandler>;
 
+// An implementation of the ArrangeableModel to be used for the full model 'duplicate' feature
+// accessible from CLI
 class DuplicableModel: public ArrangeableModel {
     AnyPtr<Model> m_model;
     AnyPtr<VirtualBedHandler> m_vbh;

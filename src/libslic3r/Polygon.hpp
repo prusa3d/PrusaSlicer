@@ -11,9 +11,20 @@
 #ifndef slic3r_Polygon_hpp_
 #define slic3r_Polygon_hpp_
 
-#include "libslic3r.h"
+#include <assert.h>
+#include <math.h>
+#include <oneapi/tbb/scalable_allocator.h>
 #include <vector>
 #include <string>
+#include <algorithm>
+#include <cstddef>
+#include <initializer_list>
+#include <iterator>
+#include <utility>
+#include <cassert>
+#include <cmath>
+
+#include "libslic3r.h"
 #include "Line.hpp"
 #include "Point.hpp"
 #include "MultiPoint.hpp"
@@ -22,6 +33,8 @@
 namespace Slic3r {
 
 class Polygon;
+class BoundingBox;
+
 using Polygons          = std::vector<Polygon, PointsAllocator<Polygon>>;
 using PolygonPtrs       = std::vector<Polygon*, PointsAllocator<Polygon*>>;
 using ConstPolygonPtrs  = std::vector<const Polygon*, PointsAllocator<const Polygon*>>;
@@ -319,6 +332,7 @@ template<class I> IntegerOnly<I, Polygons> reserve_polygons(I cap)
 
 // start Boost
 #include <boost/polygon/polygon.hpp>
+
 namespace boost { namespace polygon {
     template <>
     struct geometry_concept<Slic3r::Polygon>{ typedef polygon_concept type; };

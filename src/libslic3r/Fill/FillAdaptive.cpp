@@ -2,32 +2,41 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "../ClipperUtils.hpp"
-#include "../ExPolygon.hpp"
-#include "../Surface.hpp"
-#include "../Geometry.hpp"
-#include "../Layer.hpp"
-#include "../Print.hpp"
-#include "../ShortestPath.hpp"
-
-#include "FillAdaptive.hpp"
-
 // for indexed_triangle_set
 #include <admesh/stl.h>
-
+#include <boost/geometry/core/access.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <cstdlib>
 #include <cmath>
 #include <algorithm>
 #include <numeric>
+#include <array>
+#include <iterator>
+#include <limits>
+#include <optional>
+#include <cassert>
+#include <complex>
+
+#include "../ClipperUtils.hpp"
+#include "../ExPolygon.hpp"
+#include "../Geometry.hpp"
+#include "../Layer.hpp"
+#include "../Print.hpp"
+#include "../ShortestPath.hpp"
+#include "libslic3r/Fill/FillAdaptive.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "tcbspan/span.hpp"
 
 // Boost pool: Don't use mutexes to synchronize memory allocation.
 #define BOOST_POOL_NO_MT
 #include <boost/pool/object_pool.hpp>
-
 #include <boost/geometry.hpp>
-#include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/geometries/segment.hpp>
-#include <boost/geometry/index/rtree.hpp>
 
 
 namespace Slic3r {
@@ -507,10 +516,6 @@ static void generate_infill_lines_recursive(
             ++ address;
     }
 }
-
-#ifndef NDEBUG
-//    #define ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-#endif
 
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
 static void export_infill_lines_to_svg(const ExPolygon &expoly, const Polylines &polylines, const std::string &path, const Points &pts = Points())

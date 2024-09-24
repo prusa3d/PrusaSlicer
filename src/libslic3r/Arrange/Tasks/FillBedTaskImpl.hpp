@@ -7,7 +7,7 @@
 
 #include "FillBedTask.hpp"
 
-#include "Arrange/Core/NFP/NFPArrangeItemTraits.hpp"
+#include "libslic3r/Arrange/Core/NFP/NFPArrangeItemTraits.hpp"
 
 #include <boost/log/trivial.hpp>
 

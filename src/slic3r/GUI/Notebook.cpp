@@ -14,7 +14,7 @@
 
 wxDEFINE_EVENT(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, wxCommandEvent);
 
-ButtonsListCtrl::ButtonsListCtrl(wxWindow *parent, bool add_mode_buttons/* = false*/) :
+ButtonsListCtrl::ButtonsListCtrl(wxWindow *parent) :
     wxControl(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL)
 {
 #ifdef __WINDOWS__
@@ -30,12 +30,6 @@ ButtonsListCtrl::ButtonsListCtrl(wxWindow *parent, bool add_mode_buttons/* = fal
 
     m_buttons_sizer = new wxFlexGridSizer(1, m_btn_margin, m_btn_margin);
     m_sizer->Add(m_buttons_sizer, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxBOTTOM, m_btn_margin);
-
-    if (add_mode_buttons) {
-        m_mode_sizer = new ModeSizer(this, m_btn_margin);
-        m_sizer->AddStretchSpacer(20);
-        m_sizer->Add(m_mode_sizer, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxBOTTOM, m_btn_margin);
-    }
 
     this->Bind(wxEVT_PAINT, &ButtonsListCtrl::OnPaint, this);
 }
@@ -68,33 +62,11 @@ void ButtonsListCtrl::OnPaint(wxPaintEvent&)
         dc.DrawRectangle(pos.x, pos.y + size.y, size.x, sz.y - size.y);
     }
 
-    // highlight selected mode button
-
-    if (m_mode_sizer) {
-        const std::vector<ModeButton*>& mode_btns = m_mode_sizer->get_btns();
-        for (int idx = 0; idx < int(mode_btns.size()); idx++) {
-            ModeButton* btn = mode_btns[idx];
-            btn->SetBackgroundColour(btn->is_selected() ? selected_btn_bg : default_btn_bg);
-
-            //wxPoint pos = btn->GetPosition();
-            //wxSize size = btn->GetSize();
-            //const wxColour& clr = btn->is_selected() ? btn_marker_color : default_btn_bg;
-            //dc.SetPen(clr);
-            //dc.SetBrush(clr);
-            //dc.DrawRectangle(pos.x, pos.y + size.y, size.x, sz.y - size.y);
-        }
-    }
-
     // Draw orange bottom line
 
     dc.SetPen(btn_marker_color);
     dc.SetBrush(btn_marker_color);
     dc.DrawRectangle(1, sz.y - m_line_margin, sz.x, m_line_margin);
-}
-
-void ButtonsListCtrl::UpdateMode()
-{
-    m_mode_sizer->SetMode(Slic3r::GUI::wxGetApp().get_mode());
 }
 
 void ButtonsListCtrl::Rescale()
@@ -113,14 +85,7 @@ void ButtonsListCtrl::OnColorsChanged()
     for (ScalableButton* btn : m_pageButtons)
         btn->sys_color_changed();
 
-    m_mode_sizer->sys_color_changed();
-
     m_sizer->Layout();
-}
-
-void ButtonsListCtrl::UpdateModeMarkers()
-{
-    m_mode_sizer->update_mode_markers();
 }
 
 void ButtonsListCtrl::SetSelection(int sel)

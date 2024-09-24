@@ -2,22 +2,27 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <tbb/parallel_for.h>
+#include <random>
+#include <cstdlib>
+#include <limits>
+#include <numeric>
+#include <algorithm>
+#include <cassert>
 
 #include "SupportPointGenerator.hpp"
-#include "Execution/ExecutionTBB.hpp"
-#include "Geometry/ConvexHull.hpp"
-#include "Model.hpp"
-#include "ExPolygon.hpp"
-#include "SVG.hpp"
-#include "Point.hpp"
-#include "ClipperUtils.hpp"
-#include "Tesselate.hpp"
-#include "MinAreaBoundingBox.hpp"
-#include "libslic3r.h"
-
-#include <iostream>
-#include <random>
+#include "libslic3r/Execution/ExecutionTBB.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Tesselate.hpp"
+#include "libslic3r/MinAreaBoundingBox.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/AABBMesh.hpp"
+#include "libslic3r/Execution/Execution.hpp"
+#include "libslic3r/SLA/SupportPoint.hpp"
+#include "libslic3r/BoundingBox.hpp"
 
 namespace Slic3r {
 namespace sla {
@@ -284,14 +289,6 @@ void SupportPointGenerator::process(const std::vector<ExPolygons>& slices, const
 
         status += increment;
         m_statusfn(int(std::round(status)));
-
-#ifdef SLA_SUPPORTPOINTGEN_DEBUG
-        /*std::string layer_num_str = std::string((i<10 ? "0" : "")) + std::string((i<100 ? "0" : "")) + std::to_string(i);
-        output_expolygons(expolys_top, "top" + layer_num_str + ".svg");
-        output_expolygons(diff, "diff" + layer_num_str + ".svg");
-        if (!islands.empty())
-            output_expolygons(islands, "islands" + layer_num_str + ".svg");*/
-#endif /* SLA_SUPPORTPOINTGEN_DEBUG */
     }
 }
 

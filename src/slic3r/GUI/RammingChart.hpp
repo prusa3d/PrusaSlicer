@@ -23,7 +23,7 @@ public:
     {
         SetBackgroundStyle(wxBG_STYLE_PAINT);
         m_rect = wxRect(wxPoint(legend_side,0),rect.GetSize()-wxSize(legend_side,legend_side));
-        visible_area = wxRect2DDouble(0.0, 0.0, sampling*ramming_speed_size, 20.);
+        visible_area = wxRect2DDouble(0.0, 0.0, sampling*ramming_speed_size, 60.);
         m_buttons.clear();
         if (initial_buttons.size()>0)
             for (const auto& pair : initial_buttons)
@@ -31,7 +31,7 @@ public:
         recalculate_line();
     }
     void set_xy_range(float x,float y) {
-        x = int(x/0.5) * 0.5;
+        x = int(x/0.25) * 0.25;
         if (x>=0) visible_area.SetRight(x);
         if (y>=0) visible_area.SetBottom(y);
         recalculate_line();
@@ -104,20 +104,18 @@ private:
         }
         return (-1);
     }
-        
-        
+
     void recalculate_line();
-    void recalculate_volume();
-     
-    
+
     wxRect m_rect;                  // rectangle on screen the chart is mapped into (screen coordinates)
     wxPoint m_previous_mouse;        
     std::vector<ButtonToDrag> m_buttons;
     std::vector<int> m_line_to_draw;
     wxRect2DDouble visible_area;
     ButtonToDrag* m_dragged = nullptr;
-    float m_total_volume = 0.f;  
-    
+    float m_total_volume = 0.f;
+
+    bool m_uniform = false; // testing only
 };
 
 

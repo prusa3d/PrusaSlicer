@@ -236,7 +236,7 @@ static bool verbose_gcode()
     return s == "1" || s == "on" || s == "yes";
 }
 
-void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r::Model &model, const DynamicPrintConfig &config_in, bool comments)
+void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r::Model &model, const DynamicPrintConfig &config_in, bool comments, unsigned duplicate_count)
 {
 	DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
     config.apply(config_in);
@@ -247,10 +247,19 @@ void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r
     for (const TriangleMesh &t : meshes) {
 		ModelObject *object = model.add_object();
 		object->name += "object.stl";
-		object->add_volume(std::move(t));
+		object->add_volume(t);
 		object->add_instance();
 	}
-    arrange_objects(model, arr2::to_arrange_bed(get_bed_shape(config)), arr2::ArrangeSettings{}.set_distance_from_objects(min_object_distance(config)));
+
+    double distance = min_object_distance(config);
+    arr2::ArrangeSettings arrange_settings{};
+    arrange_settings.set_distance_from_objects(distance);
+    arr2::ArrangeBed bed{arr2::to_arrange_bed(get_bed_shape(config))};
+    if (duplicate_count > 1) {
+        duplicate(model, duplicate_count, bed, arrange_settings);
+    }
+
+    arrange_objects(model, bed, arrange_settings);
     model.center_instances_around_point({100, 100});
 	for (ModelObject *mo : model.objects) {
         mo->ensure_on_bed();
@@ -262,36 +271,36 @@ void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r
     print.set_status_silent();
 }
 
-void init_print(std::initializer_list<TestMesh> test_meshes, Slic3r::Print &print, Slic3r::Model &model, const Slic3r::DynamicPrintConfig &config_in, bool comments)
+void init_print(std::initializer_list<TestMesh> test_meshes, Slic3r::Print &print, Slic3r::Model &model, const Slic3r::DynamicPrintConfig &config_in, bool comments, unsigned duplicate_count)
 {
 	std::vector<TriangleMesh> triangle_meshes;
 	triangle_meshes.reserve(test_meshes.size());
 	for (const TestMesh test_mesh : test_meshes)
 		triangle_meshes.emplace_back(mesh(test_mesh));
-	init_print(std::move(triangle_meshes), print, model, config_in, comments);
+	init_print(std::move(triangle_meshes), print, model, config_in, comments, duplicate_count);
 }
 
-void init_print(std::initializer_list<TriangleMesh> input_meshes, Slic3r::Print &print, Slic3r::Model &model, const DynamicPrintConfig &config_in, bool comments)
+void init_print(std::initializer_list<TriangleMesh> input_meshes, Slic3r::Print &print, Slic3r::Model &model, const DynamicPrintConfig &config_in, bool comments, unsigned duplicate_count)
 {
 	std::vector<TriangleMesh> triangle_meshes;
 	triangle_meshes.reserve(input_meshes.size());
 	for (const TriangleMesh &input_mesh : input_meshes)
 		triangle_meshes.emplace_back(input_mesh);
-	init_print(std::move(triangle_meshes), print, model, config_in, comments);
+	init_print(std::move(triangle_meshes), print, model, config_in, comments, duplicate_count);
 }
 
-void init_print(std::initializer_list<TestMesh> meshes, Slic3r::Print &print, Slic3r::Model &model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments)
+void init_print(std::initializer_list<TestMesh> meshes, Slic3r::Print &print, Slic3r::Model &model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments, unsigned duplicate_count)
 {
 	Slic3r::DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
 	config.set_deserialize_strict(config_items);
-	init_print(meshes, print, model, config, comments);
+	init_print(meshes, print, model, config, comments, duplicate_count);
 }
 
-void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, Slic3r::Model &model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments)
+void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, Slic3r::Model &model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments, unsigned duplicate_count)
 {
 	Slic3r::DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
 	config.set_deserialize_strict(config_items);
-	init_print(meshes, print, model, config, comments);
+	init_print(meshes, print, model, config, comments, duplicate_count);
 }
 
 void init_and_process_print(std::initializer_list<TestMesh> meshes, Slic3r::Print &print, const DynamicPrintConfig &config, bool comments)

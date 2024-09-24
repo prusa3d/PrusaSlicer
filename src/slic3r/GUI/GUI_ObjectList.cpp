@@ -7,6 +7,7 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/TextConfiguration.hpp"
+#include "libslic3r/BuildVolume.hpp" // IWYU pragma: keep
 #include "GUI_ObjectList.hpp"
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectManipulation.hpp"
@@ -35,6 +36,7 @@
 #include <wx/progdlg.h>
 #include <wx/listbook.h>
 #include <wx/numformatter.h>
+#include <wx/bookctrl.h> // IWYU pragma: keep
 
 #include "slic3r/Utils/FixModelByWin10.hpp"
 
@@ -224,6 +226,15 @@ ObjectList::ObjectList(wxWindow* parent) :
 #ifdef __WXMSW__
     GetMainWindow()->Bind(wxEVT_MOTION, [this](wxMouseEvent& event) {
         set_tooltip_for_item(this->get_mouse_position_in_control());
+        event.Skip();
+    });
+
+    GetMainWindow()->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) {
+        m_mouse_left_down = true;
+        event.Skip();
+    });
+    GetMainWindow()->Bind(wxEVT_LEFT_UP, [this](wxMouseEvent& event) {
+        m_mouse_left_down = false;
         event.Skip();
     });
 #endif //__WXMSW__
@@ -694,6 +705,8 @@ void ObjectList::update_name_in_model(const wxDataViewItem& item) const
             //update object name with text marker in ObjectList
             m_objects_model->SetName(get_item_name(obj->name, true), item);
         }
+        // Renaming an object should invalidate gcode export - schedule Print::apply call.
+        wxGetApp().plater()->schedule_background_process();
         return;
     }
 
@@ -1208,6 +1221,15 @@ void ObjectList::key_event(wxKeyEvent& event)
 
 void ObjectList::OnBeginDrag(wxDataViewEvent &event)
 {
+#ifdef __WXMSW__
+    if (!m_mouse_left_down) {
+        event.Veto();
+        return;
+    }
+    // Invalidate LeftDown flag emmidiately to avoid its unexpected using next time.
+    m_mouse_left_down = false;
+#endif // __WXMSW__
+
     if (m_is_editing_started)
         m_is_editing_started = false;
 #ifdef __WXGTK__
@@ -1903,7 +1925,7 @@ void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
         cnv->get_gizmos_manager().reset_all_states();
         Plater::TakeSnapshot(plater, _L("Remove Multi Material painting"));
         for (ModelVolume* mv : (*m_objects)[obj_idx]->volumes)
-            mv->mmu_segmentation_facets.reset();
+            mv->mm_segmentation_facets.reset();
         break;
 
     case InfoItemType::Sinking:
@@ -2895,7 +2917,7 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
                                       [type](const ModelVolume *mv) {
                                           return !(type == InfoItemType::CustomSupports ? mv->supported_facets.empty() :
                                                    type == InfoItemType::CustomSeam     ? mv->seam_facets.empty() :
-                                                                                          mv->mmu_segmentation_facets.empty());
+                                                                                          mv->mm_segmentation_facets.empty());
                                       });
             break;
 
@@ -4553,8 +4575,8 @@ void ObjectList::rename_item()
     if (new_name.IsEmpty())
         return;
 
-    if (Plater::has_illegal_filename_characters(new_name)) {
-        Plater::show_illegal_characters_warning(this);
+    if (has_illegal_characters(new_name)) {
+        show_illegal_characters_warning(this);
         return;
     }
 
@@ -4670,22 +4692,8 @@ void ObjectList::fix_through_winsdk()
     progress_dlg.Update(100, "");
 
     // Show info notification
-    wxString msg;
-    wxString bullet_suf = "\n   - ";
-    if (!succes_models.empty()) {
-        msg = _L_PLURAL("The following model was repaired successfully", "The following models were repaired successfully", succes_models.size()) + ":";
-        for (auto& model : succes_models)
-            msg += bullet_suf + from_u8(model);
-        msg += "\n\n";
-    }
-    if (!failed_models.empty()) {
-        msg += _L_PLURAL("Folowing model repair failed", "Folowing models repair failed", failed_models.size()) + ":\n";
-        for (auto& model : failed_models)
-            msg += bullet_suf + from_u8(model.first) + ": " + _(model.second);
-    }
-    if (msg.IsEmpty())
-        msg = _L("Repairing was canceled");
-    plater->get_notification_manager()->push_notification(NotificationType::RepairFinished, NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel, boost::nowide::narrow(msg));
+    wxString msg = MenuFactory::get_repaire_result_message(succes_models, failed_models);
+    plater->get_notification_manager()->push_notification(NotificationType::RepairFinished, NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel, into_u8(msg));
 }
 
 void ObjectList::simplify()
@@ -4780,7 +4788,7 @@ void ObjectList::OnEditingDone(wxDataViewEvent &event)
     const auto renderer = dynamic_cast<BitmapTextRenderer*>(GetColumn(colName)->GetRenderer());
 
     if (renderer->WasCanceled())
-		wxTheApp->CallAfter([this]{ Plater::show_illegal_characters_warning(this); });
+		wxTheApp->CallAfter([this]{ show_illegal_characters_warning(this); });
 
 #ifdef __WXMSW__
 	// Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.

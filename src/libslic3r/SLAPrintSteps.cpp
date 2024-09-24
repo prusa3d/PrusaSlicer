@@ -2,40 +2,60 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <unordered_set>
-
 #include <libslic3r/Exception.hpp>
 #include <libslic3r/SLAPrintSteps.hpp>
 #include <libslic3r/MeshBoolean.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
-
-// Need the cylinder method for the the drainholes in hollowing step
-#include <libslic3r/SLA/SupportTreeBuilder.hpp>
-
 #include <libslic3r/Execution/ExecutionTBB.hpp>
 #include <libslic3r/SLA/Pad.hpp>
 #include <libslic3r/SLA/SupportPointGenerator.hpp>
-
+#include <libslic3r/SLA/ZCorrection.hpp>
 #include <libslic3r/ElephantFootCompensation.hpp>
-#include <libslic3r/AABBTreeIndirect.hpp>
-#include <libslic3r/MeshSplitImpl.hpp>
-#include <libslic3r/SlicesToTriangleMesh.hpp>
 #include <libslic3r/CSGMesh/ModelToCSGMesh.hpp>
 #include <libslic3r/CSGMesh/SliceCSGMesh.hpp>
 #include <libslic3r/CSGMesh/VoxelizeCSGMesh.hpp>
 #include <libslic3r/CSGMesh/PerformCSGMeshBooleans.hpp>
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
-
 #include <libslic3r/ClipperUtils.hpp>
+#include <chrono>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <numeric>
+#include <set>
+#include <tuple>
+#include <vector>
+#include <cassert>
 //#include <libslic3r/ShortEdgeCollapse.hpp>
 
 #include <boost/log/trivial.hpp>
 
 #include "I18N.hpp"
-
-#include <libnest2d/tools/benchmark.h>
 #include "format.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/CSGMesh/CSGMesh.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Execution/Execution.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/PrintBase.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/SLA/Hollowing.hpp"
+#include "libslic3r/SLA/JobController.hpp"
+#include "libslic3r/SLA/RasterBase.hpp"
+#include "libslic3r/SLA/SupportPoint.hpp"
+#include "libslic3r/SLA/SupportTree.hpp"
+#include "libslic3r/SLA/SupportTreeStrategies.hpp"
+#include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 namespace Slic3r {
 
@@ -129,6 +149,11 @@ void SLAPrint::Steps::apply_printer_corrections(SLAPrintObject &po, SliceOrigin 
         if (idx < slices.size())
             slices[idx] = elephant_foot_compensation(slices[idx], min_w, efc(i));
     }
+
+    if (o == soModel) { // Z correction applies only to the model slices
+        slices = sla::apply_zcorrection(slices,
+                                        m_print->m_material_config.zcorrection_layers.getInt());
+    }
 }
 
 indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
@@ -161,9 +186,9 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
 
 void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep step)
 {
-    Benchmark bench;
+    using std::chrono::high_resolution_clock;
 
-    bench.start();
+    auto start{high_resolution_clock::now()};
 
     auto r = range(po.m_mesh_to_slice);
     auto m = indexed_triangle_set{};
@@ -278,11 +303,14 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         po.m_preview_meshes[i] = {};
     }
 
-    bench.stop();
+    auto stop{high_resolution_clock::now()};
 
-    if (!po.m_preview_meshes[step]->empty())
-        BOOST_LOG_TRIVIAL(trace) << "Preview gen took: " << bench.getElapsedSec();
-    else
+    if (!po.m_preview_meshes[step]->empty()) {
+        using std::chrono::duration;
+        using std::chrono::seconds;
+
+        BOOST_LOG_TRIVIAL(trace) << "Preview gen took: " << duration<double>{stop - start}.count();
+    } else
         BOOST_LOG_TRIVIAL(error) << "Preview failed!";
 
     using namespace std::string_literals;
@@ -614,7 +642,15 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
         // the density config value is in percents:
         config.density_relative = float(cfg.support_points_density_relative / 100.f);
         config.minimal_distance = float(cfg.support_points_minimal_distance);
-        config.head_diameter    = float(cfg.support_head_front_diameter);
+        switch (cfg.support_tree_type) {
+        case sla::SupportTreeType::Default:
+        case sla::SupportTreeType::Organic:
+            config.head_diameter = float(cfg.support_head_front_diameter);
+            break;
+        case sla::SupportTreeType::Branching:
+            config.head_diameter = float(cfg.branchingsupport_head_front_diameter);
+            break;
+        }
 
         // scaling for the sub operations
         double d = objectstep_scale * OBJ_STEP_LEVELS[slaposSupportPoints] / 100.0;
@@ -903,6 +939,188 @@ void SLAPrint::Steps::initialize_printer_input()
     }
 }
 
+static int Ms(int s)
+{
+    return s;
+}
+
+// constant values from FW
+int tiltHeight              = 4959; //nm
+int tower_microstep_size_nm = 250000;
+int first_extra_slow_layers = 3;
+int refresh_delay_ms        = 0;
+
+static int nm_to_tower_microsteps(int nm) {
+    // add implementation
+    return nm / tower_microstep_size_nm;
+}
+
+static int count_move_time(const std::string& axis_name, double length, int steprate)
+{
+    if (length < 0 || steprate < 0)
+        return 0;
+
+    // sla - fw checks every 0.1 s if axis is still moving.See: Axis._wait_to_stop_delay.Additional 0.021 s is
+    // measured average delay of the system.Thus, the axis movement time is always quantized by this value.
+    double delay = 0.121;
+
+    // Both axes use linear ramp movements. This factor compensates the tilt acceleration and deceleration time.
+    double tilt_comp_factor = 0.1;
+
+    // Both axes use linear ramp movements.This factor compensates the tower acceleration and deceleration time.
+    int tower_comp_factor = 20000;
+
+    int l = int(length);
+    return axis_name == "tower" ? Ms((int(l / (steprate * delay) + (steprate + l) / tower_comp_factor) + 1) * (delay * 1000)) :
+                                  Ms((int(l / (steprate * delay) + tilt_comp_factor) + 1) * (delay * 1000));
+}
+
+struct ExposureProfile {
+
+    // map of internal TowerSpeeds to maximum_steprates (usteps/s)
+    // this values was provided in default_tower_moving_profiles.json by SLA-team
+    std::map<TowerSpeeds, int> tower_speeds = {
+        { tsLayer1 , 800   },
+        { tsLayer2 , 1600  },
+        { tsLayer3 , 2400  },
+        { tsLayer4 , 3200  },
+        { tsLayer5 , 4000  },
+        { tsLayer8 , 6400  },
+        { tsLayer11, 8800  },
+        { tsLayer14, 11200 },
+        { tsLayer18, 14400 },
+        { tsLayer22, 17600 },
+        { tsLayer24, 19200 },
+    };
+
+    // map of internal TiltSpeeds to maximum_steprates (usteps/s)
+    // this values was provided in default_tilt_moving_profiles.json by SLA-team
+    std::map<TiltSpeeds, int> tilt_speeds = {
+        { tsMove120  , 120   },
+        { tsLayer200 , 200   },
+        { tsMove300  , 300   },
+        { tsLayer400 , 400   },
+        { tsLayer600 , 600   },
+        { tsLayer800 , 800   },
+        { tsLayer1000, 1000  },
+        { tsLayer1250, 1250  },
+        { tsLayer1500, 1500  },
+        { tsLayer1750, 1750  },
+        { tsLayer2000, 2000  },
+        { tsLayer2250, 2250  },
+        { tsMove5120 , 5120  },
+        { tsMove8000 , 8000  },
+    };
+
+    int     delay_before_exposure_ms    { 0 };
+    int     delay_after_exposure_ms     { 0 };
+    int     tilt_down_offset_delay_ms   { 0 };
+    int     tilt_down_delay_ms          { 0 };
+    int     tilt_up_offset_delay_ms     { 0 };
+    int     tilt_up_delay_ms            { 0 };
+    int     tower_hop_height_nm         { 0 };
+    int     tilt_down_offset_steps      { 0 };
+    int     tilt_down_cycles            { 0 };
+    int     tilt_up_offset_steps        { 0 };
+    int     tilt_up_cycles              { 0 };
+    bool    use_tilt                    { true };
+    int     tower_speed                 { 0 };
+    int     tilt_down_initial_speed     { 0 };
+    int     tilt_down_finish_speed      { 0 };
+    int     tilt_up_initial_speed       { 0 };
+    int     tilt_up_finish_speed        { 0 };
+
+    ExposureProfile() {}
+
+    ExposureProfile(const SLAMaterialConfig& config, int opt_id)
+    {
+        delay_before_exposure_ms    = int(1000 * config.delay_before_exposure.get_at(opt_id));
+        delay_after_exposure_ms     = int(1000 * config.delay_after_exposure.get_at(opt_id));
+        tilt_down_offset_delay_ms   = int(1000 * config.tilt_down_offset_delay.get_at(opt_id));
+        tilt_down_delay_ms          = int(1000 * config.tilt_down_delay.get_at(opt_id));
+        tilt_up_offset_delay_ms     = int(1000 * config.tilt_up_offset_delay.get_at(opt_id));
+        tilt_up_delay_ms            = int(1000 * config.tilt_up_delay.get_at(opt_id));
+        tower_hop_height_nm         = config.tower_hop_height.get_at(opt_id) * 1000000;
+        tilt_down_offset_steps      = config.tilt_down_offset_steps.get_at(opt_id);
+        tilt_down_cycles            = config.tilt_down_cycles.get_at(opt_id);
+        tilt_up_offset_steps        = config.tilt_up_offset_steps.get_at(opt_id);
+        tilt_up_cycles              = config.tilt_up_cycles.get_at(opt_id);
+        use_tilt                    = config.use_tilt.get_at(opt_id);
+        tower_speed                 = tower_speeds.at(static_cast<TowerSpeeds>(config.tower_speed.getInts()[opt_id]));
+        tilt_down_initial_speed     = tilt_speeds.at(static_cast<TiltSpeeds>(config.tilt_down_initial_speed.getInts()[opt_id]));
+        tilt_down_finish_speed      = tilt_speeds.at(static_cast<TiltSpeeds>(config.tilt_down_finish_speed.getInts()[opt_id]));
+        tilt_up_initial_speed       = tilt_speeds.at(static_cast<TiltSpeeds>(config.tilt_up_initial_speed.getInts()[opt_id]));
+        tilt_up_finish_speed        = tilt_speeds.at(static_cast<TiltSpeeds>(config.tilt_up_finish_speed.getInts()[opt_id]));
+    }
+};
+
+static int layer_peel_move_time(int layer_height_nm, ExposureProfile p)
+{
+    int profile_change_delay = Ms(20);  // propagation delay of sending profile change command to MC
+    int sleep_delay = Ms(2);            // average delay of the Linux system sleep function
+
+    int tilt = Ms(0);
+    if (p.use_tilt) {
+        tilt += profile_change_delay;
+        // initial down movement
+        tilt += count_move_time(
+            "tilt",
+            p.tilt_down_offset_steps,
+            p.tilt_down_initial_speed);
+        // initial down delay
+        tilt += p.tilt_down_offset_delay_ms + sleep_delay;
+        // profile change delay if down finish profile is different from down initial
+        tilt += profile_change_delay;
+        // cycle down movement
+        tilt += p.tilt_down_cycles * count_move_time(
+            "tilt",
+            int((tiltHeight - p.tilt_down_offset_steps) / p.tilt_down_cycles),
+            p.tilt_down_finish_speed);
+        // cycle down delay
+        tilt += p.tilt_down_cycles * (p.tilt_down_delay_ms + sleep_delay);
+
+        // profile change delay if up initial profile is different from down finish
+        tilt += profile_change_delay;
+        // initial up movement
+        tilt += count_move_time(
+            "tilt",
+            tiltHeight - p.tilt_up_offset_steps,
+            p.tilt_up_initial_speed);
+        // initial up delay
+        tilt += p.tilt_up_offset_delay_ms + sleep_delay;
+        // profile change delay if up initial profile is different from down finish
+        tilt += profile_change_delay;
+        // finish up movement
+        tilt += p.tilt_up_cycles * count_move_time(
+            "tilt",
+            int(p.tilt_up_offset_steps / p.tilt_up_cycles),
+            p.tilt_up_finish_speed);
+        // cycle down delay
+        tilt += p.tilt_up_cycles * (p.tilt_up_delay_ms + sleep_delay);
+    }
+
+    int tower = Ms(0);
+    if (p.tower_hop_height_nm > 0) {
+        tower += count_move_time(
+            "tower",
+            nm_to_tower_microsteps(int(p.tower_hop_height_nm) + layer_height_nm),
+            p.tower_speed);
+        tower += count_move_time(
+            "tower",
+            nm_to_tower_microsteps(int(p.tower_hop_height_nm)),
+            p.tower_speed);
+        tower += profile_change_delay;
+    }
+    else {
+        tower += count_move_time(
+            "tower",
+            nm_to_tower_microsteps(layer_height_nm),
+            p.tower_speed);
+        tower += profile_change_delay;
+    }
+    return int(tilt + tower);
+}
+
 // Merging the slices from all the print objects into one slice grid and
 // calculating print statistics from the merge result.
 void SLAPrint::Steps::merge_slices_and_eval_stats() {
@@ -916,7 +1134,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
 
     print_statistics.clear();
 
-    const double area_fill = printer_config.area_fill.getFloat()*0.01;// 0.5 (50%);
+    const double area_fill = material_config.area_fill.getFloat()*0.01;// 0.5 (50%);
     const double fast_tilt = printer_config.fast_tilt_time.getFloat();// 5.0;
     const double slow_tilt = printer_config.slow_tilt_time.getFloat();// 8.0;
     const double hv_tilt   = printer_config.high_viscosity_tilt_time.getFloat();// 10.0;
@@ -926,34 +1144,29 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
 
     const int fade_layers_cnt = m_print->m_default_object_config.faded_layers.getInt();// 10 // [3;20]
 
+    ExposureProfile below(material_config, 0);
+    ExposureProfile above(material_config, 1);
+
+    const int           first_slow_layers   = fade_layers_cnt + first_extra_slow_layers;
+    const std::string   printer_model       = printer_config.printer_model;
+    const bool          is_prusa_print      = printer_model == "SL1" || printer_model == "SL1S" || printer_model == "M1";
+
     const auto width          = scaled<double>(printer_config.display_width.getFloat());
     const auto height         = scaled<double>(printer_config.display_height.getFloat());
     const double display_area = width*height;
 
-    double supports_volume(0.0);
-    double models_volume(0.0);
-
-    double estim_time(0.0);
-    std::vector<double> layers_times;
-    layers_times.reserve(printer_input.size());
-
-    size_t slow_layers = 0;
-    size_t fast_layers = 0;
+    std::vector<std::tuple<double, double, bool, double, double>> layers_info; // time, area, is_fast, models_volume, supports_volume
+    layers_info.resize(printer_input.size());
 
     const double delta_fade_time = (init_exp_time - exp_time) / (fade_layers_cnt + 1);
-    double fade_layer_time = init_exp_time;
-
-    execution::SpinningMutex<ExecutionTBB> mutex;
-    using Lock = std::lock_guard<decltype(mutex)>;
 
     // Going to parallel:
     auto printlayerfn = [this,
             // functions and read only vars
-            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time,
+            area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time, is_prusa_print, first_slow_layers, below, above,
 
             // write vars
-            &mutex, &models_volume, &supports_volume, &estim_time, &slow_layers,
-            &fast_layers, &fade_layer_time, &layers_times](size_t sliced_layer_cnt)
+            &layers_info](size_t sliced_layer_cnt)
     {
         PrintLayer &layer = m_print->m_printer_input[sliced_layer_cnt];
 
@@ -1003,9 +1216,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
         for (const ExPolygon& polygon : model_polygons)
             layer_model_area += area(polygon);
 
-        if (layer_model_area < 0 || layer_model_area > 0) {
-            Lock lck(mutex); models_volume += layer_model_area * l_height;
-        }
+        const double models_volume = (layer_model_area < 0 || layer_model_area > 0) ? layer_model_area * l_height : 0.;
 
         if(!supports_polygons.empty()) {
             if(model_polygons.empty()) supports_polygons = union_ex(supports_polygons);
@@ -1017,9 +1228,8 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
         for (const ExPolygon& polygon : supports_polygons)
             layer_support_area += area(polygon);
 
-        if (layer_support_area < 0 || layer_support_area > 0) {
-            Lock lck(mutex); supports_volume += layer_support_area * l_height;
-        }
+        const double supports_volume = (layer_support_area < 0 || layer_support_area > 0) ? layer_support_area * l_height : 0.;
+        const double layer_area = layer_model_area + layer_support_area;
 
         // Here we can save the expensively calculated polygons for printing
         ExPolygons trslices;
@@ -1029,34 +1239,32 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
 
         layer.transformed_slices(union_ex(trslices));
 
-        // Calculation of the slow and fast layers to the future controlling those values on FW
+        // Calculation of the printing time
+        // + Calculation of the slow and fast layers to the future controlling those values on FW
+        double layer_times = 0.0;
+        bool is_fast_layer = false;
 
-        const bool is_fast_layer = (layer_model_area + layer_support_area) <= display_area*area_fill;
-        const double tilt_time = material_config.material_print_speed == slamsSlow              ? slow_tilt :
-                                 material_config.material_print_speed == slamsHighViscosity     ? hv_tilt   :
-                                 is_fast_layer ? fast_tilt : slow_tilt;
+        if (is_prusa_print) {
+            is_fast_layer = int(sliced_layer_cnt) < first_slow_layers || layer_area <= display_area * area_fill;
+            const int l_height_nm = 1000000 * l_height;
 
-        { Lock lck(mutex);
-            if (is_fast_layer)
-                fast_layers++;
-            else
-                slow_layers++;
+            layer_times = layer_peel_move_time(l_height_nm, is_fast_layer ? below : above) +
+                            (is_fast_layer ? below : above).delay_before_exposure_ms +
+                            (is_fast_layer ? below : above).delay_after_exposure_ms +
+                            refresh_delay_ms * 5 +                  // ~ 5x frame display wait
+                            124;                                    // Magical constant to compensate remaining computation delay in exposure thread
 
-            // Calculation of the printing time
+            layer_times *= 0.001; // All before calculations are made in ms, but we need it in s
+        }
+        else {
+            is_fast_layer = layer_area <= display_area*area_fill;
+            const double tilt_time = material_config.material_print_speed == slamsSlow              ? slow_tilt :
+                                     material_config.material_print_speed == slamsHighViscosity     ? hv_tilt   :
+                                     is_fast_layer ? fast_tilt : slow_tilt;
 
-            double layer_times = 0.0;
-            if (sliced_layer_cnt < 3)
-                layer_times += init_exp_time;
-            else if (fade_layer_time > exp_time) {
-                fade_layer_time -= delta_fade_time;
-                layer_times += fade_layer_time;
-            }
-            else
-                layer_times += exp_time;
             layer_times += tilt_time;
 
             //// Per layer times (magical constants cuclulated from FW)
-
             static double exposure_safe_delay_before{ 3.0 };
             static double exposure_high_viscosity_delay_before{ 3.5 };
             static double exposure_slow_move_delay_before{ 1.0 };
@@ -1073,32 +1281,40 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
                 l_height * 5  // tower move
                 + 120 / 1000  // Magical constant to compensate remaining computation delay in exposure thread
             );
-
-            layers_times.push_back(layer_times);
-            estim_time += layer_times;
         }
+
+        // We are done with tilt time, but we haven't added the exposure time yet.
+        layer_times += std::max(exp_time, init_exp_time - sliced_layer_cnt * delta_fade_time);
+
+        // Collect values for this layer.
+        layers_info[sliced_layer_cnt] = std::make_tuple(layer_times, layer_area * SCALING_FACTOR * SCALING_FACTOR, is_fast_layer, models_volume, supports_volume);
     };
 
     // sequential version for debugging:
-    // for(size_t i = 0; i < m_printer_input.size(); ++i) printlayerfn(i);
+    // for(size_t i = 0; i < printer_input.size(); ++i) printlayerfn(i);
     execution::for_each(ex_tbb, size_t(0), printer_input.size(), printlayerfn,
                         execution::max_concurrency(ex_tbb));
 
-    auto SCALING2 = SCALING_FACTOR * SCALING_FACTOR;
-    print_statistics.support_used_material = supports_volume * SCALING2;
-    print_statistics.objects_used_material = models_volume  * SCALING2;
+    print_statistics.clear();
 
-    // Estimated printing time
-    // A layers count o the highest object
     if (printer_input.size() == 0)
         print_statistics.estimated_print_time = NaNd;
     else {
-        print_statistics.estimated_print_time = estim_time;
-        print_statistics.layers_times = layers_times;
+        size_t i=0;
+        for (const auto& [time, area, is_fast, models_volume, supports_volume] : layers_info) {
+            print_statistics.fast_layers_count += int(is_fast);
+            print_statistics.slow_layers_count += int(! is_fast);
+            print_statistics.layers_areas.emplace_back(area);
+            print_statistics.estimated_print_time += time;
+            print_statistics.layers_times_running_total.emplace_back(time + (i==0 ? 0. : print_statistics.layers_times_running_total[i-1]));
+            print_statistics.objects_used_material += models_volume  * SCALING_FACTOR * SCALING_FACTOR;
+            print_statistics.support_used_material += supports_volume * SCALING_FACTOR * SCALING_FACTOR;
+            ++i;
+        }
+        if (is_prusa_print)
+            // For our SLA printers, we add an error of the estimate:
+            print_statistics.estimated_print_time_tolerance = 0.03 * print_statistics.estimated_print_time;
     }
-
-    print_statistics.fast_layers_count = fast_layers;
-    print_statistics.slow_layers_count = slow_layers;
 
     report_status(-2, "", SlicingStatus::RELOAD_SLA_PREVIEW);
 }

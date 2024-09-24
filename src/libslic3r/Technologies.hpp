@@ -24,10 +24,6 @@
 #define DISABLE_INSTANCES_SYNCH 0
 // Use wxDataViewRender instead of wxDataViewCustomRenderer
 #define ENABLE_NONCUSTOM_DATA_VIEW_RENDERING 0
-// Enable G-Code viewer statistics imgui dialog
-#define ENABLE_GCODE_VIEWER_STATISTICS 0
-// Enable G-Code viewer comparison between toolpaths height and width detected from gcode and calculated at gcode generation 
-#define ENABLE_GCODE_VIEWER_DATA_CHECKING 0
 // Enable project dirty state manager debug window
 #define ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW 0
 // Disable using instanced models to render options in gcode preview
@@ -51,15 +47,17 @@
 // Enable smoothing of objects normals
 #define ENABLE_SMOOTH_NORMALS 0
 
-// Enable OpenGL ES
-#define ENABLE_OPENGL_ES 0
-// Enable OpenGL core profile context (tested against Mesa 20.1.8 on Windows)
-#define ENABLE_GL_CORE_PROFILE (1 && !ENABLE_OPENGL_ES)
-// Enable OpenGL debug messages using debug context
-#define ENABLE_OPENGL_DEBUG_OPTION (1 && ENABLE_GL_CORE_PROFILE)
-
 // Enable imgui dialog which allows to set the parameters used to export binarized gcode
 #define ENABLE_BINARIZED_GCODE_DEBUG_WINDOW 0
 
+// Enable imgui debug dialog for new gcode viewer (using libvgcode)
+#define ENABLE_NEW_GCODE_VIEWER_DEBUG 0
+// Enable extension of tool position imgui dialog to show actual speed profile
+#define ENABLE_ACTUAL_SPEED_DEBUG 1
+
+// This technology enables a hack which resolves the slow down on MAC when running the application as GCodeViewer.
+// For yet unknow reason the slow down disappears if any of the toolbars is renderered.
+// This hack keeps the collapse toolbar enabled and renders it outside of the screen.
+#define ENABLE_HACK_GCODEVIEWER_SLOW_ON_MAC 1
 
 #endif // _prusaslicer_technologies_h_

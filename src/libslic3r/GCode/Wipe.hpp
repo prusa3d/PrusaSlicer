@@ -1,14 +1,18 @@
 #ifndef slic3r_GCode_Wipe_hpp_
 #define slic3r_GCode_Wipe_hpp_
 
-#include "SmoothPath.hpp"
+#include <math.h>
+#include <cassert>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cmath>
 
+#include "SmoothPath.hpp"
 #include "../Geometry/ArcWelder.hpp"
 #include "../Point.hpp"
 #include "../PrintConfig.hpp"
-
-#include <cassert>
-#include <optional>
 
 namespace Slic3r {
 
@@ -42,7 +46,7 @@ public:
         if (this->enabled() && path.size() > 1)
             m_path = std::move(path);
     }
-    void            set_path(SmoothPath &&path, bool reversed);
+    void            set_path(SmoothPath &&path);
     void            offset_path(const Point &v) { m_offset += v; }
 
     std::string     wipe(GCodeGenerator &gcodegen, bool toolchange);

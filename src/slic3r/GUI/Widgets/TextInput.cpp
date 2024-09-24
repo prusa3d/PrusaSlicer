@@ -86,6 +86,12 @@ void TextInput::Create(wxWindow *     parent,
 
     if (!icon.IsEmpty()) {
         this->drop_down_icon = ScalableBitmap(this, icon.ToStdString(), 16);
+        this->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) {
+            const wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
+            if (OnClickDropDownIcon && dd_icon_rect.Contains(pos))
+                OnClickDropDownIcon();
+            event.Skip();
+        });
     }
     messureSize();
 }
@@ -140,6 +146,16 @@ void TextInput::SetSelection(long from, long to)
 {
     if (text_ctrl)
         text_ctrl->SetSelection(from, to);
+}
+
+void TextInput::SysColorsChanged()
+{
+    if (auto parent = this->GetParent()) {
+        SetBackgroundColour(parent->GetBackgroundColour());
+        SetForegroundColour(parent->GetForegroundColour());
+        if (this->drop_down_icon.bmp().IsOk())
+            this->drop_down_icon.sys_color_changed();
+    }
 }
 
 void TextInput::SetIcon(const wxBitmapBundle& icon_in)
@@ -233,9 +249,13 @@ void TextInput::DoSetSize(int x, int y, int width, int height, int sizeFlags)
     if (align_right)
         textPos.x += labelSize.x;
     if (text_ctrl) {
-        wxSize textSize = text_ctrl->GetSize();
+        wxSize textSize = text_ctrl->GetBestSize();
+        if (textSize.y > size.y) {
+            // Don't allow to set internal control height more, then its initial height
+            textSize.y = text_ctrl->GetSize().y;
+        }
         wxClientDC dc(this);
-        const int r_shift = int((dd_icon_size.x == 0 ? 3. : 2.) * dc.GetContentScaleFactor());
+        const int r_shift = int(dd_icon_size.x == 0 ? (3. * dc.GetContentScaleFactor()) : ((size.y - dd_icon_size.y) / 2));
         textSize.x = size.x - textPos.x - labelSize.x - dd_icon_size.x - r_shift;
         text_ctrl->SetSize(textSize);
         text_ctrl->SetPosition({textPos.x, (size.y - textSize.y) / 2});
@@ -267,7 +287,7 @@ void TextInput::render(wxDC& dc)
     wxSize size = GetSize();
     bool   align_right = GetWindowStyle() & wxRIGHT;
     // start draw
-    wxPoint pt = {5, 0};
+    wxPoint pt = { 5 + text_ctrl->GetMargins().x, 0};
     if (icon.IsOk()) {
         wxSize szIcon = get_preferred_size(icon, m_parent);
         pt.y = (size.y - szIcon.y) / 2;
@@ -283,13 +303,15 @@ void TextInput::render(wxDC& dc)
     wxPoint pt_r = {size.x, 0};
     if (drop_down_icon.bmp().IsOk()) {
         wxSize szIcon = drop_down_icon.GetSize();
-        pt_r.x -= szIcon.x + 2;
         pt_r.y = (size.y - szIcon.y) / 2;
+        pt_r.x -= szIcon.x + pt_r.y;
+        dd_icon_rect = wxRect(pt_r, szIcon);
         dc.DrawBitmap(drop_down_icon.get_bitmap(), pt_r);
+        pt_r.x -= 5;
     }
 
     auto text = wxWindow::GetLabel();
-    if (!text.IsEmpty()) {
+    if (!text_ctrl->IsShown() && !text.IsEmpty()) {
         wxSize textSize = text_ctrl->GetSize();
         if (align_right) {
             pt.x += textSize.x;

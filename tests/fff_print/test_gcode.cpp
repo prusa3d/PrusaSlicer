@@ -1,11 +1,22 @@
+/**
+ * Mostly ported from t/gcode.t
+ */
+
 #include <catch2/catch.hpp>
 
 #include <memory>
+#include <regex>
+#include <fstream>
 
 #include "libslic3r/GCode.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
+#include "libslic3r/ModelArrange.hpp"
+#include "test_data.hpp"
 
 using namespace Slic3r;
-using namespace Slic3r::GCode::Impl;
+using namespace Test;
+
+constexpr bool debug_files = false;
 
 SCENARIO("Origin manipulation", "[GCode]") {
 	Slic3r::GCodeGenerator gcodegen;
@@ -22,219 +33,299 @@ SCENARIO("Origin manipulation", "[GCode]") {
     }
 }
 
-struct ApproxEqualsPoints : public Catch::MatcherBase<Points> {
-    ApproxEqualsPoints(const Points& expected, unsigned tolerance): expected(expected), tolerance(tolerance) {}
-    bool match(const Points& points) const override {
-        if (points.size() != expected.size()) {
-            return false;
+
+TEST_CASE("Wiping speeds", "[GCode]") {
+    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+	    { "wipe", "1" },
+        { "retract_layer_change", "0" },
+    });
+    bool have_wipe = false;
+    std::vector<double> retract_speeds;
+    bool extruded_on_this_layer = false;
+    bool wiping_on_new_layer = false;
+
+	GCodeReader parser;
+    std::string gcode = Slic3r::Test::slice({TestMesh::cube_20x20x20}, config);
+    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+        if (line.travel() && line.dist_Z(self) != 0) {
+            extruded_on_this_layer = false;
+        } else if (line.extruding(self) && line.dist_XY(self) > 0) {
+            extruded_on_this_layer = true;
+        } else if (line.retracting(self) && line.dist_XY(self) > 0) {
+            have_wipe = true;
+            wiping_on_new_layer = !extruded_on_this_layer;
+            const double f = line.has_f() ? line.f() : self.f();
+            double move_time = line.dist_XY(self) / f;
+            retract_speeds.emplace_back(std::abs(line.dist_E(self)) / move_time);
         }
-        for (auto i = 0u; i < points.size(); ++i) {
-            const Point& point = points[i];
-            const Point& expected_point = this->expected[i];
-            if (
-                std::abs(point.x() - expected_point.x()) > this->tolerance
-                || std::abs(point.y() - expected_point.y()) > this->tolerance
-            ) {
-                return false;
+    });
+    CHECK(have_wipe);
+    double expected_retract_speed = config.option<ConfigOptionFloats>("retract_speed")->get_at(0) * 60;
+    for (const double retract_speed : retract_speeds) {
+        INFO("Wipe moves don\'t retract faster than configured speed");
+        CHECK(retract_speed < expected_retract_speed);
+    }
+    INFO("No wiping after layer change")
+    CHECK(!wiping_on_new_layer);
+}
+
+bool has_moves_below_z_offset(const DynamicPrintConfig& config) {
+	GCodeReader parser;
+    std::string gcode = Slic3r::Test::slice({TestMesh::cube_20x20x20}, config);
+
+    unsigned moves_below_z_offset{};
+    double configured_offset = config.opt_float("z_offset");
+    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+        if (line.travel() && line.has_z() && line.z() < configured_offset) {
+            moves_below_z_offset++;
+        }
+    });
+    return moves_below_z_offset > 0;
+}
+
+TEST_CASE("Z moves with offset", "[GCode]") {
+    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+	    { "z_offset", 5 },
+        { "start_gcode", "" },
+    });
+
+    INFO("No lift");
+    CHECK(!has_moves_below_z_offset(config));
+
+    config.set_deserialize_strict({{ "retract_lift", "3" }});
+    INFO("Lift < z offset");
+    CHECK(!has_moves_below_z_offset(config));
+
+    config.set_deserialize_strict({{ "retract_lift", "6" }});
+    INFO("Lift > z offset");
+    CHECK(!has_moves_below_z_offset(config));
+}
+
+std::optional<double> parse_axis(const std::string& line, const std::string& axis) {
+    std::smatch matches;
+    if (std::regex_search(line, matches, std::regex{axis + "(\\d+)"})) {
+        std::string matchedValue = matches[1].str();
+        return std::stod(matchedValue);
+    }
+    return std::nullopt;
+}
+
+/**
+* This tests the following behavior:
+* - complete objects does not crash
+* - no hard-coded "E" are generated
+* - Z moves are correctly generated for both objects
+* - no travel moves go outside skirt
+* - temperatures are set correctly
+*/
+TEST_CASE("Extrusion, travels, temeperatures", "[GCode]") {
+    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+        { "gcode_comments", 1 },
+        { "complete_objects", 1 },
+        { "extrusion_axis", 'A' },
+        { "start_gcode", "" },  // prevent any default extra Z move
+        { "layer_height", 0.4 },
+        { "first_layer_height", 0.4 },
+        { "temperature", "200" },
+        { "first_layer_temperature", "210" },
+        { "retract_length", "0" }
+    });
+
+    std::vector<double> z_moves;
+    Points travel_moves;
+    Points extrusions;
+    std::vector<double> temps;
+
+	GCodeReader parser;
+
+    Print print;
+    Model model;
+    Test::init_print({TestMesh::cube_20x20x20}, print, model, config, false, 2);
+    std::string gcode = Test::gcode(print);
+
+    if constexpr (debug_files) {
+        std::ofstream gcode_file{"sequential_print.gcode"};
+        gcode_file << gcode;
+    }
+
+    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+        INFO("Unexpected E argument");
+        CHECK(!line.has_e());
+
+        if (line.has_z() && std::abs(line.dist_Z(self)) > 0) {
+            z_moves.emplace_back(line.z());
+        }
+        if (line.has_x() || line.has_y()) {
+            if (line.extruding(self) || line.has_unknown_axis()) {
+                extrusions.emplace_back(scaled(line.x()), scaled(line.y()));
+            } else if (!extrusions.empty()){ // skip initial travel move to first skirt point
+                travel_moves.emplace_back(scaled(line.x()), scaled(line.y()));
+            }
+        } else if (line.cmd_is("M104") || line.cmd_is("M109")) {
+            const std::optional<double> parsed_temperature = parse_axis(line.raw(), "S");
+            if (!parsed_temperature) {
+                FAIL("Failed to parse temperature!");
+            }
+            if (temps.empty() || temps.back() != parsed_temperature) {
+                temps.emplace_back(*parsed_temperature);
             }
         }
-        return true;
-    }
-    std::string describe() const override {
-        std::stringstream ss;
-        ss << std::endl;
-        for (const Point& point : expected) {
-            ss << "(" << point.x() << ", " << point.y() << ")" << std::endl;
-        }
-        ss << "With tolerance: " << this->tolerance;
-
-        return "Equals " + ss.str();
-    }
-
-private:
-    Points expected;
-    unsigned tolerance;
-};
-
-Points get_points(const std::vector<DistancedPoint>& result) {
-    Points result_points;
-    std::transform(
-        result.begin(),
-        result.end(),
-        std::back_inserter(result_points),
-        [](const DistancedPoint& point){
-            return point.point;
-        }
-    );
-    return result_points;
-}
-
-std::vector<double> get_distances(const std::vector<DistancedPoint>& result) {
-    std::vector<double> result_distances;
-    std::transform(
-        result.begin(),
-        result.end(),
-        std::back_inserter(result_distances),
-        [](const DistancedPoint& point){
-            return point.distance_from_start;
-        }
-    );
-    return result_distances;
-}
-
-TEST_CASE("Place points at distances - expected use", "[GCode]") {
-    std::vector<Point> line{
-        scaled(Vec2f{0, 0}),
-        scaled(Vec2f{1, 0}),
-        scaled(Vec2f{2, 1}),
-        scaled(Vec2f{2, 2})
-    };
-    std::vector<double> distances{0, 0.2, 0.5, 1 + std::sqrt(2)/2, 1 + std::sqrt(2) + 0.5, 100.0};
-    std::vector<DistancedPoint> result = slice_xy_path(line, distances);
-
-    REQUIRE_THAT(get_points(result), ApproxEqualsPoints(Points{
-        scaled(Vec2f{0, 0}),
-        scaled(Vec2f{0.2, 0}),
-        scaled(Vec2f{0.5, 0}),
-        scaled(Vec2f{1, 0}),
-        scaled(Vec2f{1.5, 0.5}),
-        scaled(Vec2f{2, 1}),
-        scaled(Vec2f{2, 1.5}),
-        scaled(Vec2f{2, 2})
-    }, 5));
-
-    REQUIRE_THAT(get_distances(result), Catch::Matchers::Approx(std::vector<double>{
-        distances[0], distances[1], distances[2], 1, distances[3], 1 + std::sqrt(2), distances[4], 2 + std::sqrt(2)
-    }));
-}
-
-TEST_CASE("Place points at distances - edge case", "[GCode]") {
-    std::vector<Point> line{
-        scaled(Vec2f{0, 0}),
-        scaled(Vec2f{1, 0}),
-        scaled(Vec2f{2, 0})
-    };
-    std::vector<double> distances{0, 1, 1.5, 2};
-    Points result{get_points(slice_xy_path(line, distances))};
-    CHECK(result == Points{
-        scaled(Vec2f{0, 0}),
-        scaled(Vec2f{1, 0}),
-        scaled(Vec2f{1.5, 0}),
-        scaled(Vec2f{2, 0})
-    });
-}
-
-TEST_CASE("Generate elevated travel", "[GCode]") {
-    std::vector<Point> xy_path{
-        scaled(Vec2f{0, 0}),
-        scaled(Vec2f{1, 0}),
-    };
-    std::vector<double> ensure_points_at_distances{0.2, 0.5};
-    Points3 result{generate_elevated_travel(xy_path, ensure_points_at_distances, 2.0, [](double x){return 1 + x;})};
-
-    CHECK(result == Points3{
-        scaled(Vec3f{0, 0, 3.0}),
-        scaled(Vec3f{0.2, 0, 3.2}),
-        scaled(Vec3f{0.5, 0, 3.5}),
-        scaled(Vec3f{1, 0, 4.0})
-    });
-}
-
-TEST_CASE("Get first crossed line distance", "[GCode]") {
-    // A 2x2 square at 0, 0, with 1x1 square hole in its center.
-    ExPolygon square_with_hole{
-        {
-            scaled(Vec2f{-1, -1}),
-            scaled(Vec2f{1, -1}),
-            scaled(Vec2f{1, 1}),
-            scaled(Vec2f{-1, 1})
-        },
-        {
-            scaled(Vec2f{-0.5, -0.5}),
-            scaled(Vec2f{0.5, -0.5}),
-            scaled(Vec2f{0.5, 0.5}),
-            scaled(Vec2f{-0.5, 0.5})
-        }
-    };
-    // A 2x2 square above the previous square at (0, 3).
-    ExPolygon square_above{
-        {
-            scaled(Vec2f{-1, 2}),
-            scaled(Vec2f{1, 2}),
-            scaled(Vec2f{1, 4}),
-            scaled(Vec2f{-1, 4})
-        }
-    };
-
-    // Bottom-up travel intersecting the squares.
-    Lines travel{Polyline{
-        scaled(Vec2f{0, -2}),
-        scaled(Vec2f{0, -0.7}),
-        scaled(Vec2f{0, 0}),
-        scaled(Vec2f{0, 1}),
-        scaled(Vec2f{0, 1.3}),
-        scaled(Vec2f{0, 2.4}),
-        scaled(Vec2f{0, 4.5}),
-        scaled(Vec2f{0, 5}),
-    }.lines()};
-
-    // Try different cases by skipping lines in the travel.
-    AABBTreeLines::LinesDistancer<Linef> distancer = get_expolygons_distancer({square_with_hole, square_above});
-    CHECK(*get_first_crossed_line_distance(travel, distancer) == Approx(1));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(2), distancer) == Approx(0.5));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(4), distancer) == Approx(0.7));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(5), distancer) == Approx(1.6));
-    CHECK_FALSE(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer));
-}
-
-TEST_CASE("Generate regular polygon", "[GCode]") {
-    const unsigned points_count{32};
-    const Point centroid{scaled(Vec2d{5, -2})};
-    const Polygon result{generate_regular_polygon(centroid, scaled(Vec2d{0, 0}), points_count)};
-    const Point oposite_point{centroid * 2};
-
-    REQUIRE(result.size() == 32);
-    CHECK(result[16].x() == Approx(oposite_point.x()));
-    CHECK(result[16].y() == Approx(oposite_point.y()));
-
-    std::vector<double> angles;
-    angles.reserve(points_count);
-    for (unsigned index = 0; index < points_count; index++) {
-        const unsigned previous_index{index == 0 ? points_count - 1 : index - 1};
-        const unsigned next_index{index == points_count - 1 ? 0 : index + 1};
-
-        const Point previous_point = result.points[previous_index];
-        const Point current_point = result.points[index];
-        const Point next_point = result.points[next_index];
-
-        angles.emplace_back(angle(Vec2crd{previous_point - current_point}, Vec2crd{next_point - current_point}));
-    }
-
-    std::vector<double> expected;
-    angles.reserve(points_count);
-    std::generate_n(std::back_inserter(expected), points_count, [&](){
-        return angles.front();
     });
 
-    CHECK_THAT(angles, Catch::Matchers::Approx(expected));
+    const unsigned layer_count = 20 / 0.4;
+    INFO("Complete_objects generates the correct number of Z moves.");
+    CHECK(z_moves.size() == layer_count * 2);
+    auto first_moves = tcb::span{z_moves}.subspan(0, layer_count);
+    auto second_moves = tcb::span{z_moves}.subspan(layer_count);
+
+    CHECK( std::vector(first_moves.begin(), first_moves.end()) == std::vector(second_moves.begin(), second_moves.end()));
+    const Polygon convex_hull{Geometry::convex_hull(extrusions)};
+    INFO("All travel moves happen within skirt.");
+    for (const Point& travel_move : travel_moves) {
+        CHECK(convex_hull.contains(travel_move));
+    }
+    INFO("Expected temperature changes");
+    CHECK(temps == std::vector<double>{210, 200, 210, 200, 0});
 }
 
-TEST_CASE("Square bed with padding", "[GCode]") {
-    const Bed bed{
-        {
-            Vec2d{0, 0},
-            Vec2d{100, 0},
-            Vec2d{100, 100},
-            Vec2d{0, 100}
-        },
-        10.0
-    };
 
-    CHECK(bed.centroid.x() == 50);
-    CHECK(bed.centroid.y() == 50);
-    CHECK(bed.contains_within_padding(Vec2d{10, 10}));
-    CHECK_FALSE(bed.contains_within_padding(Vec2d{9, 10}));
+TEST_CASE("Used filament", "[GCode]") {
+    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+        { "retract_length", "1000000" },
+        { "use_relative_e_distances", 1 },
+        { "layer_gcode", "G92 E0\n" },
+    });
+	GCodeReader parser;
+    Print print;
+    Model model;
+    Test::init_print({TestMesh::cube_20x20x20}, print, model, config);
+    Test::gcode(print);
 
+    INFO("Final retraction is not considered in total used filament");
+    CHECK(print.print_statistics().total_used_filament > 0);
+}
+
+void check_m73s(Print& print){
+    std::vector<double> percent{};
+    bool got_100 = false;
+    bool extruding_after_100 = 0;
+
+	GCodeReader parser;
+    std::string gcode = Slic3r::Test::gcode(print);
+    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+
+        if (line.cmd_is("M73")) {
+            std::optional<double> p = parse_axis(line.raw(), "P");
+            if (!p) {
+                FAIL("Failed to parse percent");
+            }
+            percent.emplace_back(*p);
+            got_100 = p == Approx(100);
+        }
+        if (line.extruding(self) && got_100) {
+            extruding_after_100 = true;
+        }
+    });
+    INFO("M73 is never given more than 100%");
+    for (const double value : percent) {
+        CHECK(value <= 100);
+    }
+    INFO("No extrusions after M73 P100.");
+    CHECK(!extruding_after_100);
+}
+
+
+TEST_CASE("M73s have correct percent values", "[GCode]") {
+    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+
+    SECTION("Single object") {
+        config.set_deserialize_strict({
+            {" gcode_flavor", "sailfish" },
+            {" raft_layers", 3 },
+        });
+
+        Print print;
+        Model model;
+        Test::init_print({TestMesh::cube_20x20x20}, print, model, config);
+        check_m73s(print);
+    }
+
+    SECTION("Two copies of single object") {
+        config.set_deserialize_strict({
+            {" gcode_flavor", "sailfish" },
+        });
+        Print print;
+        Model model;
+
+        Test::init_print({TestMesh::cube_20x20x20}, print, model, config, false, 2);
+        check_m73s(print);
+
+        if constexpr (debug_files) {
+            std::ofstream gcode_file{"M73_2_copies.gcode"};
+            gcode_file << Test::gcode(print);
+        }
+    }
+
+    SECTION("Two objects") {
+        config.set_deserialize_strict({
+            {" gcode_flavor", "sailfish" },
+        });
+        Print print;
+        Model model;
+        Test::init_print({TestMesh::cube_20x20x20, TestMesh::cube_20x20x20}, print, model, config);
+        check_m73s(print);
+    }
+
+    SECTION("One layer object") {
+        config.set_deserialize_strict({
+            {" gcode_flavor", "sailfish" },
+        });
+        Print print;
+        Model model;
+        TriangleMesh test_mesh{mesh(TestMesh::cube_20x20x20)};
+        const auto layer_height = static_cast<float>(config.opt_float("layer_height"));
+        test_mesh.scale(Vec3f{1.0F, 1.0F, layer_height/20.0F});
+        Test::init_print({test_mesh}, print, model, config);
+        check_m73s(print);
+
+        if constexpr (debug_files) {
+            std::ofstream gcode_file{"M73_one_layer.gcode"};
+            gcode_file << Test::gcode(print);
+        }
+    }
+}
+
+
+TEST_CASE("M201 for acceleation reset", "[GCode]") {
+    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+	    { "gcode_flavor", "repetier" },
+        { "default_acceleration", 1337 },
+    });
+
+	GCodeReader parser;
+    std::string gcode = Slic3r::Test::slice({TestMesh::cube_with_hole}, config);
+
+    bool has_accel = false;
+    bool has_m204 = false;
+
+    parser.parse_buffer(gcode, [&] (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+        if (line.cmd_is("M201") && line.has_x() && line.has_y()) {
+            if (line.x() == 1337 && line.y() == 1337) {
+                has_accel = true;
+            }
+        }
+        if (line.cmd_is("M204") && line.raw().find('S') != std::string::npos) {
+            has_m204 = true;
+        }
+    });
+
+    INFO("M201 is generated for repetier firmware.");
+    CHECK(has_accel);
+    INFO("M204 is not generated for repetier firmware");
+    CHECK(!has_m204);
 }

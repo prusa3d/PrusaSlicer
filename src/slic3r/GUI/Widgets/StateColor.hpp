@@ -2,6 +2,9 @@
 #define slic3r_GUI_StateColor_hpp_
 
 #include <wx/colour.h>
+#include <wx/string.h>
+#include <utility>
+#include <vector>
 
 class StateColor
 {

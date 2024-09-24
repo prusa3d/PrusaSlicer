@@ -24,6 +24,9 @@
 namespace Slic3r{
 class ModelVolume;
 enum class ModelVolumeType : int;
+namespace GUI::Emboss {
+struct CreateVolumeParams;
+}
 }
 
 namespace Slic3r::GUI {
@@ -112,7 +115,7 @@ private:
     void reset_volume();
 
     // create volume from text - main functionality
-    bool process();
+    bool process(bool make_snapshot = true);
     void close();
     void draw_window();
     void draw_preview();
@@ -129,9 +132,12 @@ private:
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
+    void on_mouse_confirm_edit(const wxMouseEvent &mouse_event);
 
     void volume_transformation_changed();
     
+    Emboss::CreateVolumeParams create_input(ModelVolumeType volume_type, std::string_view svg_filepath = "");
+
     struct GuiCfg;
     std::unique_ptr<const GuiCfg> m_gui_cfg;
 

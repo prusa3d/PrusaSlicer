@@ -66,11 +66,11 @@ void open_folder(const std::string& path)
 
 std::string filename_from_url(const std::string& url)
 {
-	// TODO: can it be done with curl?
-	size_t slash = url.find_last_of("/");
-	if (slash == std::string::npos && slash != url.size() - 1)
+	std::string url_plain = std::string(url.begin(), std::find(url.begin(), url.end(), '?'));
+	size_t slash = url_plain.find_last_of("/");
+	if (slash == std::string::npos)
 		return std::string();
-	return url.substr(slash + 1, url.size() - slash + 1);
+	return std::string(url_plain.begin() + slash + 1, url_plain.end());
 }
 }
 
@@ -169,7 +169,7 @@ void Downloader::start_download(const std::string& full_url)
 void Downloader::on_progress(wxCommandEvent& event)
 {
 	size_t id = event.GetInt();
-	float percent = (float)std::stoi(boost::nowide::narrow(event.GetString())) / 100.f;
+	float percent = (float)std::stoi(into_u8(event.GetString())) / 100.f;
 	//BOOST_LOG_TRIVIAL(error) << "progress " << id << ": " << percent;
 	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
 	BOOST_LOG_TRIVIAL(trace) << "Download "<< id << ": " << percent;
@@ -181,7 +181,7 @@ void Downloader::on_error(wxCommandEvent& event)
     set_download_state(event.GetInt(), DownloadState::DownloadError);   
     BOOST_LOG_TRIVIAL(error) << "Download error: " << event.GetString();
 	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
-	ntf_mngr->set_download_URL_error(id, boost::nowide::narrow(event.GetString()));
+	ntf_mngr->set_download_URL_error(id, into_u8(event.GetString()));
 	show_error(nullptr, format_wxstr(L"%1%\n%2%", _L("The download has failed") + ":", event.GetString()));
 }
 void Downloader::on_complete(wxCommandEvent& event)

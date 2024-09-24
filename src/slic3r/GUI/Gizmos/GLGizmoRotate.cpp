@@ -153,16 +153,16 @@ void GLGizmoRotate::on_render()
 
     m_grabbers.front().matrix = local_transform(selection);
 
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
     if (!OpenGLManager::get_gl_info().is_core_profile())
-#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+#endif // !SLIC3R_OPENGL_ES
 
-#if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#if SLIC3R_OPENGL_ES
+    GLShaderProgram* shader = wxGetApp().get_shader("dashed_lines");
 #else
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#endif // SLIC3R_OPENGL_ES
     if (shader != nullptr) {
         shader->start_using();
 
@@ -170,12 +170,16 @@ void GLGizmoRotate::on_render()
         const Transform3d view_model_matrix = camera.get_view_matrix() * m_grabbers.front().matrix;
         shader->set_uniform("view_model_matrix", view_model_matrix);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#if ENABLE_GL_CORE_PROFILE
-        const std::array<int, 4>& viewport = camera.get_viewport();
-        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
-        shader->set_uniform("width", 0.25f);
-        shader->set_uniform("gap_size", 0.0f);
-#endif // ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
+        if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#if !SLIC3R_OPENGL_ES
+        }
+#endif // !SLIC3R_OPENGL_ES
 
         const bool radius_changed = std::abs(m_old_radius - m_radius) > EPSILON;
         m_old_radius = m_radius;
@@ -629,9 +633,8 @@ void GLGizmoRotate3D::on_unregister_raycasters_for_picking()
 GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
                                                     State &          state,
                                                     const Alignment &alignment)
-    : m_imgui{imgui}
 {
-    imgui->begin(_L("Optimize orientation"), ImGuiWindowFlags_NoMove |
+    ImGuiPureWrap::begin(_u8L("Optimize orientation"), ImGuiWindowFlags_NoMove |
                                      ImGuiWindowFlags_AlwaysAutoResize |
                                      ImGuiWindowFlags_NoCollapse);
 
@@ -678,7 +681,7 @@ GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
 
     ImGui::Separator();
 
-    auto btn_txt = _L("Apply");
+    auto btn_txt = _u8L("Apply");
     auto btn_txt_sz = ImGui::CalcTextSize(btn_txt.c_str());
     ImVec2 button_sz = {btn_txt_sz.x + padding.x, btn_txt_sz.y + padding.y};
     ImGui::SetCursorPosX(padding.x + sz.x - button_sz.x);
@@ -686,7 +689,7 @@ GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
     if (!wxGetApp().plater()->get_ui_job_worker().is_idle())
         imgui->disabled_begin(true);
 
-    if ( imgui->button(btn_txt) ) {
+    if ( ImGuiPureWrap::button(btn_txt) ) {
         replace_job(wxGetApp().plater()->get_ui_job_worker(),
                     std::make_unique<RotoptimizeJob>());
     }
@@ -696,7 +699,7 @@ GLGizmoRotate3D::RotoptimzeWindow::RotoptimzeWindow(ImGuiWrapper *   imgui,
 
 GLGizmoRotate3D::RotoptimzeWindow::~RotoptimzeWindow()
 {
-    m_imgui->end();
+    ImGuiPureWrap::end();
 }
 
 } // namespace GUI

@@ -63,7 +63,32 @@ public:
     void cache_extruder_filaments_names();
     void reset_extruder_filaments();
 
-    PresetCollection&           get_presets(Preset::Type preset_type);
+    // Another hideous function related to current ExtruderFilaments hack. Returns a vector of values
+    // of a given config option for all currently used filaments. Modified value is returned for modified preset.
+    // Must be called with the vector ConfigOption type, e.g. ConfigOptionPercents.
+    template <class T>
+    auto get_config_options_for_current_filaments(const t_config_option_key& key)
+    {
+        decltype(T::values) out;
+        const Preset& edited_preset = this->filaments.get_edited_preset();
+        for (const ExtruderFilaments& extr_filament : this->extruders_filaments) {
+            const Preset& selected_preset = *extr_filament.get_selected_preset();
+            const Preset& preset = edited_preset.name == selected_preset.name ? edited_preset : selected_preset;
+            const T* co = preset.config.opt<T>(key);
+            if (co) {
+                assert(co->values.size() == 1);
+                out.push_back(co->values.back());
+            } else {
+                // Key is missing or type mismatch.
+            }
+        }
+        return out;
+    }
+
+
+
+    const PresetCollection&           get_presets(Preset::Type preset_type) const;
+          PresetCollection&           get_presets(Preset::Type preset_type);
 
     // The project configuration values are kept separated from the print/filament/printer preset,
     // they are being serialized / deserialized from / to the .amf, .3mf, .config, .gcode, 
@@ -129,7 +154,7 @@ public:
         const std::string &path, LoadConfigBundleAttributes flags, ForwardCompatibilitySubstitutionRule compatibility_rule);
 
     // Export a config bundle file containing all the presets and the names of the active presets.
-    void                        export_configbundle(const std::string &path, bool export_system_settings = false, bool export_physical_printers = false);
+    void                        export_configbundle(const std::string &path, bool export_system_settings = false, bool export_physical_printers = false, std::function<bool(const std::string&, const std::string&, std::string&)> secret_callback = nullptr);
 
     // Enable / disable the "- default -" preset.
     void                        set_default_suppressed(bool default_suppressed);
@@ -158,6 +183,7 @@ public:
     void                        load_installed_printers(const AppConfig &config);
 
     const std::string&          get_preset_name_by_alias(const Preset::Type& preset_type, const std::string& alias, int extruder_id = -1);
+    const std::string&          get_preset_name_by_alias_invisible(const Preset::Type& preset_type, const std::string& alias) const;
 
     // Save current preset of a provided type under a new name. If the name is different from the old one,
     // Unselected option would be reverted to the beginning values

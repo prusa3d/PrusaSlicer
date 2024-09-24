@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Written by Treer (gitlab.com/Treer) -->
+<svg 
+	version="1.1" 
+	xmlns="http://www.w3.org/2000/svg" 
+	xmlns:xlink="http://www.w3.org/1999/xlink" 
+	width="600" 
+	height="600"
+	stroke="#808080"
+	stroke-width="30"
+	fill="none">
+
+  <title>Abstract user icon</title>
+	
+  <circle cx="300" cy="300" r="265" />
+  <circle cx="300" cy="230" r="115" />	
+  <path d="M106.81863443903,481.4 a205,205 1 0,1 386.36273112194,0" stroke-linecap="butt" />
+</svg>

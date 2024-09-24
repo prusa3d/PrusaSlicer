@@ -5,21 +5,25 @@
 #ifndef SLA_SUPPORTTREE_HPP
 #define SLA_SUPPORTTREE_HPP
 
-#include <vector>
-#include <memory>
-
 #include <libslic3r/Polygon.hpp>
 #include <libslic3r/ExPolygon.hpp>
 #include <libslic3r/AABBMesh.hpp>
-
 #include <libslic3r/SLA/Pad.hpp>
 #include <libslic3r/SLA/SupportPoint.hpp>
 #include <libslic3r/SLA/JobController.hpp>
 #include <libslic3r/SLA/SupportTreeStrategies.hpp>
+#include <math.h>
+#include <vector>
+#include <memory>
+#include <algorithm>
+#include <cmath>
+
+#include "admesh/stl.h"
 
 namespace Slic3r {
 
 namespace sla {
+struct JobController;
 
 struct SupportTreeConfig
 {

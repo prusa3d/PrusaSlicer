@@ -19,7 +19,8 @@
 
 #include <regex>
 #include <wx/numformatter.h>
-#include <wx/tooltip.h>
+#include <wx/bookctrl.h> // IWYU pragma: keep
+#include <wx/tooltip.h> // IWYU pragma: keep
 #include <wx/notebook.h>
 #include <wx/listbook.h>
 #include <wx/tokenzr.h>
@@ -142,7 +143,7 @@ void Field::PostInitialize()
 #else /* __APPLE__ */
 				case WXK_CONTROL_F:
 #endif /* __APPLE__ */
-				case 'F': { wxGetApp().plater()->search(false); break; }
+				case 'F': { wxGetApp().show_search_dialog(); break; }
 			    default: break;
 			    }
 			    if (tab_id >= 0)
@@ -205,9 +206,11 @@ wxString Field::get_tooltip_text(const wxString& default_string)
         opt_id += "]";
     }
 
+    bool newline_after_name = boost::iends_with(opt_id, "_gcode") && opt_id != "binary_gcode";
+
 	return from_u8(m_opt.tooltip) + "\n" + _L("default value") + "\t: " +
-        (boost::iends_with(opt_id, "_gcode") ? "\n" : "") + default_string +
-        (boost::iends_with(opt_id, "_gcode") ? "" : "\n") +
+        (newline_after_name ? "\n" : "") + default_string +
+        (newline_after_name ? "" : "\n") +
         _L("parameter name") + "\t: " + opt_id;
 }
 
@@ -854,6 +857,7 @@ void SpinCtrl::BUILD() {
 	switch (m_opt.type) {
 	case coInt:
 		default_value = m_opt.default_value->getInt();
+        m_last_meaningful_value = default_value;
 		break;
 	case coInts:
 	{
@@ -1153,6 +1157,10 @@ void Choice::set_selection()
         field->SetSelection(m_opt.default_value->getInt());
 		break;
 	}
+	case coEnums:{
+        field->SetSelection(m_opt.default_value->getInts()[m_opt_idx]);
+		break;
+	}
 	case coFloat:
 	case coPercent:	{
 		double val = m_opt.default_value->getFloat();
@@ -1240,7 +1248,8 @@ void Choice::set_value(const boost::any& value, bool change_event)
 
 		break;
 	}
-	case coEnum: {
+	case coEnum:
+	case coEnums: {
 		auto val = m_opt.enum_def->enum_to_index(boost::any_cast<int>(value));
         assert(val.has_value());
 		field->SetSelection(val.has_value() ? *val : 0);
@@ -1305,7 +1314,7 @@ boost::any& Choice::get_value()
 		if (m_opt_id == rp_option)
 			return m_value = boost::any(ret_str);
 
-	if (m_opt.type == coEnum)
+	if (m_opt.type == coEnum || m_opt.type == coEnums)
         // Closed enum: The combo box item index returned by the field must be convertible to an enum value.
         m_value = m_opt.enum_def->index_to_enum(field->GetSelection());
     else if (m_opt.gui_type == ConfigOptionDef::GUIType::f_enum_open || m_opt.gui_type == ConfigOptionDef::GUIType::i_enum_open) {

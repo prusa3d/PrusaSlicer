@@ -21,15 +21,17 @@ namespace boost { namespace filesystem { class directory_entry; }}
 
 namespace Slic3r {
 
+inline std::optional<std::size_t> thread_count;
 extern void set_logging_level(unsigned int level);
 extern unsigned get_logging_level();
 // Format memory allocated, separate thousands by comma.
 extern std::string format_memsize_MB(size_t n);
+extern std::string format_memsize(size_t bytes, unsigned int decimals = 1);
 // Return string to be added to the boost::log output to inform about the current process memory allocation.
 // The string is non-empty if the loglevel >= info (3) or ignore_loglevel==true.
 // Latter is used to get the memory info from SysInfoDialog.
 extern std::string log_memory_info(bool ignore_loglevel = false);
-extern void disable_multi_threading();
+extern void enforce_thread_count(std::size_t count);
 // Returns the size of physical memory (RAM) in bytes.
 extern size_t total_physical_memory();
 
@@ -72,10 +74,6 @@ const std::string& data_dir();
 // Writes out the output path prefix to the console for the first time the function is called,
 // so the user knows where to search for the debugging output.
 std::string debug_out_path(const char *name, ...);
-
-// A special type for strings encoded in the local Windows 8-bit code page.
-// This type is only needed for Perl bindings to relay to Perl that the string is raw, not UTF-8 encoded.
-typedef std::string local_encoded_string;
 
 // Returns next utf8 sequence length. =number of bytes in string, that creates together one utf-8 character. 
 // Starting at pos. ASCII characters returns 1. Works also if pos is in the middle of the sequence.

@@ -118,21 +118,13 @@ ArrangeTask<ArrItem>::process_native(Ctl &ctl)
 
     } subctl{ctl, *this};
 
-    auto fixed_items = printable.unselected;
-
-    // static (unselected) unprintable objects should not be overlapped by
-    // movable and printable objects
-    std::copy(unprintable.unselected.begin(),
-              unprintable.unselected.end(),
-              std::back_inserter(fixed_items));
-
-    arranger->arrange(printable.selected, fixed_items, bed, subctl);
+    arranger->arrange(printable.selected, printable.unselected, bed, subctl);
 
     std::vector<int> printable_bed_indices =
         get_bed_indices(crange(printable.selected), crange(printable.unselected));
 
     // If there are no printables, leave the physical bed empty
-    constexpr int SearchFrom = 1;
+    static constexpr int SearchFrom = 1;
 
     // Unprintable items should go to the first logical (!) bed not containing
     // any printable items

@@ -41,7 +41,7 @@
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
+#include <boost/log/expressions.hpp> // IWYU pragma: keep
 
 #include <boost/locale.hpp>
 
@@ -124,23 +124,22 @@ unsigned get_logging_level()
 }
 
 // Force set_logging_level(<=error) after loading of the DLL.
-// This is currently only needed if libslic3r is loaded as a shared library into Perl interpreter
-// to perform unit and integration tests.
+// This is used ot disable logging for unit and integration tests.
 static struct RunOnInit {
-    RunOnInit() { 
+    RunOnInit() {
         set_logging_level(1);
     }
 } g_RunOnInit;
 
-void disable_multi_threading()
+void enforce_thread_count(const std::size_t count)
 {
     // Disable parallelization to simplify debugging.
 #ifdef TBB_HAS_GLOBAL_CONTROL
 	{
-		static tbb::global_control gc(tbb::global_control::max_allowed_parallelism, 1);
+		static tbb::global_control gc(tbb::global_control::max_allowed_parallelism, count);
 	}
 #else // TBB_HAS_GLOBAL_CONTROL
-    static tbb::task_scheduler_init *tbb_init = new tbb::task_scheduler_init(1);
+    static tbb::task_scheduler_init *tbb_init = new tbb::task_scheduler_init(count);
     UNUSED(tbb_init);
 #endif // TBB_HAS_GLOBAL_CONTROL
 }
@@ -707,7 +706,7 @@ CopyFileResult copy_file_inner(const std::string& from, const std::string& to, s
 	// That may happen when copying on some exotic file system, for example Linux on Chrome.
 	copy_file_linux(source, target, ec);
 #else // __linux__
-	boost::filesystem::copy_file(source, target, boost::filesystem::copy_option::overwrite_if_exists, ec);
+	boost::filesystem::copy_file(source, target, boost::filesystem::copy_options::overwrite_existing, ec);
 #endif // __linux__
 	if (ec) {
 		error_message = ec.message();
@@ -1084,6 +1083,42 @@ std::string format_memsize_MB(size_t n)
     return out + "MB";
 }
 
+std::string format_memsize(size_t bytes, unsigned int decimals)
+{
+		static constexpr const float kb = 1024.0f;
+		static constexpr const float mb = 1024.0f * kb;
+		static constexpr const float gb = 1024.0f * mb;
+		static constexpr const float tb = 1024.0f * gb;
+
+		const float f_bytes = static_cast<float>(bytes);
+		if (f_bytes < kb)
+				return std::to_string(bytes) + " bytes";
+		else if (f_bytes < mb) {
+				const float f_kb = f_bytes / kb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_kb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "KB)";
+		}
+		else if (f_bytes < gb) {
+				const float f_mb = f_bytes / mb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_mb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "MB)";
+		}
+		else if (f_bytes < tb) {
+				const float f_gb = f_bytes / gb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_gb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "GB)";
+		}
+		else {
+				const float f_tb = f_bytes / tb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_tb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "TB)";
+		}
+}
+
 // Returns platform-specific string to be used as log output or parsed in SysInfoDialog.
 // The latter parses the string with (semi)colons as separators, it should look about as
 // "desc1: value1; desc2: value2" or similar (spaces should not matter).
@@ -1126,7 +1161,7 @@ std::string log_memory_info(bool ignore_loglevel)
             out += "N/A";
     #else // i.e. __linux__
         size_t tSize = 0, resident = 0, share = 0;
-        std::ifstream buffer("/proc/self/statm");
+        boost::nowide::ifstream buffer("/proc/self/statm");
         if (buffer && (buffer >> tSize >> resident >> share)) {
             size_t page_size = (size_t)sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
             size_t rss = resident * page_size;

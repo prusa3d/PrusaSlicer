@@ -524,7 +524,7 @@ void DropDown::mouseReleased(wxMouseEvent& event)
         if (HasCapture())
             ReleaseMouse();
         if (hover_item >= 0) { // not moved
-#ifdef __WXOSX__
+#ifndef _WIN32
             // To avoid cases, when some dialog appears after item selection, but DropDown is still shown
             Hide();
 #endif

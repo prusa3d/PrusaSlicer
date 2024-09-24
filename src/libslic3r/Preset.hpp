@@ -39,6 +39,8 @@ public:
     Semver                          config_version;
     std::string                     config_update_url;
     std::string                     changelog_url;
+    std::string                     repo_id;
+    std::string                     repo_prefix;
     bool                            templates_profile { false };
 
     struct PrinterVariant {
@@ -125,6 +127,7 @@ public:
         TYPE_PHYSICAL_PRINTER,
         // This type is here to support search through the Preferences
         TYPE_PREFERENCES,
+        TYPE_WEBVIEW,
     };
 
     Type                type        = TYPE_INVALID;
@@ -409,6 +412,7 @@ public:
     PresetWithVendorProfile get_edited_preset_with_vendor_profile() const { return this->get_preset_with_vendor_profile(this->get_edited_preset()); }
 
     const std::string& 		get_preset_name_by_alias(const std::string& alias) const;
+    const std::string&      get_preset_name_by_alias_invisible(const std::string& alias) const;
 	const std::string*		get_preset_name_renamed(const std::string &old_name) const;
 
 	// used to update preset_choice from Tab
@@ -435,6 +439,8 @@ public:
     Preset*         find_preset(const std::string &name, bool first_visible_if_not_found = false, bool respect_active_preset = true);
     const Preset*   find_preset(const std::string &name, bool first_visible_if_not_found = false, bool respect_active_preset = true) const 
         { return const_cast<PresetCollection*>(this)->find_preset(name, first_visible_if_not_found, respect_active_preset); }
+
+    size_t          get_preset_idx_by_name(const std::string preset_name) const;
 
     size_t          first_visible_idx() const;
     // Return index of the first compatible preset. Certainly at least the '- default -' preset shall be compatible.
@@ -525,7 +531,8 @@ public:
     // Select a profile by its name. Return true if the selection changed.
     // Without force, the selection is only updated if the index changes.
     // With force, the changes are reverted if the new index is the same as the old index.
-    bool            select_preset_by_name(const std::string &name, bool force);
+    // With force_invisible, force preset selection even it's invisible.
+    bool            select_preset_by_name(const std::string &name, bool force, bool force_invisible = false);
 
     // Generate a file path from a profile name. Add the ".ini" suffix if it is missing.
     std::string     path_from_name(const std::string &new_name) const;
@@ -906,7 +913,7 @@ public:
     // Select filament by the full filament name, which contains name of filament, separator and name of selected preset
     // If full_name doesn't contain name of selected preset, then select first preset in the list for this filament
     bool select_filament(const std::string& name, bool force = false);
-    void select_filament(size_t idx)                        { m_idx_selected = idx; }
+    void select_filament(size_t idx);
 
     std::string             get_selected_preset_name()  const { return m_idx_selected == size_t(-1) ? std::string() : m_extr_filaments[m_idx_selected].preset->name; }
     const Preset*           get_selected_preset()       const { return m_idx_selected == size_t(-1) ? nullptr   : m_extr_filaments[m_idx_selected].preset; }

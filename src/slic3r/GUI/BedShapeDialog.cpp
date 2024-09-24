@@ -266,7 +266,7 @@ ConfigOptionsGroupShp BedShapePanel::init_shape_options_page(const wxString& tit
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Settings"));
 
     optgroup->label_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
 	
@@ -290,7 +290,7 @@ wxPanel* BedShapePanel::init_texture_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Texture"));
 
     optgroup->label_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
 
@@ -363,7 +363,7 @@ wxPanel* BedShapePanel::init_model_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Model"));
 
     optgroup->label_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
 

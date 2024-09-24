@@ -1,9 +1,8 @@
 set(LibBGCode_SOURCE_DIR "" CACHE PATH "Optionally specify local LibBGCode source directory")
 
 set(_source_dir_line
-    URL https://github.com/prusa3d/libbgcode/archive/04556c4f64d4b7a5942d8d193d1eb87fc7e1005f.zip
-    URL_HASH SHA256=f0745b2dae95f0a49ae75bfbe4d775c751499fc4245864675e2dab06c13b2c8f
-)
+    URL https://github.com/prusa3d/libbgcode/archive/b5c57c423c958a78dacae468aeee63ab3d2de947.zip
+    URL_HASH SHA256=ade82ffe9c1a1876c9d4d264948fa146d33d6a9c7cc23f6422fbbdb2949c5d75)
 
 if (LibBGCode_SOURCE_DIR)
     set(_source_dir_line "SOURCE_DIR;${LibBGCode_SOURCE_DIR};BUILD_ALWAYS;ON")

@@ -105,8 +105,8 @@ void SLAImportJob::prepare()
 {
     reset();
 
-    auto path  = p->import_dlg->get_path();
-    auto nm    = wxFileName(path);
+    const std::string path  = p->import_dlg->get_path();
+    auto nm    = wxFileName(from_u8(path));
     p->path    = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
     if (p->path.empty()) {
         p->err = _u8L("The file does not exist.");

@@ -7,9 +7,18 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <assert.h>
-#include <stdio.h>
+#include <oneapi/tbb/scalable_allocator.h>
+#include <boost/container/vector.hpp>
 #include <memory>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <set>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstdlib>
 
 #include "../ClipperUtils.hpp"
 #include "../Geometry.hpp"
@@ -19,15 +28,30 @@
 #include "../Surface.hpp"
 // for Arachne based infills
 #include "../PerimeterGenerator.hpp"
-
 #include "FillBase.hpp"
 #include "FillRectilinear.hpp"
 #include "FillLightning.hpp"
-#include "FillConcentric.hpp"
 #include "FillEnsuring.hpp"
-#include "Polygon.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/ShortestPath.hpp"
 
 namespace Slic3r {
+namespace FillAdaptive {
+struct Octree;
+}  // namespace FillAdaptive
+namespace FillLightning {
+class Generator;
+}  // namespace FillLightning
 
 //static constexpr const float NarrowInfillAreaThresholdMM = 3.f;
 
@@ -446,10 +470,6 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 {
 	this->clear_fills();
 
-#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-//	this->export_region_fill_surfaces_to_svg_debug("10_fill-initial");
-#endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
-
     std::vector<SurfaceFill>  surface_fills       = group_fills(*this);
     const Slic3r::BoundingBox bbox                = this->object()->bounding_box();
     const auto                resolution          = this->object()->print()->config().gcode_resolution.value;
@@ -508,13 +528,14 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
         // apply half spacing using this flow's own spacing and generate infill
         FillParams params;
-        params.density           = float(0.01 * surface_fill.params.density);
-        params.dont_adjust       = false; //  surface_fill.params.dont_adjust;
-        params.anchor_length     = surface_fill.params.anchor_length;
-        params.anchor_length_max = surface_fill.params.anchor_length_max;
-        params.resolution        = resolution;
-        params.use_arachne       = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipEnsuring;
-        params.layer_height      = layerm.layer()->height;
+        params.density                    = float(0.01 * surface_fill.params.density);
+        params.dont_adjust                = false; //  surface_fill.params.dont_adjust;
+        params.anchor_length              = surface_fill.params.anchor_length;
+        params.anchor_length_max          = surface_fill.params.anchor_length_max;
+        params.resolution                 = resolution;
+        params.use_arachne                = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipEnsuring;
+        params.layer_height               = layerm.layer()->height;
+        params.prefer_clockwise_movements = this->object()->print()->config().prefer_clockwise_movements;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
@@ -569,11 +590,14 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
                     thick_polylines.clear();
                 } else {
+                    // When prefer_clockwise_movements is true, we have to ensure that extrusion paths will not be reversed during path planning.
                     extrusion_entities_append_paths(
                         eec->entities, std::move(polylines),
-						ExtrusionAttributes{ surface_fill.params.extrusion_role,
-							ExtrusionFlow{ flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height() } 
-						});
+						ExtrusionAttributes{
+                            surface_fill.params.extrusion_role,
+							ExtrusionFlow{ flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height() },
+                            f->is_self_crossing()
+						}, !params.prefer_clockwise_movements);
                     layerm.m_fills.entities.push_back(eec);
                 }
                 insert_fills_into_islands(*this, uint32_t(surface_fill.region_id), fill_begin, uint32_t(layerm.fills().size()));
@@ -655,7 +679,8 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         case ipGyroid:
         case ipHilbertCurve:
         case ipArchimedeanChords:
-        case ipOctagramSpiral: break;
+        case ipOctagramSpiral:
+        case ipZigZag: break;
         }
 
         // Create the filler object.

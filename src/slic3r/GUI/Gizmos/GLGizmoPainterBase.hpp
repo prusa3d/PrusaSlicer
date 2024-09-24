@@ -120,8 +120,8 @@ protected:
     virtual ColorRGBA get_cursor_sphere_left_button_color() const  { return { 0.0f, 0.0f, 1.0f, 0.25f }; }
     virtual ColorRGBA get_cursor_sphere_right_button_color() const { return { 1.0f, 0.0f, 0.0f, 0.25f }; }
 
-    virtual EnforcerBlockerType get_left_button_state_type() const { return EnforcerBlockerType::ENFORCER; }
-    virtual EnforcerBlockerType get_right_button_state_type() const { return EnforcerBlockerType::BLOCKER; }
+    virtual TriangleStateType get_left_button_state_type() const { return TriangleStateType::ENFORCER; }
+    virtual TriangleStateType get_right_button_state_type() const { return TriangleStateType::BLOCKER; }
 
     float m_cursor_radius = 2.f;
     static constexpr float CursorRadiusMin  = 0.4f; // cannot be zero
@@ -154,9 +154,7 @@ protected:
     float    m_highlight_by_angle_threshold_deg = 0.f;
 
     GLModel m_circle;
-#if !ENABLE_GL_CORE_PROFILE
     Vec2d m_old_center{ Vec2d::Zero() };
-#endif // !ENABLE_GL_CORE_PROFILE
     float m_old_cursor_radius{ 0.0f };
 
     static constexpr float SmartFillAngleMin  = 0.0f;

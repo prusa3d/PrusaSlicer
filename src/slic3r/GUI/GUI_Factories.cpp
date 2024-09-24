@@ -27,6 +27,33 @@
 #include "slic3r/Utils/MacDarkMode.hpp"
 #endif
 
+// ----------------------------------------------------------------------------
+// MenuWithSeparators
+// ----------------------------------------------------------------------------
+
+void MenuWithSeparators::DestroySeparators()
+{
+    if (m_separator_frst) {
+        Destroy(m_separator_frst);
+        m_separator_frst = nullptr;
+    }
+
+    if (m_separator_scnd) {
+        Destroy(m_separator_scnd);
+        m_separator_scnd = nullptr;
+    }
+}
+
+void MenuWithSeparators::SetFirstSeparator()
+{
+    m_separator_frst = this->AppendSeparator();
+}
+
+void MenuWithSeparators::SetSecondSeparator()
+{
+    m_separator_scnd = this->AppendSeparator();
+}
+
 namespace Slic3r
 {
 namespace GUI
@@ -473,6 +500,30 @@ std::vector<wxBitmapBundle*> MenuFactory::get_svg_volume_bitmaps()
     for (const auto &item : SVG_VOLUME_ICONS)
         volume_bmps.push_back(get_bmp_bundle(item.second));
     return volume_bmps;
+}
+
+wxString MenuFactory::get_repaire_result_message(
+    const std::vector<std::string>& succes_models,
+    const std::vector<std::pair<std::string, std::string>>& failed_models)
+{
+    // Show info notification
+    wxString msg;
+    wxString bullet_suf = "\n   - ";
+    if (!succes_models.empty()) {
+        msg = _L_PLURAL("The following model was repaired successfully", "The following models were repaired successfully", succes_models.size()) + ":";
+        for (auto& model : succes_models)
+            msg += bullet_suf + from_u8(model);
+        msg += "\n\n";
+    }
+    if (!failed_models.empty()) {
+        msg += _L_PLURAL("Folowing model repair failed", "Folowing models repair failed", failed_models.size()) + ":\n";
+        for (auto& model : failed_models)
+            msg += bullet_suf + from_u8(model.first) + ": " + _(model.second);
+    }
+    if (msg.IsEmpty())
+        msg = _L("Repairing was canceled");
+
+    return msg;
 }
 
 void MenuFactory::append_menu_item_delete(wxMenu* menu)
@@ -1427,18 +1478,24 @@ static void update_menu_item_def_colors(T* item)
 
 void MenuFactory::sys_color_changed()
 {
-    for (MenuWithSeparators* menu : { &m_object_menu, &m_sla_object_menu, &m_part_menu, &m_default_menu }) {
-        sys_color_changed_menu(dynamic_cast<wxMenu*>(menu));// msw_rescale_menu updates just icons, so use it
+    for (MenuWithSeparators* menu : { &m_object_menu, &m_sla_object_menu, &m_part_menu, &m_default_menu })
+        sys_color_changed(dynamic_cast<wxMenu*>(menu));
+}
+
+void MenuFactory::sys_color_changed(wxMenu* menu)
+{
+    sys_color_changed_menu(menu);// msw_rescale_menu updates just icons, so use it
 #ifdef _WIN32 
-        // but under MSW we have to update item's bachground color
-        for (wxMenuItem* item : menu->GetMenuItems())
-            update_menu_item_def_colors(item);
+    // but under MSW we have to update item's bachground color
+    for (wxMenuItem* item : menu->GetMenuItems())
+        update_menu_item_def_colors(item);
 #endif
-    }
 }
 
 void MenuFactory::sys_color_changed(wxMenuBar* menubar)
 {
+    if (!menubar)
+        return;
     for (size_t id = 0; id < menubar->GetMenuCount(); id++) {
         wxMenu* menu = menubar->GetMenu(id);
         sys_color_changed_menu(menu);

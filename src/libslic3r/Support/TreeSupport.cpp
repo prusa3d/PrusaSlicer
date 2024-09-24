@@ -11,33 +11,54 @@
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "TreeSupport.hpp"
+
+#include <boost/log/trivial.hpp>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/partitioner.h>
+#include <oneapi/tbb/task_arena.h>
+#include <cassert>
+#include <chrono>
+#include <optional>
+#include <string_view>
+#include <cmath>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <numeric>
+#include <ratio>
+#include <tuple>
+#include <unordered_set>
+#include <cstdlib>
+
 #include "TreeSupportCommon.hpp"
 #include "SupportCommon.hpp"
 #include "OrganicSupport.hpp"
-
 #include "../AABBTreeIndirect.hpp"
 #include "../BuildVolume.hpp"
-#include "../ClipperUtils.hpp"
 #include "../EdgeGrid.hpp"
-#include "../Fill/Fill.hpp"
 #include "../Layer.hpp"
 #include "../Print.hpp"
 #include "../MultiPoint.hpp"
 #include "../Polygon.hpp"
 #include "../Polyline.hpp"
 #include "../MutablePolygon.hpp"
-
-#include <cassert>
-#include <chrono>
-#include <fstream>
-#include <optional>
-#include <stdio.h>
-#include <string>
-#include <string_view>
-
-#include <boost/log/trivial.hpp>
-
-#include <tbb/parallel_for.h>
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/MultiMaterialSegmentation.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Support/SupportLayer.hpp"
+#include "libslic3r/Support/SupportParameters.hpp"
+#include "libslic3r/Support/TreeModelVolumes.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/TriangleSelector.hpp"
+#include "libslic3r/Utils.hpp"
 
 // #define TREESUPPORT_DEBUG_SVG
 
@@ -208,8 +229,8 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
     const int                support_enforce_layers = config.support_material_enforce_layers.value;
     std::vector<Polygons>    enforcers_layers{ print_object.slice_support_enforcers() };
     std::vector<Polygons>    blockers_layers{ print_object.slice_support_blockers() };
-    print_object.project_and_append_custom_facets(false, EnforcerBlockerType::ENFORCER, enforcers_layers);
-    print_object.project_and_append_custom_facets(false, EnforcerBlockerType::BLOCKER, blockers_layers);
+    print_object.project_and_append_custom_facets(false, TriangleStateType::ENFORCER, enforcers_layers);
+    print_object.project_and_append_custom_facets(false, TriangleStateType::BLOCKER, blockers_layers);
     const int                support_threshold      = config.support_material_threshold.value;
     const bool               support_threshold_auto = support_threshold == 0;
     // +1 makes the threshold inclusive

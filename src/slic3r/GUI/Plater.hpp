@@ -23,19 +23,13 @@
 
 #include <wx/panel.h>
 
+#include "Sidebar.hpp"
 #include "Selection.hpp"
 
-#include "libslic3r/enum_bitmask.hpp"
-#include "libslic3r/Preset.hpp"
-#include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "Jobs/Job.hpp"
 #include "Jobs/Worker.hpp"
-#include "Search.hpp"
 
-class wxButton;
-class ScalableButton;
-class wxScrolledWindow;
 class wxString;
 
 namespace Slic3r {
@@ -60,91 +54,16 @@ namespace UndoRedo {
 
 namespace GUI {
 
+wxDECLARE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
+
 class MainFrame;
-class ConfigOptionsGroup;
-class ObjectManipulation;
-class ObjectSettings;
-class ObjectLayers;
-class ObjectList;
 class GLCanvas3D;
 class Mouse3DController;
 class NotificationManager;
 struct Camera;
 class GLToolbar;
-class PlaterPresetComboBox;
-
-using t_optgroups = std::vector <std::shared_ptr<ConfigOptionsGroup>>;
-
-class Plater;
-enum class ActionButtonType : int;
-
-class Sidebar : public wxPanel
-{
-    ConfigOptionMode    m_mode{ConfigOptionMode::comSimple};
-public:
-    Sidebar(Plater *parent);
-    Sidebar(Sidebar &&) = delete;
-    Sidebar(const Sidebar &) = delete;
-    Sidebar &operator=(Sidebar &&) = delete;
-    Sidebar &operator=(const Sidebar &) = delete;
-    ~Sidebar();
-
-    void init_filament_combo(PlaterPresetComboBox **combo, const int extr_idx);
-    void remove_unused_filament_combos(const size_t current_extruder_count);
-    void update_all_preset_comboboxes();
-    void update_presets(Slic3r::Preset::Type preset_type);
-    void update_mode_sizer() const;
-    void change_top_border_for_mode_sizer(bool increase_border);
-    void update_reslice_btn_tooltip() const;
-    void msw_rescale();
-    void sys_color_changed();
-    void update_mode_markers();
-    void search();
-    void jump_to_option(size_t selected);
-    void jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category);
-    // jump to option which is represented by composite key : "opt_key;tab_name"
-    void jump_to_option(const std::string& composite_key);
-
-    ObjectManipulation*     obj_manipul();
-    ObjectList*             obj_list();
-    ObjectSettings*         obj_settings();
-    ObjectLayers*           obj_layers();
-    wxScrolledWindow*       scrolled_panel();
-    wxPanel*                presets_panel();
-
-    ConfigOptionsGroup*     og_freq_chng_params(const bool is_fff);
-    wxButton*               get_wiping_dialog_button();
-    void                    update_objects_list_extruder_column(size_t extruders_count);
-    void                    show_info_sizer();
-    void                    show_sliced_info_sizer(const bool show);
-    void                    update_sliced_info_sizer();
-    void                    enable_buttons(bool enable);
-    void                    set_btn_label(const ActionButtonType btn_type, const wxString& label) const;
-    bool                    show_reslice(bool show) const;
-	bool                    show_export(bool show) const;
-	bool                    show_send(bool show) const;
-    bool                    show_eject(bool show)const;
-	bool                    show_export_removable(bool show) const;
-	bool                    get_eject_shown() const;
-    bool                    is_multifilament();
-    void                    update_mode();
-    bool                    is_collapsed();
-    void                    collapse(bool collapse);
-    void                    check_and_update_searcher(bool respect_mode = false);
-    void                    update_ui_from_settings();
-
-#ifdef _MSW_DARK_MODE
-    void                    show_mode_sizer(bool show);
-#endif
-
-    std::vector<PlaterPresetComboBox*>&   combos_filament();
-    Search::OptionsSearcher&        get_searcher();
-    std::string&                    get_search_line();
-
-private:
-    struct priv;
-    std::unique_ptr<priv> p;
-};
+class UserAccount;
+class PresetArchiveDatabase;
 
 class Plater: public wxPanel
 {
@@ -156,7 +75,7 @@ public:
     Plater(const Plater &) = delete;
     Plater &operator=(Plater &&) = delete;
     Plater &operator=(const Plater &) = delete;
-    ~Plater() = default;
+    ~Plater();
 
     bool is_project_dirty() const;
     bool is_presets_dirty() const;
@@ -190,7 +109,7 @@ public:
     void reload_gcode_from_disk();
     void convert_gcode_to_ascii();
     void convert_gcode_to_binary();
-    void refresh_print();
+    void reload_print();
 
     std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
     // To be called when providing a list of files to the GUI slic3r on command line.
@@ -286,7 +205,6 @@ public:
 
     void export_gcode(bool prefer_removable);
     void export_stl_obj(bool extended = false, bool selection_only = false);
-    void export_amf();
     bool export_3mf(const boost::filesystem::path& output_path = boost::filesystem::path());
     void reload_from_disk();
     void replace_with_stl();
@@ -297,6 +215,7 @@ public:
     void reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
 
+    void clear_before_change_volume(ModelVolume &mv, const std::string &notification_msg);
     void clear_before_change_mesh(int obj_idx, const std::string &notification_msg);
     void changed_mesh(int obj_idx);
 
@@ -307,7 +226,10 @@ public:
     bool is_background_process_update_scheduled() const;
     void suppress_background_process(const bool stop_background_process) ;
     void send_gcode();
+    void send_gcode_inner(DynamicPrintConfig* physical_printer_config);
 	void eject_drive();
+    void connect_gcode();
+    std::string get_upload_filename();
 
     void take_snapshot(const std::string &snapshot_name);
     void take_snapshot(const wxString &snapshot_name);
@@ -320,7 +242,6 @@ public:
     void redo_to(int selection);
     bool undo_redo_string_getter(const bool is_undo, int idx, const char** out_text);
     void undo_redo_topmost_string_getter(const bool is_undo, std::string& out_text);
-    bool search_string_getter(int idx, const char** label, const char** tooltip);
     // For the memory statistics. 
     const Slic3r::UndoRedo::Stack& undo_redo_stack_main() const;
     void clear_undo_redo_stack_main();
@@ -328,16 +249,18 @@ public:
     void enter_gizmos_stack();
     void leave_gizmos_stack();
 
-    void on_extruders_change(size_t extruders_count);
     bool update_filament_colors_in_full_config();
     void on_config_change(const DynamicPrintConfig &config);
     void force_filament_colors_update();
     void force_filament_cb_update();
     void force_print_bed_update();
     // On activating the parent window.
-    void on_activate();
-    std::vector<std::string> get_extruder_colors_from_plater_config(const GCodeProcessorResult* const result = nullptr) const;
-    std::vector<std::string> get_colors_for_color_print(const GCodeProcessorResult* const result = nullptr) const;
+    void on_activate(bool active);
+
+    std::vector<std::string> get_extruder_color_strings_from_plater_config(const GCodeProcessorResult* const result = nullptr) const;
+    std::vector<std::string> get_color_strings_for_color_print(const GCodeProcessorResult* const result = nullptr) const;
+    std::vector<ColorRGBA> get_extruder_colors_from_plater_config() const;
+    std::vector<ColorRGBA> get_colors_for_color_print() const;
 
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;
@@ -354,6 +277,8 @@ public:
     GLCanvas3D* canvas3D();
     const GLCanvas3D * canvas3D() const;
     GLCanvas3D* get_current_canvas3D();
+
+    void render_sliders(GLCanvas3D& canvas);
     
     void arrange();
     void arrange(Worker &w, bool selected);
@@ -368,7 +293,6 @@ public:
 
     void copy_selection_to_clipboard();
     void paste_from_clipboard();
-    void search(bool plater_is_active);
     void mirror(Axis axis);
     void split_object();
     void split_volume();
@@ -420,7 +344,7 @@ public:
 
     void set_preview_layers_slider_values_range(int bottom, int top);
 
-    void update_preview_moves_slider();
+    void update_preview_moves_slider(std::optional<int> visible_range_min = std::nullopt, std::optional<int> visible_range_max = std::nullopt);
     void enable_preview_moves_slider(bool enable);
 
     void reset_gcode_toolpaths();
@@ -433,8 +357,17 @@ public:
     void set_bed_shape(const Pointfs& shape, const double max_print_height, const std::string& custom_texture, const std::string& custom_model, bool force_as_custom = false) const;
     void set_default_bed_shape() const;
 
-    NotificationManager * get_notification_manager();
-    const NotificationManager * get_notification_manager() const;
+    NotificationManager* get_notification_manager();
+    const NotificationManager* get_notification_manager() const;
+
+    PresetArchiveDatabase* get_preset_archive_database();
+    const PresetArchiveDatabase* get_preset_archive_database() const;
+
+    UserAccount* get_user_account();
+    const UserAccount* get_user_account() const;
+
+    void toggle_remember_user_account_session();
+    void act_with_user_account();
 
     void init_notification_manager();
 
@@ -502,10 +435,6 @@ public:
     wxMenu* instance_menu();
     wxMenu* layer_menu();
     wxMenu* multi_selection_menu();
-
-    static bool has_illegal_filename_characters(const wxString& name);
-    static bool has_illegal_filename_characters(const std::string& name);
-    static void show_illegal_characters_warning(wxWindow* parent);
 
 private:
     void reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages);

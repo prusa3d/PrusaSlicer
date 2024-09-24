@@ -54,9 +54,9 @@ protected:
 public:
     TMArrangeKernel() = default;
     TMArrangeKernel(Vec2crd gravity_center, size_t itm_cnt, double bedarea = NaNd)
-        : sink{gravity_center}
-        , m_bin_area(bedarea)
+        : m_bin_area(bedarea)
         , m_item_cnt{itm_cnt}
+        , sink{gravity_center}
     {}
 
     TMArrangeKernel(size_t itm_cnt, double bedarea = NaNd)
@@ -90,17 +90,11 @@ public:
         // Will hold the resulting score
         double score = 0;
 
-        // Density is the pack density: how big is the arranged pile
-        double density = 0;
-
         // Distinction of cases for the arrangement scene
         enum e_cases {
             // This branch is for big items in a mixed (big and small) scene
             // OR for all items in a small-only scene.
             BIG_ITEM,
-
-            // This branch is for the last big item in a mixed scene
-            LAST_BIG_ITEM,
 
             // For small items in a mixed scene.
             SMALL_ITEM,
@@ -112,10 +106,8 @@ public:
         bool bigitems = is_big(envelope_area(item)) || m_rtree.empty();
         if (is_wt)
             compute_case = WIPE_TOWER;
-        else if (bigitems && m_rem_cnt > 0)
+        else if (bigitems)
             compute_case = BIG_ITEM;
-        else if (bigitems && m_rem_cnt == 0)
-            compute_case = LAST_BIG_ITEM;
         else
             compute_case = SMALL_ITEM;
 
@@ -132,20 +124,8 @@ public:
             Point top_left{minc.x(), maxc.y()};
             Point bottom_right{maxc.x(), minc.y()};
 
-            // Now the distance of the gravity center will be calculated to the
-            // five anchor points and the smallest will be chosen.
-            std::array<double, 5> dists;
-            auto cc = fullbb.center(); // The gravity center
-            dists[0] = (minc - cc).cast<double>().norm();
-            dists[1] = (maxc - cc).cast<double>().norm();
-            dists[2] = (itmcntr - cc).template cast<double>().norm();
-            dists[3] = (top_left - cc).cast<double>().norm();
-            dists[4] = (bottom_right - cc).cast<double>().norm();
-
-            // The smalles distance from the arranged pile center:
-            double dist = norm(*(std::min_element(dists.begin(), dists.end())));
-            double bindist = norm((ibb.center() - active_sink).template cast<double>().norm());
-            dist = 0.8 * dist + 0.2 * bindist;
+            // The smallest distance from the arranged pile center:
+            double dist = norm((itmcntr - m_pilebb.center()).template cast<double>().norm());
 
             // Prepare a variable for the alignment score.
             // This will indicate: how well is the candidate item
@@ -153,7 +133,7 @@ public:
             // with all neighbors and return the score for the best
             // alignment. So it is enough for the candidate to be
             // aligned with only one item.
-            auto alignment_score = 1.0;
+            auto alignment_score = 1.;
 
             auto query = bgi::intersects(ibb);
             auto& index = is_big(envelope_area(item)) ? m_rtree : m_smallsrtree;
@@ -173,31 +153,23 @@ public:
                     auto bb = p.bb;
                     bb.merge(ibb);
                     auto bbarea = area(bb);
-                    auto ascore = 1.0 - (fixed_area(item) + parea) / bbarea;
+                    auto ascore = 1.0 - (area(fixed_bounding_box(item)) + area(p.bb)) / bbarea;
 
                     if(ascore < alignment_score)
                         alignment_score = ascore;
                 }
             }
 
-            auto fullbbsz = fullbb.size();
-            density = std::sqrt(norm(fullbbsz.x()) * norm(fullbbsz.y()));
             double R = double(m_rem_cnt) / (m_item_cnt);
+            R = std::pow(R, 1./3.);
 
             // The final mix of the score is the balance between the
             // distance from the full pile center, the pack density and
             // the alignment with the neighbors
-            if (result.empty())
-                score = 0.50 * dist + 0.50 * density;
-            else
-                // Let the density matter more when fewer objects remain
-                score = 0.50 * dist + (1.0 - R) * 0.20 * density +
-                        0.30 * alignment_score;
 
-            break;
-        }
-        case LAST_BIG_ITEM: {
-            score = norm((itmcntr - m_pilebb.center()).template cast<double>().norm());
+            // Let the density matter more when fewer objects remain
+            score = 0.6 * dist + 0.1 * alignment_score + (1.0 - R) * (0.3 * dist) + R * 0.3 * alignment_score;
+
             break;
         }
         case SMALL_ITEM: {
@@ -239,8 +211,11 @@ public:
         if (m_item_cnt == 0)
             m_item_cnt = m_rem_cnt + fixed.size() + 1;
 
-        if (std::isnan(m_bin_area))
-            m_bin_area = area(bed);
+        if (std::isnan(m_bin_area)) {
+            auto sz = bounding_box(bed).size();
+
+            m_bin_area = scaled<double>(unscaled(sz.x()) * unscaled(sz.y()));
+        }
 
         m_norm = std::sqrt(m_bin_area);
 
@@ -248,7 +223,7 @@ public:
         m_itemstats.reserve(fixed.size());
         m_rtree.clear();
         m_smallsrtree.clear();
-        m_pilebb = {};
+        m_pilebb = {active_sink, active_sink};
         unsigned idx = 0;
         for (auto &fixitem : fixed) {
             auto fixitmbb = fixed_bounding_box(fixitem);

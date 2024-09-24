@@ -2,16 +2,22 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "NFP.hpp"
-#include "NFPConcave_CGAL.hpp"
-
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/partition_2.h>
 #include <CGAL/Partition_traits_2.h>
 #include <CGAL/property_map.h>
 #include <CGAL/Polygon_vertical_decomposition_2.h>
+#include <iterator>
+#include <utility>
+#include <vector>
+#include <cstddef>
 
+#include "NFP.hpp"
+#include "NFPConcave_CGAL.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

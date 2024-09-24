@@ -4,14 +4,23 @@
 #ifndef CURAENGINE_WALLTOOLPATHS_H
 #define CURAENGINE_WALLTOOLPATHS_H
 
-#include <memory>
-
 #include <ankerl/unordered_dense.h>
+#include <stddef.h>
+#include <memory>
+#include <utility>
+#include <vector>
+#include <cstddef>
 
 #include "BeadingStrategy/BeadingStrategyFactory.hpp"
 #include "utils/ExtrusionLine.hpp"
 #include "../Polygon.hpp"
 #include "../PrintConfig.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
+
+namespace boost {
+template <class T> struct hash;
+}  // namespace boost
 
 namespace Slic3r::Arachne
 {
@@ -75,15 +84,6 @@ public:
     static bool removeEmptyToolPaths(std::vector<VariableWidthLines> &toolpaths);
 
     using ExtrusionLineSet = ankerl::unordered_dense::set<std::pair<const ExtrusionLine *, const ExtrusionLine *>, boost::hash<std::pair<const ExtrusionLine *, const ExtrusionLine *>>>;
-    /*!
-     * Get the order constraints of the insets when printing walls per region / hole.
-     * Each returned pair consists of adjacent wall lines where the left has an inset_idx one lower than the right.
-     *
-     * Odd walls should always go after their enclosing wall polygons.
-     *
-     * \param outer_to_inner Whether the wall polygons with a lower inset_idx should go before those with a higher one.
-     */
-    static ExtrusionLineSet getRegionOrder(const std::vector<ExtrusionLine *> &input, bool outer_to_inner);
 
 protected:
     /*!

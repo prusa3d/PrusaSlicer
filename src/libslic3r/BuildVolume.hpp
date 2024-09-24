@@ -5,13 +5,18 @@
 #ifndef slic3r_BuildVolume_hpp_
 #define slic3r_BuildVolume_hpp_
 
+#include <admesh/stl.h>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include "Point.hpp"
 #include "Geometry/Circle.hpp"
 #include "Polygon.hpp"
 #include "BoundingBox.hpp"
-#include <admesh/stl.h>
+#include "libslic3r/libslic3r.h"
 
-#include <string_view>
+struct indexed_triangle_set;
 
 namespace Slic3r {
 
@@ -95,9 +100,6 @@ public:
     // Called on final G-code paths.
     //FIXME The test does not take the thickness of the extrudates into account!
     bool         all_paths_inside(const GCodeProcessorResult& paths, const BoundingBoxf3& paths_bbox, bool ignore_bottom = true) const;
-    // Called on initial G-code preview on OpenGL vertex buffer interleaved normals and vertices.
-    bool         all_paths_inside_vertices_and_normals_interleaved(const std::vector<float>& paths, const Eigen::AlignedBox<float, 3>& bbox, bool ignore_bottom = true) const;
-
 
     const std::pair<std::vector<Vec2d>, std::vector<Vec2d>>& top_bottom_convex_hull_decomposition_scene() const { return m_top_bottom_convex_hull_decomposition_scene; }
     const std::pair<std::vector<Vec2d>, std::vector<Vec2d>>& top_bottom_convex_hull_decomposition_bed() const { return m_top_bottom_convex_hull_decomposition_bed; }

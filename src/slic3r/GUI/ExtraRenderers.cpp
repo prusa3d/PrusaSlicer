@@ -240,7 +240,7 @@ bool BitmapTextRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& value
     if (!text_editor || text_editor->GetValue().IsEmpty())
         return false;
 
-    m_was_unusable_symbol = Slic3r::GUI::Plater::has_illegal_filename_characters(text_editor->GetValue());
+    m_was_unusable_symbol = Slic3r::GUI::has_illegal_characters(text_editor->GetValue());
     if (m_was_unusable_symbol)
         return false;
 

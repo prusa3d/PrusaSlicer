@@ -38,18 +38,18 @@ bool GLGizmoSlaSupports::on_init()
 {
     m_shortcut_key = WXK_CONTROL_L;
 
-    m_desc["head_diameter"]    = _L("Head diameter") + ": ";
-    m_desc["lock_supports"]    = _L("Lock supports under new islands");
-    m_desc["remove_selected"]  = _L("Remove selected points");
-    m_desc["remove_all"]       = _L("Remove all points");
-    m_desc["apply_changes"]    = _L("Apply changes");
-    m_desc["discard_changes"]  = _L("Discard changes");
-    m_desc["minimal_distance"] = _L("Minimal points distance") + ": ";
-    m_desc["points_density"]   = _L("Support points density") + ": ";
-    m_desc["auto_generate"]    = _L("Auto-generate points");
-    m_desc["manual_editing"]   = _L("Manual editing");
-    m_desc["clipping_of_view"] = _L("Clipping of view")+ ": ";
-    m_desc["reset_direction"]  = _L("Reset direction");
+    m_desc["head_diameter"]    = _u8L("Head diameter") + ": ";
+    m_desc["lock_supports"]    = _u8L("Lock supports under new islands");
+    m_desc["remove_selected"]  = _u8L("Remove selected points");
+    m_desc["remove_all"]       = _u8L("Remove all points");
+    m_desc["apply_changes"]    = _u8L("Apply changes");
+    m_desc["discard_changes"]  = _u8L("Discard changes");
+    m_desc["minimal_distance"] = _u8L("Minimal points distance") + ": ";
+    m_desc["points_density"]   = _u8L("Support points density") + ": ";
+    m_desc["auto_generate"]    = _u8L("Auto-generate points");
+    m_desc["manual_editing"]   = _u8L("Manual editing");
+    m_desc["clipping_of_view"] = _u8L("Clipping of view")+ ": ";
+    m_desc["reset_direction"]  = _u8L("Reset direction");
         
     return true;
 }
@@ -566,12 +566,12 @@ void GLGizmoSlaSupports::on_render_input_window(float x, float y, float bottom_l
     bool first_run = true; // This is a hack to redraw the button when all points are removed,
                            // so it is not delayed until the background process finishes.
 RENDER_AGAIN:
-    //m_imgui->set_next_window_pos(x, y, ImGuiCond_Always);
+    //ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
     //const ImVec2 window_size(m_imgui->scaled(18.f, 16.f));
     //ImGui::SetNextWindowPos(ImVec2(x, y - std::max(0.f, y+window_size.y-bottom_limit) ));
     //ImGui::SetNextWindowSize(ImVec2(window_size));
 
-    m_imgui->begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
     // adjust window position to avoid overlap the view toolbar
     float win_h = ImGui::GetWindowHeight();
@@ -588,12 +588,12 @@ RENDER_AGAIN:
 
     // First calculate width of all the texts that are could possibly be shown. We will decide set the dialog width based on that:
 
-    const float settings_sliders_left = std::max(m_imgui->calc_text_size(m_desc.at("minimal_distance")).x, m_imgui->calc_text_size(m_desc.at("points_density")).x) + m_imgui->scaled(1.f);
-    const float clipping_slider_left = std::max(m_imgui->calc_text_size(m_desc.at("clipping_of_view")).x, m_imgui->calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
-    const float diameter_slider_left = m_imgui->calc_text_size(m_desc.at("head_diameter")).x + m_imgui->scaled(1.f);
+    const float settings_sliders_left = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("minimal_distance")).x, ImGuiPureWrap::calc_text_size(m_desc.at("points_density")).x) + m_imgui->scaled(1.f);
+    const float clipping_slider_left = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x, ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
+    const float diameter_slider_left = ImGuiPureWrap::calc_text_size(m_desc.at("head_diameter")).x + m_imgui->scaled(1.f);
     const float minimal_slider_width = m_imgui->scaled(4.f);
-    const float buttons_width_approx = m_imgui->calc_text_size(m_desc.at("apply_changes")).x + m_imgui->calc_text_size(m_desc.at("discard_changes")).x + m_imgui->scaled(1.5f);
-    const float lock_supports_width_approx = m_imgui->calc_text_size(m_desc.at("lock_supports")).x + m_imgui->scaled(2.f);
+    const float buttons_width_approx = ImGuiPureWrap::calc_text_size(m_desc.at("apply_changes")).x + ImGuiPureWrap::calc_text_size(m_desc.at("discard_changes")).x + m_imgui->scaled(1.5f);
+    const float lock_supports_width_approx = ImGuiPureWrap::calc_text_size(m_desc.at("lock_supports")).x + m_imgui->scaled(2.f);
 
     float window_width = minimal_slider_width + std::max(std::max(settings_sliders_left, clipping_slider_left), diameter_slider_left);
     window_width = std::max(std::max(window_width, buttons_width_approx), lock_supports_width_approx);
@@ -609,7 +609,7 @@ RENDER_AGAIN:
             m_new_point_head_diameter = diameter_upper_cap;
         ImGui::AlignTextToFramePadding();
 
-        m_imgui->text(m_desc.at("head_diameter"));
+        ImGuiPureWrap::text(m_desc.at("head_diameter"));
         ImGui::SameLine(diameter_slider_left);
         ImGui::PushItemWidth(window_width - diameter_slider_left);
 
@@ -644,25 +644,25 @@ RENDER_AGAIN:
         }
 
         bool changed = m_lock_unique_islands;
-        m_imgui->checkbox(m_desc.at("lock_supports"), m_lock_unique_islands);
+        ImGuiPureWrap::checkbox(m_desc.at("lock_supports"), m_lock_unique_islands);
         force_refresh |= changed != m_lock_unique_islands;
 
         m_imgui->disabled_begin(m_selection_empty);
-        remove_selected = m_imgui->button(m_desc.at("remove_selected"));
+        remove_selected = ImGuiPureWrap::button(m_desc.at("remove_selected"));
         m_imgui->disabled_end();
 
         m_imgui->disabled_begin(m_editing_cache.empty());
-        remove_all = m_imgui->button(m_desc.at("remove_all"));
+        remove_all = ImGuiPureWrap::button(m_desc.at("remove_all"));
         m_imgui->disabled_end();
 
-        m_imgui->text(" "); // vertical gap
+        ImGuiPureWrap::text(" "); // vertical gap
 
-        if (m_imgui->button(m_desc.at("apply_changes"))) {
+        if (ImGuiPureWrap::button(m_desc.at("apply_changes"))) {
             editing_mode_apply_changes();
             force_refresh = true;
         }
         ImGui::SameLine();
-        bool discard_changes = m_imgui->button(m_desc.at("discard_changes"));
+        bool discard_changes = ImGuiPureWrap::button(m_desc.at("discard_changes"));
         if (discard_changes) {
             editing_mode_discard_changes();
             force_refresh = true;
@@ -672,7 +672,7 @@ RENDER_AGAIN:
         m_imgui->disabled_begin(!is_input_enabled());
 
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(m_desc.at("minimal_distance"));
+        ImGuiPureWrap::text(m_desc.at("minimal_distance"));
         ImGui::SameLine(settings_sliders_left);
         ImGui::PushItemWidth(window_width - settings_sliders_left);
 
@@ -686,7 +686,7 @@ RENDER_AGAIN:
         bool slider_released = m_imgui->get_last_slider_status().deactivated_after_edit; // someone has just released the slider
 
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(m_desc.at("points_density"));
+        ImGuiPureWrap::text(m_desc.at("points_density"));
         ImGui::SameLine(settings_sliders_left);
 
         m_imgui->slider_float("##points_density", &density, 0.f, 200.f, "%.f %%");
@@ -711,23 +711,23 @@ RENDER_AGAIN:
             wxGetApp().obj_list()->update_and_show_object_settings_item();
         }
 
-        bool generate = m_imgui->button(m_desc.at("auto_generate"));
+        bool generate = ImGuiPureWrap::button(m_desc.at("auto_generate"));
 
         if (generate)
             auto_generate();
 
         ImGui::Separator();
-        if (m_imgui->button(m_desc.at("manual_editing")))
+        if (ImGuiPureWrap::button(m_desc.at("manual_editing")))
             switch_to_editing_mode();
 
         m_imgui->disabled_end();
 
         m_imgui->disabled_begin(!is_input_enabled() || m_normal_cache.empty());
-        remove_all = m_imgui->button(m_desc.at("remove_all"));
+        remove_all = ImGuiPureWrap::button(m_desc.at("remove_all"));
         m_imgui->disabled_end();
 
-        // m_imgui->text("");
-        // m_imgui->text(m_c->m_model_object->sla_points_status == sla::PointsStatus::NoPoints ? _(L("No points  (will be autogenerated)")) :
+        // ImGuiPureWrap::text("");
+        // ImGuiPureWrap::text(m_c->m_model_object->sla_points_status == sla::PointsStatus::NoPoints ? _(L("No points  (will be autogenerated)")) :
         //              (m_c->m_model_object->sla_points_status == sla::PointsStatus::AutoGenerated ? _(L("Autogenerated points (no modifications)")) :
         //              (m_c->m_model_object->sla_points_status == sla::PointsStatus::UserModified ? _(L("User-modified points")) :
         //              (m_c->m_model_object->sla_points_status == sla::PointsStatus::Generating ? _(L("Generation in progress...")) : "UNKNOWN STATUS"))));
@@ -739,10 +739,10 @@ RENDER_AGAIN:
     ImGui::Separator();
     if (m_c->object_clipper()->get_position() == 0.f) {
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(m_desc.at("clipping_of_view"));
+        ImGuiPureWrap::text(m_desc.at("clipping_of_view"));
     }
     else {
-        if (m_imgui->button(m_desc.at("reset_direction"))) {
+        if (ImGuiPureWrap::button(m_desc.at("reset_direction"))) {
             wxGetApp().CallAfter([this](){
                     m_c->object_clipper()->set_position_by_ratio(-1., false);
                 });
@@ -755,7 +755,7 @@ RENDER_AGAIN:
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
-    if (m_imgui->button("?")) {
+    if (ImGuiPureWrap::button("?")) {
         wxGetApp().CallAfter([]() {
             SlaGizmoHelpDialog help_dlg;
             help_dlg.ShowModal();
@@ -764,7 +764,7 @@ RENDER_AGAIN:
 
     m_imgui->disabled_end();
 
-    m_imgui->end();
+    ImGuiPureWrap::end();
 
     if (remove_selected || remove_all) {
         force_refresh = false;

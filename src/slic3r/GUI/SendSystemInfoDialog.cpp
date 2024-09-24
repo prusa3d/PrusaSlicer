@@ -59,10 +59,10 @@ static const std::string SEND_SYSTEM_INFO_DOMAIN = "prusa3d.com";
 static const std::string SEND_SYSTEM_INFO_URL = "https://files." + SEND_SYSTEM_INFO_DOMAIN + "/wp-json/v1/ps";
 
 
-#if !ENABLE_GL_CORE_PROFILE
+#if SLIC3R_OPENGL_ES
 // Declaration of a free function defined in OpenGLManager.cpp:
 std::string gl_get_string_safe(GLenum param, const std::string& default_value);
-#endif // !ENABLE_GL_CORE_PROFILE
+#endif // SLIC3R_OPENGL_ES
 
 
 // A dialog with the information text and buttons send/dont send/ask later.
@@ -493,7 +493,7 @@ static std::string generate_system_info_json()
         std::vector<std::wstring> blacklisted_libraries;
         BlacklistedLibraryCheck::get_instance().get_blacklisted(blacklisted_libraries);
         for (const std::wstring& wstr : blacklisted_libraries) {
-            std::string utf8 = boost::nowide::narrow(wstr);
+            std::string utf8 = into_u8(wstr);
             if (size_t last_bs_pos = utf8.find_last_of("\\"); last_bs_pos < utf8.size() - 1) {
                 // Remove anything before last backslash so we don't send the path to the DLL.
                 utf8.erase(0, last_bs_pos + 1);
@@ -513,13 +513,13 @@ static std::string generate_system_info_json()
     opengl_node.put("Vendor", OpenGLManager::get_gl_info().get_vendor());
     opengl_node.put("Renderer", OpenGLManager::get_gl_info().get_renderer());
     // Generate list of OpenGL extensions:
-#if ENABLE_GL_CORE_PROFILE
-    std::vector<std::string> extensions_list = OpenGLManager::get_gl_info().get_extensions_list();
-#else
+#if SLIC3R_OPENGL_ES
     std::string extensions_str = gl_get_string_safe(GL_EXTENSIONS, "");
     std::vector<std::string> extensions_list;
     boost::split(extensions_list, extensions_str, boost::is_any_of(" "), boost::token_compress_off);
-#endif // ENABLE_GL_CORE_PROFILE
+#else
+    std::vector<std::string> extensions_list = OpenGLManager::get_gl_info().get_extensions_list();
+#endif // SLIC3R_OPENGL_ES
     std::sort(extensions_list.begin(), extensions_list.end());
     pt::ptree extensions_node;
     for (const std::string& s : extensions_list) {

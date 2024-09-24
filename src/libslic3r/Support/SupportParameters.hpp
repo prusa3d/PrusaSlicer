@@ -5,12 +5,18 @@
 #ifndef slic3r_SupportParameters_hpp_
 #define slic3r_SupportParameters_hpp_
 
-#include "../libslic3r.h"
-#include "../Flow.hpp"
+#include <math.h>
+#include <stddef.h>
+#include <cmath>
+#include <cstddef>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Flow.hpp"
 
 namespace Slic3r {
 
 class PrintObject;
+
 enum InfillPattern : int;
 
 namespace FFFSupport {
@@ -87,6 +93,9 @@ struct SupportParameters {
     float 					raft_angle_1st_layer;
     float 					raft_angle_base;
     float 					raft_angle_interface;
+
+    // Print closed loop clockwise when it is equal to true.
+    bool                    prefer_clockwise_movements;
 
     // Produce a raft interface angle for a given SupportLayer::interface_id()
     float 					raft_interface_angle(size_t interface_id) const 

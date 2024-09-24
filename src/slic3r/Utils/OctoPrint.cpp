@@ -710,7 +710,7 @@ bool PrusaLink::get_storage(wxArrayString& storage_path, wxArrayString& storage_
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get storage at: %2%") % name % url;
 
     wxString wlang = GUI::wxGetApp().current_language_code();
-    std::string lang = GUI::format(wlang.SubString(0, 1));
+    std::string lang = GUI::into_u8(wlang.SubString(0, 1));
 
     auto http = Http::get(std::move(url));
     set_auth(http);
@@ -1161,7 +1161,7 @@ void PrusaConnect::set_http_post_header_args(Http& http, PrintHostPostUploadActi
 {
     // Language for accept message
     wxString wlang = GUI::wxGetApp().current_language_code();
-    std::string lang = GUI::format(wlang.SubString(0, 1));
+    std::string lang = GUI::into_u8(wlang.SubString(0, 1));
     http.header("Accept-Language", lang);
     // Post action
     if (post_action == PrintHostPostUploadAction::StartPrint) {

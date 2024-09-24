@@ -31,18 +31,18 @@ GLGizmoHollow::GLGizmoHollow(GLCanvas3D& parent, const std::string& icon_filenam
 bool GLGizmoHollow::on_init()
 {
     m_shortcut_key = WXK_CONTROL_H;
-    m_desc["enable"]           = _(L("Hollow this object"));
-    m_desc["preview"]          = _(L("Preview hollowed and drilled model"));
-    m_desc["offset"]           = _(L("Offset")) + ": ";
-    m_desc["quality"]          = _(L("Quality")) + ": ";
-    m_desc["closing_distance"] = _(L("Closing distance")) + ": ";
-    m_desc["hole_diameter"]    = _(L("Hole diameter")) + ": ";
-    m_desc["hole_depth"]       = _(L("Hole depth")) + ": ";
-    m_desc["remove_selected"]  = _(L("Remove selected holes"));
-    m_desc["remove_all"]       = _(L("Remove all holes"));
-    m_desc["clipping_of_view"] = _(L("Clipping of view"))+ ": ";
-    m_desc["reset_direction"]  = _(L("Reset direction"));
-    m_desc["show_supports"]    = _(L("Show supports"));
+    m_desc["enable"]           = _u8L("Hollow this object");
+    m_desc["preview"]          = _u8L("Preview hollowed and drilled model");
+    m_desc["offset"]           = _u8L("Offset") + ": ";
+    m_desc["quality"]          = _u8L("Quality") + ": ";
+    m_desc["closing_distance"] = _u8L("Closing distance") + ": ";
+    m_desc["hole_diameter"]    = _u8L("Hole diameter") + ": ";
+    m_desc["hole_depth"]       = _u8L("Hole depth") + ": ";
+    m_desc["remove_selected"]  = _u8L("Remove selected holes");
+    m_desc["remove_all"]       = _u8L("Remove all holes");
+    m_desc["clipping_of_view"] = _u8L("Clipping of view")+ ": ";
+    m_desc["reset_direction"]  = _u8L("Reset direction");
+    m_desc["show_supports"]    = _u8L("Show supports");
 
     return true;
 }
@@ -559,40 +559,40 @@ void GLGizmoHollow::on_render_input_window(float x, float y, float bottom_limit)
     double closing_d_max = opts[2].second->max;
     ConfigOptionMode closing_d_mode = opts[2].second->mode;
 
-    m_desc["offset"] = _(opts[0].second->label) + ":";
-    m_desc["quality"] = _(opts[1].second->label) + ":";
-    m_desc["closing_distance"] = _(opts[2].second->label) + ":";
+    m_desc["offset"]            = into_u8(_(opts[0].second->label)) + ":";
+    m_desc["quality"]           = into_u8(_(opts[1].second->label)) + ":";
+    m_desc["closing_distance"]  = into_u8(_(opts[2].second->label)) + ":";
 
 
 RENDER_AGAIN:
     const float approx_height = m_imgui->scaled(20.0f);
     y = std::min(y, bottom_limit - approx_height);
-    m_imgui->set_next_window_pos(x, y, ImGuiCond_Always);
+    ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
 
-    m_imgui->begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
     // First calculate width of all the texts that are could possibly be shown. We will decide set the dialog width based on that:
-    const float clipping_slider_left = std::max(m_imgui->calc_text_size(m_desc.at("clipping_of_view")).x,
-                                                m_imgui->calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(0.5f);
+    const float clipping_slider_left = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x,
+                                                ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(0.5f);
 
     const float settings_sliders_left =
-        std::max(std::max({m_imgui->calc_text_size(m_desc.at("offset")).x,
-                           m_imgui->calc_text_size(m_desc.at("quality")).x,
-                           m_imgui->calc_text_size(m_desc.at("closing_distance")).x,
-                           m_imgui->calc_text_size(m_desc.at("hole_diameter")).x,
-                           m_imgui->calc_text_size(m_desc.at("hole_depth")).x}) + m_imgui->scaled(0.5f), clipping_slider_left);
+        std::max(std::max({ImGuiPureWrap::calc_text_size(m_desc.at("offset")).x,
+                           ImGuiPureWrap::calc_text_size(m_desc.at("quality")).x,
+                           ImGuiPureWrap::calc_text_size(m_desc.at("closing_distance")).x,
+                           ImGuiPureWrap::calc_text_size(m_desc.at("hole_diameter")).x,
+                           ImGuiPureWrap::calc_text_size(m_desc.at("hole_depth")).x}) + m_imgui->scaled(0.5f), clipping_slider_left);
 
-    const float diameter_slider_left = settings_sliders_left; //m_imgui->calc_text_size(m_desc.at("hole_diameter")).x + m_imgui->scaled(1.f);
+    const float diameter_slider_left = settings_sliders_left; //ImGuiPureWrap::calc_text_size(m_desc.at("hole_diameter")).x + m_imgui->scaled(1.f);
     const float minimal_slider_width = m_imgui->scaled(4.f);
 
-    const float button_preview_width = m_imgui->calc_button_size(m_desc.at("preview")).x;
+    const float button_preview_width = ImGuiPureWrap::calc_button_size(m_desc.at("preview")).x;
 
     float window_width = minimal_slider_width + std::max({settings_sliders_left, clipping_slider_left, diameter_slider_left});
     window_width = std::max(window_width, button_preview_width);
 
     m_imgui->disabled_begin(!is_input_enabled());
 
-    if (m_imgui->button(m_desc["preview"]))
+    if (ImGuiPureWrap::button(m_desc["preview"]))
         reslice_until_step(slaposDrillHoles);
 
     bool config_changed = false;
@@ -602,7 +602,7 @@ RENDER_AGAIN:
     {
         auto opts = get_config_options({"hollowing_enable"});
         m_enable_hollowing = static_cast<const ConfigOptionBool*>(opts[0].first)->value;
-        if (m_imgui->checkbox(m_desc["enable"], m_enable_hollowing)) {
+        if (ImGuiPureWrap::checkbox(m_desc["enable"], m_enable_hollowing)) {
             mo->config.set("hollowing_enable", m_enable_hollowing);
             wxGetApp().obj_list()->update_and_show_object_settings_item();
             config_changed = true;
@@ -614,8 +614,8 @@ RENDER_AGAIN:
     m_imgui->disabled_begin(!is_input_enabled() || !m_enable_hollowing);
 
     ImGui::AlignTextToFramePadding();
-    m_imgui->text(m_desc.at("offset"));
-    ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
+    ImGuiPureWrap::text(m_desc.at("offset"));
+    ImGui::SameLine(settings_sliders_left, ImGuiPureWrap::get_item_spacing().x);
     ImGui::PushItemWidth(window_width - settings_sliders_left);
     m_imgui->slider_float("##offset", &offset, offset_min, offset_max, "%.1f mm", 1.0f, true, _L(opts[0].second->tooltip));
 
@@ -625,8 +625,8 @@ RENDER_AGAIN:
 
     if (current_mode >= quality_mode) {
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(m_desc.at("quality"));
-        ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
+        ImGuiPureWrap::text(m_desc.at("quality"));
+        ImGui::SameLine(settings_sliders_left, ImGuiPureWrap::get_item_spacing().x);
         m_imgui->slider_float("##quality", &quality, quality_min, quality_max, "%.1f", 1.0f, true, _L(opts[1].second->tooltip));
 
         slider_clicked |= m_imgui->get_last_slider_status().clicked;
@@ -636,8 +636,8 @@ RENDER_AGAIN:
 
     if (current_mode >= closing_d_mode) {
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(m_desc.at("closing_distance"));
-        ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
+        ImGuiPureWrap::text(m_desc.at("closing_distance"));
+        ImGui::SameLine(settings_sliders_left, ImGuiPureWrap::get_item_spacing().x);
         m_imgui->slider_float("##closing_distance", &closing_d, closing_d_min, closing_d_max, "%.1f mm", 1.0f, true, _L(opts[2].second->tooltip));
 
         slider_clicked |= m_imgui->get_last_slider_status().clicked;
@@ -681,8 +681,8 @@ RENDER_AGAIN:
 
     m_imgui->disabled_begin(!is_input_enabled());
 
-    m_imgui->text(m_desc.at("hole_diameter"));
-    ImGui::SameLine(diameter_slider_left, m_imgui->get_item_spacing().x);
+    ImGuiPureWrap::text(m_desc.at("hole_diameter"));
+    ImGui::SameLine(diameter_slider_left, ImGuiPureWrap::get_item_spacing().x);
     ImGui::PushItemWidth(window_width - diameter_slider_left);
     float diam = 2.f * m_new_hole_radius;
     m_imgui->slider_float("##hole_diameter", &diam, 1.f, 25.f, "%.1f mm", 1.f, false);
@@ -698,8 +698,8 @@ RENDER_AGAIN:
 
     ImGui::AlignTextToFramePadding();
 
-    m_imgui->text(m_desc["hole_depth"]);
-    ImGui::SameLine(diameter_slider_left, m_imgui->get_item_spacing().x);
+    ImGuiPureWrap::text(m_desc["hole_depth"]);
+    ImGui::SameLine(diameter_slider_left, ImGuiPureWrap::get_item_spacing().x);
     m_imgui->slider_float("##hole_depth", &m_new_hole_height, 0.f, 10.f, "%.1f mm", 1.f, false);
 
     m_imgui->disabled_end();
@@ -747,11 +747,11 @@ RENDER_AGAIN:
     }
 
     m_imgui->disabled_begin(!is_input_enabled() || m_selection_empty);
-    remove_selected = m_imgui->button(m_desc.at("remove_selected"));
+    remove_selected = ImGuiPureWrap::button(m_desc.at("remove_selected"));
     m_imgui->disabled_end();
 
     m_imgui->disabled_begin(!is_input_enabled() || mo->sla_drain_holes.empty());
-    remove_all = m_imgui->button(m_desc.at("remove_all"));
+    remove_all = ImGuiPureWrap::button(m_desc.at("remove_all"));
     m_imgui->disabled_end();
 
     // Following is rendered in both editing and non-editing mode:
@@ -759,17 +759,17 @@ RENDER_AGAIN:
     m_imgui->disabled_begin(!is_input_enabled());
     if (m_c->object_clipper()->get_position() == 0.f) {
         ImGui::AlignTextToFramePadding();
-        m_imgui->text(m_desc.at("clipping_of_view"));
+        ImGuiPureWrap::text(m_desc.at("clipping_of_view"));
     }
     else {
-        if (m_imgui->button(m_desc.at("reset_direction"))) {
+        if (ImGuiPureWrap::button(m_desc.at("reset_direction"))) {
             wxGetApp().CallAfter([this](){
                     m_c->object_clipper()->set_position_by_ratio(-1., false);
                 });
         }
     }
 
-    ImGui::SameLine(settings_sliders_left, m_imgui->get_item_spacing().x);
+    ImGui::SameLine(settings_sliders_left, ImGuiPureWrap::get_item_spacing().x);
     ImGui::PushItemWidth(window_width - settings_sliders_left);
     float clp_dist = m_c->object_clipper()->get_position();
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
@@ -778,13 +778,13 @@ RENDER_AGAIN:
     // make sure supports are shown/hidden as appropriate
     ImGui::Separator();
     bool show_sups = are_sla_supports_shown();
-    if (m_imgui->checkbox(m_desc["show_supports"], show_sups)) {
+    if (ImGuiPureWrap::checkbox(m_desc["show_supports"], show_sups)) {
         show_sla_supports(show_sups);
         force_refresh = true;
     }
 
     m_imgui->disabled_end();
-    m_imgui->end();
+    ImGuiPureWrap::end();
 
 
     if (remove_selected || remove_all) {

@@ -1,4 +1,62 @@
+min_slic3r_version = 2.8.1-rc0
+2.1.0 Added new parameters for nozzle checks (abrasive filaments, high flow nozzles), updated related start g-codes. Enabled overhang fan speed overrides for specific filaments (MK4S).
+min_slic3r_version = 2.8.0-alpha0
+2.0.5 Fixed an issue in configuration wizard.
+2.0.4 Added VOXELPLA filaments. Updated compatible condition for some specific filament profiles.
+2.0.3 Added printer profiles for Original Prusa MK4S and MK3.9S. Added profiles for high flow nozzles (MK4/MK3.9/XL). Reorganized configuration wizard. 
+2.0.2 Added filament profile for Prusament Woodfill. Updated FW version notification.
+2.0.1 Updated FW version notifications.
+2.0.0 Updated version for PS2.8.0.
+2.0.0-alpha1 Updated FW version notification. Added ROSA3D filaments. Updated print profiles.
+2.0.0-alpha0 Initial bundle for PS2.8.0-alpha.
+max_slic3r_version = 2.7.9
+min_slic3r_version = 2.7.5-rc
+1.14.2 Updated FW version notification.
+1.14.1 Updated FW version notifications.
+1.14.0 Added new settings for SLA material profiles.
+min_slic3r_version = 2.7.3-beta1
+1.13.6 Updated FW version notification.
+1.13.5 Updated FW version notifications.
+1.13.4 Updated FW version notification. Added ROSA3D filaments. Updated print profiles.
+1.13.3 Updated FW version notification.
+1.13.2 Added material profiles for Prusament Resin Flex Anatomic Red and Prusament Resin Flex Gingiva Mask.
+1.13.1 Added material profile for Prusament Resin Model Transparent Clear. Enabled stealth mode support for MINI, XL, MK3.5, MK3.9, MK4 (this mode will be available in FW 6.0.0).
+1.13.0 Updated version for PrusaSlicer 2.7.3
+1.13.0-beta3 Reduced number of top/bottom layers (0.6). Updated cooling thresholds.
+1.13.0-beta2 Disabled ramping lift for MK3.5.
+1.13.0-beta1 Updated overhang slowdown speeds in selected print profiles (0.6 nozzle). Slightly reduced bed temperature for some PETG filaments (MINI).
+1.13.0-beta0 Updated version for 2.7.3-beta1.
+min_slic3r_version = 2.7.3-alpha0
+1.13.0-alpha4 Updated start g-code. Updated purging volumes.
+1.13.0-alpha3 Enabled metrics. Updated FW version notification.
+1.13.0-alpha2 Updated load/unload times. Removed toolchange retraction. Enabled stabilisation cone.
+1.13.0-alpha1 Further adjusted the range of supported filament profiles (MK4 MMU3).
+1.13.0-alpha0 Added initial profiles for MK4/MK3.9 MMU3. Updated start g-code sequence for Prusa XL.
+min_slic3r_version = 2.7.2-beta1
+1.12.3 Updated start g-code for MK3.5 MMU3.
+1.12.2 Added new print profile for 0.25mm nozzle. Updated PA values in selected filament profiles. Updated FW version notification. Updated some filament and print profiles.
+1.12.1 Updated printer profile for "XLIS 5T 0.3mm nozzle" to fix issues with configuration wizard.
+1.12.0 Added profiles for Original Prusa MK3.5 MMU3. Enabled ramping z-hop for MK3.9 and MK4. Added filament profile for Fiberlogy BVOH.
+1.12.0-beta0 Bumped up version for beta.
+min_slic3r_version = 2.7.2-alpha2
+1.12.0-alpha2 Reverted loading distance for MK3.5MMU.
+1.12.0-alpha1 Updated MK3.5MMU3 profiles. Decreased loading distance.
+1.12.0-alpha0 Enabled ramping z-hop for MK4/MK3.9. Added initial profiles for Original Prusa MK3.5 MMU3.
 min_slic3r_version = 2.7.0-beta1
+1.11.16 Updated start g-code for MK3.5 MMU3.
+1.11.15 Added new print profile for 0.25mm nozzle. Updated PA values in selected filament profiles. Updated FW version notification. Updated some filament and print profiles.
+1.11.14 Updated printer profile for "XLIS 5T 0.3mm nozzle" to fix issues with configuration wizard.
+1.11.13 Added profiles for Original Prusa MK3.5 MMU3. Added filament profile for Fiberlogy BVOH.
+1.11.12 Added profiles for Original Prusa MK3.5.
+1.11.11 Decreased speed of sparse infill in STRUCTURAL profiles. Decreased max volumetric speed for some PETG filaments for better sparse infill quality and reliability (XL/MK4/3.9/MINI - 0.4mm nozzle).
+1.11.10 Updated FW version notification (XL/MINI/MK4/MK3.9).
+1.11.9 Default nozzle diameter for Prusa XL changed to 0.4mm. Added material profile for Prusament Resin Model Ultra Violet. 
+1.11.8 Updated cooling thresholds in selected filament profiles (MK4/XL).
+1.11.7 Updated binary g-code settings for PrusaSlicer 2.7.1. Binary g-code is not used by default in PrusaSlicer 2.7.0.
+1.11.6 Updated FW version notification (XL/MINI/MK4/MK3.9). Updated print profiles for 0.25mm nozzle (XLIS/MK4IS/MK3.9).
+1.11.5 Updated printer names and resources for XL/MINI Input Shaper (final firmware 5.1.0 was released).
+1.11.4 Added filament profile for Prusament rPLA. Updated start g-code for XL Multi-Tool.
+1.11.3 Updated support material settings (XL 0.6). Added new print profiles for MK4/MK3.9 IS 0.6. Updated start g-code (XL/MK4). Updated selected filament profiles. Updated FW version notification for MINI IS and XL IS (5.1.0-BETA). Decreased first layer speed for Prusa MINI IS.
 1.11.2 Bumped up version for 2.7.0-rc1. Added Prusament Resin Model Neutral Beige.
 1.11.2-beta0 Bumped up version for beta. Updated start/end g-code for Prusa MINI Input Shaper.
 min_slic3r_version = 2.7.0-alpha2
@@ -21,6 +79,12 @@ min_slic3r_version = 2.6.2-alpha0
 1.11.0-alpha1 Updated ramming parameters. Updated start-gcode for XL Multi-Tool. Updated output filename format.
 1.11.0-alpha0 Binary g-code, arc fitting, QOI/PNG thumbnails, 90degree XL tower, XL specific filament variants.
 min_slic3r_version = 2.6.1-rc2
+1.10.11 Updated FW version notification (XL/MINI/MK4/MK3.9).
+1.10.10 Default nozzle diameter for Prusa XL changed to 0.4mm.
+1.10.9 Updated FW version notification (XL/MINI/MK4/MK3.9). Updated print profiles for 0.25mm nozzle (XLIS/MK4IS/MK3.9).
+1.10.8 Updated printer names and resources for XL/MINI Input Shaper (final firmware 5.1.0 was released).
+1.10.7 Added filament profile for Prusament rPLA. Updated start g-code for XL Multi-Tool.
+1.10.6 Enabled toolchange ramming for PLA. Added new print profiles for MK4/MK3.9 IS 0.6. Updated support material settings (0.6 nozzle). Updated FW version notification for MINI IS and XL IS. Added Prusament Resin Model Neutral Beige.
 1.10.5 Updated FW version notification (MK2.5/MK3/MK3.9/MK4 family). Updated start/end g-code for Prusa MINI Input Shaper (Alpha).
 1.10.4 Reduced nozzle temperature in selected filament profiles (Prusa XL 0.6mm nozzle).
 1.10.3 Added additional printer checks for Prusa XL Input Shaper (Alpha).

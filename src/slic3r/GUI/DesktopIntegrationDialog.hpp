@@ -39,6 +39,7 @@ public:
 
 	static void perform_downloader_desktop_integration();
 	static void undo_downloader_registration();
+    static void undo_downloader_registration_rigid();    
 private:
 
 };

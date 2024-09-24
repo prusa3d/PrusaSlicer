@@ -32,8 +32,8 @@
 #include "ShortestPath.hpp"
 #include "Thread.hpp"
 #include "GCode.hpp"
-#include "GCode/WipeTower.hpp"
-#include "GCode/ConflictChecker.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/GCode/ConflictChecker.hpp"
 #include "Utils.hpp"
 #include "BuildVolume.hpp"
 #include "format.hpp"
@@ -86,6 +86,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "bed_temperature",
         "before_layer_gcode",
         "between_objects_gcode",
+        "binary_gcode",
         "bridge_acceleration",
         "bridge_fan_speed",
         "enable_dynamic_fan_speeds",
@@ -93,6 +94,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "overhang_fan_speed_1",
         "overhang_fan_speed_2",
         "overhang_fan_speed_3",
+        "chamber_temperature",
+        "chamber_minimal_temperature",
         "colorprint_heights",
         "cooling",
         "default_acceleration",
@@ -111,6 +114,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "fan_always_on",
         "fan_below_layer_time",
         "full_fan_speed_layer",
+        "filament_abrasive",
         "filament_colour",
         "filament_diameter",
         "filament_density",
@@ -123,6 +127,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "first_layer_speed_over_raft",
         "gcode_comments",
         "gcode_label_objects",
+        "nozzle_high_flow",
         "infill_acceleration",
         "layer_gcode",
         "min_fan_speed",
@@ -139,7 +144,6 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "perimeter_acceleration",
         "post_process",
         "gcode_substitutions",
-        "gcode_binary",
         "printer_notes",
         "travel_ramping_lift",
         "travel_initial_part_length",
@@ -172,7 +176,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "use_relative_e_distances",
         "use_volumetric_e",
         "variable_layer_height",
-        "wipe"
+        "wipe",
+        "wipe_tower_acceleration"
     };
 
     static std::unordered_set<std::string> steps_ignore;
@@ -206,7 +211,10 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             // Spiral Vase forces different kind of slicing than the normal model:
             // In Spiral Vase mode, holes are closed and only the largest area contour is kept at each layer.
             // Therefore toggling the Spiral Vase on / off requires complete reslicing.
-            || opt_key == "spiral_vase") {
+            || opt_key == "spiral_vase"
+            || opt_key == "filament_shrinkage_compensation_xy"
+            || opt_key == "filament_shrinkage_compensation_z"
+            || opt_key == "prefer_clockwise_movements") {
             osteps.emplace_back(posSlice);
         } else if (
                opt_key == "complete_objects"
@@ -218,14 +226,19 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "filament_unloading_speed_start"
             || opt_key == "filament_toolchange_delay"
             || opt_key == "filament_cooling_moves"
+            || opt_key == "filament_stamping_loading_speed"
+            || opt_key == "filament_stamping_distance"
             || opt_key == "filament_minimal_purge_on_wipe_tower"
             || opt_key == "filament_cooling_initial_speed"
             || opt_key == "filament_cooling_final_speed"
+            || opt_key == "filament_purge_multiplier"
             || opt_key == "filament_ramming_parameters"
             || opt_key == "filament_multitool_ramming"
             || opt_key == "filament_multitool_ramming_volume"
             || opt_key == "filament_multitool_ramming_flow"
             || opt_key == "filament_max_volumetric_speed"
+            || opt_key == "filament_infill_max_speed"
+            || opt_key == "filament_infill_max_crossing_speed"
             || opt_key == "gcode_flavor"
             || opt_key == "high_current_on_filament_swap"
             || opt_key == "infill_first"
@@ -238,13 +251,16 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "wipe_tower_cone_angle"
             || opt_key == "wipe_tower_bridging"
             || opt_key == "wipe_tower_extra_spacing"
+            || opt_key == "wipe_tower_extra_flow"
             || opt_key == "wipe_tower_no_sparse_layers"
             || opt_key == "wipe_tower_extruder"
             || opt_key == "wiping_volumes_matrix"
+            || opt_key == "wiping_volumes_use_custom_matrix"
             || opt_key == "parking_pos_retraction"
             || opt_key == "cooling_tube_retraction"
             || opt_key == "cooling_tube_length"
             || opt_key == "extra_loading_move"
+            || opt_key == "multimaterial_purging"
             || opt_key == "travel_speed"
             || opt_key == "travel_speed_z"
             || opt_key == "first_layer_speed"
@@ -516,6 +532,9 @@ std::string Print::validate(std::vector<std::string>* warnings) const
                     goto DONE;
                 }
         DONE:;
+
+        if (!this->has_same_shrinkage_compensations())
+            warnings->emplace_back("_FILAMENT_SHRINKAGE_DIFFER");
     }
 
     if (m_objects.empty())
@@ -575,12 +594,19 @@ std::string Print::validate(std::vector<std::string>* warnings) const
         //FIXME It is quite expensive to generate object layers just to get the print height!
         if (auto layers = generate_object_layers(print_object.slicing_parameters(), layer_height_profile(print_object_idx));
             ! layers.empty() && layers.back() > this->config().max_print_height + EPSILON) {
-            return
-                // Test whether the last slicing plane is below or above the print volume.
-                0.5 * (layers[layers.size() - 2] + layers.back()) > this->config().max_print_height + EPSILON ?
-                format(_u8L("The object %1% exceeds the maximum build volume height."), print_object.model_object()->name) :
-                format(_u8L("While the object %1% itself fits the build volume, its last layer exceeds the maximum build volume height."), print_object.model_object()->name) +
-                " " + _u8L("You might want to reduce the size of your model or change current print settings and retry.");
+
+            const double shrinkage_compensation_z = this->shrinkage_compensation().z();
+            if (shrinkage_compensation_z != 1. && layers.back() > (this->config().max_print_height / shrinkage_compensation_z + EPSILON)) {
+                // The object exceeds the maximum build volume height because of shrinkage compensation.
+                return format(_u8L("While the object %1% itself fits the build volume, it exceeds the maximum build volume height because of material shrinkage compensation."), print_object.model_object()->name);
+            } else if (0.5 * (layers[layers.size() - 2] + layers.back()) > this->config().max_print_height + EPSILON) {
+                // The last slicing plane is below the print volume.
+                return format(_u8L("The object %1% exceeds the maximum build volume height."), print_object.model_object()->name);
+            } else {
+                // The last slicing plane is above the print volume.
+                return format(_u8L("While the object %1% itself fits the build volume, its last layer exceeds the maximum build volume height."), print_object.model_object()->name) +
+                    " " + _u8L("You might want to reduce the size of your model or change current print settings and retry.");
+            }
         }
     }
 
@@ -751,7 +777,7 @@ std::string Print::validate(std::vector<std::string>* warnings) const
             if (! object->has_support() && warnings) {
                 for (const ModelVolume* mv : object->model_object()->volumes) {
                     bool has_enforcers = mv->is_support_enforcer() || 
-                        (mv->is_model_part() && mv->supported_facets.has_facets(*mv, EnforcerBlockerType::ENFORCER));
+                        (mv->is_model_part() && mv->supported_facets.has_facets(*mv, TriangleStateType::ENFORCER));
                     if (has_enforcers) {
                         warnings->emplace_back("_SUPPORTS_OFF");
                         break;
@@ -1055,7 +1081,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->set_status(90, message);
 
     // Create GCode on heap, it has quite a lot of data.
-    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator);
+    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator(const_cast<const Print*>(this)));
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
     if (m_conflict_result.has_value())
@@ -1152,7 +1178,7 @@ void Print::_make_skirt()
 
     // Initial offset of the brim inner edge from the object (possible with a support & raft).
     // The skirt will touch the brim if the brim is extruded.
-    auto   distance = float(scale_(m_config.skirt_distance.value) - spacing/2.);
+    auto   distance = float(scale_(m_config.skirt_distance.value - spacing/2.));
     // Draw outlines from outside to inside.
     // Loop while we have less skirts than required or any extruder hasn't reached the min length if any.
     std::vector<coordf_t> extruded_length(extruders.size(), 0.);
@@ -1460,6 +1486,21 @@ const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt) const
     return m_wipe_tower_data;
 }
 
+bool is_toolchange_required(
+    const bool first_layer,
+    const unsigned last_extruder_id,
+    const unsigned extruder_id,
+    const unsigned current_extruder_id
+) {
+    if (first_layer && extruder_id == last_extruder_id) {
+        return true;
+    }
+    if (extruder_id != current_extruder_id) {
+        return true;
+    }
+    return false;
+}
+
 void Print::_make_wipe_tower()
 {
     m_wipe_tower_data.clear();
@@ -1528,10 +1569,11 @@ void Print::_make_wipe_tower()
         unsigned int current_extruder_id = m_wipe_tower_data.tool_ordering.all_extruders().back();
         for (auto &layer_tools : m_wipe_tower_data.tool_ordering.layer_tools()) { // for all layers
             if (!layer_tools.has_wipe_tower) continue;
-            bool first_layer = &layer_tools == &m_wipe_tower_data.tool_ordering.front();
             wipe_tower.plan_toolchange((float)layer_tools.print_z, (float)layer_tools.wipe_tower_layer_height, current_extruder_id, current_extruder_id, false);
             for (const auto extruder_id : layer_tools.extruders) {
-                if ((first_layer && extruder_id == m_wipe_tower_data.tool_ordering.all_extruders().back()) || extruder_id != current_extruder_id) {
+                const bool first_layer{&layer_tools == &m_wipe_tower_data.tool_ordering.front()};
+                const unsigned last_extruder_id{m_wipe_tower_data.tool_ordering.all_extruders().back()};
+                if (is_toolchange_required(first_layer, last_extruder_id, extruder_id, current_extruder_id)) {
                     float volume_to_wipe = wipe_volumes[current_extruder_id][extruder_id];             // total volume to wipe after this toolchange
                     // Not all of that can be used for infill purging:
                     volume_to_wipe -= (float)m_config.filament_minimal_purge_on_wipe_tower.get_at(extruder_id);
@@ -1581,7 +1623,7 @@ void Print::_make_wipe_tower()
     m_wipe_tower_data.final_purge = Slic3r::make_unique<WipeTower::ToolChangeResult>(
         wipe_tower.tool_change((unsigned int)(-1)));
 
-    m_wipe_tower_data.used_filament = wipe_tower.get_used_filament();
+    m_wipe_tower_data.used_filament_until_layer = wipe_tower.get_used_filament_until_layer();
     m_wipe_tower_data.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
     m_wipe_tower_data.width = wipe_tower.width();
     m_wipe_tower_data.first_layer_height = config().first_layer_height;
@@ -1598,7 +1640,49 @@ std::string Print::output_filename(const std::string &filename_base) const
     DynamicConfig config = this->finished() ? this->print_statistics().config() : this->print_statistics().placeholders();
     config.set_key_value("num_extruders", new ConfigOptionInt((int)m_config.nozzle_diameter.size()));
     config.set_key_value("default_output_extension", new ConfigOptionString(".gcode"));
-    return this->PrintBase::output_filename(m_config.output_filename_format.value, ".gcode", filename_base, &config);
+
+    // Handle output_filename_format. There is a hack related to binary G-codes: gcode / bgcode substitution.
+    std::string output_filename_format = m_config.output_filename_format.value;
+    if (m_config.binary_gcode && boost::iends_with(output_filename_format, ".gcode"))
+        output_filename_format.insert(output_filename_format.end()-5, 'b');
+    if (! m_config.binary_gcode && boost::iends_with(output_filename_format, ".bgcode"))
+        output_filename_format.erase(output_filename_format.end()-6);
+
+    return this->PrintBase::output_filename(output_filename_format, ".gcode", filename_base, &config);
+}
+
+// Returns if all used filaments have same shrinkage compensations.
+bool Print::has_same_shrinkage_compensations() const {
+    const std::vector<unsigned int> extruders = this->extruders();
+    if (extruders.empty())
+        return false;
+
+    const double filament_shrinkage_compensation_xy = m_config.filament_shrinkage_compensation_xy.get_at(extruders.front());
+    const double filament_shrinkage_compensation_z  = m_config.filament_shrinkage_compensation_z.get_at(extruders.front());
+
+    for (unsigned int extruder : extruders) {
+        if (filament_shrinkage_compensation_xy != m_config.filament_shrinkage_compensation_xy.get_at(extruder) ||
+            filament_shrinkage_compensation_z  != m_config.filament_shrinkage_compensation_z.get_at(extruder)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Returns scaling for each axis representing shrinkage compensations in each axis.
+Vec3d Print::shrinkage_compensation() const
+{
+    if (!this->has_same_shrinkage_compensations())
+        return Vec3d::Ones();
+
+    const unsigned int first_extruder          = this->extruders().front();
+    const double       xy_compensation_percent = std::clamp(m_config.filament_shrinkage_compensation_xy.get_at(first_extruder), -99., 99.);
+    const double       z_compensation_percent  = std::clamp(m_config.filament_shrinkage_compensation_z.get_at(first_extruder), -99., 99.);
+    const double       xy_compensation         = 100. / (100. - xy_compensation_percent);
+    const double       z_compensation          = 100. / (100. - z_compensation_percent);
+
+    return { xy_compensation, xy_compensation, z_compensation };
 }
 
 const std::string PrintStatistics::FilamentUsedG     = "filament used [g]";
@@ -1620,6 +1704,11 @@ const std::string PrintStatistics::FilamentCostMask = "; filament cost =";
 const std::string PrintStatistics::TotalFilamentCost          = "total filament cost";
 const std::string PrintStatistics::TotalFilamentCostMask      = "; total filament cost =";
 const std::string PrintStatistics::TotalFilamentCostValueMask = "; total filament cost = %.2lf\n";
+
+const std::string PrintStatistics::TotalFilamentUsedWipeTower     = "total filament used for wipe tower [g]";
+const std::string PrintStatistics::TotalFilamentUsedWipeTowerValueMask = "; total filament used for wipe tower [g] = %.2lf\n";
+
+
 
 DynamicConfig PrintStatistics::config() const
 {

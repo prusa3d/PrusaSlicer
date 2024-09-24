@@ -1,0 +1,15 @@
+diff -ur build.orig/cmake/lib/webview/CMakeLists.txt build/cmake/lib/webview/CMakeLists.txt
+--- wxWidgets.orig/build/cmake/lib/webview/CMakeLists.txt	2024-06-14 19:02:36.000000000 +0200
++++ wxWidgets/build/cmake/lib/webview/CMakeLists.txt	2024-07-01 16:21:52.922737200 +0200
+@@ -46,9 +46,9 @@
+ elseif(WXMSW)
+     if(wxUSE_WEBVIEW_EDGE)
+         # Update the following variables if updating WebView2 SDK
+-        set(WEBVIEW2_VERSION "1.0.705.50")
++        set(WEBVIEW2_VERSION "1.0.2592.51")
+         set(WEBVIEW2_URL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/${WEBVIEW2_VERSION}")
+-        set(WEBVIEW2_SHA256 "6a34bb553e18cfac7297b4031f3eac2558e439f8d16a45945c22945ac404105d")
++        set(WEBVIEW2_SHA256 "805c79e05184fab18c9fe7b8ba820c598399b97adc1fbf5b0ea490efad91d5b8")
+ 
+         set(WEBVIEW2_DEFAULT_PACKAGE_DIR "${CMAKE_BINARY_DIR}/packages/Microsoft.Web.WebView2.${WEBVIEW2_VERSION}")
+ 

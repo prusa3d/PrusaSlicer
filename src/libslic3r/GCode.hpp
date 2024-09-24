@@ -15,7 +15,8 @@
 #ifndef slic3r_GCode_hpp_
 #define slic3r_GCode_hpp_
 
-#include "GCode/ExtrusionProcessor.hpp"
+#include "libslic3r/GCode/ExtrusionOrder.hpp"
+#include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "JumpPointSearch.hpp"
 #include "libslic3r.h"
 #include "ExPolygon.hpp"
@@ -24,22 +25,23 @@
 #include "PlaceholderParser.hpp"
 #include "PrintConfig.hpp"
 #include "Geometry/ArcWelder.hpp"
-#include "GCode/AvoidCrossingPerimeters.hpp"
-#include "GCode/CoolingBuffer.hpp"
-#include "GCode/FindReplace.hpp"
-#include "GCode/GCodeWriter.hpp"
-#include "GCode/LabelObjects.hpp"
-#include "GCode/PressureEqualizer.hpp"
-#include "GCode/RetractWhenCrossingPerimeters.hpp"
-#include "GCode/SmoothPath.hpp"
-#include "GCode/SpiralVase.hpp"
-#include "GCode/ToolOrdering.hpp"
-#include "GCode/Wipe.hpp"
-#include "GCode/WipeTowerIntegration.hpp"
-#include "GCode/SeamPlacer.hpp"
-#include "GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCode/AvoidCrossingPerimeters.hpp"
+#include "libslic3r/GCode/CoolingBuffer.hpp"
+#include "libslic3r/GCode/FindReplace.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
+#include "libslic3r/GCode/LabelObjects.hpp"
+#include "libslic3r/GCode/PressureEqualizer.hpp"
+#include "libslic3r/GCode/RetractWhenCrossingPerimeters.hpp"
+#include "libslic3r/GCode/SmoothPath.hpp"
+#include "libslic3r/GCode/SpiralVase.hpp"
+#include "libslic3r/GCode/ToolOrdering.hpp"
+#include "libslic3r/GCode/Wipe.hpp"
+#include "libslic3r/GCode/WipeTowerIntegration.hpp"
+#include "libslic3r/GCode/SeamPlacer.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/GCode/Travels.hpp"
 #include "EdgeGrid.hpp"
-#include "GCode/ThumbnailData.hpp"
 #include "tcbspan/span.hpp"
 
 #include <memory>
@@ -52,6 +54,7 @@ namespace Slic3r {
 
 // Forward declarations.
 class GCodeGenerator;
+struct WipeTowerData;
 
 namespace { struct Item; }
 struct PrintInstance;
@@ -89,137 +92,22 @@ struct LayerResult {
     static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
 };
 
-namespace GCode::Impl {
-struct DistancedPoint {
-    Point point;
-    double distance_from_start;
+namespace GCode {
+struct PrintObjectInstance
+{
+    const PrintObject *print_object = nullptr;
+    int                instance_idx = -1;
+
+    bool operator==(const PrintObjectInstance &other) const {return print_object == other.print_object && instance_idx == other.instance_idx; }
+    bool operator!=(const PrintObjectInstance &other) const { return !(*this == other); }
 };
 
-/**
- * @brief Takes a path described as a list of points and adds points to it.
- *
- * @param xy_path A list of points describing a path in xy.
- * @param sorted_distances A sorted list of distances along the path.
- * @return Sliced path.
- *
- * The algorithm travels along the path segments and adds points to
- * the segments in such a way that the points have specified distances
- * from the xy_path start. **Any distances over the xy_path end will
- * be simply ignored.**
- *
- * Example usage - simplified for clarity:
- * @code
- * std::vector<double> distances{0.5, 1.5};
- * std::vector<Points> xy_path{{0, 0}, {1, 0}};
- * // produces
- * {{0, 0}, {0, 0.5}, {1, 0}}
- * // notice that 1.5 is omitted
- * @endcode
- */
-std::vector<DistancedPoint> slice_xy_path(tcb::span<const Point> xy_path, tcb::span<const double> sorted_distances);
-
-/**
- * @brief Take xy_path and genrate a travel acording to elevation.
- *
- * @param xy_path A list of points describing a path in xy.
- * @param ensure_points_at_distances See slice_xy_path sorted_distances.
- * @param elevation  A function taking current distance in mm as input and returning elevation in mm as output.
- *
- * **Be aweare** that the elevation function operates in mm, while xy_path and returned travel are in
- * scaled coordinates.
- */
-Points3 generate_elevated_travel(
-    const tcb::span<const Point> xy_path,
-    const std::vector<double>& ensure_points_at_distances,
-    const double initial_elevation,
-    const std::function<double(double)>& elevation
-);
-
-/**
- * @brief Takes a list o polygons and builds a AABBTree over all unscaled lines.
- *
- * @param polygons A list of polygons.
- * @return AABB Tree over all lines of the polygons.
- *
- * Unscales the lines in the process!
- */
-AABBTreeLines::LinesDistancer<Linef> get_expolygons_distancer(const ExPolygons& polygons);
-
-/**
- * @brief Given a AABB tree over lines find intersection with xy_path closest to the xy_path start.
- *
- * @param xy_path A path in 2D.
- * @param distancer AABB Tree over lines.
- * @return Distance to the first intersection if there is one.
- *
- * **Ignores intersection with xy_path starting point.**
- */
-std::optional<double> get_first_crossed_line_distance(
-    tcb::span<const Line> xy_path,
-    const AABBTreeLines::LinesDistancer<Linef>& distancer
-);
-
-
-/**
- * Generates a regular polygon - all angles are the same (e.g. typical hexagon).
- *
- * @param centroid Central point.
- * @param start_point The polygon point are ordered. This is the first point.
- * @param points_count Amount of nodes of the polygon (e.g. 6 for haxagon).
- *
- * Distance between centroid and start point sets the scale of the polygon.
- */
-Polygon generate_regular_polygon(
-    const Point& centroid,
-    const Point& start_point,
-    const unsigned points_count
-);
-
-class Bed {
-  private:
-    Polygon inner_offset;
-    static Polygon get_inner_offset(const std::vector<Vec2d>& shape, const double padding);
-
-  public:
-    /**
-     * Bed shape with inner padding.
-     */
-    Bed(const std::vector<Vec2d>& shape, const double padding);
-
-    Vec2d centroid;
-
-    /**
-     * Returns true if the point is within the bed shape including inner padding.
-     */
-    bool contains_within_padding(const Vec2d& point) const;
-};
-}
+} // namespace GCode
 
 class GCodeGenerator {
 
-public:        
-    GCodeGenerator() : 
-    	m_origin(Vec2d::Zero()),
-        m_enable_loop_clipping(true), 
-        m_enable_cooling_markers(false), 
-        m_enable_extrusion_role_markers(false),
-        m_last_processor_extrusion_role(GCodeExtrusionRole::None),
-        m_layer_count(0),
-        m_layer_index(-1), 
-        m_layer(nullptr),
-        m_object_layer_over_raft(false),
-        m_volumetric_speed(0),
-        m_last_pos_defined(false),
-        m_last_extrusion_role(GCodeExtrusionRole::None),
-        m_last_width(0.0f),
-#if ENABLE_GCODE_VIEWER_DATA_CHECKING
-        m_last_mm3_per_mm(0.0),
-#endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
-        m_brim_done(false),
-        m_second_layer_things_done(false),
-        m_silent_time_estimator_enabled(false),
-        m_last_obj_copy(nullptr, Point(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max()))
-        {}
+public:
+    GCodeGenerator(const Print* print = nullptr); // The default value is only used in unit tests.
     ~GCodeGenerator() = default;
 
     // throws std::runtime_exception on error,
@@ -230,14 +118,27 @@ public:
     const Vec2d&    origin() const { return m_origin; }
     void            set_origin(const Vec2d &pointf);
     void            set_origin(const coordf_t x, const coordf_t y) { this->set_origin(Vec2d(x, y)); }
-    const Point&    last_pos() const { return m_last_pos; }
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset.
     template<typename Derived>
-    Vec2d           point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
-        static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "GCodeGenerator::point_to_gcode(): first parameter is not a 2D vector");
-        return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin 
-            - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+    Eigen::Matrix<double, Derived::SizeAtCompileTime, 1, Eigen::DontAlign> point_to_gcode(const Eigen::MatrixBase<Derived> &point) const {
+        static_assert(
+            Derived::IsVectorAtCompileTime,
+            "GCodeGenerator::point_to_gcode(): first parameter is not a vector"
+        );
+        static_assert(
+            int(Derived::SizeAtCompileTime) == 2 || int(Derived::SizeAtCompileTime) == 3,
+            "GCodeGenerator::point_to_gcode(): first parameter is not a 2D or 3D vector"
+        );
+
+        if constexpr (Derived::SizeAtCompileTime == 2) {
+            return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
+                - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+        } else {
+            const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
+            return to_3d(gcode_point_xy, unscaled(point.z()));
+        }
     }
+
     // Convert coordinates of the active object to G-code coordinates, possibly adjusted for extruder offset and quantized to G-code resolution.
     template<typename Derived>
     Vec2d           point_to_gcode_quantized(const Eigen::MatrixBase<Derived> &point) const {
@@ -257,8 +158,6 @@ public:
     std::string     placeholder_parser_process(const std::string &name, const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override = nullptr);
     bool            enable_cooling_markers() const { return m_enable_cooling_markers; }
 
-    // For Perl bindings, to be used exclusively by unit tests.
-    unsigned int    layer_count() const { return m_layer_count; }
     void            set_layer_count(unsigned int value) { m_layer_count = value; }
     void            apply_print_config(const PrintConfig &print_config);
 
@@ -267,20 +166,17 @@ public:
     // translate full config into a list of <key, value> items
     static void encode_full_config(const Print& print, std::vector<std::pair<std::string, std::string>>& config);
 
-    // Object and support extrusions of the same PrintObject at the same print_z.
-    // public, so that it could be accessed by free helper functions from GCode.cpp
-    struct ObjectLayerToPrint
-    {
-        ObjectLayerToPrint() : object_layer(nullptr), support_layer(nullptr) {}
-        const Layer* 		object_layer;
-        const SupportLayer* support_layer;
-        const Layer* 		layer()   const { return (object_layer != nullptr) ? object_layer : support_layer; }
-        const PrintObject* 	object()  const { return (this->layer() != nullptr) ? this->layer()->object() : nullptr; }
-        coordf_t            print_z() const { return (object_layer != nullptr && support_layer != nullptr) ? 0.5 * (object_layer->print_z + support_layer->print_z) : this->layer()->print_z; }
-    };
-    using ObjectsLayerToPrint = std::vector<ObjectLayerToPrint>;
+    using ObjectLayerToPrint  = GCode::ObjectLayerToPrint;
+    using ObjectsLayerToPrint = GCode::ObjectsLayerToPrint;
+
+    std::optional<Point> last_position;
 
 private:
+    using InstanceToPrint = GCode::InstanceToPrint;
+    using InfillRange = GCode::ExtrusionOrder::InfillRange;
+    using SliceExtrusions = GCode::ExtrusionOrder::SliceExtrusions;
+    using IslandExtrusions = GCode::ExtrusionOrder::IslandExtrusions;
+
     class GCodeOutputStream {
     public:
         GCodeOutputStream(FILE *f, GCodeProcessor &processor) : f(f), m_processor(processor) {}
@@ -295,7 +191,7 @@ private:
 
         bool is_open() const { return f; }
         bool is_error() const;
-        
+
         void flush();
         void close();
 
@@ -324,6 +220,26 @@ private:
     static ObjectsLayerToPrint         		                     collect_layers_to_print(const PrintObject &object);
     static std::vector<std::pair<coordf_t, ObjectsLayerToPrint>> collect_layers_to_print(const Print &print);
 
+    Polyline get_layer_change_xy_path(const Vec3d &from, const Vec3d &to);
+
+    std::string get_ramping_layer_change_gcode(const Vec3d &from, const Vec3d &to, const unsigned extruder_id);
+
+    /** @brief Generates ramping travel gcode for layer change. */
+    std::string generate_ramping_layer_change_gcode(
+        const Polyline &xy_path,
+        const double initial_elevation,
+        const GCode::Impl::Travels::ElevatedTravelParams &elevation_params
+    ) const;
+
+    std::vector<GCode::ExtrusionOrder::ExtruderExtrusions> get_sorted_extrusions(
+        const Print &print,
+        const ObjectsLayerToPrint &layers,
+        const LayerTools &layer_tools,
+        const std::vector<InstanceToPrint> &instances_to_print,
+        const GCode::SmoothPathCaches &smooth_path_caches,
+        const bool first_layer
+    );
+
     LayerResult process_layer(
         const Print                     &print,
         // Set of object & print layers of the same PrintObject and with the same print_z.
@@ -336,6 +252,7 @@ private:
         // If set to size_t(-1), then print all copies of all objects.
         // Otherwise print a single copy of a single object.
         const size_t                     single_object_idx = size_t(-1));
+
     // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
     // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
     // and export G-code into file.
@@ -357,35 +274,19 @@ private:
         const GCode::SmoothPathCache            &smooth_path_cache_global,
         GCodeOutputStream                       &output_stream);
 
-    void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
-    bool            last_pos_defined() const { return m_last_pos_defined; }
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
-    std::optional<std::string> get_helical_layer_change_gcode(
-        const coordf_t previous_layer_z,
-        const coordf_t print_z,
-        const std::string& comment
+    std::string change_layer(
+        coordf_t previous_layer_z,
+        coordf_t print_z,
+        bool vase_mode,
+        const Point &first_point,
+        const bool first_layer
     );
-    std::string     change_layer(coordf_t previous_layer_z, coordf_t print_z);
-    std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_skirt(const ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override,
-        const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed);
-
-    std::string     extrude_multi_path(const ExtrusionMultiPath &multipath, bool reverse, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_path(const ExtrusionPath &path, bool reverse, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
-
-    struct InstanceToPrint
-    {
-        InstanceToPrint(size_t object_layer_to_print_id, const PrintObject &print_object, size_t instance_id) :
-            object_layer_to_print_id(object_layer_to_print_id), print_object(print_object), instance_id(instance_id) {}
-
-        // Index into std::vector<ObjectLayerToPrint>, which contains Object and Support layers for the current print_z, collected for a single object, or for possibly multiple objects with multiple instances.
-        const size_t             object_layer_to_print_id;
-        const PrintObject       &print_object;
-        // Instance idx of the copy of a print object.
-        const size_t             instance_id;
-    };
+    std::string extrude_smooth_path(
+        const GCode::SmoothPath &smooth_path, const bool is_loop, const std::string_view description, const double speed
+    );
+    std::string extrude_skirt(GCode::SmoothPath smooth_path, const ExtrusionFlow &extrusion_flow_override);
 
     std::vector<InstanceToPrint> sort_print_object_instances(
         // Object and Support layers for the current print_z, collected for a single object, or for possibly multiple objects with multiple instances.
@@ -395,29 +296,36 @@ private:
         // For sequential print, the instance of the object to be printing has to be defined.
         const size_t                                     single_object_instance_idx);
 
-    // This function will be called for each printing extruder, possibly twice: First for wiping extrusions, second for normal extrusions.
-    void process_layer_single_object(
-        // output
-        std::string              &gcode, 
-        // Index of the extruder currently active.
-        const unsigned int        extruder_id,
-        // What object and instance is going to be printed.
-        const InstanceToPrint    &print_instance,
-        // and the object & support layer of the above.
-        const ObjectLayerToPrint &layer_to_print, 
-        // Container for extruder overrides (when wiping into object or infill).
-        const LayerTools         &layer_tools,
-        // Optional smooth path interpolating extrusion polylines.
-        const GCode::SmoothPathCache &smooth_path_cache,
-        // Is any extrusion possibly marked as wiping extrusion?
-        const bool                is_anything_overridden, 
-        // Round 1 (wiping into object or infill) or round 2 (normal extrusions).
-        const bool                print_wipe_extrusions);
+    std::string extrude_perimeters(
+        const PrintRegion &region,
+        const std::vector<GCode::ExtrusionOrder::Perimeter> &perimeters,
+        const InstanceToPrint &print_instance
+    );
 
-    std::string     extrude_support(const ExtrusionEntityReferences &support_fills, const GCode::SmoothPathCache &smooth_path_cache);
+    std::string extrude_infill_ranges(
+        const std::vector<InfillRange> &infill_ranges,
+        const std::string &commment
+    );
+
+    void initialize_instance(
+        const InstanceToPrint &print_instance,
+        const ObjectLayerToPrint &layer_to_print
+    );
+
+    std::string extrude_slices(
+        const InstanceToPrint &print_instance,
+        const ObjectLayerToPrint &layer_to_print,
+        const std::vector<SliceExtrusions> &slices_extrusions
+    );
+
+    std::string extrude_support(
+        const std::vector<GCode::ExtrusionOrder::SupportPath> &support_extrusions
+    );
+
     std::string generate_travel_gcode(
         const Points3& travel,
-        const std::string& comment
+        const std::string& comment,
+        const std::function<std::string()>& insert_gcode
     );
     Polyline generate_travel_xy_path(
         const Point& start,
@@ -425,16 +333,24 @@ private:
         const bool needs_retraction,
         bool& could_be_wipe_disabled
     );
-    std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
+    std::string travel_to(
+        const Point &start_point,
+        const Point &end_point,
+        ExtrusionRole role,
+        const std::string &comment,
+        const std::function<std::string()>& insert_gcode
+    );
+
+    std::string travel_to_first_position(const Vec3crd& point, const double from_z, const ExtrusionRole role, const std::function<std::string()>& insert_gcode);
+
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
 
-    std::string     retract_and_wipe(bool toolchange = false);
+    std::string     retract_and_wipe(bool toolchange = false, bool reset_e = true);
     std::string     unretract() { return m_writer.unretract(); }
     std::string     set_extruder(unsigned int extruder_id, double print_z);
     bool line_distancer_is_required(const std::vector<unsigned int>& extruder_ids);
 
-    // Cache for custom seam enforcers/blockers for each layer.
-    SeamPlacer                          m_seam_placer;
+    Seams::Placer                       m_seam_placer;
 
     /* Origin of print coordinates expressed in unscaled G-code coordinates.
        This affects the input arguments supplied to the extrude*() and travel_to()
@@ -448,7 +364,7 @@ private:
     struct PlaceholderParserIntegration {
         void reset();
         void init(const GCodeWriter &config);
-        void update_from_gcodewriter(const GCodeWriter &writer);
+        void update_from_gcodewriter(const GCodeWriter &writer, const WipeTowerData& wipe_tower_data);
         void validate_output_vector_variables();
 
         PlaceholderParser                   parser;
@@ -481,6 +397,7 @@ private:
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
     JPSPathFinder                       m_avoid_crossing_curled_overhangs;
     RetractWhenCrossingPerimeters       m_retract_when_crossing_perimeters;
+    GCode::TravelObstacleTracker        m_travel_obstacle_tracker;
     bool                                m_enable_loop_clipping;
     // If enabled, the G-code generator will put following comments at the ends
     // of the G-code lines: _EXTRUDE_SET_SPEED, _WIPE, _BRIDGE_FAN_START, _BRIDGE_FAN_END
@@ -500,7 +417,6 @@ private:
     // In non-sequential mode, all its copies will be printed.
     const Layer*                        m_layer;
     // m_layer is an object layer and it is being printed over raft surface.
-    std::optional<AABBTreeLines::LinesDistancer<Linef>> m_previous_layer_distancer;
     bool                                m_object_layer_over_raft;
     double                              m_volumetric_speed;
     // Support for the extrusion role markers. Which marker is active?
@@ -510,18 +426,20 @@ private:
     float                               m_last_layer_z{ 0.0f };
     float                               m_max_layer_z{ 0.0f };
     float                               m_last_width{ 0.0f };
-#if ENABLE_GCODE_VIEWER_DATA_CHECKING
-    double                              m_last_mm3_per_mm;
-#endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
-    Point                               m_last_pos;
-    bool                                m_last_pos_defined;
+    std::optional<Vec3d>                m_previous_layer_last_position;
+    std::optional<Vec3d>                m_previous_layer_last_position_before_wipe;
+    bool                                m_moved_to_first_layer_point{false};
 
+    // This needs to be populated during the layer processing!
     std::unique_ptr<CoolingBuffer>      m_cooling_buffer;
     std::unique_ptr<SpiralVase>         m_spiral_vase;
     std::unique_ptr<GCodeFindReplace>   m_find_replace;
     std::unique_ptr<PressureEqualizer>  m_pressure_equalizer;
     std::unique_ptr<GCode::WipeTowerIntegration> m_wipe_tower;
+
+    // Current fan speed set by dynamic fan speed control.
+    std::optional<float>                m_current_dynamic_fan_speed;
 
     // Heights (print_z) at which the skirt has already been extruded.
     std::vector<coordf_t>               m_skirt_done;
@@ -529,19 +447,41 @@ private:
     bool                                m_brim_done;
     // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
     bool                                m_second_layer_things_done;
-    // Index of a last object copy extruded.
-    std::pair<const PrintObject*, Point> m_last_obj_copy;
+    // G-code that is due to be written before the next extrusion
+    std::string                         m_pending_pre_extrusion_gcode;
+    // Pointer to currently exporting PrintObject and instance index.
+    GCode::PrintObjectInstance          m_current_instance;
 
     bool                                m_silent_time_estimator_enabled;
 
     // Processor
     GCodeProcessor                      m_processor;
 
-    std::string                         _extrude(
-        const ExtrusionAttributes &attribs, const Geometry::ArcWelder::Path &path, const std::string_view description, double speed = -1);
-    void                                print_machine_envelope(GCodeOutputStream &file, Print &print);
-    void                                _print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
-    void                                _print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
+    // Back-pointer to Print (const).
+    const Print*                        m_print;
+
+    struct EmitModifiers {
+        EmitModifiers(bool emit_fan_speed_reset, bool emit_bridge_fan_start, bool emit_bridge_fan_end)
+            : emit_fan_speed_reset(emit_fan_speed_reset), emit_bridge_fan_start(emit_bridge_fan_start), emit_bridge_fan_end(emit_bridge_fan_end) {}
+
+        EmitModifiers() : EmitModifiers(true, true, true) {};
+
+        static EmitModifiers create_with_disabled_emits() {
+            return {false, false, false};
+        }
+
+        bool emit_fan_speed_reset  = true;
+
+        bool emit_bridge_fan_start = true;
+        bool emit_bridge_fan_end   = true;
+    };
+
+    std::string                         _extrude(const ExtrusionAttributes &attribs, const Geometry::ArcWelder::Path &path, std::string_view description, double speed, const EmitModifiers &emit_modifiers = EmitModifiers());
+
+    void                                print_machine_envelope(GCodeOutputStream &file, const Print &print);
+    void                                _print_first_layer_chamber_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, int temp, bool wait, bool accurate);
+    void                                _print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
+    void                                _print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
     // On the first printing layer. This flag triggers first layer speeds.
     bool                                on_first_layer() const { return m_layer != nullptr && m_layer->id() == 0; }
     // To control print speed of 1st object layer over raft interface.

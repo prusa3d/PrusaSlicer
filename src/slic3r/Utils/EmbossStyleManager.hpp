@@ -51,7 +51,7 @@ public:
     /// </summary>
     /// <param name="item_to_store">Configuration</param>
     /// <param name="use_modification">When true cache state will be used for store</param>
-    /// <param name="use_modification">When true store activ index into configuration</param>
+    /// <param name="store_active_index">When treu also store current activ index</param>
     /// <returns>True on succes otherwise False.</returns>
     bool store_styles_to_app_config(bool use_modification = true, bool store_active_index = true);
 
@@ -213,8 +213,8 @@ public:
         {
             return EmbossStyle::operator==(other) && 
                 projection == other.projection &&
-                distance == other.distance && 
-                angle == other.angle;
+                is_approx(distance, other.distance) &&
+                is_approx(angle, other.angle);
         }
 
         // cache for view font name with maximal width in imgui

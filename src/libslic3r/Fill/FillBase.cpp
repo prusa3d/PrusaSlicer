@@ -7,18 +7,23 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <stdio.h>
+#include <boost/log/trivial.hpp>
 #include <numeric>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <cassert>
+#include <cinttypes>
+#include <cstdlib>
 
-#include "../ClipperUtils.hpp"
-#include "../EdgeGrid.hpp"
-#include "../Geometry.hpp"
-#include "../Geometry/Circle.hpp"
-#include "../Point.hpp"
-#include "../PrintConfig.hpp"
-#include "../Surface.hpp"
-#include "../libslic3r.h"
-
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/EdgeGrid.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/Geometry/Circle.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/libslic3r.h"
 #include "FillBase.hpp"
 #include "FillConcentric.hpp"
 #include "FillHoneycomb.hpp"
@@ -30,8 +35,9 @@
 #include "FillAdaptive.hpp"
 #include "FillLightning.hpp"
 #include "FillEnsuring.hpp"
-
-#include <boost/log/trivial.hpp>
+#include "libslic3r/Config.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/ShortestPath.hpp"
 
 // #define INFILL_DEBUG_OUTPUT
 
@@ -61,6 +67,7 @@ Fill* Fill::new_from_type(const InfillPattern type)
     case ipSupportBase:         return new FillSupportBase();
     case ipLightning:           return new FillLightning::Filler();
     case ipEnsuring:            return new FillEnsuring();
+    case ipZigZag:              return new FillZigZag();
     default: throw Slic3r::InvalidArgument("unknown type");
     }
 }
@@ -925,9 +932,6 @@ void mark_boundary_segments_touching_infill(
                 BoundingBoxf bbox_seg;
                 bbox_seg.merge(seg_pt1);
                 bbox_seg.merge(seg_pt2);
-#ifdef INFILL_DEBUG_OUTPUT
-                //if (this->infill_bbox.overlap(bbox_seg)) this->perimeter_overlaps.push_back({ segment.first, segment.second });
-#endif // INFILL_DEBUG_OUTPUT
                 if (this->infill_bbox.overlap(bbox_seg) && line_rounded_thick_segment_collision(seg_pt1, seg_pt2, *this->infill_pt1, *this->infill_pt2, this->radius, interval)) {
                     // The boundary segment intersects with the infill segment thickened by radius.
                     // Interval is specified in Euclidian length from seg_pt1 to seg_pt2.
@@ -1083,9 +1087,6 @@ void mark_boundary_segments_touching_infill(
                 assert(grid.bbox().contains(b.cast<coord_t>()));
                 grid.visit_cells_intersecting_line(a.cast<coord_t>(), b.cast<coord_t>(), visitor);
 #endif
-#ifdef INFILL_DEBUG_OUTPUT
-//                export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2, debug_out_path("%s-%03d-%03d-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-step", iRun, iStep, int(point_idx)), { polyline });
-#endif // INFILL_DEBUG_OUTPUT
 			}
 #ifdef INFILL_DEBUG_OUTPUT
             Polylines perimeter_overlaps;

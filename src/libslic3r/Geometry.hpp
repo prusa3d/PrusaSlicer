@@ -16,18 +16,30 @@
 #ifndef slic3r_Geometry_hpp_
 #define slic3r_Geometry_hpp_
 
+// Serialization through the Cereal library
+#include <cereal/access.hpp>
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <cereal/cereal.hpp>
+#include <Eigen/Geometry>
+#include <cmath>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstdlib>
+
 #include "libslic3r.h"
 #include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
 
-// Serialization through the Cereal library
-#include <cereal/access.hpp>
-
-namespace Slic3r { 
-
-namespace Geometry {
+namespace Slic3r::Geometry {
 
 // Generic result of an orientation predicate.
 enum Orientation
@@ -460,6 +472,8 @@ public:
     Transform3d get_matrix_no_offset() const;
     Transform3d get_matrix_no_scaling_factor() const;
 
+    Transform3d get_matrix_with_applied_shrinkage_compensation(const Vec3d &shrinkage_compensation) const;
+
     void set_matrix(const Transform3d& transform) { m_matrix = transform; }
 
     Transformation operator * (const Transformation& other) const;
@@ -551,6 +565,22 @@ Vec<3, T> spheric_to_dir(const Pair &v)
     return spheric_to_dir<T>(plr, azm);
 }
 
-} } // namespace Slicer::Geometry
+/**
+ * Checks if a given point is inside a corner of a polygon.
+ *
+ * The corner of a polygon is defined by three points A, B, C in counterclockwise order.
+ *
+ * Adapted from CuraEngine LinearAlg2D::isInsideCorner by Tim Kuipers @BagelOrb
+ * and @Ghostkeeper.
+ *
+ * @param a The first point of the corner.
+ * @param b The second point of the corner (the common vertex of the two edges forming the corner).
+ * @param c The third point of the corner.
+ * @param query_point The point to be checked if is inside the corner.
+ * @return True if the query point is inside the corner, false otherwise.
+ */
+bool is_point_inside_polygon_corner(const Point &a, const Point &b, const Point &c, const Point &query_point);
+
+} // namespace Slic3r::Geometry
 
 #endif

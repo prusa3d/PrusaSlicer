@@ -238,9 +238,11 @@ Index::const_iterator Index::recommended() const
 std::vector<Index> Index::load_db()
 {
     boost::filesystem::path cache_dir = boost::filesystem::path(Slic3r::data_dir()) / "cache";
+    boost::filesystem::path vendor_dir = boost::filesystem::path(Slic3r::data_dir()) / "vendor";
 
     std::vector<Index> index_db;
     std::string errors_cummulative;
+    
 	for (auto &dir_entry : boost::filesystem::directory_iterator(cache_dir))
         if (Slic3r::is_idx_file(dir_entry)) {
         	Index idx;
@@ -252,6 +254,20 @@ std::vector<Index> Index::load_db()
                 continue;
 			}
             index_db.emplace_back(std::move(idx));
+        }
+
+    for (auto &dir_entry : boost::filesystem::directory_iterator(vendor_dir))
+        if (Slic3r::is_idx_file(dir_entry)) {
+        	Index idx;
+            try {
+            	idx.load(dir_entry.path());
+            } catch (const std::runtime_error &err) {
+                errors_cummulative += err.what();
+                errors_cummulative += "\n";
+                continue;
+			}
+            if (std::find_if(index_db.begin(), index_db.end(), [idx](const Index& index) { return idx.vendor() == index.vendor();}) == index_db.end())
+                index_db.emplace_back(std::move(idx));
         }
 
     if (! errors_cummulative.empty())

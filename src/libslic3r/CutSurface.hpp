@@ -5,12 +5,19 @@
 #ifndef slic3r_CutSurface_hpp_
 #define slic3r_CutSurface_hpp_
 
-#include <vector>
 #include <admesh/stl.h> // indexed_triangle_set
+#include <vector>
+#include <string>
+
 #include "ExPolygon.hpp"
 #include "Emboss.hpp" // IProjection
+#include "libslic3r/BoundingBox.hpp"
 
 namespace Slic3r{
+namespace Emboss {
+class IProject3d;
+class IProjection;
+}  // namespace Emboss
 
 /// <summary>
 /// Represents cutted surface from object

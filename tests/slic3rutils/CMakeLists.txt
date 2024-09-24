@@ -4,10 +4,12 @@ add_executable(${_TEST_NAME}_tests
     slic3r_jobs_tests.cpp
     slic3r_version_tests.cpp
     slic3r_arrangejob_tests.cpp
+    secretstore_tests.cpp
     )
 
 # mold linker for successful linking needs also to link TBB library and link it before libslic3r.
 target_link_libraries(${_TEST_NAME}_tests test_common TBB::tbb TBB::tbbmalloc libslic3r_gui libslic3r)
+
 if (MSVC)
     target_link_libraries(${_TEST_NAME}_tests Setupapi.lib)
 endif ()

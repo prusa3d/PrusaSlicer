@@ -280,7 +280,6 @@ TEST_CASE("least squares arc fitting, interpolating end points", "[ArcWelder]") 
             REQUIRE(new_center_opt);
             if (new_center_opt) {
                 Vec2d  new_center = *new_center_opt;
-                double new_radius = (new_center - start_pos).norm();
                 double total_deviation = 0;
                 double new_total_deviation = 0;
                 for (const Vec2d &s : samples) {

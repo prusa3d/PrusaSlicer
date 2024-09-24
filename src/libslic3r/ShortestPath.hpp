@@ -5,21 +5,29 @@
 #ifndef slic3r_ShortestPath_hpp_
 #define slic3r_ShortestPath_hpp_
 
+#include <stddef.h>
+#include <utility>
+#include <vector>
+#include <cstddef>
+
 #include "libslic3r.h"
 #include "ExtrusionEntity.hpp"
 #include "Point.hpp"
-
-#include <utility>
-#include <vector>
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
+class ExtrusionEntityCollection;
+class Line;
 
 	namespace ClipperLib {
 		class PolyNode;
+
 		using PolyNodes = std::vector<PolyNode*, PointsAllocator<PolyNode*>>;
 	}
 
 class ExPolygon;
+
 using ExPolygons = std::vector<ExPolygon>;
 
 // Used by chain_expolygons()
@@ -54,6 +62,7 @@ ClipperLib::PolyNodes				 chain_clipper_polynodes(const Points &points, const Cl
 // Returns pairs of PrintObject idx and instance of that PrintObject.
 class Print;
 struct PrintInstance;
+
 std::vector<const PrintInstance*> 	 chain_print_object_instances(const Print &print);
 
 // Chain lines into polylines.

@@ -205,7 +205,7 @@ class GLGizmoCut3D : public GLGizmoBase
     PartSelection m_part_selection;
 
     bool                                        m_show_shortcuts{ false };
-    std::vector<std::pair<wxString, wxString>>  m_shortcuts;
+    std::vector<std::pair<std::string, std::string>>  m_shortcuts;
 
     enum class CutMode {
         cutPlanar
@@ -237,7 +237,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     std::vector<std::string> m_axis_names;
 
-    std::map<std::string, wxString> m_part_orientation_names;
+    std::map<std::string, std::string> m_part_orientation_names;
 
     std::map<std::string, std::string> m_labels_map;
 

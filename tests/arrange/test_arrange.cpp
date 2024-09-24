@@ -207,7 +207,7 @@ static void check_nfp(const std::string & outfile_prefix,
     auto orb_ex_offs_pos_r_ch = offset_ex(orb_ex_r_ch,  scaled<float>(EPSILON));
     auto orb_ex_offs_neg_r_ch = offset_ex(orb_ex_r_ch, -scaled<float>(EPSILON));
 
-    auto bedpoly_offs = offset_ex(bedpoly, SCALED_EPSILON);
+    auto bedpoly_offs = offset_ex(bedpoly, static_cast<float>(SCALED_EPSILON));
 
     auto check_at_nfppos = [&](const Point &pos) {
         ExPolygons orb_ex = orb_ex_r;
@@ -1065,58 +1065,4 @@ TEMPLATE_TEST_CASE("Test if allowed item rotations are considered", "[arrange2]"
     REQUIRE(packed);
     REQUIRE(get_rotation(itm) == Approx(PI));
 }
-
-//TEST_CASE("NFP optimizing test", "[arrange2]") {
-//    using namespace Slic3r;
-
-//    auto itemshape = arr2::to_rectangle(BoundingBox{{scaled(-25.), scaled(-25.)}, {scaled(25.), scaled(25.)}});
-
-//    arr2::ArrangeItem item{arr2::DecomposedShape{itemshape}};
-
-//    ExPolygons nfp = { ExPolygon {{scaled(-2000.), scaled(25.)}, {scaled(2000.), scaled(25.)}} };
-
-//    struct K : public arr2::GravityKernel {
-//        size_t &fncnt;
-//        K(size_t &counter, Vec2crd gpos): arr2::GravityKernel{gpos}, fncnt{counter} {}
-//        double placement_fitness(const arr2::ArrangeItem &itm, const Vec2crd &tr) const
-//        {
-//            ++fncnt;
-//            return arr2::GravityKernel::placement_fitness(itm, tr);
-//        }
-//    };
-
-//    size_t counter = 0;
-//    K k{counter, Vec2crd{0, 0}};
-//    opt::Optimizer<opt::AlgBruteForce> solver_ref({}, 1000);
-//    opt::Optimizer<opt::AlgNLoptSubplex> solver (opt::StopCriteria{}
-//                                                  .max_iterations(1000)
-//                                                  /*.rel_score_diff(1e-20)*/);
-
-//    double accuracy = 1.;
-//    arr2::PackStrategyNFP strategy_ref(solver_ref, k, ex_seq, accuracy);
-//    arr2::PackStrategyNFP strategy(solver, k, ex_seq, accuracy);
-
-//    SVG svg("nfp_optimizing.svg");
-//    svg.flipY = true;
-//    svg.draw_outline(nfp, "green");
-
-//    svg.draw_outline(item.shape().transformed_outline(), "yellow");
-
-//    double score = pick_best_spot_on_nfp(item, nfp, arr2::InfiniteBed{}, strategy);
-//    svg.draw_outline(item.shape().transformed_outline(), "red");
-
-//    counter = 0;
-//    double score_ref = pick_best_spot_on_nfp(item, nfp, arr2::InfiniteBed{}, strategy_ref);
-//    svg.draw_outline(item.shape().transformed_outline(), "blue");
-
-//#ifndef NDEBUG
-//    std::cout << "fitness called: " << k.fncnt << " times" << std::endl;
-//    std::cout << "score = " << score  << " score_ref = " << score_ref << std::endl;
-//#endif
-
-//    REQUIRE(!std::isnan(score));
-//    REQUIRE(!std::isnan(score_ref));
-//    REQUIRE(score >= score_ref);
-//}
-
 

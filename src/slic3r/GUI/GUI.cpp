@@ -9,7 +9,7 @@
 #include "format.hpp"
 #include "I18N.hpp"
 
-#include "libslic3r/LocalesUtils.hpp"
+#include <LocalesUtils.hpp>
 
 #include <string>
 
@@ -105,128 +105,6 @@ const std::string& shortkey_alt_prefix()
 #endif
 		;
 	return str;
-}
-
-// opt_index = 0, by the reason of zero-index in ConfigOptionVector by default (in case only one element)
-void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
-{
-	try{
-
-        if (config.def()->get(opt_key)->type == coBools && config.def()->get(opt_key)->nullable) {
-            ConfigOptionBoolsNullable* vec_new = new ConfigOptionBoolsNullable{ boost::any_cast<unsigned char>(value) };
-            config.option<ConfigOptionBoolsNullable>(opt_key)->set_at(vec_new, opt_index, 0);
-            return;
-        }
-
-        const ConfigOptionDef *opt_def = config.def()->get(opt_key);
-		switch (opt_def->type) {
-		case coFloatOrPercent:{
-			std::string str = boost::any_cast<std::string>(value);
-			bool percent = false;
-			if (str.back() == '%') {
-				str.pop_back();
-				percent = true;
-			}
-            double val = std::stod(str); // locale-dependent (on purpose - the input is the actual content of the field)
-			config.set_key_value(opt_key, new ConfigOptionFloatOrPercent(val, percent));
-			break;}
-		case coPercent:
-			config.set_key_value(opt_key, new ConfigOptionPercent(boost::any_cast<double>(value)));
-			break;
-		case coFloat:{
-			double& val = config.opt_float(opt_key);
-			val = boost::any_cast<double>(value);
-			break;
-		}
-		case coFloatsOrPercents:{
-			std::string str = boost::any_cast<std::string>(value);
-			bool percent = false;
-			if (str.back() == '%') {
-				str.pop_back();
-				percent = true;
-			}
-            double val = std::stod(str); // locale-dependent (on purpose - the input is the actual content of the field)
-			ConfigOptionFloatsOrPercents* vec_new = new ConfigOptionFloatsOrPercents({ {val, percent} });
-			config.option<ConfigOptionFloatsOrPercents>(opt_key)->set_at(vec_new, opt_index, opt_index);
-			break;
-		}
-		case coPercents:{
-			ConfigOptionPercents* vec_new = new ConfigOptionPercents{ boost::any_cast<double>(value) };
-			config.option<ConfigOptionPercents>(opt_key)->set_at(vec_new, opt_index, opt_index);
-			break;
-		}
-		case coFloats:{
-			ConfigOptionFloats* vec_new = new ConfigOptionFloats{ boost::any_cast<double>(value) };
-			config.option<ConfigOptionFloats>(opt_key)->set_at(vec_new, opt_index, opt_index);
- 			break;
-		}
-		case coString:
-			config.set_key_value(opt_key, new ConfigOptionString(boost::any_cast<std::string>(value)));
-			break;
-		case coStrings:{
-			if (opt_key == "compatible_prints" || opt_key == "compatible_printers" || opt_key == "gcode_substitutions") {
-				config.option<ConfigOptionStrings>(opt_key)->values =
-					boost::any_cast<std::vector<std::string>>(value);
-			}
-			else if (config.def()->get(opt_key)->gui_flags.compare("serialized") == 0) {
-				std::string str = boost::any_cast<std::string>(value);
-                std::vector<std::string> values {};
-                if (!str.empty()) {
-				    if (str.back() == ';') str.pop_back();
-				    // Split a string to multiple strings by a semi - colon.This is the old way of storing multi - string values.
-				    // Currently used for the post_process config value only.
-				    boost::split(values, str, boost::is_any_of(";"));
-				    if (values.size() == 1 && values[0] == "")
-					    values.resize(0);
-                }
-				config.option<ConfigOptionStrings>(opt_key)->values = values;
-			}
-			else{
-				ConfigOptionStrings* vec_new = new ConfigOptionStrings{ boost::any_cast<std::string>(value) };
-				config.option<ConfigOptionStrings>(opt_key)->set_at(vec_new, opt_index, 0);
-			}
-			}
-			break;
-		case coBool:
-			config.set_key_value(opt_key, new ConfigOptionBool(boost::any_cast<bool>(value)));
-			break;
-		case coBools:{
-			ConfigOptionBools* vec_new = new ConfigOptionBools{ boost::any_cast<unsigned char>(value) != 0 };
-			config.option<ConfigOptionBools>(opt_key)->set_at(vec_new, opt_index, 0);
-			break;}
-		case coInt:
-			config.set_key_value(opt_key, new ConfigOptionInt(boost::any_cast<int>(value)));
-			break;
-		case coInts:{
-			ConfigOptionInts* vec_new = new ConfigOptionInts{ boost::any_cast<int>(value) };
-			config.option<ConfigOptionInts>(opt_key)->set_at(vec_new, opt_index, 0);
-			}
-			break;
-		case coEnum:{
-			auto *opt = opt_def->default_value.get()->clone();
-			opt->setInt(boost::any_cast<int>(value));
-			config.set_key_value(opt_key, opt);
-			}
-			break;
-		case coPoints:{
-			if (opt_key == "bed_shape") {
-				config.option<ConfigOptionPoints>(opt_key)->values = boost::any_cast<std::vector<Vec2d>>(value);
-				break;
-			}
-			ConfigOptionPoints* vec_new = new ConfigOptionPoints{ boost::any_cast<Vec2d>(value) };
-			config.option<ConfigOptionPoints>(opt_key)->set_at(vec_new, opt_index, 0);
-			}
-			break;
-		case coNone:
-			break;
-		default:
-			break;
-		}
-	}
-	catch (const std::exception &e)
-	{
-		wxLogError(format_wxstr("Internal error when changing value for %1%: %2%", opt_key, e.what()));
-	}
 }
 
 void show_error(wxWindow* parent, const wxString& message, bool monospaced_font)
@@ -364,77 +242,6 @@ void show_substitutions_info(const ConfigSubstitutions& config_substitutions, co
 		format_wxstr(_L("Configuration file \"%1%\" was loaded, however some configuration values were not recognized."), from_u8(filename)), 
 		substitution_message(changes), true);
 	msg.ShowModal();
-}
-
-void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, const std::string& items)
-{
-    if (comboCtrl == nullptr)
-        return;
-    wxGetApp().UpdateDarkUI(comboCtrl);
-
-    wxCheckListBoxComboPopup* popup = new wxCheckListBoxComboPopup;
-    if (popup != nullptr) {
-		// FIXME If the following line is removed, the combo box popup list will not react to mouse clicks.
-        //  On the other side, with this line the combo box popup cannot be closed by clicking on the combo button on Windows 10.
-        comboCtrl->UseAltPopupWindow();
-
-		int max_width = 0;
-
-		// the following line messes up the popup size the first time it is shown on wxWidgets 3.1.3
-//		comboCtrl->EnablePopupAnimation(false);
-#ifdef _WIN32
-		popup->SetFont(comboCtrl->GetFont());
-#endif // _WIN32
-		comboCtrl->SetPopupControl(popup);
-		wxString title = from_u8(text);
-		max_width = std::max(max_width, 60 + comboCtrl->GetTextExtent(title).x);
-		popup->SetStringValue(title);
-		popup->Bind(wxEVT_CHECKLISTBOX, [popup](wxCommandEvent& evt) { popup->OnCheckListBox(evt); });
-		popup->Bind(wxEVT_LISTBOX, [popup](wxCommandEvent& evt) { popup->OnListBoxSelection(evt); });
-        popup->Bind(wxEVT_KEY_DOWN, [popup](wxKeyEvent& evt) { popup->OnKeyEvent(evt); });
-        popup->Bind(wxEVT_KEY_UP, [popup](wxKeyEvent& evt) { popup->OnKeyEvent(evt); });
-
-        std::vector<std::string> items_str;
-        boost::split(items_str, items, boost::is_any_of("|"), boost::token_compress_off);
-
-		// each item must be composed by 2 parts
-		assert(items_str.size() %2 == 0);
-
-		for (size_t i = 0; i < items_str.size(); i += 2) {
-			wxString label = from_u8(items_str[i]);
-			max_width = std::max(max_width, 60 + popup->GetTextExtent(label).x);
-			popup->Append(label);
-			popup->Check(i / 2, items_str[i + 1] == "1");
-		}
-
-		comboCtrl->SetMinClientSize(wxSize(max_width, -1));
-        wxGetApp().UpdateDarkUI(popup);
-	}
-}
-
-unsigned int combochecklist_get_flags(wxComboCtrl* comboCtrl)
-{
-	unsigned int flags = 0;
-
-	wxCheckListBoxComboPopup* popup = wxDynamicCast(comboCtrl->GetPopupControl(), wxCheckListBoxComboPopup);
-	if (popup != nullptr) {
-		for (unsigned int i = 0; i < popup->GetCount(); ++i) {
-			if (popup->IsChecked(i))
-				flags |= 1 << i;
-		}
-	}
-
-	return flags;
-}
-
-void combochecklist_set_flags(wxComboCtrl* comboCtrl, unsigned int flags)
-{
-	wxCheckListBoxComboPopup* popup = wxDynamicCast(comboCtrl->GetPopupControl(), wxCheckListBoxComboPopup);
-	if (popup != nullptr) {
-		for (unsigned int i = 0; i < popup->GetCount(); ++i) {
-			popup->Check(i, (flags & (1 << i)) != 0);
-		}
-	}
 }
 
 AppConfig* get_app_config()
@@ -595,12 +402,34 @@ bool create_process(const boost::filesystem::path& path, const std::wstring& cmd
 			return true;
 		}
 		else
-			error_msg = "CreateProcessW failed to create process " + boost::nowide::narrow(path.wstring());
+			error_msg = "CreateProcessW failed to create process " + into_u8(path.wstring());
 	}
 	else
-		error_msg = "Executable doesn't exists. Path: " + boost::nowide::narrow(path.wstring());
+		error_msg = "Executable doesn't exists. Path: " + into_u8(path.wstring());
 	return false;
 }
 #endif //_WIN32
+
+
+bool has_illegal_characters(const wxString& wxs_name)
+{
+	const std::string name = into_u8(wxs_name);
+	return has_illegal_characters(name);
+}
+
+bool has_illegal_characters(const std::string& name)
+{
+	for (size_t i = 0; i < std::strlen(illegal_characters); i++)
+		if (name.find_first_of(illegal_characters[i]) != std::string::npos)
+			return true;
+
+	return false;
+}
+
+void show_illegal_characters_warning(wxWindow* parent)
+{
+	show_error(parent, format_wxstr("%1%\n%2% %3%", _L("The provided name is not valid;"),
+									_L("the following characters are not allowed:"), illegal_characters));
+}
 
 } } // namespaces GUI / Slic3r

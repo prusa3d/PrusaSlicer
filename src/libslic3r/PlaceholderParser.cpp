@@ -7,22 +7,35 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PlaceholderParser.hpp"
-#include "Exception.hpp"
-#include "Flow.hpp"
-#include "Utils.hpp"
+
 #include <cstring>
 #include <ctime>
 #include <iomanip>
-#include <sstream>
 #include <map>
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <utility>
+#include <cassert>
+#include <cinttypes>
+#include <cstdio>
+#include <cstdlib>
+
+#include "Exception.hpp"
+#include "Flow.hpp"
+#include "Utils.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r_version.h"
 #ifdef _MSC_VER
     #include <stdlib.h>  // provides **_environ
 #else
-    #include <unistd.h>  // provides **environ
 #endif
 
 #ifdef __APPLE__
 #include <crt_externs.h>
+
 #undef environ
 #define environ (*_NSGetEnviron())
 #else
@@ -33,8 +46,18 @@
     #endif
 #endif
 
-#include <boost/algorithm/string.hpp>
 #include <boost/nowide/convert.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/fusion/container/vector/vector.hpp>
+#include <boost/phoenix/phoenix.hpp>
+#include <boost/proto/operators.hpp>
+#include <boost/proto/proto.hpp>
+#include <boost/proto/traits.hpp>
+#include <boost/range/iterator_range_core.hpp>
+#include <boost/regex/v5/regex.hpp>
+#include <boost/spirit/repository/include/qi.hpp>
+#include <boost/throw_exception.hpp>
 
 // Spirit v2.5 allows you to suppress automatic generation
 // of predefined terminals to speed up complation. With
@@ -45,30 +68,17 @@
 
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #define BOOST_SPIRIT_USE_PHOENIX_V3
-#include <boost/config/warning_disable.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/qi_lit.hpp>
-#include <boost/phoenix/core.hpp>
-#include <boost/phoenix/operator.hpp>
-#include <boost/phoenix/fusion.hpp>
-#include <boost/phoenix/stl.hpp>
-#include <boost/phoenix/object.hpp>
-#include <boost/fusion/include/adapt_struct.hpp>
-#include <boost/spirit/repository/include/qi_distinct.hpp>
-#include <boost/spirit/repository/include/qi_iter_pos.hpp>
-#include <boost/variant/recursive_variant.hpp>
 #include <boost/phoenix/bind/bind_function.hpp>
-
 #include <iostream>
 #include <string>
 
 // #define USE_CPP11_REGEX
 #ifdef USE_CPP11_REGEX
     #include <regex>
+
     #define SLIC3R_REGEX_NAMESPACE std
 #else /* USE_CPP11_REGEX */
-    #include <boost/regex.hpp>
     #define SLIC3R_REGEX_NAMESPACE boost
 #endif /* USE_CPP11_REGEX */
 

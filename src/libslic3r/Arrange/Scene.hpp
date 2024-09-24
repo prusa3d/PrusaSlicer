@@ -5,13 +5,30 @@
 #ifndef ARR2_SCENE_HPP
 #define ARR2_SCENE_HPP
 
+#include <stddef.h>
+#include <boost/variant.hpp>
+#include <boost/variant/variant.hpp>
 #include <any>
 #include <string_view>
+#include <algorithm>
+#include <functional>
+#include <memory>
+#include <set>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <cstddef>
 
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/AnyPtr.hpp"
 #include "libslic3r/Arrange/ArrangeSettingsView.hpp"
 #include "libslic3r/Arrange/SegmentedRectangleBed.hpp"
+#include "libslic3r/Arrange/Core/Beds.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r { namespace arr2 {
 
@@ -264,8 +281,8 @@ class Scene
     ExtendedBed m_bed;
 
 public:
-    // Can only be built from an rvalue SceneBuilder, as it's content will
-    // potentially be moved to the constructed ArrangeScene object
+    // Scene can only be built from an rvalue SceneBuilder whose content will
+    // potentially be moved to the constructed Scene object.
     template<class Sub>
     explicit Scene(SceneBuilderBase<Sub> &&bld)
     {
@@ -287,8 +304,10 @@ public:
     std::vector<ObjectID> selected_ids() const;
 };
 
+// Get all the ObjectIDs of Arrangeables which are in selected state
 std::set<ObjectID> selected_geometry_ids(const Scene &sc);
 
+// A dummy, empty ArrangeableModel for testing and as placeholder to avoiod using nullptr
 class EmptyArrangeableModel: public ArrangeableModel
 {
 public:
@@ -308,12 +327,20 @@ void SceneBuilderBase<Subclass>::build_scene(Scene &sc) &&
     if (!m_settings)
         m_settings = std::make_unique<arr2::ArrangeSettings>();
 
+    // Apply the bed minimum distance by making the original bed smaller
+    // and arranging on this smaller bed.
     coord_t inset = std::max(scaled(m_settings->get_distance_from_bed()),
                              m_skirt_offs + m_brims_offs);
 
+    // Objects have also a minimum distance from each other implemented
+    // as inflation applied to object outlines. This object distance
+    // does not apply to the bed, so the bed is inflated by this amount
+    // to compensate.
     coord_t md = scaled(m_settings->get_distance_from_objects());
     md = md / 2 - inset;
 
+    // Applying the final bed with the corrected dimensions to account
+    // for safety distances
     visit_bed([md](auto &rawbed) { rawbed = offset(rawbed, md); }, m_bed);
 
     sc.m_settings = std::move(m_settings);

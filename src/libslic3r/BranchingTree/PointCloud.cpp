@@ -4,10 +4,15 @@
 ///|/
 #include "PointCloud.hpp"
 
+#include <igl/random_points_on_mesh.h> // IWYU pragma: keep
+#include <array>
+#include <limits>
+
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/SLA/SupportTreeUtils.hpp"
-
-#include <igl/random_points_on_mesh.h>
+#include "admesh/stl.h"
+#include "libslic3r/BranchingTree/BranchingTree.hpp"
+#include "libslic3r/SLA/Pad.hpp"
 
 namespace Slic3r { namespace branchingtree {
 

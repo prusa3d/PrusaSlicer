@@ -21,8 +21,8 @@
 #ifndef slic3r_Print_hpp_
 #define slic3r_Print_hpp_
 
-#include "Fill/FillAdaptive.hpp"
-#include "Fill/FillLightning.hpp"
+#include "libslic3r/Fill/FillAdaptive.hpp"
+#include "libslic3r/Fill/FillLightning.hpp"
 #include "PrintBase.hpp"
 
 #include "BoundingBox.hpp"
@@ -32,10 +32,10 @@
 #include "Slicing.hpp"
 #include "SupportSpotsGenerator.hpp"
 #include "TriangleMeshSlicer.hpp"
-#include "GCode/ToolOrdering.hpp"
-#include "GCode/WipeTower.hpp"
-#include "GCode/ThumbnailData.hpp"
-#include "GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCode/ToolOrdering.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "MultiMaterialSegmentation.hpp"
 
 #include "libslic3r.h"
@@ -327,7 +327,7 @@ public:
     // The slicing parameters are dependent on various configuration values
     // (layer height, first layer height, raft settings, print nozzle diameter etc).
     const SlicingParameters&    slicing_parameters() const { return m_slicing_params; }
-    static SlicingParameters    slicing_parameters(const DynamicPrintConfig &full_config, const ModelObject &model_object, float object_max_z);
+    static SlicingParameters    slicing_parameters(const DynamicPrintConfig &full_config, const ModelObject &model_object, float object_max_z, const Vec3d &object_shrinkage_compensation);
 
     size_t                      num_printing_regions() const throw() { return m_shared_regions->all_regions.size(); }
     const PrintRegion&          printing_region(size_t idx) const throw() { return *m_shared_regions->all_regions[idx].get(); }
@@ -353,7 +353,7 @@ public:
     std::vector<Polygons>       slice_support_enforcers() const { return this->slice_support_volumes(ModelVolumeType::SUPPORT_ENFORCER); }
 
     // Helpers to project custom facets on slices
-    void project_and_append_custom_facets(bool seam, EnforcerBlockerType type, std::vector<Polygons>& expolys) const;
+    void project_and_append_custom_facets(bool seam, TriangleStateType type, std::vector<Polygons>& expolys) const;
 
 private:
     // to be called from Print only.
@@ -451,7 +451,7 @@ struct WipeTowerData
     std::unique_ptr<std::vector<WipeTower::ToolChangeResult>> priming;
     std::vector<std::vector<WipeTower::ToolChangeResult>> tool_changes;
     std::unique_ptr<WipeTower::ToolChangeResult>          final_purge;
-    std::vector<float>                                    used_filament;
+    std::vector<std::pair<float, std::vector<float>>>     used_filament_until_layer;
     int                                                   number_of_toolchanges;
 
     // Depth of the wipe tower to pass to GLCanvas3D for exact bounding box:
@@ -471,7 +471,7 @@ struct WipeTowerData
         priming.reset(nullptr);
         tool_changes.clear();
         final_purge.reset(nullptr);
-        used_filament.clear();
+        used_filament_until_layer.clear();
         number_of_toolchanges = -1;
         depth = 0.f;
         z_and_depth_pairs.clear();
@@ -493,6 +493,13 @@ private:
 	WipeTowerData &operator=(const WipeTowerData & /* rhs */) = delete;
 };
 
+bool is_toolchange_required(
+    const bool first_layer,
+    const unsigned last_extruder_id,
+    const unsigned extruder_id,
+    const unsigned current_extruder_id
+);
+
 struct PrintStatistics
 {
     PrintStatistics() { clear(); }
@@ -505,6 +512,7 @@ struct PrintStatistics
     double                          total_weight;
     double                          total_wipe_tower_cost;
     double                          total_wipe_tower_filament;
+    double                          total_wipe_tower_filament_weight;
     std::vector<unsigned int>       printing_extruders;
     unsigned int                    initial_extruder_id;
     std::string                     initial_filament_type;
@@ -526,6 +534,7 @@ struct PrintStatistics
         total_weight           = 0.;
         total_wipe_tower_cost  = 0.;
         total_wipe_tower_filament = 0.;
+        total_wipe_tower_filament_weight = 0.;
         initial_extruder_id    = 0;
         initial_filament_type.clear();
         printing_filament_types.clear();
@@ -547,6 +556,8 @@ struct PrintStatistics
     static const std::string TotalFilamentCost;
     static const std::string TotalFilamentCostMask;
     static const std::string TotalFilamentCostValueMask;
+    static const std::string TotalFilamentUsedWipeTower;
+    static const std::string TotalFilamentUsedWipeTowerValueMask;
 };
 
 using PrintObjectPtrs          = std::vector<PrintObject*>;
@@ -635,10 +646,6 @@ public:
     // If zero, then the print is empty and the print shall not be executed.
     unsigned int                num_object_instances() const;
 
-    // For Perl bindings. 
-    PrintObjectPtrs&            objects_mutable() { return m_objects; }
-    PrintRegionPtrs&            print_regions_mutable() { return m_print_regions; }
-
     const ExtrusionEntityCollection& skirt() const { return m_skirt; }
     const ExtrusionEntityCollection& brim() const { return m_brim; }
     // Convex hull of the 1st layer extrusions, for bed leveling and placing the initial purge line.
@@ -664,6 +671,12 @@ public:
 
     const Polygons& get_sequential_print_clearance_contours() const { return m_sequential_print_clearance_contours; }
     static bool sequential_print_horizontal_clearance_valid(const Print& print, Polygons* polygons = nullptr);
+
+    // Returns if all used filaments have same shrinkage compensations.
+    bool has_same_shrinkage_compensations() const;
+
+    // Returns scaling for each axis representing shrinkage compensations in each axis.
+    Vec3d shrinkage_compensation() const;
 
 protected:
     // Invalidates the step, and its depending steps in Print.

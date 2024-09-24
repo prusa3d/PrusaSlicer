@@ -28,6 +28,7 @@ private:
     std::vector<std::string>    m_input_files;
     std::vector<std::string>    m_actions;
     std::vector<std::string>    m_transforms;
+    std::vector<std::string>    m_profiles_sharing;
     std::vector<Model>          m_models;
 
     bool setup(int argc, char **argv);
@@ -39,6 +40,10 @@ private:
     bool export_models(IO::ExportFormat format);
     
     bool has_print_action() const { return m_config.opt_bool("export_gcode") || m_config.opt_bool("export_sla"); }
+
+    bool processed_profiles_sharing();
+
+    bool check_and_load_input_profiles(PrinterTechnology& printer_technology);
     
     std::string output_filepath(const Model &model, IO::ExportFormat format) const;
 };

@@ -5,11 +5,33 @@
 ///|/
 #include "SupportSpotsGenerator.hpp"
 
+#include <boost/log/trivial.hpp>
+#if TBB_VERSION_MAJOR >= 2021
+#include <oneapi/tbb/concurrent_vector.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/blocked_range.h>
+#else
+#include <tbb/concurrent_vector.h>
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
+#endif
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <optional>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+#include <iostream>
+#include <stdexcept>
+#include <cassert>
+
 #include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
-#include "GCode/ExtrusionProcessor.hpp"
+#include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
@@ -17,47 +39,25 @@
 #include "Print.hpp"
 #include "PrintBase.hpp"
 #include "PrintConfig.hpp"
-#include "Tesselate.hpp"
-#include "Utils.hpp"
 #include "libslic3r.h"
-#include "tbb/parallel_for.h"
-#include "tbb/blocked_range.h"
-#include "tbb/blocked_range2d.h"
-#include "tbb/parallel_reduce.h"
-#include <algorithm>
-#include <boost/log/trivial.hpp>
-#include <cmath>
-#include <cstddef>
-#include <cstdio>
-#include <functional>
-#include <limits>
-#include <math.h>
-#if TBB_VERSION_MAJOR >= 2021
-#include <oneapi/tbb/concurrent_vector.h>
-#include <oneapi/tbb/parallel_for.h>
-#else
-#include <tbb/concurrent_vector.h>
-#include <tbb/parallel_for.h>
-#endif
-#include <optional>
-#include <unordered_map>
-#include <unordered_set>
-#include <stack>
-#include <utility>
-#include <vector>
 
 #include "AABBTreeLines.hpp"
 #include "KDTreeIndirect.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
 
 // #define DETAILED_DEBUG_LOGS
 // #define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
+
 #include "libslic3r/Color.hpp"
+
 constexpr bool debug_files = true;
 #else
 constexpr bool debug_files = false;
@@ -159,26 +159,69 @@ void SliceConnection::print_info(const std::string &tag) const
     std::cout << "covariance: " << covariance << std::endl;
 }
 
-Integrals::Integrals (const Polygons& polygons) {
+Integrals::Integrals(const Polygon &polygon)
+{
+    if (polygon.points.size() < 3) {
+        assert(false && "Polygon is expected to have non-zero area!");
+        *this = Integrals{};
+        return;
+    }
+    Vec2f p0 = unscaled(polygon.first_point()).cast<float>();
+    for (size_t i = 2; i < polygon.points.size(); i++) {
+        Vec2f p1 = unscaled(polygon.points[i - 1]).cast<float>();
+        Vec2f p2 = unscaled(polygon.points[i]).cast<float>();
+
+        float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+
+        auto [area, first_moment_of_area, second_moment_area,
+              second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+
+        this->area += sign * area;
+        this->x_i += sign * first_moment_of_area;
+        this->x_i_squared += sign * second_moment_area;
+        this->xy += sign * second_moment_of_area_covariance;
+    }
+}
+
+Integrals::Integrals(const Polygons &polygons)
+{
     for (const Polygon &polygon : polygons) {
-        Vec2f p0 = unscaled(polygon.first_point()).cast<float>();
-        for (size_t i = 2; i < polygon.points.size(); i++) {
-            Vec2f p1 = unscaled(polygon.points[i - 1]).cast<float>();
-            Vec2f p2 = unscaled(polygon.points[i]).cast<float>();
+        *this = *this + Integrals{polygon};
+    }
+}
 
-            float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+Integrals::Integrals(const Polylines& polylines, const std::vector<float>& widths) {
+    assert(polylines.size() == widths.size());
+    for (size_t i = 0; i < polylines.size(); ++i) {
+        Lines polyline{polylines[i].lines()};
+        float width{widths[i]};
+        for (const Line& line : polyline) {
+            Vec2f line_direction = unscaled(line.vector()).cast<float>();
+            Vec2f normal{line_direction.y(), -line_direction.x()};
+            normal.normalize();
 
-            auto [area, first_moment_of_area, second_moment_area,
-                  second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+            Vec2f line_a = unscaled(line.a).cast<float>();
+            Vec2f line_b = unscaled(line.b).cast<float>();
+            Vec2crd a = scaled(Vec2f{line_a + normal * width/2});
+            Vec2crd b = scaled(Vec2f{line_b + normal * width/2});
+            Vec2crd c = scaled(Vec2f{line_b - normal * width/2});
+            Vec2crd d = scaled(Vec2f{line_a - normal * width/2});
 
-            this->area += sign * area;
-            this->x_i += sign * first_moment_of_area;
-            this->x_i_squared += sign * second_moment_area;
-            this->xy += sign * second_moment_of_area_covariance;
+            const Polygon ractangle({a, b, c, d});
+            Integrals integrals{ractangle};
+            *this = *this + integrals;
         }
     }
 }
 
+Integrals::Integrals(float area, Vec2f x_i, Vec2f x_i_squared, float xy)
+    : area(area), x_i(std::move(x_i)), x_i_squared(std::move(x_i_squared)), xy(xy)
+{}
+
+Integrals operator+(const Integrals &a, const Integrals &b)
+{
+    return Integrals{a.area + b.area, a.x_i + b.x_i, a.x_i_squared + b.x_i_squared, a.xy + b.xy};
+}
 
 SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
 {
@@ -300,9 +343,16 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             return {};
         }
         const float                                    flow_width = get_flow_width(layer_region, entity->role());
+
+        ExtrusionProcessor::PropertiesEstimationConfig config{};
+        config.add_corners = true;
+        config.prev_layer_boundary_offset = true;
+        config.max_line_length = params.bridge_distance;
+        config.flow_width = flow_width;
+
         std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
-            ExtrusionProcessor::estimate_points_properties<true, true, true, true>(entity->as_polyline().points, prev_layer_boundary,
-                                                                                   flow_width, params.bridge_distance);
+            ExtrusionProcessor::estimate_points_properties<
+                true>(entity->as_polyline().points, prev_layer_boundary, config);
 
         std::vector<ExtrusionLine> lines_out;
         lines_out.reserve(annotated_points.size());
@@ -354,9 +404,12 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
         const float flow_width = get_flow_width(layer_region, entity->role());
         // Compute only unsigned distance - prev_layer_lines can contain unconnected paths, thus the sign of the distance is unreliable
+
+        ExtrusionProcessor::PropertiesEstimationConfig config{};
+        config.max_line_length = params.bridge_distance;
+        config.flow_width = flow_width;
         std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
-            ExtrusionProcessor::estimate_points_properties<true, true, false, false>(entity->as_polyline().points, prev_layer_lines,
-                                                                                     flow_width, params.bridge_distance);
+            ExtrusionProcessor::estimate_points_properties<false>(entity->as_polyline().points, prev_layer_lines, config);
 
         std::vector<ExtrusionLine> lines_out;
         lines_out.reserve(annotated_points.size());
@@ -478,18 +531,50 @@ ObjectPart::ObjectPart(
             continue;
         }
 
-        const Polygons polygons{collection->polygons_covered_by_width()};
+        for (const ExtrusionEntity* entity: collection->flatten()) {
+            Polylines polylines;
+            std::vector<float> widths;
 
-        const Integrals integrals{polygons};
-        const float volume = integrals.area * layer_height;
-        this->volume += volume;
-        this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
+            if (
+                const auto* path = dynamic_cast<const ExtrusionPath*>(entity);
+                path != nullptr
+            ) {
+                polylines.push_back(path->as_polyline());
+                widths.push_back(path->width());
+            } else if (
+                const auto* loop = dynamic_cast<const ExtrusionLoop*>(entity);
+                loop != nullptr
+            ) {
+                for (const ExtrusionPath& path : loop->paths) {
+                    polylines.push_back(path.as_polyline());
+                    widths.push_back(path.width());
+                }
+            } else if (
+                const auto* multi_path = dynamic_cast<const ExtrusionMultiPath*>(entity);
+                multi_path != nullptr
+            ) {
+                for (const ExtrusionPath& path : multi_path->paths) {
+                    polylines.push_back(path.as_polyline());
+                    widths.push_back(path.width());
+                }
+            } else {
+                throw std::runtime_error(
+                    "Failed to construct object part from extrusions!"
+                    " Unknown extrusion type."
+                );
+            }
 
-        if (this->connected_to_bed) {
-            this->sticking_area += integrals.area;
-            this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
-            this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
-            this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+            const Integrals integrals{polylines, widths};
+            const float volume = integrals.area * layer_height;
+            this->volume += volume;
+            this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
+
+            if (this->connected_to_bed) {
+                this->sticking_area += integrals.area;
+                this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
+                this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+                this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+            }
         }
     }
 
@@ -1179,8 +1264,10 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
             Polygon  pol(pl.points);
             pol.make_counter_clockwise();
 
-            auto annotated_points = ExtrusionProcessor::estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines,
-                                                                                                             flow_width);
+            ExtrusionProcessor::PropertiesEstimationConfig config{};
+            config.flow_width = flow_width;
+            auto annotated_points = ExtrusionProcessor::estimate_points_properties<
+                false>(pol.points, prev_layer_lines, config);
 
             for (size_t i = 0; i < annotated_points.size(); ++i) {
                 const ExtrusionProcessor::ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
@@ -1255,10 +1342,14 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                 Points extrusion_pts;
                 extrusion->collect_points(extrusion_pts);
                 float flow_width       = get_flow_width(layer_region, extrusion->role());
-                auto  annotated_points = ExtrusionProcessor::estimate_points_properties<true, true, false, false>(extrusion_pts,
-                                                                                                                 prev_layer_lines,
-                                                                                                                 flow_width,
-                                                                                                                 params.bridge_distance);
+
+                ExtrusionProcessor::PropertiesEstimationConfig config{};
+                config.max_line_length = params.bridge_distance;
+                config.add_corners = true;
+                config.flow_width = flow_width;
+                auto annotated_points = ExtrusionProcessor::estimate_points_properties<
+                    false>(extrusion_pts, prev_layer_lines, config);
+
                 for (size_t i = 0; i < annotated_points.size(); ++i) {
                     const ExtrusionProcessor::ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
                     const ExtrusionProcessor::ExtendedPoint &b = annotated_points[i];

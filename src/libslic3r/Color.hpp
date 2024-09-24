@@ -5,8 +5,12 @@
 #ifndef slic3r_Color_hpp_
 #define slic3r_Color_hpp_
 
+#include <assert.h>
 #include <array>
 #include <algorithm>
+#include <string>
+#include <vector>
+#include <cassert>
 
 #include "Point.hpp"
 

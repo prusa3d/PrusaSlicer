@@ -5,29 +5,42 @@
 #ifndef ARRANGEITEM_HPP
 #define ARRANGEITEM_HPP
 
-#include <optional>
 #include <boost/variant.hpp>
+#include <libslic3r/ClipperUtils.hpp>
+#include <assert.h>
+#include <stddef.h>
+#include <optional>
+#include <algorithm>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
 
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/AnyPtr.hpp"
-
 #include "libslic3r/Arrange/Core/PackingContext.hpp"
 #include "libslic3r/Arrange/Core/NFP/NFPArrangeItemTraits.hpp"
 #include "libslic3r/Arrange/Core/NFP/NFP.hpp"
-
 #include "libslic3r/Arrange/Items/MutableItemTraits.hpp"
-
 #include "libslic3r/Arrange/Arrange.hpp"
 #include "libslic3r/Arrange/Tasks/ArrangeTask.hpp"
 #include "libslic3r/Arrange/Tasks/FillBedTask.hpp"
 #include "libslic3r/Arrange/Tasks/MultiplySelectionTask.hpp"
-
 #include "libslic3r/Arrange/Items/ArbitraryDataStore.hpp"
-
-#include <libslic3r/ClipperUtils.hpp>
+#include "libslic3r/Arrange/Core/ArrangeBase.hpp"
+#include "libslic3r/Arrange/Core/ArrangeItemTraits.hpp"
+#include "libslic3r/Arrange/Core/DataStoreTraits.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r { namespace arr2 {
+struct InfiniteBed;
 
 inline bool check_polygons_are_convex(const Polygons &pp) {
     return std::all_of(pp.begin(), pp.end(), [](const Polygon &p) {

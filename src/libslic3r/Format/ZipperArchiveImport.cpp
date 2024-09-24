@@ -139,7 +139,7 @@ std::pair<DynamicPrintConfig, ConfigSubstitutions> extract_profile(
     // as output argument then replace it with the readed profile to report
     // that it was empty.
     profile_use = profile_in.empty() ? profile_out : profile_in;
-    profile_out = profile_in;
+    profile_out += std::move(profile_in);
 
     return {profile_use, std::move(config_substitutions)};
 }

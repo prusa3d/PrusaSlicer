@@ -13,12 +13,16 @@
 	#endif // __APPLE__
 #endif
 
-#include <atomic>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/task_arena.h>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
-#include <tbb/parallel_for.h>
-#include <tbb/task_arena.h>
+#include <algorithm>
+#include <ostream>
+#include <cassert>
+#include <cstddef>
 
 #include "Thread.hpp"
 #include "Utils.hpp"
@@ -127,8 +131,8 @@ std::optional<std::string> get_current_thread_name()
 		return std::nullopt;
 
 	wchar_t *ptr = nullptr;
-	s_fnGetThreadDescription(::GetCurrentThread(), &ptr);
-	return (ptr == nullptr) ? std::string() : boost::nowide::narrow(ptr);
+    s_fnGetThreadDescription(::GetCurrentThread(), &ptr);
+    return (ptr == nullptr) ? std::string() : boost::nowide::narrow(ptr);
 }
 
 #else // _WIN32
@@ -235,12 +239,11 @@ void name_tbb_thread_pool_threads_set_locale()
 //	const size_t nthreads_hw = std::thread::hardware_concurrency();
 	const size_t nthreads_hw = tbb::this_task_arena::max_concurrency();
 	size_t       nthreads    = nthreads_hw;
+    if (thread_count) {
+        nthreads = std::min(nthreads_hw, *thread_count);
+    }
 
-#if 0
-	// Shiny profiler is not thread safe, thus disable parallelization.
-	disable_multi_threading();
-	nthreads = 1;
-#endif
+    enforce_thread_count(nthreads);
 
 	size_t                  nthreads_running(0);
 	std::condition_variable cv;

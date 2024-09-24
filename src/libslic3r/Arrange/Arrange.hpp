@@ -61,7 +61,7 @@ class DefaultArrangerCtl : public Arranger<ArrItem>::Ctl {
 public:
     DefaultArrangerCtl() = default;
 
-    explicit DefaultArrangerCtl(ArrangeTaskBase::Ctl &ctl) : taskctl{&ctl} {}
+    explicit DefaultArrangerCtl(ArrangeTaskCtl &ctl) : taskctl{&ctl} {}
 
     void update_status(int st) override
     {

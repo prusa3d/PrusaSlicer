@@ -30,6 +30,9 @@ namespace Slic3r{
     class AppConfig;
     class GLVolume;
     enum class ModelVolumeType : int;
+    namespace GUI::Emboss {
+        struct CreateVolumeParams;
+    }
 }
 
 namespace Slic3r::GUI {
@@ -63,7 +66,6 @@ public:
     /// <param name="axis">Axis for mirroring must be one of {0,1,2}</param>
     /// <returns>True on success start job otherwise False</returns>
     bool do_mirror(size_t axis);
-
 
     /// <summary>
     /// Call on change inside of object conatining projected volume
@@ -114,7 +116,7 @@ private:
     void reset_volume();
 
     // create volume from text - main functionality
-    bool process();
+    bool process(bool make_snapshot = true, std::optional<Transform3d> volume_transformation = std::nullopt);
     void close();
     void draw_window();
     void draw_text_input();
@@ -139,6 +141,17 @@ private:
     bool draw_bold_button();
     void draw_advanced();
 
+    void draw_use_surface();
+    void draw_per_glyph();
+    void draw_align();
+    void draw_char_gap();
+    void draw_line_gap();
+    void draw_boldness();
+    void draw_skew();
+    void draw_rotation();
+
+    void draw_surface_distance();
+
     bool select_facename(const wxString& facename);
 
     template<typename T> bool rev_input_mm(const std::string &name, T &value, const T *default_value,
@@ -152,12 +165,10 @@ private:
     template<typename T> bool rev_input(const std::string &name, T &value, const T *default_value, 
         const std::string &undo_tooltip, T step, T step_fast, const char *format, ImGuiInputTextFlags flags = 0) const;
     bool rev_checkbox(const std::string &name, bool &value, const bool* default_value, const std::string  &undo_tooltip) const;
-    bool rev_slider(const std::string &name, std::optional<int>& value, const std::optional<int> *default_value,
-        const std::string &undo_tooltip, int v_min, int v_max, const std::string &format, const wxString &tooltip) const;
     bool rev_slider(const std::string &name, std::optional<float>& value, const std::optional<float> *default_value,
-        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip) const;
+        const std::string &undo_tooltip, const MinMax<float>& min_max, const std::string &format, const wxString &tooltip) const;
     bool rev_slider(const std::string &name, float &value, const float *default_value, 
-        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip) const;
+        const std::string &undo_tooltip, const MinMax<float>& min_max, const std::string &format, const wxString &tooltip) const;
     template<typename T, typename Draw> bool revertible(const std::string &name, T &value, const T *default_value,
         const std::string &undo_tooltip, float undo_offset, Draw draw) const;
 
@@ -175,6 +186,9 @@ private:
     void create_notification_not_valid_font(const TextConfiguration& tc);
     void create_notification_not_valid_font(const std::string& text);
     void remove_notification_not_valid_font();
+
+    // initialize data for create volume in job
+    Emboss::CreateVolumeParams create_input(ModelVolumeType volume_type);
 
     struct GuiCfg;
     std::unique_ptr<const GuiCfg> m_gui_cfg;
@@ -234,6 +248,7 @@ private:
     // For text on scaled objects
     std::optional<float> m_scale_height;
     std::optional<float> m_scale_depth;
+    std::optional<float> m_scale_width;
     void calculate_scale();
 
     // drawing icons

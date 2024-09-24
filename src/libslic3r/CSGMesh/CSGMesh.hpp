@@ -87,6 +87,7 @@ struct CSGPart {
     {}
 };
 
+// Check if there are only positive parts (Union) within the collection.
 template<class Cont> bool is_all_positive(const Cont &csgmesh)
 {
     bool is_all_pos =
@@ -99,6 +100,8 @@ template<class Cont> bool is_all_positive(const Cont &csgmesh)
     return is_all_pos;
 }
 
+// Merge all the positive parts of the collection into a single triangle mesh without performing
+// any booleans.
 template<class Cont>
 indexed_triangle_set csgmesh_merge_positive_parts(const Cont &csgmesh)
 {

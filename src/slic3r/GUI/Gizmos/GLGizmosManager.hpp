@@ -94,14 +94,16 @@ private:
         float scale{ 1.0f };
         float icons_size{ Default_Icons_Size };
         float border{ 5.0f };
-        float gap_y{ 5.0f };
+        float gap_x{ 15.0f };
+        float gap_y{ 15.0f };
 
         float stride_y() const { return icons_size + gap_y;}
 
-        float scaled_icons_size() const { return scale * icons_size; }
-        float scaled_border() const { return scale * border; }
-        float scaled_gap_y() const { return scale * gap_y; }
-        float scaled_stride_y() const { return scale * stride_y(); }
+        float scaled_icons_size()   const { return int(scale * icons_size); }
+        float scaled_border()       const { return int(scale * border); }
+        float scaled_gap_x()        const { return int(scale * gap_x); }
+        float scaled_gap_y()        const { return int(scale * gap_y); }
+        float scaled_stride_y()     const { return scaled_icons_size() + scaled_gap_y(); }
     };
 
     GLCanvas3D& m_parent;
@@ -231,6 +233,8 @@ public:
     // To end highlight set gizmo = undefined
     void set_highlight(EType gizmo, bool highlight_shown) { m_highlight = std::pair<EType, bool>(gizmo, highlight_shown); }
     bool get_highlight_state() const { return m_highlight.second; }
+    float get_scaled_total_height() const;
+    float get_scaled_total_width() const;
 
 private:
     bool gizmo_event(SLAGizmoEventType action,
@@ -242,10 +246,6 @@ private:
     void render_background(float left, float top, float right, float bottom, float border_w, float border_h) const;
 
     void do_render_overlay() const;
-
-    float get_scaled_total_height() const;
-    float get_scaled_total_width() const;
-
     bool generate_icons_texture();
 
     void update_hover_state(const EType &type);

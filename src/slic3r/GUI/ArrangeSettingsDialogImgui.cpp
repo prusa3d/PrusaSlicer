@@ -38,16 +38,16 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
 {
     assert(m_imgui && m_db);
 
-    m_imgui->set_next_window_pos(pos_x, pos_y, ImGuiCond_Always, 0.5f, 0.0f);
+    ImGuiPureWrap::set_next_window_pos(pos_x, pos_y, ImGuiCond_Always, 0.5f, 0.0f);
 
-    m_imgui->begin(_L("Arrange options"),
+    ImGuiPureWrap::begin(_u8L("Arrange options"),
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoCollapse);
 
     Settings settings;
     read_settings(settings, m_db.get());
 
-    m_imgui->text(GUI::format_wxstr(
+    ImGuiPureWrap::text(GUI::format(
         _L("Press %1%left mouse button to enter the exact value"),
         shortkey_ctrl_prefix()));
 
@@ -79,13 +79,13 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
         m_db->set_distance_from_bed(settings.d_bed);
     }
 
-    if (m_imgui->checkbox(_L("Enable rotations (slow)"), settings.rotations)) {
+    if (ImGuiPureWrap::checkbox(_u8L("Enable rotations (slow)"), settings.rotations)) {
         m_db->set_rotation_enabled(settings.rotations);
     }
 
     if (m_show_xl_combo_predicate() &&
         settings.xl_align >= 0 &&
-        m_imgui->combo(_L("Alignment"),
+        ImGuiPureWrap::combo(_u8L("Alignment"),
                        {_u8L("Center"), _u8L("Rear left"), _u8L("Front left"),
                         _u8L("Front right"), _u8L("Rear right"),
                         _u8L("Random")},
@@ -97,7 +97,7 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
     }
 
     // TRN ArrangeDialog
-    if (m_imgui->combo(_L("Geometry handling"),
+    if (ImGuiPureWrap::combo(_u8L("Geometry handling"),
         // TRN ArrangeDialog: Type of "Geometry handling"
          {_u8L("Fast"),
         // TRN ArrangeDialog: Type of "Geometry handling"
@@ -114,7 +114,7 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
 
     ImGui::Separator();
 
-    if (m_imgui->button(_L("Reset defaults"))) {
+    if (ImGuiPureWrap::button(_u8L("Reset defaults"))) {
         arr2::ArrangeSettingsDb::Values df =  m_db->get_defaults();
         m_db->set_distance_from_objects(df.d_obj);
         m_db->set_distance_from_bed(df.d_bed);
@@ -131,11 +131,11 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
 
     ImGui::SameLine();
 
-    if (m_imgui->button(_L("Arrange")) && m_on_arrange_btn) {
+    if (ImGuiPureWrap::button(_u8L("Arrange")) && m_on_arrange_btn) {
         m_on_arrange_btn();
     }
 
-    m_imgui->end();
+    ImGuiPureWrap::end();
 }
 
 }} // namespace Slic3r::GUI

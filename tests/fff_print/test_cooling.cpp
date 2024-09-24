@@ -250,9 +250,9 @@ SCENARIO("Cooling integration tests", "[Cooling]") {
                 if (l == 0)
                     l = line.dist_Z(self);
                 if (l > 0.) {
-                    if (layer_times.empty())
-                        layer_times.emplace_back(0.);
-                    layer_times.back() += 60. * std::abs(l) / line.new_F(self);
+                    if (!layer_times.empty()) { // Ignore anything before first z move.
+                        layer_times.back() += 60. * std::abs(l) / line.new_F(self);
+                    }
                 }
                 if (line.has('F') && line.f() == external_perimeter_speed)
                     ++ layer_external[scaled<coord_t>(self.z())];

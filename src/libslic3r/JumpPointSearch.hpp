@@ -5,16 +5,19 @@
 #ifndef SRC_LIBSLIC3R_JUMPPOINTSEARCH_HPP_
 #define SRC_LIBSLIC3R_JUMPPOINTSEARCH_HPP_
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include "BoundingBox.hpp"
 #include "Polygon.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Polyline.hpp"
 #include "libslic3r/libslic3r.h"
-#include <unordered_map>
-#include <unordered_set>
+#include "libslic3r/Line.hpp"
 
 namespace Slic3r {
+class Layer;
 
 class JPSPathFinder
 {

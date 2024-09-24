@@ -5,16 +5,35 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Arr_segment_traits_2.h>
 #include <CGAL/Surface_sweep_2_algorithms.h>
+#include <boost/variant/get.hpp>
+#include <vector>
+#include <cassert>
 
 #include "libslic3r/Geometry/Voronoi.hpp"
-#include "libslic3r/Arachne/utils/VoronoiUtils.hpp"
-
+#include "libslic3r/Geometry/VoronoiUtils.hpp"
+#include "libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp"
+#include "libslic3r/MultiMaterialSegmentation.hpp"
 #include "VoronoiUtilsCgal.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+
+namespace CGAL {
+class MP_Float;
+}  // namespace CGAL
 
 using VD = Slic3r::Geometry::VoronoiDiagram;
-using namespace Slic3r::Arachne;
 
 namespace Slic3r::Geometry {
+
+using PolygonsSegmentIndexConstIt = std::vector<Arachne::PolygonsSegmentIndex>::const_iterator;
+using LinesIt                     = Lines::iterator;
+using ColoredLinesConstIt         = ColoredLines::const_iterator;
+
+// Explicit template instantiation.
+template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, LinesIt, LinesIt);
+template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, VD::SegmentIt, VD::SegmentIt);
+template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, ColoredLinesConstIt, ColoredLinesConstIt);
+template bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
 
 // The tangent vector of the parabola is computed based on the Proof of the reflective property.
 // https://en.wikipedia.org/wiki/Parabola#Proof_of_the_reflective_property
@@ -121,30 +140,30 @@ using ParabolicTangentToSegmentOrientation = impl::ParabolicTangentToSegmentOrie
 using ParabolicTangentToParabolicTangentOrientation = impl::ParabolicTangentToParabolicTangentOrientationPredicateFiltered;
 using CGAL_Point   = impl::K::Point_2;
 
-inline static CGAL_Point to_cgal_point(const VD::vertex_type *pt) { return {pt->x(), pt->y()}; }
-inline static CGAL_Point to_cgal_point(const Point &pt) { return {pt.x(), pt.y()}; }
-inline static CGAL_Point to_cgal_point(const Vec2d &pt) { return {pt.x(), pt.y()}; }
+inline CGAL_Point to_cgal_point(const VD::vertex_type *pt) { return {pt->x(), pt->y()}; }
+inline CGAL_Point to_cgal_point(const Point &pt) { return {pt.x(), pt.y()}; }
+inline CGAL_Point to_cgal_point(const Vec2d &pt) { return {pt.x(), pt.y()}; }
 
-inline static Linef make_linef(const VD::edge_type &edge)
+inline Linef make_linef(const VD::edge_type &edge)
 {
     const VD::vertex_type *v0 = edge.vertex0();
     const VD::vertex_type *v1 = edge.vertex1();
     return {Vec2d(v0->x(), v0->y()), Vec2d(v1->x(), v1->y())};
 }
 
-[[maybe_unused]] inline static bool is_equal(const VD::vertex_type &first, const VD::vertex_type &second) { return first.x() == second.x() && first.y() == second.y(); }
+[[maybe_unused]] inline bool is_equal(const VD::vertex_type &vertex_first, const VD::vertex_type &vertex_second) { return vertex_first.x() == vertex_second.x() && vertex_first.y() == vertex_second.y(); }
 
 // FIXME Lukas H.: Also includes parabolic segments.
 bool VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(const VD &voronoi_diagram)
 {
-    using CGAL_Point  = CGAL::Exact_predicates_exact_constructions_kernel::Point_2;
-    using CGAL_Segment = CGAL::Arr_segment_traits_2<CGAL::Exact_predicates_exact_constructions_kernel>::Curve_2;
-    auto to_cgal_point = [](const VD::vertex_type &pt) -> CGAL_Point { return {pt.x(), pt.y()}; };
+    using CGAL_E_Point   = CGAL::Exact_predicates_exact_constructions_kernel::Point_2;
+    using CGAL_E_Segment = CGAL::Arr_segment_traits_2<CGAL::Exact_predicates_exact_constructions_kernel>::Curve_2;
+    auto to_cgal_point   = [](const VD::vertex_type &pt) -> CGAL_E_Point { return {pt.x(), pt.y()}; };
 
     assert(std::all_of(voronoi_diagram.edges().cbegin(), voronoi_diagram.edges().cend(),
                        [](const VD::edge_type &edge) { return edge.color() == 0; }));
 
-    std::vector<CGAL_Segment> segments;
+    std::vector<CGAL_E_Segment> segments;
     segments.reserve(voronoi_diagram.num_edges());
 
     for (const VD::edge_type &edge : voronoi_diagram.edges()) {
@@ -163,7 +182,7 @@ bool VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(const VD &voronoi_
     for (const VD::edge_type &edge : voronoi_diagram.edges())
         edge.color(0);
 
-    std::vector<CGAL_Point> intersections_pt;
+    std::vector<CGAL_E_Point> intersections_pt;
     CGAL::compute_intersection_points(segments.begin(), segments.end(), std::back_inserter(intersections_pt));
     return intersections_pt.empty();
 }
@@ -178,29 +197,44 @@ struct ParabolicSegment
     const CGAL::Orientation is_focus_on_left;
 };
 
-inline static ParabolicSegment get_parabolic_segment(const VD::edge_type &edge, const std::vector<VoronoiUtils::Segment> &segments)
+template<typename SegmentIterator>
+inline static typename boost::polygon::enable_if<
+    typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
+        typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+    ParabolicSegment>::type
+get_parabolic_segment(const VD::edge_type &edge, const SegmentIterator segment_begin, const SegmentIterator segment_end)
 {
+    using Segment = typename std::iterator_traits<SegmentIterator>::value_type;
     assert(edge.is_curved());
 
     const VD::cell_type *left_cell  = edge.cell();
     const VD::cell_type *right_cell = edge.twin()->cell();
 
-    const Point                  focus_pt   = VoronoiUtils::getSourcePoint(*(left_cell->contains_point() ? left_cell : right_cell), segments);
-    const VoronoiUtils::Segment &directrix  = VoronoiUtils::getSourceSegment(*(left_cell->contains_point() ? right_cell : left_cell), segments);
-    CGAL::Orientation            focus_side = CGAL::opposite(CGAL::orientation(to_cgal_point(edge.vertex0()), to_cgal_point(edge.vertex1()), to_cgal_point(focus_pt)));
+    const Point       focus_pt   = VoronoiUtils::get_source_point(*(left_cell->contains_point() ? left_cell : right_cell), segment_begin, segment_end);
+    const Segment    &directrix  = VoronoiUtils::get_source_segment(*(left_cell->contains_point() ? right_cell : left_cell), segment_begin, segment_end);
+    CGAL::Orientation focus_side = CGAL::opposite(CGAL::orientation(to_cgal_point(edge.vertex0()), to_cgal_point(edge.vertex1()), to_cgal_point(focus_pt)));
 
     assert(focus_side == CGAL::Orientation::LEFT_TURN || focus_side == CGAL::Orientation::RIGHT_TURN);
-    return {focus_pt, Line(directrix.from(), directrix.to()), make_linef(edge), focus_side};
+
+    const Point directrix_from = boost::polygon::segment_traits<Segment>::get(directrix, boost::polygon::LOW);
+    const Point directrix_to   = boost::polygon::segment_traits<Segment>::get(directrix, boost::polygon::HIGH);
+    return {focus_pt, Line(directrix_from, directrix_to), make_linef(edge), focus_side};
 }
 
-inline static CGAL::Orientation orientation_of_two_edges(const VD::edge_type &edge_a, const VD::edge_type &edge_b, const std::vector<VoronoiUtils::Segment> &segments) {
+template<typename SegmentIterator>
+inline static typename boost::polygon::enable_if<
+    typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
+        typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+    CGAL::Orientation>::type
+orientation_of_two_edges(const VD::edge_type &edge_a, const VD::edge_type &edge_b, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+{
     assert(is_equal(*edge_a.vertex0(), *edge_b.vertex0()));
     CGAL::Orientation orientation;
     if (edge_a.is_linear() && edge_b.is_linear()) {
         orientation = CGAL::orientation(to_cgal_point(edge_a.vertex0()), to_cgal_point(edge_a.vertex1()), to_cgal_point(edge_b.vertex1()));
     } else if (edge_a.is_curved() && edge_b.is_curved()) {
-        const ParabolicSegment parabolic_a = get_parabolic_segment(edge_a, segments);
-        const ParabolicSegment parabolic_b = get_parabolic_segment(edge_b, segments);
+        const ParabolicSegment parabolic_a = get_parabolic_segment(edge_a, segment_begin, segment_end);
+        const ParabolicSegment parabolic_b = get_parabolic_segment(edge_b, segment_begin, segment_end);
         orientation = ParabolicTangentToParabolicTangentOrientation{}(to_cgal_point(parabolic_a.segment.a),
                                                                       to_cgal_point(parabolic_a.focus),
                                                                       to_cgal_point(parabolic_a.directrix.a),
@@ -216,7 +250,7 @@ inline static CGAL::Orientation orientation_of_two_edges(const VD::edge_type &ed
 
         const VD::edge_type   &linear_edge    = edge_a.is_curved() ? edge_b : edge_a;
         const VD::edge_type   &parabolic_edge = edge_a.is_curved() ? edge_a : edge_b;
-        const ParabolicSegment parabolic      = get_parabolic_segment(parabolic_edge, segments);
+        const ParabolicSegment parabolic      = get_parabolic_segment(parabolic_edge, segment_begin, segment_end);
         orientation = ParabolicTangentToSegmentOrientation{}(to_cgal_point(parabolic.segment.a), to_cgal_point(linear_edge.vertex1()),
                                                              to_cgal_point(parabolic.focus),
                                                              to_cgal_point(parabolic.directrix.a),
@@ -230,39 +264,54 @@ inline static CGAL::Orientation orientation_of_two_edges(const VD::edge_type &ed
     return orientation;
 }
 
-static bool check_if_three_edges_are_ccw(const VD::edge_type &first, const VD::edge_type &second, const VD::edge_type &third, const std::vector<VoronoiUtils::Segment> &segments)
+template<typename SegmentIterator>
+static typename boost::polygon::enable_if<
+    typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
+        typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+    bool>::type
+check_if_three_edges_are_ccw(const VD::edge_type  &edge_first,
+                             const VD::edge_type  &edge_second,
+                             const VD::edge_type  &edge_third,
+                             const SegmentIterator segment_begin,
+                             const SegmentIterator segment_end)
 {
-    assert(is_equal(*first.vertex0(), *second.vertex0()) && is_equal(*second.vertex0(), *third.vertex0()));
+    assert(is_equal(*edge_first.vertex0(), *edge_second.vertex0()) && is_equal(*edge_second.vertex0(), *edge_third.vertex0()));
 
-    CGAL::Orientation orientation = orientation_of_two_edges(first, second, segments);
+    CGAL::Orientation orientation = orientation_of_two_edges(edge_first, edge_second, segment_begin, segment_end);
     if (orientation == CGAL::Orientation::COLLINEAR) {
         // The first two edges are collinear, so the third edge must be on the right side on the first of them.
-        return orientation_of_two_edges(first, third, segments) == CGAL::Orientation::RIGHT_TURN;
+        return orientation_of_two_edges(edge_first, edge_third, segment_begin, segment_end) == CGAL::Orientation::RIGHT_TURN;
     } else if (orientation == CGAL::Orientation::LEFT_TURN) {
         // CCW oriented angle between vectors (common_pt, pt1) and (common_pt, pt2) is bellow PI.
         // So we need to check if test_pt isn't between them.
-        CGAL::Orientation orientation1 = orientation_of_two_edges(first, third, segments);
-        CGAL::Orientation orientation2 = orientation_of_two_edges(second, third, segments);
+        CGAL::Orientation orientation1 = orientation_of_two_edges(edge_first, edge_third, segment_begin, segment_end);
+        CGAL::Orientation orientation2 = orientation_of_two_edges(edge_second, edge_third, segment_begin, segment_end);
         return (orientation1 != CGAL::Orientation::LEFT_TURN || orientation2 != CGAL::Orientation::RIGHT_TURN);
     } else {
         assert(orientation == CGAL::Orientation::RIGHT_TURN);
         // CCW oriented angle between vectors (common_pt, pt1) and (common_pt, pt2) is upper PI.
         // So we need to check if test_pt is between them.
-        CGAL::Orientation orientation1 = orientation_of_two_edges(first, third, segments);
-        CGAL::Orientation orientation2 = orientation_of_two_edges(second, third, segments);
+        CGAL::Orientation orientation1 = orientation_of_two_edges(edge_first, edge_third, segment_begin, segment_end);
+        CGAL::Orientation orientation2 = orientation_of_two_edges(edge_second, edge_third, segment_begin, segment_end);
         return (orientation1 == CGAL::Orientation::RIGHT_TURN || orientation2 == CGAL::Orientation::LEFT_TURN);
     }
 }
 
-bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VoronoiDiagram &voronoi_diagram, const std::vector<VoronoiUtils::Segment> &segments)
+template<typename SegmentIterator>
+typename boost::polygon::enable_if<
+    typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
+        typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+    bool>::type
+VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD             &voronoi_diagram,
+                                                  const SegmentIterator segment_begin,
+                                                  const SegmentIterator segment_end)
 {
     for (const VD::vertex_type &vertex : voronoi_diagram.vertices()) {
         std::vector<const VD::edge_type *> edges;
         const VD::edge_type               *edge = vertex.incident_edge();
 
         do {
-            if (edge->is_finite() && edge->vertex0() != nullptr && edge->vertex1() != nullptr &&
-                VoronoiUtils::is_finite(*edge->vertex0()) && VoronoiUtils::is_finite(*edge->vertex1()))
+            if (edge->is_finite() && edge->vertex0() != nullptr && edge->vertex1() != nullptr && VoronoiUtils::is_finite(*edge->vertex0()) && VoronoiUtils::is_finite(*edge->vertex1()))
                 edges.emplace_back(edge);
 
             edge = edge->rot_next();
@@ -271,11 +320,11 @@ bool VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VoronoiDiagram &vor
         // Checking for CCW make sense for three and more edges.
         if (edges.size() > 2) {
             for (auto edge_it = edges.begin() ; edge_it != edges.end(); ++edge_it) {
-                const Geometry::VoronoiDiagram::edge_type *prev_edge = edge_it == edges.begin() ? edges.back() : *std::prev(edge_it);
-                const Geometry::VoronoiDiagram::edge_type *curr_edge = *edge_it;
-                const Geometry::VoronoiDiagram::edge_type *next_edge = std::next(edge_it) == edges.end() ? edges.front() : *std::next(edge_it);
+                const VD::edge_type *prev_edge = edge_it == edges.begin() ? edges.back() : *std::prev(edge_it);
+                const VD::edge_type *curr_edge = *edge_it;
+                const VD::edge_type *next_edge = std::next(edge_it) == edges.end() ? edges.front() : *std::next(edge_it);
 
-                if (!check_if_three_edges_are_ccw(*prev_edge, *curr_edge, *next_edge, segments))
+                if (!check_if_three_edges_are_ccw(*prev_edge, *curr_edge, *next_edge, segment_begin, segment_end))
                     return false;
             }
         }

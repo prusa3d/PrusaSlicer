@@ -10,6 +10,8 @@
 #ifndef slic3r_Extruder_hpp_
 #define slic3r_Extruder_hpp_
 
+#include <utility>
+
 #include "libslic3r.h"
 #include "Point.hpp"
 

@@ -2,14 +2,251 @@
 
 #include "libslic3r/Config.hpp"
 #include "libslic3r/PrintConfig.hpp"
-#include "libslic3r/LocalesUtils.hpp"
 
+#include <LocalesUtils.hpp>
 #include <cereal/types/polymorphic.hpp>
 #include <cereal/types/string.hpp> 
 #include <cereal/types/vector.hpp> 
 #include <cereal/archives/binary.hpp>
 
 using namespace Slic3r;
+
+TEST_CASE("Dynamic config serialization - tests ConfigBase", "[Config]"){
+    DynamicPrintConfig config;
+    INFO("Serialize float");
+    config.set_key_value("layer_height", new ConfigOptionFloat(0.3));
+    CHECK(config.opt_serialize("layer_height") == "0.3");
+
+    INFO("Serialize int");
+    config.set_key_value("perimeters", new ConfigOptionInt(2));
+    CHECK(config.opt_serialize("perimeters") == "2");
+
+    INFO("Serialize float or percent");
+    config.set_key_value("first_layer_height", new ConfigOptionFloatOrPercent(30, true));
+    CHECK(config.opt_serialize("first_layer_height") == "30%");
+
+    INFO("Serialize bool");
+    config.set_key_value("use_relative_e_distances", new ConfigOptionBool(true));
+    CHECK(config.opt_serialize("use_relative_e_distances") == "1");
+
+    INFO("Serialize enum");
+    config.set_key_value("gcode_flavor", new ConfigOptionEnum<GCodeFlavor>(gcfTeacup));
+    CHECK(config.opt_serialize("gcode_flavor") == "teacup");
+
+    INFO("Serialize string");
+    config.set_key_value("extrusion_axis", new ConfigOptionString("A"));
+    CHECK(config.opt_serialize("extrusion_axis") == "A");
+
+    INFO("Serialize string with newline");
+    config.set_key_value("notes", new ConfigOptionString("foo\nbar"));
+    CHECK(config.opt_serialize("notes") == "foo\\nbar");
+    config.set_deserialize_strict("notes", "bar\\nbaz");
+    INFO("Deserialize string with newline");
+    CHECK(config.opt_string("notes") == "bar\nbaz");
+
+    INFO("Serialize points");
+    config.set_key_value("extruder_offset", new ConfigOptionPoints({{10, 20}, {30, 45}}));
+    CHECK(config.opt_serialize("extruder_offset") == "10x20,30x45");
+    INFO("Deserialize points");
+    config.set_deserialize_strict("extruder_offset", "20x10");
+    CHECK(config.option<ConfigOptionPoints>("extruder_offset")->values == std::vector{Vec2d{20, 10}});
+
+    INFO("Serialize floats");
+    config.set_key_value("nozzle_diameter", new ConfigOptionFloats({0.2, 3}));
+    CHECK(config.opt_serialize("nozzle_diameter") == "0.2,3");
+    INFO("Deserialize floats");
+    config.set_deserialize_strict("nozzle_diameter", "0.1,0.4");
+    CHECK_THAT(config.option<ConfigOptionFloats>("nozzle_diameter")->values, Catch::Matchers::Approx(std::vector{0.1, 0.4}));
+    INFO("Deserialize floats from one value");
+    config.set_deserialize_strict("nozzle_diameter", "3");
+    CHECK_THAT(config.option<ConfigOptionFloats>("nozzle_diameter")->values, Catch::Matchers::Approx(std::vector{3.0}));
+
+    INFO("Serialize ints");
+    config.set_key_value("temperature", new ConfigOptionInts({180, 210}));
+    CHECK(config.opt_serialize("temperature") == "180,210");
+    INFO("Deserialize ints");
+    config.set_deserialize_strict("temperature", "195,220");
+    CHECK(config.option<ConfigOptionInts>("temperature")->values == std::vector{195,220});
+
+    INFO("Serialize bools");
+    config.set_key_value("wipe", new ConfigOptionBools({true, false}));
+    CHECK(config.opt_serialize("wipe") == "1,0");
+    INFO("Deserialize bools");
+    config.set_deserialize_strict("wipe", "0,1,1");
+    CHECK(config.option<ConfigOptionBools>("wipe")->values == std::vector<unsigned char>{false, true, true});
+
+    INFO("Deserialize bools from empty stirng");
+    config.set_deserialize_strict("wipe", "");
+    CHECK(config.option<ConfigOptionBools>("wipe")->values == std::vector<unsigned char>{});
+
+    INFO("Deserialize bools from value");
+    config.set_deserialize_strict({{"wipe", 1}});
+    CHECK(config.option<ConfigOptionBools>("wipe")->values == std::vector<unsigned char>{true});
+
+    INFO("Serialize strings");
+    config.set_key_value("post_process", new ConfigOptionStrings({"foo", "bar"}));
+    CHECK(config.opt_serialize("post_process") == "foo;bar");
+    INFO("Deserialize strings");
+    config.set_deserialize_strict("post_process", "bar;baz");
+    CHECK(config.option<ConfigOptionStrings>("post_process")->values == std::vector<std::string>{"bar", "baz"});
+}
+
+TEST_CASE("Get keys", "[Config]"){
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    CHECK(!config.keys().empty());
+}
+
+TEST_CASE("Set not already set option", "[Config]") {
+    DynamicPrintConfig config;
+    config.set_deserialize_strict("filament_diameter", "3");
+}
+
+TEST_CASE("Config apply dynamic to static", "[Config]") {
+    DynamicPrintConfig config;
+    config.set_deserialize_strict("perimeters", "2");
+
+    // This trick is taken directly from perl.
+    StaticPrintConfig* config2 = static_cast<GCodeConfig*>(new FullPrintConfig());
+    config2->apply(config, true);
+
+    CHECK(config2->opt_int("perimeters") == 2);
+    delete config2;
+}
+
+TEST_CASE("Config apply static to dynamic", "[Config]") {
+    // This trick is taken directly from perl.
+    StaticPrintConfig* config = static_cast<GCodeConfig*>(new FullPrintConfig());
+
+    DynamicPrintConfig config2;
+    config2.apply(*config, true);
+    delete config;
+
+    CHECK(
+        config2.opt_int("perimeters") ==
+        DynamicPrintConfig::full_print_config().opt_int("perimeters")
+    );
+
+}
+
+TEST_CASE("Config apply dynamic to dynamic", "[Config]") {
+
+    DynamicPrintConfig config;
+    config.set_key_value("extruder_offset", new ConfigOptionPoints({{0, 0}, {20, 0}, {0, 20}}));
+    DynamicPrintConfig config2;
+    config2.apply(config, true);
+
+    CHECK(
+        config2.option<ConfigOptionPoints>("extruder_offset")->values ==
+        std::vector<Vec2d>{{0, 0}, {20, 0}, {0, 20}}
+    );
+}
+
+TEST_CASE("Get abs value on percent", "[Config]") {
+    StaticPrintConfig* config = static_cast<GCodeConfig*>(new FullPrintConfig());
+
+    config->set_deserialize_strict("solid_infill_speed", "60");
+    config->set_deserialize_strict("top_solid_infill_speed", "10%");
+    CHECK(config->get_abs_value("top_solid_infill_speed") == 6);
+    delete config;
+}
+
+TEST_CASE("No interference between DynamicConfig objects", "[Config]") {
+    DynamicPrintConfig config;
+    config.set_key_value("fill_pattern", new ConfigOptionString("line"));
+    DynamicPrintConfig config2;
+    config2.set_key_value("fill_pattern", new ConfigOptionString("hilbertcurve"));
+    CHECK(config.opt_string("fill_pattern") == "line");
+}
+
+TEST_CASE("Normalize fdm extruder", "[Config]") {
+    DynamicPrintConfig config;
+    config.set("extruder", 2, true);
+    config.set("perimeter_extruder", 3, true);
+    config.normalize_fdm();
+    INFO("Extruder option is removed after normalize().");
+    CHECK(!config.has("extruder"));
+    INFO("Undefined extruder is populated with default extruder.");
+    CHECK(config.opt_int("infill_extruder") == 2);
+    INFO("Defined extruder is not overwritten by default extruder.");
+    CHECK(config.opt_int("perimeter_extruder") == 3);
+}
+
+TEST_CASE("Normalize fdm infill extruder", "[Config]") {
+    DynamicPrintConfig config;
+    config.set("infill_extruder", 2, true);
+    config.normalize_fdm();
+    INFO("Undefined solid infill extruder is populated with infill extruder.");
+    CHECK(config.opt_int("solid_infill_extruder") == 2);
+}
+
+TEST_CASE("Normalize fdm retract layer change", "[Config]") {
+    DynamicPrintConfig config;
+    config.set("spiral_vase", true, true);
+    config.set_key_value("retract_layer_change", new ConfigOptionBools({true, false}));
+    config.normalize_fdm();
+    CHECK(config.option<ConfigOptionBools>("retract_layer_change")->values == std::vector<unsigned char>{0, 0});
+}
+
+TEST_CASE("Can read ini with invalid items", "[Config]") {
+    std::string path = std::string(TEST_DATA_DIR) + "/test_config/bad_config_options.ini";
+
+    DynamicPrintConfig config;
+    config.load(path, ForwardCompatibilitySubstitutionRule::Disable);
+    //Did not crash.
+}
+
+struct SerializationTestData {
+    std::string name;
+    std::vector<std::string> values;
+    std::string serialized;
+};
+
+TEST_CASE("Config serialization of multiple values", "[Config]"){
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    std::vector<SerializationTestData> test_data{
+        {
+            "empty",
+            {},
+            ""
+        },
+        {
+            "single empty",
+            {""},
+            "\"\""
+        },
+        {
+            "single noempty, simple",
+            {"RGB"},
+            "RGB"
+        },
+        {
+            "multiple noempty, simple",
+            {"ABC", "DEF", "09182745@!#$*(&"},
+            "ABC;DEF;09182745@!#$*(&"
+        },
+        {
+            "multiple, simple, some empty",
+            {"ABC", "DEF", "", "09182745@!#$*(&", ""},
+            "ABC;DEF;;09182745@!#$*(&;"
+        },
+        {
+            "complex",
+            {"some \"quoted\" notes", "yet\n some notes", "whatever \n notes", ""},
+            "\"some \\\"quoted\\\" notes\";\"yet\\n some notes\";\"whatever \\n notes\";"
+        }
+    };
+
+    for (const SerializationTestData& data : test_data) {
+        config.set_key_value("filament_notes", new ConfigOptionStrings(data.values));
+        CHECK(config.opt_serialize("filament_notes") == data.serialized);
+
+        config.set_deserialize_strict("filament_notes", "");
+        CHECK(config.option<ConfigOptionStrings>("filament_notes")->values == std::vector<std::string>{});
+
+        config.set_deserialize_strict("filament_notes", data.serialized);
+        CHECK(config.option<ConfigOptionStrings>("filament_notes")->values == data.values);
+    }
+}
 
 SCENARIO("Generic config validation performs as expected.", "[Config]") {
     GIVEN("A config generated from default options") {

@@ -26,15 +26,16 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ArcWelder.hpp"
-#include "Circle.hpp"
 
-#include "../MultiPoint.hpp"
-#include "../Polygon.hpp"
-
-#include <numeric>
-#include <random>
-#include <boost/log/trivial.hpp>
 #include <boost/container/small_vector.hpp>
+#include <array>
+#include <cstdint>
+#include <iterator>
+
+#include "Circle.hpp"
+#include "../MultiPoint.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r { namespace Geometry { namespace ArcWelder {
 
@@ -120,6 +121,7 @@ static inline bool circle_approximation_sufficient(const Circle &circle, const P
     return true;
 }
 
+#if 0
 static inline bool get_deviation_sum_squared(const Circle &circle, const Points::const_iterator begin, const Points::const_iterator end, const double tolerance, double &total_deviation)
 {
     // The circle was calculated from the 1st and last point of the point sequence, thus the fitting of those points does not need to be evaluated.
@@ -148,6 +150,7 @@ static inline bool get_deviation_sum_squared(const Circle &circle, const Points:
 
     return true;
 }
+#endif
 
 double arc_fit_variance(const Point &start_pos, const Point &end_pos, const float radius, bool is_ccw,
     const Points::const_iterator begin, const Points::const_iterator end)

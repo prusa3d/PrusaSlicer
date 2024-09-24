@@ -7,6 +7,11 @@
 
 #include <cereal/access.hpp>
 #include <cereal/types/base_class.hpp>
+#include <stddef.h>
+#include <stdint.h>
+#include <cereal/cereal.hpp>
+#include <cinttypes>
+#include <cstddef>
 
 namespace Slic3r {
 

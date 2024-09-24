@@ -478,7 +478,7 @@ TEST_CASE("Arachne - #8849 - Missing part of model", "[ArachneMissingPart8849]")
     export_perimeters_to_svg(debug_out_path("arachne-missing-part-8849.svg"), polygons, perimeters, union_ex(wall_tool_paths.getInnerContour()));
 #endif
 
-    int64_t total_extrusion_length = 0;
+    [[maybe_unused]] int64_t total_extrusion_length = 0;
     for (Arachne::VariableWidthLines &perimeter : perimeters)
         for (Arachne::ExtrusionLine &extrusion_line : perimeter)
             total_extrusion_length += extrusion_line.getLength();
@@ -756,6 +756,89 @@ TEST_CASE("Arachne - SPE-1837 - No perimeters generated", "[ArachneNoPerimetersG
     Polygons polygons              = {poly_0};
     coord_t  ext_perimeter_spacing = 300000;
     coord_t  perimeter_spacing     = 700000;
+    coord_t  inset_count           = 1;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+    REQUIRE(!perimeters.empty());
+}
+
+TEST_CASE("Arachne - SPE-2298 - Missing twin edge", "[ArachneMissingTwinEdgeSPE2298]") {
+    Polygon poly_0 = {
+        Point(45275325, -26003582),
+        Point(46698318, -24091837),
+        Point(45534079, - 7648226),
+        Point(44427730,   6913138),
+        Point(42406709,  31931594),
+        Point(42041617,  31895427),
+        Point(42556409,  25628802),
+        Point(43129149,  18571997),
+        Point(44061956,   6884616),
+        Point(44482729,   1466404),
+        Point(45172290, - 7674740),
+        Point(46329004, -23890062),
+        Point(46303776, -23895512),
+        Point(45146815, - 7676652),
+        Point(44457276,   1464203),
+        Point(44036504,   6882422),
+        Point(43103702,  18569730),
+        Point(42015592,  31899494),
+        Point(41650258,  31866937),
+        Point(44100538,   1436619)
+    };
+
+    Polygons polygons = {poly_0};
+    coord_t  ext_perimeter_spacing = 407079;
+    coord_t  perimeter_spacing     = 407079;
+    coord_t  inset_count           = 1;
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+    REQUIRE(!perimeters.empty());
+}
+
+TEST_CASE("Arachne - SPE-2298 - Missing twin edge - 2", "[ArachneMissingTwinEdge2SPE2298]") {
+    Polygon poly_0 = {
+        Point(-8908308, -51405945),
+        Point(-12709229, -51250796),
+        Point(-12746335, -51233657),
+        Point(-12830242, -51142897),
+        Point(-12826443, -51134671),
+        Point(-13181213, -51120650),
+        Point(-13184646, -51206854),
+        Point(-19253324, -50972142),
+        Point(-19253413, -50972139),
+        Point(-20427346, -50924668),
+        Point(-20427431, -50924664),
+        Point(-25802429, -50698485),
+        Point(-25802568, -50698481),
+        Point(-28983179, -50556020),
+        Point(-28984425, -50555950),
+        Point(-29799753, -50499586),
+        Point(-29801136, -50499472),
+        Point(-29856539, -50494137),
+        Point(-29857834, -50493996),
+        Point(-30921022, -50364409),
+        Point(-30922312, -50364235),
+        Point(-31012584, -50350908),
+        Point(-31022222, -50358055),
+        Point(-31060596, -50368155),
+        Point(-31429495, -50322406),
+        Point(-31460950, -50531962),
+        Point(-31194587, -50578945),
+        Point(-30054463, -50718244),
+        Point(-28903516, -50799260),
+        Point(-14217296, -51420133),
+        Point(-8916965, -51624212)
+    };
+
+    Polygons polygons = {poly_0};
+    coord_t  ext_perimeter_spacing = 407079;
+    coord_t  perimeter_spacing     = 407079;
     coord_t  inset_count           = 1;
 
     Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, PrintObjectConfig::defaults(), PrintConfig::defaults());

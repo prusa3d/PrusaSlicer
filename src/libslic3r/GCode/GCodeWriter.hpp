@@ -9,15 +9,21 @@
 #ifndef slic3r_GCodeWriter_hpp_
 #define slic3r_GCodeWriter_hpp_
 
-#include "../libslic3r.h"
-#include "../Extruder.hpp"
-#include "../Point.hpp"
-#include "../PrintConfig.hpp"
-#include "CoolingBuffer.hpp"
-
+#include <string.h>
 #include <string>
 #include <string_view>
 #include <charconv>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <vector>
+#include <cstring>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Extruder.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "CoolingBuffer.hpp"
 
 namespace Slic3r {
 
@@ -52,6 +58,7 @@ public:
     std::string postamble() const;
     std::string set_temperature(unsigned int temperature, bool wait = false, int tool = -1) const;
     std::string set_bed_temperature(unsigned int temperature, bool wait = false);
+    std::string set_chamber_temperature(unsigned int temperature, bool wait, bool accurate) const;
     std::string set_print_acceleration(unsigned int acceleration)   { return set_acceleration_internal(Acceleration::Print, acceleration); }
     std::string set_travel_acceleration(unsigned int acceleration)  { return set_acceleration_internal(Acceleration::Travel, acceleration); }
     std::string reset_e(bool force = false);
@@ -66,10 +73,23 @@ public:
     std::string toolchange_prefix() const;
     std::string toolchange(unsigned int extruder_id);
     std::string set_speed(double F, const std::string_view comment = {}, const std::string_view cooling_marker = {}) const;
+
+    std::string get_travel_to_xy_gcode(const Vec2d &point, const std::string_view comment) const;
     std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
     std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
-    std::string travel_to_xyz(const Vec3d &point, const std::string_view comment = {});
-    std::string get_travel_to_z_gcode(double z, const std::string_view comment);
+
+    /**
+     * @brief Return gcode with all three axis defined. Optionally adds feedrate.
+     *
+     * Feedrate is added the starting point "from" is specified.
+     *
+     * @param from Optional starting point of the travel.
+     * @param to Where to travel to.
+     * @param comment Description of the travel purpose.
+     */
+    std::string get_travel_to_xyz_gcode(const Vec3d &from, const Vec3d &to, const std::string_view comment) const;
+    std::string travel_to_xyz(const Vec3d &from, const Vec3d &to, const std::string_view comment = {});
+    std::string get_travel_to_z_gcode(double z, const std::string_view comment) const;
     std::string travel_to_z(double z, const std::string_view comment = {});
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
     std::string extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment);
@@ -163,6 +183,8 @@ public:
         { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS) }; }
     static Vec3d                                  quantize(const Vec3d &pt)
         { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS), quantize(pt.z(), XYZF_EXPORT_DIGITS) }; }
+    static Vec2d                                  quantize(const Vec2f &pt)
+        { return { quantize(double(pt.x()), XYZF_EXPORT_DIGITS), quantize(double(pt.y()), XYZF_EXPORT_DIGITS) }; }
 
     void emit_axis(const char axis, const double v, size_t digits);
 
@@ -200,7 +222,8 @@ public:
     }
 
     void emit_string(const std::string_view s) {
-        strncpy(ptr_err.ptr, s.data(), s.size());
+        // Be aware that std::string_view::data() returns a pointer to a buffer that is not necessarily null-terminated.
+        memcpy(ptr_err.ptr, s.data(), s.size());
         ptr_err.ptr += s.size();
     }
 

@@ -17,6 +17,7 @@
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Color.hpp"
+#include "slic3r/GUI/Sidebar.hpp" // IWYU pragma: keep
 #include "format.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
@@ -40,10 +41,6 @@ using boost::optional;
 namespace Slic3r {
 
 namespace GUI {
-
-wxDEFINE_EVENT(EVT_DIFF_DIALOG_TRANSFER,        SimpleEvent);
-wxDEFINE_EVENT(EVT_DIFF_DIALOG_UPDATE_PRESETS,  SimpleEvent);
-
 
 // ----------------------------------------------------------------------------
 //                  ModelNode: a node inside DiffModel
@@ -602,6 +599,29 @@ static std::string get_pure_opt_key(std::string opt_key)
     return opt_key;
 }    
 
+wxDataViewItem DiffModel::GetItemByName(wxString name)
+{
+    // add items
+    for (std::unique_ptr<ModelNode>& preset : m_preset_nodes) {
+        for (std::unique_ptr<ModelNode>& category : preset->GetChildren()) {
+            if (category->text().Contains(name))
+                return wxDataViewItem((void*)category.get());
+
+            for (std::unique_ptr<ModelNode>& group : category->GetChildren()) {
+                if (group->text().Contains(name))
+                    return wxDataViewItem((void*)group.get());
+
+                for (std::unique_ptr<ModelNode>& option : group->GetChildren())
+                    if (option->text().Contains(name))
+                        return wxDataViewItem((void*)option.get());
+            }
+        }
+    }
+
+    return wxDataViewItem(nullptr);
+}
+
+
 // ----------------------------------------------------------------------------
 //                  DiffViewCtrl
 // ----------------------------------------------------------------------------
@@ -746,12 +766,7 @@ void DiffViewCtrl::item_value_changed(wxDataViewEvent& event)
         return;
 
     wxDataViewItem item = event.GetItem();
-
-    model->UpdateItemEnabling(item);
-    Refresh();
-
-    // update an enabling of the "save/move" buttons
-    m_empty_selection = selected_options().empty();
+    update_item_enabling(item);
 }
 
 bool DiffViewCtrl::has_unselected_options()
@@ -761,6 +776,16 @@ bool DiffViewCtrl::has_unselected_options()
             return true;
 
     return false;
+}
+
+void DiffViewCtrl::update_item_enabling(wxDataViewItem item)
+{
+
+    model->UpdateItemEnabling(item);
+    Refresh();
+
+    // update an enabling of the "save/move" buttons
+    m_empty_selection = selected_options().empty();
 }
 
 std::vector<std::string> DiffViewCtrl::options(Preset::Type type, bool selected)
@@ -1095,7 +1120,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
 
     switch (opt->type) {
     case coInt:
-        return from_u8((boost::format("%1%") % config.opt_int(opt_key)).str());
+        return from_u8((boost::format("%1%") % config.option(opt_key)->getInt()).str());
     case coInts: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionIntsNullable>(opt_key);
@@ -1140,7 +1165,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return _L("Undef");
     }
     case coFloat:
-        return double_to_string(config.opt_float(opt_key));
+        return double_to_string(config.option(opt_key)->getFloat());
     case coFloats: {
         if (is_nullable) {
             auto values = config.opt<ConfigOptionFloatsNullable>(opt_key);
@@ -1198,6 +1223,14 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     case coEnum: {
         auto opt = config.option_def(opt_key)->enum_def->enum_to_label(config.option(opt_key)->getInt());
         return opt.has_value() ? _(from_u8(*opt)) : _L("Undef");
+    }
+    case coEnums: {
+        auto values = config.option(opt_key)->getInts();
+        if (opt_idx < values.size()) {
+            auto opt = config.option_def(opt_key)->enum_def->enum_to_label(values[opt_idx]);
+            return opt.has_value() ? _(from_u8(*opt)) : _L("Undef");
+        }
+        return _L("Undef");
     }
     case coPoints: {
         if (opt_key == "bed_shape") {
@@ -1258,8 +1291,8 @@ void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent
 void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* presets_, const std::string& new_selected_preset)
 {
     // update searcher befofre update of tree
-    wxGetApp().sidebar().check_and_update_searcher();
-    Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
+    wxGetApp().check_and_update_searcher();
+    Search::OptionsSearcher& searcher = wxGetApp().searcher();
     searcher.sort_options_by_key();
 
     // list of the presets with unsaved changes
@@ -1303,6 +1336,8 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
             m_tree->Append("extruders_count", type, _L("General"), _L("Capabilities"), local_label, old_val, mod_val, new_val, category_icon_map.at("General"));
         }
 
+        wxString custom_gcode_local_name = wxEmptyString;
+
         for (const std::string& opt_key : dirty_options) {
             const Search::Option& option = searcher.get_option(opt_key, type);
             if (option.opt_key() != opt_key) {
@@ -1312,9 +1347,22 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
                 continue;
             }
 
+            if (custom_gcode_local_name.IsEmpty() && boost::nowide::narrow(option.category) == "Custom G-code")
+                custom_gcode_local_name = option.category_local;
+
             m_tree->Append(opt_key, type, option.category_local, option.group_local, option.label_local,
                 get_string_value(opt_key, old_config), get_string_value(opt_key, mod_config), 
                 m_tree->has_new_value_column() ? get_string_value(opt_key, new_config) : "", category_icon_map.at(option.category));
+        }
+
+        // Unselect all Custom-Gcodes
+        if (!custom_gcode_local_name.IsEmpty()) {
+            wxDataViewItem item = m_tree->model->GetItemByName(custom_gcode_local_name);
+            if (item.IsOk()) {
+                wxVariant variant = false;
+                m_tree->model->SetValue(variant, item, DiffModel::colToggle);
+                m_tree->update_item_enabling(item);
+            }
         }
     }
 
@@ -1495,9 +1543,9 @@ void DiffPresetDialog::create_presets_sizer()
             sizer->Add(cb, 1);
             cb->Show(new_type == Preset::TYPE_PRINTER);
         };
-        add_preset_combobox(&presets_left, m_preset_bundle_left.get());
+        add_preset_combobox(&presets_left, &m_preset_bundle_left);
         sizer->Add(equal_bmp, 0, wxRIGHT | wxLEFT | wxALIGN_CENTER_VERTICAL, 5);
-        add_preset_combobox(&presets_right, m_preset_bundle_right.get());
+        add_preset_combobox(&presets_right, &m_preset_bundle_right);
         m_presets_sizer->Add(sizer, 1, wxTOP, 5);
         equal_bmp->Show(new_type == Preset::TYPE_PRINTER);
 
@@ -1507,7 +1555,7 @@ void DiffPresetDialog::create_presets_sizer()
             std::string preset_name = get_selection(presets_left);
             presets_right->update(preset_name); 
             if (m_view_type == Preset::TYPE_INVALID)
-                update_compatibility(preset_name, presets_right->get_type(), m_preset_bundle_right.get());
+                update_compatibility(preset_name, presets_right->get_type(), &m_preset_bundle_right);
             update_tree();
         });
     }
@@ -1624,7 +1672,7 @@ void DiffPresetDialog::create_edit_sizer()
 {
     // Add check box for the edit mode
     m_use_for_transfer = new wxCheckBox(this, wxID_ANY, _L("Transfer values from left to right"));
-    m_use_for_transfer->SetToolTip(_L("If enabled, this dialog can be used for transver selected values from left to right preset."));
+    m_use_for_transfer->SetToolTip(_L("If checked, this dialog can be used for transferring selected values from the preset on the left to the preset on the right."));
     m_use_for_transfer->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
         bool use = m_use_for_transfer->GetValue();
         m_tree->GetColumn(DiffModel::colToggle)->SetHidden(!use);
@@ -1673,8 +1721,8 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
 
     assert(wxGetApp().preset_bundle);
 
-    m_preset_bundle_left  = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
-    m_preset_bundle_right = std::make_unique<PresetBundle>(*wxGetApp().preset_bundle);
+    m_preset_bundle_left  = *wxGetApp().preset_bundle;
+    m_preset_bundle_right = *wxGetApp().preset_bundle;
 
     // Create UI items
 
@@ -1704,6 +1752,13 @@ void DiffPresetDialog::update_controls_visibility(Preset::Type type /* = Preset:
         preset_combos.presets_right->Show(show);
 
         if (show) {
+            if (cb_type == Preset::TYPE_FILAMENT) {
+                int extruder_id = 0;
+                if (type == Preset::TYPE_FILAMENT)
+                    extruder_id = dynamic_cast<TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT))->get_active_extruder();
+                preset_combos.presets_left->set_extruder_idx(extruder_id);
+                preset_combos.presets_right->set_extruder_idx(extruder_id);
+            }
             preset_combos.presets_left->update_from_bundle();
             preset_combos.presets_right->update_from_bundle();
         }
@@ -1714,10 +1769,17 @@ void DiffPresetDialog::update_controls_visibility(Preset::Type type /* = Preset:
 
 void DiffPresetDialog::update_bundles_from_app()
 {
-    *m_preset_bundle_left  = *wxGetApp().preset_bundle;
-    *m_preset_bundle_right = *wxGetApp().preset_bundle;
+    m_preset_bundle_left  = *wxGetApp().preset_bundle;
+    m_preset_bundle_right = *wxGetApp().preset_bundle;
 
-    m_pr_technology = m_preset_bundle_left.get()->printers.get_edited_preset().printer_technology();
+    m_pr_technology = m_preset_bundle_left.printers.get_edited_preset().printer_technology();
+
+    for (auto preset_combos : m_preset_combos) {
+        if (m_view_type == Preset::TYPE_INVALID || m_view_type == preset_combos.presets_left->get_type()) {
+            preset_combos.presets_left->init_from_bundle(&m_preset_bundle_left);
+            preset_combos.presets_right->init_from_bundle(&m_preset_bundle_right);
+        }
+    }
 }
 
 void DiffPresetDialog::show(Preset::Type type /* = Preset::TYPE_INVALID*/)
@@ -1778,8 +1840,8 @@ void DiffPresetDialog::update_bottom_info(wxString bottom_info)
 void DiffPresetDialog::update_tree()
 {
     // update searcher before update of tree
-    wxGetApp().sidebar().check_and_update_searcher(); 
-    Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
+    wxGetApp().check_and_update_searcher();
+    Search::OptionsSearcher& searcher = wxGetApp().searcher();
     searcher.sort_options_by_key();
 
     m_tree->Clear();
@@ -1858,8 +1920,10 @@ void DiffPresetDialog::update_tree()
 
             Search::Option option = searcher.get_option(opt_key, get_full_label(opt_key, left_config), type);
             if (option.opt_key() != opt_key) {
+#ifdef _DEBUG
                 // temporary solution, just for testing
                 m_tree->Append(opt_key, type, _L("Undef category"), _L("Undef group"), opt_key, left_val, right_val, "", "question");
+#endif
                 // When founded option isn't the correct one.
                 // It can be for dirty_options: "default_print_profile", "printer_model", "printer_settings_id",
                 // because of they don't exist in searcher
@@ -1971,7 +2035,7 @@ void DiffPresetDialog::update_compatibility(const std::string& preset_name, Pres
             update_compatible_type(technology_changed, print_tab, true),
             update_compatible_type(technology_changed, false, true));
 
-    bool is_left_presets = preset_bundle == m_preset_bundle_left.get();
+    bool is_left_presets = preset_bundle == &m_preset_bundle_left;
     PrinterTechnology pr_tech = preset_bundle->printers.get_selected_preset().printer_technology();
 
     // update preset comboboxes
@@ -1989,10 +2053,10 @@ void DiffPresetDialog::update_compatibility(const std::string& preset_name, Pres
     }
 
     if (technology_changed &&
-        m_preset_bundle_left.get()->printers.get_selected_preset().printer_technology() ==
-        m_preset_bundle_right.get()->printers.get_selected_preset().printer_technology())
+        m_preset_bundle_left.printers.get_selected_preset().printer_technology() ==
+        m_preset_bundle_right.printers.get_selected_preset().printer_technology())
     {
-        m_pr_technology = m_preset_bundle_left.get()->printers.get_edited_preset().printer_technology();
+        m_pr_technology = m_preset_bundle_left.printers.get_edited_preset().printer_technology();
         update_controls_visibility();
     }
 }
@@ -2011,7 +2075,7 @@ bool DiffPresetDialog::is_save_confirmed()
     }
 
     if (!types_for_save.empty()) {
-        SavePresetDialog save_dlg(this, types_for_save, _u8L("Modified"), m_preset_bundle_right.get());
+        SavePresetDialog save_dlg(this, types_for_save, _u8L("Modified"), false, &m_preset_bundle_right);
         if (save_dlg.ShowModal() != wxID_OK)
             return false;
 
@@ -2053,8 +2117,8 @@ void DiffPresetDialog::button_event(Action act)
                 MessageDialog(this, UnsavedChangesDialog::msg_success_saved_modifications(saved_cnt)).ShowModal();
                 update_bundles_from_app();
                 for (const auto& preset : presets_to_save) {
-                    m_preset_bundle_left->get_presets(preset.type).select_preset_by_name(preset.from_name, true);
-                    m_preset_bundle_right->get_presets(preset.type).select_preset_by_name(preset.new_name, true);
+                    m_preset_bundle_left.get_presets(preset.type).select_preset_by_name(preset.from_name, true);
+                    m_preset_bundle_right.get_presets(preset.type).select_preset_by_name(preset.new_name, true);
                 }
                 update_presets(m_view_type, false);
             }
@@ -2062,12 +2126,33 @@ void DiffPresetDialog::button_event(Action act)
     }
     else {
         Hide();
+
         if (act == Action::Transfer)
-            wxPostEvent(this, SimpleEvent(EVT_DIFF_DIALOG_TRANSFER));
+            process_options([this](Preset::Type type) {
+                if (Tab* tab = wxGetApp().get_tab(type))
+                    tab->transfer_options(get_left_preset_name(type),
+                                          get_right_preset_name(type),
+                                          get_selected_options(type));
+            });
         else if (!presets_to_save.empty())
-            wxPostEvent(this, SimpleEvent(EVT_DIFF_DIALOG_UPDATE_PRESETS));
+            process_options([](Preset::Type type) {
+                if (Tab* tab = wxGetApp().get_tab(type)) {
+                    tab->update_preset_choice();
+                    wxGetApp().sidebar().update_presets(type);
+                }
+            });
     }
 }
+
+void DiffPresetDialog::process_options(std::function<void(Preset::Type)> process)
+{
+    if (m_view_type == Preset::TYPE_INVALID) {
+        for (const Preset::Type& type : types_list())
+            process(type);
+    }
+    else
+        process(m_view_type);
+};
 
 std::string DiffPresetDialog::get_left_preset_name(Preset::Type type)
 {

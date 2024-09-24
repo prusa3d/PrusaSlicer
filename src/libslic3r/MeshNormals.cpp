@@ -4,8 +4,16 @@
 ///|/
 #include "MeshNormals.hpp"
 
-#include <numeric>
 #include <boost/container/small_vector.hpp>
+#include <numeric>
+#include <algorithm>
+#include <cmath>
+#include <cassert>
+#include <cstddef>
+
+#include "libslic3r/AABBMesh.hpp"
+#include "libslic3r/Execution/Execution.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

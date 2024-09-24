@@ -191,15 +191,5 @@ void ProgressStatusBar::set_font(const wxFont &font)
     self->SetFont(font);
 }
 
-void ProgressStatusBar::show_cancel_button()
-{
-    if(m_cancelbutton) m_cancelbutton->Show();
-}
-
-void ProgressStatusBar::hide_cancel_button()
-{
-    if(m_cancelbutton) m_cancelbutton->Hide();
-}
-
 }
 

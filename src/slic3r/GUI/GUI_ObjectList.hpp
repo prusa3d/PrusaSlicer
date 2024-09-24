@@ -22,7 +22,6 @@
 class wxBoxSizer;
 class wxBitmapComboBox;
 class wxMenuItem;
-class MenuWithSeparators;
 
 namespace Slic3r {
 class ConfigOptionsGroup;
@@ -115,6 +114,9 @@ private:
     int             m_selected_layers_range_idx {-1};
 
     Clipboard       m_clipboard;
+#ifdef __WXMSW__
+    bool            m_mouse_left_down{ false };
+#endif
 
     struct dragged_item_data
     {

@@ -33,10 +33,6 @@
 #ifndef slic3r_PrintConfig_hpp_
 #define slic3r_PrintConfig_hpp_
 
-#include "libslic3r.h"
-#include "Config.hpp"
-#include "SLA/SupportTreeStrategies.hpp"
-
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 #include <boost/preprocessor/seq/for_each.hpp>
@@ -44,8 +40,35 @@
 #include <boost/preprocessor/stringize.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <boost/container_hash/hash.hpp>
+#include <cereal/cereal.hpp>
+#include <algorithm>
+#include <initializer_list>
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "libslic3r.h"
+#include "Config.hpp"
+#include "SLA/SupportTreeStrategies.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
+class FullPrintConfig;
+class GCodeConfig;
+class MachineEnvelopeConfig;
+class PrintConfig;
+class PrintObjectConfig;
+class PrintRegionConfig;
+class SLAFullPrintConfig;
+class SLAMaterialConfig;
+class SLAPrintConfig;
+class SLAPrintObjectConfig;
+class SLAPrinterConfig;
 
 enum class ArcFittingType {
     Disabled,
@@ -65,7 +88,7 @@ enum class MachineLimitsUsage {
 };
 
 enum PrintHostType {
-    htPrusaLink, htPrusaConnect, htOctoPrint, htMoonraker, htDuet, htFlashAir, htAstroBox, htRepetier, htMKS
+   htPrusaLink, htPrusaConnect, htOctoPrint, htMoonraker, htDuet, htFlashAir, htAstroBox, htRepetier, htMKS, htPrusaConnectNew
 };
 
 enum AuthorizationType {
@@ -83,6 +106,7 @@ enum InfillPattern : int {
     ipGyroid, ipHilbertCurve, ipArchimedeanChords, ipOctagramSpiral, ipAdaptiveCubic, ipSupportCubic, ipSupportBase,
     ipLightning,
     ipEnsuring,
+    ipZigZag,
     ipCount,
 };
 
@@ -159,8 +183,47 @@ enum class PerimeterGeneratorType
     Arachne
 };
 
+enum class TopOnePerimeterType
+{
+    None,
+    TopSurfaces,
+    TopmostOnly,
+    Count
+};
+
 enum class GCodeThumbnailsFormat {
     PNG, JPG, QOI
+};
+
+enum TowerSpeeds : int {
+    tsLayer1,
+    tsLayer2,
+    tsLayer3,
+    tsLayer4,
+    tsLayer5,
+    tsLayer8,
+    tsLayer11,
+    tsLayer14,
+    tsLayer18, 
+    tsLayer22,
+    tsLayer24,
+};
+
+enum TiltSpeeds : int {
+    tsMove120,
+    tsLayer200,
+    tsMove300,
+    tsLayer400,
+    tsLayer600,
+    tsLayer800,
+    tsLayer1000,
+    tsLayer1250,
+    tsLayer1500,
+    tsLayer1750,
+    tsLayer2000,
+    tsLayer2250,
+    tsMove5120,
+    tsMove8000,
 };
 
 #define CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NAME) \
@@ -190,7 +253,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(LabelObjectsStyle)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
-
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TopOnePerimeterType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -218,6 +281,7 @@ private:
     void init_fff_params();
     void init_extruder_option_keys();
     void init_sla_params();
+    void init_sla_tilt_params();
     void init_sla_support_params(const std::string &method_prefix);
 
     std::vector<std::string>    m_extruder_option_keys;
@@ -296,6 +360,9 @@ public:
     void                handle_legacy_composite() override
         { PrintConfigDef::handle_legacy_composite(*this); }
 };
+
+// This vector containes list of parameters for preview of tilt profiles
+const std::vector<std::string>& tilt_options();
 
 void handle_legacy_sla(DynamicPrintConfig &config);
 
@@ -662,6 +729,9 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                top_solid_min_thickness))
     ((ConfigOptionFloatOrPercent,       top_solid_infill_speed))
     ((ConfigOptionBool,                 wipe_into_infill))
+    // Single perimeter.
+    ((ConfigOptionEnum<TopOnePerimeterType>, top_one_perimeter_type))
+    ((ConfigOptionBool,                 only_one_perimeter_first_layer))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -703,6 +773,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                autoemit_temperature_commands))
     ((ConfigOptionString,              before_layer_gcode))
     ((ConfigOptionString,              between_objects_gcode))
+    ((ConfigOptionBool,                binary_gcode))
     ((ConfigOptionFloats,              deretract_speed))
     ((ConfigOptionString,              end_gcode))
     ((ConfigOptionStrings,             end_filament_gcode))
@@ -712,9 +783,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              filament_density))
     ((ConfigOptionStrings,             filament_type))
     ((ConfigOptionBools,               filament_soluble))
+    ((ConfigOptionBools,               filament_abrasive))
     ((ConfigOptionFloats,              filament_cost))
     ((ConfigOptionFloats,              filament_spool_weight))
     ((ConfigOptionFloats,              filament_max_volumetric_speed))
+    ((ConfigOptionFloats,              filament_infill_max_speed))
+    ((ConfigOptionFloats,              filament_infill_max_crossing_speed))
     ((ConfigOptionFloats,              filament_loading_speed))
     ((ConfigOptionFloats,              filament_loading_speed_start))
     ((ConfigOptionFloats,              filament_load_time))
@@ -726,10 +800,15 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              filament_cooling_initial_speed))
     ((ConfigOptionFloats,              filament_minimal_purge_on_wipe_tower))
     ((ConfigOptionFloats,              filament_cooling_final_speed))
+    ((ConfigOptionPercents,            filament_purge_multiplier))
     ((ConfigOptionStrings,             filament_ramming_parameters))
     ((ConfigOptionBools,               filament_multitool_ramming))
     ((ConfigOptionFloats,              filament_multitool_ramming_volume))
     ((ConfigOptionFloats,              filament_multitool_ramming_flow))
+    ((ConfigOptionFloats,              filament_stamping_loading_speed))
+    ((ConfigOptionFloats,              filament_stamping_distance))
+    ((ConfigOptionPercents,            filament_shrinkage_compensation_xy))
+    ((ConfigOptionPercents,            filament_shrinkage_compensation_z))
     ((ConfigOptionBool,                gcode_comments))
     ((ConfigOptionEnum<GCodeFlavor>,   gcode_flavor))
     ((ConfigOptionEnum<LabelObjectsStyle>,  gcode_label_objects))
@@ -739,7 +818,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     //      i - case insensitive
     //      w - whole word
     ((ConfigOptionStrings,             gcode_substitutions))
-    ((ConfigOptionBool,                gcode_binary))
     ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionFloat,               max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))
@@ -749,6 +827,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              travel_max_lift))
     ((ConfigOptionFloats,              travel_slope))
     ((ConfigOptionBools,               travel_lift_before_obstacle))
+    ((ConfigOptionBools,               nozzle_high_flow))
     ((ConfigOptionPercents,            retract_before_wipe))
     ((ConfigOptionFloats,              retract_length))
     ((ConfigOptionFloats,              retract_length_toolchange))
@@ -777,6 +856,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                remaining_times))
     ((ConfigOptionBool,                silent_mode))
     ((ConfigOptionFloat,               extra_loading_move))
+    ((ConfigOptionFloat,               multimaterial_purging))
     ((ConfigOptionString,              color_change_gcode))
     ((ConfigOptionString,              pause_print_gcode))
     ((ConfigOptionString,              template_custom_gcode))
@@ -805,6 +885,8 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInts,               overhang_fan_speed_1))
     ((ConfigOptionInts,               overhang_fan_speed_2))
     ((ConfigOptionInts,               overhang_fan_speed_3))
+    ((ConfigOptionInts,               chamber_temperature))
+    ((ConfigOptionInts,               chamber_minimal_temperature))
     ((ConfigOptionBool,               complete_objects))
     ((ConfigOptionFloats,             colorprint_heights))
     ((ConfigOptionBools,              cooling))
@@ -845,6 +927,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionString,             output_filename_format))
     ((ConfigOptionFloat,              perimeter_acceleration))
     ((ConfigOptionStrings,            post_process))
+    ((ConfigOptionBool,               prefer_clockwise_movements))
     ((ConfigOptionString,             printer_model))
     ((ConfigOptionString,             printer_notes))
     ((ConfigOptionFloat,              resolution))
@@ -866,6 +949,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              travel_acceleration))
     ((ConfigOptionBools,              wipe))
     ((ConfigOptionBool,               wipe_tower))
+    ((ConfigOptionFloat,              wipe_tower_acceleration))
     ((ConfigOptionFloat,              wipe_tower_x))
     ((ConfigOptionFloat,              wipe_tower_y))
     ((ConfigOptionFloat,              wipe_tower_width))
@@ -874,10 +958,11 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              wipe_tower_brim_width))
     ((ConfigOptionFloat,              wipe_tower_cone_angle))
     ((ConfigOptionPercent,            wipe_tower_extra_spacing))
+    ((ConfigOptionPercent,            wipe_tower_extra_flow))
     ((ConfigOptionFloat,              wipe_tower_bridging))
     ((ConfigOptionInt,                wipe_tower_extruder))
     ((ConfigOptionFloats,             wiping_volumes_matrix))
-    ((ConfigOptionFloats,             wiping_volumes_extruders))
+    ((ConfigOptionBool,               wiping_volumes_use_custom_matrix))
     ((ConfigOptionFloat,              z_offset))
 )
 
@@ -1117,6 +1202,39 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                       material_correction_y))
     ((ConfigOptionFloat,                       material_correction_z))
     ((ConfigOptionEnum<SLAMaterialSpeed>,      material_print_speed))
+    ((ConfigOptionInt,                         zcorrection_layers))
+
+    ((ConfigOptionFloatNullable,               material_ow_support_pillar_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_pillar_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_front_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_front_diameter))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_penetration))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_penetration))
+    ((ConfigOptionFloatNullable,               material_ow_support_head_width))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_width))
+    ((ConfigOptionIntNullable,                 material_ow_support_points_density_relative))
+    ((ConfigOptionFloatNullable,               material_ow_elefant_foot_compensation))
+    ((ConfigOptionFloatNullable,               material_ow_absolute_correction))
+    ((ConfigOptionFloat,                       area_fill))
+
+    //tilt params
+    ((ConfigOptionFloats,                      delay_before_exposure))
+    ((ConfigOptionFloats,                      delay_after_exposure))
+    ((ConfigOptionInts,                        tower_hop_height))
+    ((ConfigOptionEnums<TowerSpeeds>,          tower_speed))
+    ((ConfigOptionBools,                       use_tilt))
+    ((ConfigOptionEnums<TiltSpeeds>,           tilt_down_initial_speed))
+    ((ConfigOptionInts,                        tilt_down_offset_steps))
+    ((ConfigOptionFloats,                      tilt_down_offset_delay))
+    ((ConfigOptionEnums<TiltSpeeds>,           tilt_down_finish_speed))
+    ((ConfigOptionInts,                        tilt_down_cycles))
+    ((ConfigOptionFloats,                      tilt_down_delay))
+    ((ConfigOptionEnums<TiltSpeeds>,           tilt_up_initial_speed))
+    ((ConfigOptionInts,                        tilt_up_offset_steps))
+    ((ConfigOptionFloats,                      tilt_up_offset_delay))
+    ((ConfigOptionEnums<TiltSpeeds>,           tilt_up_finish_speed))
+    ((ConfigOptionInts,                        tilt_up_cycles))
+    ((ConfigOptionFloats,                      tilt_up_delay))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -1143,13 +1261,14 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                      fast_tilt_time))
     ((ConfigOptionFloat,                      slow_tilt_time))
     ((ConfigOptionFloat,                      high_viscosity_tilt_time))
-    ((ConfigOptionFloat,                      area_fill))
+//    ((ConfigOptionFloat,                      area_fill))
     ((ConfigOptionFloat,                      min_exposure_time))
     ((ConfigOptionFloat,                      max_exposure_time))
     ((ConfigOptionFloat,                      min_initial_exposure_time))
     ((ConfigOptionFloat,                      max_initial_exposure_time))
     ((ConfigOptionString,                     sla_archive_format))
     ((ConfigOptionFloat,                      sla_output_precision))
+    ((ConfigOptionString,                     printer_model))
 )
 
 PRINT_CONFIG_CLASS_DERIVED_DEFINE0(
@@ -1195,6 +1314,12 @@ class CLIMiscConfigDef : public ConfigDef
 {
 public:
     CLIMiscConfigDef();
+};
+
+class CLIProfilesSharingConfigDef : public ConfigDef
+{
+public:
+    CLIProfilesSharingConfigDef();
 };
 
 typedef std::string t_custom_gcode_key;
@@ -1268,6 +1393,9 @@ extern const CLITransformConfigDef  cli_transform_config_def;
 // This class defines all command line options that are not actions or transforms.
 extern const CLIMiscConfigDef       cli_misc_config_def;
 
+// This class defines the command line options representing profiles sharing commands.
+extern const CLIProfilesSharingConfigDef  cli_profiles_sharing_config_def;
+
 class DynamicPrintAndCLIConfig : public DynamicPrintConfig
 {
 public:
@@ -1292,6 +1420,7 @@ private:
             this->options.insert(cli_actions_config_def.options.begin(), cli_actions_config_def.options.end());
             this->options.insert(cli_transform_config_def.options.begin(), cli_transform_config_def.options.end());
             this->options.insert(cli_misc_config_def.options.begin(), cli_misc_config_def.options.end());
+            this->options.insert(cli_profiles_sharing_config_def.options.begin(), cli_profiles_sharing_config_def.options.end());
             for (const auto &kvp : this->options)
                 this->by_serialization_key_ordinal[kvp.second.serialization_key_ordinal] = &kvp.second;
         }

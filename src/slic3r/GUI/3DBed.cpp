@@ -85,7 +85,6 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
     const BoundingBox bbox = m_contour.contour.bounding_box();
     if (!bbox.defined)
         throw RuntimeError(std::string("Invalid bed shape"));
-    m_polygon = offset(m_contour.contour, (float)bbox.radius() * 1.7f, jtRound, scale_(0.5)).front();
 
     m_triangles.reset();
     m_gridlines.reset();
@@ -102,16 +101,6 @@ bool Bed3D::set_shape(const Pointfs& bed_shape, const double max_print_height, c
 
     // Let the calee to update the UI.
     return true;
-}
-
-bool Bed3D::contains(const Point& point) const
-{
-    return m_polygon.contains(point);
-}
-
-Point Bed3D::point_projection(const Point& point) const
-{
-    return m_polygon.point_projection(point);
 }
 
 void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_texture)
@@ -518,10 +507,10 @@ void Bed3D::render_default(bool bottom, bool picking, bool show_texture, const T
 
         if (show_texture) {
             // draw grid
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
             if (!OpenGLManager::get_gl_info().is_core_profile())
-#endif // ENABLE_GL_CORE_PROFILE
                 glsafe(::glLineWidth(1.5f * m_scale_factor));
+#endif // !SLIC3R_OPENGL_ES
             m_gridlines.set_color(has_model && !bottom ? DEFAULT_SOLID_GRID_COLOR : DEFAULT_TRANSPARENT_GRID_COLOR);
             m_gridlines.render();
         }
@@ -549,10 +538,10 @@ void Bed3D::render_contour(const Transform3d& view_matrix, const Transform3d& pr
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
         // draw contour
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
         if (!OpenGLManager::get_gl_info().is_core_profile())
-#endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glLineWidth(1.5f * m_scale_factor));
+#endif // !SLIC3R_OPENGL_ES
         m_contourlines.render();
 
         glsafe(::glDisable(GL_BLEND));

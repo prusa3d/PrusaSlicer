@@ -19,7 +19,7 @@
 
 #include "slic3r/Utils/UndoRedo.hpp"
 
-#include "libslic3r/LocalesUtils.hpp"
+#include <LocalesUtils.hpp>
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/BuildVolume.hpp"
@@ -832,8 +832,14 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
         const GLVolume& vol = *get_volume(id);
         const Transform3d vol_world_rafo = vol.world_matrix();
         const TriangleMesh* mesh = vol.convex_hull();
-        if (mesh == nullptr)
+        if (mesh == nullptr) {
+            // workaround to avoid a crash, see spe-2295 -> Crash when re-cutting with dowel connectors
+            const int obj_id = vol.object_idx();
+            const int vol_id = vol.volume_idx();
+            if (int(m_model->objects[obj_id]->volumes.size()) <= vol_id)
+                continue;
             mesh = &m_model->objects[vol.object_idx()]->volumes[vol.volume_idx()]->mesh();
+        }
         assert(mesh != nullptr);
         for (const stl_vertex& v : mesh->its.vertices) {
             const Vec3d world_v = vol_world_rafo * v.cast<double>();
@@ -928,9 +934,9 @@ const std::pair<Vec3d, double> Selection::get_bounding_sphere() const
                 const TriangleMesh* hull = volume.convex_hull();
                 const indexed_triangle_set& its = (hull != nullptr) ?
                     hull->its : m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh().its;
-                const Transform3d& matrix = volume.world_matrix();
+                const Transform3f matrix = volume.world_matrix().cast<float>();
                 for (const Vec3f& v : its.vertices) {
-                    const Vec3d vv = matrix * v.cast<double>();
+                    const Vec3f vv = matrix * v;
                     points.push_back(Point(vv.x(), vv.y(), vv.z()));
                 }
             }
@@ -1199,6 +1205,10 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         double max_z = 0.0;
         for (unsigned int i : m_list) {
             const GLVolume& v = *(*m_volumes)[i];
+            if (v.convex_hull() == nullptr) {
+                // E.g. negative meshes do not have a convex hull... (hotfix for SPE-2361)
+                continue;
+            }
             TriangleMesh hull_3d = *v.convex_hull();
             hull_3d.transform(v.world_matrix());
             max_z = std::max(max_z, hull_3d.bounding_box().size().z());
@@ -1244,6 +1254,10 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
             remove_volumes(m_mode, to_remove);
     }
 
+    // FIXME: It should really only account for the model parts when scaling to fit. Not for modifiers,
+    // support enforcers / blockers and negative meshes.
+
+
     switch (volume.type())
     {
     case BuildVolume::Type::Rectangle: { undoredo_snapshot = fit_rectangle(volume, !undoredo_snapshot); break; }
@@ -1273,8 +1287,8 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
 
 void Selection::mirror(Axis axis, TransformationType transformation_type)
 {
-  const Vec3d mirror((axis == X) ? -1.0 : 1.0, (axis == Y) ? -1.0 : 1.0, (axis == Z) ? -1.0 : 1.0);
-  scale_and_translate(mirror, Vec3d::Zero(), transformation_type);
+    const Vec3d mirror((axis == X) ? -1.0 : 1.0, (axis == Y) ? -1.0 : 1.0, (axis == Z) ? -1.0 : 1.0);
+    scale_and_translate(mirror, Vec3d::Zero(), transformation_type);
 }
 
 void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& world_translation, TransformationType transformation_type)
@@ -1346,7 +1360,8 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& world_trans
         synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
 
-    ensure_on_bed();
+    if (m_mode == EMode::Instance)
+        ensure_on_bed();
     set_bounding_boxes_dirty();
     wxGetApp().plater()->canvas3D()->requires_check_outside_state();
 }
@@ -2266,15 +2281,14 @@ void Selection::render_bounding_box(const BoundingBoxf3& box, const Transform3d&
 
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-#if ENABLE_GL_CORE_PROFILE
+#if SLIC3R_OPENGL_ES
+    GLShaderProgram* shader = wxGetApp().get_shader("dashed_lines");
+#else
     if (!OpenGLManager::get_gl_info().is_core_profile())
         glsafe(::glLineWidth(2.0f * m_scale_factor));
 
     GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
-#else
-    glsafe(::glLineWidth(2.0f * m_scale_factor));
-    GLShaderProgram* shader = wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // SLIC3R_OPENGL_ES
     if (shader == nullptr)
         return;
 
@@ -2282,12 +2296,16 @@ void Selection::render_bounding_box(const BoundingBoxf3& box, const Transform3d&
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix() * trafo);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#if ENABLE_GL_CORE_PROFILE
-    const std::array<int, 4>& viewport = camera.get_viewport();
-    shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
-    shader->set_uniform("width", 1.5f);
-    shader->set_uniform("gap_size", 0.0f);
-#endif // ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
+    if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 1.5f);
+        shader->set_uniform("gap_size", 0.0f);
+#if !SLIC3R_OPENGL_ES
+    }
+#endif // !SLIC3R_OPENGL_ES
     m_box.set_color(to_rgba(color));
     m_box.render();
     shader->stop_using();

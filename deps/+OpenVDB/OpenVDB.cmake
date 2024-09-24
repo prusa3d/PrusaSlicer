@@ -15,7 +15,7 @@ endif ()
 
 add_cmake_project(OpenVDB
     # 8.2 patched
-    URL https://github.com/tamasmeszaros/openvdb/archive/a68fd58d0e2b85f01adeb8b13d7555183ab10aa5.zip
+    URL https://github.com/prusa3d/openvdb/archive/a68fd58d0e2b85f01adeb8b13d7555183ab10aa5.zip
     URL_HASH SHA256=f353e7b99bd0cbfc27ac9082de51acf32a8bc0b3e21ff9661ecca6f205ec1d81
     CMAKE_ARGS
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON 

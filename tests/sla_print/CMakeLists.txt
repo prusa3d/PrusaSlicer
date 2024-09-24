@@ -5,7 +5,8 @@ add_executable(${_TEST_NAME}_tests ${_TEST_NAME}_tests_main.cpp
     sla_supptgen_tests.cpp
     sla_raycast_tests.cpp
     sla_supptreeutils_tests.cpp
-    sla_archive_readwrite_tests.cpp)
+    sla_archive_readwrite_tests.cpp
+    sla_zcorrection_tests.cpp)
 
 # mold linker for successful linking needs also to link TBB library and link it before libslic3r.
 target_link_libraries(${_TEST_NAME}_tests test_common TBB::tbb TBB::tbbmalloc libslic3r)

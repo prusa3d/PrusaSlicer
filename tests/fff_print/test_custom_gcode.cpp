@@ -45,13 +45,21 @@ SCENARIO("Custom G-code", "[CustomGCode]")
         });
         GCodeReader parser;
         bool        last_move_was_z_change = false;
+        bool        first_z_move = true; // First z move is not a layer change.
         int         num_layer_changes_not_applied = 0;
         parser.parse_buffer(Slic3r::Test::slice({ Test::TestMesh::cube_2x20x10 }, config), 
-            [&last_move_was_z_change, &num_layer_changes_not_applied](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+            [&](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
         {
-            if (last_move_was_z_change != line.cmd_is("_MY_CUSTOM_LAYER_GCODE_"))
+            if (last_move_was_z_change != line.cmd_is("_MY_CUSTOM_LAYER_GCODE_")) {
                 ++ num_layer_changes_not_applied;
-            last_move_was_z_change = line.dist_Z(self) > 0;
+            }
+            if (line.dist_Z(self) > 0 && first_z_move) {
+                first_z_move = false;
+            } else if (line.dist_Z(self) > 0){
+                last_move_was_z_change = true;
+            } else {
+                last_move_was_z_change = false;
+            }
         });
         THEN("custom layer G-code is applied after Z move and before other moves") {
             REQUIRE(num_layer_changes_not_applied == 0);

@@ -1,7 +1,17 @@
 #include "SmoothPath.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <utility>
+#include <cassert>
+
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
+#include "libslic3r/Geometry/ArcWelder.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r::GCode {
 
@@ -31,75 +41,46 @@ std::optional<Point> sample_path_point_at_distance_from_start(const SmoothPath &
 {
     if (distance >= 0) {
         for (const SmoothPathElement &el : path) {
-            auto it  = el.path.begin();
-            auto end = el.path.end();
-            Point prev_point = it->point;
-            for (++ it; it != end; ++ it) {
-                Point point = it->point;
-                if (it->linear()) {
+            Point prev_point = el.path.front().point;
+            for (auto segment_it = el.path.begin() + 1; segment_it != el.path.end(); ++segment_it) {
+                Point point = segment_it->point;
+                if (segment_it->linear()) {
                     // Linear segment
-                    Vec2d  v    = (point - prev_point).cast<double>();
-                    double lsqr = v.squaredNorm();
+                    const Vec2d  v    = (point - prev_point).cast<double>();
+                    const double lsqr = v.squaredNorm();
                     if (lsqr > sqr(distance))
-                        return std::make_optional<Point>(prev_point + (v * (distance / sqrt(lsqr))).cast<coord_t>());
+                        return prev_point + (v * (distance / sqrt(lsqr))).cast<coord_t>();
                     distance -= sqrt(lsqr);
                 } else {
                     // Circular segment
-                    float angle = Geometry::ArcWelder::arc_angle(prev_point.cast<float>(), point.cast<float>(), it->radius);
-                    double len = std::abs(it->radius) * angle;
+                    const float  angle = Geometry::ArcWelder::arc_angle(prev_point.cast<float>(), point.cast<float>(), segment_it->radius);
+                    const double len   = std::abs(segment_it->radius) * angle;
                     if (len > distance) {
-                        // Rotate the segment end point in reverse towards the start point.
-                        return std::make_optional<Point>(prev_point.rotated(- angle * (distance / len),
-                            Geometry::ArcWelder::arc_center(prev_point.cast<float>(), point.cast<float>(), it->radius, it->ccw()).cast<coord_t>()));
+                        const Point center_pt    = Geometry::ArcWelder::arc_center(prev_point.cast<float>(), point.cast<float>(), segment_it->radius, segment_it->ccw()).cast<coord_t>();
+                        const float rotation_dir = (segment_it->ccw() ? 1.f : -1.f);
+                        // Rotate the segment start point based on the arc orientation.
+                        return prev_point.rotated(rotation_dir * angle * (distance / len), center_pt);
                     }
+
                     distance -= len;
                 }
+
                 if (distance < 0)
-                    return std::make_optional<Point>(point);
+                    return point;
+
                 prev_point = point;
             }
         }
     }
+
     // Failed.
     return {};
 }
 
-std::optional<Point> sample_path_point_at_distance_from_end(const SmoothPath &path, double distance)
-{
-    if (distance >= 0) {
-        for (const SmoothPathElement& el : path) {
-            auto it = el.path.begin();
-            auto end = el.path.end();
-            Point prev_point = it->point;
-            for (++it; it != end; ++it) {
-                Point point = it->point;
-                if (it->linear()) {
-                    // Linear segment
-                    Vec2d  v = (point - prev_point).cast<double>();
-                    double lsqr = v.squaredNorm();
-                    if (lsqr > sqr(distance))
-                        return std::make_optional<Point>(prev_point + (v * (distance / sqrt(lsqr))).cast<coord_t>());
-                    distance -= sqrt(lsqr);
-                }
-                else {
-                    // Circular segment
-                    float angle = Geometry::ArcWelder::arc_angle(prev_point.cast<float>(), point.cast<float>(), it->radius);
-                    double len = std::abs(it->radius) * angle;
-                    if (len > distance) {
-                        // Rotate the segment end point in reverse towards the start point.
-                        return std::make_optional<Point>(prev_point.rotated(-angle * (distance / len),
-                            Geometry::ArcWelder::arc_center(prev_point.cast<float>(), point.cast<float>(), it->radius, it->ccw()).cast<coord_t>()));
-                    }
-                    distance -= len;
-                }
-                if (distance < 0)
-                    return std::make_optional<Point>(point);
-                prev_point = point;
-            }
-        }
-    }
-    // Failed.
-    return {};
+std::optional<Point> sample_path_point_at_distance_from_end(const SmoothPath &path, double distance) {
+    SmoothPath path_reversed = path;
+    reverse(path_reversed);
+    return sample_path_point_at_distance_from_start(path_reversed, distance);
 }
 
 // Clip length of a smooth path, for seam hiding.
@@ -131,6 +112,12 @@ double clip_end(SmoothPath &path, double distance, double min_point_distance_thr
     }
     // Return distance to go after the whole smooth path was trimmed to zero.
     return distance;
+}
+
+void reverse(SmoothPath &path) {
+    std::reverse(path.begin(), path.end());
+    for (SmoothPathElement &path_element : path)
+        Geometry::ArcWelder::reverse(path_element.path);
 }
 
 void SmoothPathCache::interpolate_add(const ExtrusionPath &path, const InterpolationParameters &params)

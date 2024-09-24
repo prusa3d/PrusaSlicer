@@ -7,16 +7,21 @@ To build PrusaSlicer on Mac OS, you will need the following software:
 - CMake
 - git
 - gettext
+- zlib
+- m4
 
 XCode is available through Apple's App Store, the other three tools are available on
-[brew](https://brew.sh/) (use `brew install cmake git gettext` to install them).
+[brew](https://brew.sh/) (use `brew install cmake git gettext zlib m4` to install them).
+
+It may help to skim over this document's [Troubleshooting](#troubleshooting)](#troubleshooting) first, as you may find helpful workarounds documented there.
 
 ### Dependencies
 
 PrusaSlicer comes with a set of CMake scripts to build its dependencies, it lives in the `deps` directory.
-Open a terminal window and navigate to PrusaSlicer sources directory and then to `deps`.
+Open a terminal window and navigate to the PrusaSlicer sources directory.
 Use the following commands to build the dependencies:
 
+    cd deps
     mkdir build
     cd build
     cmake ..
@@ -80,6 +85,37 @@ This is set in the property list file
 
 To remove the limitation, simply delete the key `MinimumSDKVersion` from that file.
 
+## Troubleshooting
+
+### `CMath::CMath` target not found
+
+At the moment (20.2.2024) PrusaSlicer cannot be built with CMake 3.28+. Use [CMake 3.27](https://github.com/Kitware/CMake/releases/tag/v3.27.9) instead. 
+If you install the CMake application from [universal DMG](https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-macos-universal.dmg), you can invoke the CMake like this:
+
+```
+/Applications/CMake.app/Contents/bin/cmake
+```
+
+### Running `cmake -GXCode` fails with `No CMAKE_CXX_COMPILER could be found.` 
+
+- If XCode command line tools wasn't already installed, run:
+    ```
+     sudo xcode-select --install
+    ```
+- If XCode command line tools are already installed, run:
+    ```
+    sudo xcode-select --reset
+    ```
+
+### Xcode keeps trying to install `m4` or the process complains about no compatible `m4` found.
+
+Ensure the homebrew installed `m4` is in front of any other installed `m4` on your system.
+
+_e.g._ `echo 'export PATH="/opt/homebrew/opt/m4/bin:$PATH"' >> ~/.bash_profile`
+
+### `cmake` complains that it can't determine the build deployment target
+
+If you see a message similar this, you can fix it by adding an argument like this `-DCMAKE_OSX_DEPLOYMENT_TARGET=14.5` to the `cmake` command. Ensure that you give it the macOS version that you are building for.
 
 # TL; DR
 

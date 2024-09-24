@@ -19,6 +19,19 @@ set(SLIC3R_GUI_SOURCES
     GUI/AboutDialog.hpp
     GUI/ArrangeSettingsDialogImgui.hpp
     GUI/ArrangeSettingsDialogImgui.cpp
+    GUI/UserAccountCommunication.cpp
+    GUI/UserAccountCommunication.hpp
+    GUI/UserAccountSession.cpp
+    GUI/UserAccountSession.hpp
+    GUI/UserAccountUtils.cpp
+    GUI/UserAccountUtils.hpp
+    GUI/UserAccount.cpp
+    GUI/UserAccount.hpp
+    GUI/WebViewDialog.cpp
+    GUI/WebViewDialog.hpp
+    GUI/WebView.cpp
+    GUI/WebView.hpp
+    GUI/WebViewPlatformUtils.hpp
     GUI/SysInfoDialog.cpp
     GUI/SysInfoDialog.hpp
     GUI/KBShortcutsDialog.cpp
@@ -82,6 +95,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Gizmos/GLGizmoMmuSegmentation.hpp
     GUI/Gizmos/GLGizmoMeasure.cpp
     GUI/Gizmos/GLGizmoMeasure.hpp
+    GUI/LibVGCode/LibVGCodeWrapper.hpp
+    GUI/LibVGCode/LibVGCodeWrapper.cpp
     GUI/GLSelectionRectangle.cpp
     GUI/GLSelectionRectangle.hpp
     GUI/GLModel.hpp
@@ -114,6 +129,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/IconManager.hpp
     GUI/MainFrame.cpp
     GUI/MainFrame.hpp
+    GUI/UpdatesUIManager.cpp
+    GUI/UpdatesUIManager.hpp
+    GUI/FrequentlyChangedParameters.cpp
+    GUI/FrequentlyChangedParameters.hpp
+    GUI/Sidebar.cpp
+    GUI/Sidebar.hpp
     GUI/Plater.cpp
     GUI/Plater.hpp
     GUI/PresetComboBoxes.hpp
@@ -184,6 +205,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/ButtonsDescription.hpp
     GUI/ImGuiWrapper.hpp
     GUI/ImGuiWrapper.cpp
+    GUI/ImGuiPureWrap.hpp
+    GUI/ImGuiPureWrap.cpp
     Config/Snapshot.cpp
     Config/Snapshot.hpp
     Config/Version.cpp
@@ -195,6 +218,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/ConfigWizard.cpp
     GUI/ConfigWizard.hpp
     GUI/ConfigWizard_private.hpp
+    GUI/ConfigWizardWebViewPage.cpp
+    GUI/ConfigWizardWebViewPage.hpp
     GUI/MsgDialog.cpp
     GUI/MsgDialog.hpp
     GUI/UpdateDialogs.cpp
@@ -234,10 +259,22 @@ set(SLIC3R_GUI_SOURCES
     GUI/ProgressStatusBar.cpp
     GUI/Mouse3DController.cpp
     GUI/Mouse3DController.hpp
-    GUI/DoubleSlider.cpp
-    GUI/DoubleSlider.hpp
+    GUI/ImGuiDoubleSlider.cpp
+    GUI/ImGuiDoubleSlider.hpp
+    GUI/TickCodesManager.cpp
+    GUI/TickCodesManager.hpp
+    GUI/DoubleSliderForLayers.cpp
+    GUI/DoubleSliderForLayers.hpp
+    GUI/DoubleSliderForGcode.cpp
+    GUI/DoubleSliderForGcode.hpp
+    GUI/RulerForDoubleSlider.cpp
+    GUI/RulerForDoubleSlider.hpp
     GUI/Notebook.cpp
     GUI/Notebook.hpp
+    GUI/TopBar.cpp
+    GUI/TopBar.hpp
+    GUI/TopBarMenus.cpp
+    GUI/TopBarMenus.hpp
     GUI/ObjectDataViewModel.cpp
     GUI/ObjectDataViewModel.hpp
     GUI/InstanceCheck.cpp
@@ -285,12 +322,18 @@ set(SLIC3R_GUI_SOURCES
     GUI/Downloader.hpp
     GUI/DownloaderFileGet.cpp
     GUI/DownloaderFileGet.hpp
+    GUI/LoginDialog.cpp
+    GUI/LoginDialog.hpp
+    GUI/PresetArchiveDatabase.cpp
+    GUI/PresetArchiveDatabase.hpp
     Utils/AppUpdater.cpp
     Utils/AppUpdater.hpp
     Utils/Http.cpp
     Utils/Http.hpp
     Utils/FixModelByWin10.cpp
     Utils/FixModelByWin10.hpp
+    Utils/Jwt.cpp
+    Utils/Jwt.hpp
     Utils/Moonraker.cpp
     Utils/Moonraker.hpp
     Utils/OctoPrint.cpp
@@ -331,6 +374,12 @@ set(SLIC3R_GUI_SOURCES
     Utils/WxFontUtils.hpp
     Utils/WifiScanner.hpp
     Utils/WifiScanner.cpp
+    Utils/Secrets.hpp
+    Utils/Secrets.cpp
+    Utils/PrusaConnect.hpp
+    Utils/PrusaConnect.cpp
+    Utils/ServiceConfig.hpp
+    Utils/ServiceConfig.cpp
 )
 
 find_package(NanoSVG REQUIRED)
@@ -347,9 +396,19 @@ if (APPLE)
             GUI/Mouse3DHandlerMac.mm
             GUI/InstanceCheckMac.mm
             GUI/InstanceCheckMac.h
-        )
+            GUI/WebViewPlatformUtilsMac.mm
+
+    )
     FIND_LIBRARY(DISKARBITRATION_LIBRARY DiskArbitration)
     FIND_LIBRARY(COREWLAN_LIBRARY CoreWLAN)
+elseif (WIN32)
+    list(APPEND SLIC3R_GUI_SOURCES
+            GUI/WebViewPlatformUtilsWin32.cpp
+    )
+else() # Linux
+    list(APPEND SLIC3R_GUI_SOURCES
+            GUI/WebViewPlatformUtilsLinux.cpp
+    )
 endif ()
 
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
@@ -362,14 +421,31 @@ endforeach()
 
 encoding_check(libslic3r_gui)
 
-target_link_libraries(libslic3r_gui libslic3r avrdude libcereal imgui GLEW::GLEW OpenGL::GL hidapi libcurl ${wxWidgets_LIBRARIES} NanoSVG::nanosvg NanoSVG::nanosvgrast)
+target_link_libraries(
+    libslic3r_gui
+    PUBLIC
+    libslic3r
+    avrdude
+    libcereal
+    imgui
+    libvgcode
+    GLEW::GLEW
+    OpenGL::GL
+    hidapi
+    libcurl
+    ${wxWidgets_LIBRARIES}
+    NanoSVG::nanosvg
+    NanoSVG::nanosvgrast
+    stb_dxt
+    fastfloat
+)
 
 if (MSVC)
-    target_link_libraries(libslic3r_gui Setupapi.lib)
+    target_link_libraries(libslic3r_gui PUBLIC Setupapi.lib)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES}) 
+    target_link_libraries(libslic3r_gui PUBLIC ${DBUS_LIBRARIES})
 elseif (APPLE)
-    target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} ${COREWLAN_LIBRARY})
+    target_link_libraries(libslic3r_gui PUBLIC ${DISKARBITRATION_LIBRARY} ${COREWLAN_LIBRARY})
 endif()
 
 #if (SLIC3R_STATIC)
@@ -387,8 +463,10 @@ endif ()
 # link these libraries.
 if (UNIX AND NOT APPLE)
     find_package(GTK${SLIC3R_GTK} REQUIRED)
-    target_include_directories(libslic3r_gui PRIVATE ${GTK${SLIC3R_GTK}_INCLUDE_DIRS})
-    target_link_libraries(libslic3r_gui ${GTK${SLIC3R_GTK}_LIBRARIES} fontconfig)
+    find_package(PkgConfig REQUIRED)
+
+    pkg_search_module(WEBKIT2GTK REQUIRED IMPORTED_TARGET webkit2gtk-4.0 webkit2gtk-4.1)
+    target_link_libraries(libslic3r_gui PUBLIC ${GTK${SLIC3R_GTK}_LIBRARIES} fontconfig PkgConfig::WEBKIT2GTK)
 endif ()
 
 # Add a definition so that we can tell we are compiling slic3r.

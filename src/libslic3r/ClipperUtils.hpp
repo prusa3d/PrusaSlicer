@@ -8,10 +8,22 @@
 
 //#define SLIC3R_USE_CLIPPER2
 
+#include <assert.h>
+#include <cstddef>
+#include <iterator>
+#include <utility>
+#include <vector>
+#include <cassert>
+
 #include "libslic3r.h"
 #include "ExPolygon.hpp"
 #include "Polygon.hpp"
 #include "Surface.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/BoundingBox.hpp"
 
 #ifdef SLIC3R_USE_CLIPPER2
 
@@ -19,7 +31,8 @@
 
 #else /* SLIC3R_USE_CLIPPER2 */
 
-#include "clipper.hpp"
+#include "libslic3r/clipper.hpp"
+
 // import these wherever we're included
 using Slic3r::ClipperLib::jtMiter;
 using Slic3r::ClipperLib::jtRound;
@@ -335,6 +348,7 @@ namespace ClipperUtils {
     [[nodiscard]] Polygon   clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox);
     [[nodiscard]] Polygons  clip_clipper_polygons_with_subject_bbox(const Polygons &src, const BoundingBox &bbox);
     [[nodiscard]] Polygons  clip_clipper_polygons_with_subject_bbox(const ExPolygon &src, const BoundingBox &bbox);
+    [[nodiscard]] Polygons  clip_clipper_polygons_with_subject_bbox(const ExPolygons &src, const BoundingBox &bbox);
 }
 
 // offset Polygons

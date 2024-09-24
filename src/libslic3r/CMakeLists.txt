@@ -88,7 +88,6 @@ set(SLIC3R_SOURCES
     ExtrusionSimulator.hpp
     FileParserError.hpp
     Fill/Fill.cpp
-    Fill/Fill.hpp
     Fill/Fill3DHoneycomb.cpp
     Fill/Fill3DHoneycomb.hpp
     Fill/FillAdaptive.cpp
@@ -150,6 +149,8 @@ set(SLIC3R_SOURCES
     Format/SVG.cpp
     Format/SLAArchiveFormatRegistry.hpp
     Format/SLAArchiveFormatRegistry.cpp
+    Format/PrintRequest.cpp
+    Format/PrintRequest.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp
@@ -178,6 +179,24 @@ set(SLIC3R_SOURCES
     GCode/SpiralVase.hpp
     GCode/SeamPlacer.cpp
     GCode/SeamPlacer.hpp
+    GCode/SeamChoice.cpp
+    GCode/SeamChoice.hpp
+    GCode/SeamPerimeters.cpp
+    GCode/SeamPerimeters.hpp
+    GCode/SeamShells.cpp
+    GCode/SeamShells.hpp
+    GCode/SeamGeometry.cpp
+    GCode/SeamGeometry.hpp
+    GCode/SeamAligned.cpp
+    GCode/SeamAligned.hpp
+    GCode/SeamRear.cpp
+    GCode/SeamRear.hpp
+    GCode/SeamRandom.cpp
+    GCode/SeamRandom.hpp
+    GCode/SeamPainting.cpp
+    GCode/SeamPainting.hpp
+    GCode/ModelVisibility.cpp
+    GCode/ModelVisibility.hpp
     GCode/SmoothPath.cpp
     GCode/SmoothPath.hpp
     GCode/ToolOrdering.cpp
@@ -192,6 +211,10 @@ set(SLIC3R_SOURCES
     GCode/GCodeProcessor.hpp
     GCode/AvoidCrossingPerimeters.cpp
     GCode/AvoidCrossingPerimeters.hpp
+    GCode/Travels.cpp
+    GCode/Travels.hpp
+    GCode/ExtrusionOrder.cpp
+    GCode/ExtrusionOrder.hpp
     GCode.cpp
     GCode.hpp
     GCodeReader.cpp
@@ -213,13 +236,15 @@ set(SLIC3R_SOURCES
     Geometry/Voronoi.hpp
     Geometry/VoronoiOffset.cpp
     Geometry/VoronoiOffset.hpp
+    Geometry/VoronoiUtils.hpp
+    Geometry/VoronoiUtils.cpp
     Geometry/VoronoiVisualUtils.hpp
-    Int128.hpp
     JumpPointSearch.cpp
     JumpPointSearch.hpp
     KDTreeIndirect.hpp
     Layer.cpp
     Layer.hpp
+    LayerRegion.hpp
     LayerRegion.cpp
     libslic3r.h
     "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h"
@@ -227,8 +252,6 @@ set(SLIC3R_SOURCES
     Line.hpp
     BlacklistedLibraryCheck.cpp
     BlacklistedLibraryCheck.hpp
-    LocalesUtils.cpp
-    LocalesUtils.hpp
     CutUtils.cpp
     CutUtils.hpp
     Model.cpp
@@ -459,11 +482,12 @@ set(SLIC3R_SOURCES
     SLA/DefaultSupportTree.cpp
     SLA/BranchingTreeSLA.hpp
     SLA/BranchingTreeSLA.cpp
+    SLA/ZCorrection.hpp
+    SLA/ZCorrection.cpp
     BranchingTree/BranchingTree.cpp
     BranchingTree/BranchingTree.hpp
     BranchingTree/PointCloud.cpp
     BranchingTree/PointCloud.hpp
-
     Arachne/BeadingStrategy/BeadingStrategy.hpp
     Arachne/BeadingStrategy/BeadingStrategy.cpp
     Arachne/BeadingStrategy/BeadingStrategyFactory.hpp
@@ -479,7 +503,6 @@ set(SLIC3R_SOURCES
     Arachne/BeadingStrategy/WideningBeadingStrategy.hpp
     Arachne/BeadingStrategy/WideningBeadingStrategy.cpp
     Arachne/utils/ExtrusionJunction.hpp
-    Arachne/utils/ExtrusionJunction.cpp
     Arachne/utils/ExtrusionLine.hpp
     Arachne/utils/ExtrusionLine.cpp
     Arachne/utils/HalfEdge.hpp
@@ -494,8 +517,11 @@ set(SLIC3R_SOURCES
     Arachne/utils/PolygonsSegmentIndex.hpp
     Arachne/utils/PolylineStitcher.hpp
     Arachne/utils/PolylineStitcher.cpp
-    Arachne/utils/VoronoiUtils.hpp
-    Arachne/utils/VoronoiUtils.cpp
+    Geometry/Voronoi.cpp
+    Geometry/VoronoiUtils.hpp
+    Geometry/VoronoiUtils.cpp
+    Arachne/PerimeterOrder.hpp
+    Arachne/PerimeterOrder.cpp
     Arachne/SkeletalTrapezoidation.hpp
     Arachne/SkeletalTrapezoidation.cpp
     Arachne/SkeletalTrapezoidationEdge.hpp
@@ -505,7 +531,19 @@ set(SLIC3R_SOURCES
     Arachne/WallToolPaths.hpp
     Arachne/WallToolPaths.cpp
     StaticMap.hpp
+    ProfilesSharingUtils.hpp
+    ProfilesSharingUtils.cpp
+    Utils/DirectoriesUtils.hpp
+    Utils/DirectoriesUtils.cpp
+    Utils/JsonUtils.hpp
+    Utils/JsonUtils.cpp
 )
+
+if (APPLE)
+    list(APPEND SLIC3R_SOURCES
+            MacUtils.mm
+        )
+endif ()
 
 add_library(libslic3r STATIC ${SLIC3R_SOURCES})
 
@@ -538,6 +576,7 @@ add_library(libslic3r_cgal STATIC
     Triangulation.hpp Triangulation.cpp
 )
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(libslic3r_cgal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 # Reset compile options of libslic3r_cgal. Despite it being linked privately, CGAL options
 # (-frounding-math) still propagate to dependent libs which is not desired.
@@ -556,6 +595,7 @@ if (_opts)
 endif()
 
 target_link_libraries(libslic3r_cgal PRIVATE ${_cgal_tgt} libigl)
+target_link_libraries(libslic3r_cgal PUBLIC semver admesh localesutils)
 
 if (MSVC AND "${CMAKE_SIZEOF_VOID_P}" STREQUAL "4") # 32 bit MSVC workaround
     target_compile_definitions(libslic3r_cgal PRIVATE CGAL_DO_NOT_USE_MPZF)
@@ -564,24 +604,19 @@ endif ()
 encoding_check(libslic3r)
 
 target_compile_definitions(libslic3r PUBLIC -DUSE_TBB -DTBB_USE_CAPTURED_EXCEPTION=0)
-target_include_directories(libslic3r PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(libslic3r PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(libslic3r PUBLIC ${EXPAT_INCLUDE_DIRS})
 
 find_package(JPEG REQUIRED)
 
-target_link_libraries(libslic3r
+target_link_libraries(libslic3r PRIVATE
     libnest2d
-    admesh
     libcereal
-    libigl
-    miniz
     boost_libs
     clipper
-    nowide
     libexpat
     glu-libtess
     qhull
-    semver
     TBB::tbb
     TBB::tbbmalloc
     libslic3r_cgal
@@ -590,20 +625,33 @@ target_link_libraries(libslic3r
     ZLIB::ZLIB
 	JPEG::JPEG
     qoi
+    fastfloat
+    int128
+)
+target_link_libraries(libslic3r PUBLIC
+    Eigen3::Eigen
+    semver
+    admesh
+    localesutils
     LibBGCode::bgcode_convert
-    )
+    tcbspan
+    miniz
+    libigl
+    agg
+    ankerl
+)
 
 if (APPLE)
     # TODO: we need to fix notarization with the separate shared library
-    target_link_libraries(libslic3r OCCTWrapper)
+    target_link_libraries(libslic3r PUBLIC OCCTWrapper)
 endif ()
 
 if (TARGET OpenVDB::openvdb)
-    target_link_libraries(libslic3r OpenVDB::openvdb)
+    target_link_libraries(libslic3r PUBLIC OpenVDB::openvdb)
 endif()
 
 if(WIN32)
-    target_link_libraries(libslic3r Psapi.lib)
+    target_link_libraries(libslic3r PUBLIC Psapi.lib)
 endif()
 
 if (APPLE)

@@ -7,25 +7,46 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#if TBB_VERSION_MAJOR >= 2021
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <oneapi/tbb/parallel_for.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/concurrent_vector.h>
+#include <tbb/parallel_for.h>
+#endif
+#include <boost/log/trivial.hpp>
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <map>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+#include <array>
+#include <initializer_list>
+#include <memory>
+#include <cassert>
+#include <cfloat>
+#include <chrono>
+#include <cstdlib>
+
 #include "AABBTreeLines.hpp"
-#include "BridgeDetector.hpp"
 #include "ExPolygon.hpp"
-#include "Exception.hpp"
 #include "Flow.hpp"
-#include "GCode/ExtrusionProcessor.hpp"
-#include "KDTreeIndirect.hpp"
+#include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "Line.hpp"
-#include "Point.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 #include "Print.hpp"
 #include "BoundingBox.hpp"
-#include "ClipperUtils.hpp"
-#include "ElephantFootCompensation.hpp"
 #include "Geometry.hpp"
 #include "I18N.hpp"
 #include "Layer.hpp"
-#include "MutablePolygon.hpp"
 #include "PrintBase.hpp"
 #include "PrintConfig.hpp"
 #include "Support/SupportMaterial.hpp"
@@ -36,43 +57,19 @@
 #include "Tesselate.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "Utils.hpp"
-#include "Fill/FillAdaptive.hpp"
-#include "Fill/FillLightning.hpp"
-#include "Format/STL.hpp"
-#include "Support/SupportMaterial.hpp"
+#include "libslic3r/Fill/FillAdaptive.hpp"
+#include "libslic3r/Fill/FillLightning.hpp"
 #include "SupportSpotsGenerator.hpp"
-#include "TriangleSelectorWrapper.hpp"
-#include "format.hpp"
 #include "libslic3r.h"
-
-#include <algorithm>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <float.h>
-#include <functional>
-#include <limits>
-#include <map>
-#if TBB_VERSION_MAJOR >= 2021
-#include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/concurrent_vector.h>
-#include <oneapi/tbb/parallel_for.h>
-#else
-#include <tbb/blocked_range.h>
-#include <tbb/concurrent_vector.h>
-#include <tbb/parallel_for.h>
-#endif
-#include <string>
-#include <string_view>
-#include <tuple>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-
-#include <boost/log/trivial.hpp>
-
-#include <tbb/parallel_for.h>
-#include <vector>
+#include "admesh/stl.h"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/MultiMaterialSegmentation.hpp"
+#include "libslic3r/TriangleSelector.hpp"
+#include "tcbspan/span.hpp"
+#include "libslic3r/Point.hpp"
 
 using namespace std::literals;
 
@@ -82,7 +79,9 @@ using namespace std::literals;
     // time limit for one ClipperLib operation (union / diff / offset), in ms
     #define PRINT_OBJECT_TIME_LIMIT_DEFAULT 50
     #include <boost/current_function.hpp>
+
     #include "Timer.hpp"
+
     #define PRINT_OBJECT_TIME_LIMIT_SECONDS(limit) Timing::TimeLimitAlarm time_limit_alarm(uint64_t(limit) * 1000000000l, BOOST_CURRENT_FUNCTION)
     #define PRINT_OBJECT_TIME_LIMIT_MILLIS(limit) Timing::TimeLimitAlarm time_limit_alarm(uint64_t(limit) * 1000000l, BOOST_CURRENT_FUNCTION)
 #else
@@ -102,11 +101,10 @@ using namespace std::literals;
     #define DEBUG
     #define _DEBUG
     #include "SVG.hpp"
+
     #undef assert 
     #include <cassert>
 #endif
-
-    #include "SVG.hpp"
 
 namespace Slic3r {
 
@@ -721,7 +719,9 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "perimeter_extrusion_width"
             || opt_key == "infill_overlap"
             || opt_key == "external_perimeters_first"
-            || opt_key == "arc_fitting") {
+            || opt_key == "arc_fitting"
+            || opt_key == "top_one_perimeter_type"
+            || opt_key == "only_one_perimeter_first_layer") {
             steps.emplace_back(posPerimeters);
         } else if (
                opt_key == "gap_fill_enabled"
@@ -886,11 +886,6 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_material_speed"
             || opt_key == "support_material_interface_speed"
             || opt_key == "bridge_speed"
-            || opt_key == "enable_dynamic_overhang_speeds"
-            || opt_key == "overhang_speed_0"
-            || opt_key == "overhang_speed_1"
-            || opt_key == "overhang_speed_2"
-            || opt_key == "overhang_speed_3"
             || opt_key == "external_perimeter_speed"
             || opt_key == "small_perimeter_speed"
             || opt_key == "solid_infill_speed"
@@ -903,6 +898,13 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "perimeter_speed") {
             invalidated |= m_print->invalidate_step(psWipeTower);
             invalidated |= m_print->invalidate_step(psGCodeExport);
+        } else if (
+               opt_key == "enable_dynamic_overhang_speeds"
+            || opt_key == "overhang_speed_0"
+            || opt_key == "overhang_speed_1"
+            || opt_key == "overhang_speed_2"
+            || opt_key == "overhang_speed_3") {
+            steps.emplace_back(posPerimeters);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps
             this->invalidate_all_steps();
@@ -2624,15 +2626,14 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
     return config;
 }
 
-void PrintObject::update_slicing_parameters()
-{
-    if (!m_slicing_params.valid)
-        m_slicing_params = SlicingParameters::create_from_config(
-            this->print()->config(), m_config, this->model_object()->max_z(), this->object_extruders());
+void PrintObject::update_slicing_parameters() {
+    if (!m_slicing_params.valid) {
+        m_slicing_params = SlicingParameters::create_from_config(this->print()->config(), m_config, this->model_object()->max_z(),
+                                                                 this->object_extruders(), this->print()->shrinkage_compensation());
+    }
 }
 
-SlicingParameters PrintObject::slicing_parameters(const DynamicPrintConfig& full_config, const ModelObject& model_object, float object_max_z)
-{
+SlicingParameters PrintObject::slicing_parameters(const DynamicPrintConfig &full_config, const ModelObject &model_object, float object_max_z, const Vec3d &object_shrinkage_compensation) {
 	PrintConfig         print_config;
 	PrintObjectConfig   object_config;
 	PrintRegionConfig   default_region_config;
@@ -2665,7 +2666,8 @@ SlicingParameters PrintObject::slicing_parameters(const DynamicPrintConfig& full
 
     if (object_max_z <= 0.f)
         object_max_z = (float)model_object.raw_bounding_box().size().z();
-    return SlicingParameters::create_from_config(print_config, object_config, object_max_z, object_extruders);
+
+    return SlicingParameters::create_from_config(print_config, object_config, object_max_z, object_extruders, object_shrinkage_compensation);
 }
 
 // returns 0-based indices of extruders used to print the object (without brim, support and other helper extrusions)
@@ -2686,7 +2688,6 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
     if (layer_height_profile.empty()) {
         // use the constructor because the assignement is crashing on ASAN OsX
         layer_height_profile = model_object.layer_height_profile.get();
-//        layer_height_profile = model_object.layer_height_profile;
         // The layer height returned is sampled with high density for the UI layer height painting
         // and smoothing tool to work.
         updated = true;
@@ -2697,8 +2698,9 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
         // Must not be of even length.
         ((layer_height_profile.size() & 1) != 0 ||
             // Last entry must be at the top of the object.
-            std::abs(layer_height_profile[layer_height_profile.size() - 2] - slicing_parameters.object_print_z_max + slicing_parameters.object_print_z_min) > 1e-3))
+            std::abs(layer_height_profile[layer_height_profile.size() - 2] - slicing_parameters.object_print_z_uncompensated_max + slicing_parameters.object_print_z_min) > 1e-3)) {
         layer_height_profile.clear();
+    }
 
     if (layer_height_profile.empty()) {
         //layer_height_profile = layer_height_profile_adaptive(slicing_parameters, model_object.layer_config_ranges, model_object.volumes);
@@ -3154,7 +3156,7 @@ static void project_triangles_to_slabs(SpanOfConstPtrs<Layer> layers, const inde
 }
 
 void PrintObject::project_and_append_custom_facets(
-        bool seam, EnforcerBlockerType type, std::vector<Polygons>& out) const
+        bool seam, TriangleStateType type, std::vector<Polygons>& out) const
 {
     for (const ModelVolume* mv : this->model_object()->volumes)
         if (mv->is_model_part()) {

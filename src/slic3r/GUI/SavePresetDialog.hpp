@@ -40,8 +40,11 @@ public:
             Warning
         };
 
+        // Item as an item inside of the SavePresetDialog
         Item(Preset::Type type, const std::string& suffix, wxBoxSizer* sizer, SavePresetDialog* parent, bool is_for_multiple_save);
-        Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PrinterTechnology pt = ptFFF);
+
+        // Item as a separate control(f.e. as a part of ConfigWizard to check name of the new custom priter)
+        Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PresetBundle* preset_bundle, PrinterTechnology pt = ptFFF);
 
         void            update_valid_bmp();
         void            accept();
@@ -49,7 +52,14 @@ public:
 
         bool            is_valid()      const { return m_valid_type != ValidationType::NoValid; }
         Preset::Type    type()          const { return m_type; }
-        std::string     preset_name()   const { return m_preset_name; }
+        std::string     preset_name()   const;
+
+        struct PresetName {
+            std::string casei_name;
+            std::string name;
+
+            bool operator<(const PresetName& other) const { return other.casei_name > this->casei_name; }
+        };
 
     private:
         Preset::Type    m_type {Preset::TYPE_INVALID};
@@ -64,10 +74,14 @@ public:
         wxTextCtrl*         m_text_ctrl     {nullptr};
         wxStaticText*       m_valid_label   {nullptr};
 
-        PresetCollection*   m_presets       {nullptr};
+        const PresetCollection* m_presets       {nullptr};
+        const PresetBundle*     m_preset_bundle {nullptr};
+
+        std::vector<PresetName> m_casei_preset_names;
 
         std::string get_init_preset_name(const std::string &suffix);
         void        init_input_name_ctrl(wxBoxSizer *input_name_sizer, std::string preset_name);
+        void        init_casei_preset_names();
         const Preset*   get_existing_preset() const ;
 
         void        update();
@@ -98,7 +112,7 @@ public:
 
     void AddItem(Preset::Type type, const std::string& suffix, bool is_for_multiple_save);
 
-    PresetBundle*   get_preset_bundle() const { return m_preset_bundle; }
+    const PresetBundle* get_preset_bundle() const { return m_preset_bundle; }
     std::string     get_name();
     std::string     get_name(Preset::Type type);
 

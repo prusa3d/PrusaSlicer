@@ -17,6 +17,9 @@ class TextInput : public wxNavigationEnabled<StaticBox>
     static const int TextInputWidth = 200;
     static const int TextInputHeight = 50;
 
+    wxRect                  dd_icon_rect;
+    std::function<void()>   OnClickDropDownIcon{ nullptr };
+
 public:
     TextInput();
 
@@ -70,6 +73,10 @@ public:
     wxString GetValue();
 
     void SetSelection(long from, long to);
+
+    void SysColorsChanged();
+
+    void SetOnDropDownIcon(std::function<void()> click_drop_down_icon_fn) { OnClickDropDownIcon = click_drop_down_icon_fn; }
 
 protected:
     virtual void OnEdit() {}
