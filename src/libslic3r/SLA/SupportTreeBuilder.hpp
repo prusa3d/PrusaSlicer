@@ -11,7 +11,11 @@
 #include <libslic3r/SLA/Pad.hpp>
 #include <libslic3r/MTUtils.hpp>
 #include <assert.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/spin_mutex.h>
+#else
+#include <tbb/spin_mutex.h>
+#endif
 #include <stddef.h>
 #include <algorithm>
 #include <mutex>

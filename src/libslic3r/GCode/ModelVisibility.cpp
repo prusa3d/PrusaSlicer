@@ -1,7 +1,12 @@
 #include <boost/log/trivial.hpp>
 #include <igl/Hit.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#endif
 #include <cmath>
 #include <cstdlib>
 

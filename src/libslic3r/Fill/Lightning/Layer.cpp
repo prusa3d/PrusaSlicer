@@ -3,9 +3,15 @@
 
 #include "Layer.hpp" //The class we're implementing.
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/blocked_range2d.h>
 #include <oneapi/tbb/parallel_for.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/blocked_range2d.h>
+#include <tbb/parallel_for.h>
+#endif
 #include <mutex>
 #include <algorithm>
 #include <limits>
