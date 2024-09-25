@@ -1563,13 +1563,21 @@ void GCodeGenerator::process_layers(
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
+#if TBB_VERSION_MAJOR >= 2021
     tbb::filter<void, LayerResult> pipeline_to_layerresult = smooth_path_interpolator & generator;
+#else
+    tbb::filter_t<void, LayerResult> pipeline_to_layerresult = smooth_path_interpolator & generator;
+#endif
     if (m_spiral_vase)
         pipeline_to_layerresult = pipeline_to_layerresult & spiral_vase;
     if (m_pressure_equalizer)
         pipeline_to_layerresult = pipeline_to_layerresult & pressure_equalizer;
 
+#if TBB_VERSION_MAJOR >= 2021
     tbb::filter<LayerResult, std::string> pipeline_to_string = cooling;
+#else
+    tbb::filter_t<LayerResult, std::string> pipeline_to_string = cooling;
+#endif
     if (m_find_replace)
         pipeline_to_string = pipeline_to_string & find_replace;
 
@@ -1656,13 +1664,21 @@ void GCodeGenerator::process_layers(
         [&output_stream](std::string s) { output_stream.write(s); }
     );
 
+#if TBB_VERSION_MAJOR >= 2021
     tbb::filter<void, LayerResult> pipeline_to_layerresult = smooth_path_interpolator & generator;
+#else
+    tbb::filter_t<void, LayerResult> pipeline_to_layerresult = smooth_path_interpolator & generator;
+#endif
     if (m_spiral_vase)
         pipeline_to_layerresult = pipeline_to_layerresult & spiral_vase;
     if (m_pressure_equalizer)
         pipeline_to_layerresult = pipeline_to_layerresult & pressure_equalizer;
 
+#if TBB_VERSION_MAJOR >= 2021
     tbb::filter<LayerResult, std::string> pipeline_to_string = cooling;
+#else
+    tbb::filter_t<LayerResult, std::string> pipeline_to_string = cooling;
+#endif
     if (m_find_replace)
         pipeline_to_string = pipeline_to_string & find_replace;
 

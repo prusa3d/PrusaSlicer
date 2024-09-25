@@ -23,9 +23,15 @@
 #include <libqhullcpp/QhullFacet.h>
 #include <libqhullcpp/QhullPoint.h>
 #include <libqhullcpp/QhullVertex.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/concurrent_vector.h>
 #include <oneapi/tbb/parallel_for.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/concurrent_vector.h>
+#include <tbb/parallel_for.h>
+#endif
 #include <cmath>
 #include <vector>
 #include <utility>
