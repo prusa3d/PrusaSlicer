@@ -414,7 +414,8 @@ private:
 	void toolchange_Wipe(
 		WipeTowerWriter &writer,
 		const box_coordinates  &cleaning_box,
-		float wipe_volume);
+		float wipe_volume,
+		const int new_temperature = 0);
 };
 
 
