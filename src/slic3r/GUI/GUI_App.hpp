@@ -119,6 +119,20 @@ static wxString dots("…", wxConvUTF8);
     #define SUPPORTS_MARKUP
 #endif
 
+
+// A wrapper class to allow ignoring some known warnings 
+// and not bothering users with redundant messages. 
+// see https://github.com/prusa3d/PrusaSlicer/issues/12920
+class LogGui : public wxLogGui
+{
+protected:
+    void DoLogText(const wxString& msg) override;
+    void DoLogRecord(wxLogLevel level, const wxString& msg, const wxLogRecordInfo& info) override;
+
+private:
+    bool ignorred_message(const wxString& msg);
+};
+
 class GUI_App : public wxApp
 {
 public:
@@ -181,6 +195,7 @@ private:
 	size_t m_instance_hash_int;
 
     Search::OptionsSearcher* m_searcher{ nullptr };
+    LogGui*                  m_log_gui { nullptr };
 
 public:
     bool            OnInit() override;
@@ -416,7 +431,7 @@ public:
     // return true if preset vas invisible and we have to installed it to make it selectable
     bool            select_printer_preset(const Preset* printer_preset);
     bool            select_filament_preset(const Preset* filament_preset, size_t extruder_index);
-    void            search_and_select_filaments(const std::string& material, size_t extruder_index, std::string& out_message);
+    void            search_and_select_filaments(const std::string& material, bool avoid_abrasive, size_t extruder_index, std::string& out_message);
     void            handle_script_message(std::string msg) {}
     void            request_model_download(std::string import_json) {}
     void            download_project(std::string project_id) {}

@@ -2,11 +2,21 @@
 #define libslic3r_SeamPerimeters_hpp_
 
 #include <tcbspan/span.hpp>
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <utility>
+#include <vector>
 
 #include "libslic3r/GCode/SeamPainting.hpp"
 #include "libslic3r/KDTreeIndirect.hpp"
 #include "libslic3r/AABBTreeLines.hpp"
 #include "libslic3r/GCode/SeamGeometry.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r {
     class Layer;
@@ -141,7 +151,8 @@ struct Perimeter
         const Polygon &polygon,
         const ModelInfo::Painting &painting,
         const LayerInfo &layer_info,
-        const PerimeterParams &params
+        const PerimeterParams &params,
+        const double offset_inside
     );
 
     static Perimeter create_degenerate(

@@ -9,6 +9,7 @@
 #include "PresetBundle.hpp"
 #include "Utils/DirectoriesUtils.hpp"
 #include "Utils/JsonUtils.hpp"
+#include "BuildVolume.hpp"
 
 #include <boost/log/trivial.hpp>
 
@@ -159,13 +160,43 @@ static bool is_compatible_preset(const Preset& printer_preset, const PrinterAttr
             printer_preset.config.opt_string("printer_variant") == attr.variant_name;
 }
 
-static void add_profile_node(pt::ptree& printer_profiles_node, const std::string& preset_name, const int extruders_cnt)
+static void add_profile_node(pt::ptree& printer_profiles_node, const Preset& printer_preset)
 {
     pt::ptree profile_node;
 
-    profile_node.put("name", preset_name);
+    const DynamicPrintConfig& config = printer_preset.config;
+
+    int extruders_cnt = printer_preset.printer_technology() == ptSLA ? 0 :
+                        config.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
+
+    profile_node.put("name", printer_preset.name);
     if (extruders_cnt > 0)
         profile_node.put("extruders_cnt", extruders_cnt);
+
+    const double max_print_height = config.opt_float("max_print_height");
+    const ConfigOptionPoints& bed_shape = *config.option<ConfigOptionPoints>("bed_shape");
+
+    BuildVolume build_volume = BuildVolume { bed_shape.values, max_print_height };
+    BoundingBoxf        bb   = build_volume.bounding_volume2d();
+
+    Vec2d origin_pt;
+    if (build_volume.type() == BuildVolume::Type::Circle) {
+        origin_pt = build_volume.bed_center();
+    }
+    else {
+        origin_pt = to_2d(-1 * build_volume.bounding_volume().min);
+    }
+    std::string origin = Slic3r::format("[%1%, %2%]", is_approx(origin_pt.x(), 0.) ? 0 : origin_pt.x(),
+                                                      is_approx(origin_pt.y(), 0.) ? 0 : origin_pt.y());
+
+    pt::ptree bed_node;
+    bed_node.put("type",                build_volume.type_name());
+    bed_node.put("width",               bb.max.x() - bb.min.x());
+    bed_node.put("height",              bb.max.y() - bb.min.y());
+    bed_node.put("origin",              origin);
+    bed_node.put("max_print_height",    max_print_height);
+
+    profile_node.add_child("bed", bed_node);
 
     printer_profiles_node.push_back(std::make_pair("", profile_node));
 }
@@ -181,16 +212,14 @@ static void get_printer_profiles_node(pt::ptree& printer_profiles_node,
     for (const Preset& printer_preset : printer_presets) {
         if (!printer_preset.is_visible)
             continue;
-        int extruders_cnt = printer_preset.printer_technology() == ptSLA ? 0 :
-                            printer_preset.config.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
 
         if (printer_preset.is_user()) {
             const Preset* parent_preset = printer_presets.get_preset_parent(printer_preset);
             if (parent_preset && is_compatible_preset(*parent_preset, attr))
-                add_profile_node(user_printer_profiles_node, printer_preset.name, extruders_cnt);
+                add_profile_node(user_printer_profiles_node, printer_preset);
         }
         else if (is_compatible_preset(printer_preset, attr))
-            add_profile_node(printer_profiles_node, printer_preset.name, extruders_cnt);
+            add_profile_node(printer_profiles_node, printer_preset);
     }
 }
 
@@ -270,9 +299,7 @@ static void add_undef_printer_models(pt::ptree& vendor_node,
                 preset.vendor || printer_presets.get_preset_parent(preset))
                 continue;
 
-            int extruders_cnt = preset.printer_technology() == ptSLA ? 0 :
-                preset.config.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
-            add_profile_node(printer_profiles_node, preset.name, extruders_cnt);
+            add_profile_node(printer_profiles_node, preset);
         }
 
         if (!printer_profiles_node.empty()) {

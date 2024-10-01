@@ -8,7 +8,7 @@
 ///|/
 #include "libslic3r/Technologies.hpp"
 #include "GUI_App.hpp"
-#include "GUI_Init.hpp"
+#include "GUI_Init.hpp" // IWYU pragma: keep
 #include "GUI_ObjectList.hpp"
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_Factories.hpp"
@@ -83,26 +83,27 @@
 #include "slic3r/Config/Snapshot.hpp"
 #include "ConfigSnapshotDialog.hpp"
 #include "FirmwareDialog.hpp"
-#include "Preferences.hpp"
+#include "slic3r/GUI/Preferences.hpp" // IWYU pragma: keep
 #include "Tab.hpp"
 #include "SysInfoDialog.hpp"
 #include "KBShortcutsDialog.hpp"
 #include "UpdateDialogs.hpp"
 #include "Mouse3DController.hpp"
 #include "RemovableDriveManager.hpp"
-#include "InstanceCheck.hpp"
+#include "InstanceCheck.hpp" // IWYU pragma: keep
 #include "NotificationManager.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
-#include "PrintHostDialogs.hpp"
+#include "PrintHostDialogs.hpp" // IWYU pragma: keep
 #include "DesktopIntegrationDialog.hpp"
 #include "SendSystemInfoDialog.hpp"
 #include "Downloader.hpp"
 #include "PhysicalPrinterDialog.hpp"
 #include "WifiConfigDialog.hpp"
 #include "UserAccount.hpp"
+#include "UserAccountUtils.hpp"
 #include "WebViewDialog.hpp"
-#include "LoginDialog.hpp"
+#include "LoginDialog.hpp" // IWYU pragma: keep
 #include "PresetArchiveDatabase.hpp"
 
 #include "BitmapCache.hpp"
@@ -907,9 +908,9 @@ bool GUI_App::init_opengl()
 }
 
 // gets path to PrusaSlicer.ini, returns semver from first line comment
-static boost::optional<Semver> parse_semver_from_ini(std::string path)
+static boost::optional<Semver> parse_semver_from_ini(const std::string& path)
 {
-    std::ifstream stream(path);
+    boost::nowide::ifstream stream(path);
     std::stringstream buffer;
     buffer << stream.rdbuf();
     std::string body = buffer.str();
@@ -1255,6 +1256,10 @@ bool GUI_App::on_init_inner()
     // Set initialization of image handlers before any UI actions - See GH issue #7469
     wxInitAllImageHandlers();
 
+    // Set our own gui log as an active target
+    m_log_gui = new LogGui();
+    wxLog::SetActiveTarget(m_log_gui);
+
 #if defined(_WIN32) && ! defined(_WIN64)
     // Win32 32bit build.
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
@@ -1279,8 +1284,7 @@ bool GUI_App::on_init_inner()
 
     // Verify resources path
     const wxString resources_dir = from_u8(Slic3r::resources_dir());
-    wxCHECK_MSG(wxDirExists(resources_dir), false,
-        wxString::Format("Resources path does not exist or is not a directory: %s", resources_dir));
+    wxCHECK_MSG(wxDirExists(resources_dir), false, wxString::Format("Resources path does not exist or is not a directory: %s", resources_dir));
 
 #ifdef __linux__
     if (! check_old_linux_datadir(GetAppName())) {
@@ -1446,6 +1450,13 @@ bool GUI_App::on_init_inner()
 
         Bind(EVT_CONFIG_UPDATER_SYNC_DONE, [this](const wxCommandEvent& evt) {
             this->check_updates(false);
+        });
+
+        Bind(wxEVT_ACTIVATE_APP, [this](const wxActivateEvent &evt) {
+            if (plater_) {
+                if (auto user_account = plater_->get_user_account())
+                    user_account->on_activate_app(evt.GetActive());
+            }
         });
 
     }
@@ -3227,7 +3238,7 @@ wxString GUI_App::current_language_code_safe() const
 
 void GUI_App::open_web_page_localized(const std::string &http_address)
 {
-    open_browser_with_warning_dialog(http_address + "&lng=" + this->current_language_code_safe(), nullptr, false);
+    open_browser_with_warning_dialog(from_u8(http_address + "&lng=") + this->current_language_code_safe(), nullptr, false);
 }
 
 // If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have a part(s).
@@ -3301,6 +3312,13 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
     if (res) {
         load_current_presets();
 
+        for (Tab* tab : tabs_list) {
+            if (tab->type() == Preset::TYPE_PRINTER) {
+                if (!tab->IsShown())
+                    mainframe->select_tab(size_t(0));
+                break;
+            }
+        }
         // #ysFIXME - delete after testing: This part of code looks redundant. All checks are inside ConfigWizard::priv::apply_config() 
         if (preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA)
             may_switch_to_SLA_preset(_L("Configuration is editing from ConfigWizard"));
@@ -3337,7 +3355,7 @@ void GUI_App::show_downloader_registration_dialog()
         , true, wxYES_NO);
     if (msg.ShowModal() == wxID_YES) {
         auto downloader_worker = new DownloaderUtils::Worker(nullptr);
-        downloader_worker->perform_register(app_config->get("url_downloader_dest"));
+        downloader_worker->perform_download_register(app_config->get("url_downloader_dest"));
 #if defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION) 
         if (DownloaderUtils::Worker::perform_registration_linux)
             DesktopIntegrationDialog::perform_downloader_desktop_integration();
@@ -3544,42 +3562,64 @@ bool GUI_App::check_updates(const bool invoked_by_user)
     // Applicaiton will continue.
     return true;
 }
+namespace {
+bool open_dialog_hyperlink_checkbox(wxWindow* parent, AppConfig* app_config)
+{
+    RichMessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+    dialog.ShowCheckBox(_L("Remember my choice"));
+    auto answer = dialog.ShowModal();
+    bool launch = answer == wxID_YES;
+    if (dialog.IsCheckBoxChecked()) {
+        wxString preferences_item = _L("Suppress to open hyperlink in browser");
+        wxString msg =
+            _L("PrusaSlicer will remember your choice.") + "\n\n" +
+            _L("You will not be asked about it again on hyperlinks hovering.") + "\n\n" +
+            format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
 
+        MessageDialog msg_dlg(parent, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+        if (msg_dlg.ShowModal() == wxID_CANCEL)
+            return false;
+        app_config->set("suppress_hyperlinks", answer == wxID_NO ? "1" : "0");
+    }
+    return launch;
+}
+bool open_dialog_hyperlink(wxWindow* parent)
+{
+    MessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
+    return dialog.ShowModal() == wxID_YES;
+}
+}
 bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* parent/* = nullptr*/, bool force_remember_choice /*= true*/, int flags/* = 0*/)
 {
+    enum class SupressHyperLinksOption{
+        SHLO_UNCHECKED,
+        SHLO_ALWAYS_SUPRESS,
+        SHLO_ALWAYS_ALLOW
+    };
+    bool empty = app_config->get("suppress_hyperlinks").empty();
+    bool checked = app_config->get_bool("suppress_hyperlinks");
+    SupressHyperLinksOption opt_val = 
+        (empty 
+            ? SupressHyperLinksOption::SHLO_UNCHECKED
+            : (checked  
+                ? SupressHyperLinksOption::SHLO_ALWAYS_SUPRESS 
+                : SupressHyperLinksOption::SHLO_ALWAYS_ALLOW));
     bool launch = true;
-
-    // warning dialog containes a "Remember my choice" checkbox
-    std::string option_key = "suppress_hyperlinks";
-    if (force_remember_choice || app_config->get(option_key).empty()) {
-        if (app_config->get(option_key).empty()) {
-            RichMessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
-            dialog.ShowCheckBox(_L("Remember my choice"));
-            auto answer = dialog.ShowModal();
-            launch = answer == wxID_YES;
-            if (dialog.IsCheckBoxChecked()) {
-                wxString preferences_item = _L("Suppress to open hyperlink in browser");
-                wxString msg =
-                    _L("PrusaSlicer will remember your choice.") + "\n\n" +
-                    _L("You will not be asked about it again on hyperlinks hovering.") + "\n\n" +
-                    format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
-
-                MessageDialog msg_dlg(parent, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
-                if (msg_dlg.ShowModal() == wxID_CANCEL)
-                    return false;
-                app_config->set(option_key, answer == wxID_NO ? "1" : "0");
-            }
-        }
-        if (launch)
-            launch = !app_config->get_bool(option_key);
-    }
-    // warning dialog doesn't containe a "Remember my choice" checkbox
-    // and will be shown only when "Suppress to open hyperlink in browser" is ON.
-    else if (app_config->get_bool(option_key)) {
-        MessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
-        launch = dialog.ShowModal() == wxID_YES;
-    }
-
+    if (opt_val == SupressHyperLinksOption::SHLO_UNCHECKED) {
+        // no previous action from user
+        // open dialog with remember checkbox
+        launch = open_dialog_hyperlink_checkbox(parent, app_config);
+    } else if (opt_val == SupressHyperLinksOption::SHLO_ALWAYS_ALLOW) {
+        // user already set checkbox to always open
+        launch = true;
+    } else if (opt_val == SupressHyperLinksOption::SHLO_ALWAYS_SUPRESS && force_remember_choice) {
+        // user already set checkbox or preferences to always supress
+        launch = false;
+    } else if (opt_val == SupressHyperLinksOption::SHLO_ALWAYS_SUPRESS && !force_remember_choice) {
+        // user already set checkbox or preferences to always supress but it is overriden
+        // no checkbox in dialog
+        launch = open_dialog_hyperlink(parent);
+    } 
     return  launch && wxLaunchDefaultBrowser(url, flags);
 }
 
@@ -3701,7 +3741,7 @@ void GUI_App::app_updater(bool from_user)
     assert(!app_data.target_path.empty());
 
     // dialog with new version info
-    AppUpdateAvailableDialog dialog(*Semver::parse(SLIC3R_VERSION), *app_data.version, from_user);
+    AppUpdateAvailableDialog dialog(*Semver::parse(SLIC3R_VERSION), *app_data.version, from_user, app_data.action == AppUpdaterURLAction::AUUA_OPEN_IN_BROWSER);
     auto dialog_result = dialog.ShowModal();
     // checkbox "do not show again"
     if (dialog.disable_version_check()) {
@@ -3709,6 +3749,10 @@ void GUI_App::app_updater(bool from_user)
     }
     // Doesn't wish to update
     if (dialog_result != wxID_OK) {
+        return;
+    }
+    if (app_data.action == AppUpdaterURLAction::AUUA_OPEN_IN_BROWSER) {
+        open_browser_with_warning_dialog(from_u8(app_data.url), nullptr, false);
         return;
     }
     // dialog with new version download (installer or app dependent on system) including path selection
@@ -3824,14 +3868,102 @@ bool GUI_App::select_printer_preset(const Preset* preset)
     return is_installed;
 }
 
+namespace {
+const Preset* find_preset_by_nozzle_and_options(
+    const PrinterPresetCollection& collection
+    , const std::string& model_id
+    , std::map<std::string, std::vector<std::string>>& options) 
+{
+    // find all matching presets when repo prefix is ommited
+    std::vector<const Preset*> results;
+    for (const Preset &preset : collection) {
+        // trim repo prefix
+        std::string printer_model = preset.config.opt_string("printer_model");
+        std::string vendor_repo_prefix;
+        if (preset.vendor) {
+            vendor_repo_prefix = preset.vendor->repo_prefix;
+        } else if (std::string inherits = preset.inherits(); !inherits.empty()) {
+            const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
+            if (parent && parent->vendor) {
+                vendor_repo_prefix = parent->vendor->repo_prefix;
+            }
+        }
+        if (printer_model.find(vendor_repo_prefix) == 0) {
+            printer_model = printer_model.substr(vendor_repo_prefix.size()
+            );
+            boost::trim_left(printer_model);
+        }
+       
+        if (!preset.is_system || printer_model != model_id)
+            continue;
+        // options (including nozzle_diameter)
+        bool failed = false;
+        for (const auto& opt : options) {
+            assert(preset.config.has(opt.first));
+            // We compare only first value now, but options contains data for all (some might be empty tho)
+            std::string opt_val;
+            if (preset.config.option(opt.first)->is_scalar()) {
+                opt_val = preset.config.option(opt.first)->serialize();
+            } else {
+                switch (preset.config.option(opt.first)->type()) {
+                case coInts:     opt_val = std::to_string(static_cast<const ConfigOptionInts*>(preset.config.option(opt.first))->values[0]); break;
+                case coFloats:   
+                    opt_val = into_u8(double_to_string(static_cast<const ConfigOptionFloats*>(preset.config.option(opt.first))->values[0]));
+                    if (size_t pos = opt_val.find(",") != std::string::npos)
+                        opt_val.replace(pos, 1, 1, '.');
+                    break;
+                case coStrings:  opt_val = static_cast<const ConfigOptionStrings*>(preset.config.option(opt.first))->values[0]; break;
+                case coBools:    opt_val = static_cast<const ConfigOptionBools*>(preset.config.option(opt.first))->values[0] ? "1" : "0"; break;
+                default:
+                   assert(true);
+                   continue;
+                }
+            }
+           
+            if (opt_val != opt.second[0])
+            {
+                failed = true;
+                break;
+            }
+        }
+        if (!failed) {
+            results.push_back(&preset);
+        }
+    }
+    // find visible without prefix
+    for (const Preset *preset : results) {
+        if (preset->is_visible && preset->config.opt_string("printer_model") == model_id) {
+            return preset;
+        }
+    }
+    // find one visible
+    for (const Preset *preset : results) {
+        if (preset->is_visible) {
+            return preset;
+        }
+    }
+    // find one without prefix
+    for (const Preset* preset : results) {
+        if (preset->config.opt_string("printer_model") == model_id) {
+            return preset;
+        }
+    }
+    if (results.size() != 0) {
+       return results.front();
+    }
+    return nullptr;
+}
+}
+
 bool GUI_App::select_printer_from_connect(const std::string& msg)
 {
-    // parse message
-    std::string model_name = plater()->get_user_account()->get_keyword_from_json(msg, "printer_model");
-    std::string uuid = plater()->get_user_account()->get_keyword_from_json(msg, "uuid");
+    // parse message "binary_gcode"
+    boost::property_tree::ptree ptree;
+    std::string model_name = UserAccountUtils::get_keyword_from_json(ptree, msg, "printer_model");
+    std::string uuid = UserAccountUtils::get_keyword_from_json(ptree, msg, "uuid");
     if (model_name.empty()) {
         std::vector<std::string> compatible_printers;
-        plater()->get_user_account()->fill_supported_printer_models_from_json(msg, compatible_printers);
+        UserAccountUtils::fill_supported_printer_models_from_json(ptree, compatible_printers);
         if (!compatible_printers.empty())  {
             model_name = compatible_printers.front();
         }
@@ -3840,10 +3972,23 @@ bool GUI_App::select_printer_from_connect(const std::string& msg)
         BOOST_LOG_TRIVIAL(error) << "Failed to select printer from Connect. Printer_model is empty.";
         return false;
     }
-    std::string nozzle = plater()->get_user_account()->get_nozzle_from_json(msg);
-    BOOST_LOG_TRIVIAL(info) << "Select printer from Connect. Model: " << model_name << "nozzle: " << nozzle;
+    std::map<std::string, std::vector<std::string>> config_options_to_match; 
+    UserAccountUtils::fill_config_options_from_json(ptree, config_options_to_match);
+    // prevent not having nozzle diameter
+    if (config_options_to_match.find("nozzle_diameter") == config_options_to_match.end()) {
+        std::string diameter = UserAccountUtils::get_keyword_from_json(ptree, msg, "nozzle_diameter");
+        if (!diameter.empty())
+             config_options_to_match["nozzle_diameter"] = {diameter};
+    }
+    // log
+    BOOST_LOG_TRIVIAL(info) << "Select printer from Connect. Model: " << model_name;
+    for(const auto& pair :config_options_to_match) {
+        std::string out;
+        for(const std::string& val :pair.second) { out += val + ",";}
+        BOOST_LOG_TRIVIAL(info) << pair.first << ": " << out;
+    }
     // select printer
-    const Preset* printer_preset = preset_bundle->printers.find_system_preset_by_model_and_variant(model_name, nozzle);
+    const Preset* printer_preset = find_preset_by_nozzle_and_options(preset_bundle->printers, model_name, config_options_to_match);
     bool is_installed = printer_preset && select_printer_preset(printer_preset);
     // notification
     std::string out = printer_preset ?
@@ -3872,11 +4017,14 @@ bool GUI_App::select_filament_preset(const Preset* preset, size_t extruder_index
     assert(preset->is_visible);
     return preset_bundle->extruders_filaments[extruder_index].select_filament(preset->name);
 }
-void GUI_App::search_and_select_filaments(const std::string& material, size_t extruder_index, std::string& out_message)
+void GUI_App::search_and_select_filaments(const std::string& material, bool avoid_abrasive, size_t extruder_index, std::string& out_message)
 {
     const Preset* preset = preset_bundle->extruders_filaments[extruder_index].get_selected_preset();
     // selected is ok
-    if (!preset->is_default && preset->config.has("filament_type") && preset->config.option("filament_type")->serialize() == material) {
+    if (!preset->is_default && preset->config.has("filament_type")
+        && (!avoid_abrasive || preset->config.option<ConfigOptionBools>("filament_abrasive")->values[0] == false) 
+        && preset->config.option("filament_type")->serialize() == material) 
+    {
         return;
     }
     // find installed compatible filament that is Prusa with suitable type and select it
@@ -3886,6 +4034,7 @@ void GUI_App::search_and_select_filaments(const std::string& material, size_t ex
             && filament.preset->is_visible
             && (!filament.preset->vendor || !filament.preset->vendor->templates_profile)
             && filament.preset->config.has("filament_type")
+            && (!avoid_abrasive || filament.preset->config.option<ConfigOptionBools>("filament_abrasive")->values[0] == false)
             && filament.preset->config.option("filament_type")->serialize() == material
             && filament.preset->name.compare(0, 9, "Prusament") == 0
             && select_filament_preset(filament.preset, extruder_index)
@@ -3904,6 +4053,7 @@ void GUI_App::search_and_select_filaments(const std::string& material, size_t ex
             && filament.preset->is_visible
             && (!filament.preset->vendor || !filament.preset->vendor->templates_profile)
             && filament.preset->config.has("filament_type")
+            && (!avoid_abrasive || filament.preset->config.option<ConfigOptionBools>("filament_abrasive")->values[0] == false)
             && filament.preset->config.option("filament_type")->serialize() == material
             && select_filament_preset(filament.preset, extruder_index)
             )
@@ -3921,6 +4071,7 @@ void GUI_App::search_and_select_filaments(const std::string& material, size_t ex
             && !filament.preset->is_default
             && (!filament.preset->vendor || !filament.preset->vendor->templates_profile)
             && filament.preset->config.has("filament_type")
+            && (!avoid_abrasive || filament.preset->config.option<ConfigOptionBools>("filament_abrasive")->values[0] == false)
             && filament.preset->config.option("filament_type")->serialize() == material
             && filament.preset->name.compare(0, 9, "Prusament") == 0
             && select_filament_preset(filament.preset, extruder_index))
@@ -3936,7 +4087,8 @@ void GUI_App::select_filament_from_connect(const std::string& msg)
 {
     // parse message
     std::vector<std::string> materials;
-    plater()->get_user_account()->fill_material_from_json(msg, materials);
+    std::vector<bool> avoid_abrasive;
+    UserAccountUtils::fill_material_from_json(msg, materials, avoid_abrasive);
     if (materials.empty()) {
         BOOST_LOG_TRIVIAL(error) << "Failed to select filament from Connect. No material data.";
         return;
@@ -3945,11 +4097,14 @@ void GUI_App::select_filament_from_connect(const std::string& msg)
     size_t extruder_count = preset_bundle->extruders_filaments.size();
     if (extruder_count != materials.size()) {
         BOOST_LOG_TRIVIAL(error) << format("Failed to select filament from Connect. Selected printer has %1% extruders while data from Connect contains %2% materials.", extruder_count, materials.size());
+        plater()->get_notification_manager()->close_notification_of_type(NotificationType::SelectFilamentFromConnect);
+        // TRN: Notification text.
+        plater()->get_notification_manager()->push_notification(NotificationType::SelectFilamentFromConnect, NotificationManager::NotificationLevel::ImportantNotificationLevel, _u8L("Failed to select filament from Connect."));
         return;
     }
     std::string notification_text;
     for (size_t i = 0; i < extruder_count; i++) {
-        search_and_select_filaments(materials[i], i, notification_text);
+        search_and_select_filaments(materials[i], avoid_abrasive.size() > i ? avoid_abrasive[i] : false, i, notification_text);
     }
 
     // When all filaments are selected/intalled, 
@@ -3970,7 +4125,8 @@ void GUI_App::handle_connect_request_printer_select(const std::string& msg)
     // Here comes code from ConnectWebViewPanel
     // It only contains uuid of a printer to be selected
     // Lets queue it and wait on result. The result is send via event to plater, where it is send to handle_connect_request_printer_select_inner
-    std::string uuid = plater()->get_user_account()->get_keyword_from_json(msg, "uuid");
+    boost::property_tree::ptree ptree;
+    std::string uuid = UserAccountUtils::get_keyword_from_json(ptree, msg, "uuid");
     plater()->get_user_account()->enqueue_printer_data_action(uuid);
 }
 void GUI_App::handle_connect_request_printer_select_inner(const std::string & msg)
@@ -3978,7 +4134,6 @@ void GUI_App::handle_connect_request_printer_select_inner(const std::string & ms
     BOOST_LOG_TRIVIAL(debug) << "Handling web request: " << msg;
     // return to plater
     this->mainframe->select_tab(size_t(0));
-  
     if (!select_printer_from_connect(msg)) {
         // If printer was not selected, do not select filament.
         return;
@@ -3993,6 +4148,32 @@ void GUI_App::handle_connect_request_printer_select_inner(const std::string & ms
 void GUI_App::show_printer_webview_tab()
 {
     mainframe->show_printer_webview_tab(preset_bundle->physical_printers.get_selected_printer_config());
+}
+
+
+
+bool LogGui::ignorred_message(const wxString& msg)
+{    
+    for(const wxString& err : std::initializer_list<wxString>{ wxString("cHRM chunk does not match sRGB"),
+                                                               wxString("known incorrect sRGB profile") }) {
+        if (msg.Contains(err))
+            return true;
+    }
+    return false;
+}
+
+void LogGui::DoLogText(const wxString& msg)
+{
+    if (ignorred_message(msg))
+        return;
+    wxLogGui::DoLogText(msg);
+}
+
+void LogGui::DoLogRecord(wxLogLevel level, const wxString& msg, const wxLogRecordInfo& info)
+{
+    if (ignorred_message(msg))
+        return;
+    wxLogGui::DoLogRecord(level, msg, info);
 }
 
 } // GUI

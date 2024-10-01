@@ -1,11 +1,18 @@
-#include <fstream>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <cstdint>
+#include <iterator>
+#include <tuple>
+#include <limits>
 
-#include "ClipperUtils.hpp"
-
+#include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Layer.hpp"
-
 #include "libslic3r/GCode/SeamGeometry.hpp"
 #include "libslic3r/GCode/SeamPerimeters.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/GCode/SeamPainting.hpp"
+#include "libslic3r/MultiPoint.hpp"
+#include "tcbspan/span.hpp"
 
 namespace Slic3r::Seams::Perimeters::Impl {
 
@@ -320,7 +327,8 @@ Perimeter Perimeter::create(
     const Polygon &polygon,
     const ModelInfo::Painting &painting,
     const LayerInfo &layer_info,
-    const PerimeterParams &params
+    const PerimeterParams &params,
+    const double offset_inside
 ) {
     if (polygon.size() < 3) {
         return Perimeter::create_degenerate(
@@ -347,10 +355,17 @@ Perimeter Perimeter::create(
         Impl::oversample_painted(points, is_painted, layer_info.slice_z, params.oversampling_max_distance)};
 
     std::vector<PointType> point_types{
-        Impl::get_point_types(perimeter_points, painting, layer_info.slice_z, params.painting_radius)};
+        Impl::get_point_types(perimeter_points, painting, layer_info.slice_z, offset_inside > 0 ? offset_inside * 2 : params.painting_radius)};
 
-    std::tie(perimeter_points, point_types) =
-        Impl::remove_redundant_points(perimeter_points, point_types, params.simplification_epsilon);
+    // Geometry converted from extrusions has non zero offset_inside.
+    // Do not remomve redundant points for extrusions, becouse the redundant
+    // points can be on overhangs.
+    if (offset_inside < std::numeric_limits<double>::epsilon()) {
+        // The following is optimization with significant impact. If in doubt, run
+        // the "Seam benchmarks" test case in fff_print_tests.
+        std::tie(perimeter_points, point_types) =
+            Impl::remove_redundant_points(perimeter_points, point_types, params.simplification_epsilon);
+    }
 
     const std::vector<double> embeddings{
         Geometry::get_embedding_distances(perimeter_points, layer_info.distancer)};
@@ -405,7 +420,7 @@ LayerPerimeters create_perimeters(
             const Geometry::BoundedPolygon &bounded_polygon{layer[polygon_index]};
             const LayerInfo &layer_info{layer_infos[layer_index]};
             result[layer_index][polygon_index] = BoundedPerimeter{
-                Perimeter::create(bounded_polygon.polygon, painting, layer_info, params),
+                Perimeter::create(bounded_polygon.polygon, painting, layer_info, params, bounded_polygon.offset_inside),
                 bounded_polygon.bounding_box};
         }
     );

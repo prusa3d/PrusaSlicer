@@ -1,4 +1,5 @@
 #include <catch2/catch.hpp>
+#include <igl/qslim.h>
 #include <test_utils.hpp>
 
 #include <libslic3r/QuadricEdgeCollapse.hpp>
@@ -239,7 +240,6 @@ TEST_CASE("Simplify frog_legs.obj to 5% by Quadric edge collapse", "[its][quadri
     Private::is_better_similarity(mesh.its, its, Private::frog_leg_5);
 }
 
-#include <libigl/igl/qslim.h>
 TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
 {
     std::string  obj_filename    = "frog_legs.obj";

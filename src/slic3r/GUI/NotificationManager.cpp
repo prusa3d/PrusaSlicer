@@ -11,7 +11,7 @@
 #include "wxExtensions.hpp"
 #include "ObjectDataViewModel.hpp"
 #include "libslic3r/Config.hpp"
-#include "../Utils/PrintHost.hpp"
+#include "slic3r/Utils/PrintHost.hpp" // IWYU pragma: keep
 #include "libslic3r/Config.hpp"
 #include "format.hpp"
 

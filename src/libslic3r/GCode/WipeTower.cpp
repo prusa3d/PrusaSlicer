@@ -7,23 +7,28 @@
 ///|/
 #include "WipeTower.hpp"
 
+#include <LocalesUtils.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 #include <cassert>
-#include <iostream>
 #include <vector>
 #include <numeric>
 #include <memory>
 #include <sstream>
-#include <iomanip>
+#include <cstdio>
+#include <cstdlib>
 
-#include "ClipperUtils.hpp"
-#include "GCodeProcessor.hpp"
-#include "BoundingBox.hpp"
-#include "LocalesUtils.hpp"
-#include "Geometry.hpp"
-#include "Surface.hpp"
-#include "Fill/FillRectilinear.hpp"
-
-#include <boost/algorithm/string/predicate.hpp>
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/libslic3r.h"
 
 
 namespace Slic3r

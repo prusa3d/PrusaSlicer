@@ -1,8 +1,15 @@
 #ifndef slic3r_GCode_WipeTowerIntegration_hpp_
 #define slic3r_GCode_WipeTowerIntegration_hpp_
 
+#include <string>
+#include <vector>
+#include <cmath>
+#include <cstddef>
+#include <optional>
+
 #include "WipeTower.hpp"
 #include "../PrintConfig.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
@@ -35,8 +42,39 @@ public:
     std::string tool_change(GCodeGenerator &gcodegen, int extruder_id, bool finish_layer);
     std::string finalize(GCodeGenerator &gcodegen);
     std::vector<float> used_filament_length() const;
+    std::optional<WipeTower::ToolChangeResult> get_toolchange(std::size_t index, bool ignore_sparse) const {
+        if (m_layer_idx >= m_tool_changes.size()) {
+            return std::nullopt;
+        }
+        if(
+            ignore_sparse
+            && m_tool_changes.at(m_layer_idx).size() == 1
+            && (
+                m_tool_changes.at(m_layer_idx).front().initial_tool
+                == m_tool_changes.at(m_layer_idx).front().new_tool
+            )
+            && m_layer_idx != 0
+        ) {
+            // Ignore sparse
+            return std::nullopt;
+        }
+
+        return m_tool_changes.at(m_layer_idx).at(index);
+    }
+
+    Vec2f transform_wt_pt(const Vec2f& pt) const {
+        Vec2f out = Eigen::Rotation2Df(this->get_alpha()) * pt;
+        out += m_wipe_tower_pos;
+        return out;
+    };
 
 private:
+    // Toolchangeresult.gcode assumes the wipe tower corner is at the origin (except for priming lines)
+    // We want to rotate and shift all extrusions (gcode postprocessing) and starting and ending position
+    float get_alpha() const {
+        return m_wipe_tower_rotation / 180.f * float(M_PI);
+    }
+
     WipeTowerIntegration& operator=(const WipeTowerIntegration&);
     std::string append_tcr(GCodeGenerator &gcodegen, const WipeTower::ToolChangeResult &tcr, int new_extruder_id, double z = -1.) const;
 

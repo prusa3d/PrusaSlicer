@@ -5,7 +5,7 @@
 #include "HexFile.hpp"
 
 #include <sstream>
-#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/fstream.hpp> // IWYU pragma: keep
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 

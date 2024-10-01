@@ -6,6 +6,20 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PerimeterGenerator.hpp"
+
+#include <ankerl/unordered_dense.h>
+#include <algorithm>
+#include <cmath>
+#include <cassert>
+#include <cstdlib>
+#include <iterator>
+#include <limits>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+#include <tuple>
+
 #include "AABBTreeLines.hpp"
 #include "BoundingBox.hpp"
 #include "BridgeDetector.hpp"
@@ -13,36 +27,21 @@
 #include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
-#include "MultiPoint.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 #include "PrintConfig.hpp"
 #include "ShortestPath.hpp"
 #include "Surface.hpp"
-
 #include "Geometry/ConvexHull.hpp"
 #include "clipper/clipper_z.hpp"
-
 #include "Arachne/PerimeterOrder.hpp"
 #include "Arachne/WallToolPaths.hpp"
 #include "Arachne/utils/ExtrusionLine.hpp"
 #include "Arachne/utils/ExtrusionJunction.hpp"
 #include "libslic3r.h"
-
-#include <algorithm>
-#include <cmath>
-#include <cassert>
-#include <cstdlib>
-#include <iterator>
-#include <limits>
-#include <stack>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-
-#include <ankerl/unordered_dense.h>
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/Line.hpp"
 
 //#define ARACHNE_DEBUG
 

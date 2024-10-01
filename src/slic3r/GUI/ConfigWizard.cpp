@@ -1503,7 +1503,7 @@ PageCustom::PageCustom(ConfigWizard *parent)
     auto *label = new wxStaticText(this, wxID_ANY, _L("Custom profile name:"));
 
     wxBoxSizer* profile_name_sizer = new wxBoxSizer(wxVERTICAL);
-    profile_name_editor = new SavePresetDialog::Item{ this, profile_name_sizer, default_profile_name, &wxGetApp().preset_bundle->printers};
+    profile_name_editor = new SavePresetDialog::Item{ this, profile_name_sizer, default_profile_name, wxGetApp().preset_bundle};
     profile_name_editor->Enable(false);
 
     cb_custom->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &) {
@@ -1718,7 +1718,7 @@ bool PageDownloader::on_finish_downloader() const
 bool DownloaderUtils::Worker::perform_registration_linux = false;
 #endif // __linux__
 
-bool DownloaderUtils::Worker::perform_register(const std::string& path)
+bool DownloaderUtils::Worker::perform_download_register(const std::string& path)
 {
     boost::filesystem::path aux_dest (path);
     boost::system::error_code ec;
@@ -1734,6 +1734,10 @@ bool DownloaderUtils::Worker::perform_register(const std::string& path)
     }
     BOOST_LOG_TRIVIAL(info) << "Downloader registration: Directory for downloads: " << chosen_dest.string();
     wxGetApp().app_config->set("url_downloader_dest", chosen_dest.string());
+    return perform_url_register();
+}
+bool DownloaderUtils::Worker::perform_url_register()
+{
 #ifdef _WIN32
     // Registry key creation for "prusaslicer://" URL
 
@@ -1793,12 +1797,12 @@ bool DownloaderUtils::Worker::on_finish() {
     BOOST_LOG_TRIVIAL(debug) << "PageDownloader::on_finish_downloader ac_value " << ac_value << " downloader_checked " << downloader_checked;
     if (ac_value && downloader_checked) {
         // already registered but we need to do it again
-        if (!perform_register(GUI::into_u8(path_name())))
+        if (!perform_download_register(GUI::into_u8(path_name())))
             return false;
         app_config->set("downloader_url_registered", "1");
     } else if (!ac_value && downloader_checked) {
         // register
-        if (!perform_register(GUI::into_u8(path_name())))
+        if (!perform_download_register(GUI::into_u8(path_name())))
             return false;
         app_config->set("downloader_url_registered", "1");
     } else if (ac_value && !downloader_checked) {
@@ -2877,13 +2881,9 @@ void ConfigWizard::priv::create_vendor_printers_page(const std::string& repo_id,
         // single vendor repository
         if (pageFFF) {
             pages_fff.emplace_back(pageFFF);
-            if (!pageFFF->any_selected())
-                pageFFF->printer_pickers[0]->select_one(0, true);// select first printer for them
         }
         if (pageSLA) {
             pages_msla.emplace_back(pageSLA);
-            if (!pageSLA->any_selected())
-                pageSLA->printer_pickers[0]->select_one(0, true);// select first printer for them
         }
     }
     if (pageFFF || pageSLA)
@@ -2994,8 +2994,18 @@ void ConfigWizard::priv::on_printer_pick(PagePrinters *page, const PrinterPicker
 
     if (page->technology & T_FFF) {
         page_filaments->clear();
+        if (!any_fff_selected) {
+            // clear all filament's info, when no one printer is selected
+            filaments.clear();
+            aliases_fff.clear();
+        }
     } else if (page->technology & T_SLA) {
         page_sla_materials->clear();
+        if (!any_sla_selected) {
+            // clear all material's info, when no one printer is selected
+            sla_materials.clear();
+            aliases_sla.clear();
+        }
     }
 }
 
@@ -3323,17 +3333,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     const auto enabled_vendors = appconfig_new.vendors();
     const auto enabled_vendors_old = app_config->vendors();
 
-    std::vector<std::string> used_repo_ids;
-    for (const auto& vendor : enabled_vendors) {
-        const auto& it = bundles.find(vendor.first);
-        assert(it != bundles.end());
-        const std::string repo_id = it->second.vendor_profile->repo_id;
-        if (std::find(used_repo_ids.begin(), used_repo_ids.end(), repo_id) == used_repo_ids.end()) {
-            used_repo_ids.emplace_back(repo_id);
-        }
-    }
-    wxGetApp().plater()->get_preset_archive_database()->set_installed_printer_repositories(std::move(used_repo_ids));
-
     bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;
     auto get_preferred_printer_technology = [enabled_vendors, enabled_vendors_old, suppress_sla_printer](const std::string& bundle_name, const Bundle& bundle) {
@@ -3566,6 +3565,36 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
             }
         }
     }
+
+    // Save used repo into manifest.
+    std::vector<std::string> used_repo_ids;
+    for (const auto& vendor : enabled_vendors) {
+        // here vendor might be empty - it causes false has_installed_printers : 1 entries in manifest.
+        if (vendor.second.empty()){
+            continue;
+        }
+        bool not_empty = false;
+        for (const auto& it : vendor.second) {
+            if (!it.second.empty())  {
+                not_empty = true;
+                break;
+            }
+        }
+        if (!not_empty) {
+            continue;
+        }
+
+        const auto& it = bundles.find(vendor.first);
+        // This is a last resort solution of missing secret repo in manifest while some of its printers are installed.
+        if (it == bundles.end()) { 
+            continue;
+        }
+        const std::string repo_id = it->second.vendor_profile->repo_id;
+        if (std::find(used_repo_ids.begin(), used_repo_ids.end(), repo_id) == used_repo_ids.end()) {
+            used_repo_ids.emplace_back(repo_id);
+        }
+    }
+    wxGetApp().plater()->get_preset_archive_database()->set_installed_printer_repositories(std::move(used_repo_ids));
 
     // apply materials in app_config
     for (const std::string& section_name : {AppConfig::SECTION_FILAMENTS, AppConfig::SECTION_MATERIALS})

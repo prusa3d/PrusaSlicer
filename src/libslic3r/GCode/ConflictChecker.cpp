@@ -5,12 +5,23 @@
 ///|/
 #include "ConflictChecker.hpp"
 
-#include <tbb/parallel_for.h>
-#include <tbb/concurrent_vector.h>
-
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <oneapi/tbb/parallel_for.h>
 #include <map>
 #include <functional>
-#include <atomic>
+#include <cmath>
+#include <cstdint>
+#include <algorithm>
+#include <cassert>
+#include <cfloat>
+#include <cstdlib>
+
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

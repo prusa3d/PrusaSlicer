@@ -4,17 +4,26 @@
 ///|/
 #include "DoubleSliderForLayers.hpp"
 
-#include "libslic3r/Utils.hpp"  // -> get_time_dhms()
-#include "libslic3r/format.hpp" // -> format()
-#include "I18N.hpp"
-
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/constants.hpp>
+#include <boost/format.hpp>
 #include <cmath>
+#include <algorithm>
+#include <array>
+#include <set>
+#include <cstdio>
 
+#include "libslic3r/Utils.hpp"  // -> get_time_dhms()
+#include "libslic3r/format.hpp" // -> format()
+#include "I18N.hpp"
 #include "ImGuiWrapper.hpp"
-#include "imgui/imgui_internal.h"
+#include "libslic3r/libslic3r.h"
+#include "slic3r/GUI/ImGuiDoubleSlider.hpp"
+#include "slic3r/GUI/ImGuiPureWrap.hpp"
+#include "slic3r/GUI/RulerForDoubleSlider.hpp"
+#include "slic3r/GUI/TickCodesManager.hpp"
 
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -198,6 +207,7 @@ void DSForLayers::draw_ticks(const ImRect& slideable_region)
     };
 
     std::set<TickCode>::const_iterator tick_it = m_ticks.ticks.begin();
+    bool is_hovered_tick = false;
     while (tick_it != m_ticks.ticks.end())
     {
         float tick_pos = get_tick_pos(tick_it->tick);
@@ -212,11 +222,17 @@ void DSForLayers::draw_ticks(const ImRect& slideable_region)
                 m_focus = fiTick;
                 ImGuiPureWrap::tooltip(get_tooltip(tick_it->tick), ImGui::GetFontSize() * 20.f);
             }
+            is_hovered_tick = true;
+            m_ctrl.SetHoveredRegion(tick_hover_box);
+            if (m_ctrl.IsLClickOnHoveredPos())
+                m_ctrl.IsActiveHigherThumb() ? SetHigherPos(tick_it->tick) : SetLowerPos(tick_it->tick);
             break;
         }
         ++tick_it;
     }
-     
+    if (!is_hovered_tick)
+        m_ctrl.InvalidateHoveredRegion();
+
     auto active_tick_it = m_ticks.ticks.find(TickCode{ m_ctrl.GetActivePos() });
 
     tick_it = m_ticks.ticks.begin();
@@ -335,12 +351,15 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
     int tick = 0;
     double value = 0.0;
     size_t sequence = 0;
-    int prev_y_pos = -1;
+    float prev_y_pos = -1.f;
     int values_size = (int)m_values.size();
+
+    const float label_shift = 0.5f * label_height;
 
     if (m_ruler.long_step < 0) {
         // sequential print when long_step wasn't detected because of a lot of printed objects 
         if (m_ruler.max_values.size() > 1) {
+            float last_pos = get_tick_pos(m_ctrl.GetMaxPos());
             while (tick <= m_ctrl.GetMaxPos() && sequence < m_ruler.count()) {
                 // draw just ticks with max value
                 value = m_ruler.max_values[sequence];
@@ -360,7 +379,7 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
 
                 float pos = get_tick_pos(tick);
                 draw_tick(pos, long_outer_x);
-                if (prev_y_pos < 0 || prev_y_pos - pos >= label_height) {
+                if (prev_y_pos < 0 || pos == last_pos || (prev_y_pos - pos >= label_shift && pos - last_pos >= label_shift)) {
                     draw_text(tick, pos);
                     prev_y_pos = pos;
                 }
@@ -382,6 +401,46 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
         }
     }
     else {
+        std::vector<int> last_positions; 
+        if (m_ruler.count() == 1)
+            last_positions.emplace_back(m_ctrl.GetMaxPos());
+        else {
+            // fill last positions for each object in sequential print
+            last_positions.reserve(m_ruler.count());
+
+            int tick = 0;
+            double value = 0.0;
+            size_t sequence = 0;
+
+            while (tick <= m_ctrl.GetMaxPos()) {
+                value += m_ruler.long_step;
+
+                if (sequence < m_ruler.count() && value > m_ruler.max_values[sequence])
+                    value = m_ruler.max_values[sequence];
+
+                for (; tick < values_size; tick++) {
+                    if (m_values[tick] == value)
+                        break;
+                    if (m_values[tick] > value) {
+                        if (tick > 0)
+                            tick--;
+                        break;
+                    }
+                }
+                if (tick > m_ctrl.GetMaxPos())
+                    break;
+
+                if (sequence < m_ruler.count() && value == m_ruler.max_values[sequence]) {
+                    last_positions.emplace_back(tick);
+                    value = 0.0;
+                    sequence++;
+                    tick++;
+                }
+            }
+        }
+
+        float last_pos = get_tick_pos(last_positions[sequence]);
+
         while (tick <= m_ctrl.GetMaxPos()) {
             value += m_ruler.long_step;
 
@@ -404,7 +463,7 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
 
             float pos = get_tick_pos(tick);
             draw_tick(pos, long_outer_x);
-            if (prev_y_pos < 0 || prev_y_pos - pos >= label_height) {
+            if (prev_y_pos < 0 || pos == last_pos || (prev_y_pos - pos >= label_shift && pos - last_pos >= label_shift) ) {
                 draw_text(tick, pos);
                 prev_y_pos = pos;
             }
@@ -415,6 +474,9 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
                 value = 0.0;
                 sequence++;
                 tick++;
+
+                if (sequence < m_ruler.count())
+                    last_pos = get_tick_pos(last_positions[sequence]);
             }
         }
         // short ticks from the last tick to the end 
@@ -1192,6 +1254,9 @@ std::string DSForLayers::get_tooltip(int tick/*=-1*/)
                            "This code won't be processed during G-code generation.");
         else if (conflict == ctMeaninglessToolChange)
             tooltip += _u8L("There is an extruder change set to the same extruder.\n"
+                           "This code won't be processed during G-code generation.");
+        else if (conflict == ctNotPossibleToolChange)
+            tooltip += _u8L("There is an extruder change set to a non-existing extruder.\n"
                            "This code won't be processed during G-code generation.");
         else if (conflict == ctRedundant)
             tooltip += _u8L("There is a color change for extruder that has not been used before.\n"

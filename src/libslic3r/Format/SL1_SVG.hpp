@@ -5,9 +5,21 @@
 #ifndef SL1_SVG_HPP
 #define SL1_SVG_HPP
 
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "SL1.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Format/SLAArchiveReader.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/SLA/RasterBase.hpp"
 
 namespace Slic3r {
+class DynamicPrintConfig;
+class SLAPrint;
 
 class SL1_SVGArchive: public SL1Archive {
 protected:

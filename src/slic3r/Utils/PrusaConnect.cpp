@@ -78,7 +78,7 @@ bool PrusaConnectNew::test(wxString& curl_msg) const
 {
     // Test is not used by upload and gets list of files on a device.   
     const std::string name = get_name();
-    std::string url = GUI::format("https://connect.prusa3d.com/app/teams/%1%/files?printer_uuid=%2%", m_team_id, m_uuid);
+    std::string url = GUI::format("%1%/%2%/files?printer_uuid=%3%", Utils::ServiceConfig::instance().connect_teams_url(), m_team_id, m_uuid);
     const std::string access_token = GUI::wxGetApp().plater()->get_user_account()->get_access_token();
     BOOST_LOG_TRIVIAL(info) << GUI::format("%1%: Get files/raw at: %2%", name, url);
     bool res = true;

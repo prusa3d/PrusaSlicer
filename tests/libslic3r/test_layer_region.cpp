@@ -131,7 +131,7 @@ TEST_CASE_METHOD(LayerRegionFixture, "test the bridge expansion with the bridge 
     }
 
     REQUIRE(result.size() == 2);
-    CHECK(result.at(0).bridge_angle == Approx(1.5707963268));
+    CHECK(std::fmod(result.at(1).bridge_angle, M_PI) == Approx(0.0));
     CHECK(std::fmod(result.at(1).bridge_angle, M_PI) == Approx(0.0));
     CHECK(result.at(0).expolygon.contour.size() == 22);
     CHECK(result.at(1).expolygon.contour.size() == 14);

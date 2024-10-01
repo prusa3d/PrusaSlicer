@@ -7,10 +7,14 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "SpiralVase.hpp"
-#include "GCode.hpp"
-#include <sstream>
-#include <cmath>
-#include <limits>
+
+#include <utility>
+#include <cstddef>
+
+#include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

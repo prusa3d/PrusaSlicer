@@ -6,13 +6,26 @@
 #define BOOSTTHREADWORKER_HPP
 
 #include <boost/variant.hpp>
-
-#include "Worker.hpp"
-
 #include <libslic3r/Thread.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/variant/variant.hpp>
+#include <atomic>
+#include <deque>
+#include <exception>
+#include <functional>
+#include <future>
+#include <memory>
+#include <string>
+#include <utility>
 
+#include "Worker.hpp"
 #include "ThreadSafeQueue.hpp"
+#include "slic3r/GUI/Jobs/Job.hpp"
+
+namespace Slic3r {
+class ProgressIndicator;
+}  // namespace Slic3r
 
 namespace Slic3r { namespace GUI {
 

@@ -106,23 +106,13 @@ bool load_step(const char *path, Model *model /*BBS:, ImportStepProgressFn proFn
     else
         new_object->name = occt_object.object_name;
 
-
-    for (size_t i=0; i<occt_object.volumes.size(); ++i) {
-        indexed_triangle_set its;
-        for (size_t j=0; j<occt_object.volumes[i].vertices.size(); ++j)
-            its.vertices.emplace_back(Vec3f(occt_object.volumes[i].vertices[j][0],
-                                            occt_object.volumes[i].vertices[j][1],
-                                            occt_object.volumes[i].vertices[j][2]));
-        for (size_t j=0; j<occt_object.volumes[i].indices.size(); ++j)
-            its.indices.emplace_back(Vec3i(occt_object.volumes[i].indices[j][0],
-                                           occt_object.volumes[i].indices[j][1],
-                                           occt_object.volumes[i].indices[j][2]));
-        its_merge_vertices(its, true);
-        TriangleMesh triangle_mesh(std::move(its));
+    for (size_t i = 0; i < occt_object.volumes.size(); ++i) {
+        TriangleMesh triangle_mesh;
+        triangle_mesh.from_facets(std::move(occt_object.volumes[i].facets));
         ModelVolume* new_volume = new_object->add_volume(std::move(triangle_mesh));
 
         new_volume->name = occt_object.volumes[i].volume_name.empty()
-                       ? std::string("Part") + std::to_string(i+1)
+                       ? std::string("Part") + std::to_string(i + 1)
                        : occt_object.volumes[i].volume_name;
         new_volume->source.input_file = path;
         new_volume->source.object_idx = (int)model->objects.size() - 1;

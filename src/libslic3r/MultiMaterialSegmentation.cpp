@@ -2,23 +2,47 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <boost/log/trivial.hpp>
+#include <boost/thread/lock_guard.hpp>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <boost/container_hash/hash.hpp>
+#include <utility>
+#include <unordered_set>
+#include <mutex>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <limits>
+#include <queue>
+#include <vector>
+#include <cassert>
+#include <cstdlib>
+
 #include "BoundingBox.hpp"
 #include "ClipperUtils.hpp"
 #include "EdgeGrid.hpp"
 #include "Layer.hpp"
 #include "Print.hpp"
-#include "Geometry/VoronoiVisualUtils.hpp"
 #include "Geometry/VoronoiUtils.hpp"
 #include "MutablePolygon.hpp"
-#include "format.hpp"
-
-#include <utility>
-#include <unordered_set>
-
-#include <boost/log/trivial.hpp>
-#include <tbb/parallel_for.h>
-#include <mutex>
-#include <boost/thread/lock_guard.hpp>
+#include "admesh/stl.h"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/Geometry/VoronoiOffset.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/TriangleMeshSlicer.hpp"
+#include "libslic3r/TriangleSelector.hpp"
+#include "libslic3r/Utils.hpp"
+#include "libslic3r/libslic3r.h"
+#include "MultiMaterialSegmentation.hpp"
 
 //#define MM_SEGMENTATION_DEBUG_GRAPH
 //#define MM_SEGMENTATION_DEBUG_REGIONS

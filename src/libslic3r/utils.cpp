@@ -41,7 +41,7 @@
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
+#include <boost/log/expressions.hpp> // IWYU pragma: keep
 
 #include <boost/locale.hpp>
 
@@ -1161,7 +1161,7 @@ std::string log_memory_info(bool ignore_loglevel)
             out += "N/A";
     #else // i.e. __linux__
         size_t tSize = 0, resident = 0, share = 0;
-        std::ifstream buffer("/proc/self/statm");
+        boost::nowide::ifstream buffer("/proc/self/statm");
         if (buffer && (buffer >> tSize >> resident >> share)) {
             size_t page_size = (size_t)sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
             size_t rss = resident * page_size;

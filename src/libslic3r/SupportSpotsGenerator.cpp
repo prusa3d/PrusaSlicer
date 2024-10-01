@@ -5,11 +5,27 @@
 ///|/
 #include "SupportSpotsGenerator.hpp"
 
+#include <boost/log/trivial.hpp>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/blocked_range.h>
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <optional>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+#include <iostream>
+#include <stdexcept>
+#include <cassert>
+
 #include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
-#include "GCode/ExtrusionProcessor.hpp"
+#include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
@@ -17,42 +33,24 @@
 #include "Print.hpp"
 #include "PrintBase.hpp"
 #include "PrintConfig.hpp"
-#include "Tesselate.hpp"
-#include "Utils.hpp"
 #include "libslic3r.h"
-#include "tbb/parallel_for.h"
-#include "tbb/blocked_range.h"
-#include "tbb/blocked_range2d.h"
-#include "tbb/parallel_reduce.h"
-#include <algorithm>
-#include <boost/log/trivial.hpp>
-#include <cmath>
-#include <cstddef>
-#include <cstdio>
-#include <functional>
-#include <limits>
-#include <math.h>
-#include <oneapi/tbb/concurrent_vector.h>
-#include <oneapi/tbb/parallel_for.h>
-#include <optional>
-#include <unordered_map>
-#include <unordered_set>
-#include <stack>
-#include <utility>
-#include <vector>
-
 #include "AABBTreeLines.hpp"
 #include "KDTreeIndirect.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "Geometry/ConvexHull.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
 
 // #define DETAILED_DEBUG_LOGS
 // #define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
+
 #include "libslic3r/Color.hpp"
+
 constexpr bool debug_files = true;
 #else
 constexpr bool debug_files = false;
@@ -338,9 +336,16 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             return {};
         }
         const float                                    flow_width = get_flow_width(layer_region, entity->role());
+
+        ExtrusionProcessor::PropertiesEstimationConfig config{};
+        config.add_corners = true;
+        config.prev_layer_boundary_offset = true;
+        config.max_line_length = params.bridge_distance;
+        config.flow_width = flow_width;
+
         std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
-            ExtrusionProcessor::estimate_points_properties<true, true, true, true>(entity->as_polyline().points, prev_layer_boundary,
-                                                                                   flow_width, params.bridge_distance);
+            ExtrusionProcessor::estimate_points_properties<
+                true>(entity->as_polyline().points, prev_layer_boundary, config);
 
         std::vector<ExtrusionLine> lines_out;
         lines_out.reserve(annotated_points.size());
@@ -392,9 +397,12 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
         const float flow_width = get_flow_width(layer_region, entity->role());
         // Compute only unsigned distance - prev_layer_lines can contain unconnected paths, thus the sign of the distance is unreliable
+
+        ExtrusionProcessor::PropertiesEstimationConfig config{};
+        config.max_line_length = params.bridge_distance;
+        config.flow_width = flow_width;
         std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
-            ExtrusionProcessor::estimate_points_properties<true, true, false, false>(entity->as_polyline().points, prev_layer_lines,
-                                                                                     flow_width, params.bridge_distance);
+            ExtrusionProcessor::estimate_points_properties<false>(entity->as_polyline().points, prev_layer_lines, config);
 
         std::vector<ExtrusionLine> lines_out;
         lines_out.reserve(annotated_points.size());
@@ -1249,8 +1257,10 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
             Polygon  pol(pl.points);
             pol.make_counter_clockwise();
 
-            auto annotated_points = ExtrusionProcessor::estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines,
-                                                                                                             flow_width);
+            ExtrusionProcessor::PropertiesEstimationConfig config{};
+            config.flow_width = flow_width;
+            auto annotated_points = ExtrusionProcessor::estimate_points_properties<
+                false>(pol.points, prev_layer_lines, config);
 
             for (size_t i = 0; i < annotated_points.size(); ++i) {
                 const ExtrusionProcessor::ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
@@ -1325,10 +1335,14 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                 Points extrusion_pts;
                 extrusion->collect_points(extrusion_pts);
                 float flow_width       = get_flow_width(layer_region, extrusion->role());
-                auto  annotated_points = ExtrusionProcessor::estimate_points_properties<true, true, false, false>(extrusion_pts,
-                                                                                                                 prev_layer_lines,
-                                                                                                                 flow_width,
-                                                                                                                 params.bridge_distance);
+
+                ExtrusionProcessor::PropertiesEstimationConfig config{};
+                config.max_line_length = params.bridge_distance;
+                config.add_corners = true;
+                config.flow_width = flow_width;
+                auto annotated_points = ExtrusionProcessor::estimate_points_properties<
+                    false>(extrusion_pts, prev_layer_lines, config);
+
                 for (size_t i = 0; i < annotated_points.size(); ++i) {
                     const ExtrusionProcessor::ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
                     const ExtrusionProcessor::ExtendedPoint &b = annotated_points[i];

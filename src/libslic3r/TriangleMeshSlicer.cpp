@@ -2,31 +2,32 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "ClipperUtils.hpp"
-#include "Geometry.hpp"
+#include <boost/log/trivial.hpp>
+#include <ankerl/unordered_dense.h>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/scalable_allocator.h>
+#include <algorithm>
+#include <cmath>
+#include <mutex>
+#include <utility>
+#include <array>
+#include <iterator>
+#include <limits>
+#include <cassert>
+#include <cstdlib>
+
 #include "Tesselate.hpp"
 #include "TriangleMesh.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "Utils.hpp"
-
-#include <algorithm>
-#include <cmath>
-#include <deque>
-#include <queue>
-#include <mutex>
-#include <new>
-#include <utility>
-
-#include <boost/log/trivial.hpp>
-
-#include <tbb/parallel_for.h>
-#include <tbb/scalable_allocator.h>
-
-#include <ankerl/unordered_dense.h>
-
-#ifndef NDEBUG
-//    #define EXPENSIVE_DEBUG_CHECKS
-#endif // NDEBUG
+#include "admesh/stl.h"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/MultiPoint.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 #if 0
     #define DEBUG
@@ -36,8 +37,6 @@
 // #define SLIC3R_TRIANGLEMESH_DEBUG
 #endif
 
-#include <assert.h>
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
 
 #if defined(__cpp_lib_hardware_interference_size) && ! defined(__APPLE__)

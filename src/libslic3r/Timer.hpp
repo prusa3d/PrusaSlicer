@@ -5,8 +5,11 @@
 #ifndef libslic3r_Timer_hpp_
 #define libslic3r_Timer_hpp_
 
+#include <stdint.h>
 #include <string>
 #include <chrono>
+#include <string_view>
+#include <cinttypes>
 
 namespace Slic3r {
 

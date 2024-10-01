@@ -5,16 +5,29 @@
 #ifndef UTILS_EXTRUSION_LINE_H
 #define UTILS_EXTRUSION_LINE_H
 
+#include <clipper/clipper_z.hpp>
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <algorithm>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstddef>
+
 #include "ExtrusionJunction.hpp"
 #include "../../Polyline.hpp"
 #include "../../Polygon.hpp"
 #include "../../BoundingBox.hpp"
 #include "../../ExtrusionEntity.hpp"
 #include "../../Flow.hpp"
-#include "../../../clipper/clipper_z.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 struct ThickPolyline;
+class Flow;
 }
 
 namespace Slic3r::Arachne

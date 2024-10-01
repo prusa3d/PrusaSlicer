@@ -11,6 +11,18 @@
 #ifndef slic3r_Layer_hpp_
 #define slic3r_Layer_hpp_
 
+#include <boost/container/small_vector.hpp>
+#include <stddef.h>
+#include <stdint.h>
+#include <algorithm>
+#include <functional>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cinttypes>
+#include <cstddef>
+
 #include "Line.hpp"
 #include "libslic3r.h"
 #include "BoundingBox.hpp"
@@ -18,16 +30,19 @@
 #include "SurfaceCollection.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "LayerRegion.hpp"
-
-#include <boost/container/small_vector.hpp>
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
 
 class ExPolygon;
+
 using ExPolygons = std::vector<ExPolygon>;
 class Layer;
+
 using LayerPtrs = std::vector<Layer*>;
 class LayerRegion;
+
 using LayerRegionPtrs = std::vector<LayerRegion*>;
 class PrintRegion;
 class PrintObject;

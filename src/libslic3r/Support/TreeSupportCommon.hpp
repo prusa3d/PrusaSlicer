@@ -13,11 +13,31 @@
 #ifndef slic3r_TreeSupportCommon_hpp
 #define slic3r_TreeSupportCommon_hpp
 
-#include "../libslic3r.h"
-#include "../Polygon.hpp"
-#include "SupportCommon.hpp"
-
+#include <assert.h>
+#include <math.h>
+#include <oneapi/tbb/scalable_allocator.h>
+#include <stddef.h>
 #include <string_view>
+#include <algorithm>
+#include <mutex>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cmath>
+#include <cstddef>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Polygon.hpp"
+#include "SupportCommon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Slicing.hpp"
+#include "libslic3r/Support/SupportLayer.hpp"
+#include "libslic3r/Support/SupportParameters.hpp"
+
+namespace Slic3r {
+class PrintObject;
+}  // namespace Slic3r
 
 using namespace Slic3r::FFFSupport;
 

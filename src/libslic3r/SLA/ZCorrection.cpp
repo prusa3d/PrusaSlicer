@@ -1,8 +1,11 @@
 #include "ZCorrection.hpp"
 
-#include "Execution/ExecutionTBB.hpp"
+#include <iterator>
 
+#include "libslic3r/Execution/ExecutionTBB.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r { namespace sla {
 

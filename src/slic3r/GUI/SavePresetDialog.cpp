@@ -33,7 +33,7 @@ constexpr auto BORDER_W = 10;
 
 std::string SavePresetDialog::Item::get_init_preset_name(const std::string &suffix)
 {
-    PresetBundle*     preset_bundle = dynamic_cast<SavePresetDialog*>(m_parent)->get_preset_bundle();
+    const PresetBundle*     preset_bundle = dynamic_cast<SavePresetDialog*>(m_parent)->get_preset_bundle();
     if (!preset_bundle)
         preset_bundle = wxGetApp().preset_bundle;
     m_presets = &preset_bundle->get_presets(m_type);
@@ -55,11 +55,30 @@ std::string SavePresetDialog::Item::get_init_preset_name(const std::string &suff
 void SavePresetDialog::Item::init_casei_preset_names()
 {
     m_casei_preset_names.clear();
-    m_casei_preset_names.reserve(m_presets->size());
 
-    for (const Preset& preset : *m_presets)
-        if (!preset.is_default)
-            m_casei_preset_names.emplace_back(PresetName({ boost::to_lower_copy<std::string>(preset.name), preset.name }));
+    auto add_names_from_collection = [this](const PresetCollection& presets) {
+        for (const Preset& preset : presets)
+            if (!preset.is_default)
+                m_casei_preset_names.emplace_back(PresetName({ boost::to_lower_copy<std::string>(preset.name), preset.name }));
+    };
+
+    if (m_presets) {
+        // This item is a part of SavePresetDialog and will check names inside selected PresetCollection
+        m_casei_preset_names.reserve(m_presets->size());
+        add_names_from_collection(*m_presets);
+    }
+    else // This item is a part of ConfigWizard and will check names inside all PresetCollections in respect to the m_printer_technology
+    if (m_preset_bundle) {
+        auto types_list = PresetBundle::types_list(m_printer_technology);
+
+        size_t presets_cnt = 0;
+        for (const Preset::Type& type : types_list)
+            presets_cnt += m_preset_bundle->get_presets(type).size();
+        m_casei_preset_names.reserve(presets_cnt);
+
+        for (const Preset::Type& type : types_list)
+            add_names_from_collection(m_preset_bundle->get_presets(type));
+    }
 
     std::sort(m_casei_preset_names.begin(), m_casei_preset_names.end());
 }
@@ -139,9 +158,9 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
     update();
 }
 
-SavePresetDialog::Item::Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PresetCollection* presets, PrinterTechnology pt /*= ptFFF*/):
+SavePresetDialog::Item::Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PresetBundle* preset_bundle, PrinterTechnology pt /*= ptFFF*/):
     m_preset_name(def_name),
-    m_presets(presets),
+    m_preset_bundle(preset_bundle),
     m_printer_technology(pt),
     m_parent(parent),
     m_valid_bmp(new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("tick_mark"))),
@@ -196,10 +215,12 @@ const Preset* SavePresetDialog::Item::get_existing_preset() const
     if (m_presets)
         return m_presets->find_preset(existed_preset_name, false);
 
-    for (const Preset::Type& type : PresetBundle::types_list(m_printer_technology)) {
-        const PresetCollection& presets = wxGetApp().preset_bundle->get_presets(type);
-        if (const Preset* preset = presets.find_preset(existed_preset_name, false))
-            return preset;
+    if (m_preset_bundle) {
+        for (const Preset::Type& type : PresetBundle::types_list(m_printer_technology)) {
+            const PresetCollection& presets = m_preset_bundle->get_presets(type);
+            if (const Preset* preset = presets.find_preset(existed_preset_name, false))
+                return preset;
+        }
     }
 
     return nullptr;

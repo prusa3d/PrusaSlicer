@@ -5,9 +5,20 @@
 #ifndef slic3r_MutablePolygon_hpp_
 #define slic3r_MutablePolygon_hpp_
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <algorithm>
+#include <initializer_list>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstddef>
+
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

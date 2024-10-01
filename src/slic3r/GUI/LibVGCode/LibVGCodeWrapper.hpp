@@ -5,20 +5,33 @@
 #ifndef slic3r_LibVGCodeWrapper_hpp_
 #define slic3r_LibVGCodeWrapper_hpp_
 
+#include <../../src/libvgcode/include/Viewer.hpp>
+#include <../../src/libvgcode/include/PathVertex.hpp>
+#include <../../src/libvgcode/include/GCodeInputData.hpp>
+#include <../../src/libvgcode/include/ColorRange.hpp>
+#include <stddef.h>
+#include <string>
+#include <vector>
+#include <cstddef>
+
+#include "../../src/libvgcode/include/Types.hpp"
 #include "libslic3r/Color.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "slic3r/GUI/GUI_Preview.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Point.hpp"
 
-#include <libvgcode/include/Viewer.hpp>
-#include <libvgcode/include/PathVertex.hpp>
-#include <libvgcode/include/GCodeInputData.hpp>
-#include <libvgcode/include/ColorRange.hpp>
 
 namespace Slic3r {
 class Print;
+
+namespace CustomGCode {
+struct Item;
+}  // namespace CustomGCode
 } // namespace Slic3r
 
 namespace libvgcode {
+class Viewer;
 
 // mapping from Slic3r::Vec3f to libvgcode::Vec3
 extern Vec3 convert(const Slic3r::Vec3f& v);

@@ -17,6 +17,8 @@
 class wxWebView;
 class wxWebViewEvent;
 
+wxDECLARE_EVENT(EVT_OPEN_EXTERNAL_LOGIN, wxCommandEvent);
+
 namespace Slic3r {
 namespace GUI {
 
@@ -182,7 +184,9 @@ public:
     void resend_config();
 protected:
     // action callbacs stored in m_actions
+    virtual void on_connect_action_log(const std::string& message_data);
     virtual void on_connect_action_error(const std::string& message_data);
+    virtual void on_connect_action_request_login(const std::string& message_data);
     virtual void on_connect_action_request_config(const std::string& message_data);
     virtual void on_connect_action_request_open_in_browser(const std::string& message_data);
     virtual void on_connect_action_select_printer(const std::string& message_data) = 0;
@@ -203,6 +207,7 @@ public:
     void sys_color_changed() override;
     void on_navigation_request(wxWebViewEvent &evt) override;
 protected:
+    void on_connect_action_request_login(const std::string &message_data) override;
     void on_connect_action_select_printer(const std::string& message_data) override;
     void on_connect_action_print(const std::string& message_data) override;
     void on_connect_action_webapp_ready(const std::string& message_data) override {}
@@ -211,7 +216,9 @@ protected:
     void on_connect_action_error(const std::string &message_data) override;
 private:
     static wxString get_login_script(bool refresh);
+    static wxString get_logout_script();
     void on_user_token(UserAccountSuccessEvent& e);
+    void on_user_logged_out(UserAccountSuccessEvent& e);
     bool m_reached_default_url {false};
 };
 
@@ -224,8 +231,21 @@ public:
 
     void send_api_key();
     void send_credentials();
-    void set_api_key(const std::string& key) { m_api_key = key; }
-    void set_credentials(const std::string& usr, const std::string& psk) { m_usr = usr; m_psk = psk; }
+    void set_api_key(const std::string &key)
+    {
+        if (m_api_key != key) {
+            clear();
+            m_api_key = key;
+        }
+    }
+    void set_credentials(const std::string &usr, const std::string &psk)
+    {
+        if (m_usr != usr || m_psk != psk) {
+            clear();
+            m_usr = usr;
+            m_psk = psk;
+        }
+    }
     void clear() { m_api_key.clear(); m_usr.clear(); m_psk.clear(); m_api_key_sent = false; }
     void sys_color_changed() override;
 private:
@@ -263,20 +283,13 @@ public:
 class LoginWebViewDialog : public WebViewDialog
 {
 public:
-    LoginWebViewDialog(wxWindow *parent, std::string &ret_val, const wxString& url);
+    LoginWebViewDialog(wxWindow *parent, std::string &ret_val, const wxString& url, wxEvtHandler* evt_handler);
     void on_navigation_request(wxWebViewEvent &evt) override;
     void on_dpi_changed(const wxRect &suggested_rect) override;
-
 private:
-    std::string &m_ret_val;
-};
-
-class LogoutWebViewDialog : public WebViewDialog
-{
-public:
-    LogoutWebViewDialog(wxWindow* parent);
-    void on_loaded(wxWebViewEvent &evt) override;
-    void on_dpi_changed(const wxRect &suggested_rect) override {}
+    std::string&    m_ret_val;
+    wxEvtHandler*   p_evt_handler;
+    bool            m_evt_sent{ false };
 };
 
 } // GUI

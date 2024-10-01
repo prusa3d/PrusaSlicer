@@ -3,20 +3,27 @@
 
 #include "SkeletalTrapezoidation.hpp"
 
-#include <stack>
-#include <functional>
-#include <sstream>
-#include <queue>
 #include <boost/log/trivial.hpp>
+#include <boost/polygon/polygon.hpp>
+#include <queue>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <limits>
+#include <utility>
+#include <cassert>
+#include <cstdlib>
 
-#include "utils/linearAlg2D.hpp"
-#include "Utils.hpp"
-#include "SVG.hpp"
-#include "Geometry/VoronoiVisualUtils.hpp"
-#include "Geometry/VoronoiUtilsCgal.hpp"
-#include "../EdgeGrid.hpp"
+#include "libslic3r/Geometry/VoronoiUtils.hpp"
+#include "ankerl/unordered_dense.h"
+#include "libslic3r/Arachne/SkeletalTrapezoidationEdge.hpp"
+#include "libslic3r/Arachne/SkeletalTrapezoidationJoint.hpp"
+#include "libslic3r/Arachne/utils/ExtrusionJunction.hpp"
+#include "libslic3r/Arachne/utils/ExtrusionLine.hpp"
 
-#include "Geometry/VoronoiUtils.hpp"
+#ifndef NDEBUG
+    #include "libslic3r/EdgeGrid.hpp"
+#endif
 
 #define SKELETAL_TRAPEZOIDATION_BEAD_SEARCH_MAX 1000 //A limit to how long it'll keep searching for adjacent beads. Increasing will re-use beadings more often (saving performance), but search longer for beading (costing performance).
 

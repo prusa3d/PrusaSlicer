@@ -8,8 +8,20 @@
 #include <libslic3r/ClipperZUtils.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Utils.hpp>
-
+#include <clipper/clipper_z.hpp>
 #include <numeric>
+#include <cmath>
+#include <iterator>
+#include <utility>
+#include <algorithm>
+#include <cassert>
+
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 namespace Algorithm {

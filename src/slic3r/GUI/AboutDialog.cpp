@@ -18,7 +18,7 @@
 #include "MainFrame.hpp"
 #include "format.hpp"
 
-#include <wx/clipbrd.h>
+#include <wx/clipbrd.h> // IWYU pragma: keep
 
 namespace Slic3r { 
 namespace GUI {

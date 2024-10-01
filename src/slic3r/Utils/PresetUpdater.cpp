@@ -14,7 +14,7 @@
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/fstream.hpp> // IWYU pragma: keep
 #include <boost/lexical_cast.hpp>
 #include <boost/log/trivial.hpp>
 #include <curl/curl.h>

@@ -5,12 +5,17 @@
 #ifndef slic3r_GUI_DoubleSliderForLayers_hpp_
 #define slic3r_GUI_DoubleSliderForLayers_hpp_
 
+#include <vector>
+#include <set>
+#include <functional>
+#include <string>
+
 #include "ImGuiDoubleSlider.hpp"
 #include "RulerForDoubleSlider.hpp"
 #include "TickCodesManager.hpp"
+#include "libslic3r/CustomGCode.hpp"
 
-#include <vector>
-#include <set>
+struct ImVec2;
 
 namespace Slic3r {
 class Print;

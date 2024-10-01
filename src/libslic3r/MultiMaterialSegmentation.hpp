@@ -5,13 +5,21 @@
 #ifndef slic3r_MultiMaterialSegmentation_hpp_
 #define slic3r_MultiMaterialSegmentation_hpp_
 
+#include <boost/polygon/polygon.hpp>
 #include <utility>
 #include <vector>
+#include <functional>
+
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
 class PrintObject;
 class ExPolygon;
+
 using ExPolygons = std::vector<ExPolygon>;
 
 struct ColoredLine

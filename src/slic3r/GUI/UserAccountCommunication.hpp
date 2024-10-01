@@ -13,7 +13,7 @@
 #include <thread>
 #include <mutex>
 #include <memory>
-#include <wx/timer.h>
+#include <ctime>
 
 namespace Slic3r {
 namespace GUI {
@@ -42,7 +42,10 @@ public:
     void do_login();
     void do_logout();
     void do_clear();
-    wxString get_login_redirect_url();
+    // Generates and stores Code Verifier - second call deletes previous one.
+    wxString generate_login_redirect_url();
+    // Only recreates the url with already existing url (if generate was not called before - url will be faulty)
+    wxString get_login_redirect_url(const std::string& service = std::string()) const;
     // Trigger function starts various remote operations
     void enqueue_connect_status_action();
     void enqueue_connect_printer_models_action();
@@ -57,7 +60,7 @@ public:
     // Exchanges code for tokens and shared_session_key
     void on_login_code_recieved(const std::string& url_message);
 
-    void on_activate_window(bool active);
+    void on_activate_app(bool active);
 
     void set_username(const std::string& username);
     void set_remember_session(bool b);
@@ -94,11 +97,12 @@ private:
 
     wxTimer*                                m_token_timer;
     wxEvtHandler*                           m_timer_evt_handler;
+    std::time_t                             m_next_token_refresh_at{0};
 
     void wakeup_session_thread();
     void init_session_thread();
     void login_redirect();
-    std::string client_id() const { return "oamhmhZez7opFosnwzElIgE2oGgI2iJORSkw587O"; }
+    std::string client_id() const { return Utils::ServiceConfig::instance().account_client_id(); }
 
     
     

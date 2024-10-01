@@ -4,11 +4,16 @@
 #include "SkeletalTrapezoidationGraph.hpp"
 
 #include <ankerl/unordered_dense.h>
-
 #include <boost/log/trivial.hpp>
+#include <algorithm>
+#include <iostream>
+#include <cassert>
+#include <cinttypes>
 
-#include "utils/linearAlg2D.hpp"
 #include "../Line.hpp"
+#include "libslic3r/Arachne/SkeletalTrapezoidationEdge.hpp"
+#include "libslic3r/Arachne/SkeletalTrapezoidationJoint.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r::Arachne
 {

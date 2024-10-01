@@ -12,6 +12,12 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 #include <imgui/imgui_internal.h>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <cassert>
+#include <cinttypes>
+#include <cstddef>
 
 namespace ImGuiPureWrap {
 

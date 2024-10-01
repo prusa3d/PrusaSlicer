@@ -5,15 +5,29 @@
 #ifndef SLA_HOLLOWING_HPP
 #define SLA_HOLLOWING_HPP
 
-#include <memory>
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/SLA/JobController.hpp>
 #include <libslic3r/CSGMesh/VoxelizeCSGMesh.hpp>
+#include <stddef.h>
+#include <memory>
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <utility>
+#include <vector>
+#include <cstddef>
+
+#include "admesh/stl.h"
+#include "libslic3r/CSGMesh/CSGMesh.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
 class ModelObject;
+struct VoxelGrid;
 
 namespace sla {
 
@@ -30,6 +44,7 @@ enum HollowingFlags { hfRemoveInsideTriangles = 0x1 };
 // All data related to a generated mesh interior. Includes the 3D grid and mesh
 // and various metadata. No need to manipulate from outside.
 struct Interior;
+
 struct InteriorDeleter { void operator()(Interior *p); };
 using  InteriorPtr = std::unique_ptr<Interior, InteriorDeleter>;
 

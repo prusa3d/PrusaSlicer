@@ -11,10 +11,14 @@
 #ifndef slic3r_Line_hpp_
 #define slic3r_Line_hpp_
 
+#include <type_traits>
+#include <cmath>
+#include <utility>
+#include <vector>
+#include <complex>
+
 #include "libslic3r.h"
 #include "Point.hpp"
-
-#include <type_traits>
 
 namespace Slic3r {
 
@@ -24,6 +28,7 @@ class Line3;
 class Linef3;
 class Polyline;
 class ThickLine;
+
 typedef std::vector<Line> Lines;
 typedef std::vector<Line3> Lines3;
 typedef std::vector<ThickLine> ThickLines;
@@ -190,7 +195,7 @@ template<class L> bool intersection(const L &l1, const L &l2, Vec<Dim<L>, Scalar
 class Line
 {
 public:
-    Line() {}
+    Line() = default;
     Line(const Point& _a, const Point& _b) : a(_a), b(_b) {}
     explicit operator Lines() const { Lines lines; lines.emplace_back(*this); return lines; }
     void   scale(double factor) { this->a *= factor; this->b *= factor; }
@@ -315,6 +320,7 @@ BoundingBox get_extents(const Lines &lines);
 
 // start Boost
 #include <boost/polygon/polygon.hpp>
+
 namespace boost { namespace polygon {
     template <>
     struct geometry_concept<Slic3r::Line> { typedef segment_concept type; };

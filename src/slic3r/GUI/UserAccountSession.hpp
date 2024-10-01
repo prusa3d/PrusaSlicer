@@ -3,6 +3,7 @@
 
 #include "Event.hpp"
 #include "libslic3r/AppConfig.hpp"
+#include "slic3r/Utils/ServiceConfig.hpp"
 
 #include <queue>
 #include <map>
@@ -13,7 +14,7 @@
 namespace Slic3r {
 namespace GUI {
 
-using OpenPrusaAuthEvent = Event<wxString>;
+using OpenPrusaAuthEvent = Event<std::pair<wxString,wxString>>;
 using UserAccountSuccessEvent = Event<std::string>;
 using UserAccountFailEvent = Event<std::string>;
 using UserAccountTimeEvent = Event<int>;
@@ -108,18 +109,19 @@ public:
         , m_polling_action(polling_enabled ? UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS : UserAccountActionID::USER_ACCOUNT_ACTION_DUMMY)
        
     {
+        auto& sc = Utils::ServiceConfig::instance();
         
         // do not forget to add delete to destructor
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_DUMMY] = std::make_unique<DummyUserAction>();
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN] = std::make_unique<UserActionPost>("EXCHANGE_TOKENS", "https://account.prusa3d.com/o/token/");
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CODE_FOR_TOKEN] = std::make_unique<UserActionPost>("EXCHANGE_TOKENS", "https://account.prusa3d.com/o/token/");
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_USER_ID] = std::make_unique<UserActionGetWithEvent>("USER_ID", "https://account.prusa3d.com/api/v1/me/", EVT_UA_ID_USER_SUCCESS, EVT_UA_RESET);
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_TEST_ACCESS_TOKEN] = std::make_unique<UserActionGetWithEvent>("TEST_ACCESS_TOKEN", "https://account.prusa3d.com/api/v1/me/", EVT_UA_ID_USER_SUCCESS, EVT_UA_FAIL);
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_TEST_CONNECTION] = std::make_unique<UserActionGetWithEvent>("TEST_CONNECTION", "https://account.prusa3d.com/api/v1/me/", wxEVT_NULL, EVT_UA_RESET);
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS] = std::make_unique<UserActionGetWithEvent>("CONNECT_STATUS", "https://connect.prusa3d.com/slicer/status", EVT_UA_PRUSACONNECT_STATUS_SUCCESS, EVT_UA_FAIL);
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS] = std::make_unique<UserActionGetWithEvent>("CONNECT_PRINTER_MODELS", "https://connect.prusa3d.com/slicer/printer_list", EVT_UA_PRUSACONNECT_PRINTER_MODELS_SUCCESS, EVT_UA_FAIL);
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR] = std::make_unique<UserActionGetWithEvent>("AVATAR", "https://media.printables.com/media/", EVT_UA_AVATAR_SUCCESS, EVT_UA_FAIL);
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID] = std::make_unique<UserActionGetWithEvent>("USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID", "https://connect.prusa3d.com/app/printers/", EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, EVT_UA_FAIL);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN] = std::make_unique<UserActionPost>("EXCHANGE_TOKENS", sc.account_token_url());
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CODE_FOR_TOKEN] = std::make_unique<UserActionPost>("EXCHANGE_TOKENS", sc.account_token_url());
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_USER_ID] = std::make_unique<UserActionGetWithEvent>("USER_ID", sc.account_me_url(), EVT_UA_ID_USER_SUCCESS, EVT_UA_RESET);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_TEST_ACCESS_TOKEN] = std::make_unique<UserActionGetWithEvent>("TEST_ACCESS_TOKEN", sc.account_me_url(), EVT_UA_ID_USER_SUCCESS, EVT_UA_FAIL);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_TEST_CONNECTION] = std::make_unique<UserActionGetWithEvent>("TEST_CONNECTION", sc.account_me_url(), wxEVT_NULL, EVT_UA_RESET);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS] = std::make_unique<UserActionGetWithEvent>("CONNECT_STATUS", sc.connect_status_url(), EVT_UA_PRUSACONNECT_STATUS_SUCCESS, EVT_UA_FAIL);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS] = std::make_unique<UserActionGetWithEvent>("CONNECT_PRINTER_MODELS", sc.connect_printer_list_url(), EVT_UA_PRUSACONNECT_PRINTER_MODELS_SUCCESS, EVT_UA_FAIL);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR] = std::make_unique<UserActionGetWithEvent>("AVATAR", sc.media_url(), EVT_UA_AVATAR_SUCCESS, EVT_UA_FAIL);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID] = std::make_unique<UserActionGetWithEvent>("USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID", sc.connect_printers_url(), EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, EVT_UA_FAIL);
     }
     ~UserAccountSession()
     {
@@ -134,9 +136,12 @@ public:
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID].reset(nullptr);
     }
     void clear() {
-        m_access_token.clear();
-        m_refresh_token.clear();
-        m_shared_session_key.clear();
+        {
+            std::lock_guard<std::mutex> lock(m_credentials_mutex);
+            m_access_token.clear();
+            m_refresh_token.clear();
+            m_shared_session_key.clear();
+        }
         m_proccessing_enabled = false;
     }
 
@@ -148,11 +153,27 @@ public:
     void enqueue_refresh(const std::string& body);
 
     void process_action_queue();
-    bool is_initialized() { return !m_access_token.empty() || !m_refresh_token.empty(); }
-    std::string get_access_token() const { return m_access_token; }
-    std::string get_refresh_token() const { return m_refresh_token; }
-    std::string get_shared_session_key() const { return m_shared_session_key; }
-    long long get_next_token_timeout() const {return m_next_token_timeout; }
+    bool is_initialized() const {
+        std::lock_guard<std::mutex> lock(m_credentials_mutex);
+        return !m_access_token.empty() || !m_refresh_token.empty();
+    }
+    bool is_enqueued(UserAccountActionID action_id) const;
+    std::string get_access_token() const {
+        std::lock_guard<std::mutex> lock(m_credentials_mutex);
+        return m_access_token;
+    }
+    std::string get_refresh_token() const {
+        std::lock_guard<std::mutex> lock(m_credentials_mutex);
+        return m_refresh_token;
+    }
+    std::string get_shared_session_key() const {
+        std::lock_guard<std::mutex> lock(m_credentials_mutex);
+        return m_shared_session_key;
+    }
+    long long get_next_token_timeout() const {
+        std::lock_guard<std::mutex> lock(m_credentials_mutex);
+        return m_next_token_timeout;
+    }
 
     //void set_polling_enabled(bool enabled) {m_polling_action = enabled ? UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS : UserAccountActionID::USER_ACCOUNT_ACTION_DUMMY; }
     void set_polling_action(UserAccountActionID action) { m_polling_action = action; }
@@ -162,7 +183,7 @@ private:
     void cancel_queue();
     void code_exchange_fail_callback(const std::string& body);
     void token_success_callback(const std::string& body);
-    std::string client_id() const { return "oamhmhZez7opFosnwzElIgE2oGgI2iJORSkw587O"; }
+    std::string client_id() const { return Utils::ServiceConfig::instance().account_client_id(); }
 
     // false prevents action queu to be processed - no communication is done
     // sets to true by init_with_code or enqueue_action call
@@ -171,13 +192,16 @@ private:
     // set to USER_ACCOUNT_ACTION_DUMMY to switch off polling
     UserAccountActionID m_polling_action;
 
+    // Section of following vars is guarded by this mutex
+    mutable std::mutex m_credentials_mutex;
     std::string m_access_token;
     std::string m_refresh_token;
     std::string m_shared_session_key;
-    long long m_next_token_timeout; 
+    long long m_next_token_timeout;
+    // End of section guarded by m_credentials_mutex
 
     std::queue<ActionQueueData>                                    m_action_queue;
-    std::queue<ActionQueueData>                                    m_priority_action_queue;
+    std::deque<ActionQueueData>                                    m_priority_action_queue;
     std::map<UserAccountActionID, std::unique_ptr<UserAction>>     m_actions;
 
     wxEvtHandler* p_evt_handler;

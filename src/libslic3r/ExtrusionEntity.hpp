@@ -8,20 +8,30 @@
 #ifndef slic3r_ExtrusionEntity_hpp_
 #define slic3r_ExtrusionEntity_hpp_
 
+#include <assert.h>
+#include <stddef.h>
+#include <optional>
+#include <string_view>
+#include <numeric>
+#include <cmath>
+#include <limits>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+
 #include "libslic3r.h"
 #include "ExtrusionRole.hpp"
 #include "Flow.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
-
-#include <assert.h>
-#include <optional>
-#include <string_view>
-#include <numeric>
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 class ExPolygon;
+
 using ExPolygons = std::vector<ExPolygon>;
 class ExtrusionEntityCollection;
 class Extruder;
@@ -290,7 +300,7 @@ class ExtrusionLoop : public ExtrusionEntity
 {
 public:
     ExtrusionPaths paths;
-    
+
     ExtrusionLoop() = default;
     ExtrusionLoop(ExtrusionLoopRole role) : m_loop_role(role) {}
     ExtrusionLoop(const ExtrusionPaths &paths, ExtrusionLoopRole role = elrDefault) : paths(paths), m_loop_role(role) {}

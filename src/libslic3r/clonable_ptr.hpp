@@ -18,6 +18,9 @@
  * or copy at http://opensource.org/licenses/MIT)
  */
 
+#ifndef libslic3r_clonable_ptr_hpp_
+#define libslic3r_clonable_ptr_hpp_
+
 #include "assert.h"
 
 namespace Slic3r {
@@ -170,3 +173,5 @@ template<class T, class U> inline bool operator>(const clonable_ptr<T>& l, const
 }
 
 } // namespace Slic3r
+
+#endif // libslic3r_clonable_ptr_hpp_

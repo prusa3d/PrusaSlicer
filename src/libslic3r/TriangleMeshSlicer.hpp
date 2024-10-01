@@ -5,10 +5,18 @@
 #ifndef slic3r_TriangleMeshSlicer_hpp_
 #define slic3r_TriangleMeshSlicer_hpp_
 
+#include <stddef.h>
+#include <stdint.h>
 #include <functional>
 #include <vector>
+#include <cinttypes>
+#include <cstddef>
+
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+
+struct indexed_triangle_set;
 
 namespace Slic3r {
 

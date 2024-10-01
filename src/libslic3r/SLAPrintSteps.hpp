@@ -5,12 +5,17 @@
 #ifndef SLAPRINTSTEPS_HPP
 #define SLAPRINTSTEPS_HPP
 
-#include <random>
-
 #include <libslic3r/SLAPrint.hpp>
-
 #include <libslic3r/SLA/Hollowing.hpp>
 #include <libslic3r/SLA/SupportTree.hpp>
+#include <stddef.h>
+#include <random>
+#include <string>
+#include <utility>
+#include <cstddef>
+
+#include "admesh/stl.h"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

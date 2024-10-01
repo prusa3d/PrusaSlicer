@@ -6,10 +6,13 @@
 #ifndef PNGREAD_HPP
 #define PNGREAD_HPP
 
+#include <stddef.h>
 #include <vector>
 #include <string>
 #include <istream>
 #include <cstdint>
+#include <algorithm>
+#include <cstddef>
 
 namespace Slic3r { namespace png {
 

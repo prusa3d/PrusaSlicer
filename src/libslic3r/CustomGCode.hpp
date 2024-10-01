@@ -5,8 +5,11 @@
 #ifndef slic3r_CustomGCode_hpp_
 #define slic3r_CustomGCode_hpp_
 
+#include <stddef.h>
 #include <string>
 #include <vector>
+#include <utility>
+#include <cstddef>
 
 namespace Slic3r {
 

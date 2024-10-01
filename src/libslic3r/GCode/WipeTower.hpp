@@ -5,11 +5,15 @@
 #ifndef slic3r_GCode_WipeTower_hpp_
 #define slic3r_GCode_WipeTower_hpp_
 
+#include <stddef.h>
 #include <cmath>
 #include <string>
 #include <sstream>
 #include <utility>
 #include <algorithm>
+#include <limits>
+#include <vector>
+#include <cstddef>
 
 #include "libslic3r/Point.hpp"
 
@@ -19,6 +23,7 @@ namespace Slic3r
 class WipeTowerWriter;
 class PrintConfig;
 class PrintRegionConfig;
+
 enum GCodeFlavor : unsigned char;
 
 

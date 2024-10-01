@@ -12,11 +12,13 @@
 #include <deque>
 #include <sstream>
 #include <exception>
-#include <boost/filesystem/fstream.hpp>
+#include <random>
+#include <boost/filesystem/fstream.hpp> // IWYU pragma: keep
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/fstream.hpp>
 
 #include <curl/curl.h>
 
@@ -154,7 +156,7 @@ struct Http::priv
 
 	std::string curl_error(CURLcode curlcode);
 	std::string body_size_error();
-	void http_perform();
+    void http_perform(const HttpRetryOpt& retry_opts = HttpRetryOpt::no_retry());
 };
 
 Http::priv::priv(const std::string &url)
@@ -300,7 +302,7 @@ void Http::priv::form_add_file(const char *name, const fs::path &path, const cha
 //FIXME may throw! Is the caller aware of it?
 void Http::priv::set_post_body(const fs::path &path)
 {
-	std::ifstream file(path.string());
+	boost::nowide::ifstream file(path.string());
 	std::string file_content { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
 	postfields = std::move(file_content);
 }
@@ -340,8 +342,20 @@ std::string Http::priv::body_size_error()
 	return (boost::format("HTTP body data size exceeded limit (%1% bytes)") % limit).str();
 }
 
-void Http::priv::http_perform()
+bool is_transient_error(CURLcode res, long http_status)
 {
+    if (res == CURLE_OK  || res == CURLE_HTTP_RETURNED_ERROR)
+        return http_status == 408 || http_status >= 500;
+    return res == CURLE_COULDNT_CONNECT || res == CURLE_COULDNT_RESOLVE_HOST ||
+        res == CURLE_OPERATION_TIMEDOUT;
+}
+
+void Http::priv::http_perform(const HttpRetryOpt& retry_opts)
+{
+	using namespace std::chrono_literals;
+    static thread_local std::mt19937 generator;
+    std::uniform_int_distribution<std::chrono::milliseconds::rep> randomized_delay(retry_opts.initial_delay.count(), (retry_opts.initial_delay.count() * 3) / 2);
+
 	::curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 	::curl_easy_setopt(curl, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
 	::curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writecb);
@@ -375,7 +389,28 @@ void Http::priv::http_perform()
 		::curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, postfields.size());
 	}
 
-	CURLcode res = ::curl_easy_perform(curl);
+    bool retry;
+    CURLcode res;
+    long http_status = 0;
+    std::chrono::milliseconds delay = std::chrono::milliseconds(randomized_delay(generator));
+    size_t num_retries = 0;
+	do  {
+	    res = ::curl_easy_perform(curl);
+
+	    if (res == CURLE_OK)
+	        ::curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status);
+	    retry = retry_opts.initial_delay > 0ms && is_transient_error(res, http_status);
+        if (retry && retry_opts.max_retries > 0 && num_retries >= retry_opts.max_retries)
+            retry = false;
+        if (retry) {
+            num_retries++;
+            BOOST_LOG_TRIVIAL(error)
+                << "HTTP Transient error (code=" << res << ", http_status=" << http_status
+                << "), retrying in " << delay.count() / 1000.0f << " s";
+            std::this_thread::sleep_for(delay);
+            delay = std::min(delay * 2, retry_opts.max_delay);
+        }
+    } while (retry);
 
     putFile.reset();
 
@@ -397,8 +432,6 @@ void Http::priv::http_perform()
 			if (errorfn) { errorfn(std::move(buffer), curl_error(res), 0); }
 		};
 	} else {
-		long http_status = 0;
-		::curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status);
 
 		if (http_status >= 400) {
 			if (errorfn) { errorfn(std::move(buffer), std::string(), http_status); }
@@ -419,6 +452,23 @@ Http::Http(const std::string &url) : p(new priv(url)) {}
 
 
 // Public
+
+const HttpRetryOpt& HttpRetryOpt::default_retry()
+{
+	using namespace std::chrono_literals;
+    static HttpRetryOpt val = {500ms, 64s, 0};
+    return val;
+}
+
+const HttpRetryOpt& HttpRetryOpt::no_retry()
+{
+    using namespace std::chrono_literals;
+    static HttpRetryOpt val = {0ms};
+    return val;
+}
+
+
+
 
 Http::Http(Http &&other) : p(std::move(other.p)) {}
 
@@ -609,13 +659,13 @@ Http& Http::cookie_jar(const std::string& file_path)
 	return *this;
 }
 
-Http::Ptr Http::perform()
+Http::Ptr Http::perform(const HttpRetryOpt& retry_opts)
 {
 	auto self = std::make_shared<Http>(std::move(*this));
 
 	if (self->p) {
-		auto io_thread = std::thread([self](){
-				self->p->http_perform();
+		auto io_thread = std::thread([self, &retry_opts](){
+				self->p->http_perform(retry_opts);
 			});
 		self->p->io_thread = std::move(io_thread);
 	}
@@ -623,9 +673,9 @@ Http::Ptr Http::perform()
 	return self;
 }
 
-void Http::perform_sync()
+void Http::perform_sync(const HttpRetryOpt& retry_opts)
 {
-	if (p) { p->http_perform(); }
+	if (p) { p->http_perform(retry_opts); }
 }
 
 void Http::cancel()

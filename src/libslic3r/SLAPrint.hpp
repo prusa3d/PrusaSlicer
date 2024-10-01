@@ -6,22 +6,48 @@
 #ifndef slic3r_SLAPrint_hpp_
 #define slic3r_SLAPrint_hpp_
 
+#include <boost/functional/hash.hpp>
+#include <stdlib.h>
 #include <cstdint>
 #include <mutex>
 #include <set>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "PrintBase.hpp"
 #include "SLA/SupportTree.hpp"
 #include "Point.hpp"
 #include "Format/SLAArchiveWriter.hpp"
-#include "GCode/ThumbnailData.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/CSGMesh/CSGMesh.hpp"
 #include "libslic3r/MeshBoolean.hpp"
 #include "libslic3r/OpenVDBUtils.hpp"
-
-#include <boost/functional/hash.hpp>
+#include "admesh/stl.h"
+#include "libslic3r/AnyPtr.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/SLA/Hollowing.hpp"
+#include "libslic3r/SLA/Pad.hpp"
+#include "libslic3r/SLA/SupportPoint.hpp"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
+namespace sla {
+struct JobController;
+}  // namespace sla
 
 enum SLAPrintStep : unsigned int {
     slapsMergeSlicesAndEval,

@@ -7,8 +7,14 @@
 #include "slic3r/GUI/UserAccount.hpp"
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/WebView.hpp"
+#include "slic3r/GUI/WebViewPlatformUtils.hpp"
+#include "slic3r/Utils/ServiceConfig.hpp"
+
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/Field.hpp"
+
+#include <libslic3r/PresetBundle.hpp> // IWYU pragma: keep
+
 
 #include <wx/webview.h>
 
@@ -21,6 +27,7 @@
 // to set authorization cookie for all WebKit requests to Connect
 #define AUTH_VIA_FETCH_OVERRIDE 0
 
+wxDEFINE_EVENT(EVT_OPEN_EXTERNAL_LOGIN, wxCommandEvent);
 
 namespace pt = boost::property_tree;
 
@@ -103,6 +110,10 @@ WebViewPanel::WebViewPanel(wxWindow *parent, const wxString& default_url, const 
 
     // Create the webview
     m_browser = WebView::CreateWebView(this, /*m_default_url*/ GUI::format_wxstr("file://%1%/web/%2%.html", boost::filesystem::path(resources_dir()).generic_string(), m_loading_html), m_script_message_hadler_names);
+    if (Utils::ServiceConfig::instance().webdev_enabled()) {
+        m_browser->EnableContextMenu();
+        m_browser->EnableAccessToDevTools();
+    }
     if (!m_browser) {
         wxStaticText* text = new wxStaticText(this, wxID_ANY, _L("Failed to load a web browser."));
         topsizer->Add(text, 0, wxALIGN_LEFT | wxBOTTOM, 10);
@@ -482,12 +493,14 @@ SourceViewDialog::SourceViewDialog(wxWindow* parent, wxString source) :
 
 ConnectRequestHandler::ConnectRequestHandler()
 {
+    m_actions["REQUEST_LOGIN"] = std::bind(&ConnectRequestHandler::on_connect_action_request_login, this, std::placeholders::_1);
     m_actions["REQUEST_CONFIG"] = std::bind(&ConnectRequestHandler::on_connect_action_request_config, this, std::placeholders::_1);
     m_actions["WEBAPP_READY"] = std::bind(&ConnectRequestHandler::on_connect_action_webapp_ready,this, std::placeholders::_1);
     m_actions["SELECT_PRINTER"] = std::bind(&ConnectRequestHandler::on_connect_action_select_printer, this, std::placeholders::_1);
     m_actions["PRINT"] = std::bind(&ConnectRequestHandler::on_connect_action_print, this, std::placeholders::_1);
     m_actions["REQUEST_OPEN_IN_BROWSER"] = std::bind(&ConnectRequestHandler::on_connect_action_request_open_in_browser, this, std::placeholders::_1);
     m_actions["ERROR"] = std::bind(&ConnectRequestHandler::on_connect_action_error, this, std::placeholders::_1);
+    m_actions["LOG"] = std::bind(&ConnectRequestHandler::on_connect_action_log, this, std::placeholders::_1);
 }
 ConnectRequestHandler::~ConnectRequestHandler()
 {
@@ -528,13 +541,22 @@ void ConnectRequestHandler::handle_message(const std::string& message)
 
 void ConnectRequestHandler::on_connect_action_error(const std::string &message_data)
 {
-    BOOST_LOG_TRIVIAL(error) << "WebKit runtime error: " << message_data;
+    BOOST_LOG_TRIVIAL(error) << "WebView runtime error: " << message_data;
 }
 
 void ConnectRequestHandler::resend_config()
 {
     on_connect_action_request_config({});
 }
+
+void ConnectRequestHandler::on_connect_action_log(const std::string& message_data)
+{
+    BOOST_LOG_TRIVIAL(info) << "WebView log: " << message_data;
+}
+
+void ConnectRequestHandler::on_connect_action_request_login(const std::string &message_data)
+{}
+
 
 void ConnectRequestHandler::on_connect_action_request_config(const std::string& message_data)
 {
@@ -571,11 +593,13 @@ void ConnectRequestHandler::on_connect_action_request_open_in_browser(const std:
 }
 
 ConnectWebViewPanel::ConnectWebViewPanel(wxWindow* parent)
-    : WebViewPanel(parent, L"https://connect.prusa3d.com/", { "_prusaSlicer" }, "connect_loading")
+    : WebViewPanel(parent, GUI::from_u8(Utils::ServiceConfig::instance().connect_url()), { "_prusaSlicer" }, "connect_loading")
 {  
-    //m_browser->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new WebViewHandler("https")));
+    // m_browser->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new WebViewHandler("https")));
 
-    wxGetApp().plater()->Bind(EVT_UA_ID_USER_SUCCESS, &ConnectWebViewPanel::on_user_token, this);
+    auto* plater = wxGetApp().plater();
+    plater->Bind(EVT_UA_ID_USER_SUCCESS, &ConnectWebViewPanel::on_user_token, this);
+    plater->Bind(EVT_UA_LOGGEDOUT, &ConnectWebViewPanel::on_user_logged_out, this);
 }
 
 ConnectWebViewPanel::~ConnectWebViewPanel()
@@ -625,32 +649,105 @@ wxString ConnectWebViewPanel::get_login_script(bool refresh)
             window.__access_token_version = 0;
         )",
 #else
+        refresh
+        ?
         R"(
-        console.log('Preparing login');
-        function errorHandler(err) {
+        if (location.protocol === 'https:') {
+            if (window._prusaSlicer_initLogin !== undefined) {
+                console.log('Init login');
+                if (window._prusaSlicer !== undefined)
+                    _prusaSlicer.postMessage({action: 'LOG', message: 'Refreshing login'});
+                _prusaSlicer_initLogin('%s');
+            } else {
+                console.log('Refreshing login skipped as no _prusaSlicer_login defined (yet?)');
+                if (window._prusaSlicer === undefined) {
+                    console.log('Message handler _prusaSlicer not defined yet');
+                } else {
+                    _prusaSlicer.postMessage({action: 'LOG', message: 'Refreshing login skipped as no _prusaSlicer_initLogin defined (yet?)'});
+                }
+            }
+        }
+        )"
+        :
+        R"(
+        function _prusaSlicer_log(msg) {
+            console.log(msg);
+            if (window._prusaSlicer !== undefined)
+                _prusaSlicer.postMessage({action: 'LOG', message: msg});
+        }
+        function _prusaSlicer_errorHandler(err) {
             const msg = {
                 action: 'ERROR',
-                error: JSON.stringify(err),
+                error: typeof(err) === 'string' ? err : JSON.stringify(err),
                 critical: false
             };
             console.error('Login error occurred', msg);
             window._prusaSlicer.postMessage(msg);
         };
-        window.fetch('/slicer/login', {method: 'POST', headers: {Authorization: 'Bearer %s'}})
-            .then(function (resp) {
-                console.log('Login resp', resp);
-                resp.text()
-                    .then(function (json) { console.log('Login resp body', json); })
-                    .then(function (body) {
-                        if (resp.status >= 400) errorHandler({status: resp.status, body});
-                    });
-            })
-            .catch(errorHandler);
+
+        function _prusaSlicer_delay(ms) {
+            return new Promise((resolve, reject) => {
+                setTimeout(resolve, ms);
+            });
+        }
+
+        async function _prusaSlicer_initLogin(token) {
+            const parts = token.split('.');
+            const claims = JSON.parse(atob(parts[1]));
+            const now = new Date().getTime() / 1000;
+            if (claims.exp <= now) {
+                _prusaSlicer_log('Skipping initLogin as token is expired');
+                return;
+            }
+
+            let retry = false;
+            let backoff = 1000;
+            const maxBackoff = 64000;
+            do {
+
+                let error = false;
+
+                try {
+                    _prusaSlicer_log('Slicer Login request ' + token.substring(token.length - 8));
+                    let resp = await fetch('/slicer/login', {method: 'POST', headers: {Authorization: 'Bearer ' + token}});
+                    let body = await resp.text();
+                    _prusaSlicer_log('Slicer Login resp ' + resp.status + ' (' + token.substring(token.length - 8) + ') body: ' + body);
+                    if (resp.status >= 500 || resp.status == 408) {
+                        retry = true;
+                    } else {
+                        retry = false;
+                        if (resp.status >= 400)
+                            _prusaSlicer_errorHandler({status: resp.status, body});
+                    }
+                } catch (e) {
+                    _prusaSlicer_log('Slicer Login failed: ' + e.toString());
+                    console.error('Slicer Login failed', e.toString());
+                    retry = true;
+                }
+
+                if (retry) {
+                    await _prusaSlicer_delay(backoff + 1000 * Math.random());
+                    if (backoff < maxBackoff) {
+                        backoff *= 2;
+                    }
+                }
+            } while (retry);
+        }
+
+        if (location.protocol === 'https:' && window._prusaSlicer) {
+            _prusaSlicer_log('Requesting login');
+            _prusaSlicer.postMessage({action: 'REQUEST_LOGIN'});
+        }
         )",
 #endif
         access_token
     );
     return javascript;
+}
+
+wxString ConnectWebViewPanel::get_logout_script()
+{
+    return "sessionStorage.removeItem('_slicer_token');";
 }
 
 void ConnectWebViewPanel::on_page_will_load()
@@ -665,10 +762,18 @@ void ConnectWebViewPanel::on_user_token(UserAccountSuccessEvent& e)
     e.Skip();
     auto access_token = wxGetApp().plater()->get_user_account()->get_access_token();
     assert(!access_token.empty());
+
     wxString javascript = get_login_script(true);
-    //m_browser->AddUserScript(javascript, wxWEBVIEW_INJECT_AT_DOCUMENT_END);
     BOOST_LOG_TRIVIAL(debug) << "RunScript " << javascript << "\n";
     m_browser->RunScriptAsync(javascript);
+    resend_config();
+}
+
+void ConnectWebViewPanel::on_user_logged_out(UserAccountSuccessEvent& e)
+{
+    e.Skip();
+    // clear token from session storage
+    m_browser->RunScriptAsync(get_logout_script());
 }
 
 void ConnectWebViewPanel::on_script_message(wxWebViewEvent& evt)
@@ -678,6 +783,7 @@ void ConnectWebViewPanel::on_script_message(wxWebViewEvent& evt)
 }
 void ConnectWebViewPanel::on_navigation_request(wxWebViewEvent &evt) 
 {
+    BOOST_LOG_TRIVIAL(debug) << "Navigation requested to: " << into_u8(evt.GetURL());
     if (evt.GetURL() == m_default_url) {
         m_reached_default_url = true;
         return;
@@ -713,11 +819,11 @@ void ConnectWebViewPanel::logout()
     Plater* plater = wxGetApp().plater();
     auto javascript = wxString::Format(
                      R"(
-            console.log('Preparing login');
+            console.log('Preparing logout');
             window.fetch('/slicer/logout', {method: 'POST', headers: {Authorization: 'Bearer %s'}})
                 .then(function (resp){
-                    console.log('Login resp', resp);
-                    resp.text().then(function (json) { console.log('Login resp body', json) });
+                    console.log('Logout resp', resp);
+                    resp.text().then(function (json) { console.log('Logout resp body', json) });
                 });
         )",
                      plater->get_user_account()->get_access_token()
@@ -731,6 +837,12 @@ void ConnectWebViewPanel::sys_color_changed()
 {
     resend_config();
 }
+
+void ConnectWebViewPanel::on_connect_action_request_login(const std::string &message_data)
+{
+    run_script_bridge(get_login_script(true));
+}
+
 
 void ConnectWebViewPanel::on_connect_action_select_printer(const std::string& message_data)
 {
@@ -750,6 +862,10 @@ PrinterWebViewPanel::PrinterWebViewPanel(wxWindow* parent, const wxString& defau
         return;
 
     m_browser->Bind(wxEVT_WEBVIEW_LOADED, &PrinterWebViewPanel::on_loaded, this);
+#ifndef NDEBUG
+    m_browser->EnableAccessToDevTools();
+    m_browser->EnableContextMenu();
+#endif
 }
 
 void PrinterWebViewPanel::on_loaded(wxWebViewEvent& evt)
@@ -771,14 +887,18 @@ void PrinterWebViewPanel::send_api_key()
     wxString key = from_u8(m_api_key);
     wxString script = wxString::Format(R"(
     // Check if window.fetch exists before overriding
-    if (window.fetch) {
-        const originalFetch = window.fetch;
+    if (window.originalFetch === undefined) {
+        console.log('Patching fetch with API key');
+        window.originalFetch = window.fetch;
         window.fetch = function(input, init = {}) {
             init.headers = init.headers || {};
-            init.headers['X-API-Key'] = '%s';
-            return originalFetch(input, init);
+            init.headers['X-Api-Key'] = sessionStorage.getItem('apiKey');
+            console.log('Patched fetch', input, init);
+            return window.originalFetch(input, init);
         };
     }
+    sessionStorage.setItem('authType', 'ApiKey');
+    sessionStorage.setItem('apiKey', '%s');
 )",
     key);
 
@@ -786,34 +906,18 @@ void PrinterWebViewPanel::send_api_key()
     BOOST_LOG_TRIVIAL(debug) << "RunScript " << script << "\n";
     m_browser->AddUserScript(script);
     m_browser->Reload();
-    
+    remove_webview_credentials(m_browser);
 }
 
 void PrinterWebViewPanel::send_credentials()
 {
     if (!m_browser || m_api_key_sent)
         return;
-    m_api_key_sent = true;
-    wxString usr = from_u8(m_usr);
-    wxString psk = from_u8(m_psk);
-    wxString script = wxString::Format(R"(
-    // Check if window.fetch exists before overriding
-    if (window.fetch) {
-        const originalFetch = window.fetch;
-        window.fetch = function(input, init = {}) {
-            init.headers = init.headers || {};
-            init.headers['X-API-Key'] = 'Basic ' + btoa(`%s:%s`);
-            return originalFetch(input, init);
-        };
-    }
-)", usr, psk);
-    
     m_browser->RemoveAllUserScripts();
-    BOOST_LOG_TRIVIAL(debug) << "RunScript " << script << "\n";
-    m_browser->AddUserScript(script);
-    
+    m_browser->AddUserScript("sessionStorage.removeItem('authType'); sessionStorage.removeItem('apiKey'); console.log('Session Storage cleared');");
     m_browser->Reload();
-    
+    m_api_key_sent = true;
+    setup_webview_with_credentials(m_browser, m_usr, m_psk);
 }
 
 void PrinterWebViewPanel::sys_color_changed()
@@ -865,6 +969,10 @@ WebViewDialog::WebViewDialog(wxWindow* parent, const wxString& url, const wxStri
 
     // Create the webview
     m_browser = WebView::CreateWebView(this, GUI::format_wxstr("file://%1%/web/%2%.html", boost::filesystem::path(resources_dir()).generic_string(), m_loading_html), m_script_message_hadler_names);
+    if (Utils::ServiceConfig::instance().webdev_enabled()) {
+        m_browser->EnableContextMenu();
+        m_browser->EnableAccessToDevTools();
+    }
     if (!m_browser) {
         wxStaticText* text = new wxStaticText(this, wxID_ANY, _L("Failed to load a web browser."));
         topsizer->Add(text, 0, wxALIGN_LEFT | wxBOTTOM, 10);
@@ -1003,7 +1111,7 @@ void WebViewDialog::on_reload_button(wxCommandEvent& WXUNUSED(evt))
 }
 
 
-void WebViewDialog::on_navigation_request(wxWebViewEvent &evt) 
+void WebViewDialog::on_navigation_request(wxWebViewEvent &evt)
 {
 }
 
@@ -1221,7 +1329,7 @@ void WebViewDialog::EndModal(int retCode)
 
 PrinterPickWebViewDialog::PrinterPickWebViewDialog(wxWindow* parent, std::string& ret_val)
     : WebViewDialog(parent
-        , L"https://connect.prusa3d.com/slicer-select-printer"
+        , GUI::from_u8(Utils::ServiceConfig::instance().connect_select_printer_url())
         , _L("Choose a printer")
         , wxSize(std::max(parent->GetClientSize().x / 2, 100 * wxGetApp().em_unit()), std::max(parent->GetClientSize().y / 2, 50 * wxGetApp().em_unit()))
         ,{"_prusaSlicer"}
@@ -1267,32 +1375,95 @@ void PrinterPickWebViewDialog::on_connect_action_webapp_ready(const std::string&
     }
 }
 
-void PrinterPickWebViewDialog::request_compatible_printers_FFF()
-{
-    //PrinterParams: {
-    //material: Material;
-    //nozzleDiameter: number;
-    //printerType: string;
-    //filename: string;
-    //}
-    const Preset& selected_printer = wxGetApp().preset_bundle->printers.get_selected_preset();
-    const Preset& selected_filament = wxGetApp().preset_bundle->filaments.get_selected_preset();
-    double nozzle_diameter = static_cast<const ConfigOptionFloats*>(selected_printer.config.option("nozzle_diameter"))->values[0];
-    wxString nozzle_diameter_serialized = double_to_string(nozzle_diameter);
-    nozzle_diameter_serialized.Replace(L",", L".");
-    // Sending only first filament type for now. This should change to array of values
-    const std::string filament_type_serialized = selected_filament.config.option("filament_type")->serialize();
-    const std::string printer_model_serialized = selected_printer.config.option("printer_model")->serialize();
+void PrinterPickWebViewDialog::request_compatible_printers_FFF() {
+// {
+//  "printerUuid": "",
+//  "printerModel": "MK4S",
+//  "filename": "Shape-Box_0.4n_0.2mm_{..}_MK4S_{..}.bgcode",
+//  "nozzle_diameter": [0.4],     // array float
+//  "material": ["PLA", "ASA"],   // array string
+//  "filament_abrasive": [false], // array boolean
+//  "high_flow": [false],         // array boolean
+//}
+    const Preset &selected_printer = wxGetApp().preset_bundle->printers.get_selected_preset();
+    const DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
+    
+    wxString nozzle_diameter_serialized = "[";
+    const auto nozzle_diameter_floats = static_cast<const ConfigOptionFloats *>(full_config.option("nozzle_diameter"));
+    for (size_t i = 0; i < nozzle_diameter_floats->size(); i++) {
+        double nozzle_diameter = nozzle_diameter_floats->values[i];
+        wxString value = double_to_string(nozzle_diameter);
+        value.Replace(L",", L".");
+        nozzle_diameter_serialized += value;
+        if (i <  nozzle_diameter_floats->size() - 1) {
+            nozzle_diameter_serialized += ", ";
+        }
+    }
+    nozzle_diameter_serialized += "]";
+    
+    std::string filament_type_serialized = "[";
+    const auto filament_type_strings =  static_cast<const ConfigOptionStrings *>(full_config.option("filament_type"));
+    for (size_t i = 0; i < filament_type_strings->size(); i++) {
+        std::string value = filament_type_strings->values[0];
+        filament_type_serialized += "\"" + value + "\"";
+        if (i <  filament_type_strings->size() - 1)
+        {
+            filament_type_serialized += ", ";
+        }
+    }
+    filament_type_serialized += "]";
+    
+    wxString nozzle_high_flow_serialized = "[";
+    const auto nozzle_high_flow_bools =  static_cast<const ConfigOptionBools *>(full_config.option("nozzle_high_flow"));
+    for (size_t i = 0; i < nozzle_high_flow_bools->size(); i++) {
+        wxString value = nozzle_high_flow_bools->values[0] ? "true" : "false";
+        nozzle_high_flow_serialized += value;
+        if (i <  nozzle_high_flow_bools->size() - 1) {
+            nozzle_high_flow_serialized += ", ";
+        }
+    }
+    nozzle_high_flow_serialized += "]";
+
+    wxString filament_abrasive_serialized = "[";
+    const auto filament_abrasive_bools =  static_cast<const ConfigOptionBools *>(full_config.option("filament_abrasive"));
+    for (size_t i = 0; i < filament_abrasive_bools->size(); i++) {
+        wxString value = filament_abrasive_bools->values[0] ? "true" : "false";
+        filament_abrasive_serialized += value;
+        if (i <  filament_abrasive_bools->size() - 1) {
+            filament_abrasive_serialized += ", ";
+        }
+    }
+    filament_abrasive_serialized += "]";
+    
+    std::string printer_model_serialized = full_config.option("printer_model")->serialize();
+    std::string vendor_repo_prefix;
+    if (selected_printer.vendor) {
+        vendor_repo_prefix = selected_printer.vendor->repo_prefix;
+    } else if (std::string inherits = selected_printer.inherits(); !inherits.empty()) {
+        const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
+        if (parent && parent->vendor) {
+            vendor_repo_prefix = parent->vendor->repo_prefix;
+        }
+    }
+    if (printer_model_serialized.find(vendor_repo_prefix) == 0) {
+        printer_model_serialized = printer_model_serialized.substr(vendor_repo_prefix.size());
+        boost::trim_left(printer_model_serialized);
+    }
+
     const std::string uuid = wxGetApp().plater()->get_user_account()->get_current_printer_uuid_from_connect(printer_model_serialized);
     const std::string filename = wxGetApp().plater()->get_upload_filename();
-    const std::string request = GUI::format(
+    //filament_abrasive
+    std::string request = GUI::format(
         "{"
         "\"printerUuid\": \"%4%\", "
         "\"printerModel\": \"%3%\", "
-        "\"nozzleDiameter\": %2%, "
-        "\"material\": \"%1%\", "
-        "\"filename\": \"%5%\" "
-        "}", filament_type_serialized, nozzle_diameter_serialized, printer_model_serialized, uuid, filename);
+        "\"nozzle_diameter\": %2%, "
+        "\"material\": %1%, "
+        "\"filename\": \"%5%\", "
+        "\"filament_abrasive\": %6%,"
+        "\"high_flow\": %7%"
+        "}"
+        , filament_type_serialized, nozzle_diameter_serialized, printer_model_serialized, uuid, filename, nozzle_high_flow_serialized, filament_abrasive_serialized);
 
     wxString script = GUI::format_wxstr("window._prusaConnect_v1.requestCompatiblePrinter(%1%)", request);
     run_script(script);
@@ -1300,7 +1471,21 @@ void PrinterPickWebViewDialog::request_compatible_printers_FFF()
 void PrinterPickWebViewDialog::request_compatible_printers_SLA()
 {
     const Preset& selected_printer = wxGetApp().preset_bundle->printers.get_selected_preset();
-    const std::string printer_model_serialized = selected_printer.config.option("printer_model")->serialize();
+    std::string printer_model_serialized = selected_printer.config.option("printer_model")->serialize();
+    
+    std::string vendor_repo_prefix;
+    if (selected_printer.vendor) {
+        vendor_repo_prefix = selected_printer.vendor->repo_prefix;
+    } else if (std::string inherits = selected_printer.inherits(); !inherits.empty()) {
+        const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
+        if (parent && parent->vendor) {
+            vendor_repo_prefix = parent->vendor->repo_prefix;
+        }
+    }
+    if (printer_model_serialized.find(vendor_repo_prefix) == 0) {
+        printer_model_serialized = printer_model_serialized.substr(vendor_repo_prefix.size());
+        boost::trim_left(printer_model_serialized);
+    }
     const Preset& selected_material = wxGetApp().preset_bundle->sla_materials.get_selected_preset();
     const std::string material_type_serialized = selected_material.config.option("material_type")->serialize();
     const std::string uuid = wxGetApp().plater()->get_user_account()->get_current_printer_uuid_from_connect(printer_model_serialized);
@@ -1316,7 +1501,7 @@ void PrinterPickWebViewDialog::request_compatible_printers_SLA()
     wxString script = GUI::format_wxstr("window._prusaConnect_v1.requestCompatiblePrinter(%1%)", request);
     run_script(script);
 }
-void PrinterPickWebViewDialog::on_dpi_changed(const wxRect &suggested_rect) 
+void PrinterPickWebViewDialog::on_dpi_changed(const wxRect &suggested_rect)
 {
     wxWindow *parent = GetParent();
     const wxSize &size = wxSize(
@@ -1328,13 +1513,10 @@ void PrinterPickWebViewDialog::on_dpi_changed(const wxRect &suggested_rect)
     Refresh();
 }
 
-LoginWebViewDialog::LoginWebViewDialog(wxWindow *parent, std::string &ret_val, const wxString& url) 
-    : WebViewDialog(parent
-        , url
-        , _L("Log in dialog"),
-          wxSize(50 * wxGetApp().em_unit(), 80 * wxGetApp().em_unit())
-        , {})
+LoginWebViewDialog::LoginWebViewDialog(wxWindow *parent, std::string &ret_val, const wxString& url, wxEvtHandler* evt_handler)
+    : WebViewDialog(parent, url, _L("Log in dialog"), wxSize(50 * wxGetApp().em_unit(), 80 * wxGetApp().em_unit()), {})
     , m_ret_val(ret_val)
+    , p_evt_handler(evt_handler)
 {
     Centre();
 }
@@ -1342,32 +1524,32 @@ void LoginWebViewDialog::on_navigation_request(wxWebViewEvent &evt)
 {
     wxString url = evt.GetURL();
     if (url.starts_with(L"prusaslicer")) {
+        delete_cookies(m_browser, "https://account.prusa3d.com");
+        delete_cookies(m_browser, "https://accounts.google.com");
+        delete_cookies(m_browser, "https://appleid.apple.com");
+        delete_cookies(m_browser, "https://facebook.com");
         evt.Veto();
         m_ret_val = into_u8(url);
         EndModal(wxID_OK);
+    } else if (url.Find(L"accounts.google.com") != wxString::npos
+        || url.Find(L"appleid.apple.com") != wxString::npos
+        || url.Find(L"facebook.com") != wxString::npos) {         
+        auto& sc = Utils::ServiceConfig::instance();
+        if (!m_evt_sent && !url.starts_with(GUI::from_u8(sc.account_url()))) {
+            wxCommandEvent* evt = new wxCommandEvent(EVT_OPEN_EXTERNAL_LOGIN);
+            evt->SetString(url);
+            p_evt_handler->QueueEvent(evt);
+            m_evt_sent = true;
+        }
     }
 }
-void LoginWebViewDialog::on_dpi_changed(const wxRect &suggested_rect) 
+
+void LoginWebViewDialog::on_dpi_changed(const wxRect &suggested_rect)
 {
     const wxSize &size = wxSize(50 * wxGetApp().em_unit(), 80 * wxGetApp().em_unit());
     SetMinSize(size);
     Fit();
     Refresh();
-}
-
-LogoutWebViewDialog::LogoutWebViewDialog(wxWindow *parent)
-    : WebViewDialog(parent
-        ,  L"https://account.prusa3d.com/logout"
-        , _L("Logout dialog")
-        , wxSize(std::max(parent->GetClientSize().x / 4, 10 * wxGetApp().em_unit()), std::max(parent->GetClientSize().y / 4, 10 * wxGetApp().em_unit()))
-        , {})
-{
-    Centre();
-}
-
-void LogoutWebViewDialog::on_loaded(wxWebViewEvent &evt)
-{
-     EndModal(wxID_OK);
 }
 } // GUI
 } // Slic3r

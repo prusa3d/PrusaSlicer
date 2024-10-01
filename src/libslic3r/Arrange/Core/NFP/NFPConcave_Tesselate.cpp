@@ -6,8 +6,15 @@
 
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Tesselate.hpp>
+#include <algorithm>
+#include <iterator>
+#include <vector>
+#include <cstddef>
 
 #include "NFP.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

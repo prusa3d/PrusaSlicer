@@ -5,16 +5,29 @@
 #ifndef SLA_SUPPORTPOINTGENERATOR_HPP
 #define SLA_SUPPORTPOINTGENERATOR_HPP
 
-#include <random>
-
 #include <libslic3r/AABBMesh.hpp>
-
 #include <libslic3r/SLA/SupportPoint.hpp>
 #include <libslic3r/BoundingBox.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Point.hpp>
-
 #include <boost/container/small_vector.hpp>
+#include <stdint.h>
+#include <random>
+#include <cmath>
+#include <cstddef>
+#include <functional>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#include <cinttypes>
+
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
+
+namespace Slic3r {
+class AABBMesh;
+}  // namespace Slic3r
 
 // #define SLA_SUPPORTPOINTGEN_DEBUG
 

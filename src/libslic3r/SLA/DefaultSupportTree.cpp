@@ -8,6 +8,24 @@
 #include <libslic3r/SLA/Clustering.hpp>
 #include <libslic3r/MeshNormals.hpp>
 #include <libslic3r/Execution/ExecutionTBB.hpp>
+#include <boost/log/trivial.hpp>
+#include <cmath>
+#include <functional>
+#include <iterator>
+#include <set>
+#include <string>
+#include <cassert>
+#include <cstddef>
+
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/Optimize/Optimizer.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/SLA/SpatIndex.hpp"
+#include "libslic3r/SLA/SupportPoint.hpp"
+#include "libslic3r/SLA/SupportTreeStrategies.hpp"
+#include "libslic3r/SLA/SupportTreeUtils.hpp"
+#include "libslic3r/SLA/SupportTreeUtilsLegacy.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r { namespace sla {
 

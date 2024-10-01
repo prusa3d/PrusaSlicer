@@ -2,6 +2,8 @@
 #define slic3r_GCode_SmoothPath_hpp_
 
 #include <ankerl/unordered_dense.h>
+#include <optional>
+#include <vector>
 
 #include "../ExtrusionEntity.hpp"
 #include "../Geometry/ArcWelder.hpp"
@@ -9,6 +11,8 @@
 namespace Slic3r {
 
 class ExtrusionEntityCollection;
+class Point;
+class Polyline;
 
 namespace GCode {
 

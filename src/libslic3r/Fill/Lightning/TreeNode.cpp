@@ -3,7 +3,13 @@
 
 #include "TreeNode.hpp"
 
+#include <algorithm>
+#include <limits>
+#include <cassert>
+#include <cstdlib>
+
 #include "../../Geometry.hpp"
+#include "libslic3r/Line.hpp"
 
 namespace Slic3r::FillLightning {
 

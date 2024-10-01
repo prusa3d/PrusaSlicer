@@ -3,10 +3,10 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "SimpleArrangeItem.hpp"
-#include "libslic3r/Arrange/ArrangeImpl.hpp"
-#include "libslic3r/Arrange/Tasks/ArrangeTaskImpl.hpp"
-#include "libslic3r/Arrange/Tasks/FillBedTaskImpl.hpp"
-#include "libslic3r/Arrange/Tasks/MultiplySelectionTaskImpl.hpp"
+#include "libslic3r/Arrange/ArrangeImpl.hpp" // IWYU pragma: keep
+#include "libslic3r/Arrange/Tasks/ArrangeTaskImpl.hpp" // IWYU pragma: keep
+#include "libslic3r/Arrange/Tasks/FillBedTaskImpl.hpp" // IWYU pragma: keep
+#include "libslic3r/Arrange/Tasks/MultiplySelectionTaskImpl.hpp" // IWYU pragma: keep
 
 namespace Slic3r { namespace arr2 {
 

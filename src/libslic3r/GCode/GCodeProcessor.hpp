@@ -181,9 +181,6 @@ namespace Slic3r {
             Height,
             Width,
             Layer_Change,
-            Layer_Change_Travel,
-            Layer_Change_Retraction_Start,
-            Layer_Change_Retraction_End,
             Color_Change,
             Pause_Print,
             Custom_Code,
@@ -343,7 +340,9 @@ namespace Slic3r {
             // hard limit for the travel acceleration, to which the firmware will clamp.
             float max_travel_acceleration; // mm/s^2
             float extrude_factor_override_percentage;
-            float time; // s
+            // We accumulate total print time in doubles to reduce the loss of precision
+            // while adding big floating numbers with small float numbers.
+            double time; // s
             struct StopTime
             {
                 unsigned int g1_line_id;

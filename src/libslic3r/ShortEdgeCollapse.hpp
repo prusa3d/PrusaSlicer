@@ -5,7 +5,12 @@
 #ifndef SRC_LIBSLIC3R_SHORTEDGECOLLAPSE_HPP_
 #define SRC_LIBSLIC3R_SHORTEDGECOLLAPSE_HPP_
 
+#include <stddef.h>
+#include <cstddef>
+
 #include "libslic3r/TriangleMesh.hpp"
+
+struct indexed_triangle_set;
 
 namespace Slic3r{
 

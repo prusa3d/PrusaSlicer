@@ -21,8 +21,8 @@
 #ifndef slic3r_Print_hpp_
 #define slic3r_Print_hpp_
 
-#include "Fill/FillAdaptive.hpp"
-#include "Fill/FillLightning.hpp"
+#include "libslic3r/Fill/FillAdaptive.hpp"
+#include "libslic3r/Fill/FillLightning.hpp"
 #include "PrintBase.hpp"
 
 #include "BoundingBox.hpp"
@@ -32,10 +32,10 @@
 #include "Slicing.hpp"
 #include "SupportSpotsGenerator.hpp"
 #include "TriangleMeshSlicer.hpp"
-#include "GCode/ToolOrdering.hpp"
-#include "GCode/WipeTower.hpp"
-#include "GCode/ThumbnailData.hpp"
-#include "GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCode/ToolOrdering.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "MultiMaterialSegmentation.hpp"
 
 #include "libslic3r.h"
@@ -492,6 +492,13 @@ private:
 	WipeTowerData(const WipeTowerData & /* rhs */) = delete;
 	WipeTowerData &operator=(const WipeTowerData & /* rhs */) = delete;
 };
+
+bool is_toolchange_required(
+    const bool first_layer,
+    const unsigned last_extruder_id,
+    const unsigned extruder_id,
+    const unsigned current_extruder_id
+);
 
 struct PrintStatistics
 {

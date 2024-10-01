@@ -1,8 +1,17 @@
 #ifndef libslic3r_SeamChoice_hpp_
 #define libslic3r_SeamChoice_hpp_
 
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <utility>
+
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/GCode/SeamShells.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/GCode/SeamGeometry.hpp"
+#include "libslic3r/GCode/SeamPerimeters.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r::Seams {
 

@@ -27,18 +27,41 @@
 //#define DEBUG_OUTPUT_DIR std::string("C:/data/temp/cutSurface/")
 
 using namespace Slic3r;
-#include "ExPolygonsIndex.hpp"
-
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
 #include <CGAL/Exact_integer.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Cartesian_converter.h>
-#include <tbb/parallel_for.h>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <boost/property_map/property_map.hpp>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <optional>
+#include <queue>
+#include <set>
+#include <tuple>
+#include <utility>
+#include <cassert>
 
+#include "ExPolygonsIndex.hpp"
 // libslic3r
 #include "TriangleMesh.hpp" // its_merge
 #include "Utils.hpp" // next_highest_power_of_2
-#include "ClipperUtils.hpp" // union_ex + offset_ex
+#include "admesh/stl.h"
+#include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Emboss.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace priv {
 
@@ -521,9 +544,10 @@ void store(const Emboss::IProjection &projection, const Point &point_to_project,
 } // namespace privat
 
 #ifdef DEBUG_OUTPUT_DIR
-#include "libslic3r/SVG.hpp"
 #include <boost/log/trivial.hpp>
 #include <filesystem>
+
+#include "libslic3r/SVG.hpp"
 #endif // DEBUG_OUTPUT_DIR
 
 SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
@@ -1779,6 +1803,7 @@ priv::VDistances priv::calc_distances(const SurfacePatches &patches,
 
 #include "libslic3r/AABBTreeLines.hpp"
 #include "libslic3r/Line.hpp"
+
 // functions for choose_best_distance
 namespace priv {
 
@@ -2560,6 +2585,7 @@ void priv::create_face_types(FaceTypeMap           &map,
 
 #include <CGAL/Polygon_mesh_processing/clip.h>
 #include <CGAL/Polygon_mesh_processing/corefinement.h>
+
 bool priv::clip_cut(SurfacePatch &cut, CutMesh clipper)
 {
     CutMesh& tm = cut.mesh; 

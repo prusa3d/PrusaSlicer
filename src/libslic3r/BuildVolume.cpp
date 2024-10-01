@@ -3,12 +3,23 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "BuildVolume.hpp"
-#include "ClipperUtils.hpp"
-#include "Geometry/ConvexHull.hpp"
-#include "GCode/GCodeProcessor.hpp"
-#include "Point.hpp"
 
 #include <boost/log/trivial.hpp>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <cassert>
+#include <cstddef>
+
+#include "ClipperUtils.hpp"
+#include "Geometry/ConvexHull.hpp"
+#include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "Point.hpp"
+#include "admesh/stl.h"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Geometry/Circle.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r {
 

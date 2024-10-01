@@ -32,8 +32,8 @@
 #include "ShortestPath.hpp"
 #include "Thread.hpp"
 #include "GCode.hpp"
-#include "GCode/WipeTower.hpp"
-#include "GCode/ConflictChecker.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/GCode/ConflictChecker.hpp"
 #include "Utils.hpp"
 #include "BuildVolume.hpp"
 #include "format.hpp"
@@ -114,6 +114,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "fan_always_on",
         "fan_below_layer_time",
         "full_fan_speed_layer",
+        "filament_abrasive",
         "filament_colour",
         "filament_diameter",
         "filament_density",
@@ -126,6 +127,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "first_layer_speed_over_raft",
         "gcode_comments",
         "gcode_label_objects",
+        "nozzle_high_flow",
         "infill_acceleration",
         "layer_gcode",
         "min_fan_speed",
@@ -1484,6 +1486,21 @@ const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt) const
     return m_wipe_tower_data;
 }
 
+bool is_toolchange_required(
+    const bool first_layer,
+    const unsigned last_extruder_id,
+    const unsigned extruder_id,
+    const unsigned current_extruder_id
+) {
+    if (first_layer && extruder_id == last_extruder_id) {
+        return true;
+    }
+    if (extruder_id != current_extruder_id) {
+        return true;
+    }
+    return false;
+}
+
 void Print::_make_wipe_tower()
 {
     m_wipe_tower_data.clear();
@@ -1552,10 +1569,11 @@ void Print::_make_wipe_tower()
         unsigned int current_extruder_id = m_wipe_tower_data.tool_ordering.all_extruders().back();
         for (auto &layer_tools : m_wipe_tower_data.tool_ordering.layer_tools()) { // for all layers
             if (!layer_tools.has_wipe_tower) continue;
-            bool first_layer = &layer_tools == &m_wipe_tower_data.tool_ordering.front();
             wipe_tower.plan_toolchange((float)layer_tools.print_z, (float)layer_tools.wipe_tower_layer_height, current_extruder_id, current_extruder_id, false);
             for (const auto extruder_id : layer_tools.extruders) {
-                if ((first_layer && extruder_id == m_wipe_tower_data.tool_ordering.all_extruders().back()) || extruder_id != current_extruder_id) {
+                const bool first_layer{&layer_tools == &m_wipe_tower_data.tool_ordering.front()};
+                const unsigned last_extruder_id{m_wipe_tower_data.tool_ordering.all_extruders().back()};
+                if (is_toolchange_required(first_layer, last_extruder_id, extruder_id, current_extruder_id)) {
                     float volume_to_wipe = wipe_volumes[current_extruder_id][extruder_id];             // total volume to wipe after this toolchange
                     // Not all of that can be used for infill purging:
                     volume_to_wipe -= (float)m_config.filament_minimal_purge_on_wipe_tower.get_at(extruder_id);

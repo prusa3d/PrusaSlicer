@@ -12,15 +12,14 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "GCodeWriter.hpp"
-#include "../CustomGCode.hpp"
 
 #include <algorithm>
-#include <iomanip>
 #include <iostream>
-#include <map>
-#include <assert.h>
 #include <string_view>
-#include <boost/math/special_functions/pow.hpp>
+#include <cassert>
+#include <cinttypes>
+
+#include "libslic3r/libslic3r.h"
 
 #ifdef __APPLE__
     #include <boost/spirit/include/karma.hpp>

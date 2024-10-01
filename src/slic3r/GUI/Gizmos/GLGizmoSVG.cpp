@@ -27,12 +27,12 @@
 
 #include <wx/display.h> // detection of change DPI
 #include <boost/log/trivial.hpp>
+#include <boost/nowide/fstream.hpp>
 
 #include <GL/glew.h>
 #include <chrono> // measure enumeration of fonts
 #include <sstream> // save for svg
 #include <array>
-#include <fstream>
 
 using namespace Slic3r;
 using namespace Slic3r::Emboss;
@@ -215,9 +215,11 @@ bool GLGizmoSVG::create_volume(std::string_view svg_file, const Vec2d &mouse_pos
 }
 
 CreateVolumeParams GLGizmoSVG::create_input(ModelVolumeType volume_type, std::string_view svg_filepath) {
+    // Be carefull it must be before call create_emboss_data_base
+    const GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
+    // NOTE: During selection of file it could change hovered volume
     DataBasePtr base = create_emboss_data_base(m_job_cancel, volume_type, svg_filepath);
     auto gizmo = static_cast<unsigned char>(GLGizmosManager::Svg);
-    const GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
     Plater *plater = wxGetApp().plater();
     return CreateVolumeParams{std::move(base), m_parent, plater->get_camera(), plater->build_volume(),
         plater->get_ui_job_worker(), volume_type, m_raycast_manager, gizmo, gl_volume};
@@ -1592,21 +1594,18 @@ void GLGizmoSVG::draw_filename(){
             wxFileDialog dlg(parent, dlg_title, last_used_directory, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
             if (dlg.ShowModal() == wxID_OK ){
                 last_used_directory = dlg.GetDirectory();
-                wxString out_path = dlg.GetPath();
-                std::string path{out_path.c_str()};
-                //Slic3r::save(*m_volume_shape.svg_file.image, path);
-
-                std::ofstream stream(path);
+                std::string out_path_str(into_u8(dlg.GetPath()));
+                boost::nowide::ofstream stream(out_path_str);
                 if (stream.is_open()){
                     stream << *svg.file_data;
 
                     // change source file
                     m_filename_preview.clear();
-                    m_volume_shape.svg_file->path = path;
+                    m_volume_shape.svg_file->path = out_path_str;
                     m_volume_shape.svg_file->path_in_3mf.clear(); // possible change name
                     m_volume->emboss_shape->svg_file = m_volume_shape.svg_file; // copy - write changes into volume
                 } else {
-                    BOOST_LOG_TRIVIAL(error) << "Opening file: \"" << path << "\" Failed";
+                    BOOST_LOG_TRIVIAL(error) << "Opening file: \"" << out_path_str << "\" Failed";
                 }
 
             }
@@ -1907,21 +1906,18 @@ void GLGizmoSVG::draw_rotation()
     // minus create clock-wise roation from CCW
     float angle = m_angle.value_or(0.f);
     float angle_deg = static_cast<float>(-angle * 180 / M_PI);
-    if (m_imgui->slider_float("##angle", &angle_deg, limits.angle.min, limits.angle.max, u8"%.2f °", 1.f, false, _L("Rotate text Clock-wise."))){
+    if (m_imgui->slider_float("##angle", &angle_deg, limits.angle.min, limits.angle.max, u8"%.2f °", 1.f, false, _L("Rotate Clock-wise."))){
         // convert back to radians and CCW
         double angle_rad = -angle_deg * M_PI / 180.0;
         Geometry::to_range_pi_pi(angle_rad);                
 
         double diff_angle = angle_rad - angle;
-        
-        do_local_z_rotate(m_parent.get_selection(), diff_angle);
+        if (!is_approx(diff_angle, 0.)) {
+            do_local_z_rotate(m_parent.get_selection(), diff_angle);
 
-        // calc angle after rotation
-        m_angle = calc_angle(m_parent.get_selection());
-        
-        // recalculate for surface cut
-        if (m_volume->emboss_shape->projection.use_surface)
-            process();
+            // calc angle after rotation
+            m_angle = calc_angle(m_parent.get_selection());
+        }
     }
     bool is_stop_sliding = m_imgui->get_last_slider_status().deactivated_after_edit;
 
@@ -1931,19 +1927,19 @@ void GLGizmoSVG::draw_rotation()
         if (reset_button(m_icons)) {
             do_local_z_rotate(m_parent.get_selection(), -(*m_angle));
             m_angle.reset();
-
-            // recalculate for surface cut
-            if (m_volume->emboss_shape->projection.use_surface)
-                process();
-
             is_reseted = true;
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Reset rotation").c_str());
     }
 
     // Apply rotation on model (backend)
-    if (is_stop_sliding || is_reseted)
-        m_parent.do_rotate(rotation_snapshot_name);    
+    if (is_stop_sliding || is_reseted) {
+        m_parent.do_rotate(rotation_snapshot_name);
+
+        // recalculate for surface cut
+        if (m_volume->emboss_shape->projection.use_surface)
+            process();
+    }
 
     // Keep up - lock button icon
     if (!m_volume->is_the_only_one_part()) {
