@@ -1256,6 +1256,10 @@ bool GUI_App::on_init_inner()
     // Set initialization of image handlers before any UI actions - See GH issue #7469
     wxInitAllImageHandlers();
 
+    // Set our own gui log as an active target
+    m_log_gui = new LogGui();
+    wxLog::SetActiveTarget(m_log_gui);
+
 #if defined(_WIN32) && ! defined(_WIN64)
     // Win32 32bit build.
     if (wxPlatformInfo::Get().GetArchName().substr(0, 2) == "64") {
@@ -4144,6 +4148,32 @@ void GUI_App::handle_connect_request_printer_select_inner(const std::string & ms
 void GUI_App::show_printer_webview_tab()
 {
     mainframe->show_printer_webview_tab(preset_bundle->physical_printers.get_selected_printer_config());
+}
+
+
+
+bool LogGui::ignorred_message(const wxString& msg)
+{    
+    for(const wxString& err : std::initializer_list<wxString>{ wxString("cHRM chunk does not match sRGB"),
+                                                               wxString("known incorrect sRGB profile") }) {
+        if (msg.Contains(err))
+            return true;
+    }
+    return false;
+}
+
+void LogGui::DoLogText(const wxString& msg)
+{
+    if (ignorred_message(msg))
+        return;
+    wxLogGui::DoLogText(msg);
+}
+
+void LogGui::DoLogRecord(wxLogLevel level, const wxString& msg, const wxLogRecordInfo& info)
+{
+    if (ignorred_message(msg))
+        return;
+    wxLogGui::DoLogRecord(level, msg, info);
 }
 
 } // GUI

@@ -27,12 +27,13 @@
 
 #include <wx/display.h> // detection of change DPI
 #include <boost/log/trivial.hpp>
+
 #include <boost/nowide/fstream.hpp> // boost::nowide::ofstream stream
+
 #include <GL/glew.h>
 #include <chrono> // measure enumeration of fonts
 #include <sstream> // save for svg
 #include <array>
-#include <fstream> // IWYU pragma: keep
 
 using namespace Slic3r;
 using namespace Slic3r::Emboss;

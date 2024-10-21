@@ -119,6 +119,20 @@ static wxString dots("…", wxConvUTF8);
     #define SUPPORTS_MARKUP
 #endif
 
+
+// A wrapper class to allow ignoring some known warnings 
+// and not bothering users with redundant messages. 
+// see https://github.com/prusa3d/PrusaSlicer/issues/12920
+class LogGui : public wxLogGui
+{
+protected:
+    void DoLogText(const wxString& msg) override;
+    void DoLogRecord(wxLogLevel level, const wxString& msg, const wxLogRecordInfo& info) override;
+
+private:
+    bool ignorred_message(const wxString& msg);
+};
+
 class GUI_App : public wxApp
 {
 public:
@@ -181,6 +195,7 @@ private:
 	size_t m_instance_hash_int;
 
     Search::OptionsSearcher* m_searcher{ nullptr };
+    LogGui*                  m_log_gui { nullptr };
 
 public:
     bool            OnInit() override;

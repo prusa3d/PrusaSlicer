@@ -28,7 +28,6 @@
 #include "SVG.hpp"
 #include "Algorithm/RegionExpansion.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
-#include "libslic3r/LayerRegion.hpp"
 #include "libslic3r/Line.hpp"
 #include "libslic3r/MultiMaterialSegmentation.hpp"
 #include "libslic3r/Point.hpp"

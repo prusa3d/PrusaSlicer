@@ -8,7 +8,6 @@
 #include <cstring>
 #include <algorithm>
 #include <array>
-#include <iosfwd>
 #include <iterator>
 #include <limits>
 #include <cctype>

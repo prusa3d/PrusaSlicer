@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iterator>
 #include <tuple>
+#include <limits>
 
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Layer.hpp"

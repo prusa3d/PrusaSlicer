@@ -1,12 +1,13 @@
 #include "Jwt.hpp"
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/beast/core/detail/base64.hpp> // IWYU pragma: keep
+#include <boost/optional/optional.hpp>
 #include <ctime>
 #include <sstream>
 #include <tuple>
-
-#include <boost/beast/core/detail/base64.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+#include <algorithm>
 
 namespace Slic3r::Utils {
 

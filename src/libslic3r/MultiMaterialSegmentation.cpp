@@ -34,7 +34,6 @@
 #include "libslic3r/LayerRegion.hpp"
 #include "libslic3r/Line.hpp"
 #include "libslic3r/Model.hpp"
-#include "libslic3r/MultiMaterialSegmentation.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/PrintConfig.hpp"

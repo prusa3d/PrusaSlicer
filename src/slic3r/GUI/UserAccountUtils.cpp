@@ -1,11 +1,13 @@
 #include "UserAccountUtils.hpp"
 
-#include "format.hpp"
-
-#include <boost/regex.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/lexical_cast/bad_lexical_cast.hpp>
+#include <cassert>
+#include <cstddef>
+#include <exception>
+#include <utility>
 
 namespace pt = boost::property_tree;
 

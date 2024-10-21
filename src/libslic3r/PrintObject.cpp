@@ -34,7 +34,6 @@
 #include "Flow.hpp"
 #include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "Line.hpp"
-#include "Point.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 #include "Print.hpp"

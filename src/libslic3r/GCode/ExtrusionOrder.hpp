@@ -25,6 +25,7 @@ class ExtrusionEntityReference;
 class Print;
 class PrintObject;
 class PrintRegion;
+
 namespace GCode {
 class WipeTowerIntegration;
 }  // namespace GCode
