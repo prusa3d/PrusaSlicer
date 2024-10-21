@@ -153,7 +153,6 @@ try {
             // Now copy the facets.
             const TopAbs_Orientation anOrientation = anExpSF.Current().Orientation();
             for (Standard_Integer aTriIter = 1; aTriIter <= aTriangulation->NbTriangles(); ++aTriIter) {
-                const int aTriangleOffet = int(facets.size());
                 Poly_Triangle aTri = aTriangulation->Triangle(aTriIter);
 
                 Standard_Integer anId[3];
