@@ -1436,6 +1436,28 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(45));
 
+    def = this->add("top_fill_angle", coFloat);
+    def->label = L("Top fill angle");
+    def->category = L("Infill");
+    def->tooltip = L("Angle for the top fill orientation. "
+	           "It only affects the top visible layer, but not its adjacent solid shells.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(45));
+
+    def = this->add("bottom_fill_angle", coFloat);
+    def->label = L("Bottom fill angle");
+    def->category = L("Infill");
+    def->tooltip = L("Angle for the bottom fill orientation. "
+	           "It only affects the bottom external visible layer, but not its adjacent solid shells.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(45));
+
     def = this->add("fill_density", coPercent);
     def->gui_flags = "show_value";
     def->label = L("Fill density");

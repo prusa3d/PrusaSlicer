@@ -1497,6 +1497,8 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Advanced"));
         optgroup->append_single_option_line("solid_infill_every_layers", category_path + "solid-infill-every-x-layers");
         optgroup->append_single_option_line("fill_angle", category_path + "fill-angle");
+        optgroup->append_single_option_line("top_fill_angle");
+        optgroup->append_single_option_line("bottom_fill_angle");
         optgroup->append_single_option_line("solid_infill_below_area", category_path + "solid-infill-threshold-area");
         optgroup->append_single_option_line("bridge_angle");
         optgroup->append_single_option_line("only_retract_when_crossing_perimeters");
