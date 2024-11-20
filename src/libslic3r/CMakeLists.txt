@@ -524,7 +524,7 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC 
+add_library(libslic3r_cgal STATIC
     CutSurface.hpp CutSurface.cpp
     Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
     IntersectionPoints.hpp IntersectionPoints.cpp
@@ -596,6 +596,7 @@ target_link_libraries(libslic3r PUBLIC
     libigl
     agg
     ankerl
+    boost_headeronly
 )
 
 if (APPLE)

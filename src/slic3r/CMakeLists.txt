@@ -450,6 +450,7 @@ target_link_libraries(
     fastfloat
     OpenSSL::SSL
     OpenSSL::Crypto
+    boost_headeronly
 )
 
 if (MSVC)
