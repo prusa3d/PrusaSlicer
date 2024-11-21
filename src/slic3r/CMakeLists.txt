@@ -391,6 +391,7 @@ set(SLIC3R_GUI_SOURCES
 )
 
 find_package(NanoSVG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 if (APPLE)
     list(APPEND SLIC3R_GUI_SOURCES
@@ -447,12 +448,15 @@ target_link_libraries(
     NanoSVG::nanosvgrast
     stb_dxt
     fastfloat
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    boost_headeronly
 )
 
 if (MSVC)
     target_link_libraries(libslic3r_gui PUBLIC Setupapi.lib)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_libraries(libslic3r_gui PUBLIC ${DBUS_LIBRARIES})
+    target_link_libraries(libslic3r_gui PUBLIC ${DBus1_LIBRARIES})
 elseif (APPLE)
     target_link_libraries(libslic3r_gui PUBLIC ${DISKARBITRATION_LIBRARY} ${COREWLAN_LIBRARY})
 endif()
