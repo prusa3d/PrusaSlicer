@@ -13,6 +13,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/nowide/fstream.hpp>
+#include <boost/nowide/convert.hpp>
 #include <curl/curl.h>
 #include <string>
 
