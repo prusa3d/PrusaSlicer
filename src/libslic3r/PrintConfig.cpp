@@ -734,6 +734,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("print_extrusion_multiplier", coFloat);
+    def->label = L("Extrusion multiplier");
+    def->category = L("Advanced");
+    def->tooltip = L("This factor changes the amount of flow proportionally. You may need to tweak "
+        "this setting to get nice surface finish and correct single wall widths. "
+        "Usual values are between 90% and 110%. This print setting is multiplied "
+        "with the extrusion_multiplier from the filament tab.  Its only purpose is to "
+        "offer the same functionality but on a per-object basis.");
+    def->mode = comAdvanced;
+    def->min = 0.5;
+    def->max = 1.5;
+    def->set_default_value(new ConfigOptionFloat(1));
+
     def = this->add("bridge_speed", coFloat);
     def->label = L("Bridges");
     def->category = L("Speed");
