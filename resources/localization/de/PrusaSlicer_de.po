@@ -9112,7 +9112,7 @@ msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:308
 msgid "Licensed under GNU AGPLv3."
-msgstr "Lizensiert unter GNU AGPLv3."
+msgstr "Lizenziert unter GNU AGPLv3."
 
 #: src/libslic3r/PrintConfig.cpp:2566
 msgid "Lift height"
