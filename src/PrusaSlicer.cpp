@@ -616,7 +616,7 @@ int CLI::run(int argc, char **argv)
         } else if (opt_key == "export_3mf") {
             if (! this->export_models(IO::TMF))
                 return 1;
-        } else if (opt_key == "export_gcode" || opt_key == "export_sla" || opt_key == "slice") {
+        } else if (opt_key == "export_gcode" || opt_key == "export_sla" || opt_key == "slice" || opt_key == "export_stl_with_support" ) {
             if (opt_key == "export_gcode" && printer_technology == ptSLA) {
                 boost::nowide::cerr << "error: cannot export G-code for an FFF configuration" << std::endl;
                 return 1;
@@ -624,6 +624,11 @@ int CLI::run(int argc, char **argv)
                 boost::nowide::cerr << "error: cannot export SLA slices for a SLA configuration" << std::endl;
                 return 1;
             }
+            // if we are exporting stl with support, force the printer technology to SLA
+            if ( opt_key == "export_stl_with_support" ) {
+                printer_technology = ptSLA;
+            }
+
             // Make a copy of the model if the current action is not the last action, as the model may be
             // modified by the centering and such.
             Model model_copy;
@@ -666,34 +671,55 @@ int CLI::run(int argc, char **argv)
                 }
                 if (print->empty())
                     boost::nowide::cout << "Nothing to print for " << outfile << " . Either the print is empty or no object is fully inside the print volume." << std::endl;
-                else
+                else {
                     try {
                         std::string outfile_final;
                         print->process();
-                        if (printer_technology == ptFFF) {
-                            // The outfile is processed by a PlaceholderParser.
-                            outfile = fff_print.export_gcode(outfile, nullptr, nullptr);
-                            outfile_final = fff_print.print_statistics().finalize_output_path(outfile);
+                        if ( opt_key == "export_stl_with_support" ) {
+                            // generate the support mesh
+                            SLAPrint *slaprint = static_cast<SLAPrint*>(print);
+                            TriangleMesh *mesh = ( TriangleMesh * )&(slaprint->objects()[0]->support_mesh());
+                            // generate the pad mesh and merge with the support
+                            mesh->merge(slaprint->objects()[0]->pad_mesh());
+
+                            // grab the object modified mesh and merge with the support+pad
+                            std::shared_ptr<const indexed_triangle_set> m = slaprint->objects()[0]->get_mesh_to_print();
+                            TriangleMesh inst_object_mesh;
+                            if (m)
+                                inst_object_mesh = TriangleMesh{*m};
+                            mesh->merge(inst_object_mesh);
+
+                            // now export with support
+                            Slic3r::store_stl(outfile.c_str(), mesh, true);
+                            std::cout << "File exported to " << outfile << " with supports" << std::endl;
                         } else {
-                            outfile = sla_print.output_filepath(outfile);
-                            // We need to finalize the filename beforehand because the export function sets the filename inside the zip metadata
-                            outfile_final = sla_print.print_statistics().finalize_output_path(outfile);
-                            sla_print.export_print(outfile_final);
-                        }
-                        if (outfile != outfile_final) {
-                            if (Slic3r::rename_file(outfile, outfile_final)) {
-                                boost::nowide::cerr << "Renaming file " << outfile << " to " << outfile_final << " failed" << std::endl;
-                                return 1;
+                            if (printer_technology == ptFFF) {
+                                // The outfile is processed by a PlaceholderParser.
+                                outfile = fff_print.export_gcode(outfile, nullptr, nullptr);
+                                outfile_final = fff_print.print_statistics().finalize_output_path(outfile);
+                            } else {
+                                outfile = sla_print.output_filepath(outfile);
+                                // We need to finalize the filename beforehand because the export function sets the filename inside the zip metadata
+                                outfile_final = sla_print.print_statistics().finalize_output_path(outfile);
+                                sla_print.export_print(outfile_final);
                             }
-                            outfile = outfile_final;
+                            if (outfile != outfile_final) {
+                                if (Slic3r::rename_file(outfile, outfile_final)) {
+                                    boost::nowide::cerr << "Renaming file " << outfile << " to " << outfile_final << " failed" << std::endl;
+                                    return 1;
+                                }
+                                outfile = outfile_final;
+                            }
+                            // Run the post-processing scripts if defined.
+                            run_post_process_scripts(outfile, fff_print.full_print_config());
+                            boost::nowide::cout << "Slicing result exported to " << outfile << std::endl;
                         }
-                        // Run the post-processing scripts if defined.
-                        run_post_process_scripts(outfile, fff_print.full_print_config());
-                        boost::nowide::cout << "Slicing result exported to " << outfile << std::endl;
                     } catch (const std::exception &ex) {
                         boost::nowide::cerr << ex.what() << std::endl;
                         return 1;
                     }
+                }
+
 /*
                 print.center = ! m_config.has("center")
                     && ! m_config.has("align_xy")

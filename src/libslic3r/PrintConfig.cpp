@@ -5589,6 +5589,11 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->tooltip = L("Export the model(s) as STL.");
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("export_stl_with_support", coBool);
+    def->label = L("Export STL with supports");
+    def->tooltip = L("Export the model(s) as STL, including print supports.");
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("export_gcode", coBool);
     def->label = L("Export G-code");
     def->tooltip = L("Slice the model and export toolpaths as G-code.");
