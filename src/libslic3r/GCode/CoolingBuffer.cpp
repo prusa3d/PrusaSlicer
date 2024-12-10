@@ -530,16 +530,14 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             if (active_speed_modifier != size_t(-1)) {
                 assert(active_speed_modifier < adjustment->lines.size());
                 CoolingLine &sm = adjustment->lines[active_speed_modifier];
-                // There should be at least some extrusion move inside the adjustment block.
-                // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
-                assert(sm.length > 0);
-                assert(sm.time > 0);
-                if (sm.time <= 0) {
+                if (sm.length <= 0) {
                     // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should not confuse firmware either.
                     // Prohibit time adjustment of a block of zero length extrusions by the cooling buffer.
                     sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
                     // But the start / end comment shall be removed.
                     sm.type |= CoolingLine::TYPE_ADJUSTABLE_EMPTY;
+                } else {
+                    assert(sm.time > 0);
                 }
             }
             active_speed_modifier = size_t(-1);
