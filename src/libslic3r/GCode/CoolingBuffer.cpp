@@ -509,21 +509,23 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     assert((line.type & CoolingLine::TYPE_HAS_F) == 0);
                     CoolingLine &sm = adjustment->lines[active_speed_modifier];
                     assert(sm.feedrate > 0.f);
-                    sm.length   += line.length;
-                    sm.time     += line.time;
-                    if (sm.time_max != FLT_MAX) {
-                        if (line.time_max == FLT_MAX)
-                            sm.time_max = FLT_MAX;
-                        else
-                            sm.time_max += line.time_max;
+                    if (line.length > 0) {
+                        sm.length   += line.length;
+                        sm.time     += line.time;
+                        if (sm.time_max != FLT_MAX) {
+                            if (line.time_max == FLT_MAX)
+                                sm.time_max = FLT_MAX;
+                            else
+                                sm.time_max += line.time_max;
+                        }
+                        // Don't store this line.
+                        line.type = 0;
                     }
-                    // Don't store this line.
-                    line.type = 0;
                 }
             }
             std::copy(std::begin(new_pos), std::begin(new_pos) + 5, std::begin(current_pos));
         } else if (boost::starts_with(sline, ";_EXTRUDE_END")) {
-            // Closing a block of non-zero length extrusion moves.
+            // Closing a block of extrusion moves.
             line.type = CoolingLine::TYPE_EXTRUDE_END;
             if (active_speed_modifier != size_t(-1)) {
                 assert(active_speed_modifier < adjustment->lines.size());
