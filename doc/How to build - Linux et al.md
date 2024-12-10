@@ -17,7 +17,7 @@ You need at least 8GB of RAM on your system. Linking on a 4GB RAM system will li
 
 GNU build tools, CMake, git and other libraries have to be installed on the build machine.
 Unless that's already the case, install them as usual from your distribution packages.
-E.g. on Ubuntu 20.10, run
+E.g. on Ubuntu 24.04 / Debian 12, run
 ```shell
 sudo apt-get install  -y \
 git \
@@ -27,8 +27,8 @@ cmake \
 libglu1-mesa-dev \
 libgtk-3-dev \
 libdbus-1-dev \
-libwebkit2gtk-4.0-dev \
-
+libwebkit2gtk-4.1-dev \
+texinfo
 ```
 The names of the packages may be different on different distros.
 
