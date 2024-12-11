@@ -1450,11 +1450,8 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(fileMenu, wxID_ANY, _L("&Save Project") + "\tCtrl+S", _L("Save current project file"),
             [this](wxCommandEvent&) { save_project(); }, "save", nullptr,
             [this](){return m_plater != nullptr && can_save(); }, this);
-#ifdef __APPLE__
+        // Ctrl+Shift+S should be consistent across platforms.
         append_menu_item(fileMenu, wxID_ANY, _L("Save Project &as") + dots + "\tCtrl+Shift+S", _L("Save current project file as"),
-#else
-        append_menu_item(fileMenu, wxID_ANY, _L("Save Project &as") + dots + "\tCtrl+Alt+S", _L("Save current project file as"),
-#endif // __APPLE__
             [this](wxCommandEvent&) { save_project_as(); }, "save", nullptr,
             [this](){return m_plater != nullptr && can_save_as(); }, this);
 
@@ -1614,7 +1611,6 @@ void MainFrame::init_menubar_as_editor()
         editMenu->AppendSeparator();
         append_menu_item(editMenu, wxID_ANY, _L("Searc&h") + "\tCtrl+F",
             _L("Search in settings"), [this](wxCommandEvent&) {
-//             wxGetApp().show_search_dialog(); 
 				m_tabpanel->GetTopBarItemsCtrl()->TriggerSearch();
             },
             "search", nullptr, []() {return true; }, this);
