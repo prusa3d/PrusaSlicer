@@ -596,15 +596,23 @@ function(prusaslicer_copy_dlls target)
     else ()
         set (_out_dir "$<TARGET_PROPERTY:${target},BINARY_DIR>")
     endif ()
+
+    if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+        set(_gmpdll winarm64/gmp-10.dll)
+        set(_mpfrdll winarm64/mpfr-6.dll)
+    else()
+        set(_gmpdll win${_bits}/libgmp-10.dll)
+        set(_mpfrdll win${_bits}/libmpfr-4.dll)
+    endif()
     
     # This has to be a separate target due to the windows command line lenght limits    
     add_custom_command(TARGET ${target} POST_BUILD 
-        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/+GMP/gmp/lib/win${_bits}/libgmp-10.dll ${_out_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/+GMP/gmp/lib/${_gmpdll} ${_out_dir}
         COMMENT "Copy gmp runtime to build tree"
         VERBATIM)
     
     add_custom_command(TARGET ${target} POST_BUILD 
-        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/+MPFR/mpfr/lib/win${_bits}/libmpfr-4.dll ${_out_dir}
+        COMMAND ${CMAKE_COMMAND} -E copy ${TOP_LEVEL_PROJECT_DIR}/deps/+MPFR/mpfr/lib/${_mpfrdll} ${_out_dir}
         COMMENT "Copy mpfr runtime to build tree"
         VERBATIM)
 endfunction()
