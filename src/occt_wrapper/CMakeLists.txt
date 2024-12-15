@@ -19,35 +19,23 @@ include(GenerateExportHeader)
 
 generate_export_header(OCCTWrapper)
 
-find_package(OpenCASCADE 7.6.1 REQUIRED)
+find_package(OpenCASCADE REQUIRED)
+# OpenCASCADE has an exact version match even if you don't specify the EXACT
+# keyword in the find_package(). So lets implement it on our own.
+set(OPENCASCADE_MODULE_VERSION
+    "${OpenCASCADE_MAJOR_VERSION}.${OpenCASCADE_MINOR_VERSION}.${OpenCASCADE_MAINTENANCE_VERSION}")
+set(OPENCASCADE_REQUIRED_VERSION "7.8.0")
+if (${OPENCASCADE_MODULE_VERSION} VERSION_LESS ${OPENCASCADE_REQUIRED_VERSION})
+    message(
+        FATAL_ERROR
+        "Coun't find a compatible OpenCASCADE version - "
+        "required: ${OPENCASCADE_REQUIRED_VERSION}, found: "
+        "${OPENCASCADE_MODULE_VERSION}"
+    )
+endif()
 
 set(OCCT_LIBS
-    TKXDESTEP
-    TKSTEP
-    TKSTEP209
-    TKSTEPAttr
-    TKSTEPBase
-    TKXCAF
-    TKXSBase
-    TKVCAF
-    TKCAF
-    TKLCAF
-    TKCDF
-    TKV3d
-    TKService
-    TKMesh
-    TKBO
-    TKPrim
-    TKHLR
-    TKShHealing
-    TKTopAlgo
-    TKGeomAlgo
-    TKBRep
-    TKGeomBase
-    TKG3d
-    TKG2d
-    TKMath
-    TKernel
+    TKDESTEP
 )
 
 slic3r_remap_configs("${OCCT_LIBS}" RelWithDebInfo Release)
