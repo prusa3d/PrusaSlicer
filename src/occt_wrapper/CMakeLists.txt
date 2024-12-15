@@ -59,5 +59,8 @@ target_link_libraries(OCCTWrapper libslic3r admesh)
 
 include(GNUInstallDirs)
 
-install(TARGETS OCCTWrapper DESTINATION "${CMAKE_INSTALL_BINDIR}")
-
+if (WIN32 OR APPLE)
+    install(TARGETS OCCTWrapper DESTINATION "${CMAKE_INSTALL_BINDIR}")
+else()
+    install(TARGETS OCCTWrapper DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+endif()
