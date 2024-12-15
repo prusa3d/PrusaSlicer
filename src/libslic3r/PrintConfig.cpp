@@ -2876,6 +2876,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(70));
 
+    def = this->add("internal_infill_min_width", coFloat);
+    def->label = L("Internal infill minimum width");
+    def->category = L("Infill");
+    def->tooltip = L("Force solid infill for regions that would be internal infill but are surrounded by solid infill "
+                     "and are thinner than this. This can be used to avoid unneeded patches of internal infill which "
+                     "can slow the print down due to excessive direction changes, or to get a cleaner top surface for "
+                     "e.g. signs with raised text.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("solid_infill_extruder", coInt);
     def->label = L("Solid infill extruder");
     def->category = L("Extruders");

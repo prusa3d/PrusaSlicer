@@ -1131,7 +1131,38 @@ void PrintObject::detect_surfaces_type()
                     {
                         Polygons topbottom = to_polygons(top);
                         polygons_append(topbottom, to_polygons(bottom));
-                        surfaces_append(surfaces_out, diff_ex(surfaces_prev, topbottom), stInternal);
+
+                        Surfaces internal;
+                        surfaces_append(internal, diff_ex(surfaces_prev, topbottom), stInternal);
+
+                        float internal_infill_min_width = layerm->region().config().internal_infill_min_width.value;
+                        if (internal_infill_min_width > 0) {
+                            // convert thin patches of internal infill surrounded by other surfaces into top surfaces
+
+                            float shrink_by = scale_(internal_infill_min_width) * 0.5;
+
+                            // use extrusion width as basis for a heuristic for what should be considered a significant surrounding area
+                            float edge_band_width = layerm->flow(frExternalPerimeter).scaled_width() * 10;
+
+                            for (Surface &surface : internal) {
+                                // keep as internal if this surface is not thin enough
+                                if (!offset_ex(surface.expolygon, -shrink_by).empty()) {
+                                    continue;
+                                }
+
+                                // calculate an edge band around this surface to probe for adjacent surfaces
+                                ExPolygons edge_band = diff_ex(offset_ex(surface.expolygon, edge_band_width), {surface.expolygon});
+
+                                // keep as internal if this surface is not sufficiently surrounded by adjacent surfaces
+                                if (area(intersection_ex(surfaces_prev, edge_band)) < area(edge_band) * 0.25) {
+                                    continue;
+                                }
+
+                                surface.surface_type = stTop;
+                            }
+                        }
+
+                        surfaces_append(surfaces_out, std::move(internal));
                     }
 
                     surfaces_append(surfaces_out, std::move(top));
