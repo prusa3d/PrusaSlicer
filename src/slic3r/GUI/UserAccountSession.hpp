@@ -30,6 +30,7 @@ wxDECLARE_EVENT(EVT_UA_FAIL, UserAccountFailEvent); // Soft fail - clears only a
 wxDECLARE_EVENT(EVT_UA_RESET, UserAccountFailEvent); // Hard fail - clears all
 wxDECLARE_EVENT(EVT_UA_PRUSACONNECT_PRINTER_DATA_FAIL, UserAccountFailEvent); // Failed to get data for printer to select, soft fail, action does not repeat
 wxDECLARE_EVENT(EVT_UA_REFRESH_TIME, UserAccountTimeEvent);
+wxDECLARE_EVENT(EVT_UA_ENQUEUED_REFRESH, SimpleEvent);
 
 typedef std::function<void(const std::string& body)> UserActionSuccessFn;
 typedef std::function<void(const std::string& body)> UserActionFailFn;
@@ -121,7 +122,7 @@ public:
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS] = std::make_unique<UserActionGetWithEvent>("CONNECT_STATUS", sc.connect_status_url(), EVT_UA_PRUSACONNECT_STATUS_SUCCESS, EVT_UA_FAIL);
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS] = std::make_unique<UserActionGetWithEvent>("CONNECT_PRINTER_MODELS", sc.connect_printer_list_url(), EVT_UA_PRUSACONNECT_PRINTER_MODELS_SUCCESS, EVT_UA_FAIL);
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR] = std::make_unique<UserActionGetWithEvent>("AVATAR", sc.media_url(), EVT_UA_AVATAR_SUCCESS, EVT_UA_FAIL);
-        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID] = std::make_unique<UserActionGetWithEvent>("USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID", sc.connect_printers_url(), EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, EVT_UA_FAIL);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID] = std::make_unique<UserActionGetWithEvent>("USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID", sc.connect_printers_url(), EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, EVT_UA_PRUSACONNECT_PRINTER_DATA_FAIL);
     }
     ~UserAccountSession()
     {

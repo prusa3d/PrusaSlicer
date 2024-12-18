@@ -24,7 +24,7 @@ void read_file(const char* input_file, pt::ptree& tree)
 	try {
 		pt::read_xml(ifs, tree);
 	}
-	catch (const boost::property_tree::xml_parser::xml_parser_error& err) {
+	catch (const boost::property_tree::xml_parser::xml_parser_error&) {
 		throw Slic3r::RuntimeError("Failed reading PrintRequest file. File format is corrupt.");
 	}
 }

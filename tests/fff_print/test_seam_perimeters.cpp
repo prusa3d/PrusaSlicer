@@ -124,44 +124,48 @@ constexpr const char *to_string(Perimeters::AngleType angle_type) {
     throw std::runtime_error("Unreachable");
 }
 
-void serialize_shell(std::ostream &output, const Shells::Shell<Perimeters::Perimeter> &shell) {
+void serialize_shells(std::ostream &output, const Shells::Shells<> &shells) {
     output << "x,y,z,point_type,point_classification,angle_type,layer_index,"
-              "point_index,distance,distance_to_previous,is_degenerate"
+              "point_index,distance,distance_to_previous,is_degenerate,shell_index"
            << std::endl;
 
-    for (std::size_t perimeter_index{0}; perimeter_index < shell.size(); ++perimeter_index) {
-        const Shells::Slice<> &slice{shell[perimeter_index]};
-        const Perimeters::Perimeter &perimeter{slice.boundary};
-        const std::vector<Vec2d> &points{perimeter.positions};
+    for (std::size_t shell_index{0}; shell_index < shells.size(); ++shell_index) {
+        const Shells::Shell<> &shell{shells[shell_index]};
+        for (std::size_t perimeter_index{0}; perimeter_index < shell.size(); ++perimeter_index) {
+            const Shells::Slice<> &slice{shell[perimeter_index]};
+            const Perimeters::Perimeter &perimeter{slice.boundary};
+            const std::vector<Vec2d> &points{perimeter.positions};
 
-        double total_distance{0.0};
-        for (std::size_t point_index{0}; point_index < perimeter.point_types.size(); ++point_index) {
-            const Vec3d point{to_3d(points[point_index], perimeter.slice_z)};
-            const Perimeters::PointType point_type{perimeter.point_types[point_index]};
-            const Perimeters::PointClassification point_classification{
-                perimeter.point_classifications[point_index]};
-            const Perimeters::AngleType angle_type{perimeter.angle_types[point_index]};
-            const std::size_t layer_index{slice.layer_index};
-            const std::size_t previous_index{point_index == 0 ? points.size() - 1 : point_index - 1};
-            const double distance_to_previous{(points[point_index] - points[previous_index]).norm()};
-            total_distance += point_index == 0 ? 0.0 : distance_to_previous;
-            const double distance{total_distance};
-            const bool is_degenerate{perimeter.is_degenerate};
+            double total_distance{0.0};
+            for (std::size_t point_index{0}; point_index < perimeter.point_types.size(); ++point_index) {
+                const Vec3d point{to_3d(points[point_index], perimeter.slice_z)};
+                const Perimeters::PointType point_type{perimeter.point_types[point_index]};
+                const Perimeters::PointClassification point_classification{
+                    perimeter.point_classifications[point_index]};
+                const Perimeters::AngleType angle_type{perimeter.angle_types[point_index]};
+                const std::size_t layer_index{slice.layer_index};
+                const std::size_t previous_index{point_index == 0 ? points.size() - 1 : point_index - 1};
+                const double distance_to_previous{(points[point_index] - points[previous_index]).norm()};
+                total_distance += point_index == 0 ? 0.0 : distance_to_previous;
+                const double distance{total_distance};
+                const bool is_degenerate{perimeter.is_degenerate};
 
-            // clang-format off
-                output
-                    << point.x() << ","
-                    << point.y() << ","
-                    << point.z() << ","
-                    << to_string(point_type) << ","
-                    << to_string(point_classification) << ","
-                    << to_string(angle_type) << ","
-                    << layer_index << ","
-                    << point_index << ","
-                    << distance << ","
-                    << distance_to_previous << ","
-                    << is_degenerate << std::endl;
-            // clang-format on
+                // clang-format off
+                    output
+                        << point.x() << ","
+                        << point.y() << ","
+                        << point.z() << ","
+                        << to_string(point_type) << ","
+                        << to_string(point_classification) << ","
+                        << to_string(angle_type) << ","
+                        << layer_index << ","
+                        << point_index << ","
+                        << distance << ","
+                        << distance_to_previous << ","
+                        << is_degenerate << ","
+                        << shell_index << std::endl;
+                // clang-format on
+            }
         }
     }
 }
@@ -175,6 +179,6 @@ TEST_CASE_METHOD(Test::SeamsFixture, "Create perimeters", "[Seams][SeamPerimeter
 
     if constexpr (debug_files) {
         std::ofstream csv{"perimeters.csv"};
-        serialize_shell(csv, shells[0]);
+        serialize_shells(csv, shells);
     }
 }

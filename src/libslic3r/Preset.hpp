@@ -127,7 +127,6 @@ public:
         TYPE_PHYSICAL_PRINTER,
         // This type is here to support search through the Preferences
         TYPE_PREFERENCES,
-        TYPE_WEBVIEW,
     };
 
     Type                type        = TYPE_INVALID;
@@ -224,6 +223,10 @@ public:
 
     // Sort lexicographically by a preset name. The preset name shall be unique across a single PresetCollection.
     bool                operator<(const Preset &other) const { return this->name < other.name; }
+
+    // Returns id without trimmed prefix if present and vendor has any.
+    std::string         trim_vendor_repo_prefix(const std::string& id) const;
+    std::string         trim_vendor_repo_prefix(const std::string& id, const VendorProfile* vendor_profile) const;
 
     static const std::vector<std::string>&  print_options();
     static const std::vector<std::string>&  filament_options();

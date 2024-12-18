@@ -12,6 +12,7 @@
 // This wrapper also manages implicit conversion from wxString to UTF8 and format_wxstr() variants are provided to format into wxString.
 
 #include <wx/string.h>
+#include <ostream>
 
 namespace Slic3r::internal::format {
 	// Wrapper around wxScopedCharBuffer to indicate that the content is UTF8 formatted.

@@ -17,6 +17,15 @@ struct OpenGLVersions
 	static const std::vector<std::pair<int, int>> core;
 };
 
+struct CLISelectedProfiles
+{
+    std::string                 print;
+    std::string                 printer;
+    std::vector<std::string>    materials;
+
+    bool has_valid_data() { return !print.empty() && !printer.empty() && !materials.empty(); }
+};
+
 struct GUI_InitParams
 {
 	int		                    argc;
@@ -28,6 +37,7 @@ struct GUI_InitParams
     std::vector<std::string>    load_configs;
     DynamicPrintConfig          extra_config;
     std::vector<std::string>    input_files;
+    CLISelectedProfiles         selected_presets;
 
     bool                        start_as_gcodeviewer;
     bool                        start_downloader;

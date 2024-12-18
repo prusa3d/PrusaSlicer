@@ -66,6 +66,7 @@ public:
     // A print host usually does not support multiple printers, with the exception of Repetier server.
     virtual bool supports_multiple_printers() const { return false; }
     virtual std::string get_host() const = 0;
+    virtual std::string get_notification_host() const {return get_host(); }
 
     // Support for Repetier server multiple groups & printers. Not supported by other print hosts.
     // Returns false if not supported. May throw HostNetworkError.

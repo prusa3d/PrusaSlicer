@@ -120,6 +120,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "filament_density",
         "filament_notes",
         "filament_cost",
+        "filament_seam_gap_distance",
         "filament_spool_weight",
         "first_layer_acceleration",
         "first_layer_acceleration_over_raft",
@@ -161,6 +162,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "retract_restart_extra",
         "retract_restart_extra_toolchange",
         "retract_speed",
+        "seam_gap_distance",
         "single_extruder_multi_material_priming",
         "slowdown_below_layer_time",
         "solid_infill_acceleration",
@@ -199,10 +201,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "draft_shield"
             || opt_key == "skirt_distance"
             || opt_key == "min_skirt_length"
-            || opt_key == "ooze_prevention"
-            || opt_key == "wipe_tower_x"
-            || opt_key == "wipe_tower_y"
-            || opt_key == "wipe_tower_rotation_angle") {
+            || opt_key == "ooze_prevention") {
             steps.emplace_back(psSkirtBrim);
         } else if (
                opt_key == "first_layer_height"
@@ -284,6 +283,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             steps.emplace_back(psSkirtBrim);
         } else if (opt_key == "avoid_crossing_curled_overhangs") {
             osteps.emplace_back(posEstimateCurledExtrusions);
+        } else if (opt_key == "automatic_extrusion_widths") {
+            osteps.emplace_back(posPerimeters);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps
             //FIXME invalidate all steps of all objects as well?
@@ -628,15 +629,19 @@ std::string Print::validate(std::vector<std::string>* warnings) const
     if (this->has_wipe_tower() && ! m_objects.empty()) {
         // Make sure all extruders use same diameter filament and have the same nozzle diameter
         // EPSILON comparison is used for nozzles and 10 % tolerance is used for filaments
-        double first_nozzle_diam = m_config.nozzle_diameter.get_at(extruders.front());
+        double first_nozzle_diam   = m_config.nozzle_diameter.get_at(extruders.front());
         double first_filament_diam = m_config.filament_diameter.get_at(extruders.front());
+
+        bool allow_nozzle_diameter_differ_warning = (warnings != nullptr);
         for (const auto& extruder_idx : extruders) {
-            double nozzle_diam = m_config.nozzle_diameter.get_at(extruder_idx);
+            double nozzle_diam   = m_config.nozzle_diameter.get_at(extruder_idx);
             double filament_diam = m_config.filament_diameter.get_at(extruder_idx);
-            if (nozzle_diam - EPSILON > first_nozzle_diam || nozzle_diam + EPSILON < first_nozzle_diam
-             || std::abs((filament_diam-first_filament_diam)/first_filament_diam) > 0.1)
-                 return _u8L("The wipe tower is only supported if all extruders have the same nozzle diameter "
-                          "and use filaments of the same diameter.");
+            if (allow_nozzle_diameter_differ_warning && (nozzle_diam - EPSILON > first_nozzle_diam || nozzle_diam + EPSILON < first_nozzle_diam)) {
+                allow_nozzle_diameter_differ_warning = false;
+                warnings->emplace_back("_WIPE_TOWER_NOZZLE_DIAMETER_DIFFER");
+            } else if (std::abs((filament_diam - first_filament_diam) / first_filament_diam) > 0.1) {
+                return _u8L("The wipe tower is only supported if all extruders use filaments of the same diameter.");
+            }
         }
 
         if (m_config.gcode_flavor != gcfRepRapSprinter && m_config.gcode_flavor != gcfRepRapFirmware &&
@@ -739,13 +744,11 @@ std::string Print::validate(std::vector<std::string>* warnings) const
 		};
         for (PrintObject *object : m_objects) {
             if (object->has_support_material()) {
-				if ((object->config().support_material_extruder == 0 || object->config().support_material_interface_extruder == 0) && max_nozzle_diameter - min_nozzle_diameter > EPSILON) {
+				if (warnings != nullptr && (object->config().support_material_extruder == 0 || object->config().support_material_interface_extruder == 0) && max_nozzle_diameter - min_nozzle_diameter > EPSILON) {
                     // The object has some form of support and either support_material_extruder or support_material_interface_extruder
-                    // will be printed with the current tool without a forced tool change. Play safe, assert that all object nozzles
-                    // are of the same diameter.
-                    return _u8L("Printing with multiple extruders of differing nozzle diameters. "
-                           "If support is to be printed with the current extruder (support_material_extruder == 0 or support_material_interface_extruder == 0), "
-                           "all nozzles have to be of the same diameter.");
+                    // will be printed with the current tool without a forced tool change.
+                    // Notify the user that printing supports with different nozzle diameters is experimental and requires caution.
+                    warnings->emplace_back("_SUPPORT_NOZZLE_DIAMETER_DIFFER");
                 }
                 if (this->has_wipe_tower() && object->config().support_material_style != smsOrganic) {
     				if (object->config().support_material_contact_distance == 0) {
@@ -1049,8 +1052,8 @@ void Print::process()
     if (this->has_wipe_tower()) {
         // These values have to be updated here, not during wipe tower generation.
         // When the wipe tower is moved/rotated, it is not regenerated.
-        m_wipe_tower_data.position = { m_config.wipe_tower_x, m_config.wipe_tower_y };
-        m_wipe_tower_data.rotation_angle = m_config.wipe_tower_rotation_angle;
+        m_wipe_tower_data.position = model().wipe_tower().position;
+        m_wipe_tower_data.rotation_angle = model().wipe_tower().rotation;
     }
     auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(objects(), m_wipe_tower_data);
 
@@ -1279,8 +1282,8 @@ Points Print::first_layer_wipe_tower_corners() const
             pts.emplace_back(center + r*Vec2d(std::cos(alpha)/cone_x_scale, std::sin(alpha)));
 
         for (Vec2d& pt : pts) {
-            pt = Eigen::Rotation2Dd(Geometry::deg2rad(m_config.wipe_tower_rotation_angle.value)) * pt;
-            pt += Vec2d(m_config.wipe_tower_x.value, m_config.wipe_tower_y.value);
+            pt = Eigen::Rotation2Dd(Geometry::deg2rad(model().wipe_tower().rotation)) * pt;
+            pt += model().wipe_tower().position;
             pts_scaled.emplace_back(Point(scale_(pt.x()), scale_(pt.y())));
         }
     }
@@ -1554,7 +1557,7 @@ void Print::_make_wipe_tower()
     this->throw_if_canceled();
 
     // Initialize the wipe tower.
-    WipeTower wipe_tower(m_config, m_default_region_config, wipe_volumes, m_wipe_tower_data.tool_ordering.first_extruder());
+    WipeTower wipe_tower(model().wipe_tower().position.cast<float>(), model().wipe_tower().rotation, m_config, m_default_region_config, wipe_volumes, m_wipe_tower_data.tool_ordering.first_extruder());
 
     // Set the extruder & material properties at the wipe tower object.
     for (size_t i = 0; i < m_config.nozzle_diameter.size(); ++ i)
@@ -1763,5 +1766,21 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
     return final_path;
 }
 
+PrintRegion *PrintObjectRegions::FuzzySkinPaintedRegion::parent_print_object_region(const LayerRangeRegions &layer_range) const
+{
+    using FuzzySkinParentType = PrintObjectRegions::FuzzySkinPaintedRegion::ParentType;
+
+    if (this->parent_type == FuzzySkinParentType::PaintedRegion) {
+        return layer_range.painted_regions[this->parent].region;
+    }
+
+    assert(this->parent_type == FuzzySkinParentType::VolumeRegion);
+    return layer_range.volume_regions[this->parent].region;
+}
+
+int PrintObjectRegions::FuzzySkinPaintedRegion::parent_print_object_region_id(const LayerRangeRegions &layer_range) const
+{
+    return this->parent_print_object_region(layer_range)->print_object_region_id();
+}
 
 } // namespace Slic3r

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" fill-rule="evenodd" clip-rule="evenodd" image-rendering="optimizeQuality" shape-rendering="geometricPrecision" text-rendering="geometricPrecision" viewBox="0 0 128 128">
+  <path fill="#ED6B21" fill-rule="nonzero" d="M107.76 57.98H20.24c-1.51 0-2.74-1.22-2.74-2.73V20.24c0-1.51 1.23-2.74 2.74-2.74h87.52c1.51 0 2.74 1.23 2.74 2.74v35.01c0 1.51-1.23 2.73-2.74 2.73zm-84.79-5.47h82.06V22.97H22.97v29.54z"/>
+  <path fill="#FFFFFF" d="M2.73 0H16v5.47H5.47V16H0V2.73C0 1.23 1.23 0 2.73 0zM112 0h13.27c1.5 0 2.73 1.23 2.73 2.73V16h-5.47V5.47H112V0zm16 112v13.27c0 1.5-1.23 2.73-2.73 2.73H112v-5.47h10.53V112H128zM16 128H2.73A2.74 2.74 0 0 1 0 125.27V112h5.47v10.53H16V128z"/>
+  <path fill="#FFFFFF" fill-rule="nonzero" d="M46.5 110.5H20.24c-1.51 0-2.74-1.23-2.74-2.74V72.75c0-1.51 1.23-2.73 2.74-2.73H46.5c1.51 0 2.73 1.22 2.73 2.73v35.01c0 1.51-1.22 2.74-2.73 2.74zm-23.53-5.47h20.79V75.49H22.97v29.54zM107.76 110.5H64c-1.51 0-2.74-1.23-2.74-2.74V72.75c0-1.51 1.23-2.73 2.74-2.73h43.76c1.51 0 2.74 1.22 2.74 2.73v35.01c0 1.51-1.23 2.74-2.74 2.74zm-41.02-5.47h38.29V75.49H66.74v29.54z"/>
+</svg>

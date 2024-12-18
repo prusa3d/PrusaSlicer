@@ -568,9 +568,10 @@ struct EdgeToFace {
     bool operator<(const EdgeToFace &other) const { return vertex_low < other.vertex_low || (vertex_low == other.vertex_low && vertex_high < other.vertex_high); }
 };
 
-template<typename FaceFilter, typename ThrowOnCancelCallback>
-static std::vector<EdgeToFace> create_edge_map(
-    const indexed_triangle_set &its, FaceFilter face_filter, ThrowOnCancelCallback throw_on_cancel)
+template<AdditionalMeshInfo mesh_info = AdditionalMeshInfo::None, typename FaceFilter, typename ThrowOnCancelCallback>
+static std::vector<EdgeToFace> create_edge_map(const typename IndexedTriangleSetType<mesh_info>::type &its,
+                                               FaceFilter                                              face_filter,
+                                               ThrowOnCancelCallback                                   throw_on_cancel)
 {
     std::vector<EdgeToFace> edges_map;
     edges_map.reserve(its.indices.size() * 3);
@@ -599,12 +600,14 @@ static std::vector<EdgeToFace> create_edge_map(
 
 // Map from a face edge to a unique edge identifier or -1 if no neighbor exists.
 // Two neighbor faces share a unique edge identifier even if they are flipped.
-template<typename FaceFilter, typename ThrowOnCancelCallback>
-static inline std::vector<Vec3i> its_face_edge_ids_impl(const indexed_triangle_set &its, FaceFilter face_filter, ThrowOnCancelCallback throw_on_cancel)
+template<AdditionalMeshInfo mesh_info = AdditionalMeshInfo::None, typename FaceFilter, typename ThrowOnCancelCallback>
+static inline std::vector<Vec3i> its_face_edge_ids_impl(const typename IndexedTriangleSetType<mesh_info>::type &its,
+                                                        FaceFilter                                              face_filter,
+                                                        ThrowOnCancelCallback                                   throw_on_cancel)
 {
     std::vector<Vec3i> out(its.indices.size(), Vec3i(-1, -1, -1));
 
-    std::vector<EdgeToFace> edges_map = create_edge_map(its, face_filter, throw_on_cancel);
+    std::vector<EdgeToFace> edges_map = create_edge_map<mesh_info>(its, face_filter, throw_on_cancel);
 
     // Assign a unique common edge id to touching triangle edges.
     int num_edges = 0;
@@ -624,8 +627,8 @@ static inline std::vector<Vec3i> its_face_edge_ids_impl(const indexed_triangle_s
             }
         if (! found) {
             //FIXME Vojtech: Trying to find an edge with equal orientation. This smells.
-            // admesh can assign the same edge ID to more than two facets (which is 
-            // still topologically correct), so we have to search for a duplicate of 
+            // admesh can assign the same edge ID to more than two facets (which is
+            // still topologically correct), so we have to search for a duplicate of
             // this edge too in case it was already seen in this orientation
             for (j = i + 1; j < edges_map.size() && edge_i == edges_map[j]; ++ j)
                 if (edges_map[j].face != -1) {
@@ -650,9 +653,16 @@ static inline std::vector<Vec3i> its_face_edge_ids_impl(const indexed_triangle_s
     return out;
 }
 
-std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its)
+// Explicit template instantiation.
+template std::vector<Vec3i> its_face_edge_ids<AdditionalMeshInfo::None>(const IndexedTriangleSetType<AdditionalMeshInfo::None>::type &);
+template std::vector<Vec3i> its_face_edge_ids<AdditionalMeshInfo::Color>(const IndexedTriangleSetType<AdditionalMeshInfo::Color>::type &);
+template std::vector<Vec3i> its_face_edge_ids<AdditionalMeshInfo::None>(const IndexedTriangleSetType<AdditionalMeshInfo::None>::type &, const std::vector<char> &);
+template std::vector<Vec3i> its_face_edge_ids<AdditionalMeshInfo::Color>(const IndexedTriangleSetType<AdditionalMeshInfo::Color>::type &, const std::vector<char> &);
+
+template<AdditionalMeshInfo mesh_info>
+std::vector<Vec3i> its_face_edge_ids(const typename IndexedTriangleSetType<mesh_info>::type &its)
 {
-    return its_face_edge_ids_impl(its, [](const uint32_t){ return true; }, [](){});
+    return its_face_edge_ids_impl<mesh_info>(its, [](const uint32_t){ return true; }, [](){});
 }
 
 std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, std::function<void()> throw_on_cancel_callback)
@@ -660,9 +670,10 @@ std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, std::funct
     return its_face_edge_ids_impl(its, [](const uint32_t){ return true; }, throw_on_cancel_callback);
 }
 
-std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, const std::vector<char> &face_mask)
+template<AdditionalMeshInfo mesh_info>
+std::vector<Vec3i> its_face_edge_ids(const typename IndexedTriangleSetType<mesh_info>::type &its, const std::vector<char> &face_mask)
 {
-    return its_face_edge_ids_impl(its, [&face_mask](const uint32_t idx){ return face_mask[idx]; }, [](){});
+    return its_face_edge_ids_impl<mesh_info>(its, [&face_mask](const uint32_t idx){ return face_mask[idx]; }, [](){});
 }
 
 // Having the face neighbors available, assign unique edge IDs to face edges for chaining of polygons over slices.

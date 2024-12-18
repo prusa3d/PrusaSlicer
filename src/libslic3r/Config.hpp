@@ -69,6 +69,8 @@ namespace Slic3r {
         double  value;
         bool    percent;
 
+        double get_abs_value(double ratio_over) const { return this->percent ? (ratio_over * this->value / 100) : this->value; }
+
     private:
         friend class cereal::access;
         template<class Archive> void serialize(Archive& ar) { ar(this->value); ar(this->percent); }
@@ -2265,17 +2267,18 @@ public:
     bool                                is_scalar()     const { return (int(this->type) & int(coVectorType)) == 0; }
 
     template<class Archive> ConfigOption* load_option_from_archive(Archive &archive) const {
-    	if (this->nullable) {
-		    switch (this->type) {
-            case coFloat:           { auto opt = new ConfigOptionFloatNullable();	archive(*opt); return opt; }
-            case coInt:             { auto opt = new ConfigOptionIntNullable();	    archive(*opt); return opt; }
-		    case coFloats:          { auto opt = new ConfigOptionFloatsNullable();	archive(*opt); return opt; }
-		    case coInts:            { auto opt = new ConfigOptionIntsNullable();	archive(*opt); return opt; }
-		    case coPercents:        { auto opt = new ConfigOptionPercentsNullable();archive(*opt); return opt; }
-		    case coBools:           { auto opt = new ConfigOptionBoolsNullable();	archive(*opt); return opt; }
-		    default:                throw ConfigurationError(std::string("ConfigOptionDef::load_option_from_archive(): Unknown nullable option type for option ") + this->opt_key);
-		    }
-    	} else {
+        if (this->nullable) {
+            switch (this->type) {
+            case coFloat:            { auto opt = new ConfigOptionFloatNullable();            archive(*opt); return opt; }
+            case coInt:              { auto opt = new ConfigOptionIntNullable();              archive(*opt); return opt; }
+            case coFloats:           { auto opt = new ConfigOptionFloatsNullable();           archive(*opt); return opt; }
+            case coInts:             { auto opt = new ConfigOptionIntsNullable();             archive(*opt); return opt; }
+            case coPercents:         { auto opt = new ConfigOptionPercentsNullable();         archive(*opt); return opt; }
+            case coBools:            { auto opt = new ConfigOptionBoolsNullable();            archive(*opt); return opt; }
+            case coFloatsOrPercents: { auto opt = new ConfigOptionFloatsOrPercentsNullable(); archive(*opt); return opt; }
+            default:                 throw ConfigurationError(std::string("ConfigOptionDef::load_option_from_archive(): Unknown nullable option type for option ") + this->opt_key);
+            }
+        } else {
 		    switch (this->type) {
 		    case coFloat:           { auto opt = new ConfigOptionFloat();  			archive(*opt); return opt; }
 		    case coFloats:          { auto opt = new ConfigOptionFloats(); 			archive(*opt); return opt; }
@@ -2300,16 +2303,17 @@ public:
 	}
 
     template<class Archive> ConfigOption* save_option_to_archive(Archive &archive, const ConfigOption *opt) const {
-    	if (this->nullable) {
-		    switch (this->type) {
-            case coFloat:           archive(*static_cast<const ConfigOptionFloatNullable*>(opt));  break;
-            case coInt:             archive(*static_cast<const ConfigOptionIntNullable*>(opt));  break;
-		    case coFloats:          archive(*static_cast<const ConfigOptionFloatsNullable*>(opt));  break;
-		    case coInts:            archive(*static_cast<const ConfigOptionIntsNullable*>(opt));    break;
-		    case coPercents:        archive(*static_cast<const ConfigOptionPercentsNullable*>(opt));break;
-		    case coBools:           archive(*static_cast<const ConfigOptionBoolsNullable*>(opt)); 	break;
-		    default:                throw ConfigurationError(std::string("ConfigOptionDef::save_option_to_archive(): Unknown nullable option type for option ") + this->opt_key);
-		    }
+        if (this->nullable) {
+            switch (this->type) {
+            case coFloat:            archive(*static_cast<const ConfigOptionFloatNullable*>(opt));            break;
+            case coInt:              archive(*static_cast<const ConfigOptionIntNullable*>(opt));              break;
+            case coFloats:           archive(*static_cast<const ConfigOptionFloatsNullable*>(opt));           break;
+            case coInts:             archive(*static_cast<const ConfigOptionIntsNullable*>(opt));             break;
+            case coPercents:         archive(*static_cast<const ConfigOptionPercentsNullable*>(opt));         break;
+            case coBools:            archive(*static_cast<const ConfigOptionBoolsNullable*>(opt));            break;
+            case coFloatsOrPercents: archive(*static_cast<const ConfigOptionFloatsOrPercentsNullable*>(opt)); break;
+            default:                 throw ConfigurationError(std::string("ConfigOptionDef::save_option_to_archive(): Unknown nullable option type for option ") + this->opt_key);
+            }
 		} else {
 		    switch (this->type) {
 		    case coFloat:           archive(*static_cast<const ConfigOptionFloat*>(opt));  			break;

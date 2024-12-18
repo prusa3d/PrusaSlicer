@@ -22,6 +22,8 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/log/trivial.hpp>
 
+#include "libslic3r/MultipleBeds.hpp"
+
 // #define SLAPRINT_DO_BENCHMARK
 
 #ifdef SLAPRINT_DO_BENCHMARK
@@ -297,6 +299,16 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
         update_apply_status(this->invalidate_state_by_config_options(printer_diff, invalidate_all_model_objects));
     if (! material_diff.empty())
         update_apply_status(this->invalidate_state_by_config_options(material_diff, invalidate_all_model_objects));
+
+    // Multiple beds hack: We currently use one SLAPrint for all beds. It must be invalidated
+    // when beds are switched. If not done explicitly, supports from previously sliced object
+    // might end up with wrong offset.
+    static int last_bed_idx = s_multiple_beds.get_active_bed();
+    int current_bed = s_multiple_beds.get_active_bed();
+    if (current_bed != last_bed_idx) {
+        invalidate_all_model_objects = true;
+        last_bed_idx = current_bed;
+    }
 
     // Apply variables to placeholder parser. The placeholder parser is currently used
     // only to generate the output file name.
@@ -699,6 +711,16 @@ void SLAPrint::export_print(const std::string &fname, const ThumbnailsList &thum
     else {
         throw ExportError(format(_u8L("Unknown archive format: %s"), m_printer_config.sla_archive_format.value));
     }
+}
+
+bool SLAPrint::is_prusa_print(const std::string& printer_model)
+{
+    static const std::vector<std::string> prusa_printer_models = { "SL1", "SL1S", "M1", "SLX" };
+    for (const std::string& model : prusa_printer_models)
+        if (model == printer_model)
+            return true;
+
+    return false;
 }
 
 bool SLAPrint::invalidate_step(SLAPrintStep step)

@@ -7945,7 +7945,7 @@ mz_uint mz_zip_reader_get_filename_from_extra(mz_zip_archive* pZip, mz_uint file
     while (p_nf + 4 < e) {
         mz_uint16 len = ((mz_uint16)p_nf[2]) | ((mz_uint16)p_nf[3] << 8);
         if (p_nf[0] == '\x75' && p_nf[1] == '\x70' && len >= 5 && p_nf + 4 + len < e && p_nf[4] == '\x01') {
-            mz_uint length = MZ_MIN(len - 5, extra_buf_size - 1);
+            mz_uint length = MZ_MIN((mz_uint)len - 5, extra_buf_size - 1);
             memcpy(buffer, p_nf + 9, length);
             return length;
         }

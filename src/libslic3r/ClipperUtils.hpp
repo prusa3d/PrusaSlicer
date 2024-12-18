@@ -520,6 +520,7 @@ inline Slic3r::Lines intersection_ln(const Slic3r::Line &subject, const Slic3r::
 Slic3r::Polygons union_(const Slic3r::Polygons &subject);
 Slic3r::Polygons union_(const Slic3r::ExPolygons &subject);
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const ClipperLib::PolyFillType fillType);
+Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygon &subject2);
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygons &subject2);
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::ExPolygon &subject2);
 // May be used to "heal" unusual models (3DLabPrints etc.) by providing fill_type (pftEvenOdd, pftNonZero, pftPositive, pftNegative).
@@ -537,6 +538,11 @@ ClipperLib::PolyTree union_pt(const Slic3r::Polygons &subject);
 ClipperLib::PolyTree union_pt(const Slic3r::ExPolygons &subject);
 
 Slic3r::Polygons union_pt_chained_outside_in(const Slic3r::Polygons &subject);
+
+// Perform union operation on Polygons using parallel reduction to merge Polygons one by one.
+// When many detailed Polygons overlap, performing union over all Polygons at once can be quite slow.
+// However, performing the union operation incrementally can be significantly faster in such cases.
+Slic3r::Polygons union_parallel_reduce(const Slic3r::Polygons &subject);
 
 ClipperLib::PolyNodes order_nodes(const ClipperLib::PolyNodes &nodes);
 

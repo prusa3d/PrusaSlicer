@@ -3293,7 +3293,7 @@ const ImFontGlyph* ImFont::FindGlyph(ImWchar c) const
     }
     const ImWchar i = IndexLookup.Data[c];
     if (i == (ImWchar)-1) {
-       imgui_rendered_fallback_glyph(c);
+        imgui_rendered_fallback_glyph(c);
         return FallbackGlyph;
     }
     return &Glyphs.Data[i];

@@ -470,6 +470,13 @@ void UserAccountCommunication::enqueue_printer_data_action(const std::string& uu
     }
     wakeup_session_thread();
 }
+   
+void UserAccountCommunication::request_refresh()
+{
+    m_token_timer->Stop();
+    enqueue_refresh();
+}
+
 void UserAccountCommunication::enqueue_refresh()
 {
     {
@@ -529,8 +536,7 @@ void UserAccountCommunication::on_activate_app(bool active)
 #endif
     if (active && m_next_token_refresh_at > 0 && m_next_token_refresh_at - now < refresh_threshold) {
         BOOST_LOG_TRIVIAL(info) << "Enqueue access token refresh on activation";
-        m_token_timer->Stop();
-        enqueue_refresh();
+        request_refresh();
     }
 }
 
@@ -547,9 +553,10 @@ void UserAccountCommunication::set_refresh_time(int seconds)
 {
     assert(m_token_timer);
     m_token_timer->Stop();
-    const auto prior_expiration_secs = 5 * 60;
-    int milliseconds = std::max((seconds - prior_expiration_secs) * 1000, 60000);
+    const auto prior_expiration_secs = std::max(seconds / 24, 10);
+    int milliseconds = std::max((seconds - prior_expiration_secs) * 1000, 1000);
     m_next_token_refresh_at = std::time(nullptr) + milliseconds / 1000;
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << " " << milliseconds / 1000;
     m_token_timer->StartOnce(milliseconds);
 }
 

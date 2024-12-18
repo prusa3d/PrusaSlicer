@@ -136,6 +136,7 @@ struct Http::priv
 	Http::ErrorFn errorfn;
 	Http::ProgressFn progressfn;
 	Http::IPResolveFn ipresolvefn;
+    Http::RetryFn retryfn;
 
 	priv(const std::string &url);
 	~priv();
@@ -395,6 +396,12 @@ void Http::priv::http_perform(const HttpRetryOpt& retry_opts)
     std::chrono::milliseconds delay = std::chrono::milliseconds(randomized_delay(generator));
     size_t num_retries = 0;
 	do  {
+        // break if canceled outside
+        if (retryfn && !retryfn(num_retries + 1, num_retries < retry_opts.max_retries ? delay.count() : 0)) {
+            res = CURLE_ABORTED_BY_CALLBACK;
+            cancel = true;
+            break;
+        }
 	    res = ::curl_easy_perform(curl);
 
 	    if (res == CURLE_OK)
@@ -409,6 +416,7 @@ void Http::priv::http_perform(const HttpRetryOpt& retry_opts)
                 << "), retrying in " << delay.count() / 1000.0f << " s";
             std::this_thread::sleep_for(delay);
             delay = std::min(delay * 2, retry_opts.max_delay);
+            
         }
     } while (retry);
 
@@ -456,7 +464,7 @@ Http::Http(const std::string &url) : p(new priv(url)) {}
 const HttpRetryOpt& HttpRetryOpt::default_retry()
 {
 	using namespace std::chrono_literals;
-    static HttpRetryOpt val = {500ms, 64s, 0};
+    static HttpRetryOpt val = {500ms, std::chrono::milliseconds(MAX_RETRY_DELAY_MS), MAX_RETRIES};
     return val;
 }
 
@@ -640,6 +648,12 @@ Http& Http::on_progress(ProgressFn fn)
 Http& Http::on_ip_resolve(IPResolveFn fn)
 {
 	if (p) { p->ipresolvefn = std::move(fn); }
+	return *this;
+}
+
+Http& Http::on_retry(RetryFn fn)
+{
+	if (p) { p->retryfn = std::move(fn); }
 	return *this;
 }
 

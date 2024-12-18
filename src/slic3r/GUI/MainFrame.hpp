@@ -47,6 +47,7 @@ class PreferencesDialog;
 class GalleryDialog;
 class ConnectWebViewPanel; 
 class PrinterWebViewPanel;
+class PrintablesWebViewPanel;
 
 enum QuickSlice
 {
@@ -93,15 +94,18 @@ class MainFrame : public DPIFrame
     TopBarMenus m_bar_menus;
 
     wxMenuItem* m_menu_item_reslice_now { nullptr };
+    wxMenuItem* m_menu_item_reload { nullptr };
     wxSizer*    m_main_sizer{ nullptr };
 
     size_t      m_last_selected_tab;
     Search::OptionsSearcher m_searcher;
 
-    ConnectWebViewPanel* m_connect_webview{ nullptr };
-    bool                 m_connect_webview_added{ false };
-    PrinterWebViewPanel* m_printer_webview{ nullptr };
-    bool                 m_printer_webview_added{ false };
+    ConnectWebViewPanel*    m_connect_webview{ nullptr };
+    bool                    m_connect_webview_added{ false };
+    PrintablesWebViewPanel* m_printables_webview{ nullptr };
+    bool                    m_printables_webview_added{ false };
+    PrinterWebViewPanel*    m_printer_webview{ nullptr };
+    bool                    m_printer_webview_added{ false };
 
     std::string     get_base_name(const wxString &full_name, const char *extension = nullptr) const;
     std::string     get_dir_name(const wxString &full_name) const;
@@ -124,6 +128,11 @@ class MainFrame : public DPIFrame
     bool can_delete_all() const;
     bool can_reslice() const;
 
+    void    add_connect_webview_tab();
+    void    remove_connect_webview_tab();
+    void    on_tab_change_rename_reload_item(int new_tab);
+    bool    reload_item_condition_cb();
+    void    reload_item_function_cb();
     // MenuBar items changeable in respect to printer technology 
     enum MenuItems
     {                   //   FFF                  SLA
@@ -214,17 +223,25 @@ public:
     void        add_to_recent_projects(const wxString& filename);
     void        technology_changed();
 
-    void    add_connect_webview_tab();
-    void    remove_connect_webview_tab();
+    void    on_account_login(const std::string& token);
+    void    on_account_will_refresh();
+    void    on_account_did_refresh(const std::string& token);
+    void    on_account_logout();
+    void    show_connect_tab(const wxString& url);
+    void    show_printables_tab(const std::string& url);
+
+    void    add_printables_webview_tab();
+    void    remove_printables_webview_tab();
 
     void    show_printer_webview_tab(DynamicPrintConfig* dpc);
 
     void    add_printer_webview_tab(const wxString& url);
     void    remove_printer_webview_tab();
-    void    set_printer_webview_tab_url(const wxString& url);
     bool    get_printer_webview_tab_added() const { return m_printer_webview_added; }
     void    set_printer_webview_api_key(const std::string& key);
     void    set_printer_webview_credentials(const std::string& usr, const std::string& psk);
+    bool    is_any_webview_selected();
+    void    reload_selected_webview();
 
     void    refresh_account_menu(bool avatar = false);
 

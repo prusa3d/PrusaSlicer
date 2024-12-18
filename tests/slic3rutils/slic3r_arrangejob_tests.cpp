@@ -90,14 +90,14 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
     arr2::ArrangeSettings settings;
 
     Points bedpts = get_bed_shape(cfg);
-    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts);
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts, Vec2crd{0, 0});
 
     SECTION("Single cube needs to be centered") {
         w.push(std::make_unique<ArrangeJob2>(arr2::Scene{
             arr2::SceneBuilder{}
                 .set_model(m)
                 .set_arrange_settings(&settings)
-                .set_bed(cfg)}));
+                .set_bed(cfg, Vec2crd{0, 0})}));
 
         w.process_events();
 
@@ -126,7 +126,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
         arr2::Scene   scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)
+                                     .set_bed(cfg, Vec2crd{0, 0})
                                      .set_selection(&sel)};
 
         w.push(std::make_unique<ArrangeJob2>(std::move(scene)));
@@ -160,7 +160,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
         arr2::Scene   scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)
+                                     .set_bed(cfg, Vec2crd{0, 0})
                                      .set_selection(&sel)};
 
         w.push(std::make_unique<ArrangeJob2>(std::move(scene)));
@@ -217,7 +217,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
         arr2::Scene scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)};
+                                     .set_bed(cfg, Point::new_scale(10, 10))};
 
         w.push(std::make_unique<ArrangeJob2>(std::move(scene)));
         w.process_events();
@@ -266,7 +266,7 @@ TEST_CASE("Test for modifying model during arrangement", "[arrangejob][fillbedjo
     new_volume->name = new_object->name;
 
     Points bedpts = get_bed_shape(cfg);
-    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts);
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts, Vec2crd{0, 0});
 
     BoostThreadWorker w(std::make_unique<DummyProgress>());
     RandomArrangeSettings settings;
@@ -278,7 +278,7 @@ TEST_CASE("Test for modifying model during arrangement", "[arrangejob][fillbedjo
         arr2::Scene scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)};
+                                     .set_bed(cfg, Vec2crd{0, 0})};
 
         ArrangeJob2::Callbacks cbs;
         cbs.on_prepared = [&m] (auto &) {

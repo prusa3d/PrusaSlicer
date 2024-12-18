@@ -32,9 +32,6 @@ struct PerimeterExtrusion
     size_t                             depth                      = std::numeric_limits<size_t>::max();
     PerimeterExtrusion                *nearest_external_perimeter = nullptr;
 
-    // Should this extrusion be fuzzyfied during path generation?
-    bool                               fuzzify = false;
-
     // Returns if ExtrusionLine is a contour or a hole.
     bool is_contour() const { return extrusion.is_contour(); }
 

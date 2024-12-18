@@ -427,8 +427,8 @@ public:
         if (wipe_tower_data.final_purge)
             m_final.emplace_back(*wipe_tower_data.final_purge.get());
 
-        m_angle = config.wipe_tower_rotation_angle.value / 180.0f * PI;
-        m_position = Slic3r::Vec2f(config.wipe_tower_x.value, config.wipe_tower_y.value);
+        m_angle = print.model().wipe_tower().rotation / 180.0f * PI;
+        m_position = print.model().wipe_tower().position.cast<float>();
         m_layers_count = wipe_tower_data.tool_changes.size() + (m_priming.empty() ? 0 : 1);
     }
 

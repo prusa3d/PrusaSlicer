@@ -98,6 +98,7 @@ public:
     void UnselectPopupButtons();
 
     void CreateSearch();
+    void TriggerSearch();
     void ShowFull();
     void ShowJustMode();
     void SetSettingsButtonTooltip(const wxString& tooltip);

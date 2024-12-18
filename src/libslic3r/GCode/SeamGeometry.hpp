@@ -147,12 +147,12 @@ void iterate_nested(const NestedVector &nested_vector, const std::function<void(
     });
 }
 
-void visit_near_forward(
+void visit_forward(
     const std::size_t start_index,
     const std::size_t loop_size,
     const std::function<bool(std::size_t)> &visitor
 );
-void visit_near_backward(
+void visit_backward(
     const std::size_t start_index,
     const std::size_t loop_size,
     const std::function<bool(std::size_t)> &visitor
@@ -191,6 +191,24 @@ std::pair<std::size_t, double> pick_closest_bounding_box(
 );
 
 Polygon to_polygon(const ExtrusionLoop &loop);
+
+enum class Direction1D {
+    forward,
+    backward
+};
+
+struct PointOnLine{
+    Vec2d point;
+    std::size_t line_index;
+};
+
+std::optional<PointOnLine> offset_along_lines(
+    const Vec2d &point,
+    const std::size_t loop_line_index,
+    const Linesf &loop_lines,
+    const double offset,
+    const Direction1D direction
+);
 
 } // namespace Slic3r::Seams::Geometry
 

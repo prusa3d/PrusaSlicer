@@ -59,16 +59,28 @@ struct RearestPointCalculator {
         const Vec2d prefered_position{center_x, bounding_box.max.y() + rear_y_offset};
         auto [_, line_index, point] = possible_distancer.distance_from_lines_extra<false>(prefered_position);
         const Vec2d location_at_bb{center_x, bounding_box.max.y()};
-        auto [_d, line_index_at_bb, point_at_bb] = possible_distancer.distance_from_lines_extra<false>(location_at_bb);
-        const double y_distance{point.y() - point_at_bb.y()};
+        auto [_d, line_index_at_bb, point_bb] = possible_distancer.distance_from_lines_extra<false>(location_at_bb);
+        const double y_distance{point.y() - point_bb.y()};
 
         Vec2d result{point};
         if (y_distance < 0) {
-            result = point_at_bb;
+            result = point_bb;
         } else if (y_distance <= rear_tolerance) {
             const double factor{y_distance / rear_tolerance};
-            result = factor * point +  (1 - factor) * point_at_bb;
+            result = factor * point +  (1 - factor) * point_bb;
         }
+
+        if (bounding_box.max.y() - result.y() > rear_tolerance) {
+            for (const PerimeterLine &line : possible_lines) {
+                if (line.a.y() > result.y()) {
+                    result = line.a;
+                }
+                if (line.b.y() > result.y()) {
+                    result = line.b;
+                }
+            }
+        }
+
         return SeamChoice{possible_lines[line_index].previous_index, possible_lines[line_index].next_index, result};
     }
 };

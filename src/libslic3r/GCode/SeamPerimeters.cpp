@@ -58,10 +58,7 @@ std::pair<std::vector<Vec2d>, std::vector<PointType>> remove_redundant_points(
         const std::int64_t index{std::distance(points.begin(), iterator)};
         if (next(iterator) == points.end() || point_types[index] != point_types[index + 1]) {
             std::vector<Vec2d> simplification_result;
-            douglas_peucker<double>(
-                range_start, next(iterator), std::back_inserter(simplification_result), tolerance,
-                [](const Vec2d &point) { return point; }
-            );
+            douglas_peucker(range_start, next(iterator), std::back_inserter(simplification_result), tolerance);
 
             points_result.insert(
                 points_result.end(), simplification_result.begin(), simplification_result.end()
@@ -164,7 +161,7 @@ std::vector<AngleType> merge_angle_types(
             resulting_type = smooth_angle_type;
 
             // Check if there is a sharp angle in the vicinity. If so, do not use the smooth angle.
-            Geometry::visit_near_forward(index, angle_types.size(), [&](const std::size_t forward_index) {
+            Geometry::visit_forward(index, angle_types.size(), [&](const std::size_t forward_index) {
                 const double distance{(points[forward_index] - points[index]).norm()};
                 if (distance > min_arm_length) {
                     return true;
@@ -174,7 +171,7 @@ std::vector<AngleType> merge_angle_types(
                 }
                 return false;
             });
-            Geometry::visit_near_backward(index, angle_types.size(), [&](const std::size_t backward_index) {
+            Geometry::visit_backward(index, angle_types.size(), [&](const std::size_t backward_index) {
                 const double distance{(points[backward_index] - points[index]).norm()};
                 if (distance > min_arm_length) {
                     return true;

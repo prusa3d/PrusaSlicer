@@ -18,7 +18,9 @@
 #include "libslic3r/TriangleMesh.hpp"
 
 #include <memory>
+#include <numeric>
 #include <optional>
+#include <libslic3r/TriangleMeshSlicer.hpp>
 
 namespace Slic3r::GUI {
 
@@ -139,10 +141,12 @@ void GLGizmoPainterBase::render_cursor()
         return;
 
     if (m_tool_type == ToolType::BRUSH) {
-        if (m_cursor_type == TriangleSelector::SPHERE)
+        if (m_cursor_type == TriangleSelector::CursorType::SPHERE)
             render_cursor_sphere(trafo_matrices[m_rr.mesh_id]);
-        else if (m_cursor_type == TriangleSelector::CIRCLE)
+        else if (m_cursor_type == TriangleSelector::CursorType::CIRCLE)
             render_cursor_circle();
+    } else if (m_tool_type == ToolType::HEIGHT_RANGE) {
+        render_cursor_height_range(trafo_matrices[m_rr.mesh_id]);
     }
 }
 
@@ -270,7 +274,6 @@ void GLGizmoPainterBase::render_cursor_circle()
     glsafe(::glEnable(GL_DEPTH_TEST));
 }
 
-
 void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 {
     if (s_sphere == nullptr) {
@@ -314,6 +317,78 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     shader->stop_using();
 }
 
+void GLGizmoPainterBase::render_cursor_height_range(const Transform3d &trafo) const {
+    const ModelObject   &model_object   = *m_c->selection_info()->model_object();
+    const Vec3f          mesh_hit_world = (trafo * m_rr.hit.cast<double>()).cast<float>();
+
+    const std::array<float, 2> z_range = {mesh_hit_world.z() - m_height_range_z_range / 2.f,
+                                          mesh_hit_world.z() + m_height_range_z_range / 2.f};
+
+    struct SlicedPolygonsAtZ
+    {
+        float    z;
+        Polygons polygons;
+    };
+
+    std::vector<SlicedPolygonsAtZ> sliced_polygons_per_z;
+    for (const float z: z_range) {
+        sliced_polygons_per_z.push_back({z, slice_mesh(model_object.volumes[m_rr.mesh_id]->mesh().its, z, MeshSlicingParams(trafo))});
+    }
+
+    const size_t max_vertices_cnt = std::accumulate(sliced_polygons_per_z.cbegin(), sliced_polygons_per_z.cend(), 0,
+                                                    [](const size_t sum, const SlicedPolygonsAtZ &polygons_at_z) {
+                                                        return sum + count_points(polygons_at_z.polygons);
+                                                    });
+
+    GLModel::Geometry z_range_geometry;
+    z_range_geometry.format = {GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3};
+    z_range_geometry.reserve_vertices(max_vertices_cnt);
+    z_range_geometry.reserve_indices(max_vertices_cnt);
+    z_range_geometry.color = ColorRGBA::WHITE();
+
+    size_t vertices_cnt = 0;
+    for (const SlicedPolygonsAtZ &polygons_at_z : sliced_polygons_per_z) {
+        for (const Polygon &polygon: polygons_at_z.polygons) {
+            for (const Point &pt: polygon.points)
+                z_range_geometry.add_vertex(Vec3f(unscaled<float>(pt.x()), unscaled<float>(pt.y()), polygons_at_z.z));
+
+            for (size_t pt_idx = 1; pt_idx < polygon.points.size(); ++pt_idx)
+                z_range_geometry.add_line(vertices_cnt + pt_idx - 1, vertices_cnt + pt_idx);
+
+            z_range_geometry.add_line(vertices_cnt + polygon.points.size() - 1, vertices_cnt);
+
+            vertices_cnt += polygon.points.size();
+        }
+    }
+
+    GLModel z_range_model;
+    if (!z_range_geometry.is_empty())
+        z_range_model.init_from(std::move(z_range_geometry));
+
+    const Camera     &camera            = wxGetApp().plater()->get_camera();
+    const Transform3d view_model_matrix = camera.get_view_matrix();
+
+    GLShaderProgram *shader = wxGetApp().get_shader("mm_contour");
+    if (shader == nullptr)
+        return;
+
+    shader->start_using();
+    shader->set_uniform("offset", OpenGLManager::get_gl_info().is_mesa() ? 0.0005 : 0.00001);
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    ScopeGuard guard([shader]() { if (shader) shader->stop_using(); });
+
+    const bool is_left_handed = Geometry::Transformation(view_model_matrix).is_left_handed();
+    if (is_left_handed)
+        glsafe(::glFrontFace(GL_CW));
+
+    z_range_model.render();
+
+    if (is_left_handed)
+        glsafe(::glFrontFace(GL_CCW));
+
+    shader->stop_using();
+}
 
 bool GLGizmoPainterBase::is_mesh_point_clipped(const Vec3d& point, const Transform3d& trafo) const
 {
@@ -453,37 +528,53 @@ std::vector<std::vector<GLGizmoPainterBase::ProjectedMousePosition>> GLGizmoPain
 // concludes that the event was not intended for it, it should return false.
 bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
-    if (action == SLAGizmoEventType::MouseWheelUp
-     || action == SLAGizmoEventType::MouseWheelDown) {
-        if (control_down) {
+    if (action == SLAGizmoEventType::MouseWheelUp || action == SLAGizmoEventType::MouseWheelDown) {
+        // On Windows Right ALT could be reported as Left ALT + Control.
+        // In such cases, we want to prioritize ALT over Control.
+        if (!alt_down && control_down) {
             double pos = m_c->object_clipper()->get_position();
             pos = action == SLAGizmoEventType::MouseWheelDown
                       ? std::max(0., pos - 0.01)
                       : std::min(1., pos + 0.01);
             m_c->object_clipper()->set_position_by_ratio(pos, true);
             return true;
-        }
-        else if (alt_down) {
+        } else if (alt_down) {
             if (m_tool_type == ToolType::BRUSH && (m_cursor_type == TriangleSelector::CursorType::SPHERE || m_cursor_type == TriangleSelector::CursorType::CIRCLE)) {
                 m_cursor_radius = action == SLAGizmoEventType::MouseWheelDown ? std::max(m_cursor_radius - this->get_cursor_radius_step(), this->get_cursor_radius_min())
                                                                               : std::min(m_cursor_radius + this->get_cursor_radius_step(), this->get_cursor_radius_max());
                 m_parent.set_as_dirty();
                 return true;
-            } else if (m_tool_type == ToolType::SMART_FILL) {
-                m_smart_fill_angle = action == SLAGizmoEventType::MouseWheelDown ? std::max(m_smart_fill_angle - SmartFillAngleStep, SmartFillAngleMin)
-                                                                                : std::min(m_smart_fill_angle + SmartFillAngleStep, SmartFillAngleMax);
+            } else if (m_tool_type == ToolType::SMART_FILL || m_tool_type == ToolType::BUCKET_FILL) {
+                float &fill_angle = (m_tool_type == ToolType::SMART_FILL) ? m_smart_fill_angle : m_bucket_fill_angle;
+                fill_angle        = (action == SLAGizmoEventType::MouseWheelDown) ? std::max(fill_angle - SmartFillAngleStep, SmartFillAngleMin)
+                                                                                  : std::min(fill_angle + SmartFillAngleStep, SmartFillAngleMax);
+
                 m_parent.set_as_dirty();
                 if (m_rr.mesh_id != -1) {
-                    const Selection     &selection                 = m_parent.get_selection();
-                    const ModelObject   *mo                        = m_c->selection_info()->model_object();
-                    const ModelInstance *mi                        = mo->instances[selection.get_instance_idx()];
-                    const Transform3d   trafo_matrix_not_translate = mi->get_transformation().get_matrix_no_offset() * mo->volumes[m_rr.mesh_id]->get_matrix_no_offset();
-                    const Transform3d   trafo_matrix = mi->get_transformation().get_matrix() * mo->volumes[m_rr.mesh_id]->get_matrix();
-                    m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), trafo_matrix_not_translate, this->get_clipping_plane_in_volume_coordinates(trafo_matrix), m_smart_fill_angle,
-                                                                                   m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f, true);
+                    const Selection                       &selection      = m_parent.get_selection();
+                    const ModelObject                     *mo             = m_c->selection_info()->model_object();
+                    const ModelInstance                   *mi             = mo->instances[selection.get_instance_idx()];
+                    const Transform3d                      trafo_matrix   = mi->get_transformation().get_matrix() * mo->volumes[m_rr.mesh_id]->get_matrix();
+                    const TriangleSelector::ClippingPlane &clipping_plane = this->get_clipping_plane_in_volume_coordinates(trafo_matrix);
+
+                    if (m_tool_type == ToolType::SMART_FILL) {
+                        const Transform3d trafo_matrix_not_translate = mi->get_transformation().get_matrix_no_offset() * mo->volumes[m_rr.mesh_id]->get_matrix_no_offset();
+                        m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), trafo_matrix_not_translate, clipping_plane, m_smart_fill_angle, SmartFillGapArea,
+                                                                                       m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f, TriangleSelector::ForceReselection::YES);
+                    } else {
+                        assert(m_tool_type == ToolType::BUCKET_FILL);
+                        m_triangle_selectors[m_rr.mesh_id]->bucket_fill_select_triangles(m_rr.hit, int(m_rr.facet), clipping_plane, m_bucket_fill_angle, BucketFillGapArea,
+                                                                                         TriangleSelector::BucketFillPropagate::YES, TriangleSelector::ForceReselection::YES);
+                    }
+
                     m_triangle_selectors[m_rr.mesh_id]->request_update_render_data();
                     m_seed_fill_last_mesh_id = m_rr.mesh_id;
                 }
+                return true;
+            } else if (m_tool_type == ToolType::HEIGHT_RANGE) {
+                m_height_range_z_range = action == SLAGizmoEventType::MouseWheelDown ? std::max(m_height_range_z_range - HeightRangeZRangeStep, HeightRangeZRangeMin)
+                                                                                     : std::min(m_height_range_z_range + HeightRangeZRangeStep, HeightRangeZRangeMax);
+                m_parent.set_as_dirty();
                 return true;
             }
 
@@ -556,18 +647,21 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
             assert(mesh_idx < int(m_triangle_selectors.size()));
             const TriangleSelector::ClippingPlane &clp = this->get_clipping_plane_in_volume_coordinates(trafo_matrix);
             if (m_tool_type == ToolType::SMART_FILL || m_tool_type == ToolType::BUCKET_FILL || (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER)) {
-                for(const ProjectedMousePosition &projected_mouse_position : projected_mouse_positions) {
+                for (const ProjectedMousePosition &projected_mouse_position: projected_mouse_positions) {
                     assert(projected_mouse_position.mesh_idx == mesh_idx);
-                    const Vec3f mesh_hit = projected_mouse_position.mesh_hit;
-                    const int facet_idx = int(projected_mouse_position.facet_idx);
+                    const Vec3f mesh_hit  = projected_mouse_position.mesh_hit;
+                    const int   facet_idx = int(projected_mouse_position.facet_idx);
+
                     m_triangle_selectors[mesh_idx]->seed_fill_apply_on_triangles(new_state);
-                    if (m_tool_type == ToolType::SMART_FILL)
-                        m_triangle_selectors[mesh_idx]->seed_fill_select_triangles(mesh_hit, facet_idx, trafo_matrix_not_translate, clp, m_smart_fill_angle,
-                                                                                       m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f, true);
-                    else if (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER)
-                        m_triangle_selectors[mesh_idx]->bucket_fill_select_triangles(mesh_hit, facet_idx, clp, false, true);
-                    else if (m_tool_type == ToolType::BUCKET_FILL)
-                        m_triangle_selectors[mesh_idx]->bucket_fill_select_triangles(mesh_hit, facet_idx, clp, true, true);
+
+                    if (m_tool_type == ToolType::SMART_FILL) {
+                        m_triangle_selectors[mesh_idx]->seed_fill_select_triangles(mesh_hit, facet_idx, trafo_matrix_not_translate, clp, m_smart_fill_angle, SmartFillGapArea,
+                                                                                   (m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f), TriangleSelector::ForceReselection::YES);
+                    } else if (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER) {
+                        m_triangle_selectors[mesh_idx]->bucket_fill_select_triangles(mesh_hit, facet_idx, clp, m_bucket_fill_angle, BucketFillGapArea, TriangleSelector::BucketFillPropagate::NO, TriangleSelector::ForceReselection::YES);
+                    } else if (m_tool_type == ToolType::BUCKET_FILL) {
+                        m_triangle_selectors[mesh_idx]->bucket_fill_select_triangles(mesh_hit, facet_idx, clp, m_bucket_fill_angle, BucketFillGapArea, TriangleSelector::BucketFillPropagate::YES, TriangleSelector::ForceReselection::YES);
+                    }
 
                     m_seed_fill_last_mesh_id = -1;
                 }
@@ -587,6 +681,16 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
                         std::unique_ptr<TriangleSelector::Cursor> cursor = TriangleSelector::DoublePointCursor::cursor_factory(first_position_it->mesh_hit, second_position_it->mesh_hit, camera_pos, m_cursor_radius, m_cursor_type, trafo_matrix, clp);
                         m_triangle_selectors[mesh_idx]->select_patch(int(first_position_it->facet_idx), std::move(cursor), new_state, trafo_matrix_not_translate, m_triangle_splitting_enabled, m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f);
                     }
+                }
+            } else if (m_tool_type == ToolType::HEIGHT_RANGE) {
+                for (const ProjectedMousePosition &projected_mouse_position: projected_mouse_positions) {
+                    const Vec3f         &mesh_hit  = projected_mouse_position.mesh_hit;
+                    const int            facet_idx = int(projected_mouse_position.facet_idx);
+                    const BoundingBoxf3  mesh_bbox = mo->volumes[projected_mouse_position.mesh_idx]->mesh().bounding_box();
+
+                    std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::HeightRange>(mesh_hit, mesh_bbox, m_height_range_z_range, trafo_matrix, clp);
+                    m_triangle_selectors[mesh_idx]->select_patch(facet_idx, std::move(cursor), new_state, trafo_matrix_not_translate,
+                                                                 m_triangle_splitting_enabled, m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f);
                 }
             }
 
@@ -646,12 +750,12 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         assert(m_rr.mesh_id < int(m_triangle_selectors.size()));
         const TriangleSelector::ClippingPlane &clp = this->get_clipping_plane_in_volume_coordinates(trafo_matrix);
         if (m_tool_type == ToolType::SMART_FILL)
-            m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), trafo_matrix_not_translate, clp, m_smart_fill_angle,
+            m_triangle_selectors[m_rr.mesh_id]->seed_fill_select_triangles(m_rr.hit, int(m_rr.facet), trafo_matrix_not_translate, clp, m_smart_fill_angle, SmartFillGapArea,
                                                                            m_paint_on_overhangs_only ? m_highlight_by_angle_threshold_deg : 0.f);
         else if (m_tool_type == ToolType::BRUSH && m_cursor_type == TriangleSelector::CursorType::POINTER)
-            m_triangle_selectors[m_rr.mesh_id]->bucket_fill_select_triangles(m_rr.hit, int(m_rr.facet), clp, false);
+            m_triangle_selectors[m_rr.mesh_id]->bucket_fill_select_triangles(m_rr.hit, int(m_rr.facet), clp, m_bucket_fill_angle, BucketFillGapArea, TriangleSelector::BucketFillPropagate::NO);
         else if (m_tool_type == ToolType::BUCKET_FILL)
-            m_triangle_selectors[m_rr.mesh_id]->bucket_fill_select_triangles(m_rr.hit, int(m_rr.facet), clp, true);
+            m_triangle_selectors[m_rr.mesh_id]->bucket_fill_select_triangles(m_rr.hit, int(m_rr.facet), clp, m_bucket_fill_angle, BucketFillGapArea, TriangleSelector::BucketFillPropagate::YES);
         m_triangle_selectors[m_rr.mesh_id]->request_update_render_data();
         m_seed_fill_last_mesh_id = m_rr.mesh_id;
         return true;
@@ -760,13 +864,9 @@ void GLGizmoPainterBase::update_raycast_cache(const Vec2d& mouse_position,
     for (int mesh_id = 0; mesh_id < int(trafo_matrices.size()); ++mesh_id) {
 
         if (m_c->raycaster()->raycasters()[mesh_id]->unproject_on_mesh(
-                   mouse_position,
-                   trafo_matrices[mesh_id],
-                   camera,
-                   hit,
-                   normal,
-                   m_c->object_clipper()->get_clipping_plane(),
-                   &facet))
+                mouse_position, trafo_matrices[mesh_id], camera, hit, normal,
+                m_c->object_clipper()->get_clipping_plane(), &facet, false
+            ))
         {
             // In case this hit is clipped, skip it.
             if (is_mesh_point_clipped(hit.cast<double>(), trafo_matrices[mesh_id]))

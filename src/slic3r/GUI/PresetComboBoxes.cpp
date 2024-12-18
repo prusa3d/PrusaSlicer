@@ -216,20 +216,28 @@ void PresetComboBox::update_selection()
 // A workaround for a set of issues related to text fitting into gtk widgets:
 // See e.g.: https://github.com/prusa3d/PrusaSlicer/issues/4584
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
-    GList* cells = gtk_cell_layout_get_cells(GTK_CELL_LAYOUT(m_widget));
-
-    // 'cells' contains the GtkCellRendererPixBuf for the icon,
-    // 'cells->next' contains GtkCellRendererText for the text we need to ellipsize
-    if (!cells || !cells->next) return;
-
-    auto cell = static_cast<GtkCellRendererText *>(cells->next->data);
-
-    if (!cell) return;
-
-    g_object_set(G_OBJECT(cell), "ellipsize", PANGO_ELLIPSIZE_END, (char*)NULL);
-
-    // Only the list of cells must be freed, the renderer isn't ours to free
-    g_list_free(cells);
+    GtkWidget* widget = m_widget;
+    if (GTK_IS_CONTAINER(widget)) {
+        GList* children = gtk_container_get_children(GTK_CONTAINER(widget));
+        if (children) {
+            widget = GTK_WIDGET(children->data);
+            g_list_free(children);
+        }
+    }
+    if (GTK_IS_ENTRY(widget)) {
+        // Set ellipsization for the entry
+        gtk_entry_set_width_chars(GTK_ENTRY(widget), 20);  // Adjust this value as needed
+        gtk_entry_set_max_width_chars(GTK_ENTRY(widget), 20);  // Adjust this value as needed
+        // Create a PangoLayout for the entry and set ellipsization
+        PangoLayout* layout = gtk_entry_get_layout(GTK_ENTRY(widget));
+        if (layout) {
+            pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
+        } else {
+            g_warning("Unable to get PangoLayout from GtkEntry");
+        }
+    } else {
+        g_warning("Expected GtkEntry, but got %s", G_OBJECT_TYPE_NAME(widget));
+    }
 #endif
 }
 
@@ -971,20 +979,9 @@ static std::string get_connect_state_suffix_for_printer(const Preset& printer_pr
         
         for (const auto& [printer_model_nozzle_pair, states] : printer_state_map) {
             std::string printer_model = printer_preset.config.opt_string("printer_model");
-            std::string vendor_repo_prefix;
-            if (printer_preset.vendor) {
-                vendor_repo_prefix = printer_preset.vendor->repo_prefix;
-            } else if (std::string inherits = printer_preset.inherits(); !inherits.empty()) {
-                const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
-                if (parent && parent->vendor) {
-                    vendor_repo_prefix = parent->vendor->repo_prefix;
-                }
-            }
-            if (printer_model.find(vendor_repo_prefix) == 0) {
-                printer_model = printer_model.substr(vendor_repo_prefix.size());
-                boost::trim_left(printer_model);
-            }
-
+            const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(printer_preset);
+            printer_model = printer_preset.trim_vendor_repo_prefix(printer_model, printer_with_vendor.vendor);
+            
             if (printer_preset.config.has("nozzle_diameter")) {
                 double nozzle_diameter = static_cast<const ConfigOptionFloats*>(printer_preset.config.option("nozzle_diameter"))->values[0];
                 wxString nozzle_diameter_serialized = double_to_string(nozzle_diameter);
@@ -1035,19 +1032,8 @@ static bool fill_data_to_connect_info_line(  const Preset& printer_preset,
         for (const auto& [printer_model_nozzle_pair, states] : printer_state_map) {
             // get printer_model without repo prefix
             std::string printer_model = printer_preset.config.opt_string("printer_model");
-            std::string vendor_repo_prefix;
-            if (printer_preset.vendor) {
-                vendor_repo_prefix = printer_preset.vendor->repo_prefix;
-            } else if (std::string inherits = printer_preset.inherits(); !inherits.empty()) {
-                const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
-                if (parent && parent->vendor) {
-                    vendor_repo_prefix = parent->vendor->repo_prefix;
-                }
-            }
-            if (printer_model.find(vendor_repo_prefix) == 0) {
-                printer_model = printer_model.substr(vendor_repo_prefix.size());
-                boost::trim_left(printer_model);
-            }
+            const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(printer_preset);
+            printer_model = printer_preset.trim_vendor_repo_prefix(printer_model, printer_with_vendor.vendor);
 
             if (printer_preset.config.has("nozzle_diameter")) {
                 double nozzle_diameter = static_cast<const ConfigOptionFloats*>(printer_preset.config.option("nozzle_diameter"))->values[0];

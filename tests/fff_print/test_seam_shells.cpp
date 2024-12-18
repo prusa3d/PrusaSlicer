@@ -10,8 +10,6 @@
 using namespace Slic3r;
 using namespace Slic3r::Seams;
 
-constexpr bool debug_files{false};
-
 struct ProjectionFixture
 {
     Polygon extrusion_path{

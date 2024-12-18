@@ -208,6 +208,12 @@ namespace ImGui
     const wchar_t RemoveTick               = 0x280F;
     const wchar_t RemoveTickHovered        = 0x2810;
 
+    // icon for multiple beds
+    const wchar_t SliceAllBtnIcon          = 0x2811;
+    const wchar_t PrintIdle                = 0x2812;
+    const wchar_t PrintRunning             = 0x2813;
+    const wchar_t PrintFinished            = 0x2814;
+    const wchar_t WarningMarkerDisabled    = 0x2815;
     //    void MyFunction(const char* name, const MyMatrix44& v);
 }
 

@@ -150,8 +150,6 @@ using SpanOfConstPtrs           = tcb::span<const T* const>;
 using LayerPtrs                 = std::vector<Layer*>;
 using SupportLayerPtrs          = std::vector<SupportLayer*>;
 
-class BoundingBoxf3;        // TODO: for temporary constructor parameter
-
 // Single instance of a PrintObject.
 // As multiple PrintObjects may be generated for a single ModelObject (their instances differ in rotation around Z),
 // ModelObject's instancess will be distributed among these multiple PrintObjects.
@@ -204,6 +202,22 @@ public:
         PrintRegion     *region { nullptr };
     };
 
+    struct LayerRangeRegions;
+
+    struct FuzzySkinPaintedRegion
+    {
+        enum class ParentType { VolumeRegion, PaintedRegion };
+
+        ParentType   parent_type { ParentType::VolumeRegion };
+        // Index of a parent VolumeRegion or PaintedRegion.
+        int          parent { -1 };
+        // Pointer to PrintObjectRegions::all_regions.
+        PrintRegion *region { nullptr };
+
+        PrintRegion *parent_print_object_region(const LayerRangeRegions &layer_range) const;
+        int          parent_print_object_region_id(const LayerRangeRegions &layer_range) const;
+    };
+
     // One slice over the PrintObject (possibly the whole PrintObject) and a list of ModelVolumes and their bounding boxes
     // possibly clipped by the layer_height_range.
     struct LayerRangeRegions
@@ -216,8 +230,9 @@ public:
         std::vector<VolumeExtents>  volumes;
 
         // Sorted in the order of their source ModelVolumes, thus reflecting the order of region clipping, modifier overrides etc.
-        std::vector<VolumeRegion>   volume_regions;
-        std::vector<PaintedRegion>  painted_regions;
+        std::vector<VolumeRegion>           volume_regions;
+        std::vector<PaintedRegion>          painted_regions;
+        std::vector<FuzzySkinPaintedRegion> fuzzy_skin_painted_regions;
 
         bool has_volume(const ObjectID id) const {
             auto it = lower_bound_by_predicate(this->volumes.begin(), this->volumes.end(), [id](const VolumeExtents &l) { return l.volume_id < id; });
@@ -340,6 +355,8 @@ public:
     bool                        has_support_material()  const { return this->has_support() || this->has_raft(); }
     // Checks if the model object is painted using the multi-material painting gizmo.
     bool                        is_mm_painted()         const { return this->model_object()->is_mm_painted(); }
+    // Checks if the model object is painted using the fuzzy skin painting gizmo.
+    bool                        is_fuzzy_skin_painted() const { return this->model_object()->is_fuzzy_skin_painted(); }
 
     // returns 0-based indices of extruders used to print the object (without brim, support and other helper extrusions)
     std::vector<unsigned int>   object_extruders() const;
@@ -503,6 +520,8 @@ bool is_toolchange_required(
 struct PrintStatistics
 {
     PrintStatistics() { clear(); }
+    float                           normal_print_time_seconds;
+    float                           silent_print_time_seconds;
     std::string                     estimated_normal_print_time;
     std::string                     estimated_silent_print_time;
     double                          total_used_filament;

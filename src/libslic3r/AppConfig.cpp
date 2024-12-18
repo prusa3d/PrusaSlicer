@@ -63,9 +63,6 @@ void AppConfig::reset()
 void AppConfig::set_defaults()
 {
     if (m_mode == EAppMode::Editor) {
-        // Reset the empty fields to defaults.
-        if (get("autocenter").empty())
-            set("autocenter", "0");
         // Disable background processing by default as it is not stable.
         if (get("background_processing").empty())
             set("background_processing", "0");

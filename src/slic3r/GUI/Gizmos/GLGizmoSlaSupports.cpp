@@ -103,6 +103,13 @@ void GLGizmoSlaSupports::data_changed(bool is_serializing)
 
 void GLGizmoSlaSupports::on_render()
 {
+    if (! selected_print_object_exists(m_parent, wxEmptyString)) {
+        wxGetApp().CallAfter([this]() {
+            // Close current gizmo.
+            m_parent.get_gizmos_manager().open_gizmo(m_parent.get_gizmos_manager().get_current_type());
+        });
+    }
+
     if (m_state == On) {
         // This gizmo is showing the object elevated. Tell the common
         // SelectionInfo object to lie about the actual shift.
@@ -843,6 +850,13 @@ bool GLGizmoSlaSupports::ask_about_changes(std::function<void()> on_yes, std::fu
 void GLGizmoSlaSupports::on_set_state()
 {
     if (m_state == On) { // the gizmo was just turned on
+        
+        // Make sure that current object is on current bed. Refuse to turn on otherwise.
+        if (! selected_print_object_exists(m_parent, _L("Selected object has to be on the active bed."))) {
+            m_state = Off;
+            return;
+        }
+        
         // Set default head diameter from config.
         const DynamicPrintConfig& cfg = wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
         m_new_point_head_diameter = static_cast<const ConfigOptionFloat*>(cfg.option("support_head_front_diameter"))->value;

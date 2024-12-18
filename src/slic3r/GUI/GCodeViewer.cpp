@@ -31,6 +31,8 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "MsgDialog.hpp"
 
+#include "libslic3r/MultipleBeds.hpp"
+
 #if ENABLE_ACTUAL_SPEED_DEBUG
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif // ENABLE_ACTUAL_SPEED_DEBUG
@@ -86,7 +88,10 @@ void GCodeViewer::COG::render()
         const double inv_zoom = camera.get_inv_zoom();
         model_matrix = model_matrix * Geometry::scale_transform(inv_zoom);
     }
-    const Transform3d& view_matrix = camera.get_view_matrix();
+    
+    Transform3d view_matrix = camera.get_view_matrix();
+    view_matrix.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+
     shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
@@ -233,7 +238,10 @@ void GCodeViewer::SequentialView::Marker::render()
     shader->start_using();
     shader->set_uniform("emission_factor", 0.0f);
     const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d& view_matrix = camera.get_view_matrix();
+    
+    Transform3d view_matrix = camera.get_view_matrix();
+    view_matrix.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+
     float scale_factor = m_scale_factor;
     if (m_fixed_screen_size)
         scale_factor *= 10.0f * camera.get_inv_zoom();
@@ -862,7 +870,7 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
         m_viewer.toggle_top_layer_only_view_range();
 
     // avoid processing if called with the same gcode_result
-    if (m_last_result_id == gcode_result.id && wxGetApp().is_editor()) {
+    if (m_last_result_id == gcode_result.id && ! s_beds_switched_since_last_gcode_load && wxGetApp().is_editor() && ! s_reload_preview_after_switching_beds) {
         // collect tool colors
         libvgcode::Palette tools_colors;
         tools_colors.reserve(str_tool_colors.size());
@@ -882,6 +890,7 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
     }
 
     m_last_result_id = gcode_result.id;
+    s_beds_switched_since_last_gcode_load = false;
 
     // release gpu memory, if used
     reset();
@@ -1014,8 +1023,12 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
         });
     m_paths_bounding_box = BoundingBoxf3(libvgcode::convert(bbox[0]).cast<double>(), libvgcode::convert(bbox[1]).cast<double>());
 
-    if (wxGetApp().is_editor())
+    if (wxGetApp().is_editor()) {
         m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(gcode_result, m_paths_bounding_box);
+        if (!m_contained_in_bed) {
+            s_print_statuses[s_multiple_beds.get_active_bed()] = PrintStatus::toolpath_outside;
+        }
+    }
 
     m_extruders_count = gcode_result.extruders_count;
     m_sequential_view.gcode_window.load_gcode(gcode_result);
@@ -1107,6 +1120,9 @@ void GCodeViewer::load_as_preview(libvgcode::GCodeInputData&& data)
     const libvgcode::AABox bbox = m_viewer.get_extrusion_bounding_box();
     const BoundingBoxf3 paths_bounding_box(libvgcode::convert(bbox[0]).cast<double>(), libvgcode::convert(bbox[1]).cast<double>());
     m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(GCodeProcessorResult(), paths_bounding_box);
+    if (!m_contained_in_bed) {
+        s_print_statuses[s_multiple_beds.get_active_bed()] = PrintStatus::toolpath_outside;
+    }
 }
 
 void GCodeViewer::update_shells_color_by_extruder(const DynamicPrintConfig* config)
@@ -1690,9 +1706,9 @@ void GCodeViewer::load_wipetower_shell(const Print& print)
             const std::vector<std::pair<float, float>> z_and_depth_pairs = print.wipe_tower_data(extruders_count).z_and_depth_pairs;
             const float brim_width = wipe_tower_data.brim_width;
             if (depth != 0.) {
-                m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, z_and_depth_pairs,
-                    max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle, false, brim_width);
-                GLVolume* volume = m_shells.volumes.volumes.back();
+                GLVolume* volume{m_shells.volumes.load_wipe_tower_preview(wxGetApp().plater()->model().wipe_tower().position.x(), wxGetApp().plater()->model().wipe_tower().position.y(), config.wipe_tower_width, depth, z_and_depth_pairs,
+                    max_z, config.wipe_tower_cone_angle, wxGetApp().plater()->model().wipe_tower().rotation, false, brim_width, 0)};
+                m_shells.volumes.volumes.emplace_back(volume);
                 volume->color.a(0.25f);
                 volume->force_native_color = true;
                 volume->set_render_color(true);
@@ -1706,7 +1722,12 @@ void GCodeViewer::load_wipetower_shell(const Print& print)
 void GCodeViewer::render_toolpaths()
 {
     const Camera& camera = wxGetApp().plater()->get_camera();
-    const libvgcode::Mat4x4 converted_view_matrix = libvgcode::convert(static_cast<Matrix4f>(camera.get_view_matrix().matrix().cast<float>()));
+
+    Transform3d tr = camera.get_view_matrix();
+    tr.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+    Matrix4f m = tr.matrix().cast<float>();
+
+    const libvgcode::Mat4x4 converted_view_matrix = libvgcode::convert(m);
     const libvgcode::Mat4x4 converted_projetion_matrix = libvgcode::convert(static_cast<Matrix4f>(camera.get_projection_matrix().matrix().cast<float>()));
 #if VGCODE_ENABLE_COG_AND_TOOL_MARKERS
     m_viewer.set_cog_marker_scale_factor(m_cog_marker_fixed_screen_size ? 10.0f * m_cog_marker_size * camera.get_inv_zoom() : m_cog_marker_size);
@@ -1896,7 +1917,11 @@ void GCodeViewer::render_shells()
     shader->start_using();
     shader->set_uniform("emission_factor", 0.1f);
     const Camera& camera = wxGetApp().plater()->get_camera();
-    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
+
+    Transform3d tr = camera.get_view_matrix();
+    tr.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+
+    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, tr, camera.get_projection_matrix());
     shader->set_uniform("emission_factor", 0.0f);
     shader->stop_using();
 }

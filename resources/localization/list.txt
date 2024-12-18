@@ -78,16 +78,15 @@ src/slic3r/GUI/GUI_ObjectSettings.cpp
 src/slic3r/GUI/GUI_Preview.cpp
 src/slic3r/GUI/HintNotification.cpp
 src/slic3r/GUI/ImGuiWrapper.cpp
-src/slic3r/GUI/Jobs/ArrangeJob.cpp
 src/slic3r/GUI/Jobs/ArrangeJob2.cpp
 src/slic3r/GUI/Jobs/EmbossJob.cpp
-src/slic3r/GUI/Jobs/FillBedJob.cpp
 src/slic3r/GUI/Jobs/PlaterWorker.hpp
 src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
 src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
 src/slic3r/GUI/Jobs/SLAImportDialog.hpp
 src/slic3r/GUI/Jobs/SLAImportJob.cpp
 src/slic3r/GUI/KBShortcutsDialog.cpp
+src/slic3r/GUI/BulkExportDialog.cpp
 src/slic3r/GUI/LoginDialog.cpp
 src/slic3r/GUI/MainFrame.cpp
 src/slic3r/GUI/Mouse3DController.cpp
@@ -139,3 +138,4 @@ src/slic3r/Utils/PresetUpdater.cpp
 src/slic3r/Utils/Process.cpp
 src/slic3r/Utils/PrusaConnect.cpp
 src/slic3r/Utils/Repetier.cpp
+src/slic3r/Utils/PresetUpdaterWrapper.cpp

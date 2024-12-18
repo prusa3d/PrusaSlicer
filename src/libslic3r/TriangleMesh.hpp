@@ -39,6 +39,30 @@ namespace Slic3r {
 class TriangleMesh;
 class TriangleMeshSlicer;
 
+struct indexed_triangle_set_with_color
+{
+    std::vector<stl_triangle_vertex_indices> indices;
+    std::vector<stl_vertex>                  vertices;
+    std::vector<uint8_t>                     colors;
+};
+
+enum class AdditionalMeshInfo {
+    None,
+    Color
+};
+
+template<AdditionalMeshInfo mesh_info> struct IndexedTriangleSetType;
+
+template<> struct IndexedTriangleSetType<AdditionalMeshInfo::None>
+{
+    using type = indexed_triangle_set;
+};
+
+template<> struct IndexedTriangleSetType<AdditionalMeshInfo::Color>
+{
+    using type = indexed_triangle_set_with_color;
+};
+
 struct RepairedMeshErrors {
     // How many edges were united by merging their end points with some other end points in epsilon neighborhood?
     int           edges_fixed               = 0;
@@ -210,9 +234,14 @@ private:
 // Map from a face edge to a unique edge identifier or -1 if no neighbor exists.
 // Two neighbor faces share a unique edge identifier even if they are flipped.
 // Used for chaining slice lines into polygons.
-std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its);
+template<AdditionalMeshInfo mesh_info = AdditionalMeshInfo::None>
+std::vector<Vec3i> its_face_edge_ids(const typename IndexedTriangleSetType<mesh_info>::type &its);
+
 std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, std::function<void()> throw_on_cancel_callback);
-std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, const std::vector<char> &face_mask);
+
+template<AdditionalMeshInfo mesh_info = AdditionalMeshInfo::None>
+std::vector<Vec3i> its_face_edge_ids(const typename IndexedTriangleSetType<mesh_info>::type &its, const std::vector<char> &face_mask);
+
 // Having the face neighbors available, assign unique edge IDs to face edges for chaining of polygons over slices.
 std::vector<Vec3i> its_face_edge_ids(const indexed_triangle_set &its, std::vector<Vec3i> &face_neighbors, bool assign_unbound_edges = false, int *num_edges = nullptr);
 
@@ -394,7 +423,7 @@ inline BoundingBoxf3 bounding_box(const indexed_triangle_set& its, const Transfo
     return {bmin.cast<double>(), bmax.cast<double>()};
 }
 
-}
+} // namespace Slic3r
 
 // Serialization through the Cereal library
 #include <cereal/access.hpp>

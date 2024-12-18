@@ -74,7 +74,7 @@ template<class Img> bool decode_png(const ReadBuf &in_buf, Img &out_img)
 
 // TODO: std::istream of FILE* could be similarly adapted in case its needed...
 
-
+bool decode_png(const std::string& png_data, std::vector<unsigned char>& image_data, unsigned& width, unsigned& height);
 
 // Down to earth function to store a packed RGB image to file. Mostly useful for debugging purposes.
 bool write_rgb_to_file(const char *file_name_utf8, size_t width, size_t height, const uint8_t *data_rgb);

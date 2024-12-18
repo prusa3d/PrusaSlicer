@@ -37,6 +37,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Format/3mf.hpp"
+#include "libslic3r/Semver.hpp"
 #include "../GUI/GUI.hpp"
 #include "../GUI/I18N.hpp"
 #include "../GUI/MsgDialog.hpp"
@@ -392,7 +393,8 @@ bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, wxPro
 				on_progress(L("Loading repaired model"), 80);
 				DynamicPrintConfig config;
 				ConfigSubstitutionContext config_substitutions{ ForwardCompatibilitySubstitutionRule::EnableSilent };
-				bool loaded = Slic3r::load_3mf(path_dst.string().c_str(), config, config_substitutions, &model, false);
+                boost::optional<Semver> prusaslicer_generator_version;
+				bool loaded = Slic3r::load_3mf(path_dst.string().c_str(), config, config_substitutions, &model, false, prusaslicer_generator_version);
 			    boost::filesystem::remove(path_dst);
 				if (! loaded)
 	 				throw Slic3r::RuntimeError("Import of the repaired 3mf file failed");

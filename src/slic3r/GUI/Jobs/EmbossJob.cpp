@@ -14,6 +14,8 @@
 #include <libslic3r/BuildVolume.hpp> // create object
 #include <libslic3r/SLA/ReprojectPointsOnMesh.hpp>
 
+#include "libslic3r/MultipleBeds.hpp"
+
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -322,9 +324,9 @@ void CreateObjectJob::process(Ctl &ctl)
     Points bed_shape_;
     bed_shape_.reserve(m_input.bed_shape.size());
     for (const Vec2d &p : m_input.bed_shape)
-        bed_shape_.emplace_back(p.cast<int>());
+        bed_shape_.emplace_back(p.cast<coord_t>());
     Slic3r::Polygon bed(bed_shape_);
-    if (!bed.contains(bed_coor.cast<int>()))
+    if (!bed.contains(bed_coor.cast<coord_t>()))
         // mouse pose is out of build plate so create object in center of plate
         bed_coor = bed.centroid().cast<double>();
 
@@ -373,6 +375,7 @@ void CreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
         // set transformation
         Slic3r::Geometry::Transformation tr(m_transformation);
         new_object->instances.front()->set_transformation(tr);
+        new_object->instances.front()->set_offset(new_object->instances.front()->get_offset() + s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
         new_object->ensure_on_bed();
 
         // Actualize right panel and set inside of selection

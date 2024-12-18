@@ -143,6 +143,12 @@ enum SeamPosition {
     spRandom, spNearest, spAligned, spRear
 };
 
+enum class ScarfSeamPlacement {
+    nowhere,
+    countours,
+    everywhere
+};
+
 enum SLAMaterial {
     slamTough,
     slamFlex,
@@ -226,6 +232,12 @@ enum TiltSpeeds : int {
     tsMove8000,
 };
 
+enum class EnsureVerticalShellThickness {
+    Disabled,
+    Partial,
+    Enabled,
+};
+
 #define CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NAME) \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names(); \
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values();
@@ -244,6 +256,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialPattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialStyle)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialInterfacePattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SeamPosition)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ScarfSeamPlacement)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLADisplayOrientation)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLASupportTreeType)
@@ -254,6 +267,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TopOnePerimeterType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(EnsureVerticalShellThickness)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -671,11 +685,14 @@ PRINT_CONFIG_CLASS_DEFINE(
 PRINT_CONFIG_CLASS_DEFINE(
     PrintRegionConfig,
 
+    ((ConfigOptionBool,                 automatic_infill_combination))
+    ((ConfigOptionFloatOrPercent,       automatic_infill_combination_max_layer_height))
     ((ConfigOptionFloat,                bridge_angle))
     ((ConfigOptionInt,                  bottom_solid_layers))
     ((ConfigOptionFloat,                bottom_solid_min_thickness))
     ((ConfigOptionFloat,                bridge_flow_ratio))
     ((ConfigOptionFloat,                bridge_speed))
+    ((ConfigOptionEnum<EnsureVerticalShellThickness>, ensure_vertical_shell_thickness))
     ((ConfigOptionEnum<InfillPattern>,  top_fill_pattern))
     ((ConfigOptionEnum<InfillPattern>,  bottom_fill_pattern))
     ((ConfigOptionFloatOrPercent,       external_perimeter_extrusion_width))
@@ -732,6 +749,14 @@ PRINT_CONFIG_CLASS_DEFINE(
     // Single perimeter.
     ((ConfigOptionEnum<TopOnePerimeterType>, top_one_perimeter_type))
     ((ConfigOptionBool,                 only_one_perimeter_first_layer))
+
+    ((ConfigOptionEnum<ScarfSeamPlacement>, scarf_seam_placement))
+    ((ConfigOptionBool,                     scarf_seam_only_on_smooth))
+    ((ConfigOptionPercent,                  scarf_seam_start_height))
+    ((ConfigOptionBool,                     scarf_seam_entire_loop))
+    ((ConfigOptionFloat,                    scarf_seam_length))
+    ((ConfigOptionFloat,                    scarf_seam_max_segment_length))
+    ((ConfigOptionBool,                     scarf_seam_on_inner_perimeters))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -807,6 +832,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              filament_multitool_ramming_flow))
     ((ConfigOptionFloats,              filament_stamping_loading_speed))
     ((ConfigOptionFloats,              filament_stamping_distance))
+    ((ConfigOptionFloatsOrPercentsNullable, filament_seam_gap_distance))
     ((ConfigOptionPercents,            filament_shrinkage_compensation_xy))
     ((ConfigOptionPercents,            filament_shrinkage_compensation_z))
     ((ConfigOptionBool,                gcode_comments))
@@ -837,6 +863,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              retract_restart_extra))
     ((ConfigOptionFloats,              retract_restart_extra_toolchange))
     ((ConfigOptionFloats,              retract_speed))
+    ((ConfigOptionFloatOrPercent,      seam_gap_distance))
     ((ConfigOptionString,              start_gcode))
     ((ConfigOptionStrings,             start_filament_gcode))
     ((ConfigOptionBool,                single_extruder_multi_material))
@@ -873,6 +900,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     PrintConfig, 
     (MachineEnvelopeConfig, GCodeConfig),
 
+    ((ConfigOptionBool,               automatic_extrusion_widths))
     ((ConfigOptionBool,               avoid_crossing_curled_overhangs))
     ((ConfigOptionBool,               avoid_crossing_perimeters))
     ((ConfigOptionFloatOrPercent,     avoid_crossing_perimeters_max_detour))
@@ -950,11 +978,8 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBools,              wipe))
     ((ConfigOptionBool,               wipe_tower))
     ((ConfigOptionFloat,              wipe_tower_acceleration))
-    ((ConfigOptionFloat,              wipe_tower_x))
-    ((ConfigOptionFloat,              wipe_tower_y))
     ((ConfigOptionFloat,              wipe_tower_width))
     ((ConfigOptionFloat,              wipe_tower_per_color_wipe))
-    ((ConfigOptionFloat,              wipe_tower_rotation_angle))
     ((ConfigOptionFloat,              wipe_tower_brim_width))
     ((ConfigOptionFloat,              wipe_tower_cone_angle))
     ((ConfigOptionPercent,            wipe_tower_extra_spacing))

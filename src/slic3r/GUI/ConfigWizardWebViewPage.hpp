@@ -53,6 +53,7 @@ public:
     void on_error(wxWebViewEvent &evt);
     void on_navigation_request(wxWebViewEvent &evt);
     void on_idle(wxIdleEvent &evt);
+    void on_script_message(wxWebViewEvent& evt);
     void load_error_page();
     // returns true if logged in - wizard needs to update repos
     bool login_changed();

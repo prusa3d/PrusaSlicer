@@ -228,12 +228,12 @@ void ObjectSettings::update_config_values(ModelConfig* config)
         update_config_values(config);
 
         if (is_added) {
-// #ysFIXME - Delete after testing! Very likely this CallAfret is no needed
-//            wxTheApp->CallAfter([this]() {
+            // #ysNOTE - CallAfter is needed here to avoid crash on add new override params! see GH#13450
+            wxTheApp->CallAfter([this]() {
                 wxWindowUpdateLocker noUpdates(m_parent);
                 update_settings_list();
                 m_parent->Layout();
-//            });
+            });
         }
     };
 

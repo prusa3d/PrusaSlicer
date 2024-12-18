@@ -3,21 +3,17 @@
 
 #include <libslic3r/Execution/ExecutionSeq.hpp>
 
-#include <libslic3r/Arrange/Core/ArrangeBase.hpp>
-#include <libslic3r/Arrange/Core/ArrangeFirstFit.hpp>
-#include <libslic3r/Arrange/Core/NFP/PackStrategyNFP.hpp>
-#include <libslic3r/Arrange/Core/NFP/RectangleOverfitPackingStrategy.hpp>
+#include <arrange/ArrangeBase.hpp>
+#include <arrange/ArrangeFirstFit.hpp>
+#include <arrange/NFP/PackStrategyNFP.hpp>
+#include <arrange/NFP/RectangleOverfitPackingStrategy.hpp>
+#include <arrange/NFP/Kernels/GravityKernel.hpp>
+#include <arrange/NFP/Kernels/TMArrangeKernel.hpp>
+#include <arrange/NFP/NFPConcave_Tesselate.hpp>
 
-#include <libslic3r/Arrange/Core/NFP/Kernels/GravityKernel.hpp>
-#include <libslic3r/Arrange/Core/NFP/Kernels/TMArrangeKernel.hpp>
-
-#include <libslic3r/Arrange/Core/NFP/NFPConcave_CGAL.hpp>
-#include <libslic3r/Arrange/Core/NFP/NFPConcave_Tesselate.hpp>
-#include <libslic3r/Arrange/Core/NFP/CircularEdgeIterator.hpp>
-
-#include <libslic3r/Arrange/Items/SimpleArrangeItem.hpp>
-#include <libslic3r/Arrange/Items/ArrangeItem.hpp>
-#include <libslic3r/Arrange/Items/TrafoOnlyArrangeItem.hpp>
+#include <arrange-wrapper/Items/SimpleArrangeItem.hpp>
+#include <arrange-wrapper/Items/ArrangeItem.hpp>
+#include <arrange-wrapper/Items/TrafoOnlyArrangeItem.hpp>
 
 #include <libslic3r/Model.hpp>
 
@@ -386,7 +382,7 @@ template<> inline Slic3r::arr2::RectangleBed init_bed<Slic3r::arr2::RectangleBed
 
 template<> inline Slic3r::arr2::CircleBed init_bed<Slic3r::arr2::CircleBed>()
 {
-    return Slic3r::arr2::CircleBed{Slic3r::Point::Zero(), scaled(300.)};
+    return Slic3r::arr2::CircleBed{Slic3r::Point::Zero(), scaled(300.), Slic3r::Vec2crd{0, 0}};
 }
 
 template<> inline Slic3r::arr2::IrregularBed init_bed<Slic3r::arr2::IrregularBed>()
@@ -640,6 +636,7 @@ struct RectangleItem {
 
     void set_bed_index(int idx) { bed_index = idx; }
     int  get_bed_index() const noexcept { return bed_index; }
+    std::optional<int> get_bed_constraint() const { return std::nullopt; }
 
     void set_translation(const Vec2crd &tr) { translation = tr; }
     const Vec2crd & get_translation() const noexcept { return translation; }

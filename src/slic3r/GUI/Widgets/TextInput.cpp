@@ -257,6 +257,7 @@ void TextInput::DoSetSize(int x, int y, int width, int height, int sizeFlags)
         wxClientDC dc(this);
         const int r_shift = int(dd_icon_size.x == 0 ? (3. * dc.GetContentScaleFactor()) : ((size.y - dd_icon_size.y) / 2));
         textSize.x = size.x - textPos.x - labelSize.x - dd_icon_size.x - r_shift;
+        if (textSize.x < -1) textSize.x = -1;
         text_ctrl->SetSize(textSize);
         text_ctrl->SetPosition({textPos.x, (size.y - textSize.y) / 2});
     }

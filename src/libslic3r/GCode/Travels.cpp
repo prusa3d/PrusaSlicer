@@ -456,7 +456,6 @@ Points3 generate_travel_to_extrusion(
         ElevatedTravelFormula{elevation_params}
     )};
 
-    result.emplace_back(xy_path.back().x(), xy_path.back().y(), scaled(initial_elevation));
     return result;
 }
 } // namespace Slic3r::GCode::Impl::Travels

@@ -189,8 +189,6 @@ public:
 	    bool                is_outside : 1;
 	    // Wheter or not this volume has been generated from a modifier
 	    bool                is_modifier : 1;
-	    // Wheter or not this volume has been generated from the wipe tower
-	    bool                is_wipe_tower : 1;
 	    // Wheter or not this volume has been generated from an extrusion path
 	    bool                is_extrusion_path : 1;
         // Whether or not always use the volume's own color (not using SELECTED/HOVER/DISABLED/OUTSIDE)
@@ -215,6 +213,13 @@ public:
     std::vector<coordf_t>       print_zs;
     // Offset into qverts & tverts, or offsets into indices stored into an OpenGL name_index_buffer.
     std::vector<size_t>         offsets;
+
+    std::optional<int> wipe_tower_bed_index;
+
+    // Wheter or not this volume has been generated from the wipe tower
+    bool is_wipe_tower() const {
+        return bool{wipe_tower_bed_index};
+    }
 
     // Bounding box of this volume, in unscaled coordinates.
     BoundingBoxf3 bounding_box() const { 
@@ -425,11 +430,11 @@ public:
         int                instance_idx);
 
 #if SLIC3R_OPENGL_ES
-    int load_wipe_tower_preview(
-        float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle, float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh = nullptr);
+    GLVolume* load_wipe_tower_preview(
+        float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle, float rotation_angle, bool size_unknown, float brim_width, size_t idx, TriangleMesh* out_mesh = nullptr);
 #else
-    int load_wipe_tower_preview(
-        float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle, float rotation_angle, bool size_unknown, float brim_width);
+    GLVolume* load_wipe_tower_preview(
+        float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle, float rotation_angle, bool size_unknown, float brim_width, size_t idx);
 #endif // SLIC3R_OPENGL_ES
 
     // Load SLA auxiliary GLVolumes (for support trees or pad).

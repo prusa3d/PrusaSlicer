@@ -81,7 +81,8 @@ struct ExtrusionLine
      */
     std::vector<ExtrusionJunction> junctions;
 
-    ExtrusionLine(const size_t inset_idx, const bool is_odd);
+    ExtrusionLine(size_t inset_idx, bool is_odd);
+    ExtrusionLine(size_t inset_idx, bool is_odd, bool is_closed);
     ExtrusionLine() : inset_idx(-1), is_odd(true), is_closed(false) {}
     ExtrusionLine(const ExtrusionLine &other) : inset_idx(other.inset_idx), is_odd(other.is_odd), is_closed(other.is_closed), junctions(other.junctions) {}
 

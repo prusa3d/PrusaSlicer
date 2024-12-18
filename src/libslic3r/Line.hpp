@@ -190,6 +190,10 @@ template<class L> bool intersection(const L &l1, const L &l2, Vec<Dim<L>, Scalar
     return false; // not intersecting
 }
 
+inline Point midpoint(const Point &a, const Point &b) {
+    return (a + b) / 2;
+}
+
 } // namespace line_alg
 
 class Line
@@ -204,7 +208,7 @@ public:
     void   rotate(double angle, const Point &center) { this->a.rotate(angle, center); this->b.rotate(angle, center); }
     void   reverse() { std::swap(this->a, this->b); }
     double length() const { return (b.cast<double>() - a.cast<double>()).norm(); }
-    Point  midpoint() const { return (this->a + this->b) / 2; }
+    Point  midpoint() const { return line_alg::midpoint(this->a, this->b); }
     bool   intersection_infinite(const Line &other, Point* point) const;
     bool   operator==(const Line &rhs) const { return this->a == rhs.a && this->b == rhs.b; }
     double distance_to_squared(const Point &point) const { return distance_to_squared(point, this->a, this->b); }

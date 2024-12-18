@@ -139,7 +139,9 @@ public:
 	// y			-- y coordinates of wipe tower in mm ( left bottom corner )
 	// width		-- width of wipe tower in mm ( default 60 mm - leave as it is )
 	// wipe_area	-- space available for one toolchange in mm
-    WipeTower(const PrintConfig& config,
+    WipeTower(const Vec2f& position,
+		      double rotation_deg,
+		      const PrintConfig& config,
 	          const PrintRegionConfig& default_region_config,
 			  const std::vector<std::vector<float>>& wiping_matrix,
 			  size_t initial_tool);
@@ -275,6 +277,7 @@ private:
 
 	bool   m_semm               = true; // Are we using a single extruder multimaterial printer?
 	bool   m_is_mk4mmu3         = false;
+    bool   m_switch_filament_monitoring = false;
     Vec2f  m_wipe_tower_pos; 			// Left front corner of the wipe tower in mm.
 	float  m_wipe_tower_width; 			// Width of the wipe tower.
 	float  m_wipe_tower_depth 	= 0.f; 	// Depth of the wipe tower
@@ -282,7 +285,6 @@ private:
 	float  m_wipe_tower_cone_angle = 0.f;
     float  m_wipe_tower_brim_width      = 0.f; 	// Width of brim (mm) from config
     float  m_wipe_tower_brim_width_real = 0.f; 	// Width of brim (mm) after generation
-	float  m_wipe_tower_rotation_angle = 0.f; // Wipe tower rotation angle in degrees (with respect to x axis)
     float  m_internal_rotation  = 0.f;
 	float  m_y_shift			= 0.f;  // y shift passed to writer
 	float  m_z_pos 				= 0.f;  // Current Z position.

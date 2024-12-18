@@ -24,7 +24,9 @@ ServiceConfig::ServiceConfig()
     , m_account_url("https://account.prusa3d.com")
     , m_account_client_id("oamhmhZez7opFosnwzElIgE2oGgI2iJORSkw587O")
     , m_media_url("https://media.printables.com")
-    , m_preset_repo_url("https://preset-repo-api.prusa3d.com") {
+    , m_preset_repo_url("https://preset-repo-api.prusa3d.com") 
+    , m_printables_url("https://www.printables.com")
+{
 #ifdef SLIC3R_REPO_URL
     m_preset_repo_url = SLIC3R_REPO_URL;
 #endif
@@ -34,6 +36,7 @@ ServiceConfig::ServiceConfig()
     update_from_env(m_account_client_id, "PRUSA_ACCOUNT_CLIENT_ID");
     update_from_env(m_media_url, "PRUSA_MEDIA_URL", true);
     update_from_env(m_preset_repo_url, "PRUSA_PRESET_REPO_URL", true);
+    update_from_env(m_printables_url, "PRUSA_PRINTABLES_URL", true);
 }
 
 ServiceConfig& ServiceConfig::instance()

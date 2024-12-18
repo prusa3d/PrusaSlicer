@@ -46,6 +46,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         ExtrusionEntityCollection gap_fill;
         ExPolygons                fill_expolygons;
         Flow                      flow(1., 1., 1.);
+        PerimeterRegions          perimeter_regions;
         PerimeterGenerator::Parameters perimeter_generator_params(
             1., // layer height
             -1, // layer ID
@@ -53,6 +54,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
             static_cast<const PrintRegionConfig&>(config),
             static_cast<const PrintObjectConfig&>(config),
             static_cast<const PrintConfig&>(config),
+            perimeter_regions,
             false); // spiral_vase
         Polygons lower_layer_polygons_cache;
         for (const Surface &surface : slices)
