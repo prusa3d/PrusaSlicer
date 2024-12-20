@@ -33,3 +33,9 @@ add_library(slic3r-arrange-wrapper
 target_include_directories(slic3r-arrange-wrapper PRIVATE src)
 target_include_directories(slic3r-arrange-wrapper PUBLIC include)
 target_link_libraries(slic3r-arrange-wrapper PUBLIC slic3r-arrange)
+
+if (WIN32)
+    install(TARGETS slic3r-arrange-wrapper LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX})
+else()
+    install(TARGETS slic3r-arrange-wrapper LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
