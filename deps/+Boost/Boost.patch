@@ -1,0 +1,29 @@
+--- ./libs/json/include/boost/json/detail/charconv/detail/emulated128-orig.hpp	2024-07-16 21:55:14.679931600 -0600
++++ ./libs/json/include/boost/json/detail/charconv/detail/emulated128.hpp	2024-07-16 21:56:13.328860900 -0600
+@@ -58,7 +58,7 @@
+ 
+ static inline std::uint64_t umul64(std::uint32_t x, std::uint32_t y) noexcept
+ {
+-#if defined(BOOST_JSON_HAS_MSVC_32BIT_INTRINSICS)
++#if defined(BOOST_JSON_HAS_MSVC_32BIT_INTRINSICS) && !defined(_M_ARM64)
+     return __emulu(x, y);
+ #else
+     return x * static_cast<std::uint64_t>(y);
+@@ -73,7 +73,7 @@
+     auto result = static_cast<boost::uint128_type>(x) * static_cast<boost::uint128_type>(y);
+     return {static_cast<std::uint64_t>(result >> 64), static_cast<std::uint64_t>(result)};
+ 
+-    #elif defined(BOOST_JSON_HAS_MSVC_64BIT_INTRINSICS)
++    #elif defined(BOOST_JSON_HAS_MSVC_64BIT_INTRINSICS) && !defined(_M_ARM64)
+ 
+     std::uint64_t high;
+     std::uint64_t low = _umul128(x, y, &high);
+@@ -113,7 +113,7 @@
+     auto result = static_cast<boost::uint128_type>(x) * static_cast<boost::uint128_type>(y);
+     return static_cast<std::uint64_t>(result >> 64);
+ 
+-    #elif defined(BOOST_JSON_HAS_MSVC_64BIT_INTRINSICS)
++    #elif defined(BOOST_JSON_HAS_MSVC_64BIT_INTRINSICS) && !defined(_M_ARM64)
+ 
+     return __umulh(x, y);
+ 
