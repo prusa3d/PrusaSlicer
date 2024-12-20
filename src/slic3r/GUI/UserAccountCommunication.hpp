@@ -81,7 +81,6 @@ public:
 private:
     std::unique_ptr<UserAccountSession>     m_session;
     std::thread                             m_thread;
-    std::mutex                              m_session_mutex;
     std::mutex                              m_thread_stop_mutex;
     std::condition_variable                 m_thread_stop_condition;
     bool                                    m_thread_stop { false };

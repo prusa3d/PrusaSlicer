@@ -35,6 +35,7 @@ wxDEFINE_EVENT(EVT_UA_ENQUEUED_REFRESH, SimpleEvent);
 void UserActionPost::perform(/*UNUSED*/ wxEvtHandler* evt_handler, /*UNUSED*/ const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const
 {
     std::string url = m_url;
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << " " << url; 
     auto http = Http::post(std::move(url));
     if (!input.empty())
         http.set_post_body(input);
@@ -53,6 +54,7 @@ void UserActionPost::perform(/*UNUSED*/ wxEvtHandler* evt_handler, /*UNUSED*/ co
 void UserActionGetWithEvent::perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const
 {
     std::string url = m_url + input;
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << " " << url; 
     auto http = Http::get(std::move(url));
     if (!access_token.empty()) {
         http.header("Authorization", "Bearer " + access_token);
@@ -82,75 +84,98 @@ void UserActionGetWithEvent::perform(wxEvtHandler* evt_handler, const std::strin
     http.perform_sync(HttpRetryOpt::default_retry());
 }
 
-bool UserAccountSession::is_enqueued(UserAccountActionID action_id) const {
-    return std::any_of(
-        std::begin(m_priority_action_queue), std::end(m_priority_action_queue),
-        [action_id](const ActionQueueData& item) { return item.action_id == action_id; }
-    );
+bool UserAccountSession::is_enqueued(UserAccountActionID action_id) const 
+{
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        return std::any_of(
+            std::begin(m_priority_action_queue), std::end(m_priority_action_queue),
+            [action_id](const ActionQueueData& item) { return item.action_id == action_id; }
+        );
+    }
 }
-
 
 void UserAccountSession::process_action_queue()
 {
-    if (!m_proccessing_enabled)
-        return;
-    if (m_priority_action_queue.empty() && m_action_queue.empty()) {
-        // update printers periodically
-        enqueue_action(m_polling_action, nullptr, nullptr, {});
-    }
-    // priority queue works even when tokens are empty or broken
-    while (!m_priority_action_queue.empty()) {
-        std::string access_token;
-        {
-            std::lock_guard<std::mutex> lock(m_credentials_mutex);
-            access_token = m_access_token;
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        if (!m_proccessing_enabled)
+            return;
+        if (m_priority_action_queue.empty() && m_action_queue.empty()) {
+            // update printers periodically
+            enqueue_action_inner(m_polling_action, nullptr, nullptr, {});
         }
-        m_actions[m_priority_action_queue.front().action_id]->perform(p_evt_handler, access_token, m_priority_action_queue.front().success_callback, m_priority_action_queue.front().fail_callback, m_priority_action_queue.front().input);
-        if (!m_priority_action_queue.empty())
+    }
+    process_action_queue_inner();
+}
+void UserAccountSession::process_action_queue_inner()
+{
+    bool call_priority = false;
+    bool call_standard = false;
+    ActionQueueData selected_data;
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+    
+        // priority queue works even when tokens are empty or broken
+        if (!m_priority_action_queue.empty()) {
+            // Do a copy here even its costly. We need to get data outside m_session_mutex protected code to perform background operation over it.
+            selected_data = m_priority_action_queue.front();
             m_priority_action_queue.pop_front();
-    }
-    // regular queue has to wait until priority fills tokens
-    if (!this->is_initialized())
-        return;
-    while (!m_action_queue.empty()) {
-        std::string access_token;
-        {
-            std::lock_guard<std::mutex> lock(m_credentials_mutex);
-            access_token = m_access_token;
-        }
-        m_actions[m_action_queue.front().action_id]->perform(p_evt_handler, access_token, m_action_queue.front().success_callback, m_action_queue.front().fail_callback, m_action_queue.front().input);
-        if (!m_action_queue.empty())
+            call_priority = true;
+        } else if (this->is_initialized() && !m_action_queue.empty()) {
+            // regular queue has to wait until priority fills tokens
+            // Do a copy here even its costly. We need to get data outside m_session_mutex protected code to perform background operation over it.
+            selected_data = m_action_queue.front();
             m_action_queue.pop();
+            call_standard = true;
+        }
     }
+    if (call_priority || call_standard) {
+        m_actions[selected_data.action_id]->perform(p_evt_handler, get_access_token(), selected_data.success_callback, selected_data.fail_callback, selected_data.input);
+        process_action_queue_inner();
+    }        
 }
 
 void UserAccountSession::enqueue_action(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input)
 {
-    m_proccessing_enabled = true;
-    m_action_queue.push({ id, success_callback, fail_callback, input });
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        enqueue_action_inner(id, success_callback, fail_callback, input);
+    }
 }
 
+// called from m_session_mutex protected code only!
+void UserAccountSession::enqueue_action_inner(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input)
+{
+        m_proccessing_enabled = true;
+        m_action_queue.push({ id, success_callback, fail_callback, input });
+}
 
 void UserAccountSession::init_with_code(const std::string& code, const std::string& code_verifier)
 {
-    // Data we have       
-    const std::string REDIRECT_URI = "prusaslicer://login";
-    std::string post_fields = "code=" + code +
-        "&client_id=" + client_id() +
-        "&grant_type=authorization_code" +
-        "&redirect_uri=" + REDIRECT_URI +
-        "&code_verifier="+ code_verifier;
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        // Data we have       
+        const std::string REDIRECT_URI = "prusaslicer://login";
+        std::string post_fields = "code=" + code +
+            "&client_id=" + client_id() +
+            "&grant_type=authorization_code" +
+            "&redirect_uri=" + REDIRECT_URI +
+            "&code_verifier="+ code_verifier;
 
-    m_proccessing_enabled = true;
-    // fail fn might be cancel_queue here
-    m_priority_action_queue.push_back({ UserAccountActionID::USER_ACCOUNT_ACTION_CODE_FOR_TOKEN
-        , std::bind(&UserAccountSession::token_success_callback, this, std::placeholders::_1)
-        , std::bind(&UserAccountSession::code_exchange_fail_callback, this, std::placeholders::_1)
-        , post_fields });
+        m_proccessing_enabled = true;
+        // fail fn might be cancel_queue here
+        m_priority_action_queue.push_back({ UserAccountActionID::USER_ACCOUNT_ACTION_CODE_FOR_TOKEN
+            , std::bind(&UserAccountSession::token_success_callback, this, std::placeholders::_1)
+            , std::bind(&UserAccountSession::code_exchange_fail_callback, this, std::placeholders::_1)
+            , post_fields });
+    }
 }
 
 void UserAccountSession::token_success_callback(const std::string& body)
 {
+    // No need to use lock m_session_mutex here
+
     BOOST_LOG_TRIVIAL(debug) << "Access token refreshed";
     // Data we need
     std::string access_token, refresh_token, shared_session_key;
@@ -204,20 +229,23 @@ void UserAccountSession::token_success_callback(const std::string& body)
 
 void UserAccountSession::code_exchange_fail_callback(const std::string& body)
 {
+    
     BOOST_LOG_TRIVIAL(debug) << "Access token refresh failed, body: " << body;
     clear();
     cancel_queue();
     // Unlike refresh_fail_callback, no event was triggered so far, do it. (USER_ACCOUNT_ACTION_CODE_FOR_TOKEN does not send events)
-    wxQueueEvent(p_evt_handler, new UserAccountFailEvent(EVT_UA_RESET, std::move(body)));
+    wxQueueEvent(p_evt_handler, new UserAccountFailEvent(EVT_UA_RESET, body));
 }
 
 void UserAccountSession::enqueue_test_with_refresh()
 {
-    // on test fail - try refresh
-    m_proccessing_enabled = true;
-    m_priority_action_queue.push_back({ UserAccountActionID::USER_ACCOUNT_ACTION_TEST_ACCESS_TOKEN, nullptr, std::bind(&UserAccountSession::enqueue_refresh, this, std::placeholders::_1), {} });
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        // on test fail - try refresh
+        m_proccessing_enabled = true;
+        m_priority_action_queue.push_back({ UserAccountActionID::USER_ACCOUNT_ACTION_TEST_ACCESS_TOKEN, nullptr, std::bind(&UserAccountSession::enqueue_refresh, this, std::placeholders::_1), {} });
+    }
 }
-
 
 void UserAccountSession::enqueue_refresh(const std::string& body)
 {
@@ -230,11 +258,13 @@ void UserAccountSession::enqueue_refresh(const std::string& body)
                       "&client_id=" + client_id() +
                       "&refresh_token=" + m_refresh_token;
     }
-
-    m_priority_action_queue.push_back({ UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN
-        , std::bind(&UserAccountSession::token_success_callback, this, std::placeholders::_1)
-        , std::bind(&UserAccountSession::refresh_fail_callback, this, std::placeholders::_1)
-        , post_fields });
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        m_priority_action_queue.push_back({ UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN
+            , std::bind(&UserAccountSession::token_success_callback, this, std::placeholders::_1)
+            , std::bind(&UserAccountSession::refresh_fail_callback, this, std::placeholders::_1)
+            , post_fields });
+    }
 }
 
 void UserAccountSession::refresh_fail_callback(const std::string& body)
@@ -244,15 +274,17 @@ void UserAccountSession::refresh_fail_callback(const std::string& body)
     // No need to notify UI thread here
     // backtrace: load tokens -> TEST_TOKEN fail (access token bad) -> REFRESH_TOKEN fail (refresh token bad)
     // USER_ACCOUNT_ACTION_TEST_ACCESS_TOKEN triggers EVT_UA_FAIL, we need also RESET
-    wxQueueEvent(p_evt_handler, new UserAccountFailEvent(EVT_UA_RESET, std::move(body)));
-
+    wxQueueEvent(p_evt_handler, new UserAccountFailEvent(EVT_UA_RESET, body));
 }
 
 void UserAccountSession::cancel_queue()
 {
-    m_priority_action_queue.clear();
-    while (!m_action_queue.empty()) {
-        m_action_queue.pop();
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        m_priority_action_queue.clear();
+        while (!m_action_queue.empty()) {
+            m_action_queue.pop();
+        }
     }
 }
 

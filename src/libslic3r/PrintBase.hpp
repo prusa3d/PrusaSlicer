@@ -495,7 +495,7 @@ public:
     // Calls a registered callback to update the status, or print out the default message.
     void                    set_status(int percent, const std::string &message, unsigned int flags = SlicingStatus::DEFAULT) {
 		if (m_status_callback) m_status_callback(SlicingStatus(percent, message, flags));
-        else printf("%d => %s\n", percent, message.c_str());
+        else { printf("%d => %s\n", percent, message.c_str()); std::fflush(stdout); }
     }
 
     typedef std::function<void()>  cancel_callback_type;

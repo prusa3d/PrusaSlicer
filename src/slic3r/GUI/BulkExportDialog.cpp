@@ -204,7 +204,7 @@ BulkExportDialog::BulkExportDialog(const std::vector<std::pair<int, std::optiona
     DPIDialog(
         nullptr,
         wxID_ANY,
-        paths.size() == 1 ? _L("Export bed") : _L("Export beds"),
+        _L("Export beds"),
         wxDefaultPosition,
         wxSize(45 * wxGetApp().em_unit(), 5 * wxGetApp().em_unit()),
         wxDEFAULT_DIALOG_STYLE | wxICON_WARNING
@@ -253,8 +253,8 @@ void BulkExportDialog::accept()
 {
     if (has_warnings()) {
         MessageDialog dialog(nullptr,
-            _L("Some of the selected files already exists. Do you want to replace them?"),
-            _L("Export Beds"), wxYES_NO | wxICON_QUESTION);
+            _L("Some of the selected files already exist. Do you want to replace them?"),
+            _L("Export beds"), wxYES_NO | wxICON_QUESTION);
         if (dialog.ShowModal() == wxID_NO)
             return;
     }

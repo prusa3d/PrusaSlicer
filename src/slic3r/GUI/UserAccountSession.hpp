@@ -143,7 +143,10 @@ public:
             m_refresh_token.clear();
             m_shared_session_key.clear();
         }
-        m_proccessing_enabled = false;
+        {
+            std::lock_guard<std::mutex> lock(m_session_mutex);
+            m_proccessing_enabled = false;
+        }
     }
 
     // Functions that automatically enable action queu processing
@@ -152,8 +155,8 @@ public:
     // Special enques, that sets callbacks.
     void enqueue_test_with_refresh();
     void enqueue_refresh(const std::string& body);
-
     void process_action_queue();
+
     bool is_initialized() const {
         std::lock_guard<std::mutex> lock(m_credentials_mutex);
         return !m_access_token.empty() || !m_refresh_token.empty();
@@ -177,21 +180,22 @@ public:
     }
 
     //void set_polling_enabled(bool enabled) {m_polling_action = enabled ? UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS : UserAccountActionID::USER_ACCOUNT_ACTION_DUMMY; }
-    void set_polling_action(UserAccountActionID action) { m_polling_action = action; }
+    void set_polling_action(UserAccountActionID action) { 
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        m_polling_action = action; 
+    }
 private:
-
     void refresh_fail_callback(const std::string& body);
     void cancel_queue();
     void code_exchange_fail_callback(const std::string& body);
     void token_success_callback(const std::string& body);
     std::string client_id() const { return Utils::ServiceConfig::instance().account_client_id(); }
+    void process_action_queue_inner();
 
-    // false prevents action queu to be processed - no communication is done
-    // sets to true by init_with_code or enqueue_action call
-    bool        m_proccessing_enabled {false}; 
-    // action when woken up on idle - switches between USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS and USER_ACCOUNT_ACTION_CONNECT_STATUS
-    // set to USER_ACCOUNT_ACTION_DUMMY to switch off polling
-    UserAccountActionID m_polling_action;
+    // called from m_session_mutex protected code only
+    void enqueue_action_inner(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input);
+
+   
 
     // Section of following vars is guarded by this mutex
     mutable std::mutex m_credentials_mutex;
@@ -201,8 +205,21 @@ private:
     long long m_next_token_timeout;
     // End of section guarded by m_credentials_mutex
 
+
+     // Section of following vars is guarded by this mutex
+    mutable std::mutex m_session_mutex;
+
     std::queue<ActionQueueData>                                    m_action_queue;
-    std::deque<ActionQueueData>                                    m_priority_action_queue;
+    std::deque<ActionQueueData>                                    m_priority_action_queue; 
+     // false prevents action queue to be processed - no communication is done
+    // sets to true by init_with_code or enqueue_action call
+    bool        m_proccessing_enabled {false}; 
+    // action when woken up on idle - switches between USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS and USER_ACCOUNT_ACTION_CONNECT_STATUS
+    // set to USER_ACCOUNT_ACTION_DUMMY to switch off polling
+    UserAccountActionID m_polling_action;
+
+     // End of section guarded by m_session_mutex
+    
     std::map<UserAccountActionID, std::unique_ptr<UserAction>>     m_actions;
 
     wxEvtHandler* p_evt_handler;

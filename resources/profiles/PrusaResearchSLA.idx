@@ -1,4 +1,7 @@
 min_slic3r_version = 2.8.0-alpha0
+1.0.3 Added material profiles for Prusa Resin Model (Prusa Orange, Transparent Green, Anthracite Grey, Sandstone, Brick Red and Terra Brown), Altana CubicInk (HP 4-2100 VP, HP 4-1000 VP-V0 and 4-2800 VP-ESD) and Liqcreate resins (Dental Model Pro Grey, Dental Model Pro Beige, Wax Castable, Flexible-X, Premium Model, Tough-X, Bio-Med Clear).   
+1.0.2 Added material profiles for Prusament Resin Model (Rich Black, Bright Yellow, Bright Magenta, Bright Cyan, Transparent Amber)
+1.0.1 Added material profile for Prusament Resin Model Classic Red.
 1.0.0 Updated version for PS2.8.0.
 1.0.0-alpha0 Initial bundle for PS2.8.0-alpha.
 max_slic3r_version = 2.7.9

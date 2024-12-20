@@ -729,6 +729,10 @@ const PrintInstance * get_first_instance(
     const std::vector<ExtruderExtrusions> &extrusions,
     const std::vector<InstanceToPrint> &instances_to_print
 ) {
+    if (instances_to_print.empty()) {
+        return nullptr;
+    }
+
     for (const ExtruderExtrusions &extruder_extrusions : extrusions) {
         if (!extruder_extrusions.overriden_extrusions.empty()) {
             for (std::size_t i{0}; i < instances_to_print.size(); ++i) {
@@ -749,7 +753,8 @@ const PrintInstance * get_first_instance(
             }
         }
     }
-    return nullptr;
+    const InstanceToPrint &instance{instances_to_print.front()};
+    return &instance.print_object.instances()[instance.instance_id];
 }
 
 }

@@ -242,8 +242,6 @@ void UserAccountCommunication::set_username(const std::string& username)
 {
     m_username = username;
     {
-        // We don't need mutex lock here, as credentials are guarded by own mutex in m_session
-        //std::lock_guard<std::mutex> lock(m_session_mutex);
         if (is_secret_store_ok()) {
             std::string tokens;
             if (m_remember_session) {
@@ -292,36 +290,28 @@ void UserAccountCommunication::set_remember_session(bool b)
 
 std::string UserAccountCommunication::get_access_token()
 {
-    {
-        // We don't need mutex lock here, as credentials are guarded by own mutex in m_session
-        //std::lock_guard<std::mutex> lock(m_session_mutex);
-        return m_session->get_access_token();
-    }
+
+    return m_session->get_access_token();
+
 }
 
 std::string UserAccountCommunication::get_shared_session_key()
 {
-    {
-        // We don't need mutex lock here, as credentials are guarded by own mutex in m_session
-        //std::lock_guard<std::mutex> lock(m_session_mutex);
-        return m_session->get_shared_session_key();
-    }
+
+    return m_session->get_shared_session_key();
+
 }
 
 void UserAccountCommunication::set_polling_enabled(bool enabled)
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        return m_session->set_polling_action(enabled ? UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS : UserAccountActionID::USER_ACCOUNT_ACTION_DUMMY);
-    }
+    return m_session->set_polling_action(enabled ? UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS : UserAccountActionID::USER_ACCOUNT_ACTION_DUMMY);
 }
 
 void UserAccountCommunication::on_uuid_map_success()
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        return m_session->set_polling_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS);
-    }
+
+    return m_session->set_polling_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS);
+    
 }
 
 // Generates and stores Code Verifier - second call deletes previous one.
@@ -371,13 +361,10 @@ bool UserAccountCommunication::is_logged()
 }
 void UserAccountCommunication::do_login()
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        if (!m_session->is_initialized()) {
-            login_redirect();
-        } else { 
-            m_session->enqueue_test_with_refresh();
-        }
+    if (!m_session->is_initialized()) {
+        login_redirect();
+    } else { 
+        m_session->enqueue_test_with_refresh();
     }
     wakeup_session_thread();
 }
@@ -389,85 +376,64 @@ void UserAccountCommunication::do_logout()
 
 void UserAccountCommunication::do_clear()
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        m_session->clear();
-    }
+    m_session->clear();
     set_username({});
     m_token_timer->Stop();
 }
 
 void UserAccountCommunication::on_login_code_recieved(const std::string& url_message)
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        const std::string code = get_code_from_message(url_message);
-        m_session->init_with_code(code, m_code_verifier);
-    }
+    const std::string code = get_code_from_message(url_message);
+    m_session->init_with_code(code, m_code_verifier);
     wakeup_session_thread();
 }
 
 void UserAccountCommunication::enqueue_connect_printer_models_action()
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        if (!m_session->is_initialized()) {
-            BOOST_LOG_TRIVIAL(error) << "Connect Printer Models connection failed - Not Logged in.";
-            return;
-        }
-        m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS, nullptr, nullptr, {});
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Printer Models connection failed - Not Logged in.";
+        return;
     }
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS, nullptr, nullptr, {});
     wakeup_session_thread();
 }
 
 void UserAccountCommunication::enqueue_connect_status_action()
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        if (!m_session->is_initialized()) {
-            BOOST_LOG_TRIVIAL(error) << "Connect Status endpoint connection failed - Not Logged in.";
-            return;
-        }
-        m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS, nullptr, nullptr, {});
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Status endpoint connection failed - Not Logged in.";
+        return;
     }
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS, nullptr, nullptr, {});
     wakeup_session_thread();
 }
 void UserAccountCommunication::enqueue_test_connection()
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        if (!m_session->is_initialized()) {
-            BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
-            return;
-        }
-        m_session->enqueue_test_with_refresh();
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
+        return;
     }
+    m_session->enqueue_test_with_refresh();
     wakeup_session_thread();
 }
 
 void UserAccountCommunication::enqueue_avatar_action(const std::string& url)
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        if (!m_session->is_initialized()) {
-            BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
-            return;
-        }
-        m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR, nullptr, nullptr, url);
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
+        return;
     }
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR, nullptr, nullptr, url);
     wakeup_session_thread();
 }
 
 void UserAccountCommunication::enqueue_printer_data_action(const std::string& uuid)
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        if (!m_session->is_initialized()) {
-            BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
-            return;
-        }
-        m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID, nullptr, nullptr, uuid);
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
+        return;
     }
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID, nullptr, nullptr, uuid);   
     wakeup_session_thread();
 }
    
@@ -479,18 +445,15 @@ void UserAccountCommunication::request_refresh()
 
 void UserAccountCommunication::enqueue_refresh()
 {
-    {
-        std::lock_guard<std::mutex> lock(m_session_mutex);
-        if (!m_session->is_initialized()) {
-            BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
-            return;
-        }
-        if (m_session->is_enqueued(UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN)) {
-            BOOST_LOG_TRIVIAL(debug) << "User Account: Token refresh already enqueued, skipping...";
-            return;
-        }
-        m_session->enqueue_refresh({});
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
+        return;
     }
+    if (m_session->is_enqueued(UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN)) {
+        BOOST_LOG_TRIVIAL(debug) << "User Account: Token refresh already enqueued, skipping...";
+        return;
+    }
+    m_session->enqueue_refresh({});
     wakeup_session_thread();
 }
 
@@ -512,10 +475,7 @@ void UserAccountCommunication::init_session_thread()
                 continue;
             }
             m_thread_wakeup = false;
-            {
-                std::lock_guard<std::mutex> lock(m_session_mutex);
-                m_session->process_action_queue();
-            }
+            m_session->process_action_queue();
         }
     });
 }

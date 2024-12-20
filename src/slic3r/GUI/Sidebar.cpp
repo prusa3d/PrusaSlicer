@@ -764,6 +764,7 @@ void Sidebar::on_select_preset(wxCommandEvent& evt)
         wxQueueEvent(this->m_plater, new SimpleEvent(EVT_REGENERATE_BED_THUMBNAILS));
         this->m_plater->update();
         s_print_statuses.fill(PrintStatus::idle);
+        this->m_plater->canvas3D()->check_volumes_outside_state(false);
     }
 
 #ifdef __WXMSW__

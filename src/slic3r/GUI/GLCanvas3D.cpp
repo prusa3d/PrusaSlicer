@@ -1873,35 +1873,60 @@ StatisticsSum get_statistics_sum() {
 
 // retur width of table
 float project_overview_table(float scale) {
-    float width_100 = 100.f * scale;
+    const float width_gap = 10.f * scale;
+    float total_width{ width_gap };
 
     ImGui::Text("%s", _u8L("Project overview").c_str());
-    if (ImGui::BeginTable("table1", 6)) {
-        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width_100);
+    if (ImGui::BeginTable("project_overview_table", 6)) {
+
+        float width = std::max<float>(ImGui::CalcTextSize(format(_u8L("Bed %1%"), 1).c_str()).x, ImGui::CalcTextSize(_u8L("Total").c_str()).x) + width_gap;
+        total_width += width;
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width);
+
+        std::string name = _u8L("Cost");
+        width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+        total_width += width;
         ImGui::TableSetupColumn(
-            _u8L("Cost").c_str(),
+            name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
-            0.6f * width_100
+            width
         );
+
+        name = _u8L("Filament (g)");
+        width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+        total_width += width;
         ImGui::TableSetupColumn(
-            (_u8L("Filament") + " (g)").c_str(),
+            name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
-            width_100
+            width
         );
+
+        name = _u8L("Filament (m)");
+        width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+        total_width += width;
         ImGui::TableSetupColumn(
-            (_u8L("Filament") + " (m)").c_str(),
+            name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
-            width_100
+            width
         );
+
+        // TRN %1% is one "Stealth mode" or "Normal mode"
+        name = format(_u8L("Estimated Time (%1%)"), _u8L("Stealth mode"));
+        width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+        total_width += width;
         ImGui::TableSetupColumn(
-            (_u8L("Estimate Time") + " (" + _u8L("Stealth mode") +")").c_str(),
+            name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
-            2.f* width_100
+            width
         );
+
+        name = format(_u8L("Estimated Time (%1%)"), _u8L("Normal mode"));
+        width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+        total_width += width;
         ImGui::TableSetupColumn(
-            (_u8L("Estimate Time") + " (" + _u8L("Normal mode") +")").c_str(),
+            name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
-            2.f * width_100
+            width
         );
         ImGui::TableHeadersRow();
 
@@ -1910,13 +1935,14 @@ float project_overview_table(float scale) {
                 const std::reference_wrapper<const PrintStatistics> statistics{*optional_statistics};
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", (_u8L("Bed") + wxString::Format(" %d", bed_index + 1)).ToStdString().c_str());
+                // TRN %1% is a number of the Bed
+                ImGui::Text("%s", format(_u8L("Bed %1%"), bed_index + 1).c_str());
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", wxString::Format("%.2f", statistics.get().total_cost).ToStdString().c_str());
+                ImGui::Text("%.2f", statistics.get().total_cost);
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", wxString::Format("%.2f", statistics.get().total_weight).ToStdString().c_str());
+                ImGui::Text("%.2f", statistics.get().total_weight);
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", wxString::Format("%.2f", statistics.get().total_used_filament / 1000).ToStdString().c_str());
+                ImGui::Text("%.2f", statistics.get().total_used_filament / 1000);
                 ImGui::TableNextColumn();
                 ImGui::Text("%s", statistics.get().estimated_silent_print_time.c_str());
                 ImGui::TableNextColumn();
@@ -1924,7 +1950,7 @@ float project_overview_table(float scale) {
             } else {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::Text("%s", (_u8L("Bed") + wxString::Format(" %d", bed_index + 1)).ToStdString().c_str());
+                ImGui::Text("%s", format(_u8L("Bed %1%"), bed_index + 1).c_str());
                 ImGui::TableNextColumn();
                 ImGui::Text("-");
                 ImGui::TableNextColumn();
@@ -1945,11 +1971,11 @@ float project_overview_table(float scale) {
         ImGui::TableNextColumn();
         ImGui::Text("%s", _u8L("Total").c_str());
         ImGui::TableNextColumn();
-        ImGui::Text("%s", wxString::Format("%.2f", statistics_sum.cost).ToStdString().c_str());
+        ImGui::Text("%.2f", statistics_sum.cost);
         ImGui::TableNextColumn();
-        ImGui::Text("%s", wxString::Format("%.2f", statistics_sum.filement_weight).ToStdString().c_str());
+        ImGui::Text("%.2f", statistics_sum.filement_weight);
         ImGui::TableNextColumn();
-        ImGui::Text("%s", wxString::Format("%.2f", statistics_sum.filament_length / 1000).ToStdString().c_str());
+        ImGui::Text("%.2f", statistics_sum.filament_length / 1000);
         ImGui::TableNextColumn();
         ImGui::Text("%s", get_time_dhms(statistics_sum.silent_print_time).c_str());
         ImGui::TableNextColumn();
@@ -1960,7 +1986,7 @@ float project_overview_table(float scale) {
         ImGui::EndTable();
     }
 
-    return 7.6f * width_100;
+    return total_width + 2.f * width_gap;
 }
 
 struct ExtruderStatistics {
@@ -2010,31 +2036,39 @@ ExtruderStatistics sum_extruder_statistics(
 }
 
 void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, const float scale) {
-    float width_100 = 100.f * scale;
 
-    ImGui::Text("%s", _u8L("Extruder usage breakdown").c_str());
-    if (ImGui::BeginTable("table1", 3)) {
-        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width_100);
+    ImGui::Text("%s", _u8L("Extruders usage breakdown").c_str());
+    if (ImGui::BeginTable("extruder_usage_table", 3)) {
+        const float width_gap = 10.f * scale;
+        float width = width_gap + std::max<float>(ImGui::CalcTextSize(format(_u8L("Extruder %1%"), 1).c_str()).x, 
+                                                  ImGui::CalcTextSize(_u8L("Total").c_str()).x);
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width);
+
+        std::string name = _u8L("Filament (g)");
+        width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
         ImGui::TableSetupColumn(
-            (_u8L("Filament") + " (g)").c_str(),
+            name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
-            width_100
+            width
         );
+
+        name = _u8L("Filament (m)");
+        width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
         ImGui::TableSetupColumn(
-            (_u8L("Filament") + " (m)").c_str(),
+            name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
-            width_100
+            width
         );
         ImGui::TableHeadersRow();
 
         for (const auto &[extruder_index, statistics] : extruder_statistics) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::Text("%s", (_u8L("Extruder") + wxString::Format(" %d", extruder_index + 1)).ToStdString().c_str());
+            ImGui::Text("%s", format(_u8L("Extruder %1%"), extruder_index + 1).c_str());
             ImGui::TableNextColumn();
-            ImGui::Text("%s", wxString::Format("%.2f", statistics.filament_weight).ToStdString().c_str());
+            ImGui::Text("%.2f", statistics.filament_weight);
             ImGui::TableNextColumn();
-            ImGui::Text("%s", wxString::Format("%.2f", statistics.filament_length).ToStdString().c_str());
+            ImGui::Text("%.2f", statistics.filament_length);
         }
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImGuiPureWrap::COL_ORANGE_LIGHT);
@@ -2044,9 +2078,9 @@ void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, cons
         ImGui::TableNextColumn();
         ImGui::Text("%s", _u8L("Total").c_str());
         ImGui::TableNextColumn();
-        ImGui::Text("%s", wxString::Format("%.2f", extruder_statistics_sum.filament_weight).ToStdString().c_str());
+        ImGui::Text("%.2f", extruder_statistics_sum.filament_weight);
         ImGui::TableNextColumn();
-        ImGui::Text("%s", wxString::Format("%.2f", extruder_statistics_sum.filament_length).ToStdString().c_str());
+        ImGui::Text("%.2f", extruder_statistics_sum.filament_length);
 
         ImGui::PopStyleColor();
 
@@ -2089,7 +2123,7 @@ void render_print_statistics(float scale) {
 
 void render_autoslicing_wait() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20.f,30.f));
-    begin_statistics(_u8L("Waiting for statistics").c_str());
+    begin_statistics((_u8L("Generating statistics") + " ...").c_str());
     ImGui::Text("%s", _u8L("Statistics will be available once all beds are sliced").c_str());
     ImGui::PopStyleVar();
     ImGui::End();
@@ -6612,12 +6646,12 @@ void GLCanvas3D::_render_overlays()
 
 std::string get_status_text(PrintStatus status) {
     switch(status) {
-        case PrintStatus::idle: return _u8L("Unsliced");
+        case PrintStatus::idle: return _u8L("Unsliced bed");
         case PrintStatus::running: return _u8L("Slicing") + "...";
-        case PrintStatus::finished: return _u8L("Sliced");
+        case PrintStatus::finished: return _u8L("Sliced bed");
         case PrintStatus::outside: return _u8L("Object at boundary");
         case PrintStatus::invalid: return _u8L("Invalid data");
-        case PrintStatus::empty: return _u8L("Empty");
+        case PrintStatus::empty: return _u8L("Empty bed");
         case PrintStatus::toolpath_outside: return _u8L("Toolpath exceeds bounds");
     }
     return {};

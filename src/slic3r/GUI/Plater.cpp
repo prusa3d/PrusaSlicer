@@ -1618,7 +1618,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     q->canvas3D()->check_volumes_outside_state();
     s_multiple_beds.ensure_wipe_towers_on_beds(model, fff_prints);
     s_multiple_beds.update_shown_beds(model, q->build_volume());
-    update();
+
+    s_print_statuses.fill(PrintStatus::idle);
+    update((unsigned int)UpdateParams::FORCE_BACKGROUND_PROCESSING_UPDATE);
 
     return obj_idxs;
 }
@@ -1883,6 +1885,8 @@ void Plater::priv::selection_changed()
 
 void Plater::priv::object_list_changed()
 {
+    if (!wxGetApp().plater())
+        return;
     const bool export_in_progress = this->background_process.is_export_scheduled(); // || ! send_gcode_file.empty());
                                                                                     //
     if (printer_technology == ptFFF) {
@@ -2143,7 +2147,7 @@ void Plater::priv::process_validation_warning(const std::vector<std::string>& wa
         if (text == "_SUPPORTS_OFF") {
             text = _u8L("An object has custom support enforcers which will not be used "
                         "because supports are disabled.")+"\n";
-            hypertext = _u8L("Enable supports for enforcers only");
+            hypertext = _u8L("Enable supports for enforcers only.");
             action_fn = [](wxEvtHandler*) {
                 Tab* print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
                 assert(print_tab);
@@ -2166,8 +2170,12 @@ void Plater::priv::process_validation_warning(const std::vector<std::string>& wa
                                      "is experimental, so proceed with caution.");
             notification_type = NotificationType::WipeTowerNozzleDiameterDiffer;
         } else if (text == "_SUPPORT_NOZZLE_DIAMETER_DIFFER") {
+            // TRN: This is a first part of the notification text:
+            // "Printing supports with different nozzle diameters is experimental. For best results, switch to Organic supports and assign a specific extruder for supports."
             text              = _u8L("Printing supports with different nozzle diameters "
                                      "is experimental. For best results, switch to Organic supports and");
+            // TRN: This is a second part (hyperlink) of the notification text:
+            // "Printing supports with different nozzle diameters is experimental. For best results, switch to Organic supports and assign a specific extruder for supports."
             hypertext         = _u8L("assign a specific extruder for supports.");
             multiline         = true;
             notification_type = NotificationType::SupportNozzleDiameterDiffer;
@@ -2247,7 +2255,7 @@ void Plater::priv::regenerate_thumbnails(SimpleEvent&) {
 // Returns a bitmask of UpdateBackgroundProcessReturnState.
 unsigned int Plater::priv::update_background_process(bool force_validation, bool postpone_error_messages)
 {
-    assert(! s_beds_just_switched || background_process.idle());
+//    assert(! s_beds_just_switched || background_process.idle());
 
     int active_bed = s_multiple_beds.get_active_bed();
     background_process.set_temp_output_path(active_bed);
@@ -4047,7 +4055,6 @@ void Plater::priv::show_autoslicing_action_buttons() const {
     if (!s_multiple_beds.is_autoslicing()) {
         return;
     }
-    wxWindowUpdateLocker noUpdater(sidebar);
 
     DynamicPrintConfig* selected_printer_config = wxGetApp().preset_bundle->physical_printers.get_selected_printer_config();
     const auto print_host_opt = selected_printer_config ? selected_printer_config->option<ConfigOptionString>("print_host") : nullptr;
@@ -7339,6 +7346,7 @@ bool Plater::set_printer_technology(PrinterTechnology printer_technology)
     p->printer_technology = printer_technology;
     bool ret = p->background_process.select_technology(printer_technology);
     if (ret) {
+        s_print_statuses.fill(PrintStatus::idle);
         // Update the active presets.
     }
     //FIXME for SLA synchronize

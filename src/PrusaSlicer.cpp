@@ -644,8 +644,10 @@ int CLI::run(int argc, char **argv)
                 sla_print.set_status_callback(
                             [](const PrintBase::SlicingStatus& s)
                 {
-                    if(s.percent >= 0) // FIXME: is this sufficient?
+                    if(s.percent >= 0) { // FIXME: is this sufficient?
                         printf("%3d%s %s\n", s.percent, "% =>", s.text.c_str());
+                        std::fflush(stdout);
+                    }
                 });
 
                 PrintBase  *print = (printer_technology == ptFFF) ? static_cast<PrintBase*>(&fff_print) : static_cast<PrintBase*>(&sla_print);

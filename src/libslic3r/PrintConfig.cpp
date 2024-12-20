@@ -538,8 +538,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("automatic_infill_combination", coBool);
     def->label = L("Automatic infill combination");
     def->category = L("Infill");
-    def->tooltip = L("This feature automatically combine infill of several layers and speeds up your print by extruding thicker "
-                     "infill layers while preserving thin perimeters, thus accuracy.");
+    def->tooltip = L("This feature automatically combines infill of several layers and speeds up your print by extruding thicker "
+                     "infill layers while preserving thin perimeters, thus maintaining accuracy.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -1011,6 +1011,7 @@ void PrintConfigDef::init_fff_params()
                    "(top+bottom solid layers).");
     def->set_enum<EnsureVerticalShellThickness>({
         { "disabled", L("Disabled") },
+        // TRN: This is a drop-down option for 'Ensure vertical shell thickness' parameter.
         { "partial",  L("Partial")  },
         { "enabled",  L("Enabled")  },
     });
@@ -2731,7 +2732,9 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<ScarfSeamPlacement>(ScarfSeamPlacement::nowhere));
     def->set_enum<ScarfSeamPlacement>({
+        // TRN: Drop-down option for 'Scarf joint placement' parameter.
         { "nowhere", L("Nowhere") },
+        // TRN: Drop-down option for 'Scarf joint placement' parameter.
         { "contours", L("Contours") },
         { "everywhere", L("Everywhere") }
     });
@@ -2747,7 +2750,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Scarf start height");
     def->category = L("Layers and Perimeters");
     def->tooltip = L("Start height of the scarf joint specified as fraction of the current layer height.");
-    def->sidetext = L(" %");
+    def->sidetext = L("%");
     def->min = 0;
     def->max = 100;
     def->mode = comAdvanced;
@@ -2772,7 +2775,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("scarf_seam_max_segment_length", coFloat);
     def->label = L("Max scarf joint segment length");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Maximal length of any scarf joint segment.");
+    def->tooltip = L("Maximum length of any scarf joint segment.");
     def->sidetext = L("mm");
     def->min = 0.15f;
     def->mode = comAdvanced;

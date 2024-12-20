@@ -286,7 +286,7 @@ CommonUpdaterDialog::CommonUpdaterDialog(PresetUpdaterUIStatus* ui_status, wxWin
     , PresetUpdaterUIStatusCancel(ui_status)
 {
     auto* headline = new wxStaticText(this, wxID_ANY, first_line, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
-    m_status_text = new wxStaticText(this, wxID_ANY, _L("Initializing..."), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
+    m_status_text = new wxStaticText(this, wxID_ANY, _L("Initializing") + dots, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
     m_cancel_button = new wxButton(this, wxID_CANCEL, "Cancel");
     // Layout using sizer
     wxBoxSizer* hsizer = new wxBoxSizer(wxHORIZONTAL);
