@@ -1610,7 +1610,8 @@ static void update_color_changes_using_color_projection_ranges(std::vector<Color
 static std::vector<ColorPolygons> slice_model_volume_with_color(const ModelVolume                                              &model_volume,
                                                                const std::function<ModelVolumeFacetsInfo(const ModelVolume &)> &extract_facets_info,
                                                                const std::vector<float>                                        &layer_zs,
-                                                               const PrintObject                                               &print_object)
+                                                               const PrintObject                                               &print_object,
+                                                               const size_t                                                     num_facets_states)
 {
     const ModelVolumeFacetsInfo facets_info = extract_facets_info(model_volume);
 
@@ -1635,6 +1636,15 @@ static std::vector<ColorPolygons> slice_model_volume_with_color(const ModelVolum
             for (ColorPolygon &color_polygon : color_polygons) {
                 std::replace(color_polygon.colors.begin(), color_polygon.colors.end(), static_cast<uint8_t>(TriangleStateType::NONE), static_cast<uint8_t>(volume_extruder_id));
             }
+        }
+    }
+
+    // Replace any non-existing painted color with the default (TriangleStateType::NONE).
+    for (ColorPolygons &color_polygons : color_polygons_per_layer) {
+        for (ColorPolygon &color_polygon : color_polygons) {
+            std::replace_if(color_polygon.colors.begin(), color_polygon.colors.end(),
+                            [&num_facets_states](const uint8_t color) { return color >= num_facets_states; },
+                            static_cast<uint8_t>(TriangleStateType::NONE));
         }
     }
 
@@ -1694,7 +1704,7 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
     BOOST_LOG_TRIVIAL(debug) << "Print object segmentation - Slicing painted triangles - Begin";
     const std::vector<float> layer_zs = get_print_object_layers_zs(layers);
     for (const ModelVolume *mv : print_object.model_object()->volumes) {
-        std::vector<ColorPolygons> color_polygons_per_layer = slice_model_volume_with_color(*mv, extract_facets_info, layer_zs, print_object);
+        std::vector<ColorPolygons> color_polygons_per_layer = slice_model_volume_with_color(*mv, extract_facets_info, layer_zs, print_object, num_facets_states);
 
         tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&color_polygons_per_layer, &color_polygons_lines_layers, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
@@ -1791,6 +1801,9 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
             throw_on_cancel_callback();
 
             std::vector<ColorProjectionLines> &input_polygons_projection_lines = input_polygons_projection_lines_layers[layer_idx];
+            if (input_polygons_projection_lines.empty()) {
+                continue;
+            }
 
             if constexpr (MM_SEGMENTATION_DEBUG_COLOR_RANGES) {
                 export_color_projection_lines_color_ranges_to_svg(debug_out_path("mm-color-ranges-%d.svg", layer_idx), input_polygons_projection_lines, input_expolygons[layer_idx]);

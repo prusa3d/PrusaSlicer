@@ -607,7 +607,7 @@ void Bed3D::render_default(bool bottom, bool picking, bool show_texture, const T
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-        const bool has_model = !m_model.model.get_filename().empty();
+        const bool has_model = !m_model.model.get_filename().empty() && ! m_models_overlap;
         if (!has_model && !bottom) {
             // draw background
             glsafe(::glDepthMask(GL_FALSE));
