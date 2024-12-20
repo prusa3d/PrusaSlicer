@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(PrusaSlicer-native)
 
+# This enables -fPIC for shared libaries and -fpie for binaries
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 add_subdirectory(clipper)
 find_package(Qhull 7.2 REQUIRED)
 add_library(qhull INTERFACE)
