@@ -32,3 +32,9 @@ add_library(slic3r-arrange
 target_include_directories(slic3r-arrange PRIVATE src)
 target_include_directories(slic3r-arrange PUBLIC include)
 target_link_libraries(slic3r-arrange PUBLIC libslic3r)
+
+if (WIN32)
+    install(TARGETS slic3r-arrange LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX})
+else()
+    install(TARGETS slic3r-arrange LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
