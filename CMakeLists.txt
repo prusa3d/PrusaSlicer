@@ -9,7 +9,14 @@
 #/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 #/|/
 cmake_minimum_required(VERSION 3.13)
-project(PrusaSlicer)
+
+ # Specify search path for CMake modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+# This will define e.g. -DCMAKE_BUILD_TYPE=AddressSanitizer
+include(DefineCompilerFlags)
+
+project(PrusaSlicer LANGUAGES C CXX)
 
 include("version.inc")
 include(GNUInstallDirs)
@@ -38,8 +45,6 @@ option(SLIC3R_GUI    			"Compile PrusaSlicer with GUI components (OpenGL, wxWidg
 option(SLIC3R_FHS               "Assume PrusaSlicer is to be installed in a FHS directory structure" 0)
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
-option(SLIC3R_ASAN              "Enable ASan on Clang and GCC" 0)
-option(SLIC3R_UBSAN             "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" ON)
 option(SLIC3R_LOG_TO_FILE       "Enable logging into file")
 option(SLIC3R_REPO_URL          "Preset repo URL")
@@ -175,9 +180,6 @@ foreach (DIR ${PREFIX_PATH_CHECK})
     endif ()
 endforeach ()
 
-# Add our own cmake module path.
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules/)
-
 enable_testing ()
 
 # Enable C++17 language standard.
@@ -289,49 +291,6 @@ if (NOT MSVC AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMP
     endif()
 
 endif()
-
-if (SLIC3R_ASAN)
-    # ASAN should be available on MSVC starting with Visual Studio 2019 16.9
-    # https://devblogs.microsoft.com/cppblog/address-sanitizer-for-msvc-now-generally-available/
-    add_compile_options(-fsanitize=address)
-
-    if (NOT MSVC)
-        add_compile_options(-fno-omit-frame-pointer)
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
-        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fsanitize=address")
-    endif ()
-
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lasan")
-    endif ()
-endif ()
-
-if (SLIC3R_UBSAN)
-    # Stacktrace for every report is enabled by default. It can be disabled by running PrusaSlicer with "UBSAN_OPTIONS=print_stacktrace=0".
-
-    # Define macro SLIC3R_UBSAN to allow detection in the source code if this sanitizer is enabled.
-    add_compile_definitions(SLIC3R_UBSAN)
-
-    # Clang supports much more useful checks than GCC, so when Clang is detected, another checks will be enabled.
-    # List of what GCC is checking: https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
-    # List of what Clang is checking: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-        set(_ubsan_flags "-fsanitize=undefined,integer")
-    else ()
-        set(_ubsan_flags "-fsanitize=undefined")
-    endif ()
-
-    add_compile_options(${_ubsan_flags} -fno-omit-frame-pointer)
-
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${_ubsan_flags}")
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_ubsan_flags}")
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${_ubsan_flags}")
-
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lubsan")
-    endif ()
-endif ()
 
 if (APPLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=partial-availability -Werror=unguarded-availability -Werror=unguarded-availability-new")
