@@ -257,7 +257,7 @@ bool PrusaConnectNew::get_storage(wxArrayString& storage_path, wxArrayString& st
                     if (path && (!available || *available)) {
                         StorageInfo si;
                         si.path = boost::nowide::widen(*path);
-                        si.name = name ? boost::nowide::widen(*name) : wxString();
+                        si.name = name ? boost::nowide::widen(*name) : std::wstring();
                         // If read_only is missing, assume it is NOT read only.
                         // si.read_only = read_only ? *read_only : false; // version without "ro"
                         si.read_only = (read_only ? *read_only : (ro ? *ro : false));
