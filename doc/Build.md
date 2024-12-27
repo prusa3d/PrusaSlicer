@@ -51,8 +51,12 @@ ctest
 ```
 
 ## Advanced build options
-The standard `CMAKE_BUILD_TYPE` option is supported. Furthermore there are several more build options provided by PrusaSlicer. These options have the `SLIC3R_` prefix and can be passed to cmake during in the `Build PrusaSlicer` step. E.g.:
+The standard `CMAKE_BUILD_TYPE` option is supported, including sanitizer build types. Furthermore there are several more build options provided by PrusaSlicer. These options have the `SLIC3R_` prefix and can be passed to cmake during in the `Build PrusaSlicer` step. E.g.:
 ```bash
-cmake .. -DSLIC3R_ASAN=ON -DCMAKE_PREFIX_PATH="../deps/build/destdir/usr/local"
+cmake .. -DCMAKE_PREFIX_PATH="../deps/build/destdir/usr/local"
 ```
+- `-DCMAKE_BUILD_TYPE=AddressSanitizer` to build with Address Sanitizer
+- `-DCMAKE_BUILD_TYPE=UndefinedSanitizer` to build with Undefined Sanitizer
+- `-DCMAKE_BUILD_TYPE=MemorySanitizer` to build with Memory Sanitizer
+
 See the main CMakeLists.txt for the full list.

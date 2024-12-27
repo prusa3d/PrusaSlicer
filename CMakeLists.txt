@@ -9,7 +9,14 @@
 #/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 #/|/
 cmake_minimum_required(VERSION 3.13)
-project(PrusaSlicer)
+
+ # Specify search path for CMake modules
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+# This will define e.g. -DCMAKE_BUILD_TYPE=AddressSanitizer
+include(DefineCompilerFlags)
+
+project(PrusaSlicer LANGUAGES C CXX)
 
 option(SLIC3R_STATIC "Compile PrusaSlicer with static libraries (Boost, TBB, glew)" ON)
 option(SLIC3R_FHS "Assume PrusaSlicer is to be installed in a FHS directory structure" OFF)
@@ -25,8 +32,6 @@ if (SLIC3R_PCH AND MSVC)
     message(STATUS "Disabling SLIC3R_PCH: Currently not supported on MSVC")
     set(SLIC3R_PCH OFF)
 endif ()
-option(SLIC3R_ASAN "Enable ASan on Clang and GCC" 0)
-option(SLIC3R_UBSAN "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_REPO_URL "Preset repo URL")
 option(SLIC3R_RELEASE_DEBUG_SYMBOLS "Build release build with debug symbols" ON)
 option(SLIC3R_ENABLE_PROFILING "Enable Tracy profiling instrumentation" OFF)
@@ -72,7 +77,6 @@ set(SLIC3R_YAML ryml CACHE STRING "YAML library to use (allowed: libfyaml, yaml-
 option(SLIC3R_DEBUG_PRESET_CACHE "In Debug build cache loading of preset bundle" ON)
 
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules/)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -270,9 +274,21 @@ enable_testing()
 
 include(DoxygenTarget)
 include(LuaDocsTarget)
-include(Sanitizers)
 
-if (NOT SLIC3R_ASAN AND NOT SLIC3R_UBSAN)
+if (CMAKE_BUILD_TYPE STREQUAL "UndefinedSanitizer")
+    # Define macro SLIC3R_UBSAN to allow detection in the source code if this sanitizer is enabled.
+    add_compile_definitions(SLIC3R_UBSAN)
+endif ()
+
+if (APPLE AND CMAKE_BUILD_TYPE STREQUAL "AddressSanitizer")
+    # This is an unfortunate reality when using ASAN with dependencies that are not compiled with asan.
+    # See https://stackoverflow.com/questions/38723374/why-does-xcode-define-libcpp-has-no-asan-when-creating-an-address-sanitized-bui
+    # This sadly means that the memory of e.g. std::vector "between" size and capacity is not poisoned
+    # and some issues (e.g. accessing an element past vector size but within its capacity) wont be reported.
+    add_compile_definitions(_LIBCPP_HAS_NO_ASAN)
+endif ()
+
+if (NOT CMAKE_BUILD_TYPE MATCHES "^(AddressSanitizer|UndefinedSanitizer|MemorySanitizer)$")
     include(CheckIPOSupported)
     check_ipo_supported(RESULT _ipo_supported OUTPUT _ipo_output LANGUAGES CXX C)
     if (_ipo_supported)
