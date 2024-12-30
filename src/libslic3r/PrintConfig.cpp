@@ -1253,6 +1253,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionStrings { "" });
 
+    def = this->add("filament_max_speed", coFloats);
+    def->label = L("Max speed");
+    def->tooltip = L("Maximum speed allowed for this filament. Limits the maximum "
+        "speed of a print to the minimum of the print speed and the filament speed. "
+        "Set zero for no limit.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats{ 0. });
+
     def = this->add("filament_max_volumetric_speed", coFloats);
     def->label = L("Max volumetric speed");
     def->tooltip = L("Maximum volumetric speed allowed for this filament. Limits the maximum volumetric "

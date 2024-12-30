@@ -2293,6 +2293,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("filament_abrasive");
 
         optgroup = page->new_optgroup(L("Print speed override"));
+        optgroup->append_single_option_line("filament_max_speed", "max-speed_127176");
         optgroup->append_single_option_line("filament_max_volumetric_speed", "max-volumetric-speed_127176");
 
         line = { "", "" };

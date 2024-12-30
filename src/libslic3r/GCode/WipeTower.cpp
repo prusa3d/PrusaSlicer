@@ -542,6 +542,7 @@ WipeTower::ToolChangeResult WipeTower::construct_tcr(WipeTowerWriter& writer,
 
 
 WipeTower::WipeTower(const Vec2f& pos, double rotation_deg, const PrintConfig& config, const PrintRegionConfig& default_region_config, const std::vector<std::vector<float>>& wiping_matrix, size_t initial_tool) :
+    m_config(&config),
     m_semm(config.single_extruder_multi_material.value),
     m_wipe_tower_pos(pos),
     m_wipe_tower_width(float(config.wipe_tower_width)),
@@ -646,6 +647,10 @@ void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
     m_filpar[idx].filament_area = float((M_PI/4.f) * pow(config.filament_diameter.get_at(idx), 2)); // all extruders are assumed to have the same filament diameter at this point
     float nozzle_diameter = float(config.nozzle_diameter.get_at(idx));
     m_filpar[idx].nozzle_diameter = nozzle_diameter; // to be used in future with (non-single) multiextruder MM
+
+    float max_speed = float(config.filament_max_speed.get_at(idx));
+    if (max_speed > 0.f)
+        m_filpar[idx].max_speed = max_speed;
 
     float max_vol_speed = float(config.filament_max_volumetric_speed.get_at(idx));
     if (max_vol_speed!= 0.f)
@@ -1173,7 +1178,11 @@ void WipeTower::toolchange_Wipe(
         x_to_wipe = std::max(x_to_wipe, x_to_fill_cleaning_box);
     }
 
-    const float target_speed = is_first_layer() ? m_first_layer_speed * 60.f : m_infill_speed * 60.f;
+    float max_speed = std::numeric_limits<float>::max();
+    if (m_config->filament_max_speed.get_at(m_current_tool) > 0) {
+        max_speed = float(m_config->filament_max_speed.get_at(m_current_tool));
+    }
+    const float target_speed = std::min(max_speed, (is_first_layer() ? m_first_layer_speed * 60.f : m_infill_speed * 60.f));
     float wipe_speed = 0.33f * target_speed;
 
     // if there is less than 2.5*line_width to the edge, advance straightaway (there is likely a blob anyway)

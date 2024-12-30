@@ -252,6 +252,7 @@ public:
         float               cooling_final_speed = 0.f;
         float               ramming_line_width_multiplicator = 1.f;
         float               ramming_step_multiplicator = 1.f;
+        float               max_speed = std::numeric_limits<float>::max();
         float               max_e_speed = std::numeric_limits<float>::max();
         std::vector<float>  ramming_speed;
         float               nozzle_diameter;
@@ -275,6 +276,7 @@ private:
     }
 
 
+	const PrintConfig* m_config;
 	bool   m_semm               = true; // Are we using a single extruder multimaterial printer?
 	bool   m_is_mk4mmu3         = false;
     bool   m_switch_filament_monitoring = false;
