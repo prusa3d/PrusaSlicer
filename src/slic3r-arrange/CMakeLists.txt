@@ -1,7 +1,7 @@
 project(slic3r-arrange)
 cmake_minimum_required(VERSION 3.13)
 
-add_library(slic3r-arrange
+add_library(slic3r-arrange STATIC
     include/arrange/Beds.hpp
     include/arrange/ArrangeItemTraits.hpp
     include/arrange/PackingContext.hpp
