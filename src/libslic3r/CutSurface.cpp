@@ -6,12 +6,11 @@
 
 template <typename T>
 auto access_pmap(std::optional<T> opt) -> T {
-    return opt.value();
+    return opt.value_or(T{});
 }
 
 template <typename Pair>
 auto access_pmap(Pair pair) { return pair.first; }
-
 
 /// models_input.obj - Check transormation of model to each others
 /// projection_center.obj - circle representing center of projection with correct distance
@@ -3718,7 +3717,7 @@ void priv::store(const CutMesh &mesh, const FaceTypeMap &face_type_map, const st
     }
 
     CutMesh &mesh_ = const_cast<CutMesh &>(mesh);
-    auto face_colors = access_pmap((mesh_.add_property_map<priv::FI, CGAL::Color>("f:color")));    
+    auto face_colors = access_pmap((mesh_.add_property_map<priv::FI, CGAL::Color>("f:color")));
     for (FI fi : mesh.faces()) { 
         auto &color = face_colors[fi];
         switch (face_type_map[fi]) {
@@ -3744,7 +3743,7 @@ void priv::store(const CutMesh &mesh, const ReductionMap &reduction_map, const s
     std::string off_file = dir + "model" + std::to_string(reduction_order++) + ".off";
 
     CutMesh &mesh_ = const_cast<CutMesh &>(mesh);
-    auto vertex_colors = access_pmap((mesh_.add_property_map<priv::VI, CGAL::Color>("v:color")));    
+    auto vertex_colors = access_pmap((mesh_.add_property_map<priv::VI, CGAL::Color>("v:color")));
     // initialize to gray color
     for (VI vi: mesh.vertices())
         vertex_colors[vi] = CGAL::Color{127, 127, 127};
