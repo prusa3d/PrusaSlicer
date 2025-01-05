@@ -732,7 +732,7 @@ msgstr "Einstellungen hinzufügen"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1464
 msgid "Add Settings Bundle for Height range"
-msgstr "Höhenbreich Einstellungsbündel hinzufügen"
+msgstr "Höhenbereich Einstellungsbündel hinzufügen"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1466
 msgid "Add Settings Bundle for Object"
@@ -1124,7 +1124,7 @@ msgstr "Es wurde ein neues Filament installiert, das nun aktiviert wird."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:3504
 msgid "A new Printer was installed and it will be activated."
-msgstr "A new Printer was installed and it will be activated."
+msgstr "Ein neuer Drucker wurde installiert und wird nun aktiviert."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:3531
 msgid "A new SLA material was installed and it will be activated."
@@ -5744,7 +5744,7 @@ msgstr "Export &Konfiguration"
 
 #: src/slic3r/GUI/MainFrame.cpp:1553
 msgid "Export Config &Bundle"
-msgstr "Konfigurationssa&mlung exportieren"
+msgstr "Konfigurationssa&mmlung exportieren"
 
 #: src/slic3r/GUI/MainFrame.cpp:1556
 msgid "Export Config Bundle With Physical Printers"
