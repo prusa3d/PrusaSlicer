@@ -7,6 +7,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set(_gtk_ver 3)
     endif ()
     set(_wx_toolkit "-DwxBUILD_TOOLKIT=gtk${_gtk_ver}")
+
+    set(_wx_glcanvas_egl "-DwxUSE_GLCANVAS_EGL=${SLIC3R_EGL}")
 endif()
 
 set(_unicode_utf8 OFF)
@@ -28,8 +30,8 @@ else ()
 endif ()
 
 add_cmake_project(wxWidgets
-    URL https://github.com/prusa3d/wxWidgets/archive/323a465e577e03f330e2e6a4c78e564d125340cb.zip
-    URL_HASH SHA256=B538E4AD3CC93117932F4DED70C476D6650F9C70A9D4055A08F3693864C47465
+    URL https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.5/wxWidgets-3.2.5.tar.bz2
+    URL_HASH SHA256=0AD86A3AD3E2E519B6A705248FC9226E3A09BBF069C6C692A02ACF7C2D1C6B51
     PATCH_COMMAND COMMAND ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/webview.patch
     CMAKE_ARGS
         "-DCMAKE_DEBUG_POSTFIX:STRING="
@@ -51,7 +53,7 @@ add_cmake_project(wxWidgets
         -DwxUSE_EXPAT=sys
         -DwxUSE_LIBSDL=OFF
         -DwxUSE_XTEST=OFF
-        -DwxUSE_GLCANVAS_EGL=OFF
+        ${_wx_glcanvas_egl}
         -DwxUSE_WEBREQUEST=OFF
         ${_wx_webview}
         ${_wx_secretstore}
@@ -68,4 +70,3 @@ if (MSVC)
             "${CMAKE_CURRENT_BINARY_DIR}/builds/wxWidgets/lib/vc_x64_lib/WebView2Loader.dll"
             "${${PROJECT_NAME}_DEP_INSTALL_PREFIX}/bin/WebView2Loader.dll")
 endif()
-
