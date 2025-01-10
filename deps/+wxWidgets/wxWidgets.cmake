@@ -7,6 +7,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set(_gtk_ver 3)
     endif ()
     set(_wx_toolkit "-DwxBUILD_TOOLKIT=gtk${_gtk_ver}")
+
+    set(_wx_glcanvas_egl "-DwxUSE_GLCANVAS_EGL=${SLIC3R_EGL}")
 endif()
 
 set(_unicode_utf8 OFF)
@@ -51,7 +53,7 @@ add_cmake_project(wxWidgets
         -DwxUSE_EXPAT=sys
         -DwxUSE_LIBSDL=OFF
         -DwxUSE_XTEST=OFF
-        -DwxUSE_GLCANVAS_EGL=ON
+        ${_wx_glcanvas_egl}
         -DwxUSE_WEBREQUEST=OFF
         ${_wx_webview}
         ${_wx_secretstore}
@@ -68,4 +70,3 @@ if (MSVC)
             "${CMAKE_CURRENT_BINARY_DIR}/builds/wxWidgets/lib/vc_x64_lib/WebView2Loader.dll"
             "${${PROJECT_NAME}_DEP_INSTALL_PREFIX}/bin/WebView2Loader.dll")
 endif()
-
