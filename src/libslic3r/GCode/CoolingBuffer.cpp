@@ -873,7 +873,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
 
                 fan_speed_new                        = std::clamp(int(float(fan_speed_new) * factor + 0.5f), 0, 100);
                 bridge_fan_speed                     = std::clamp(int(float(bridge_fan_speed) * factor + 0.5f), 0, 100);
-                requested_fan_speed_limits.max_speed = fan_speed_new;
+                requested_fan_speed_limits.max_speed = std::clamp(int(float(requested_fan_speed_limits.max_speed) * factor + 0.5f), 0, 100);
             }
 
 #undef EXTRUDER_CONFIG
