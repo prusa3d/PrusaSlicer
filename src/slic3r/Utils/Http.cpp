@@ -200,7 +200,7 @@ bool Http::priv::ca_file_supported(::CURL *curl)
 
 	if (curl == nullptr) { return res; }
 
-#if LIBCURL_VERSION_MAJOR >= 7 && LIBCURL_VERSION_MINOR >= 48
+#if LIBCURL_VERSION_NUM >= 0x073000 // equivalent to v7.48 or greater
 	::curl_tlssessioninfo *tls;
 	if (::curl_easy_getinfo(curl, CURLINFO_TLS_SSL_PTR, &tls) == CURLE_OK) {
 		if (tls->backend == CURLSSLBACKEND_SCHANNEL || tls->backend == CURLSSLBACKEND_DARWINSSL) {
@@ -364,7 +364,7 @@ void Http::priv::http_perform(const HttpRetryOpt& retry_opts)
 	::curl_easy_setopt(curl, CURLOPT_READFUNCTION, form_file_read_cb);
 
 	::curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-#if LIBCURL_VERSION_MAJOR >= 7 && LIBCURL_VERSION_MINOR >= 32
+#if LIBCURL_VERSION_NUM >= 0x072000 // equivalent to v7.32 or higher
 	::curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xfercb);
 	::curl_easy_setopt(curl, CURLOPT_XFERINFODATA, static_cast<void*>(this));
 #ifndef _WIN32
