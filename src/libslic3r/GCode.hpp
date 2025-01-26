@@ -229,7 +229,7 @@ private:
         const Polyline &xy_path,
         const double initial_elevation,
         const GCode::Impl::Travels::ElevatedTravelParams &elevation_params
-    ) const;
+    );
 
     std::vector<GCode::ExtrusionOrder::ExtruderExtrusions> get_sorted_extrusions(
         const Print &print,
