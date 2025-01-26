@@ -329,9 +329,9 @@ std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij
 
 std::string GCodeWriter::travel_to_xyz(const Vec3d &to, const std::string_view comment)
 {
-    if (std::abs(to.x() - m_pos.x()) < EPSILON && std::abs(to.y() - m_pos.y()) < EPSILON) {
+    if (std::abs(to.x() - m_pos.x()) < GCodeFormatter::XYZ_EPSILON && std::abs(to.y() - m_pos.y()) < GCodeFormatter::XYZ_EPSILON) {
         return this->travel_to_z(to.z(), comment);
-    } else if (std::abs(to.z() - m_pos.z()) < EPSILON) {
+    } else if (std::abs(to.z() - m_pos.z()) < GCodeFormatter::XYZ_EPSILON) {
         return this->travel_to_xy(to.head<2>(), comment);
     } else {
         std::string result{this->get_travel_to_xyz_gcode(to, comment)};
@@ -365,7 +365,7 @@ std::string GCodeWriter::get_travel_to_xyz_gcode(const Vec3d &to, const std::str
 
 std::string GCodeWriter::travel_to_z(double z, const std::string_view comment)
 {
-    if (std::abs(m_pos.z() - z) < EPSILON) {
+    if (std::abs(m_pos.z() - z) < GCodeFormatter::XYZ_EPSILON) {
         return "";
     } else {
         m_pos.z() = z;

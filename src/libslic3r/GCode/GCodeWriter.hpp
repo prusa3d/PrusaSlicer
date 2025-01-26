@@ -176,6 +176,9 @@ public:
     static constexpr const std::array<double, 10> pow_10    {   1.,     10.,    100.,    1000.,    10000.,    100000.,    1000000.,    10000000.,    100000000.,    1000000000.};
     static constexpr const std::array<double, 10> pow_10_inv{1./1.,  1./10., 1./100., 1./1000., 1./10000., 1./100000., 1./1000000., 1./10000000., 1./100000000., 1./1000000000.};
 
+    // Compute XYZ_EPSILON based on XYZF_EXPORT_DIGITS
+    static constexpr double XYZ_EPSILON = pow_10_inv[XYZF_EXPORT_DIGITS];
+
     // Quantize doubles to a resolution of the G-code.
     static double                                 quantize(double v, size_t ndigits) { return std::round(v * pow_10[ndigits]) * pow_10_inv[ndigits]; }
     static double                                 quantize_xyzf(double v) { return quantize(v, XYZF_EXPORT_DIGITS); }
