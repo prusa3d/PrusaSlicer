@@ -5878,6 +5878,7 @@ void TabSLAPrint::build()
     auto optgroup = page->new_optgroup(L("Layers"));
     optgroup->append_single_option_line("layer_height");
     optgroup->append_single_option_line("faded_layers");
+    optgroup->append_single_option_line("bottom_layers");
 
     page = add_options_page(L("Supports"), "support"/*"sla_supports"*/);
 

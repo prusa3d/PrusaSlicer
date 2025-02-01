@@ -38,6 +38,20 @@ static float constrained_map(float value, float min, float max, float out_min, f
     return out_min * (1 - t) + out_max * t;
 }
 
+static float generate_layer_exposure_time(
+    int current_layer, int bottom_layers, int faded_layers,
+    float initial_exposure_time, float exposure_time
+) {
+    if (current_layer <= bottom_layers) {
+        return initial_exposure_time;
+    } else {
+        return constrained_map(
+            current_layer - bottom_layers, 1, faded_layers + 1,
+            initial_exposure_time, exposure_time
+        );
+    }
+}
+
 static void write_thumbnail(
     size_t width, size_t height, const ThumbnailsList &thumbnails, uint16_t *buffer
 ) {
@@ -317,7 +331,7 @@ void GOOWriter::export_print(
     h_info.after_lift_time_s = hton(option_as_float(mat.sla_wait_after_lift));
     h_info.after_retract_time_s = hton(option_as_float(mat.sla_wait_after_retract));
     h_info.bottom_exposure_time_s = hton(option_as_float(mat.initial_exposure_time));
-    h_info.bottom_layers = hton<uint32_t>(obj_stats.faded_layers + 1), // NOTE: Faded layers + initial layer have increased exposure
+    h_info.bottom_layers = hton<uint32_t>(obj_stats.bottom_layers),
     h_info.bottom_lift_distance_mm = hton(option_as_float(mat.sla_initial_primary_lift_distance));
     h_info.bottom_lift_speed_mm_min = hton(option_as_float(mat.sla_initial_primary_lift_speed));
     h_info.lift_distance_mm = hton(option_as_float(mat.sla_primary_lift_distance));
@@ -375,8 +389,8 @@ void GOOWriter::export_print(
         l_def.position_mm = hton<float>(
             mat.initial_layer_height.getFloat() + layer_height * (current_layer - 1)
         );
-        l_def.exposure_time_s = hton(constrained_map(
-            current_layer, 1, obj_stats.faded_layers + 1, //
+        l_def.exposure_time_s = hton(generate_layer_exposure_time(
+            current_layer, obj_stats.bottom_layers, obj_stats.faded_layers,
             mat.initial_exposure_time, mat.exposure_time
         ));
         l_def.off_time_s = 0;

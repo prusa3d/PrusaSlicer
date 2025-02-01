@@ -4183,6 +4183,14 @@ void PrintConfigDef::init_sla_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionInt(10));
 
+    def = this->add("bottom_layers", coInt);
+    def->label = L("Bottom Layers");
+    def->tooltip = L("Number of layers the initial exposure time is repeated for.");
+    def->min = 1;
+    def->max = 20;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(2));
+
     def = this->add("min_exposure_time", coFloat);
     def->label = L("Minimum exposure time");
     def->tooltip = L("Minimum exposure time");

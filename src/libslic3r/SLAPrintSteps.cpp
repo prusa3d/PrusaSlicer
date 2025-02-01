@@ -1138,6 +1138,20 @@ static float constrained_map(float value, float min, float max, float out_min, f
     float t = (value - min) / (max - min);
     return out_min * (1 - t) + out_max * t;
 }
+
+static float generate_layer_exposure_time(
+    int current_layer, int bottom_layers, int faded_layers,
+    float initial_exposure_time, float exposure_time
+) {
+    if (current_layer <= bottom_layers) {
+        return initial_exposure_time;
+    } else {
+        return constrained_map(
+            current_layer - bottom_layers, 1, faded_layers + 1,
+            initial_exposure_time, exposure_time
+        );
+    }
+}
 }
 
 // Merging the slices from all the print objects into one slice grid and
@@ -1164,6 +1178,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
 
     const double time_estimate_correction = printer_config.time_estimate_correction.getFloat();
 
+    const int bottom_layers_cnt = m_print->m_default_object_config.bottom_layers.getInt();// 2 // [1;20]
     const int fade_layers_cnt = m_print->m_default_object_config.faded_layers.getInt();// 10 // [3;20]
 
     ExposureProfile below(material_config, 0);
@@ -1186,7 +1201,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     auto printlayerfn = [this,
             // functions and read only vars
             area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time, is_prusa_print, first_slow_layers, below, above,
-            is_printer_with_tilt, time_estimate_correction, fade_layers_cnt,
+            is_printer_with_tilt, time_estimate_correction, bottom_layers_cnt, fade_layers_cnt,
 
             // write vars
             &layers_info](size_t sliced_layer_cnt)
@@ -1312,8 +1327,10 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
         } else {
             bool first_layer = sliced_layer_cnt == 0;
 
-            double layer_exposure_time = constrained_map(sliced_layer_cnt,
-                0, fade_layers_cnt, init_exp_time, exp_time);
+            double layer_exposure_time = generate_layer_exposure_time(
+                sliced_layer_cnt, bottom_layers_cnt, fade_layers_cnt,
+                init_exp_time, exp_time
+            );
 
             // NOTE: Following times are in minutes and are therefore multiplied by 60
             double primary_lift_time =

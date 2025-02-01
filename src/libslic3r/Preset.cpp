@@ -540,6 +540,7 @@ static std::vector<std::string> s_Preset_printer_options {
 static std::vector<std::string> s_Preset_sla_print_options {
     "layer_height",
     "faded_layers",
+    "bottom_layers",
     "supports_enable",
     "support_tree_type",
 
