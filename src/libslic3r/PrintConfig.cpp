@@ -3029,6 +3029,24 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionString(""));
 
+    def = this->add("bed_temperature_offset", coInt);
+    def->label = L("Bed");
+    def->tooltip = L("How much to offset the bed temperature.");
+    def->sidetext = L("°C");
+    def->mode = comExpert;
+    def->max = -max_temp;
+    def->max = max_temp;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("temperature_offset", coInt);
+    def->label = L("Nozzle");
+    def->tooltip = L("How much to offset the nozzle temperature (when, for example, using a nozzle with a different thermal conductivity).");
+    def->sidetext = L("°C");
+    def->mode = comExpert;
+    def->max = -max_temp;
+    def->max = max_temp;
+    def->set_default_value(new ConfigOptionInt(0));
+
     def = this->add("single_extruder_multi_material", coBool);
     def->label = L("Single Extruder Multi Material");
     def->tooltip = L("The printer multiplexes filaments into a single hot end.");

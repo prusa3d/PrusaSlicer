@@ -170,10 +170,11 @@ namespace Slic3r {
     {
         // First layer temperature should be used when on the first layer (obviously) and when
         // "other layers" is set to zero (which means it should not be used).
-        return (gcodegen.layer() == nullptr || gcodegen.layer()->id() == 0
+        return ((gcodegen.layer() == nullptr || gcodegen.layer()->id() == 0
              || gcodegen.config().temperature.get_at(gcodegen.writer().extruder()->id()) == 0)
             ? gcodegen.config().first_layer_temperature.get_at(gcodegen.writer().extruder()->id())
-            : gcodegen.config().temperature.get_at(gcodegen.writer().extruder()->id());
+            : gcodegen.config().temperature.get_at(gcodegen.writer().extruder()->id())) +
+            gcodegen.config().temperature_offset.value;
     }
 
     const std::vector<std::string> ColorPrintColors::Colors = { "#C0392B", "#E67E22", "#F1C40F", "#27AE60", "#1ABC9C", "#2980B9", "#9B59B6" };
@@ -1879,14 +1880,14 @@ void GCodeGenerator::print_machine_envelope(GCodeOutputStream &file, const Print
 }
 
 // Write 1st layer bed temperatures into the G-code.
-// Only do that if the start G-code does not already contain any M-code controlling an extruder temperature.
-// M140 - Set Extruder Temperature
-// M190 - Set Extruder Temperature and Wait
+// Only do that if the start G-code does not already contain any M-code controlling bed temperature.
+// M140 - Set Bed Temperature
+// M190 - Set Bed Temperature and Wait
 void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
     bool autoemit = print.config().autoemit_temperature_commands;
     // Initial bed temperature based on the first extruder.
-    int  temp = print.config().first_layer_bed_temperature.get_at(first_printing_extruder_id);
+    int  temp = print.config().first_layer_bed_temperature.get_at(first_printing_extruder_id) + print.config().bed_temperature_offset;
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode     = -1;
     bool temp_set_by_gcode = custom_gcode_sets_temperature(gcode, 140, 190, false, temp_by_gcode);
@@ -1898,7 +1899,6 @@ void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file,
     if (autoemit && ! temp_set_by_gcode)
         file.write(set_temp_gcode);
 }
-
 
 
 // Write chamber temperatures into the G-code.
@@ -1934,20 +1934,21 @@ void GCodeGenerator::_print_first_layer_extruder_temperatures(GCodeOutputStream 
     bool autoemit = print.config().autoemit_temperature_commands;
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode = -1;
+    int nozzle_temp_offset = print.config().temperature_offset.value;
     bool include_g10   = print.config().gcode_flavor == gcfRepRapFirmware;
     if (! autoemit  || custom_gcode_sets_temperature(gcode, 104, 109, include_g10, temp_by_gcode)) {
         // Set the extruder temperature at m_writer, but throw away the generated G-code as it will be written with the custom G-code.
         int temp = print.config().first_layer_temperature.get_at(first_printing_extruder_id);
         if (autoemit && temp_by_gcode >= 0 && temp_by_gcode < 1000)
             temp = temp_by_gcode;
-        m_writer.set_temperature(temp, wait, first_printing_extruder_id);
+        m_writer.set_temperature(temp + nozzle_temp_offset, wait, first_printing_extruder_id);
     } else {
         // Custom G-code does not set the extruder temperature. Do it now.
         if (print.config().single_extruder_multi_material.value) {
             // Set temperature of the first printing extruder only.
             int temp = print.config().first_layer_temperature.get_at(first_printing_extruder_id);
             if (temp > 0)
-                file.write(m_writer.set_temperature(temp, wait, first_printing_extruder_id));
+                file.write(m_writer.set_temperature(temp + nozzle_temp_offset, wait, first_printing_extruder_id));
         } else {
             // Set temperatures of all the printing extruders.
             for (unsigned int tool_id : print.extruders()) {
@@ -1961,7 +1962,7 @@ void GCodeGenerator::_print_first_layer_extruder_temperatures(GCodeOutputStream 
                 }
 
                 if (temp > 0)
-                    file.write(m_writer.set_temperature(temp, wait, tool_id));
+                    file.write(m_writer.set_temperature(temp + nozzle_temp_offset, wait, tool_id));
             }
         }
     }
@@ -2622,9 +2623,9 @@ LayerResult GCodeGenerator::process_layer(
             }
             int temperature = print.config().temperature.get_at(extruder.id());
             if (temperature > 0 && (temperature != print.config().first_layer_temperature.get_at(extruder.id())))
-                gcode += m_writer.set_temperature(temperature, false, extruder.id());
+                gcode += m_writer.set_temperature(temperature + print.config().temperature_offset.value, false, extruder.id());
         }
-        gcode += m_writer.set_bed_temperature(print.config().bed_temperature.get_at(first_extruder_id));
+        gcode += m_writer.set_bed_temperature(print.config().bed_temperature.get_at(first_extruder_id) + print.config().bed_temperature_offset.value);
         // Mark the temperature transition from 1st to 2nd layer to be finished.
         m_second_layer_things_done = true;
     }
@@ -3851,7 +3852,7 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
         int temp = (m_layer_index <= 0 ? m_config.first_layer_temperature.get_at(extruder_id) :
                                          m_config.temperature.get_at(extruder_id));
 
-        gcode += m_writer.set_temperature(temp, false);
+        gcode += m_writer.set_temperature(temp + m_config.temperature_offset.value, false);
     }
 
     this->placeholder_parser().set("current_extruder", extruder_id);
