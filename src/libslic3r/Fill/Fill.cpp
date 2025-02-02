@@ -179,7 +179,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        params.pattern 		 = region_config.fill_pattern.value;
 		        params.density       = float(region_config.fill_density);
 
-				std::vector<int> zz_angles;
+		        std::vector<int> zz_angles;
                 //Parsing the angles from the setting
                 if (params.pattern == ipZigZag) {
                     std::string split_me = region_config.infill_zigzag_angles;

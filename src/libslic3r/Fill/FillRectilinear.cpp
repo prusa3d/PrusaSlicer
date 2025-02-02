@@ -2896,7 +2896,7 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
             // increments.
             flip = ((adjusted_angle / 180) % 2) == 1;
         } 
-		traverse_graph_generate_polylines(poly_with_offset, params, segs, this->has_consistent_pattern(), flip, polylines_out);
+        traverse_graph_generate_polylines(poly_with_offset, params, segs, this->has_consistent_pattern(), flip, polylines_out);
     }
 
 #ifdef SLIC3R_DEBUG
