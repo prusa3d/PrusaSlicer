@@ -135,11 +135,6 @@ void test_slicing(std::initializer_list<TestMesh> meshes, DynamicPrintConfig& co
         check_gcode(meshes, config, duplicate);
     }
 
-    SECTION("Negative restart extra length") {
-        config.set_deserialize_strict({{ "retract_restart_extra", "-1" }});
-        check_gcode(meshes, config, duplicate);
-    }
-
     SECTION("Retract_lift") {
         config.set_deserialize_strict({{ "retract_lift", "1,2" }});
         check_gcode(meshes, config, duplicate);

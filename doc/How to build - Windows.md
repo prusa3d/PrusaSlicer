@@ -58,8 +58,28 @@ Debug->Start Debugging or press F5
 
 PrusaSlicer should start. You're up and running!
 
+### Running Unit Tests
+
+For the most complete unit testing, use the Debug build option `-DCMAKE_BUILD_TYPE=Debug` when running cmake.
+Without the Debug build, internal assert statements are not tested.
+
+To run the unit tests:
+
+    cd build
+    make test
 
 
+To run a specific unit test:
+
+    cd build\tests
+
+The unit tests can be found by
+
+    `dir *\*_tests`
+
+Any of these unit tests can be run directly e.g.
+
+    `.\fff_print\fff_print_tests`
 
 ## 2.B Run the automatic build script
 

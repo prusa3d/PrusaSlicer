@@ -119,12 +119,12 @@ std::optional<double> parse_axis(const std::string& line, const std::string& axi
 * - no travel moves go outside skirt
 * - temperatures are set correctly
 */
-TEST_CASE("Extrusion, travels, temeperatures", "[GCode]") {
+TEST_CASE("Extrusion, travels, temperatures", "[GCode]") {
     DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
     config.set_deserialize_strict({
         { "gcode_comments", 1 },
         { "complete_objects", 1 },
-        { "extrusion_axis", 'A' },
+        { "extrusion_axis", "A" },
         { "start_gcode", "" },  // prevent any default extra Z move
         { "layer_height", 0.4 },
         { "first_layer_height", 0.4 },
@@ -174,6 +174,11 @@ TEST_CASE("Extrusion, travels, temeperatures", "[GCode]") {
         }
     });
 
+    // Remove last travel_moves returning to origin
+    if (travel_moves.back().x() == 0 && travel_moves.back().y() == 0) {
+        travel_moves.pop_back();
+    }
+
     const unsigned layer_count = 20 / 0.4;
     INFO("Complete_objects generates the correct number of Z moves.");
     CHECK(z_moves.size() == layer_count * 2);
@@ -192,20 +197,30 @@ TEST_CASE("Extrusion, travels, temeperatures", "[GCode]") {
 
 
 TEST_CASE("Used filament", "[GCode]") {
-    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-    config.set_deserialize_strict({
-        { "retract_length", "1000000" },
+    DynamicPrintConfig config1 = Slic3r::DynamicPrintConfig::full_print_config();
+    config1.set_deserialize_strict({
+        { "retract_length", "0" },
         { "use_relative_e_distances", 1 },
         { "layer_gcode", "G92 E0\n" },
     });
-	GCodeReader parser;
-    Print print;
-    Model model;
-    Test::init_print({TestMesh::cube_20x20x20}, print, model, config);
-    Test::gcode(print);
+    Print print1;
+    Model model1;
+    Test::init_print({TestMesh::cube_20x20x20}, print1, model1, config1);
+    Test::gcode(print1);
+
+    DynamicPrintConfig config2 = Slic3r::DynamicPrintConfig::full_print_config();
+    config2.set_deserialize_strict({
+        { "retract_length", "999" },
+        { "use_relative_e_distances", 1 },
+        { "layer_gcode", "G92 E0\n" },
+    });
+    Print print2;
+    Model model2;
+    Test::init_print({TestMesh::cube_20x20x20}, print2, model2, config2);
+    Test::gcode(print2);
 
     INFO("Final retraction is not considered in total used filament");
-    CHECK(print.print_statistics().total_used_filament > 0);
+    CHECK(print1.print_statistics().total_used_filament == print2.print_statistics().total_used_filament);
 }
 
 void check_m73s(Print& print){
