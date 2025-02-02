@@ -21,7 +21,3 @@ deps/build-linux/*
 **/.idea/
 .pkg_cache
 CMakeUserPresets.json
-/build-default
-/.gitignore
-/.gitignore
-/.gitignore
