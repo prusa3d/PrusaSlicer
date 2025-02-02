@@ -317,7 +317,6 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
 	case coString:
         if (m_opt_id == "infill_zigzag_angles") {
             wxString label = m_opt.full_label.empty() ? _(m_opt.label) : _(m_opt.full_label);
-            //^(\d+,\s*)+(\d+(,\s*)*)+$
             if (!is_matched(str.ToStdString(), "^(\\d+,\\s*)+(\\d+(,\\s*)*)+$")) {
                 show_error(m_parent, format_wxstr(_L("%s is expecting a comma-delimited list of whole number, positive, angles in degrees. For example, \"90,0\"."), label));
                 m_value = into_u8(str);
