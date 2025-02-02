@@ -1557,6 +1557,16 @@ void PrintConfigDef::init_fff_params()
     });
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipStars));
 
+    def = this->add("infill_zigzag_angles", coString);
+    def->label = L("Zig Zag Angles");
+    def->category = L("Infill");
+    def->tooltip = L("List of angles to exercise more control over the Zig Zag Infill pattern. Enter in whole number degrees 0 through "
+                     "360. The multiple angles are separated by commas. If this setting is blank, "
+                     "has only one angle, or has invalid input (like letters), the \"Fill angle\" setting is used.");
+    def->sidetext = L("°,°,…");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("90,0"));
+
     def = this->add("first_layer_acceleration", coFloat);
     def->label = L("First layer");
     def->tooltip = L("This is the acceleration your printer will use for first layer. Set zero "

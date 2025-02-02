@@ -19,6 +19,8 @@
 #include <cassert>
 #include <cinttypes>
 #include <cstdlib>
+#include <string>
+#include <sstream>
 
 #include "../ClipperUtils.hpp"
 #include "../Geometry.hpp"
@@ -69,6 +71,8 @@ struct SurfaceFillParams
 //    coordf_t    	overlap = 0.;
     // Angle as provided by the region config, in radians.
     float       	angle = 0.f;
+    // For Zigzag Infill - Angles that should be used
+    std::vector<int> zigzag_infill_angles;
     // Is bridging used for this fill? Bridging parameters may be used even if this->flow.bridge() is not set.
     bool 			bridge;
     // Non-negative for a bridge.
@@ -123,6 +127,7 @@ struct SurfaceFillParams
 	bool operator==(const SurfaceFillParams &rhs) const {
 		return  this->extruder 			== rhs.extruder 		&&
 				this->pattern 			== rhs.pattern 			&&
+				this->zigzag_infill_angles == rhs.zigzag_infill_angles &&
 				this->spacing 			== rhs.spacing 			&&
 //				this->overlap 			== rhs.overlap 			&&
 				this->angle   			== rhs.angle   			&&
@@ -173,6 +178,20 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        params.extruder 	 = layerm.region().extruder(extrusion_role);
 		        params.pattern 		 = region_config.fill_pattern.value;
 		        params.density       = float(region_config.fill_density);
+
+				std::vector<int> zz_angles;
+                //Parsing the angles from the setting
+				if (params.pattern == ipZigZag) {
+                    std::string split_me = region_config.infill_zigzag_angles;
+                    std::stringstream ss(split_me);
+
+                    for (int i; ss >> i;) {
+                        zz_angles.push_back(i);
+                        if (ss.peek() == ',')
+                            ss.ignore();
+                    }
+                }
+                params.zigzag_infill_angles = zz_angles;
 
 		        if (surface.is_solid()) {
 		            params.density = 100.f;
@@ -493,6 +512,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->layer_id = this->id() - first_object_layer_id;
         f->z 		= this->print_z;
         f->angle 	= surface_fill.params.angle;
+        f->zigzag_infill_angles = surface_fill.params.zigzag_infill_angles;
         f->adapt_fill_octree   = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
         f->print_config        = &this->object()->print()->config();
         f->print_object_config = &this->object()->config();

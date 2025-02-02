@@ -104,6 +104,8 @@ public:
     coordf_t    overlap;
     // in radians, ccw, 0 = East
     float       angle;
+    //For the Zig Zag infill, there is a setting to control the line directions
+    std::vector<int> zigzag_infill_angles;
     // In scaled coordinates. Maximum lenght of a perimeter segment connecting two infill lines.
     // Used by the FillRectilinear2, FillGrid2, FillTriangles, FillStars and FillCubic.
     // If left to zero, the links will not be limited.

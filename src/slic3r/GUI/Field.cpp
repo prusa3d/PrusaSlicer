@@ -315,7 +315,18 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
         m_value = val;
 		break; }
 	case coString:
-	case coStrings:
+        if (m_opt_id == "infill_zigzag_angles") {
+            wxString label = m_opt.full_label.empty() ? _(m_opt.label) : _(m_opt.full_label);
+            //^(\d+,\s*)+(\d+(,\s*)*)+$
+            if (!is_matched(str.ToStdString(), "^(\\d+,\\s*)+(\\d+(,\\s*)*)+$")) {
+                show_error(m_parent, format_wxstr(_L("%s is expecting a comma-delimited list of whole number, positive, angles in degrees. For example, \"90,0\"."), label));
+                m_value = into_u8(str);
+                break;
+            }
+        }
+        //Note - Leaving out a break; here so it falls through. "Thumbnails" is a coString
+        //but its logic is in the coFloatOrPercent case.
+    case coStrings:
     case coFloatsOrPercents:
     case coFloatOrPercent: {
         if (m_opt.type == coFloatOrPercent && m_opt.opt_key == "first_layer_height" && !str.IsEmpty() && str.Last() == '%') {
