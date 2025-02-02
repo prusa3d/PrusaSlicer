@@ -181,7 +181,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
 				std::vector<int> zz_angles;
                 //Parsing the angles from the setting
-				if (params.pattern == ipZigZag) {
+                if (params.pattern == ipZigZag) {
                     std::string split_me = region_config.infill_zigzag_angles;
                     std::stringstream ss(split_me);
 
