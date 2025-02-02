@@ -358,20 +358,21 @@ std::string GCodeWriter::travel_to_xyz_force(const Vec3d &to, const std::string_
     GCodeG1Formatter w;
     w.emit_xyz(to);
 
-    double speed_z = this->config.travel_speed_z.value;
-    if (speed_z == 0.)
-        speed_z = this->config.travel_speed.value;
+    double speed = this->config.travel_speed.value;
+    const double speed_z = this->config.travel_speed_z.value;
 
-    const double distance_xy{(to.head<2>() - m_pos.head<2>()).norm()};
-    const double distnace_z{std::abs(to.z() - m_pos.z())};
-    const double time_z = distnace_z / speed_z;
-    const double time_xy = distance_xy / this->config.travel_speed.value;
-    const double factor = time_z > 0 ? time_xy / time_z : 1;
-    if (factor < 1) {
-        w.emit_f(std::floor((this->config.travel_speed.value * factor  + (1 - factor) * speed_z) * 60.0));
-    } else {
-        w.emit_f(this->config.travel_speed.value * 60.0);
+    if (speed_z) {
+        const Vec3d move{to - m_pos};
+        const double distance{move.norm()};
+        const double abs_unit_vector_z{std::abs(move.z())/distance};
+        // De-compose speed into z vector component according to the movement unit vector.
+        const double speed_vector_z{abs_unit_vector_z * speed};
+        if (speed_vector_z > speed_z) {
+            // Re-compute speed so that the z component is exactly speed_z.
+            speed = speed_z / abs_unit_vector_z;
+        }
     }
+    w.emit_f(speed * 60.0);
 
     w.emit_comment(this->config.gcode_comments, comment);
     m_pos = to;
