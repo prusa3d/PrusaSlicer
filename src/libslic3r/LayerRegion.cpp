@@ -89,6 +89,8 @@ void LayerRegion::slices_to_fill_surfaces_clipped()
 void LayerRegion::make_perimeters(
     // Input slices for which the perimeters, gap fills and fill expolygons are to be generated.
     const SurfaceCollection                                &slices,
+    // Configuration regions that will be applied to parts of created perimeters.
+    const PerimeterRegions                                 &perimeter_regions,
     // Ranges of perimeter extrusions and gap fill extrusions per suface, referencing
     // newly created extrusions stored at this LayerRegion.
     std::vector<std::pair<ExtrusionRange, ExtrusionRange>> &perimeter_and_gapfill_ranges,
@@ -123,6 +125,7 @@ void LayerRegion::make_perimeters(
         region_config,
         this->layer()->object()->config(),
         print_config,
+        perimeter_regions,
         spiral_vase
     );
 

@@ -140,6 +140,10 @@ enum class NotificationType
     BedTemperaturesDiffer,
     // Notification that shrinkage compensations for the used filaments differ.
     ShrinkageCompensationsDiffer,
+    // Notification about using wipe tower with different nozzle diameters.
+    WipeTowerNozzleDiameterDiffer,
+    // Notification about using supports with different nozzle diameters.
+    SupportNozzleDiameterDiffer,
 };
 
 class NotificationManager
@@ -179,7 +183,7 @@ public:
 	// Push a NotificationType::CustomNotification with provided notification level and 10s for RegularNotificationLevel.
 	// ErrorNotificationLevel are never faded out.
     void push_notification(NotificationType type, NotificationLevel level, const std::string& text, const std::string& hypertext = "",
-                           std::function<bool(wxEvtHandler*)> callback = std::function<bool(wxEvtHandler*)>(), const std::string& text_after = "", int timestamp = 0);
+                           std::function<bool(wxEvtHandler*)> callback = std::function<bool(wxEvtHandler*)>(), const std::string& text_after = "", int timestamp = 0, bool multiline = false);
 	// Pushes basic_notification with delay. See push_delayed_notification_data.
 	void push_delayed_notification(const NotificationType type, std::function<bool(void)> condition_callback, int64_t initial_delay, int64_t delay_interval);
 	// Removes all notifications of type from m_waiting_notifications
@@ -227,6 +231,7 @@ public:
 	void set_sla(bool b) { set_fff(!b); }
 	// Exporting finished, show this information with path, button to open containing folder and if ejectable - eject button
 	void push_exporting_finished_notification(const std::string& path, const std::string& dir_path, bool on_removable);
+    void push_bulk_exporting_finished_notification(const std::string& dir_path, bool on_removable);
 	// notifications with progress bar
 	// print host upload
 	void push_upload_job_notification(int id, float filesize, const std::string& filename, const std::string& host, float percentage = 0);
@@ -236,6 +241,7 @@ public:
 	void set_upload_job_notification_comp_on_100(int id, bool comp);
 	void set_upload_job_notification_completed(int id);
 	void set_upload_job_notification_completed_with_warning(int id);
+    void set_upload_job_notification_hypertext(int i, std::function<bool(wxEvtHandler*)> callback);
 	void upload_job_notification_show_canceled(int id, const std::string& filename, const std::string& host);
 	void upload_job_notification_show_error(int id, const std::string& filename, const std::string& host);
 	// Download App progress
@@ -243,6 +249,7 @@ public:
 	void set_download_progress_percentage(float percentage);
 	// Download URL progress notif
 	void push_download_URL_progress_notification(size_t id, const std::string& text, std::function<bool(DownloaderUserAction, int)> user_action_callback);
+    void push_download_URL_progress_notification_with_printables_link(size_t id, const std::string& text, const std::string& url, std::function<bool(DownloaderUserAction, int)> user_action_callback, std::function<void(std::string)> hypertext_callback);
 	void set_download_URL_progress(size_t id, float percentage);
 	void set_download_URL_paused(size_t id);
 	void set_download_URL_canceled(size_t id);
@@ -340,7 +347,7 @@ private:
 			Paused
 		};
 
-		PopNotification(const NotificationData &n, NotificationIDProvider &id_provider, wxEvtHandler* evt_handler);
+		PopNotification(const NotificationData &n, NotificationIDProvider &id_provider, wxEvtHandler* evt_handler, bool multiline = false);
 		virtual ~PopNotification() { if (m_id) m_id_provider.release_id(m_id); }
 		virtual void           render(GLCanvas3D& canvas, float initial_y, bool move_from_overlay, float overlay_width);
 		// close will dissapear notification on next render
@@ -576,6 +583,22 @@ private:
 		std::string						m_error_message;
 	};
 
+    class URLDownloadWithPrintablesLinkNotification : public URLDownloadNotification
+	{
+    public:
+		URLDownloadWithPrintablesLinkNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, size_t download_id, std::function<bool(DownloaderUserAction, int)> user_action_callback, std::function<void(std::string)> hypertext_callback)
+			: URLDownloadNotification(n, id_provider, evt_handler, download_id, user_action_callback)
+            , m_hypertext_callback_override(hypertext_callback)
+		{
+		}
+    protected: 
+        void	render_text(const float win_size_x, const float win_size_y,
+							const float win_pos_x, const float win_pos_y) override;
+        void    init() override;
+        bool    on_text_click() override;
+        std::function<void(std::string)> m_hypertext_callback_override;
+    };
+
 	class PrintHostUploadNotification : public ProgressBarNotification
 	{
 	public:
@@ -601,6 +624,7 @@ private:
 				set_percentage(percentage);
 		}
 		void				set_percentage(float percent) override;
+        bool                on_text_click() override;
 		void				cancel() { m_uj_state = UploadJobState::PB_CANCELLED; m_has_cancel_button = false; }
 		void				error()  { m_uj_state = UploadJobState::PB_ERROR;     m_has_cancel_button = false; init(); }
 		bool				compare_job_id(const int other_id) const { return m_job_id == other_id; }
@@ -611,6 +635,12 @@ private:
 		void				set_complete_on_100(bool val) { m_complete_on_100 = val; }
 		void                complete();
 		void                complete_with_warning();
+        void                set_hypertext_override(std::function<bool(wxEvtHandler *)> callback) 
+        { 
+            m_hypertext_override = true;  
+            m_callback_override = callback;
+            init();
+        }
 	protected:
 		void        init() override;
 		void		count_spaces() override;
@@ -643,6 +673,9 @@ private:
 		bool				m_more_hypertext_used { false };
 		// When m_complete_on_100 is set to false - percent >= 1 wont switch to PB_COMPLETED state.
 		bool				m_complete_on_100 { true };
+
+        bool                             m_hypertext_override { false };
+        std::function<bool(wxEvtHandler *)>     m_callback_override;
 	};
 
 	class SlicingProgressNotification : public ProgressBarNotification
@@ -751,10 +784,15 @@ private:
 	class ExportFinishedNotification : public PopNotification
 	{
 	public:
-		ExportFinishedNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, bool to_removable,const std::string& export_path,const std::string& export_dir_path)
-			: PopNotification(n, id_provider, evt_handler)
+		ExportFinishedNotification(
+            const NotificationData& n,
+            NotificationIDProvider& id_provider,
+            wxEvtHandler* evt_handler,
+            bool to_removable,
+            const std::string& export_dir_path
+        ):
+            PopNotification(n, id_provider, evt_handler)
 			, m_to_removable(to_removable)
-			, m_export_path(export_path)
 			, m_export_dir_path(export_dir_path)
 		    {
 				m_multiline = true;
@@ -825,7 +863,7 @@ private:
 
 	//pushes notification into the queue of notifications that are rendered
 	//can be used to create custom notification
-	bool push_notification_data(const NotificationData& notification_data, int timestamp);
+	bool push_notification_data(const NotificationData& notification_data, int timestamp, bool multiline = false);
 	bool push_notification_data(std::unique_ptr<NotificationManager::PopNotification> notification, int timestamp);
 	// Delayed notifications goes first to the m_waiting_notifications vector and only after remaining time is <= 0
 	// and condition callback is success, notification is regular pushed from update function.

@@ -86,7 +86,9 @@ class Preview : public wxPanel
 
     DynamicPrintConfig* m_config;
     BackgroundSlicingProcess* m_process;
-    GCodeProcessorResult* m_gcode_result;
+    std::vector<GCodeProcessorResult>* m_gcode_results;
+
+    GCodeProcessorResult* active_gcode_result();
 
     // Calling this function object forces Plater::schedule_background_process.
     std::function<void()> m_schedule_background_process;
@@ -117,7 +119,7 @@ public:
     };
 
     Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
-        GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process = []() {});
+        std::vector<GCodeProcessorResult>* gcode_results, std::function<void()> schedule_background_process = []() {});
     virtual ~Preview();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
@@ -129,14 +131,13 @@ public:
     void select_view(const std::string& direction);
     void set_drop_target(wxDropTarget* target);
 
-    void load_gcode_shells();
     void load_print(bool keep_z_range = false);
     void reload_print();
 
     void msw_rescale();
 
     void render_sliders(GLCanvas3D& canvas);
-    float get_layers_slider_width() const;
+    float get_layers_slider_width(bool disregard_visibility = false) const;
     float get_moves_slider_height() const;
 
     bool is_loaded() const { return m_loaded; }

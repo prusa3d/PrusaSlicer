@@ -1148,8 +1148,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     ExposureProfile above(material_config, 1);
 
     const int           first_slow_layers   = fade_layers_cnt + first_extra_slow_layers;
-    const std::string   printer_model       = printer_config.printer_model;
-    const bool          is_prusa_print      = printer_model == "SL1" || printer_model == "SL1S" || printer_model == "M1";
+    const bool          is_prusa_print = SLAPrint::is_prusa_print(printer_config.printer_model);
 
     const auto width          = scaled<double>(printer_config.display_width.getFloat());
     const auto height         = scaled<double>(printer_config.display_height.getFloat());

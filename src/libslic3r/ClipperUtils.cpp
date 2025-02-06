@@ -20,6 +20,9 @@
 #include "libslic3r/Surface.hpp"
 #include "libslic3r/libslic3r.h"
 
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_reduce.h>
+
 // #define CLIPPER_UTILS_TIMING
 
 #ifdef CLIPPER_UTILS_TIMING
@@ -745,6 +748,8 @@ Slic3r::Polygons union_(const Slic3r::Polygons &subject, const ClipperLib::PolyF
     { return to_polygons(clipper_do<ClipperLib::Paths>(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::EmptyPathsProvider(), fillType, ApplySafetyOffset::No)); }
 Slic3r::Polygons union_(const Slic3r::ExPolygons &subject)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::EmptyPathsProvider(), ApplySafetyOffset::No); }
+Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygon &subject2)
+    { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::SinglePathProvider(subject2.points), ApplySafetyOffset::No); }
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygons &subject2)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(subject2), ApplySafetyOffset::No); }
 Slic3r::Polygons union_(Slic3r::Polygons &&subject, const Slic3r::Polygons &subject2) { 
@@ -1010,6 +1015,21 @@ Polygons union_pt_chained_outside_in(const Polygons &subject)
     Polygons retval;
     traverse_pt_outside_in(union_pt(subject).Childs, &retval);
     return retval;
+}
+
+Polygons union_parallel_reduce(const Polygons &subject)
+{
+    return tbb::parallel_reduce(
+        tbb::blocked_range<size_t>(0, subject.size()), Polygons(),
+        [&subject](tbb::blocked_range<size_t> range, Polygons partial_union) {
+            for (size_t subject_idx = range.begin(); subject_idx < range.end(); ++subject_idx) {
+                partial_union = union_(partial_union, subject[subject_idx]);
+            }
+            return partial_union;
+        },
+        [](const Polygons &a, const Polygons &b) {
+            return union_(a, b);
+        });
 }
 
 Polygons simplify_polygons(const Polygons &subject)

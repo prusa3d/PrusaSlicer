@@ -576,6 +576,8 @@ std::string load_full_print_config(const std::string& print_preset_name,
         extruders_filaments.clear();
         for (size_t i = 0; i < material_preset_names.size(); ++i)
             extruders_filaments.emplace_back(ExtruderFilaments(&preset_bundle.filaments, i, material_preset_names[i]));
+        if (extruders_filaments.size() == 1)
+            preset_bundle.filaments.select_preset_by_name(material_preset_names[0], false);
     }
 
     config = preset_bundle.full_config();

@@ -71,6 +71,24 @@ inline ZPaths expolygons_to_zpaths(const ExPolygons &src, coord_t &base_idx)
     return out;
 }
 
+// Convert multiple expolygons into z-paths with a given Z coordinate.
+// If Open, then duplicate the first point of each path at its end.
+template<bool Open>
+inline ZPaths expolygons_to_zpaths_with_same_z(const ExPolygons &src, const coord_t z)
+{
+    ZPaths out;
+    out.reserve(std::accumulate(src.begin(), src.end(), size_t(0),
+        [](const size_t acc, const ExPolygon &expoly) { return acc + expoly.num_contours(); }));
+    for (const ExPolygon &expoly : src) {
+        out.emplace_back(to_zpath<Open>(expoly.contour.points, z));
+        for (const Polygon &hole : expoly.holes) {
+            out.emplace_back(to_zpath<Open>(hole.points, z));
+        }
+    }
+
+    return out;
+}
+
 // Convert a single path to path with a given Z coordinate.
 // If Open, then duplicate the first point at the end.
 template<bool Open = false>

@@ -14,8 +14,10 @@
 
 #include <wx/event.h>
 
+#include "libslic3r/Print.hpp"
 #include "libslic3r/PrintBase.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/SLAPrint.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 
@@ -83,14 +85,16 @@ enum BackgroundSlicingProcessStep {
 class BackgroundSlicingProcess
 {
 public:
-	BackgroundSlicingProcess();
 	// Stop the background processing and finalize the bacgkround processing thread, remove temp files.
 	~BackgroundSlicingProcess();
 
-	void set_fff_print(Print *print) { m_fff_print = print; }
-    void set_sla_print(SLAPrint *print) { m_sla_print = print; }
+	void set_temp_output_path(int bed_idx);
+	void set_fff_print(Print* print) { if (m_fff_print != print) stop(); m_fff_print = print; }
+    void set_sla_print(SLAPrint *print) { if (m_sla_print != print) stop(); m_sla_print = print; }
 	void set_thumbnail_cb(ThumbnailsGeneratorCallback cb) { m_thumbnail_cb = cb; }
 	void set_gcode_result(GCodeProcessorResult* result) { m_gcode_result = result; }
+
+	GCodeProcessorResult *get_gcode_result() { return m_gcode_result; }
 
 	// The following wxCommandEvent will be sent to the UI thread / Plater window, when the slicing is finished
 	// and the background processing will transition into G-code export.
@@ -175,7 +179,9 @@ public:
     // This "finished" flag does not account for the final export of the output file (.gcode or zipped PNGs),
     // and it does not account for the OctoPrint scheduling.
     bool    finished() const { return m_print->finished(); }
-    
+	void finalize_gcode(const std::string &path, const bool path_on_removable_media);
+    void prepare_upload(PrintHostJob &upload_job);
+
 private:
 	void 	thread_proc();
 	// Calls thread_proc(), catches all C++ exceptions and shows them using wxApp::OnUnhandledException().
@@ -266,8 +272,6 @@ private:
     bool                invalidate_all_steps();
     // If the background processing stop was requested, throw CanceledException.
     void                throw_if_canceled() const { if (m_print->canceled()) throw CanceledException(); }
-	void				finalize_gcode();
-    void                prepare_upload();
     // To be executed at the background thread.
 	ThumbnailsList		render_thumbnails(const ThumbnailsParams &params);
 	// Execute task from background thread on the UI thread synchronously. Returns true if processed, false if cancelled before executing the task.

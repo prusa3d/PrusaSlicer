@@ -295,7 +295,7 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
     const float tick_width      = float(int(1.0f * m_scale +0.5f));
     const float label_height    = m_imgui->GetTextureCustomRect(ImGui::PausePrint)->Height;
 
-    const ImU32 tick_clr = IM_COL32(255, 255, 255, 255);
+    constexpr ImU32 tick_clr = IM_COL32(255, 255, 255, 255);
 
     const float x_center = slideable_region.GetCenter().x;
 
@@ -328,7 +328,7 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
         ImGui::RenderText(start, label.c_str());
     };
 
-    auto draw_tick = [tick_clr, x_center, tick_width, inner_x](const float tick_pos, const float outer_x)
+    auto draw_tick = [x_center, tick_width, inner_x](const float tick_pos, const float outer_x)
     {
         ImRect tick_right = ImRect(x_center + inner_x, tick_pos - tick_width, x_center + outer_x, tick_pos);
         ImGui::RenderFrame(tick_right.Min, tick_right.Max, tick_clr, false);

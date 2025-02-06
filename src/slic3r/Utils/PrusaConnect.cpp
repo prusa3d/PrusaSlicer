@@ -6,6 +6,8 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/UserAccount.hpp"
+#include "slic3r/GUI/UserAccountUtils.hpp"
+
 
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/convert.hpp>
@@ -21,31 +23,6 @@ namespace pt = boost::property_tree;
 namespace Slic3r {
 namespace
 {
-std::string escape_string(const std::string& unescaped)
-{
-    std::string ret_val;
-    CURL* curl = curl_easy_init();
-    if (curl) {
-        char* decoded = curl_easy_escape(curl, unescaped.c_str(), unescaped.size());
-        if (decoded) {
-            ret_val = std::string(decoded);
-            curl_free(decoded);
-        }
-        curl_easy_cleanup(curl);
-    }
-    return ret_val;
-}
-std::string escape_path_by_element(const boost::filesystem::path& path)
-{
-    std::string ret_val = escape_string(path.filename().string());
-    boost::filesystem::path parent(path.parent_path());
-    while (!parent.empty() && parent.string() != "/") // "/" check is for case "/file.gcode" was inserted. Then boost takes "/" as parent_path.
-    {
-        ret_val = escape_string(parent.filename().string()) + "/" + ret_val;
-        parent = parent.parent_path();
-    }
-    return ret_val;
-}
 
 boost::optional<std::string> get_error_message_from_response_body(const std::string& body)
 {
@@ -110,19 +87,6 @@ bool PrusaConnectNew::init_upload(PrintHostUpload upload_data, std::string& out)
     const std::string upload_filename = upload_data.upload_path.filename().string();
     std::string url = GUI::format("%1%/app/users/teams/%2%/uploads", get_host(), m_team_id);
     std::string request_body_json = upload_data.data_json;
-    //    GUI::format(
-    //    "{"
-    //        "\"filename\": \"%1%\", "
-    //        "\"size\": %2%, "
-    //        "\"path\": \"%3%\", "
-    //        "\"force\": true, "
-    //        "\"printer_uuid\": \"%4%\""
-    //    "}"
-    //    , upload_filename
-    //    , file_size
-    //    , upload_data.upload_path.generic_string()
-    //    , m_uuid
-    //);
     
     // replace plaholder filename
     assert(request_body_json.find("%1%") != std::string::npos);
@@ -153,6 +117,12 @@ bool PrusaConnectNew::init_upload(PrintHostUpload upload_data, std::string& out)
 
 bool PrusaConnectNew::upload(PrintHostUpload upload_data, ProgressFn progress_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
+    std::string json = GUI::format(upload_data.data_json, "", "1");
+    boost::property_tree::ptree ptree;
+    const std::string printer_uuid = GUI::UserAccountUtils::get_keyword_from_json(ptree, json, "printer_uuid");
+    wxString printer_page_url = GUI::format("https://connect.prusa3d.com/printer/%1%/dashboard", printer_uuid);
+    info_fn(L"prusaconnect_printer_address", printer_page_url);
+
     std::string init_out;
     if (!init_upload(upload_data, init_out))
     {
@@ -181,21 +151,12 @@ bool PrusaConnectNew::upload(PrintHostUpload upload_data, ProgressFn progress_fn
     }
     const std::string name = get_name();
     const std::string access_token = GUI::wxGetApp().plater()->get_user_account()->get_access_token();
-//    const std::string escaped_upload_path = upload_data.storage + "/" + escape_path_by_element(upload_data.upload_path.string());
-//    const std::string set_ready = upload_data.set_ready.empty() ? "" : "&set_ready=" + upload_data.set_ready;
-//    const std::string position = upload_data.position.empty() ? "" : "&position=" + upload_data.position;
-//    const std::string wait_until = upload_data.wait_until.empty() ? "" : "&wait_until=" + upload_data.wait_until;
     const std::string url = GUI::format(
         "%1%/app/teams/%2%/files/raw"
         "?upload_id=%3%"
- //       "&force=true"
- //       "&printer_uuid=%4%"
- //       "&path=%5%"
- //       "%6%"
- //       "%7%"
- //       "%8%"
-        , get_host(), m_team_id, upload_id/*, m_uuid, escaped_upload_path, set_ready, position, wait_until*/);
+        , get_host(), m_team_id, upload_id);
     bool res = true;
+
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Uploading file %2% at %3%, filename: %4%, path: %5%, print: %6%")
         % name
@@ -228,6 +189,11 @@ bool PrusaConnectNew::upload(PrintHostUpload upload_data, ProgressFn progress_fn
         .perform_sync();
 
     return res;
+}
+
+std::string PrusaConnectNew::get_notification_host() const  
+{
+    return "Prusa Connect"; 
 }
 
 bool PrusaConnectNew::get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const

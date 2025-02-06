@@ -48,6 +48,7 @@ public:
     void enqueue_connect_printer_models_action();
     void enqueue_avatar_action();
     void enqueue_printer_data_action(const std::string& uuid);
+    void request_refresh();
     // Clears all data and connections, called on logout or EVT_UA_RESET
     void clear();
 

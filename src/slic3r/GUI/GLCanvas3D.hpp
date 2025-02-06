@@ -24,7 +24,7 @@
 #include "SceneRaycaster.hpp"
 #include "GUI_Utils.hpp"
 
-#include "libslic3r/Arrange/ArrangeSettingsDb_AppCfg.hpp"
+#include <arrange-wrapper/ArrangeSettingsDb_AppCfg.hpp>
 #include "ArrangeSettingsDialogImgui.hpp"
 
 #include "libslic3r/Slicing.hpp"
@@ -158,17 +158,17 @@ wxDECLARE_EVENT(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_RIGHT_CLICK, RBtnEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_REMOVE_OBJECT, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_ARRANGE, SimpleEvent);
+wxDECLARE_EVENT(EVT_GLCANVAS_ARRANGE_CURRENT_BED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_SELECT_ALL, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_QUESTION_MARK, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INCREASE_INSTANCES, Event<int>); // data: +1 => increase, -1 => decrease
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_MOVED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_FORCE_UPDATE, SimpleEvent);
-wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
+wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_TOUCHED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_SCALED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_MIRRORED, SimpleEvent);
-wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, Event<bool>);
 wxDECLARE_EVENT(EVT_GLCANVAS_UPDATE_GEOMETRY, Vec3dsEvent<2>);
 wxDECLARE_EVENT(EVT_GLCANVAS_MOUSE_DRAGGING_STARTED, SimpleEvent);
@@ -323,6 +323,7 @@ class GLCanvas3D
 
             Point start_position_2D{ Invalid_2D_Point };
             Vec3d start_position_3D{ Invalid_3D_Point };
+            Vec3d camera_start_target{ Invalid_3D_Point };
             int move_volume_idx{ -1 };
             bool move_requires_threshold{ false };
             Point move_start_threshold_position_2D{ Invalid_2D_Point };
@@ -336,10 +337,13 @@ class GLCanvas3D
 
         void set_start_position_2D_as_invalid() { drag.start_position_2D = Drag::Invalid_2D_Point; }
         void set_start_position_3D_as_invalid() { drag.start_position_3D = Drag::Invalid_3D_Point; }
+        void set_camera_start_target_as_invalid() { drag.camera_start_target = Drag::Invalid_3D_Point; }
         void set_move_start_threshold_position_2D_as_invalid() { drag.move_start_threshold_position_2D = Drag::Invalid_2D_Point; }
 
-        bool is_start_position_2D_defined() const { return (drag.start_position_2D != Drag::Invalid_2D_Point); }
-        bool is_start_position_3D_defined() const { return (drag.start_position_3D != Drag::Invalid_3D_Point); }
+        bool is_start_position_2D_defined() const { return drag.start_position_2D != Drag::Invalid_2D_Point; }
+        bool is_start_position_3D_defined() const { return drag.start_position_3D != Drag::Invalid_3D_Point; }
+        bool is_camera_start_target_defined() { return drag.camera_start_target != Drag::Invalid_3D_Point; }
+
         bool is_move_start_threshold_position_2D_defined() const { return (drag.move_start_threshold_position_2D != Drag::Invalid_2D_Point); }
         bool is_move_threshold_met(const Point& mouse_pos) const {
             return (std::abs(mouse_pos(0) - drag.move_start_threshold_position_2D(0)) > Drag::MoveThresholdPx)
@@ -487,6 +491,7 @@ private:
     wxGLContext* m_context;
     SceneRaycaster m_scene_raycaster;
     Bed3D &m_bed;
+    int m_last_active_bed_id{ -1 };
 #if ENABLE_RETINA_GL
     std::unique_ptr<RetinaHelper> m_retina_helper;
 #endif
@@ -507,11 +512,14 @@ private:
     // see request_extra_frame()
     bool m_extra_frame_requested;
     bool m_event_handlers_bound{ false };
+    float m_bed_selector_current_height = 0.f;
 
     GLVolumeCollection m_volumes;
 #if SLIC3R_OPENGL_ES
-    TriangleMesh m_wipe_tower_mesh;
+    std::vector<TriangleMesh> m_wipe_tower_meshes;
 #endif // SLIC3R_OPENGL_ES
+    std::array<std::optional<BoundingBoxf>, MAX_NUMBER_OF_BEDS> m_wipe_tower_bounding_boxes;
+
     GCodeViewer m_gcode_viewer;
 
     RenderTimer m_render_timer;
@@ -519,8 +527,12 @@ private:
     Selection m_selection;
     const DynamicPrintConfig* m_config;
     Model* m_model;
+public:
     BackgroundSlicingProcess *m_process;
+private:
     bool m_requires_check_outside_state{ false };
+
+    void select_bed(int i, bool triggered_by_user);
 
     std::array<unsigned int, 2> m_old_size{ 0, 0 };
 
@@ -621,6 +633,7 @@ private:
         std::vector<std::pair<size_t, Transform3d>> m_instances;
         bool m_evaluating{ false };
         bool m_dragging{ false };
+        bool m_first_displacement{ true };
 
         std::vector<std::pair<Pointf3s, Transform3d>> m_hulls_2d_cache;
 
@@ -638,7 +651,6 @@ private:
     };
 
     SequentialPrintClearance m_sequential_print_clearance;
-    bool m_sequential_print_clearance_first_displacement{ true };
 
     struct ToolbarHighlighter
     {
@@ -680,6 +692,7 @@ private:
     };
 
     CameraTarget m_camera_target;
+    GLModel m_target_validation_box;
 #endif // ENABLE_SHOW_CAMERA_TARGET
     GLModel m_background;
 
@@ -902,30 +915,30 @@ public:
     int get_move_volume_id() const { return m_mouse.drag.move_volume_idx; }
     int get_first_hover_volume_idx() const { return m_hover_volume_idxs.empty() ? -1 : m_hover_volume_idxs.front(); }
     void set_selected_extruder(int extruder) { m_selected_extruder = extruder;}
-    
+
     class WipeTowerInfo {
     protected:
         Vec2d m_pos = {NaNd, NaNd};
         double m_rotation = 0.;
         BoundingBoxf m_bb;
+        int m_bed_index{0};
         friend class GLCanvas3D;
 
-    public:        
+    public:
         inline operator bool() const {
             return !std::isnan(m_pos.x()) && !std::isnan(m_pos.y());
         }
-        
+
         inline const Vec2d& pos() const { return m_pos; }
         inline double rotation() const { return m_rotation; }
         inline const Vec2d bb_size() const { return m_bb.size(); }
         inline const BoundingBoxf& bounding_box() const { return m_bb; }
-        
-        void apply_wipe_tower() const { apply_wipe_tower(m_pos, m_rotation); }
+        inline const int bed_index() const { return m_bed_index; }
 
-        static void apply_wipe_tower(Vec2d pos, double rot);
+        static void apply_wipe_tower(Vec2d pos, double rot, int bed_index);
     };
-    
-    WipeTowerInfo get_wipe_tower_info() const;
+
+    std::vector<WipeTowerInfo> get_wipe_tower_infos() const;
 
     // Returns the view ray line, in world coordinate, at the given mouse position.
     Linef3 mouse_ray(const Point& mouse_pos);
@@ -979,7 +992,7 @@ public:
     void reset_sequential_print_clearance() {
         m_sequential_print_clearance.m_evaluating = false;
         if (m_sequential_print_clearance.is_dragging())
-            m_sequential_print_clearance_first_displacement = true;
+            m_sequential_print_clearance.m_first_displacement = true;
         else
             m_sequential_print_clearance.set_contours(ContoursList(), false);
         set_as_dirty();
@@ -988,6 +1001,8 @@ public:
 
     void set_sequential_print_clearance_contours(const ContoursList& contours, bool generate_fill) {
         m_sequential_print_clearance.set_contours(contours, generate_fill);
+        if (generate_fill)
+            m_sequential_print_clearance.m_evaluating = false;
         set_as_dirty();
         request_extra_frame();
     }
@@ -1035,7 +1050,7 @@ private:
     bool _set_current();
     void _resize(unsigned int w, unsigned int h);
 
-    BoundingBoxf3 _max_bounding_box(bool include_gizmos, bool include_bed_model) const;
+    BoundingBoxf3 _max_bounding_box(bool include_bed_model) const;
 
     void _zoom_to_box(const BoundingBoxf3& box, double margin_factor = DefaultCameraZoomToBoxMarginFactor);
     void _update_camera_zoom(double zoom);
@@ -1059,6 +1074,7 @@ private:
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
+    void _render_bed_selector();
     void _render_volumes_for_picking(const Camera& camera) const;
     void _render_current_gizmo() const { m_gizmos.render_current_gizmo(); }
     void _render_gizmos_overlay();
@@ -1068,11 +1084,12 @@ private:
     void _render_view_toolbar() const;
 #if ENABLE_SHOW_CAMERA_TARGET
     void _render_camera_target();
+    void _render_camera_target_validation_box();
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
     void _render_selection_sidebar_hints() { m_selection.render_sidebar_hints(m_sidebar_field); }
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
-    bool _render_arrange_menu(float pos_x);
+    bool _render_arrange_menu(float pos_x, bool current_bed);
     void _render_thumbnail_internal(ThumbnailData& thumbnail_data, const ThumbnailsParams& thumbnail_params, const GLVolumeCollection& volumes, Camera::EType camera_type);
     // render thumbnail using an off-screen framebuffer
     void _render_thumbnail_framebuffer(ThumbnailData& thumbnail_data, unsigned int w, unsigned int h, const ThumbnailsParams& thumbnail_params, const GLVolumeCollection& volumes, Camera::EType camera_type);
@@ -1087,7 +1104,7 @@ private:
 
     // Convert the screen space coordinate to an object space coordinate.
     // If the Z screen space coordinate is not provided, a depth buffer value is substituted.
-    Vec3d _mouse_to_3d(const Point& mouse_pos, float* z = nullptr);
+    Vec3d _mouse_to_3d(const Point& mouse_pos, const float* z = nullptr, bool use_ortho = false);
 
     // Convert the screen space coordinate to world coordinate on the bed.
     Vec3d _mouse_to_bed_3d(const Point& mouse_pos);
@@ -1104,6 +1121,7 @@ private:
     void _set_warning_notification(EWarning warning, bool state);
 
     std::pair<bool, const GLVolume*> _is_any_volume_outside() const;
+    bool _is_sequential_print_enabled() const;
 
     // updates the selection from the content of m_hover_volume_idxs
     void _update_selection_from_hover();

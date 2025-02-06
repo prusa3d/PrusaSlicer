@@ -22,11 +22,31 @@
 
 namespace Slic3r {
 class ExtrusionEntityCollection;
+class LayerRegion;
 class Surface;
+class PrintRegion;
 struct ThickPolyline;
 
-namespace PerimeterGenerator
+struct PerimeterRegion
 {
+    const PrintRegion *region;
+    ExPolygons         expolygons;
+    BoundingBox        bbox;
+
+    explicit PerimeterRegion(const LayerRegion &layer_region);
+
+    // If there is any incompatibility, we don't need to create separate LayerRegions.
+    // Because it is enough to split perimeters by PerimeterRegions.
+    static bool has_compatible_perimeter_regions(const PrintRegionConfig &config, const PrintRegionConfig &other_config);
+
+    static void merge_compatible_perimeter_regions(std::vector<PerimeterRegion> &perimeter_regions);
+};
+
+using PerimeterRegions = std::vector<PerimeterRegion>;
+
+} // namespace Slic3r
+
+namespace Slic3r::PerimeterGenerator {
 
 struct Parameters {    
     Parameters(
@@ -39,6 +59,7 @@ struct Parameters {
         const PrintRegionConfig    &config,
         const PrintObjectConfig    &object_config,
         const PrintConfig          &print_config,
+        const PerimeterRegions     &perimeter_regions,
         const bool                  spiral_vase) :   
             layer_height(layer_height),
             layer_id(layer_id),
@@ -49,6 +70,7 @@ struct Parameters {
             config(config), 
             object_config(object_config), 
             print_config(print_config),
+            perimeter_regions(perimeter_regions),
             spiral_vase(spiral_vase),
             scaled_resolution(scaled<double>(print_config.gcode_resolution.value)),
             mm3_per_mm(perimeter_flow.mm3_per_mm()),
@@ -67,6 +89,7 @@ struct Parameters {
     const PrintRegionConfig     &config;
     const PrintObjectConfig     &object_config;
     const PrintConfig           &print_config;
+    const PerimeterRegions      &perimeter_regions;
 
     // Derived parameters
     bool                         spiral_vase;
@@ -113,7 +136,6 @@ void process_arachne(
 
 ExtrusionMultiPath thick_polyline_to_multi_path(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, float tolerance, float merge_tolerance);
 
-} // namespace PerimeterGenerator
-} // namespace Slic3r
+} // namespace Slic3r::PerimeterGenerator
 
 #endif

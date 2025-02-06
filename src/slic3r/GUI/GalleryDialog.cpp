@@ -35,6 +35,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Format/OBJ.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 #include "../Utils/MacDarkMode.hpp"
 
 namespace Slic3r {
@@ -305,7 +306,9 @@ static void generate_thumbnail_from_model(const std::string& filename)
 
     ThumbnailData thumbnail_data;
     const ThumbnailsParams thumbnail_params = { {}, false, false, false, true };
+    s_multiple_beds.set_thumbnail_bed_idx(-2);
     wxGetApp().plater()->canvas3D()->render_thumbnail(thumbnail_data, 256, 256, thumbnail_params, volumes, Camera::EType::Perspective);
+    s_multiple_beds.set_thumbnail_bed_idx(-1);
 
     if (thumbnail_data.width == 0 || thumbnail_data.height == 0)
         return;

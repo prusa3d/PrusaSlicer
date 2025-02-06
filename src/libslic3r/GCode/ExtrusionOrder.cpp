@@ -129,10 +129,10 @@ std::vector<Perimeter> extract_perimeter_extrusions(
                     const bool is_hole = loop->is_clockwise();
                     reverse_loop = print.config().prefer_clockwise_movements ? !is_hole : is_hole;
                 }
-                SmoothPath path{smooth_path(&layer, ExtrusionEntityReference{*ee, reverse_loop}, extruder_id, last_position)};
+                auto [path, wipe_offset]{smooth_path(&layer, &region, ExtrusionEntityReference{*ee, reverse_loop}, extruder_id, last_position)};
                 previous_position = get_gcode_point(last_position, offset);
                 if (!path.empty()) {
-                    result.push_back(Perimeter{std::move(path), reverse_loop, ee});
+                    result.push_back(Perimeter{std::move(path), reverse_loop, ee, wipe_offset});
                 }
             }
         }
@@ -194,7 +194,7 @@ std::vector<InfillRange> extract_infill_ranges(
         std::vector<SmoothPath> paths;
         for (const ExtrusionEntityReference &extrusion_reference : sorted_extrusions) {
             std::optional<InstancePoint> last_position{get_instance_point(previous_position, offset)};
-            SmoothPath path{smooth_path(&layer, extrusion_reference, extruder_id, last_position)};
+            auto [path, _]{smooth_path(&layer, &region, extrusion_reference, extruder_id, last_position)};
             if (!path.empty()) {
                 paths.push_back(std::move(path));
             }
@@ -367,7 +367,7 @@ std::vector<SupportPath> get_support_extrusions(
                 if (collection != nullptr) {
                     for (const ExtrusionEntity * sub_entity : *collection) {
                         std::optional<InstancePoint> last_position{get_instance_point(previous_position, {0, 0})};
-                        SmoothPath path{smooth_path(nullptr, {*sub_entity, entity_reference.flipped()}, extruder_id, last_position)};
+                        auto [path, _]{smooth_path(nullptr, nullptr, {*sub_entity, entity_reference.flipped()}, extruder_id, last_position)};
                         if (!path.empty()) {
                             paths.push_back({std::move(path), is_interface});
                         }
@@ -375,7 +375,7 @@ std::vector<SupportPath> get_support_extrusions(
                     }
                 } else {
                     std::optional<InstancePoint> last_position{get_instance_point(previous_position, {0, 0})};
-                    SmoothPath path{smooth_path(nullptr, entity_reference, extruder_id, last_position)};
+                    auto [path, _]{smooth_path(nullptr, nullptr, entity_reference, extruder_id, last_position)};
                     if (!path.empty()) {
                         paths.push_back({std::move(path), is_interface});
                     }
@@ -561,7 +561,7 @@ std::vector<ExtruderExtrusions> get_extrusions(
                 }
                 const ExtrusionEntityReference entity{*print.skirt().entities[i], reverse};
                 std::optional<InstancePoint> last_position{get_instance_point(previous_position, {0, 0})};
-                SmoothPath path{smooth_path(nullptr, entity, extruder_id, last_position)};
+                auto [path, _]{smooth_path(nullptr, nullptr, entity, extruder_id, last_position)};
                 previous_position = get_gcode_point(last_position, {0, 0});
                 extruder_extrusions.skirt.emplace_back(i, std::move(path));
             }
@@ -580,7 +580,7 @@ std::vector<ExtruderExtrusions> get_extrusions(
                 const ExtrusionEntityReference entity_reference{*entity, reverse};
 
                 std::optional<InstancePoint> last_position{get_instance_point(previous_position, {0, 0})};
-                SmoothPath path{smooth_path(nullptr, entity_reference, extruder_id, last_position)};
+                auto [path, _]{smooth_path(nullptr, nullptr, entity_reference, extruder_id, last_position)};
                 previous_position = get_gcode_point(last_position, {0, 0});
                 extruder_extrusions.brim.push_back({std::move(path), is_loop});
             }
@@ -607,16 +607,16 @@ std::vector<ExtruderExtrusions> get_extrusions(
     return extrusions;
 }
 
-std::optional<InstancePoint> get_first_point(const SmoothPath &path) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const SmoothPath &path) {
     for (const SmoothPathElement & element : path) {
         if (!element.path.empty()) {
-            return InstancePoint{element.path.front().point};
+            return element.path.front();
         }
     }
     return std::nullopt;
 }
 
-std::optional<InstancePoint> get_first_point(const std::vector<SmoothPath> &smooth_paths) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<SmoothPath> &smooth_paths) {
     for (const SmoothPath &path : smooth_paths) {
         if (auto result = get_first_point(path)) {
             return result;
@@ -625,7 +625,7 @@ std::optional<InstancePoint> get_first_point(const std::vector<SmoothPath> &smoo
     return std::nullopt;
 }
 
-std::optional<InstancePoint> get_first_point(const std::vector<InfillRange> &infill_ranges) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<InfillRange> &infill_ranges) {
     for (const InfillRange &infill_range : infill_ranges) {
         if (auto result = get_first_point(infill_range.items)) {
             return result;
@@ -634,7 +634,7 @@ std::optional<InstancePoint> get_first_point(const std::vector<InfillRange> &inf
     return std::nullopt;
 }
 
-std::optional<InstancePoint> get_first_point(const std::vector<Perimeter> &perimeters) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<Perimeter> &perimeters) {
     for (const Perimeter &perimeter : perimeters) {
         if (auto result = get_first_point(perimeter.smooth_path)) {
             return result;
@@ -643,7 +643,7 @@ std::optional<InstancePoint> get_first_point(const std::vector<Perimeter> &perim
     return std::nullopt;
 }
 
-std::optional<InstancePoint> get_first_point(const std::vector<IslandExtrusions> &extrusions) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<IslandExtrusions> &extrusions) {
     for (const IslandExtrusions &island : extrusions) {
         if (island.infill_first) {
             if (auto result = get_first_point(island.infill_ranges)) {
@@ -664,7 +664,7 @@ std::optional<InstancePoint> get_first_point(const std::vector<IslandExtrusions>
     return std::nullopt;
 }
 
-std::optional<InstancePoint> get_first_point(const std::vector<SliceExtrusions> &extrusions) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<SliceExtrusions> &extrusions) {
     for (const SliceExtrusions &slice : extrusions) {
         if (auto result = get_first_point(slice.common_extrusions)) {
             return result;
@@ -673,44 +673,47 @@ std::optional<InstancePoint> get_first_point(const std::vector<SliceExtrusions> 
     return std::nullopt;
 }
 
-std::optional<Point> get_first_point(const ExtruderExtrusions &extrusions) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const ExtruderExtrusions &extrusions) {
     for (const auto&[_, path] : extrusions.skirt) {
         if (auto result = get_first_point(path)) {
-            return result->local_point;
+            return result;
         };
     }
     for (const BrimPath &brim_path : extrusions.brim) {
         if (auto result = get_first_point(brim_path.path)) {
-            return result->local_point;
+            return result;
         };
     }
     for (const OverridenExtrusions &overriden_extrusions : extrusions.overriden_extrusions) {
         if (auto result = get_first_point(overriden_extrusions.slices_extrusions)) {
-            return result->local_point - overriden_extrusions.instance_offset;
+            result->point += overriden_extrusions.instance_offset;
+            return result;
         }
     }
 
     for (const NormalExtrusions &normal_extrusions : extrusions.normal_extrusions) {
         for (const SupportPath &support_path : normal_extrusions.support_extrusions) {
             if (auto result = get_first_point(support_path.path)) {
-                return result->local_point + normal_extrusions.instance_offset;
+                result->point += normal_extrusions.instance_offset;
+                return result;
             }
         }
         if (auto result = get_first_point(normal_extrusions.slices_extrusions)) {
-            return result->local_point + normal_extrusions.instance_offset;
+            result->point += normal_extrusions.instance_offset;
+            return result;
         }
     }
 
     return std::nullopt;
 }
 
-std::optional<Point> get_first_point(const std::vector<ExtruderExtrusions> &extrusions) {
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<ExtruderExtrusions> &extrusions) {
     if (extrusions.empty()) {
         return std::nullopt;
     }
 
     if (extrusions.front().wipe_tower_start) {
-        return extrusions.front().wipe_tower_start;
+        return {{*(extrusions.front().wipe_tower_start)}};
     }
 
     for (const ExtruderExtrusions &extruder_extrusions : extrusions) {
@@ -726,6 +729,10 @@ const PrintInstance * get_first_instance(
     const std::vector<ExtruderExtrusions> &extrusions,
     const std::vector<InstanceToPrint> &instances_to_print
 ) {
+    if (instances_to_print.empty()) {
+        return nullptr;
+    }
+
     for (const ExtruderExtrusions &extruder_extrusions : extrusions) {
         if (!extruder_extrusions.overriden_extrusions.empty()) {
             for (std::size_t i{0}; i < instances_to_print.size(); ++i) {
@@ -746,7 +753,8 @@ const PrintInstance * get_first_instance(
             }
         }
     }
-    return nullptr;
+    const InstanceToPrint &instance{instances_to_print.front()};
+    return &instance.print_object.instances()[instance.instance_id];
 }
 
 }

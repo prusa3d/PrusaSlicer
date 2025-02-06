@@ -34,6 +34,8 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
+    Algorithm/LineSegmentation/LineSegmentation.cpp
+    Algorithm/LineSegmentation/LineSegmentation.hpp
     Algorithm/PathSorting.hpp
     Algorithm/RegionExpansion.hpp
     Algorithm/RegionExpansion.cpp
@@ -87,6 +89,8 @@ set(SLIC3R_SOURCES
     ExtrusionSimulator.cpp
     ExtrusionSimulator.hpp
     FileParserError.hpp
+    Feature/FuzzySkin/FuzzySkin.cpp
+    Feature/FuzzySkin/FuzzySkin.hpp
     Fill/Fill.cpp
     Fill/Fill3DHoneycomb.cpp
     Fill/Fill3DHoneycomb.hpp
@@ -195,6 +199,8 @@ set(SLIC3R_SOURCES
     GCode/SeamRandom.hpp
     GCode/SeamPainting.cpp
     GCode/SeamPainting.hpp
+    GCode/SeamScarf.cpp
+    GCode/SeamScarf.hpp
     GCode/ModelVisibility.cpp
     GCode/ModelVisibility.hpp
     GCode/SmoothPath.cpp
@@ -256,8 +262,6 @@ set(SLIC3R_SOURCES
     CutUtils.hpp
     Model.cpp
     Model.hpp
-    ModelArrange.hpp
-    ModelArrange.cpp
     MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
     MeshNormals.hpp
@@ -267,55 +271,6 @@ set(SLIC3R_SOURCES
     MeasureUtils.hpp
     CustomGCode.cpp
     CustomGCode.hpp
-    Arrange/Arrange.hpp
-    Arrange/ArrangeImpl.hpp
-    Arrange/Items/ArrangeItem.hpp
-    Arrange/Items/ArrangeItem.cpp
-    Arrange/Items/SimpleArrangeItem.hpp
-    Arrange/Items/SimpleArrangeItem.cpp
-    Arrange/Items/TrafoOnlyArrangeItem.hpp
-    Arrange/Items/MutableItemTraits.hpp
-    Arrange/Items/ArbitraryDataStore.hpp
-    Arrange/ArrangeSettingsView.hpp
-    Arrange/ArrangeSettingsDb_AppCfg.hpp
-    Arrange/ArrangeSettingsDb_AppCfg.cpp
-    Arrange/Scene.hpp
-    Arrange/Scene.cpp
-    Arrange/SceneBuilder.hpp
-    Arrange/SceneBuilder.cpp
-    Arrange/Tasks/ArrangeTask.hpp
-    Arrange/Tasks/ArrangeTaskImpl.hpp
-    Arrange/Tasks/FillBedTask.hpp
-    Arrange/Tasks/FillBedTaskImpl.hpp
-    Arrange/Tasks/MultiplySelectionTask.hpp
-    Arrange/Tasks/MultiplySelectionTaskImpl.hpp
-    Arrange/SegmentedRectangleBed.hpp
-    Arrange/Core/ArrangeItemTraits.hpp
-    Arrange/Core/DataStoreTraits.hpp
-    Arrange/Core/ArrangeBase.hpp
-    Arrange/Core/PackingContext.hpp
-    Arrange/Core/ArrangeFirstFit.hpp
-    Arrange/Core/Beds.hpp
-    Arrange/Core/Beds.cpp
-    Arrange/Core/NFP/NFP.hpp
-    Arrange/Core/NFP/NFP.cpp
-    Arrange/Core/NFP/NFPConcave_CGAL.hpp
-    Arrange/Core/NFP/NFPConcave_CGAL.cpp
-    Arrange/Core/NFP/NFPConcave_Tesselate.hpp
-    Arrange/Core/NFP/NFPConcave_Tesselate.cpp
-    Arrange/Core/NFP/EdgeCache.hpp
-    Arrange/Core/NFP/EdgeCache.cpp
-    Arrange/Core/NFP/CircularEdgeIterator.hpp
-    Arrange/Core/NFP/NFPArrangeItemTraits.hpp
-    Arrange/Core/NFP/PackStrategyNFP.hpp
-    Arrange/Core/NFP/RectangleOverfitPackingStrategy.hpp
-    Arrange/Core/NFP/Kernels/KernelTraits.hpp
-    Arrange/Core/NFP/Kernels/GravityKernel.hpp
-    Arrange/Core/NFP/Kernels/TMArrangeKernel.hpp
-    Arrange/Core/NFP/Kernels/CompactifyKernel.hpp
-    Arrange/Core/NFP/Kernels/RectangleOverfitKernelWrapper.hpp
-    Arrange/Core/NFP/Kernels/SVGDebugOutputKernelWrapper.hpp
-    Arrange/Core/NFP/Kernels/KernelUtils.hpp
     MultiPoint.cpp
     MultiPoint.hpp
     MutablePriorityQueue.hpp
@@ -439,6 +394,8 @@ set(SLIC3R_SOURCES
     miniz_extension.hpp
     miniz_extension.cpp
     MarchingSquares.hpp
+    MultipleBeds.cpp
+    MultipleBeds.hpp
     Execution/Execution.hpp
     Execution/ExecutionSeq.hpp
     Execution/ExecutionTBB.hpp
@@ -567,7 +524,7 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC 
+add_library(libslic3r_cgal STATIC
     CutSurface.hpp CutSurface.cpp
     Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
     IntersectionPoints.hpp IntersectionPoints.cpp
@@ -639,6 +596,7 @@ target_link_libraries(libslic3r PUBLIC
     libigl
     agg
     ankerl
+    boost_headeronly
 )
 
 if (APPLE)

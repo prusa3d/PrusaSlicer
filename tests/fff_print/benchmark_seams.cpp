@@ -105,13 +105,14 @@ TEST_CASE_METHOD(Slic3r::Test::SeamsFixture, "Seam benchmarks", "[Seams][.Benchm
         using namespace Slic3r;
         Placer placer;
         placer.init(print->objects(), params, [](){});
-        std::vector<std::pair<const Layer*, const ExtrusionLoop*>> loops;
+        std::vector<std::tuple<const Layer*, const ExtrusionLoop*, const PrintRegion *>> loops;
 
         const PrintObject* object{print->objects().front()};
         for (const Layer* layer :object->layers()) {
             for (const LayerSlice& lslice : layer->lslices_ex) {
                 for (const LayerIsland &island : lslice.islands) {
                     const LayerRegion &layer_region = *layer->get_region(island.perimeters.region());
+                    const PrintRegion &region = print->get_print_region(layer_region.region().print_region_id());
                     for (uint32_t perimeter_id : island.perimeters) {
                         const auto *entity_collection{static_cast<const ExtrusionEntityCollection*>(layer_region.perimeters().entities[perimeter_id])};
                         if (entity_collection != nullptr) {
@@ -120,7 +121,7 @@ TEST_CASE_METHOD(Slic3r::Test::SeamsFixture, "Seam benchmarks", "[Seams][.Benchm
                                 if (loop == nullptr) {
                                     continue;
                                 }
-                                loops.emplace_back(layer, loop);
+                                loops.emplace_back(layer, loop, &region);
                             }
                         }
                     }
@@ -129,8 +130,8 @@ TEST_CASE_METHOD(Slic3r::Test::SeamsFixture, "Seam benchmarks", "[Seams][.Benchm
         }
         BENCHMARK_ADVANCED("Place seam benchy")(Catch::Benchmark::Chronometer meter) {
             meter.measure([&] {
-                for (const auto &[layer, loop] : loops) {
-                    placer.place_seam(layer, *loop, {0, 0});
+                for (const auto &[layer, loop, region] : loops) {
+                    placer.place_seam(layer, region, *loop, false, {0, 0});
                 }
             });
         };

@@ -83,6 +83,7 @@ struct Perimeter {
     GCode::SmoothPath smooth_path;
     bool reversed;
     const ExtrusionEntity *extrusion_entity;
+    std::size_t wipe_offset;
 };
 
 struct IslandExtrusions {
@@ -122,8 +123,9 @@ struct InstancePoint {
     Point local_point;
 };
 
-using PathSmoothingFunction = std::function<SmoothPath(
-    const Layer *, const ExtrusionEntityReference &, const unsigned extruder_id, std::optional<InstancePoint> &previous_position
+using PathSmoothingResult = std::pair<GCode::SmoothPath, std::size_t>;
+using PathSmoothingFunction = std::function<PathSmoothingResult(
+    const Layer *, const PrintRegion *, const ExtrusionEntityReference &, const unsigned extruder_id, std::optional<InstancePoint> &previous_position
 )>;
 
 struct BrimPath {
@@ -158,7 +160,7 @@ std::vector<ExtruderExtrusions> get_extrusions(
     std::optional<Point> previous_position
 );
 
-std::optional<Point> get_first_point(const std::vector<ExtruderExtrusions> &extrusions);
+std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<ExtruderExtrusions> &extrusions);
 
 const PrintInstance * get_first_instance(
     const std::vector<ExtruderExtrusions> &extrusions,

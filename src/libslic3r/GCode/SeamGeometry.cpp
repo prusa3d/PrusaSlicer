@@ -66,7 +66,7 @@ Vec2d get_polygon_normal(
     std::optional<std::size_t> previous_index;
     std::optional<std::size_t> next_index;
 
-    visit_near_forward(index, points.size(), [&](const std::size_t index_candidate) {
+    visit_forward(index, points.size(), [&](const std::size_t index_candidate) {
         if (index == index_candidate) {
             return false;
         }
@@ -77,7 +77,7 @@ Vec2d get_polygon_normal(
         }
         return false;
     });
-    visit_near_backward(index, points.size(), [&](const std::size_t index_candidate) {
+    visit_backward(index, points.size(), [&](const std::size_t index_candidate) {
         const double distance{(points[index_candidate] - points[index]).norm()};
         if (distance > min_arm_length) {
             previous_index = index_candidate;
@@ -280,14 +280,14 @@ std::vector<Vec2d> oversample_edge(const Vec2d &from, const Vec2d &to, const dou
     return result;
 }
 
-void visit_near_forward(
+void visit_forward(
     const std::size_t start_index,
     const std::size_t loop_size,
     const std::function<bool(std::size_t)> &visitor
 ) {
     std::size_t last_index{loop_size - 1};
     std::size_t index{start_index};
-    for (unsigned _{0}; _ < 30; ++_) { // Do not visit too far.
+    for (unsigned _{0}; _ < loop_size + 1; ++_) {
         if (visitor(index)) {
             return;
         }
@@ -295,14 +295,14 @@ void visit_near_forward(
     }
 }
 
-void visit_near_backward(
+void visit_backward(
     const std::size_t start_index,
     const std::size_t loop_size,
     const std::function<bool(std::size_t)> &visitor
 ) {
     std::size_t last_index{loop_size - 1};
     std::size_t index{start_index == 0 ? loop_size - 1 : start_index - 1};
-    for (unsigned _{0}; _ < 30; ++_) { // Do not visit too far.
+    for (unsigned _{0}; _ < loop_size; ++_) {
         if (visitor(index)) {
             return;
         }
@@ -374,7 +374,7 @@ std::vector<double> get_vertex_angles(const std::vector<Vec2d> &points, const do
         std::optional<std::size_t> previous_index;
         std::optional<std::size_t> next_index;
 
-        visit_near_forward(index, points.size(), [&](const std::size_t index_candidate) {
+        visit_forward(index, points.size(), [&](const std::size_t index_candidate) {
             if (index == index_candidate) {
                 return false;
             }
@@ -385,7 +385,7 @@ std::vector<double> get_vertex_angles(const std::vector<Vec2d> &points, const do
             }
             return false;
         });
-        visit_near_backward(index, points.size(), [&](const std::size_t index_candidate) {
+        visit_backward(index, points.size(), [&](const std::size_t index_candidate) {
             const double distance{(points[index_candidate] - points[index]).norm()};
             if (distance > min_arm_length) {
                 previous_index = index_candidate;
@@ -440,4 +440,57 @@ Polygon to_polygon(const ExtrusionLoop &loop) {
     }
     return Polygon{loop_points};
 }
+
+std::optional<PointOnLine> offset_along_lines(
+    const Vec2d &point,
+    const std::size_t loop_line_index,
+    const Linesf &loop_lines,
+    const double offset,
+    const Direction1D direction
+) {
+    const Linef initial_line{loop_lines[loop_line_index]};
+    double distance{
+        direction == Direction1D::forward ? (initial_line.b - point).norm() :
+                                            (point - initial_line.a).norm()};
+    if (distance >= offset) {
+        const Vec2d edge_direction{(initial_line.b - initial_line.a).normalized()};
+        const Vec2d offset_point{direction == Direction1D::forward ? Vec2d{point + offset * edge_direction} : Vec2d{point - offset * edge_direction}};
+        return {{offset_point, loop_line_index}};
+    }
+
+    std::optional<PointOnLine> offset_point;
+
+    bool skip_first{direction == Direction1D::forward};
+    const auto visitor{[&](std::size_t index) {
+        if (skip_first) {
+            skip_first = false;
+            return false;
+        }
+        const Vec2d previous_point{
+            direction == Direction1D::forward ? loop_lines[index].a : loop_lines[index].b};
+        const Vec2d next_point{
+            direction == Direction1D::forward ? loop_lines[index].b : loop_lines[index].a};
+        const Vec2d edge{next_point - previous_point};
+
+        if (distance + edge.norm() > offset) {
+            const double remaining_distance{offset - distance};
+            offset_point =
+                PointOnLine{previous_point + remaining_distance * edge.normalized(), index};
+            return true;
+        }
+
+        distance += edge.norm();
+
+        return false;
+    }};
+
+    if (direction == Direction1D::forward) {
+        Geometry::visit_forward(loop_line_index, loop_lines.size(), visitor);
+    } else {
+        Geometry::visit_backward(loop_line_index, loop_lines.size(), visitor);
+    }
+
+    return offset_point;
+}
+
 } // namespace Slic3r::Seams::Geometry

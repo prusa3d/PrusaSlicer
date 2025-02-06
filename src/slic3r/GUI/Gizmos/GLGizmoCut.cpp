@@ -3256,7 +3256,7 @@ Transform3d GLGizmoCut3D::get_cut_matrix(const Selection& selection)
     return translation_transform(cut_center_offset) * m_rotation_m;
 }
 
-void update_object_cut_id(CutObjectBase& cut_id, ModelObjectCutAttributes attributes, const int dowels_count)
+void update_object_cut_id(CutId& cut_id, ModelObjectCutAttributes attributes, const int dowels_count)
 {
     // we don't save cut information, if result will not contains all parts of initial object
     if (!attributes.has(ModelObjectCutAttribute::KeepUpper) ||
@@ -3264,7 +3264,7 @@ void update_object_cut_id(CutObjectBase& cut_id, ModelObjectCutAttributes attrib
         attributes.has(ModelObjectCutAttribute::InvalidateCutInfo))
         return;
 
-    if (cut_id.id().invalid())
+    if (! cut_id.valid())
         cut_id.init();
     // increase check sum, if it's needed
     {
@@ -3377,11 +3377,11 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
     }
 }
 
-void synchronize_model_after_cut(Model& model, const CutObjectBase& cut_id)
+void synchronize_model_after_cut(Model& model, const CutId& cut_id)
 {
     for (ModelObject* obj : model.objects)
         if (obj->is_cut() && obj->cut_id.has_same_id(cut_id) && !obj->cut_id.is_equal(cut_id))
-            obj->cut_id.copy(cut_id);
+            obj->cut_id = cut_id;
 }
 
 void GLGizmoCut3D::perform_cut(const Selection& selection)
@@ -3432,7 +3432,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                                               only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
                                               only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) |
                                               only_if(dowels_count > 0, ModelObjectCutAttribute::CreateDowels) |
-                                              only_if(!has_connectors && !cut_with_groove && cut_mo->cut_id.id().invalid(), ModelObjectCutAttribute::InvalidateCutInfo);
+                                              only_if(!has_connectors && !cut_with_groove && ! cut_mo->cut_id.valid(), ModelObjectCutAttribute::InvalidateCutInfo);
 
         // update cut_id for the cut object in respect to the attributes
         update_object_cut_id(cut_mo->cut_id, attributes, dowels_count);
@@ -3445,7 +3445,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         check_objects_after_cut(new_objects);
 
         // save cut_id to post update synchronization
-        const CutObjectBase cut_id = cut_mo->cut_id;
+        const CutId cut_id = cut_mo->cut_id;
 
         // update cut results on plater and in the model 
         plater->apply_cut_object_to_model(object_idx, new_objects);

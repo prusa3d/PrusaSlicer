@@ -48,7 +48,7 @@
 #include "libslic3r/GCode/PostProcessor.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/CutUtils.hpp"
-#include "libslic3r/ModelArrange.hpp"
+#include <arrange-wrapper/ModelArrange.hpp>
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
@@ -58,11 +58,14 @@
 #include "libslic3r/Format/STL.hpp"
 #include "libslic3r/Format/OBJ.hpp"
 #include "libslic3r/Format/SL1.hpp"
+#include "libslic3r/miniz_extension.hpp"
+#include "libslic3r/PNGReadWrite.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/BlacklistedLibraryCheck.hpp"
 #include "libslic3r/ProfilesSharingUtils.hpp"
 #include "libslic3r/Utils/DirectoriesUtils.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 
 #include "PrusaSlicer.hpp"
 
@@ -91,6 +94,10 @@ int CLI::run(int argc, char **argv)
     // startup if gtk3 is used. This env var has to be set explicitly to
     // instruct the window manager to fall back to X server mode.
     ::setenv("GDK_BACKEND", "x11", /* replace */ true);
+
+    // https://github.com/prusa3d/PrusaSlicer/issues/12969
+    ::setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", /* replace */ false);
+    ::setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", /* replace */ false);
 #endif
 
 	// Switch boost::filesystem to utf8.
@@ -384,7 +391,9 @@ int CLI::run(int argc, char **argv)
     
     // Loop through transform options.
     bool user_center_specified = false;
-    arr2::ArrangeBed bed = arr2::to_arrange_bed(get_bed_shape(m_print_config));
+
+    const Vec2crd gap{s_multiple_beds.get_bed_gap()};
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(get_bed_shape(m_print_config), gap);
     arr2::ArrangeSettings arrange_cfg;
     arrange_cfg.set_distance_from_objects(min_object_distance(m_print_config));
 
@@ -606,9 +615,6 @@ int CLI::run(int argc, char **argv)
                 model.add_default_instances();
             if (! this->export_models(IO::OBJ))
                 return 1;
-        } else if (opt_key == "export_amf") {
-            if (! this->export_models(IO::AMF))
-                return 1;
         } else if (opt_key == "export_3mf") {
             if (! this->export_models(IO::TMF))
                 return 1;
@@ -638,8 +644,10 @@ int CLI::run(int argc, char **argv)
                 sla_print.set_status_callback(
                             [](const PrintBase::SlicingStatus& s)
                 {
-                    if(s.percent >= 0) // FIXME: is this sufficient?
+                    if(s.percent >= 0) { // FIXME: is this sufficient?
                         printf("%3d%s %s\n", s.percent, "% =>", s.text.c_str());
+                        std::fflush(stdout);
+                    }
                 });
 
                 PrintBase  *print = (printer_technology == ptFFF) ? static_cast<PrintBase*>(&fff_print) : static_cast<PrintBase*>(&sla_print);
@@ -667,8 +675,67 @@ int CLI::run(int argc, char **argv)
                         std::string outfile_final;
                         print->process();
                         if (printer_technology == ptFFF) {
+
+
+
+
+
+                            std::function<ThumbnailsList(const ThumbnailsParams&)> thumbnail_generator_cli;
+                            if (!fff_print.model().objects.empty() && boost::iends_with(fff_print.model().objects.front()->input_file, ".3mf")) {
+                                std::string filename = fff_print.model().objects.front()->input_file;
+                                thumbnail_generator_cli = [filename](const ThumbnailsParams&) {
+                                    ThumbnailsList list_out;
+
+                                    mz_zip_archive archive;
+                                    mz_zip_zero_struct(&archive);
+
+                                    if (!open_zip_reader(&archive, filename))
+                                        return list_out;
+                                    mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
+                                    mz_zip_archive_file_stat stat;
+
+                                    int index = mz_zip_reader_locate_file(&archive, "Metadata/thumbnail.png", nullptr, 0);
+                                    if (index < 0 || !mz_zip_reader_file_stat(&archive, index, &stat))
+                                        return list_out;
+                                    std::string buffer;
+                                    buffer.resize(int(stat.m_uncomp_size));
+                                    mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, buffer.data(), (size_t)stat.m_uncomp_size, 0);
+                                    if (res == 0)
+                                        return list_out;
+                                    close_zip_reader(&archive);
+
+                                    std::vector<unsigned char> data;
+                                    unsigned width = 0;
+                                    unsigned height = 0;
+                                    png::decode_png(buffer, data, width, height);
+
+                                    {
+                                        // Flip the image vertically so it matches the convention in Thumbnails generator.
+                                        const int row_size = width * 4; // Each pixel is 4 bytes (RGBA)
+                                        std::vector<unsigned char> temp_row(row_size);
+                                        for (int i = 0; i < height / 2; ++i) {
+                                            unsigned char* top_row = &data[i * row_size];
+                                            unsigned char* bottom_row = &data[(height - i - 1) * row_size];
+                                            std::copy(bottom_row, bottom_row + row_size, temp_row.begin());
+                                            std::copy(top_row, top_row + row_size, bottom_row);
+                                            std::copy(temp_row.begin(), temp_row.end(), top_row);
+                                        }
+                                    }
+
+                                    ThumbnailData th;
+                                    th.set(width, height);
+                                    th.pixels = data;
+                                    list_out.push_back(th);
+                                    return list_out;
+                                };  
+                            }
+
+
+
+
+
                             // The outfile is processed by a PlaceholderParser.
-                            outfile = fff_print.export_gcode(outfile, nullptr, nullptr);
+                            outfile = fff_print.export_gcode(outfile, nullptr, thumbnail_generator_cli);
                             outfile_final = fff_print.print_statistics().finalize_output_path(outfile);
                         } else {
                             outfile = sla_print.output_filepath(outfile);
@@ -751,6 +818,11 @@ int CLI::run(int argc, char **argv)
         params.load_configs = load_configs;
         params.extra_config = std::move(m_extra_config);
         params.input_files  = std::move(m_input_files);
+        if (has_config_from_profiles && params.input_files.empty()) {
+            params.selected_presets = Slic3r::GUI::CLISelectedProfiles{ m_config.opt_string("print-profile"),
+                                                                        m_config.opt_string("printer-profile") ,
+                                                                        m_config.option<ConfigOptionStrings>("material-profile")->values };
+        }
         params.start_as_gcodeviewer = start_as_gcodeviewer;
         params.start_downloader = start_downloader;
         params.download_url = download_url;
@@ -950,7 +1022,6 @@ bool CLI::export_models(IO::ExportFormat format)
         const std::string path = this->output_filepath(model, format);
         bool success = false;
         switch (format) {
-            case IO::AMF: success = Slic3r::store_amf(path.c_str(), &model, nullptr, false); break;
             case IO::OBJ: success = Slic3r::store_obj(path.c_str(), &model);          break;
             case IO::STL: success = Slic3r::store_stl(path.c_str(), &model, true);    break;
             case IO::TMF: success = Slic3r::store_3mf(path.c_str(), &model, nullptr, false); break;
@@ -970,7 +1041,6 @@ std::string CLI::output_filepath(const Model &model, IO::ExportFormat format) co
 {
     std::string ext;
     switch (format) {
-        case IO::AMF: ext = ".zip.amf"; break;
         case IO::OBJ: ext = ".obj"; break;
         case IO::STL: ext = ".stl"; break;
         case IO::TMF: ext = ".3mf"; break;

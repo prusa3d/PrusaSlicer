@@ -1,4 +1,8 @@
 min_slic3r_version = 2.8.1-rc0
+2.1.4 Added filament profiles for Prusament PETG Magnetite 40%. Updated FW version notification.
+2.1.3 Added Buddy3D filaments.
+2.1.2 Added filament profile for Prusament PP Carbon Fiber. Added filament profile for Cookiecad PLA.
+2.1.1 Updated FW version notification. Updated start g-code (XL). Updated Fiberflex 40D profile (MK4).
 2.1.0 Added new parameters for nozzle checks (abrasive filaments, high flow nozzles), updated related start g-codes. Enabled overhang fan speed overrides for specific filaments (MK4S).
 min_slic3r_version = 2.8.0-alpha0
 2.0.5 Fixed an issue in configuration wizard.

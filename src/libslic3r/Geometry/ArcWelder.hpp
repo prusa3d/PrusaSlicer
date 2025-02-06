@@ -424,6 +424,9 @@ struct Segment
     // CCW or CW. Ignored for zero radius (linear segment).
     Orientation orientation{ Orientation::CCW };
 
+    float height_fraction{ 1.f };
+    float e_fraction{ 1.f };
+
     bool    linear() const { return radius == 0; }
     bool    ccw() const { return orientation == Orientation::CCW; }
     bool    cw() const { return orientation == Orientation::CW; }

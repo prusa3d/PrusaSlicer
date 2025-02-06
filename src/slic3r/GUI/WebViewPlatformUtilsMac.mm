@@ -155,7 +155,27 @@ void delete_cookies(wxWebView* web_view, const std::string& url)
             }
         }
     }];
-
+}
+void add_request_authorization(wxWebView* web_view, const wxString& address, const std::string& token)
+{
+    // unused on MacOS
+    assert(true);
+}
+void remove_request_authorization(wxWebView* web_view)
+{
+    // unused on MacOS
+    assert(true);
+}
+void load_request(wxWebView* web_view, const std::string& address, const std::string& token)
+{
+    WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());
+    NSString *url_string = [NSString stringWithCString:address.c_str() encoding:[NSString defaultCStringEncoding]];
+    NSString *token_string = [NSString stringWithCString:token.c_str() encoding:[NSString defaultCStringEncoding]];
+    NSURL *url = [NSURL URLWithString:url_string];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    NSString *auth_value = [NSString stringWithFormat:@"External %@", token_string];
+    [request setValue:auth_value forHTTPHeaderField:@"Authorization"];
+    [backend loadRequest:request];
 }
 }
 

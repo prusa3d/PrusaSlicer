@@ -9,6 +9,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
+#include <curl/curl.h>
 
 namespace Slic3r {
 namespace GUI {
@@ -72,16 +73,31 @@ std::string filename_from_url(const std::string& url)
 		return std::string();
 	return std::string(url_plain.begin() + slash + 1, url_plain.end());
 }
+std::string unescape_url(const std::string& unescaped)
+{
+	std::string ret_val;
+	CURL* curl = curl_easy_init();
+	if (curl) {
+		int decodelen;
+		char* decoded = curl_easy_unescape(curl, unescaped.c_str(), unescaped.size(), &decodelen);
+		if (decoded) {
+			ret_val = std::string(decoded);
+			curl_free(decoded);
+		}
+		curl_easy_cleanup(curl);
+	}
+	return ret_val;
+}
 }
 
-Download::Download(int ID, std::string url, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder)
+Download::Download(int ID, std::string url, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder, bool load_after)
     : m_id(ID)
 	, m_filename(filename_from_url(url))
 	, m_dest_folder(dest_folder)
 {
 	assert(boost::filesystem::is_directory(dest_folder));
 	m_final_path = dest_folder / m_filename;
-    m_file_get = std::make_shared<FileGet>(ID, std::move(url), m_filename, evt_handler, dest_folder);
+    m_file_get = std::make_shared<FileGet>(ID, std::move(url), m_filename, evt_handler, dest_folder, load_after);
 }
 
 void Download::start()
@@ -116,11 +132,6 @@ void Download::resume()
 Downloader::Downloader()
 	: wxEvtHandler()
 {
-	//Bind(EVT_DWNLDR_FILE_COMPLETE, [](const wxCommandEvent& evt) {});
-	//Bind(EVT_DWNLDR_FILE_PROGRESS, [](const wxCommandEvent& evt) {});
-	//Bind(EVT_DWNLDR_FILE_ERROR, [](const wxCommandEvent& evt) {});
-	//Bind(EVT_DWNLDR_FILE_NAME_CHANGE, [](const wxCommandEvent& evt) {});
-
 	Bind(EVT_DWNLDR_FILE_COMPLETE, &Downloader::on_complete, this);
 	Bind(EVT_DWNLDR_FILE_PROGRESS, &Downloader::on_progress, this);
 	Bind(EVT_DWNLDR_FILE_ERROR, &Downloader::on_error, this);
@@ -133,23 +144,18 @@ void Downloader::start_download(const std::string& full_url)
 {
 	assert(m_initialized);
 	
-	// TODO: There is a misterious slash appearing in recieved msg on windows
-#ifdef _WIN32
-	if (!boost::starts_with(full_url, "prusaslicer://open/?file=")) {
-#else
-    if (!boost::starts_with(full_url, "prusaslicer://open?file=")) {
-#endif
-		BOOST_LOG_TRIVIAL(error) << "Could not start download due to wrong URL: " << full_url;
-		// TODO: show error?
+    std::string escaped_url = unescape_url(full_url);
+    if (boost::starts_with(escaped_url, "prusaslicer://open?file=")) {
+        escaped_url = escaped_url.substr(24);
+    }else if (boost::starts_with(escaped_url, "prusaslicer://open/?file=")) {
+        escaped_url = escaped_url.substr(25);
+    } else {
+        BOOST_LOG_TRIVIAL(error) << "Could not start download due to wrong URL: " << full_url;
 		return;
-	}
+    }
+    
     size_t id = get_next_id();
-    // TODO: still same mistery 
-#ifdef _WIN32
-    std::string escaped_url = FileGet::escape_url(full_url.substr(25));
-#else
-    std::string escaped_url = FileGet::escape_url(full_url.substr(24));
-#endif
+
 	if (!boost::starts_with(escaped_url, "https://") || !FileGet::is_subdomain(escaped_url, "printables.com")) {
 		std::string msg = format(_L("Download won't start. Download URL doesn't point to https://printables.com : %1%"), escaped_url);
 		BOOST_LOG_TRIVIAL(error) << msg;
@@ -158,12 +164,36 @@ void Downloader::start_download(const std::string& full_url)
 		return;
 	}
 	
-	std::string text(escaped_url);
-    m_downloads.emplace_back(std::make_unique<Download>(id, std::move(escaped_url), this, m_dest_folder));
+    m_downloads.emplace_back(std::make_unique<Download>(id, std::move(escaped_url), this, m_dest_folder, true));
 	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
 	ntf_mngr->push_download_URL_progress_notification(id, m_downloads.back()->get_filename(), std::bind(&Downloader::user_action_callback, this, std::placeholders::_1, std::placeholders::_2));
 	m_downloads.back()->start();
 	BOOST_LOG_TRIVIAL(debug) << "started download";
+}
+
+void Downloader::start_download_printables(const std::string& url, bool load_after, const std::string& printables_url, GUI_App* app)
+{
+    assert(m_initialized);
+    
+    size_t id = get_next_id();
+
+	if (!boost::starts_with(url, "https://") || !FileGet::is_subdomain(url, "printables.com")) {
+		std::string msg = format(_L("Download won't start. Download URL doesn't point to https://printables.com : %1%"), url);
+		BOOST_LOG_TRIVIAL(error) << msg;
+		NotificationManager* ntf_mngr = wxGetApp().notification_manager();
+		ntf_mngr->push_notification(NotificationType::CustomNotification, NotificationManager::NotificationLevel::RegularNotificationLevel, msg);
+		return;
+	}
+	
+    m_downloads.emplace_back(std::make_unique<Download>(id, url, this, m_dest_folder, load_after));
+	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
+	ntf_mngr->push_download_URL_progress_notification_with_printables_link( id
+        , m_downloads.back()->get_filename()
+        , printables_url
+        , std::bind(&Downloader::user_action_callback, this, std::placeholders::_1, std::placeholders::_2)
+        , std::bind(&GUI_App::open_link_in_printables, app, std::placeholders::_1)
+    );
+	m_downloads.back()->start();
 }
 
 void Downloader::on_progress(wxCommandEvent& event)
@@ -184,14 +214,14 @@ void Downloader::on_error(wxCommandEvent& event)
 	ntf_mngr->set_download_URL_error(id, into_u8(event.GetString()));
 	show_error(nullptr, format_wxstr(L"%1%\n%2%", _L("The download has failed") + ":", event.GetString()));
 }
-void Downloader::on_complete(wxCommandEvent& event)
+void Downloader::on_complete(Event<DownloadEventData>& event)
 {
-	// TODO: is this always true? :
 	// here we open the file itself, notification should get 1.f progress from on progress.
-    set_download_state(event.GetInt(), DownloadState::DownloadDone);
+    set_download_state(event.data.id, DownloadState::DownloadDone);
 	wxArrayString paths;
-	paths.Add(event.GetString());
-	wxGetApp().plater()->load_files(paths);
+	paths.Add(event.data.path);
+    if (event.data.load_after)
+	    wxGetApp().plater()->load_files(paths);
 }
 bool Downloader::user_action_callback(DownloaderUserAction action, int id)
 {

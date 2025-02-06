@@ -103,6 +103,10 @@ void UserAccount::enqueue_printer_data_action(const std::string& uuid)
 {
     m_communication->enqueue_printer_data_action(uuid);
 }
+void UserAccount::request_refresh()
+{
+    m_communication->request_refresh();
+}
 
 bool UserAccount::on_login_code_recieved(const std::string& url_message)
 {
@@ -199,7 +203,7 @@ bool UserAccount::on_connect_printers_success(const std::string& data, AppConfig
         if (auto pair = printer_state_table.find(*printer_state); pair != printer_state_table.end()) {
             state = pair->second;
         } else {
-            assert(true); // On this assert, printer_state_table needs to be updated with *state_opt and correct ConnectPrinterState
+            assert(false); // On this assert, printer_state_table needs to be updated with *state_opt and correct ConnectPrinterState
             continue;
         }
         if (m_printer_uuid_map.find(*printer_uuid) == m_printer_uuid_map.end()) {

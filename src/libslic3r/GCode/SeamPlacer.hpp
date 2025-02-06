@@ -12,6 +12,7 @@
 #include <atomic>
 
 #include "libslic3r/GCode/SeamAligned.hpp"
+#include "libslic3r/GCode/SeamScarf.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Point.hpp"
@@ -37,7 +38,7 @@ struct Params
     double concave_visibility_modifier{};
     Perimeters::PerimeterParams perimeter;
     Slic3r::ModelInfo::Visibility::Params visibility;
-    bool staggered_inner_seams;
+    bool staggered_inner_seams{};
 };
 
 std::ostream& operator<<(std::ostream& os, const Params& params);
@@ -53,7 +54,9 @@ public:
         const std::function<void(void)> &throw_if_canceled
     );
 
-    Point place_seam(const Layer *layer, const ExtrusionLoop &loop, const Point &last_pos) const;
+    boost::variant<Point, Scarf::Scarf> place_seam(
+        const Layer *layer, const PrintRegion *region, const ExtrusionLoop &loop, const bool flipped, const Point &last_pos
+    ) const;
 
 private:
     Params params;

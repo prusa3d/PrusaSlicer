@@ -2710,9 +2710,10 @@ void GLGizmoEmboss::draw_advanced()
         return;
     }
 
+
+#ifdef SHOW_FONT_FILE_PROPERTY
     FontProp &font_prop = m_style_manager.get_font_prop();
     const FontFile::Info &font_info = get_font_info(*ff.font_file, font_prop);
-#ifdef SHOW_FONT_FILE_PROPERTY
     ImGui::SameLine();
     int cache_size = ff.has_value()? (int)ff.cache->size() : 0;
     std::string ff_property = 

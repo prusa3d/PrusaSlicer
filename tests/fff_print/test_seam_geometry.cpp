@@ -143,3 +143,30 @@ TEST_CASE("Calculate overhangs", "[Seams][SeamGeometry]") {
         0.0, M_PI / 4.0, M_PI / 4.0, 0.0
     }));
 }
+
+const Linesf lines{to_unscaled_linesf({ExPolygon{
+    scaled(Vec2d{0.0, 0.0}),
+    scaled(Vec2d{1.0, 0.0}),
+    scaled(Vec2d{1.0, 1.0}),
+    scaled(Vec2d{0.0, 1.0})
+}})};
+
+TEST_CASE("Offset along loop lines forward", "[Seams][SeamGeometry]") {
+    const std::optional<Seams::Geometry::PointOnLine> result{Seams::Geometry::offset_along_lines(
+        {0.5, 0.0}, 0, lines, 3.9, Seams::Geometry::Direction1D::forward
+    )};
+    REQUIRE(result);
+    const auto &[point, line_index] = *result;
+    CHECK((scaled(point) - Point::new_scale(0.4, 0.0)).norm() < scaled(EPSILON));
+    CHECK(line_index == 0);
+}
+
+TEST_CASE("Offset along loop lines backward", "[Seams][SeamGeometry]") {
+    const std::optional<Seams::Geometry::PointOnLine> result{Seams::Geometry::offset_along_lines(
+        {1.0, 0.5}, 1, lines, 1.8, Seams::Geometry::Direction1D::backward
+    )};
+    REQUIRE(result);
+    const auto &[point, line_index] = *result;
+    CHECK((scaled(point) - Point::new_scale(0.0, 0.3)).norm() < scaled(EPSILON));
+    CHECK(line_index == 3);
+}

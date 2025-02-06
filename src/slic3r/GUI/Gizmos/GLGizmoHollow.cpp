@@ -81,6 +81,12 @@ void GLGizmoHollow::data_changed(bool is_serializing)
 
 void GLGizmoHollow::on_render()
 {
+    if (! selected_print_object_exists(m_parent, wxEmptyString)) {
+        wxGetApp().CallAfter([this]() {
+            // Close current gizmo.
+            m_parent.get_gizmos_manager().open_gizmo(m_parent.get_gizmos_manager().get_current_type());
+        });
+    }
     const Selection& selection = m_parent.get_selection();
     const CommonGizmosDataObjects::SelectionInfo* sel_info = m_c->selection_info();
 
@@ -137,7 +143,7 @@ void GLGizmoHollow::render_points(const Selection& selection)
     if (!inst)
         return;
 
-    double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
+    double shift_z = m_c->selection_info()->print_object() ? m_c->selection_info()->print_object()->get_current_elevation() : 0.;
     Transform3d trafo(inst->get_transformation().get_matrix());
     trafo.translation()(2) += shift_z;
     const Geometry::Transformation transformation{trafo};
@@ -848,6 +854,14 @@ void GLGizmoHollow::on_set_state()
 {
     if (m_state == m_old_state)
         return;
+
+    if (m_state == On) {       
+        // Make sure that current object is on current bed. Refuse to turn on otherwise.
+        if (! selected_print_object_exists(m_parent, _L("Selected object has to be on the active bed."))) {
+            m_state = Off;
+            return;
+        }
+    }
 
     if (m_state == Off && m_old_state != Off) {
         // the gizmo was just turned Off

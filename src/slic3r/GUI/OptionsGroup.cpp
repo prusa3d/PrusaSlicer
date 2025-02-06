@@ -22,6 +22,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include "slic3r/GUI/Search.hpp" // IWYU pragma: keep
+#include "slic3r/GUI/Field.hpp"
 #include "libslic3r/Exception.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/AppConfig.hpp"
@@ -175,8 +176,10 @@ void OptionsGroup::change_opt_value(DynamicPrintConfig& config, const t_config_o
                 str.pop_back();
                 percent = true;
             }
-            double val = std::stod(str); // locale-dependent (on purpose - the input is the actual content of the field)
-            ConfigOptionFloatsOrPercents* vec_new = new ConfigOptionFloatsOrPercents({ {val, percent} });
+
+            const bool                    is_na_value = opt_def->nullable && str == _(L("N/A"));
+            const FloatOrPercent          val         = is_na_value ? ConfigOptionFloatsOrPercentsNullable::nil_value() : FloatOrPercent{std::stod(str), percent};
+            ConfigOptionFloatsOrPercents *vec_new     = new ConfigOptionFloatsOrPercents({val});
             config.option<ConfigOptionFloatsOrPercents>(opt_key)->set_at(vec_new, opt_index, opt_index);
             break;
         }
@@ -1020,6 +1023,21 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
                 ret = double_to_string(val); }
             }
             break;
+        case coFloatsOrPercents: {
+            if (config.option(opt_key)->is_nil()) {
+                ret = _(L("N/A"));
+            } else {
+                const auto &config_option = config.option<ConfigOptionFloatsOrPercentsNullable>(opt_key)->get_at(idx);
+
+                text_value = double_to_string(config_option.value);
+                if (config_option.percent) {
+                    text_value += "%";
+                }
+
+                ret = text_value;
+            }
+            break;
+        }
         case coBools:
             ret = config.option<ConfigOptionBoolsNullable>(opt_key)->values[idx];
             break;

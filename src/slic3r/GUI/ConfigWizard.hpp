@@ -22,14 +22,10 @@ namespace Slic3r {
 
 class PresetBundle;
 class PresetUpdater;
+class AppConfig;
+class PresetArchiveDatabase;
 
 namespace GUI {
-
-class ConfigWizardLoadingDialog : public wxDialog
-{
-public:
-    ConfigWizardLoadingDialog(wxWindow* parent, const wxString& message);
-};
 
 namespace DownloaderUtils {
     class Worker : public wxBoxSizer
@@ -101,8 +97,6 @@ private:
 
     friend struct ConfigWizardPage;
 };
-
-
 
 }
 }

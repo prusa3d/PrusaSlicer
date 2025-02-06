@@ -81,14 +81,14 @@ SCENARIO("Simplify polyne, template", "[Polyline]")
     Points polyline{ {0,0}, {1000,0}, {2000,0}, {2000,1000}, {2000,2000}, {1000,2000}, {0,2000}, {0,1000}, {0,0} };
     WHEN("simplified with Douglas-Peucker with back inserter") {
         Points out;
-        douglas_peucker<int64_t>(polyline.begin(), polyline.end(), std::back_inserter(out), 10, [](const Point &p) { return p; });
+        douglas_peucker<int64_t>(polyline.begin(), polyline.end(), std::back_inserter(out), 10., [](const Point &p) { return p; });
         THEN("simplified correctly") {
             REQUIRE(out == Points{ {0,0}, {2000,0}, {2000,2000}, {0,2000}, {0,0} });
         }
     }
     WHEN("simplified with Douglas-Peucker in place") {
         Points out{ polyline };
-        out.erase(douglas_peucker<int64_t>(out.begin(), out.end(), out.begin(), 10, [](const Point &p) { return p; }), out.end());
+        out.erase(douglas_peucker<int64_t>(out.begin(), out.end(), out.begin(), 10., [](const Point &p) { return p; }), out.end());
         THEN("simplified correctly") {
             REQUIRE(out == Points{ {0,0}, {2000,0}, {2000,2000}, {0,2000}, {0,0} });
         }

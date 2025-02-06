@@ -110,6 +110,12 @@ bool GLGizmoMmuSegmentation::on_init()
     m_desc["second_color"]         = _u8L("Second color");
     m_desc["remove_caption"]       = _u8L("Shift + Left mouse button") + ": ";
     m_desc["remove"]               = _u8L("Remove painted color");
+
+    m_desc["alt_caption"]          = _u8L("Alt + Mouse wheel") + ": ";
+    m_desc["alt_brush"]            = _u8L("Change brush size");
+    m_desc["alt_fill"]             = _u8L("Change angle");
+    m_desc["alt_height_range"]     = _u8L("Change height range");
+
     m_desc["remove_all"]           = _u8L("Clear all");
     m_desc["circle"]               = _u8L("Circle");
     m_desc["sphere"]               = _u8L("Sphere");
@@ -119,9 +125,14 @@ bool GLGizmoMmuSegmentation::on_init()
     m_desc["tool_brush"]           = _u8L("Brush");
     m_desc["tool_smart_fill"]      = _u8L("Smart fill");
     m_desc["tool_bucket_fill"]     = _u8L("Bucket fill");
+    m_desc["tool_height_range"]    = _u8L("Height range");
 
     m_desc["smart_fill_angle"]     = _u8L("Smart fill angle");
+    m_desc["bucket_fill_angle"]    = _u8L("Bucket fill angle");
+
     m_desc["split_triangles"]      = _u8L("Split triangles");
+
+    m_desc["height_range_z_range"] = _u8L("Height range");
 
     init_extruders_data();
 
@@ -263,17 +274,19 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     if (!m_c->selection_info()->model_object())
         return;
 
-    const float approx_height = m_imgui->scaled(22.0f);
+    const float approx_height = m_imgui->scaled(25.35f);
                             y = std::min(y, bottom_limit - approx_height);
     ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
 
     ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
     // First calculate width of all the texts that are could possibly be shown. We will decide set the dialog width based on that:
-    const float clipping_slider_left = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x,
-                                                ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
+    const float clipping_slider_left     = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x,
+                                                    ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
     const float cursor_slider_left       = ImGuiPureWrap::calc_text_size(m_desc.at("cursor_size")).x + m_imgui->scaled(1.f);
     const float smart_fill_slider_left   = ImGuiPureWrap::calc_text_size(m_desc.at("smart_fill_angle")).x + m_imgui->scaled(1.f);
+    const float bucket_fill_slider_left  = ImGuiPureWrap::calc_text_size(m_desc.at("bucket_fill_angle")).x + m_imgui->scaled(1.f);
+    const float height_range_slider_left = ImGuiPureWrap::calc_text_size(m_desc.at("height_range_z_range")).x + m_imgui->scaled(1.f);
 
     const float cursor_type_radio_circle  = ImGuiPureWrap::calc_text_size(m_desc["circle"]).x + m_imgui->scaled(2.5f);
     const float cursor_type_radio_sphere  = ImGuiPureWrap::calc_text_size(m_desc["sphere"]).x + m_imgui->scaled(2.5f);
@@ -286,30 +299,39 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     const float combo_label_width        = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("first_color")).x,
                                                     ImGuiPureWrap::calc_text_size(m_desc.at("second_color")).x) + m_imgui->scaled(1.f);
 
-    const float tool_type_radio_brush       = ImGuiPureWrap::calc_text_size(m_desc["tool_brush"]).x + m_imgui->scaled(2.5f);
-    const float tool_type_radio_bucket_fill = ImGuiPureWrap::calc_text_size(m_desc["tool_bucket_fill"]).x + m_imgui->scaled(2.5f);
-    const float tool_type_radio_smart_fill  = ImGuiPureWrap::calc_text_size(m_desc["tool_smart_fill"]).x + m_imgui->scaled(2.5f);
+    const float tool_type_radio_brush        = ImGuiPureWrap::calc_text_size(m_desc["tool_brush"]).x + m_imgui->scaled(2.5f);
+    const float tool_type_radio_bucket_fill  = ImGuiPureWrap::calc_text_size(m_desc["tool_bucket_fill"]).x + m_imgui->scaled(2.5f);
+    const float tool_type_radio_smart_fill   = ImGuiPureWrap::calc_text_size(m_desc["tool_smart_fill"]).x + m_imgui->scaled(2.5f);
+    const float tool_type_radio_height_range = ImGuiPureWrap::calc_text_size(m_desc["tool_height_range"]).x + m_imgui->scaled(2.5f);
+
+    const float tool_type_radio_first_line  = tool_type_radio_brush + tool_type_radio_bucket_fill + tool_type_radio_smart_fill;
+    const float tool_type_radio_second_line = tool_type_radio_height_range;
+    const float tool_type_radio_max_width   = std::max(tool_type_radio_first_line, tool_type_radio_second_line);
 
     const float split_triangles_checkbox_width = ImGuiPureWrap::calc_text_size(m_desc["split_triangles"]).x + m_imgui->scaled(2.5f);
 
-    float caption_max    = 0.f;
+    float caption_max = 0.f;
+    for (const std::string t : {"first_color", "second_color", "remove", "alt"}) {
+        caption_max = std::max(caption_max, ImGuiPureWrap::calc_text_size(m_desc[t + "_caption"]).x);
+    }
+
     float total_text_max = 0.f;
-    for (const auto &t : std::array<std::string, 3>{"first_color", "second_color", "remove"}) {
-        caption_max    = std::max(caption_max, ImGuiPureWrap::calc_text_size(m_desc[t + "_caption"]).x);
+    for (const std::string t : {"first_color", "second_color", "remove", "alt_brush", "alt_fill", "alt_height_range"}) {
         total_text_max = std::max(total_text_max, ImGuiPureWrap::calc_text_size(m_desc[t]).x);
     }
+
     total_text_max += caption_max + m_imgui->scaled(1.f);
     caption_max    += m_imgui->scaled(1.f);
 
-    const float sliders_left_width = std::max(smart_fill_slider_left, std::max(cursor_slider_left, clipping_slider_left));
+    const float sliders_left_width = std::max({smart_fill_slider_left, bucket_fill_slider_left, cursor_slider_left, clipping_slider_left, height_range_slider_left});
     const float slider_icon_width  = ImGuiPureWrap::get_slider_icon_size().x;
     float       window_width       = minimal_slider_width + sliders_left_width + slider_icon_width;
-    window_width       = std::max(window_width, total_text_max);
-    window_width       = std::max(window_width, button_width);
-    window_width       = std::max(window_width, split_triangles_checkbox_width);
-    window_width       = std::max(window_width, cursor_type_radio_circle + cursor_type_radio_sphere + cursor_type_radio_pointer);
-    window_width       = std::max(window_width, tool_type_radio_brush + tool_type_radio_bucket_fill + tool_type_radio_smart_fill);
-    window_width       = std::max(window_width, 2.f * buttons_width + m_imgui->scaled(1.f));
+    window_width = std::max(window_width, total_text_max);
+    window_width = std::max(window_width, button_width);
+    window_width = std::max(window_width, split_triangles_checkbox_width);
+    window_width = std::max(window_width, cursor_type_radio_circle + cursor_type_radio_sphere + cursor_type_radio_pointer);
+    window_width = std::max(window_width, tool_type_radio_max_width);
+    window_width = std::max(window_width, 2.f * buttons_width + m_imgui->scaled(1.f));
 
     auto draw_text_with_caption = [&caption_max](const std::string &caption, const std::string& text) {
         ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, caption);
@@ -317,8 +339,14 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
         ImGuiPureWrap::text(text);
     };
 
-    for (const auto &t : std::array<std::string, 3>{"first_color", "second_color", "remove"})
+    for (const std::string t : {"first_color", "second_color", "remove"}) {
         draw_text_with_caption(m_desc.at(t + "_caption"), m_desc.at(t));
+    }
+
+    std::string alt_hint_text = (m_tool_type == ToolType::BRUSH)        ? "alt_brush" :
+                                (m_tool_type == ToolType::HEIGHT_RANGE) ? "alt_height_range"
+                                                                        : "alt_fill";
+    draw_text_with_caption(m_desc.at("alt_caption"), m_desc.at(alt_hint_text));
 
     ImGui::Separator();
 
@@ -360,8 +388,8 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImGuiPureWrap::text(m_desc.at("tool_type"));
     ImGui::NewLine();
 
-    float tool_type_offset = (window_width - tool_type_radio_brush - tool_type_radio_bucket_fill - tool_type_radio_smart_fill + m_imgui->scaled(1.5f)) / 2.f;
-    ImGui::SameLine(tool_type_offset);
+    const float tool_type_first_line_offset = (window_width - tool_type_radio_first_line + m_imgui->scaled(1.5f)) / 2.f;
+    ImGui::SameLine(tool_type_first_line_offset);
     ImGui::PushItemWidth(tool_type_radio_brush);
     if (ImGuiPureWrap::radio_button(m_desc["tool_brush"], m_tool_type == ToolType::BRUSH)) {
         m_tool_type = ToolType::BRUSH;
@@ -374,7 +402,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     if (ImGui::IsItemHovered())
         ImGuiPureWrap::tooltip(_u8L("Paints facets according to the chosen painting brush."), max_tooltip_width);
 
-    ImGui::SameLine(tool_type_offset + tool_type_radio_brush);
+    ImGui::SameLine(tool_type_first_line_offset + tool_type_radio_brush);
     ImGui::PushItemWidth(tool_type_radio_smart_fill);
     if (ImGuiPureWrap::radio_button(m_desc["tool_smart_fill"], m_tool_type == ToolType::SMART_FILL)) {
         m_tool_type = ToolType::SMART_FILL;
@@ -387,7 +415,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     if (ImGui::IsItemHovered())
         ImGuiPureWrap::tooltip(_u8L("Paints neighboring facets whose relative angle is less or equal to set angle."), max_tooltip_width);
 
-    ImGui::SameLine(tool_type_offset + tool_type_radio_brush + tool_type_radio_smart_fill);
+    ImGui::SameLine(tool_type_first_line_offset + tool_type_radio_brush + tool_type_radio_smart_fill);
     ImGui::PushItemWidth(tool_type_radio_bucket_fill);
     if (ImGuiPureWrap::radio_button(m_desc["tool_bucket_fill"], m_tool_type == ToolType::BUCKET_FILL)) {
         m_tool_type = ToolType::BUCKET_FILL;
@@ -400,9 +428,25 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     if (ImGui::IsItemHovered())
         ImGuiPureWrap::tooltip(_u8L("Paints neighboring facets that have the same color."), max_tooltip_width);
 
+    ImGui::NewLine();
+
+    const float tool_type_second_line_offset = (window_width - tool_type_radio_second_line + m_imgui->scaled(1.5f)) / 2.f;
+    ImGui::SameLine(tool_type_second_line_offset);
+    ImGui::PushItemWidth(tool_type_radio_height_range);
+    if (ImGuiPureWrap::radio_button(m_desc["tool_height_range"], m_tool_type == ToolType::HEIGHT_RANGE)) {
+        m_tool_type = ToolType::HEIGHT_RANGE;
+        for (auto &triangle_selector : m_triangle_selectors) {
+            triangle_selector->seed_fill_unselect_all_triangles();
+            triangle_selector->request_update_render_data();
+        }
+    }
+
+    if (ImGui::IsItemHovered())
+        ImGuiPureWrap::tooltip(_u8L("Paints facets within the chosen height range."), max_tooltip_width);
+
     ImGui::Separator();
 
-    if(m_tool_type == ToolType::BRUSH) {
+    if (m_tool_type == ToolType::BRUSH) {
         ImGuiPureWrap::text(m_desc.at("cursor_type"));
         ImGui::NewLine();
 
@@ -449,18 +493,35 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
         m_imgui->disabled_end();
 
         ImGui::Separator();
-    } else if(m_tool_type == ToolType::SMART_FILL) {
+    } else if (m_tool_type == ToolType::SMART_FILL || m_tool_type == ToolType::BUCKET_FILL) {
         ImGui::AlignTextToFramePadding();
-        ImGuiPureWrap::text(m_desc["smart_fill_angle"] + ":");
-        std::string format_str = std::string("%.f") + I18N::translate_utf8("°", "Degree sign to use in the respective slider in MMU gizmo,"
-                                                                                "placed after the number with no whitespace in between.");
+        ImGuiPureWrap::text((m_tool_type == ToolType::SMART_FILL ? m_desc["smart_fill_angle"] : m_desc["bucket_fill_angle"])  + ":");
+        std::string format_str_angle = std::string("%.f") + I18N::translate_utf8("°", "Degree sign to use in the respective slider in MMU gizmo,"
+                                                                                      "placed after the number with no whitespace in between.");
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel")))
-            for (auto &triangle_selector : m_triangle_selectors) {
+        float &fill_angle = (m_tool_type == ToolType::SMART_FILL) ? m_smart_fill_angle : m_bucket_fill_angle;
+        if (m_imgui->slider_float("##fill_angle", &fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str_angle.data(), 1.0f, true, _L("Alt + Mouse wheel"))) {
+            for (auto &triangle_selector: m_triangle_selectors) {
                 triangle_selector->seed_fill_unselect_all_triangles();
                 triangle_selector->request_update_render_data();
             }
+        }
+
+        ImGui::Separator();
+    } else if (m_tool_type == ToolType::HEIGHT_RANGE) {
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(m_desc["height_range_z_range"] + ":");
+        std::string format_str_angle = std::string("%.2f ") + I18N::translate_utf8("mm", "Millimeter sign to use in the respective slider in multi-material painting gizmo,"
+                                                                                         "placed after the number with space in between.");
+        ImGui::SameLine(sliders_left_width);
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        if (m_imgui->slider_float("##height_range_z_range", &m_height_range_z_range, HeightRangeZRangeMin, HeightRangeZRangeMax, format_str_angle.data(), 1.0f, true, _L("Alt + Mouse wheel"))) {
+            for (auto &triangle_selector: m_triangle_selectors) {
+                triangle_selector->seed_fill_unselect_all_triangles();
+                triangle_selector->request_update_render_data();
+            }
+        }
 
         ImGui::Separator();
     }
@@ -509,7 +570,7 @@ void GLGizmoMmuSegmentation::update_model_object() const
         if (! mv->is_model_part())
             continue;
         ++idx;
-        updated |= mv->mm_segmentation_facets.set(*m_triangle_selectors[idx].get());
+        updated |= mv->mm_segmentation_facets.set(*m_triangle_selectors[idx]);
     }
 
     if (updated) {
@@ -560,7 +621,7 @@ void GLGizmoMmuSegmentation::update_from_model_object()
 
 PainterGizmoType GLGizmoMmuSegmentation::get_painter_type() const
 {
-    return PainterGizmoType::MMU_SEGMENTATION;
+    return PainterGizmoType::MM_SEGMENTATION;
 }
 
 ColorRGBA GLGizmoMmuSegmentation::get_cursor_sphere_left_button_color() const
@@ -699,7 +760,7 @@ void GLMmSegmentationGizmo3DScene::render(size_t triangle_indices_idx) const
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, this->vertices_VBO_id));
     const GLint position_id = shader->get_attrib_location("v_position");
     if (position_id != -1) {
-        glsafe(::glVertexAttribPointer(position_id, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (GLvoid*)0));
+        glsafe(::glVertexAttribPointer(position_id, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (GLvoid*)nullptr));
         glsafe(::glEnableVertexAttribArray(position_id));
     }
 

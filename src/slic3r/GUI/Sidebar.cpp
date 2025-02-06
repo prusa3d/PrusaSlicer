@@ -32,6 +32,7 @@
 #include <wx/statbox.h>
 #include <wx/statbmp.h>
 #include <wx/wupdlock.h> // IWYU pragma: keep
+#include "libslic3r/MultipleBeds.hpp"
 #include "wx/generic/stattextg.h"
 #ifdef _WIN32
 #include <wx/richtooltip.h>
@@ -500,24 +501,43 @@ Sidebar::Sidebar(Plater *parent)
 
     enable_buttons(false);
 
-    auto *btns_sizer = new wxBoxSizer(wxVERTICAL);
+    m_btns_sizer = new wxBoxSizer(wxVERTICAL);
 
-    auto* complect_btns_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto *complect_btns_sizer = new wxBoxSizer(wxHORIZONTAL);
     complect_btns_sizer->Add(m_btn_export_gcode, 1, wxEXPAND);
     complect_btns_sizer->Add(m_btn_connect_gcode, 1, wxEXPAND | wxLEFT, margin_5);
     complect_btns_sizer->Add(m_btn_send_gcode, 0, wxLEFT, margin_5);
 	complect_btns_sizer->Add(m_btn_export_gcode_removable, 0, wxLEFT, margin_5);
 
-    btns_sizer->Add(m_btn_reslice, 0, wxEXPAND | wxTOP, margin_5);
-    btns_sizer->Add(complect_btns_sizer, 0, wxEXPAND | wxTOP, margin_5);
+    m_btns_sizer->Add(m_btn_reslice, 0, wxEXPAND | wxTOP, margin_5);
+    m_btns_sizer->Add(complect_btns_sizer, 0, wxEXPAND | wxTOP, margin_5);
 
     auto *sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(m_scrolled_panel, 1, wxEXPAND);
-    sizer->Add(btns_sizer, 0, wxEXPAND | wxLEFT | wxBOTTOM
+
+    const int buttons_sizer_flags{
+        wxEXPAND
+        | wxLEFT
+        | wxBOTTOM
 #ifndef _WIN32
         | wxRIGHT
 #endif // __linux__
-        , margin_5);
+    };
+    sizer->Add(m_btns_sizer, 0, buttons_sizer_flags, margin_5);
+
+    m_autoslicing_btns_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+	init_scalable_btn(&m_btn_export_all_gcode_removable, "export_to_sd", _L("Export all to SD card / Flash drive") + " " + GUI::shortkey_ctrl_prefix() + "U");
+    init_btn(&m_btn_export_all_gcode, _L("Export all G-codes") + dots, scaled_height);
+    init_btn(&m_btn_connect_gcode_all, _L("Send all to Connect"), scaled_height);
+
+    m_autoslicing_btns_sizer->Add(m_btn_export_all_gcode, 1, wxEXPAND);
+    m_autoslicing_btns_sizer->Add(m_btn_connect_gcode_all, 1, wxEXPAND | wxLEFT, margin_5);
+	m_autoslicing_btns_sizer->Add(m_btn_export_all_gcode_removable, 0, wxLEFT, margin_5);
+
+    m_autoslicing_btns_sizer->Show(false);
+
+    sizer->Add(m_autoslicing_btns_sizer, 0, buttons_sizer_flags | wxTOP, margin_5);
     SetSizer(sizer);
 
     // Events
@@ -552,6 +572,17 @@ Sidebar::Sidebar(Plater *parent)
 
     this->Bind(wxEVT_COMBOBOX, &Sidebar::on_select_preset, this);
 
+    m_btn_export_all_gcode->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        this->m_plater->export_all_gcodes(false);
+    });
+
+    m_btn_export_all_gcode_removable->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        this->m_plater->export_all_gcodes(true);
+    });
+
+    m_btn_connect_gcode_all->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        this->m_plater->connect_gcode_all();
+    });
 }
 
 Sidebar::~Sidebar() {}
@@ -587,6 +618,12 @@ void Sidebar::remove_unused_filament_combos(const size_t current_extruder_count)
     }
 }
 
+void Sidebar::update_all_filament_comboboxes()
+{
+    for (PlaterPresetComboBox* cb : m_combos_filament)
+        cb->update();
+}
+
 void Sidebar::update_all_preset_comboboxes()
 {
     PresetBundle &preset_bundle = *wxGetApp().preset_bundle;
@@ -604,8 +641,7 @@ void Sidebar::update_all_preset_comboboxes()
     // Update the filament choosers to only contain the compatible presets, update the color preview,
     // update the dirty flags.
     if (print_tech == ptFFF) {
-        for (PlaterPresetComboBox* cb : m_combos_filament)
-            cb->update();
+        update_all_filament_comboboxes();
     }
 }
 
@@ -723,6 +759,12 @@ void Sidebar::on_select_preset(wxCommandEvent& evt)
          * and for SLA presets they should be deleted
          */
         m_object_list->update_object_list_by_printer_technology();
+        s_multiple_beds.stop_autoslice(false);
+        this->switch_from_autoslicing_mode();
+        wxQueueEvent(this->m_plater, new SimpleEvent(EVT_REGENERATE_BED_THUMBNAILS));
+        this->m_plater->update();
+        s_print_statuses.fill(PrintStatus::idle);
+        this->m_plater->canvas3D()->check_volumes_outside_state(false);
     }
 
 #ifdef __WXMSW__
@@ -851,11 +893,17 @@ void Sidebar::show_info_sizer()
     const int obj_idx = selection.get_object_idx();
     const int inst_idx = selection.get_instance_idx();
 
-    if (m_mode < comExpert || objects.empty() || obj_idx < 0 || int(objects.size()) <= obj_idx ||
-        inst_idx < 0 || int(objects[obj_idx]->instances.size()) <= inst_idx ||
-        objects[obj_idx]->volumes.empty() ||                                            // hack to avoid crash when deleting the last object on the bed
-        (selection.is_single_full_object() && objects[obj_idx]->instances.size()> 1) ||
-        !(selection.is_single_full_instance() || selection.is_single_volume())) {
+    if (
+        m_mode < comExpert
+        || objects.empty()
+        || obj_idx < 0
+        || int(objects.size()) <= obj_idx
+        || inst_idx < 0
+        || int(objects[obj_idx]->instances.size()) <= inst_idx
+        || objects[obj_idx]->volumes.empty() // hack to avoid crash when deleting the last object on the bed
+        || (selection.is_single_full_object() && objects[obj_idx]->instances.size()> 1)
+        || !(selection.is_single_full_instance() || selection.is_single_volume())
+    ) {
         m_object_info->Show(false);
         return;
     }
@@ -916,7 +964,7 @@ void Sidebar::update_sliced_info_sizer()
     {
         if (m_plater->printer_technology() == ptSLA)
         {
-            const SLAPrintStatistics& ps = m_plater->sla_print().print_statistics();
+            const SLAPrintStatistics& ps = m_plater->active_sla_print().print_statistics();
             wxString new_label = _L("Used Material (ml)") + ":";
             const bool is_supports = ps.support_used_material > 0.0;
             if (is_supports)
@@ -960,7 +1008,7 @@ void Sidebar::update_sliced_info_sizer()
         }
         else
         {
-            const PrintStatistics& ps = m_plater->fff_print().print_statistics();
+            const PrintStatistics& ps = m_plater->active_fff_print().print_statistics();
             const bool is_wipe_tower = ps.total_wipe_tower_filament > 0;
 
             bool imperial_units = wxGetApp().app_config->get_bool("use_inches");
@@ -1060,11 +1108,37 @@ void Sidebar::update_sliced_info_sizer()
 
 void Sidebar::show_sliced_info_sizer(const bool show)
 {
+    if (m_autoslicing_mode) {
+        return;
+    }
+
     wxWindowUpdateLocker freeze_guard(this);
 
     m_sliced_info->Show(show);
     if (show)
         update_sliced_info_sizer();
+
+    Layout();
+    m_scrolled_panel->Refresh();
+}
+
+void Sidebar::show_btns_sizer(const bool show)
+{
+    if (m_autoslicing_mode) {
+        return;
+    }
+
+    wxWindowUpdateLocker freeze_guard(this);
+    m_btns_sizer->Show(show);
+
+    Layout();
+    m_scrolled_panel->Refresh();
+}
+
+void Sidebar::show_bulk_btns_sizer(const bool show)
+{
+    wxWindowUpdateLocker freeze_guard(this);
+    m_autoslicing_btns_sizer->Show(show);
 
     Layout();
     m_scrolled_panel->Refresh();
@@ -1079,11 +1153,68 @@ void Sidebar::enable_buttons(bool enable)
     m_btn_connect_gcode->Enable(enable);
 }
 
-bool Sidebar::show_reslice(bool show)          const { return m_btn_reslice->Show(show); }
-bool Sidebar::show_export(bool show)           const { return m_btn_export_gcode->Show(show); }
-bool Sidebar::show_send(bool show)             const { return m_btn_send_gcode->Show(show); }
-bool Sidebar::show_export_removable(bool show) const { return m_btn_export_gcode_removable->Show(show); }
-bool Sidebar::show_connect(bool show)          const { return m_btn_connect_gcode->Show(show); }
+void Sidebar::enable_bulk_buttons(bool enable)
+{
+    m_btn_export_all_gcode->Enable(enable);
+    m_btn_export_all_gcode_removable->Enable(enable);
+    m_btn_connect_gcode_all->Enable(enable);
+}
+
+bool Sidebar::show_reslice(bool show) const {
+    if (this->m_autoslicing_mode) {
+        return false;
+    }
+    return m_btn_reslice->Show(show);
+}
+bool Sidebar::show_export(bool show) const {
+    if (this->m_autoslicing_mode) {
+        return false;
+    }
+    return m_btn_export_gcode->Show(show);
+}
+bool Sidebar::show_send(bool show) const {
+    if (this->m_autoslicing_mode) {
+        return false;
+    }
+    return m_btn_send_gcode->Show(show);
+}
+bool Sidebar::show_export_removable(bool show) const {
+    if (this->m_autoslicing_mode) {
+        return false;
+    }
+    return m_btn_export_gcode_removable->Show(show);
+}
+bool Sidebar::show_connect(bool show) const {
+    if (this->m_autoslicing_mode) {
+        return false;
+    }
+    return m_btn_connect_gcode->Show(show);
+}
+
+bool Sidebar::show_export_all(bool show) const {
+    return m_btn_export_all_gcode->Show(show);
+};
+bool Sidebar::show_export_removable_all(bool show) const {
+    return m_btn_export_all_gcode_removable->Show(show);
+};
+bool Sidebar::show_connect_all(bool show) const {
+    return m_btn_connect_gcode_all->Show(show);
+};
+
+void Sidebar::switch_to_autoslicing_mode() {
+    this->show_sliced_info_sizer(false);
+    this->show_btns_sizer(false);
+    this->m_autoslicing_mode = true;
+}
+
+void Sidebar::switch_from_autoslicing_mode() {
+    if (!this->m_autoslicing_mode) {
+        return;
+    }
+    this->m_autoslicing_mode = false;
+    this->show_sliced_info_sizer(true);
+    this->show_bulk_btns_sizer(false);
+}
 
 
 void Sidebar::update_mode()

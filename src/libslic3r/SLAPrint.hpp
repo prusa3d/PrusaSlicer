@@ -582,6 +582,8 @@ public:
     void export_print(const std::string    &fname,
                       const ThumbnailsList &thumbnails,
                       const std::string    &projectname = "");
+
+    static bool is_prusa_print(const std::string& printer_model);
     
 private:
     

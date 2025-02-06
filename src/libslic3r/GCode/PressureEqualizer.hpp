@@ -178,8 +178,8 @@ private:
 
         bool        adjustable_flow       = false;
 
-        bool        extrude_set_speed_tag = false;
-        bool        extrude_end_tag       = false;
+        void        update_end_position(const float *position_end, const bool *position_provided_original);
+        void        update_end_position(const float *position_start, const float *position_end, float t, const bool *position_provided_original);
     };
 
     using GCodeLines = std::vector<GCodeLine>;

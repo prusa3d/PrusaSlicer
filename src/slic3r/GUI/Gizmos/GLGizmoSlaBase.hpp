@@ -49,6 +49,8 @@ protected:
 
     const GLVolumeCollection &volumes() const { return m_volumes; }
 
+    static bool selected_print_object_exists(const GLCanvas3D& canvas, const wxString& text);
+
 private:
     GLVolumeCollection m_volumes;
     bool m_input_enabled{ false };

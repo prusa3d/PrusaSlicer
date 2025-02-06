@@ -496,6 +496,7 @@ void OptionsSearcher::show_dialog(bool show /*= true*/)
     search_dialog->Popup();
     if (!search_input->HasFocus())
         search_input->SetFocus();
+    wxYield();
 }
 
 void OptionsSearcher::dlg_sys_color_changed()
@@ -527,13 +528,12 @@ void OptionsSearcher::edit_search_input()
 void OptionsSearcher::process_key_down_from_input(wxKeyEvent& e)
 {
     int key = e.GetKeyCode();
-    if (key == WXK_ESCAPE)
+    if (key == WXK_ESCAPE) {
+        set_focus_to_parent();
         search_dialog->Hide();
+    }
     else if (search_dialog && (key == WXK_UP || key == WXK_DOWN || key == WXK_NUMPAD_ENTER || key == WXK_RETURN)) {
         search_dialog->KeyDown(e);
-#ifdef __linux__
-        search_dialog->SetFocus();
-#endif // __linux__
     }
 }
 
@@ -707,7 +707,7 @@ void SearchDialog::OnKeyDown(wxKeyEvent& event)
     if (key == WXK_UP || key == WXK_DOWN)
     {
         // So, for the next correct navigation, set focus on the search_list
- //       search_list->SetFocus(); // #ys_delete_after_test -> Looks like no need anymore
+        search_list->SetFocus();
 
         auto item = search_list->GetSelection();
 

@@ -103,7 +103,7 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     if (! m_c->selection_info()->model_object())
         return;
 
-    const float approx_height = m_imgui->scaled(25.f);
+    const float approx_height = m_imgui->scaled(26.3f);
     y = std::min(y, bottom_limit - approx_height);
     ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
 
@@ -115,7 +115,7 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     const float cursor_slider_left             = ImGuiPureWrap::calc_text_size(m_desc.at("cursor_size")).x + m_imgui->scaled(1.f);
     const float smart_fill_slider_left         = ImGuiPureWrap::calc_text_size(m_desc.at("smart_fill_angle")).x + m_imgui->scaled(1.f);
     const float autoset_slider_label_max_width = m_imgui->scaled(7.5f);
-    const float autoset_slider_left            = ImGuiPureWrap::calc_text_size(m_desc.at("highlight_by_angle"), autoset_slider_label_max_width).x + m_imgui->scaled(1.f);
+    const float autoset_slider_left            = ImGuiPureWrap::calc_text_size(m_desc.at("highlight_by_angle"), false, autoset_slider_label_max_width).x + m_imgui->scaled(1.f);
 
     const float cursor_type_radio_circle  = ImGuiPureWrap::calc_text_size(m_desc["circle"]).x + m_imgui->scaled(2.5f);
     const float cursor_type_radio_sphere  = ImGuiPureWrap::calc_text_size(m_desc["sphere"]).x + m_imgui->scaled(2.5f);
@@ -301,11 +301,12 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
 
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel")))
-            for (auto &triangle_selector : m_triangle_selectors) {
+        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel"))) {
+            for (auto &triangle_selector: m_triangle_selectors) {
                 triangle_selector->seed_fill_unselect_all_triangles();
                 triangle_selector->request_update_render_data();
             }
+        }
     }
 
     ImGui::Separator();
@@ -459,7 +460,7 @@ void GLGizmoFdmSupports::update_model_object() const
         if (! mv->is_model_part())
             continue;
         ++idx;
-        updated |= mv->supported_facets.set(*m_triangle_selectors[idx].get());
+        updated |= mv->supported_facets.set(*m_triangle_selectors[idx]);
     }
 
     if (updated) {
@@ -518,7 +519,7 @@ bool GLGizmoFdmSupports::has_backend_supports()
 
 void GLGizmoFdmSupports::auto_generate()
 {
-    std::string err = wxGetApp().plater()->fff_print().validate();
+    std::string err = wxGetApp().plater()->active_fff_print().validate();
     if (!err.empty()) {
         MessageDialog dlg(GUI::wxGetApp().plater(), _L("Automatic painting requires valid print setup.") + " \n" + from_u8(err), _L("Warning"), wxOK);
         dlg.ShowModal();

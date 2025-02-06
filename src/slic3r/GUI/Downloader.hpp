@@ -13,6 +13,7 @@ namespace Slic3r {
 namespace GUI {
 
 class NotificationManager;
+class GUI_App;
 
 enum DownloadState
 {
@@ -35,7 +36,7 @@ enum DownloaderUserAction
 
 class Download { 
 public:
-    Download(int ID, std::string url, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder);
+    Download(int ID, std::string url, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder, bool load_after);
     void start();
     void cancel();
     void pause();
@@ -67,6 +68,8 @@ public:
         m_initialized = true; 
     }
     void start_download(const std::string& full_url);
+
+    void start_download_printables(const std::string& url, bool load_after, const std::string& printables_url, GUI_App* app);
     // cancel = false -> just pause
     bool user_action_callback(DownloaderUserAction action, int id);
 private:
@@ -80,7 +83,7 @@ private:
 
     void on_progress(wxCommandEvent& event);
     void on_error(wxCommandEvent& event);
-    void on_complete(wxCommandEvent& event);
+    void on_complete(Event<DownloadEventData>& event);
     void on_name_change(wxCommandEvent& event);
     void on_paused(wxCommandEvent& event);
     void on_canceled(wxCommandEvent& event);

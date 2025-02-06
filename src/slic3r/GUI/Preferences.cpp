@@ -135,13 +135,13 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		downloader->set_path_name(app_config->get("url_downloader_dest"));
 		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
 
-		for (const std::string& opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button"})
+		for (const std::string opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button"})
 			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
 		// by default "Log in" button is visible
 		if (!app_config->has("show_login_button"))
 			m_optgroup_other->set_value("show_login_button", true);
 
-		for (const std::string& opt_key : { "default_action_on_close_application"
+		for (const std::string opt_key : { "default_action_on_close_application"
 										   ,"default_action_on_new_project"
 										   ,"default_action_on_select_preset" })
 			m_optgroup_general->set_value(opt_key, app_config->get(opt_key) == "none");
@@ -300,11 +300,6 @@ void PreferencesDialog::build()
 			L("Remember output directory"),
 			L("If this is enabled, Slic3r will prompt the last output directory instead of the one containing the input files."),
 			app_config->has("remember_output_path") ? app_config->get_bool("remember_output_path") : true);
-
-		append_bool_option(m_optgroup_general, "autocenter", 
-			L("Auto-center parts"),
-			L("If this is enabled, Slic3r will auto-center objects around the print bed center."),
-			app_config->get_bool("autocenter"));
 
 		append_bool_option(m_optgroup_general, "background_processing", 
 			L("Background processing"),
@@ -637,7 +632,7 @@ void PreferencesDialog::build()
 			L("Show \"Log in\" button in application top bar"),
 			L("If enabled, PrusaSlicer will show up \"Log in\" button in application top bar."),
 			app_config->get_bool("show_login_button"));
-		
+
 		append_bool_option(m_optgroup_other, "downloader_url_registered",
 			L("Allow downloads from Printables.com"),
 			L("If enabled, PrusaSlicer will be allowed to download from Printables.com"),

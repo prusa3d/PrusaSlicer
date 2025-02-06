@@ -10,7 +10,6 @@
 
 #include "libslic3r/GCode.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
-#include "libslic3r/ModelArrange.hpp"
 #include "test_data.hpp"
 
 using namespace Slic3r;

@@ -34,7 +34,7 @@ ArrangeSettingsDialogImgui::ArrangeSettingsDialogImgui(
     : m_imgui{imgui}, m_db{std::move(db)}
 {}
 
-void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
+void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y, bool current_bed)
 {
     assert(m_imgui && m_db);
 
@@ -131,8 +131,11 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
 
     ImGui::SameLine();
 
-    if (ImGuiPureWrap::button(_u8L("Arrange")) && m_on_arrange_btn) {
+    if (!current_bed && ImGuiPureWrap::button(_u8L("Arrange")) && m_on_arrange_btn) {
         m_on_arrange_btn();
+    }
+    if (current_bed && ImGuiPureWrap::button(_u8L("Arrange bed")) && m_on_arrange_bed_btn) {
+        m_on_arrange_bed_btn();
     }
 
     ImGuiPureWrap::end();

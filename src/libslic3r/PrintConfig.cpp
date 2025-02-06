@@ -193,7 +193,16 @@ static const t_config_enum_values s_keys_map_SeamPosition {
     { "aligned",        spAligned },
     { "rear",           spRear }
 };
+
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SeamPosition)
+
+static const t_config_enum_values s_keys_map_ScarfSeamPlacement {
+    { "nowhere",        static_cast<int>(ScarfSeamPlacement::nowhere) },
+    { "contours",       static_cast<int>(ScarfSeamPlacement::countours) },
+    { "everywhere",     static_cast<int>(ScarfSeamPlacement::everywhere) }
+};
+
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ScarfSeamPlacement)
 
 static const t_config_enum_values s_keys_map_SLADisplayOrientation = {
     { "landscape",      sladoLandscape},
@@ -304,6 +313,13 @@ static const t_config_enum_values s_keys_map_TiltSpeeds{
     { "move8000",   tsMove8000   },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TiltSpeeds)
+
+static const t_config_enum_values s_keys_map_EnsureVerticalShellThickness {
+    { "disabled", int(EnsureVerticalShellThickness::Disabled) },
+    { "partial",  int(EnsureVerticalShellThickness::Partial)  },
+    { "enabled",  int(EnsureVerticalShellThickness::Enabled)  },
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(EnsureVerticalShellThickness)
 
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
@@ -475,6 +491,20 @@ void PrintConfigDef::init_common_params()
     def->cli = ConfigOptionDef::nocli;
     def->set_default_value(new ConfigOptionEnum<AuthorizationType>(atKeyPassword));
 
+    def = this->add("profile_vendor", coString);
+    def->label = L("Profile vendor");
+    def->tooltip = L("Name of profile vendor");
+    def->mode = comAdvanced;
+    def->cli = ConfigOptionDef::nocli;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("profile_version", coString);
+    def->label = L("Profile version");
+    def->tooltip = L("Version of profile");
+    def->mode = comAdvanced;
+    def->cli = ConfigOptionDef::nocli;
+    def->set_default_value(new ConfigOptionString(""));
+
     // temporary workaround for compatibility with older Slicer
     {
         def = this->add("preset_name", coString);
@@ -496,6 +526,31 @@ void PrintConfigDef::init_fff_params()
     });
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
+
+    def = this->add("automatic_extrusion_widths", coBool);
+    def->label = L("Automatic extrusion widths calculation");
+    def->category = L("Extrusion Width");
+    def->tooltip = L("Automatically calculates extrusion widths based on the nozzle diameter of the currently used extruder. "
+                     "This setting is essential for printing with different nozzle diameters.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("automatic_infill_combination", coBool);
+    def->label = L("Automatic infill combination");
+    def->category = L("Infill");
+    def->tooltip = L("This feature automatically combines infill of several layers and speeds up your print by extruding thicker "
+                     "infill layers while preserving thin perimeters, thus maintaining accuracy.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("automatic_infill_combination_max_layer_height", coFloatOrPercent);
+    def->label = L("Automatic infill combination - Max layer height");
+    def->category = L("Infill");
+    def->tooltip = L("Maximum layer height for combining infill when automatic infill combining is enabled. "
+                     "Maximum layer height could be specified either as an absolute in millimeters value or as a percentage of nozzle diameter. "
+                     "For printing with different nozzle diameters, it is recommended to use percentage value over absolute value.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatOrPercent(100., true));
 
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;
@@ -948,6 +1003,20 @@ void PrintConfigDef::init_fff_params()
     def->height = 120;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionStrings { "; Filament-specific end gcode \n;END gcode for filament\n" });
+
+    def = this->add("ensure_vertical_shell_thickness", coEnum);
+    def->label = L("Ensure vertical shell thickness");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Add solid infill near sloping surfaces to guarantee the vertical shell thickness "
+                   "(top+bottom solid layers).");
+    def->set_enum<EnsureVerticalShellThickness>({
+        { "disabled", L("Disabled") },
+        // TRN: This is a drop-down option for 'Ensure vertical shell thickness' parameter.
+        { "partial",  L("Partial")  },
+        { "enabled",  L("Enabled")  },
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<EnsureVerticalShellThickness>(EnsureVerticalShellThickness::Enabled));
 
     auto def_top_fill_pattern = def = this->add("top_fill_pattern", coEnum);
     def->label = L("Top fill pattern");
@@ -2625,6 +2694,17 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats { 0. });
 
+    def = this->add("seam_gap_distance", coFloatOrPercent);
+    def->label = L("Seam gap distance");
+    def->tooltip = L("The distance between the endpoints of a closed loop perimeter. "
+                   "Positive values will shorten and interrupt the loop slightly to reduce the seam. "
+                   "Negative values will extend the loop, causing the endpoints to overlap slightly. "
+                   "When percents are used, the distance is derived from the nozzle diameter. "
+                   "Set to zero to disable this feature.");
+    def->sidetext = L("mm or %");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatOrPercent{ 15., true });
+
     def = this->add("seam_position", coEnum);
     def->label = L("Seam position");
     def->category = L("Layers and Perimeters");
@@ -2642,6 +2722,69 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Staggered inner seams");
     // TRN PrintSettings: "Staggered inner seams"
     def->tooltip = L("This option causes the inner seams to be shifted backwards based on their depth, forming a zigzag pattern.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("scarf_seam_placement", coEnum);
+    def->label = L("Scarf joint placement");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Where to place scarf joint seam.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<ScarfSeamPlacement>(ScarfSeamPlacement::nowhere));
+    def->set_enum<ScarfSeamPlacement>({
+        // TRN: Drop-down option for 'Scarf joint placement' parameter.
+        { "nowhere", L("Nowhere") },
+        // TRN: Drop-down option for 'Scarf joint placement' parameter.
+        { "contours", L("Contours") },
+        { "everywhere", L("Everywhere") }
+    });
+
+    def = this->add("scarf_seam_only_on_smooth", coBool);
+    def->label = L("Scarf joint only on smooth perimeters");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Only use the scarf joint when the perimeter is smooth.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("scarf_seam_start_height", coPercent);
+    def->label = L("Scarf start height");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Start height of the scarf joint specified as fraction of the current layer height.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionPercent(0));
+
+    def = this->add("scarf_seam_entire_loop", coBool);
+    def->label = L("Scarf joint around entire perimeter");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Extend the scarf around entire length of the perimeter.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("scarf_seam_length", coFloat);
+    def->label = L("Scarf joint length");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Length of the scarf joint.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(20));
+
+    def = this->add("scarf_seam_max_segment_length", coFloat);
+    def->label = L("Max scarf joint segment length");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Maximum length of any scarf joint segment.");
+    def->sidetext = L("mm");
+    def->min = 0.15f;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1.0));
+
+    def = this->add("scarf_seam_on_inner_perimeters", coBool);
+    def->label = L("Scarf joint on inner perimeters");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Use scarf joint on inner perimeters.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -3478,33 +3621,12 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = "";
     def->set_default_value(new ConfigOptionBool{ false });
 
-    def = this->add("wipe_tower_x", coFloat);
-    def->label = L("Position X");
-    def->tooltip = L("X coordinate of the left front corner of a wipe tower");
-    def->sidetext = L("mm");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(180.));
-
-    def = this->add("wipe_tower_y", coFloat);
-    def->label = L("Position Y");
-    def->tooltip = L("Y coordinate of the left front corner of a wipe tower");
-    def->sidetext = L("mm");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(140.));
-
     def = this->add("wipe_tower_width", coFloat);
     def->label = L("Width");
     def->tooltip = L("Width of a wipe tower");
     def->sidetext = L("mm");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(60.));
-
-    def = this->add("wipe_tower_rotation_angle", coFloat);
-    def->label = L("Wipe tower rotation angle");
-    def->tooltip = L("Wipe tower rotation angle with respect to x-axis.");
-    def->sidetext = L("°");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(0.));
 
     def = this->add("wipe_tower_brim_width", coFloat);
     def->label = L("Wipe tower brim width");
@@ -3706,9 +3828,9 @@ void PrintConfigDef::init_fff_params()
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
         def = this->add_nullable(std::string("filament_") + opt_key, it_opt->second.type);
-        def->label 		= it_opt->second.label;
+        def->label      = it_opt->second.label;
         def->full_label = it_opt->second.full_label;
-        def->tooltip 	= it_opt->second.tooltip;
+        def->tooltip    = it_opt->second.tooltip;
         def->sidetext   = it_opt->second.sidetext;
         def->mode       = it_opt->second.mode;
         switch (def->type) {
@@ -3716,6 +3838,44 @@ void PrintConfigDef::init_fff_params()
         case coPercents : def->set_default_value(new ConfigOptionPercentsNullable(static_cast<const ConfigOptionPercents*>(it_opt->second.default_value.get())->values)); break;
         case coBools    : def->set_default_value(new ConfigOptionBoolsNullable   (static_cast<const ConfigOptionBools*   >(it_opt->second.default_value.get())->values)); break;
         default: assert(false);
+        }
+    }
+
+    // Declare values for filament profile, overriding printer's profile.
+    for (const char *opt_key : {
+        // Floats or Percents
+        "seam_gap_distance"}) {
+
+        auto it_opt = options.find(opt_key);
+        assert(it_opt != options.end());
+
+        switch (it_opt->second.type) {
+            case coFloatOrPercent: {
+                def = this->add_nullable(std::string("filament_") + opt_key, coFloatsOrPercents);
+                break;
+            }
+            default: {
+                assert(false);
+                break;
+            }
+        }
+
+        def->label      = it_opt->second.label;
+        def->full_label = it_opt->second.full_label;
+        def->tooltip    = it_opt->second.tooltip;
+        def->sidetext   = it_opt->second.sidetext;
+        def->mode       = it_opt->second.mode;
+
+        switch (def->type) {
+            case coFloatsOrPercents: {
+                const auto &default_value = *static_cast<const ConfigOptionFloatOrPercent *>(it_opt->second.default_value.get());
+                def->set_default_value(new ConfigOptionFloatsOrPercentsNullable{{default_value.value, default_value.percent}});
+                break;
+            }
+            default: {
+                assert(false);
+                break;
+            }
         }
     }
 }
@@ -4747,12 +4907,11 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
     // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
     "wall_add_middle_threshold", "wall_split_middle_threshold",
-    // Replaced by new concentric ensuring in 2.6.0-alpha5
-    "ensure_vertical_shell_thickness",
     // Disabled in 2.6.0-alpha6, this option is problematic
     "infill_only_where_needed",
     "gcode_binary", // Introduced in 2.7.0-alpha1, removed in 2.7.1 (replaced by binary_gcode).
-    "wiping_volumes_extruders" // Removed in 2.7.3-alpha1.
+    "wiping_volumes_extruders", // Removed in 2.7.3-alpha1.
+    "wipe_tower_x", "wipe_tower_y", "wipe_tower_rotation_angle" // Removed in 2.9.0
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
@@ -4824,16 +4983,17 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         opt_key = "printhost_apikey";
     } else if (opt_key == "preset_name") {
         opt_key = "preset_names";
-    } /*else if (opt_key == "material_correction" || opt_key == "relative_correction") {
-        ConfigOptionFloats p;
-        p.deserialize(value);
-
-        if (p.values.size() < 3) {
-            double firstval = p.values.front();
-            p.values.emplace(p.values.begin(), firstval);
-            value = p.serialize();
+    } else if (opt_key == "ensure_vertical_shell_thickness") {
+        if (value == "1") {
+            value = "enabled";
+        } else if (value == "0") {
+            value = "partial";
+        } else if (const t_config_enum_values &enum_keys_map = ConfigOptionEnum<EnsureVerticalShellThickness>::get_enum_values(); enum_keys_map.find(value) == enum_keys_map.end()) {
+            assert(value == "0" || value == "1");
+            // Values other than 0/1 are replaced with "partial" for handling values from different slicers.
+            value = "partial";
         }
-    }*/
+    }
 
     // In PrusaSlicer 2.3.0-alpha0 the "monotonous" infill was introduced, which was later renamed to "monotonic".
     if (value == "monotonous" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern"))
@@ -5450,11 +5610,6 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def = this->add("export_3mf", coBool);
     def->label = L("Export 3MF");
     def->tooltip = L("Export the model(s) as 3MF.");
-    def->set_default_value(new ConfigOptionBool(false));
-
-    def = this->add("export_amf", coBool);
-    def->label = L("Export AMF");
-    def->tooltip = L("Export the model(s) as AMF.");
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("export_stl", coBool);

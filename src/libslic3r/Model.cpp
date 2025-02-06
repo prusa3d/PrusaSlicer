@@ -16,11 +16,11 @@
 #include "BuildVolume.hpp"
 #include "Exception.hpp"
 #include "Model.hpp"
-#include "ModelArrange.hpp"
 #include "Geometry/ConvexHull.hpp"
 #include "MTUtils.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "TriangleSelector.hpp"
+#include "MultipleBeds.hpp"
 
 #include "Format/AMF.hpp"
 #include "Format/OBJ.hpp"
@@ -68,7 +68,9 @@ Model& Model::assign_copy(const Model &rhs)
     }
 
     // copy custom code per height
-    this->custom_gcode_per_print_z = rhs.custom_gcode_per_print_z;
+    this->custom_gcode_per_print_z_vector = rhs.custom_gcode_per_print_z_vector;
+    this->wipe_tower_vector = rhs.wipe_tower_vector;
+
     return *this;
 }
 
@@ -89,7 +91,9 @@ Model& Model::assign_copy(Model &&rhs)
     rhs.objects.clear();
 
     // copy custom code per height
-    this->custom_gcode_per_print_z = std::move(rhs.custom_gcode_per_print_z);
+    this->custom_gcode_per_print_z_vector = std::move(rhs.custom_gcode_per_print_z_vector);
+    this->wipe_tower_vector = rhs.wipe_tower_vector;
+
     return *this;
 }
 
@@ -115,6 +119,37 @@ void Model::update_links_bottom_up_recursive()
 	}
 }
 
+ModelWipeTower& Model::wipe_tower()
+{
+    return const_cast<ModelWipeTower&>(const_cast<const Model*>(this)->wipe_tower());
+}
+
+const ModelWipeTower& Model::wipe_tower() const
+{
+    return wipe_tower_vector[s_multiple_beds.get_active_bed()];
+}
+
+const ModelWipeTower& Model::wipe_tower(const int bed_index) const
+{
+    return wipe_tower_vector[bed_index];
+}
+
+ModelWipeTower& Model::wipe_tower(const int bed_index)
+{
+    return wipe_tower_vector[bed_index];
+}
+
+CustomGCode::Info& Model::custom_gcode_per_print_z()
+{
+    return const_cast<CustomGCode::Info&>(const_cast<const Model*>(this)->custom_gcode_per_print_z());
+}
+
+const CustomGCode::Info& Model::custom_gcode_per_print_z() const
+{
+    return custom_gcode_per_print_z_vector[s_multiple_beds.get_active_bed()];
+}
+
+
 // Loading model from a file, it may be a simple geometry file as STL or OBJ, however it may be a project file as well.
 Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, LoadAttributes options)
 {
@@ -136,10 +171,11 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
         result = load_step(input_file.c_str(), &model);
     else if (boost::algorithm::iends_with(input_file, ".amf") || boost::algorithm::iends_with(input_file, ".amf.xml"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
-    else if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
+    else if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip")) {
         //FIXME options & LoadAttribute::CheckVersion ? 
-        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, false);
-    else if (boost::algorithm::iends_with(input_file, ".svg"))
+        boost::optional<Semver> prusaslicer_generator_version;
+        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, false, prusaslicer_generator_version);
+    } else if (boost::algorithm::iends_with(input_file, ".svg"))
         result = load_svg(input_file, model);
     else if (boost::ends_with(input_file, ".printRequest"))
         result = load_printRequest(input_file.c_str(), &model);
@@ -151,33 +187,40 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
 
     if (model.objects.empty())
         throw Slic3r::RuntimeError("The supplied file couldn't be read because it's empty");
-   
+
     if (!boost::ends_with(input_file, ".printRequest"))
         for (ModelObject *o : model.objects)
             o->input_file = input_file;
-    
+
     if (options & LoadAttribute::AddDefaultInstances)
         model.add_default_instances();
 
-    CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, config);
-    CustomGCode::check_mode_for_custom_gcode_per_print_z(model.custom_gcode_per_print_z);
+    for (CustomGCode::Info& info : model.custom_gcode_per_print_z_vector) {
+        CustomGCode::update_custom_gcode_per_print_z_from_config(info, config);
+        CustomGCode::check_mode_for_custom_gcode_per_print_z(info);
+    }
 
     sort_remove_duplicates(config_substitutions->substitutions);
     return model;
 }
 
 // Loading model from a file (3MF or AMF), not from a simple geometry file (STL or OBJ).
-Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, LoadAttributes options)
-{
+Model Model::read_from_archive(
+    const std::string& input_file,
+    DynamicPrintConfig* config,
+    ConfigSubstitutionContext* config_substitutions,
+    boost::optional<Semver> &prusaslicer_generator_version,
+    LoadAttributes options
+) {
     assert(config != nullptr);
     assert(config_substitutions != nullptr);
 
     Model model;
 
     bool result = false;
-    if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
-        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion);
-    else if (boost::algorithm::iends_with(input_file, ".zip.amf"))
+    if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip")) {
+        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion, prusaslicer_generator_version);
+    } else if (boost::algorithm::iends_with(input_file, ".zip.amf"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
     else
         throw Slic3r::RuntimeError("Unknown file format. Input file must have .3mf or .zip.amf extension.");
@@ -198,8 +241,10 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
     if (options & LoadAttribute::AddDefaultInstances)
         model.add_default_instances();
 
-    CustomGCode::update_custom_gcode_per_print_z_from_config(model.custom_gcode_per_print_z, config);
-    CustomGCode::check_mode_for_custom_gcode_per_print_z(model.custom_gcode_per_print_z);
+    for (CustomGCode::Info& info : model.custom_gcode_per_print_z_vector) {
+        CustomGCode::update_custom_gcode_per_print_z_from_config(info, config);
+        CustomGCode::check_mode_for_custom_gcode_per_print_z(info);
+    }
 
     handle_legacy_sla(*config);
 
@@ -372,8 +417,10 @@ double Model::max_z() const
 unsigned int Model::update_print_volume_state(const BuildVolume &build_volume)
 {
     unsigned int num_printable = 0;
+    s_multiple_beds.clear_inst_map();
     for (ModelObject* model_object : this->objects)
         num_printable += model_object->update_instances_print_volume_state(build_volume);
+    s_multiple_beds.inst_map_updated();
     return num_printable;
 }
 
@@ -646,6 +693,11 @@ bool Model::is_mm_painted() const
     return std::any_of(this->objects.cbegin(), this->objects.cend(), [](const ModelObject *mo) { return mo->is_mm_painted(); });
 }
 
+bool Model::is_fuzzy_skin_painted() const
+{
+    return std::any_of(this->objects.cbegin(), this->objects.cend(), [](const ModelObject *mo) { return mo->is_fuzzy_skin_painted(); });
+}
+
 ModelObject::~ModelObject()
 {
     this->clear_volumes();
@@ -671,7 +723,7 @@ ModelObject& ModelObject::assign_copy(const ModelObject &rhs)
     this->layer_height_profile        = rhs.layer_height_profile;
     this->printable                   = rhs.printable;
     this->origin_translation          = rhs.origin_translation;
-    this->cut_id.copy(rhs.cut_id);
+    this->cut_id                      = rhs.cut_id;
     this->copy_transformation_caches(rhs);
 
     this->clear_volumes();
@@ -827,6 +879,11 @@ bool ModelObject::is_seam_painted() const
 bool ModelObject::is_mm_painted() const
 {
     return std::any_of(this->volumes.cbegin(), this->volumes.cend(), [](const ModelVolume *mv) { return mv->is_mm_painted(); });
+}
+
+bool ModelObject::is_fuzzy_skin_painted() const
+{
+    return std::any_of(this->volumes.cbegin(), this->volumes.cend(), [](const ModelVolume *mv) { return mv->is_fuzzy_skin_painted(); });
 }
 
 bool ModelObject::is_text() const
@@ -1246,6 +1303,7 @@ void ModelObject::convert_units(ModelObjectPtrs& new_objects, ConversionType con
             vol->supported_facets.assign(volume->supported_facets);
             vol->seam_facets.assign(volume->seam_facets);
             vol->mm_segmentation_facets.assign(volume->mm_segmentation_facets);
+            vol->fuzzy_skin_facets.assign(volume->fuzzy_skin_facets);
 
             // Perform conversion only if the target "imperial" state is different from the current one.
             // This check supports conversion of "mixed" set of volumes, each with different "imperial" state.
@@ -1358,6 +1416,7 @@ void ModelVolume::reset_extra_facets()
     this->supported_facets.reset();
     this->seam_facets.reset();
     this->mm_segmentation_facets.reset();
+    this->fuzzy_skin_facets.reset();
 }
 
 
@@ -1580,11 +1639,15 @@ unsigned int ModelObject::update_instances_print_volume_state(const BuildVolume 
         OUTSIDE = 2
     };
     for (ModelInstance* model_instance : this->instances) {
+        int bed_idx = -1;
         unsigned int inside_outside = 0;
         for (const ModelVolume* vol : this->volumes)
             if (vol->is_model_part()) {
                 const Transform3d matrix = model_instance->get_matrix() * vol->get_matrix();
-                BuildVolume::ObjectState state = build_volume.object_state(vol->mesh().its, matrix.cast<float>(), true /* may be below print bed */);
+                int bed = -1;
+                BuildVolume::ObjectState state = build_volume.object_state(vol->mesh().its, matrix.cast<float>(), true /* may be below print bed */, true /*ignore_bottom*/, &bed);
+                if (bed_idx == -1) // instance will be assigned to the bed the first volume is assigned to.
+                    bed_idx = bed;
                 if (state == BuildVolume::ObjectState::Inside)
                     // Volume is completely inside.
                     inside_outside |= INSIDE;
@@ -1603,6 +1666,8 @@ unsigned int ModelObject::update_instances_print_volume_state(const BuildVolume 
             inside_outside == INSIDE ? ModelInstancePVS_Inside : ModelInstancePVS_Fully_Outside;
         if (inside_outside == INSIDE)
             ++num_printable;
+        if (bed_idx != -1)
+            s_multiple_beds.set_instance_bed(model_instance->id(), model_instance->printable, bed_idx);
     }
     return num_printable;
 }
@@ -1924,6 +1989,7 @@ void ModelVolume::assign_new_unique_ids_recursive()
     supported_facets.set_new_unique_id();
     seam_facets.set_new_unique_id();
     mm_segmentation_facets.set_new_unique_id();
+    fuzzy_skin_facets.set_new_unique_id();
 }
 
 void ModelVolume::rotate(double angle, Axis axis)
@@ -2041,35 +2107,46 @@ void ModelInstance::transform_polygon(Polygon* polygon) const
     polygon->scale(get_scaling_factor(X), get_scaling_factor(Y)); // scale around polygon origin
 }
 
-indexed_triangle_set FacetsAnnotation::get_facets(const ModelVolume& mv, TriangleStateType type) const
-{
+indexed_triangle_set FacetsAnnotation::get_facets(const ModelVolume &mv, TriangleStateType type) const {
     TriangleSelector selector(mv.mesh());
     // Reset of TriangleSelector is done inside TriangleSelector's constructor, so we don't need it to perform it again in deserialize().
     selector.deserialize(m_data, false);
     return selector.get_facets(type);
 }
 
-indexed_triangle_set FacetsAnnotation::get_facets_strict(const ModelVolume& mv, TriangleStateType type) const
-{
+indexed_triangle_set FacetsAnnotation::get_facets_strict(const ModelVolume &mv, TriangleStateType type) const {
     TriangleSelector selector(mv.mesh());
     // Reset of TriangleSelector is done inside TriangleSelector's constructor, so we don't need it to perform it again in deserialize().
     selector.deserialize(m_data, false);
     return selector.get_facets_strict(type);
 }
 
-bool FacetsAnnotation::has_facets(const ModelVolume& mv, TriangleStateType type) const
-{
+indexed_triangle_set_with_color FacetsAnnotation::get_all_facets_with_colors(const ModelVolume &mv) const {
+    TriangleSelector selector(mv.mesh());
+    // Reset of TriangleSelector is done inside TriangleSelector's constructor, so we don't need it to perform it again in deserialize().
+    selector.deserialize(m_data, false);
+    return selector.get_all_facets_with_colors();
+}
+
+indexed_triangle_set_with_color FacetsAnnotation::get_all_facets_strict_with_colors(const ModelVolume &mv) const {
+    TriangleSelector selector(mv.mesh());
+    // Reset of TriangleSelector is done inside TriangleSelector's constructor, so we don't need it to perform it again in deserialize().
+    selector.deserialize(m_data, false);
+    return selector.get_all_facets_strict_with_colors();
+}
+
+bool FacetsAnnotation::has_facets(const ModelVolume &mv, TriangleStateType type) const {
     return TriangleSelector::has_facets(m_data, type);
 }
 
-bool FacetsAnnotation::set(const TriangleSelector& selector)
-{
+bool FacetsAnnotation::set(const TriangleSelector &selector) {
     TriangleSelector::TriangleSplittingData sel_map = selector.serialize();
     if (sel_map != m_data) {
         m_data = std::move(sel_map);
         this->touch();
         return true;
     }
+
     return false;
 }
 
@@ -2109,9 +2186,15 @@ std::string FacetsAnnotation::get_triangle_as_string(int triangle_idx) const
 
 // Recover triangle splitting & state from string of hexadecimal values previously
 // generated by get_triangle_as_string. Used to load from 3MF.
-void FacetsAnnotation::set_triangle_from_string(int triangle_id, const std::string& str)
+void FacetsAnnotation::set_triangle_from_string(int triangle_id, const std::string &str)
 {
-    assert(! str.empty());
+    if (str.empty()) {
+        // The triangle isn't painted, so it means that it will use the default extruder.
+        m_data.used_states[static_cast<int>(TriangleStateType::NONE)] = true;
+        return;
+    }
+
+    assert(!str.empty());
     assert(m_data.triangles_to_split.empty() || m_data.triangles_to_split.back().triangle_idx < triangle_id);
     m_data.triangles_to_split.emplace_back(triangle_id, int(m_data.bitstream.size()));
 
@@ -2254,20 +2337,19 @@ bool model_mmu_segmentation_data_changed(const ModelObject& mo, const ModelObjec
         [](const ModelVolume &mv_old, const ModelVolume &mv_new){ return mv_old.mm_segmentation_facets.timestamp_matches(mv_new.mm_segmentation_facets); });
 }
 
+bool model_fuzzy_skin_data_changed(const ModelObject &mo, const ModelObject &mo_new)
+{
+    return model_property_changed(mo, mo_new,
+        [](const ModelVolumeType t) { return t == ModelVolumeType::MODEL_PART; },
+        [](const ModelVolume &mv_old, const ModelVolume &mv_new){ return mv_old.fuzzy_skin_facets.timestamp_matches(mv_new.fuzzy_skin_facets); });
+}
+
 bool model_has_parameter_modifiers_in_objects(const Model &model)
 {
     for (const auto& model_object : model.objects)
         for (const auto& volume : model_object->volumes)
             if (volume->is_modifier())
                 return true;
-    return false;
-}
-
-bool model_has_multi_part_objects(const Model &model)
-{
-    for (const ModelObject *model_object : model.objects)
-    	if (model_object->volumes.size() != 1 || ! model_object->volumes.front()->is_model_part())
-    		return true;
     return false;
 }
 

@@ -778,6 +778,7 @@ namespace Slic3r {
         void update_estimated_statistics();
 
         double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
+
    };
 
 } /* namespace Slic3r */

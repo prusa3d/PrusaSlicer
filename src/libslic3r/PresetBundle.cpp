@@ -1533,12 +1533,6 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
                 if (dst)
                     unescape_strings_cstyle(kvp.second.data(), *dst);
             }
-        } else if (section.first == "settings") {
-            // Load the settings.
-            for (auto &kvp : section.second) {
-                if (kvp.first == "autocenter") {
-                }
-            }
         } else
             // Ignore an unknown section.
             continue;
@@ -2045,13 +2039,6 @@ void PresetBundle::export_configbundle(const std::string &path, bool export_syst
 
     if (export_physical_printers && this->physical_printers.get_selected_idx() >= 0)
         c << "physical_printer = " << this->physical_printers.get_selected_printer_name() << std::endl;
-#if 0
-    // Export the following setting values from the provided setting repository.
-    static const char *settings_keys[] = { "autocenter" };
-    c << "[settings]" << std::endl;
-    for (size_t i = 0; i < sizeof(settings_keys) / sizeof(settings_keys[0]); ++ i)
-        c << settings_keys[i] << " = " << settings.serialize(settings_keys[i]) << std::endl;
-#endif
 
     c.close();
 }

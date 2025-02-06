@@ -34,7 +34,7 @@ namespace Slic3r {
 
 class AppConfig;
 class PresetBundle;
-class PresetUpdater;
+class PresetUpdaterWrapper;
 class ModelObject;
 class PrintHostJobQueue;
 class Model;
@@ -357,11 +357,9 @@ public:
 
     AppConfig*      app_config{ nullptr };
     PresetBundle*   preset_bundle{ nullptr };
-    PresetUpdater*  preset_updater{ nullptr };
     MainFrame*      mainframe{ nullptr };
     Plater*         plater_{ nullptr };
-
-	PresetUpdater*  get_preset_updater() { return preset_updater; }
+	PresetUpdaterWrapper*  get_preset_updater_wrapper() { return m_preset_updater_wrapper.get(); }
 
     wxBookCtrlBase* tab_panel() const ;
     int             extruders_cnt() const;
@@ -415,14 +413,6 @@ public:
     void            open_wifi_config_dialog(bool forced, const wxString& drive_path = {});
     bool            get_wifi_config_dialog_shown() const { return m_wifi_config_dialog_shown; }
     
-    void            request_login(bool show_user_info = false) {}
-    bool            check_login() { return false; }
-    void            get_login_info() {}
-    bool            is_user_login() { return true; }
-
-    void            request_user_login(int online_login) {}
-    void            request_user_logout() {}
-    int             request_user_unbind(std::string dev_id) { return 0; }
     bool            select_printer_from_connect(const std::string& cmd);
     void            select_filament_from_connect(const std::string& cmd);
     void            handle_connect_request_printer_select(const std::string& cmd);
@@ -438,7 +428,10 @@ public:
     void            request_project_download(std::string project_id) {}
     void            request_open_project(std::string project_id) {}
     void            request_remove_project(std::string project_id) {}
-
+    void            printables_download_request(const std::string& download_url, const std::string& model_url);
+    void            printables_slice_request(const std::string& download_url, const std::string& model_url);
+    void            printables_login_request();
+    void            open_link_in_printables(const std::string& url);
 private:
     bool            on_init_inner();
 	void            init_app_config();
@@ -460,6 +453,9 @@ private:
     void            app_updater(bool from_user);
     // inititate read of version file online in separate thread
     void            app_version_check(bool from_user);
+#if defined(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION) 
+    void            remove_desktop_files_dialog();
+#endif //(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION)
 
     bool                    m_wifi_config_dialog_shown { false };
     bool                    m_wifi_config_dialog_was_declined { false };
@@ -468,7 +464,7 @@ private:
     std::map< ConfigMenuIDs, wxMenuItem*> m_config_menu_updatable_items;
 
     ConfigWizard* m_config_wizard {nullptr};
-    
+    std::unique_ptr<PresetUpdaterWrapper> m_preset_updater_wrapper; 
 };
 
 DECLARE_APP(GUI_App)

@@ -62,12 +62,10 @@
 #include "Field.hpp"
 #include "DesktopIntegrationDialog.hpp"
 #include "slic3r/Config/Snapshot.hpp"
-#include "slic3r/Utils/PresetUpdater.hpp"
 #include "format.hpp"
 #include "MsgDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "UpdatesUIManager.hpp"
-#include "PresetArchiveDatabase.hpp"
 #include "Plater.hpp" // #ysFIXME - implement getter for preset_archive_database from GetApp()???
 #include "slic3r/Utils/AppUpdater.hpp"
 #include "slic3r/GUI/I18N.hpp"
@@ -86,29 +84,8 @@
 namespace Slic3r {
 namespace GUI {
 
-
 using Config::Snapshot;
 using Config::SnapshotDB;
-
-
-
-ConfigWizardLoadingDialog::ConfigWizardLoadingDialog(wxWindow* parent, const wxString& message)
-    : wxDialog(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxFRAME_FLOAT_ON_PARENT)
-{
-    auto* text = new wxStaticText(this, wxID_ANY, message, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
-    auto* vsizer = new wxBoxSizer(wxVERTICAL);
-    auto *top_sizer = new wxBoxSizer(wxVERTICAL);
-    vsizer->Add(text, 1, wxEXPAND);
-    top_sizer->Add(vsizer, 1, wxEXPAND | wxALL, 15);
-    SetSizer(top_sizer);
-    #ifdef _WIN32
-        wxGetApp().UpdateDlgDarkUI(this);
-    #endif
-    Fit();
-}
-
-
-// Configuration data structures extensions needed for the wizard
 
 bool Bundle::load(fs::path source_path, BundleLocation location, bool ais_prusa_bundle)
 {
@@ -138,6 +115,7 @@ bool Bundle::load(fs::path source_path, BundleLocation location, bool ais_prusa_
     return true;
 }
 
+// Configuration data structures extensions needed for the wizard
 Bundle::Bundle(Bundle &&other)
     : preset_bundle(std::move(other.preset_bundle))
     , vendor_profile(other.vendor_profile)
@@ -151,7 +129,7 @@ BundleMap BundleMap::load()
 {
     BundleMap res;
 
-    const PresetArchiveDatabase* pad = wxGetApp().plater()->get_preset_archive_database();
+    const Slic3r::PresetUpdaterWrapper* preset_updater_wrapper = wxGetApp().get_preset_updater_wrapper();
     const auto vendor_dir = (boost::filesystem::path(Slic3r::data_dir()) / "vendor").make_preferred();
     const auto archive_dir = (boost::filesystem::path(Slic3r::data_dir()) / "cache" / "vendor").make_preferred();
     const auto rsrc_vendor_dir = (boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
@@ -228,7 +206,7 @@ BundleMap BundleMap::load()
                     BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to corrupted profile file %2%. Message: %3%", id, dir_entry.path().string(), e.what());
                     continue;
                 }
-                if (vp.repo_id.empty() || !pad->is_selected_repository_by_id(vp.repo_id)) {
+                if (vp.repo_id.empty() || !preset_updater_wrapper->is_selected_repository_by_id(vp.repo_id)) {
                     continue;
                 }
                 // Don't load
@@ -655,7 +633,7 @@ PageUpdateManager::PageUpdateManager(ConfigWizard* parent_in)
 
     const int em = em_unit(this);
 
-    manager = std::make_unique<RepositoryUpdateUIManager>(this, wxGetApp().plater()->get_preset_archive_database(), em);
+    manager = std::make_unique<RepositoryUpdateUIManager>(this, wxGetApp().get_preset_updater_wrapper(), em);
 
     warning_text = new wxStaticText(this, wxID_ANY, _L("WARNING: Select at least one source."));
     warning_text->SetFont(wxGetApp().bold_font());
@@ -3327,15 +3305,16 @@ static std::string get_first_added_preset(const std::map<std::string, std::strin
     return *diff.begin();
 }
 
-bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes)
+bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdaterWrapper *updater, bool& apply_keeped_changes)
 {
     wxString header, caption = _L("Configuration is edited in ConfigWizard");
     const auto enabled_vendors = appconfig_new.vendors();
     const auto enabled_vendors_old = app_config->vendors();
 
-    bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
+    bool show_info_msg = false;
+    bool suppress_sla_printer = model_has_parameter_modifiers_in_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;
-    auto get_preferred_printer_technology = [enabled_vendors, enabled_vendors_old, suppress_sla_printer](const std::string& bundle_name, const Bundle& bundle) {
+    auto get_preferred_printer_technology = [enabled_vendors, enabled_vendors_old, suppress_sla_printer, &show_info_msg](const std::string& bundle_name, const Bundle& bundle) {
         const auto config = enabled_vendors.find(bundle_name);
         PrinterTechnology pt = ptAny;
         if (config != enabled_vendors.end()) {
@@ -3345,17 +3324,21 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
                     pt = model.technology;
                     const auto config_old = enabled_vendors_old.find(bundle_name);
                     if (config_old == enabled_vendors_old.end() || config_old->second.find(model.id) == config_old->second.end()) {
-                        // if preferred printer model has SLA printer technology it's important to check the model for multi-part state
-                        if (pt == ptSLA && suppress_sla_printer)
+                        // if preferred printer model has SLA printer technology it's important to check the model for modifiers
+                        if (pt == ptSLA && suppress_sla_printer) {
+                            show_info_msg = true;
                             continue;
+                        }
                         return pt;
                     }
 
                     if (const auto model_it_old = config_old->second.find(model.id);
                         model_it_old == config_old->second.end() || model_it_old->second != model_it->second) {
-                        // if preferred printer model has SLA printer technology it's important to check the model for multi-part state
-                        if (pt == ptSLA && suppress_sla_printer)
+                        // if preferred printer model has SLA printer technology it's important to check the model for modifiers
+                        if (pt == ptSLA && suppress_sla_printer) {
+                            show_info_msg = true;
                             continue;
+                        }
                         return pt;
                     }
                 }
@@ -3377,8 +3360,9 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         }
     }
 
-    if (preferred_pt == ptSLA && !wxGetApp().may_switch_to_SLA_preset(caption))
-        return false;
+    if (show_info_msg)
+        show_info(nullptr, _L("It's impossible to print object(s) which contains parameter modifiers with SLA technology.\n\n"
+                              "SLA-printer preset will not be selected"), caption);
 
     bool check_unsaved_preset_changes = page_welcome->reset_user_profile();
     if (check_unsaved_preset_changes)
@@ -3461,9 +3445,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (install_bundles.size() > 0) {
         // Install bundles from resources or cache / vendor.
         // Don't create snapshot - we've already done that above if applicable.
-        GUI_App& app = wxGetApp();
-        const auto* archive_db = app.plater()->get_preset_archive_database();
-        bool install_result = updater->install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), archive_db->get_selected_archive_repositories(), false);
+        bool install_result = updater->install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), false);
         if (!install_result)
             return false;
     } else {
@@ -3594,7 +3576,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
             used_repo_ids.emplace_back(repo_id);
         }
     }
-    wxGetApp().plater()->get_preset_archive_database()->set_installed_printer_repositories(std::move(used_repo_ids));
+    wxGetApp().get_preset_updater_wrapper()->set_installed_printer_repositories(std::move(used_repo_ids));
 
     // apply materials in app_config
     for (const std::string& section_name : {AppConfig::SECTION_FILAMENTS, AppConfig::SECTION_MATERIALS})
@@ -3704,18 +3686,9 @@ bool ConfigWizard::priv::check_sla_selected()
 
 void ConfigWizard::priv::set_config_updated_from_archive(bool load_installed_printers, bool run_preset_updater) 
 {
-    if (run_preset_updater)  {         
-        // This block of preset_updater functions is done in GUI_App::run_wizard before ConfigWizard::run()
-        // It needs to be also done when repos are confirmed inside wizard.
-        // Possible optimalization - do not run this block if no repos were changed.
-        GUI_App& app = wxGetApp();
-        // Do blocking sync on every change of archive repos, so user is always offered recent profiles.
-        const SharedArchiveRepositoryVector &repos = app.plater()->get_preset_archive_database()->get_selected_archive_repositories();
-        app.preset_updater->sync_blocking(app.preset_bundle, &app, repos);
-        // Offer update installation. It used to be offered only when wizard run reason was RR_USER.
-        app.preset_updater->update_index_db();
-        app.preset_updater->config_update(app.app_config->orig_version(), PresetUpdater::UpdateParams::SHOW_TEXT_BOX, repos);
-
+    if (run_preset_updater)  {   
+        // TRN: Progress dialog title
+        wxGetApp().get_preset_updater_wrapper()->wizard_sync(wxGetApp().preset_bundle, wxGetApp().app_config->orig_version(), q, true, _L("Updating Configuration sources"));
         // We have now probably changed data. We need to rebuild database from which wizards constructs.
         // Just reload bundles and upadte installed printer from appconfig_new.
         bundles = BundleMap::load();
@@ -3751,8 +3724,7 @@ bool ConfigWizard::priv::any_installed_vendor_for_repo(const std::string& repo_i
 
 static bool to_delete(PagePrinters* page, const std::set<std::string>& selected_uuids)
 {
-    const PresetArchiveDatabase*         pad   = wxGetApp().plater()->get_preset_archive_database();
-    const SharedArchiveRepositoryVector& archs = pad->get_all_archive_repositories();
+    const SharedArchiveRepositoryVector& archs = wxGetApp().get_preset_updater_wrapper()->get_all_archive_repositories();
 
     bool unselect_all = true;
 
@@ -3768,14 +3740,14 @@ static bool to_delete(PagePrinters* page, const std::set<std::string>& selected_
 
 static void unselect(PagePrinters* page)
 {
-    const PresetArchiveDatabase*            pad             = wxGetApp().plater()->get_preset_archive_database();
-    const SharedArchiveRepositoryVector&    archs           = pad->get_all_archive_repositories();
+    const Slic3r::PresetUpdaterWrapper*    puw              = wxGetApp().get_preset_updater_wrapper();
+    const SharedArchiveRepositoryVector&    archs           = puw->get_all_archive_repositories();
 
     bool unselect_all = true;
 
     for (const auto* archive : archs) {
         if (page->get_vendor_repo_id() == archive->get_manifest().id) {
-            if (pad->is_selected_repository_by_uuid(archive->get_uuid()))
+            if (puw->is_selected_repository_by_uuid(archive->get_uuid()))
                 unselect_all = false;
             //break; ! don't break here, because there can be several archives with same repo_id
         }
@@ -3866,16 +3838,16 @@ void ConfigWizard::priv::load_pages_from_archive()
 
     // fill vendors and printers pages from Update manager
 
-    auto pad = wxGetApp().plater()->get_preset_archive_database();
+    const auto* puw = wxGetApp().get_preset_updater_wrapper();
 
-    const SharedArchiveRepositoryVector& archs = pad->get_all_archive_repositories();
+    const SharedArchiveRepositoryVector& archs = puw->get_all_archive_repositories();
 
     only_sla_mode = true;
     bool is_primary_printer_page_set = false;
 
     for (const auto* archive : archs) {
         const auto& data = archive->get_manifest();
-        const bool is_selected_arch     = pad->is_selected_repository_by_uuid(archive->get_uuid());
+        const bool is_selected_arch     = puw->is_selected_repository_by_uuid(archive->get_uuid());
 
         std::vector<const VendorProfile*> vendors;
         const bool any_installed_vendor = any_installed_vendor_for_repo(data.id, vendors);
@@ -4148,7 +4120,7 @@ bool ConfigWizard::run(RunReason reason, StartPage start_page)
 
     if (ShowModal() == wxID_OK) {
         bool apply_keeped_changes = false;
-        if (! p->apply_config(app.app_config, app.preset_bundle, app.preset_updater, apply_keeped_changes))
+        if (! p->apply_config(app.app_config, app.preset_bundle, app.get_preset_updater_wrapper(), apply_keeped_changes))
             return false;
 
         if (apply_keeped_changes)
@@ -4169,7 +4141,8 @@ void ConfigWizard::update_login()
 {
     if (p->page_login && p->page_login->login_changed()) {
         // repos changed - we need rebuild
-        wxGetApp().plater()->get_preset_archive_database()->sync_blocking();
+        // TRN: Progress dialog title
+        wxGetApp().get_preset_updater_wrapper()->wizard_sync(wxGetApp().preset_bundle, wxGetApp().app_config->orig_version(), this, false, _L("Updating Configuration sources"));
         // now change PageUpdateManager
         p->page_update_manager->manager->update();
     }

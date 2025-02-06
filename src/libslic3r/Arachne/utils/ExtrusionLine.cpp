@@ -23,6 +23,8 @@ namespace Slic3r::Arachne
 
 ExtrusionLine::ExtrusionLine(const size_t inset_idx, const bool is_odd) : inset_idx(inset_idx), is_odd(is_odd), is_closed(false) {}
 
+ExtrusionLine::ExtrusionLine(const size_t inset_idx, const bool is_odd, const bool is_closed) : inset_idx(inset_idx), is_odd(is_odd), is_closed(is_closed) {}
+
 int64_t ExtrusionLine::getLength() const
 {
     if (junctions.empty())

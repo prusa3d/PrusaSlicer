@@ -604,7 +604,6 @@ bool ImGuiControl::draw_slider( int* higher_pos, int* lower_pos,
     const ImRect& slideable_region  = m_selection == ssHigher ? m_regions.higher_slideable_region : m_regions.lower_slideable_region;
     const ImRect& active_thumb      = m_selection == ssHigher ? m_regions.higher_thumb            : m_regions.lower_thumb;
 
-    bool show_move_label = false;
     ImRect mouse_pos_rc = active_thumb;
 
     std::string move_label = "";
@@ -617,7 +616,6 @@ bool ImGuiControl::draw_slider( int* higher_pos, int* lower_pos,
             sl_region.Max.x += m_draw_opts.dummy_sz().x;
         behavior(id, sl_region, m_min_pos, m_max_pos,
                  &m_mouse_pos, &mouse_pos_rc, m_flags, true);
-        show_move_label = true;
         move_label = get_label_on_move(m_mouse_pos);
     }
 

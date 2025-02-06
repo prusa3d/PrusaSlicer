@@ -451,11 +451,31 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
     }
 }
 
+std::string Preset::trim_vendor_repo_prefix(const std::string& id) const
+{
+    return Preset::trim_vendor_repo_prefix(id, this->vendor);
+}
+std::string Preset::trim_vendor_repo_prefix(const std::string& id, const VendorProfile* vendor_profile) const
+{
+    if (!vendor_profile) {
+        return id;
+    }
+    std::string res = id;
+    if (boost::algorithm::starts_with(res, vendor_profile->repo_prefix)) {
+        boost::algorithm::erase_head(res, vendor_profile->repo_prefix.size());
+        boost::algorithm::trim_left(res);
+    }
+    return res;
+}
+
 static std::vector<std::string> s_Preset_print_options {
     "layer_height", "first_layer_height", "perimeters", "spiral_vase", "slice_closing_radius", "slicing_mode",
     "top_solid_layers", "top_solid_min_thickness", "bottom_solid_layers", "bottom_solid_min_thickness",
-    "extra_perimeters", "extra_perimeters_on_overhangs", "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters", "thin_walls", "overhangs",
-    "seam_position","staggered_inner_seams", "external_perimeters_first", "fill_density", "fill_pattern", "top_fill_pattern", "bottom_fill_pattern",
+    "ensure_vertical_shell_thickness", "extra_perimeters", "extra_perimeters_on_overhangs",
+    "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters", "thin_walls", "overhangs",
+    "seam_position", "staggered_inner_seams", "seam_gap_distance",
+    "external_perimeters_first", "fill_density", "fill_pattern", "top_fill_pattern", "bottom_fill_pattern",
+    "scarf_seam_placement", "scarf_seam_only_on_smooth", "scarf_seam_start_height", "scarf_seam_entire_loop", "scarf_seam_length", "scarf_seam_max_segment_length", "scarf_seam_on_inner_perimeters",
     "infill_every_layers", /*"infill_only_where_needed",*/ "solid_infill_every_layers", "fill_angle", "bridge_angle",
     "solid_infill_below_area", "only_retract_when_crossing_perimeters", "infill_first",
     "ironing", "ironing_type", "ironing_flowrate", "ironing_speed", "ironing_spacing",
@@ -484,12 +504,13 @@ static std::vector<std::string> s_Preset_print_options {
     "perimeter_extrusion_width", "external_perimeter_extrusion_width", "infill_extrusion_width", "solid_infill_extrusion_width",
     "top_infill_extrusion_width", "support_material_extrusion_width", "infill_overlap", "infill_anchor", "infill_anchor_max", "bridge_flow_ratio",
     "elefant_foot_compensation", "xy_size_compensation", "resolution", "gcode_resolution", "arc_fitting",
-    "wipe_tower", "wipe_tower_x", "wipe_tower_y",
-    "wipe_tower_width", "wipe_tower_cone_angle", "wipe_tower_rotation_angle", "wipe_tower_brim_width", "wipe_tower_bridging", "single_extruder_multi_material_priming", "mmu_segmented_region_max_width",
+    "wipe_tower",
+    "wipe_tower_width", "wipe_tower_cone_angle", "wipe_tower_brim_width", "wipe_tower_bridging", "single_extruder_multi_material_priming", "mmu_segmented_region_max_width",
     "mmu_segmented_region_interlocking_depth", "wipe_tower_extruder", "wipe_tower_no_sparse_layers", "wipe_tower_extra_flow", "wipe_tower_extra_spacing", "compatible_printers", "compatible_printers_condition", "inherits",
     "perimeter_generator", "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
     "wall_distribution_count", "min_feature_size", "min_bead_width",
     "top_one_perimeter_type", "only_one_perimeter_first_layer",
+    "automatic_extrusion_widths", "automatic_infill_combination", "automatic_infill_combination_max_layer_height",
 };
 
 static std::vector<std::string> s_Preset_filament_options {
@@ -510,6 +531,8 @@ static std::vector<std::string> s_Preset_filament_options {
     "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
     // Shrinkage compensation
     "filament_shrinkage_compensation_xy", "filament_shrinkage_compensation_z",
+    // Seams overrides
+    "filament_seam_gap_distance"
 };
 
 static std::vector<std::string> s_Preset_machine_limits_options {

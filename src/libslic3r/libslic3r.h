@@ -17,9 +17,9 @@
 #include "libslic3r_version.h"
 
 // Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
-#define SLIC3R_APP_FULL_NAME SLIC3R_APP_KEY
-//#define SLIC3R_APP_FULL_NAME SLIC3R_APP_KEY "-alpha"
-//#define SLIC3R_APP_FULL_NAME SLIC3R_APP_KEY "-beta"
+   #define SLIC3R_APP_FULL_NAME SLIC3R_APP_KEY
+// #define SLIC3R_APP_FULL_NAME SLIC3R_APP_KEY "-alpha"
+// #define SLIC3R_APP_FULL_NAME SLIC3R_APP_KEY "-beta"
 
 
 
@@ -114,6 +114,8 @@ using deque =
 
 template<typename T, typename Q>
 inline T unscale(Q v) { return T(v) * T(SCALING_FACTOR); }
+
+constexpr size_t MAX_NUMBER_OF_BEDS = 9;
 
 enum Axis { 
 	X=0,
@@ -485,6 +487,11 @@ Fn for_each_in_tuple(Fn fn, Tup &&tup)
     std::apply(mpfn, tup);
 
     return fn;
+}
+
+template<typename T>
+inline bool is_in_range(const T &value, const T &low, const T &high) {
+    return low <= value && value <= high;
 }
 
 } // namespace Slic3r
