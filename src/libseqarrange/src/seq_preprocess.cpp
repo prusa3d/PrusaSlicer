@@ -980,8 +980,8 @@ bool check_PolygonPositionWithinPlate(const SolverConfiguration &solver_configur
     {
 	printf("x: %d,%d\n", polygon_box.min.x() + x, polygon_box.max.x() + x);
 	printf("y: %d,%d\n", polygon_box.min.y() + y, polygon_box.max.y() + y);
-	printf("X: %d\n", solver_configuration.x_plate_bounding_box_size * scale_factor);
-	printf("Y: %d\n", solver_configuration.y_plate_bounding_box_size * scale_factor);
+	printf("X: %d\n", (solver_configuration.plate_bounding_box.max.x() - solver_configuration.plate_bounding_box.min.x()) * scale_factor);
+	printf("Y: %d\n", (solver_configuration.plate_bounding_box.max.y() - solver_configuration.plate_bounding_box.min.x()) * scale_factor);
     }
     #endif
 

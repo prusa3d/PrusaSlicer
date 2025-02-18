@@ -1235,7 +1235,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration                
 	    #ifdef DEBUG
 	    {	    
 		printf("Polygon positions:\n");
-		for (unsgined int i = 0; i < decided_polygons.size(); ++i)
+		for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 		{
 		    printf("  [ID:%d,RID:%d] x:%.3f, y:%.3f (t:%.3f)\n",
 			   original_index_map[decided_polygons[i]],

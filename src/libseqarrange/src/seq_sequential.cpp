@@ -6476,7 +6476,7 @@ std::optional<std::pair<int, int> > check_PointsOutsidePolygons(const std::vecto
 {
     #ifdef DEBUG
     {
-	printf("Levels U %d,%d\n", unreachable_polygons[0].size(), unreachable_polygons[1].size());
+	printf("Levels U %zu,%zu\n", unreachable_polygons[0].size(), unreachable_polygons[1].size());
 	
 	int c = 0;
 	string svg_filename = "collision_checking.svg";
@@ -7007,7 +7007,7 @@ void extract_DecisionValuesFromModel(const z3::model     &Model,
 		
 		#ifdef DEBUG
 		{	
-		    printf("saved: %.3f\n", unordered_values_X.back()->as_double());
+		    printf("saved: %.3f\n", unordered_values_X.back().as_double());
 		}
 		#endif
 	    }
@@ -7023,7 +7023,7 @@ void extract_DecisionValuesFromModel(const z3::model     &Model,
 
 		#ifdef DEBUG
 		{	
-		    printf("saved: %.3f\n", unordered_values_Y.back()->as_double());
+		    printf("saved: %.3f\n", unordered_values_Y.back().as_double());
 		}
 		#endif
 	    }
