@@ -1,65 +1,77 @@
 name: Bug Report
 description: File a bug report
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Before filing, please check if the issue already exists (either open or closed) by using the search bar on the issues page. If it does, comment there. Even if it's closed, we can reopen it based on your comment.
+        Before submitting a new issue, please search both open and closed issues to check if this has been reported before. If you find a similar issue, please add your information as a comment on the existing issue instead of creating a new one. We can reopen closed issues if needed.
+
   - type: textarea
     id: what-happened
     attributes:
-      label: Description of the bug
-      description: What happened? Please, enclose a screenshot whenever possible (even when you think the description is clear). What did you expect to happen? In case of 3D rendering issues, please attach the content of menu Help -> System Info dialog.
+      label: Bug Description
+      description: |
+        Please describe what happened and what you expected to happen instead. 
+        Include screenshots whenever possible, even if the issue seems clear.
+        For 3D rendering issues, please include the output from Help -> System Info.
       placeholder: |
-        What is the problem?
-        What did you expect?
-        You paste or drop screenshots here 
-    validations:
-      required: true
-  - type: textarea
-    id: to_reproduce
-    attributes:
-      label: Project file & How to reproduce
-      description: "*Please* upload a ZIP archive containing the project file used when the problem arise. Please export it just before the problem occurs. Even if you did nothing and/or there is no object, export it! (it contains your current configuration)."
-      placeholder: |
-        `File`->`Save project as...` then zip it & drop it here
-        Also, if needed include the steps to reproduce the bug:
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
-    validations:
-      required: true
-  - type: checkboxes
-    attributes:
-      label: Checklist of files included above
-      options:
-      - label: Project file
-      - label: Screenshot
-    validations:
-      required: true
-  - type: input
-    id: version
-    attributes:
-      label: Version of PrusaSlicer
-      description: What version of PrusaSlicer are you running? You can see the full version in `Help` -> `About PrusaSlicer`.
-      placeholder: e.g. 2.4.1-alpha2-win64 / 2.3.3-linux / 2.4.1-alpha0+61-win64-gcd2459455 ...
-    validations:
-      required: true
-  - type: input
-    id: os
-    attributes:
-      label: Operating system
-      description: with the version if possible
-      placeholder: e.g. Windows 7/8/10/11 ... , Ubuntu 22.04/Debian ... , macOS 10.15/11.1 ...
-    validations:
-      required: true
-  - type: input
-    id: printer
-    attributes:
-      label: Printer model
-      description: Please, fill this in even when it seems irrelevant.
-      placeholder: voron 2.4 with afterburner
+        • What is the problem you encountered?
+        • What did you expect to happen instead?
+        • Drop any relevant screenshots here
     validations:
       required: true
 
+  - type: textarea
+    id: to_reproduce
+    attributes:
+      label: Project File & Reproduction Steps
+      description: |
+        Please upload your project file as a ZIP archive. Export it right before the issue occurs, even if the project is empty - this helps us see your configuration.
+        
+        To export: File -> Save project as... -> Create ZIP
+      placeholder: |
+        1. Drop your project ZIP file here
+        2. List the steps to reproduce the issue:
+           • Open PrusaSlicer
+           • Click on...
+           • etc.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: files-included
+    attributes:
+      label: Submission Checklist
+      options:
+        - label: I have attached the project file
+          required: true
+        - label: I have included relevant screenshots
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: PrusaSlicer Version
+      description: Check Help -> About PrusaSlicer for your exact version number
+      placeholder: 2.4.1-alpha2-win64, 2.3.3-linux, 2.4.1-alpha0+61-win64-gcd2459455
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: Please include your OS version
+      placeholder: Windows 11, Ubuntu 22.04, macOS 13.1
+    validations:
+      required: true
+
+  - type: input
+    id: printer
+    attributes:
+      label: Printer Model
+      description: Please specify your printer model (required even if the issue seems unrelated)
+      placeholder: Voron 2.4 with Afterburner
+    validations:
+      required: true
