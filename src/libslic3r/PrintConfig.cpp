@@ -15,7 +15,7 @@
 ///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
 ///|/ Copyright (c) 2016 Vanessa Ezekowitz @VanessaE
 ///|/ Copyright (c) 2015 Alexander Rössler @machinekoder
-///|/ Copyright (c) 2014 Petr Ledvina @ledvinap
+///|/ Copyright (c) 2014 Petr Ledvina @ledvina
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -2752,8 +2752,9 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("retract_restart_extra_toolchange", coFloats);
     def->label = L("Extra length on restart");
-    def->tooltip = L("When the retraction is compensated after changing tool, the extruder will push "
-                   "this additional amount of filament.");
+    def->tooltip = L("When the retraction is compensated after changing tool or changing layer, the extruder will push "
+                   "this additional amount of filament. This parameter is useful for closing up gaps on seams."
+                   "Typical values around 0.05mm");
     def->sidetext = L("mm");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloats { 0. });
