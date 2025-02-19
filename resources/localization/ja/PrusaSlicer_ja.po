@@ -14200,7 +14200,7 @@ msgstr "右マウスボタン："
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1599
 msgid "Right Preset Value"
-msgstr "正しいプリセット値"
+msgstr "右プリセット値"
 
 #: src/slic3r/GUI/MainFrame.cpp:1426
 msgid "Right View"
