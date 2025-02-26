@@ -25,6 +25,8 @@ using PresetUpdaterStatusMessageEvent = GUI::Event<wxString>;
 wxDECLARE_EVENT(EVT_PRESET_UPDATER_STATUS_END, PresetUpdaterStatusSimpleEvent);
 wxDECLARE_EVENT(EVT_PRESET_UPDATER_STATUS_PRINT, PresetUpdaterStatusMessageEvent);
 wxDECLARE_EVENT(EVT_CONFIG_UPDATER_SYNC_DONE, wxCommandEvent);
+wxDECLARE_EVENT(EVT_CONFIG_UPDATER_FAILED_ARCHIVE, wxCommandEvent);
+
 class PresetBundle; 
 class Semver;
 
@@ -40,9 +42,11 @@ public:
         PURP_NO_RETRY,
     };
     // called from PresetUpdaterWrapper
-    PresetUpdaterUIStatus(PresetUpdaterUIStatus::PresetUpdaterRetryPolicy policy);
+    PresetUpdaterUIStatus();
     ~PresetUpdaterUIStatus(){}
     void set_handler(wxEvtHandler* evt_handler) {m_evt_handler = evt_handler;}
+
+    void reset(PresetUpdaterUIStatus::PresetUpdaterRetryPolicy policy);
 
     // called from worker thread
     bool on_attempt(int attempt, unsigned delay);
@@ -53,6 +57,8 @@ public:
     HttpRetryOpt get_retry_policy() const { return m_retry_policy; }
     std::string get_error() const { return m_error_msg; }
     std::string get_target() const { return m_target; }
+    void add_failed_archive(const std::string& id) { m_failed_archives.emplace_back(id); }
+    const std::vector<std::string>&  get_failed_archives() { return m_failed_archives; }
 
     // called from PresetUpdaterUIStatusCancel (ui thread)
     void set_canceled(bool val) { m_canceled.store(val); }
@@ -66,6 +72,8 @@ private:
 
     HttpRetryOpt m_retry_policy;
     static const std::map<PresetUpdaterUIStatus::PresetUpdaterRetryPolicy, HttpRetryOpt> policy_map;
+
+    std::vector<std::string> m_failed_archives;
 };
 
 // Purpose of this class:
@@ -152,7 +160,7 @@ private:
 
     // m_worker_thread runs on background while m_modal_thread runs only when modal window exists.
     std::thread m_worker_thread;
-    PresetUpdaterUIStatus* m_ui_status {nullptr};
+    std::unique_ptr<PresetUpdaterUIStatus> m_ui_status;
     std::thread m_modal_thread;
 };
 

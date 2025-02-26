@@ -876,6 +876,7 @@ void MainFrame::show_connect_tab(const wxString& url)
     if (!m_connect_webview_added) {
         return;
     }
+    m_connect_webview->prohibit_after_show_func_once();
     m_tabpanel->SetSelection(m_tabpanel->FindPage(m_connect_webview));
     m_connect_webview->set_load_default_url_on_next_error(true);
     m_connect_webview->load_url(url);

@@ -144,6 +144,10 @@ enum class NotificationType
     WipeTowerNozzleDiameterDiffer,
     // Notification about using supports with different nozzle diameters.
     SupportNozzleDiameterDiffer,
+    // Transient error on Prusa Account communication - user is informed and has option to cancel (logout)
+    AccountTransientRetry,
+    // Failed to download secret repo archive
+    FailedSecretVendorUpdateSync
 };
 
 class NotificationManager

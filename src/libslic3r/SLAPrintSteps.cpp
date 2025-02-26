@@ -512,7 +512,8 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
 
     if(slindex_it == po.m_slice_index.end())
         //TRN To be shown at the status bar on SLA slicing error.
-        throw Slic3r::RuntimeError(format("Model named: %s can not be sliced. Please check if the model is sane.", po.model_object()->name));
+        throw Slic3r::RuntimeError(format("Model named: %s can not be sliced. This can be caused by the model mesh being broken. "
+                                          "Repairing it might fix the problem.", po.model_object()->name));
 
     po.m_model_height_levels.clear();
     po.m_model_height_levels.reserve(po.m_slice_index.size());
@@ -1040,7 +1041,7 @@ struct ExposureProfile {
         tilt_down_delay_ms          = int(1000 * config.tilt_down_delay.get_at(opt_id));
         tilt_up_offset_delay_ms     = int(1000 * config.tilt_up_offset_delay.get_at(opt_id));
         tilt_up_delay_ms            = int(1000 * config.tilt_up_delay.get_at(opt_id));
-        tower_hop_height_nm         = config.tower_hop_height.get_at(opt_id) * 1000000;
+        tower_hop_height_nm         = int(config.tower_hop_height.get_at(opt_id) * 1000000);
         tilt_down_offset_steps      = config.tilt_down_offset_steps.get_at(opt_id);
         tilt_down_cycles            = config.tilt_down_cycles.get_at(opt_id);
         tilt_up_offset_steps        = config.tilt_up_offset_steps.get_at(opt_id);

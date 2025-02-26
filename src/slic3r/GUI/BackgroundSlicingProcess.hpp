@@ -133,7 +133,7 @@ public:
 
 	// Apply config over the print. Returns false, if the new config values caused any of the already
 	// processed steps to be invalidated, therefore the task will need to be restarted.
-    PrintBase::ApplyStatus apply(const Model &model, const DynamicPrintConfig &config);
+    PrintBase::ApplyStatus apply(const Model &model, const DynamicPrintConfig &config, std::vector<std::string> *warnings = nullptr);
 	// After calling the apply() function, set_task() may be called to limit the task to be processed by process().
 	// This is useful for calculating SLA supports for a single object only.
 	void 		set_task(const PrintBase::TaskParams &params);

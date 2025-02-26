@@ -22,6 +22,7 @@
 #include "slic3r/Utils/FixModelByWin10.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
+#include "libslic3r/ModelProcessing.hpp"
 
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -1898,7 +1899,7 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
     // split to parts
     for (int id = int(volumes.size())-1; id >= 0; id--)
         if (volumes[id]->is_splittable() && volumes[id]->is_model_part()) // we have to split just solid volumes
-            volumes[id]->split(1);
+            ModelProcessing::split(volumes[id], 1);
 
     m_parts.clear();
     for (const ModelVolume* volume : volumes) {
@@ -3293,8 +3294,8 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
         if (connectors_count != connectors_names.size())
             err_objects_names.push_back(object->name);
 
-        // check manifol/repairs
-        auto stats = object->get_object_stl_stats();
+        // check manifold/repairs
+        auto stats = ModelProcessing::get_object_mesh_stats(object);
         if (!stats.manifold() || stats.repaired())
             err_objects_idxs.push_back(obj_idx);
         obj_idx++;

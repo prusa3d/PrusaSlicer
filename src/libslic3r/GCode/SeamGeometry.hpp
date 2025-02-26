@@ -11,6 +11,8 @@
 #include <optional>
 #include <utility>
 
+#include <boost/variant.hpp>
+
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/AABBTreeLines.hpp"
@@ -30,13 +32,23 @@ template <typename LineType> class LinesDistancer;
 
 namespace Slic3r::Seams::Geometry {
 
+struct Overhang {
+    Point start;
+    Point end;
+};
+
+struct LoopOverhang {};
+
+using Overhangs = std::vector<boost::variant<Overhang, LoopOverhang>>;
+
 struct Extrusion
 {
     Extrusion(
         Polygon &&polygon,
         BoundingBox bounding_box,
         const double width,
-        const ExPolygon &island_boundary
+        const ExPolygon &island_boundary,
+        Overhangs &&overhangs
     );
 
     Extrusion(const Extrusion &) = delete;
@@ -51,6 +63,7 @@ struct Extrusion
 
     // At index 0 there is the bounding box of contour. Rest are the bounding boxes of holes in order.
     BoundingBoxes island_boundary_bounding_boxes;
+    Overhangs overhangs;
 };
 
 using Extrusions = std::vector<Extrusion>;
@@ -59,16 +72,15 @@ std::vector<Extrusions> get_extrusions(tcb::span<const Slic3r::Layer *const> obj
 
 struct BoundedPolygon {
     Polygon polygon;
+    Overhangs overhangs;
     BoundingBox bounding_box;
     bool is_hole{false};
-    double offset_inside{};
 };
 
 using BoundedPolygons = std::vector<BoundedPolygon>;
 
 BoundedPolygons project_to_geometry(const Geometry::Extrusions &external_perimeters, const double max_bb_distance);
 std::vector<BoundedPolygons> project_to_geometry(const std::vector<Geometry::Extrusions> &extrusions, const double max_bb_distance);
-std::vector<BoundedPolygons> convert_to_geometry(const std::vector<Geometry::Extrusions> &extrusions);
 
 Vec2d get_polygon_normal(
     const std::vector<Vec2d> &points, const std::size_t index, const double min_arm_length
@@ -164,10 +176,6 @@ std::vector<Linef> unscaled(const Lines &lines);
 
 Points scaled(const std::vector<Vec2d> &points);
 
-std::vector<double> get_embedding_distances(
-    const std::vector<Vec2d> &points, const AABBTreeLines::LinesDistancer<Linef> &perimeter_distancer
-);
-
 /**
  * @brief Calculate overhang angle for each of the points over the previous layer perimeters.
  *
@@ -201,14 +209,6 @@ struct PointOnLine{
     Vec2d point;
     std::size_t line_index;
 };
-
-std::optional<PointOnLine> offset_along_lines(
-    const Vec2d &point,
-    const std::size_t loop_line_index,
-    const Linesf &loop_lines,
-    const double offset,
-    const Direction1D direction
-);
 
 } // namespace Slic3r::Seams::Geometry
 

@@ -127,12 +127,13 @@ public:
             bool m_visible{ true };
             bool m_fixed_screen_size{ false };
             float m_scale_factor{ 1.0f };
+            bool m_generic_marker{ true };
 #if ENABLE_ACTUAL_SPEED_DEBUG
             ActualSpeedImguiWidget m_actual_speed_imgui_widget;
 #endif // ENABLE_ACTUAL_SPEED_DEBUG
 
         public:
-            void init();
+            void init(std::optional<std::unique_ptr<GLModel>>& model_opt);
 
             const BoundingBoxf3& get_bounding_box() const { return m_model.get_bounding_box(); }
 
@@ -260,6 +261,7 @@ private:
     bool m_contained_in_bed{ true };
 
     ConflictResultOpt m_conflict_result;
+    std::optional<std::pair<std::string, std::string>> m_sequential_collision_detected;
 
     libvgcode::Viewer m_viewer;
     bool m_loaded_as_preview{ false };
@@ -356,6 +358,7 @@ public:
     void invalidate_legend() { m_legend_resizer.reset(); }
 
     const ConflictResultOpt& get_conflict_result() const { return m_conflict_result; }
+    std::optional<std::pair<std::string, std::string>> get_sequential_collision_detected() const { return m_sequential_collision_detected; }
 
     void load_shells(const Print& print);
 

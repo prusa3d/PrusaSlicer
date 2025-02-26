@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <libslic3r/Polygon.hpp>
 #include <libslic3r/Polyline.hpp>
@@ -6,6 +6,7 @@
 #include <libslic3r/Geometry/VoronoiOffset.hpp>
 
 #include <numeric>
+#include <random>
 
 //#define VORONOI_DEBUG_OUT
 

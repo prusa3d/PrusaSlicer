@@ -248,6 +248,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/PlaterWorker.hpp
     GUI/Jobs/ArrangeJob2.hpp
     GUI/Jobs/ArrangeJob2.cpp
+    GUI/Jobs/SeqArrangeJob.hpp
+    GUI/Jobs/SeqArrangeJob.cpp
     GUI/Jobs/CreateFontNameImageJob.cpp
     GUI/Jobs/CreateFontNameImageJob.hpp
     GUI/Jobs/CreateFontStyleImagesJob.cpp

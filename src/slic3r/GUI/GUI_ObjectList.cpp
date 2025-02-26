@@ -8,6 +8,8 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/TextConfiguration.hpp"
 #include "libslic3r/BuildVolume.hpp" // IWYU pragma: keep
+#include "libslic3r/ModelProcessing.hpp"
+#include "libslic3r/FileReader.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectManipulation.hpp"
@@ -434,7 +436,7 @@ void ObjectList::get_selection_indexes(std::vector<int>& obj_idxs, std::vector<i
 
 int ObjectList::get_repaired_errors_count(const int obj_idx, const int vol_idx /*= -1*/) const
 {
-    return obj_idx >= 0 ? (*m_objects)[obj_idx]->get_repaired_errors_count(vol_idx) : 0;
+    return obj_idx >= 0 ? ModelProcessing::get_repaired_errors_count(object(obj_idx), vol_idx) : 0;
 }
 
 static std::string get_warning_icon_name(const TriangleMeshStats& stats)
@@ -455,7 +457,7 @@ MeshErrorsInfo ObjectList::get_mesh_errors_info(const int obj_idx, const int vol
     }
 
     const TriangleMeshStats& stats = vol_idx == -1 ?
-        (*m_objects)[obj_idx]->get_object_stl_stats() :
+        ModelProcessing::get_object_mesh_stats((*m_objects)[obj_idx]) :
         (*m_objects)[obj_idx]->volumes[vol_idx]->mesh().stats();
 
     if (!stats.repaired() && stats.manifold()) {
@@ -1607,10 +1609,10 @@ void ObjectList::load_from_files(const wxArrayString& input_files, ModelObject& 
 
         Model model;
         try {
-            model = Model::read_from_file(input_file);
+            model = FileReader::load_model(input_file);
         }
         catch (std::exception& e) {
-            auto msg = _L("Error!") + " " + input_file + " : " + e.what() + ".";
+            auto msg = _L("Error!") + " " + input_file + " : " + _(e.what()) + ".";
             show_error(parent, msg);
             exit(1);
         }
@@ -1886,7 +1888,7 @@ bool ObjectList::del_subobject_item(wxDataViewItem& item)
 
     // If last volume item with warning was deleted, unmark object item
     if (type & itVolume) {
-        const std::string& icon_name = get_warning_icon_name(object(obj_idx)->get_object_stl_stats());
+        const std::string& icon_name = get_warning_icon_name(ModelProcessing::get_object_mesh_stats(object(obj_idx)));
         m_objects_model->UpdateWarningIcon(parent, icon_name);
     }
 
@@ -2148,7 +2150,7 @@ void ObjectList::split()
     wxGetApp().plater()->clear_before_change_mesh(obj_idx, _u8L("Custom supports, seams, fuzzy skin and multi-material painting were "
                                                                 "removed after splitting the object."));
 
-    volume->split(nozzle_dmrs_cnt);
+    ModelProcessing::split(volume, nozzle_dmrs_cnt);
 
     (*m_objects)[obj_idx]->input_file.clear();
 
@@ -2343,7 +2345,7 @@ void ObjectList::merge(bool to_multipart_object)
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Merge all parts to the one single object"));
 
         ModelObject* model_object = (*m_objects)[obj_idx];
-        model_object->merge();
+        ModelProcessing::merge(model_object);
 
         m_objects_model->DeleteVolumeChildren(item);
 
@@ -3173,7 +3175,7 @@ bool ObjectList::delete_from_model_and_list(const std::vector<ItemForDelete>& it
                         m_objects_model->SetExtruder(extruder, parent);
                     }
                     // If last volume item with warning was deleted, unmark object item
-                    m_objects_model->UpdateWarningIcon(parent, get_warning_icon_name(obj->get_object_stl_stats()));
+                    m_objects_model->UpdateWarningIcon(parent, get_warning_icon_name(ModelProcessing::get_object_mesh_stats(obj)));
                 }
                 wxGetApp().plater()->canvas3D()->ensure_on_bed(item->obj_idx, printer_technology() != ptSLA);
             }
@@ -4623,8 +4625,8 @@ void ObjectList::fix_through_winsdk()
     if (vol_idxs.empty()) {
 #if !FIX_THROUGH_WINSDK_ALWAYS
         for (int i = int(obj_idxs.size())-1; i >= 0; --i)
-                if (object(obj_idxs[i])->get_repaired_errors_count() == 0)
-                    obj_idxs.erase(obj_idxs.begin()+i);
+            if (ModelProcessing::get_repaired_errors_count(object(obj_idxs[i])) == 0)
+                obj_idxs.erase(obj_idxs.begin()+i);
 #endif // FIX_THROUGH_WINSDK_ALWAYS
         for (int obj_idx : obj_idxs)
             model_names.push_back(object(obj_idx)->name);
@@ -4633,7 +4635,7 @@ void ObjectList::fix_through_winsdk()
         ModelObject* obj = object(obj_idxs.front());
 #if !FIX_THROUGH_WINSDK_ALWAYS
         for (int i = int(vol_idxs.size()) - 1; i >= 0; --i)
-            if (obj->get_repaired_errors_count(vol_idxs[i]) == 0)
+            if (ModelProcessing::get_repaired_errors_count(obj, vol_idxs[i]) == 0)
                 vol_idxs.erase(vol_idxs.begin() + i);
 #endif // FIX_THROUGH_WINSDK_ALWAYS
         for (int vol_idx : vol_idxs)
@@ -4689,7 +4691,7 @@ void ObjectList::fix_through_winsdk()
         int vol_idx{ -1 };
         for (int obj_idx : obj_idxs) {
 #if !FIX_THROUGH_WINSDK_ALWAYS
-            if (object(obj_idx)->get_repaired_errors_count(vol_idx) == 0)
+            if (ModelProcessing::get_repaired_errors_count(object(obj_idx), vol_idx) == 0)
                 continue;
 #endif // FIX_THROUGH_WINSDK_ALWAYS
             if (!fix_and_update_progress(obj_idx, vol_idx, model_idx, progress_dlg, succes_models, failed_models))
@@ -4734,7 +4736,7 @@ void ObjectList::update_item_error_icon(const int obj_idx, const int vol_idx) co
 {
     auto obj = object(obj_idx);
     if (wxDataViewItem obj_item = m_objects_model->GetItemById(obj_idx)) {
-        const std::string& icon_name = get_warning_icon_name(obj->get_object_stl_stats());
+        const std::string& icon_name = get_warning_icon_name(ModelProcessing::get_object_mesh_stats(obj));
         m_objects_model->UpdateWarningIcon(obj_item, icon_name);
     }
 

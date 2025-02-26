@@ -26,7 +26,9 @@ std::vector<PerimeterSegment> get_segments(
     Vec2d previous_position{positions.front()};
     double distance{0.0};
     std::vector<PerimeterSegment> result;
-    for (std::size_t index{0}; index < positions.size(); ++index) {
+    for (std::size_t i{0}; i <= positions.size(); ++i) {
+        const std::size_t index{i == positions.size() ? 0 : i};
+        const double previous_distance{distance};
         distance += (positions[index] - previous_position).norm();
         previous_position = positions[index];
 
@@ -38,7 +40,7 @@ std::vector<PerimeterSegment> get_segments(
             }
         } else {
             if (current_begin) {
-                result.push_back(PerimeterSegment{*current_begin, distance, *current_begin_index});
+                result.push_back(PerimeterSegment{*current_begin, previous_distance, *current_begin_index});
             }
             current_begin = std::nullopt;
             current_begin_index = std::nullopt;
@@ -86,19 +88,21 @@ SeamChoice pick_random_point(
 
     double distance{0.0};
     std::size_t previous_index{segment.begin_index};
-    for (std::size_t index{segment.begin_index + 1}; index < perimeter.positions.size(); ++index) {
+    for (std::size_t i{segment.begin_index + 1}; i <= perimeter.positions.size(); ++i) {
+        const std::size_t index{i == perimeter.positions.size() ? 0 : i};
         const Vec2d edge{positions[index] - positions[previous_index]};
 
         if (distance + edge.norm() >= random_distance) {
+            std::size_t current_index{index};
             if (random_distance - distance < std::numeric_limits<double>::epsilon()) {
-                index = previous_index;
+                current_index = previous_index;
             } else if (distance + edge.norm() - random_distance < std::numeric_limits<double>::epsilon()) {
                 previous_index = index;
             }
 
             const double remaining_distance{random_distance - distance};
             const Vec2d position{positions[previous_index] + remaining_distance * edge.normalized()};
-            return {previous_index, index, position};
+            return {previous_index, current_index, position};
         }
 
         distance += edge.norm();

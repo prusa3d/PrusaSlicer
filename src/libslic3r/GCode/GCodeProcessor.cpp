@@ -538,6 +538,7 @@ void GCodeProcessorResult::reset() {
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
     spiral_vase_mode = false;
     conflict_result = std::nullopt;
+    sequential_collision_detected = std::nullopt;
 }
 
 const std::vector<std::pair<GCodeProcessor::EProducer, std::string>> GCodeProcessor::Producers = {
@@ -2849,6 +2850,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
         for (unsigned char a = X; a < E; ++a) {
             m_end_position[a] = double(new_pos[a]);
         }
+        m_end_position[Z] += m_z_offset;
         store_move_vertex(EMoveType::Seam);
         m_end_position = curr_pos;
 

@@ -611,7 +611,8 @@ bool Selection::contains_any_volume(const std::vector<unsigned int>& volume_idxs
 
 bool Selection::contains_sinking_volumes(bool ignore_modifiers) const
 {
-    for (const GLVolume* v : *m_volumes) {
+    for (unsigned int i : m_list) {
+        const GLVolume* v = (*m_volumes)[i];
         if (!ignore_modifiers || !v->is_modifier) {
             if (v->is_sinking())
                 return true;
@@ -1624,8 +1625,6 @@ void Selection::erase()
         wxGetApp().obj_list()->delete_from_model_and_list(items);
         ensure_not_below_bed();
     }
-
-    wxGetApp().plater()->canvas3D()->set_sequential_clearance_as_evaluating();
 }
 
 void Selection::render(float scale_factor)

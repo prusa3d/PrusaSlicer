@@ -7,6 +7,11 @@
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/GUI.hpp"
 
+// These two should not be here. 2.9.1 is getting near and we need a quick
+// way of detecting if complete_objects is used.
+#include "slic3r/GUI/GUI_App.hpp"
+#include "libslic3r/PresetBundle.hpp"
+
 namespace Slic3r { namespace GUI {
 
 struct Settings {
@@ -44,92 +49,100 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y, bool current_b
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoCollapse);
 
-    Settings settings;
-    read_settings(settings, m_db.get());
+    if (! wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("complete_objects") || wxGetApp().preset_bundle->prints.get_edited_preset().printer_technology() == ptSLA) {
+        Settings settings;
+        read_settings(settings, m_db.get());
 
-    ImGuiPureWrap::text(GUI::format(
-        _L("Press %1%left mouse button to enter the exact value"),
-        shortkey_ctrl_prefix()));
+        ImGuiPureWrap::text(GUI::format(
+            _L("Press %1%left mouse button to enter the exact value"),
+            shortkey_ctrl_prefix()));
 
-    float dobj_min, dobj_max;
-    float dbed_min, dbed_max;
+        float dobj_min, dobj_max;
+        float dbed_min, dbed_max;
 
-    m_db->distance_from_obj_range(dobj_min, dobj_max);
-    m_db->distance_from_bed_range(dbed_min, dbed_max);
+        m_db->distance_from_obj_range(dobj_min, dobj_max);
+        m_db->distance_from_bed_range(dbed_min, dbed_max);
 
-    if(dobj_min > settings.d_obj) {
-        settings.d_obj = std::max(dobj_min, settings.d_obj);
-        m_db->set_distance_from_objects(settings.d_obj);
+        if (dobj_min > settings.d_obj) {
+            settings.d_obj = std::max(dobj_min, settings.d_obj);
+            m_db->set_distance_from_objects(settings.d_obj);
+        }
+
+        if (dbed_min > settings.d_bed) {
+            settings.d_bed = std::max(dbed_min, settings.d_bed);
+            m_db->set_distance_from_bed(settings.d_bed);
+        }
+
+        if (m_imgui->slider_float(_L("Spacing"), &settings.d_obj, dobj_min,
+            dobj_max, "%5.2f")) {
+            settings.d_obj = std::max(dobj_min, settings.d_obj);
+            m_db->set_distance_from_objects(settings.d_obj);
+        }
+
+        if (m_imgui->slider_float(_L("Spacing from bed"), &settings.d_bed,
+            dbed_min, dbed_max, "%5.2f")) {
+            settings.d_bed = std::max(dbed_min, settings.d_bed);
+            m_db->set_distance_from_bed(settings.d_bed);
+        }
+
+        if (ImGuiPureWrap::checkbox(_u8L("Enable rotations (slow)"), settings.rotations)) {
+            m_db->set_rotation_enabled(settings.rotations);
+        }
+
+        if (m_show_xl_combo_predicate() &&
+            settings.xl_align >= 0 &&
+            ImGuiPureWrap::combo(_u8L("Alignment"),
+                { _u8L("Center"), _u8L("Rear left"), _u8L("Front left"),
+                 _u8L("Front right"), _u8L("Rear right"),
+                 _u8L("Random") },
+                settings.xl_align)) {
+            if (settings.xl_align >= 0 &&
+                settings.xl_align < ArrangeSettingsView::xlpCount)
+                m_db->set_xl_alignment(static_cast<ArrangeSettingsView::XLPivots>(
+                    settings.xl_align));
+        }
+
+        // TRN ArrangeDialog
+        if (ImGuiPureWrap::combo(_u8L("Geometry handling"),
+            // TRN ArrangeDialog: Type of "Geometry handling"
+            { _u8L("Fast"),
+            // TRN ArrangeDialog: Type of "Geometry handling"
+              _u8L("Balanced"),
+            // TRN ArrangeDialog: Type of "Geometry handling"
+              _u8L("Accurate") },
+            settings.geom_handling)) {
+            if (settings.geom_handling >= 0 &&
+                settings.geom_handling < ArrangeSettingsView::ghCount)
+                m_db->set_geometry_handling(
+                    static_cast<ArrangeSettingsView::GeometryHandling>(
+                        settings.geom_handling));
+        }
+
+        ImGui::Separator();
+
+        if (ImGuiPureWrap::button(_u8L("Reset defaults"))) {
+            arr2::ArrangeSettingsDb::Values df = m_db->get_defaults();
+            m_db->set_distance_from_objects(df.d_obj);
+            m_db->set_distance_from_bed(df.d_bed);
+            m_db->set_rotation_enabled(df.rotations);
+            if (m_show_xl_combo_predicate())
+                m_db->set_xl_alignment(df.xl_align);
+
+            m_db->set_geometry_handling(df.geom_handling);
+            m_db->set_arrange_strategy(df.arr_strategy);
+
+            if (m_on_reset_btn)
+                m_on_reset_btn();
+        }
+        ImGui::SameLine();
+    } else {
+        ImGui::PushTextWrapPos(350.f);
+        ImGuiPureWrap::text(_u8L("Sequential printing is active. Arrange algorithm will use geometry of the printer "
+                                 "to optimize objects placement and avoid collisions with the gantry."));
+        ImGui::PopTextWrapPos();
+        ImGui::Separator();
     }
 
-    if (dbed_min > settings.d_bed) {
-        settings.d_bed = std::max(dbed_min, settings.d_bed);
-        m_db->set_distance_from_bed(settings.d_bed);
-    }
-
-    if (m_imgui->slider_float(_L("Spacing"), &settings.d_obj, dobj_min,
-                              dobj_max, "%5.2f")) {
-        settings.d_obj = std::max(dobj_min, settings.d_obj);
-        m_db->set_distance_from_objects(settings.d_obj);
-    }
-
-    if (m_imgui->slider_float(_L("Spacing from bed"), &settings.d_bed,
-                              dbed_min, dbed_max, "%5.2f")) {
-        settings.d_bed = std::max(dbed_min, settings.d_bed);
-        m_db->set_distance_from_bed(settings.d_bed);
-    }
-
-    if (ImGuiPureWrap::checkbox(_u8L("Enable rotations (slow)"), settings.rotations)) {
-        m_db->set_rotation_enabled(settings.rotations);
-    }
-
-    if (m_show_xl_combo_predicate() &&
-        settings.xl_align >= 0 &&
-        ImGuiPureWrap::combo(_u8L("Alignment"),
-                       {_u8L("Center"), _u8L("Rear left"), _u8L("Front left"),
-                        _u8L("Front right"), _u8L("Rear right"),
-                        _u8L("Random")},
-                       settings.xl_align)) {
-        if (settings.xl_align >= 0 &&
-            settings.xl_align < ArrangeSettingsView::xlpCount)
-            m_db->set_xl_alignment(static_cast<ArrangeSettingsView::XLPivots>(
-                settings.xl_align));
-    }
-
-    // TRN ArrangeDialog
-    if (ImGuiPureWrap::combo(_u8L("Geometry handling"),
-        // TRN ArrangeDialog: Type of "Geometry handling"
-         {_u8L("Fast"),
-        // TRN ArrangeDialog: Type of "Geometry handling"
-          _u8L("Balanced"),
-        // TRN ArrangeDialog: Type of "Geometry handling"
-          _u8L("Accurate")},
-                       settings.geom_handling)) {
-        if (settings.geom_handling >= 0 &&
-            settings.geom_handling < ArrangeSettingsView::ghCount)
-            m_db->set_geometry_handling(
-                static_cast<ArrangeSettingsView::GeometryHandling>(
-                    settings.geom_handling));
-    }
-
-    ImGui::Separator();
-
-    if (ImGuiPureWrap::button(_u8L("Reset defaults"))) {
-        arr2::ArrangeSettingsDb::Values df =  m_db->get_defaults();
-        m_db->set_distance_from_objects(df.d_obj);
-        m_db->set_distance_from_bed(df.d_bed);
-        m_db->set_rotation_enabled(df.rotations);
-        if (m_show_xl_combo_predicate())
-            m_db->set_xl_alignment(df.xl_align);
-
-        m_db->set_geometry_handling(df.geom_handling);
-        m_db->set_arrange_strategy(df.arr_strategy);
-
-        if (m_on_reset_btn)
-            m_on_reset_btn();
-    }
-
-    ImGui::SameLine();
 
     if (!current_bed && ImGuiPureWrap::button(_u8L("Arrange")) && m_on_arrange_btn) {
         m_on_arrange_btn();

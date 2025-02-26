@@ -1,4 +1,6 @@
-#include "catch2/catch.hpp"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include "test_utils.hpp"
 
 #include <random>
@@ -9,9 +11,12 @@
 #include "slic3r/GUI/Jobs/ArrangeJob2.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/FileReader.hpp"
 #include "libslic3r/SLAPrint.hpp"
 
 #include "libslic3r/Format/3mf.hpp"
+
+using Catch::Approx;
 
 class RandomArrangeSettings: public Slic3r::arr2::ArrangeSettingsView {
     Slic3r::arr2::ArrangeSettingsDb::Values m_v;
@@ -84,7 +89,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
     DynamicPrintConfig cfg;
     cfg.load_from_ini(basepath + "default_fff.ini",
                       ForwardCompatibilitySubstitutionRule::Enable);
-    Model m = Model::read_from_file(basepath + "20mm_cube.obj", &cfg);
+    Model m = FileReader::load_model(basepath + "20mm_cube.obj");
 
     UIThreadWorker w;
     arr2::ArrangeSettings settings;

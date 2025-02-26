@@ -14,7 +14,7 @@
 #include "libslic3r/GCode/SeamPlacer.hpp"
 #include "libslic3r/GCode/SeamAligned.hpp"
 
-#include <filesystem>
+#include <boost/filesystem.hpp>
 #include <unordered_map>
 
 namespace Slic3r { namespace Test {
@@ -159,7 +159,7 @@ std::string slice(
 bool contains(const std::string &data, const std::string &pattern);
 bool contains_regex(const std::string &data, const std::string &pattern);
 
-inline std::unique_ptr<Print> process_3mf(const std::filesystem::path &path) {
+inline std::unique_ptr<Print> process_3mf(const boost::filesystem::path &path) {
     DynamicPrintConfig config;
     auto print{std::make_unique<Print>()};
     Model model;
@@ -176,7 +176,7 @@ inline std::unique_ptr<Print> process_3mf(const std::filesystem::path &path) {
 
 static std::map<std::string, std::unique_ptr<Print>> prints_3mfs;
 // Lazy getter, to avoid processing the 3mf multiple times, it already takes ages.
-inline Print *get_print(const std::filesystem::path &file_path) {
+inline Print *get_print(const boost::filesystem::path &file_path) {
     if (!prints_3mfs.count(file_path.string())) {
         prints_3mfs[file_path.string()] = process_3mf(file_path.string());
     }
@@ -204,8 +204,8 @@ inline void serialize_seam(std::ostream &output, const std::vector<std::vector<S
 
 struct SeamsFixture
 {
-    const std::filesystem::path file_3mf{
-        std::filesystem::path{TEST_DATA_DIR} / std::filesystem::path{"seam_test_object.3mf"}};
+    const boost::filesystem::path file_3mf{
+        boost::filesystem::path{TEST_DATA_DIR} / boost::filesystem::path{"seam_test_object.3mf"}};
     const Print *print{Test::get_print(file_3mf)};
     const PrintObject *print_object{print->objects()[0]};
 

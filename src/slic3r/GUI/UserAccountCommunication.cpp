@@ -13,6 +13,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/nowide/fstream.hpp>
+#include <boost/nowide/convert.hpp>
 #include <curl/curl.h>
 #include <string>
 
@@ -41,6 +42,8 @@
 #include <openssl/evp.h>
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
+
+#include <fcntl.h>
 #endif // __linux__
 
 
@@ -138,7 +141,7 @@ bool load_secret(const std::string& opt, std::string& usr, std::string& psswd)
 }
 
 #ifdef __linux__
-void load_refresh_token_linux(std::string& refresh_token)
+void load_tokens_linux(UserAccountCommunication::StoreData& result)
 {
         // Load refresh token from UserAccount.dat
         boost::filesystem::path source(boost::filesystem::path(Slic3r::data_dir()) / "UserAccount.dat") ;
@@ -156,18 +159,80 @@ void load_refresh_token_linux(std::string& refresh_token)
         }
         boost::nowide::ifstream stream(source.generic_string(), std::ios::in | std::ios::binary);
         if (!stream) {
-            BOOST_LOG_TRIVIAL(error) << "UserAccount: Failed to read token from " << source;
+            BOOST_LOG_TRIVIAL(error) << "UserAccount: Failed to read tokens from " << source;
             return;
         }
-        std::getline(stream, refresh_token);
+        std::string token_data;
+        std::getline(stream, token_data);
         stream.close();
         if (delete_after_read) {
             ec.clear();
             if (!boost::filesystem::remove(source, ec) || ec) {
                 BOOST_LOG_TRIVIAL(error) << "UserAccount: Failed to remove file " << source;
             }
-
         }
+
+        // read data
+        std::vector<std::string> token_list;
+        boost::split(token_list, token_data, boost::is_any_of("|"), boost::token_compress_off);
+        assert(token_list.empty() || token_list.size() == 5);
+        if (token_list.size() < 5) {
+            BOOST_LOG_TRIVIAL(error) << "Size of read secrets is only: " << token_list.size() << " (expected 5). Data: " << token_data;
+        }
+        result.access_token = token_list.size() > 0 ? token_list[0] : std::string();
+        result.refresh_token = token_list.size() > 1 ? token_list[1] : std::string();
+        result.next_timeout = token_list.size() > 2 ? token_list[2] : std::string();
+        result.master_pid =  token_list.size() > 3 ? token_list[3] : std::string();
+        result.shared_session_key = token_list.size() > 4 ? token_list[4] : std::string();
+}
+bool concurrent_write_file(const std::string& secret_to_store, const boost::filesystem::path& filename)
+{
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
+    // Open the file
+    int fd = open(filename.string().c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd == -1) {
+        BOOST_LOG_TRIVIAL(error)  << "Unable to open store file " << filename << ": " << strerror(errno);
+        return false;
+    }
+    // Close the file when the guard dies
+    Slic3r::ScopeGuard sg_fd([fd]() { 
+        close(fd); 
+        BOOST_LOG_TRIVIAL(debug) << "Closed file.";
+    });
+
+    // Configure the lock
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_WRLCK;  // Write lock
+    lock.l_whence = SEEK_SET;  // Lock from the start of the file
+    lock.l_start = 0;
+    lock.l_len = 0;  // 0 means lock the entire file
+
+    // Try to acquire the lock
+    BOOST_LOG_TRIVIAL(debug) << "Waiting to acquire lock on file: " << filename;
+    if (fcntl(fd, F_SETLKW, &lock) == -1) {
+        BOOST_LOG_TRIVIAL(error) << "Unable to acquire lock: " << strerror(errno);
+        return false;
+    }
+    BOOST_LOG_TRIVIAL(debug) << "Lock acquired on file: " << filename;
+    
+    Slic3r::ScopeGuard sg_lock([&lock, fd, filename]() {
+        // Release the lock when guard dies.
+        lock.l_type = F_UNLCK;  // Unlock the file
+       if (fcntl(fd, F_SETLK, &lock) == -1) {
+            BOOST_LOG_TRIVIAL(error)  << "Unable to release lock ("<< filename <<"): " << strerror(errno);
+        } else {
+            BOOST_LOG_TRIVIAL(debug) << "Lock released on file: " << filename;
+        }
+    });
+
+    // Write content to the file
+    if (write(fd, secret_to_store.c_str(), strlen(secret_to_store.c_str())) == -1) {
+        BOOST_LOG_TRIVIAL(error)  << "Unable to write to file: " << strerror(errno);
+        return false;
+    }
+    BOOST_LOG_TRIVIAL(debug) << "Content written to file.";
+    return true;
 }
 #endif //__linux__
 }
@@ -176,44 +241,33 @@ UserAccountCommunication::UserAccountCommunication(wxEvtHandler* evt_handler, Ap
     : wxEvtHandler()
     , m_evt_handler(evt_handler)
     , m_app_config(app_config)
-    , m_polling_timer(new wxTimer(this))
-    , m_token_timer(new wxTimer(this))
+    , m_polling_timer(std::make_unique<wxTimer>(this))
+    , m_token_timer(std::make_unique<wxTimer>(this))
+    , m_slave_read_timer(std::make_unique<wxTimer>(this))
+    , m_after_race_lost_timer(std::make_unique<wxTimer>(this))
 {
     Bind(wxEVT_TIMER, &UserAccountCommunication::on_token_timer, this, m_token_timer->GetId());
     Bind(wxEVT_TIMER, &UserAccountCommunication::on_polling_timer, this, m_polling_timer->GetId());
+    Bind(wxEVT_TIMER, &UserAccountCommunication::on_slave_read_timer, this, m_slave_read_timer->GetId());
+    Bind(wxEVT_TIMER, &UserAccountCommunication::on_after_race_lost_timer, this, m_after_race_lost_timer->GetId());
 
-    std::string access_token, refresh_token, shared_session_key, next_timeout;
-    if (is_secret_store_ok()) {
-        std::string key0, key1, key2, tokens;
-        if (load_secret("tokens", key0, tokens)) {
-            std::vector<std::string> token_list;
-            boost::split(token_list, tokens, boost::is_any_of("|"), boost::token_compress_off);
-            assert(token_list.empty() || token_list.size() == 3);
-            access_token = token_list.size() > 0 ? token_list[0] : std::string();
-            refresh_token = token_list.size() > 1 ? token_list[1] : std::string();
-            next_timeout = token_list.size() > 2 ? token_list[2] : std::string();
-        } else {
-            load_secret("access_token", key0, access_token);
-            load_secret("refresh_token", key1, refresh_token);
-            load_secret("access_token_timeout", key2, next_timeout);
-            assert(key0 == key1);
-        }
-        shared_session_key = key0;
+    StoreData stored_data;
+    read_stored_data(stored_data);
 
-    } else {
-#ifdef __linux__
-        load_refresh_token_linux(refresh_token);
-#endif
-    }
-    long long next = next_timeout.empty() ? 0 : std::stoll(next_timeout);
-    long long remain_time = next - std::time(nullptr);
+    long long next_timeout_long = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout);
+    long long remain_time = next_timeout_long - std::time(nullptr);
     if (remain_time <= 0) {
-        access_token.clear();
+        stored_data.access_token.clear();
     } else {
         set_refresh_time((int)remain_time);
     }
-    bool has_token = !refresh_token.empty();
-    m_session = std::make_unique<UserAccountSession>(evt_handler, access_token, refresh_token, shared_session_key, m_app_config->get_bool("connect_polling"));
+    if (!stored_data.access_token.empty()) {
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ <<" access_token: " << stored_data.access_token.substr(0,5) << "..." << stored_data.access_token.substr(stored_data.access_token.size()-5);
+    } else {
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ <<" access_token empty!";
+    }
+    bool has_token = !stored_data.refresh_token.empty();
+    m_session = std::make_unique<UserAccountSession>(evt_handler, stored_data.access_token, stored_data.refresh_token, stored_data.shared_session_key, next_timeout_long, m_app_config->get_bool("connect_polling"));
     init_session_thread();
     // perform login at the start, but only with tokens
     if (has_token) {
@@ -225,6 +279,7 @@ UserAccountCommunication::~UserAccountCommunication()
 {
     m_token_timer->Stop();
     m_polling_timer->Stop();
+
     if (m_thread.joinable()) {
         // Stop the worker thread, if running.
         {
@@ -238,24 +293,42 @@ UserAccountCommunication::~UserAccountCommunication()
     }
 }
 
-void UserAccountCommunication::set_username(const std::string& username)
+void UserAccountCommunication::set_username(const std::string& username, bool store)
 {
     m_username = username;
+    if (!store && !username.empty()) {
+        return;
+    }
     {
+        //BOOST_LOG_TRIVIAL(debug) << __FUNCTION__  << " empty: " << username.empty();
+        std::string at = m_session->get_access_token();
+        if (!at.empty())
+            at = at.substr(0,5) + "..." + at.substr(at.size()-5);
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ <<" access_token: " << (username.empty() ? "" : at);
         if (is_secret_store_ok()) {
-            std::string tokens;
-            if (m_remember_session) {
+            std::string tokens = "|||";
+            if (m_remember_session && !username.empty()) {
                 tokens = m_session->get_access_token() +
-                    "|" + m_session->get_refresh_token() +
-                    "|" + std::to_string(m_session->get_next_token_timeout());
+                "|" + m_session->get_refresh_token() +
+                "|" + std::to_string(m_session->get_next_token_timeout()) +
+                "|" + std::to_string(get_current_pid());
             }
-            save_secret("tokens", m_session->get_shared_session_key(), tokens);
-        }
-        else {
+            if (!save_secret("tokens", m_session->get_shared_session_key(), tokens)) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to write tokens to the secret store.";
+            }
+        } else {
 #ifdef __linux__
             // If we can't store the tokens in secret store, store them in file with chmod 600
             boost::filesystem::path target(boost::filesystem::path(Slic3r::data_dir()) / "UserAccount.dat") ;
-            std::string data = m_session->get_refresh_token();
+            std::string data = "||||";
+            if (m_remember_session && !username.empty()) {
+                data = m_session->get_access_token() +
+                "|" + m_session->get_refresh_token() +
+                "|" + std::to_string(m_session->get_next_token_timeout()) +
+                "|" + std::to_string(get_current_pid()) +
+                "|" + m_session->get_shared_session_key();
+            }
+
             FILE* file; 
             static const auto perms = boost::filesystem::owner_read | boost::filesystem::owner_write;   // aka 600
             
@@ -265,17 +338,15 @@ void UserAccountCommunication::set_username(const std::string& username)
                 BOOST_LOG_TRIVIAL(debug) << "UserAccount: boost::filesystem::permisions before write error message (this could be irrelevant message based on file system): " << ec.message();
             ec.clear();
 
-            file = boost::nowide::fopen(target.generic_string().c_str(), "wb");
-            if (file == NULL) {
-                BOOST_LOG_TRIVIAL(error) << "UserAccount: Failed to open file to store token: " << target;
-                return;
+            if (!concurrent_write_file(data, target)) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to store secret.";
             }
-            fwrite(data.c_str(), 1, data.size(), file);
-            fclose(file);
 
             boost::filesystem::permissions(target, perms, ec);
             if (ec)
                 BOOST_LOG_TRIVIAL(debug) << "UserAccount: boost::filesystem::permisions after write error message (this could be irrelevant message based on file system): " << ec.message();
+#else
+            BOOST_LOG_TRIVIAL(error) << "Failed to write tokens to the secret store: Store is not ok.";
 #endif
         }
     }
@@ -283,9 +354,10 @@ void UserAccountCommunication::set_username(const std::string& username)
 
 void UserAccountCommunication::set_remember_session(bool b)
 { 
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     m_remember_session = b;
     // tokens needs to be stored or deleted
-    set_username(m_username);
+    set_username(m_username, true);
 }
 
 std::string UserAccountCommunication::get_access_token()
@@ -304,6 +376,8 @@ std::string UserAccountCommunication::get_shared_session_key()
 
 void UserAccountCommunication::set_polling_enabled(bool enabled)
 {
+    // Here enabled sets to USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS so it gets full list on first,
+    // than it should change inside session to USER_ACCOUNT_ACTION_CONNECT_STATUS
     return m_session->set_polling_action(enabled ? UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS : UserAccountActionID::USER_ACCOUNT_ACTION_DUMMY);
 }
 
@@ -323,7 +397,7 @@ wxString UserAccountCommunication::generate_login_redirect_url()
     const std::string REDIRECT_URI = "prusaslicer://login";
     CodeChalengeGenerator ccg;
     m_code_verifier = ccg.generate_verifier();
-    std::string code_challenge = ccg.generate_chalenge(m_code_verifier);
+    std::string code_challenge = ccg.generate_challenge(m_code_verifier);
     wxString language = GUI::wxGetApp().current_language_code();
     language = language.SubString(0, 1);
     BOOST_LOG_TRIVIAL(info) << "code verifier: " << m_code_verifier;
@@ -339,7 +413,7 @@ wxString UserAccountCommunication::get_login_redirect_url(const std::string& ser
     const std::string CLIENT_ID = client_id();
     const std::string REDIRECT_URI = "prusaslicer://login";
     CodeChalengeGenerator ccg;
-    std::string code_challenge = ccg.generate_chalenge(m_code_verifier);
+    std::string code_challenge = ccg.generate_challenge(m_code_verifier);
     wxString language = GUI::wxGetApp().current_language_code();
     language = language.SubString(0, 1);
 
@@ -376,9 +450,13 @@ void UserAccountCommunication::do_logout()
 
 void UserAccountCommunication::do_clear()
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     m_session->clear();
-    set_username({});
+    set_username({}, true);
     m_token_timer->Stop();
+    m_slave_read_timer->Stop();
+    m_after_race_lost_timer->Stop();
+    m_next_token_refresh_at = 0;
 }
 
 void UserAccountCommunication::on_login_code_recieved(const std::string& url_message)
@@ -410,20 +488,40 @@ void UserAccountCommunication::enqueue_connect_status_action()
 void UserAccountCommunication::enqueue_test_connection()
 {
     if (!m_session->is_initialized()) {
-        BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
+        BOOST_LOG_TRIVIAL(error) << "Connect test endpoint connection failed - Not Logged in.";
         return;
     }
     m_session->enqueue_test_with_refresh();
     wakeup_session_thread();
 }
 
-void UserAccountCommunication::enqueue_avatar_action(const std::string& url)
+void UserAccountCommunication::enqueue_avatar_old_action(const std::string& url)
+{
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect avatar endpoint connection failed - Not Logged in.";
+        return;
+    }
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_OLD, nullptr, nullptr, url);
+    wakeup_session_thread();
+}
+
+void UserAccountCommunication::enqueue_avatar_new_action(const std::string& url)
 {
     if (!m_session->is_initialized()) {
         BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
         return;
     }
-    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR, nullptr, nullptr, url);
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_NEW, nullptr, nullptr, url);
+    wakeup_session_thread();
+}
+
+void UserAccountCommunication::enqueue_id_action()
+{
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect id endpoint connection failed - Not Logged in.";
+        return;
+    }
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_USER_ID, nullptr, nullptr, {});
     wakeup_session_thread();
 }
 
@@ -437,12 +535,6 @@ void UserAccountCommunication::enqueue_printer_data_action(const std::string& uu
     wakeup_session_thread();
 }
    
-void UserAccountCommunication::request_refresh()
-{
-    m_token_timer->Stop();
-    enqueue_refresh();
-}
-
 void UserAccountCommunication::enqueue_refresh()
 {
     if (!m_session->is_initialized()) {
@@ -487,7 +579,7 @@ void UserAccountCommunication::on_activate_app(bool active)
         m_window_is_active = active;
     }
     auto now = std::time(nullptr);
-    BOOST_LOG_TRIVIAL(info) << "UserAccountCommunication activate: active " << active;
+    //BOOST_LOG_TRIVIAL(info) << "UserAccountCommunication activate: active " << active;
 #ifndef _NDEBUG
     // constexpr auto refresh_threshold = 110 * 60;
     constexpr auto refresh_threshold = 60;
@@ -495,13 +587,22 @@ void UserAccountCommunication::on_activate_app(bool active)
     constexpr auto refresh_threshold = 60;
 #endif
     if (active && m_next_token_refresh_at > 0 && m_next_token_refresh_at - now < refresh_threshold) {
-        BOOST_LOG_TRIVIAL(info) << "Enqueue access token refresh on activation";
+        // Commented during implementation of sharing access token among instances - TODO
+        BOOST_LOG_TRIVIAL(debug) << " Requesting refresh when app was activated: next token refresh is at " <<  m_next_token_refresh_at - now;
         request_refresh();
+        return;
+    }
+    // When no token timers are running but we have token -> refresh it.
+    if (active && m_next_token_refresh_at > 0 && m_token_timer->IsRunning() && m_slave_read_timer->IsRunning() && m_after_race_lost_timer->IsRunning()) {
+        BOOST_LOG_TRIVIAL(debug) << " Requesting refresh when app was activated when no timers are running, next token refresh is at " <<  m_next_token_refresh_at - now;
+        request_refresh();
+        return;
     }
 }
 
 void UserAccountCommunication::wakeup_session_thread()
 {
+    //BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     {
         std::lock_guard<std::mutex> lck(m_thread_stop_mutex);
         m_thread_wakeup = true;
@@ -513,6 +614,7 @@ void UserAccountCommunication::set_refresh_time(int seconds)
 {
     assert(m_token_timer);
     m_token_timer->Stop();
+    m_last_token_duration_seconds = seconds;
     const auto prior_expiration_secs = std::max(seconds / 24, 10);
     int milliseconds = std::max((seconds - prior_expiration_secs) * 1000, 1000);
     m_next_token_refresh_at = std::time(nullptr) + milliseconds / 1000;
@@ -520,21 +622,260 @@ void UserAccountCommunication::set_refresh_time(int seconds)
     m_token_timer->StartOnce(milliseconds);
 }
 
+void UserAccountCommunication::read_stored_data(UserAccountCommunication::StoreData& result)
+{
+    if (is_secret_store_ok()) {
+        std::string key0, tokens;
+        if (load_secret("tokens", key0, tokens)) {
+            std::vector<std::string> token_list;
+            boost::split(token_list, tokens, boost::is_any_of("|"), boost::token_compress_off);
+            assert(token_list.empty() || token_list.size() == 4);
+            if (token_list.size() < 3) {
+                BOOST_LOG_TRIVIAL(error) << "Size of read secrets is only: " << token_list.size() << " (expected 4). Data: " << tokens;
+            }
+            result.access_token = token_list.size() > 0 ? token_list[0] : std::string();
+            result.refresh_token = token_list.size() > 1 ? token_list[1] : std::string();
+            result.next_timeout = token_list.size() > 2 ? token_list[2] : std::string();
+            result.master_pid =  token_list.size() > 3 ? token_list[3] : std::string();
+        }
+        result.shared_session_key = key0;
+    } else {
+#ifdef __linux__
+        load_tokens_linux(result);
+#endif
+    }
+}
+
+void UserAccountCommunication::request_refresh()
+{
+    // This function is called when Printables requests new token - same token as we have now wont do.
+    // Or from UserAccountCommunication::on_activate_app(true) when current token has too small refresh or is dead
+    // See if there is different token stored, if not - proceed to T3 (there might be more than 1 app doing this).
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
+    if (m_token_timer->IsRunning()) {
+        m_token_timer->Stop();
+    } 
+    if (m_slave_read_timer->IsRunning()) {
+        m_slave_read_timer->Stop();
+    }
+    if (m_after_race_lost_timer->IsRunning()) {
+        m_after_race_lost_timer->Stop();
+    }
+    
+    std::string current_access_token = m_session->get_access_token();
+    StoreData stored_data;
+    read_stored_data(stored_data);
+    if (stored_data.refresh_token.empty()) {
+        BOOST_LOG_TRIVIAL(warning) << "Store is empty - logging out.";
+        do_logout();
+        return;
+    }
+
+    // Here we need to count with situation when token was renewed in m_session but was not yet stored.
+    // Then store token is not valid - it should has erlier expiration
+    long long expires_in_second = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout) - std::time(nullptr);
+    BOOST_LOG_TRIVIAL(error) << "Compare " <<  expires_in_second << " vs " << m_next_token_refresh_at - std::time(nullptr) << (stored_data.access_token != current_access_token ? " not same" : " same");
+    if (stored_data.access_token != current_access_token && expires_in_second > 0 && expires_in_second > m_next_token_refresh_at - std::time(nullptr)) {
+        BOOST_LOG_TRIVIAL(debug) << "Found usable token. Expires in " << expires_in_second;
+        set_tokens(stored_data);
+    } else {
+        BOOST_LOG_TRIVIAL(debug) << "No new token";
+        enqueue_refresh_race(stored_data.refresh_token);
+    }
+}
 
 void UserAccountCommunication::on_token_timer(wxTimerEvent& evt)
 {
-    BOOST_LOG_TRIVIAL(info) << "UserAccountCommunication: Token refresh timer fired";
-    enqueue_refresh();
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << " T1";
+    // Read PID from current stored token and decide if master / slave
+
+    std::string my_pid = std::to_string(get_current_pid());
+    StoreData stored_data;
+    read_stored_data(stored_data);
+
+    if (stored_data.refresh_token.empty()) {
+        BOOST_LOG_TRIVIAL(warning) << "Store is empty - logging out.";
+        do_logout();
+        return;
+    }
+
+    long long expires_in_second = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout) - std::time(nullptr);
+    if (my_pid == stored_data.master_pid) {
+        enqueue_refresh(); 
+        return;
+    } 
+    // token could be either already new -> we want to start using it now
+    const auto prior_expiration_secs = std::max(m_last_token_duration_seconds / 24, 10);
+    if (expires_in_second >= 0 && expires_in_second > prior_expiration_secs) {
+        BOOST_LOG_TRIVIAL(debug) << "Current token has different PID - expiration is " << expires_in_second << " while longest expected was " << prior_expiration_secs << ". Using this token.";
+        set_tokens(stored_data);
+        return;
+    } 
+    // or yet to be renewed -> we should wait to give time to master to renew it
+    if (expires_in_second >= 0) {
+        BOOST_LOG_TRIVIAL(debug) << "Current token has different PID - waiting " << expires_in_second / 2;
+        m_slave_read_timer->StartOnce((expires_in_second / 2) * 1000);
+        return;
+    }
+    // or expired -> renew now.
+    BOOST_LOG_TRIVIAL(debug) << "Current token has different PID and is expired.";
+    enqueue_refresh_race(stored_data.refresh_token);
 }
+void UserAccountCommunication::on_slave_read_timer(wxTimerEvent& evt)
+{
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << " T2";
+    std::string current_access_token = m_session->get_access_token();
+    StoreData stored_data;
+    read_stored_data(stored_data);
+
+    if (stored_data.refresh_token.empty()) {
+        BOOST_LOG_TRIVIAL(warning) << "Store is empty - logging out.";
+        do_logout();
+        return;
+    }
+    
+    long long expires_in_second = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout) - std::time(nullptr);
+    if (stored_data.access_token != current_access_token) {
+        // consider stored_data as renewed token from master
+        BOOST_LOG_TRIVIAL(debug) << "Token in store seems to be new - using it.";
+        set_tokens(stored_data);   
+        return;
+    }
+    if (stored_data.access_token != current_access_token) {
+        // token is expired
+        BOOST_LOG_TRIVIAL(debug) << "Token in store seems to be new but expired - refreshing now.";
+        enqueue_refresh_race(stored_data.refresh_token);
+        return;
+    }
+    BOOST_LOG_TRIVIAL(debug) <<"No new token, enqueueing refresh (race expected).";
+    enqueue_refresh_race();
+}
+
+void UserAccountCommunication::enqueue_refresh_race(const std::string refresh_token_from_store/* = std::string()*/)
+{
+    BOOST_LOG_TRIVIAL(debug) <<  __FUNCTION__ << " T3";
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
+        return;
+    }
+    if (refresh_token_from_store.empty() && m_session->is_enqueued(UserAccountActionID::USER_ACCOUNT_ACTION_REFRESH_TOKEN)) {
+        BOOST_LOG_TRIVIAL(error) <<  __FUNCTION__ << " Token refresh already enqueued, skipping...";
+        return;
+    }
+    // At this point, last master did not renew the tokens, behave like master
+    m_session->enqueue_refresh_race();
+    wakeup_session_thread();
+}
+
+void UserAccountCommunication::on_race_lost()
+{
+    BOOST_LOG_TRIVIAL(debug) <<  __FUNCTION__ << " T4";
+    // race from on_slave_read_timer has been lost
+    // other instance was faster to renew tokens so refresh token from this app was denied (invalid grant)
+    // we should read the other token now.
+    std::string current_access_token = m_session->get_access_token();
+    StoreData stored_data;
+    read_stored_data(stored_data);
+
+    if (stored_data.refresh_token.empty()) {
+        BOOST_LOG_TRIVIAL(warning) << "Store is empty - logging out.";
+        do_logout();
+        return;
+    }
+
+    long long expires_in_second = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout) - std::time(nullptr);
+    const auto prior_expiration_secs = std::max(m_last_token_duration_seconds / 24, 10);
+    if (expires_in_second > 0 && expires_in_second > prior_expiration_secs) {
+        BOOST_LOG_TRIVIAL(debug) << "Token is alive - using it.";
+        set_tokens(stored_data);
+        return;
+    }
+    BOOST_LOG_TRIVIAL(debug) << "No suitable token found waiting " << std::max((expires_in_second / 2), (long long)2);
+    m_after_race_lost_timer->StartOnce(std::max((expires_in_second / 2) * 1000, (long long)2000));   
+}
+
+void UserAccountCommunication::on_after_race_lost_timer(wxTimerEvent& evt)
+{
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << " T5";
+
+    std::string current_access_token = m_session->get_access_token();
+    StoreData stored_data;
+    read_stored_data(stored_data);
+
+    if (stored_data.refresh_token.empty()) {
+        BOOST_LOG_TRIVIAL(warning) << "Store is empty - logging out.";
+        do_logout();
+        return;
+    }
+
+    long long expires_in_second = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout) - std::time(nullptr);
+    const auto prior_expiration_secs = std::max(m_last_token_duration_seconds / 24, 10);
+    if (expires_in_second > 0 && expires_in_second > prior_expiration_secs) {
+       BOOST_LOG_TRIVIAL(debug) << "Token is alive - using it.";
+       set_tokens(stored_data);
+       return;
+    } 
+    BOOST_LOG_TRIVIAL(warning) << "No new token is stored - This is error state. Logging out.";
+    do_logout();
+}
+
+void UserAccountCommunication::set_tokens(const StoreData store_data)
+{
+    if (m_token_timer->IsRunning()) {
+        m_token_timer->Stop();
+    } 
+    if (m_slave_read_timer->IsRunning()) {
+        m_slave_read_timer->Stop();
+    }
+    if (m_after_race_lost_timer->IsRunning()) {
+        m_after_race_lost_timer->Stop();
+    }
+
+    long long next = store_data.next_timeout.empty() ? 0 : std::stoll(store_data.next_timeout);
+    m_session->set_tokens(store_data.access_token, store_data.refresh_token, store_data.shared_session_key, next);
+    enqueue_id_action();
+}
+
+void UserAccountCommunication::on_store_read_request()
+{
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
+    StoreData stored_data;
+    read_stored_data(stored_data);
+
+    if (stored_data.refresh_token.empty()) {
+        BOOST_LOG_TRIVIAL(warning) << "Store is empty - logging out.";
+        do_logout();
+        return;
+    }
+    
+    std::string currrent_access_token = m_session->get_access_token();
+    if (currrent_access_token == stored_data.access_token)
+    {
+        BOOST_LOG_TRIVIAL(debug) << "Current token is up to date.";
+        return;
+    }
+
+    long long expires_in_second = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout) - std::time(nullptr);
+    const auto prior_expiration_secs = std::max(m_last_token_duration_seconds / 24, 10);
+    if (expires_in_second > 0 /*&& expires_in_second > prior_expiration_secs*/) {
+       BOOST_LOG_TRIVIAL(debug) << "Token is alive - using it.";
+       set_tokens(stored_data);
+       return;
+    } else {
+        BOOST_LOG_TRIVIAL(warning) << "Token read from store is expired!";
+    }
+}
+
 void UserAccountCommunication::on_polling_timer(wxTimerEvent& evt)
 {
+
     if (!m_window_is_active) {
         return;
     }
     wakeup_session_thread();
 }
 
-std::string CodeChalengeGenerator::generate_chalenge(const std::string& verifier)
+std::string CodeChalengeGenerator::generate_challenge(const std::string& verifier)
 {
     std::string code_challenge;
     try
@@ -544,7 +885,7 @@ std::string CodeChalengeGenerator::generate_chalenge(const std::string& verifier
     }
     catch (const std::exception& e)
     {
-        BOOST_LOG_TRIVIAL(error) << "Code Chalenge Generator failed: " << e.what();
+        BOOST_LOG_TRIVIAL(error) << "Code Challenge Generator failed: " << e.what();
     }
     assert(!code_challenge.empty());
     return code_challenge;

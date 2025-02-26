@@ -2,7 +2,8 @@
 #include "libslic3r/GCode/SeamPerimeters.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Point.hpp"
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <libslic3r/GCode/SeamGeometry.hpp>
 #include <libslic3r/Geometry.hpp>
 #include <fstream>
@@ -11,26 +12,30 @@
 
 using namespace Slic3r;
 using namespace Slic3r::Seams;
+using namespace  Catch;
 
 constexpr bool debug_files{false};
 
-const ExPolygon square{
-    scaled(Vec2d{0.0, 0.0}), scaled(Vec2d{1.0, 0.0}), scaled(Vec2d{1.0, 1.0}),
-    scaled(Vec2d{0.0, 1.0})};
 
 TEST_CASE("Oversample painted", "[Seams][SeamPerimeters]") {
+    Perimeters::PerimeterPoints square(4);
+    square[0].position = Vec2d{0.0, 0.0};
+    square[1].position = Vec2d{1.0, 0.0};
+    square[2].position = Vec2d{1.0, 1.0};
+    square[3].position = Vec2d{0.0, 1.0};
+
     auto is_painted{[](const Vec3f &position, float radius) {
         return (position - Vec3f{0.5, 0.0, 1.0}).norm() < radius;
     }};
-    std::vector<Vec2d> points{Perimeters::Impl::oversample_painted(
-        Seams::Geometry::unscaled(square.contour.points), is_painted, 1.0, 0.2
+    Perimeters::PerimeterPoints points{Perimeters::Impl::oversample_painted(
+        square, is_painted, 1.0, 0.2
     )};
 
     REQUIRE(points.size() == 8);
-    CHECK((points[1] - Vec2d{0.2, 0.0}).norm() == Approx(0.0));
+    CHECK((points[1].position - Vec2d{0.2, 0.0}).norm() == Approx(0.0));
 
     points = Perimeters::Impl::oversample_painted(
-        Seams::Geometry::unscaled(square.contour.points), is_painted, 1.0, 0.199
+        square, is_painted, 1.0, 0.199
     );
     CHECK(points.size() == 9);
 }
@@ -39,24 +44,35 @@ TEST_CASE("Remove redundant points", "[Seams][SeamPerimeters]") {
     using Perimeters::PointType;
     using Perimeters::PointClassification;
 
-    std::vector<Vec2d> points{{0.0, 0.0}, {1.0, 0.0}, {2.0, 0.0}, {3.0, 0.0},
-                              {3.0, 1.0}, {3.0, 2.0}, {0.0, 2.0}};
-    std::vector<PointType> point_types{PointType::common,
-                                       PointType::enforcer, // Should keep this.
-                                       PointType::enforcer, // Should keep this.
-                                       PointType::blocker,
-                                       PointType::blocker, // Should remove this.
-                                       PointType::blocker,  PointType::common};
+    Perimeters::PerimeterPoints points(9);
+    points[0].position = {0.0, 0.0};
+    points[0].type = PointType::common;
+    points[1].position = {1.0, 0.0};
+    points[1].type = PointType::enforcer; // Should keep
+    points[2].position = {2.0, 0.0};
+    points[2].type = PointType::enforcer; // Should keep
+    points[3].position = {3.0, 0.0};
+    points[3].type = PointType::blocker;
+    points[4].position = {3.0, 1.0};
+    points[4].type = PointType::blocker; // Should remove
+    points[5].position = {3.0, 1.1};
+    points[5].type = PointType::blocker;
+    points[6].position = {3.0, 1.2};
+    points[6].type = PointType::blocker;
+    points[6].classification = PointClassification::overhang; // Should keep
+    points[7].position = {3.0, 2.0};
+    points[7].type = PointType::blocker;
+    points[8].position = {0.0, 2.0};
+    points[8].type = PointType::common;
 
-    const auto [resulting_points, resulting_point_types]{
-        Perimeters::Impl::remove_redundant_points(points, point_types, 0.1)};
+    Perimeters::PerimeterPoints result{
+        Perimeters::Impl::remove_redundant_points(points, 0.1)};
 
-    REQUIRE(resulting_points.size() == 6);
-    REQUIRE(resulting_point_types.size() == 6);
-    CHECK((resulting_points[3] - Vec2d{3.0, 0.0}).norm() == Approx(0.0));
-    CHECK((resulting_points[4] - Vec2d{3.0, 2.0}).norm() == Approx(0.0));
-    CHECK(resulting_point_types[3] == PointType::blocker);
-    CHECK(resulting_point_types[4] == PointType::blocker);
+    REQUIRE(result.size() == 8);
+    CHECK((result[3].position - Vec2d{3.0, 0.0}).norm() == Approx(0.0));
+    CHECK((result[4].position - Vec2d{3.0, 1.1}).norm() == Approx(0.0));
+    CHECK(result[3].type == PointType::blocker);
+    CHECK(result[4].type == PointType::blocker);
 }
 
 TEST_CASE("Perimeter constructs KD trees", "[Seams][SeamPerimeters]") {
@@ -88,8 +104,6 @@ TEST_CASE("Perimeter constructs KD trees", "[Seams][SeamPerimeters]") {
     CHECK(perimeter.common_points.common_points);
     CHECK(perimeter.common_points.embedded_points);
 }
-
-using std::filesystem::path;
 
 constexpr const char *to_string(Perimeters::PointType point_type) {
     using Perimeters::PointType;
@@ -181,4 +195,58 @@ TEST_CASE_METHOD(Test::SeamsFixture, "Create perimeters", "[Seams][SeamPerimeter
         std::ofstream csv{"perimeters.csv"};
         serialize_shells(csv, shells);
     }
+}
+
+using Dir = Seams::Geometry::Direction1D;
+
+Perimeters::Perimeter get_perimeter(){
+    Perimeters::Perimeter perimeter;
+    perimeter.positions = {
+        Vec2d{0.0, 0.0},
+        Vec2d{1.0, 0.0},
+        Vec2d{1.0, 1.0},
+        Vec2d{0.0, 1.0}
+    };
+    return perimeter;
+}
+
+TEST_CASE("Offset along perimeter forward", "[Seams][SeamPerimeters]") {
+    const std::optional<Perimeters::PointOnPerimeter> result{Perimeters::offset_along_perimeter(
+        {0, 1, {0.5, 0.0}}, get_perimeter(), 3.9, Dir::forward,
+        [](const Perimeters::Perimeter &, const std::size_t) { return false; }
+    )};
+    REQUIRE(result);
+    const auto &[previous_index, next_index, point] = *result;
+    CHECK((scaled(point) - Point::new_scale(0.4, 0.0)).norm() < scaled(EPSILON));
+    CHECK(previous_index == 0);
+    CHECK(next_index == 1);
+}
+
+TEST_CASE("Offset along perimeter backward", "[Seams][SeamPerimeters]") {
+    const std::optional<Perimeters::PointOnPerimeter> result{Perimeters::offset_along_perimeter(
+        {1, 2, {1.0, 0.5}}, get_perimeter(), 1.8, Dir::backward,
+        [](const Perimeters::Perimeter &, const std::size_t) { return false; }
+    )};
+    REQUIRE(result);
+    const auto &[previous_index, next_index, point] = *result;
+    CHECK((scaled(point) - Point::new_scale(0.0, 0.3)).norm() < scaled(EPSILON));
+    CHECK(previous_index == 3);
+    CHECK(next_index == 0);
+}
+
+TEST_CASE("Offset along perimeter forward respects stop condition", "[Seams][SeamPerimeters]") {
+    Perimeters::Perimeter perimeter{get_perimeter()};
+    perimeter.point_types = std::vector<Perimeters::PointType>(perimeter.positions.size(), Perimeters::PointType::common);
+    perimeter.point_types[2] = Perimeters::PointType::blocker;
+    const std::optional<Perimeters::PointOnPerimeter> result{Perimeters::offset_along_perimeter(
+        {0, 1, {0.5, 0.0}}, perimeter, 3.9, Dir::forward,
+        [](const Perimeters::Perimeter &perimeter, const std::size_t index) {
+            return perimeter.point_types[index] == Perimeters::PointType::blocker;
+        }
+    )};
+    REQUIRE(result);
+    const auto &[previous_index, next_index, point] = *result;
+    CHECK((scaled(point) - Point::new_scale(1.0, 0.0)).norm() < scaled(EPSILON));
+    CHECK(previous_index == 1);
+    CHECK(next_index == 1);
 }

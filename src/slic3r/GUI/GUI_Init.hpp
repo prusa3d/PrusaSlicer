@@ -39,16 +39,16 @@ struct GUI_InitParams
     std::vector<std::string>    input_files;
     CLISelectedProfiles         selected_presets;
 
-    bool                        start_as_gcodeviewer;
-    bool                        start_downloader;
-    bool                        delete_after_load;
+    bool                        start_as_gcodeviewer            { false };
+    bool                        start_downloader                { false };
+    bool                        delete_after_load               { false };
     std::string                 download_url;
 #if !SLIC3R_OPENGL_ES
-		std::pair<int, int>         opengl_version;
-		bool                        opengl_debug;
-		bool                        opengl_compatibiity_profile;
+    std::pair<int, int>         opengl_version                  { 0, 0 };
+    bool                        opengl_debug                    { false };
+    bool                        opengl_compatibility_profile    { false };
 #endif // !SLIC3R_OPENGL_ES
-		bool                        opengl_aa;
+    bool                        opengl_aa                       { false };
 };
 
 int GUI_Run(GUI_InitParams &params);

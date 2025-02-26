@@ -115,7 +115,7 @@ void RepositoryUpdateUIManager::fill_entries(bool init_selection/* = false*/)
 
         if (data.source_path.empty()) {
             // online repo
-            m_online_entries.push_back({ is_selected, uuid, data.name, data.description, data.visibility });
+            m_online_entries.push_back({ is_selected, uuid, data.name, data.description, data.visibility, data.not_in_manifest });
         }
         else {
             // offline repo
@@ -161,12 +161,19 @@ void RepositoryUpdateUIManager::fill_grids()
                 });
             add(chb);
 
-            if (entry.visibility.empty())
-                add(new wxStaticText(m_parent, wxID_ANY, ""));
-            else {
+            if (entry.not_in_manifest) {
+                wxStaticBitmap* bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("notification_warning"));
+                // TRN tooltip in Configuration Wizard - Configuration Sources
+                bmp->SetToolTip(_L("This source has installed vendors, yet you do not have rights to receive updates of it.\n"
+                    "This may be because you are logged out. Log in to restore access to all your subscribed sources.\n"
+                    "If you are logged in, please concider unsubscribing this source."));
+                add(bmp);
+            } else if (!entry.visibility.empty()) {
                 wxStaticBitmap* bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("info"));
                 bmp->SetToolTip(from_u8(entry.visibility));
                 add(bmp);
+            } else {
+                add(new wxStaticText(m_parent, wxID_ANY, ""));
             }
 
             add(new wxStaticText(m_parent, wxID_ANY, from_u8(entry.name) + " "));

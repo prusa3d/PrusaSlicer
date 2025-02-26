@@ -138,12 +138,14 @@ Extrusion::Extrusion(
     Polygon &&polygon,
     BoundingBox bounding_box,
     const double width,
-    const ExPolygon &island_boundary
+    const ExPolygon &island_boundary,
+    Overhangs &&overhangs
 )
-    : polygon(polygon)
+    : polygon(std::move(polygon))
     , bounding_box(std::move(bounding_box))
     , width(width)
-    , island_boundary(island_boundary) {
+    , island_boundary(island_boundary)
+    , overhangs(std::move(overhangs)) {
     this->island_boundary_bounding_boxes.push_back(island_boundary.contour.bounding_box());
 
     std::transform(
@@ -151,6 +153,66 @@ Extrusion::Extrusion(
         std::back_inserter(this->island_boundary_bounding_boxes),
         [](const Polygon &polygon) { return polygon.bounding_box(); }
     );
+}
+
+Overhangs get_overhangs(const ExtrusionPaths& paths) {
+    if (paths.empty()) {
+        return {};
+    }
+
+    Overhangs result;
+    std::optional<Point> start_point;
+    if (paths.front().role().is_bridge()) {
+        start_point = paths.front().first_point();
+    }
+    Point previous_last_point{paths.front().last_point()};
+    for (const ExtrusionPath& path : tcb::span{paths}.subspan(1)) {
+        if(path.role().is_bridge() && !start_point) {
+            start_point = path.first_point();
+        }
+        if(!path.role().is_bridge() && start_point) {
+            result.push_back(Overhang{*start_point, previous_last_point});
+            start_point = std::nullopt;
+        }
+        previous_last_point = path.last_point();
+    }
+    if (start_point) {
+        result.push_back(Overhang{*start_point, previous_last_point});
+    }
+    return result;
+}
+
+Overhangs get_overhangs(const ExtrusionEntity *entity) {
+    Overhangs result;
+    if (auto path{dynamic_cast<const ExtrusionPath *>(entity)}) {
+        if(path->role().is_bridge()) {
+            result.emplace_back(Overhang{
+                path->first_point(),
+                path->last_point()
+            });
+        }
+    } else if (auto path{dynamic_cast<const ExtrusionMultiPath *>(entity)}) {
+        const Overhangs overhangs{get_overhangs(path->paths)};
+        result.insert(result.end(), overhangs.begin(), overhangs.end());
+    } else if (auto path{dynamic_cast<const ExtrusionLoop *>(entity)}) {
+        const bool bridge_loop{std::all_of(
+            path->paths.begin(),
+            path->paths.end(),
+            [](const ExtrusionPath& path){
+                return path.role().is_bridge();
+            }
+        )};
+
+        if (bridge_loop) {
+            result.emplace_back(LoopOverhang{});
+        } else {
+            const Overhangs overhangs{get_overhangs(path->paths)};
+            result.insert(result.end(), overhangs.begin(), overhangs.end());
+        }
+    } else {
+        throw std::runtime_error{"Unknown extrusion entity!"};
+    }
+    return result;
 }
 
 Geometry::Extrusions get_external_perimeters(const Slic3r::Layer &layer, const LayerSlice &slice) {
@@ -163,10 +225,11 @@ Geometry::Extrusions get_external_perimeters(const Slic3r::Layer &layer, const L
             )};
             for (const ExtrusionEntity *entity : *collection) {
                 if (entity->role().is_external_perimeter()) {
+                    Overhangs overhangs{get_overhangs(entity)};
                     Polygon polygon{entity->as_polyline().points};
                     const BoundingBox bounding_box{polygon.bounding_box()};
                     const double width{layer_region.flow(FlowRole::frExternalPerimeter).width()};
-                    result.emplace_back(std::move(polygon), bounding_box, width, island.boundary);
+                    result.emplace_back(std::move(polygon), bounding_box, width, island.boundary, std::move(overhangs));
                 }
             }
         }
@@ -215,19 +278,33 @@ BoundedPolygons project_to_geometry(const Geometry::Extrusions &external_perimet
             )};
 
             if (distance > max_bb_distance) {
-                Polygons expanded_extrusion{expand(external_perimeter.polygon, Slic3r::scaled(external_perimeter.width / 2.0))};
+                const Polygons expanded_extrusion{expand(external_perimeter.polygon, Slic3r::scaled(external_perimeter.width / 2.0))};
                 if (!expanded_extrusion.empty()) {
                     return BoundedPolygon{
-                        expanded_extrusion.front(), expanded_extrusion.front().bounding_box(), external_perimeter.polygon.is_clockwise(), 0.0
+                        expanded_extrusion.front(),
+                        external_perimeter.overhangs,
+                        expanded_extrusion.front().bounding_box(),
+                        external_perimeter.polygon.is_clockwise(),
                     };
                 }
+                return BoundedPolygon{
+                    external_perimeter.polygon,
+                    external_perimeter.overhangs,
+                    external_perimeter.polygon.bounding_box(),
+                    external_perimeter.polygon.is_clockwise()
+                };
             }
 
             const bool is_hole{choosen_index != 0};
             const Polygon &adjacent_boundary{
                 !is_hole ? external_perimeter.island_boundary.contour :
                            external_perimeter.island_boundary.holes[choosen_index - 1]};
-            return BoundedPolygon{adjacent_boundary, external_perimeter.island_boundary_bounding_boxes[choosen_index], is_hole, 0.0};
+            return BoundedPolygon{
+                adjacent_boundary,
+                external_perimeter.overhangs,
+                external_perimeter.island_boundary_bounding_boxes[choosen_index],
+                is_hole,
+            };
         }
     );
     return result;
@@ -238,27 +315,6 @@ std::vector<BoundedPolygons> project_to_geometry(const std::vector<Geometry::Ext
 
     for (std::size_t layer_index{0}; layer_index < extrusions.size(); ++layer_index) {
         result[layer_index] = project_to_geometry(extrusions[layer_index], max_bb_distance);
-    }
-
-    return result;
-}
-
-std::vector<BoundedPolygons> convert_to_geometry(const std::vector<Geometry::Extrusions> &extrusions) {
-    std::vector<BoundedPolygons> result;
-    result.reserve(extrusions.size());
-
-    for (const Geometry::Extrusions &layer : extrusions) {
-        result.emplace_back();
-
-        using std::transform, std::back_inserter;
-        transform(
-            layer.begin(), layer.end(), back_inserter(result.back()),
-            [&](const Geometry::Extrusion &extrusion) {
-                return BoundedPolygon{
-                    extrusion.polygon, extrusion.bounding_box, extrusion.polygon.is_clockwise(), extrusion.width / 2.0
-                };
-            }
-        );
     }
 
     return result;
@@ -337,34 +393,6 @@ Points scaled(const std::vector<Vec2d> &points) {
     return result;
 }
 
-std::vector<double> get_embedding_distances(
-    const std::vector<Vec2d> &points, const AABBTreeLines::LinesDistancer<Linef> &perimeter_distancer
-) {
-    std::vector<double> result;
-    result.reserve(points.size());
-    using std::transform, std::back_inserter;
-    transform(points.begin(), points.end(), back_inserter(result), [&](const Vec2d &point) {
-        const double distance{perimeter_distancer.distance_from_lines<true>(point)};
-        return distance < 0 ? -distance : 0.0;
-    });
-    return result;
-}
-
-std::vector<double> get_overhangs(
-    const std::vector<Vec2d> &points,
-    const AABBTreeLines::LinesDistancer<Linef> &previous_layer_perimeter_distancer,
-    const double layer_height
-) {
-    std::vector<double> result;
-    result.reserve(points.size());
-    using std::transform, std::back_inserter;
-    transform(points.begin(), points.end(), back_inserter(result), [&](const Vec2d &point) {
-        const double distance{previous_layer_perimeter_distancer.distance_from_lines<true>(point)};
-        return distance > 0 ? M_PI / 2 - std::atan(layer_height / distance) : 0.0;
-    });
-    return result;
-}
-
 // Measured from outside, convex is positive
 std::vector<double> get_vertex_angles(const std::vector<Vec2d> &points, const double min_arm_length) {
     std::vector<double> result;
@@ -439,58 +467,6 @@ Polygon to_polygon(const ExtrusionLoop &loop) {
         }
     }
     return Polygon{loop_points};
-}
-
-std::optional<PointOnLine> offset_along_lines(
-    const Vec2d &point,
-    const std::size_t loop_line_index,
-    const Linesf &loop_lines,
-    const double offset,
-    const Direction1D direction
-) {
-    const Linef initial_line{loop_lines[loop_line_index]};
-    double distance{
-        direction == Direction1D::forward ? (initial_line.b - point).norm() :
-                                            (point - initial_line.a).norm()};
-    if (distance >= offset) {
-        const Vec2d edge_direction{(initial_line.b - initial_line.a).normalized()};
-        const Vec2d offset_point{direction == Direction1D::forward ? Vec2d{point + offset * edge_direction} : Vec2d{point - offset * edge_direction}};
-        return {{offset_point, loop_line_index}};
-    }
-
-    std::optional<PointOnLine> offset_point;
-
-    bool skip_first{direction == Direction1D::forward};
-    const auto visitor{[&](std::size_t index) {
-        if (skip_first) {
-            skip_first = false;
-            return false;
-        }
-        const Vec2d previous_point{
-            direction == Direction1D::forward ? loop_lines[index].a : loop_lines[index].b};
-        const Vec2d next_point{
-            direction == Direction1D::forward ? loop_lines[index].b : loop_lines[index].a};
-        const Vec2d edge{next_point - previous_point};
-
-        if (distance + edge.norm() > offset) {
-            const double remaining_distance{offset - distance};
-            offset_point =
-                PointOnLine{previous_point + remaining_distance * edge.normalized(), index};
-            return true;
-        }
-
-        distance += edge.norm();
-
-        return false;
-    }};
-
-    if (direction == Direction1D::forward) {
-        Geometry::visit_forward(loop_line_index, loop_lines.size(), visitor);
-    } else {
-        Geometry::visit_backward(loop_line_index, loop_lines.size(), visitor);
-    }
-
-    return offset_point;
 }
 
 } // namespace Slic3r::Seams::Geometry

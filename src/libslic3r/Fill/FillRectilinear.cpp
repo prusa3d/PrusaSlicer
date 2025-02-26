@@ -41,7 +41,7 @@
 #endif
 
 #if defined(SLIC3R_DEBUG) || defined(INFILL_DEBUG_OUTPUT)
-    #include "SVG.hpp"
+    #include "libslic3r/SVG.hpp"
 #endif
 
 #include <cassert>

@@ -58,7 +58,7 @@ public:
 
     int show(bool show_from_menu = false);
     void get_input_files(wxArrayString& input_files);
-    bool load_files(const wxArrayString& input_files);
+    bool add_files_to_custom_dir(const wxArrayString& input_files);
 
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;

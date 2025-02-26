@@ -109,6 +109,12 @@ void delete_cookies(wxWebView* web_view, const std::string& url)
     webkit_cookie_manager_get_cookies(cookieManager, uri, nullptr, (GAsyncReadyCallback)Slic3r::GUI::get_cookie_callback, nullptr);
 }
 
+void delete_cookies_with_counter(wxWebView* web_view, const std::string& url, std::atomic<size_t>& counter)
+{
+    delete_cookies(web_view, url);
+    counter++;
+}
+
 void add_request_authorization(wxWebView* web_view, const wxString& address, const std::string& token)
 {
     // unused on Linux

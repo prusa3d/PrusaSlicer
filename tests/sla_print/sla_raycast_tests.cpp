@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <test_utils.hpp>
 
 #include <libslic3r/AABBMesh.hpp>
@@ -7,6 +8,7 @@
 #include "sla_test_utils.hpp"
 
 using namespace Slic3r;
+using namespace Catch;
 
 // First do a simple test of the hole raycaster.
 TEST_CASE("Raycaster - find intersections of a line and cylinder")

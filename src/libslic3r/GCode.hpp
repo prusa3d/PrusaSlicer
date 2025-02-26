@@ -229,7 +229,7 @@ private:
         const Polyline &xy_path,
         const double initial_elevation,
         const GCode::Impl::Travels::ElevatedTravelParams &elevation_params
-    ) const;
+    );
 
     std::vector<GCode::ExtrusionOrder::ExtruderExtrusions> get_sorted_extrusions(
         const Print &print,
@@ -329,10 +329,16 @@ private:
         const std::vector<GCode::ExtrusionOrder::SupportPath> &support_extrusions
     );
 
+    enum class EnforceFirstZ {
+        False,
+        True
+    };
+
     std::string generate_travel_gcode(
         const Points3& travel,
         const std::string& comment,
-        const std::function<std::string()>& insert_gcode
+        const std::function<std::string()>& insert_gcode,
+        const EnforceFirstZ enforce_first_z = EnforceFirstZ::False
     );
     Polyline generate_travel_xy_path(
         const Point& start,
@@ -340,12 +346,14 @@ private:
         const bool needs_retraction,
         bool& could_be_wipe_disabled
     );
+
     std::string travel_to(
         const Vec3crd &start_point,
         const Vec3crd &end_point,
         ExtrusionRole role,
         const std::string &comment,
-        const std::function<std::string()>& insert_gcode
+        const std::function<std::string()>& insert_gcode,
+        const EnforceFirstZ enforce_first_z = EnforceFirstZ::False
     );
 
     std::string travel_to_first_position(const Vec3crd& point, const double from_z, const ExtrusionRole role, const std::function<std::string()>& insert_gcode);
@@ -486,6 +494,7 @@ private:
     std::string                         _extrude(const ExtrusionAttributes &attribs, const Geometry::ArcWelder::Path &path, std::string_view description, double speed, const EmitModifiers &emit_modifiers = EmitModifiers());
 
     void                                print_machine_envelope(GCodeOutputStream &file, const Print &print);
+    std::string                         _process_start_gcode(const Print &print, unsigned int current_extruder_id);
     void                                _print_first_layer_chamber_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, int temp, bool wait, bool accurate);
     void                                _print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);
     void                                _print_first_layer_extruder_temperatures(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait);

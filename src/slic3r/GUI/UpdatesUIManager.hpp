@@ -21,14 +21,15 @@ namespace GUI {
 class RepositoryUpdateUIManager
 {
     struct OnlineEntry {
-        OnlineEntry(bool use, const std::string &id, const std::string &name, const std::string &description, const std::string &visibility) :
-            use(use), id(id), name(name), description(description), visibility(visibility) {}
+        OnlineEntry(bool use, const std::string &id, const std::string &name, const std::string &description, const std::string &visibility, bool not_in_manifest) :
+            use(use), id(id), name(name), description(description), visibility(visibility) ,not_in_manifest(not_in_manifest) {}
 
         bool            use;
         std::string     id;
         std::string     name;
         std::string     description;
         std::string   	visibility;
+        bool            not_in_manifest;
     };
 
     struct OfflineEntry {

@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <filesystem>
 #include <fstream>
 #include "libslic3r/ClipperUtils.hpp"
@@ -9,6 +10,7 @@
 
 using namespace Slic3r;
 using namespace Slic3r::Seams;
+using namespace Catch;
 
 struct ProjectionFixture
 {
@@ -21,7 +23,12 @@ struct ProjectionFixture
     double extrusion_width{0.2};
 
     ProjectionFixture() {
-        extrusions.emplace_back(Polygon{extrusion_path}, extrusion_path.bounding_box(), extrusion_width, island_boundary);
+        extrusions.emplace_back(
+            Polygon{extrusion_path},
+            extrusion_path.bounding_box(),
+            extrusion_width, island_boundary,
+            Seams::Geometry::Overhangs{}
+        );
     }
 };
 

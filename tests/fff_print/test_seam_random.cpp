@@ -1,5 +1,5 @@
 #include <libslic3r/Point.hpp>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <libslic3r/GCode/SeamRandom.hpp>
 #include "test_data.hpp"
 #include <fstream>
@@ -32,7 +32,7 @@ Perimeters::Perimeter get_perimeter() {
 }
 } // namespace RandomTest
 
-double get_chi2_uniform(const std::vector<double> &data, double min, double max, const std::size_t bin_count) {
+double get_chi2_uniform(const std::vector<double> &data, const double min, const double max, const std::size_t bin_count) {
     std::vector<std::size_t> bins(bin_count);
     const double bin_size{(max - min) / bin_count};
     const double expected_frequncy{static_cast<double>(data.size()) / bin_count};
@@ -62,7 +62,7 @@ TEST_CASE("Random is uniform", "[Seams][SeamRandom]") {
         return choice->position.x();
     });
     const std::size_t degrees_of_freedom{10};
-    const double critical{18.307}; // dof 10, significance 0.05
+    const double critical{29.588}; // dof 10, significance 0.001
 
     CHECK(get_chi2_uniform(x_positions, 0.0, 1.0, degrees_of_freedom + 1) < critical);
 }

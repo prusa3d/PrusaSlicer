@@ -37,6 +37,7 @@
 #include "Utils.hpp"
 #include "BuildVolume.hpp"
 #include "format.hpp"
+#include "ArrangeHelper.hpp"
 
 #include <float.h>
 
@@ -432,89 +433,6 @@ bool Print::has_brim() const
     return std::any_of(m_objects.begin(), m_objects.end(), [](PrintObject *object) { return object->has_brim(); });
 }
 
-bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Polygons* polygons)
-{
-	Polygons convex_hulls_other;
-    if (polygons != nullptr)
-        polygons->clear();
-    std::vector<size_t> intersecting_idxs;
-
-	  std::map<ObjectID, Polygon> map_model_object_to_convex_hull;
-	  for (const PrintObject *print_object : print.objects()) {
-	      assert(! print_object->model_object()->instances.empty());
-	      assert(! print_object->instances().empty());
-	      ObjectID model_object_id = print_object->model_object()->id();
-	      auto it_convex_hull = map_model_object_to_convex_hull.find(model_object_id);
-        // Get convex hull of all printable volumes assigned to this print object.
-        ModelInstance *model_instance0 = print_object->model_object()->instances.front();
-	      if (it_convex_hull == map_model_object_to_convex_hull.end()) {
-	          // Calculate the convex hull of a printable object. 
-	          // Grow convex hull with the clearance margin.
-	          // FIXME: Arrangement has different parameters for offsetting (jtMiter, limit 2)
-	          // which causes that the warning will be showed after arrangement with the
-	          // appropriate object distance. Even if I set this to jtMiter the warning still shows up.
-            Geometry::Transformation trafo = model_instance0->get_transformation();
-            trafo.set_offset({ 0.0, 0.0, model_instance0->get_offset().z() });
-            Polygon ch2d = print_object->model_object()->convex_hull_2d(trafo.get_matrix());
-            Polygons offs_ch2d = offset(ch2d,
-                // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
-                // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
-                float(scale_(0.5 * print.config().extruder_clearance_radius.value - BuildVolume::BedEpsilon)), jtRound, scale_(0.1));
-            // for invalid geometries the vector returned by offset() may be empty
-            if (!offs_ch2d.empty())
-                it_convex_hull = map_model_object_to_convex_hull.emplace_hint(it_convex_hull, model_object_id, offs_ch2d.front());
-        }
-        if (it_convex_hull != map_model_object_to_convex_hull.end()) {
-            // Make a copy, so it may be rotated for instances.
-            Polygon convex_hull0 = it_convex_hull->second;
-            const double z_diff = Geometry::rotation_diff_z(model_instance0->get_matrix(), print_object->instances().front().model_instance->get_matrix());
-            if (std::abs(z_diff) > EPSILON)
-                convex_hull0.rotate(z_diff);
-            // Now we check that no instance of convex_hull intersects any of the previously checked object instances.
-            for (const PrintInstance& instance : print_object->instances()) {
-                Polygon convex_hull = convex_hull0;
-                // instance.shift is a position of a centered object, while model object may not be centered.
-                // Convert the shift from the PrintObject's coordinates into ModelObject's coordinates by removing the centering offset.
-                convex_hull.translate(instance.shift - print_object->center_offset());
-                // if output needed, collect indices (inside convex_hulls_other) of intersecting hulls
-                for (size_t i = 0; i < convex_hulls_other.size(); ++i) {
-                    if (!intersection(convex_hulls_other[i], convex_hull).empty()) {
-                        if (polygons == nullptr)
-                            return false;
-                        else {
-                            intersecting_idxs.emplace_back(i);
-                            intersecting_idxs.emplace_back(convex_hulls_other.size());
-                        }
-                    }
-                }
-                convex_hulls_other.emplace_back(std::move(convex_hull));
-            }
-        }
-    }
-
-    if (!intersecting_idxs.empty()) {
-        // use collected indices (inside convex_hulls_other) to update output
-        std::sort(intersecting_idxs.begin(), intersecting_idxs.end());
-        intersecting_idxs.erase(std::unique(intersecting_idxs.begin(), intersecting_idxs.end()), intersecting_idxs.end());
-        for (size_t i : intersecting_idxs) {
-            polygons->emplace_back(std::move(convex_hulls_other[i]));
-        }
-        return false;
-    }
-    return true;
-}
-
-static inline bool sequential_print_vertical_clearance_valid(const Print &print)
-{
-	std::vector<const PrintInstance*> print_instances_ordered = sort_object_instances_by_model_order(print);
-	// Ignore the last instance printed.
-	print_instances_ordered.pop_back();
-	// Find the other highest instance.
-	auto it = std::max_element(print_instances_ordered.begin(), print_instances_ordered.end(), [](auto l, auto r) {
-		return l->print_object->height() < r->print_object->height();
-	});
-    return it == print_instances_ordered.end() || (*it)->print_object->height() <= scale_(print.config().extruder_clearance_height.value);
-}
 
 // Matches "G92 E0" with various forms of writing the zero and with an optional comment.
 boost::regex regex_g92e0 { "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
@@ -525,14 +443,19 @@ std::string Print::validate(std::vector<std::string>* warnings) const
     std::vector<unsigned int> extruders = this->extruders();
 
     if (warnings) {
-        for (size_t a=0; a<extruders.size(); ++a)
-            for (size_t b=a+1; b<extruders.size(); ++b)
-                if (std::abs(m_config.bed_temperature.get_at(extruders[a]) - m_config.bed_temperature.get_at(extruders[b])) > 15
-                 || std::abs(m_config.first_layer_bed_temperature.get_at(extruders[a]) - m_config.first_layer_bed_temperature.get_at(extruders[b])) > 15) {
-                    warnings->emplace_back("_BED_TEMPS_DIFFER");
-                    goto DONE;
+        if (m_config.bed_temperature_extruder == 0) {
+            for (size_t a = 0; a < extruders.size(); ++a) {
+                for (size_t b = a + 1; b < extruders.size(); ++b) {
+                    if (std::abs(m_config.bed_temperature.get_at(extruders[a]) - m_config.bed_temperature.get_at(extruders[b])) > 15
+                     || std::abs(m_config.first_layer_bed_temperature.get_at(extruders[a]) - m_config.first_layer_bed_temperature.get_at(extruders[b])) > 15) {
+                        warnings->emplace_back("_BED_TEMPS_DIFFER");
+                        goto DONE;
+                    }
                 }
-        DONE:;
+            }
+
+            DONE:;
+        }
 
         if (!this->has_same_shrinkage_compensations())
             warnings->emplace_back("_FILAMENT_SHRINKAGE_DIFFER");
@@ -543,15 +466,6 @@ std::string Print::validate(std::vector<std::string>* warnings) const
 
     if (extruders.empty())
         return _u8L("The supplied settings will cause an empty print.");
-
-    if (m_config.complete_objects) {
-        if (!sequential_print_horizontal_clearance_valid(*this, const_cast<Polygons*>(&m_sequential_print_clearance_contours)))
-            return _u8L("Some objects are too close; your extruder will collide with them.");
-        if (!sequential_print_vertical_clearance_valid(*this))
-            return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
-    }
-    else
-        const_cast<Polygons*>(&m_sequential_print_clearance_contours)->clear();
 
     if (m_config.avoid_crossing_perimeters && m_config.avoid_crossing_curled_overhangs) {
         return _u8L("Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be both enabled together.");
@@ -1061,6 +975,8 @@ void Print::process()
     if (conflictRes.has_value())
         BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
 
+    m_sequential_collision_detected =  config().complete_objects ? check_seq_conflict(model(), config()) : std::nullopt;
+
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
 }
 
@@ -1089,6 +1005,9 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
 
     if (m_conflict_result.has_value())
         result->conflict_result = *m_conflict_result;
+
+    if (result)
+        result->sequential_collision_detected = m_sequential_collision_detected;
 
     return path.c_str();
 }

@@ -2,10 +2,12 @@
  * Ported from t/retraction.t
  */
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
-#include <libslic3r/GCodeReader.hpp>
-#include <libslic3r/Config.hpp>
+#include "libslic3r/GCodeReader.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
+#include "libslic3r/Config.hpp"
 
 #include "test_data.hpp"
 #include <regex>
@@ -13,6 +15,7 @@
 
 using namespace Slic3r;
 using namespace Test;
+using namespace Catch;
 
 constexpr bool debug_files {false};
 
@@ -59,6 +62,10 @@ void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfi
         const double retract_restart_extra = config.option<ConfigOptionFloats>("retract_restart_extra")->get_at(tool);
         const double retract_restart_extra_toolchange = config.option<ConfigOptionFloats>("retract_restart_extra_toolchange")->get_at(tool);
 
+        const double travel_speed = config.opt_float("travel_speed");
+
+        const double feedrate = line.has_f() ? line.f() : self.f();
+
         if (line.dist_Z(self) != 0) {
             // lift move or lift + change layer
             const double retract_lift = config.option<ConfigOptionFloats>("retract_lift")->get_at(tool);
@@ -77,7 +84,7 @@ void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfi
                 lift_dist = line.dist_Z(self);
             }
             if (line.dist_Z(self) < 0) {
-                INFO("Must be lifted before going down.")
+                INFO("Must be lifted before going down.");
                 CHECK(lifted);
                 INFO("Going down by the same amount of the lift or by the amount needed to get to next layer");
                 CHECK((
@@ -87,9 +94,26 @@ void check_gcode(std::initializer_list<TestMesh> meshes, const DynamicPrintConfi
                 lift_dist = 0;
                 lifted = false;
             }
-            const double feedrate = line.has_f() ? line.f() : self.f();
-            INFO("move Z at travel speed");
-            CHECK(feedrate == Approx(config.opt_float("travel_speed") * 60));
+            const double travel_speed_z = config.opt_float("travel_speed_z");
+            if (travel_speed_z) {
+                Vec3d move{line.dist_X(self), line.dist_Y(self), line.dist_Z(self)};
+                const double move_u_z = move.z() / move.norm();
+                const double travel_speed_ = std::abs(travel_speed_z / move_u_z);
+                INFO("move Z feedrate Z component is less than or equal to travel_speed_z");
+                CHECK(feedrate * std::abs(move_u_z) <= Approx(travel_speed_z * 60).epsilon(GCodeFormatter::XYZ_EPSILON));
+                if (travel_speed_ < travel_speed) {
+                    INFO("move Z at travel speed Z");
+                    CHECK(feedrate == Approx(travel_speed_ * 60).epsilon(GCodeFormatter::XYZ_EPSILON));
+                    INFO("move Z feedrate Z component is equal to travel_speed_z");
+                    CHECK(feedrate * std::abs(move_u_z) == Approx(travel_speed_z * 60).epsilon(GCodeFormatter::XYZ_EPSILON));
+                } else {
+                    INFO("move Z at travel speed");
+                    CHECK(feedrate == Approx(travel_speed * 60).epsilon(GCodeFormatter::XYZ_EPSILON));
+                }
+            } else {
+                INFO("move Z at travel speed");
+                CHECK(feedrate == Approx(travel_speed * 60).epsilon(GCodeFormatter::XYZ_EPSILON));
+            }
         }
         if (line.retracting(self)) {
             retracted[tool] = true;
@@ -135,11 +159,6 @@ void test_slicing(std::initializer_list<TestMesh> meshes, DynamicPrintConfig& co
         check_gcode(meshes, config, duplicate);
     }
 
-    SECTION("Negative restart extra length") {
-        config.set_deserialize_strict({{ "retract_restart_extra", "-1" }});
-        check_gcode(meshes, config, duplicate);
-    }
-
     SECTION("Retract_lift") {
         config.set_deserialize_strict({{ "retract_lift", "1,2" }});
         check_gcode(meshes, config, duplicate);
@@ -147,7 +166,7 @@ void test_slicing(std::initializer_list<TestMesh> meshes, DynamicPrintConfig& co
 
 }
 
-TEST_CASE("Slicing with retraction and lifing", "[retraction]") {
+TEST_CASE("Slicing with retraction and lifting", "[retraction]") {
     DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
     config.set_deserialize_strict({
 	    { "nozzle_diameter", "0.6,0.6,0.6,0.6" },
@@ -158,6 +177,37 @@ TEST_CASE("Slicing with retraction and lifing", "[retraction]") {
         { "retract_before_travel", "3" },
         { "retract_layer_change", "1" },
         { "only_retract_when_crossing_perimeters", 0 },
+    });
+
+    SECTION("Standard run") {
+        test_slicing({TestMesh::cube_20x20x20}, config);
+    }
+    SECTION("With duplicate cube") {
+        test_slicing({TestMesh::cube_20x20x20}, config, 2);
+    }
+    SECTION("Dual extruder with multiple skirt layers") {
+        config.set_deserialize_strict({
+            {"infill_extruder", 2},
+            {"skirts", 4},
+            {"skirt_height", 3},
+        });
+        test_slicing({TestMesh::cube_20x20x20}, config);
+    }
+}
+
+TEST_CASE("Slicing with retraction and lifting with travel_speed_z=10", "[retraction]") {
+    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+    config.set_deserialize_strict({
+	    { "nozzle_diameter", "0.6,0.6,0.6,0.6" },
+        { "first_layer_height", config.opt_float("layer_height") },
+        { "first_layer_speed", "100%" },
+        { "start_gcode", "" },  // To avoid dealing with the nozzle lift in start G-code
+        { "retract_length", "1.5" },
+        { "retract_before_travel", "3" },
+        { "retract_layer_change", "1" },
+        { "only_retract_when_crossing_perimeters", 0 },
+        { "travel_speed", "600" },
+        { "travel_speed_z", "10" },
     });
 
     SECTION("Standard run") {

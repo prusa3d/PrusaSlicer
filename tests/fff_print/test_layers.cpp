@@ -2,11 +2,13 @@
 * Ported from t/layers.t
 */
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include "test_data.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::Test;
+using namespace Catch;
 
 void check_layers(const DynamicPrintConfig& config) {
 	GCodeReader parser;
@@ -27,10 +29,10 @@ void check_layers(const DynamicPrintConfig& config) {
     const double layer_height = config.opt_float("layer_height");
     INFO("Correct first layer height.");
     CHECK(z.at(0) == Approx(first_layer_height + z_offset));
-    INFO("Correct second layer height")
+    INFO("Correct second layer height");
     CHECK(z.at(1) == Approx(first_layer_height + layer_height + z_offset));
 
-    INFO("Correct layer height")
+    INFO("Correct layer height");
     for (const double increment : tcb::span{increments}.subspan(1)) {
         CHECK(increment == Approx(layer_height));
     }

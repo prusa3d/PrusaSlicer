@@ -260,7 +260,7 @@ static t_config_option_keys print_config_diffs(const StaticPrintConfig     &curr
 }
 
 
-SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig config)
+SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings)
 {
 #ifdef _DEBUG
     check_model_ids_validity(model);
@@ -695,8 +695,8 @@ std::string SLAPrint::validate(std::vector<std::string>*) const
         }
     }
 
-    if ((!m_material_config.use_tilt.get_at(0) && m_material_config.tower_hop_height.get_at(0) == 0)
-        || (!m_material_config.use_tilt.get_at(1) && m_material_config.tower_hop_height.get_at(1) == 0))
+    if ((!m_material_config.use_tilt.get_at(0) && is_approx(m_material_config.tower_hop_height.get_at(0), 0.))
+        || (!m_material_config.use_tilt.get_at(1) && is_approx(m_material_config.tower_hop_height.get_at(1), 0.)))
         return _u8L("Disabling the 'Use tilt' function causes the object to separate away from the film in the "
                     "vertical direction only. Therefore, it is necessary to set the 'Tower hop height' parameter "
                     "to reasonable value. The recommended value is 5 mm.");

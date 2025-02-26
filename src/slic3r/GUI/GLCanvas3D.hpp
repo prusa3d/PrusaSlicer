@@ -373,7 +373,8 @@ class GLCanvas3D
         SlaSupportsOutside,
         SomethingNotShown,
         ObjectClashed,
-        GCodeConflict
+        GCodeConflict,
+        SequentialCollision
     };
 
     class RenderStats
@@ -624,34 +625,6 @@ public:
 
 private:
 
-    class SequentialPrintClearance
-    {
-        GLModel m_fill;
-        // list of unique contours
-        std::vector<GLModel> m_contours;
-        // list of transforms used to render the contours
-        std::vector<std::pair<size_t, Transform3d>> m_instances;
-        bool m_evaluating{ false };
-        bool m_dragging{ false };
-        bool m_first_displacement{ true };
-
-        std::vector<std::pair<Pointf3s, Transform3d>> m_hulls_2d_cache;
-
-    public:
-        void set_contours(const ContoursList& contours, bool generate_fill);
-        void update_instances_trafos(const std::vector<Transform3d>& trafos);
-        void render();
-        bool empty() const { return m_contours.empty(); }
-
-        void start_dragging() { m_dragging = true; }
-        bool is_dragging() const { return m_dragging; }
-        void stop_dragging() { m_dragging = false; }
-
-        friend class GLCanvas3D;
-    };
-
-    SequentialPrintClearance m_sequential_print_clearance;
-
     struct ToolbarHighlighter
     {
         void set_timer_owner(wxEvtHandler* owner, int timerid = wxID_ANY) { m_timer.SetOwner(owner, timerid); }
@@ -755,6 +728,8 @@ public:
     const libvgcode::Interval& get_gcode_view_enabled_range() const { return m_gcode_viewer.get_gcode_view_enabled_range(); }
     const libvgcode::Interval& get_gcode_view_visible_range() const { return m_gcode_viewer.get_gcode_view_visible_range(); }
     const libvgcode::PathVertex& get_gcode_vertex_at(size_t id) const { return m_gcode_viewer.get_gcode_vertex_at(id); }
+
+    std::optional<std::unique_ptr<GLModel>> get_current_marker_model() const;
 
     void toggle_sla_auxiliaries_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1);
     void toggle_model_objects_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1, const ModelVolume* mv = nullptr);
@@ -989,39 +964,6 @@ public:
 #endif
     }
 
-    void reset_sequential_print_clearance() {
-        m_sequential_print_clearance.m_evaluating = false;
-        if (m_sequential_print_clearance.is_dragging())
-            m_sequential_print_clearance.m_first_displacement = true;
-        else
-            m_sequential_print_clearance.set_contours(ContoursList(), false);
-        set_as_dirty();
-        request_extra_frame();
-    }
-
-    void set_sequential_print_clearance_contours(const ContoursList& contours, bool generate_fill) {
-        m_sequential_print_clearance.set_contours(contours, generate_fill);
-        if (generate_fill)
-            m_sequential_print_clearance.m_evaluating = false;
-        set_as_dirty();
-        request_extra_frame();
-    }
-
-    bool is_sequential_print_clearance_empty() const {
-        return m_sequential_print_clearance.empty();
-    }
-
-    bool is_sequential_print_clearance_evaluating() const {
-        return m_sequential_print_clearance.m_evaluating;
-    }
-
-    void update_sequential_clearance(bool force_contours_generation);
-    void set_sequential_clearance_as_evaluating() {
-        m_sequential_print_clearance.m_evaluating = true;
-        set_as_dirty();
-        request_extra_frame();
-    }
-
     const Print* fff_print() const;
     const SLAPrint* sla_print() const;
 
@@ -1067,7 +1009,6 @@ private:
     void _render_gcode() { m_gcode_viewer.render(); }
     void _render_gcode_cog() { m_gcode_viewer.render_cog(); }
     void _render_selection();
-    void _render_sequential_clearance();
     bool check_toolbar_icon_size(float init_scale, float& new_scale_to_save, bool is_custom, int counter = 3);
 #if ENABLE_RENDER_SELECTION_CENTER
     void _render_selection_center() { m_selection.render_center(m_gizmos.is_dragging()); }

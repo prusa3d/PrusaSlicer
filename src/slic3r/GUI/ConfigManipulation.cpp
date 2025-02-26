@@ -317,7 +317,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, has_solid_infill);
 
     for (auto el : { "fill_angle", "bridge_angle", "infill_extrusion_width",
-                    "infill_speed", "bridge_speed" })
+                    "infill_speed", "bridge_speed", "over_bridge_speed" })
         toggle_field(el, have_infill || has_solid_infill);
 
     const bool has_ensure_vertical_shell_thickness = config->opt_enum<EnsureVerticalShellThickness>("ensure_vertical_shell_thickness") != EnsureVerticalShellThickness::Disabled;
@@ -388,10 +388,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "ironing_type", "ironing_flowrate", "ironing_spacing", "ironing_speed" })
     	toggle_field(el, has_ironing);
 
-    bool have_sequential_printing = config->opt_bool("complete_objects");
-    for (auto el : { "extruder_clearance_radius", "extruder_clearance_height" })
-        toggle_field(el, have_sequential_printing);
-
     bool have_ooze_prevention = config->opt_bool("ooze_prevention");
     toggle_field("standby_temperature_delta", have_ooze_prevention);
 
@@ -399,9 +395,6 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "wipe_tower_width",  "wipe_tower_brim_width", "wipe_tower_cone_angle",
                      "wipe_tower_extra_spacing", "wipe_tower_extra_flow", "wipe_tower_bridging", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming" })
         toggle_field(el, have_wipe_tower);
-
-    bool have_non_zero_mmu_segmented_region_max_width = config->opt_float("mmu_segmented_region_max_width") > 0.;
-    toggle_field("mmu_segmented_region_interlocking_depth", have_non_zero_mmu_segmented_region_max_width);
 
     toggle_field("avoid_crossing_curled_overhangs", !config->opt_bool("avoid_crossing_perimeters"));
     toggle_field("avoid_crossing_perimeters", !config->opt_bool("avoid_crossing_curled_overhangs"));
@@ -427,6 +420,17 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("scarf_seam_length", uses_scarf_seam);
     toggle_field("scarf_seam_max_segment_length", uses_scarf_seam);
     toggle_field("scarf_seam_on_inner_perimeters", uses_scarf_seam);
+
+    bool use_beam_interlocking = config->opt_bool("interlocking_beam");
+    toggle_field("interlocking_beam_width", use_beam_interlocking);
+    toggle_field("interlocking_orientation", use_beam_interlocking);
+    toggle_field("interlocking_beam_layer_count", use_beam_interlocking);
+    toggle_field("interlocking_depth", use_beam_interlocking);
+    toggle_field("interlocking_boundary_avoidance", use_beam_interlocking);
+    toggle_field("mmu_segmented_region_max_width", !use_beam_interlocking);
+
+    bool have_non_zero_mmu_segmented_region_max_width = !use_beam_interlocking && config->opt_float("mmu_segmented_region_max_width") > 0.;
+    toggle_field("mmu_segmented_region_interlocking_depth", have_non_zero_mmu_segmented_region_max_width);
 }
 
 void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)

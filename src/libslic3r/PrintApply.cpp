@@ -1050,7 +1050,23 @@ static PrintObjectRegions* generate_print_object_regions(
     return out.release();
 }
 
-Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_config)
+static void validate_print_config_change(const PrintConfig &old_config, const DynamicPrintConfig &new_config, std::vector<std::string> *warnings)
+{
+    if (warnings == nullptr) {
+        return;
+    }
+
+    if (old_config.bed_temperature_extruder > 0 && old_config.bed_temperature_extruder == new_config.option("bed_temperature_extruder")->getInt()) {
+        // Bed temperature extruder is set, and it didn't change with the new config.
+        if (old_config.bed_temperature.values != new_config.option("bed_temperature")->getInts()
+         || old_config.first_layer_bed_temperature.values != new_config.option("first_layer_bed_temperature")->getInts()) {
+            // When any bed temperature changes, we warn the user that the bed temperature extruder may need to be changed.
+            warnings->emplace_back("_BED_TEMPS_CHANGED");
+        }
+    }
+}
+
+Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_config, std::vector<std::string> *warnings)
 {
 #ifdef _DEBUG
     check_model_ids_validity(model);
@@ -1075,6 +1091,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     // Collect changes to object and region configs.
     t_config_option_keys object_diff      = m_default_object_config.diff(new_full_config);
     t_config_option_keys region_diff      = m_default_region_config.diff(new_full_config);
+
+    // Check if the print config change will produce any warnings.
+    validate_print_config_change(m_config, new_full_config, warnings);
 
     // Do not use the ApplyStatus as we will use the max function when updating apply_status.
     unsigned int apply_status = APPLY_STATUS_UNCHANGED;
@@ -1123,10 +1142,13 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     }
 
     // Check the position and rotation of the wipe tower.
-    if (model.wipe_tower() != m_model.wipe_tower()) {
+    if (model.wipe_tower() != m_model.wipe_tower())
         update_apply_status(this->invalidate_step(psSkirtBrim));
-    }
     m_model.wipe_tower() = model.wipe_tower();
+    // Inform the placeholder parser about the position and rotation of the wipe tower.
+    m_placeholder_parser.set("wipe_tower_x", model.wipe_tower().position.x());
+    m_placeholder_parser.set("wipe_tower_y", model.wipe_tower().position.y());
+    m_placeholder_parser.set("wipe_tower_rotation_angle", model.wipe_tower().rotation);
 
     ModelObjectStatusDB model_object_status_db;
 
@@ -1163,8 +1185,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 
             update_apply_status(
                 (num_extruders_changed || tool_change_differ || multi_extruder_differ || color_change_differ) ?
-            	// The Tool Ordering and the Wipe Tower are no more valid.
-            	this->invalidate_steps({ psWipeTower, psGCodeExport }) :
+                // The Tool Ordering and the Wipe Tower are no more valid.
+                // Because G-code export (PlaceholderParser) accesses the first layer convex hull, we need to also invalidate psSkirtBrim.
+            	this->invalidate_steps({ psWipeTower, psGCodeExport, psSkirtBrim }) :
             	// There is no change in Tool Changes stored in custom_gcode_per_print_z, therefore there is no need to update Tool Ordering.
             	this->invalidate_step(psGCodeExport));
             m_model.custom_gcode_per_print_z() = model.custom_gcode_per_print_z();
@@ -1336,7 +1359,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             if (model_object.instances.size() != model_object_new.instances.size() || 
             	! std::equal(model_object.instances.begin(), model_object.instances.end(), model_object_new.instances.begin(), [](auto l, auto r){ return l->id() == r->id(); })) {
             	// G-code generator accesses model_object.instances to generate sequential print ordering matching the Plater object list.
-            	update_apply_status(this->invalidate_step(psGCodeExport));
+                // WipingExtrusions::mark_wiping_extrusions() precalculate data based on the number of instances when wiping into infill/object is enabled.
+                update_apply_status(this->invalidate_steps({psGCodeExport, psWipeTower}));
+
 	            model_object.clear_instances();
 	            model_object.instances.reserve(model_object_new.instances.size());
 	            for (const ModelInstance *model_instance : model_object_new.instances) {

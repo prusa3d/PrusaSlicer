@@ -27,13 +27,14 @@ class Line;
 	}
 
 class ExPolygon;
+struct LayerIsland;
 
 using ExPolygons = std::vector<ExPolygon>;
 
 // Used by chain_expolygons()
-std::vector<size_t> 				 chain_points(const Points &points, Point *start_near = nullptr);
+std::vector<size_t> 				 chain_points(const Points &points, const Point *start_near = nullptr);
 // Used to give layer islands a print order.
-std::vector<size_t> 				 chain_expolygons(const ExPolygons &expolygons, Point *start_near = nullptr);
+std::vector<size_t> 				 chain_expolygons(const ExPolygons &expolygons);
 
 // Chain extrusion entities by a shortest distance. Returns the ordered extrusions together with a "reverse" flag.
 // Set input "reversed" to true if the vector of "entities" is to be considered to be reversed once already.
@@ -67,6 +68,11 @@ std::vector<const PrintInstance*> 	 chain_print_object_instances(const Print &pr
 
 // Chain lines into polylines.
 Polylines 							 chain_lines(const std::vector<Line> &lines, const double point_distance_epsilon);
+
+// Chain and reorder layer islands by the shortest distance.
+std::vector<size_t>                  chain_layer_islands(const std::vector<std::reference_wrapper<const LayerIsland>> &islands, const Point *start_near = nullptr);
+void                                 reorder_layer_islands(std::vector<std::reference_wrapper<const LayerIsland>> &islands, const std::vector<size_t> &chain);
+void                                 chain_and_reorder_layer_islands(std::vector<std::reference_wrapper<const LayerIsland>> &islands, const Point *start_near = nullptr);
 
 } // namespace Slic3r
 

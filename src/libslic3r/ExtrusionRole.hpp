@@ -31,6 +31,7 @@ enum class ExtrusionRoleModifier : uint16_t {
     Solid,
     Ironing,
     Bridge,
+    OverBridge,
 // 3) Special types
     // Indicator that the extrusion role was mixed from multiple differing extrusion roles,
     // for example from Support and SupportInterface.
@@ -62,6 +63,7 @@ struct ExtrusionRole : public ExtrusionRoleModifiers
     static constexpr const ExtrusionRoleModifiers SolidInfill{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid };
     // Top solid infill (visible).
     //FIXME why there is no bottom solid infill type?
+    static constexpr const ExtrusionRoleModifiers InfillOverBridge{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid | ExtrusionRoleModifier::OverBridge };
     static constexpr const ExtrusionRoleModifiers TopSolidInfill{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid | ExtrusionRoleModifier::External };
     // Ironing infill at the top surfaces.
     static constexpr const ExtrusionRoleModifiers Ironing{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid | ExtrusionRoleModifier::Ironing | ExtrusionRoleModifier::External };

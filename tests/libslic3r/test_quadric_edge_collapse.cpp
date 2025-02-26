@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <igl/qslim.h>
 #include <test_utils.hpp>
 
@@ -240,7 +240,7 @@ TEST_CASE("Simplify frog_legs.obj to 5% by Quadric edge collapse", "[its][quadri
     Private::is_better_similarity(mesh.its, its, Private::frog_leg_5);
 }
 
-TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
+TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[its]")
 {
     std::string  obj_filename    = "frog_legs.obj";
     TriangleMesh mesh            = load_model(obj_filename);

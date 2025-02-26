@@ -171,6 +171,9 @@ void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Tra
         shader->set_uniform("projection_matrix", projection_matrix);
         glsafe(::glEnable(GL_BLEND));
         glsafe(::glEnable(GL_DEPTH_TEST));
+        glsafe(::glDepthMask(GL_FALSE));
+        const bool old_cullface = ::glIsEnabled(GL_CULL_FACE);
+        glsafe(::glDisable(GL_CULL_FACE));
         glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         glsafe(::glBindTexture(GL_TEXTURE_2D, m_digits_texture->get_id()));
 
@@ -187,13 +190,16 @@ void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Tra
             mat.translate(s_multiple_beds.get_bed_translation(i));
             if (build_volume().type() != BuildVolume::Type::Circle)
                 mat.translate(Vec3d(0.3 * size_x, 0.3 * size_x, 0.));
-            mat.translate(Vec3d(0., 0., 0.5));            
+            mat.translate(Vec3d(0., 0., 0.5 * GROUND_Z));            
             mat.scale(Vec3d(size_x, size_x * aspect, 1.));
 
             shader->set_uniform("view_model_matrix", mat);
             m_digits_models[i + 1]->render();
         }
         glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
+        if (old_cullface)
+            glsafe(::glEnable(GL_CULL_FACE));
+        glsafe(::glDepthMask(GL_TRUE));
         glsafe(::glDisable(GL_DEPTH_TEST));
         shader->stop_using();
     }

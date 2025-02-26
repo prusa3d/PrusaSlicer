@@ -71,7 +71,7 @@ template<class T, class TT = T> using WritableDataStoreOnly = std::enable_if_t<I
 template<class T, class ArrItem>
 void set_data(ArrItem &itm, const std::string &key, T &&data)
 {
-    WritableDataStoreTraits<ArrItem>::template set(itm, key, std::forward<T>(data));
+    WritableDataStoreTraits<ArrItem>::template set<>(itm, key, std::forward<T>(data));
 }
 
 template<class T> constexpr bool IsReadWritableDataStore = IsDataStore<T> && IsWritableDataStore<T>;

@@ -1363,7 +1363,9 @@ static void chain_open_polylines_close_gaps(std::vector<OpenPolyline>           
                     opl->points.pop_back();
                 } else {
                     // The end points are different, keep both of them.
-                    midpoint_inserted = handle_color_at_gap_between_open_polylines<mesh_info>(*opl, opl->points.front(), opl->colors.front());
+                    if constexpr (mesh_info == AdditionalMeshInfo::Color) {
+                        midpoint_inserted = handle_color_at_gap_between_open_polylines<mesh_info>(*opl, opl->points.front(), opl->colors.front());
+                    }
                 }
 
                 // When we split the gap into two pieces by adding a midpoint, then a valid polygon has at least 4 points.

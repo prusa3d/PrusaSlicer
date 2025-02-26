@@ -22,7 +22,7 @@ class CodeChalengeGenerator
 public:
     CodeChalengeGenerator() {}
     ~CodeChalengeGenerator() {}
-    std::string generate_chalenge(const std::string& verifier);
+    std::string generate_challenge(const std::string& verifier);
     std::string generate_verifier();
 private:
     std::string generate_code_verifier(size_t length);
@@ -32,6 +32,14 @@ private:
 
 class UserAccountCommunication : public wxEvtHandler 
 {
+ public:
+    struct StoreData {
+        std::string access_token;
+        std::string refresh_token;
+        std::string shared_session_key;
+        std::string next_timeout;
+        std::string master_pid;
+    };
 public:
     UserAccountCommunication(wxEvtHandler* evt_handler, AppConfig* app_config);
     ~UserAccountCommunication();
@@ -49,7 +57,9 @@ public:
     // Trigger function starts various remote operations
     void enqueue_connect_status_action();
     void enqueue_connect_printer_models_action();
-    void enqueue_avatar_action(const std::string& url);
+    void enqueue_avatar_old_action(const std::string& url);
+    void enqueue_avatar_new_action(const std::string& url);
+    void enqueue_id_action();
     void enqueue_test_connection();
     void enqueue_printer_data_action(const std::string& uuid);
     void enqueue_refresh();
@@ -63,7 +73,7 @@ public:
 
     void on_activate_app(bool active);
 
-    void set_username(const std::string& username);
+    void set_username(const std::string& username, bool store);
     void set_remember_session(bool b);
     bool get_remember_session() const {return m_remember_session; }
 
@@ -78,6 +88,10 @@ public:
     void set_refresh_time(int seconds);
     void on_token_timer(wxTimerEvent& evt);
     void on_polling_timer(wxTimerEvent& evt);
+    void set_tokens(const StoreData store_data);
+
+    void on_race_lost(); // T4
+    void on_store_read_request();
 private:
     std::unique_ptr<UserAccountSession>     m_session;
     std::thread                             m_thread;
@@ -86,7 +100,7 @@ private:
     bool                                    m_thread_stop { false };
     bool                                    m_thread_wakeup{ false };
     bool                                    m_window_is_active{ true };
-    wxTimer*                                m_polling_timer;
+    std::unique_ptr<wxTimer>                m_polling_timer;
 
     std::string                             m_code_verifier;
     wxEvtHandler*                           m_evt_handler;
@@ -95,7 +109,7 @@ private:
     std::string                             m_username;
     bool                                    m_remember_session { true }; // if default is true, on every login Remember me will be checked.
 
-    wxTimer*                                m_token_timer;
+    std::unique_ptr<wxTimer>                m_token_timer;
     std::time_t                             m_next_token_refresh_at{0};
 
     void wakeup_session_thread();
@@ -103,8 +117,15 @@ private:
     void login_redirect();
     std::string client_id() const { return Utils::ServiceConfig::instance().account_client_id(); }
 
+    // master / slave logic
+    std::unique_ptr<wxTimer> m_slave_read_timer; // T2 timer
+    std::unique_ptr<wxTimer> m_after_race_lost_timer; // T5 timer
+    int m_last_token_duration_seconds {0};
     
-    
+    void on_slave_read_timer(wxTimerEvent& evt); // T2
+    void read_stored_data(StoreData& result);
+    void enqueue_refresh_race(const std::string refresh_token_from_store = std::string()); // T3
+    void on_after_race_lost_timer(wxTimerEvent& evt); // T4
 };
 }
 }

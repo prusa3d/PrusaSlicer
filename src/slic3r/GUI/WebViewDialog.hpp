@@ -13,6 +13,8 @@
 #include <wx/infobar.h>
 #endif
 
+#include <atomic>
+
 class wxWebView;
 class wxWebViewEvent;
 
@@ -30,7 +32,7 @@ public:
     virtual void on_show(wxShowEvent& evt) {};
     virtual void on_script_message(wxWebViewEvent& evt);
 
-    void on_idle(wxIdleEvent& evt);
+    virtual void on_idle(wxIdleEvent& evt);
     void on_url(wxCommandEvent& evt);
     void on_back_button(wxCommandEvent& evt);
     void on_forward_button(wxCommandEvent& evt);
@@ -93,7 +95,7 @@ protected:
 class PrinterPickWebViewDialog : public WebViewDialog, public ConnectRequestHandler
 {
 public:
-    PrinterPickWebViewDialog(wxWindow* parent, std::string& ret_val);
+    PrinterPickWebViewDialog(wxWindow* parent, std::string& ret_val, bool multiple_beds);
     void on_show(wxShowEvent& evt) override;
     void on_script_message(wxWebViewEvent& evt) override;
 protected:
@@ -108,6 +110,7 @@ protected:
     void on_connect_action_close_dialog(const std::string& message_data) override {assert(false);}
 private:
     std::string& m_ret_val;
+    bool m_multiple_beds;
 };
 
 class PrintablesConnectUploadDialog : public WebViewDialog, public ConnectRequestHandler
@@ -124,7 +127,7 @@ protected:
     void on_reload_event(const std::string& message_data) override;
     void run_script_bridge(const wxString &script) override { run_script(script); }
     void on_connect_action_close_dialog(const std::string& message_data) override;
-};
+   };
 
 class LoginWebViewDialog : public WebViewDialog
 {
@@ -132,10 +135,17 @@ public:
     LoginWebViewDialog(wxWindow *parent, std::string &ret_val, const wxString& url, wxEvtHandler* evt_handler);
     void on_navigation_request(wxWebViewEvent &evt) override;
     void on_dpi_changed(const wxRect &suggested_rect) override;
+    void on_idle(wxIdleEvent& evt) override;
 private:
     std::string&    m_ret_val;
     wxEvtHandler*   p_evt_handler;
     bool            m_evt_sent{ false };
+
+    bool                m_waiting_for_counters {false};
+    std::atomic<size_t> m_atomic_counter;
+    size_t              m_counter_to_match;
+    wxTimer             m_force_quit_timer;
+    bool                m_force_quit{false};
 };
 
 } // GUI

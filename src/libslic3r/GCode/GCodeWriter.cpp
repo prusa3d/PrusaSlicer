@@ -295,19 +295,25 @@ std::string GCodeWriter::set_speed(double F, const std::string_view comment, con
     return w.string();
 }
 
-std::string GCodeWriter::get_travel_to_xy_gcode(const Vec2d &point, const std::string_view comment) const
+std::string GCodeWriter::travel_to_xy_force(const Vec2d &point, const std::string_view comment)
 {
     GCodeG1Formatter w;
     w.emit_xy(point);
     w.emit_f(this->config.travel_speed.value * 60.0);
     w.emit_comment(this->config.gcode_comments, comment);
+    m_pos.head<2>() = point.head<2>();
     return w.string();
 }
 
 std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string_view comment)
 {
-    m_pos.head<2>() = point.head<2>();
-    return this->get_travel_to_xy_gcode(point, comment);
+    if (std::abs(point.x() - m_pos.x()) < GCodeFormatter::XYZ_EPSILON
+        && std::abs(point.y() - m_pos.y()) < GCodeFormatter::XYZ_EPSILON)
+    {
+        return "";
+    } else {
+        return this->travel_to_xy_force(point, comment);
+    }
 }
 
 std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment)
@@ -329,51 +335,60 @@ std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij
 
 std::string GCodeWriter::travel_to_xyz(const Vec3d &to, const std::string_view comment)
 {
-    if (std::abs(to.x() - m_pos.x()) < EPSILON && std::abs(to.y() - m_pos.y()) < EPSILON) {
-        return this->travel_to_z(to.z(), comment);
-    } else if (std::abs(to.z() - m_pos.z()) < EPSILON) {
-        return this->travel_to_xy(to.head<2>(), comment);
+    if (std::abs(to.x() - m_pos.x()) < GCodeFormatter::XYZ_EPSILON
+        && std::abs(to.y() - m_pos.y()) < GCodeFormatter::XYZ_EPSILON
+        && std::abs(to.z() - m_pos.z()) < GCodeFormatter::XYZ_EPSILON)
+    {
+        return "";
+    } else if (
+        std::abs(to.x() - m_pos.x()) < GCodeFormatter::XYZ_EPSILON
+        && std::abs(to.y() - m_pos.y()) < GCodeFormatter::XYZ_EPSILON)
+    {
+        return this->travel_to_z_force(to.z(), comment);
+    } else if (
+        std::abs(to.z() - m_pos.z()) < GCodeFormatter::XYZ_EPSILON)
+    {
+        return this->travel_to_xy_force(to.head<2>(), comment);
     } else {
-        std::string result{this->get_travel_to_xyz_gcode(to, comment)};
-        m_pos = to;
-        return result;
+        return this->travel_to_xyz_force(to, comment);
     }
 }
 
-std::string GCodeWriter::get_travel_to_xyz_gcode(const Vec3d &to, const std::string_view comment) const {
+std::string GCodeWriter::travel_to_xyz_force(const Vec3d &to, const std::string_view comment) {
     GCodeG1Formatter w;
     w.emit_xyz(to);
 
-    double speed_z = this->config.travel_speed_z.value;
-    if (speed_z == 0.)
-        speed_z = this->config.travel_speed.value;
+    double speed = this->config.travel_speed.value;
+    const double speed_z = this->config.travel_speed_z.value;
 
-    const double distance_xy{(to.head<2>() - m_pos.head<2>()).norm()};
-    const double distnace_z{std::abs(to.z() - m_pos.z())};
-    const double time_z = distnace_z / speed_z;
-    const double time_xy = distance_xy / this->config.travel_speed.value;
-    const double factor = time_z > 0 ? time_xy / time_z : 1;
-    if (factor < 1) {
-        w.emit_f(std::floor((this->config.travel_speed.value * factor  + (1 - factor) * speed_z) * 60.0));
-    } else {
-        w.emit_f(this->config.travel_speed.value * 60.0);
+    if (speed_z) {
+        const Vec3d move{to - m_pos};
+        const double distance{move.norm()};
+        const double abs_unit_vector_z{std::abs(move.z())/distance};
+        // De-compose speed into z vector component according to the movement unit vector.
+        const double speed_vector_z{abs_unit_vector_z * speed};
+        if (speed_vector_z > speed_z) {
+            // Re-compute speed so that the z component is exactly speed_z.
+            speed = speed_z / abs_unit_vector_z;
+        }
     }
+    w.emit_f(speed * 60.0);
 
     w.emit_comment(this->config.gcode_comments, comment);
+    m_pos = to;
     return w.string();
 }
 
 std::string GCodeWriter::travel_to_z(double z, const std::string_view comment)
 {
-    if (std::abs(m_pos.z() - z) < EPSILON) {
+    if (std::abs(m_pos.z() - z) < GCodeFormatter::XYZ_EPSILON) {
         return "";
     } else {
-        m_pos.z() = z;
-        return this->get_travel_to_z_gcode(z, comment);
+        return this->travel_to_z_force(z, comment);
     }
 }
 
-std::string GCodeWriter::get_travel_to_z_gcode(double z, const std::string_view comment) const
+std::string GCodeWriter::travel_to_z_force(double z, const std::string_view comment)
 {
     double speed = this->config.travel_speed_z.value;
     if (speed == 0.)
@@ -383,6 +398,7 @@ std::string GCodeWriter::get_travel_to_z_gcode(double z, const std::string_view 
     w.emit_z(z);
     w.emit_f(speed * 60.0);
     w.emit_comment(this->config.gcode_comments, comment);
+    m_pos.z() = z;
     return w.string();
 }
 

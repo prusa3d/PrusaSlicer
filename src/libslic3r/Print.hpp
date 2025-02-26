@@ -608,7 +608,7 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
 
-    ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
+    ApplyStatus         apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings = nullptr) override;
     void                set_task(const TaskParams &params) override { PrintBaseWithState<PrintStep, psCount>::set_task_impl(params, m_objects); }
     void                process() override;
     void                finalize() override { PrintBaseWithState<PrintStep, psCount>::finalize_impl(m_objects); }
@@ -688,9 +688,6 @@ public:
     const PrintRegion&          get_print_region(size_t idx) const  { return *m_print_regions[idx]; }
     const ToolOrdering&         get_tool_ordering() const { return m_wipe_tower_data.tool_ordering; }
 
-    const Polygons& get_sequential_print_clearance_contours() const { return m_sequential_print_clearance_contours; }
-    static bool sequential_print_horizontal_clearance_valid(const Print& print, Polygons* polygons = nullptr);
-
     // Returns if all used filaments have same shrinkage compensations.
     bool has_same_shrinkage_compensations() const;
 
@@ -744,9 +741,6 @@ private:
     // Estimated print time, filament consumed.
     PrintStatistics                         m_print_statistics;
 
-    // Cache to store sequential print clearance contours
-    Polygons m_sequential_print_clearance_contours;
-
     // To allow GCode to set the Print's GCodeExport step status.
     friend class GCodeGenerator;
     // To allow GCodeProcessor to emit warnings.
@@ -755,6 +749,7 @@ private:
     friend class PrintObject;
 
     ConflictResultOpt m_conflict_result;
+    std::optional<std::pair<std::string, std::string>> m_sequential_collision_detected; // names of objects (hit first when printing second)
 };
 
 } /* slic3r_Print_hpp_ */

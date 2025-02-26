@@ -330,7 +330,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
                 % model.thumbnail
                 % vendor.id
                 % model.id;
-            load_bitmap(Slic3r::var(PRINTER_PLACEHOLDER), bitmap, bitmap_width);
+            load_bitmap(GUI::from_u8(Slic3r::var(PRINTER_PLACEHOLDER)), bitmap, bitmap_width);
         }
         
         wxStaticText* title = new wxStaticText(this, wxID_ANY, from_u8(model.name), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);

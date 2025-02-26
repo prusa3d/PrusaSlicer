@@ -704,7 +704,8 @@ namespace DoExport {
 	                if (region.config().get_abs_value("infill_speed") == 0 ||
 	                    region.config().get_abs_value("solid_infill_speed") == 0 ||
 	                    region.config().get_abs_value("top_solid_infill_speed") == 0 ||
-                        region.config().get_abs_value("bridge_speed") == 0)
+                        region.config().get_abs_value("bridge_speed") == 0 ||
+                        region.config().get_abs_value("over_bridge_speed") == 0)
                     {
                         // Minimal volumetric flow should not be calculated over ironing extrusions.
                         // Use following lambda instead of the built-it method.
@@ -1214,7 +1215,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     // Enable ooze prevention if configured so.
     DoExport::init_ooze_prevention(print, m_ooze_prevention);
 
-    std::string start_gcode = this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, initial_extruder_id);
+    const std::string start_gcode = this->_process_start_gcode(print, initial_extruder_id);
 
     this->_print_first_layer_chamber_temperature(file, print, start_gcode, config().chamber_temperature.get_at(initial_extruder_id), false, false);
     this->_print_first_layer_bed_temperature(file, print, start_gcode, initial_extruder_id, true);
@@ -1276,7 +1277,9 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
                 file.write(this->retract_and_wipe());
                 file.write(m_label_objects.maybe_stop_instance());
                 const double last_z{this->writer().get_position().z()};
-                file.write(this->writer().get_travel_to_z_gcode(last_z, "ensure z position"));
+                file.write(this->writer().travel_to_z_force(last_z, "ensure z position"));
+                const double travel_z = std::max(last_z, double(m_max_layer_z));
+                file.write(this->writer().travel_to_z_force(travel_z, "ensure z position to clear all already printed objects"));
                 const Vec3crd from{to_3d(*this->last_position, scaled(this->m_last_layer_z))};
                 const Vec3crd to{0, 0, scaled(this->m_last_layer_z)};
                 file.write(this->travel_to(from, to, ExtrusionRole::None, "move to origin position for next object", [](){return "";}));
@@ -1356,8 +1359,15 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
                     } else {
                         // Just continue printing, no action necessary.
                     }
-
                 }
+
+                // When priming is enabled, extruders are ordered (inside ToolOrdering::collect_extruder_statistics())
+                // in such a way that the last one is the first printing extruder (actually printing, not just priming).
+                const unsigned int first_printing_extruder_after_priming = tool_ordering.all_extruders().back();
+
+                // Because CoolingBuffer doesn't process the priming of extruders, set the current extruder
+                // to the actual first printing extruder (that is also the last primed extruder).
+                m_cooling_buffer->set_current_extruder(first_printing_extruder_after_priming);
             }
             print.throw_if_canceled();
         }
@@ -1878,15 +1888,34 @@ void GCodeGenerator::print_machine_envelope(GCodeOutputStream &file, const Print
     }
 }
 
+std::string GCodeGenerator::_process_start_gcode(const Print& print, unsigned int current_extruder_id)
+{
+    const int num_extruders            = print.config().nozzle_diameter.values.size();
+    const int bed_temperature_extruder = print.config().bed_temperature_extruder;
+    if (0 < bed_temperature_extruder && bed_temperature_extruder <= num_extruders) {
+        const int first_layer_bed_temperature = print.config().first_layer_bed_temperature.get_at(bed_temperature_extruder - 1);
+        DynamicConfig config;
+        config.set_key_value("first_layer_bed_temperature", new ConfigOptionInts(num_extruders, first_layer_bed_temperature));
+        return this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, current_extruder_id, &config);
+    } else {
+        return this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, current_extruder_id);
+    }
+}
+
 // Write 1st layer bed temperatures into the G-code.
 // Only do that if the start G-code does not already contain any M-code controlling an extruder temperature.
 // M140 - Set Extruder Temperature
 // M190 - Set Extruder Temperature and Wait
 void GCodeGenerator::_print_first_layer_bed_temperature(GCodeOutputStream &file, const Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
-    bool autoemit = print.config().autoemit_temperature_commands;
-    // Initial bed temperature based on the first extruder.
-    int  temp = print.config().first_layer_bed_temperature.get_at(first_printing_extruder_id);
+    const bool autoemit                    = print.config().autoemit_temperature_commands;
+    const int  num_extruders               = print.config().nozzle_diameter.values.size();
+    const int  bed_temperature_extruder    = print.config().bed_temperature_extruder;
+    const bool use_first_printing_extruder = bed_temperature_extruder <= 0 || bed_temperature_extruder > num_extruders;
+
+    // Initial bed temperature based on the first printing extruder or based on the extruded in bed_temperature_extruder.
+    int temp = print.config().first_layer_bed_temperature.get_at(use_first_printing_extruder ? first_printing_extruder_id : bed_temperature_extruder - 1);
+
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode     = -1;
     bool temp_set_by_gcode = custom_gcode_sets_temperature(gcode, 140, 190, false, temp_by_gcode);
@@ -2245,7 +2274,7 @@ std::string GCodeGenerator::generate_ramping_layer_change_gcode(
     const Polyline &xy_path,
     const double initial_elevation,
     const GCode::Impl::Travels::ElevatedTravelParams &elevation_params
-) const {
+) {
     using namespace GCode::Impl::Travels;
 
     const std::vector<double> ensure_points_at_distances = linspace(
@@ -2263,7 +2292,7 @@ std::string GCodeGenerator::generate_ramping_layer_change_gcode(
     for (const Vec3crd &point : travel) {
         const Vec3d gcode_point{this->point_to_gcode(point)};
         travel_gcode += this->m_writer
-                            .get_travel_to_xyz_gcode(gcode_point, "layer change");
+                            .travel_to_xyz_force(gcode_point, "layer change");
     }
     return travel_gcode;
 }
@@ -2295,13 +2324,20 @@ std::pair<GCode::SmoothPath, std::size_t> split_with_seam(
     if (loop.paths.empty() || loop.paths.front().empty()) {
         return {SmoothPath{}, 0};
     }
-    if (const auto seam_point{boost::get<Point>(&seam)}; seam_point != nullptr) {
+    const auto seam_point{boost::get<Point>(&seam)};
+    const auto scarf{boost::get<Seams::Scarf::Scarf>(&seam)};
+
+    if (seam_point != nullptr) {
         return {
             smooth_path_cache.resolve_or_fit_split_with_seam(
                 loop, flipped, scaled_resolution, *seam_point, seam_point_merge_distance_threshold
             ),
             0};
-    } else if (const auto scarf{boost::get<Seams::Scarf::Scarf>(&seam)}; scarf != nullptr) {
+    } else if (scarf != nullptr && scarf->start_point == scarf->end_point) {
+        return {smooth_path_cache.resolve_or_fit_split_with_seam(
+            loop, flipped, scaled_resolution, scarf->start_point, seam_point_merge_distance_threshold
+        ), 0};
+    } else if (scarf != nullptr) {
         ExtrusionPaths paths{loop.paths};
         const auto apply_smoothing{[&](tcb::span<const ExtrusionPath> paths){
             return smooth_path_cache.resolve_or_fit(paths, false, scaled<double>(0.0015));
@@ -2543,7 +2579,12 @@ LayerResult GCodeGenerator::process_layer(
     if (extrusions.empty()) {
         return result;
     }
-    const Geometry::ArcWelder::Segment first_segment{*GCode::ExtrusionOrder::get_first_point(extrusions)};
+
+    const auto optional_first_segment{GCode::ExtrusionOrder::get_first_point(extrusions)};
+    if (!optional_first_segment) {
+        return result;
+    }
+    const Geometry::ArcWelder::Segment &first_segment{*optional_first_segment};
     const Vec3crd first_point{to_3d(first_segment.point, scaled(print_z + (first_segment.height_fraction - 1.0) * height))};
     const PrintInstance* first_instance{get_first_instance(extrusions, instances_to_print)};
     m_label_objects.update(first_instance);
@@ -2624,7 +2665,15 @@ LayerResult GCodeGenerator::process_layer(
             if (temperature > 0 && (temperature != print.config().first_layer_temperature.get_at(extruder.id())))
                 gcode += m_writer.set_temperature(temperature, false, extruder.id());
         }
-        gcode += m_writer.set_bed_temperature(print.config().bed_temperature.get_at(first_extruder_id));
+
+        // Bed temperature for layers from the 2nd layer is based on the first printing
+        // extruder on the layer or on the extruded in bed_temperature_extruder.
+        const int  num_extruders            = print.config().nozzle_diameter.values.size();
+        const int  bed_temperature_extruder = print.config().bed_temperature_extruder;
+        const bool use_first_extruder       = bed_temperature_extruder <= 0 || bed_temperature_extruder > num_extruders;
+        const int  bed_temperature          = print.config().bed_temperature.get_at(use_first_extruder ? first_extruder_id : bed_temperature_extruder - 1);
+        gcode += m_writer.set_bed_temperature(bed_temperature);
+
         // Mark the temperature transition from 1st to 2nd layer to be finished.
         m_second_layer_things_done = true;
     }
@@ -2949,31 +2998,33 @@ std::string GCodeGenerator::change_layer(
         && this->m_config.travel_slope.get_at(extruder_id) > 0
         && this->m_config.travel_slope.get_at(extruder_id) < 90
     );
-    if (do_ramping_layer_change) {
-        Vec3d from{to_3d(this->point_to_gcode(*this->last_position), previous_layer_z)};
-        const Vec3d to{to_3d(unscaled(first_point), print_z)};
-        const double travel_length{(to - from).norm()};
 
-        if (this->m_config.retract_before_travel.get_at(extruder_id) < travel_length) {
+    const Vec3d to{to_3d(unscaled(first_point), print_z)};
+    if (this->last_position && print_z > previous_layer_z && !EXTRUDER_CONFIG(retract_layer_change)) {
+        const Vec3d from{to_3d(this->point_to_gcode(*this->last_position), previous_layer_z)};
+        const Polyline xy_path{this->get_layer_change_xy_path(from, to)};
+
+        if (this->needs_retraction(xy_path, ExtrusionRole::Mixed)) {
             gcode += this->retract_and_wipe();
         }
+    } else {
+        gcode += this->retract_and_wipe();
+    }
 
-        // Update from after wipe.
-        from = to_3d(this->point_to_gcode(*this->last_position), previous_layer_z);
+    if (do_ramping_layer_change) {
+        // Must be determined again after possible wipe.
+        const Vec3d from{to_3d(this->point_to_gcode(*this->last_position), previous_layer_z)};
 
         gcode += this->get_ramping_layer_change_gcode(from, to, extruder_id);
 
         this->writer().update_position(to);
         this->last_position = this->gcode_to_point(unscaled(first_point));
     } else {
-        if (EXTRUDER_CONFIG(retract_layer_change)) {
-            gcode += this->retract_and_wipe();
-        }
         if (!first_layer) {
-            // travel_to_z is not used as it may not generate the travel if the writter z == print_z.
-            gcode += this->writer().get_travel_to_z_gcode(print_z, "simple layer change");
+            gcode += this->writer().travel_to_z_force(print_z, "simple layer change");
+        } else {
             Vec3d position{this->writer().get_position()};
-            position.z() = print_z;
+            position.z() = position.z() + m_config.z_offset;
             this->writer().update_position(position);
         }
     }
@@ -3090,7 +3141,7 @@ std::string GCodeGenerator::extrude_perimeters(
         // Apply the small perimeter speed.
         if (perimeter.extrusion_entity->length() <= SMALL_PERIMETER_LENGTH)
             speed = m_config.small_perimeter_speed.get_abs_value(m_config.perimeter_speed);
-        gcode += this->extrude_smooth_path(perimeter.smooth_path, true, comment_perimeter, speed, perimeter.wipe_offset);
+        gcode += this->extrude_smooth_path(perimeter.smooth_path, perimeter.extrusion_entity->is_loop(), comment_perimeter, speed, perimeter.wipe_offset);
         this->m_travel_obstacle_tracker.mark_extruded(
             perimeter.extrusion_entity, print_instance.object_layer_to_print_id, print_instance.instance_id
         );
@@ -3213,7 +3264,7 @@ std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point, const
     if (!EXTRUDER_CONFIG(travel_ramping_lift) && this->last_position) {
         const Vec3crd from{to_3d(*this->last_position, scaled(from_z))};
         gcode = this->travel_to(
-            from, point, role, "travel to first layer point", insert_gcode
+            from, point, role, "travel to first layer point", insert_gcode, EnforceFirstZ::True
         );
     } else {
         double lift{
@@ -3229,15 +3280,15 @@ std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point, const
         if (EXTRUDER_CONFIG(retract_length) > 0 && !this->last_position) {
             if (!this->last_position || EXTRUDER_CONFIG(retract_before_travel) < (this->point_to_gcode(*this->last_position) - gcode_point.head<2>()).norm()) {
                 gcode += this->writer().retract();
-                gcode += this->writer().get_travel_to_z_gcode(from_z + lift, "lift");
+                gcode += this->writer().travel_to_z_force(from_z + lift, "lift");
             }
         }
 
         const std::string comment{"move to first layer point"};
 
         gcode += insert_gcode();
-        gcode += this->writer().get_travel_to_xy_gcode(gcode_point.head<2>(), comment);
-        gcode += this->writer().get_travel_to_z_gcode(gcode_point.z(), comment);
+        gcode += this->writer().travel_to_xy_force(gcode_point.head<2>(), comment);
+        gcode += this->writer().travel_to_z_force(gcode_point.z(), comment);
 
         this->m_avoid_crossing_perimeters.reset_once_modifiers();
         this->last_position = point.head<2>();
@@ -3293,7 +3344,7 @@ std::string GCodeGenerator::_extrude(
         gcode += this->retract_and_wipe();
         gcode += m_writer.multiple_extruders ? "" : m_label_objects.maybe_change_instance(m_writer);
         gcode += this->m_writer.travel_to_xy(this->point_to_gcode(path.front().point), comment);
-        gcode += this->m_writer.get_travel_to_z_gcode(z, comment);
+        gcode += this->m_writer.travel_to_z_force(z, comment);
     } else if ( this->last_position != path.front().point) {
         std::string comment = "move to first ";
         comment += description;
@@ -3364,6 +3415,14 @@ std::string GCodeGenerator::_extrude(
             speed = m_config.get_abs_value("infill_speed");
         } else if (path_attr.role == ExtrusionRole::SolidInfill) {
             speed = m_config.get_abs_value("solid_infill_speed");
+        } else if (path_attr.role == ExtrusionRole::InfillOverBridge) {
+            const double solid_infill_speed = m_config.get_abs_value("solid_infill_speed");
+            const double over_bridge_speed{m_config.get_abs_value("over_bridge_speed", solid_infill_speed)};
+            if (over_bridge_speed > 0) {
+                speed = over_bridge_speed;
+            } else {
+                speed = solid_infill_speed;
+            }
         } else if (path_attr.role == ExtrusionRole::TopSolidInfill) {
             speed = m_config.get_abs_value("top_solid_infill_speed");
         } else if (path_attr.role == ExtrusionRole::Ironing) {
@@ -3376,8 +3435,14 @@ std::string GCodeGenerator::_extrude(
     }
     if (m_volumetric_speed != 0. && speed == 0)
         speed = m_volumetric_speed / path_attr.mm3_per_mm;
-    if (this->on_first_layer())
-        speed = m_config.get_abs_value("first_layer_speed", speed);
+    if (this->on_first_layer()) {
+        const double first_layer_infill_speed{m_config.get_abs_value("first_layer_infill_speed", speed)};
+        if (path_attr.role == ExtrusionRole::SolidInfill && first_layer_infill_speed > 0) {
+            speed = first_layer_infill_speed;
+        } else {
+            speed = m_config.get_abs_value("first_layer_speed", speed);
+        }
+    }
     else if (this->object_layer_over_raft())
         speed = m_config.get_abs_value("first_layer_speed_over_raft", speed);
 
@@ -3546,7 +3611,8 @@ std::string GCodeGenerator::_extrude(
 std::string GCodeGenerator::generate_travel_gcode(
     const Points3& travel,
     const std::string& comment,
-    const std::function<std::string()>& insert_gcode
+    const std::function<std::string()>& insert_gcode,
+    const EnforceFirstZ enforce_first_z
 ) {
     std::string gcode;
 
@@ -3570,7 +3636,18 @@ std::string GCodeGenerator::generate_travel_gcode(
             already_inserted = true;
         }
 
-        gcode += this->m_writer.travel_to_xyz(gcode_point, comment);
+        if (enforce_first_z == EnforceFirstZ::True && i == 0) {
+            if (
+                std::abs(gcode_point.x() - m_writer.get_position().x()) < GCodeFormatter::XYZ_EPSILON
+                && std::abs(gcode_point.y() - m_writer.get_position().y()) < GCodeFormatter::XYZ_EPSILON
+            ) {
+                gcode += this->m_writer.travel_to_z_force(gcode_point.z(), comment);
+            } else {
+                gcode += this->m_writer.travel_to_xyz_force(gcode_point, comment);
+            }
+        } else {
+            gcode += this->m_writer.travel_to_xyz(gcode_point, comment);
+        }
         this->last_position = point.head<2>();
     }
 
@@ -3668,7 +3745,8 @@ std::string GCodeGenerator::travel_to(
     const Vec3crd &end_point,
     ExtrusionRole role,
     const std::string &comment,
-    const std::function<std::string()>& insert_gcode
+    const std::function<std::string()>& insert_gcode,
+    const GCodeGenerator::EnforceFirstZ enforce_first_z
 ) {
     const double initial_elevation{unscaled(start_point.z())};
 
@@ -3735,7 +3813,7 @@ std::string GCodeGenerator::travel_to(
     }
     travel.emplace_back(end_point);
 
-    return wipe_retract_gcode + generate_travel_gcode(travel, comment, insert_gcode);
+    return wipe_retract_gcode + generate_travel_gcode(travel, comment, insert_gcode, enforce_first_z);
 }
 
 std::string GCodeGenerator::retract_and_wipe(bool toolchange, bool reset_e)

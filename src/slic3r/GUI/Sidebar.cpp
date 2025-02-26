@@ -45,6 +45,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/ModelProcessing.hpp"
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -930,7 +931,7 @@ void Sidebar::show_info_sizer()
     Vec3d size = vol ? vol->mesh().transformed_bounding_box(t).size() : model_object->instance_bounding_box(inst_idx).size();
     m_object_info->info_size->SetLabel(wxString::Format("%.2f x %.2f x %.2f", size(0)*koef, size(1)*koef, size(2)*koef));
 
-    const TriangleMeshStats& stats = vol ? vol->mesh().stats() : model_object->get_object_stl_stats();
+    const TriangleMeshStats& stats = vol ? vol->mesh().stats() : ModelProcessing::get_object_mesh_stats(model_object);
 
     double volume_val = stats.volume;
     if (vol)

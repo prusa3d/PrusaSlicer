@@ -78,7 +78,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
                 );
             } else {
                 gcode += gcodegen.writer().travel_to_xy(gcodegen.point_to_gcode(xy_point), comment);
-                gcode += gcodegen.writer().get_travel_to_z_gcode(z, comment);
+                gcode += gcodegen.writer().travel_to_z_force(z, comment);
             }
         }
         gcode += gcodegen.unretract();
@@ -100,10 +100,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
             gcodegen.m_wipe.reset_path(); // We don't want wiping on the ramming lines.
         toolchange_gcode_str = gcodegen.set_extruder(new_extruder_id, tcr.print_z); // TODO: toolchange_z vs print_z
         if (gcodegen.config().wipe_tower) {
-            deretraction_str += gcodegen.writer().get_travel_to_z_gcode(z, "restore layer Z");
-            Vec3d position{gcodegen.writer().get_position()};
-            position.z() = z;
-            gcodegen.writer().update_position(position);
+            deretraction_str += gcodegen.writer().travel_to_z_force(z, "restore layer Z");
             deretraction_str += gcodegen.unretract();
         }
     }

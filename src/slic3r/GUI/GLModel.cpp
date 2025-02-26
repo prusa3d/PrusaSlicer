@@ -14,7 +14,7 @@
 #endif // ENABLE_GLMODEL_STATISTICS
 
 #include "libslic3r/TriangleMesh.hpp"
-#include "libslic3r/Model.hpp"
+#include "libslic3r/FileReader.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
@@ -653,15 +653,14 @@ bool GLModel::init_from_file(const std::string& filename)
     if (!boost::algorithm::iends_with(filename, ".stl"))
         return false;
 
-    Model model;
+    TriangleMesh mesh;
     try {
-        model = Model::read_from_file(filename);
+        mesh = FileReader::load_mesh(filename);
     }
     catch (std::exception&) {
         return false;
     }
-
-    init_from(model.mesh());
+    init_from(mesh);
 
     m_filename = filename;
 

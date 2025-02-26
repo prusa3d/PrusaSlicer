@@ -217,45 +217,82 @@ int GCodeViewer::SequentialView::ActualSpeedImguiWidget::plot(const char* label,
 }
 #endif // ENABLE_ACTUAL_SPEED_DEBUG
 
-void GCodeViewer::SequentialView::Marker::init()
-{
-    m_model.init_from(stilized_arrow(16, 2.0f, 4.0f, 1.0f, 8.0f));
-    m_model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
-}
+void GCodeViewer::SequentialView::Marker::init(std::optional<std::unique_ptr<GLModel>>& model_opt)
+ {
+     if (! model_opt.has_value())
+         return;
+ 
+     m_model.reset();
+     
+     m_generic_marker = (model_opt->get() == nullptr);
+     if (m_generic_marker)
+         m_model.init_from(stilized_arrow(16, 2.0f, 4.0f, 1.0f, 8.0f));
+     else
+         m_model = **model_opt;
+ 
+     m_model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
+ }
 
 void GCodeViewer::SequentialView::Marker::render()
 {
     if (!m_visible)
         return;
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+    GLShaderProgram* shader = wxGetApp().get_shader("tool_marker");
     if (shader == nullptr)
         return;
 
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
+    const bool curr_cull_face = glIsEnabled(GL_CULL_FACE);
+    glsafe(::glDisable(GL_CULL_FACE));
+
     shader->start_using();
-    shader->set_uniform("emission_factor", 0.0f);
     const Camera& camera = wxGetApp().plater()->get_camera();
     
     Transform3d view_matrix = camera.get_view_matrix();
-    view_matrix.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()));
+    Vec3d bed_inst_offset = s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed());
+    view_matrix.translate(bed_inst_offset);
+
+    std::array<std::array<float, 4>, 2> clip_planes;
+    if (m_generic_marker)
+        // dummy values, generic marker does not need clipping
+        clip_planes = {{ { 1.0f, 0.0f, 0.0f, FLT_MAX }, { 1.0f, 0.0f, 0.0f, FLT_MAX } }};
+    else {
+        BoundingBoxf box = s_multiple_beds.get_build_volume_box();
+        box.translate(to_2d(bed_inst_offset));
+        // add a bit on both sides
+        box = box.inflated(40.0f);
+        clip_planes = {{ { 1.0f, 0.0f, 0.0f, -box.min.cast<float>().x() } , { -1.0f, 0.0f, 0.0f, box.max.cast<float>().x() }}};
+    }
 
     float scale_factor = m_scale_factor;
     if (m_fixed_screen_size)
         scale_factor *= 10.0f * camera.get_inv_zoom();
-    const Transform3d model_matrix = (Geometry::translation_transform((m_world_position + m_model_z_offset * Vec3f::UnitZ()).cast<double>()) *
-        Geometry::translation_transform(scale_factor * m_model.get_bounding_box().size().z() * Vec3d::UnitZ()) * Geometry::rotation_transform({ M_PI, 0.0, 0.0 })) *
-        Geometry::scale_transform(scale_factor);
+    const Transform3d model_matrix = m_generic_marker
+        ? Geometry::translation_transform((m_world_position + m_model_z_offset * Vec3f::UnitZ()).cast<double>()) *
+          Geometry::translation_transform(scale_factor * m_model.get_bounding_box().size().z() * Vec3d::UnitZ()) *
+          Geometry::rotation_transform({ M_PI, 0.0, 0.0 }) *
+          Geometry::scale_transform(scale_factor)
+        : Geometry::translation_transform(m_world_position.cast<double>());
     shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
     const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
     shader->set_uniform("view_normal_matrix", view_normal_matrix);
+    Transform3d volume_world_matrix = model_matrix;
+    if (!m_generic_marker)
+        volume_world_matrix = Geometry::translation_transform(bed_inst_offset) * volume_world_matrix;
+    shader->set_uniform("volume_world_matrix", volume_world_matrix);
+    shader->set_uniform("clipping_planes[0]", clip_planes[0]);
+    shader->set_uniform("clipping_planes[1]", clip_planes[1]);
 
     m_model.render();
 
     shader->stop_using();
+
+    if (curr_cull_face)
+        glsafe(::glEnable(GL_CULL_FACE));
 
     glsafe(::glDisable(GL_BLEND));
 }
@@ -842,9 +879,6 @@ void GCodeViewer::init()
     if (m_gl_data_initialized)
         return;
 
-    // initializes tool marker
-    m_sequential_view.marker.init();
-
     m_gl_data_initialized = true;
 
     try
@@ -1102,6 +1136,8 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
     m_conflict_result = gcode_result.conflict_result;
     if (m_conflict_result.has_value())
         m_conflict_result->layer = m_viewer.get_layer_id_at(static_cast<float>(m_conflict_result->_height));
+
+    m_sequential_collision_detected = gcode_result.sequential_collision_detected;
 }
 
 void GCodeViewer::load_as_preview(libvgcode::GCodeInputData&& data)
@@ -1166,6 +1202,13 @@ void GCodeViewer::render()
             const libvgcode::PathVertex& curr_vertex = m_viewer.get_current_vertex();
             m_sequential_view.marker.set_world_position(libvgcode::convert(curr_vertex.position));
             m_sequential_view.marker.set_z_offset(m_z_offset);
+
+            // Following just makes sure that the shown marker is correct.
+            auto marker_model_opt = wxGetApp().plater()->get_current_canvas3D()->get_current_marker_model();
+            m_sequential_view.marker.init(marker_model_opt);
+            if (marker_model_opt.has_value())
+                m_max_bounding_box.reset();
+
             m_sequential_view.render(legend_height, &m_viewer, curr_vertex.gcode_id);
         }
     }

@@ -2165,7 +2165,7 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
            extremes.front()->layer_type == SupporLayerType::TopContact || // first extreme is a top contact layer
            extremes.front()->extreme_z() > m_slicing_params.first_print_layer_height - EPSILON)));
 
-    bool synchronize = this->synchronize_layers();
+    const bool synchronize = this->synchronize_layers();
 
 #ifdef _DEBUG
     // Verify that the extremes are separated by m_support_layer_height_min.
@@ -2177,6 +2177,9 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
                (extremes[i]->layer_type == SupporLayerType::BottomContact && extremes[i - 1]->layer_type == SupporLayerType::TopContact));
     }
 #endif
+
+    // Threshold for snapping support layers to nearest object layers.
+    const coordf_t SUPPORT_LAYER_SNAP_THRESHOLD = m_slicing_params.layer_height / 10.;
 
     // Generate intermediate layers.
     // The first intermediate layer is the same as the 1st layer if there is no raft,
@@ -2288,22 +2291,30 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
                 if (-- n_layers_extra == 0)
                     continue;
             }
-            coordf_t extr2z_large_steps = extr2z;
+
+            const coordf_t extr2z_large_steps = extr2z;
             // Take the largest allowed step in the Z axis until extr2z_large_steps is reached.
-            for (size_t i = 0; i < n_layers_extra; ++ i) {
+            for (size_t i = 0; i < n_layers_extra; ++i) {
                 SupportGeneratorLayer &layer_new = layer_storage.allocate_unguarded(SupporLayerType::Intermediate);
                 if (i + 1 == n_layers_extra) {
                     // Last intermediate layer added. Align the last entered layer with extr2z_large_steps exactly.
                     layer_new.bottom_z = (i == 0) ? extr1z : intermediate_layers.back()->print_z;
-                    layer_new.print_z = extr2z_large_steps;
+                    layer_new.print_z  = extr2z_large_steps;
+                    layer_new.height   = layer_new.print_z - layer_new.bottom_z;
+                } else {
+                    // Intermediate layer, not the last added.
+                    layer_new.bottom_z = (i == 0) ? extr1z : intermediate_layers.back()->print_z;
+
+                    const coordf_t next_print_z = extr1z + coordf_t(i + 1) * step;
+                    if (const Layer *layer_to_snap = object.get_layer_at_printz(next_print_z, SUPPORT_LAYER_SNAP_THRESHOLD); layer_to_snap != nullptr) {
+                        layer_new.print_z = layer_to_snap->print_z;
+                    } else {
+                        layer_new.print_z = next_print_z;
+                    }
+
                     layer_new.height = layer_new.print_z - layer_new.bottom_z;
                 }
-                else {
-                    // Intermediate layer, not the last added.
-                    layer_new.height = step;
-                    layer_new.bottom_z = extr1z + i * step;
-                    layer_new.print_z = layer_new.bottom_z + step;
-                }
+
                 assert(intermediate_layers.empty() || intermediate_layers.back()->print_z <= layer_new.print_z);
                 intermediate_layers.push_back(&layer_new);
             }

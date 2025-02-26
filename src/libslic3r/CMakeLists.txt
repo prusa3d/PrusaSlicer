@@ -34,6 +34,8 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
+    ArrangeHelper.cpp
+    ArrangeHelper.hpp
     Algorithm/LineSegmentation/LineSegmentation.cpp
     Algorithm/LineSegmentation/LineSegmentation.hpp
     Algorithm/PathSorting.hpp
@@ -88,6 +90,10 @@ set(SLIC3R_SOURCES
     ExtrusionRole.hpp
     ExtrusionSimulator.cpp
     ExtrusionSimulator.hpp
+    Feature/Interlocking/InterlockingGenerator.cpp
+    Feature/Interlocking/InterlockingGenerator.hpp
+    Feature/Interlocking/VoxelUtils.cpp
+    Feature/Interlocking/VoxelUtils.hpp
     FileParserError.hpp
     Feature/FuzzySkin/FuzzySkin.cpp
     Feature/FuzzySkin/FuzzySkin.hpp
@@ -245,6 +251,8 @@ set(SLIC3R_SOURCES
     Geometry/VoronoiUtils.hpp
     Geometry/VoronoiUtils.cpp
     Geometry/VoronoiVisualUtils.hpp
+    InfillAboveBridges.hpp
+    InfillAboveBridges.cpp
     JumpPointSearch.cpp
     JumpPointSearch.hpp
     KDTreeIndirect.hpp
@@ -262,6 +270,10 @@ set(SLIC3R_SOURCES
     CutUtils.hpp
     Model.cpp
     Model.hpp
+    ModelProcessing.cpp
+    ModelProcessing.hpp
+    FileReader.cpp
+    FileReader.hpp
     MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
     MeshNormals.hpp
@@ -597,6 +609,7 @@ target_link_libraries(libslic3r PUBLIC
     agg
     ankerl
     boost_headeronly
+    libseqarrange
 )
 
 if (APPLE)

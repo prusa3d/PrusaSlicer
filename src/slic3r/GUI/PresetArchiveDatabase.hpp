@@ -37,6 +37,7 @@ public:
 		// not read from manifest json
 		boost::filesystem::path tmp_path; // Where archive is unzziped. Created each app run. 
 		boost::filesystem::path source_path; // Path given by user. Stored between app runs.
+        bool not_in_manifest {false};
 
         RepositoryManifest() = default;
         RepositoryManifest(
@@ -47,7 +48,8 @@ public:
             const std::string &description = "",
             const std::string &visibility = "",
             const boost::filesystem::path &tmp_path = "",
-            const boost::filesystem::path &source_path = ""
+            const boost::filesystem::path &source_path = "",
+            bool not_in_manifest = false
         )
             : id(id)
             , name(name)
@@ -57,6 +59,7 @@ public:
             , visibility(visibility)
             , tmp_path(tmp_path)
             , source_path(source_path) 
+            , not_in_manifest(not_in_manifest)
 		{}
         RepositoryManifest(const RepositoryManifest &other)
             : id(other.id)
@@ -66,7 +69,8 @@ public:
             , description(other.description)
             , visibility(other.visibility)
             , tmp_path(other.tmp_path)
-            , source_path(other.source_path) 
+            , source_path(other.source_path)
+            , not_in_manifest(other.not_in_manifest)
 		{}
 	};
 	// Use std::move when calling constructor.

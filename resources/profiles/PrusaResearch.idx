@@ -1,4 +1,13 @@
+min_slic3r_version = 2.9.1-alpha0
+2.2.0 Extruder clearance moved to printer settings. Added BREAKAWAY print profiles (XL).
 min_slic3r_version = 2.8.1-rc0
+2.1.11 Added filament profiles for Elegoo PLA and Elegoo Rapid PETG. Updated filament settings.
+2.1.10 Added MMU3 support for selected ASA, ABS, BVOH and PC Blend filaments (MK3.9/MK4 family printers).
+2.1.9 Updated minimal chamber temperatures (CORE One).
+2.1.8 Added printer profiles for Prusa CORE One.
+2.1.7 Updated organic support parameters for alternative nozzle diameters.
+2.1.6 Added profiles for IGUS filaments. Updated end gcode script condition.
+2.1.5 Fixed LA/PA condition for Prusament PP Carbon Fiber (MK3/MK3.5).
 2.1.4 Added filament profiles for Prusament PETG Magnetite 40%. Updated FW version notification.
 2.1.3 Added Buddy3D filaments.
 2.1.2 Added filament profile for Prusament PP Carbon Fiber. Added filament profile for Cookiecad PLA.

@@ -33,6 +33,7 @@
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/FileReader.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Format/OBJ.hpp"
 #include "libslic3r/MultipleBeds.hpp"
@@ -64,7 +65,7 @@ bool GalleryDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& f
     // hides the system icon
     this->MSWUpdateDragImageOnLeave();
 #endif // WIN32
-    return gallery_dlg ? gallery_dlg->load_files(filenames) : false;
+    return gallery_dlg ? gallery_dlg->add_files_to_custom_dir(filenames) : false;
 }
 
 
@@ -281,7 +282,7 @@ static void generate_thumbnail_from_model(const std::string& filename)
 
     Model model;
     try {
-        model = Model::read_from_file(filename);
+        model = FileReader::load_model(filename);
     }
     catch (std::exception&) {
         BOOST_LOG_TRIVIAL(error) << "Error loading model from " << filename << " in generate_thumbnail_from_model()";
@@ -343,10 +344,15 @@ void GalleryDialog::load_label_icon_list()
 
         std::vector<std::string> sorted_names;
         for (auto& dir_entry : fs::directory_iterator(dir)) {
-            TriangleMesh mesh;
-            if ((is_gallery_file(dir_entry, ".stl") && mesh.ReadSTLFile(dir_entry.path().string().c_str())) || 
-                (is_gallery_file(dir_entry, ".obj") && load_obj(dir_entry.path().string().c_str(), &mesh) )    )
+            if (is_gallery_file(dir_entry, ".stl") || is_gallery_file(dir_entry, ".obj")) {
+                try {
+                    Model model = FileReader::load_model(dir_entry.path().string());
+                }
+                catch (std::exception&) {
+                    continue;
+                }
                 sorted_names.push_back(dir_entry.path().filename().string());
+            }
         }
 
         // sort the filename case insensitive
@@ -441,7 +447,7 @@ void GalleryDialog::add_custom_shapes(wxEvent& event)
     if (input_files.IsEmpty())
         return;
 
-    load_files(input_files);
+    add_files_to_custom_dir(input_files);
 }
 
 void GalleryDialog::del_custom_shapes()
@@ -558,7 +564,7 @@ void GalleryDialog::update()
     load_label_icon_list();
 }
 
-bool GalleryDialog::load_files(const wxArrayString& input_files)
+bool GalleryDialog::add_files_to_custom_dir(const wxArrayString& input_files)
 {
     auto dest_dir = get_dir(false);
 
@@ -577,16 +583,14 @@ bool GalleryDialog::load_files(const wxArrayString& input_files)
     // Iterate through the input files
     for (size_t i = 0; i < input_files.size(); ++i) {
         std::string input_file = into_u8(input_files.Item(i));
-
-        TriangleMesh mesh; 
-        if (is_gallery_file(input_file, ".stl") && !mesh.ReadSTLFile(input_file.c_str())) {
-            show_warning(format_wxstr(_L("Loading of the \"%1%\""), input_file), "STL");
-            continue;
-        }
-
-        if (is_gallery_file(input_file, ".obj") && !load_obj(input_file.c_str(), &mesh)) {
-            show_warning(format_wxstr(_L("Loading of the \"%1%\""), input_file), "OBJ");
-            continue;
+        if (is_gallery_file(input_file, ".stl") || is_gallery_file(input_file, ".obj")) {
+            try {
+                Model model = FileReader::load_model(input_file);
+            }
+            catch (std::exception&) {
+                show_warning(format_wxstr(_L("Loading of the \"%1%\""), input_file), is_gallery_file(input_file, ".obj") ? "OBJ" : "STL");
+                continue;
+            }
         }
 
         try {

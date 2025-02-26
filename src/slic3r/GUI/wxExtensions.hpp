@@ -283,12 +283,24 @@ public:
 
 class HighlighterForWx : public Highlighter
 {
+    struct BlinkingCustomCtrl
+    {
+        OG_CustomCtrl *custom_ctrl_ptr;
+        bool          *show_blink_ptr;
+
+        bool is_valid() const
+        {
+            return custom_ctrl_ptr != nullptr && show_blink_ptr != nullptr;
+        }
+    };
+
+    using BlinkingCustomCtrls = std::vector<BlinkingCustomCtrl>;
+
 // There are 2 possible cases to use HighlighterForWx:
 // - using a BlinkingBitmap. Change state of this bitmap
-    BlinkingBitmap* m_blinking_bitmap   { nullptr };
+    BlinkingBitmap     *m_blinking_bitmap { nullptr };
 // - using OG_CustomCtrl where arrow will be rendered and flag indicated "show/hide" state of this arrow
-    OG_CustomCtrl*  m_custom_ctrl       { nullptr };
-    bool*           m_show_blink_ptr    { nullptr };
+    BlinkingCustomCtrls m_blinking_custom_ctrls;
 
 public:
     HighlighterForWx() {}
@@ -297,6 +309,7 @@ public:
     void bind_timer(wxWindow* owner) override;
     void init(BlinkingBitmap* blinking_bitmap);
     void init(std::pair<OG_CustomCtrl*, bool*>);
+    void init(const std::vector<std::pair<OG_CustomCtrl *, bool *>> &blinking_custom_ctrls_params);
     void blink();
     void invalidate();
 };

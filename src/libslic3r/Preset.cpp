@@ -485,7 +485,7 @@ static std::vector<std::string> s_Preset_print_options {
     "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "infill_speed", "solid_infill_speed",
     "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3",
     "top_solid_infill_speed", "support_material_speed", "support_material_xy_spacing", "support_material_interface_speed",
-    "bridge_speed", "gap_fill_speed", "gap_fill_enabled", "travel_speed", "travel_speed_z", "first_layer_speed", "first_layer_speed_over_raft", "perimeter_acceleration", "infill_acceleration",
+    "bridge_speed", "over_bridge_speed", "gap_fill_speed", "gap_fill_enabled", "travel_speed", "travel_speed_z", "first_layer_speed", "first_layer_infill_speed", "first_layer_speed_over_raft", "perimeter_acceleration", "infill_acceleration",
     "external_perimeter_acceleration", "top_solid_infill_acceleration", "solid_infill_acceleration", "travel_acceleration", "wipe_tower_acceleration",
     "bridge_acceleration", "first_layer_acceleration", "first_layer_acceleration_over_raft", "default_acceleration", "skirts", "skirt_distance", "skirt_height", "draft_shield",
     "min_skirt_length", "brim_width", "brim_separation", "brim_type", "support_material", "support_material_auto", "support_material_threshold", "support_material_enforce_layers",
@@ -497,8 +497,8 @@ static std::vector<std::string> s_Preset_print_options {
     "support_material_buildplate_only", 
     "support_tree_angle", "support_tree_angle_slow", "support_tree_branch_diameter", "support_tree_branch_diameter_angle", "support_tree_branch_diameter_double_wall", 
     "support_tree_top_rate", "support_tree_branch_distance", "support_tree_tip_diameter",
-    "dont_support_bridges", "thick_bridges", "notes", "complete_objects", "extruder_clearance_radius",
-    "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "gcode_substitutions", "perimeter_extruder",
+    "dont_support_bridges", "thick_bridges", "notes", "complete_objects",
+    "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "gcode_substitutions", "perimeter_extruder",
     "infill_extruder", "solid_infill_extruder", "support_material_extruder", "support_material_interface_extruder",
     "ooze_prevention", "standby_temperature_delta", "interface_shells", "extrusion_width", "first_layer_extrusion_width",
     "perimeter_extrusion_width", "external_perimeter_extrusion_width", "infill_extrusion_width", "solid_infill_extrusion_width",
@@ -511,6 +511,7 @@ static std::vector<std::string> s_Preset_print_options {
     "wall_distribution_count", "min_feature_size", "min_bead_width",
     "top_one_perimeter_type", "only_one_perimeter_first_layer",
     "automatic_extrusion_widths", "automatic_infill_combination", "automatic_infill_combination_max_layer_height",
+    "bed_temperature_extruder", "interlocking_beam", "interlocking_orientation", "interlocking_beam_layer_count", "interlocking_depth", "interlocking_boundary_avoidance", "interlocking_beam_width",
 };
 
 static std::vector<std::string> s_Preset_filament_options {
@@ -556,7 +557,7 @@ static std::vector<std::string> s_Preset_printer_options {
     "max_print_height", "default_print_profile", "inherits",
     "remaining_times", "silent_mode",
     "machine_limits_usage", "thumbnails", "thumbnails_format",
-    "nozzle_high_flow"
+    "nozzle_high_flow", "extruder_clearance_radius", "extruder_clearance_height"
 };
 
 static std::vector<std::string> s_Preset_sla_print_options {

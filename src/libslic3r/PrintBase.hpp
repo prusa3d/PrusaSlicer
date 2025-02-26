@@ -433,7 +433,7 @@ public:
         // Some data was changed, which in turn invalidated already calculated steps.
         APPLY_STATUS_INVALIDATED,
     };
-    virtual ApplyStatus     apply(const Model &model, DynamicPrintConfig config) = 0;
+    virtual ApplyStatus     apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings = nullptr) = 0;
     const Model&            model() const { return m_model; }
 
     struct TaskParams {

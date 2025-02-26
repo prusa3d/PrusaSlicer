@@ -27,11 +27,22 @@ class Painting;
 }
 
 namespace Slic3r::Seams::Perimeters {
-enum class AngleType;
-enum class PointType;
-enum class PointClassification;
+enum class AngleType { convex, concave, smooth };
+enum class PointType { enforcer, blocker, common };
+enum class PointClassification { overhang, embedded, common };
 struct Perimeter;
 struct PerimeterParams;
+
+/**
+ * When previous_index == next_index, the point is at the point.
+ * Otherwise the point is at the edge.
+ */
+struct PointOnPerimeter
+{
+    std::size_t previous_index{};
+    std::size_t next_index{};
+    Vec2d position{Vec2d::Zero()};
+};
 
 struct LayerInfo
 {
@@ -55,6 +66,18 @@ using LayerInfos = std::vector<LayerInfo>;
 LayerInfos get_layer_infos(
     tcb::span<const Slic3r::Layer* const> object_layers, const double elephant_foot_compensation
 );
+
+struct PerimeterPoint {
+    Vec2d position{Vec2d::Zero()};
+    double angle{};
+    PointType type{PointType::common};
+    PointClassification classification{PointClassification::common};
+    AngleType angle_type{AngleType::smooth};
+};
+
+using PerimeterPoints = std::vector<PerimeterPoint>;
+
+
 } // namespace Slic3r::Seams::Perimeters
 
 namespace Slic3r::Seams::Perimeters::Impl {
@@ -69,8 +92,8 @@ namespace Slic3r::Seams::Perimeters::Impl {
  *
  * @return All the points (original and added) in order along the edges.
  */
-std::vector<Vec2d> oversample_painted(
-    const std::vector<Vec2d> &points,
+PerimeterPoints oversample_painted(
+    PerimeterPoints &points,
     const std::function<bool(Vec3f, double)> &is_painted,
     const double slice_z,
     const double max_distance
@@ -83,21 +106,14 @@ std::vector<Vec2d> oversample_painted(
  *
  * @param tolerance Douglas-Peucker epsilon.
  */
-std::pair<std::vector<Vec2d>, std::vector<PointType>> remove_redundant_points(
-    const std::vector<Vec2d> &points,
-    const std::vector<PointType> &point_types,
+PerimeterPoints remove_redundant_points(
+    const PerimeterPoints &points,
     const double tolerance
 );
 
 } // namespace Slic3r::Seams::Perimeters::Impl
 
 namespace Slic3r::Seams::Perimeters {
-
-enum class AngleType { convex, concave, smooth };
-
-enum class PointType { enforcer, blocker, common };
-
-enum class PointClassification { overhang, embedded, common };
 
 struct PerimeterParams
 {
@@ -149,10 +165,10 @@ struct Perimeter
 
     static Perimeter create(
         const Polygon &polygon,
+        const Geometry::Overhangs &overhangs,
         const ModelInfo::Painting &painting,
         const LayerInfo &layer_info,
-        const PerimeterParams &params,
-        const double offset_inside
+        const PerimeterParams &params
     );
 
     static Perimeter create_degenerate(
@@ -203,6 +219,19 @@ inline std::vector<Vec2d> extract_points(
     }
     return result;
 }
+
+
+using Seams::Geometry::PointOnLine;
+
+std::optional<PointOnPerimeter> offset_along_perimeter(
+    const PointOnPerimeter &point,
+    const Perimeter& perimeter,
+    const double offset,
+    const Seams::Geometry::Direction1D direction,
+    const std::function<bool(const Perimeter&, const std::size_t)> &early_stop_condition
+);
+
+unsigned get_point_value(const PointType point_type, const PointClassification point_classification);
 
 } // namespace Slic3r::Seams::Perimeters
 

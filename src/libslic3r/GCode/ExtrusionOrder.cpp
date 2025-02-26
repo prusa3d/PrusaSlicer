@@ -208,6 +208,20 @@ std::vector<InfillRange> extract_infill_ranges(
     return result;
 }
 
+// Returns LayerIslands ordered by the shortest distance.
+std::vector<std::reference_wrapper<const LayerIsland>> get_ordered_islands(
+    const LayerSlice &lslice,
+    const std::optional<Point> &previous_position
+) {
+    std::vector<std::reference_wrapper<const LayerIsland>> islands_to_order;
+    for (const LayerIsland &island : lslice.islands) {
+        islands_to_order.emplace_back(island);
+    }
+
+    chain_and_reorder_layer_islands(islands_to_order, previous_position.has_value() ? std::addressof(*previous_position) : nullptr);
+    return islands_to_order;
+}
+
 std::vector<IslandExtrusions> extract_island_extrusions(
     const LayerSlice &lslice,
     const Print &print,
@@ -218,17 +232,19 @@ std::vector<IslandExtrusions> extract_island_extrusions(
     const unsigned extruder_id,
     std::optional<Point> &previous_position
 ) {
+    const auto should_pick_infill = [&should_pick_extrusion](const ExtrusionEntityCollection &eec, const PrintRegion &region) {
+        return should_pick_extrusion(eec, region) && eec.role() != ExtrusionRole::Ironing;
+    };
+
+    std::vector<std::reference_wrapper<const LayerIsland>> ordered_islands = get_ordered_islands(lslice, previous_position);
+
     std::vector<IslandExtrusions> result;
-    for (const LayerIsland &island : lslice.islands) {
+    for (const LayerIsland &island : ordered_islands) {
         const LayerRegion &layerm = *layer.get_region(island.perimeters.region());
         // PrintObjects own the PrintRegions, thus the pointer to PrintRegion would be
         // unique to a PrintObject, they would not identify the content of PrintRegion
         // accross the whole print uniquely. Translate to a Print specific PrintRegion.
         const PrintRegion &region = print.get_print_region(layerm.region().print_region_id());
-
-        const auto should_pick_infill = [&should_pick_extrusion](const ExtrusionEntityCollection &eec, const PrintRegion &region) {
-            return should_pick_extrusion(eec, region) && eec.role() != ExtrusionRole::Ironing;
-        };
 
         result.push_back(IslandExtrusions{&region});
         IslandExtrusions &island_extrusions{result.back()};
@@ -243,9 +259,9 @@ std::vector<IslandExtrusions> extract_island_extrusions(
         } else {
             island_extrusions.perimeters = extract_perimeter_extrusions(print, layer, island, should_pick_extrusion, extruder_id, offset, previous_position, smooth_path);
 
-            island_extrusions.infill_ranges = {extract_infill_ranges(
+            island_extrusions.infill_ranges = extract_infill_ranges(
                 print, layer, island, offset, previous_position, should_pick_infill, smooth_path, extruder_id
-            )};
+            );
         }
     }
     return result;
@@ -261,13 +277,14 @@ std::vector<InfillRange> extract_ironing_extrusions(
     const unsigned extruder_id,
     std::optional<Point> &previous_position
 ) {
+    const auto should_pick_ironing = [&should_pick_extrusion](const auto &eec, const auto &region) {
+        return should_pick_extrusion(eec, region) && eec.role() == ExtrusionRole::Ironing;
+    };
+
+    std::vector<std::reference_wrapper<const LayerIsland>> ordered_islands = get_ordered_islands(lslice, previous_position);
+
     std::vector<InfillRange> result;
-
-    for (const LayerIsland &island : lslice.islands) {
-        const auto should_pick_ironing = [&should_pick_extrusion](const auto &eec, const auto &region) {
-            return should_pick_extrusion(eec, region) && eec.role() == ExtrusionRole::Ironing;
-        };
-
+    for (const LayerIsland &island : ordered_islands) {
         const std::vector<InfillRange> ironing_ranges{extract_infill_ranges(
             print, layer, island, offset, previous_position, should_pick_ironing, smooth_path, extruder_id
         )};
@@ -421,9 +438,7 @@ std::vector<OverridenExtrusions> get_overriden_extrusions(
             std::vector<SliceExtrusions> slices_extrusions{get_slices_extrusions(
                 print, *layer, should_pick_extrusion, smooth_path, offset, extruder_id, previous_position
             )};
-            if (!slices_extrusions.empty()) {
-                result.push_back({offset, std::move(slices_extrusions)});
-            }
+            result.push_back({offset, std::move(slices_extrusions)});
         }
     }
     return result;

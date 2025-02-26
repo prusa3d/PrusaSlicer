@@ -67,6 +67,8 @@ std::pair<bool, std::string> GLShadersManager::init()
 #endif // SLIC3R_OPENGL_ES
     // used to render toolpaths center of gravity
     valid &= append_shader("toolpaths_cog", { prefix + "toolpaths_cog.vs", prefix + "toolpaths_cog.fs" });
+    // used to render tool marker
+    valid &= append_shader("tool_marker", { prefix + "tool_marker.vs", prefix + "tool_marker.fs" });
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
     valid &= append_shader("gouraud_light", { prefix + "gouraud_light.vs", prefix + "gouraud_light.fs" });
     // extend "gouraud_light" by adding clipping, used in sla gizmos

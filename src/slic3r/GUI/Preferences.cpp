@@ -146,6 +146,7 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 										   ,"default_action_on_select_preset" })
 			m_optgroup_general->set_value(opt_key, app_config->get(opt_key) == "none");
 		m_optgroup_general->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty());
+		m_optgroup_gui->set_value("seq_top_layer_only", app_config->get_bool("seq_top_layer_only"));
 
 		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());

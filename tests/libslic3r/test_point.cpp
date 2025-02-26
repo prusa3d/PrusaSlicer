@@ -5,11 +5,13 @@
  *  and cross product uses doubles
  */
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 #include <libslic3r/Point.hpp>
 #include "test_utils.hpp"
 
 using namespace Slic3r;
+using namespace Catch;
 
 TEST_CASE("Nearest point", "[Point]") {
     const Point point{10, 15};

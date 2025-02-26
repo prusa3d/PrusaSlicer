@@ -120,7 +120,8 @@ bool PrusaConnectNew::upload(PrintHostUpload upload_data, ProgressFn progress_fn
     std::string json = GUI::format(upload_data.data_json, "", "1");
     boost::property_tree::ptree ptree;
     const std::string printer_uuid = GUI::UserAccountUtils::get_keyword_from_json(ptree, json, "printer_uuid");
-    wxString printer_page_url = GUI::format("https://connect.prusa3d.com/printer/%1%/dashboard", printer_uuid);
+    auto& sc = Utils::ServiceConfig::instance();
+    wxString printer_page_url = GUI::format("%1%/printer/%2%/dashboard", sc.connect_url(), printer_uuid);
     info_fn(L"prusaconnect_printer_address", printer_page_url);
 
     std::string init_out;

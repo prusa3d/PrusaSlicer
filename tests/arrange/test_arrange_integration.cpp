@@ -1,4 +1,11 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
+#include <catch2/generators/catch_generators_all.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/catch_approx.hpp>
+
 #include "test_utils.hpp"
 
 #include <arrange-wrapper/Arrange.hpp>
@@ -10,6 +17,8 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Format/3mf.hpp"
+
+using namespace Catch;
 
 static Slic3r::Model get_example_model_with_20mm_cube()
 {

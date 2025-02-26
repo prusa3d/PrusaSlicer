@@ -12,4 +12,5 @@ jobs:
     secrets: inherit
     with:
       with_asan: true
+      debug_symbols: true
       actions_branch: master

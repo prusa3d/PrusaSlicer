@@ -150,7 +150,78 @@ void delete_cookies(wxWebView* webview, const std::string& url)
         ).Get());
     
 }
+void delete_cookies_with_counter(wxWebView* webview, const std::string& url, std::atomic<size_t>& counter)
+{
+    ICoreWebView2 *webView2 = static_cast<ICoreWebView2 *>(webview->GetNativeBackend());
+    if (!webView2) {
+        BOOST_LOG_TRIVIAL(error) << "delete_cookies Failed: webView2 is null.";
+        return;
+    }
 
+    /*
+    "cookies": [{
+		"domain": ".google.com",
+		"expires": 1756464458.304917,
+		"httpOnly": true,
+		"name": "__Secure-1PSIDCC",
+		"path": "/",
+		"priority": "High",
+		"sameParty": false,
+		"secure": true,
+		"session": false,
+		"size": 90,
+		"sourcePort": 443,
+		"sourceScheme": "Secure",
+		"value": "AKEyXzUvV_KBqM4aOlsudROI_VZ-ToIH41LRbYJFtFjmKq_rOmx1owoyUGvQHbwr5be380fKuQ"
+    },...]}
+    */
+    wxString parameters = GUI::format_wxstr(L"{\"urls\": [\"%1%\"]}", url);
+    webView2->CallDevToolsProtocolMethod(L"Network.getCookies", parameters.c_str(),
+        Microsoft::WRL::Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
+            [webView2, url, &counter](HRESULT errorCode, LPCWSTR resultJson) -> HRESULT {
+                if (FAILED(errorCode)) {
+                    return S_OK;
+                }
+                // Handle successful call (resultJson contains the list of cookies)
+                pt::ptree ptree;
+                try {
+                    std::stringstream ss(GUI::into_u8(resultJson));
+                    pt::read_json(ss, ptree);
+                }
+                catch (const std::exception& e) {
+                    BOOST_LOG_TRIVIAL(error) << "Failed to parse cookies json: " << e.what();
+                    return S_OK;
+                }
+                auto& cookies = ptree.get_child("cookies");
+                if (cookies.size() == 0) {
+                    counter++;
+                    return S_OK;
+                }
+                for (auto it = cookies.begin(); it != cookies.end(); ++it) {
+                    const auto& cookie = *it;
+                    std::string name = cookie.second.get<std::string>("name");
+                    std::string domain = cookie.second.get<std::string>("domain");
+                    // Delete cookie by name and domain
+                    wxString name_and_domain = GUI::format_wxstr(L"{\"name\": \"%1%\", \"domain\": \"%2%\"}", name, domain);
+                    BOOST_LOG_TRIVIAL(debug) << "Deleting cookie: " << name_and_domain;
+                    bool last = false;
+                    if (std::next(it) == cookies.end()) {
+                        last = true;
+                    }
+                    webView2->CallDevToolsProtocolMethod(L"Network.deleteCookies", name_and_domain.c_str(),
+                        Microsoft::WRL::Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
+                            [last, &counter](HRESULT errorCode, LPCWSTR resultJson) -> HRESULT { 
+                                if (last) {
+                                    counter++;
+                                }
+                                return S_OK; 
+                            }).Get());
+                }       
+                return S_OK;
+            }
+        ).Get());
+    
+}
 static EventRegistrationToken m_webResourceRequestedTokenForImageBlocking = {};
 static wxString filter_patern;
 namespace {
@@ -167,7 +238,7 @@ void RequestHeadersToLog(ICoreWebView2HttpRequestHeaders* requestHeaders)
         wchar_t* value = nullptr;
 
         iterator->GetCurrentHeader(&name, &value);
-        BOOST_LOG_TRIVIAL(debug) <<"name: " << name << L", value: " << value;
+        BOOST_LOG_TRIVIAL(trace) <<"name: " << name << L", value: " << value;
         if (name) {
             CoTaskMemFree(name);
         }

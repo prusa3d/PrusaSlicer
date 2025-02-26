@@ -200,15 +200,16 @@ void BulkExportDialog::Item::update_valid_bmp()
     m_valid_bmp->SetBitmap(*get_bmp_bundle(get_bmp_name(m_status)));
 }
 
-BulkExportDialog::BulkExportDialog(const std::vector<std::pair<int, std::optional<fs::path>>> &paths):
+BulkExportDialog::BulkExportDialog(const std::vector<std::pair<int, std::optional<fs::path>>> &paths, const wxString& title):
     DPIDialog(
         nullptr,
         wxID_ANY,
-        _L("Export beds"),
+        title,
         wxDefaultPosition,
         wxSize(45 * wxGetApp().em_unit(), 5 * wxGetApp().em_unit()),
         wxDEFAULT_DIALOG_STYLE | wxICON_WARNING
     )
+    , m_title(title)
 {
     this->SetFont(wxGetApp().normal_font());
 
@@ -254,7 +255,7 @@ void BulkExportDialog::accept()
     if (has_warnings()) {
         MessageDialog dialog(nullptr,
             _L("Some of the selected files already exist. Do you want to replace them?"),
-            _L("Export beds"), wxYES_NO | wxICON_QUESTION);
+            m_title, wxYES_NO | wxICON_QUESTION);
         if (dialog.ShowModal() == wxID_NO)
             return;
     }

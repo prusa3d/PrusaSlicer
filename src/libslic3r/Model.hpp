@@ -14,17 +14,14 @@
 #define slic3r_Model_hpp_
 
 #include "libslic3r.h"
-#include "enum_bitmask.hpp"
 #include "Geometry.hpp"
 #include "ObjectID.hpp"
 #include "Point.hpp"
-#include "PrintConfig.hpp"
 #include "Slicing.hpp"
 #include "SLA/SupportPoint.hpp"
 #include "SLA/Hollowing.hpp"
 #include "TriangleMesh.hpp"
 #include "CustomGCode.hpp"
-#include "enum_bitmask.hpp"
 #include "TextConfiguration.hpp"
 #include "EmbossShape.hpp"
 #include "TriangleSelector.hpp"
@@ -47,7 +44,6 @@ namespace cereal {
 }
 
 namespace Slic3r {
-enum class ConversionType;
 
 class BuildVolume;
 class Model;
@@ -424,6 +420,7 @@ public:
     ModelVolume*            add_volume(TriangleMesh &&mesh, ModelVolumeType type = ModelVolumeType::MODEL_PART);
     ModelVolume*            add_volume(const ModelVolume &volume, ModelVolumeType type = ModelVolumeType::INVALID);
     ModelVolume*            add_volume(const ModelVolume &volume, TriangleMesh &&mesh);
+    ModelVolume*            insert_volume(size_t idx, const ModelVolume &volume, TriangleMesh &&mesh);
     void                    delete_volume(size_t idx);
     void                    clear_volumes();
     void                    sort_volumes(bool full_sort);
@@ -509,7 +506,6 @@ public:
 
     // This method could only be called before the meshes of this ModelVolumes are not shared!
     void scale_mesh_after_creation(const float scale);
-    void convert_units(ModelObjectPtrs&new_objects, ConversionType conv_type, std::vector<int> volume_idxs);
 
     size_t materials_count() const;
     size_t facets_count() const;
@@ -519,9 +515,6 @@ public:
     // delete volumes which are marked as connector for this object
     void delete_connectors();
     void clone_for_cut(ModelObject **obj);
-
-    void split(ModelObjectPtrs*new_objects);
-    void merge();
     // Support for non-uniform scaling of instances. If an instance is rotated by angles, which are not multiples of ninety degrees,
     // then the scaling in world coordinate system is not representable by the Geometry::Transformation structure.
     // This situation is solved by baking in the instance transformation into the mesh vertices.
@@ -535,11 +528,6 @@ public:
     void print_info() const;
 
     std::string get_export_filename() const;
-
-    // Get full stl statistics for all object's meshes
-    TriangleMeshStats get_object_stl_stats() const;
-    // Get count of errors in the mesh( or all object's meshes, if volume index isn't defined)
-    int         get_repaired_errors_count(const int vol_idx = -1) const;
 
     // Detect if object has at least one solid mash
     bool has_solid_mesh() const;
@@ -695,13 +683,6 @@ private:
 
     // Called by min_z(), max_z()
     void update_min_max_z();
-};
-
-enum class ConversionType : int {
-    CONV_TO_INCH,
-    CONV_FROM_INCH,
-    CONV_TO_METER,
-    CONV_FROM_METER,
 };
 
 class FacetsAnnotation final : public ObjectWithTimestamp {
@@ -879,11 +860,8 @@ public:
     int                 extruder_id() const;
 
     bool                is_splittable() const;
+    void                discard_splittable() { m_is_splittable = 0; }
 
-    // Split this volume, append the result to the object owning this volume.
-    // Return the number of volumes created from this one.
-    // This is useful to assign different materials to different volumes of an object.
-    size_t              split(unsigned int max_extruders);
     void                translate(double x, double y, double z) { translate(Vec3d(x, y, z)); }
     void                translate(const Vec3d& displacement);
     void                scale(const Vec3d& scaling_factors);
@@ -904,8 +882,6 @@ public:
     void                calculate_convex_hull();
     const TriangleMesh& get_convex_hull() const;
     const std::shared_ptr<const TriangleMesh>& get_convex_hull_shared_ptr() const { return m_convex_hull; }
-    // Get count of errors in the mesh
-    int                 get_repaired_errors_count() const;
 
     // Helpers for loading / storing into AMF / 3MF files.
     static ModelVolumeType type_from_string(const std::string &s);
@@ -940,8 +916,6 @@ public:
 
     void set_mirror(const Vec3d& mirror) { m_transformation.set_mirror(mirror); }
     void set_mirror(Axis axis, double mirror) { m_transformation.set_mirror(axis, mirror); }
-    void convert_from_imperial_units();
-    void convert_from_meters();
 
     const Transform3d& get_matrix() const { return m_transformation.get_matrix(); }
     Transform3d get_matrix_no_offset() const { return m_transformation.get_matrix_no_offset(); }
@@ -1318,24 +1292,6 @@ public:
 
     OBJECTBASE_DERIVED_COPY_MOVE_CLONE(Model)
 
-    enum class LoadAttribute : int {
-        AddDefaultInstances,
-        CheckVersion
-    };
-    using LoadAttributes = enum_bitmask<LoadAttribute>;
-
-    static Model read_from_file(
-        const std::string& input_file, 
-        DynamicPrintConfig* config = nullptr, ConfigSubstitutionContext* config_substitutions = nullptr,
-        LoadAttributes options = LoadAttribute::AddDefaultInstances);
-    static Model read_from_archive(
-        const std::string& input_file,
-        DynamicPrintConfig* config,
-        ConfigSubstitutionContext* config_substitutions,
-        boost::optional<Semver> &prusaslicer_generator_version,
-        LoadAttributes options = LoadAttribute::AddDefaultInstances
-    );
-
     // Add a new ModelObject to this Model, generate a new ID for this ModelObject.
     ModelObject* add_object();
     ModelObject* add_object(const char *name, const char *path, const TriangleMesh &mesh);
@@ -1373,14 +1329,6 @@ public:
     // Croaks if the duplicated objects do not fit the print bed.
     void duplicate_objects_grid(size_t x, size_t y, coordf_t dist);
 
-    bool 		  looks_like_multipart_object() const;
-    void 		  convert_multipart_object(unsigned int max_extruders);
-    bool          looks_like_imperial_units() const;
-    void          convert_from_imperial_units(bool only_small_volumes);
-    bool          looks_like_saved_in_meters() const;
-    void          convert_from_meters(bool only_small_volumes);
-    int           removed_objects_with_zero_volume();
-
     // Ensures that the min z of the model is not negative
     void 		  adjust_min_z();
 
@@ -1411,8 +1359,6 @@ private:
 		ar(materials, objects, wipe_tower_vector);
     }
 };
-
-ENABLE_ENUM_BITMASK_OPERATORS(Model::LoadAttribute)
 
 #undef OBJECTBASE_DERIVED_COPY_MOVE_CLONE
 #undef OBJECTBASE_DERIVED_PRIVATE_COPY_MOVE

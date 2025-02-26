@@ -61,6 +61,8 @@ const constexpr double POLYGON_COLOR_FILTER_TOLERANCE_SCALED          = scaled<d
 const constexpr double INPUT_POLYGONS_FILTER_TOLERANCE_SCALED         = scaled<double>(0.001);
 const constexpr double MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED = scaled<double>(0.4);
 const constexpr double MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED       = scaled<double>(0.01);
+const constexpr double MM_SEGMENTATION_SNAP_ANGLE_THRESHOLD           = PI / 12.;
+const constexpr double MM_SEGMENTATION_SNAP_ANGLE_MAX_DISTANCE_SCALED = scaled<double>(0.1);
 
 enum VD_ANNOTATION : Voronoi::VD::cell_type::color_type {
     VERTEX_ON_CONTOUR = 1,
@@ -140,6 +142,34 @@ struct ColorProjectionLine
 };
 
 using ColorProjectionLines = std::vector<ColorProjectionLine>;
+
+struct ColorProjectionExPolygon
+{
+    ColorProjectionLines              contour;
+    std::vector<ColorProjectionLines> holes;
+
+    size_t polygons_count() const { return holes.size() + 1; }
+
+    size_t lines_count() const
+    {
+        size_t lines_cnt = this->contour.size();
+        for (const ColorProjectionLines &hole : this->holes) {
+            lines_cnt += hole.size();
+        }
+
+        return lines_cnt;
+    }
+};
+
+using ColorProjectionExPolygons = std::vector<ColorProjectionExPolygon>;
+
+size_t lines_count(const ColorProjectionExPolygons &color_projection_expolygons)
+{
+    return std::accumulate(color_projection_expolygons.begin(), color_projection_expolygons.end(), size_t(0),
+                           [](const size_t acc, const ColorProjectionExPolygon &color_projection_expolygon) {
+                               return acc + color_projection_expolygon.lines_count();
+                           });
+}
 
 struct ColorProjectionLineWrapper
 {
@@ -279,7 +309,7 @@ using ColorPoints = std::vector<ColorPoint>;
     }
 }
 
-[[maybe_unused]] static void export_color_projection_lines_color_ranges_to_svg(const std::string &path, const std::vector<ColorProjectionLines> &color_polygons_projection_lines, const ExPolygons &lslices) {
+[[maybe_unused]] static void export_color_projection_lines_color_ranges_to_svg(const std::string &path, const ColorProjectionExPolygon &color_projection_expolygon, const ExPolygons &lslices) {
     const std::vector<std::string> colors        = {"blue", "cyan", "red", "orange", "pink", "yellow", "magenta", "purple", "black"};
     const std::string              default_color = "black";
     const coordf_t                 stroke_width  = scaled<coordf_t>(0.05);
@@ -287,8 +317,8 @@ using ColorPoints = std::vector<ColorPoint>;
 
     ::Slic3r::SVG svg(path.c_str(), bbox);
 
-    for (const ColorProjectionLines &color_polygon_projection_lines : color_polygons_projection_lines) {
-        for (const ColorProjectionLine &color_projection_line : color_polygon_projection_lines) {
+    const auto draw_color_projection_line = [&](const ColorProjectionLines &color_projection_lines) -> void {
+        for (const ColorProjectionLine &color_projection_line : color_projection_lines) {
             svg.draw(Line(color_projection_line.a, color_projection_line.b), default_color, stroke_width);
 
             for (const ColorProjectionRange &range : color_projection_line.color_projection_ranges) {
@@ -299,6 +329,11 @@ using ColorPoints = std::vector<ColorPoint>;
                 svg.draw(Line(from_pt, to_pt), (range.color < colors.size() ? colors[range.color] : default_color), stroke_width);
             }
         }
+    };
+
+    draw_color_projection_line(color_projection_expolygon.contour);
+    for (const ColorProjectionLines &hole_color_projection_lines : color_projection_expolygon.holes) {
+        draw_color_projection_line(hole_color_projection_lines);
     }
 }
 
@@ -413,6 +448,7 @@ static void delete_vertex_deep(const VD::vertex_type &vertex) {
 
     while (!vertices_to_delete.empty()) {
         const VD::vertex_type &vertex_to_delete = *vertices_to_delete.front();
+        assert(vertex_to_delete.color() != VD_ANNOTATION::VERTEX_ON_CONTOUR);
         vertices_to_delete.pop();
         vertex_to_delete.color(VD_ANNOTATION::DELETED);
 
@@ -427,97 +463,163 @@ static void delete_vertex_deep(const VD::vertex_type &vertex) {
     }
 }
 
-static inline Vec2d mk_point_vec2d(const VD::vertex_type *point) {
-    assert(point != nullptr);
-    return {point->x(), point->y()};
-}
-
-static inline Vec2d mk_vector_vec2d(const VD::edge_type *edge) {
-    assert(edge != nullptr);
-    return mk_point_vec2d(edge->vertex1()) - mk_point_vec2d(edge->vertex0());
-}
-
-static inline Vec2d mk_flipped_vector_vec2d(const VD::edge_type *edge) {
-    assert(edge != nullptr);
-    return mk_point_vec2d(edge->vertex0()) - mk_point_vec2d(edge->vertex1());
-}
-
-static double edge_length(const VD::edge_type &edge) {
-    assert(edge.is_finite());
-    return mk_vector_vec2d(&edge).norm();
-}
-
-// Used in remove_multiple_edges_in_vertices()
-// Returns length of edge with is connected to contour. To this length is include other edges with follows it if they are almost straight (with the
-// tolerance of 15) And also if node between two subsequent edges is connected only to these two edges.
-static inline double calc_total_edge_length(const VD::edge_type &starting_edge)
+// Removes all edges except one in a Voronoi vertex that has more than one Voronoi edge (for example,
+// in concave parts of a polygon). The one edge that is kept is selected arbitrarily.
+static void remove_excess_voronoi_edges(const VD::vertex_type &vertex)
 {
-    double               total_edge_length = edge_length(starting_edge);
-    const VD::edge_type *prev              = &starting_edge;
-    do {
-        if (prev->is_finite() && non_deleted_edge_count(*prev->vertex1()) > 2)
-            break;
-
-        bool                 found_next_edge = false;
-        const VD::edge_type *current         = prev->next();
-        do {
-            if (current->color() == VD_ANNOTATION::DELETED)
-                continue;
-
-            Vec2d  first_line_vec_n  = mk_flipped_vector_vec2d(prev).normalized();
-            Vec2d  second_line_vec_n = mk_vector_vec2d(current).normalized();
-            double angle             = ::acos(std::clamp(first_line_vec_n.dot(second_line_vec_n), -1.0, 1.0));
-            if (Slic3r::cross2(first_line_vec_n, second_line_vec_n) < 0.0)
-                angle = 2.0 * (double) PI - angle;
-
-            if (std::abs(angle - PI) >= (PI / 12))
-                continue;
-
-            prev               = current;
-            found_next_edge    = true;
-            total_edge_length += edge_length(*current);
-
-            break;
-        } while (current = current->prev()->twin(), current != prev->next());
-
-        if (!found_next_edge)
-            break;
-
-    } while (prev != &starting_edge);
-
-    return total_edge_length;
-}
-
-// When a Voronoi vertex has more than one Voronoi edge (for example, in concave parts of a polygon),
-// we leave just one Voronoi edge in the Voronoi vertex.
-// This Voronoi edge is selected based on a heuristic.
-static void remove_multiple_edges_in_vertex(const VD::vertex_type &vertex) {
-    if (non_deleted_edge_count(vertex) <= 1)
+    if (non_deleted_edge_count(vertex) <= 1) {
         return;
+    }
 
-    std::vector<std::pair<const VD::edge_type *, double>> edges_to_check;
-    const VD::edge_type *edge = vertex.incident_edge();
+    std::vector<const VD::edge_type *> vertex_edges;
+    const VD::edge_type               *edge = vertex.incident_edge();
     do {
-        if (edge->color() == VD_ANNOTATION::DELETED)
+        if (edge->color() == VD_ANNOTATION::DELETED) {
             continue;
+        }
 
-        edges_to_check.emplace_back(edge, calc_total_edge_length(*edge));
+        vertex_edges.emplace_back(edge);
     } while (edge = edge->prev()->twin(), edge != vertex.incident_edge());
 
-    std::sort(edges_to_check.begin(), edges_to_check.end(), [](const auto &l, const auto &r) -> bool {
-        return l.second > r.second;
-    });
-
-    while (edges_to_check.size() > 1) {
-        const VD::edge_type &edge_to_check = *edges_to_check.back().first;
+    while (vertex_edges.size() > 1) {
+        const VD::edge_type &edge_to_check = *vertex_edges.back();
         edge_to_check.color(VD_ANNOTATION::DELETED);
         edge_to_check.twin()->color(VD_ANNOTATION::DELETED);
 
-        if (const VD::vertex_type &vertex_to_delete = *edge_to_check.vertex1(); can_vertex_be_deleted(vertex_to_delete))
+        if (const VD::vertex_type &vertex_to_delete = *edge_to_check.vertex1(); can_vertex_be_deleted(vertex_to_delete)) {
             delete_vertex_deep(vertex_to_delete);
+        }
 
-        edges_to_check.pop_back();
+        vertex_edges.pop_back();
     }
+}
+
+// Returns first non-deleted edge in clockwise.
+static const VD::edge_type *get_cw_first_non_deleted_edge(const VD::edge_type *edge_begin)
+{
+    const VD::edge_type *edge = edge_begin;
+    do {
+        if (edge->color() == VD_ANNOTATION::DELETED) {
+            continue;
+        } else {
+            assert(edge->color() != VD_ANNOTATION::VERTEX_ON_CONTOUR);
+            return edge;
+        }
+    } while (edge = edge->prev()->twin(), edge != edge_begin);
+
+    return nullptr;
+}
+
+// Return convex Polygon for Voronoi cell (Voronoi cell is always convex).
+// During processing a Voronoi cell, it marks its edges as deleted.
+template<typename CellRange>
+static typename std::enable_if<
+    std::is_same<CellRange, Geometry::SegmentCellRange<Point>>::value || std::is_same<CellRange, Geometry::PointCellRange<Point>>::value,
+    std::optional<Polygon>>::type
+cell_range_to_polygon(const CellRange &cell_range)
+{
+    assert(cell_range.is_valid());
+    assert(cell_range.edge_begin->vertex0()->color() == VD_ANNOTATION::VERTEX_ON_CONTOUR);
+
+    if (!cell_range.is_valid() || cell_range.edge_begin->vertex0()->color() != VD_ANNOTATION::VERTEX_ON_CONTOUR) {
+        return std::nullopt;
+    }
+
+    Polygon cell_polygon;
+    cell_polygon.points.emplace_back(Geometry::VoronoiUtils::to_point(cell_range.edge_begin->vertex0()).template cast<coord_t>());
+
+    // We have ensured that each cell_polygon have to start at edge_begin->vertex0() and end at edge_end->vertex1().
+    const VD::edge_type *edge = cell_range.edge_begin;
+    do {
+        if (edge->color() == VD_ANNOTATION::DELETED) {
+            continue;
+        }
+
+        const VD::vertex_type &next_vertex = *edge->vertex1();
+        cell_polygon.points.emplace_back(Geometry::VoronoiUtils::to_point(next_vertex).cast<coord_t>());
+        edge->color(VD_ANNOTATION::DELETED);
+
+        if (next_vertex.color() == VD_ANNOTATION::VERTEX_ON_CONTOUR || next_vertex.color() == VD_ANNOTATION::DELETED) {
+            break;
+        }
+
+        edge = edge->twin();
+    } while (edge = edge->twin()->next(), edge != cell_range.edge_begin);
+
+    if (edge->vertex1() != cell_range.edge_end->vertex1()) {
+        return std::nullopt;
+    }
+
+    if (cell_range.edge_begin->vertex0() == cell_range.edge_end->vertex1()) {
+        cell_polygon.points.pop_back();
+    }
+
+    return cell_polygon;
+}
+
+static std::optional<Polygon> segment_cell_range_to_polygon(const Geometry::SegmentCellRange<Point> &cell_range)
+{
+    return cell_range_to_polygon(cell_range);
+}
+
+static std::optional<Polygon> point_cell_range_to_polygon(const Geometry::PointCellRange<Point> &cell_range)
+{
+    return cell_range_to_polygon(cell_range);
+}
+
+inline double calc_triangle_area(const Point &a_pt, const Point &b_pt, const Point &c_pt)
+{
+    Vec2d ba = (b_pt - a_pt).cast<double>();
+    Vec2d ca = (c_pt - a_pt).cast<double>();
+    return Slic3r::cross2(ba, ca) / 2.;
+}
+
+static std::pair<Polygon, Polygon> split_convex_polygon_to_two_polygons_with_equal_area(const Polygon &input_polygon)
+{
+    assert(input_polygon.size() >= 3);
+    const double half_area = input_polygon.area() / 2.;
+
+    assert(half_area > 0.);
+    if (half_area <= 0.) {
+        return {};
+    }
+
+    Polygon left_polygon;
+    left_polygon.points.emplace_back(input_polygon.points[0]);
+
+    Polygon right_polygon;
+    right_polygon.points.emplace_back(input_polygon.points[0]);
+    right_polygon.points.emplace_back(input_polygon.points[1]);
+
+    double right_polygon_area = 0.;
+    size_t curr_idx           = 2;
+    for (; curr_idx < input_polygon.size(); ++curr_idx) {
+        const Point &start_pt           = input_polygon.points[0];
+        const Point &prev_pt            = input_polygon.points[curr_idx - 1];
+        const Point &curr_pt            = input_polygon.points[curr_idx];
+        const double curr_triangle_area = calc_triangle_area(start_pt, prev_pt, curr_pt);
+
+        if ((right_polygon_area + curr_triangle_area) <= half_area) {
+            right_polygon_area += curr_triangle_area;
+            right_polygon.points.emplace_back(curr_pt);
+        } else {
+            // Split current triangle.
+            const double remaining_area  = half_area - right_polygon_area;
+            const double split_ratio     = remaining_area / curr_triangle_area;
+            const Point  intersection_pt = prev_pt + (split_ratio * (curr_pt - prev_pt).cast<double>()).cast<coord_t>();
+
+            right_polygon.points.emplace_back(intersection_pt);
+            left_polygon.points.emplace_back(intersection_pt);
+            break;
+        }
+    }
+
+    for (; curr_idx < input_polygon.size(); ++curr_idx) {
+        left_polygon.points.emplace_back(input_polygon.points[curr_idx]);
+    }
+
+    assert(left_polygon.size() >= 3 && right_polygon.size() >= 3);
+    return {left_polygon, right_polygon};
 }
 
 // Returns list of ExPolygons for each extruder + 1 for default unpainted regions.
@@ -573,7 +675,7 @@ static std::vector<ExPolygons> extract_colored_segments(const std::vector<Colore
     }
 
     // Fourth, remove all edges that point outward from the input polygon.
-    for (Voronoi::VD::cell_type cell : vd.cells()) {
+    for (const Voronoi::VD::cell_type &cell : vd.cells()) {
         if (cell.is_degenerate() || !cell.contains_segment())
             continue;
 
@@ -595,10 +697,25 @@ static std::vector<ExPolygons> extract_colored_segments(const std::vector<Colore
         }
     }
 
-    // Fifth, if a Voronoi vertex has more than one Voronoi edge, remove all but one of them based on heuristics.
-    for (const Voronoi::VD::vertex_type &vertex : vd.vertices()) {
-        if (vertex.color() == VD_ANNOTATION::VERTEX_ON_CONTOUR)
-            remove_multiple_edges_in_vertex(vertex);
+    // Fifth, if a Voronoi vertex has more than one Voronoi edge, remove all except one.
+    // Edges are removed only for Voronoi vertices that aren't in the place where color changes.
+    for (const Voronoi::VD::cell_type &cell : vd.cells()) {
+        if (cell.is_degenerate() || !cell.contains_segment()) {
+            continue;
+        }
+
+        const ColoredLine &curr_line = Geometry::VoronoiUtils::get_source_segment(cell, colored_lines.begin(), colored_lines.end());
+        const ColoredLine &next_line = get_next_contour_line(curr_line);
+        if (curr_line.color != next_line.color) {
+            continue;
+        }
+
+        if (const Geometry::SegmentCellRange<Point> cell_range = Geometry::VoronoiUtils::compute_segment_cell_range(cell, colored_lines.begin(), colored_lines.end());
+            cell_range.is_valid()) {
+            const VD::vertex_type &vertex = *cell_range.edge_begin->vertex0();
+            assert(vertex.color() == VD_ANNOTATION::VERTEX_ON_CONTOUR);
+            remove_excess_voronoi_edges(vertex);
+        }
     }
 
     if constexpr (MM_SEGMENTATION_DEBUG_GRAPH) {
@@ -615,38 +732,47 @@ static std::vector<ExPolygons> extract_colored_segments(const std::vector<Colore
             if (cell_range.edge_begin->vertex0()->color() != VD_ANNOTATION::VERTEX_ON_CONTOUR)
                 continue;
 
-            const ColoredLine source_segment = Geometry::VoronoiUtils::get_source_segment(cell, colored_lines.begin(), colored_lines.end());
-
-            Polygon segmented_polygon;
-            segmented_polygon.points.emplace_back(source_segment.line.b);
-
-            // We have ensured that each segmented_polygon have to start at edge_begin->vertex0() and end at edge_end->vertex1().
-            const VD::edge_type *edge = cell_range.edge_begin;
-            do {
-                if (edge->color() == VD_ANNOTATION::DELETED)
-                    continue;
-
-                const VD::vertex_type &next_vertex = *edge->vertex1();
-                segmented_polygon.points.emplace_back(Geometry::VoronoiUtils::to_point(next_vertex).cast<coord_t>());
-                edge->color(VD_ANNOTATION::DELETED);
-
-                if (next_vertex.color() == VD_ANNOTATION::VERTEX_ON_CONTOUR || next_vertex.color() == VD_ANNOTATION::DELETED)
-                    break;
-
-                edge = edge->twin();
-            } while (edge = edge->twin()->next(), edge != cell_range.edge_begin);
-
-            if (edge->vertex1() != cell_range.edge_end->vertex1())
+            const ColoredLine           &curr_line            = Geometry::VoronoiUtils::get_source_segment(cell, colored_lines.begin(), colored_lines.end());
+            const std::optional<Polygon> segment_cell_polygon = segment_cell_range_to_polygon(cell_range);
+            if (!segment_cell_polygon.has_value())
                 continue;
 
+            const Voronoi::VD::vertex_type &cell_begin_vertex = *cell_range.edge_begin->vertex0();
+            // The cell_range.edge_begin was deleted, so if any edge is starting in the cell_range.edge_begin->vertex0(),
+            // then it is an edge from a cell that was generated by a point, and the cell is between two different colors.
+            assert(non_deleted_edge_count(cell_begin_vertex) <= 1);
+            if (non_deleted_edge_count(cell_begin_vertex) == 1) {
+                const VD::edge_type *point_cell_begin_edge = get_cw_first_non_deleted_edge(cell_range.edge_begin);
+                const VD::edge_type *point_cell_end_edge   = cell_range.edge_begin->twin();
+
+                assert(point_cell_begin_edge != nullptr && point_cell_end_edge != nullptr);
+                if (point_cell_begin_edge == nullptr || point_cell_end_edge == nullptr)
+                    continue;
+
+                assert(point_cell_begin_edge->color() != VD_ANNOTATION::DELETED && point_cell_end_edge->color() != VD_ANNOTATION::DELETED);
+                assert(point_cell_begin_edge->vertex0() == point_cell_end_edge->vertex1());
+
+                const Geometry::PointCellRange<Point> point_cell_range(Geometry::VoronoiUtils::to_point(point_cell_begin_edge->vertex0()).cast<coord_t>(), point_cell_begin_edge, point_cell_end_edge);
+                const std::optional<Polygon>          point_cell_polygon = point_cell_range_to_polygon(point_cell_range);
+                if (!point_cell_polygon.has_value())
+                    continue;
+
+                const ColoredLine          &next_line           = get_next_contour_line(curr_line);
+                std::pair<Polygon, Polygon> point_cell_polygons = split_convex_polygon_to_two_polygons_with_equal_area(*point_cell_polygon);
+                segmented_expolygons_per_extruder[curr_line.color].emplace_back(std::move(point_cell_polygons.first));
+                segmented_expolygons_per_extruder[next_line.color].emplace_back(std::move(point_cell_polygons.second));
+            }
+
             cell_range.edge_begin->vertex0()->color(VD_ANNOTATION::DELETED);
-            segmented_expolygons_per_extruder[source_segment.color].emplace_back(std::move(segmented_polygon));
+            segmented_expolygons_per_extruder[curr_line.color].emplace_back(*segment_cell_polygon);
         }
     }
 
     // Merge all polygons together for each extruder
-    for (auto &segmented_expolygons : segmented_expolygons_per_extruder)
+    for (auto &segmented_expolygons : segmented_expolygons_per_extruder) {
         segmented_expolygons = union_ex(segmented_expolygons);
+        segmented_expolygons = Slic3r::closing_ex(segmented_expolygons, static_cast<float>(SCALED_EPSILON));
+    }
 
     return segmented_expolygons_per_extruder;
 }
@@ -864,14 +990,15 @@ static inline std::vector<std::vector<ExPolygons>> segmentation_top_and_bottom_l
                 // color_idx == 0 means "don't know" extruder aka the underlying extruder.
                 // As this region may split existing regions, we collect statistics over all regions for color_idx == 0.
                 color_idx == 0 || config.perimeter_extruder == int(color_idx)) {
-                out.extrusion_width     = std::max<float>(out.extrusion_width, float(config.perimeter_extrusion_width));
+                const Flow perimeter_flow = region->flow(FlowRole::frPerimeter);
+                out.extrusion_width     = std::max<float>(out.extrusion_width, perimeter_flow.width());
                 out.top_solid_layers    = std::max<int>(out.top_solid_layers, config.top_solid_layers);
                 out.bottom_solid_layers = std::max<int>(out.bottom_solid_layers, config.bottom_solid_layers);
                 out.small_region_threshold = config.gap_fill_enabled.value && config.gap_fill_speed.value > 0 ?
                                              // Gap fill enabled. Enable a single line of 1/2 extrusion width.
-                                             0.5f * float(config.perimeter_extrusion_width) :
+                                             0.5f * perimeter_flow.width() :
                                              // Gap fill disabled. Enable two lines slightly overlapping.
-                                             float(config.perimeter_extrusion_width) + 0.7f * Flow::rounded_rectangle_extrusion_spacing(float(config.perimeter_extrusion_width), float(layer.height));
+                                             perimeter_flow.width() + 0.7f * perimeter_flow.spacing();
                 out.small_region_threshold = scaled<float>(out.small_region_threshold * 0.5f);
                 ++ out.num_regions;
             }
@@ -1021,8 +1148,9 @@ static std::vector<std::vector<ExPolygons>> merge_segmented_layers(const std::ve
     return segmented_regions_merged;
 }
 
-// Check if all ColoredLine representing a single layer uses the same color.
-static bool has_layer_only_one_color(const std::vector<ColoredLines> &colored_polygons) {
+// Check if all ColoredLines representing several Polygons (ExPolygon) uses the same color.
+static bool has_polygons_only_one_color(const std::vector<ColoredLines> &colored_polygons)
+{
     assert(!colored_polygons.empty());
     assert(!colored_polygons.front().empty());
     int first_line_color = colored_polygons.front().front().color;
@@ -1277,48 +1405,60 @@ void static filter_color_of_small_segments(ColorPoints &color_polygon_points, co
     return true;
 }
 
-static std::vector<ColorProjectionLines> create_color_projection_lines(const ExPolygon &ex_polygon) {
-    std::vector<ColorProjectionLines> color_projection_lines(ex_polygon.num_contours());
+static ColorProjectionLines create_color_projection_lines(const Polygon &polygon)
+{
+    ColorProjectionLines color_projection_lines;
+    color_projection_lines.reserve(polygon.size());
 
-    for (size_t contour_idx = 0; contour_idx < ex_polygon.num_contours(); ++contour_idx) {
-        const Lines lines = ex_polygon.contour_or_hole(contour_idx).lines();
-        color_projection_lines[contour_idx].reserve(lines.size());
-
-        for (const Line &line : lines) {
-            color_projection_lines[contour_idx].emplace_back(line);
-        }
+    for (const Line &line : polygon.lines()) {
+        color_projection_lines.emplace_back(line);
     }
 
     return color_projection_lines;
 }
 
-static std::vector<ColorProjectionLines> create_color_projection_lines(const ExPolygons &ex_polygons) {
-    std::vector<ColorProjectionLines> color_projection_lines;
-    color_projection_lines.reserve(number_polygons(ex_polygons));
+static ColorProjectionExPolygon create_color_projection_expolygon(const ExPolygon &expolygon)
+{
+    ColorProjectionExPolygon color_projection_expolygon;
+    color_projection_expolygon.contour = create_color_projection_lines(expolygon.contour);
 
-    for (const ExPolygon &ex_polygon : ex_polygons) {
-        Slic3r::append(color_projection_lines, create_color_projection_lines(ex_polygon));
+    color_projection_expolygon.holes.reserve(expolygon.holes.size());
+    for (const Polygon &hole_polygon : expolygon.holes) {
+        color_projection_expolygon.holes.emplace_back(create_color_projection_lines(hole_polygon));
     }
 
-    return color_projection_lines;
+    return color_projection_expolygon;
+}
+
+static ColorProjectionExPolygons create_color_projection_expolygons(const ExPolygons &expolygons)
+{
+    ColorProjectionExPolygons color_projection_expolygons;
+    color_projection_expolygons.reserve(expolygons.size());
+
+    for (const ExPolygon &expolygon : expolygons) {
+        color_projection_expolygons.emplace_back(create_color_projection_expolygon(expolygon));
+    }
+
+    return color_projection_expolygons;
 }
 
 // Create the flat vector of ColorProjectionLineWrapper where each ColorProjectionLineWrapper
-// is pointing into the one ColorProjectionLine in the vector of ColorProjectionLines.
-static std::vector<ColorProjectionLineWrapper> create_color_projection_lines_mapping(std::vector<ColorProjectionLines> &color_polygons_projection_lines) {
-    auto total_lines_count = [&color_polygons_projection_lines]() {
-        return std::accumulate(color_polygons_projection_lines.begin(), color_polygons_projection_lines.end(), size_t(0),
-                               [](const size_t acc, const ColorProjectionLines &color_projection_lines) {
-                                   return acc + color_projection_lines.size();
-                               });
-    };
-
+// is pointing into the one ColorProjectionLine in the vector of ColorProjectionExPolygons.
+static std::vector<ColorProjectionLineWrapper> create_color_projection_lines_mapping(ColorProjectionExPolygons &color_projection_expolygons)
+{
     std::vector<ColorProjectionLineWrapper> color_projection_lines_mapping;
-    color_projection_lines_mapping.reserve(total_lines_count());
+    color_projection_lines_mapping.reserve(lines_count(color_projection_expolygons));
 
-    for (ColorProjectionLines &color_polygon_projection_lines : color_polygons_projection_lines) {
+    const auto append_color_projection_lines = [&color_projection_lines_mapping](ColorProjectionLines &color_polygon_projection_lines) {
         for (ColorProjectionLine &color_projection_line : color_polygon_projection_lines) {
             color_projection_lines_mapping.emplace_back(&color_projection_line);
+        }
+    };
+
+    for (ColorProjectionExPolygon &color_projection_expolygon : color_projection_expolygons) {
+        append_color_projection_lines(color_projection_expolygon.contour);
+        for (ColorProjectionLines &hole_color_projection_lines : color_projection_expolygon.holes) {
+            append_color_projection_lines(hole_color_projection_lines);
         }
     }
 
@@ -1348,140 +1488,357 @@ static uint8_t get_color_of_first_polygon_line(const ColorProjectionLines &color
     }
 }
 
-static void filter_projected_color_points_on_polygons(std::vector<ColorProjectionLines> &color_polygons_projection_lines) {
-    for (ColorProjectionLines &color_polygon_projection_lines : color_polygons_projection_lines) {
-        for (ColorProjectionLine &color_line : color_polygon_projection_lines) {
-            if (color_line.color_changes.empty())
-                continue;
+// Helper function to find the dominant color in a map.
+static std::optional<uint8_t> get_dominant_color_from_map(const std::unordered_map<uint8_t, double> &area_per_color)
+{
+    if (area_per_color.empty())
+        return std::nullopt;
 
-            std::sort(color_line.color_changes.begin(), color_line.color_changes.end());
+    return std::max_element(area_per_color.begin(), area_per_color.end(),
+                            [](const std::pair<uint8_t, double> &p1, const std::pair<uint8_t, double> &p2) {
+                                return p1.second < p2.second;
+                            })->first;
+}
 
-            // Snap projected points to the first endpoint of the line.
-            const double line_length = (color_line.b - color_line.a).cast<double>().norm();
+// Function to find the dominant color over the beginning of the ColorProjectionLine.
+static std::optional<uint8_t> find_dominant_color_from_begin(const ColorProjectionLine &color_line)
+{
+    assert(!color_line.color_changes.empty());
+    const ColorChanges                 &color_changes              = color_line.color_changes;
+    const double                        line_length                = (color_line.b - color_line.a).cast<double>().norm();
+    const double                        max_snap_distance          = std::min(line_length, 10. * MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED);
+    bool                                max_snap_distance_exceeded = false;
+    std::unordered_map<uint8_t, double> area_per_color;
+    for (auto curr_it = std::next(color_changes.cbegin()); curr_it != color_changes.cend(); ++curr_it) {
+        auto prev_it = std::prev(curr_it);
+        if (const double endpoint_dist = curr_it->t * line_length; endpoint_dist < max_snap_distance) {
+            area_per_color[prev_it->color_next] += (curr_it->t - prev_it->t) * line_length;
+        } else {
+            area_per_color[prev_it->color_next] += max_snap_distance - prev_it->t * line_length;
+            max_snap_distance_exceeded           = true;
+            break;
+        }
+    }
 
-            std::vector<ColorChange *> snap_candidates;
-            for (ColorChange &color_change : color_line.color_changes) {
-                if (const double endpoint_dist = color_change.t * line_length; endpoint_dist < MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED) {
-                    snap_candidates.emplace_back(&color_change);
-                } else {
-                    break;
-                }
+    if (!max_snap_distance_exceeded) {
+        const ColorChange &last_color_change          = color_changes.back();
+        area_per_color[last_color_change.color_next] += max_snap_distance - last_color_change.t * line_length;
+    }
+
+    return get_dominant_color_from_map(area_per_color);
+}
+
+// Function to find the dominant color over the end of the ColorProjectionLine.
+std::optional<uint8_t> find_dominant_color_from_end(const ColorProjectionLine &color_line)
+{
+    const ColorChanges                 &color_changes     = color_line.color_changes;
+    const double                        line_length       = (color_line.b - color_line.a).cast<double>().norm();
+    const double                        max_snap_distance = std::min(line_length, 10. * MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED);
+    double                              prev_t            = 1.;
+    std::unordered_map<uint8_t, double> area_per_color;
+    for (auto curr_it = color_changes.crbegin(); curr_it != color_changes.crend(); ++curr_it) {
+        if (const double endpoint_dist = (1. - curr_it->t) * line_length; endpoint_dist < max_snap_distance) {
+            area_per_color[curr_it->color_next] += (prev_t - curr_it->t) * line_length;
+        } else {
+            area_per_color[curr_it->color_next] += max_snap_distance - (1. - prev_t) * line_length;
+            break;
+        }
+
+        prev_t = curr_it->t;
+    }
+
+    return get_dominant_color_from_map(area_per_color);
+}
+
+static void filter_projected_color_points_on_polygon(ColorProjectionLines &color_polygon_projection_lines)
+{
+    for (ColorProjectionLine &color_line : color_polygon_projection_lines) {
+        if (color_line.color_changes.empty())
+            continue;
+
+        std::sort(color_line.color_changes.begin(), color_line.color_changes.end());
+
+        // Snap projected points to the first endpoint of the line.
+        const double line_length = (color_line.b - color_line.a).cast<double>().norm();
+
+        std::vector<ColorChange *> snap_candidates;
+        for (ColorChange &color_change : color_line.color_changes) {
+            if (const double endpoint_dist = color_change.t * line_length; endpoint_dist < MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED) {
+                snap_candidates.emplace_back(&color_change);
+            } else {
+                break;
+            }
+        }
+
+        if (snap_candidates.size() == 1) {
+            snap_candidates.front()->t = 0.;
+        } else if (const std::optional<uint8_t> dominant_color_from_begin = find_dominant_color_from_begin(color_line); snap_candidates.size() > 1 && dominant_color_from_begin.has_value()) {
+            ColorChange &first_candidate = *snap_candidates.front();
+            first_candidate.t            = 0.;
+            for (ColorChange *snap_candidate : snap_candidates) {
+                snap_candidate->color_next = *dominant_color_from_begin;
+            }
+        }
+
+        snap_candidates.clear();
+
+        // Snap projected points to the second endpoint of the line.
+        for (auto cr_it = color_line.color_changes.rbegin(); cr_it != color_line.color_changes.rend(); ++cr_it) {
+            ColorChange &color_change = *cr_it;
+            if (const double endpoint_dist = (1. - color_change.t) * line_length; endpoint_dist < MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED) {
+                snap_candidates.emplace_back(&color_change);
+            } else {
+                break;
+            }
+        }
+
+        if (const std::optional<uint8_t> dominant_color_from_end = find_dominant_color_from_end(color_line); !snap_candidates.empty() && dominant_color_from_end.has_value()) {
+            for (ColorChange *snap_candidate : snap_candidates) {
+                snap_candidate->color_next = *dominant_color_from_end;
             }
 
-            if (snap_candidates.size() == 1) {
-                snap_candidates.front()->t = 0.;
-            } else if (snap_candidates.size() > 1) {
-                ColorChange &first_candidate = *snap_candidates.front();
-                ColorChange &last_candidate  = *snap_candidates.back();
+            // Be aware that snap_candidates are sorted in the opposite order to color_line.color_changes.
+            color_line.color_changes.back().t = 1.;
+        }
 
-                first_candidate.t = 0.;
-                for (auto cr_it = std::next(snap_candidates.begin()); cr_it != snap_candidates.end(); ++cr_it) {
-                    (*cr_it)->color_next = last_candidate.color_next;
-                }
-            }
+        // Remove color ranges that just repeating the same color.
+        // We don't care about color_prev, because both color_prev and color_next may not be connected.
+        // Also, we will not use color_prev during the final stage of producing ColorPolygons.
+        if (color_line.color_changes.size() > 1) {
+            ColorChanges color_changes_filtered;
+            color_changes_filtered.reserve(color_line.color_changes.size());
 
-            snap_candidates.clear();
-
-            // Snap projected points to the second endpoint of the line.
-            for (auto cr_it = color_line.color_changes.rbegin(); cr_it != color_line.color_changes.rend(); ++cr_it) {
+            color_changes_filtered.emplace_back(color_line.color_changes.front());
+            for (auto cr_it = std::next(color_line.color_changes.begin()); cr_it != color_line.color_changes.end(); ++cr_it) {
                 ColorChange &color_change = *cr_it;
-                if (const double endpoint_dist = (1. - color_change.t) * line_length; endpoint_dist < MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED) {
-                    snap_candidates.emplace_back(&color_change);
+
+                if (color_changes_filtered.back().color_next == color_change.color_next) {
+                    continue;
+                } else if (const double t_diff = (color_change.t - color_changes_filtered.back().t); t_diff * line_length < MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED) {
+                    color_changes_filtered.back().color_next = color_change.color_next;
                 } else {
-                    break;
+                    color_changes_filtered.emplace_back(color_change);
                 }
             }
 
-            while (snap_candidates.size() > 1) {
-                snap_candidates.pop_back();
-                color_line.color_changes.pop_back();
+            color_line.color_changes = std::move(color_changes_filtered);
+        }
+    }
+}
+
+static void filter_projected_color_points_on_expolygon(ColorProjectionExPolygon &color_projection_expolygon)
+{
+    filter_projected_color_points_on_polygon(color_projection_expolygon.contour);
+    for (ColorProjectionLines &hole_color_projection_lines : color_projection_expolygon.holes) {
+        filter_projected_color_points_on_polygon(hole_color_projection_lines);
+    }
+}
+
+static double calc_three_color_points_angle(const ColorPoint &prev_pt, const ColorPoint &curr_pt, const ColorPoint &next_pt)
+{
+    assert(prev_pt.p != curr_pt.p);
+    assert(curr_pt.p != next_pt.p);
+
+    const Vec2d ab_vec = (prev_pt.p - curr_pt.p).cast<double>().normalized();
+    const Vec2d cb_vec = (next_pt.p - curr_pt.p).cast<double>().normalized();
+    return PI - std::acos(std::clamp(ab_vec.dot(cb_vec), -1.0, 1.0));
+}
+
+struct SnapAngle
+{
+    enum class Direction { Forward, Backward };
+
+    size_t    pt_index;
+    Direction direction;
+};
+
+static std::optional<SnapAngle> find_nearest_snap_angle(const ColorPoints &color_polygon_points, const size_t begin_idx, const double max_distance, const double angle_threshold)
+{
+    assert(begin_idx < color_polygon_points.size() && color_polygon_points.size() >= 3);
+
+    const auto calc_three_points_angle = [&color_polygon_points](const size_t prev_idx, const size_t curr_idx, const size_t next_idx) -> double {
+        return calc_three_color_points_angle(color_polygon_points[prev_idx], color_polygon_points[curr_idx], color_polygon_points[next_idx]);
+    };
+
+    const auto next_index = [&color_polygon_points](const size_t curr_idx) -> size_t {
+        return curr_idx < (color_polygon_points.size() - 1) ? curr_idx + 1 : 0;
+    };
+
+    const auto prev_index = [&color_polygon_points](const size_t curr_idx) -> size_t {
+        return curr_idx > 0 ? curr_idx - 1 : color_polygon_points.size() - 1;
+    };
+
+    const auto distance_sqr = [&color_polygon_points](const size_t first_idx, const size_t second_idx) -> double {
+        return (color_polygon_points[second_idx].p - color_polygon_points[first_idx].p).cast<double>().squaredNorm();
+    };
+
+    // Try to find a snap angle in the forward direction.
+    const double max_distance_sqr   = Slic3r::sqr(max_distance);
+    size_t       prev_idx           = prev_index(begin_idx);
+    size_t       curr_idx           = begin_idx;
+    size_t       next_idx           = next_index(begin_idx);
+    double       total_distance_sqr = 0.;
+    do {
+        total_distance_sqr += distance_sqr(curr_idx, next_idx);
+        if (total_distance_sqr > max_distance_sqr) {
+            break;
+        }
+
+        prev_idx = curr_idx;
+        curr_idx = next_idx;
+        next_idx = next_index(next_idx);
+
+        if (color_polygon_points[prev_idx].color_next != color_polygon_points[curr_idx].color_next) {
+            break;
+        }
+
+        if (const double angle = calc_three_points_angle(prev_idx, curr_idx, next_idx); angle > angle_threshold) {
+            return SnapAngle{curr_idx, SnapAngle::Direction::Forward};
+        }
+    } while (curr_idx != begin_idx);
+
+    // Try to find a snap angle in the backward direction.
+    prev_idx           = prev_index(begin_idx);
+    curr_idx           = begin_idx;
+    next_idx           = next_index(begin_idx);
+    total_distance_sqr = 0.;
+    do {
+        total_distance_sqr += distance_sqr(prev_idx, curr_idx);
+        if (total_distance_sqr > max_distance_sqr) {
+            break;
+        }
+
+        next_idx = curr_idx;
+        curr_idx = prev_idx;
+        prev_idx = prev_index(prev_idx);
+
+        if (color_polygon_points[prev_idx].color_next != color_polygon_points[curr_idx].color_next) {
+            break;
+        }
+
+        if (const double angle = calc_three_points_angle(prev_idx, curr_idx, next_idx); angle > angle_threshold) {
+            return SnapAngle{curr_idx, SnapAngle::Direction::Backward};
+        }
+    } while (curr_idx != begin_idx);
+
+    return std::nullopt;
+}
+
+static void snap_projected_color_points_to_nearest_angles(std::vector<ColorPoints> &color_polygons_points)
+{
+    for (ColorPoints &color_polygon_points : color_polygons_points) {
+        assert(color_polygon_points.size() >= 3);
+
+        const auto next_index = [&color_polygon_points](const size_t curr_idx) -> size_t {
+            return curr_idx < (color_polygon_points.size() - 1) ? curr_idx + 1 : 0;
+        };
+
+        const auto prev_index = [&color_polygon_points](const size_t curr_idx) -> size_t {
+            return curr_idx > 0 ? curr_idx - 1 : color_polygon_points.size() - 1;
+        };
+
+        for (size_t curr_idx = 0; curr_idx < color_polygon_points.size(); ++curr_idx) {
+            const ColorPoint &prev_pt = color_polygon_points[prev_index(curr_idx)];
+            const ColorPoint &curr_pt = color_polygon_points[curr_idx];
+            const ColorPoint &next_pt = color_polygon_points[next_index(curr_idx)];
+
+            // We care only about places in which color changes with angles below the threshold.
+            if (prev_pt.color_next == curr_pt.color_next || calc_three_color_points_angle(prev_pt, curr_pt, next_pt) > MM_SEGMENTATION_SNAP_ANGLE_THRESHOLD) {
+                continue;
             }
 
-            if (!snap_candidates.empty()) {
-                assert(snap_candidates.size() == 1);
-                snap_candidates.back()->t = 1.;
+            const std::optional<SnapAngle> snap_angle = find_nearest_snap_angle(color_polygon_points, curr_idx, MM_SEGMENTATION_SNAP_ANGLE_MAX_DISTANCE_SCALED, MM_SEGMENTATION_SNAP_ANGLE_THRESHOLD);
+            if (!snap_angle.has_value()) {
+                continue;
             }
 
-            // Remove color ranges that just repeating the same color.
-            // We don't care about color_prev, because both color_prev and color_next may not be connected.
-            // Also, we will not use color_prev during the final stage of producing ColorPolygons.
-            if (color_line.color_changes.size() > 1) {
-                ColorChanges color_changes_filtered;
-                color_changes_filtered.reserve(color_line.color_changes.size());
+            if (snap_angle->direction == SnapAngle::Direction::Forward) {
+                color_polygon_points[snap_angle->pt_index].color_next = curr_pt.color_next;
 
-                color_changes_filtered.emplace_back(color_line.color_changes.front());
-                for (auto cr_it = std::next(color_line.color_changes.begin()); cr_it != color_line.color_changes.end(); ++cr_it) {
-                    ColorChange &color_change = *cr_it;
-
-                    if (color_changes_filtered.back().color_next == color_change.color_next) {
-                        continue;
-                    } else if (const double t_diff = (color_change.t - color_changes_filtered.back().t); t_diff * line_length < MM_SEGMENTATION_MAX_SNAP_DISTANCE_SCALED) {
-                        color_changes_filtered.back().color_next = color_change.color_next;
-                    } else {
-                        color_changes_filtered.emplace_back(color_change);
-                    }
+                for (size_t modify_idx = curr_idx; modify_idx != snap_angle->pt_index; modify_idx = next_index(modify_idx)) {
+                    color_polygon_points[modify_idx].color_next = prev_pt.color_next;
                 }
+            } else {
+                assert(snap_angle->direction == SnapAngle::Direction::Backward);
+                color_polygon_points[prev_index(snap_angle->pt_index)].color_next = prev_pt.color_next;
 
-                color_line.color_changes = std::move(color_changes_filtered);
+                for (size_t modify_idx = snap_angle->pt_index; modify_idx != curr_idx; modify_idx = next_index(modify_idx)) {
+                    color_polygon_points[modify_idx].color_next = curr_pt.color_next;
+                }
             }
         }
     }
 }
 
-static std::vector<ColorPoints> convert_color_polygons_projection_lines_to_color_points(const std::vector<ColorProjectionLines> &color_polygons_projection_lines) {
-    std::vector<ColorPoints> color_polygons_points;
-    color_polygons_points.reserve(color_polygons_projection_lines.size());
+static ColorPoints convert_color_polygon_projection_lines_to_color_points(const ColorProjectionLines &color_polygon_projection_lines)
+{
+    if (color_polygon_projection_lines.empty())
+        return {};
 
-    for (const ColorProjectionLines &color_polygon_projection_lines : color_polygons_projection_lines) {
-        if (color_polygon_projection_lines.empty())
-            continue;
+    ColorPoints color_polygon_points;
+    color_polygon_points.reserve(color_polygon_projection_lines.size());
 
-        ColorPoints color_polygon_points;
-        color_polygon_points.reserve(color_polygon_projection_lines.size());
-
-        uint8_t prev_color = get_color_of_first_polygon_line(color_polygon_projection_lines);
-        uint8_t curr_color = prev_color;
-        for (const ColorProjectionLine &color_line : color_polygon_projection_lines) {
-            if (color_line.color_changes.empty()) {
+    uint8_t prev_color = get_color_of_first_polygon_line(color_polygon_projection_lines);
+    uint8_t curr_color = prev_color;
+    for (const ColorProjectionLine &color_line : color_polygon_projection_lines) {
+        if (color_line.color_changes.empty()) {
+            color_polygon_points.emplace_back(color_line.a, prev_color, curr_color);
+            prev_color = curr_color;
+        } else {
+            if (const ColorChange &first_color_change = color_line.color_changes.front(); first_color_change.t != 0.) {
                 color_polygon_points.emplace_back(color_line.a, prev_color, curr_color);
                 prev_color = curr_color;
-            } else {
-                if (const ColorChange &first_color_change = color_line.color_changes.front(); first_color_change.t != 0.) {
-                    color_polygon_points.emplace_back(color_line.a, prev_color, curr_color);
+            }
+
+            for (const ColorChange &color_change : color_line.color_changes) {
+                if (color_change.t != 1.) {
+                    const Vec2d color_line_vec    = (color_line.b - color_line.a).cast<double>();
+                    const Point color_line_new_pt = (color_change.t * color_line_vec).cast<coord_t>() + color_line.a;
+
+                    color_polygon_points.emplace_back(color_line_new_pt, prev_color, color_change.color_next);
+                    curr_color = color_change.color_next;
                     prev_color = curr_color;
                 }
+            }
 
-                for (const ColorChange &color_change : color_line.color_changes) {
-                    if (color_change.t != 1.) {
-                        const Vec2d color_line_vec    = (color_line.b - color_line.a).cast<double>();
-                        const Point color_line_new_pt = (color_change.t * color_line_vec).cast<coord_t>() + color_line.a;
-
-                        color_polygon_points.emplace_back(color_line_new_pt, prev_color, color_change.color_next);
-                        curr_color = color_change.color_next;
-                        prev_color = curr_color;
-                    }
-                }
-
-                if (const ColorChange &last_color_change = color_line.color_changes.back(); last_color_change.t == 1.) {
-                    curr_color = last_color_change.color_next;
-                }
+            if (const ColorChange &last_color_change = color_line.color_changes.back(); last_color_change.t == 1.) {
+                curr_color = last_color_change.color_next;
             }
         }
-
-        ColorPoints color_polygon_points_filtered;
-        color_polygon_points_filtered.reserve(color_polygon_points.size());
-
-        douglas_peucker(color_polygon_points.begin(), color_polygon_points.end(), std::back_inserter(color_polygon_points_filtered), INPUT_POLYGONS_FILTER_TOLERANCE_SCALED, POLYGON_COLOR_FILTER_DISTANCE_SCALED);
-
-        if (color_polygon_points_filtered.size() < 3)
-            continue;
-
-        filter_color_of_small_segments(color_polygon_points_filtered, POLYGON_COLOR_FILTER_DISTANCE_SCALED);
-
-        color_polygons_points.emplace_back(std::move(color_polygon_points_filtered));
     }
 
-    return color_polygons_points;
+    ColorPoints color_polygon_points_filtered;
+    color_polygon_points_filtered.reserve(color_polygon_points.size());
+
+    douglas_peucker(color_polygon_points.begin(), color_polygon_points.end(), std::back_inserter(color_polygon_points_filtered), INPUT_POLYGONS_FILTER_TOLERANCE_SCALED, POLYGON_COLOR_FILTER_DISTANCE_SCALED);
+
+    if (color_polygon_points_filtered.size() < 3)
+        return {};
+
+    filter_color_of_small_segments(color_polygon_points_filtered, POLYGON_COLOR_FILTER_DISTANCE_SCALED);
+
+    return color_polygon_points_filtered;
+}
+
+static std::vector<ColorPoints> convert_color_expolygon_projection_lines_to_color_points(const ColorProjectionExPolygon &color_projection_expolygon)
+{
+    std::vector<ColorPoints> color_expolygon_points;
+    color_expolygon_points.reserve(color_projection_expolygon.polygons_count());
+
+    ColorPoints contour_color_points = convert_color_polygon_projection_lines_to_color_points(color_projection_expolygon.contour);
+    if (contour_color_points.empty())
+        return color_expolygon_points;
+
+    color_expolygon_points.emplace_back(std::move(contour_color_points));
+    for (const ColorProjectionLines &hole_color_projection_lines : color_projection_expolygon.holes) {
+        ColorPoints hole_color_points = convert_color_polygon_projection_lines_to_color_points(hole_color_projection_lines);
+        if (hole_color_points.empty())
+            continue;
+
+        color_expolygon_points.emplace_back(std::move(hole_color_points));
+    }
+
+    return color_expolygon_points;
 }
 
 static std::optional<ColorProjectionRange> project_color_line_on_projection_line(const ColorLine &color_line, const ColorProjectionLine &projection_line, const double max_projection_distance_scaled) {
@@ -1599,11 +1956,18 @@ inline void update_color_changes_using_color_projection_ranges(ColorProjectionLi
     }
 }
 
-static void update_color_changes_using_color_projection_ranges(std::vector<ColorProjectionLines> &polygons_projection_lines) {
-    for (ColorProjectionLines &polygon_projection_lines : polygons_projection_lines) {
-        for (ColorProjectionLine &projection_line : polygon_projection_lines) {
-            update_color_changes_using_color_projection_ranges(projection_line);
-        }
+static void update_color_changes_using_color_projection_ranges(ColorProjectionLines &polygon_projection_lines)
+{
+    for (ColorProjectionLine &projection_line : polygon_projection_lines) {
+        update_color_changes_using_color_projection_ranges(projection_line);
+    }
+}
+
+static void update_color_changes_using_color_projection_ranges(ColorProjectionExPolygon &color_projection_expolygon)
+{
+    update_color_changes_using_color_projection_ranges(color_projection_expolygon.contour);
+    for (ColorProjectionLines &hole_color_projection_lines : color_projection_expolygon.holes) {
+        update_color_changes_using_color_projection_ranges(hole_color_projection_lines);
     }
 }
 
@@ -1651,24 +2015,82 @@ static std::vector<ColorPolygons> slice_model_volume_with_color(const ModelVolum
     return color_polygons_per_layer;
 }
 
+// For each ColorProjectionLine, find the nearest ColorLines and project them on the ColorProjectionLine.
+static void project_color_projection_lines_on_color_lines(ColorProjectionLines                           &color_projection_lines, const AABBTreeLines::LinesDistancer<ColorLine> &color_lines_distancer)
+{
+    for (ColorProjectionLine &projection_line : color_projection_lines) {
+        std::vector<size_t> nearest_color_line_indices;
+        Slic3r::append(nearest_color_line_indices, color_lines_distancer.all_lines_in_radius(projection_line.a, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
+        Slic3r::append(nearest_color_line_indices, color_lines_distancer.all_lines_in_radius(projection_line.b, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
+        Slic3r::sort_remove_duplicates(nearest_color_line_indices);
+
+        for (size_t nearest_color_line_idx : nearest_color_line_indices) {
+            const ColorLine                    &color_line = color_lines_distancer.get_line(nearest_color_line_idx);
+            std::optional<ColorProjectionRange> projection = project_color_line_on_projection_line(color_line, projection_line, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED);
+            if (projection.has_value()) {
+                projection_line.color_projection_ranges.emplace_back(*projection);
+            }
+        }
+    }
+}
+
+// For each ColorProjectionLine, find the nearest ColorLines and project them on the ColorProjectionLine.
+static void project_color_projection_expolygon_on_color_lines(ColorProjectionExPolygon &color_projection_expolygon, const AABBTreeLines::LinesDistancer<ColorLine> &color_lines_distancer)
+{
+    project_color_projection_lines_on_color_lines(color_projection_expolygon.contour, color_lines_distancer);
+    for (ColorProjectionLines &hole_color_projection_lines : color_projection_expolygon.holes) {
+        project_color_projection_lines_on_color_lines(hole_color_projection_lines, color_lines_distancer);
+    }
+}
+
+// For each ColorProjectionLine, find the nearest ColorLines and project them on the ColorProjectionLine.
+static void project_color_projection_expolygons_on_color_lines(ColorProjectionExPolygons &color_projection_expolygons, const AABBTreeLines::LinesDistancer<ColorLine> &color_lines_distancer)
+{
+    for (ColorProjectionExPolygon &color_projection_expolygon : color_projection_expolygons) {
+        project_color_projection_expolygon_on_color_lines(color_projection_expolygon, color_lines_distancer);
+    }
+}
+
+// For each ColorLine, find the nearest ColorProjectionLines and project the ColorLine on each ColorProjectionLine.
+static void project_color_lines_on_color_projection_lines(std::vector<ColorLines> &color_polygons_lines, const AABBTreeLines::LinesDistancer<ColorProjectionLineWrapper> &color_projection_lines_distancer)
+{
+    for (const ColorLines &color_polygon : color_polygons_lines) {
+        for (const ColorLine &color_line : color_polygon) {
+            std::vector<size_t> nearest_projection_line_indices;
+            Slic3r::append(nearest_projection_line_indices, color_projection_lines_distancer.all_lines_in_radius(color_line.a, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
+            Slic3r::append(nearest_projection_line_indices, color_projection_lines_distancer.all_lines_in_radius(color_line.b, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
+            Slic3r::sort_remove_duplicates(nearest_projection_line_indices);
+
+            for (size_t nearest_projection_line_idx : nearest_projection_line_indices) {
+                ColorProjectionLine                 &color_projection_line = *color_projection_lines_distancer.get_line(nearest_projection_line_idx).color_projection_line;
+                std::optional<ColorProjectionRange> projection              = project_color_line_on_projection_line(color_line, color_projection_line, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED);
+                if (projection.has_value()) {
+                    color_projection_line.color_projection_ranges.emplace_back(*projection);
+                }
+            }
+        }
+    }
+}
+
 std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject                                               &print_object,
                                                               const std::function<ModelVolumeFacetsInfo(const ModelVolume &)> &extract_facets_info,
                                                               const size_t                                                     num_facets_states,
                                                               const float                                                      segmentation_max_width,
                                                               const float                                                      segmentation_interlocking_depth,
+                                                              const bool                                                       segmentation_interlocking_beam,
                                                               const IncludeTopAndBottomLayers                                  include_top_and_bottom_layers,
                                                               const std::function<void()>                                     &throw_on_cancel_callback)
 {
     const size_t                                   num_layers    = print_object.layers().size();
     const SpanOfConstPtrs<Layer>                   layers        = print_object.layers();
 
-    std::vector<ExPolygons>                        input_expolygons(num_layers);
-    std::vector<std::vector<ColorProjectionLines>> input_polygons_projection_lines_layers(num_layers);
-    std::vector<std::vector<ColorLines>>           color_polygons_lines_layers(num_layers);
+    std::vector<ExPolygons>                input_expolygons(num_layers);
+    std::vector<ColorProjectionExPolygons> input_expolygons_projection_lines_layers(num_layers);
+    std::vector<std::vector<ColorLines>>   color_polygons_lines_layers(num_layers);
 
     // Merge all regions and remove small holes
     BOOST_LOG_TRIVIAL(debug) << "Print object segmentation - Slices preprocessing in parallel - Begin";
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&layers, &input_expolygons, &input_polygons_projection_lines_layers, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&layers, &input_expolygons, &input_expolygons_projection_lines_layers, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
             throw_on_cancel_callback();
 
@@ -1691,8 +2113,8 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
             // Such close points sometimes caused that the Voronoi diagram has self-intersecting edges around these vertices.
             // This consequently leads to issues with the extraction of colored segments by function extract_colored_segments.
             // Calling expolygons_simplify fixed these issues.
-            input_expolygons[layer_idx]                       = remove_duplicates(expolygons_simplify(offset_ex(ex_polygons, -10.f * float(SCALED_EPSILON)), 5 * SCALED_EPSILON), scaled<coord_t>(0.01), PI / 6);
-            input_polygons_projection_lines_layers[layer_idx] = create_color_projection_lines(input_expolygons[layer_idx]);
+            input_expolygons[layer_idx]                         = remove_duplicates(expolygons_simplify(offset_ex(ex_polygons, -10.f * float(SCALED_EPSILON)), 5 * SCALED_EPSILON), scaled<coord_t>(0.01), PI / 6);
+            input_expolygons_projection_lines_layers[layer_idx] = create_color_projection_expolygons(input_expolygons[layer_idx]);
 
             if constexpr (MM_SEGMENTATION_DEBUG_INPUT) {
                 export_processed_input_expolygons_to_svg(debug_out_path("mm-input-%d.svg", layer_idx), layers[layer_idx]->regions(), input_expolygons[layer_idx]);
@@ -1745,47 +2167,17 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
 
     // Project sliced ColorPolygons on sliced layers (input_expolygons).
     BOOST_LOG_TRIVIAL(debug) << "Print object segmentation - Projection of painted triangles - Begin";
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&color_polygons_lines_layers, &input_polygons_projection_lines_layers, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&color_polygons_lines_layers, &input_expolygons_projection_lines_layers, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
             throw_on_cancel_callback();
 
             // For each ColorLine, find the nearest ColorProjectionLines and project the ColorLine on each ColorProjectionLine.
-            const AABBTreeLines::LinesDistancer<ColorProjectionLineWrapper> color_projection_lines_distancer{create_color_projection_lines_mapping(input_polygons_projection_lines_layers[layer_idx])};
-            for (const ColorLines &color_polygon : color_polygons_lines_layers[layer_idx]) {
-                for (const ColorLine &color_line : color_polygon) {
-                    std::vector<size_t> nearest_projection_line_indices;
-                    Slic3r::append(nearest_projection_line_indices, color_projection_lines_distancer.all_lines_in_radius(color_line.a, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
-                    Slic3r::append(nearest_projection_line_indices, color_projection_lines_distancer.all_lines_in_radius(color_line.b, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
-                    Slic3r::sort_remove_duplicates(nearest_projection_line_indices);
-
-                    for (size_t nearest_projection_line_idx : nearest_projection_line_indices) {
-                        ColorProjectionLine                 &color_projection_line = *color_projection_lines_distancer.get_line(nearest_projection_line_idx).color_projection_line;
-                        std::optional<ColorProjectionRange> projection              = project_color_line_on_projection_line(color_line, color_projection_line, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED);
-                        if (projection.has_value()) {
-                            color_projection_line.color_projection_ranges.emplace_back(*projection);
-                        }
-                    }
-                }
-            }
+            const AABBTreeLines::LinesDistancer<ColorProjectionLineWrapper> color_projection_lines_distancer{create_color_projection_lines_mapping(input_expolygons_projection_lines_layers[layer_idx])};
+            project_color_lines_on_color_projection_lines(color_polygons_lines_layers[layer_idx], color_projection_lines_distancer);
 
             // For each ColorProjectionLine, find the nearest ColorLines and project them on the ColorProjectionLine.
             const AABBTreeLines::LinesDistancer<ColorLine> color_lines_distancer{flatten_color_lines(color_polygons_lines_layers[layer_idx])};
-            for (ColorProjectionLines &input_polygon_projection_lines : input_polygons_projection_lines_layers[layer_idx]) {
-                for (ColorProjectionLine &projection_lines : input_polygon_projection_lines) {
-                    std::vector<size_t> nearest_color_line_indices;
-                    Slic3r::append(nearest_color_line_indices, color_lines_distancer.all_lines_in_radius(projection_lines.a, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
-                    Slic3r::append(nearest_color_line_indices, color_lines_distancer.all_lines_in_radius(projection_lines.b, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED));
-                    Slic3r::sort_remove_duplicates(nearest_color_line_indices);
-
-                    for (size_t nearest_color_line_idx : nearest_color_line_indices) {
-                        const ColorLine                     &color_line = color_lines_distancer.get_line(nearest_color_line_idx);
-                        std::optional<ColorProjectionRange> projection = project_color_line_on_projection_line(color_line, projection_lines, MM_SEGMENTATION_MAX_PROJECTION_DISTANCE_SCALED);
-                        if (projection.has_value()) {
-                            projection_lines.color_projection_ranges.emplace_back(*projection);
-                        }
-                    }
-                }
-            }
+            project_color_projection_expolygons_on_color_lines(input_expolygons_projection_lines_layers[layer_idx], color_lines_distancer);
         }
     }); // end of parallel_for
     BOOST_LOG_TRIVIAL(debug) << "MM segmentation - Projection of painted triangles - End";
@@ -1796,36 +2188,46 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
     // Be aware that after the projection of the ColorPolygons and its postprocessing isn't
     // ensured that consistency of the color_prev. So, only color_next can be used.
     BOOST_LOG_TRIVIAL(debug) << "Print object segmentation - Layers segmentation in parallel - Begin";
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&input_polygons_projection_lines_layers, &segmented_regions, &input_expolygons, &num_facets_states, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&input_expolygons_projection_lines_layers, &segmented_regions, &input_expolygons, &num_facets_states, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
             throw_on_cancel_callback();
 
-            std::vector<ColorProjectionLines> &input_polygons_projection_lines = input_polygons_projection_lines_layers[layer_idx];
-            if (input_polygons_projection_lines.empty()) {
-                continue;
-            }
+            ColorProjectionExPolygons &input_expolygons_projection_lines = input_expolygons_projection_lines_layers[layer_idx];
+            for (ColorProjectionExPolygon &input_expolygon_projection_lines : input_expolygons_projection_lines) {
+                const size_t expolygon_idx = &input_expolygon_projection_lines - input_expolygons_projection_lines.data();
 
-            if constexpr (MM_SEGMENTATION_DEBUG_COLOR_RANGES) {
-                export_color_projection_lines_color_ranges_to_svg(debug_out_path("mm-color-ranges-%d.svg", layer_idx), input_polygons_projection_lines, input_expolygons[layer_idx]);
-            }
+                if constexpr (MM_SEGMENTATION_DEBUG_COLOR_RANGES) {
+                    export_color_projection_lines_color_ranges_to_svg(debug_out_path("mm-color-ranges-%d-%d.svg", layer_idx, expolygon_idx), input_expolygon_projection_lines, input_expolygons[layer_idx]);
+                }
 
-            update_color_changes_using_color_projection_ranges(input_polygons_projection_lines);
-            filter_projected_color_points_on_polygons(input_polygons_projection_lines);
+                update_color_changes_using_color_projection_ranges(input_expolygon_projection_lines);
+                filter_projected_color_points_on_expolygon(input_expolygon_projection_lines);
 
-            const std::vector<ColorPoints>  color_polygons_points = convert_color_polygons_projection_lines_to_color_points(input_polygons_projection_lines);
-            const std::vector<ColoredLines> colored_polygons      = color_points_to_colored_lines(color_polygons_points);
+                std::vector<ColorPoints> color_polygons_points = convert_color_expolygon_projection_lines_to_color_points(input_expolygon_projection_lines);
+                if (color_polygons_points.empty())
+                    continue;
 
-            if constexpr (MM_SEGMENTATION_DEBUG_COLORIZED_POLYGONS) {
-                export_color_polygons_points_to_svg(debug_out_path("mm-projected-color_polygon-%d.svg", layer_idx), color_polygons_points, input_expolygons[layer_idx]);
-            }
+                snap_projected_color_points_to_nearest_angles(color_polygons_points);
 
-            assert(!colored_polygons.empty());
-            if (has_layer_only_one_color(colored_polygons)) {
-                // When the whole layer is painted using the same color, it is not needed to construct a Voronoi diagram for the segmentation of this layer.
-                assert(!colored_polygons.front().empty());
-                segmented_regions[layer_idx][size_t(colored_polygons.front().front().color)] = input_expolygons[layer_idx];
-            } else {
-                segmented_regions[layer_idx] = extract_colored_segments(colored_polygons, num_facets_states, layer_idx);
+                if constexpr (MM_SEGMENTATION_DEBUG_COLORIZED_POLYGONS) {
+                    export_color_polygons_points_to_svg(debug_out_path("mm-projected-color_polygon-%d-%d.svg", layer_idx, expolygon_idx), color_polygons_points, input_expolygons[layer_idx]);
+                }
+
+                const std::vector<ColoredLines> colored_polygons = color_points_to_colored_lines(color_polygons_points);
+                assert(!colored_polygons.empty());
+                if (has_polygons_only_one_color(colored_polygons)) {
+                    // When the whole ExPolygon is painted using the same color, it is not needed to construct a Voronoi diagram for the segmentation of this ExPolygon.
+                    assert(!colored_polygons.front().empty());
+                    segmented_regions[layer_idx][size_t(colored_polygons.front().front().color)].emplace_back(input_expolygons[layer_idx][expolygon_idx]);
+                } else {
+                    std::vector<ExPolygons> colored_segments_by_states = extract_colored_segments(colored_polygons, num_facets_states, layer_idx);
+                    for (size_t state_idx = 0; state_idx < num_facets_states; ++state_idx) {
+                        if (colored_segments_by_states[state_idx].empty())
+                            continue;
+
+                        Slic3r::append(segmented_regions[layer_idx][state_idx], std::move(colored_segments_by_states[state_idx]));
+                    }
+                }
             }
 
             if constexpr (MM_SEGMENTATION_DEBUG_REGIONS) {
@@ -1843,7 +2245,7 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
         throw_on_cancel_callback();
     }
 
-    if (segmentation_max_width > 0.f) {
+    if ((segmentation_max_width > 0.f || segmentation_interlocking_depth > 0.f) && !segmentation_interlocking_beam) {
         cut_segmented_layers(input_expolygons, segmented_regions, scaled<float>(segmentation_max_width), scaled<float>(segmentation_interlocking_depth), throw_on_cancel_callback);
         throw_on_cancel_callback();
     }
@@ -1865,12 +2267,13 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
     const size_t num_facets_states  = print_object.print()->config().nozzle_diameter.size() + 1;
     const float  max_width          = float(print_object.config().mmu_segmented_region_max_width.value);
     const float  interlocking_depth = float(print_object.config().mmu_segmented_region_interlocking_depth.value);
+    const bool   interlocking_beam  = print_object.config().interlocking_beam.value;
 
     const auto extract_facets_info = [](const ModelVolume &mv) -> ModelVolumeFacetsInfo {
         return {mv.mm_segmentation_facets, mv.is_mm_painted(), false};
     };
 
-    return segmentation_by_painting(print_object, extract_facets_info, num_facets_states, max_width, interlocking_depth, IncludeTopAndBottomLayers::Yes, throw_on_cancel_callback);
+    return segmentation_by_painting(print_object, extract_facets_info, num_facets_states, max_width, interlocking_depth, interlocking_beam, IncludeTopAndBottomLayers::Yes, throw_on_cancel_callback);
 }
 
 // Returns fuzzy skin segmentation based on painting in fuzzy skin segmentation gizmo
@@ -1889,7 +2292,7 @@ std::vector<std::vector<ExPolygons>> fuzzy_skin_segmentation_by_painting(const P
         max_external_perimeter_width = std::max<float>(max_external_perimeter_width, region.flow(print_object, frExternalPerimeter, print_object.config().layer_height).width());
     }
 
-    return segmentation_by_painting(print_object, extract_facets_info, num_facets_states, max_external_perimeter_width, 0.f, IncludeTopAndBottomLayers::No, throw_on_cancel_callback);
+    return segmentation_by_painting(print_object, extract_facets_info, num_facets_states, max_external_perimeter_width, 0.f, false, IncludeTopAndBottomLayers::No, throw_on_cancel_callback);
 }
 
 

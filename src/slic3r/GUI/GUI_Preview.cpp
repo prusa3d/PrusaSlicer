@@ -301,6 +301,7 @@ void Preview::reload_print()
 
     m_loaded = false;
     load_print();
+    m_layers_slider->seq_top_layer_only(wxGetApp().app_config->get_bool("seq_top_layer_only"));
 }
 
 void Preview::msw_rescale()
@@ -403,6 +404,7 @@ void Preview::create_sliders()
     m_layers_slider->SetEmUnit(wxGetApp().em_unit());
     m_layers_slider->set_imgui_wrapper(wxGetApp().imgui());
     m_layers_slider->show_estimated_times(wxGetApp().app_config->get_bool("show_estimated_times_in_dbl_slider"));
+    m_layers_slider->seq_top_layer_only(wxGetApp().app_config->get_bool("seq_top_layer_only"));
     m_layers_slider->show_ruler(wxGetApp().app_config->get_bool("show_ruler_in_dbl_slider"), wxGetApp().app_config->get_bool("show_ruler_bg_in_dbl_slider"));
 
     m_layers_slider->SetDrawMode(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA,
@@ -410,8 +412,10 @@ void Preview::create_sliders()
 
     m_layers_slider->set_callback_on_thumb_move( [this]() -> void { Preview::on_layers_slider_scroll_changed(); } );
 
-    m_layers_slider->set_callback_on_change_app_config([](const std::string& key, const std::string& val)   -> void {
+    m_layers_slider->set_callback_on_change_app_config([this](const std::string& key, const std::string& val)   -> void {
         wxGetApp().app_config->set(key, val);
+        if (key == "seq_top_layer_only")
+            reload_print();
     });
 
     if (wxGetApp().is_editor()) {

@@ -1,9 +1,12 @@
 #include <libslic3r/Point.hpp>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <catch2/catch_approx.hpp>
 #include <libslic3r/GCode/SeamGeometry.hpp>
 #include <libslic3r/Geometry.hpp>
 
 using namespace Slic3r;
+using namespace Catch;
 
 TEST_CASE("Lists mapping", "[Seams][SeamGeometry]") {
     // clang-format off
@@ -122,51 +125,4 @@ TEST_CASE("Vertex angle is rotation agnostic", "[Seams][SeamGeometry]") {
 
     std::vector<double> rotated_angles = Seams::Geometry::get_vertex_angles(points, 0.1);
     CHECK(rotated_angles[1] == Approx(angles[1]));
-}
-
-TEST_CASE("Calculate overhangs", "[Seams][SeamGeometry]") {
-    const ExPolygon square{
-        scaled(Vec2d{0.0, 0.0}),
-        scaled(Vec2d{1.0, 0.0}),
-        scaled(Vec2d{1.0, 1.0}),
-        scaled(Vec2d{0.0, 1.0})
-    };
-    const std::vector<Vec2d> points{Seams::Geometry::unscaled(square.contour.points)};
-    ExPolygon previous_layer{square};
-    previous_layer.translate(scaled(Vec2d{-0.5, 0}));
-    AABBTreeLines::LinesDistancer<Linef> previous_layer_distancer{
-        to_unscaled_linesf({previous_layer})};
-    const std::vector<double> overhangs{
-        Seams::Geometry::get_overhangs(points, previous_layer_distancer, 0.5)};
-    REQUIRE(overhangs.size() == points.size());
-    CHECK_THAT(overhangs, Catch::Matchers::Approx(std::vector<double>{
-        0.0, M_PI / 4.0, M_PI / 4.0, 0.0
-    }));
-}
-
-const Linesf lines{to_unscaled_linesf({ExPolygon{
-    scaled(Vec2d{0.0, 0.0}),
-    scaled(Vec2d{1.0, 0.0}),
-    scaled(Vec2d{1.0, 1.0}),
-    scaled(Vec2d{0.0, 1.0})
-}})};
-
-TEST_CASE("Offset along loop lines forward", "[Seams][SeamGeometry]") {
-    const std::optional<Seams::Geometry::PointOnLine> result{Seams::Geometry::offset_along_lines(
-        {0.5, 0.0}, 0, lines, 3.9, Seams::Geometry::Direction1D::forward
-    )};
-    REQUIRE(result);
-    const auto &[point, line_index] = *result;
-    CHECK((scaled(point) - Point::new_scale(0.4, 0.0)).norm() < scaled(EPSILON));
-    CHECK(line_index == 0);
-}
-
-TEST_CASE("Offset along loop lines backward", "[Seams][SeamGeometry]") {
-    const std::optional<Seams::Geometry::PointOnLine> result{Seams::Geometry::offset_along_lines(
-        {1.0, 0.5}, 1, lines, 1.8, Seams::Geometry::Direction1D::backward
-    )};
-    REQUIRE(result);
-    const auto &[point, line_index] = *result;
-    CHECK((scaled(point) - Point::new_scale(0.0, 0.3)).norm() < scaled(EPSILON));
-    CHECK(line_index == 3);
 }

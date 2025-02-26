@@ -22,6 +22,7 @@
 #include "Print.hpp"
 #include "ShortestPath.hpp"
 #include "admesh/stl.h"
+#include "libslic3r/Feature/Interlocking/InterlockingGenerator.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/Exception.hpp"
@@ -921,6 +922,12 @@ void PrintObject::slice_volumes()
 
         BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - Fuzzy skin segmentation";
         apply_fuzzy_skin_segmentation(*this, [print]() { print->throw_if_canceled(); });
+    }
+
+    if (m_config.interlocking_beam) {
+        BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - Applying multi-material interlocking";
+        InterlockingGenerator::generate_interlocking_structure(*this);
+        m_print->throw_if_canceled();
     }
 
     BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - make_slices in parallel - begin";

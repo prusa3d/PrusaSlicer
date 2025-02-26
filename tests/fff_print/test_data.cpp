@@ -1,3 +1,4 @@
+#include <catch2/catch_test_macros.hpp>
 #include "test_data.hpp"
 
 #include "libslic3r/TriangleMesh.hpp"
@@ -399,7 +400,6 @@ bool contains_regex(const std::string &data, const std::string &pattern)
 
 } } // namespace Slic3r::Test
 
-#include <catch2/catch.hpp>
 
 SCENARIO("init_print functionality", "[test_data]") {
 	GIVEN("A default config") {

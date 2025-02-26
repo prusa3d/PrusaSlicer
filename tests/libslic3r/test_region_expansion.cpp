@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <libslic3r/libslic3r.h>
 #include <libslic3r/Algorithm/RegionExpansion.hpp>
@@ -8,6 +9,7 @@
 #include <libslic3r/SVG.cpp>
 
 using namespace Slic3r;
+using namespace Catch;
 
 //#define DEBUG_TEMP_DIR "d:\\temp\\"
 

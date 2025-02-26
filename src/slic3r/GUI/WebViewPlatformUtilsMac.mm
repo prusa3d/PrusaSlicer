@@ -156,6 +156,13 @@ void delete_cookies(wxWebView* web_view, const std::string& url)
         }
     }];
 }
+
+void delete_cookies_with_counter(wxWebView* web_view, const std::string& url, std::atomic<size_t>& counter)
+{
+    delete_cookies(web_view, url);
+    counter++;
+}
+
 void add_request_authorization(wxWebView* web_view, const wxString& address, const std::string& token)
 {
     // unused on MacOS

@@ -12,6 +12,7 @@
 #endif //_WIN32
 
 #include <string>
+#include <map>
 
 #include <boost/filesystem.hpp>
 
@@ -32,6 +33,7 @@ bool    instance_check(int argc, char** argv, bool app_config_single_instance);
 // apple implementation of inner functions of instance_check
 // in InstanceCheckMac.mm
 void    send_message_mac(const std::string& msg, const std::string& version);
+void    multicast_message_mac(const std::string &msg);
 void    send_message_mac_closing(const std::string& msg, const std::string& version);
 
 
@@ -54,11 +56,16 @@ wxDECLARE_EVENT(EVT_START_DOWNLOAD_OTHER_INSTANCE, StartDownloadOtherInstanceEve
 wxDECLARE_EVENT(EVT_LOGIN_OTHER_INSTANCE, LoginOtherInstanceEvent);
 using InstanceGoToFrontEvent = SimpleEvent;
 wxDECLARE_EVENT(EVT_INSTANCE_GO_TO_FRONT, InstanceGoToFrontEvent);
+wxDECLARE_EVENT(EVT_STORE_READ_REQUEST, SimpleEvent);
 
 class OtherInstanceMessageHandler
 {
 public:
-	OtherInstanceMessageHandler() = default;
+	OtherInstanceMessageHandler() 
+    {
+         m_message_handlers["CLI"] = std::bind(&OtherInstanceMessageHandler::handle_message_type_cli, this, std::placeholders::_1);
+         m_message_handlers["STORE_READ"] = std::bind(&OtherInstanceMessageHandler::handle_message_type_store_read, this, std::placeholders::_1);
+    }
 	OtherInstanceMessageHandler(OtherInstanceMessageHandler const&) = delete;
 	void operator=(OtherInstanceMessageHandler const&) = delete;
 	~OtherInstanceMessageHandler() { assert(!m_initialized); }
@@ -68,13 +75,10 @@ public:
 	// stops listening, on linux stops the background thread
 	void    shutdown(MainFrame* main_frame);
 
-	//finds paths to models in message(= command line arguments, first should be prusaSlicer executable)
-	//and sends them to plater via LoadFromOtherInstanceEvent
-	//security of messages: from message all existing paths are proccesed to load model 
-	//						win32 - anybody who has hwnd can send message.
-	//						mac - anybody who posts notification with name:@"OtherPrusaSlicerTerminating"
-	//						linux - instrospectable on dbus
-	void           handle_message(const std::string& message);
+	// message in format { "type" : "TYPE", "data" : "data" }
+	void    handle_message(const std::string& message);
+
+    void    multicast_message(const std::string& message_type, const std::string& message_data = std::string());
 #ifdef __APPLE__
 	// Messege form other instance, that it deleted its lockfile - first instance to get it will create its own.
 	void           handle_message_other_closed();
@@ -84,19 +88,37 @@ public:
 	void           update_windows_properties(MainFrame* main_frame);
 #endif //WIN32
 private:
+    //finds paths to models in message(= command line arguments, first should be prusaSlicer executable)
+	//and sends them to plater via LoadFromOtherInstanceEvent
+	//security of messages: from message all existing paths are proccesed to load model 
+	//						win32 - anybody who has hwnd can send message.
+	//						mac - anybody who posts notification with name:@"OtherPrusaSlicerTerminating"
+	//						linux - instrospectable on dbus
+    void    handle_message_type_cli(const std::string& data);
+    // Passes information to UI to perform store read
+    void    handle_message_type_store_read(const std::string& data);
+    std::map<std::string, std::function<void(const std::string&)>> m_message_handlers;
+
 	bool                    m_initialized { false };
 	wxEvtHandler*           m_callback_evt_handler { nullptr };
 
 #ifdef BACKGROUND_MESSAGE_LISTENER
-	//worker thread to listen incoming dbus communication
-	boost::thread 			m_thread;
-	std::condition_variable m_thread_stop_condition;
-	mutable std::mutex 		m_thread_stop_mutex;
-	bool 					m_stop{ false };
-	bool					m_start{ true };
-	
-	// background thread method
-	void    listen();
+	// instance check worker thread to listen incoming dbus communication
+	// Only one instance has registered dbus object at time
+	boost::thread 			m_instance_check_thread;
+	std::condition_variable m_instance_check_thread_stop_condition;
+	mutable std::mutex 		m_instance_check_thread_stop_mutex;
+	bool 					m_instance_check_thread_stop{ false };
+	//bool					m_instance_check_thread_start{ true };	
+	void    listen_instance_check();
+
+	// "multicast" worker thread to listen incoming dbus communication
+	// every instance has registered its own object
+	boost::thread 			m_multicast_listener_thread;
+	std::condition_variable m_multicast_listener_thread_stop_condition;
+	mutable std::mutex 		m_multicast_listener_thread_stop_mutex;
+	bool 					m_multicast_listener_thread_stop{ false };
+	void    listen_multicast();
 #endif //BACKGROUND_MESSAGE_LISTENER
 
 #if __APPLE__

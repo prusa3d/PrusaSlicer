@@ -1,3 +1,5 @@
+min_slic3r_version = 2.9.1-alpha0
+2.1.0 Extruder clearance moved to printer settings.
 min_slic3r_version = 2.8.0-alpha0
 2.0.3 Rat Rig official Idex release + minor updates to print settings and filament paramethers
 2.0.2 Fixed bed model and texture sizes.

@@ -232,6 +232,10 @@ void WebViewPanel::on_show(wxShowEvent& evt)
         return;
     }
 
+    if (m_after_show_func_prohibited_once) {
+        m_after_show_func_prohibited_once = false;
+        return;
+    }
     after_on_show(evt);
 }
 
@@ -422,7 +426,7 @@ void WebViewPanel::run_script(const wxString& javascript)
     // Remember the script we run in any case, so the next time the user opens
     // the "Run Script" dialog box, it is shown there for convenient updating.
     m_javascript = javascript;
-    BOOST_LOG_TRIVIAL(debug) << "RunScript " << javascript << "\n";
+    BOOST_LOG_TRIVIAL(trace) << "RunScript " << javascript << "\n";
     m_browser->RunScriptAsync(javascript);
 }
 
@@ -595,9 +599,10 @@ void WebViewPanel::sys_color_changed()
 void WebViewPanel::on_app_quit_event(const std::string& message_data)
 {
     // MacOS only suplement for cmd+Q
-    wxGetApp().Exit();
+    if (wxGetApp().mainframe) {
+         wxGetApp().mainframe->Close();
+    }
 }
-
 void WebViewPanel::on_app_minimize_event(const std::string& message_data)
 {
     // MacOS only suplement for cmd+M
@@ -614,6 +619,7 @@ ConnectWebViewPanel::ConnectWebViewPanel(wxWindow* parent)
     auto* plater = wxGetApp().plater();
     plater->Bind(EVT_UA_LOGGEDOUT, &ConnectWebViewPanel::on_user_logged_out, this);
     plater->Bind(EVT_UA_ID_USER_SUCCESS, &ConnectWebViewPanel::on_user_token, this);
+    plater->Bind(EVT_UA_ID_USER_SUCCESS_AFTER_TOKEN_SUCCESS, &ConnectWebViewPanel::on_user_token, this);
 
     m_actions["appQuit"] = std::bind(&WebViewPanel::on_app_quit_event, this, std::placeholders::_1);
     m_actions["appMinimize"] = std::bind(&WebViewPanel::on_app_minimize_event, this, std::placeholders::_1);
@@ -640,6 +646,7 @@ void ConnectWebViewPanel::late_create()
 
 void ConnectWebViewPanel::on_user_token(UserAccountSuccessEvent& e)
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     e.Skip();
     if (!m_browser) {
         return;
@@ -659,6 +666,7 @@ ConnectWebViewPanel::~ConnectWebViewPanel()
 
 wxString ConnectWebViewPanel::get_login_script(bool refresh)
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     Plater* plater = wxGetApp().plater();
     const std::string& access_token = plater->get_user_account()->get_access_token();
     assert(!access_token.empty());
@@ -809,6 +817,7 @@ void ConnectWebViewPanel::on_page_will_load()
     if (!m_browser) {
         return;
     }
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     auto javascript = get_login_script(false);
     BOOST_LOG_TRIVIAL(debug) << "RunScript " << javascript << "\n";
     m_browser->AddUserScript(javascript);
@@ -858,6 +867,7 @@ void ConnectWebViewPanel::on_navigation_request(wxWebViewEvent &evt)
 
 void ConnectWebViewPanel::on_connect_action_error(const std::string &message_data)
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     ConnectRequestHandler::on_connect_action_error(message_data);
     // TODO: make this more user friendly (and make sure only once opened if multiple errors happen)
 //    MessageDialog dialog(
@@ -872,6 +882,7 @@ void ConnectWebViewPanel::on_connect_action_error(const std::string &message_dat
 
 void ConnectWebViewPanel::on_reload_event(const std::string& message_data)
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     // Event from our error page button or keyboard shortcut 
     m_styles_defined = false;
     try {
@@ -888,6 +899,12 @@ void ConnectWebViewPanel::on_reload_event(const std::string& message_data)
         BOOST_LOG_TRIVIAL(error) << "Could not parse printables message. " << e.what();
         return;
     }
+}
+
+void ConnectWebViewPanel::after_on_show(wxShowEvent& evt)
+{
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
+    run_script("window.location.reload();");
 }
 
 void ConnectWebViewPanel::logout()
@@ -1150,6 +1167,7 @@ PrintablesWebViewPanel::PrintablesWebViewPanel(wxWindow* parent)
     m_events["reloadHomePage"] = std::bind(&PrintablesWebViewPanel::on_reload_event, this, std::placeholders::_1);
     m_events["appQuit"] = std::bind(&WebViewPanel::on_app_quit_event, this, std::placeholders::_1);
     m_events["appMinimize"] = std::bind(&WebViewPanel::on_app_minimize_event, this, std::placeholders::_1);
+    m_events["ready"] = std::bind(&PrintablesWebViewPanel::on_printables_event_dummy, this, std::placeholders::_1);
 }
 
 void PrintablesWebViewPanel::handle_message(const std::string& message)
@@ -1375,6 +1393,7 @@ void PrintablesWebViewPanel::send_refreshed_token(const std::string& access_toke
     if (m_load_default_url) {
         return;
     }
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     hide_loading_overlay();
     wxString script = GUI::format_wxstr("window.postMessage(JSON.stringify({"
         "event: 'accessTokenChange',"
@@ -1388,6 +1407,7 @@ void PrintablesWebViewPanel::send_will_refresh()
     if (m_load_default_url) {
         return;
     }
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     wxString script = "window.postMessage(JSON.stringify({ event: 'accessTokenWillChange' }))";
     run_script(script);
 }
@@ -1408,7 +1428,7 @@ void PrintablesWebViewPanel::sys_color_changed()
 
 void PrintablesWebViewPanel::on_printables_event_access_token_expired(const std::string& message_data)
 {
-    //  { "event": "accessTokenExpired:)
+    //  { "event": "accessTokenExpired")
     // There seems to be a situation where we get accessTokenExpired when there is active token from Slicer POW
     // We need get new token and freeze webview until its not refreshed
     if (m_refreshing_token) {
@@ -1418,6 +1438,7 @@ void PrintablesWebViewPanel::on_printables_event_access_token_expired(const std:
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     m_refreshing_token = true;
     show_loading_overlay();
+   
     wxGetApp().plater()->get_user_account()->request_refresh();
 }
 
