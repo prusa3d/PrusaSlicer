@@ -63,5 +63,9 @@ if (UNIX AND NOT APPLE)
 endif ()
 
 if (SLIC3R_ENABLE_WEBKIT)
-   target_compile_definitions(slic3r-app-desktop PRIVATE SLIC3R_HAS_WEBKIT) 
+   target_compile_definitions(slic3r-app-desktop PRIVATE SLIC3R_HAS_WEBKIT)
+endif()
+
+if (SLIC3R_EGL)
+    target_compile_definitions(slic3r-app-desktop PRIVATE SLIC3R_EGL)
 endif()
