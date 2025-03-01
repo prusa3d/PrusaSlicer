@@ -140,6 +140,10 @@ if (NOT WIN32 AND NOT APPLE)
     set_target_properties(PrusaSlicer PROPERTIES OUTPUT_NAME "prusa-slicer")
 endif ()
 
+if (SLIC3R_EGL)
+    target_compile_options(PrusaSlicer PRIVATE -DSLIC3R_EGL=1)
+endif()
+
 
 target_link_libraries(PrusaSlicer PRIVATE libslic3r libcereal slic3r-arrange-wrapper libseqarrange stb_image)
 

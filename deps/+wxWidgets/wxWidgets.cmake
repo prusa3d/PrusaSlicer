@@ -51,7 +51,7 @@ add_cmake_project(wxWidgets
         -DwxUSE_EXPAT=sys
         -DwxUSE_LIBSDL=OFF
         -DwxUSE_XTEST=OFF
-        -DwxUSE_GLCANVAS_EGL=OFF
+        -DwxUSE_GLCANVAS_EGL=${SLIC3R_EGL}
         -DwxUSE_WEBREQUEST=OFF
         ${_wx_webview}
         ${_wx_secretstore}
