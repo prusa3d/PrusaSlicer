@@ -1,7 +1,9 @@
 ///|/ Copyright (c) Prusa Research 2019 - 2023 Tomáš Mészáros @tamasmeszaros, Oleksandra Iushchenko @YuSanka, Pavel Mikuš @Godrak, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2024 Felix Reißmann @Felix-Rm
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+
 #include <libslic3r/Exception.hpp>
 #include <libslic3r/SLAPrintSteps.hpp>
 #include <libslic3r/MeshBoolean.hpp>
@@ -1256,6 +1258,37 @@ static int layer_peel_move_time(int layer_height_nm, ExposureProfile p)
     return int(tilt + tower);
 }
 
+namespace {
+template<typename T> static T constrain(T value, T min, T max) {
+    if (value < min)
+        return min;
+    else if (value > max)
+        return max;
+    else
+        return value;
+}
+
+static float constrained_map(float value, float min, float max, float out_min, float out_max) {
+    value = constrain(value, min, max);
+    float t = (value - min) / (max - min);
+    return out_min * (1 - t) + out_max * t;
+}
+
+static float generate_layer_exposure_time(
+    int current_layer, int bottom_layers, int faded_layers,
+    float initial_exposure_time, float exposure_time
+) {
+    if (current_layer <= bottom_layers) {
+        return initial_exposure_time;
+    } else {
+        return constrained_map(
+            current_layer - bottom_layers, 1, faded_layers + 1,
+            initial_exposure_time, exposure_time
+        );
+    }
+}
+}
+
 // Merging the slices from all the print objects into one slice grid and
 // calculating print statistics from the merge result.
 void SLAPrint::Steps::merge_slices_and_eval_stats() {
@@ -1273,10 +1306,14 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     const double fast_tilt = printer_config.fast_tilt_time.getFloat();// 5.0;
     const double slow_tilt = printer_config.slow_tilt_time.getFloat();// 8.0;
     const double hv_tilt   = printer_config.high_viscosity_tilt_time.getFloat();// 10.0;
+    const bool is_printer_with_tilt = !(std::isnan(fast_tilt) || std::isnan(slow_tilt) || std::isnan(hv_tilt));
 
     const double init_exp_time = material_config.initial_exposure_time.getFloat();
     const double exp_time      = material_config.exposure_time.getFloat();
 
+    const double time_estimate_correction = printer_config.time_estimate_correction.getFloat();
+
+    const int bottom_layers_cnt = m_print->m_default_object_config.bottom_layers.getInt();// 2 // [1;20]
     const int fade_layers_cnt = m_print->m_default_object_config.faded_layers.getInt();// 10 // [3;20]
 
     ExposureProfile below(material_config, 0);
@@ -1298,6 +1335,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     auto printlayerfn = [this,
             // functions and read only vars
             area_fill, display_area, exp_time, init_exp_time, fast_tilt, slow_tilt, hv_tilt, material_config, delta_fade_time, is_prusa_print, first_slow_layers, below, above,
+            is_printer_with_tilt, time_estimate_correction, bottom_layers_cnt, fade_layers_cnt,
 
             // write vars
             &layers_info](size_t sliced_layer_cnt)
@@ -1378,47 +1416,83 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
         double layer_times = 0.0;
         bool is_fast_layer = false;
 
-        if (is_prusa_print) {
-            is_fast_layer = int(sliced_layer_cnt) < first_slow_layers || layer_area <= display_area * area_fill;
-            const int l_height_nm = 1000000 * l_height;
+        if (is_printer_with_tilt) {
+            if (is_prusa_print) {
+                is_fast_layer = int(sliced_layer_cnt) < first_slow_layers || layer_area <= display_area * area_fill;
+                const int l_height_nm = 1000000 * l_height;
 
-            layer_times = layer_peel_move_time(l_height_nm, is_fast_layer ? below : above) +
-                            (is_fast_layer ? below : above).delay_before_exposure_ms +
-                            (is_fast_layer ? below : above).delay_after_exposure_ms +
-                            refresh_delay_ms * 5 +                  // ~ 5x frame display wait
-                            124;                                    // Magical constant to compensate remaining computation delay in exposure thread
+                layer_times = layer_peel_move_time(l_height_nm, is_fast_layer ? below : above) +
+                                (is_fast_layer ? below : above).delay_before_exposure_ms +
+                                (is_fast_layer ? below : above).delay_after_exposure_ms +
+                                refresh_delay_ms * 5 +                  // ~ 5x frame display wait
+                                124;                                    // Magical constant to compensate remaining computation delay in exposure thread
 
-            layer_times *= 0.001; // All before calculations are made in ms, but we need it in s
-        }
-        else {
-            is_fast_layer = layer_area <= display_area*area_fill;
-            const double tilt_time = material_config.material_print_speed == slamsSlow              ? slow_tilt :
-                                     material_config.material_print_speed == slamsHighViscosity     ? hv_tilt   :
-                                     is_fast_layer ? fast_tilt : slow_tilt;
+                layer_times *= 0.001; // All before calculations are made in ms, but we need it in s
+            }
+            else {
+                is_fast_layer = layer_area <= display_area*area_fill;
+                const double tilt_time = material_config.material_print_speed == slamsSlow              ? slow_tilt :
+                                        material_config.material_print_speed == slamsHighViscosity     ? hv_tilt   :
+                                        is_fast_layer ? fast_tilt : slow_tilt;
 
-            layer_times += tilt_time;
+                layer_times += tilt_time;
 
-            //// Per layer times (magical constants cuclulated from FW)
-            static double exposure_safe_delay_before{ 3.0 };
-            static double exposure_high_viscosity_delay_before{ 3.5 };
-            static double exposure_slow_move_delay_before{ 1.0 };
+                //// Per layer times (magical constants cuclulated from FW)
+                static double exposure_safe_delay_before{ 3.0 };
+                static double exposure_high_viscosity_delay_before{ 3.5 };
+                static double exposure_slow_move_delay_before{ 1.0 };
 
-            if (material_config.material_print_speed == slamsSlow)
-                layer_times += exposure_safe_delay_before;
-            else if (material_config.material_print_speed == slamsHighViscosity)
-                layer_times += exposure_high_viscosity_delay_before;
-            else if (!is_fast_layer)
-                layer_times += exposure_slow_move_delay_before;
+                if (material_config.material_print_speed == slamsSlow)
+                    layer_times += exposure_safe_delay_before;
+                else if (material_config.material_print_speed == slamsHighViscosity)
+                    layer_times += exposure_high_viscosity_delay_before;
+                else if (!is_fast_layer)
+                    layer_times += exposure_slow_move_delay_before;
 
-            // Increase layer time for "magic constants" from FW
-            layer_times += (
-                l_height * 5  // tower move
-                + 120 / 1000  // Magical constant to compensate remaining computation delay in exposure thread
+                // Increase layer time for "magic constants" from FW
+                layer_times += (
+                    l_height * 5  // tower move
+                    + 120 / 1000  // Magical constant to compensate remaining computation delay in exposure thread
+                );
+            }
+
+            // We are done with tilt time, but we haven't added the exposure time yet.
+            layer_times += std::max(exp_time, init_exp_time - sliced_layer_cnt * delta_fade_time);
+        } else {
+            bool first_layer = sliced_layer_cnt == 0;
+
+            double layer_exposure_time = generate_layer_exposure_time(
+                sliced_layer_cnt, bottom_layers_cnt, fade_layers_cnt,
+                init_exp_time, exp_time
             );
-        }
 
-        // We are done with tilt time, but we haven't added the exposure time yet.
-        layer_times += std::max(exp_time, init_exp_time - sliced_layer_cnt * delta_fade_time);
+            // NOTE: Following times are in minutes and are therefore multiplied by 60
+            double primary_lift_time =
+                (first_layer ? material_config.sla_initial_primary_lift_distance : material_config.sla_primary_lift_distance) /
+                (first_layer ? material_config.sla_initial_primary_lift_speed : material_config.sla_primary_lift_speed) * 60;
+            double secondary_lift_time =
+                (first_layer ? material_config.sla_initial_secondary_lift_distance : material_config.sla_secondary_lift_distance) /
+                (first_layer ? material_config.sla_initial_secondary_lift_speed : material_config.sla_secondary_lift_speed) * 60;
+            double primary_retract_time =
+                (first_layer ? material_config.sla_initial_primary_retract_distance : material_config.sla_primary_retract_distance) /
+                (first_layer ? material_config.sla_initial_primary_retract_speed : material_config.sla_primary_retract_speed) * 60;
+            double secondary_retract_time =
+                (first_layer ? material_config.sla_initial_secondary_retract_distance : material_config.sla_secondary_retract_distance) /
+                (first_layer ? material_config.sla_initial_secondary_retract_speed : material_config.sla_secondary_retract_speed) * 60;
+
+            double wait_times =
+                (first_layer ? material_config.sla_initial_wait_before_lift : material_config.sla_wait_before_lift) +
+                (first_layer ? material_config.sla_initial_wait_after_lift : material_config.sla_wait_after_lift) +
+                (first_layer ? material_config.sla_initial_wait_after_retract : material_config.sla_wait_after_retract);
+
+            layer_times = layer_exposure_time +
+                primary_lift_time + secondary_lift_time +
+                primary_retract_time + secondary_retract_time +
+                wait_times + time_estimate_correction;
+
+            // NOTE: All faded layers are considered slow layers
+            is_fast_layer = sliced_layer_cnt > fade_layers_cnt;
+        }
 
         // Collect values for this layer.
         layers_info[sliced_layer_cnt] = std::make_tuple(layer_times, layer_area * SCALING_FACTOR * SCALING_FACTOR, is_fast_layer, models_volume, supports_volume);
