@@ -24,46 +24,93 @@ static double random_value()
     return dist(gen);
 }
 
-void fuzzy_polyline(Points &poly, const bool closed, const double fuzzy_skin_thickness, const double fuzzy_skin_point_distance)
+// Defines a <double> lerp function equal in functionality to the lerp function defined in c++20.
+static double lerp(double a, double b, double t)
 {
-    const double min_dist_between_points = fuzzy_skin_point_distance * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
-    const double range_random_point_dist = fuzzy_skin_point_distance / 2.;
-    double       dist_left_over          = random_value() * (min_dist_between_points / 2.); // the distance to be traversed on the line before making the first new point
+    return a + t * (b - a);
+}
 
+void fuzzy_polyline(Points &points, const bool closed, const double fuzzy_skin_thickness, const double fuzzy_skin_point_dist)
+{
+    /* Fuzzification configuration setup */
     Points out;
-    out.reserve(poly.size());
 
-    // Skip the first point for open polyline.
-    Point *p0 = closed ? &poly.back() : &poly.front();
-    for (auto it_pt1 = closed ? poly.begin() : std::next(poly.begin()); it_pt1 != poly.end(); ++it_pt1) {
-        Point &p1 = *it_pt1;
+    const double line_unit_length = 2./3. * fuzzy_skin_point_dist; // The unit lengths of line segments, equal to both the minimum length of the line, as well as the delta between minimum and maximum line length.
+    const double point_min_delta = 2e-1 * line_unit_length; // The radius in which reference points might get dropped if they are next to original corner points.
+    const int n_point = points.size();
+    int n_seg = points.size();
+    // Reduce the number of segments by 1 for open lines, or pre-closed loops since no segment exists between the first and last points in these cases.
+    if (!closed or (closed and (points[0] == points[n_seg - 1])))
+        --n_seg;
 
-        // 'a' is the (next) new point between p0 and p1
-        Vec2d  p0p1      = (p1 - *p0).cast<double>();
-        double p0p1_size = p0p1.norm();
-        double p0pa_dist = dist_left_over;
-        for (; p0pa_dist < p0p1_size; p0pa_dist += min_dist_between_points + random_value() * range_random_point_dist) {
-            double r = random_value() * (fuzzy_skin_thickness * 2.) - fuzzy_skin_thickness;
-            out.emplace_back(*p0 + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>());
+    double total_length = 0;
+    for (int i = 0; i < n_seg; ++i) {
+        total_length += (points[(i + 1) % n_point] - points[i]).cast<double>().norm();
+    }
+
+    out.reserve(n_seg + std::ceil(total_length / line_unit_length));
+
+    /* Fuzzification loop variable initialisation */
+    Vec2d seg_dir;
+    Vec2d seg_perp = closed ?
+                     perp((points[0] - points[-1 % n_seg]).cast<double>().normalized()) :
+                     perp((points[1] - points[0]).cast<double>().normalized());
+    Point p_ref = points[0]; // The reference point for the current line segment (= the first corner)
+
+    double x_prev = 0;
+    double x_next = total_length < (2. * line_unit_length) ? total_length : line_unit_length + random_value() * std::min(line_unit_length, total_length - 2 * line_unit_length);
+
+    double x_prev_corner = 0; // Will be properly set in the first corner point loop
+    double x_next_corner = 0;
+    int corner_idx = 0;
+
+    double y_0 = (2. * random_value() - 1.) * fuzzy_skin_thickness;
+    double y_prev = y_0;
+    double y_next = (2. * random_value() - 1.) * fuzzy_skin_thickness;
+
+    /* Fuzzification loop: */
+    while (x_prev < total_length) {
+        // Add any interim corner points from the original line
+        while (x_next_corner <= x_next) {
+            // Don't add the last point, since it has some special behaviour
+            if (corner_idx == n_seg)
+                break;
+            double y = lerp(y_prev, y_next, (x_next_corner - x_prev) / (x_next - x_prev));
+            Vec2d prev_perp = seg_perp;
+
+            p_ref = points[corner_idx];
+            Vec2d seg = (points[(corner_idx + 1) % n_point] - p_ref).cast<double>();
+            double seg_length = seg.norm();
+            seg_dir = seg.normalized();
+            seg_perp = perp(seg_dir);
+
+            Vec2d corner_perp = seg_perp.dot(prev_perp) > -0.99 ? Vec2d((seg_perp + prev_perp).normalized()) : seg_dir;
+            out.emplace_back(p_ref + (y * corner_perp).cast<coord_t>());
+
+            x_prev_corner = x_next_corner;
+            x_next_corner += seg_length;
+            ++corner_idx;
         }
+        // Add the next mid-segment fuzzy point
+        // Only add the point if it is not too close to an existing interim corner point to prevent point spam
+        if (!((x_next - x_prev_corner) < point_min_delta or (x_next_corner - x_next) < point_min_delta))
+            out.emplace_back(p_ref + ((x_next - x_prev_corner) * seg_dir + y_next * seg_perp).cast<coord_t>());
 
-        dist_left_over = p0pa_dist - p0p1_size;
-        p0             = &p1;
+        x_prev = x_next;
+        x_next = x_prev > total_length - (2. * line_unit_length) ? total_length : x_prev + line_unit_length + random_value() * std::min(line_unit_length, total_length - x_prev - 2. * line_unit_length);
+
+        y_prev = y_next;
+        y_next = (closed and x_next == total_length) ? y_0 : (2. * random_value() - 1.) * fuzzy_skin_thickness;
     }
+    // Add the closing corner
+    if (closed)
+        out.emplace_back(out[0]);
+    else
+        out.emplace_back(points[n_seg] + (y_next * seg_perp).cast<coord_t>());
 
-    while (out.size() < 3) {
-        size_t point_idx = poly.size() - 2;
-        out.emplace_back(poly[point_idx]);
-        if (point_idx == 0) {
-            break;
-        }
+    out.shrink_to_fit();
 
-        --point_idx;
-    }
-
-    if (out.size() >= 3) {
-        poly = std::move(out);
-    }
+    points = std::move(out);
 }
 
 void fuzzy_polygon(Polygon &polygon, double fuzzy_skin_thickness, double fuzzy_skin_point_distance)
@@ -71,53 +118,90 @@ void fuzzy_polygon(Polygon &polygon, double fuzzy_skin_thickness, double fuzzy_s
     fuzzy_polyline(polygon.points, true, fuzzy_skin_thickness, fuzzy_skin_point_distance);
 }
 
-void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, const double fuzzy_skin_thickness, const double fuzzy_skin_point_distance)
+void fuzzy_extrusion_line(Arachne::ExtrusionLine &ext_lines, const double fuzzy_skin_thickness, const double fuzzy_skin_point_dist)
 {
-    const double min_dist_between_points = fuzzy_skin_point_distance * 3. / 4.; // hardcoded: the point distance may vary between 3/4 and 5/4 the supplied value
-    const double range_random_point_dist = fuzzy_skin_point_distance / 2.;
-    double       dist_left_over          = random_value() * (min_dist_between_points / 2.); // the distance to be traversed on the line before making the first new point
+    // Fuzzification configuration setup
+    const bool closed = ext_lines.is_closed;
+    const std::vector<Arachne::ExtrusionJunction> &points = ext_lines.junctions;
 
-    Arachne::ExtrusionJunction *p0 = &ext_lines.front();
-    Arachne::ExtrusionJunctions out;
-    out.reserve(ext_lines.size());
-    for (auto &p1 : ext_lines) {
-        if (p0->p == p1.p) {
-            // Copy the first point.
-            out.emplace_back(p1.p, p1.w, p1.perimeter_index);
-            continue;
+    std::vector<Arachne::ExtrusionJunction> out;
+
+    const double line_unit_length = 2./3. * fuzzy_skin_point_dist; // The unit lengths of line segments, equal to both the minimum length of the line, as well as the delta between minimum and maximum line length.
+    const double point_min_delta = 2e-1 * line_unit_length; // The radius in which reference points might get dropped if they are next to original corner points
+    const int n_point = ext_lines.size();
+    int n_seg = n_point;
+    // Reduce the number of segments by 1 for open lines, or pre-closed loops since no segment exists between the first and last points in these cases.
+    if (!closed or (closed and (points[0].p == points[n_seg - 1].p)))
+        --n_seg;
+
+    double total_length = 0;
+    for (int i = 0; i < n_seg; ++i) {
+        total_length += (points[(i + 1) % n_point].p - points[i].p).cast<double>().norm();
+    }
+
+    out.reserve(n_seg + std::ceil(total_length / line_unit_length));
+
+    // Fuzzification loop variable initialisation
+    Vec2d seg_dir;
+    Vec2d seg_perp = closed ?
+                     perp((points[0].p - points[-1 % n_seg].p).cast<double>().normalized()) :
+                     perp((points[1].p - points[0].p).cast<double>().normalized());
+    Arachne::ExtrusionJunction p_ref = points[0]; // The reference point for the current line segment (= the first corner)
+
+    double x_prev = 0;
+    double x_next = total_length < (2. * line_unit_length) ? total_length : line_unit_length + random_value() * std::min(line_unit_length, total_length - 2 * line_unit_length);
+
+    double x_prev_corner = 0; // Will be properly set in the first corner point loop
+    double x_next_corner = 0;
+    int corner_idx = 0;
+
+    double y_0 = (2. * random_value() - 1.) * fuzzy_skin_thickness;
+    double y_prev = y_0;
+    double y_next = (2. * random_value() - 1.) * fuzzy_skin_thickness;
+
+    /* Fuzzification loop: */
+    while (x_prev < total_length) {
+        // Add any interim corner points from the original line
+        while (x_next_corner <= x_next) {
+            // Don't add the last point, since it has some special behaviour
+            if (corner_idx == n_seg)
+                break;
+            double y = lerp(y_prev, y_next, (x_next_corner - x_prev) / (x_next - x_prev));
+            Vec2d prev_perp = seg_perp;
+
+            p_ref = points[corner_idx];
+            Vec2d seg = (points[(corner_idx + 1) % n_point].p - p_ref.p).cast<double>();
+            double seg_length = seg.norm();
+            seg_dir = seg.normalized();
+            seg_perp = perp(seg_dir);
+
+            Vec2d corner_perp = seg_perp.dot(prev_perp) > -0.99 ? Vec2d((seg_perp + prev_perp).normalized()) : seg_dir;
+            out.emplace_back(p_ref.p + (y * corner_perp).cast<coord_t>(), p_ref.w, p_ref.perimeter_index);
+
+            x_prev_corner = x_next_corner;
+            x_next_corner += seg_length;
+            ++corner_idx;
         }
+        // Add the next mid-segment fuzzy point
+        // Only add the point if it is not too close to an existing interim corner point to prevent point spam
+        if (!((x_next - x_prev_corner) < point_min_delta or (x_next_corner - x_next) < point_min_delta))
+            out.emplace_back(p_ref.p + ((x_next - x_prev_corner) * seg_dir + y_next * seg_perp).cast<coord_t>(), p_ref.w, p_ref.perimeter_index);
 
-        // 'a' is the (next) new point between p0 and p1
-        Vec2d  p0p1      = (p1.p - p0->p).cast<double>();
-        double p0p1_size = p0p1.norm();
-        double p0pa_dist = dist_left_over;
-        for (; p0pa_dist < p0p1_size; p0pa_dist += min_dist_between_points + random_value() * range_random_point_dist) {
-            double r = random_value() * (fuzzy_skin_thickness * 2.) - fuzzy_skin_thickness;
-            out.emplace_back(p0->p + (p0p1 * (p0pa_dist / p0p1_size) + perp(p0p1).cast<double>().normalized() * r).cast<coord_t>(), p1.w, p1.perimeter_index);
-        }
+        x_prev = x_next;
+        x_next = x_prev > total_length - (2. * line_unit_length) ? total_length : x_prev + line_unit_length + random_value() * std::min(line_unit_length, total_length - x_prev - 2. * line_unit_length);
 
-        dist_left_over = p0pa_dist - p0p1_size;
-        p0             = &p1;
+        y_prev = y_next;
+        y_next = (closed and x_next == total_length) ? y_0 : (2. * random_value() - 1.) * fuzzy_skin_thickness;
     }
+    // Add the closing corner
+    if (closed)
+        out.emplace_back(out[0]);
+    else
+        out.emplace_back(points[n_seg].p + (y_next * seg_perp).cast<coord_t>(), p_ref.w, p_ref.perimeter_index);
 
-    while (out.size() < 3) {
-        size_t point_idx = ext_lines.size() - 2;
-        out.emplace_back(ext_lines[point_idx].p, ext_lines[point_idx].w, ext_lines[point_idx].perimeter_index);
-        if (point_idx == 0) {
-            break;
-        }
+    out.shrink_to_fit();
 
-        --point_idx;
-    }
-
-    if (ext_lines.back().p == ext_lines.front().p) {
-        // Connect endpoints.
-        out.front().p = out.back().p;
-    }
-
-    if (out.size() >= 3) {
-        ext_lines.junctions = std::move(out);
-    }
+    ext_lines.junctions = std::move(out);
 }
 
 bool should_fuzzify(const PrintRegionConfig &config, const size_t layer_idx, const size_t perimeter_idx, const bool is_contour)
