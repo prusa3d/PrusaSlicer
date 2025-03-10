@@ -497,7 +497,7 @@ namespace DoExport {
         print_statistics.total_extruded_volume = total_extruded_volume;
         print_statistics.total_used_filament   = total_used_filament;
         print_statistics.total_weight          = total_weight;
-        print_statistics.total_cost            = total_cost;
+        print_statistics.total_cost            = total_cost+cost_of_electricity;
 
         print_statistics.filament_stats        = result.print_statistics.volumes_per_extruder;
     }
