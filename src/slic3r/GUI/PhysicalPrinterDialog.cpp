@@ -282,7 +282,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
         for (const std::string& preset_name : preset_names)
             m_presets.emplace_back(new PresetForPrinter(this, preset_name));
         // "stored" indicates data are stored secretly, load them from store.
-        if (m_printer.config.opt_string("printhost_password") == "stored" && m_printer.config.opt_string("printhost_password") == "stored") {
+        if (m_printer.config.opt_string("printhost_user") == "stored" && m_printer.config.opt_string("printhost_password") == "stored") {
             std::string username;
             std::string password;
             if (load_secret(m_printer.name, "printhost_password", username, password)) {
