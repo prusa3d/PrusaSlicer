@@ -295,6 +295,17 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
                 m_printer.config.opt_string("printhost_password") = std::string();
             }
         }
+
+        if (m_printer.config.opt_string("printhost_apikey") == "stored") {
+            std::string dummy;
+            std::string apikey;
+            if (load_secret(m_printer.name, "printhost_apikey", dummy, apikey)) {
+                if (!apikey.empty())
+                    m_printer.config.opt_string("printhost_apikey") = apikey;
+            } else {
+                m_printer.config.opt_string("printhost_apikey") = std::string();
+            }
+        }
     }
 
     if (m_presets.size() == 1)
@@ -970,6 +981,13 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
     if (!m_printer.config.opt_string("printhost_password").empty()) {
         if (save_secret(m_printer.name, "printhost_password", m_printer.config.opt_string("printhost_user"), m_printer.config.opt_string("printhost_password"))) {
             m_printer.config.opt_string("printhost_password", false) = "stored";
+        }
+    }
+    if (!m_printer.config.opt_string("printhost_apikey").empty()) {
+        if (save_secret(m_printer.name, "printhost_apikey",
+                        "apikey", /* username will be ignored */
+                        m_printer.config.opt_string("printhost_apikey"))) {
+            m_printer.config.opt_string("printhost_apikey", false) = "stored";
         }
     }
 
