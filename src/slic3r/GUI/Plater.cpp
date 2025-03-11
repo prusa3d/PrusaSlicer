@@ -6712,16 +6712,14 @@ void Plater::send_gcode()
             physical_printer_config->opt_string("printhost_password") = std::string();
         }
     }
-    /*
     if (physical_printer_config->opt_string("printhost_apikey") == "stored") {
-        std::string username;
-        std::string password;
-        if (load_secret(printer_name, "printhost_apikey", username, password) && !password.empty())
-            physical_printer_config->opt_string("printhost_apikey") = password;
+        std::string dummy;
+        std::string apikey;
+        if (load_secret(printer_name, "printhost_apikey", dummy, apikey) && !apikey.empty())
+            physical_printer_config->opt_string("printhost_apikey") = apikey;
         else
             physical_printer_config->opt_string("printhost_apikey") = std::string();
     }
-    */
     send_gcode_inner(physical_printer_config);
 }
 
