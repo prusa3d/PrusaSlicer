@@ -6698,7 +6698,7 @@ void Plater::send_gcode()
     // Passwords and API keys
     // "stored" indicates data are stored secretly, load them from store.
     std::string printer_name = wxGetApp().preset_bundle->physical_printers.get_selected_printer().name;
-    if (physical_printer_config->opt_string("printhost_password") == "stored" && physical_printer_config->opt_string("printhost_password") == "stored") {
+    if (physical_printer_config->opt_string("printhost_user") == "stored" && physical_printer_config->opt_string("printhost_password") == "stored") {
         std::string username;
         std::string password;
         if (load_secret(printer_name, "printhost_password", username, password)) {
