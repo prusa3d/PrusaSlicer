@@ -922,6 +922,37 @@ void MainFrame::remove_printables_webview_tab()
     m_printables_webview->destroy_browser();
 }
 
+namespace {
+bool load_secret(const std::string& id, const std::string& opt, std::string& usr, std::string& psswd)
+{
+#if wxUSE_SECRETSTORE
+    wxSecretStore store = wxSecretStore::GetDefault();
+    wxString errmsg;
+    if (!store.IsOk(&errmsg)) {
+        std::string msg = GUI::format("%1% (%2%).", _u8L("This system doesn't support storing passwords securely"), errmsg);
+        BOOST_LOG_TRIVIAL(error) << msg;
+        show_error(nullptr, msg);
+        return false;
+    }
+    const wxString service = GUI::format_wxstr(L"%1%/PhysicalPrinter/%2%/%3%", SLIC3R_APP_NAME, id, opt);
+    wxString username;
+    wxSecretValue password;
+    if (!store.Load(service, username, password)) {
+        std::string msg(_u8L("Failed to load credentials from the system password store."));
+        BOOST_LOG_TRIVIAL(error) << msg;
+        show_error(nullptr, msg);
+        return false;
+    }
+    usr = into_u8(username);
+    psswd = into_u8(password.GetAsString());
+    return true;
+#else
+    BOOST_LOG_TRIVIAL(error) << "wxUSE_SECRETSTORE not supported. Cannot load password from the system store.";
+    return false;
+#endif // wxUSE_SECRETSTORE
+}
+}
+
 void MainFrame::show_printer_webview_tab(DynamicPrintConfig* dpc)
 {
     
@@ -932,11 +963,37 @@ void MainFrame::show_printer_webview_tab(DynamicPrintConfig* dpc)
         if (url.find("http://") != 0 && url.find("https://") != 0) {
             url = "http://" + url;
         }
+
         // set password / api key
+        std::string printer_name = wxGetApp().preset_bundle->physical_printers.get_selected_printer().name;
         if (dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(dpc->option("printhost_authorization_type"))->value == AuthorizationType::atKeyPassword) {
+
+            if (dpc->opt_string("printhost_apikey") == "stored") {
+                std::string dummy;
+                std::string apikey;
+                if (load_secret(printer_name, "printhost_apikey", dummy, apikey) && !apikey.empty())
+                    dpc->opt_string("printhost_apikey") = apikey;
+                else
+                    dpc->opt_string("printhost_apikey") = std::string();
+            }
+
             set_printer_webview_api_key(dpc->opt_string("printhost_apikey"));
         }
         else {
+            if (dpc->opt_string("printhost_user") == "stored" &&
+                dpc->opt_string("printhost_password") == "stored") {
+                std::string user;
+                std::string password;
+                if (load_secret(printer_name, "printhost_password", user, password) &&
+                    !user.empty() && !password.empty()) {
+                    dpc->opt_string("printhost_user") = user;
+                    dpc->opt_string("printhost_password") = password;
+                }
+            } else {
+                dpc->opt_string("printhost_user") = std::string();
+                dpc->opt_string("printhost_password") = std::string();
+            }
+
             set_printer_webview_credentials(dpc->opt_string("printhost_user"), dpc->opt_string("printhost_password"));
         }
         add_printer_webview_tab(from_u8(url));
