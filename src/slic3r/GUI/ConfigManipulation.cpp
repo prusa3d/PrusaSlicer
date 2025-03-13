@@ -300,6 +300,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, have_infill);
     }
 
+    //Do we enable the extra zigzag angle setting?
+    const bool have_zigzag_infill = have_infill && (config->option<ConfigOptionEnum<InfillPattern>>("fill_pattern")
+                                  ->value == ipZigZag);
+    for (auto el : {"infill_zigzag_angles"}) {
+        toggle_field(el, have_zigzag_infill);
+    }
+
     toggle_field("infill_every_layers", have_infill && !has_automatic_infill_combination);
     toggle_field("automatic_infill_combination_max_layer_height", have_infill && has_automatic_infill_combination);
 
