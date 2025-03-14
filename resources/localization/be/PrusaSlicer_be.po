@@ -5462,7 +5462,7 @@ msgstr "Аб'ёмы прадзьмуху - табліца"
 
 #: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
-"This matrix describes volumes (in cubic milimetres) required to purge the "
+"This matrix describes volumes (in cubic millimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools."
 msgstr ""
 "Табліца апісвае аб'ёмы (у кубічных міліметрах), якія неабходныя для "

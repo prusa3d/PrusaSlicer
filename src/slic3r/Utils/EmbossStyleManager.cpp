@@ -408,7 +408,7 @@ void StyleManager::init_style_images(const Vec2i &max_size,
     auto mf = wxGetApp().mainframe;
     // dot per inch for monitor
     int dpi = get_dpi_for_window(mf);
-    // pixel per milimeter
+    // pixel per millimeter
     double ppm = dpi / ObjectManipulation::in_to_mm;
 
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
