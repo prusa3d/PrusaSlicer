@@ -3691,7 +3691,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("wiping_volumes_matrix", coFloats);
     def->label = L("Purging volumes - matrix");
-    def->tooltip = L("This matrix describes volumes (in cubic milimetres) required to purge the"
+    def->tooltip = L("This matrix describes volumes (in cubic millimetres) required to purge the"
                      " new filament on the wipe tower for any given pair of tools.");
     def->set_default_value(new ConfigOptionFloats {   0., 140., 140., 140., 140.,
                                                     140.,   0., 140., 140., 140.,

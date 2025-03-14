@@ -14532,7 +14532,7 @@ msgstr "Volumi di spurgo - matrice"
 
 #: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
-"This matrix describes volumes (in cubic milimetres) required to purge the "
+"This matrix describes volumes (in cubic millimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools."
 msgstr ""
 "Questa matrice descrive il volume (in millimetri cubici) necessario per "

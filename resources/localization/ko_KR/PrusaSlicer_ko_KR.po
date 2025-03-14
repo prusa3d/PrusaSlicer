@@ -5016,7 +5016,7 @@ msgstr "볼륨 삭제 - 행렬"
 
 #: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
-"This matrix describes volumes (in cubic milimetres) required to purge the "
+"This matrix describes volumes (in cubic millimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools."
 msgstr ""
 "이 매트릭스는 지정 된 도구 쌍에 대해 와이퍼 타워의 새필라멘트를 제거 하는 데 "

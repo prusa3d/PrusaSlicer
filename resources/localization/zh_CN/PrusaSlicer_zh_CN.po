@@ -4968,7 +4968,7 @@ msgstr "清除量-矩阵"
 
 #: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
-"This matrix describes volumes (in cubic milimetres) required to purge the "
+"This matrix describes volumes (in cubic millimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools."
 msgstr ""
 "此矩阵描述清除擦料塔上任何给定工具对的新耗材所需的体积（以立方米为单位）。"

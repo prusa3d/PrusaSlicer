@@ -5691,7 +5691,7 @@ msgstr "Таблица очищающих объёмов"
 
 #: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
-"This matrix describes volumes (in cubic milimetres) required to purge the "
+"This matrix describes volumes (in cubic millimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools."
 msgstr ""
 "Эта таблица описывает объёмы (в кубических миллиметрах), необходимые для "

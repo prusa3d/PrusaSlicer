@@ -5277,7 +5277,7 @@ msgstr "Öblítési mennyiségek - mátrix"
 
 #: src/libslic3r/PrintConfig.cpp:3694
 msgid ""
-"This matrix describes volumes (in cubic milimetres) required to purge the "
+"This matrix describes volumes (in cubic millimetres) required to purge the "
 "new filament on the wipe tower for any given pair of tools."
 msgstr ""
 "Ez a mátrix bármely adott szerszámpár esetében leírja az új filament "
