@@ -328,7 +328,7 @@ void DSForLayers::draw_ruler(const ImRect& slideable_region)
         ImGui::RenderText(start, label.c_str());
     };
 
-    auto draw_tick = [x_center, tick_width, inner_x](const float tick_pos, const float outer_x)
+    auto draw_tick = [x_center, tick_width, inner_x, tick_clr](const float tick_pos, const float outer_x)
     {
         ImRect tick_right = ImRect(x_center + inner_x, tick_pos - tick_width, x_center + outer_x, tick_pos);
         ImGui::RenderFrame(tick_right.Min, tick_right.Max, tick_clr, false);
