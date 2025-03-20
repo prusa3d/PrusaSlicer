@@ -147,6 +147,8 @@ set(SLIC3R_SOURCES
     Format/SL1_SVG.cpp
     Format/AnycubicSLA.hpp
     Format/AnycubicSLA.cpp
+    Format/MiiCraft3DP.hpp
+    Format/MiiCraft3DP.cpp
     Format/STEP.hpp
     Format/STEP.cpp
     Format/SVG.hpp
