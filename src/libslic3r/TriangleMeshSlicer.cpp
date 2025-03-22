@@ -2206,6 +2206,17 @@ std::vector<ExPolygons> slice_mesh_ex(
     return layers;
 }
 
+std::vector<ExPolygons>  slice_mesh_ex(
+    const indexed_triangle_set       &mesh,
+    const std::vector<float>         &zs,
+    float                             closing_radius,
+    std::function<void()>             throw_on_cancel)
+{
+    MeshSlicingParamsEx params;
+    params.closing_radius = closing_radius;
+    return slice_mesh_ex(mesh, zs, params, throw_on_cancel);
+}
+
 // Slice a triangle set with a set of Z slabs (thick layers).
 // The effect is similar to producing the usual top / bottom layers from a sliced mesh by 
 // subtracting layer[i] from layer[i - 1] for the top surfaces resp.

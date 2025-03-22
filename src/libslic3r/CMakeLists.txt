@@ -571,6 +571,7 @@ add_library(libslic3r_cgal STATIC
     CutSurface.hpp CutSurface.cpp
     Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
     IntersectionPoints.hpp IntersectionPoints.cpp
+    TriangleMesh.hpp TriangleMesh.cpp
     MeshBoolean.hpp MeshBoolean.cpp
     TryCatchSignal.hpp TryCatchSignal.cpp
     Triangulation.hpp Triangulation.cpp
