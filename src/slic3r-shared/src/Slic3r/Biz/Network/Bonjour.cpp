@@ -12,6 +12,7 @@
 #include <boost/format.hpp>
 #include <Slic3r/Log.hpp>
 #include <boost/bind/bind.hpp>
+#include <boost/asio/deadline_timer.hpp>
 
 using boost::optional;
 using boost::system::error_code;
@@ -620,7 +621,7 @@ UdpSession::UdpSession(Bonjour::ReplyFn rfn) : replyfn(rfn)
 	buffer.resize(DnsMessage::MAX_SIZE);
 }
 
-UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, const asio::ip::address& interface_address, std::shared_ptr< boost::asio::io_service > io_service)
+UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, const asio::ip::address& interface_address, std::shared_ptr< boost::asio::io_context > io_service)
 	: replyfn(replyfn)
 	, multicast_address(multicast_address)
 	, socket(*io_service)
@@ -654,7 +655,7 @@ UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multica
 }
 
 
-UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, std::shared_ptr< boost::asio::io_service > io_service)
+UdpSocket::UdpSocket( Bonjour::ReplyFn replyfn, const asio::ip::address& multicast_address, std::shared_ptr< boost::asio::io_context > io_service)
 	: replyfn(replyfn)
 	, multicast_address(multicast_address)
 	, socket(*io_service)
@@ -710,7 +711,7 @@ void UdpSocket::receive_handler(SharedSession session, const boost::system::erro
 	// let io_service to handle the datagram on session
 	// from boost documentation io_service::post:
 	// The io_service guarantees that the handler will only be called in a thread in which the run(), run_one(), poll() or poll_one() member functions is currently being invoked.
-	io_service->post(boost::bind(&UdpSession::handle_receive, session, error, bytes));
+	boost::asio::post(io_service->get_executor(), boost::bind(&UdpSession::handle_receive, session, error, bytes));
 	// immediately accept new datagrams
 	async_receive();
 }
@@ -867,7 +868,7 @@ void Bonjour::priv::lookup_perform()
 {
 	service_dn = (boost::format("_%1%._%2%.local") % service % protocol).str();
 
-	std::shared_ptr< boost::asio::io_service > io_service(new boost::asio::io_service);
+	std::shared_ptr< boost::asio::io_context > io_service(new boost::asio::io_context);
 
 	std::vector<LookupSocket*> sockets;
 
@@ -962,7 +963,7 @@ void Bonjour::priv::resolve_perform()
 			rpls.push_back(reply);
 	};
 
-	std::shared_ptr< boost::asio::io_service > io_service(new boost::asio::io_service);
+	std::shared_ptr< boost::asio::io_context > io_service(new boost::asio::io_context);
 	std::vector<ResolveSocket*> sockets;
 
 	// resolve interfaces - from PR#6646
