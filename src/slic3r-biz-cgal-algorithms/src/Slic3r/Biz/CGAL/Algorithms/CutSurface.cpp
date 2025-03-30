@@ -1650,11 +1650,9 @@ priv::CutAOIs priv::cut_from_model(
     // detect anomalities in visitor.
     bool is_valid = true;
     // NOTE: map are created when convert shapes to cgal model
-    const EdgeShapeMap&
-        edge_shape_map = cgal_shape.property_map<EI, IntersectingElement>(edge_shape_map_name).first;
-    const FaceShapeMap&
-        face_shape_map = cgal_shape.property_map<FI, IntersectingElement>(face_shape_map_name).first;
-    Visitor visitor{cgal_model, cgal_shape, edge_shape_map, face_shape_map, vert_shape_map, &is_valid};
+    auto edge_shape_map = cgal_shape.property_map<EI, IntersectingElement>(edge_shape_map_name);
+    auto face_shape_map = cgal_shape.property_map<FI, IntersectingElement>(face_shape_map_name);
+    Visitor visitor{cgal_model, cgal_shape, edge_shape_map.value(), face_shape_map.value(), vert_shape_map, &is_valid};
 
     // a property map containing the constrained-or-not status of each edge
     EdgeBoolMap ecm = cgal_model.add_property_map<EI, bool>(is_constrained_edge_name, false).first;
@@ -1818,11 +1816,10 @@ void priv::collect_surface_data(
 
 void priv::create_reduce_map(ReductionMap& reduction_map, const CutMesh& mesh)
 {
-    const VertexShapeMap& vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(
-                                                   vert_shape_map_name
-    )
-                                               .first;
-    const EdgeBoolMap& ecm = mesh.property_map<EI, bool>(is_constrained_edge_name).first;
+    auto optional_vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name);
+    const VertexShapeMap &vert_shape_map = optional_vert_shape_map.value();
+    auto optional_ecm = mesh.property_map<EI, bool>(is_constrained_edge_name);
+    const EdgeBoolMap &ecm = optional_ecm.value();
 
     // check if vertex was made by edge_2 which is diagonal of quad
     auto is_reducible_vertex = [&vert_shape_map](VI reduction_from) -> bool {
@@ -2010,14 +2007,13 @@ priv::VDistances priv::calc_distances(
     priv::VDistances result(count_shapes_points);
     for (const SurfacePatch& patch : patches) {
         // map is created during intersection by corefine visitor
-        const VertexShapeMap& vert_shape_map = models[patch.model_id]
-                                                   .property_map<VI, const IntersectingElement*>(
-                                                       vert_shape_map_name
-                                                   )
-                                                   .first;
+        auto optional_vert_shape_map =
+            models[patch.model_id].property_map<VI, const IntersectingElement *>(vert_shape_map_name);
+        const VertexShapeMap &vert_shape_map = optional_vert_shape_map.value();
         uint32_t patch_index = &patch - &patches.front();
         // map is created during patch creation / dividing
-        const CvtVI2VI& cvt = patch.mesh.property_map<VI, VI>(patch_source_name).first;
+        auto optional_cvt = patch.mesh.property_map<VI, VI>(patch_source_name);
+        const CvtVI2VI& cvt = optional_cvt.value();
         // for each point on outline
         for (const Loop& loop : patch.loops)
             for (const VI& vi_patch : loop) {
@@ -3136,7 +3132,7 @@ using BBS = std::vector<BoundingBoxf3>;
 BBS create_bbs(const VCutAOIs& cuts, const CutMeshes& cut_models);
 
 using Primitive = ::CGAL::AABB_face_graph_triangle_primitive<CutMesh>;
-using Traits    = ::CGAL::AABB_traits<EpicKernel, Primitive>;
+using Traits    = ::CGAL::AABB_traits_3<EpicKernel, Primitive>;
 using Ray       = EpicKernel::Ray_3;
 using Tree      = ::CGAL::AABB_tree<Traits>;
 using Trees     = std::vector<Tree>;
@@ -3296,8 +3292,8 @@ bool priv::is_patch_inside_of_model(const SurfacePatch& patch, const Tree& tree,
 uint32_t priv::get_shape_point_index(const CutAOI& cut, const CutMesh& model)
 {
     // map is created during intersection by corefine visitor
-    const VertexShapeMap&
-        vert_shape_map = model.property_map<VI, const IntersectingElement*>(vert_shape_map_name).first;
+    auto optional_vert_shape_map = model.property_map<VI, const IntersectingElement *>(vert_shape_map_name);
+    const VertexShapeMap &vert_shape_map = optional_vert_shape_map.value();
     // for each half edge of outline
     for (HI hi : cut.second) {
         VI vi                         = model.source(hi);
@@ -3325,7 +3321,7 @@ priv::SurfacePatch priv::separate_patch(
     patch_new.model_id     = patch.model_id;
     patch_new.shape_id     = patch.shape_id;
     // fix cvt
-    CvtVI2VI cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).first;
+    CvtVI2VI cvt = patch_new.mesh.property_map<VI, VI>(patch_source_name).value();
     for (VI& vi : cvt) {
         if (!vi.is_valid())
             continue;
@@ -3347,7 +3343,8 @@ void priv::divide_patch(size_t i, SurfacePatchesEx& patches)
     CutMesh::Property_map<FI, bool>
         is_processed = cm.add_property_map<FI, bool>(patch_number_name, false).first;
 
-    const CvtVI2VI& cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name).first;
+    auto optional_cvt_from = patch.mesh.property_map<VI, VI>(patch_source_name);
+    const CvtVI2VI& cvt_from = optional_cvt_from.value();
 
     std::vector<FI> fis;
     fis.reserve(cm.faces().size());
@@ -3549,10 +3546,8 @@ bool priv::is_over_whole_expoly(
 bool priv::is_over_whole_expoly(const CutAOI& cutAOI, const ExPolygon& shape, const CutMesh& mesh)
 {
     // NonInterupted contour is without other point and contain all from shape
-    const VertexShapeMap& vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(
-                                                   vert_shape_map_name
-    )
-                                               .first;
+    auto optional_vert_shape_map = mesh.property_map<VI, const IntersectingElement*>(vert_shape_map_name);
+    const VertexShapeMap &vert_shape_map = optional_vert_shape_map.value();
     for (HI hi : cutAOI.second) {
         const IntersectingElement* ie_s = vert_shape_map[mesh.source(hi)];
         const IntersectingElement* ie_t = vert_shape_map[mesh.target(hi)];
