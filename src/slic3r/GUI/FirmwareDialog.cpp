@@ -429,7 +429,7 @@ void FirmwareDialog::priv::avr109_wait_for_bootloader(Avr109Pid usb_pid, unsigne
 
 void FirmwareDialog::priv::avr109_reboot(const SerialPortInfo &port)
 {
-	asio::io_service io;
+	asio::io_context io;
 	Serial serial(io, port.port, 1200);
 	std::this_thread::sleep_for(std::chrono::milliseconds(50));
 }
