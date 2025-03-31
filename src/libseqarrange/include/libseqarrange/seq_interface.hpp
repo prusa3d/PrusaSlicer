@@ -28,7 +28,6 @@ using namespace Slic3r;
 namespace Sequential
 {
     class ObjectTooLargeException : public std::runtime_error { public: explicit ObjectTooLargeException(const std::string& msg) : std::runtime_error(msg) {}};
-    class InternalErrorException : public std::runtime_error { public: explicit InternalErrorException(const std::string& msg) : std::runtime_error(msg) {} };
 
 
     

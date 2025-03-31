@@ -1,6 +1,11 @@
 min_slic3r_version = 2.9.1-alpha0
+2.2.3 Updated FW version notification. Added filament profiles.
+2.2.2 Added filament profiles for Sunlu PLA+ 2.0; Elegoo Rapid PLA+; Overture PETG; Overture HS TPU, Polymaker PolyTerra PLA. Increased PETG nominal chamber temperature (C1).
+2.2.1 Updated values for 1st layer solid infill speed and speed over bridges. Updated PLA idle temperature (C1). 
 2.2.0 Extruder clearance moved to printer settings. Added BREAKAWAY print profiles (XL).
 min_slic3r_version = 2.8.1-rc0
+2.1.13 Updated FW version notification.
+2.1.12 Added filament profiles for Sunlu PLA+ 2.0; Elegoo Rapid PLA+; Overture PETG; Polymaker PolyTerra PLA.
 2.1.11 Added filament profiles for Elegoo PLA and Elegoo Rapid PETG. Updated filament settings.
 2.1.10 Added MMU3 support for selected ASA, ABS, BVOH and PC Blend filaments (MK3.9/MK4 family printers).
 2.1.9 Updated minimal chamber temperatures (CORE One).
@@ -14,6 +19,7 @@ min_slic3r_version = 2.8.1-rc0
 2.1.1 Updated FW version notification. Updated start g-code (XL). Updated Fiberflex 40D profile (MK4).
 2.1.0 Added new parameters for nozzle checks (abrasive filaments, high flow nozzles), updated related start g-codes. Enabled overhang fan speed overrides for specific filaments (MK4S).
 min_slic3r_version = 2.8.0-alpha0
+2.0.6 Updated FW version notification.
 2.0.5 Fixed an issue in configuration wizard.
 2.0.4 Added VOXELPLA filaments. Updated compatible condition for some specific filament profiles.
 2.0.3 Added printer profiles for Original Prusa MK4S and MK3.9S. Added profiles for high flow nozzles (MK4/MK3.9/XL). Reorganized configuration wizard. 

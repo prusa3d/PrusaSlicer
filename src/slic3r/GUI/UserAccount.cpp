@@ -60,7 +60,7 @@ bool UserAccount::get_remember_session()
     return m_communication->get_remember_session();
 }
 
-bool UserAccount::is_logged()
+bool UserAccount::is_logged() const
 {
     return m_communication->is_logged();
 }

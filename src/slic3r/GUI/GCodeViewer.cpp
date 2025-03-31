@@ -217,12 +217,13 @@ int GCodeViewer::SequentialView::ActualSpeedImguiWidget::plot(const char* label,
 }
 #endif // ENABLE_ACTUAL_SPEED_DEBUG
 
-void GCodeViewer::SequentialView::Marker::init(std::optional<std::unique_ptr<GLModel>>& model_opt)
+void GCodeViewer::SequentialView::Marker::init(std::optional<std::unique_ptr<GLModel>>& model_opt, bool is_ht90)
  {
      if (! model_opt.has_value())
          return;
  
      m_model.reset();
+     m_is_ht90 = is_ht90;
      
      m_generic_marker = (model_opt->get() == nullptr);
      if (m_generic_marker)
@@ -232,6 +233,85 @@ void GCodeViewer::SequentialView::Marker::init(std::optional<std::unique_ptr<GLM
  
      m_model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
  }
+
+
+
+
+// This does not do any scaling!
+static Transform3d align_cylinder(const Vec3d& p1, const Vec3d& p2, double r) {
+    Vec3d direction = p2 - p1;
+    Vec3d axis = direction.normalized();
+    Vec3d z0(0, 0, 1);
+    Matrix3d rotation;
+    if (axis.isApprox(z0))
+        rotation = Eigen::Matrix3d::Identity(); // Already aligned, use identity rotation
+    else if (axis.isApprox(-z0)) {
+        // 180-degree rotation around x or y (choose any perpendicular axis)
+        rotation = Eigen::AngleAxisd(M_PI, Vec3d(1, 0, 0)).toRotationMatrix();
+    } else {
+        Vec3d rotationAxis = z0.cross(axis);
+        double angle = acos(z0.dot(axis));
+        rotation = Eigen::AngleAxisd(angle, rotationAxis.normalized()).toRotationMatrix();
+    }
+    Transform3d transform = Transform3d::Identity();
+    transform.linear() = rotation;// * Geometry::scale_transform(Vec3d(2*r,2*r,length)).matrix().block<3,3>(0,0);
+    transform.translation() = p1;
+    return transform;
+}
+
+static void render_ht90_rods(const Vec3d& pos, GLShaderProgram* shader, const Transform3d& view_matrix, const Vec3d& bed_offset, GLModel& model)
+{
+    Vec3d start(30.06, 27.70, 35); // Position of the back-right ball bearing, on the extruder head.
+    Vec3d end(32.33, 212.92, 338.8); // The other ball bearing, on the printer.
+    double r=4.725; // Diameter of the rod.
+    double rods_spacing = 60.;
+    double height = (end-start).norm();
+
+
+    if (!model.is_initialized()) {
+        auto t0 = its_make_sphere(r, 0.5);
+        auto t1 = its_make_sphere(r, 0.5);
+        auto t2 = its_make_cylinder(r, height);
+        its_translate(t1, Vec3f(0., 0., height));
+        its_merge(t2, t0);
+        its_merge(t2, t1);
+        model.init_from(t2);
+        model.set_color({ 1.0f, 1.0f, 1.0f, 0.5f });
+    }
+
+   
+    // trans transforms extruder to world coord system of the first bed
+    Transform3d trans = Geometry::translation_transform(pos);
+
+    Vec3d p1 = trans * start;
+    Vec3d p2 = end; // already in world coords
+    
+    for (int j=0; j<6; ++j) {
+        if (j == 3) {
+            p1.x() = p1.x() - rods_spacing;
+            p2.x() = p2.x() - rods_spacing;
+        }
+
+        p1 = trans * Geometry::rotation_transform(Vec3d(0,0,2*M_PI/3)) * trans.inverse() * p1;
+        p2 = Geometry::rotation_transform(Vec3d(0,0,2*M_PI/3)) * p2;
+
+        double dx = p2.x() - p1.x();
+        double dy = p2.y() - p1.y();
+        double dz = std::sqrt(height * height - dx * dx - dy * dy);
+        p2.z() = p1.z() + dz;
+
+        Transform3d wm = align_cylinder(p1, p2, r);
+        shader->set_uniform("view_model_matrix", view_matrix * wm);
+        shader->set_uniform("volume_world_matrix", Geometry::translation_transform(bed_offset) * wm);
+        model.render();
+    }
+
+}
+
+
+
+
+
 
 void GCodeViewer::SequentialView::Marker::render()
 {
@@ -263,7 +343,7 @@ void GCodeViewer::SequentialView::Marker::render()
         BoundingBoxf box = s_multiple_beds.get_build_volume_box();
         box.translate(to_2d(bed_inst_offset));
         // add a bit on both sides
-        box = box.inflated(40.0f);
+        box = box.inflated(m_is_ht90 ? 60.f : 40.f);
         clip_planes = {{ { 1.0f, 0.0f, 0.0f, -box.min.cast<float>().x() } , { -1.0f, 0.0f, 0.0f, box.max.cast<float>().x() }}};
     }
 
@@ -287,7 +367,11 @@ void GCodeViewer::SequentialView::Marker::render()
     shader->set_uniform("clipping_planes[0]", clip_planes[0]);
     shader->set_uniform("clipping_planes[1]", clip_planes[1]);
 
+    shader->set_uniform("volume_world_matrix", volume_world_matrix);
     m_model.render();
+
+    if (m_is_ht90 && ! m_generic_marker)
+        render_ht90_rods(m_world_position.cast<double>(), shader, view_matrix, bed_inst_offset, m_model_ht90_rod);
 
     shader->stop_using();
 
@@ -1204,8 +1288,8 @@ void GCodeViewer::render()
             m_sequential_view.marker.set_z_offset(m_z_offset);
 
             // Following just makes sure that the shown marker is correct.
-            auto marker_model_opt = wxGetApp().plater()->get_current_canvas3D()->get_current_marker_model();
-            m_sequential_view.marker.init(marker_model_opt);
+            auto [marker_model_opt, is_ht90] = wxGetApp().plater()->get_current_canvas3D()->get_current_marker_model();
+            m_sequential_view.marker.init(marker_model_opt, is_ht90);
             if (marker_model_opt.has_value())
                 m_max_bounding_box.reset();
 

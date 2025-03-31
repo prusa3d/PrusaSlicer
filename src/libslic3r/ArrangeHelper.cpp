@@ -71,7 +71,7 @@ static Sequential::PrinterGeometry get_printer_geometry(const ConfigBase& config
 	{
 		if (! printer_notes.empty()) {
 			try {
-				boost::nowide::ifstream in(resources_dir() + "/data/printer_gantries/geometries.txt");
+				boost::nowide::ifstream in(resources_dir() + "/data/printer_gantries/geometries.json");
 				boost::property_tree::ptree pt;
 				boost::property_tree::read_json(in, pt);
 				for (const auto& printer : pt.get_child("printers")) {

@@ -1143,11 +1143,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     // and the model object's bounding box bottom. Units in mm.
     ((ConfigOptionFloat, branchingsupport_object_elevation))/*= 5.0*/
 
-
-
     /////// Following options influence automatic support points placement:
     ((ConfigOptionInt, support_points_density_relative))
-    ((ConfigOptionFloat, support_points_minimal_distance))
 
     // Now for the base pool (pad) /////////////////////////////////////////////
 

@@ -80,9 +80,10 @@ private:
     std::vector<std::unique_ptr<Item>> m_items;
     wxFlexGridSizer*m_sizer{nullptr};
     wxString m_title;
+    std::string m_unusable_symbols;    
 public:
 
-    BulkExportDialog(const std::vector<std::pair<int, std::optional<boost::filesystem::path>>> &paths, const wxString& title);
+    BulkExportDialog(const std::vector<std::pair<int, std::optional<boost::filesystem::path>>> &paths, const wxString& title, const std::string& unusable_symbols);
     std::vector<std::pair<int, std::optional<boost::filesystem::path>>> get_paths() const;
     bool has_warnings() const;
 

@@ -774,7 +774,7 @@ void AMFParserContext::endElement(const char * /* name */)
 
                     point(coord_idx) = float(atof(p));
                     if (++coord_idx == 5) {
-                        m_object->sla_support_points.push_back(sla::SupportPoint(point));
+                        m_object->sla_support_points.push_back(sla::SupportPoint{Vec3f(point[0], point[1], point[2]), point[3]});
                         coord_idx = 0;
                     }
 					if (end == nullptr)

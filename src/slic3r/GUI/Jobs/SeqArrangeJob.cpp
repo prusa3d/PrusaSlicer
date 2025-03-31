@@ -33,8 +33,11 @@ void SeqArrangeJob::process(Ctl& ctl)
             }
         );
     } catch (const SeqArrangeJobException&) {
-        // The task was canceled. Just make sure that the progress notification disappears.
-        ctl.update_status(100, "");
+        ctl.update_status(100, ""); // Hide progress notification.
+    }
+    catch (const std::exception&) {
+        ctl.update_status(100, ""); // Hide progress notification.
+        throw;
     }
 }
 
@@ -60,7 +63,7 @@ void SeqArrangeJob::finalize(bool canceled, std::exception_ptr& eptr)
             dlg.ShowModal();
             error = true;
             eptr = nullptr; // The exception is handled.
-        } catch (const Sequential::InternalErrorException& ex) {
+        } catch (const std::runtime_error& ex) {
             ErrorDialog dlg(wxGetApp().plater(), GUI::format_wxstr(_L("Internal error: %1%"), ex.what()), false);
             dlg.ShowModal();
             error = true;

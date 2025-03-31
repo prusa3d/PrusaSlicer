@@ -46,7 +46,7 @@ public:
 
     // UI Session thread Interface 
     //
-    bool is_logged();
+    bool is_logged() const;
     void do_login();
     void do_logout();
     void do_clear();

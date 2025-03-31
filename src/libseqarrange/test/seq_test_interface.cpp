@@ -1,6 +1,6 @@
 /*================================================================*/
 /*
- * Author:  Pavel Surynek, 2023 - 2024
+ * Author:  Pavel Surynek, 2023 - 2025
  * Company: Prusa Research
  *
  * File:    seq_test_interface.cpp
@@ -40,8 +40,8 @@ using namespace Sequential;
 
 /*----------------------------------------------------------------*/
 
-const int SEQ_PRUSA_MK3S_X_SIZE = 2500;
-const int SEQ_PRUSA_MK3S_Y_SIZE = 2100;    
+const coord_t SEQ_PRUSA_MK3S_X_SIZE = 250000000;
+const coord_t SEQ_PRUSA_MK3S_Y_SIZE = 210000000;    
 
 
 /*----------------------------------------------------------------*/
@@ -502,25 +502,43 @@ void save_import_data(const std::string           &filename,
 /*----------------------------------------------------------------*/
 
 TEST_CASE("Interface test 1", "[Sequential Arrangement Interface]")
-{ 
+//void interface_test_1(void)
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing interface 1 ...\n");
+    INFO("Testing interface 1 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.decimation_precision = SEQ_DECIMATION_PRECISION_HIGH;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});
 
-
-    printf("Loading objects ...\n");
+    #ifdef DEBUG
+    {
+	printf("Loading objects ...\n");
+    }
+    #endif
+    
     std::vector<ObjectToPrint> objects_to_print = load_exported_data_from_text(arrange_data_export_text);
     REQUIRE(objects_to_print.size() > 0);
-    printf("Loading objects ... finished\n");    
+    
+    #ifdef DEBUG
+    {
+	printf("Loading objects ... finished\n");
+    }
+    #endif
 
     std::vector<ScheduledPlate> scheduled_plates;
-    printf("Scheduling objects for sequential print ...\n");
+    #ifdef DEBUG
+    {
+	printf("Scheduling objects for sequential print ...\n");
+    }
+    #endif
 		
     int result = schedule_ObjectsForSequentialPrint(solver_configuration,
 						    objects_to_print,
@@ -529,61 +547,104 @@ TEST_CASE("Interface test 1", "[Sequential Arrangement Interface]")
     REQUIRE(result == 0);
     if (result == 0)
     {
-	printf("Object scheduling for sequential print SUCCESSFUL !\n");
+	#ifdef DEBUG
+	{
+	    printf("Object scheduling for sequential print SUCCESSFUL !\n");
+	}
+	#endif
 
-	printf("Number of plates: %ld\n", scheduled_plates.size());
+        #ifdef DEBUG
+	{
+	    printf("Number of plates: %ld\n", scheduled_plates.size());
+	}
+	#endif
 	REQUIRE(scheduled_plates.size() > 0);
 
 	for (unsigned int plate = 0; plate < scheduled_plates.size(); ++plate)
 	{
-	    printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+	    #ifdef DEBUG
+	    {
+		printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+	    }
+	    #endif
 	    REQUIRE(scheduled_plates[plate].scheduled_objects.size() > 0);
 
 	    for (const auto& scheduled_object: scheduled_plates[plate].scheduled_objects)
 	    {
-		cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
-		REQUIRE(scheduled_object.x >= 0);
-		REQUIRE(scheduled_object.x <= solver_configuration.x_plate_bounding_box_size * SEQ_SLICER_SCALE_FACTOR);
-		REQUIRE(scheduled_object.y >= 0);
-		REQUIRE(scheduled_object.y <= solver_configuration.y_plate_bounding_box_size * SEQ_SLICER_SCALE_FACTOR);
+                #ifdef DEBUG
+		{
+		    cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
+		}
+		#endif
+		REQUIRE(scheduled_object.x >= solver_configuration.plate_bounding_box.min.x() * SEQ_SLICER_SCALE_FACTOR);
+		REQUIRE(scheduled_object.x <= solver_configuration.plate_bounding_box.max.x() * SEQ_SLICER_SCALE_FACTOR);
+		REQUIRE(scheduled_object.y >= solver_configuration.plate_bounding_box.min.y() * SEQ_SLICER_SCALE_FACTOR);
+		REQUIRE(scheduled_object.y <= solver_configuration.plate_bounding_box.max.y() * SEQ_SLICER_SCALE_FACTOR);
 	    }
 	}
     }
     else
     {
-	printf("Something went WRONG during sequential scheduling (code: %d)\n", result);
+        #ifdef DEBUG
+	{
+	    printf("Something went WRONG during sequential scheduling (code: %d)\n", result);
+	}
+	#endif
     }
-    
+
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing interface 1 ... finished\n");    
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing interface 1 ... finished");    
 }
 
 
 TEST_CASE("Interface test 2", "[Sequential Arrangement Interface]")
-{ 
+//void interface_test_2(void)
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing interface 2 ...\n");
+    INFO("Testing interface 2 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.decimation_precision = SEQ_DECIMATION_PRECISION_HIGH;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});    
 
-    printf("Loading objects ...\n");    
+    #ifdef DEBUG
+    {
+	printf("Loading objects ...\n");
+    }
+    #endif
     std::vector<ObjectToPrint> objects_to_print = load_exported_data_from_text(arrange_data_export_text);
 
     std::vector<std::vector<Slic3r::Polygon> > convex_unreachable_zones;
     std::vector<std::vector<Slic3r::Polygon> > box_unreachable_zones;    
 
-    printf("Preparing extruder unreachable zones ...\n");
+    #ifdef DEBUG
+    {
+	printf("Preparing extruder unreachable zones ...\n");
+    }
+    #endif
     setup_ExtruderUnreachableZones(solver_configuration, convex_unreachable_zones, box_unreachable_zones);
 
     std::vector<ScheduledPlate> scheduled_plates;
-    printf("Scheduling objects for sequential print ...\n");
+    #ifdef DEBUG
+    {
+	printf("Scheduling objects for sequential print ...\n");
+    }
+    #endif
 
     int result = schedule_ObjectsForSequentialPrint(solver_configuration,
 						    objects_to_print,
@@ -594,141 +655,257 @@ TEST_CASE("Interface test 2", "[Sequential Arrangement Interface]")
     REQUIRE(result == 0);    
     if (result == 0)
     {
-	printf("Object scheduling for sequential print SUCCESSFUL !\n");
-
-	printf("Number of plates: %ld\n", scheduled_plates.size());
+	#ifdef DEBUG
+	{
+	    printf("Object scheduling for sequential print SUCCESSFUL !\n");
+	    printf("Number of plates: %ld\n", scheduled_plates.size());
+	}
+	#endif
 	REQUIRE(scheduled_plates.size() > 0);	
 
 	for (unsigned int plate = 0; plate < scheduled_plates.size(); ++plate)
 	{
-	    printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+	    #ifdef DEBUG
+	    {
+		printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+	    }
+	    #endif
 	    REQUIRE(scheduled_plates[plate].scheduled_objects.size() > 0);	    
 
 	    for (const auto& scheduled_object: scheduled_plates[plate].scheduled_objects)
 	    {
-		cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
-		REQUIRE(scheduled_object.x >= 0);
-		REQUIRE(scheduled_object.x <= solver_configuration.x_plate_bounding_box_size * SEQ_SLICER_SCALE_FACTOR);
-		REQUIRE(scheduled_object.y >= 0);
-		REQUIRE(scheduled_object.y <= solver_configuration.y_plate_bounding_box_size * SEQ_SLICER_SCALE_FACTOR);		
+		#ifdef DEBUG
+		{
+		    cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
+		}
+		#endif
+		REQUIRE(scheduled_object.x >= solver_configuration.plate_bounding_box.min.x() * SEQ_SLICER_SCALE_FACTOR);
+		REQUIRE(scheduled_object.x <= solver_configuration.plate_bounding_box.max.x() * SEQ_SLICER_SCALE_FACTOR);
+		REQUIRE(scheduled_object.y >= solver_configuration.plate_bounding_box.min.y() * SEQ_SLICER_SCALE_FACTOR);
+		REQUIRE(scheduled_object.y <= solver_configuration.plate_bounding_box.max.y() * SEQ_SLICER_SCALE_FACTOR);
 	    }
 	}
     }
     else
     {
-	printf("Something went WRONG during sequential scheduling (code: %d)\n", result);
+	#ifdef DEBUG
+	{
+	    printf("Something went WRONG during sequential scheduling (code: %d)\n", result);
+	}
+	#endif
     }          
-    
+
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing interface 2 ... finished\n");    
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing interface 2 ... finished");    
 }
 
 
 TEST_CASE("Interface test 3", "[Sequential Arrangement Interface]")
-{ 
+//void interface_test_3(void)
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing interface 3 ...\n");
+    INFO("Testing interface 3 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
     
-    PrinterGeometry printer_geometry;
+    PrinterGeometry printer_geometry =
+	{
+	    { {0, 0}, {250000000, 0}, {250000000, 210000000}, {0, 210000000} },
+	    { 0, 3000000, 22000000},
+	    { 11000000, 13000000 },
+	    {
+		{0, { { {-500000, -500000}, {500000, -500000}, {500000, 500000}, {-500000, 500000} } } },
+		{3000000, { { {-9000000, -17000000}, {40000000, -17000000}, {40000000, 44000000}, {-9000000, 44000000} },
+			    { {-36000000, -44000000}, {40000000, -44000000}, {40000000, -13000000}, {-36000000, -13000000} } } },
+		{22000000, { { {-41000000, -45000000}, {16000000, -45000000}, {16000000, 22000000}, {-41000000, 22000000} },			    
+			     { {11000000, -45000000}, {39000000, -45000000}, {39000000, 45000000}, {11000000 , 45000000} } } },
+		{11000000, { { {-300000000, -4000000}, {300000000, -4000000}, {300000000, -14000000}, {-300000000, -14000000} } } },
+		{13000000, { { {-13000000, -84000000}, {11000000, -84000000}, {11000000, -38000000}, {-13000000, -38000000} },
+			     { {11000000, -300000000}, {300000000, -300000000}, {300000000, -84000000}, {11000000, -84000000} } } }
+			    
+	    }
+	};
+    
+    /*
     int result = load_printer_geometry_from_text(printer_geometry_mk4_text, printer_geometry);
     REQUIRE(result == 0);
-    
+
     if (result != 0)
     {
-	printf("Printer geometry load error.\n");
+        #ifdef DEBUG
+	{
+	    printf("Printer geometry load error.\n");
+	}
+	#endif
 	return;
     }
+    */
     
     REQUIRE(printer_geometry.plate.points.size() == 4);
 
-    for (const auto& convex_height: printer_geometry.convex_heights)
+    #ifdef DEBUG
     {
-	cout << "convex_height:" << convex_height << endl;
-    }
-
-    for (const auto& box_height: printer_geometry.box_heights)
-    {
-	cout << "box_height:" << box_height << endl;
-    }
-    printf("extruder slices:\n");
-    REQUIRE(printer_geometry.extruder_slices.size() > 0);
-    
-    for (std::map<coord_t, std::vector<Polygon> >::const_iterator extruder_slice = printer_geometry.extruder_slices.begin(); extruder_slice != printer_geometry.extruder_slices.end(); ++extruder_slice)
-    {
-	for (const auto &polygon: extruder_slice->second)
+	for (const auto& convex_height: printer_geometry.convex_heights)
 	{
-	    printf("  polygon height: %d\n", extruder_slice->first);
-	    
-	    for (const auto &point: polygon.points)
-	    {
-		cout << "    " << point.x() << "  " << point.y() << endl;
-	    }
+	    cout << "convex_height:" << convex_height << endl;
 	}
     }
+    #endif
 
+    #ifdef DEBUG
+    {
+	for (const auto& box_height: printer_geometry.box_heights)
+	{
+	    cout << "box_height:" << box_height << endl;
+	}
+    }
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("extruder slices:\n");
+    }
+    #endif
+    REQUIRE(printer_geometry.extruder_slices.size() > 0);
+
+    #ifdef DEBUG
+    {    
+	for (std::map<coord_t, std::vector<Polygon> >::const_iterator extruder_slice = printer_geometry.extruder_slices.begin(); extruder_slice != printer_geometry.extruder_slices.end(); ++extruder_slice)
+	{
+	    for (const auto &polygon: extruder_slice->second)
+	    {
+		printf("  polygon height: %d\n", extruder_slice->first);
+		
+		for (const auto &point: polygon.points)
+		{
+		    cout << "    " << point.x() << "  " << point.y() << endl;
+		}
+	    }
+	}
+
+    }
+    #endif
+
+    #ifdef DEBUG
     finish = clock();
     
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing interface 3 ... finished\n");    
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing interface 3 ... finished");    
 }    
 
 
 TEST_CASE("Interface test 4", "[Sequential Arrangement Interface]")
+//void interface_test_4(void)
 {
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing interface 4 ...\n");
+    INFO("Testing interface 4 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.decimation_precision = SEQ_DECIMATION_PRECISION_HIGH;
     solver_configuration.object_group_size = 4;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});    
 
-    printf("Loading objects ...\n");    
+    #ifdef DEBUG
+    {
+	printf("Loading objects ...\n");
+    }
+    #endif
     std::vector<ObjectToPrint> objects_to_print = load_exported_data_from_text(arrange_data_export_text);
-    printf("Loading objects ... finished\n");
+    #ifdef DEBUG
+    {    
+	printf("Loading objects ... finished\n");
+    }
+    #endif
 
     PrinterGeometry printer_geometry;
 
-    printf("Loading printer geometry ...\n");
+    #ifdef DEBUG
+    {    
+	printf("Loading printer geometry ...\n");
+    }
+    #endif
     int result = load_printer_geometry_from_text(printer_geometry_mk4_compatibility_text, printer_geometry);
     
     REQUIRE(result == 0);    
     if (result != 0)
     {
-	printf("Cannot load printer geometry (code: %d).\n", result);
+        #ifdef DEBUG
+	{	
+	    printf("Cannot load printer geometry (code: %d).\n", result);
+	}
+	#endif
 	return;
     }
     solver_configuration.setup(printer_geometry);
-    printf("Loading printer geometry ... finished\n");
+    #ifdef DEBUG
+    {
+	printf("Loading printer geometry ... finished\n");
+    }
+    #endif
     
     std::vector<ScheduledPlate> scheduled_plates;
-    printf("Scheduling objects for sequential print ...\n");
+    #ifdef DEBUG
+    {    
+	printf("Scheduling objects for sequential print ...\n");
+    }
+    #endif
 
     scheduled_plates = schedule_ObjectsForSequentialPrint(solver_configuration,
 							  printer_geometry,
 							  objects_to_print);    
 
-    printf("Object scheduling for sequential print SUCCESSFUL !\n");
-    
-    printf("Number of plates: %ld\n", scheduled_plates.size());
+    #ifdef DEBUG
+    {    
+	printf("Object scheduling for sequential print SUCCESSFUL !\n");
+    }
+    #endif
+
+    #ifdef DEBUG
+    {    
+	printf("Number of plates: %ld\n", scheduled_plates.size());
+    }
+    #endif
     REQUIRE(scheduled_plates.size() > 0);    
 
     for (unsigned int plate = 0; plate < scheduled_plates.size(); ++plate)
     {
-	printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+        #ifdef DEBUG
+	{	
+	    printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+	}
+	#endif
 	REQUIRE(scheduled_plates[plate].scheduled_objects.size() > 0);	
 	
 	for (const auto& scheduled_object: scheduled_plates[plate].scheduled_objects)
 	{
-	    cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
+            #ifdef DEBUG
+	    {	    
+		cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
+	    }
+	    #endif
 
 	    BoundingBox plate_box = get_extents(printer_geometry.plate);
 	    
@@ -738,68 +915,122 @@ TEST_CASE("Interface test 4", "[Sequential Arrangement Interface]")
 	    REQUIRE(scheduled_object.y <= plate_box.max.y());		
 	}
     }
-    
+
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing interface 4 ... finished\n");
+    #endif
+
+    #ifdef DEBUG
+    {    
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing interface 4 ... finished");
 }
 
 
 TEST_CASE("Interface test 5", "[Sequential Arrangement Interface]")
+//void interface_test_5(void)
 {
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing interface 5 ...\n");
+    INFO("Testing interface 5 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.decimation_precision = SEQ_DECIMATION_PRECISION_LOW;
     solver_configuration.object_group_size = 4;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});
 
-    printf("Loading objects ...\n");    
+    #ifdef DEBUG
+    {    
+	printf("Loading objects ...\n");
+    }
+    #endif
     std::vector<ObjectToPrint> objects_to_print = load_exported_data_from_text(arrange_data_export_text);
-    printf("Loading objects ... finished\n");
+    #ifdef DEBUG
+    {    
+	printf("Loading objects ... finished\n");
+    }
+    #endif
 
     PrinterGeometry printer_geometry;
 
-    printf("Loading printer geometry ...\n");
+    #ifdef DEBUG
+    {    
+	printf("Loading printer geometry ...\n");
+    }
+    #endif
     int result = load_printer_geometry_from_text(printer_geometry_mk4_compatibility_text, printer_geometry);
 
     REQUIRE(result == 0);    
     if (result != 0)
     {
-	printf("Cannot load printer geometry (code: %d).\n", result);
+        #ifdef DEBUG
+	{	
+	    printf("Cannot load printer geometry (code: %d).\n", result);
+	}
+	#endif
 	return;
     }
     solver_configuration.setup(printer_geometry);
-    printf("Loading printer geometry ... finished\n");
+    #ifdef DEBUG
+    {    
+	printf("Loading printer geometry ... finished\n");
+    }
+    #endif
     
     std::vector<ScheduledPlate> scheduled_plates;
-    printf("Scheduling objects for sequential print ...\n");
 
+    #ifdef DEBUG
+    {    
+	printf("Scheduling objects for sequential print ...\n");
+    }
+    #endif
     scheduled_plates = schedule_ObjectsForSequentialPrint(solver_configuration,
 							  printer_geometry,
 							  objects_to_print,
-							  [](int progress) { printf("Progress: %d\n", progress);
-							                     REQUIRE(progress >= 0);
+							  [](int progress) {
+                                                                             #ifdef DEBUG
+							                     { printf("Progress: %d\n", progress); }
+                                                                             #endif
+									     REQUIRE(progress >= 0);
 									     REQUIRE(progress <= 100); });
 
-    printf("Object scheduling for sequential print SUCCESSFUL !\n");
-    
-    printf("Number of plates: %ld\n", scheduled_plates.size());
+    #ifdef DEBUG
+    {    
+	printf("Object scheduling for sequential print SUCCESSFUL !\n");
+    }
+    #endif
+
+    #ifdef DEBUG
+    {    
+	printf("Number of plates: %ld\n", scheduled_plates.size());
+    }
+    #endif
     REQUIRE(scheduled_plates.size() > 0);    
 
     for (unsigned int plate = 0; plate < scheduled_plates.size(); ++plate)
     {
-	printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+        #ifdef DEBUG
+	{	
+	    printf("Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+	}
+	#endif
 	REQUIRE(scheduled_plates[plate].scheduled_objects.size() > 0);	
 	
 	for (const auto& scheduled_object: scheduled_plates[plate].scheduled_objects)
 	{
-	    cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
+            #ifdef DEBUG
+	    {	    
+		cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
+	    }
+	    #endif
 
 	    BoundingBox plate_box = get_extents(printer_geometry.plate);
 	    
@@ -810,46 +1041,81 @@ TEST_CASE("Interface test 5", "[Sequential Arrangement Interface]")
 	}
     }
     
+    #ifdef DEBUG
     finish = clock();    
-    printf("Solving time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    {    
+	printf("Solving time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    start = clock();    
+    #endif
 
-    start = clock();
-    
-    printf("Checking sequential printability ...\n");
+
+    #ifdef DEBUG
+    {    
+	printf("Checking sequential printability ...\n");
+    }
+    #endif
 
     bool printable = check_ScheduledObjectsForSequentialPrintability(solver_configuration,
 								     printer_geometry,
 								     objects_to_print,
-								     scheduled_plates);    
-    printf("  Scheduled/arranged objects are sequentially printable: %s\n", (printable ? "YES" : "NO"));
+								     scheduled_plates);
+
+    #ifdef DEBUG
+    {    
+	printf("  Scheduled/arranged objects are sequentially printable: %s\n", (printable ? "YES" : "NO"));
+    }
+    #endif
     REQUIRE(printable);
 
-    printf("Checking sequential printability ... finished\n");
+    #ifdef DEBUG
+    {    
+	printf("Checking sequential printability ... finished\n");
+    }
+    #endif
 
-    finish = clock();   
-    printf("Checking time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);    
+    #ifdef DEBUG
+    finish = clock();    
+    {
+	printf("Checking time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
     
-    printf("Testing interface 5 ... finished\n");
+    INFO("Testing interface 5 ... finished");
 }
 
 
 TEST_CASE("Interface test 6", "[Sequential Arrangement Interface]")
+//void interface_test_6(void)
 {
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing interface 6 ...\n");
+    INFO("Testing interface 6 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.decimation_precision = SEQ_DECIMATION_PRECISION_LOW;
     solver_configuration.object_group_size = 4;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});
 
-    printf("Loading objects ...\n");    
+    #ifdef DEBUG
+    {
+	printf("Loading objects ...\n");
+    }
+    #endif
     std::vector<ObjectToPrint> objects_to_print = load_exported_data_from_text(arrange_data_export_text);
-    REQUIRE(objects_to_print.size() > 0);    
-    printf("Loading objects ... finished\n");
+    REQUIRE(objects_to_print.size() > 0);
+    
+    #ifdef DEBUG
+    {
+	printf("Loading objects ... finished\n");
+    }
+    #endif
 
     for (auto& object_to_print: objects_to_print)
     {
@@ -858,41 +1124,77 @@ TEST_CASE("Interface test 6", "[Sequential Arrangement Interface]")
 
     PrinterGeometry printer_geometry;
 
-    printf("Loading printer geometry ...\n");
+    #ifdef DEBUG
+    {    
+	printf("Loading printer geometry ...\n");
+    }
+    #endif
     int result = load_printer_geometry_from_text(printer_geometry_mk4_compatibility_text, printer_geometry);
+    
     REQUIRE(result == 0);    
     if (result != 0)
     {
-	printf("Cannot load printer geometry (code: %d).\n", result);
+	#ifdef DEBUG
+	{
+	    printf("Cannot load printer geometry (code: %d).\n", result);
+	}
+	#endif
 	return;
     }
     solver_configuration.setup(printer_geometry);
-    printf("Loading printer geometry ... finished\n");
+    #ifdef DEBUG
+    {
+	printf("Loading printer geometry ... finished\n");
+    }
+    #endif
     
     std::vector<ScheduledPlate> scheduled_plates;
-    printf("Scheduling objects for sequential print ...\n");
+    #ifdef DEBUG
+    {    
+	printf("Scheduling objects for sequential print ...\n");
+    }
+    #endif
 
     scheduled_plates = schedule_ObjectsForSequentialPrint(solver_configuration,
 							  printer_geometry,
 							  objects_to_print,
-							  [](int progress) { printf("Progress: %d\n", progress);
+							  [](int progress) {
+                                                                             #ifdef DEBUG
+							                     { printf("Progress: %d\n", progress); }
+                                                                             #endif
 							                     REQUIRE(progress >= 0);
 									     REQUIRE(progress <= 100); });
 
-    printf("Object scheduling for sequential print SUCCESSFUL !\n");
-    
-    printf("Number of plates: %ld\n", scheduled_plates.size());
+    #ifdef DEBUG
+    {    
+	printf("Object scheduling for sequential print SUCCESSFUL !\n");
+    }
+    #endif
+
+    #ifdef DEBUG
+    {    
+	printf("Number of plates: %ld\n", scheduled_plates.size());
+    }
+    #endif
     REQUIRE(scheduled_plates.size() > 0);    
 
     for (unsigned int plate = 0; plate < scheduled_plates.size(); ++plate)
     {
-	printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+        #ifdef DEBUG
+	{	
+	    printf("  Number of objects on plate: %ld\n", scheduled_plates[plate].scheduled_objects.size());
+	}
+	#endif
+	
 	REQUIRE(scheduled_plates[plate].scheduled_objects.size() > 0);	
 	
 	for (const auto& scheduled_object: scheduled_plates[plate].scheduled_objects)
 	{
-	    cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
-		
+            #ifdef DEBUG
+	    {	    
+		cout << "    ID: " << scheduled_object.id << "  X: " << scheduled_object.x << "  Y: " << scheduled_object.y << endl;
+	    }
+	    #endif		
 	    BoundingBox plate_box = get_extents(printer_geometry.plate);
 	    
 	    REQUIRE(scheduled_object.x >= plate_box.min.x());
@@ -902,27 +1204,46 @@ TEST_CASE("Interface test 6", "[Sequential Arrangement Interface]")
 	}
     }
     
+    #ifdef DEBUG
     finish = clock();    
-    printf("Solving time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    {    
+	printf("Solving time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    start = clock();    
+    #endif
 
-    start = clock();
-    
-    printf("Checking sequential printability ...\n");
+    #ifdef DEBUG
+    {    
+	printf("Checking sequential printability ...\n");
+    }
+    #endif
 
     bool printable = check_ScheduledObjectsForSequentialPrintability(solver_configuration,
 								     printer_geometry,
 								     objects_to_print,
 								     scheduled_plates);
-    
-    printf("  Scheduled/arranged objects are sequentially printable: %s\n", (printable ? "YES" : "NO"));
+
+    #ifdef DEBUG
+    {    
+	printf("  Scheduled/arranged objects are sequentially printable: %s\n", (printable ? "YES" : "NO"));
+    }
+    #endif
     REQUIRE(printable);    
 
-    printf("Checking sequential printability ... finished\n");
+    #ifdef DEBUG
+    {    
+	printf("Checking sequential printability ... finished\n");
+    }
+    finish = clock();    
+    #endif
 
-    finish = clock();   
-    printf("Checking time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);    
+    #ifdef DEBUG
+    {    
+	printf("Checking time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
     
-    printf("Testing interface 6 ... finished\n");
+    INFO("Testing interface 6 ... finished");
 }
 
 

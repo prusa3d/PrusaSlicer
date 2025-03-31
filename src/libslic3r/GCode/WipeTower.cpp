@@ -942,10 +942,10 @@ void WipeTower::toolchange_Unload(
         }
     }
 
-    if (m_switch_filament_monitoring) {
+    if (m_switch_filament_monitoring)
         writer.switch_filament_monitoring(false);
+    if (m_is_mk4mmu3)
         writer.wait(1.5f);
-    }
     
 
     // now the ramming itself:

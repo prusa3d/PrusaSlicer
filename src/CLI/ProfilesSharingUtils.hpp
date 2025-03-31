@@ -6,7 +6,7 @@
 #define slic3r_ProfilesSharingUtils_hpp_
 
 #include <string>
-#include "Config.hpp"
+#include "libslic3r/Config.hpp"
 
 namespace Slic3r {
 

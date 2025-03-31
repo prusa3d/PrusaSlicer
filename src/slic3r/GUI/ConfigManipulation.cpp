@@ -478,7 +478,6 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     toggle_field("branchingsupport_max_weight_on_model", supports_en && is_branching_tree);
 
     toggle_field("support_points_density_relative", supports_en);
-    toggle_field("support_points_minimal_distance", supports_en);
 
     bool pad_en = config->opt_bool("pad_enable");
 

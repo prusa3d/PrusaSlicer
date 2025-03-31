@@ -162,9 +162,10 @@ void GLCanvas3D::select_bed(int i, bool triggered_by_user)
 // - nullopt = same as before
 // - nullptr = none available, use generic
 // - GLModel = the model to use
-std::optional<std::unique_ptr<GLModel>> GLCanvas3D::get_current_marker_model() const
+// The other field is whether the printer is HT90.
+std::pair<std::optional<std::unique_ptr<GLModel>>, bool> GLCanvas3D::get_current_marker_model() const
 {
-    std::optional<std::unique_ptr<GLModel>> out;
+    auto out = std::make_pair<std::optional<std::unique_ptr<GLModel>>, bool>(std::nullopt, false);
 
     static std::string last_printer_notes;
     static double old_r = 0.;
@@ -182,11 +183,13 @@ std::optional<std::unique_ptr<GLModel>> GLCanvas3D::get_current_marker_model() c
         old_h = h;
         old_seq = seq;
 
-        out = std::make_optional(nullptr);
+        out.second = (printer_notes.find("PRINTER_MODEL_HT90") != std::string::npos);
+
+        out.first = std::make_optional(nullptr);
         if (! seq)
             return out;
         try {            
-            boost::nowide::ifstream in(resources_dir() + "/data/printer_gantries/geometries.txt");
+            boost::nowide::ifstream in(resources_dir() + "/data/printer_gantries/geometries.json");
             boost::property_tree::ptree pt;
             boost::property_tree::read_json(in, pt);
             for (const auto& printer : pt.get_child("printers")) {
@@ -197,7 +200,7 @@ std::optional<std::unique_ptr<GLModel>> GLCanvas3D::get_current_marker_model() c
                     if (boost::filesystem::exists(filename)) {
                         std::unique_ptr<GLModel> m = std::make_unique<GLModel>();
                         if (m->init_from_file(filename))
-                            out = std::make_optional(std::move(m));
+                            out.first = std::make_optional(std::move(m));
                     }
                     break;
                 }
@@ -205,7 +208,7 @@ std::optional<std::unique_ptr<GLModel>> GLCanvas3D::get_current_marker_model() c
         } catch (...) {
             // Whatever happened, ignore it. We will return nullptr.
         }
-        if (*out == nullptr && seq) {
+        if (*(out.first) == nullptr && seq) {
             // Generic sequential extruder model.
             double gantry_height = 10;
             auto mesh = its_make_cylinder(r, h + gantry_height - 0.001);
@@ -215,7 +218,7 @@ std::optional<std::unique_ptr<GLModel>> GLCanvas3D::get_current_marker_model() c
             its_merge(mesh, mesh2);
             std::unique_ptr<GLModel> m = std::make_unique<GLModel>();
             m->init_from(mesh);
-            out = std::make_optional(std::move(m));
+            out.first = std::make_optional(std::move(m));
         }
     }
     return out;

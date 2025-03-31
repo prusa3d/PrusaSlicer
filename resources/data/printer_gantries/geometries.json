@@ -281,6 +281,62 @@
                     ]
                 }
             ]
+        },
+        {
+            "printer_notes_regex": ".*PRINTER_MODEL_HT90.*",
+            "gantry_model_filename": "prusa3d_ht90_actuator.stl",
+            "slices": [
+                {
+                    "height": "0",
+                    "type": "convex",
+                    "polygons": [
+                        "-5,-5; 5,-5; 5,5; -5,5"
+                    ]
+                },
+                {
+                    "height": "1",
+                    "type": "convex",
+                    "polygons": [
+                        "-33,-2; 33,-2; 33,48; -33,48",
+			"-46,-37; 46,-37; 46,2; -46,2"
+                    ]
+                },
+                {
+                    "height": "20",
+                    "type": "convex",
+                    "polygons": [
+                        "-55,-55; 55,-55; 55,55; -55,55"
+                    ]
+                },
+                {
+                    "height": "28",
+                    "type": "convex",
+                    "polygons": [
+		        "-76,-68; 76,-68; 76,65; -76,65"
+                    ]
+                },
+                {
+                    "height": "40",
+                    "type": "convex",
+                    "polygons": [
+                        "-120,-118; 120,-118; 120,94; -120,94"
+                    ]
+                },
+                {
+                    "height": "60",
+                    "type": "box",
+                    "polygons": [
+		        "-170,-164; 170,-164; 170,130; -170,130"
+                    ]
+                },
+                {
+                    "height": "80",
+                    "type": "box",
+                    "polygons": [
+		        "-400,-400; 400,-400; 400,400; -400,400"
+                    ]
+                }		
+            ]
         }
     ]
 }

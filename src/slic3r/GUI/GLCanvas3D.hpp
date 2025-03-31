@@ -729,7 +729,7 @@ public:
     const libvgcode::Interval& get_gcode_view_visible_range() const { return m_gcode_viewer.get_gcode_view_visible_range(); }
     const libvgcode::PathVertex& get_gcode_vertex_at(size_t id) const { return m_gcode_viewer.get_gcode_vertex_at(id); }
 
-    std::optional<std::unique_ptr<GLModel>> get_current_marker_model() const;
+    std::pair<std::optional<std::unique_ptr<GLModel>>, bool> get_current_marker_model() const;
 
     void toggle_sla_auxiliaries_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1);
     void toggle_model_objects_visibility(bool visible, const ModelObject* mo = nullptr, int instance_idx = -1, const ModelVolume* mv = nullptr);

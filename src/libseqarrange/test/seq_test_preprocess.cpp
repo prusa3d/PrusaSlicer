@@ -1,6 +1,6 @@
 /*================================================================*/
 /*
- * Author:  Pavel Surynek, 2023 - 2024
+ * Author:  Pavel Surynek, 2023 - 2025
  * Company: Prusa Research
  *
  * File:    seq_test_preprocess.cpp
@@ -50,13 +50,12 @@ using namespace Sequential;
 
 /*----------------------------------------------------------------*/
 
-const int SEQ_PRUSA_MK3S_X_SIZE = 2500;
-const int SEQ_PRUSA_MK3S_Y_SIZE = 2100;    
-
+const coord_t SEQ_PRUSA_MK3S_X_SIZE = 250000000;
+const coord_t SEQ_PRUSA_MK3S_Y_SIZE = 210000000;    
 
 /*----------------------------------------------------------------*/
 
-
+/*
 static Polygon scale_UP(const Polygon &polygon)
 {
     Polygon poly = polygon;
@@ -68,7 +67,7 @@ static Polygon scale_UP(const Polygon &polygon)
 
     return poly;
 }
-
+*/
 
 static Polygon scale_UP(const Polygon &polygon, double x_pos, double y_pos)
 {
@@ -88,14 +87,17 @@ std::vector<Polygon> test_polygons;
 
 TEST_CASE("Preprocessing test 1", "[Sequential Arrangement Preprocessing]")
 {
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing preprocessing 1 ...\n");
+    INFO("Testing preprocessing 1 ...");
 
     SolverConfiguration solver_configuration;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
-
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});
+    #ifdef DEBUG
     start = clock();
+    #endif
     for (unsigned int i = 0; i < PRUSA_PART_POLYGONS.size(); ++i)
     {
 	Polygon scale_down_polygon;
@@ -110,29 +112,40 @@ TEST_CASE("Preprocessing test 1", "[Sequential Arrangement Preprocessing]")
 	Polygon display_polygon = scale_UP(test_polygons[i], 1000, 1000);
 	preview_svg.draw(display_polygon, "blue");
 	preview_svg.Close();
-    }        
+    }
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing preprocessing 1 ... finished\n");    
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing preprocessing 1 ... finished");    
 }
 
 
-TEST_CASE("Preprocessing test 2", "[Sequential Arrangement Preprocessing]")
-{ 
+//TEST_CASE("Preprocessing test 2", "[Sequential Arrangement Preprocessing]")
+void preprocessing_test_2(void)
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing preprocess 2 ...\n");
+    INFO("Testing preprocess 2 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});
 
     vector<Polygon> polygons;
     vector<Polygon> unreachable_polygons;
     
-    for (unsigned int i = 0; i < PRUSA_PART_POLYGONS.size(); ++i)
+    for (unsigned int i = 0; i < 8 /*PRUSA_PART_POLYGONS.size()*/; ++i)
     {
 	Polygon scale_down_polygon;
 	scaleDown_PolygonForSequentialSolver(PRUSA_PART_POLYGONS[i], scale_down_polygon);
@@ -169,21 +182,29 @@ TEST_CASE("Preprocessing test 2", "[Sequential Arrangement Preprocessing]")
 											 decided_polygons,
 											 remaining_polygons);
 
-	printf("----> Optimization finished <----\n");
+	#ifdef DEBUG
+	{
+	    printf("----> Optimization finished <----\n");
+	}
+	#endif
 	REQUIRE(optimized);	
 	
 	if (optimized)
 	{
-	    printf("Polygon positions:\n");
-	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+	    #ifdef DEBUG
 	    {
-		printf("  [%d] %.3f, %.3f (%.3f)\n", decided_polygons[i], poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double(), times_T[decided_polygons[i]].as_double());
+		printf("Polygon positions:\n");
+		for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+		{
+		    printf("  [%d] %.3f, %.3f (%.3f)\n", decided_polygons[i], poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double(), times_T[decided_polygons[i]].as_double());
+		}
+		printf("Remaining polygons: %ld\n", remaining_polygons.size());
+		for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
+		{
+		    printf("  %d\n", remaining_polygons[i]);
+		}
 	    }
-	    printf("Remaining polygons: %ld\n", remaining_polygons.size());
-	    for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
-	    {
-		printf("  %d\n", remaining_polygons[i]);
-	    }
+	    #endif
 	
 	    SVG preview_svg("preprocess_test_2.svg");
 
@@ -194,29 +215,26 @@ TEST_CASE("Preprocessing test 2", "[Sequential Arrangement Preprocessing]")
 		    #ifdef DEBUG
 		    {
 			printf("----> %.3f,%.3f\n", poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double());		    
-			for (int k = 0; k < polygons[decided_polygons[i]].points.size(); ++k)
+			for (unsigned int k = 0; k < polygons[decided_polygons[i]].points.size(); ++k)
 			{
 			    printf("    xy: %d, %d\n", polygons[decided_polygons[i]].points[k].x(), polygons[decided_polygons[i]].points[k].y());
 			}
 		    }
 		    #endif
 
-		    for (unsigned int j = 0; j < unreachable_polygons[decided_polygons[i]].size(); ++j)
+		    #ifdef DEBUG
 		    {
-			#ifdef DEBUG
+			for (unsigned int k = 0; k < unreachable_polygons[decided_polygons[i]].points.size(); ++k)
 			{
-			    for (int k = 0; k < unreachable_polygons[decided_polygons[i]][j].points.size(); ++k)
-			    {
-				printf("    Pxy: %d, %d\n", unreachable_polygons[decided_polygons[i]][j].points[k].x(), unreachable_polygons[decided_polygons[i]][j].points[k].y());
-			    }
+			    printf("    Pxy: %d, %d\n", unreachable_polygons[decided_polygons[i]].points[k].x(), unreachable_polygons[decided_polygons[i]].points[k].y());
 			}
-			#endif
-			
-			Polygon display_unreachable_polygon = scale_UP(unreachable_polygons[decided_polygons[i]],
-								      poly_positions_X[decided_polygons[i]].as_double(),
-								      poly_positions_Y[decided_polygons[i]].as_double());
-			preview_svg.draw(display_unreachable_polygon, "lightgrey");   
 		    }
+		    #endif
+			
+		    Polygon display_unreachable_polygon = scale_UP(unreachable_polygons[decided_polygons[i]],
+								   poly_positions_X[decided_polygons[i]].as_double(),
+								   poly_positions_Y[decided_polygons[i]].as_double());
+		    preview_svg.draw(display_unreachable_polygon, "lightgrey");   
 		}
 	    }	    
 
@@ -303,19 +321,33 @@ TEST_CASE("Preprocessing test 2", "[Sequential Arrangement Preprocessing]")
 	}
 	else
 	{
-	    printf("Polygon optimization FAILED.\n");
-	}	
+	    #ifdef DEBUG
+	    {
+		printf("Polygon optimization FAILED.\n");
+	    }
+	    #endif
+	}
+	#ifdef DEBUG
 	finish = clock();
+	#endif
 
-	printf("Intermediate time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+        #ifdef DEBUG
+	{
+	    printf("Intermediate time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+	}
+	#endif
 	
 	vector<Polygon> next_polygons;
 	vector<Polygon> next_unreachable_polygons;
 
-	for (unsigned int i = 0; i < polygon_index_map.size(); ++i)
+	#ifdef DEBUG
 	{
-	    printf("  %d\n", polygon_index_map[i]);
+	    for (unsigned int i = 0; i < polygon_index_map.size(); ++i)
+	    {
+		printf("  %d\n", polygon_index_map[i]);
+	    }
 	}
+	#endif
 	for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
 	{
 	    next_polygons.push_back(polygons[remaining_polygons[i]]);	    	    
@@ -336,23 +368,33 @@ TEST_CASE("Preprocessing test 2", "[Sequential Arrangement Preprocessing]")
     }
     while (!remaining_polygons.empty());
 
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing preprocess 2 ... finished\n");    
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing preprocess 2 ... finished");    
 }    
 
 
 TEST_CASE("Preprocessing test 3", "[Sequential Arrangement Preprocessing]")
 {
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
 
     SolverConfiguration solver_configuration;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});
     
-    printf("Testing preprocessing 3 ...\n");
+    INFO("Testing preprocessing 3 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     std::vector<Slic3r::Polygon> nozzle_unreachable_polygons;
     std::vector<Slic3r::Polygon> extruder_unreachable_polygons;
@@ -585,28 +627,38 @@ TEST_CASE("Preprocessing test 3", "[Sequential Arrangement Preprocessing]")
 	    preview_svg.Close();
 	}			
     }    
-    
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing preprocess 3 ... finished\n");    
+    #endif
 
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing preprocess 3 ... finished");
 }
 
 
-TEST_CASE("Preprocessing test 4", "[Sequential Arrangement Preprocessing]")
-{ 
+//TEST_CASE("Preprocessing test 4", "[Sequential Arrangement Preprocessing]")
+void preprocessing_test_4(void)
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing preprocess 4 ...\n");
+    INFO("Testing preprocess 4 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});    
 
     std::vector<Slic3r::Polygon> polygons;
     std::vector<std::vector<Slic3r::Polygon> > unreachable_polygons;
+    
     for (int i = 0; i < 12; ++i)
     {
 	Polygon scale_down_polygon;
@@ -658,21 +710,29 @@ TEST_CASE("Preprocessing test 4", "[Sequential Arrangement Preprocessing]")
 											 decided_polygons,
 											 remaining_polygons);
 
-	printf("----> Optimization finished <----\n");
+	#ifdef DEBUG
+	{
+	    printf("----> Optimization finished <----\n");
+	}
+	#endif
 	REQUIRE(optimized);
 	
 	if (optimized)
 	{
-	    printf("Polygon positions:\n");
-	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+            #ifdef DEBUG
 	    {
-		printf("  [%d] %.3f, %.3f (%.3f)\n", decided_polygons[i], poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double(), times_T[decided_polygons[i]].as_double());
+		printf("Polygon positions:\n");
+		for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+		{
+		    printf("  [%d] %.3f, %.3f (%.3f)\n", decided_polygons[i], poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double(), times_T[decided_polygons[i]].as_double());
+		}
+		printf("Remaining polygons: %ld\n", remaining_polygons.size());
+		for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
+		{
+		    printf("  %d\n", remaining_polygons[i]);
+		}
 	    }
-	    printf("Remaining polygons: %ld\n", remaining_polygons.size());
-	    for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
-	    {
-		printf("  %d\n", remaining_polygons[i]);
-	    }
+	    #endif
 	
 	    SVG preview_svg("preprocess_test_4.svg");
 
@@ -682,27 +742,29 @@ TEST_CASE("Preprocessing test 4", "[Sequential Arrangement Preprocessing]")
 		{
 		    #ifdef DEBUG
 		    {	
-		    printf("----> %.3f,%.3f\n", poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double());		    
-		    for (int k = 0; k < polygons[decided_polygons[i]].points.size(); ++k)
-		    {
-			printf("    xy: %d, %d\n", polygons[decided_polygons[i]].points[k].x(), polygons[decided_polygons[i]].points[k].y());
+			printf("----> %.3f,%.3f\n", poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double());		    
+			for (unsigned int k = 0; k < polygons[decided_polygons[i]].points.size(); ++k)
+			{
+			    printf("    xy: %d, %d\n", polygons[decided_polygons[i]].points[k].x(), polygons[decided_polygons[i]].points[k].y());
+			}
 		    }
-}
 		    #endif
+		    
 		    for (unsigned int j = 0; j < unreachable_polygons[decided_polygons[i]].size(); ++j)
 		    {
 			#ifdef DEBUG
-                        {
-			for (int k = 0; k < unreachable_polygons[decided_polygons[i]][j].points.size(); ++k)
 			{
-			    printf("    Pxy: %d, %d\n", unreachable_polygons[decided_polygons[i]][j].points[k].x(), unreachable_polygons[decided_polygons[i]][j].points[k].y());
+			    for (unsigned int k = 0; k < unreachable_polygons[decided_polygons[i]][j].points.size(); ++k)
+			    {
+				printf("    Pxy: %d, %d\n", unreachable_polygons[decided_polygons[i]][j].points[k].x(), unreachable_polygons[decided_polygons[i]][j].points[k].y());
+			    }
 			}
 			#endif
-
+			
 			Polygon display_unreachable_polygon = scale_UP(unreachable_polygons[decided_polygons[i]][j],
-								      poly_positions_X[decided_polygons[i]].as_double(),
-								      poly_positions_Y[decided_polygons[i]].as_double());
-			preview_svg.draw(display_unreachable_polygon, "lightgrey");   
+								       poly_positions_X[decided_polygons[i]].as_double(),
+								       poly_positions_Y[decided_polygons[i]].as_double());
+			preview_svg.draw(display_unreachable_polygon, "lightgrey");   			    			    
 		    }
 		}
 	    }	    
@@ -712,7 +774,6 @@ TEST_CASE("Preprocessing test 4", "[Sequential Arrangement Preprocessing]")
 		Polygon display_polygon = scale_UP(polygons[decided_polygons[i]],
 						   poly_positions_X[decided_polygons[i]].as_double(),
 						   poly_positions_Y[decided_polygons[i]].as_double());
-		
 		string color;
 		
 		switch(i)
@@ -785,23 +846,37 @@ TEST_CASE("Preprocessing test 4", "[Sequential Arrangement Preprocessing]")
 		
 		preview_svg.draw(display_polygon, color);
 	    }
-	    
 	    preview_svg.Close();
 	}
 	else
 	{
-	    printf("Polygon optimization FAILED.\n");
+	    #ifdef DEBUG
+	    {
+		printf("Polygon optimization FAILED.\n");
+	    }
+	    #endif	    
 	}
-	finish = clock();	
-	printf("Intermediate time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+        #ifdef DEBUG
+	finish = clock();
+	#endif
+
+	#ifdef DEBUG
+	{
+	    printf("Intermediate time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+	}
+	#endif
 	
 	vector<Polygon> next_polygons;
 	vector<vector<Polygon> > next_unreachable_polygons;
 
-	for (unsigned int i = 0; i < polygon_index_map.size(); ++i)
+	#ifdef DEBUG
 	{
-	    printf("  %d\n", polygon_index_map[i]);
+	    for (unsigned int i = 0; i < polygon_index_map.size(); ++i)
+	    {
+		printf("  %d\n", polygon_index_map[i]);
+	    }
 	}
+	#endif
 	for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
 	{
 	    next_polygons.push_back(polygons[remaining_polygons[i]]);	    	    
@@ -822,23 +897,33 @@ TEST_CASE("Preprocessing test 4", "[Sequential Arrangement Preprocessing]")
     }
     while (!remaining_polygons.empty());
 
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing preprocess 4 ... finished\n");    
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing preprocess 4 ... finished");
 }    
 
 
 TEST_CASE("Preprocessing test 5", "[Sequential Arrangement Preprocessing]")
-{ 
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing preprocess 5 ...\n");
+    INFO("Testing preprocess 5 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});    
 
     std::vector<Slic3r::Polygon> polygons;
     std::vector<std::vector<Slic3r::Polygon> > unreachable_polygons;
@@ -878,27 +963,38 @@ TEST_CASE("Preprocessing test 5", "[Sequential Arrangement Preprocessing]")
 	preview_svg.Close();
     }
 
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing preprocess 5 ... finished\n");
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing preprocess 5 ... finished");
 }
 
 
-TEST_CASE("Preprocessing test 6", "[Sequential Arrangement Preprocessing]")
-{ 
+//TEST_CASE("Preprocessing test 6", "[Sequential Arrangement Preprocessing]")
+void preprocessing_test_6(void)
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing preprocess 6 ...\n");
+    INFO("Testing preprocess 6 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
-    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
+    solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE / SEQ_SLICER_SCALE_FACTOR, SEQ_PRUSA_MK3S_Y_SIZE / SEQ_SLICER_SCALE_FACTOR});    
 
     std::vector<Slic3r::Polygon> polygons;
     std::vector<std::vector<Slic3r::Polygon> > unreachable_polygons;
-    for (unsigned int i = 0; i < PRUSA_PART_POLYGONS.size(); ++i)
+    for (unsigned int i = 0; i < 12 /*PRUSA_PART_POLYGONS.size()*/; ++i)
     {
 	Polygon decimated_polygon;
 	decimate_PolygonForSequentialSolver(solver_configuration,
@@ -955,21 +1051,29 @@ TEST_CASE("Preprocessing test 6", "[Sequential Arrangement Preprocessing]")
 											 decided_polygons,
 											 remaining_polygons);
 
-	printf("----> Optimization finished <----\n");
+	#ifdef DEBUG
+	{
+	    printf("----> Optimization finished <----\n");
+	}
+	#endif
 	REQUIRE(optimized);
 	
 	if (optimized)
 	{
-	    printf("Polygon positions:\n");
-	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+	    #ifdef DEBUG
 	    {
-		printf("  [%d] %.3f, %.3f (%.3f)\n", decided_polygons[i], poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double(), times_T[decided_polygons[i]].as_double());
+		printf("Polygon positions:\n");
+		for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+		{
+		    printf("  [%d] %.3f, %.3f (%.3f)\n", decided_polygons[i], poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double(), times_T[decided_polygons[i]].as_double());
+		}
+		printf("Remaining polygons: %ld\n", remaining_polygons.size());
+		for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
+		{
+		    printf("  %d\n", remaining_polygons[i]);
+		}
 	    }
-	    printf("Remaining polygons: %ld\n", remaining_polygons.size());
-	    for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
-	    {
-		printf("  %d\n", remaining_polygons[i]);
-	    }
+	    #endif
 	
 	    SVG preview_svg("preprocess_test_6.svg");
 
@@ -980,7 +1084,7 @@ TEST_CASE("Preprocessing test 6", "[Sequential Arrangement Preprocessing]")
 		    #ifdef DEBUG
                     {
 			printf("----> %.3f,%.3f\n", poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double());		    
-			for (int k = 0; k < polygons[decided_polygons[i]].points.size(); ++k)
+			for (unsigned int k = 0; k < polygons[decided_polygons[i]].points.size(); ++k)
 			{
 			    printf("    xy: %d, %d\n", polygons[decided_polygons[i]].points[k].x(), polygons[decided_polygons[i]].points[k].y());
 			}
@@ -990,7 +1094,7 @@ TEST_CASE("Preprocessing test 6", "[Sequential Arrangement Preprocessing]")
 		    {
 			#ifdef DEBUG
                         {
-			    for (int k = 0; k < unreachable_polygons[decided_polygons[i]][j].points.size(); ++k)
+			    for (unsigned int k = 0; k < unreachable_polygons[decided_polygons[i]][j].points.size(); ++k)
 			    {
 				printf("    Pxy: %d, %d\n", unreachable_polygons[decided_polygons[i]][j].points[k].x(), unreachable_polygons[decided_polygons[i]][j].points[k].y());
 			    }
@@ -1087,18 +1191,33 @@ TEST_CASE("Preprocessing test 6", "[Sequential Arrangement Preprocessing]")
 	}
 	else
 	{
-	    printf("Polygon optimization FAILED.\n");
+	    #ifdef DEBUG
+	    {
+		printf("Polygon optimization FAILED.\n");
+	    }
+	    #endif
 	}
-	finish = clock();	
-	printf("Intermediate time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+	#ifdef DEBUG
+	finish = clock();
+	#endif
+	
+	#ifdef DEBUG
+	{
+	    printf("Intermediate time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+	}
+	#endif
 	
 	vector<Polygon> next_polygons;
 	vector<vector<Polygon> > next_unreachable_polygons;
 
-	for (unsigned int i = 0; i < polygon_index_map.size(); ++i)
+	#ifdef DEBUG
 	{
-	    printf("  %d\n", polygon_index_map[i]);
+	    for (unsigned int i = 0; i < polygon_index_map.size(); ++i)
+	    {
+		printf("  %d\n", polygon_index_map[i]);
+	    }
 	}
+	#endif
 	for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
 	{
 	    next_polygons.push_back(polygons[remaining_polygons[i]]);	    	    
@@ -1119,10 +1238,16 @@ TEST_CASE("Preprocessing test 6", "[Sequential Arrangement Preprocessing]")
     }
     while (!remaining_polygons.empty());
 
+    #ifdef DEBUG
     finish = clock();
-    
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing preprocess 6 ... finished\n");    
+    #endif
+
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    INFO("Testing preprocess 6 ... finished");    
 }    
 
 

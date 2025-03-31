@@ -86,6 +86,7 @@ bool PrinterGeometry::convert_Geometry2PlateBounds(Slic3r::BoundingBox &plate_bo
 	    plate_bounding_polygon.points.insert(plate_bounding_polygon.points.begin() + i, Point(plate.points[i].x() / SEQ_SLICER_SCALE_FACTOR,
 												  plate.points[i].y() / SEQ_SLICER_SCALE_FACTOR));
 	}
+	plate_bounding_polygon.make_counter_clockwise();    	
 	return false;
     }
     else
@@ -293,7 +294,7 @@ std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(
 							plate_polygons,
 							plate_unreachable_polygons))
 	{
-	    return std::pair<int, int>(objects_to_print[conflict.value().first].id, objects_to_print[conflict.value().second].id);
+	    return std::pair<int, int>(scheduled_plate.scheduled_objects[conflict.value().first].id, scheduled_plate.scheduled_objects[conflict.value().second].id);
 	}
 	#ifdef DEBUG
 	{
@@ -313,7 +314,7 @@ std::optional<std::pair<int, int> > check_ScheduledObjectsForSequentialConflict(
 							    plate_polygons,
 							    plate_unreachable_polygons))
 	{
-	    return std::pair<int, int>(objects_to_print[conflict.value().first].id, objects_to_print[conflict.value().second].id);
+	    return std::pair<int, int>(scheduled_plate.scheduled_objects[conflict.value().first].id, scheduled_plate.scheduled_objects[conflict.value().second].id);
 	}
 	#ifdef DEBUG
 	{
@@ -1234,7 +1235,7 @@ int schedule_ObjectsForSequentialPrint(const SolverConfiguration                
 	    #ifdef DEBUG
 	    {	    
 		printf("Polygon positions:\n");
-		for (unsgined int i = 0; i < decided_polygons.size(); ++i)
+		for (unsigned int i = 0; i < decided_polygons.size(); ++i)
 		{
 		    printf("  [ID:%d,RID:%d] x:%.3f, y:%.3f (t:%.3f)\n",
 			   original_index_map[decided_polygons[i]],

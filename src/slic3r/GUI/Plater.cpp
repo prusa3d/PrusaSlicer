@@ -1100,6 +1100,8 @@ void Plater::priv::init()
             this->notification_manager->push_notification(NotificationType::AccountTransientRetry
                 , NotificationManager::NotificationLevel::RegularNotificationLevel
                 , evt.data
+                // TRN: This is a hyperlink in a notification. It is preceded by a message from PrusaAccount (therefore not in this dictionary)
+                // saying something like "connection not established, I will keep trying".
                 , _u8L("Stop now.")
                 , [this](wxEvtHandler* ) {
                     this->user_account->do_logout();
@@ -1374,6 +1376,21 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 config.null_nullables();
                 // and place the loaded config over the base.
                 config += std::move(config_loaded);
+            } else { // config_loaded.empty()
+                // Detection of possible breaking change in 3MF configuration loading sometimes in future.
+                if (prusaslicer_generator_version && // set only when loaded with configuration
+                    *prusaslicer_generator_version > Semver(SLIC3R_VERSION)) {
+                    wxString title = _L("Configuration was not loaded");
+                    const wxString url = "https://prusa.io/3mf-transfer";
+                    // TRN: %1% is filename of the project, %2% is url link.
+                    wxString message = format_wxstr(_L("<b>Unable to load configuration from project\n\nFile: </b>%1%\n\n"
+                        "This project was created in a newer version of PrusaSlicer. Only the geometry was loaded.\n"
+                        "Update to the latest version for full compatibility.\nFor more info: <a href=%2%>%2%</a>"),
+                        from_path(filename), url);
+                    HtmlCapableRichMessageDialog dialog(q, message ,title, wxOK,
+                        [&url](const std::string&) { wxGetApp().open_browser_with_warning_dialog(url); });
+                    dialog.ShowModal();
+                }
             }
             if (!config_substitutions.empty())
                 show_substitutions_info(config_substitutions.substitutions, filename.string());
@@ -2169,8 +2186,12 @@ void Plater::priv::process_validation_warning(const std::vector<std::string>& wa
                 return true;
             };
         } else if (text == "_BED_TEMPS_DIFFER" || text == "_BED_TEMPS_CHANGED") {
+            // TRN: Text of a notification, followed by (single) hyperlink to two of the config options. The sentence had to be split because of the hyperlink, sorry.
+            // The hyperlink part of the sentence reads "'Bed temperature by extruder' and 'Wipe tower extruder'", and it is also to be translated.
             text              = _u8L("Bed temperatures for the used filaments differ significantly.\n"
                                      "For multi-material prints it is recommended to set the ");
+            // TRN: The other part of the sentence starting "Bed temperatures for the used" (also in the dictionary). Sorry for splitting it, technical reasons -
+            // this part of the sentence is a hyperlink.
             hypertext = _u8L("'Bed temperature by extruder' and 'Wipe tower extruder'");
             multiline = true;
             notification_type = NotificationType::BedTemperaturesDiffer;
@@ -5010,7 +5031,8 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                                 break;
                             }
                             // if 3mf - read archive headers to find project file
-                            if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(final_path.string())) ||
+                            auto [is_project, ps_version] = is_project_3mf(final_path.string());
+                            if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project) ||
                                 (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf"))) {
                                 non_project_paths.emplace_back(final_path);
                                 break;
@@ -5230,16 +5252,19 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
         std::string filename = (*it).filename().string();
 
         bool handle_as_project = boost::algorithm::iends_with(filename, ".3mf");
-        if (boost::algorithm::iends_with(filename, ".zip") && is_project_3mf(it->string())) {
+        auto [has_config, ps_version] = is_project_3mf(it->string());
+
+        if (boost::algorithm::iends_with(filename, ".zip") && has_config) {
             BOOST_LOG_TRIVIAL(warning) << "File with .zip extension is 3mf project, opening as it would have .3mf extension: " << *it;
             handle_as_project = true;
         }
         if (handle_as_project && load_just_one_file) {
             ProjectDropDialog::LoadType load_type = ProjectDropDialog::LoadType::Unknown;
             {
-                if (boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string()))
+                if (boost::algorithm::iends_with(filename, ".3mf") && (!has_config && !ps_version.has_value())) {
+                    // Projects generated by PrusaSlicer is expected to have config. If absent, it will be reported later.
                     load_type = ProjectDropDialog::LoadType::LoadGeometry;
-                else {
+                } else {
                     if (wxGetApp().app_config->get_bool("show_drop_project_dialog")) {
                         ProjectDropDialog dlg(filename);
                         if (dlg.ShowModal() == wxID_OK) {
@@ -5948,7 +5973,7 @@ void Plater::export_all_gcodes(bool prefer_removable) {
         paths.emplace_back(print_index, output_file);
     }
 
-    BulkExportDialog dialog{paths, _L("Export beds")};
+    BulkExportDialog dialog{paths, _L("Export beds"),  "<>[]:/\\|?*\""};
     if (dialog.ShowModal() != wxID_OK) {
         return;
     }
@@ -6596,7 +6621,7 @@ void Plater::connect_gcode_all() {
         paths.emplace_back(print_index, filename_fixed);
     }
 
-    BulkExportDialog dialog{paths, _L("Send all to Connect")};
+    BulkExportDialog dialog{paths, _L("Send all to Connect"),  connect.get_unusable_symbols()};
     if (dialog.ShowModal() != wxID_OK) {
         return;
     }

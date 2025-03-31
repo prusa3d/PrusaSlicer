@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="50mm"
+   height="50mm"
+   viewBox="0 0 50 50"
+   version="1.1"
+   id="svg3403"
+   inkscape:version="1.2 (dc2aedaf03, 2022-05-15)"
+   sodipodi:docname="sla_support.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview3405"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="true"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="false"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     showborder="true"
+     borderlayer="true"
+     inkscape:zoom="3.3638608"
+     inkscape:cx="115.78957"
+     inkscape:cy="88.588685"
+     inkscape:window-width="1920"
+     inkscape:window-height="1129"
+     inkscape:window-x="1912"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs3400">
+    <marker
+       style="overflow:visible"
+       id="Arrow2"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow2"
+       markerWidth="7.6999998"
+       markerHeight="5.5999999"
+       viewBox="0 0 7.7 5.6"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.7)"
+         d="M -2,-4 9,0 -2,4 c 2,-2.33 2,-5.66 0,-8 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="arrow2L" />
+    </marker>
+    <marker
+       style="overflow:visible"
+       id="Arrow2-5"
+       refX="0"
+       refY="0"
+       orient="auto-start-reverse"
+       inkscape:stockid="Arrow2"
+       markerWidth="7.6999998"
+       markerHeight="5.5999999"
+       viewBox="0 0 7.7 5.6"
+       inkscape:isstock="true"
+       inkscape:collect="always"
+       preserveAspectRatio="xMidYMid">
+      <path
+         transform="scale(0.7)"
+         d="M -2,-4 9,0 -2,4 c 2,-2.33 2,-5.66 0,-8 z"
+         style="fill:context-stroke;fill-rule:evenodd;stroke:none"
+         id="arrow2L-4" />
+    </marker>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:2.5;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,11.25 H 46.858514 50"
+       id="path13101"
+       sodipodi:nodetypes="ccc" />
+    <text
+       xml:space="preserve"
+       style="font-size:0.25494px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="46.68829"
+       y="11.313486"
+       id="text13105"><tspan
+         sodipodi:role="line"
+         id="tspan13103"
+         style="fill:#ffffff;stroke:none;stroke-width:0.25"
+         x="46.68829"
+         y="11.313486">201. - 250. layer</tspan></text>
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:2.5;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,6.25 H 50"
+       id="path13095" />
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,1.3745207 H 50"
+       id="path13003" />
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,1.875 H 50"
+       id="path13005" />
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,2.375 H 50"
+       id="path13007" />
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,0.87396551 H 50"
+       id="path12741" />
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,0.375 H 50"
+       id="path12739" />
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:0.05;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,0.075 H 50"
+       id="path9670-6" />
+    <path
+       style="fill:#cccccc;stroke:#cccccc;stroke-width:0.05;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 0,0.175 H 50"
+       id="path12735" />
+    <path
+       style="fill:none;stroke:#b50000;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 3.5,0 4.0915916,3.8987591 5,15 6,40"
+       id="path3587"
+       sodipodi:nodetypes="cccc" />
+    <text
+       xml:space="preserve"
+       style="font-size:1.05833px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#364e59;stroke:none;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="9.5439215"
+       y="-7.5019774"
+       id="text4929"><tspan
+         sodipodi:role="line"
+         id="tspan4927"
+         style="font-size:1.05833px;fill:#364e59;stroke:none;stroke-width:0.4"
+         x="9.5439215"
+         y="-7.5019774">island supports</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:2.11667px;line-height:1.3;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#364e59;stroke:none;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="24.711193"
+       y="52.296951"
+       id="text4985"><tspan
+         sodipodi:role="line"
+         id="tspan4983"
+         style="font-weight:normal;font-size:2.11667px;stroke-width:0.4"
+         x="24.711193"
+         y="52.296951">For loading is used only first red curve</tspan><tspan
+         sodipodi:role="line"
+         style="font-weight:normal;font-size:2.11667px;stroke-width:0.4"
+         x="24.711193"
+         y="55.048622"
+         id="tspan9281">Use only line segments (no curve)</tspan><tspan
+         sodipodi:role="line"
+         style="font-weight:normal;font-size:2.11667px;stroke-width:0.4"
+         x="24.711193"
+         y="57.800293"
+         id="tspan15589">Y coordinate of points must only increase.</tspan><tspan
+         sodipodi:role="line"
+         style="font-weight:normal;font-size:2.11667px;stroke-width:0.4"
+         x="24.711193"
+         y="60.551964"
+         id="tspan17460">First point.y must be zero</tspan><tspan
+         sodipodi:role="line"
+         style="font-weight:normal;font-size:2.11667px;stroke-width:0.4"
+         x="24.711193"
+         y="63.303635"
+         id="tspan9676">Last virtual point of curve is [last.x, ∞]</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:2.11667px;line-height:1.3;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#364e59;stroke:none;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="33.019527"
+       y="-2.8043785"
+       id="text4985-7"><tspan
+         sodipodi:role="line"
+         style="font-weight:bold;font-size:2.11667px;stroke-width:0.4"
+         x="33.019527"
+         y="-2.8043785"
+         id="tspan9281-8">Supported radius[in mm]</tspan></text>
+    <rect
+       style="fill:#ba00ff;stroke:none;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       id="rect6552"
+       width="0.39999992"
+       height="1"
+       x="-0.2"
+       y="0" />
+    <text
+       xml:space="preserve"
+       style="font-size:1.05833px;line-height:1.2;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#ba00ff;stroke:none;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="-0.38932067"
+       y="-1.6407087"
+       id="text6608"><tspan
+         sodipodi:role="line"
+         style="font-size:1.05833px;text-align:center;text-anchor:middle;stroke-width:0.4"
+         x="-0.38932067"
+         y="-1.6407087"
+         id="tspan7386">Head</tspan><tspan
+         sodipodi:role="line"
+         style="font-size:1.05833px;text-align:center;text-anchor:middle;stroke-width:0.4"
+         x="-0.38932067"
+         y="-0.3707087"
+         id="tspan7390">interface</tspan></text>
+    <path
+       style="fill:#ba00ff;stroke:#364e59;stroke-width:0.1;stroke-linejoin:round;stroke-dasharray:none;marker-end:url(#Arrow2);stop-color:#000000"
+       d="m 6.5368033,-7.2418186 -2.726239,6.27839838"
+       id="path7457"
+       sodipodi:nodetypes="cc" />
+    <text
+       xml:space="preserve"
+       style="font-size:1.67576px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#364e59;stroke:none;stroke-width:0.1;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="15.351564"
+       y="55.742996"
+       id="text9279"><tspan
+         sodipodi:role="line"
+         id="tspan9277"
+         style="fill:#364e59;stroke:none;stroke-width:0.1"
+         x="15.351564"
+         y="55.742996" /></text>
+    <path
+       style="fill:#364e59;stroke:#364e59;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000;marker-end:url(#Arrow2)"
+       d="M 29.365905,-1.4460483 H 48.609472"
+       id="path9401" />
+    <text
+       xml:space="preserve"
+       style="font-size:2.06203px;line-height:1.3;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:center;text-decoration-color:#000000;text-anchor:middle;fill:#364e59;stroke:none;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="-8.5609999"
+       y="41.920982"
+       id="text4985-7-3"><tspan
+         sodipodi:role="line"
+         style="font-weight:bold;font-size:2.11667px;stroke-width:0.4"
+         x="-8.5609999"
+         y="41.920982"
+         id="tspan9281-8-8">z [in mm]</tspan><tspan
+         sodipodi:role="line"
+         style="font-weight:normal;font-size:1.05833px;stroke-width:0.4"
+         x="-8.5609999"
+         y="44.620838"
+         id="tspan9668"
+         dy="-1.0011104">Print Direction</tspan></text>
+    <path
+       style="fill:#364e59;stroke:#364e59;stroke-width:0.4;stroke-linejoin:round;stroke-dasharray:none;marker-end:url(#Arrow2-5);stop-color:#000000"
+       d="M -2.7788881,27.725679 V 46.969247"
+       id="path9401-5" />
+    <path
+       style="fill:#364e59;stroke:#364e59;stroke-width:0.1;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       d="M 3.9353759,39.821947 H 58.843042"
+       id="path9670"
+       sodipodi:nodetypes="cc" />
+    <text
+       xml:space="preserve"
+       style="font-size:1.05833px;line-height:1.3;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#364e59;stroke:#364e59;stroke-width:0.1;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="50.865135"
+       y="39.457973"
+       id="text9674"><tspan
+         sodipodi:role="line"
+         id="tspan9672"
+         style="font-weight:normal;font-size:1.05833px;stroke:none;stroke-width:0.1;text-anchor:start;text-align:start"
+         x="59.791695"
+         y="39.457973">Last curve point</tspan><tspan
+         sodipodi:role="line"
+         style="font-weight:normal;font-size:1.05833px;stroke:none;stroke-width:0.1;text-anchor:start;text-align:start"
+         x="59.791695"
+         y="40.833801"
+         id="tspan9678">define stability requirements</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:0.25494px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="47.136429"
+       y="0.44968146"
+       id="text12797"><tspan
+         sodipodi:role="line"
+         id="tspan12795"
+         style="fill:#ffffff;stroke:none;stroke-width:0.25"
+         x="47.136429"
+         y="0.44968146">6. - 10. layer</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:1.05833px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="50.574947"
+       y="0.98318326"
+       id="text13011"><tspan
+         sodipodi:role="line"
+         style="stroke-width:0.25"
+         x="50.574947"
+         y="0.98318326"
+         id="tspan13013">Guid for layers height 0.05mm</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:0.25494px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="46.987049"
+       y="0.9476288"
+       id="text13029"><tspan
+         sodipodi:role="line"
+         id="tspan13027"
+         style="fill:#ffffff;stroke:none;stroke-width:0.25"
+         x="46.987049"
+         y="0.9476288">16. - 20. layer</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:0.25494px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="46.987049"
+       y="1.448184"
+       id="text13033"><tspan
+         sodipodi:role="line"
+         id="tspan13031"
+         style="fill:#ffffff;stroke:none;stroke-width:0.25"
+         x="46.987049"
+         y="1.448184">26. - 30. layer</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:0.25494px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="46.987049"
+       y="1.941787"
+       id="text13037"><tspan
+         sodipodi:role="line"
+         id="tspan13035"
+         style="fill:#ffffff;stroke:none;stroke-width:0.25"
+         x="46.987049"
+         y="1.941787">36. - 40. layer</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:0.25494px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="46.987049"
+       y="2.4423423"
+       id="text13041"><tspan
+         sodipodi:role="line"
+         id="tspan13039"
+         style="fill:#ffffff;stroke:none;stroke-width:0.25"
+         x="46.987049"
+         y="2.4423423">46. - 50. layer</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:0.25494px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:0.25;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="46.68829"
+       y="6.3134861"
+       id="text13099"><tspan
+         sodipodi:role="line"
+         id="tspan13097"
+         style="fill:#ffffff;stroke:none;stroke-width:0.25"
+         x="46.68829"
+         y="6.3134861">101. - 150. layer</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:1.05833px;line-height:0;font-family:'Cascadia Code';-inkscape-font-specification:'Cascadia Code';text-align:start;text-decoration-color:#000000;text-anchor:start;fill:#ffffff;stroke:none;stroke-width:2.5;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
+       x="14.708422"
+       y="-6.6856461"
+       id="text17458"><tspan
+         sodipodi:role="line"
+         id="tspan17456"
+         style="stroke-width:2.5" /></text>
+  </g>
+</svg>

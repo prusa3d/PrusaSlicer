@@ -930,6 +930,18 @@ static inline std::optional<std::string> find_M84(const std::string &gcode) {
 void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     const bool export_to_binary_gcode = print.full_print_config().option<ConfigOptionBool>("binary_gcode")->value;
+
+    std::string prepared_by_info;
+    if (const char* extras = boost::nowide::getenv("SLIC3R_PREPARED_BY_INFO"); extras) {
+        std::string str(extras);
+        if (str.size() < 50 && std::all_of(str.begin(), str.end(), [](char c) { return c < 127 && c != '\n' && c != '\r'; }))
+            prepared_by_info = extras;
+        else {
+            BOOST_LOG_TRIVIAL(error) << "Value in SLIC3R_PREPARED_BY_INFO env variable is invalid. Closing.";
+            std::terminate();
+        }
+    }
+
     // if exporting gcode in binary format: 
     // we generate here the data to be passed to the post-processor, who is responsible to export them to file 
     // 1) generate the thumbnails
@@ -955,6 +967,8 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         // file data
         binary_data.file_metadata.raw_data.emplace_back("Producer", std::string(SLIC3R_APP_NAME) + " " + std::string(SLIC3R_VERSION));
         binary_data.file_metadata.raw_data.emplace_back("Produced on", Utils::utc_timestamp());
+        if (! prepared_by_info.empty())
+            binary_data.file_metadata.raw_data.emplace_back("Prepared by", prepared_by_info);
 
         // config data
         encode_full_config(*m_print, binary_data.slicer_metadata.raw_data);
@@ -1024,9 +1038,13 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         this->m_avoid_crossing_curled_overhangs.init_bed_shape(get_bed_shape(print.config()));
     }
 
-    if (!export_to_binary_gcode)
+    if (!export_to_binary_gcode) {
         // Write information on the generator.
-        file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
+        file.write_format("; %s\n", Slic3r::header_slic3r_generated().c_str());
+        if (! prepared_by_info.empty())
+            file.write_format("; prepared by %s\n", prepared_by_info.c_str());
+        file.write_format("\n");
+    }
 
     if (! export_to_binary_gcode) {
         // if exporting gcode in ascii format, generate the thumbnails here

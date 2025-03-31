@@ -109,6 +109,8 @@ set(SLIC3R_CLI_SOURCES
     CLI/ProcessTransform.cpp
     CLI/ProcessActions.cpp
     CLI/Run.cpp
+    CLI/ProfilesSharingUtils.cpp
+    CLI/ProfilesSharingUtils.hpp
 )
 if (SLIC3R_GUI)
     list(APPEND SLIC3R_CLI_SOURCES

@@ -26,6 +26,7 @@
 
 #include "PrintBase.hpp"
 #include "SLA/SupportTree.hpp"
+#include "SLA/SupportPointGenerator.hpp" // SupportPointGeneratorData
 #include "Point.hpp"
 #include "Format/SLAArchiveWriter.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
@@ -366,6 +367,9 @@ private:
     std::vector<SliceRecord>                m_slice_index;
 
     std::vector<float>                      m_model_height_levels;
+
+    // Precalculated data needed for interactive automatic support placement.
+    sla::SupportPointGeneratorData          m_support_point_generator_data;
 
     struct SupportData
     {

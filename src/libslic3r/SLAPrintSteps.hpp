@@ -56,6 +56,8 @@ private:
     void generate_preview(SLAPrintObject &po, SLAPrintObjectStep step);
     indexed_triangle_set generate_preview_vdb(SLAPrintObject &po, SLAPrintObjectStep step);
 
+    void prepare_for_generate_supports(SLAPrintObject &po);
+
 public:
     explicit Steps(SLAPrint *print);
 

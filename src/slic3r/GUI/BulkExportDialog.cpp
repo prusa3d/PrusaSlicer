@@ -94,6 +94,7 @@ constexpr int max_path_length = 255;
 
 struct PathValidator {
     std::reference_wrapper<std::vector<std::unique_ptr<BulkExportDialog::Item>>> items;
+    std::string unusable_symbols;
     using ItemStatus = BulkExportDialog::ItemStatus;
 
     bool is_duplicate(const fs::path &path) {
@@ -112,8 +113,7 @@ struct PathValidator {
         const fs::path &path,
         const std::string &filename
     ) {
-        const char* unusable_symbols = "<>[]:/\\|?*\"";
-        for (size_t i = 0; i < std::strlen(unusable_symbols); i++) {
+        for (size_t i = 0; i < std::strlen(unusable_symbols.c_str()); i++) {
             if (filename.find_first_of(unusable_symbols[i]) != std::string::npos) {
                 return {
                     ItemStatus::NoValid,
@@ -200,7 +200,7 @@ void BulkExportDialog::Item::update_valid_bmp()
     m_valid_bmp->SetBitmap(*get_bmp_bundle(get_bmp_name(m_status)));
 }
 
-BulkExportDialog::BulkExportDialog(const std::vector<std::pair<int, std::optional<fs::path>>> &paths, const wxString& title):
+BulkExportDialog::BulkExportDialog(const std::vector<std::pair<int, std::optional<fs::path>>> &paths, const wxString& title, const std::string& unusable_symbols):
     DPIDialog(
         nullptr,
         wxID_ANY,
@@ -210,6 +210,7 @@ BulkExportDialog::BulkExportDialog(const std::vector<std::pair<int, std::optiona
         wxDEFAULT_DIALOG_STYLE | wxICON_WARNING
     )
     , m_title(title)
+    , m_unusable_symbols(unusable_symbols)
 {
     this->SetFont(wxGetApp().normal_font());
 
@@ -247,7 +248,7 @@ BulkExportDialog::BulkExportDialog(const std::vector<std::pair<int, std::optiona
 
 void BulkExportDialog::AddItem(const std::optional<const boost::filesystem::path>& path, int bed_index)
 {
-    m_items.push_back(std::make_unique<Item>(this, m_sizer, path, bed_index, PathValidator{m_items}));
+    m_items.push_back(std::make_unique<Item>(this, m_sizer, path, bed_index, PathValidator{m_items, m_unusable_symbols}));
 }
 
 void BulkExportDialog::accept()

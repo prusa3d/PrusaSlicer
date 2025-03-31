@@ -38,6 +38,7 @@ public:
     bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override;
     //const std::string& get_apikey() const { return m_apikey; }
     //const std::string& get_cafile() const { return m_cafile; }
+    std::string get_unusable_symbols() const override { return "\\/:*?\"%<>¯°#ˇ|[]"; }
 
 private:
     std::string m_uuid;

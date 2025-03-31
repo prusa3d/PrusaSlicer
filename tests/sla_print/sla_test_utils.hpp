@@ -136,6 +136,6 @@ double predict_error(const ExPolygon &p, const sla::PixelDim &pd);
 
 sla::SupportPoints calc_support_pts(
     const TriangleMesh &                      mesh,
-    const sla::SupportPointGenerator::Config &cfg = {});
+    const sla::SupportPointGeneratorConfig &cfg = {});
 
 #endif // SLA_TEST_UTILS_HPP

@@ -148,6 +148,19 @@ void assume_BedBoundingPolygon(z3::context           &Context,
 {
     BoundingBox box = get_extents(polygon);
 
+    #ifdef DEBUG
+    {
+	printf("Polygon box: [%d,%d] [%d,%d]\n", box.min.x(), box.min.y(), box.max.x(), box.max.y());
+
+	printf("Bed bounding polygon: %ld\n", bed_bounding_polygon.points.size());
+	for  (unsigned int i = 0; i < bed_bounding_polygon.points.size(); ++i)
+	{
+	    printf("[%d,%d] ", bed_bounding_polygon.points[i].x(), bed_bounding_polygon.points[i].y());
+	}
+	printf("\n");
+    }
+    #endif    
+
     assume_PointInsidePolygon(Context,
 			      dec_var_X + box.min.x(),
 			      dec_var_Y + box.min.y(),
@@ -470,7 +483,8 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 	    #endif
 	    for (unsigned int j = 1; j < undecided.size(); ++j)
 	    {
-		Solver.add(dec_vars_T[0] + temporal_spread < dec_vars_T[undecided[j]]);
+		//Solver.add(dec_vars_T[0] + temporal_spread < dec_vars_T[undecided[j]]);
+		Solver.add(dec_vars_T[undecided[j]] < 0 || dec_vars_T[0] + temporal_spread < dec_vars_T[undecided[j]]);
 	    }
 	}
 	else if (is_fixed(0, fixed))
@@ -481,8 +495,9 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 	    }
 	    #endif
 	    for (unsigned int j = 0; j < undecided.size(); ++j)
-	    {	
-		Solver.add(Context.real_val(dec_values_T[0].numerator, dec_values_T[0].denominator) + temporal_spread < dec_vars_T[undecided[j]]);
+	    {
+		//Solver.add(Context.real_val(dec_values_T[0].numerator, dec_values_T[0].denominator) + temporal_spread < dec_vars_T[undecided[j]]);		
+		Solver.add(dec_vars_T[undecided[j]] < 0 || Context.real_val(dec_values_T[0].numerator, dec_values_T[0].denominator) + temporal_spread < dec_vars_T[undecided[j]]);
 	    }
 	}
 	else
@@ -506,7 +521,8 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 		    printf("Undecided --> Undecided: %d --> %d standard\n", undecided[i], next_i);
 		}
 		#endif
-		Solver.add(dec_vars_T[undecided[i]] + temporal_spread < dec_vars_T[next_i] && dec_vars_T[undecided[i]] + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]);
+		//Solver.add(dec_vars_T[undecided[i]] + temporal_spread < dec_vars_T[next_i] && dec_vars_T[undecided[i]] + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]);		
+		Solver.add((dec_vars_T[undecided[i]] < 0 || dec_vars_T[next_i] < 0) || dec_vars_T[undecided[i]] + temporal_spread < dec_vars_T[next_i] && dec_vars_T[undecided[i]] + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]);
 	    }
 	    /* Undecided --> missing */
 	    else
@@ -520,12 +536,14 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 		{
 		    if (i != j)
 		    {
-			Solver.add(dec_vars_T[undecided[j]] + temporal_spread < dec_vars_T[undecided[i]]);
+			//Solver.add(dec_vars_T[undecided[j]] + temporal_spread < dec_vars_T[undecided[i]]);
+			Solver.add(dec_vars_T[undecided[j]] < 0 || dec_vars_T[undecided[j]] + temporal_spread < dec_vars_T[undecided[i]]);			
 		    }
 		}
 		for (unsigned int j = 0; j < fixed.size(); ++j)
 		{
-		    Solver.add(Context.real_val(dec_values_T[fixed[j]].numerator, dec_values_T[fixed[j]].denominator) + temporal_spread < dec_vars_T[undecided[i]]);
+		    //Solver.add(Context.real_val(dec_values_T[fixed[j]].numerator, dec_values_T[fixed[j]].denominator) + temporal_spread < dec_vars_T[undecided[i]]);
+		    Solver.add(dec_vars_T[undecided[i]] < 0 || Context.real_val(dec_values_T[fixed[j]].numerator, dec_values_T[fixed[j]].denominator) + temporal_spread < dec_vars_T[undecided[i]]);		    
 		}
 	    }
 	}
@@ -544,8 +562,12 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 		    printf("Fixed --> Undecided: %d --> %d standard\n", fixed[i], next_i);
 		}
 	        #endif
+		/*
 		Solver.add(   Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) + temporal_spread < dec_vars_T[next_i]
 			   && Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]);	    
+		*/
+		Solver.add(dec_vars_T[next_i] < 0 || (   Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) + temporal_spread < dec_vars_T[next_i]
+						      && Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]));
 	    }
 	    /* Fixed --> Fixed */
 	    else if (is_fixed(next_i, fixed))
@@ -557,8 +579,12 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 		#endif
 		for (unsigned int j = 0; j < undecided.size(); ++j)
 		{
+		    /*
 		    Solver.add(   Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) > dec_vars_T[undecided[j]] + temporal_spread
 			       || Context.real_val(dec_values_T[next_i].numerator, dec_values_T[next_i].denominator) + temporal_spread < dec_vars_T[undecided[j]]);
+		    */
+		    Solver.add(dec_vars_T[undecided[j]] < 0 || (   Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) > dec_vars_T[undecided[j]] + temporal_spread
+							        || Context.real_val(dec_values_T[next_i].numerator, dec_values_T[next_i].denominator) + temporal_spread < dec_vars_T[undecided[j]]));
 		}	    
 	    }
 	}
@@ -1431,7 +1457,7 @@ void assume_PointInsidePolygon(z3::context           &Context,
 	    z3::expr inside_half_plane(  (normal.x() * dec_var_X)
 				       + (normal.y() * dec_var_Y)		 
 				       - (normal.x() * line.a.x())
-				       - (normal.y() * line.a.y()) < 0);
+				       - (normal.y() * line.a.y()) < 0);	    
 
 	    if (point == polygon.points.begin())
 	    {
@@ -1442,7 +1468,6 @@ void assume_PointInsidePolygon(z3::context           &Context,
 		in_conjunction = in_conjunction && inside_half_plane;
 	    }
 	}
-
 	constraints.push_back(in_conjunction);
     }
 }
@@ -6451,7 +6476,7 @@ std::optional<std::pair<int, int> > check_PointsOutsidePolygons(const std::vecto
 {
     #ifdef DEBUG
     {
-	printf("Levels U %d,%d\n", unreachable_polygons[0].size(), unreachable_polygons[1].size());
+	printf("Levels U %zu,%zu\n", unreachable_polygons[0].size(), unreachable_polygons[1].size());
 	
 	int c = 0;
 	string svg_filename = "collision_checking.svg";
@@ -6982,7 +7007,7 @@ void extract_DecisionValuesFromModel(const z3::model     &Model,
 		
 		#ifdef DEBUG
 		{	
-		    printf("saved: %.3f\n", unordered_values_X.back()->as_double());
+		    printf("saved: %.3f\n", unordered_values_X.back().as_double());
 		}
 		#endif
 	    }
@@ -6998,7 +7023,7 @@ void extract_DecisionValuesFromModel(const z3::model     &Model,
 
 		#ifdef DEBUG
 		{	
-		    printf("saved: %.3f\n", unordered_values_Y.back()->as_double());
+		    printf("saved: %.3f\n", unordered_values_Y.back().as_double());
 		}
 		#endif
 	    }
@@ -9488,8 +9513,6 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 
 	bool size_solvable = false;
 	
-	z3::expr_vector bounding_box_assumptions(Context);
-
 	coord_t box_min_x = (_outer_half_box.min.x() + _inner_half_box.min.x()) / 2;
 	coord_t box_max_x = (_outer_half_box.max.x() + _inner_half_box.max.x()) / 2;
 
@@ -9770,6 +9793,8 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
     std::vector<Rational> local_dec_values_Y = dec_values_Y;
     std::vector<Rational> local_dec_values_T = dec_values_T;
 
+    assert(inner_half_polygon.points.size() == solver_configuration.plate_bounding_polygon.points.size());
+    
     Polygon _inner_half_polygon = inner_half_polygon;
     Polygon _outer_half_polygon = solver_configuration.plate_bounding_polygon;
 
@@ -9839,7 +9864,6 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 
 	bool size_solvable = false;
 	
-	z3::expr_vector bounding_box_assumptions(Context);
 	Polygon bounding_polygon;
 
 	for (unsigned int i = 0; i < _outer_half_polygon.points.size(); ++i)
@@ -9883,7 +9907,7 @@ bool optimize_ConsequentialWeakPolygonNonoverlappingBinaryCentered(z3::solver   
 							  undecided,	       
 							  polygons,
 							  unreachable_polygons))
-	{	    
+	{
 	    switch (Solver.check(complete_assumptions))
 	    {
 	    case z3::sat:
@@ -11006,12 +11030,12 @@ bool optimize_SubglobalSequentialPolygonNonoverlappingBinaryCentered(const Solve
 	if (!optimized)
 	{
 	    if (curr_polygon <= 0)
-	    {		
+	    {
 		return false;
 	    }
 	    else
 	    {
-		if (curr_polygon + solver_configuration.object_group_size < polygons.size())						
+		if (curr_polygon + solver_configuration.object_group_size < polygons.size())
 		{		    
 		    curr_polygon += solver_configuration.object_group_size;
 
@@ -11102,7 +11126,7 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
     BoundingBox inner_half_box({box_center_x, box_center_y}, {box_center_x, box_center_y});
     
     for (unsigned int curr_polygon = 0; curr_polygon < polygons.size(); /* nothing */)
-    {
+    {	
 	bool optimized = false;
 	z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
 	    
@@ -11311,7 +11335,7 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 	if (!optimized)
 	{
 	    if (curr_polygon <= 0)
-	    {		
+	    {
 		return false;
 	    }
 	    else
@@ -11328,7 +11352,6 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 		return true;		   
 	    }
 	}
-	assert(remaining_polygons.empty());
     }
     assert(remaining_polygons.empty());
 	
@@ -11398,7 +11421,7 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
     }
     
     for (unsigned int curr_polygon = 0; curr_polygon < solvable_objects.size(); /* nothing */)
-    {
+    {	
 	bool optimized = false;
 	z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
 	    
@@ -11477,12 +11500,11 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 							 polygons,
 							 lepox_to_next,
 							 trans_bed_lepox);
-	
 	std::vector<int> missing;
 	std::vector<int> remaining_local;	
     
 	while(object_group_size > 0)
-	{
+	{	    
 	    z3::expr_vector presence_assumptions(z_context);
 	    assume_ConsequentialObjectPresence(z_context, local_dec_vars_T, undecided, missing, presence_assumptions);
 	    
@@ -11493,6 +11515,11 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 		{
 		    printf("  %d\n", undecided[j]);
 		}
+		printf("Missing\n");
+		for (unsigned int j = 0; j < missing.size(); ++j)
+		{
+		    printf("  %d\n", missing[j]);
+		}		
 		printf("Decided\n");
 		for (unsigned int j = 0; j < decided_polygons.size(); ++j)
 		{
@@ -11579,7 +11606,7 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 	    }
 	    
 	    if (optimized)
-	    {				
+	    {
 		for (unsigned int i = 0; i < undecided.size(); ++i)
 		{
 		    dec_values_X[undecided[i]] = local_values_X[undecided[i]];
@@ -11650,7 +11677,6 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 		return true;		   
 	    }
 	}
-	assert(remaining_polygons.empty());
     }
     assert(remaining_polygons.empty());
 	

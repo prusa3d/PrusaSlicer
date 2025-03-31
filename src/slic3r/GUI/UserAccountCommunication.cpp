@@ -429,7 +429,7 @@ void UserAccountCommunication::login_redirect()
     wxQueueEvent(m_evt_handler,new OpenPrusaAuthEvent(GUI::EVT_OPEN_PRUSAAUTH, {std::move(url1), std::move(url2)}));
 }
 
-bool UserAccountCommunication::is_logged()
+bool UserAccountCommunication::is_logged() const
 {
     return !m_username.empty();
 }
@@ -674,7 +674,7 @@ void UserAccountCommunication::request_refresh()
     // Here we need to count with situation when token was renewed in m_session but was not yet stored.
     // Then store token is not valid - it should has erlier expiration
     long long expires_in_second = stored_data.next_timeout.empty() ? 0 : std::stoll(stored_data.next_timeout) - std::time(nullptr);
-    BOOST_LOG_TRIVIAL(error) << "Compare " <<  expires_in_second << " vs " << m_next_token_refresh_at - std::time(nullptr) << (stored_data.access_token != current_access_token ? " not same" : " same");
+    BOOST_LOG_TRIVIAL(debug) << "Compare " <<  expires_in_second << " vs " << m_next_token_refresh_at - std::time(nullptr) << (stored_data.access_token != current_access_token ? " not same" : " same");
     if (stored_data.access_token != current_access_token && expires_in_second > 0 && expires_in_second > m_next_token_refresh_at - std::time(nullptr)) {
         BOOST_LOG_TRIVIAL(debug) << "Found usable token. Expires in " << expires_in_second;
         set_tokens(stored_data);

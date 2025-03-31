@@ -1,6 +1,6 @@
 /*================================================================*/
 /*
- * Author:  Pavel Surynek, 2023 - 2024
+ * Author:  Pavel Surynek, 2023 - 2025
  * Company: Prusa Research
  *
  * File:    seq_test_polygon.cpp
@@ -56,44 +56,56 @@ const int SEQ_PRUSA_MK3S_Y_SIZE = 2100;
 
 TEST_CASE("Polygon test 1", "[Polygon]")
 {
-    printf("Testing polygon 1 ...\n");
+    INFO("Testing polygon 1 ...");
 
     Polygon polygon_1 = {{-1000000, -1000000}, {1000000, -1000000}, {1000000, 1000000}, {-1000000, 1000000} };
 
-    for (unsigned int i = 0; i < polygon_1.size(); ++i)
+    #ifdef DEBUG
     {
-	Point point = polygon_1[i];
-	printf("%d,%d\n", point.x(), point.y());
+	for (unsigned int i = 0; i < polygon_1.size(); ++i)
+	{
+	    Point point = polygon_1[i];
+	    printf("%d,%d\n", point.x(), point.y());
+	}
     }
+    #endif
     REQUIRE(polygon_1.size() > 0);
     
-    printf("Testing polygon 1 ... finished\n");
+    INFO("Testing polygon 1 ... finished");
 }
 
 
 TEST_CASE("Polygon test 2", "[Polygon]")
 { 
-    printf("Testing polygon 2 ...\n");
+    INFO("Testing polygon 2 ...");
 
     for (unsigned int k = 0; k < PRUSA_PART_POLYGONS.size(); ++k)
     {
-	printf("k = %d\n", k);
+        #ifdef DEBUG
+	{
+	    printf("k = %d\n", k);
+	}
+	#endif
 	
 	const Polygon &polygon_1 = PRUSA_PART_POLYGONS[k];
 	Polygon hull_1 = convex_hull(polygon_1);
-	
-	for (unsigned int i = 0; i < polygon_1.size(); ++i)
+
+        #ifdef DEBUG
 	{
-	    const Point &point = polygon_1[i];
-	    printf("poly %d: %d,%d\n", i, point.x(), point.y());
-	}
-	printf("\n");
+	    for (unsigned int i = 0; i < polygon_1.size(); ++i)
+	    {
+		const Point &point = polygon_1[i];
+		printf("poly %d: %d,%d\n", i, point.x(), point.y());
+	    }
+	    printf("\n");
 	
-	for (unsigned int i = 0; i < hull_1.size(); ++i)
-	{
-	    const Point &point = hull_1[i];
-	    printf("hull %d: %d,%d\n", i, point.x(), point.y());
+	    for (unsigned int i = 0; i < hull_1.size(); ++i)
+	    {
+		const Point &point = hull_1[i];
+		printf("hull %d: %d,%d\n", i, point.x(), point.y());
+	    }
 	}
+	#endif
 
 	REQUIRE(hull_1.size() > 0);
 
@@ -102,26 +114,49 @@ TEST_CASE("Polygon test 2", "[Polygon]")
 	    const Point &point_1 = hull_1[0];
 	    const Point &point_2 = hull_1[1];
 
-	    Point v = (point_2 - point_1); //.normalized();
-	    printf("v: %d,%d\n", v.x(), v.y());
-	    cout << v << endl;
-	    
-	    Point u = v.normalized();	    
-	    printf("u: %d,%d\n", u.x(), u.y());
-	    cout << u << endl;
+	    Point v = (point_2 - point_1); //.normalized();			    
+            #ifdef DEBUG
+	    {
+		printf("v: %d,%d\n", v.x(), v.y());
+		cout << v << endl;
+	    }
+	    #endif
 
-	    printf("Ortho:\n");
+            #ifdef DEBUG
+	    {
+		Point u = v.normalized();			    		
+		printf("u: %d,%d\n", u.x(), u.y());
+		cout << u << endl;
+	    }
+	    #endif
+
 	    Point n(v.y(), -v.x());
-	    cout << n << endl;
+	    
+            #ifdef DEBUG
+	    {
+		printf("Ortho:\n");	    
+		cout << n << endl;
+	    }
+	    #endif
 
 	    coord_t d = n.x() * point_1.x() + n.y() * point_1.y();
-	    printf("%d\n", d);
-	    cout << d << endl;
+
+            #ifdef DEBUG
+	    {
+		printf("%d\n", d);
+		cout << d << endl;
+	    }
+	    #endif
 
 	    auto is_inside=[&](const Point &p)
 	    {
 		coord_t d1 = n.x() * p.x() + n.y() * p.y() - d;
-		printf("d1: %d\n", d1);
+
+                #ifdef DEBUG
+		{		
+		    printf("d1: %d\n", d1);
+		}
+		#endif
 
 		if (d1 >= 0)
 		{
@@ -133,23 +168,39 @@ TEST_CASE("Polygon test 2", "[Polygon]")
 		}
 	    };
 	    
-	    bool ins1 = is_inside(point_1);	    
-	    printf("%s\n", ins1 ? "yes" : "no");
+	    bool ins1 = is_inside(point_1);
+            #ifdef DEBUG
+	    {
+		printf("%s\n", ins1 ? "yes" : "no");
+	    }
+	    #endif
 	    REQUIRE(ins1);
 	    
 	    bool ins2 = is_inside(point_2);
-	    printf("%s\n", ins2 ? "yes" : "no");
+            #ifdef DEBUG
+	    {
+		printf("%s\n", ins2 ? "yes" : "no");
+	    }
+	    #endif
 	    REQUIRE(ins2);
 	    
-	    bool ins3 = is_inside(point_1 + point_2);
-	    printf("%s\n", ins3 ? "yes" : "no");
+            #ifdef DEBUG
+	    {
+		bool ins3 = is_inside(point_1 + point_2);		
+		printf("%s\n", ins3 ? "yes" : "no");
+	    }
+	    #endif
 	    
-	    bool ins4 = is_inside(point_1 - point_2);
-	    printf("%s\n", ins4 ? "yes" : "no");
+            #ifdef DEBUG
+	    {
+		bool ins4 = is_inside(point_1 - point_2);		
+		printf("%s\n", ins4 ? "yes" : "no");
+	    }
+	    #endif
 	}		
     }
     
-    printf("Testing polygon 2 ... finished\n");
+    INFO("Testing polygon 2 ... finished");
 }
 
 
@@ -157,12 +208,17 @@ int line_count = 4;
 Line lines[] = {{Point(100,100), Point(200,200)}, {Point(200,100), Point(100,200)}, {Point(0,0), Point(100,10)}, {Point(50,0), Point(60,100)} };
 
 TEST_CASE("Polygon test 3", "[Polygon]")
-{ 
-    clock_t start, finish;
-    
-    printf("Testing polygon 3 ...\n");
 
+{
+    #ifdef DEBUG
+    clock_t start, finish;
+    #endif
+    
+    INFO("Testing polygon 3 ...");
+
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -171,26 +227,35 @@ TEST_CASE("Polygon test 3", "[Polygon]")
     
     for (int i = 0; i < line_count; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("i:%d\n", i);	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < line_count; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif       
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < line_count; ++i)
     {
 	string name = "t_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T_parameters.push_back(expr(z_context.real_const(name.c_str())));
     }    
     
@@ -234,18 +299,30 @@ TEST_CASE("Polygon test 3", "[Polygon]")
     case z3::sat:
     {
 	sat = true;
-	printf("  SATISFIABLE\n");
+        #ifdef DEBUG
+	{
+	    printf("  SATISFIABLE\n");
+	}
+	#endif
 	break;
     }
     case z3::unsat:	
     {
-	printf("  UNSATISFIABLE\n");
+        #ifdef DEBUG
+	{	
+	    printf("  UNSATISFIABLE\n");
+	}
+	#endif
 	return;
 	break;
     }
     case z3::unknown:
     {
-	printf("  UNKNOWN\n");
+        #ifdef DEBUG
+	{
+	    printf("  UNKNOWN\n");
+	}
+	#endif
 	break;
     }
     default:
@@ -264,60 +341,68 @@ TEST_CASE("Polygon test 3", "[Polygon]")
     }
     #endif
 
-    finish = clock();    
+    #ifdef DEBUG
+    finish = clock();
+    #endif
 
-    printf("Printing interpretation:\n");    
-    for (unsigned int i = 0; i < z_model.size(); ++i)
+    #ifdef DEBUG
     {
-	printf("Variable:%s  ", z_model[i].name().str().c_str());
-	
-        #ifdef DEBUG
+	printf("Printing interpretation:\n");    
+	for (unsigned int i = 0; i < z_model.size(); ++i)
 	{
-	    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
-	    double value = z_model.get_const_interp(z_model[i]).as_double();
+	    printf("Variable:%s  ", z_model[i].name().str().c_str());
+	    {
+		cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
+		double value = z_model.get_const_interp(z_model[i]).as_double();
 	    
-	    printf("value: %.3f\n", value);
+		printf("value: %.3f\n", value);
 	
-	    cout << float(z_model[i]) << "\n";
+		cout << float(z_model[i]) << "\n";
 
-	    switch (z_model.get_const_interp(z_model[i]).bool_value())
-	    {
-	    case Z3_L_FALSE:
-	    {
-		printf("   value: FALSE\n");
-		break;
+		switch (z_model.get_const_interp(z_model[i]).bool_value())
+		{
+		case Z3_L_FALSE:
+		{
+		    printf("   value: FALSE\n");
+		    break;
+		}
+		case Z3_L_TRUE:
+		{
+		    printf("   value: TRUE\n");
+		    break;
+		}
+		case Z3_L_UNDEF:
+		{
+		    printf("   value: UNDEF\n");
+		    break;
+		}	    
+		default:
+		{
+		    break;
+		}
+		}
 	    }
-	    case Z3_L_TRUE:
-	    {
-		printf("   value: TRUE\n");
-		break;
-	    }
-	    case Z3_L_UNDEF:
-	    {
-		printf("   value: UNDEF\n");
-		break;
-	    }	    
-	    default:
-	    {
-		break;
-	    }
-	    }
-         }
-         #endif
+	}
+	
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
     }
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 3 ... finished\n");    
+    #endif
+    
+    INFO("Testing polygon 3 ... finished");    
 }
 
 
 TEST_CASE("Polygon test 4", "[Polygon]")
-{ 
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 4 ...\n");
+    INFO("Testing polygon 4 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -326,26 +411,35 @@ TEST_CASE("Polygon test 4", "[Polygon]")
     
     for (int i = 0; i < line_count; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("i:%d\n", i);
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif       
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < line_count; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif      
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < line_count; ++i)
     {
 	string name = "t_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	T_parameters.push_back(expr(z_context.real_const(name.c_str())));
     }    
     
@@ -373,11 +467,15 @@ TEST_CASE("Polygon test 4", "[Polygon]")
 					   T_parameters[3],
 					   lines[3]);    
 
-    printf("Printing solver status:\n");
-    cout << z_solver << "\n";
+    #ifdef DEBUG
+    {	
+	printf("Printing solver status:\n");
+	cout << z_solver << "\n";
     
-    printf("Printing smt status:\n");
-    cout << z_solver.to_smt2() << "\n";
+	printf("Printing smt status:\n");
+	cout << z_solver.to_smt2() << "\n";
+    }
+    #endif
 
     bool sat = false;
 
@@ -386,18 +484,30 @@ TEST_CASE("Polygon test 4", "[Polygon]")
     case z3::sat:
     {
 	sat = true;
-	printf("  SATISFIABLE\n");
+        #ifdef DEBUG
+	{	
+	    printf("  SATISFIABLE\n");
+	}
+	#endif
 	break;
     }
     case z3::unsat:	
     {
-	printf("  UNSATISFIABLE\n");
+        #ifdef DEBUG
+	{		
+	    printf("  UNSATISFIABLE\n");
+	}
+	#endif
 	return;
 	break;
     }
     case z3::unknown:
     {
-	printf("  UNKNOWN\n");
+        #ifdef DEBUG
+	{	
+	    printf("  UNKNOWN\n");
+	}
+	#endif
 	break;
     }
     default:
@@ -407,50 +517,54 @@ TEST_CASE("Polygon test 4", "[Polygon]")
     }
     REQUIRE(sat);
 
-    z3::model z_model(z_solver.get_model());
-    printf("Printing model:\n");
-    cout << z_model << "\n";
+    #ifdef DEBUG
+    {	
+	z3::model z_model(z_solver.get_model());
+	printf("Printing model:\n");
+	cout << z_model << "\n";
 
-    finish = clock();    
-
-    printf("Printing interpretation:\n");    
-    for (unsigned int i = 0; i < z_model.size(); ++i)
-    {
-	printf("Variable:%s  ", z_model[i].name().str().c_str());
+	finish = clock();    
+    
+	printf("Printing interpretation:\n");    
+	for (unsigned int i = 0; i < z_model.size(); ++i)
+	{
+	    printf("Variable:%s  ", z_model[i].name().str().c_str());
 	
-	cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
-	double value = z_model.get_const_interp(z_model[i]).as_double();
+	    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
+	    double value = z_model.get_const_interp(z_model[i]).as_double();
 	
-	printf("value: %.3f\n", value);
+	    printf("value: %.3f\n", value);
 	
-	cout << float(z_model[i]) << "\n";
-        
-	switch (z_model.get_const_interp(z_model[i]).bool_value())
-	{
-	case Z3_L_FALSE:
-	{
-	    printf("   value: FALSE\n");
-	    break;
-	}
-	case Z3_L_TRUE:
-	{
-	    printf("   value: TRUE\n");
-	    break;
-	}
-	case Z3_L_UNDEF:
-	{
-	    printf("   value: UNDEF\n");
+	    cout << float(z_model[i]) << "\n";
+	    
+	    switch (z_model.get_const_interp(z_model[i]).bool_value())
+	    {
+	    case Z3_L_FALSE:
+	    {
+		printf("   value: FALSE\n");
 		break;
-	}	    
-	default:
-	{
+	    }
+	    case Z3_L_TRUE:
+	    {
+		printf("   value: TRUE\n");
 		break;
+	    }
+	    case Z3_L_UNDEF:
+	    {
+		printf("   value: UNDEF\n");
+		break;
+	    }	    
+	    default:
+	    {
+		break;
+	    }
+	    }
 	}
-	}
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
     }
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 4 ... finished\n");    
+    #endif
+    
+    INFO("Testing polygon 4 ... finished");    
 }
 
 
@@ -459,12 +573,16 @@ Line poly_lines[] = {{Point(100,100), Point(200,100)}, {Point(200,100), Point(20
 
 
 TEST_CASE("Polygon test 5", "[Polygon]")
-{ 
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 5 ...\n");
+    INFO("Testing polygon 5 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -472,18 +590,24 @@ TEST_CASE("Polygon test 5", "[Polygon]")
     
     for (int i = 0; i < poly_line_count; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{
+	    printf("i:%d\n", i);
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < poly_line_count; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
     
@@ -533,18 +657,30 @@ TEST_CASE("Polygon test 5", "[Polygon]")
     case z3::sat:
     {
 	sat = true;
-	printf("  SATISFIABLE\n");
+        #ifdef DEBUG
+	{
+	    printf("  SATISFIABLE\n");
+	}
+	#endif
 	break;
     }
     case z3::unsat:	
     {
-	printf("  UNSATISFIABLE\n");
+	#ifdef DEBUG
+	{
+	    printf("  UNSATISFIABLE\n");
+	}
+	#endif
 	return;
 	break;
     }
     case z3::unknown:
     {
-	printf("  UNKNOWN\n");
+	#ifdef DEBUG
+	{
+	    printf("  UNKNOWN\n");
+	}
+	#endif
 	break;
     }
     default:
@@ -562,22 +698,25 @@ TEST_CASE("Polygon test 5", "[Polygon]")
     }
     #endif
 
-    finish = clock();    
+    #ifdef DEBUG    
+    finish = clock();
+    #endif
 
-    printf("Printing interpretation:\n");    
-    for (unsigned int i = 0; i < z_model.size(); ++i)
+    #ifdef DEBUG
     {
-	printf("Variable:%s  ", z_model[i].name().str().c_str());
+	printf("Printing interpretation:\n");
 	
-	#ifdef DEBUG
+	for (unsigned int i = 0; i < z_model.size(); ++i)
 	{
+	    printf("Variable:%s  ", z_model[i].name().str().c_str());
+	    
 	    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
 	    double value = z_model.get_const_interp(z_model[i]).as_double();
 	    
 	    printf("value: %.3f\n", value);
-	
+	    
 	    cout << float(z_model[i]) << "\n";
-
+	    
 	    switch (z_model.get_const_interp(z_model[i]).bool_value())
 	    {
 	    case Z3_L_FALSE:
@@ -601,11 +740,11 @@ TEST_CASE("Polygon test 5", "[Polygon]")
 	    }
 	    }
 	}
-	#endif
-    }
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 5 ... finished\n");    
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }    
+    #endif
+    
+    INFO("Testing polygon 5 ... finished");
 }
 
 namespace {
@@ -614,13 +753,18 @@ namespace {
 }
 
 
-TEST_CASE("Polygon test 6", "[Polygon]")
-{ 
+//TEST_CASE("Polygon test 6", "[Polygon]")
+void polygon_test_6(void)
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 6 ...\n");
+    INFO("Testing polygon 6 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -628,18 +772,24 @@ TEST_CASE("Polygon test 6", "[Polygon]")
     
     for (int i = 0; i < poly_line_count; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{
+	    printf("i:%d\n", i);
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < poly_line_count; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
     
@@ -669,18 +819,30 @@ TEST_CASE("Polygon test 6", "[Polygon]")
     case z3::sat:
     {
 	sat = true;
-	printf("  SATISFIABLE\n");
+	#ifdef DEBUG
+	{	
+	    printf("  SATISFIABLE\n");
+	}
+	#endif
 	break;
     }
     case z3::unsat:	
     {
-	printf("  UNSATISFIABLE\n");
+        #ifdef DEBUG
+	{	
+	    printf("  UNSATISFIABLE\n");
+	}
+	#endif
 	return;
 	break;
     }
     case z3::unknown:
     {
-	printf("  UNKNOWN\n");
+        #ifdef DEBUG
+	{		
+	    printf("  UNKNOWN\n");
+	}
+	#endif
 	break;
     }
     default:
@@ -699,22 +861,23 @@ TEST_CASE("Polygon test 6", "[Polygon]")
     }
     #endif
 
-    finish = clock();    
+    #ifdef DEBUG    
+    finish = clock();
+    #endif
 
-    printf("Printing interpretation:\n");    
-    for (unsigned int i = 0; i < z_model.size(); ++i)
-    {
-	printf("Variable:%s  ", z_model[i].name().str().c_str());       
-	cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
-
-	z3::expr valo_1 = z_model.get_const_interp(z_model[i]);
-	z3::expr deco_1 = expr(z_context.real_const("deco_1"));
-
-	z3::expr lino_1 = (valo_1 * deco_1 == 0);
-
-	#ifdef DEBUG
+    #ifdef DEBUG
+    {	    
+	printf("Printing interpretation:\n");
+	
+	for (unsigned int i = 0; i < z_model.size(); ++i)
 	{
-	    printf("value: %.3f\n", value);
+	    printf("Variable:%s  ", z_model[i].name().str().c_str());       
+	    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
+	    
+	    z3::expr valo_1 = z_model.get_const_interp(z_model[i]);
+	    z3::expr deco_1 = expr(z_context.real_const("deco_1"));
+	    
+	    z3::expr lino_1 = (valo_1 * deco_1 == 0);
 	
 	    cout << float(z_model[i]) << "\n";
 	    
@@ -741,11 +904,11 @@ TEST_CASE("Polygon test 6", "[Polygon]")
 	    }
 	    }
 	}
-	#endif
+        printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
     }
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 6 ... finished\n");    
+    #endif
+    
+    INFO("Testing polygon 6 ... finished");    
 }
 
 
@@ -754,12 +917,16 @@ Polygon polygon_2 = {{0, 0}, {150, 0}, {150, 50}, {75, 120}, {0, 50} };
 
 
 TEST_CASE("Polygon test 7", "[Polygon]")
-{ 
+{
+    #ifdef DEBUG
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 7 ...\n");
+    INFO("Testing polygon 7 ...");
 
+    #ifdef DEBUG
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -769,34 +936,46 @@ TEST_CASE("Polygon test 7", "[Polygon]")
     
     for (int i = 0; i < 2; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{
+	    printf("i:%d\n", i);
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < 2; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (unsigned int i = 0; i < polygon_1.points.size(); ++i)
     {
 	string name = "t1_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T1_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_2.points.size(); ++i)
     {
 	string name = "t2_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T2_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }        
     
@@ -830,18 +1009,30 @@ TEST_CASE("Polygon test 7", "[Polygon]")
     case z3::sat:
     {
 	sat = true;
-	printf("  SATISFIABLE\n");
+	#ifdef DEBUG
+	{
+	    printf("  SATISFIABLE\n");
+	}
+	#endif
 	break;
     }
     case z3::unsat:	
     {
-	printf("  UNSATISFIABLE\n");
+        #ifdef DEBUG
+	{
+	    printf("  UNSATISFIABLE\n");
+	}
+	#endif
 	return;
 	break;
     }
     case z3::unknown:
     {
-	printf("  UNKNOWN\n");
+        #ifdef DEBUG
+	{	
+	    printf("  UNKNOWN\n");
+	}
+	#endif
 	break;
     }
     default:
@@ -860,36 +1051,47 @@ TEST_CASE("Polygon test 7", "[Polygon]")
     }
     #endif
 
-    finish = clock();    
-
-    double poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y;
-    poly_1_pos_x = poly_1_pos_y = poly_2_pos_x = poly_2_pos_y = 0.0;    
+    #ifdef DEBUG    
+    finish = clock();
     
-    printf("Printing interpretation:\n");    
+    double poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y;
+    poly_1_pos_x = poly_1_pos_y = poly_2_pos_x = poly_2_pos_y = 0.0;
+    #endif    
+
+    #ifdef DEBUG
+    {
+	printf("Printing interpretation:\n");
+    }
+    #endif
+    
     for (unsigned int i = 0; i < z_model.size(); ++i)
     {
-	printf("Variable:%s  ", z_model[i].name().str().c_str());
+        #ifdef DEBUG
+	{
+	    double value = z_model.get_const_interp(z_model[i]).as_double();
 	
-	cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
-	double value = z_model.get_const_interp(z_model[i]).as_double();
-	printf("value: %.3f\n", value);	
+	    printf("Variable:%s  ", z_model[i].name().str().c_str());	
+	    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
+	    printf("value: %.3f\n", value);
 
-	if (z_model[i].name().str() == "x_pos-0")
-	{
-	    poly_1_pos_x = value;
+	    if (z_model[i].name().str() == "x_pos-0")
+	    {
+		poly_1_pos_x = value;
+	    }
+	    else if (z_model[i].name().str() == "y_pos-0")
+	    {
+		poly_1_pos_y = value;
+	    }
+	    else if (z_model[i].name().str() == "x_pos-1")
+	    {
+		poly_2_pos_x = value;
+	    }
+	    else if (z_model[i].name().str() == "y_pos-1")
+	    {
+		poly_2_pos_y = value;
+	    }
 	}
-	else if (z_model[i].name().str() == "y_pos-0")
-	{
-	    poly_1_pos_y = value;
-	}
-	else if (z_model[i].name().str() == "x_pos-1")
-	{
-	    poly_2_pos_x = value;
-	}
-	else if (z_model[i].name().str() == "y_pos-1")
-	{
-	    poly_2_pos_y = value;
-	}	
+	#endif
 	
 	#ifdef DEBUG
 	{
@@ -922,7 +1124,11 @@ TEST_CASE("Polygon test 7", "[Polygon]")
 	
     }
 
-    printf("Positions: %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y);
+    #ifdef DEBUG
+    {
+	printf("Positions: %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y);
+    }
+    #endif
 
     #ifdef DEBUG
     {
@@ -931,7 +1137,7 @@ TEST_CASE("Polygon test 7", "[Polygon]")
 	    double value = X_positions[i].as_double();
 	    printf("Orig X: %.3f\n", value);
 
-	    value = Y_positi ons[i].as_double();
+	    value = Y_positions[i].as_double();
 	    printf("Orig Y: %.3f\n", value);	
 	}
     }
@@ -946,10 +1152,14 @@ TEST_CASE("Polygon test 7", "[Polygon]")
     }
     #endif
     
-    preview_svg.Close();    
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 7 ... finished\n");    
+    preview_svg.Close();
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 7 ... finished");    
 }
 
 
@@ -982,13 +1192,18 @@ Polygon scale_UP(const Polygon &polygon, double x_pos, double y_pos)
 Polygon polygon_3 = {{40, 0}, {80, 40}, {40, 80}, {0, 40}};
 //Polygon polygon_3 = {{20, 0}, {40, 0}, {60, 30}, {30, 50}, {0, 30}};
 
-TEST_CASE("Polygon test 8", "[Polygon]")
-{ 
+//TEST_CASE("Polygon test 8", "[Polygon]")
+void polygon_test_8(void)
+{
+    #ifdef DEBUG    
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 8 ...\n");
+    INFO("Testing polygon 8 ...");
 
+    #ifdef DEBUG    
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -999,42 +1214,57 @@ TEST_CASE("Polygon test 8", "[Polygon]")
     
     for (int i = 0; i < 3; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("i:%d\n", i);
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < 3; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (unsigned int i = 0; i < polygon_1.points.size(); ++i)
     {
 	string name = "t1_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	T1_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_2.points.size(); ++i)
     {
 	string name = "t2_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T2_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_3.points.size(); ++i)
     {
 	string name = "t3_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T3_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }            
     
@@ -1122,21 +1352,33 @@ TEST_CASE("Polygon test 8", "[Polygon]")
 	switch (z_solver.check(decision_box_assumptions))
 	{
 	case z3::sat:
-	{	    
-	    printf("  SATISFIABLE\n");
+	{
+            #ifdef DEBUG
+	    {
+		printf("  SATISFIABLE\n");
+	    }
+	    #endif
 	    last_solvable_decision_box_size = decision_box_size;
 	    sat = true;	    
 	    break;
 	}
 	case z3::unsat:	
 	{
-	    printf("  UNSATISFIABLE\n");
+            #ifdef DEBUG
+	    {
+		printf("  UNSATISFIABLE\n");
+	    }
+	    #endif
 	    sat = false;	    
 	    break;
 	}
 	case z3::unknown:
 	{
-	    printf("  UNKNOWN\n");
+	    #ifdef DEBUG
+	    {
+		printf("  UNKNOWN\n");
+	    }
+	    #endif
 	    break;
 	}
 	default:
@@ -1155,15 +1397,23 @@ TEST_CASE("Polygon test 8", "[Polygon]")
 		cout << z_model << "\n";
 	    }
 	    #endif
-    
-	    printf("Printing interpretation:\n");    
+
+            #ifdef DEBUG
+	    {
+		printf("Printing interpretation:\n");
+	    }
+	    #endif
 	    for (unsigned int i = 0; i < z_model.size(); ++i)
 	    {
-		printf("Variable:%s  ", z_model[i].name().str().c_str());
-		
-		cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
 		double value = z_model.get_const_interp(z_model[i]).as_double();
-		printf("value: %.3f\n", value);	
+		
+                #ifdef DEBUG
+		{		
+		    printf("Variable:%s  ", z_model[i].name().str().c_str());		
+		    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
+		    printf("value: %.3f\n", value);
+		}
+		#endif
 	    
 		if (z_model[i].name().str() == "x_pos-0")
 		{
@@ -1194,44 +1444,20 @@ TEST_CASE("Polygon test 8", "[Polygon]")
 	else
 	{
 	    break;
-	}
-
-	#ifdef DEBUG
-	{
-	    cout << float(z_model[i]) << "\n";
-        
-	    switch (z_model.get_const_interp(z_model[i]).bool_value())
-	    {
-	    case Z3_L_FALSE:
-	    {
-		printf("   value: FALSE\n");
-		break;
-	    }
-	    case Z3_L_TRUE:
-	    {
-		printf("   value: TRUE\n");
-		break;
-	    }
-	    case Z3_L_UNDEF:
-	    {
-		printf("   value: UNDEF\n");
-		break;
-	    }	    
-	    default:
-	    {
-		break;
-	    }
-	    }
-	}
-	#endif
-	
+	}	
     }
+    #ifdef DEBUG
     finish = clock();
+    #endif
 
     REQUIRE(last_solvable_decision_box_size > 0);
 
-    printf("Solvable decision box: %d\n", last_solvable_decision_box_size);
-    printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y, poly_3_pos_x, poly_3_pos_y);
+    #ifdef DEBUG
+    {		
+	printf("Solvable decision box: %d\n", last_solvable_decision_box_size);
+	printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y, poly_3_pos_x, poly_3_pos_y);
+    }
+    #endif
 
     #ifdef DEBUG
     {
@@ -1241,7 +1467,8 @@ TEST_CASE("Polygon test 8", "[Polygon]")
 	    printf("Orig X: %.3f\n", value);
 
 	    value = Y_positions[i].as_double();
-	    printf("Orig Y: %.3f\n", value);	
+	    printf("Orig Y: %.3f\n", value);
+	}
     }
     #endif
     
@@ -1250,25 +1477,34 @@ TEST_CASE("Polygon test 8", "[Polygon]")
     Polygon display_polygon_1 = scale_UP(polygon_1, poly_1_pos_x, poly_1_pos_y);
     Polygon display_polygon_2 = scale_UP(polygon_2, poly_2_pos_x, poly_2_pos_y);
     Polygon display_polygon_3 = scale_UP(polygon_3, poly_3_pos_x, poly_3_pos_y);    
-
+    
     preview_svg.draw(display_polygon_1, "green");
     preview_svg.draw(display_polygon_2, "blue");
     preview_svg.draw(display_polygon_3, "red");    
     
-    preview_svg.Close();    
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 8 ... finished\n");    
+    preview_svg.Close();
+    
+    #ifdef DEBUG
+    {		
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 8 ... finished");    
 }
 
 
 TEST_CASE("Polygon test 9", "[Polygon]")
-{ 
+{
+    #ifdef DEBUG    
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 9 ...\n");
+    INFO("Testing polygon 9 ...");
 
+    #ifdef DEBUG        
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -1279,42 +1515,57 @@ TEST_CASE("Polygon test 9", "[Polygon]")
     
     for (int i = 0; i < 3; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("i:%d\n", i);	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif	
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < 3; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (unsigned int i = 0; i < polygon_1.points.size(); ++i)
     {
 	string name = "t1_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T1_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_2.points.size(); ++i)
     {
 	string name = "t2_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T2_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_3.points.size(); ++i)
     {
 	string name = "t3_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T3_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }            
     
@@ -1402,21 +1653,33 @@ TEST_CASE("Polygon test 9", "[Polygon]")
 	switch (z_solver.check(bounding_box_assumptions))
 	{
 	case z3::sat:
-	{	    
-	    printf("  SATISFIABLE\n");
+	{
+	    #ifdef DEBUG
+	    {
+		printf("  SATISFIABLE\n");
+	    }
+	    #endif
 	    last_solvable_bounding_box_size = bounding_box_size;
 	    sat = true;	    
 	    break;
 	}
 	case z3::unsat:	
 	{
-	    printf("  UNSATISFIABLE\n");
+	    #ifdef DEBUG
+	    {
+		printf("  UNSATISFIABLE\n");
+	    }
+	    #endif
 	    sat = false;	    
 	    break;
 	}
 	case z3::unknown:
 	{
-	    printf("  UNKNOWN\n");
+	    #ifdef DEBUG
+	    {
+		printf("  UNKNOWN\n");
+	    }
+	    #endif
 	    break;
 	}
 	default:
@@ -1435,15 +1698,23 @@ TEST_CASE("Polygon test 9", "[Polygon]")
 		cout << z_model << "\n";
 	    }
 	    #endif
-    
-	    printf("Printing interpretation:\n");    
+
+	    #ifdef DEBUG
+	    {
+		printf("Printing interpretation:\n");
+	    }
+	    #endif
 	    for (unsigned int i = 0; i < z_model.size(); ++i)
 	    {
-		printf("Variable:%s  ", z_model[i].name().str().c_str());
-		
-		cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
 		double value = z_model.get_const_interp(z_model[i]).as_double();
-		printf("value: %.3f\n", value);	
+				
+                #ifdef DEBUG
+		{
+		    printf("Variable:%s  ", z_model[i].name().str().c_str());		
+		    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
+		    printf("value: %.3f\n", value);
+		}
+		#endif
 	    
 		if (z_model[i].name().str() == "x_pos-0")
 		{
@@ -1475,41 +1746,19 @@ TEST_CASE("Polygon test 9", "[Polygon]")
 	{
 	    break;
 	}
-
-	#ifdef DEBUG
-	{
-	    cout << float(z_model[i]) << "\n";
-        
-	    switch (z_model.get_const_interp(z_model[i]).bool_value())
-	    {
-	    case Z3_L_FALSE:
-	    {
-		printf("   value: FALSE\n");
-		break;
-	    }
-	    case Z3_L_TRUE:
-	    {
-		printf("   value: TRUE\n");
-		break;
-	    }
-	    case Z3_L_UNDEF:
-	    {
-		printf("   value: UNDEF\n");
-		break;
-	    }	    
-	    default:
-	    {
-		break;
-	    }
-	    }
-	}
-	#endif	
     }
+    #ifdef DEBUG    
     finish = clock();
+    #endif
 
-    REQUIRE(last_solvable_bounding_box_size > 0);    
-    printf("Solvable bounding box: %d\n", last_solvable_bounding_box_size);
-    printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y, poly_3_pos_x, poly_3_pos_y);
+    REQUIRE(last_solvable_bounding_box_size > 0);
+
+    #ifdef DEBUG
+    {
+	printf("Solvable bounding box: %d\n", last_solvable_bounding_box_size);
+	printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x, poly_1_pos_y, poly_2_pos_x, poly_2_pos_y, poly_3_pos_x, poly_3_pos_y);
+    }
+    #endif
 
     #ifdef DEBUG
     {
@@ -1534,22 +1783,31 @@ TEST_CASE("Polygon test 9", "[Polygon]")
     preview_svg.draw(display_polygon_2, "blue");
     preview_svg.draw(display_polygon_3, "red");    
     
-    preview_svg.Close();    
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 9 ... finished\n");    
+    preview_svg.Close();
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 9 ... finished");    
 }
 
 
 Polygon polygon_4 = {{20, 0}, {40, 0}, {60, 30}, {30, 50}, {0, 30}};
 
-TEST_CASE("Polygon test 10", "[Polygon]")
-{ 
+//TEST_CASE("Polygon test 10", "[Polygon]")
+void polygon_test_10(void)
+{
+    #ifdef DEBUG        
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 10 ...\n");
+    INFO("Testing polygon 10 ...");
 
+    #ifdef DEBUG        
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -1561,50 +1819,68 @@ TEST_CASE("Polygon test 10", "[Polygon]")
     
     for (int i = 0; i < 4; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+        #ifdef DEBUG
+	{
+	    printf("i:%d\n", i);	    
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < 4; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (unsigned int i = 0; i < polygon_1.points.size(); ++i)
     {
 	string name = "t1_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T1_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_2.points.size(); ++i)
     {
 	string name = "t2_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T2_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_3.points.size(); ++i)
     {
 	string name = "t3_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T3_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_4.points.size(); ++i)
     {
 	string name = "t4_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T4_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }                
     
@@ -1650,21 +1926,33 @@ TEST_CASE("Polygon test 10", "[Polygon]")
 	switch (z_solver.check(bounding_box_assumptions))
 	{
 	case z3::sat:
-	{	    
-	    printf("  SATISFIABLE\n");
+	{
+            #ifdef DEBUG
+	    {
+		printf("  SATISFIABLE\n");
+	    }
+	    #endif
 	    last_solvable_bounding_box_size = bounding_box_size;
 	    sat = true;	    
 	    break;
 	}
 	case z3::unsat:	
 	{
-	    printf("  UNSATISFIABLE\n");
+            #ifdef DEBUG
+	    {
+		printf("  UNSATISFIABLE\n");
+	    }
+	    #endif
 	    sat = false;	    
 	    break;
 	}
 	case z3::unknown:
 	{
-	    printf("  UNKNOWN\n");
+            #ifdef DEBUG
+	    {
+		printf("  UNKNOWN\n");
+	    }
+	    #endif
 	    break;
 	}
 	default:
@@ -1683,16 +1971,25 @@ TEST_CASE("Polygon test 10", "[Polygon]")
 		cout << z_model << "\n";
 	    }
 	    #endif
-    
-	    printf("Printing interpretation:\n");    
+
+	    #ifdef DEBUG
+	    {
+		printf("Printing interpretation:\n");
+	    }
+	    #endif
+	    
 	    for (unsigned int i = 0; i < z_model.size(); ++i)
 	    {
-		printf("Variable:%s  ", z_model[i].name().str().c_str());
-		
-		cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
 		double value = z_model.get_const_interp(z_model[i]).as_double();
-		printf("value: %.3f\n", value);	
-	    
+		
+		#ifdef DEBUG		
+		{
+		    printf("Variable:%s  ", z_model[i].name().str().c_str());
+		    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
+		    printf("value: %.3f\n", value);			    
+		}
+		#endif
+			    
 		if (z_model[i].name().str() == "x_pos-0")
 		{
 		    poly_1_pos_x = value;
@@ -1731,50 +2028,26 @@ TEST_CASE("Polygon test 10", "[Polygon]")
 	{
 	    break;
 	}	
-
-	#ifdef DEBUG
-	{
-	    cout << float(z_model[i]) << "\n";
-        
-	    switch (z_model.get_const_interp(z_model[i]).bool_value())
-	    {
-	    case Z3_L_FALSE:
-	    {
-		printf("   value: FALSE\n");
-		break;
-	    }
-	    case Z3_L_TRUE:
-	    {
-		printf("   value: TRUE\n");
-		break;
-	    }
-	    case Z3_L_UNDEF:
-	    {
-		printf("   value: UNDEF\n");
-		break;
-	    }	    
-	    default:
-	    {
-		break;
-	    }
-	    }
-	}
-	#endif
-	
     }
+    #ifdef DEBUG
     finish = clock();
+    #endif
 
     REQUIRE(last_solvable_bounding_box_size > 0);    
 
-    printf("Solvable bounding box: %d\n", last_solvable_bounding_box_size);
-    printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
-	                                                                  poly_1_pos_y,
-                                                                  	  poly_2_pos_x,
-                                                                  	  poly_2_pos_y,
-                                                                  	  poly_3_pos_x,
-                                                                  	  poly_3_pos_y,
-                                                                  	  poly_4_pos_x,
-                                                                  	  poly_4_pos_y);
+    #ifdef DEBUG
+    {
+	printf("Solvable bounding box: %d\n", last_solvable_bounding_box_size);
+	printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
+	                                                                      poly_1_pos_y,
+	                                                                      poly_2_pos_x,
+                                                                  	      poly_2_pos_y,
+                                                                  	      poly_3_pos_x,
+                                                                  	      poly_3_pos_y,
+                                                                  	      poly_4_pos_x,
+                                                                  	      poly_4_pos_y);
+    }
+    #endif
 
     #ifdef DEBUG
     {
@@ -1801,20 +2074,29 @@ TEST_CASE("Polygon test 10", "[Polygon]")
     preview_svg.draw(display_polygon_3, "red");
     preview_svg.draw(display_polygon_4, "grey");        
     
-    preview_svg.Close();    
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 10 ... finished\n");    
+    preview_svg.Close();
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 10 ... finished");    
 }
 
 
 TEST_CASE("Polygon test 11", "[Polygon]")
-{ 
+//void polygon_test_11(void)
+{
+    #ifdef DEBUG        
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 11 ...\n");
+    INFO("Testing polygon 11 ...");
 
+    #ifdef DEBUG    
     start = clock();
+    #endif
 
     z3::context z_context;    
     z3::expr_vector X_positions(z_context);
@@ -1826,50 +2108,68 @@ TEST_CASE("Polygon test 11", "[Polygon]")
     
     for (int i = 0; i < 4; ++i)
     {
-	printf("i:%d\n", i);
 	string name = "x_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("i:%d\n", i);	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	X_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (int i = 0; i < 4; ++i)
     {
 	string name = "y_pos-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{	
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	Y_positions.push_back(expr(z_context.real_const(name.c_str())));
     }
 
     for (unsigned int i = 0; i < polygon_1.points.size(); ++i)
     {
 	string name = "t1_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T1_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_2.points.size(); ++i)
     {
 	string name = "t2_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T2_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_3.points.size(); ++i)
     {
 	string name = "t3_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T3_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }
 
     for (unsigned int i = 0; i < polygon_4.points.size(); ++i)
     {
 	string name = "t4_par-" + to_string(i);
-	printf("name: %s\n", name.c_str());
-	
+	#ifdef DEBUG
+	{
+	    printf("name: %s\n", name.c_str());
+	}
+	#endif
 	T4_parameters.push_back(expr(z_context.real_const(name.c_str())));	
     }                
     
@@ -1903,7 +2203,11 @@ TEST_CASE("Polygon test 11", "[Polygon]")
    
     for (int bounding_box_size = 200; bounding_box_size > 10; bounding_box_size -= 4)
     {
-	printf("BB: %d\n", bounding_box_size);
+        #ifdef DEBUG
+	{
+	    printf("BB: %d\n", bounding_box_size);
+	}
+	#endif
 	z3::expr_vector bounding_box_assumptions(z_context);
 
 	assume_BedBoundingBox(X_positions[0], Y_positions[0], polygons[0], bounding_box_size, bounding_box_size, bounding_box_assumptions);
@@ -1916,20 +2220,32 @@ TEST_CASE("Polygon test 11", "[Polygon]")
 	switch (z_solver.check(bounding_box_assumptions))
 	{
 	case z3::sat:
-	{	    
-	    printf("  SATISFIABLE\n");
+	{
+            #ifdef DEBUG
+	    {	    
+		printf("  SATISFIABLE\n");
+	    }
+	    #endif
 	    sat = true;	    
 	    break;
 	}
 	case z3::unsat:	
 	{
-	    printf("  UNSATISFIABLE\n");
+            #ifdef DEBUG
+	    {
+		printf("  UNSATISFIABLE\n");
+	    }
+	    #endif
 	    sat = false;	    
 	    break;
 	}
 	case z3::unknown:
 	{
-	    printf("  UNKNOWN\n");
+	    #ifdef DEBUG
+	    {
+		printf("  UNKNOWN\n");
+	    }
+	    #endif
 	    break;
 	}
 	default:
@@ -1948,15 +2264,23 @@ TEST_CASE("Polygon test 11", "[Polygon]")
 		cout << z_model << "\n";
 	    }
 	    #endif
-    
-	    printf("Printing interpretation:\n");    
+
+	    #ifdef DEBUG
+	    {
+		printf("Printing interpretation:\n");
+	    }
+            #endif
 	    for (unsigned int i = 0; i < z_model.size(); ++i)
 	    {
-		printf("Variable:%s  ", z_model[i].name().str().c_str());
-		
-		cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";
 		double value = z_model.get_const_interp(z_model[i]).as_double();
-		printf("value: %.3f\n", value);	
+		
+	        #ifdef DEBUG
+		{
+		    printf("Variable:%s  ", z_model[i].name().str().c_str());		
+		    cout << z_model.get_const_interp(z_model[i]).as_double() << "\n";		
+		    printf("value: %.3f\n", value);
+		}
+	        #endif
 	    
 		if (z_model[i].name().str() == "x_pos-0")
 		{
@@ -1992,14 +2316,18 @@ TEST_CASE("Polygon test 11", "[Polygon]")
 		}				
 	    }
 
-	    printf("preRefined positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
+	    #ifdef DEBUG
+	    {
+		printf("preRefined positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
 	                                                                  poly_1_pos_y,
                                                                   	  poly_2_pos_x,
                                                                   	  poly_2_pos_y,
                                                                   	  poly_3_pos_x,
                                                                   	  poly_3_pos_y,
                                                                   	  poly_4_pos_x,
-                                                                  	  poly_4_pos_y);				    
+                                                                  	  poly_4_pos_y);
+	    }
+	    #endif
 
 	    while (true)
 	    {
@@ -2030,20 +2358,32 @@ TEST_CASE("Polygon test 11", "[Polygon]")
 		    switch (z_solver.check(bounding_box_assumptions))
 		    {
 		    case z3::sat:
-		    {	    
-			printf("  sat\n");
+		    {
+			#ifdef DEBUG
+			{
+			    printf("  sat\n");
+			}
+			#endif
 			refined_sat = true;	    
 			break;
 		    }
 		    case z3::unsat:	
 		    {
-			printf("  unsat\n");
+			#ifdef DEBUG
+			{			
+			    printf("  unsat\n");
+			}
+			#endif
 			refined_sat = false;	    
 			break;
 		    }
 		    case z3::unknown:
 		    {
-			printf("  unknown\n");
+			#ifdef DEBUG
+			{
+			    printf("  unknown\n");
+			}
+			#endif
 			break;
 		    }
 		    default:
@@ -2100,14 +2440,18 @@ TEST_CASE("Polygon test 11", "[Polygon]")
 				poly_4_pos_y = value;
 			    }
 			}
-			printf("Refined positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
+                        #ifdef DEBUG
+			{
+			    printf("Refined positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
 	                                                                  poly_1_pos_y,
                                                                   	  poly_2_pos_x,
                                                                   	  poly_2_pos_y,
                                                                   	  poly_3_pos_x,
                                                                   	  poly_3_pos_y,
                                                                   	  poly_4_pos_x,
-                                                                  	  poly_4_pos_y);			
+                                                                  	  poly_4_pos_y);
+			}
+			#endif
 		    }
 		    else
 		    {
@@ -2125,43 +2469,17 @@ TEST_CASE("Polygon test 11", "[Polygon]")
 	{
 	    break;
 	}	
-
-	#ifdef DEBUG
-	{
-	    cout << float(z_model[i]) << "\n";
-	    
-	    switch (z_model.get_const_interp(z_model[i]).bool_value())
-	    {
-	    case Z3_L_FALSE:
-	    {
-		printf("   value: FALSE\n");
-		break;
-	    }
-	    case Z3_L_TRUE:
-	    {
-		printf("   value: TRUE\n");
-		break;
-	    }
-	    case Z3_L_UNDEF:
-	    {
-		printf("   value: UNDEF\n");
-		break;
-	    }	    
-	    default:
-	    {
-		break;
-	    }
-	    }
-	}
-	#endif
-
     }
+    #ifdef DEBUG 
     finish = clock();
+    #endif
 
     REQUIRE(last_solvable_bounding_box_size > 0);
 
-    printf("Solvable bounding box: %d\n", last_solvable_bounding_box_size);
-    printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
+    #ifdef DEBUG
+    {
+	printf("Solvable bounding box: %d\n", last_solvable_bounding_box_size);
+	printf("Positions: %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\n", poly_1_pos_x,
 	                                                                  poly_1_pos_y,
                                                                   	  poly_2_pos_x,
                                                                   	  poly_2_pos_y,
@@ -2169,6 +2487,8 @@ TEST_CASE("Polygon test 11", "[Polygon]")
                                                                   	  poly_3_pos_y,
                                                                   	  poly_4_pos_x,
                                                                   	  poly_4_pos_y);
+    }
+    #endif
 
     #ifdef DEBUG
     {
@@ -2195,20 +2515,29 @@ TEST_CASE("Polygon test 11", "[Polygon]")
     preview_svg.draw(display_polygon_3, "red");
     preview_svg.draw(display_polygon_4, "grey");        
     
-    preview_svg.Close();    
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 11 ... finished\n");    
+    preview_svg.Close();
+    
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 11 ... finished");
 }
 
 
 TEST_CASE("Polygon test 12", "[Polygon]")
-{ 
+{
+    #ifdef DEBUG        
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 12 ...\n");
+    INFO("Testing polygon 12 ...");
 
+    #ifdef DEBUG    
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
@@ -2242,16 +2571,22 @@ TEST_CASE("Polygon test 12", "[Polygon]")
 							dec_var_names_map,
 							polygons);
 
+    #ifdef DEBUG    
     finish = clock();
+    #endif
     REQUIRE(optimized);    
 
     if (optimized)
     {
-	printf("Polygon positions:\n");
-	for (unsigned int i = 0; i < polygons.size(); ++i)
+        #ifdef DEBUG
 	{
-	    printf("  %.3f, %.3f\n", X_values[i], Y_values[i]);
+	    printf("Polygon positions:\n");
+	    for (unsigned int i = 0; i < polygons.size(); ++i)
+	    {
+		printf("  %.3f, %.3f\n", X_values[i], Y_values[i]);
+	    }
 	}
+	#endif
     
 	SVG preview_svg("polygon_test_12.svg");
 	
@@ -2306,21 +2641,34 @@ TEST_CASE("Polygon test 12", "[Polygon]")
     }
     else
     {
-	printf("Polygon optimization FAILED.\n");
+        #ifdef DEBUG
+	{	
+	    printf("Polygon optimization FAILED.\n");
+	}
+	#endif
     }
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 12 ... finished\n");    
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 12 ... finished");    
 }
 
 
-TEST_CASE("Polygon test 13", "[Polygon]")
-{ 
+//TEST_CASE("Polygon test 13", "[Polygon]")
+void polygon_test_13(void)
+{
+    #ifdef DEBUG        
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 13 ...\n");
+    INFO("Testing polygon 13 ...");
 
+    #ifdef DEBUG    
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
@@ -2366,16 +2714,23 @@ TEST_CASE("Polygon test 13", "[Polygon]")
 							dec_var_names_map,
 							polygons);
 
+    #ifdef DEBUG    
     finish = clock();
+    #endif
+    
     REQUIRE(optimized);
 
     if (optimized)
     {
-	printf("Polygon positions:\n");
-	for (unsigned int i = 0; i < polygons.size(); ++i)
-	{
-	    printf("  %.3f, %.3f\n", X_values[i], Y_values[i]);
+        #ifdef DEBUG
+	{	
+	    printf("Polygon positions:\n");
+	    for (unsigned int i = 0; i < polygons.size(); ++i)
+	    {
+		printf("  %.3f, %.3f\n", X_values[i], Y_values[i]);
+	    }
 	}
+	#endif
     
 	SVG preview_svg("polygon_test_13.svg");
 	
@@ -2460,21 +2815,33 @@ TEST_CASE("Polygon test 13", "[Polygon]")
     }
     else
     {
-	printf("Polygon optimization FAILED.\n");
+	#ifdef DEBUG
+	{
+	    printf("Polygon optimization FAILED.\n");
+	}
+	#endif
     }
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 13 ... finished\n");    
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 13 ... finished");
 }
 
 
 TEST_CASE("Polygon test 14", "[Polygon]")
-{ 
+{
+    #ifdef DEBUG        
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 14 ...\n");
-
+    INFO("Testing polygon 14 ...");
+    
+    #ifdef DEBUG    
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
@@ -2553,7 +2920,11 @@ TEST_CASE("Polygon test 14", "[Polygon]")
 	    poly_positions_Y[undecided[i]] = Y_values[undecided[i]];
 	}
 
-	printf("Optimized 1: %d\n", optimized);
+        #ifdef DEBUG
+	{
+	    printf("Optimized 1: %d\n", optimized);
+	}
+	#endif
     }
     
     {
@@ -2610,22 +2981,33 @@ TEST_CASE("Polygon test 14", "[Polygon]")
 						       undecided,
 						       dec_var_names_map,
 						       polygons);
-	printf("Optimized 2: %d\n", optimized);
+
+	#ifdef DEBUG
+	{
+	    printf("Optimized 2: %d\n", optimized);
+	}
+	#endif
 	
 	decided.push_back(4);
 	decided.push_back(5);
 	decided.push_back(6);
 	decided.push_back(7);       
-	
+
+        #ifdef DEBUG	
 	finish = clock();
+	#endif
 	
 	if (optimized)
 	{
-	    printf("Polygon positions:\n");
-	    for (unsigned int i = 0; i < decided.size(); ++i)
+	    #ifdef DEBUG
 	    {
-		printf("  %.3f, %.3f\n", X_values[decided[i]].as_double(), Y_values[decided[i]].as_double());
+		printf("Polygon positions:\n");
+		for (unsigned int i = 0; i < decided.size(); ++i)
+		{
+		    printf("  %.3f, %.3f\n", X_values[decided[i]].as_double(), Y_values[decided[i]].as_double());
+		}
 	    }
+	    #endif
 	    
 	    SVG preview_svg("polygon_test_14.svg");
 	
@@ -2710,24 +3092,37 @@ TEST_CASE("Polygon test 14", "[Polygon]")
 	}
 	else
 	{
-	    printf("Polygon optimization FAILED.\n");
+	    #ifdef DEBUG
+	    {
+		printf("Polygon optimization FAILED.\n");
+	    }
+	    #endif
 	}
 
 	REQUIRE(optimized);
     }
-
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 14 ... finished\n");    
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 14 ... finished");    
 }
 
 
 TEST_CASE("Polygon test 15", "[Polygon]")
-{ 
+//void polygon_test_15(void)
+{
+    #ifdef DEBUG        
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 15 ...\n");
+    INFO("Testing polygon 15 ...");
 
+    #ifdef DEBUG        
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});
@@ -2789,16 +3184,20 @@ TEST_CASE("Polygon test 15", "[Polygon]")
 	
 	if (optimized)
 	{
-	    printf("Polygon positions:\n");
-	    for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+	    #ifdef DEBUG
 	    {
-		printf("  %.3f, %.3f\n", poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double());
+		printf("Polygon positions:\n");
+		for (unsigned int i = 0; i < decided_polygons.size(); ++i)
+		{
+		    printf("  %.3f, %.3f\n", poly_positions_X[decided_polygons[i]].as_double(), poly_positions_Y[decided_polygons[i]].as_double());
+		}
+		printf("Remaining polygons: %ld\n", remaining_polygons.size());
+		for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
+		{
+		    printf("  %d\n", remaining_polygons[i]);
+		}
 	    }
-	    printf("Remaining polygons: %ld\n", remaining_polygons.size());
-	    for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
-	    {
-		printf("  %d\n", remaining_polygons[i]);
-	    }
+	    #endif
 	
 	    SVG preview_svg("polygon_test_15.svg");
 	
@@ -2885,7 +3284,11 @@ TEST_CASE("Polygon test 15", "[Polygon]")
 	}
 	else
 	{
-	    printf("Polygon optimization FAILED.\n");
+	    #ifdef DEBUG
+	    {
+		printf("Polygon optimization FAILED.\n");
+	    }
+	    #endif
 	}
 	REQUIRE(optimized);
 	
@@ -2902,20 +3305,31 @@ TEST_CASE("Polygon test 15", "[Polygon]")
     }
     while (!remaining_polygons.empty());
 
+    #ifdef DEBUG
     finish = clock();
+    #endif
     
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 15 ... finished\n");    
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 15 ... finished");    
 }    
 
 
 TEST_CASE("Polygon test 16", "[Polygon]")
-{ 
+{
+    #ifdef DEBUG        
     clock_t start, finish;
+    #endif
     
-    printf("Testing polygon 16 ...\n");
+    INFO("Testing polygon 16 ...");
 
+    #ifdef DEBUG        
     start = clock();
+    #endif
 
     SolverConfiguration solver_configuration;
     solver_configuration.plate_bounding_box = BoundingBox({0,0}, {SEQ_PRUSA_MK3S_X_SIZE, SEQ_PRUSA_MK3S_Y_SIZE});    
@@ -2929,12 +3343,23 @@ TEST_CASE("Polygon test 16", "[Polygon]")
 
     double area = calc_PolygonUnreachableZoneArea(polygon_1, polygons);
     REQUIRE(area > 0.0);
-    printf("Polygons area: %.3f\n", area);
+    #ifdef DEBUG
+    {
+	printf("Polygons area: %.3f\n", area);
+    }
+    #endif
 
+    #ifdef DEBUG    
     finish = clock();
+    #endif
     
-    printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
-    printf("Testing polygon 16 ... finished\n");    
+    #ifdef DEBUG
+    {
+	printf("Time: %.3f\n", (finish - start) / (double)CLOCKS_PER_SEC);
+    }
+    #endif
+    
+    INFO("Testing polygon 16 ... finished");    
 } 
    
 

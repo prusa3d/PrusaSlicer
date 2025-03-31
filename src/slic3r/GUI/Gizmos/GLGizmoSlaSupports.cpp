@@ -17,21 +17,97 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_ObjectSettings.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
+#include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/SLAPrint.hpp"
 
+#include "libslic3r/SLA/SupportIslands/SampleConfigFactory.hpp"
+#include "imgui/imgui_stdlib.h" // string input for ImGui
 static const double CONE_RADIUS = 0.25;
 static const double CONE_HEIGHT = 0.75;
 
-namespace Slic3r {
-namespace GUI {
+using namespace Slic3r;
+using namespace Slic3r::GUI;
+
+namespace {
+
+enum class IconType : unsigned {
+    show_support_points_selected,
+    show_support_points_unselected,
+    show_support_points_hovered,
+    show_support_structure_selected,
+    show_support_structure_unselected,
+    show_support_structure_hovered,
+    // automatic calc of icon's count
+    _count
+};
+
+IconManager::Icons init_icons(IconManager &mng, ImVec2 size = ImVec2{50, 50}) {
+    mng.release();
+
+    // icon order has to match the enum IconType
+    IconManager::InitTypes init_types {        
+        {"support_structure_invisible.svg", size, IconManager::RasterType::color},           // show_support_points_selected
+        {"support_structure_invisible.svg", size, IconManager::RasterType::gray_only_data},  // show_support_points_unselected
+        {"support_structure_invisible.svg", size, IconManager::RasterType::color},           // show_support_points_hovered
+
+        {"support_structure.svg", size, IconManager::RasterType::color},           // show_support_structure_selected
+        {"support_structure.svg", size, IconManager::RasterType::gray_only_data},  // show_support_structure_unselected
+        {"support_structure.svg", size, IconManager::RasterType::color},           // show_support_structure_hovered
+    };
+
+    assert(init_types.size() == static_cast<size_t>(IconType::_count));
+    std::string path = resources_dir() + "/icons/";
+    for (IconManager::InitType &init_type : init_types)
+        init_type.filepath = path + init_type.filepath;
+
+    return mng.init(init_types);
+}
+const IconManager::Icon &get_icon(const IconManager::Icons &icons, IconType type) { 
+    return *icons[static_cast<unsigned>(type)]; }
+
+/// <summary>
+/// Draw icon buttons to swap between show structure and only supports points
+/// </summary>
+/// <param name="show_support_structure">In|Out view mode</param>
+/// <param name="icons">all loaded icons</param>
+/// <returns>True when change is made</returns>
+bool draw_view_mode(bool &show_support_structure, const IconManager::Icons &icons) {
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 8.);
+    ScopeGuard sg([] { ImGui::PopStyleVar(); });
+    if (show_support_structure) {        
+        draw(get_icon(icons, IconType::show_support_structure_selected));
+        if(ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Visible support structure").c_str());
+        ImGui::SameLine();
+        if (clickable(get_icon(icons, IconType::show_support_points_unselected),
+                      get_icon(icons, IconType::show_support_points_hovered))) {
+            show_support_structure = false;
+            return true;
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Click to show support points without support structure").c_str()); 
+    } else { // !show_support_structure
+        if (clickable(get_icon(icons, IconType::show_support_structure_unselected),
+                      get_icon(icons, IconType::show_support_structure_hovered))) {
+            show_support_structure = true;
+            return true;
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Click to show support structure with pad").c_str()); 
+        ImGui::SameLine();
+        draw(get_icon(icons, IconType::show_support_points_selected));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Visible support points without support structure").c_str());
+    }
+    return false;
+}
+} // namespace
+
 
 GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-: GLGizmoSlaBase(parent, icon_filename, sprite_id, slaposDrillHoles)
-{
-    show_sla_supports(true);
+    : GLGizmoSlaBase(parent, icon_filename, sprite_id, slaposDrillHoles /*slaposSupportPoints*/) {
+    show_sla_supports(false);
 }
 
 bool GLGizmoSlaSupports::on_init()
@@ -44,8 +120,7 @@ bool GLGizmoSlaSupports::on_init()
     m_desc["remove_all"]       = _u8L("Remove all points");
     m_desc["apply_changes"]    = _u8L("Apply changes");
     m_desc["discard_changes"]  = _u8L("Discard changes");
-    m_desc["minimal_distance"] = _u8L("Minimal points distance") + ": ";
-    m_desc["points_density"]   = _u8L("Support points density") + ": ";
+    m_desc["points_density"]   = _u8L("Support points density");
     m_desc["auto_generate"]    = _u8L("Auto-generate points");
     m_desc["manual_editing"]   = _u8L("Manual editing");
     m_desc["clipping_of_view"] = _u8L("Clipping of view")+ ": ";
@@ -141,8 +216,6 @@ void GLGizmoSlaSupports::on_render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-    show_sla_supports(!m_editing_mode);
-
     render_volumes();
     render_points(selection);
 
@@ -195,10 +268,15 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
     const Transform3d& view_matrix = camera.get_view_matrix();
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
+    const ColorRGBA selected_color = ColorRGBA::REDISH();
+    const ColorRGBA hovered_color = ColorRGBA::CYAN();
+    const ColorRGBA island_color = ColorRGBA::BLUEISH();
+    const ColorRGBA inactive_color = ColorRGBA::LIGHT_GRAY();
+    const ColorRGBA manual_color = ColorRGBA::ORANGE();
+
     ColorRGBA render_color;
     for (size_t i = 0; i < cache_size; ++i) {
         const sla::SupportPoint& support_point = m_editing_mode ? m_editing_cache[i].support_point : m_normal_cache[i];
-        const bool point_selected = m_editing_mode ? m_editing_cache[i].selected : false;
 
         const bool clipped = is_mesh_point_clipped(support_point.pos.cast<double>());
         if (i < m_point_raycasters.size()) {
@@ -208,22 +286,16 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
         if (clipped)
             continue;
 
+        render_color = 
+            support_point.type == sla::SupportPointType::manual_add ? manual_color : 
+            support_point.type == sla::SupportPointType::island ? island_color :
+            inactive_color;
         // First decide about the color of the point.
-        if (size_t(m_hover_id) == i && m_editing_mode) // ignore hover state unless editing mode is active
-            render_color = { 0.f, 1.f, 1.f, 1.f };
-        else { // neigher hover nor picking
-            bool supports_new_island = m_lock_unique_islands && support_point.is_new_island;
-            if (m_editing_mode) {
-                if (point_selected)
-                    render_color = { 1.f, 0.3f, 0.3f, 1.f};
-                else
-                    if (supports_new_island)
-                        render_color = { 0.3f, 0.3f, 1.f, 1.f };
-                    else
-                        render_color = { 0.7f, 0.7f, 0.7f, 1.f };
-            }
-            else
-                render_color = { 0.5f, 0.5f, 0.5f, 1.f };
+        if (m_editing_mode) {
+            if (size_t(m_hover_id) == i) // ignore hover state unless editing mode is active
+                render_color = hovered_color;
+            else if (m_editing_cache[i].selected)
+                render_color = selected_color;
         }
 
         m_cone.model.set_color(render_color);
@@ -324,7 +396,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
                 std::pair<Vec3f, Vec3f> pos_and_normal;
                 if (unproject_on_mesh(mouse_position, pos_and_normal)) { // we got an intersection
                     Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add support point"));
-                    m_editing_cache.emplace_back(sla::SupportPoint(pos_and_normal.first, m_new_point_head_diameter/2.f, false), false, pos_and_normal.second);
+                    m_editing_cache.emplace_back(sla::SupportPoint{pos_and_normal.first, m_new_point_head_diameter/2.f}, false, pos_and_normal.second);
                     m_parent.set_as_dirty();
                     m_wait_for_up_event = true;
                     unregister_point_raycasters_for_picking();
@@ -479,7 +551,7 @@ void GLGizmoSlaSupports::delete_selected_points(bool force)
     Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Delete support point"));
 
     for (unsigned int idx=0; idx<m_editing_cache.size(); ++idx) {
-        if (m_editing_cache[idx].selected && (!m_editing_cache[idx].support_point.is_new_island || !m_lock_unique_islands || force)) {
+        if (m_editing_cache[idx].selected && (!m_editing_cache[idx].support_point.is_island() || !m_lock_unique_islands || force)) {
             m_editing_cache.erase(m_editing_cache.begin() + (idx--));
         }
     }
@@ -517,51 +589,21 @@ std::vector<const ConfigOption*> GLGizmoSlaSupports::get_config_options(const st
     return out;
 }
 
-
-
-/*
-void GLGizmoSlaSupports::find_intersecting_facets(const igl::AABB<Eigen::MatrixXf, 3>* aabb, const Vec3f& normal, double offset, std::vector<unsigned int>& idxs) const
-{
-    if (aabb->is_leaf()) { // this is a facet
-        // corner.dot(normal) - offset
-        idxs.push_back(aabb->m_primitive);
-    }
-    else { // not a leaf
-    using CornerType = Eigen::AlignedBox<float, 3>::CornerType;
-        bool sign = std::signbit(offset - normal.dot(aabb->m_box.corner(CornerType(0))));
-        for (unsigned int i=1; i<8; ++i)
-            if (std::signbit(offset - normal.dot(aabb->m_box.corner(CornerType(i)))) != sign) {
-                find_intersecting_facets(aabb->m_left, normal, offset, idxs);
-                find_intersecting_facets(aabb->m_right, normal, offset, idxs);
-            }
-    }
-}
-
-
-
-void GLGizmoSlaSupports::make_line_segments() const
-{
-    TriangleMeshSlicer tms(&m_c->m_model_object->volumes.front()->mesh);
-    Vec3f normal(0.f, 1.f, 1.f);
-    double d = 0.;
-
-    std::vector<IntersectionLine> lines;
-    find_intersections(&m_AABB, normal, d, lines);
-    ExPolygons expolys;
-    tms.make_expolygons_simple(lines, &expolys);
-
-    SVG svg("slice_loops.svg", get_extents(expolys));
-    svg.draw(expolys);
-    //for (const IntersectionLine &l : lines[i])
-    //    svg.draw(l, "red", 0);
-    //svg.draw_outline(expolygons, "black", "blue", 0);
-    svg.Close();
-}
-*/
-
-
 void GLGizmoSlaSupports::on_render_input_window(float x, float y, float bottom_limit)
 {
+    // Keep resolution of icons for 
+    static float rendered_line_height;    
+    if (float line_height = ImGui::GetTextLineHeightWithSpacing();
+        m_icons.empty() ||
+        rendered_line_height != line_height) { // change of view resolution
+        rendered_line_height = line_height;
+
+        // need regeneration when change resolution(move between monitors)
+        float width = std::round(line_height / 8 + 1) * 8;
+        ImVec2 icon_size{width, width};
+        m_icons = init_icons(m_icon_manager, icon_size);
+    }
+
     static float last_y = 0.0f;
     static float last_h = 0.0f;
 
@@ -595,7 +637,7 @@ RENDER_AGAIN:
 
     // First calculate width of all the texts that are could possibly be shown. We will decide set the dialog width based on that:
 
-    const float settings_sliders_left = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("minimal_distance")).x, ImGuiPureWrap::calc_text_size(m_desc.at("points_density")).x) + m_imgui->scaled(1.f);
+    const float settings_sliders_left = ImGuiPureWrap::calc_text_size(m_desc.at("points_density")).x + m_imgui->scaled(1.f);
     const float clipping_slider_left = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x, ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
     const float diameter_slider_left = ImGuiPureWrap::calc_text_size(m_desc.at("head_diameter")).x + m_imgui->scaled(1.f);
     const float minimal_slider_width = m_imgui->scaled(4.f);
@@ -677,60 +719,96 @@ RENDER_AGAIN:
     }
     else { // not in editing mode:
         m_imgui->disabled_begin(!is_input_enabled());
-
-        ImGui::AlignTextToFramePadding();
-        ImGuiPureWrap::text(m_desc.at("minimal_distance"));
-        ImGui::SameLine(settings_sliders_left);
-        ImGui::PushItemWidth(window_width - settings_sliders_left);
-
-        std::vector<const ConfigOption*> opts = get_config_options({"support_points_density_relative", "support_points_minimal_distance"});
-        float density = static_cast<const ConfigOptionInt*>(opts[0])->value;
-        float minimal_point_distance = static_cast<const ConfigOptionFloat*>(opts[1])->value;
-
-        m_imgui->slider_float("##minimal_point_distance", &minimal_point_distance, 0.f, 20.f, "%.f mm");
-        bool slider_clicked = m_imgui->get_last_slider_status().clicked; // someone clicked the slider
-        bool slider_edited = m_imgui->get_last_slider_status().edited; // someone is dragging the slider
-        bool slider_released = m_imgui->get_last_slider_status().deactivated_after_edit; // someone has just released the slider
-
-        ImGui::AlignTextToFramePadding();
         ImGuiPureWrap::text(m_desc.at("points_density"));
-        ImGui::SameLine(settings_sliders_left);
+        ImGui::SameLine();
 
-        m_imgui->slider_float("##points_density", &density, 0.f, 200.f, "%.f %%");
-        slider_clicked |= m_imgui->get_last_slider_status().clicked;
-        slider_edited |= m_imgui->get_last_slider_status().edited;
-        slider_released |= m_imgui->get_last_slider_status().deactivated_after_edit;
+        if (draw_view_mode(m_show_support_structure, m_icons)){
+            show_sla_supports(m_show_support_structure);
+            if (m_show_support_structure) {
+                if (m_normal_cache.empty()) { 
+                    // first click also have to generate point
+                    auto_generate();
+                } else {
+                    reslice_until_step(slaposPad);
+                }
+            }
+        }
 
-        if (slider_clicked) { // stash the values of the settings so we know what to revert to after undo
-            m_minimal_point_distance_stash = minimal_point_distance;
-            m_density_stash = density;
+        const char *support_points_density = "support_points_density_relative";
+        float density = static_cast<const ConfigOptionInt*>(get_config_options({support_points_density})[0])->value; 
+        float old_density = density;
+        wxString tooltip = _L("Change amount of generated support points.");
+        if (m_imgui->slider_float("##density", &density, 50.f, 200.f, "%.f %%", 1.f, false, tooltip)){
+            if (density < 10.f) // not neccessary, but lower value seems pointless. Zero cause issues inside algorithms.
+                density = 10.f;
+            mo->config.set(support_points_density, (int) density);
         }
-        if (slider_edited) {
-            mo->config.set("support_points_minimal_distance", minimal_point_distance);
-            mo->config.set("support_points_density_relative", (int)density);
-        }
-        if (slider_released) {
-            mo->config.set("support_points_minimal_distance", m_minimal_point_distance_stash);
-            mo->config.set("support_points_density_relative", (int)m_density_stash);
+        
+        const ImGuiWrapper::LastSliderStatus &density_status = m_imgui->get_last_slider_status();
+        static std::optional<int> density_stash; // Value for undo/redo stack is written on stop dragging
+        if (!density_stash.has_value() && !is_approx(density, old_density)) // stash the values of the settings so we know what to revert to after undo
+            density_stash = (int)old_density;
+        if (density_status.deactivated_after_edit && density_stash.has_value()) { //  slider released            
+            // set configuration to value before slide
+            // to store this value on undo redo snapshot stack
+            mo->config.set(support_points_density, *density_stash);
+            density_stash.reset();
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Support parameter change"));
-            mo->config.set("support_points_minimal_distance", minimal_point_distance);
-            mo->config.set("support_points_density_relative", (int)density);
+            mo->config.set(support_points_density, (int) density);
             wxGetApp().obj_list()->update_and_show_object_settings_item();
-        }
-
-        bool generate = ImGuiPureWrap::button(m_desc.at("auto_generate"));
-
-        if (generate)
             auto_generate();
+        }
+        
+        const sla::SupportPoints &supports = m_normal_cache;
+        int count_user_edited = 0;
+        int count_island = 0;
+        for (const sla::SupportPoint &support : supports)
+            switch (support.type) { 
+            case sla::SupportPointType::manual_add: ++count_user_edited; break;
+            case sla::SupportPointType::island:     ++count_island;      break;
+            //case sla::SupportPointType::slope:
+            default: assert(support.type == sla::SupportPointType::slope); }
+
+        std::string stats;
+        if (supports.empty()) {
+            stats = "No support points generated yet.";
+        } else if (count_user_edited == 0) {
+            stats = GUI::format("%d support points generated (%d on islands)",
+                (int) supports.size(), count_island);
+        } else {
+            stats = GUI::format("%d(%d manual) support points (%d on islands)", 
+                (int) supports.size(), count_user_edited, count_island);
+        }
+        ImVec4 light_gray{0.4f, 0.4f, 0.4f, 1.0f};
+        ImGui::TextColored(light_gray, "%s", stats.c_str());
+
+#ifdef USE_ISLAND_GUI_FOR_SETTINGS
+        ImGui::Separator();
+        ImGui::Text("Between delimiters is temporary GUI");
+        sla::SampleConfig &sample_config = sla::SampleConfigFactory::get_sample_config();
+        if (float overhang_sample_distance = sample_config.prepare_config.discretize_overhang_step;
+            m_imgui->slider_float("overhang discretization", &overhang_sample_distance, 2e-5f, 10.f, "%.2f mm")){
+            sample_config.prepare_config.discretize_overhang_step = overhang_sample_distance;
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Smaller will slow down. Step for discretization overhang outline for test of support need");        
+        
+        draw_island_config();
+        ImGui::Text("Distribution depends on './resources/data/sla_support.svg'\ninstruction for edit are in file");
+        ImGui::Separator();
+#endif // USE_ISLAND_GUI_FOR_SETTINGS
+
+        if (ImGuiPureWrap::button(m_desc.at("auto_generate")))
+            auto_generate();
+        ImGui::SameLine();
+
+        m_imgui->disabled_begin(!is_input_enabled() || m_normal_cache.empty());
+        remove_all = ImGuiPureWrap::button(m_desc.at("remove_all"));
+        m_imgui->disabled_end();
 
         ImGui::Separator();
         if (ImGuiPureWrap::button(m_desc.at("manual_editing")))
             switch_to_editing_mode();
 
-        m_imgui->disabled_end();
-
-        m_imgui->disabled_begin(!is_input_enabled() || m_normal_cache.empty());
-        remove_all = ImGuiPureWrap::button(m_desc.at("remove_all"));
         m_imgui->disabled_end();
 
         // ImGuiPureWrap::text("");
@@ -797,6 +875,139 @@ RENDER_AGAIN:
     if (force_refresh)
         m_parent.set_as_dirty();
 }
+
+#ifdef USE_ISLAND_GUI_FOR_SETTINGS
+void GLGizmoSlaSupports::draw_island_config() {
+    if (!ImGui::TreeNode("Support islands:"))
+        return; // no need to draw configuration for islands
+    sla::SampleConfig &sample_config = sla::SampleConfigFactory::get_sample_config();
+
+    ImGui::SameLine();
+    ImGui::Text("head radius %.2f mm", unscale<float>(sample_config.head_radius));
+
+    bool exist_change = false;
+
+    if (float max_for_one = unscale<float>(sample_config.max_length_for_one_support_point); // [in mm]
+        ImGui::InputFloat("One support", &max_for_one, .1f, 1.f, "%.2f mm")) {
+        sample_config.max_length_for_one_support_point = scale_(max_for_one);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Maximal island length (longest voronoi path)\n"
+            "for support island by exactly one point.\n"
+            "Point will be on the longest path center");
+
+    if (float max_for_two = unscale<float>(sample_config.max_length_for_two_support_points); // [in mm]
+        ImGui::InputFloat("Two supports", &max_for_two, .1f, 1.f, "%.2f mm")) {
+        sample_config.max_length_for_two_support_points = scale_(max_for_two);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Maximal island length (longest voronoi path)\n"
+            "for support by 2 points on path sides\n"
+            "To stretch the island.");
+    if (float thin_max_width = unscale<float>(sample_config.thin_max_width); // [in mm]
+        ImGui::InputFloat("Thin max width", &thin_max_width, .1f, 1.f, "%.2f mm")) {
+        sample_config.thin_max_width = scale_(thin_max_width);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Maximal width of line island supported in the middle of line\n"
+            "Must be greater than thick min width(to make hysteresis)");
+    if (float thick_min_width = unscale<float>(sample_config.thick_min_width); // [in mm]
+        ImGui::InputFloat("Thick min width", &thick_min_width, .1f, 1.f, "%.2f mm")) {
+        sample_config.thick_min_width = scale_(thick_min_width);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Minimal width to be supported by outline\n"
+            "Must be smaller than thin max width(to make hysteresis)");
+    if (float max_distance = unscale<float>(sample_config.thin_max_distance); // [in mm]
+        ImGui::InputFloat("Thin max distance", &max_distance, .1f, 1.f, "%.2f mm")) {
+        sample_config.thin_max_distance = scale_(max_distance);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Maximal distance of supports on thin island's part");
+    if (float max_distance = unscale<float>(sample_config.thick_inner_max_distance); // [in mm]
+        ImGui::InputFloat("Thick inner max distance", &max_distance, .1f, 1.f, "%.2f mm")) {
+        sample_config.thick_inner_max_distance = scale_(max_distance);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Maximal distance of supports inside thick island's part");
+    if (float max_distance = unscale<float>(sample_config.thick_outline_max_distance); // [in mm]
+        ImGui::InputFloat("Thick outline max distance", &max_distance, .1f, 1.f, "%.2f mm")) {
+        sample_config.thick_outline_max_distance = scale_(max_distance);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Maximal distance of supports on thick island's part outline");
+    
+    if (float minimal_distance_from_outline = unscale<float>(sample_config.minimal_distance_from_outline); // [in mm]
+        ImGui::InputFloat("From outline", &minimal_distance_from_outline, .1f, 1.f, "%.2f mm")) {
+        sample_config.minimal_distance_from_outline = scale_(minimal_distance_from_outline);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("When it is possible, there will be this minimal distance from outline.\n"
+            "ZERO mean head center will lay on island outline\n"
+            "IMHO value should be bigger than head radius");
+    ImGui::SameLine();
+    if (float maximal_distance_from_outline = unscale<float>(sample_config.maximal_distance_from_outline); // [in mm]
+        ImGui::InputFloat("Max", &maximal_distance_from_outline, .1f, 1.f, "%.2f mm")) {
+        sample_config.maximal_distance_from_outline = scale_(maximal_distance_from_outline);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Measured as sum of VD edge length from outline\n"
+            "Used only when there is no space for outline offset on first/last point\n"
+            "Must be bigger than value 'From outline'");
+
+    if (float simplification_tolerance = unscale<float>(sample_config.simplification_tolerance); // [in mm]
+        ImGui::InputFloat("Simplify", &simplification_tolerance, .1f, 1.f, "%.2f mm")) {
+        sample_config.simplification_tolerance = scale_(simplification_tolerance);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("There is no need to calculate with precisse island Voronoi\n" 
+            "NOTE: Slice of Cylinder bottom has tip of trinagles on contour\n"
+            "(neighbor coordinate -> create issue in boost::voronoi)\n"
+            "Bigger value will speed up");
+    ImGui::Text("Aligning termination criteria:");
+    if (ImGui::IsItemHovered()) 
+        ImGui::SetTooltip("After initial support placement on island, supports are aligned\n"
+                          "to more uniformly support area of irregular island shape");
+    if (int count = static_cast<int>(sample_config.count_iteration);
+        ImGui::SliderInt("max iteration", &count, 0, 100, "%d loops" )){
+        sample_config.count_iteration = count;
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Align termination condition, max count of aligning calls");
+    if (float minimal_move = unscale<float>(sample_config.minimal_move); // [in mm]
+        ImGui::InputFloat("minimal move", &minimal_move, .1f, 1.f, "%.2f mm")) {
+        sample_config.minimal_move = scale_(minimal_move);
+        exist_change = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Align termination condition, when support points after align did not change their position more,\n"
+            "than this distance it is deduce that supports are aligned enough.\n"
+            "Bigger value mean speed up of aligning");    
+
+    if (exist_change){
+        sla::SampleConfigFactory::verify(sample_config);
+    }
+
+
+#ifdef OPTION_TO_STORE_ISLAND
+    bool store_islands = !sample_config.path.empty();
+    if (ImGui::Checkbox("StoreIslands", &store_islands)) {
+        if (store_islands == true)
+            sample_config.path = "C:/data/temp/island<<order>>.svg";
+        else
+            sample_config.path.clear();
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Store islands into files\n<<order>> is replaced by island order number");
+    if (store_islands) {
+        ImGui::SameLine();
+        std::string path;
+        ImGui::InputText("path", &sample_config.path);
+    }
+#endif // OPTION_TO_STORE_ISLAND
+
+    // end of tree node
+    ImGui::TreePop();
+}
+#endif // USE_ISLAND_GUI_FOR_SETTINGS
 
 bool GLGizmoSlaSupports::on_is_activable() const
 {
@@ -914,7 +1125,7 @@ void GLGizmoSlaSupports::on_dragging(const UpdateData &data)
 {
     assert(m_hover_id != -1);
     if (!m_editing_mode) return;
-    if (m_editing_cache[m_hover_id].support_point.is_new_island && m_lock_unique_islands)
+    if (m_editing_cache[m_hover_id].support_point.is_island() && m_lock_unique_islands)
         return;
     
     std::pair<Vec3f, Vec3f> pos_and_normal;
@@ -922,7 +1133,7 @@ void GLGizmoSlaSupports::on_dragging(const UpdateData &data)
         return;
 
     m_editing_cache[m_hover_id].support_point.pos = pos_and_normal.first;
-    m_editing_cache[m_hover_id].support_point.is_new_island = false;
+    m_editing_cache[m_hover_id].support_point.type = sla::SupportPointType::manual_add;
     m_editing_cache[m_hover_id].normal = pos_and_normal.second;        
 }
 
@@ -1021,7 +1232,7 @@ void GLGizmoSlaSupports::editing_mode_apply_changes()
         mo->sla_support_points.clear();
         mo->sla_support_points = m_normal_cache;
 
-        reslice_until_step(slaposPad);
+        reslice_until_step(m_show_support_structure ? slaposPad : slaposSupportPoints);
     }
 }
 
@@ -1121,10 +1332,10 @@ void GLGizmoSlaSupports::get_data_from_backend()
     for (const SLAPrintObject* po : m_parent.sla_print()->objects()) {
         if (po->model_object()->id() == mo->id()) {
             m_normal_cache.clear();
-            const std::vector<sla::SupportPoint>& points = po->get_support_points();
-            auto mat = po->trafo().inverse().cast<float>();
-            for (unsigned int i=0; i<points.size();++i)
-                m_normal_cache.emplace_back(sla::SupportPoint(mat * points[i].pos, points[i].head_front_radius, points[i].is_new_island));
+            
+            auto mat = po->trafo().inverse().cast<float>(); // TODO: WTF trafo????? !!!!!!
+            for (const sla::SupportPoint &p : po->get_support_points())
+                m_normal_cache.emplace_back(sla::SupportPoint{mat * p.pos, p.head_front_radius, p.type});
 
             mo->sla_points_status = sla::PointsStatus::AutoGenerated;
             break;
@@ -1138,27 +1349,18 @@ void GLGizmoSlaSupports::get_data_from_backend()
 
 void GLGizmoSlaSupports::auto_generate()
 {
-    //wxMessageDialog dlg(GUI::wxGetApp().plater(), 
-    MessageDialog dlg(GUI::wxGetApp().plater(), 
-                        _L("Autogeneration will erase all manually edited points.") + "\n\n" +
-                        _L("Are you sure you want to do it?") + "\n",
-                        _L("Warning"), wxICON_WARNING | wxYES | wxNO);
-
+    Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Autogenerate support points"));
+    wxGetApp().CallAfter([this]() { reslice_until_step(
+        m_show_support_structure ? slaposPad : slaposSupportPoints); });
     ModelObject* mo = m_c->selection_info()->model_object();
-
-    if (mo->sla_points_status != sla::PointsStatus::UserModified || m_normal_cache.empty() || dlg.ShowModal() == wxID_YES) {
-        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Autogenerate support points"));
-        wxGetApp().CallAfter([this]() { reslice_until_step(slaposPad); });
-        mo->sla_points_status = sla::PointsStatus::Generating;
-    }
+    mo->sla_points_status = sla::PointsStatus::Generating;
 }
-
-
 
 void GLGizmoSlaSupports::switch_to_editing_mode()
 {
     wxGetApp().plater()->enter_gizmos_stack();
     m_editing_mode = true;
+    show_sla_supports(false);
     m_editing_cache.clear();
     for (const sla::SupportPoint& sp : m_normal_cache)
         m_editing_cache.emplace_back(sp);
@@ -1172,6 +1374,7 @@ void GLGizmoSlaSupports::disable_editing_mode()
 {
     if (m_editing_mode) {
         m_editing_mode = false;
+        show_sla_supports(m_show_support_structure);
         wxGetApp().plater()->leave_gizmos_stack();
         m_parent.set_as_dirty();
         unregister_point_raycasters_for_picking();
@@ -1308,11 +1511,20 @@ SlaGizmoHelpDialog::SlaGizmoHelpDialog()
         gridsizer->Add(desc, -1, wxALIGN_CENTRE_VERTICAL);
     }
 
+    std::vector<std::pair<std::string, wxString>> point_types;
+    point_types.push_back(std::make_pair("sphere_lightgray",_L("Generated support point")));
+    point_types.push_back(std::make_pair("sphere_redish",   _L("Selected support point")));
+    point_types.push_back(std::make_pair("sphere_orange",   _L("Edited support point")));
+    point_types.push_back(std::make_pair("sphere_blueish",  _L("Island support point")));
+    point_types.push_back(std::make_pair("sphere_cyan",     _L("Hovered support point")));
+    for (const auto &[icon_name, description] : point_types) {
+        auto desc = new wxStaticText(this, wxID_ANY, description);
+        desc->SetFont(font);
+        gridsizer->Add(new wxStaticBitmap(this, wxID_ANY, ScalableBitmap(this, icon_name).bmp()),
+            -1, wxALIGN_CENTRE_VERTICAL);
+        gridsizer->Add(desc, -1, wxALIGN_CENTRE_VERTICAL);
+    }
+
     SetSizer(hsizer);
     hsizer->SetSizeHints(this);
 }
-
-
-
-} // namespace GUI
-} // namespace Slic3r

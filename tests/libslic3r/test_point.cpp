@@ -31,6 +31,13 @@ TEST_CASE("Distance to line", "[Point]") {
     CHECK(line.distance_to(Point{50, 50}) == Approx(50));
     CHECK(line.perp_distance_to(Point{50, 50}) == Approx(50));
     CHECK(line.perp_distance_to(Point{150, 50}) == Approx(50));
+    
+    // possitive values are on the left side WRT line direction
+    CHECK(line.perp_signed_distance_to(Point{50, 50}) == Approx(50));
+    CHECK(line.perp_signed_distance_to(Point{50, -50}) == Approx(-50));
+    const Line line2{{0, 0}, {0, 100}};
+    CHECK(line2.perp_signed_distance_to(Point{50, 50}) == Approx(-50));
+    CHECK(line2.perp_signed_distance_to(Point{-50, 50}) == Approx(50));
 }
 
 TEST_CASE("Distance to diagonal line", "[Point]") {

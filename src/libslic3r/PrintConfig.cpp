@@ -738,6 +738,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(60));
 
     def = this->add("over_bridge_speed", coFloatOrPercent);
+    // TRN: Label for speed used to print infill above bridges.
     def->label = L("Over bridges");
     def->category = L("Speed");
     def->tooltip = L("Speed for printing solid infill above bridges. Set to 0 to use solid infill speed. "
@@ -1128,8 +1129,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("extruder_clearance_height", coFloat);
     def->label = L("Height");
     def->tooltip = L("Only used when 'Print Settings -> Complete individual objects' is active. Set this to the vertical "
-                   "distance between your nozzle tip and (usually) the X carriage rods so slicer can check for collisions "
-                   "with previously printed objects and prevent them when arranging.\n"
+                   "distance between your nozzle tip and (usually) the X carriage rods. Used to check for collisions "
+                   "with previously printed objects and to prevent them when arranging.\n"
                    "The value is ignored for most Prusa printers, which come with more detailed extruder model.");
     def->sidetext = L("mm");
     def->min = 0;
@@ -1138,9 +1139,10 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("extruder_clearance_radius", coFloat);
     def->label = L("Radius");
-    def->tooltip = L("Only used when 'Print Settings -> Complete individual objects' is active. Set this so slicer can "
-                   "check for collisions with previously printed objects and prevent them when arranging.\n"
-                   "The value is ignored for most Prusa printers, which come with more detailed extruder model.");
+    def->tooltip = L("Only used when 'Print Settings -> Complete individual objects' is active. Set this to a radius "
+                     "of a nozzle-centered cylinder big enough to enclose the extruder assembly. Used to check for collisions "
+                     "with previously printed objects and to prevent them when arranging.\n"
+                     "The value is ignored for most Prusa printers, which come with more detailed extruder model.");
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comExpert;
@@ -2018,7 +2020,7 @@ void PrintConfigDef::init_fff_params()
 
     def           = this->add("interlocking_orientation", coFloat);
     def->label    = L("Interlocking direction");
-    def->tooltip  = L("Orientation of interlock beams.");
+    def->tooltip  = L("Orientation of interlocking beams.");
     def->sidetext = L("°");
     def->min      = 0;
     def->max      = 360;
@@ -4562,14 +4564,6 @@ void PrintConfigDef::init_sla_params()
     def->min = 0;
     def->set_default_value(new ConfigOptionInt(100));
 
-    def = this->add("support_points_minimal_distance", coFloat);
-    def->label = L("Minimal distance of the support points");
-    def->category = L("Supports");
-    def->tooltip = L("No support points will be placed closer than this threshold.");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(1.));
-
     def = this->add("pad_enable", coBool);
     def->label = L("Use pad");
     def->category = L("Pad");
@@ -4992,7 +4986,8 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "infill_only_where_needed",
     "gcode_binary", // Introduced in 2.7.0-alpha1, removed in 2.7.1 (replaced by binary_gcode).
     "wiping_volumes_extruders", // Removed in 2.7.3-alpha1.
-    "wipe_tower_x", "wipe_tower_y", "wipe_tower_rotation_angle" // Removed in 2.9.0
+    "wipe_tower_x", "wipe_tower_y", "wipe_tower_rotation_angle", // Removed in 2.9.0
+    "support_points_minimal_distance", // End of the using in 2.9.1 (change algorithm for the support generator)
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
@@ -5788,11 +5783,10 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->label = L("Slice");
 //    def->tooltip = L("Slice the model as FFF or SLA based on the printer_technology configuration value.");
     def->tooltip = L("Slice the model as FFF or SLA based on the printer_technology configuration value "
-                     "and export FFF printing toolpaths as G-code or SLA printing layers as PNG.");
+                     "and export the result.");
     def->cli = "slice|s";
     def->set_default_value(new ConfigOptionBool(false));
 
-    /* looks like redundant actions. "slice" is complitely enough
     def = this->add("export_sla", coBool);
     def->label = L("Export SLA");
     def->tooltip = L("Slice the model and export SLA printing layers as PNG.");
@@ -5804,7 +5798,6 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->tooltip = L("Slice the model and export toolpaths as G-code.");
     def->cli = "export-gcode|gcode|g";
     def->set_default_value(new ConfigOptionBool(false));
-*/
 }
 
 CLITransformConfigDef::CLITransformConfigDef()

@@ -8,6 +8,7 @@
 #include "GLGizmoSlaBase.hpp"
 #include "slic3r/GUI/GLSelectionRectangle.hpp"
 #include "slic3r/GUI/I18N.hpp"
+#include "slic3r/GUI/IconManager.hpp"
 
 #include "libslic3r/SLA/SupportPoint.hpp"
 #include "libslic3r/ObjectID.hpp"
@@ -91,16 +92,20 @@ private:
     void unregister_point_raycasters_for_picking();
     void update_point_raycasters_for_picking_transform();
 
+    void draw_island_config();
+
+    bool m_show_support_structure = false;
     bool m_lock_unique_islands = false;
     bool m_editing_mode = false;            // Is editing mode active?
     float m_new_point_head_diameter;        // Size of a new point.
     CacheEntry m_point_before_drag;         // undo/redo - so we know what state was edited
     float m_old_point_head_diameter = 0.;   // the same
-    float m_minimal_point_distance_stash = 0.f; // and again
-    float m_density_stash = 0.f;                // and again
     mutable std::vector<CacheEntry> m_editing_cache; // a support point and whether it is currently selected
     std::vector<sla::SupportPoint> m_normal_cache; // to restore after discarding changes or undo/redo
     ObjectID m_old_mo_id;
+
+    IconManager m_icon_manager;
+    IconManager::Icons m_icons;
 
     PickingModel m_sphere;
     PickingModel m_cone;

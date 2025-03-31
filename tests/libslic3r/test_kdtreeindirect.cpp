@@ -86,6 +86,23 @@ TEST_CASE("Test kdtree query for a Box", "[KDTreeIndirect]")
     REQUIRE(call_count < pgrid.point_count());
 }
 
+TEST_CASE("Test kdtree closests points", "[KDTreeIndirect]") {
+    Points pts{
+        Point{-9000000,  9000000},
+        Point{-9000000, -9000000},
+        Point{ 9000000, -9000000},
+        Point{ 9000000,  9000000},
+        Point{25, 25}
+    };
+    auto point_accessor = [&pts](size_t idx, size_t dim) -> coord_t & {
+        return pts[idx][dim];
+    };
+    KDTreeIndirect<2, coord_t, decltype(point_accessor)> tree(point_accessor, pts.size());
+
+    std::array<size_t, 5> closest = find_closest_points<5>(tree, Point{0, 0});
+    CHECK(closest[0] == 4);
+}
+
 //TEST_CASE("Test kdtree query for a Sphere", "[KDTreeIndirect]") {
 //    auto vol = BoundingBox3Base<Vec3f>{{0.f, 0.f, 0.f}, {10.f, 10.f, 10.f}};
 

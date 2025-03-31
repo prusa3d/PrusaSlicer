@@ -1540,8 +1540,8 @@ bool GUI_App::on_init_inner()
 
         Bind(EVT_CONFIG_UPDATER_FAILED_ARCHIVE, [this](const wxCommandEvent& evt) {
             assert(!evt.GetString().empty());
-            // TRN Notification text, 1 is list of vendors.
-            std::string notification_text = format(_u8L("Update Check Failed for the Following Vendors:\n\n%1%\nThis may be due to an account logout or a lost connection. Please verify your account status and internet connection. Then select \"Check for Configuration Updates\" to repeat."), evt.GetString());
+            // TRN Notification text, %1% is list of vendors.
+            std::string notification_text = format(_u8L("Update check failed for the following vendors:\n\n%1%\nThis may be due to an account logout or a lost connection. Please verify your account status and internet connection. Then select \"Check for Configuration Updates\" to repeat."), evt.GetString());
             notification_manager()->push_notification(NotificationType::FailedSecretVendorUpdateSync,
                 NotificationManager::NotificationLevel::WarningNotificationLevel,
                 notification_text);
@@ -4228,6 +4228,14 @@ void GUI_App::open_link_in_printables(const std::string& url)
 {
     mainframe->show_printables_tab(url);
 }
+
+ bool GUI_App::is_account_logged_in() const
+ {
+     if (!plater_ || !plater_->get_user_account()) {
+         return false;
+     }
+     return plater_->get_user_account()->is_logged();
+ }
 
 bool LogGui::ignorred_message(const wxString& msg)
 {    

@@ -11,10 +11,10 @@
 #include "libslic3r/Config.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
 #include "libslic3r/Model.hpp"
-#include "libslic3r/ProfilesSharingUtils.hpp"
 #include "libslic3r/FileReader.hpp"
 
-#include "CLI.hpp"
+#include "CLI/CLI.hpp"
+#include "CLI/ProfilesSharingUtils.hpp"
 
 namespace Slic3r::CLI {
 

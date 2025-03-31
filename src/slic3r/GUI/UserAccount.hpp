@@ -35,7 +35,7 @@ public:
     UserAccount(wxEvtHandler* evt_handler, Slic3r::AppConfig* app_config, const std::string& instance_hash);
     ~UserAccount();
 
-    bool is_logged();
+    bool is_logged() const;
     void do_login();
     void do_logout();
     wxString generate_login_redirect_url() { return m_communication->generate_login_redirect_url();  }

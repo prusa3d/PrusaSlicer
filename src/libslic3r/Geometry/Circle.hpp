@@ -239,7 +239,7 @@ int ray_circle_intersections(T r, T a, T b, T c, std::pair<Eigen::Matrix<T, 2, 1
         // What if the line touches the circle?
         return false;
     }
-    return ray_circle_intersections_r2_lv2_c2(r * r, a, b, a * a + b * b, c, out);
+    return ray_circle_intersections_r2_lv2_c(r * r, a, b, a * a + b * b, c, out);
 }
 
 } } // namespace Slic3r::Geometry

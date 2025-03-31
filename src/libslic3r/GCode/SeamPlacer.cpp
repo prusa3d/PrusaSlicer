@@ -271,7 +271,8 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
     SeamChoice seam_choice,
     const Perimeters::Perimeter &perimeter,
     const bool staggered_inner_seams,
-    const bool flipped
+    const bool flipped,
+    const bool thick_bridges
 ) {
     using Perimeters::offset_along_perimeter;
     using Perimeters::PointOnPerimeter;
@@ -339,11 +340,24 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
         perimeter.angle_types[seam_choice.previous_index] == Perimeters::AngleType::smooth
     };
 
+    if (perimeter.layer_index == 0) {
+        place_scarf_seam = false;
+    }
+
     if (region->config().scarf_seam_only_on_smooth && !is_smooth) {
         place_scarf_seam = false;
     }
 
     if (region->config().scarf_seam_length.value <= std::numeric_limits<double>::epsilon()) {
+        place_scarf_seam = false;
+    }
+
+    const bool is_overhang{
+        perimeter.point_classifications[seam_choice.previous_index] == Perimeters::PointClassification::overhang
+        || perimeter.point_classifications[seam_choice.next_index] == Perimeters::PointClassification::overhang
+    };
+
+    if (thick_bridges && is_overhang) {
         place_scarf_seam = false;
     }
 
@@ -528,6 +542,8 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
     assert(layer->id() >= po->slicing_parameters().raft_layers());
     const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
 
+    const bool thick_bridges{po->config().thick_bridges.value};
+
     if (po->config().seam_position.value == spNearest) {
         const std::vector<Perimeters::BoundedPerimeter> &perimeters{
             this->perimeters_per_layer.at(po)[layer_index]};
@@ -535,7 +551,7 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
             place_seam_near(perimeters, loop, last_pos, this->params.max_nearest_detour);
         return finalize_seam_position(
             loop, region, seam_choice, perimeters[perimeter_index].perimeter,
-            this->params.staggered_inner_seams, flipped
+            this->params.staggered_inner_seams, flipped, thick_bridges
         );
     } else {
         const std::vector<SeamPerimeterChoice> &seams_on_perimeters{this->seams_per_object.at(po)[layer_index]};
@@ -553,7 +569,7 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
                                                                seams_on_perimeters[0]};
                 return finalize_seam_position(
                     loop, region, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
-                    this->params.staggered_inner_seams, flipped
+                    this->params.staggered_inner_seams, flipped, thick_bridges
                 );
             }
         }
@@ -562,7 +578,7 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
             choose_closest_seam(seams_on_perimeters, Geometry::to_polygon(loop))};
         return finalize_seam_position(
             loop, region, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
-            this->params.staggered_inner_seams, flipped
+            this->params.staggered_inner_seams, flipped, thick_bridges
         );
     }
 }

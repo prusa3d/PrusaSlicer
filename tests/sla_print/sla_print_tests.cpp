@@ -31,52 +31,6 @@ const char *const SUPPORT_TEST_MODELS[] = {
 
 } // namespace
 
-TEST_CASE("Support point generator should be deterministic if seeded", 
-          "[SLASupportGeneration], [SLAPointGen]") {
-    TriangleMesh mesh = load_model("A_upsidedown.obj");
-    
-    AABBMesh emesh{mesh};
-    
-    sla::SupportTreeConfig supportcfg;
-    sla::SupportPointGenerator::Config autogencfg;
-    autogencfg.head_diameter = float(2 * supportcfg.head_front_radius_mm);
-    sla::SupportPointGenerator point_gen{emesh, autogencfg, [] {}, [](int) {}};
-        
-    auto   bb      = mesh.bounding_box();
-    double zmin    = bb.min.z();
-    double zmax    = bb.max.z();
-    double gnd     = zmin - supportcfg.object_elevation_mm;
-    auto   layer_h = 0.05f;
-    
-    auto slicegrid = grid(float(gnd), float(zmax), layer_h);
-    std::vector<ExPolygons> slices = slice_mesh_ex(mesh.its, slicegrid, CLOSING_RADIUS);
-    
-    point_gen.seed(0);
-    point_gen.execute(slices, slicegrid);
-    
-    auto get_chksum = [](const std::vector<sla::SupportPoint> &pts){
-        int64_t chksum = 0;
-        for (auto &pt : pts) {
-            auto p = scaled(pt.pos);
-            chksum += p.x() + p.y() + p.z();
-        }
-        
-        return chksum;
-    };
-    
-    int64_t checksum = get_chksum(point_gen.output());
-    size_t ptnum = point_gen.output().size();
-    REQUIRE(point_gen.output().size() > 0);
-    
-    for (int i = 0; i < 20; ++i) {
-        point_gen.output().clear();
-        point_gen.seed(0);
-        point_gen.execute(slices, slicegrid);
-        REQUIRE(point_gen.output().size() == ptnum);
-        REQUIRE(checksum == get_chksum(point_gen.output()));
-    }
-}
-
 TEST_CASE("Flat pad geometry is valid", "[SLASupportGeneration]") {
     sla::PadConfig padcfg;
     

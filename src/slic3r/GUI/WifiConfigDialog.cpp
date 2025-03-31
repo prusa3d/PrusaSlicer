@@ -251,7 +251,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
     }
 
     if (boost::filesystem::exists(file_path)) {
-        // TRN placeholder 1 is path to file
+        // TRN placeholder %1% is path to file
         wxString msg_text = GUI::format_wxstr(_L("%1% already exists. Do you want to rewrite it?\n(Other items than Wi-Fi credentials will stay unchanged)"), file_path.string());
         WarningDialog dialog(m_parent, msg_text, _L("Warning"), wxYES | wxNO);
         if (dialog.ShowModal() == wxID_NO) {
