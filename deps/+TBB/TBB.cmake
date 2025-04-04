@@ -7,6 +7,7 @@ add_cmake_project(
         -DTBB_TEST=OFF
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DCMAKE_DEBUG_POSTFIX=_debug
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
 
 

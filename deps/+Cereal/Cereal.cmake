@@ -5,4 +5,5 @@ add_cmake_project(Cereal
         -DJUST_INSTALL_CEREAL=ON
         -DSKIP_PERFORMANCE_COMPARISON=ON
         -DBUILD_TESTS=OFF
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
