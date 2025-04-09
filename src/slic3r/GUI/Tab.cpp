@@ -2254,6 +2254,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("overhang_fan_speed_1", category_path + "dynamic-fan-speeds");
         optgroup->append_single_option_line("overhang_fan_speed_2", category_path + "dynamic-fan-speeds");
         optgroup->append_single_option_line("overhang_fan_speed_3", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("external_perimeter_fan_speed", category_path + "dynamic-fan-speeds");
 
         optgroup = page->new_optgroup(L("Cooling thresholds"), 25);
         optgroup->append_single_option_line("fan_below_layer_time", category_path + "cooling-thresholds");
@@ -2432,6 +2433,7 @@ void TabFilament::toggle_options()
         for (int i = 0; i < 4; i++) {
             toggle_option("overhang_fan_speed_"+std::to_string(i),dynamic_fan_speeds);
         }
+        toggle_option("external_perimeter_fan_speed", dynamic_fan_speeds);
     }
 
     if (m_active_page->title() == "Advanced")
