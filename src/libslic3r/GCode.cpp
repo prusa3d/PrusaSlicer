@@ -491,11 +491,13 @@ namespace DoExport {
             total_weight        += weight;
             total_cost          += weight * extruder->filament_cost() * 0.001;
         }
+	double cost_of_electricity = ((((total_used_filament/1000)*7)/60)*0.14);
+		// 7 is the avg meters per seasond of filament used. 60 is used for convertion in h and the 0.14 is the avg cost of electricity per h.
 
         print_statistics.total_extruded_volume = total_extruded_volume;
         print_statistics.total_used_filament   = total_used_filament;
         print_statistics.total_weight          = total_weight;
-        print_statistics.total_cost            = total_cost;
+        print_statistics.total_cost            = total_cost+cost_of_electricity;
 
         print_statistics.filament_stats        = result.print_statistics.volumes_per_extruder;
     }
