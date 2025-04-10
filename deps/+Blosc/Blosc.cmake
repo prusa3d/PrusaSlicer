@@ -16,6 +16,7 @@ add_cmake_project(Blosc
         -DBUILD_TESTS=OFF 
         -DBUILD_BENCHMARKS=OFF 
         -DPREFER_EXTERNAL_ZLIB=ON
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
 
 set(DEP_Blosc_DEPENDS ZLIB)

@@ -906,7 +906,7 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     // identify glyph for intersected vertex
     std::string vert_shape_map_name = "v:glyph_id";
     MyMesh cgal_object = MeshBoolean::cgal2::to_cgal(cube, face_map_name);
-    auto face_map = cgal_object.property_map<MyMesh::Face_index, int32_t>(face_map_name).first;
+    auto face_map = cgal_object.property_map<MyMesh::Face_index, int32_t>(face_map_name).value();
     auto vert_shape_map = cgal_object.add_property_map<MyMesh::Vertex_index, IntersectingElemnt>(vert_shape_map_name).first;
 
     std::string edge_shape_map_name = "e:glyph_id";
@@ -915,8 +915,8 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 
     MyMesh cgal_shape = MeshBoolean::cgal2::to_cgal(shape, projection, 0, edge_shape_map_name, face_shape_map_name, glyph_contours);    
 
-    auto edge_shape_map = cgal_shape.property_map<MyMesh::Edge_index, IntersectingElemnt>(edge_shape_map_name).first;
-    auto face_shape_map = cgal_shape.property_map<MyMesh::Face_index, IntersectingElemnt>(face_shape_map_name).first;
+    auto edge_shape_map = cgal_shape.property_map<MyMesh::Edge_index, IntersectingElemnt>(edge_shape_map_name).value();
+    auto face_shape_map = cgal_shape.property_map<MyMesh::Face_index, IntersectingElemnt>(face_shape_map_name).value();
 
     // bool map for affected edge
     using d_prop_bool = CGAL::dynamic_edge_property_t<bool>;
