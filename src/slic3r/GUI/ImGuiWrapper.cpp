@@ -293,7 +293,7 @@ bool ImGuiWrapper::update_mouse_data(wxMouseEvent& evt)
 
     ImGuiIO& io = ImGui::GetIO();
     io.MousePos = ImVec2((float)evt.GetX(), (float)evt.GetY());
-    io.MouseDown[0] = evt.LeftIsDown();
+    io.MouseDown[0] = evt.LeftIsDown() || (evt.Leaving() && (m_mouse_buttons & 1));
     io.MouseDown[1] = evt.RightIsDown();
     io.MouseDown[2] = evt.MiddleIsDown();
     io.MouseDoubleClicked[0] = evt.LeftDClick();
