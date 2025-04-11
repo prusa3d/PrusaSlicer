@@ -806,8 +806,10 @@ void MainFrame::create_preset_tabs()
     add_created_tab(new TabPrinter(m_tabpanel), wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? "printer" : "sla_printer");
     
     m_printables_webview = new PrintablesWebViewPanel(m_tabpanel);
-    add_printables_webview_tab();
-   
+
+    if (!wxGetApp().app_config->has("show_printables_button") || wxGetApp().app_config->get_bool("show_printables_button"))
+        add_printables_webview_tab();
+
     m_connect_webview = new ConnectWebViewPanel(m_tabpanel);
     m_printer_webview = new PrinterWebViewPanel(m_tabpanel, L"");
    
@@ -908,7 +910,6 @@ void MainFrame::add_printables_webview_tab()
     m_printables_webview_added = true;
 }
 
-// no longer needed?
 void MainFrame::remove_printables_webview_tab()
 {
     if (!m_printables_webview_added) {
@@ -2322,6 +2323,15 @@ void MainFrame::update_ui_from_settings()
 //    m_plater->sidebar().Layout();
 
     update_topbars();
+
+    if (wxGetApp().app_config->has("show_printables_button"))
+    {
+        if (wxGetApp().app_config->get_bool("show_printables_button")) {
+            add_printables_webview_tab();
+        } else {
+            remove_printables_webview_tab();
+        }
+    }
 
     if (m_plater)
         m_plater->update_ui_from_settings();
