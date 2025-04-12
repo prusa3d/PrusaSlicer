@@ -105,12 +105,13 @@ void LabelObjects::init(const SpanOfConstPtrs<PrintObject>& objects, LabelObject
                 name += " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id); 
             }
             else if (m_label_objects_style == LabelObjectsStyle::Firmware) {
-                // use one-based indexing for objects and instances so indices match what we see in PrusaSlicer.
-                ++object_id;
-                ++instance_id;
+                // uses one-based indexing for objects and instances so indices match what we see in PrusaSlicer.
+
+                // Ensure unique name in case multiple objects have the same name
+                name += "_" + std::to_string(object_id + 1);
 
                 if (object_has_more_instances)
-                    name += " (Instance " + std::to_string(instance_id) + ")";
+                    name += " (Instance " + std::to_string(instance_id + 1) + ")";
                 if (m_flavor == gcfKlipper) {
                     // Disallow Klipper special chars, common illegal filename chars, etc.
                     const std::string banned = "\b\t\n\v\f\r \"#%&\'*-./:;<>\\";
