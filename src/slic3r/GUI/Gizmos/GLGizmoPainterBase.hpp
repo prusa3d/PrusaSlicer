@@ -14,7 +14,7 @@
 #include "libslic3r/Model.hpp"
 
 #include <cereal/types/vector.hpp>
-#include <GL/glew.h>
+#include <glad/gl.h>
 
 #include <memory>
 #include <wx/string.h>
