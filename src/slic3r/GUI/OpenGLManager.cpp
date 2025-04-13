@@ -15,7 +15,7 @@
 
 #include "libslic3r/Platform.hpp"
 
-#include <GL/glew.h>
+#include <glad/gl.h>
 
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -123,12 +123,12 @@ void OpenGLManager::GLInfo::detect() const
     if (Slic3r::total_physical_memory() / (1024 * 1024 * 1024) < 6)
         *max_tex_size /= 2;
 
-    if (GLEW_EXT_texture_filter_anisotropic) {
+    if (GLAD_GL_EXT_texture_filter_anisotropic) {
         float* max_anisotropy = const_cast<float*>(&m_max_anisotropy);
         glsafe(::glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy));
     }
 
-    if (!GLEW_ARB_compatibility)
+    if (!GLAD_GL_ARB_compatibility)
         *const_cast<bool*>(&m_core_profile) = true;
 
     int* samples = const_cast<int*>(&m_samples);
@@ -344,28 +344,24 @@ static void CustomGLDebugOutput(GLenum source, GLenum type, unsigned int id, GLe
 bool OpenGLManager::init_gl()
 {
     if (!m_gl_initialized) {
-      glewExperimental = true;
-      GLenum err = glewInit();
-        if (err != GLEW_OK) {
-            BOOST_LOG_TRIVIAL(error) << "Unable to init glew library: " << glewGetErrorString(err);
+        const auto version = gladLoaderLoadGL();
+        if (version == 0) {
+            BOOST_LOG_TRIVIAL(error) << "Unable to initialize GLAD";
             return false;
         }
-
-        do {
-            // glewInit() generates an OpenGL GL_INVALID_ENUM error
-            err = ::glGetError();
-        } while (err != GL_NO_ERROR);
-
         m_gl_initialized = true;
 
-        if (GLEW_EXT_texture_compression_s3tc)
+        BOOST_LOG_TRIVIAL(info) << boost::format("GLAD: Loaded OpenGL %1%.%2%") %
+                GLAD_VERSION_MAJOR(version) % GLAD_VERSION_MINOR(version);
+
+        if (GLAD_GL_EXT_texture_compression_s3tc)
             s_compressed_textures_supported = true;
         else
             s_compressed_textures_supported = false;
 
-        if (GLEW_ARB_framebuffer_object)
+        if (GLAD_GL_ARB_framebuffer_object)
             s_framebuffers_type = EFramebufferType::Arb;
-        else if (GLEW_EXT_framebuffer_object)
+        else if (GLAD_GL_EXT_framebuffer_object)
             s_framebuffers_type = EFramebufferType::Ext;
         else
             s_framebuffers_type = EFramebufferType::Unknown;
@@ -403,7 +399,7 @@ bool OpenGLManager::init_gl()
                 wxMessageBox(message, wxString("PrusaSlicer - ") + _L("Error loading shaders"), wxOK | wxICON_ERROR);
             }
 #if !SLIC3R_OPENGL_ES
-            if (m_debug_enabled && s_gl_info.is_version_greater_or_equal_to(4, 3) && GLEW_KHR_debug) {
+            if (m_debug_enabled && s_gl_info.is_version_greater_or_equal_to(4, 3) && GLAD_GL_KHR_debug) {
                 ::glEnable(GL_DEBUG_OUTPUT);
                 ::glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
                 ::glDebugMessageCallback(CustomGLDebugOutput, nullptr);
