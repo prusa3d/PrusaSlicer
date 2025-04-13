@@ -25,7 +25,7 @@
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/MultipleBeds.hpp"
 
-#include <GL/glew.h>
+#include <glad/gl.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>

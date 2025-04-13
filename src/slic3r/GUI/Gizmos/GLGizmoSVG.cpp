@@ -29,7 +29,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/fstream.hpp>
 
-#include <GL/glew.h>
+#include <glad/gl.h>
 #include <chrono> // measure enumeration of fonts
 #include <sstream> // save for svg
 #include <array>
