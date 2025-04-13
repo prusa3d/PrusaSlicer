@@ -110,10 +110,6 @@ void CopyrightsDialog::fill_entries()
         { "Boost"           , "1998-2005 Beman Dawes, David Abrahams; "
                               "2004 - 2007 Rene Rivera"                     , "https://www.boost.org/" },
         { "Clipper"         , "2010-2015 Angus Johnson "                    , "http://www.angusj.com " },
-        { "GLEW (The OpenGL Extension Wrangler Library)", 
-                              "2002 - 2007, Milan Ikits; "
-                              "2002 - 2007, Marcelo E.Magallon; "
-                              "2002, Lev Povalahev"                         , "http://glew.sourceforge.net/" },
         { "Libigl"          , "2013 Alec Jacobson and others"               , "https://libigl.github.io/" },
         { "Qhull"           , "1993-2015 C.B.Barber Arlington and "
                               "University of Minnesota"                     , "http://qhull.org/" },

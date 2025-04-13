@@ -155,7 +155,7 @@
 
 #include "Widgets/CheckBox.hpp"
 
-#include "GL/glew.h"
+#include <glad/gl.h>
 
 using boost::optional;
 namespace fs = boost::filesystem;
