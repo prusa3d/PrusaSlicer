@@ -2,7 +2,7 @@
 #include <libslic3r/Utils.hpp>
 #include <libslic3r/SLAPrint.hpp>
 
-#include <GL/glew.h>
+#include <glad/gl.h>
 
 #include <boost/log/trivial.hpp>
 
@@ -292,7 +292,7 @@ Display::~Display()
 void Display::set_active(long width, long height)
 {   
     if (!m_initialized) {
-        glewInit();
+        gladLoaderLoadGL();
         m_initialized = true;
     }
 
