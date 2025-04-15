@@ -20,8 +20,13 @@
 #include "libslic3r/Surface.hpp"
 #include "libslic3r/libslic3r.h"
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_reduce.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_reduce.h>
+#endif
 
 // #define CLIPPER_UTILS_TIMING
 
