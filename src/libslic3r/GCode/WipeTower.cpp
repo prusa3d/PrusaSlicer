@@ -278,6 +278,9 @@ public:
 // Loads filament while also moving towards given points in x-axis (x feedrate is limited by cutting the distance short if necessary)
     WipeTowerWriter& load_move_x_advanced(float farthest_x, float loading_dist, float loading_speed, float max_x_speed = 50.f)
     {
+        if (loading_dist == 0.f || loading_speed == 0.f)
+            return *this;
+
         float time = std::abs(loading_dist / loading_speed); // time that the move must take
         float x_distance = std::abs(farthest_x - x());       // max x-distance that we can travel
         float x_speed = x_distance / time;                   // x-speed to do it in that time
