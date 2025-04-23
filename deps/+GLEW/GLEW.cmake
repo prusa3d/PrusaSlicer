@@ -5,4 +5,5 @@ add_cmake_project(
   SOURCE_SUBDIR build/cmake
   CMAKE_ARGS
     -DBUILD_UTILS=OFF
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )

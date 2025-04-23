@@ -11,6 +11,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(PrusaSlicer)
 
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 include("version.inc")
 include(GNUInstallDirs)
 include(CMakeDependentOption)

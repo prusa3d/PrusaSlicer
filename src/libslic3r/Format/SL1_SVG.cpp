@@ -17,7 +17,6 @@
 #include "libslic3r/Zipper.hpp"
 #include "libslic3r/libslic3r.h"
 
-#define NANOSVG_IMPLEMENTATION
 #include <cstdint>
 #include <algorithm>
 #include <string_view>
