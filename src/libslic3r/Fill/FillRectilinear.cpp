@@ -1367,6 +1367,7 @@ static void traverse_graph_generate_polylines(const ExPolygonWithOffset         
                                               const FillParams                       &params,
                                               std::vector<SegmentedIntersectionLine> &segs,
                                               const bool                              consistent_pattern,
+                                              const bool                             flip,
                                               Polylines                              &polylines_out)
 {
     // For each outer only chords, measure their maximum distance to the bow of the outer contour.
@@ -1412,7 +1413,12 @@ static void traverse_graph_generate_polylines(const ExPolygonWithOffset         
 
                     // For infill that needs to be consistent between layers (like Zig Zag),
                     // we are switching between forward and backward passes based on the line index.
-                    const bool forward_pass = !consistent_pattern || (i_vline2 % 2 == 0);
+                    bool forward_pass = (!consistent_pattern || (i_vline2 % 2 == 0)); 
+                    //With Consistent Patterns (aka Zigzag), swap forward/backwards passes
+                    //based on the flip parameter.
+                    if (consistent_pattern && flip)
+                        forward_pass = !forward_pass;
+
                     for (int i = 0; i < int(vline.intersections.size()); ++i) {
                         const int                  intrsctn_idx = forward_pass ? i : int(vline.intersections.size()) - i - 1;
                         const SegmentIntersection &intrsctn     = vline.intersections[intrsctn_idx];
@@ -2832,7 +2838,7 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
 
     std::vector<SegmentedIntersectionLine> segs = slice_region_by_vertical_lines(poly_with_offset, n_vlines, x0, line_spacing);
     // Connect by horizontal / vertical links, classify the links based on link_max_length as too long.
-	connect_segment_intersections_by_contours(poly_with_offset, segs, params, link_max_length);
+    connect_segment_intersections_by_contours(poly_with_offset, segs, params, link_max_length);
 
 #ifdef SLIC3R_DEBUG
     // Paint the segments and finalize the SVG file.
@@ -2875,7 +2881,22 @@ bool FillRectilinear::fill_surface_by_lines(const Surface *surface, const FillPa
 		    polylines_from_paths(path, poly_with_offset, segs, polylines_out);
         }
 	} else {
-		traverse_graph_generate_polylines(poly_with_offset, params, segs, this->has_consistent_pattern(), polylines_out);
+        bool flip = false;
+        std::vector<int> zigzag_angles = this->zigzag_infill_angles;
+        int num_angles = zigzag_angles.size();
+
+        if (num_angles > 1) {
+            int adjusted_angle = this->angle;
+            adjusted_angle = zigzag_angles[((this->layer_id / surface->thickness_layers) % num_angles)];
+
+            // With the ZigZag Infill, the original code was not differentiating between 180 and 0.
+            // The lines were all going in the same direction. To combat that, if our angle is
+            // over 180, let's tell the next function to flip (do a backwards pass instead of a forward).
+            // Just in case someone enters more than 360 degrees, we'll go ahead and adjust that to 180
+            // increments.
+            flip = ((adjusted_angle / 180) % 2) == 1;
+        } 
+        traverse_graph_generate_polylines(poly_with_offset, params, segs, this->has_consistent_pattern(), flip, polylines_out);
     }
 
 #ifdef SLIC3R_DEBUG
