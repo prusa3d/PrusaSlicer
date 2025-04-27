@@ -282,7 +282,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
         for (const std::string& preset_name : preset_names)
             m_presets.emplace_back(new PresetForPrinter(this, preset_name));
         // "stored" indicates data are stored secretly, load them from store.
-        if (m_printer.config.opt_string("printhost_password") == "stored" && m_printer.config.opt_string("printhost_password") == "stored") {
+        if (m_printer.config.opt_string("printhost_user") == "stored" && m_printer.config.opt_string("printhost_password") == "stored") {
             std::string username;
             std::string password;
             if (load_secret(m_printer.name, "printhost_password", username, password)) {
@@ -293,6 +293,17 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
             } else {
                 m_printer.config.opt_string("printhost_user") = std::string();
                 m_printer.config.opt_string("printhost_password") = std::string();
+            }
+        }
+
+        if (m_printer.config.opt_string("printhost_apikey") == "stored") {
+            std::string dummy;
+            std::string apikey;
+            if (load_secret(m_printer.name, "printhost_apikey", dummy, apikey)) {
+                if (!apikey.empty())
+                    m_printer.config.opt_string("printhost_apikey") = apikey;
+            } else {
+                m_printer.config.opt_string("printhost_apikey") = std::string();
             }
         }
     }
@@ -970,6 +981,13 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
     if (!m_printer.config.opt_string("printhost_password").empty()) {
         if (save_secret(m_printer.name, "printhost_password", m_printer.config.opt_string("printhost_user"), m_printer.config.opt_string("printhost_password"))) {
             m_printer.config.opt_string("printhost_password", false) = "stored";
+        }
+    }
+    if (!m_printer.config.opt_string("printhost_apikey").empty()) {
+        if (save_secret(m_printer.name, "printhost_apikey",
+                        "apikey", /* username will be ignored */
+                        m_printer.config.opt_string("printhost_apikey"))) {
+            m_printer.config.opt_string("printhost_apikey", false) = "stored";
         }
     }
 
