@@ -24,7 +24,7 @@ target_compile_definitions(opencsg_example PRIVATE ${wxWidgets_DEFINITIONS})
 slic3r_remap_configs(OpenCSG::opencsg RelWithDebInfo Release)
 target_link_libraries(opencsg_example ${wxWidgets_LIBRARIES} 
     OpenCSG::opencsg 
-    GLEW::GLEW
+    GLAD::GL
     OpenGL::GL 
     #-lXrandr -lXext -lX11
     )
