@@ -5,7 +5,7 @@
 #include "Engine.hpp"
 #include "ShaderCSGDisplay.hpp"
 
-#include <GL/glew.h>
+#include <glad/gl.h>
 
 #include <opencsg/opencsg.h>
 // For compilers that support precompilation, includes "wx/wx.h".

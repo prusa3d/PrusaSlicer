@@ -11,7 +11,7 @@
 #include "GLModel.hpp"
 #include "BitmapCache.hpp"
 
-#include <GL/glew.h>
+#include <glad/gl.h>
 
 #include <wx/image.h>
 
