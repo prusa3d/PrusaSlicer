@@ -352,7 +352,7 @@ msgid ""
 "where supports should be enforced or blocked? Try the<a>Paint-on supports</"
 "a>feature. (Requires Advanced or Expert mode.)"
 msgstr ""
-"Aufmal Stützen\n"
+"Aufmal-Stützen\n"
 "Wussten Sie, dass Sie direkt auf das Objekt malen und Bereiche auswählen "
 "können, in denen Stützen erzwungen oder blockiert werden sollen? Probieren "
 "Sie die Funktion <a>Aufmal-Stützen</a> aus. (Erfordert den Modus "
@@ -1949,7 +1949,7 @@ msgstr "Stützblocker hinzufügen"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:196
 msgid "Add support enforcer"
-msgstr "Stützverstärker hinzufügen"
+msgstr "Stützerzwinger hinzufügen"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:202
 msgid "Add text"
@@ -4110,7 +4110,7 @@ msgid ""
 "An object has custom support enforcers which will not be used because "
 "supports are disabled."
 msgstr ""
-"Ein Objekt verfügt über benutzerdefinierte Stützverstärker, die nicht "
+"Ein Objekt verfügt über benutzerdefinierte Stützerzwinger, die nicht "
 "verwendet werden, weil Stützen deaktiviert sind."
 
 #: src/slic3r/GUI/Plater.cpp:2209
@@ -4862,7 +4862,7 @@ msgstr "Wählen Sie aus, welche Art von Unterstützung Sie benötigen"
 
 #: src/slic3r/GUI/FrequentlyChangedParameters.cpp:121
 msgid "For support enforcers only"
-msgstr "Nur für Stützverstärker"
+msgstr "Nur für Stützerzwinger"
 
 #: src/slic3r/GUI/FrequentlyChangedParameters.cpp:157
 msgid ""
@@ -6221,7 +6221,7 @@ msgstr "Stützblocker"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4315
 msgid "Support Enforcer"
-msgstr "Stützverstärker"
+msgstr "Stützerzwinger"
 
 #: src/slic3r/Utils/Duet.cpp:175
 msgid "Failed to parse a Connect reply"
@@ -6652,7 +6652,7 @@ msgstr "Die folgenden Zeichen sind im Namen nicht erlaubt"
 
 #: src/libslic3r/PrintConfig.cpp:4555
 msgid "Only create support if it lies in a support enforcer."
-msgstr "Stützen nur erzeugen, wenn sie in einem Stützenverstärker liegen."
+msgstr "Stützen nur erzeugen, wenn sie in einem Stützerzwinger liegen."
 
 #: src/libslic3r/PrintConfig.cpp:4560
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:123
@@ -12043,7 +12043,7 @@ msgstr "Fuzzy Skin Typ."
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:2018
 #: src/slic3r/GUI/Preferences.cpp:580
 msgid "None"
-msgstr "Kein"
+msgstr "Keine"
 
 #: src/libslic3r/PrintConfig.cpp:1693
 msgid "Outside walls"
@@ -14641,7 +14641,7 @@ msgstr ""
 "Wenn dieses Kontrollkästchen aktiviert ist, werden Stützen automatisch "
 "basierend auf dem Schwellenwert für den Überhang generiert. Wenn diese "
 "Option nicht aktiviert ist, werden Stützen nur innerhalb der Volumen der "
-"\"Stützverstärker\" generiert."
+"\"Stützerzwinger\" generiert."
 
 #: src/libslic3r/PrintConfig.cpp:3172
 msgid "XY separation between an object and its support"
@@ -20871,7 +20871,7 @@ msgid ""
 msgstr ""
 "Wenn diese Option aktiviert ist, werden die Volumen innerhalb des Objekts "
 "immer sortiert. Die korrekte Reihenfolge ist Modellteil, Negatives Volumen, "
-"Modifikator, Stützblocker und Stützverstärker. Wenn deaktiviert, können Sie "
+"Modifikator, Stützblocker und Stützerzwinger. Wenn deaktiviert, können Sie "
 "Modellteile, Negative Volumen und Modifizierer neu anordnen. Allerdings muss "
 "eines der Modellteile an erster Stelle stehen."
 
