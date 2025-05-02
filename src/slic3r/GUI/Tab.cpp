@@ -3180,7 +3180,7 @@ const std::vector<std::string> extruder_options = {
     "min_layer_height", "max_layer_height", "extruder_offset",
     "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below",
     "retract_speed", "deretract_speed", "retract_restart_extra", "retract_before_travel",
-    "retract_layer_change", "wipe", "retract_before_wipe", "travel_ramping_lift",
+    "retract_layer_change", "wipe", "min_wipe_length", "retract_before_wipe", "travel_ramping_lift",
     "travel_slope", "travel_max_lift", "travel_lift_before_obstacle", "nozzle_high_flow",
     "retract_length_toolchange", "retract_restart_extra_toolchange",
 };
@@ -3386,6 +3386,7 @@ void TabPrinter::build_extruder_pages(size_t n_before_extruders)
         optgroup->append_single_option_line("retract_before_travel", "", extruder_idx);
         optgroup->append_single_option_line("retract_layer_change", "", extruder_idx);
         optgroup->append_single_option_line("wipe", "", extruder_idx);
+        optgroup->append_single_option_line("min_wipe_length", "", extruder_idx);
         optgroup->append_single_option_line("retract_before_wipe", "", extruder_idx);
 
         optgroup = page->new_optgroup(L("Retraction when tool is disabled (advanced settings for multi-extruder setups)"));
@@ -3619,32 +3620,13 @@ void TabPrinter::toggle_options()
 
         // some options only apply when not using firmware retraction
         vec.resize(0);
-        vec = { "retract_speed", "deretract_speed", "retract_before_wipe", "retract_restart_extra", "wipe" };
+        vec = { "retract_speed", "deretract_speed", "retract_before_wipe", "retract_restart_extra" };
         for (auto el : vec)
             toggle_option(el, retraction && !use_firmware_retraction, i);
 
+        toggle_option("wipe", retraction, i);
         bool wipe = m_config->opt_bool("wipe", i);
-        toggle_option("retract_before_wipe", wipe, i);
-
-        if (use_firmware_retraction && wipe) {
-            //wxMessageDialog dialog(parent(),
-            MessageDialog dialog(parent(),
-                _(L("The Wipe option is not available when using the Firmware Retraction mode.\n"
-                    "\nShall I disable it in order to enable Firmware Retraction?")),
-                _(L("Firmware Retraction")), wxICON_WARNING | wxYES | wxNO);
-
-            DynamicPrintConfig new_conf = *m_config;
-            if (dialog.ShowModal() == wxID_YES) {
-                auto wipe = static_cast<ConfigOptionBools*>(m_config->option("wipe")->clone());
-                for (size_t w = 0; w < wipe->values.size(); w++)
-                    wipe->values[w] = false;
-                new_conf.set_key_value("wipe", wipe);
-            }
-            else {
-                new_conf.set_key_value("use_firmware_retraction", new ConfigOptionBool(false));
-            }
-            load_config(new_conf);
-        }
+        toggle_option("retract_before_wipe", retraction && wipe && !use_firmware_retraction, i);
 
         toggle_option("travel_lift_before_obstacle", ramping_lift, i);
 

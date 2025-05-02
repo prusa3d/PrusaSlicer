@@ -73,8 +73,9 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
     static constexpr const std::string_view wipe_retract_comment = "wipe and retract"sv;
 
     // Remaining quantized retraction length.
-    if (double retract_length = extruder.retract_to_go(toolchange ? extruder.retract_length_toolchange() : extruder.retract_length()); 
-        retract_length > 0 && this->has_path()) {
+    double retract_length = extruder.retract_to_go(toolchange ? extruder.retract_length_toolchange() : extruder.retract_length());
+    const double min_length = gcodegen.writer().config.min_wipe_length.get_at(extruder.id());
+    if ((retract_length > 0 || min_length > 0) && this->has_path()) {
         // Delayed emitting of a wipe start tag.
         bool wiped = false;
         const double wipe_speed = this->calc_wipe_speed(gcodegen.writer().config);
@@ -86,7 +87,9 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             }
         };
         const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer().config, extruder.id());
-        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e](const Vec2d &prev_quantized, Vec2d &p) {
+        double wipe_length = std::max(min_length, retract_length / xy_to_e);
+
+        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, &wipe_length, xy_to_e](const Vec2d &prev_quantized, Vec2d &p) {
             Vec2d  p_quantized = GCodeFormatter::quantize(p);
             if (p_quantized == prev_quantized) {
                 p = p_quantized;
@@ -96,21 +99,27 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             // Quantize E axis as it is to be extruded as a whole segment.
             double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);
             bool   done = false;
-            if (dE > retract_length - EPSILON) {
-                if (dE > retract_length + EPSILON)
+            if (segment_length > wipe_length - EPSILON) {
+                if (segment_length > wipe_length + EPSILON)
                     // Shorten the segment.
-                    p = GCodeFormatter::quantize(Vec2d(prev_quantized + (p - prev_quantized) * (retract_length / dE)));
+                    p = GCodeFormatter::quantize(Vec2d(prev_quantized + (p - prev_quantized) * (wipe_length / segment_length)));
                 else
                     p = p_quantized;
                 dE   = retract_length;
+                segment_length = wipe_length;
                 done = true;
             } else
                 p = p_quantized;
-            gcode += gcodegen.writer().extrude_to_xy(p, -dE, wipe_retract_comment);
+            if (dE > retract_length) dE = retract_length;
+            if (dE)
+                gcode += gcodegen.writer().extrude_to_xy(p, -dE, wipe_retract_comment);
+            else
+                gcode += gcodegen.writer().travel_to_xy(p, wipe_retract_comment);
             retract_length -= dE;
+            wipe_length -= segment_length;
             return done;
         };
-        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, &wipe_linear](
+        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, &wipe_length, xy_to_e, &wipe_linear](
             const Vec2d &prev_quantized, Vec2d &p, double radius_in, const bool ccw) {
             Vec2d  p_quantized = GCodeFormatter::quantize(p);
             if (p_quantized == prev_quantized) {
@@ -128,22 +137,24 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             double segment_length = angle * std::abs(radius);
             double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);
             bool   done = false;
-            if (dE > retract_length - EPSILON) {
-                if (dE > retract_length + EPSILON) {
+            if (segment_length > wipe_length - EPSILON) {
+                if (segment_length > wipe_length + EPSILON) {
                     // Shorten the segment. Recalculate the arc from the unquantized end coordinate.
                     center = Geometry::ArcWelder::arc_center(prev_quantized.cast<double>(), p.cast<double>(), double(radius), ccw);
                     angle = Geometry::ArcWelder::arc_angle(prev_quantized.cast<double>(), p.cast<double>(), double(radius));
                     segment_length = angle * std::abs(radius);
                     dE = xy_to_e * segment_length;
                     p = GCodeFormatter::quantize(
-                            Vec2d(center + Eigen::Rotation2D((ccw ? angle : -angle) * (retract_length / dE)) * (prev_quantized - center)));
+                            Vec2d(center + Eigen::Rotation2D((ccw ? angle : -angle) * (wipe_length / segment_length)) * (prev_quantized - center)));
                 } else
                     p = p_quantized;
                 dE   = retract_length;
+                segment_length = wipe_length;
                 done = true;
             } else
                 p = p_quantized;
-            assert(dE > 0);
+            if (dE > retract_length) dE = retract_length;
+            //assert(dE > 0);
             {
                 // Calculate quantized IJ circle center offset.
                 Vec2d ij = GCodeFormatter::quantize(Vec2d(center - prev_quantized));
@@ -151,10 +162,15 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                     // Degenerated arc after quantization. Process it as if it was a line segment.
                     return wipe_linear(prev_quantized, p);
                 // The arc is valid.
-                gcode += gcodegen.writer().extrude_to_xy_G2G3IJ(
-                    p, ij, ccw, -dE, wipe_retract_comment);
+                if (dE)
+                    gcode += gcodegen.writer().extrude_to_xy_G2G3IJ(
+                        p, ij, ccw, -dE, wipe_retract_comment);
+                else
+                    gcode += gcodegen.writer().travel_to_xy_G2G3IJ(
+                        p, ij, ccw, wipe_retract_comment);
             }
             retract_length -= dE;
+            wipe_length -= segment_length;
             return done;
         };
         // Start with the current position, which may be different from the wipe path start in case of loop clipping.
