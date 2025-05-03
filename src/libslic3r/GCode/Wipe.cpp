@@ -78,7 +78,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
     if ((retract_length > 0 || min_length > 0) && this->has_path()) {
         // Delayed emitting of a wipe start tag.
         bool wiped = false;
-        const double wipe_speed = this->calc_wipe_speed(gcodegen.writer().config);
+        const double wipe_speed = gcodegen.writer().config.max_print_speed.value;
         auto start_wipe = [&wiped, &gcode, &gcodegen, wipe_speed](){
             if (! wiped) {
                 wiped = true;
