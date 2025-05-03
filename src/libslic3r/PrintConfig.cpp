@@ -2649,7 +2649,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Minimum length to move while wiping, even if retraction finishes earlier.");
     def->sidetext = L("mm");
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloats { 2.0 });
+    def->set_default_value(new ConfigOptionFloats { 0.0 });
 
     def = this->add("retract_before_wipe", coPercents);
     def->label = L("Retract amount before wipe");
