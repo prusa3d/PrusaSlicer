@@ -13,10 +13,17 @@
 #include "TreeSupport.hpp"
 
 #include <boost/log/trivial.hpp>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/partitioner.h>
 #include <oneapi/tbb/task_arena.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/partitioner.h>
+#include <tbb/task_arena.h>
+#endif
 #include <cassert>
 #include <chrono>
 #include <optional>

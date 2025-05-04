@@ -4,9 +4,15 @@
 ///|/
 #include <boost/log/trivial.hpp>
 #include <ankerl/unordered_dense.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/scalable_allocator.h>
+#endif
 #include <algorithm>
 #include <cmath>
 #include <mutex>
