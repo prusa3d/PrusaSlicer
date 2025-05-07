@@ -10,11 +10,18 @@
 #ifndef slic3r_FillHoneycomb_hpp_
 #define slic3r_FillHoneycomb_hpp_
 
+#include <math.h>
+#include <stddef.h>
 #include <map>
+#include <utility>
+#include <cmath>
+#include <cstddef>
 
-#include "../libslic3r.h"
-
+#include "libslic3r/libslic3r.h"
 #include "FillBase.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
 
@@ -22,6 +29,7 @@ class FillHoneycomb : public Fill
 {
 public:
     ~FillHoneycomb() override {}
+    bool is_self_crossing() override { return false; }
 
 protected:
     Fill* clone() const override { return new FillHoneycomb(*this); };

@@ -6,13 +6,26 @@
 #define BOOSTTHREADWORKER_HPP
 
 #include <boost/variant.hpp>
-
-#include "Worker.hpp"
-
 #include <libslic3r/Thread.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/variant/variant.hpp>
+#include <atomic>
+#include <deque>
+#include <exception>
+#include <functional>
+#include <future>
+#include <memory>
+#include <string>
+#include <utility>
 
+#include "Worker.hpp"
 #include "ThreadSafeQueue.hpp"
+#include "slic3r/GUI/Jobs/Job.hpp"
+
+namespace Slic3r {
+class ProgressIndicator;
+}  // namespace Slic3r
 
 namespace Slic3r { namespace GUI {
 
@@ -67,8 +80,58 @@ class BoostThreadWorker : public Worker, private Job::Ctl
         void deliver(BoostThreadWorker &runner);
     };
 
-    using JobQueue     = ThreadSafeQueueSPSC<JobEntry>;
-    using MessageQueue = ThreadSafeQueueSPSC<WorkerMessage>;
+    // The m_running state flag needs special attention. Previously, it was set simply in the run()
+    // method whenever a new job was taken from the input queue and unset after the finalize message
+    // was pushed into the output queue. This was not correct. It must not be possible to consume
+    // the finalize message before the flag gets unset, these two operations must be done atomically
+    // So the underlying queues are here extended to support handling of this m_running flag.
+    template<class El>
+    class RawQueue: public std::deque<El> {
+        std::atomic<bool> *m_running_ptr;
+
+    public:
+        using std::deque<El>::deque;
+        explicit RawQueue(std::atomic<bool> &rflag): m_running_ptr{&rflag} {}
+
+        void set_running() { m_running_ptr->store(true); }
+        void set_stopped() { m_running_ptr->store(false); }
+    };
+
+    // The running flag is set if a job is popped from the queue
+    template<class El>
+    class RawJobQueue: public RawQueue<El> {
+    public:
+        using RawQueue<El>::RawQueue;
+        void pop_front()
+        {
+            RawQueue<El>::pop_front();
+            this->set_running();
+        }
+    };
+
+    // The running flag is unset when the finalize message is pushed into the queue
+    template<class El>
+    class RawMsgQueue: public RawQueue<El> {
+    public:
+        using RawQueue<El>::RawQueue;
+        void push_back(El &&entry)
+        {
+            this->emplace_back(std::move(entry));
+        }
+
+        template<class...EArgs>
+        auto & emplace_back(EArgs&&...args)
+        {
+            auto &el = RawQueue<El>::emplace_back(std::forward<EArgs>(args)...);
+            if (el.get_type() == WorkerMessage::Finalize)
+                this->set_stopped();
+
+            return el;
+        }
+    };
+
+    using JobQueue     = ThreadSafeQueueSPSC<JobEntry, RawJobQueue>;
+    using MessageQueue = ThreadSafeQueueSPSC<WorkerMessage, RawMsgQueue>;
 
     boost::thread                      m_thread;
     std::atomic<bool>                  m_running{false}, m_canceled{false};

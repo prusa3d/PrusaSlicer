@@ -243,7 +243,7 @@ ErrorDialog::ErrorDialog(wxWindow *parent, const wxString &msg, bool monospaced_
     create(m_content, monospaced_font ? 48 : 84);
 }
 
-ErrorDialog::ErrorDialog(wxWindow *parent, const wxString &msg, const std::function<void(const std::string&)> &on_link_clicked)
+ErrorDialog::ErrorDialog(wxWindow *parent, const wxString &msg, const t_link_clicked& on_link_clicked)
     : MsgDialog(parent, wxString::Format(_L("%s error"), SLIC3R_APP_NAME), 
                         wxString::Format(_L("%s has encountered an error"), SLIC3R_APP_NAME), wxOK)
     , m_content(HtmlContent{ msg, false, true, on_link_clicked })

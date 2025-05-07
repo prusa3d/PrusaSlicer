@@ -1,4 +1,6 @@
-#include "catch2/catch.hpp"
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include "test_utils.hpp"
 
 #include <random>
@@ -9,9 +11,12 @@
 #include "slic3r/GUI/Jobs/ArrangeJob2.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/FileReader.hpp"
 #include "libslic3r/SLAPrint.hpp"
 
 #include "libslic3r/Format/3mf.hpp"
+
+using Catch::Approx;
 
 class RandomArrangeSettings: public Slic3r::arr2::ArrangeSettingsView {
     Slic3r::arr2::ArrangeSettingsDb::Values m_v;
@@ -84,20 +89,20 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
     DynamicPrintConfig cfg;
     cfg.load_from_ini(basepath + "default_fff.ini",
                       ForwardCompatibilitySubstitutionRule::Enable);
-    Model m = Model::read_from_file(basepath + "20mm_cube.obj", &cfg);
+    Model m = FileReader::load_model(basepath + "20mm_cube.obj");
 
     UIThreadWorker w;
     arr2::ArrangeSettings settings;
 
     Points bedpts = get_bed_shape(cfg);
-    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts);
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts, Vec2crd{0, 0});
 
     SECTION("Single cube needs to be centered") {
         w.push(std::make_unique<ArrangeJob2>(arr2::Scene{
             arr2::SceneBuilder{}
                 .set_model(m)
                 .set_arrange_settings(&settings)
-                .set_bed(cfg)}));
+                .set_bed(cfg, Vec2crd{0, 0})}));
 
         w.process_events();
 
@@ -126,7 +131,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
         arr2::Scene   scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)
+                                     .set_bed(cfg, Vec2crd{0, 0})
                                      .set_selection(&sel)};
 
         w.push(std::make_unique<ArrangeJob2>(std::move(scene)));
@@ -160,7 +165,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
         arr2::Scene   scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)
+                                     .set_bed(cfg, Vec2crd{0, 0})
                                      .set_selection(&sel)};
 
         w.push(std::make_unique<ArrangeJob2>(std::move(scene)));
@@ -217,7 +222,7 @@ TEST_CASE("Basic arrange with cube", "[arrangejob]") {
         arr2::Scene scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)};
+                                     .set_bed(cfg, Point::new_scale(10, 10))};
 
         w.push(std::make_unique<ArrangeJob2>(std::move(scene)));
         w.process_events();
@@ -266,7 +271,7 @@ TEST_CASE("Test for modifying model during arrangement", "[arrangejob][fillbedjo
     new_volume->name = new_object->name;
 
     Points bedpts = get_bed_shape(cfg);
-    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts);
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts, Vec2crd{0, 0});
 
     BoostThreadWorker w(std::make_unique<DummyProgress>());
     RandomArrangeSettings settings;
@@ -278,7 +283,7 @@ TEST_CASE("Test for modifying model during arrangement", "[arrangejob][fillbedjo
         arr2::Scene scene{arr2::SceneBuilder{}
                                      .set_model(m)
                                      .set_arrange_settings(&settings)
-                                     .set_bed(cfg)};
+                                     .set_bed(cfg, Vec2crd{0, 0})};
 
         ArrangeJob2::Callbacks cbs;
         cbs.on_prepared = [&m] (auto &) {

@@ -5,6 +5,9 @@
 #include "EmbossStyleManager.hpp"
 #include <optional>
 #include <GL/glew.h> // Imgui texture
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif
 #include <imgui/imgui_internal.h> // ImTextCharFromUtf8
 #include <libslic3r/AppConfig.hpp>
 #include <libslic3r/Utils.hpp> // ScopeGuard
@@ -12,7 +15,7 @@
 #include "WxFontUtils.hpp"
 #include "slic3r/GUI/3DScene.hpp" // ::glsafe
 #include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
-#include "slic3r/GUI/ImGuiWrapper.hpp" // check of font ranges
+#include "slic3r/GUI/ImGuiPureWrap.hpp" // check of font ranges
 
 #include <boost/assign.hpp>
 #include <boost/bimap.hpp>
@@ -337,8 +340,8 @@ void StyleManager::init_trunc_names(float max_width) {
     for (auto &s : m_styles)
         if (s.truncated_name.empty()) {
             std::string name = s.name;
-            ImGuiWrapper::escape_double_hash(name);
-            s.truncated_name = ImGuiWrapper::trunc(name, max_width);
+            ImGuiPureWrap::escape_double_hash(name);
+            s.truncated_name = ImGuiPureWrap::trunc(name, max_width);
         }
 }
 
@@ -538,7 +541,7 @@ bool StyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<FontFile> 
 
 #include <libslic3r/AppConfig.hpp>
 #include "WxFontUtils.hpp"
-#include "fast_float/fast_float.h"
+#include <fast_float.h>
 
 // StylesSerializable
 namespace {

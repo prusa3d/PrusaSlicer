@@ -20,6 +20,7 @@
 #include <wx/menu.h>
 #include <wx/odcombo.h>
 #include <wx/listbook.h>
+#include <wx/generic/stattextg.h>
 
 #ifdef _WIN32
 #include <wx/msw/dcclient.h>
@@ -44,6 +45,7 @@
 #include "BitmapCache.hpp"
 #include "PhysicalPrinterDialog.hpp"
 #include "MsgDialog.hpp"
+#include "UserAccount.hpp"
 
 #include "Widgets/ComboBox.hpp"
 
@@ -81,9 +83,32 @@ PresetComboBox::PresetComboBox(wxWindow* parent, Preset::Type preset_type, const
     BitmapComboBox(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, size, 0, nullptr, wxCB_READONLY),
     m_type(preset_type),
     m_last_selected(wxNOT_FOUND),
-    m_em_unit(em_unit(this)),
-    m_preset_bundle(preset_bundle ? preset_bundle : wxGetApp().preset_bundle)
+    m_em_unit(em_unit(this))
 {
+    init_from_bundle(preset_bundle);
+    
+    m_bitmapCompatible   = get_bmp_bundle("flag_green");
+    m_bitmapIncompatible = get_bmp_bundle("flag_red");
+
+    // parameters for an icon's drawing
+    fill_width_height();
+
+    Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& e) {
+        if (m_suppress_change)
+            e.StopPropagation();
+        else
+            e.Skip();
+    });
+    Bind(wxEVT_COMBOBOX_DROPDOWN, [this](wxCommandEvent&) { m_suppress_change = false; });
+    Bind(wxEVT_COMBOBOX_CLOSEUP,  [this](wxCommandEvent&) { m_suppress_change = true;  });
+
+    Bind(wxEVT_COMBOBOX, &PresetComboBox::OnSelect, this);
+}
+
+void PresetComboBox::init_from_bundle(PresetBundle* preset_bundle)
+{
+    m_preset_bundle = preset_bundle ? preset_bundle : wxGetApp().preset_bundle;
+
     switch (m_type)
     {
     case Preset::TYPE_PRINT: {
@@ -113,23 +138,6 @@ PresetComboBox::PresetComboBox(wxWindow* parent, Preset::Type preset_type, const
     }
     default: break;
     }
-
-    m_bitmapCompatible   = get_bmp_bundle("flag_green");
-    m_bitmapIncompatible = get_bmp_bundle("flag_red");
-
-    // parameters for an icon's drawing
-    fill_width_height();
-
-    Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& e) {
-        if (m_suppress_change)
-            e.StopPropagation();
-        else
-            e.Skip();
-    });
-    Bind(wxEVT_COMBOBOX_DROPDOWN, [this](wxCommandEvent&) { m_suppress_change = false; });
-    Bind(wxEVT_COMBOBOX_CLOSEUP,  [this](wxCommandEvent&) { m_suppress_change = true;  });
-
-    Bind(wxEVT_COMBOBOX, &PresetComboBox::OnSelect, this);
 }
 
 void PresetComboBox::OnSelect(wxCommandEvent& evt)
@@ -208,20 +216,28 @@ void PresetComboBox::update_selection()
 // A workaround for a set of issues related to text fitting into gtk widgets:
 // See e.g.: https://github.com/prusa3d/PrusaSlicer/issues/4584
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
-    GList* cells = gtk_cell_layout_get_cells(GTK_CELL_LAYOUT(m_widget));
-
-    // 'cells' contains the GtkCellRendererPixBuf for the icon,
-    // 'cells->next' contains GtkCellRendererText for the text we need to ellipsize
-    if (!cells || !cells->next) return;
-
-    auto cell = static_cast<GtkCellRendererText *>(cells->next->data);
-
-    if (!cell) return;
-
-    g_object_set(G_OBJECT(cell), "ellipsize", PANGO_ELLIPSIZE_END, (char*)NULL);
-
-    // Only the list of cells must be freed, the renderer isn't ours to free
-    g_list_free(cells);
+    GtkWidget* widget = m_widget;
+    if (GTK_IS_CONTAINER(widget)) {
+        GList* children = gtk_container_get_children(GTK_CONTAINER(widget));
+        if (children) {
+            widget = GTK_WIDGET(children->data);
+            g_list_free(children);
+        }
+    }
+    if (GTK_IS_ENTRY(widget)) {
+        // Set ellipsization for the entry
+        gtk_entry_set_width_chars(GTK_ENTRY(widget), 20);  // Adjust this value as needed
+        gtk_entry_set_max_width_chars(GTK_ENTRY(widget), 20);  // Adjust this value as needed
+        // Create a PangoLayout for the entry and set ellipsization
+        PangoLayout* layout = gtk_entry_get_layout(GTK_ENTRY(widget));
+        if (layout) {
+            pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
+        } else {
+            g_warning("Unable to get PangoLayout from GtkEntry");
+        }
+    } else {
+        g_warning("Expected GtkEntry, but got %s", G_OBJECT_TYPE_NAME(widget));
+    }
 #endif
 }
 
@@ -251,6 +267,8 @@ void PresetComboBox::update(std::string select_preset_name)
     Clear();
     invalidate_selection();
 
+    const ExtruderFilaments* extruder_filaments = m_preset_bundle->extruders_filaments.empty() ? nullptr : &m_preset_bundle->extruders_filaments[m_extruder_idx];
+
     const std::deque<Preset>& presets = m_collection->get_presets();
 
     struct PresetData {
@@ -262,6 +280,9 @@ void PresetComboBox::update(std::string select_preset_name)
     std::vector<PresetData> system_presets;
     std::vector<PresetData> nonsys_presets;
     std::vector<PresetData> incomp_presets;
+    std::vector<PresetData> template_presets;
+
+    const bool allow_templates = !wxGetApp().app_config->get_bool("no_templates");
 
     wxString selected = "";
     if (!presets.front().is_visible)
@@ -270,7 +291,9 @@ void PresetComboBox::update(std::string select_preset_name)
     for (size_t i = presets.front().is_visible ? 0 : m_collection->num_default_presets(); i < presets.size(); ++i)
     {
         const Preset& preset = presets[i];
-        if (!m_show_all && (!preset.is_visible || !preset.is_compatible))
+        const bool is_compatible = m_type == Preset::TYPE_FILAMENT && extruder_filaments ? extruder_filaments->filament(i).is_compatible : preset.is_compatible;
+
+        if (!m_show_all && (!preset.is_visible || !is_compatible))
             continue;
 
         // marker used for disable incompatible printer models for the selected physical printer
@@ -286,7 +309,7 @@ void PresetComboBox::update(std::string select_preset_name)
         }
         std::string main_icon_name = m_type == Preset::TYPE_PRINTER && preset.printer_technology() == ptSLA ? "sla_printer" : m_main_bitmap_name;
 
-        auto bmp = get_bmp(bitmap_key, main_icon_name, "lock_closed", is_enabled, preset.is_compatible, preset.is_system || preset.is_default);
+        auto bmp = get_bmp(bitmap_key, main_icon_name, "lock_closed", is_enabled, is_compatible, preset.is_system || preset.is_default);
         assert(bmp);
 
         if (!is_enabled) {
@@ -296,13 +319,24 @@ void PresetComboBox::update(std::string select_preset_name)
         }
         else if (preset.is_default || preset.is_system)
         {
-            system_presets.push_back({get_preset_name(preset), get_preset_name(preset).Lower(), bmp, is_enabled});
+            if (preset.vendor && preset.vendor->templates_profile) {
+                if (allow_templates)
+                    template_presets.push_back({ get_preset_name(preset), get_preset_name(preset).Lower(), bmp, is_enabled });
+            }
+            else {
+                system_presets.push_back({ get_preset_name(preset), get_preset_name(preset).Lower(), bmp, is_enabled });
+            }
             if (preset.name == select_preset_name)
                 selected = preset.name;
 
             if (preset.is_dirty && m_show_modif_preset_separately) {
                 wxString preset_name = get_preset_name_with_suffix(preset);
-                system_presets.push_back({preset_name, preset_name.Lower(), bmp, is_enabled});
+                if (preset.vendor && preset.vendor->templates_profile) {
+                    if (allow_templates)
+                        template_presets.push_back({ get_preset_name(preset), get_preset_name(preset).Lower(), bmp, is_enabled });
+                }
+                else
+                    system_presets.push_back({preset_name, preset_name.Lower(), bmp, is_enabled});
                 if (into_u8(preset_name) == select_preset_name)
                     selected = preset_name;
             }
@@ -350,6 +384,22 @@ void PresetComboBox::update(std::string select_preset_name)
             validate_selection(it->name == selected);
         }
     }
+
+    if (!template_presets.empty())
+    {
+        std::sort(template_presets.begin(), template_presets.end(), [](const PresetData& a, const PresetData& b) {
+            return a.lower_name < b.lower_name;
+            });
+
+        set_label_marker(Append(separator(L("Template presets")), wxNullBitmap));
+        for (std::vector<PresetData>::iterator it = template_presets.begin(); it != template_presets.end(); ++it) {
+            int item_id = Append(it->name, *it->bitmap);
+            if (!it->enabled)
+                set_label_marker(item_id, LABEL_ITEM_DISABLED);
+            validate_selection(it->name == selected);
+        }
+    }
+
     if (!incomp_presets.empty())
     {
         std::sort(incomp_presets.begin(), incomp_presets.end(), [](const PresetData& a, const PresetData& b) {
@@ -372,14 +422,18 @@ void PresetComboBox::edit_physical_printer()
         return;
 
     PhysicalPrinterDialog dlg(this->GetParent(),this->GetString(this->GetSelection()));
-    if (dlg.ShowModal() == wxID_OK)
+    if (dlg.ShowModal() == wxID_OK) {
         update();
+        wxGetApp().show_printer_webview_tab();
+    }
 }
 
 void PresetComboBox::add_physical_printer()
 {
-    if (PhysicalPrinterDialog(this->GetParent(), wxEmptyString).ShowModal() == wxID_OK)
+    if (PhysicalPrinterDialog(this->GetParent(), wxEmptyString).ShowModal() == wxID_OK) {
         update();
+        wxGetApp().show_printer_webview_tab();
+    }
 }
 
 void PresetComboBox::open_physical_printer_url()
@@ -433,7 +487,10 @@ void PresetComboBox::update()
 
 void PresetComboBox::update_from_bundle()
 {
-    this->update(m_collection->get_selected_preset().name);
+    if (m_collection->type() == Preset::TYPE_FILAMENT && !m_preset_bundle->extruders_filaments.empty())
+        this->update(m_preset_bundle->extruders_filaments[m_extruder_idx].get_selected_preset_name());
+    else
+        this->update(m_collection->get_selected_preset().name);
 }
 
 void PresetComboBox::msw_rescale()
@@ -606,6 +663,9 @@ bool PresetComboBox::selection_is_changed_according_to_physical_printers()
         else if (dynamic_cast<TabPresetComboBox*>(this)!=nullptr)
             wxGetApp().sidebar().update_presets(m_type);
 
+        // Check and show "Physical printer" page if needed
+        wxGetApp().show_printer_webview_tab();
+
         return true;
     }
 
@@ -657,6 +717,51 @@ PlaterPresetComboBox::PlaterPresetComboBox(wxWindow *parent, Preset::Type preset
         else
             switch_to_tab();
     });
+
+    if (m_type == Preset::TYPE_PRINTER) {
+
+#ifdef _WIN32
+        connect_info_sizer = new wxBoxSizer(wxHORIZONTAL);
+
+        connect_available_info = new wxGenericStaticText(parent, wxID_ANY, /*"Info about <b>Connect</b> for printer preset"*/ "");
+        connect_offline_info   = new wxGenericStaticText(parent, wxID_ANY, /*"Info about <b>Connect</b> for printer preset"*/ "");
+        connect_printing_info  = new wxGenericStaticText(parent, wxID_ANY, /*"Info about <b>Connect</b> for printer preset"*/ "");
+
+        connect_info_sizer->Add(new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("connect_status", 14, 14, "#5CD800")), 0, wxALIGN_CENTER_VERTICAL);
+        connect_info_sizer->Add(connect_available_info, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+
+        connect_info_sizer->Add(new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("connect_status", 14, 14, "#FB3636")), 0, wxALIGN_CENTER_VERTICAL);
+        connect_info_sizer->Add(connect_offline_info, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+
+        connect_info_sizer->Add(new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("connect_status", 14, 14, "#2E9BFF")), 0, wxALIGN_CENTER_VERTICAL);
+        connect_info_sizer->Add(connect_printing_info, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+#else
+        connect_info_sizer = new wxFlexGridSizer(9, 10, 0);
+        connect_info_sizer->SetFlexibleDirection(wxBOTH);
+
+        connect_available_info = new wxStaticText(parent, wxID_ANY, "0");
+        connect_offline_info   = new wxStaticText(parent, wxID_ANY, "0");
+        connect_printing_info  = new wxStaticText(parent, wxID_ANY, "0");
+        connect_available_info->SetFont(wxGetApp().bold_font());
+        connect_offline_info  ->SetFont(wxGetApp().bold_font());
+        connect_printing_info ->SetFont(wxGetApp().bold_font());
+
+        connect_info_sizer->Add(new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("connect_status", 14, 14, "#5CD800")), 0, wxALIGN_CENTER_VERTICAL | wxTOP, 1);
+        connect_info_sizer->Add(connect_available_info, 0, wxALIGN_CENTER_VERTICAL);
+        // TRN: this is part of the infoline below Printer Settings dropdown, informing about number of printers available/offline/printing in Prusa Connect.
+        connect_info_sizer->Add(new wxStaticText(parent, wxID_ANY, _L("available")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+
+        connect_info_sizer->Add(new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("connect_status", 14, 14, "#FB3636")), 0, wxALIGN_CENTER_VERTICAL | wxTOP, 1);
+        connect_info_sizer->Add(connect_offline_info, 0, wxALIGN_CENTER_VERTICAL);
+        // TRN: this is part of the infoline below Printer Settings dropdown, informing about number of printers available/offline/printing in Prusa Connect.
+        connect_info_sizer->Add(new wxStaticText(parent, wxID_ANY, _L("offline")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+
+        connect_info_sizer->Add(new wxStaticBitmap(parent, wxID_ANY, *get_bmp_bundle("connect_status", 14, 14, "#2E9BFF")), 0, wxALIGN_CENTER_VERTICAL | wxTOP, 1);
+        connect_info_sizer->Add(connect_printing_info, 0, wxALIGN_CENTER_VERTICAL);
+        // TRN: this is part of the infoline below Printer Settings dropdown, informing about number of printers available/offline/printing in Prusa Connect.
+        connect_info_sizer->Add(new wxStaticText(parent, wxID_ANY, _L("printing")), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
+#endif
+    }
 }
 
 PlaterPresetComboBox::~PlaterPresetComboBox()
@@ -771,9 +876,7 @@ void PlaterPresetComboBox::show_add_menu()
 
     append_menu_item(menu, wxID_ANY, _L("Add physical printer"), "",
         [this](wxCommandEvent&) {
-            PhysicalPrinterDialog dlg(this->GetParent(), wxEmptyString);
-            if (dlg.ShowModal() == wxID_OK)
-                update();
+            add_physical_printer();
         }, "edit_uni", menu, []() { return true; }, wxGetApp().plater());
 
     wxGetApp().plater()->PopupMenu(menu);
@@ -830,6 +933,103 @@ wxString PlaterPresetComboBox::get_preset_name(const Preset& preset)
 {
     std::string name = preset.alias.empty() ? preset.name : (preset.vendor && preset.vendor->templates_profile ? preset.name : preset.alias);
     return from_u8(name + suffix(preset));
+}
+
+
+struct PrinterStatesCount
+{
+    size_t offline_cnt   { 0 };
+    size_t busy_cnt      { 0 };
+    size_t available_cnt { 0 };
+    size_t total         { 0 };
+};
+
+static PrinterStatesCount get_printe_states_count(const std::vector<size_t>& states)
+{
+    PrinterStatesCount states_cnt;
+
+    for (size_t i = 0; i < states.size(); i++) {
+        if (states[i] == 0)
+            continue;
+
+        ConnectPrinterState state = static_cast<ConnectPrinterState>(i);
+
+        if (state == ConnectPrinterState::CONNECT_PRINTER_OFFLINE)
+            states_cnt.offline_cnt += states[i];
+        else if (state == ConnectPrinterState::CONNECT_PRINTER_PAUSED ||
+            state == ConnectPrinterState::CONNECT_PRINTER_STOPPED ||
+            state == ConnectPrinterState::CONNECT_PRINTER_PRINTING ||
+            state == ConnectPrinterState::CONNECT_PRINTER_BUSY ||
+            state == ConnectPrinterState::CONNECT_PRINTER_ATTENTION ||
+            state == ConnectPrinterState::CONNECT_PRINTER_ERROR)
+            states_cnt.busy_cnt += states[i];
+        else
+            states_cnt.available_cnt += states[i];
+    }
+    states_cnt.total = states_cnt.offline_cnt + states_cnt.busy_cnt + states_cnt.available_cnt;
+
+    return states_cnt;
+}
+
+static std::string get_connect_state_suffix_for_printer(const Preset& printer_preset)
+{
+    // process real data from Connect
+    if (auto printer_state_map = wxGetApp().plater()->get_user_account()->get_printer_state_map();
+        !printer_state_map.empty()) {
+        
+        const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(printer_preset);
+        const std::string trimmed_preset_name = printer_preset.trim_vendor_repo_prefix(printer_preset.name, printer_with_vendor.vendor);
+        for (const auto& [preset_name_from_map, states] : printer_state_map) {
+            if (trimmed_preset_name != preset_name_from_map) {
+                continue;
+            }
+            PrinterStatesCount states_cnt = get_printe_states_count(states);
+            if (states_cnt.available_cnt > 0)
+                return "_available";
+            if (states_cnt.busy_cnt > 0)
+                return "_busy";
+            return "_offline";
+        }
+    }
+
+    return "";
+}
+
+static bool fill_data_to_connect_info_line(  const Preset& printer_preset,
+#ifdef _WIN32
+                                            wxGenericStaticText* connect_available_info,
+                                            wxGenericStaticText* connect_offline_info,
+                                            wxGenericStaticText* connect_printing_info)
+#else
+                                            wxStaticText* connect_available_info,
+                                            wxStaticText* connect_offline_info,
+                                            wxStaticText* connect_printing_info)
+#endif
+{
+    if (auto printer_state_map = wxGetApp().plater()->get_user_account()->get_printer_state_map();
+        !printer_state_map.empty()) {
+
+        const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(printer_preset);
+        const std::string trimmed_preset_name = printer_preset.trim_vendor_repo_prefix(printer_preset.name, printer_with_vendor.vendor);
+        for (const auto& [preset_name_from_map, states] : printer_state_map) {
+            if (trimmed_preset_name != preset_name_from_map) {
+                continue;
+            }
+            
+            PrinterStatesCount states_cnt = get_printe_states_count(states);
+#ifdef _WIN32
+            connect_available_info->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.available_cnt), _L("available")));
+            connect_offline_info  ->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.offline_cnt),   _L("offline")));
+            connect_printing_info ->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.busy_cnt),      _L("printing")));
+#else
+            connect_available_info->SetLabel(format_wxstr("%1% ", states_cnt.available_cnt));
+            connect_offline_info  ->SetLabel(format_wxstr("%1% ", states_cnt.offline_cnt));
+            connect_printing_info ->SetLabel(format_wxstr("%1% ", states_cnt.busy_cnt));
+#endif
+            return true;
+        }
+    }
+    return false;
 }
 
 // Only the compatible presets are shown.
@@ -903,6 +1103,12 @@ void PlaterPresetComboBox::update()
 
         std::string bitmap_key, filament_rgb, extruder_rgb, material_rgb;
         std::string bitmap_type_name = bitmap_key = m_type == Preset::TYPE_PRINTER && preset.printer_technology() == ptSLA ? "sla_printer" : m_main_bitmap_name;
+
+        if (m_type == Preset::TYPE_PRINTER) {
+            bitmap_type_name = bitmap_key += get_connect_state_suffix_for_printer(preset);
+            if (is_selected)
+                connect_info_sizer->Show(fill_data_to_connect_info_line(preset, connect_available_info, connect_offline_info, connect_printing_info));
+        }
 
         bool single_bar = false;
         if (m_type == Preset::TYPE_FILAMENT)
@@ -1009,11 +1215,17 @@ void PlaterPresetComboBox::update()
                 bool selected; // is selected
             };
             std::vector<PhysicalPrinterPresetData> preset_data;
+            bool is_selected_some_ph_printer{ false };
             for (PhysicalPrinterCollection::ConstIterator it = ph_printers.begin(); it != ph_printers.end(); ++it) {
                 for (const std::string& preset_name : it->get_preset_names()) {
-                    preset_data.push_back({ wxString::FromUTF8(it->get_full_name(preset_name)).Lower(), preset_name, it->get_full_name(preset_name), ph_printers.is_selected(it, preset_name) });
+                    bool is_selected = ph_printers.is_selected(it, preset_name);
+                    preset_data.push_back({ wxString::FromUTF8(it->get_full_name(preset_name)).Lower(), preset_name, it->get_full_name(preset_name), is_selected });
+                    if (is_selected)
+                        is_selected_some_ph_printer = true;
                 }
             }
+            if (is_selected_some_ph_printer)
+                connect_info_sizer->Show(false);
             std::sort(preset_data.begin(), preset_data.end(), [](const PhysicalPrinterPresetData& a, const PhysicalPrinterPresetData& b) {
                 return a.lower_name < b.lower_name;
                 });
@@ -1085,6 +1297,12 @@ void PlaterPresetComboBox::sys_color_changed()
 {
     PresetComboBox::sys_color_changed();
     edit_btn->sys_color_changed();
+
+    if (connect_info_sizer) {
+        wxGetApp().UpdateDarkUI(connect_available_info);
+        wxGetApp().UpdateDarkUI(connect_printing_info);
+        wxGetApp().UpdateDarkUI(connect_offline_info);
+    }
 }
 
 // ---------------------------------
@@ -1146,7 +1364,7 @@ void TabPresetComboBox::update()
     Clear();
     invalidate_selection();
 
-    const ExtruderFilaments& extruder_filaments = m_preset_bundle->extruders_filaments[m_active_extruder_idx];
+    const ExtruderFilaments& extruder_filaments = m_preset_bundle->extruders_filaments[m_extruder_idx];
 
     const std::deque<Preset>& presets = m_collection->get_presets();
     

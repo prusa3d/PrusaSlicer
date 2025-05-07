@@ -10,6 +10,8 @@
 #include "Selection.hpp"
 #include "Plater.hpp"
 
+#include "libslic3r/MultipleBeds.hpp"
+
 namespace Slic3r {
 namespace GUI {
 
@@ -115,7 +117,7 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
             const Selection& selection = wxGetApp().plater()->get_selection();
             if (selection.is_single_volume() || selection.is_single_modifier()) {
                 const GLVolume* volume = selection.get_first_volume();
-                if (!volume->is_wipe_tower && !volume->is_sla_pad() && !volume->is_sla_support())
+                if (!volume->is_wipe_tower() && !volume->is_sla_pad() && !volume->is_sla_support())
                     m_selected_volume_id = *selection.get_volume_idxs().begin();
             }
         }
@@ -160,13 +162,31 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
         const std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = get_raycasters(type);
         const Vec3f camera_forward = camera.get_dir_forward().cast<float>();
         HitResult current_hit = { type };
-        for (std::shared_ptr<SceneRaycasterItem> item : *raycasters) {
+        for (const std::shared_ptr<SceneRaycasterItem>& item : *raycasters) {
             if (!item->is_active())
                 continue;
 
+            bool sth_hit = false;
+
             current_hit.raycaster_id = item->get_id();
-            const Transform3d& trafo = item->get_transform();
-            if (item->get_raycaster()->closest_hit(mouse_pos, trafo, camera, current_hit.position, current_hit.normal, clip_plane)) {
+            const Transform3d& trafo_orig = item->get_transform();
+            Transform3d trafo = trafo_orig;
+            if (type == EType::Bed) {
+                int bed_idx_hit = -1;
+                for (int i = 0; i < s_multiple_beds.get_number_of_beds(); ++i) {
+                    trafo = trafo_orig;
+                    trafo.translate(s_multiple_beds.get_bed_translation(i));
+                    sth_hit = item->get_raycaster()->closest_hit(mouse_pos, trafo, camera, current_hit.position, current_hit.normal, clip_plane);
+                    if (sth_hit) {
+                        bed_idx_hit = i;
+                        break;
+                    }
+                }
+                s_multiple_beds.set_last_hovered_bed(bed_idx_hit);
+            } else
+                sth_hit = item->get_raycaster()->closest_hit(mouse_pos, trafo, camera, current_hit.position, current_hit.normal, clip_plane);
+
+            if (sth_hit) {
                 current_hit.position = (trafo * current_hit.position.cast<double>()).cast<float>();
                 current_hit.normal = (trafo.matrix().block(0, 0, 3, 3).inverse().transpose() * current_hit.normal.cast<double>()).normalized().cast<float>();
                 if (item->use_back_faces() || current_hit.normal.dot(camera_forward) < 0.0f) {

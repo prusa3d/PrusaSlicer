@@ -9,6 +9,10 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
+#include "slic3r/GUI/MsgDialog.hpp"
+#include "slic3r/GUI/MainFrame.hpp"
+
+#include "libslic3r/MultipleBeds.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -20,6 +24,22 @@ GLGizmoSlaBase::GLGizmoSlaBase(GLCanvas3D& parent, const std::string& icon_filen
 : GLGizmoBase(parent, icon_filename, sprite_id)
 , m_min_sla_print_object_step((int)min_step)
 {}
+
+/*static*/ bool GLGizmoSlaBase::selected_print_object_exists(const GLCanvas3D& canvas, const wxString& text)
+{
+    if (const Selection& sel = canvas.get_selection(); !sel.is_single_full_instance() || !sel.get_model()->objects[sel.get_object_idx()]
+        || ! canvas.sla_print()->get_print_object_by_model_object_id(sel.get_model()->objects[sel.get_object_idx()]->id()))
+    {
+        if (! text.IsEmpty())
+            wxGetApp().CallAfter([text]() {
+                MessageDialog dlg(GUI::wxGetApp().mainframe, text,
+                    _L("Bed selection mismatch"), wxICON_INFORMATION | wxOK);
+                dlg.ShowModal();
+            });
+        return false;
+    }
+    return true;
+}
 
 void GLGizmoSlaBase::reslice_until_step(SLAPrintObjectStep step, bool postpone_error_messages)
 {
@@ -74,6 +94,7 @@ void GLGizmoSlaBase::update_volumes()
 
         const int object_idx   = m_parent.get_selection().get_object_idx();
         const int instance_idx = m_parent.get_selection().get_instance_idx();
+
         const Geometry::Transformation& inst_trafo = po->model_object()->instances[instance_idx]->get_transformation();
         const double current_elevation = po->get_current_elevation();
 
@@ -94,12 +115,14 @@ void GLGizmoSlaBase::update_volumes()
         const Transform3d po_trafo_inverse = po->trafo().inverse();
 
         // main mesh
+        backend_mesh.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()).cast<float>());
         backend_mesh.transform(po_trafo_inverse);
         add_volume(backend_mesh, 0, true);
 
         // supports mesh
         TriangleMesh supports_mesh = po->support_mesh();
         if (!supports_mesh.empty()) {
+            supports_mesh.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()).cast<float>());
             supports_mesh.transform(po_trafo_inverse);
             add_volume(supports_mesh, -int(slaposSupportTree));
         }
@@ -107,6 +130,7 @@ void GLGizmoSlaBase::update_volumes()
         // pad mesh
         TriangleMesh pad_mesh = po->pad_mesh();
         if (!pad_mesh.empty()) {
+            pad_mesh.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()).cast<float>());
             pad_mesh.transform(po_trafo_inverse);
             add_volume(pad_mesh, -int(slaposPad));
         }

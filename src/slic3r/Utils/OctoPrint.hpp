@@ -118,6 +118,7 @@ public:
     PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint | PrintHostPostUploadAction::QueuePrint; }
     const char* get_name() const override { return "PrusaConnect"; }
     bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override { return false; }
+    std::string get_unusable_symbols() const override { return "\\/:*?\"%<>¯°#ˇ|[]"; }
 protected:
     void set_http_post_header_args(Http& http, PrintHostPostUploadAction post_action) const override;
 };

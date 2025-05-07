@@ -10,9 +10,7 @@
 class wxWindow;
 class wxGLCanvas;
 class wxGLContext;
-#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 class wxGLAttributes;
-#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
 namespace Slic3r {
 namespace GUI {
@@ -34,6 +32,7 @@ public:
         bool m_core_profile{ false };
         int m_max_tex_size{ 0 };
         float m_max_anisotropy{ 0.0f };
+        int m_samples{ 0 };
 
         std::string m_version_string;
         Semver m_version = Semver::invalid();
@@ -57,11 +56,11 @@ public:
 
         bool is_mesa() const;
         bool is_es() const {
-#if ENABLE_OPENGL_ES
+#if SLIC3R_OPENGL_ES
             return true;
 #else
             return false;
-#endif // ENABLE_OPENGL_ES
+#endif // SLIC3R_OPENGL_ES
         }
 
         int get_max_tex_size() const;
@@ -74,9 +73,9 @@ public:
         // Otherwise HTML formatted for the system info dialog.
         std::string to_string(bool for_github) const;
 
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
         std::vector<std::string> get_extensions_list() const;
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // !SLIC3R_OPENGL_ES
 
     private:
         void detect() const;
@@ -120,11 +119,11 @@ public:
     ~OpenGLManager();
 
     bool init_gl();
-#if ENABLE_GL_CORE_PROFILE
-    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_compatibility_profile, bool enable_debug);
-#else
+#if SLIC3R_OPENGL_ES
     wxGLContext* init_glcontext(wxGLCanvas& canvas);
-#endif // ENABLE_GL_CORE_PROFILE
+#else
+    wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_compatibility_profile, bool enable_debug);
+#endif // SLIC3R_OPENGL_ES
 
     GLShaderProgram* get_shader(const std::string& shader_name) { return m_shaders_manager.get_shader(shader_name); }
     GLShaderProgram* get_current_shader() { return m_shaders_manager.get_current_shader(); }
@@ -133,16 +132,9 @@ public:
     static bool can_multisample() { return s_multisample == EMultisampleState::Enabled; }
     static bool are_framebuffers_supported() { return (s_framebuffers_type != EFramebufferType::Unknown); }
     static EFramebufferType get_framebuffers_type() { return s_framebuffers_type; }
-    static wxGLCanvas* create_wxglcanvas(wxWindow& parent);
+    static wxGLCanvas* create_wxglcanvas(wxWindow& parent, bool enable_auto_aa_samples);
     static const GLInfo& get_gl_info() { return s_gl_info; }
     static bool force_power_of_two_textures() { return s_force_power_of_two_textures; }
-
-private:
-#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
-    static void detect_multisample(const wxGLAttributes& attribList);
-#else
-    static void detect_multisample(int* attribList);
-#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 };
 
 } // namespace GUI

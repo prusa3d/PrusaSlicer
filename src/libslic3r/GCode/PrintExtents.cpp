@@ -8,14 +8,22 @@
 // to decide whether to pause the print after the priming towers are extruded
 // to let the operator remove them from the print bed.
 
+#include <algorithm>
+#include <vector>
+#include <cstddef>
+
 #include "../BoundingBox.hpp"
 #include "../ExtrusionEntity.hpp"
 #include "../ExtrusionEntityCollection.hpp"
 #include "../Layer.hpp"
 #include "../Print.hpp"
-
 #include "PrintExtents.hpp"
 #include "WipeTower.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
 
@@ -143,8 +151,8 @@ BoundingBoxf get_wipe_tower_extrusions_extents(const Print &print, const coordf_
     // Wipe tower extrusions are saved as if the tower was at the origin with no rotation
     // We need to get position and angle of the wipe tower to transform them to actual position.
     Transform2d trafo =
-        Eigen::Translation2d(print.config().wipe_tower_x.value, print.config().wipe_tower_y.value) *
-        Eigen::Rotation2Dd(Geometry::deg2rad(print.config().wipe_tower_rotation_angle.value));
+        Eigen::Translation2d(print.model().wipe_tower().position.x(), print.model().wipe_tower().position.y()) *
+        Eigen::Rotation2Dd(Geometry::deg2rad(print.model().wipe_tower().rotation));
 
     BoundingBoxf bbox;
     for (const std::vector<WipeTower::ToolChangeResult> &tool_changes : print.wipe_tower_data().tool_changes) {

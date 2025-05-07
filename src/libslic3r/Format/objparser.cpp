@@ -2,16 +2,19 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <stdlib.h>
-#include <string.h>
-
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/cstdio.hpp>
+#include <LocalesUtils.hpp>
+#include <fast_float.h>
+#include <new>
+#include <system_error>
+#include <utility>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 #include "objparser.hpp"
-
-#include "libslic3r/LocalesUtils.hpp"
-#include "fast_float/fast_float.h"
 
 namespace ObjParser {
 
@@ -351,11 +354,20 @@ bool objparse(const char *path, ObjData &data)
 	if (pFile == 0)
 		return false;
 
+	constexpr size_t half_buf = 65536;
 	try {
-		char buf[65536 * 2];
+        char buf[half_buf * 2];
 		size_t len = 0;
 		size_t lenPrev = 0;
-		while ((len = ::fread(buf + lenPrev, 1, 65536, pFile)) != 0) {
+        while ((len = ::fread(buf + lenPrev, 1, half_buf-1, pFile)) != 0) {
+            if (std::feof(pFile)) {
+                // Fix issue with missing last trinagle in obj file:
+                // https://github.com/prusa3d/PrusaSlicer/issues/12157
+                // algorithm expect line endings after last face
+                // but file format support it
+                buf[len+lenPrev] = '\n';
+                ++len;
+            }
 			len += lenPrev;
 			size_t lastLine = 0;
 			for (size_t i = 0; i < len; ++ i)
@@ -370,7 +382,7 @@ bool objparse(const char *path, ObjData &data)
 					lastLine = i + 1;
 				}
 			lenPrev = len - lastLine;
-			if (lenPrev > 65536) {
+            if (lenPrev > half_buf) {
 		    	BOOST_LOG_TRIVIAL(error) << "ObjParser: Excessive line length";
 				::fclose(pFile);
 				return false;

@@ -27,13 +27,14 @@
 #include "GUI_Utils.hpp"
 #include "Event.hpp"
 #include "UnsavedChangesDialog.hpp"
+#include "Search.hpp"
 
-class wxBookCtrlBase;
+#include "TopBarMenus.hpp"
+
+class TopBar;
 class wxProgressDialog;
 
 namespace Slic3r {
-
-class ProgressStatusBar;
 
 namespace GUI
 {
@@ -44,6 +45,9 @@ class Plater;
 class MainFrame;
 class PreferencesDialog;
 class GalleryDialog;
+class ConnectWebViewPanel; 
+class PrinterWebViewPanel;
+class PrintablesWebViewPanel;
 
 enum QuickSlice
 {
@@ -66,13 +70,13 @@ struct PresetTab {
 
 class SettingsDialog : public DPIFrame//DPIDialog
 {
-    wxBookCtrlBase* m_tabpanel { nullptr };
+    TopBar*         m_tabpanel { nullptr };
     MainFrame*      m_main_frame { nullptr };
     wxMenuBar*      m_menubar{ nullptr };
 public:
     SettingsDialog(MainFrame* mainframe);
     ~SettingsDialog() = default;
-    void set_tabpanel(wxBookCtrlBase* tabpanel) { m_tabpanel = tabpanel; }
+    void set_tabpanel(TopBar* tabpanel) { m_tabpanel = tabpanel; }
     wxMenuBar* menubar() { return m_menubar; }
 
 protected:
@@ -87,20 +91,26 @@ class MainFrame : public DPIFrame
     wxString    m_qs_last_output_file = wxEmptyString;
     wxString    m_last_config = wxEmptyString;
     wxMenuBar*  m_menubar{ nullptr };
+    TopBarMenus m_bar_menus;
 
-#if 0
-    wxMenuItem* m_menu_item_repeat { nullptr }; // doesn't used now
-#endif
     wxMenuItem* m_menu_item_reslice_now { nullptr };
+    wxMenuItem* m_menu_item_reload { nullptr };
     wxSizer*    m_main_sizer{ nullptr };
 
     size_t      m_last_selected_tab;
+    Search::OptionsSearcher m_searcher;
+
+    ConnectWebViewPanel*    m_connect_webview{ nullptr };
+    bool                    m_connect_webview_added{ false };
+    PrintablesWebViewPanel* m_printables_webview{ nullptr };
+    bool                    m_printables_webview_added{ false };
+    PrinterWebViewPanel*    m_printer_webview{ nullptr };
+    bool                    m_printer_webview_added{ false };
 
     std::string     get_base_name(const wxString &full_name, const char *extension = nullptr) const;
     std::string     get_dir_name(const wxString &full_name) const;
 
     void on_presets_changed(SimpleEvent&);
-    void on_value_changed(wxCommandEvent&);
 
     bool can_start_new_project() const;
     bool can_export_model() const;
@@ -117,8 +127,12 @@ class MainFrame : public DPIFrame
     bool can_delete() const;
     bool can_delete_all() const;
     bool can_reslice() const;
-    void bind_diff_dialog();
 
+    void    add_connect_webview_tab();
+    void    remove_connect_webview_tab();
+    void    on_tab_change_rename_reload_item(int new_tab);
+    bool    reload_item_condition_cb();
+    void    reload_item_function_cb();
     // MenuBar items changeable in respect to printer technology 
     enum MenuItems
     {                   //   FFF                  SLA
@@ -126,6 +140,7 @@ class MainFrame : public DPIFrame
         miSend,         // Send G-code          Send to print
         miMaterialTab,  // Filament Settings    Material Settings
         miPrinterTab,   // Different bitmap for Printer Settings
+        miLogin,
     };
 
     // vector of a MenuBar items changeable in respect to printer technology 
@@ -137,7 +152,6 @@ class MainFrame : public DPIFrame
     {
         Unknown,
         Old,
-        New,
         Dlg,
         GCodeViewer
     };
@@ -163,6 +177,8 @@ public:
 
     void        update_title();
 
+    void        set_callbacks_for_topbar_menus();
+    void        update_topbars();
     void        init_tabpanel();
     void        create_preset_tabs();
     void        add_created_tab(Tab* panel, const std::string& bmp_name = "");
@@ -175,9 +191,6 @@ public:
     void        update_menubar();
     // Open item in menu by menu and item name (in actual language)
     void        open_menubar_item(const wxString& menu_name,const wxString& item_name);
-#ifdef _WIN32
-    void        show_tabs_menu(bool show);
-#endif
     void        update_ui_from_settings();
     bool        is_loaded() const { return m_loaded; }
     bool        is_last_input_file() const  { return !m_qs_last_input_file.IsEmpty(); }
@@ -193,6 +206,7 @@ public:
     void        export_configbundle(bool export_physical_printers = false);
     void        load_configbundle(wxString file = wxEmptyString);
     void        load_config(const DynamicPrintConfig& config);
+    void        update_search_lines(const std::string search_line);
     // Select tab in m_tabpanel
     // When tab == -1, will be selected last selected tab
     void        select_tab(Tab* tab);
@@ -209,19 +223,41 @@ public:
     void        add_to_recent_projects(const wxString& filename);
     void        technology_changed();
 
+    void    on_account_login(const std::string& token);
+    void    on_account_will_refresh();
+    void    on_account_did_refresh(const std::string& token);
+    void    on_account_logout();
+    void    show_connect_tab(const wxString& url);
+    void    show_printables_tab(const std::string& url);
+
+    void    add_printables_webview_tab();
+    void    remove_printables_webview_tab();
+
+    void    show_printer_webview_tab(DynamicPrintConfig* dpc);
+
+    void    add_printer_webview_tab(const wxString& url);
+    void    remove_printer_webview_tab();
+    bool    get_printer_webview_tab_added() const { return m_printer_webview_added; }
+    void    set_printer_webview_api_key(const std::string& key);
+    void    set_printer_webview_credentials(const std::string& usr, const std::string& psk);
+    bool    is_any_webview_selected();
+    void    reload_selected_webview();
+
+    void    refresh_account_menu(bool avatar = false);
+
     PrintHostQueueDialog* printhost_queue_dlg() { return m_printhost_queue_dlg; }
 
     Plater*               m_plater { nullptr };
-    wxBookCtrlBase*       m_tabpanel { nullptr };
+    TopBar*               m_tmp_top_bar { nullptr };
+    TopBar*               m_tabpanel { nullptr };
     SettingsDialog        m_settings_dialog;
     DiffPresetDialog      diff_dialog;
     wxWindow*             m_plater_page{ nullptr };
 //    wxProgressDialog*     m_progress_dialog { nullptr };
     PreferencesDialog*    preferences_dialog { nullptr };
     PrintHostQueueDialog* m_printhost_queue_dlg;
-//    std::shared_ptr<ProgressStatusBar>  m_statusbar;
     GalleryDialog*        m_gallery_dialog{ nullptr };
-
+    
 #ifdef __APPLE__
     std::unique_ptr<wxTaskBarIcon> m_taskbar_icon;
 #endif // __APPLE__

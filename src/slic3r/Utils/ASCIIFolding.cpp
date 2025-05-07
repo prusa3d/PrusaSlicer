@@ -4,10 +4,8 @@
 ///|/
 #include "ASCIIFolding.hpp"
 
-#include <stdio.h>
-#include <string.h>
-#include <locale>
 #include <boost/locale/encoding_utf.hpp>
+#include <iterator>
 
 namespace Slic3r {
 

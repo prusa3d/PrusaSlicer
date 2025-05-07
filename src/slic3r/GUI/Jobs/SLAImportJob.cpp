@@ -95,7 +95,7 @@ void SLAImportJob::reset()
 {
     p->sel     = Sel::modelAndProfile;
     p->mesh    = {};
-    p->profile = p->plater->sla_print().full_print_config();
+    p->profile = p->plater->active_sla_print().full_print_config();
     p->quality = SLAImportQuality::Balanced;
     p->path.Clear();
     p->err     = "";
@@ -105,8 +105,8 @@ void SLAImportJob::prepare()
 {
     reset();
 
-    auto path  = p->import_dlg->get_path();
-    auto nm    = wxFileName(path);
+    const std::string path  = p->import_dlg->get_path();
+    auto nm    = wxFileName(from_u8(path));
     p->path    = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
     if (p->path.empty()) {
         p->err = _u8L("The file does not exist.");
@@ -142,7 +142,7 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
 
     if (p->sel != Sel::modelOnly) {
         if (p->profile.empty())
-            p->profile = p->plater->sla_print().full_print_config();
+            p->profile = p->plater->active_sla_print().full_print_config();
 
         const ModelObjectPtrs& objects = p->plater->model().objects;
         for (auto object : objects)

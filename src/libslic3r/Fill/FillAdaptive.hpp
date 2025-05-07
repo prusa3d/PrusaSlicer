@@ -15,7 +15,16 @@
 #ifndef slic3r_FillAdaptive_hpp_
 #define slic3r_FillAdaptive_hpp_
 
+#include <Eigen/Geometry>
+#include <memory>
+#include <utility>
+#include <vector>
+
 #include "FillBase.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 struct indexed_triangle_set;
 
@@ -27,6 +36,7 @@ namespace FillAdaptive
 {
 
 struct Octree;
+
 // To keep the definition of Octree opaque, we have to define a custom deleter.
 struct OctreeDeleter { void operator()(Octree *p); };
 using  OctreePtr = std::unique_ptr<Octree, OctreeDeleter>;
@@ -75,6 +85,7 @@ protected:
     // may not be optimal as the internal infill lines may get extruded before the long infill
     // lines to which the short infill lines are supposed to anchor.
 	bool no_sort() const override { return false; }
+    bool is_self_crossing() override { return true; }
 };
 
 } // namespace FillAdaptive

@@ -5,9 +5,9 @@
 #ifndef SRC_LIBSLIC3R_PATH_SORTING_HPP_
 #define SRC_LIBSLIC3R_PATH_SORTING_HPP_
 
-#include "AABBTreeLines.hpp"
-#include "BoundingBox.hpp"
-#include "Line.hpp"
+#include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Line.hpp"
 #include "ankerl/unordered_dense.h"
 #include <algorithm>
 #include <iterator>
@@ -18,8 +18,39 @@
 #include <type_traits>
 #include <unordered_set>
 
-namespace Slic3r {
-namespace Algorithm {
+namespace Slic3r::Algorithm {
+
+bool is_first_path_touching_second_path(const AABBTreeLines::LinesDistancer<Line> &first_distancer,
+                                        const AABBTreeLines::LinesDistancer<Line> &second_distancer,
+                                        const BoundingBox                         &second_distancer_bbox,
+                                        const double                               touch_distance_threshold)
+{
+    for (const Line &line : first_distancer.get_lines()) {
+        if (bbox_point_distance(second_distancer_bbox, line.a) < touch_distance_threshold && second_distancer.distance_from_lines<false>(line.a) < touch_distance_threshold) {
+            return true;
+        }
+    }
+
+    const Point first_distancer_last_pt = first_distancer.get_lines().back().b;
+    if (bbox_point_distance(second_distancer_bbox, first_distancer_last_pt) && second_distancer.distance_from_lines<false>(first_distancer_last_pt) < touch_distance_threshold) {
+        return true;
+    }
+
+    return false;
+}
+
+bool are_paths_touching(const AABBTreeLines::LinesDistancer<Line> &first_distancer,  const BoundingBox &first_distancer_bbox,
+                        const AABBTreeLines::LinesDistancer<Line> &second_distancer, const BoundingBox &second_distancer_bbox,
+                        const double touch_distance_threshold)
+{
+    if (is_first_path_touching_second_path(first_distancer, second_distancer, second_distancer_bbox, touch_distance_threshold)) {
+        return true;
+    } else if (is_first_path_touching_second_path(second_distancer, first_distancer, first_distancer_bbox, touch_distance_threshold)) {
+        return true;
+    }
+
+    return false;
+}
 
 //Sorts the paths such that all paths between begin and last_seed are printed first, in some order. The rest of the paths is sorted
 // such that the paths that are touching some of the already printed are printed first, sorted secondary by the distance to the last point of the last 
@@ -28,44 +59,34 @@ namespace Algorithm {
 // to the second, then they touch.
 // convert_to_lines is a lambda that should accept the path as argument and return it as Lines vector, in correct order.
 template<typename RandomAccessIterator, typename ToLines>
-void sort_paths(RandomAccessIterator begin, RandomAccessIterator end, Point start, double touch_limit_distance, ToLines convert_to_lines)
+void sort_paths(RandomAccessIterator begin, RandomAccessIterator end, Point start, const double touch_distance_threshold, ToLines convert_to_lines)
 {
-    size_t paths_count = std::distance(begin, end);
+    const size_t paths_count = std::distance(begin, end);
     if (paths_count <= 1)
         return;
-
-    auto paths_touch = [touch_limit_distance](const AABBTreeLines::LinesDistancer<Line> &left,
-                                              const AABBTreeLines::LinesDistancer<Line> &right) {
-        for (const Line &l : left.get_lines()) {
-            if (right.distance_from_lines<false>(l.a) < touch_limit_distance) {
-                return true;
-            }
-        }
-        if (right.distance_from_lines<false>(left.get_lines().back().b) < touch_limit_distance) {
-            return true;
-        }
-
-        for (const Line &l : right.get_lines()) {
-            if (left.distance_from_lines<false>(l.a) < touch_limit_distance) {
-                return true;
-            }
-        }
-        if (left.distance_from_lines<false>(right.get_lines().back().b) < touch_limit_distance) {
-            return true;
-        }
-        return false;
-    };
 
     std::vector<AABBTreeLines::LinesDistancer<Line>> distancers(paths_count);
     for (size_t path_idx = 0; path_idx < paths_count; path_idx++) {
         distancers[path_idx] = AABBTreeLines::LinesDistancer<Line>{convert_to_lines(*std::next(begin, path_idx))};
     }
 
+    BoundingBoxes bboxes;
+    bboxes.reserve(paths_count);
+    for (auto tp_it = begin; tp_it != end; ++tp_it) {
+        bboxes.emplace_back(tp_it->bounding_box());
+    }
+
     std::vector<std::unordered_set<size_t>> dependencies(paths_count);
-    for (size_t path_idx = 0; path_idx < paths_count; path_idx++) {
-        for (size_t next_path_idx = path_idx + 1; next_path_idx < paths_count; next_path_idx++) {
-            if (paths_touch(distancers[path_idx], distancers[next_path_idx])) {
-                dependencies[next_path_idx].insert(path_idx);
+    for (size_t curr_path_idx = 0; curr_path_idx < paths_count; ++curr_path_idx) {
+        for (size_t next_path_idx = curr_path_idx + 1; next_path_idx < paths_count; ++next_path_idx) {
+            const BoundingBox &curr_path_bbox = bboxes[curr_path_idx];
+            const BoundingBox &next_path_bbox = bboxes[next_path_idx];
+
+            if (bbox_bbox_distance(curr_path_bbox, next_path_bbox) >= touch_distance_threshold)
+                continue;
+
+            if (are_paths_touching(distancers[curr_path_idx], curr_path_bbox, distancers[next_path_idx], next_path_bbox, touch_distance_threshold)) {
+                dependencies[next_path_idx].insert(curr_path_idx);
             }
         }
     }
@@ -127,6 +148,6 @@ void sort_paths(RandomAccessIterator begin, RandomAccessIterator end, Point star
     }
 }
 
-}} // namespace Slic3r::Algorithm
+} // namespace Slic3r::Algorithm
 
 #endif /*SRC_LIBSLIC3R_PATH_SORTING_HPP_*/

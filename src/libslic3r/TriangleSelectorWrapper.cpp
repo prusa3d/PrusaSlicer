@@ -3,7 +3,16 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "TriangleSelectorWrapper.hpp"
+
+#include <igl/Hit.h>
 #include <memory>
+#include <utility>
+#include <vector>
+
+#include "admesh/stl.h"
+#include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/TriangleSelector.hpp"
 
 namespace Slic3r {
 
@@ -29,7 +38,7 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &orig
             if ((point - pos).norm() < radius && face_normal.dot(dir) < 0) {
                 std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
                         pos, origin, radius, this->mesh_transform, TriangleSelector::ClippingPlane { });
-                selector.select_patch(hit.id, std::move(cursor), EnforcerBlockerType::ENFORCER, trafo_no_translate,
+                selector.select_patch(hit.id, std::move(cursor), TriangleStateType::ENFORCER, trafo_no_translate,
                         true, eps_angle);
                 break;
             }
@@ -42,7 +51,7 @@ void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &orig
         if (dist < radius) {
             std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<TriangleSelector::Sphere>(
                     point, origin, radius, this->mesh_transform, TriangleSelector::ClippingPlane { });
-            selector.select_patch(hit_idx_out, std::move(cursor), EnforcerBlockerType::ENFORCER,
+            selector.select_patch(hit_idx_out, std::move(cursor), TriangleStateType::ENFORCER,
                     trafo_no_translate,
                     true, eps_angle);
         }

@@ -6,15 +6,20 @@
 #ifndef slic3r_GCode_Travels_hpp_
 #define slic3r_GCode_Travels_hpp_
 
-#include <vector>
 #include <tcbspan/span.hpp>
-#include <functional>
-#include <optional>
-
 #include <boost/functional/hash.hpp>
 #include <boost/math/special_functions/pow.hpp>
+#include <boost/container_hash/hash.hpp>
+#include <vector>
+#include <functional>
+#include <optional>
+#include <cstddef>
+#include <unordered_set>
 
 #include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/GCode/ExtrusionOrder.hpp"
 
 // Forward declarations.
 namespace Slic3r {
@@ -29,6 +34,7 @@ class ExtrusionEntity;
 
 namespace Slic3r::GCode {
 struct ObjectLayerToPrint;
+
 using ObjectsLayerToPrint = std::vector<ObjectLayerToPrint>;
 
 class ObjectOrExtrusionLinef : public Linef

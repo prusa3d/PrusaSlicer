@@ -1,4 +1,49 @@
+min_slic3r_version = 2.9.1-alpha0
+2.2.7 Updated FW version notification (6.3.1 CORE One). Updated PA values for Prusament PC Blend (MINI). Updated support material extrusion width for some profiles.
+2.2.6 Updated end print parking position in accordance with FW6.3.1 (CORE One).
+2.2.5 Updated FW version notification. Updated PETG cooling thresholds (CORE One). Updated Spectrum PCTG PA values. BASF vendor renamed to Forward AM.
+2.2.4 Updated profile for Prusament PP Carbon Fiber (CORE One) and Spectrum PCTG.
+2.2.3 Updated FW version notification. Added filament profiles.
+2.2.2 Added filament profiles for Sunlu PLA+ 2.0; Elegoo Rapid PLA+; Overture PETG; Overture HS TPU, Polymaker PolyTerra PLA. Increased PETG nominal chamber temperature (C1).
+2.2.1 Updated values for 1st layer solid infill speed and speed over bridges. Updated PLA idle temperature (C1). 
+2.2.0 Extruder clearance moved to printer settings. Added BREAKAWAY print profiles (XL).
+min_slic3r_version = 2.8.1-rc0
+2.1.13 Updated FW version notification.
+2.1.12 Added filament profiles for Sunlu PLA+ 2.0; Elegoo Rapid PLA+; Overture PETG; Polymaker PolyTerra PLA.
+2.1.11 Added filament profiles for Elegoo PLA and Elegoo Rapid PETG. Updated filament settings.
+2.1.10 Added MMU3 support for selected ASA, ABS, BVOH and PC Blend filaments (MK3.9/MK4 family printers).
+2.1.9 Updated minimal chamber temperatures (CORE One).
+2.1.8 Added printer profiles for Prusa CORE One.
+2.1.7 Updated organic support parameters for alternative nozzle diameters.
+2.1.6 Added profiles for IGUS filaments. Updated end gcode script condition.
+2.1.5 Fixed LA/PA condition for Prusament PP Carbon Fiber (MK3/MK3.5).
+2.1.4 Added filament profiles for Prusament PETG Magnetite 40%. Updated FW version notification.
+2.1.3 Added Buddy3D filaments.
+2.1.2 Added filament profile for Prusament PP Carbon Fiber. Added filament profile for Cookiecad PLA.
+2.1.1 Updated FW version notification. Updated start g-code (XL). Updated Fiberflex 40D profile (MK4).
+2.1.0 Added new parameters for nozzle checks (abrasive filaments, high flow nozzles), updated related start g-codes. Enabled overhang fan speed overrides for specific filaments (MK4S).
+min_slic3r_version = 2.8.0-alpha0
+2.0.6 Updated FW version notification.
+2.0.5 Fixed an issue in configuration wizard.
+2.0.4 Added VOXELPLA filaments. Updated compatible condition for some specific filament profiles.
+2.0.3 Added printer profiles for Original Prusa MK4S and MK3.9S. Added profiles for high flow nozzles (MK4/MK3.9/XL). Reorganized configuration wizard. 
+2.0.2 Added filament profile for Prusament Woodfill. Updated FW version notification.
+2.0.1 Updated FW version notifications.
+2.0.0 Updated version for PS2.8.0.
+2.0.0-alpha1 Updated FW version notification. Added ROSA3D filaments. Updated print profiles.
+2.0.0-alpha0 Initial bundle for PS2.8.0-alpha.
+max_slic3r_version = 2.7.9
+min_slic3r_version = 2.7.5-rc
+1.14.2 Updated FW version notification.
+1.14.1 Updated FW version notifications.
+1.14.0 Added new settings for SLA material profiles.
 min_slic3r_version = 2.7.3-beta1
+1.13.6 Updated FW version notification.
+1.13.5 Updated FW version notifications.
+1.13.4 Updated FW version notification. Added ROSA3D filaments. Updated print profiles.
+1.13.3 Updated FW version notification.
+1.13.2 Added material profiles for Prusament Resin Flex Anatomic Red and Prusament Resin Flex Gingiva Mask.
+1.13.1 Added material profile for Prusament Resin Model Transparent Clear. Enabled stealth mode support for MINI, XL, MK3.5, MK3.9, MK4 (this mode will be available in FW 6.0.0).
 1.13.0 Updated version for PrusaSlicer 2.7.3
 1.13.0-beta3 Reduced number of top/bottom layers (0.6). Updated cooling thresholds.
 1.13.0-beta2 Disabled ramping lift for MK3.5.

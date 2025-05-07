@@ -1,16 +1,24 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
+#include <catch2/generators/catch_generators_all.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/catch_approx.hpp>
+
 #include "test_utils.hpp"
 
-#include <libslic3r/Arrange/Arrange.hpp>
-#include <libslic3r/Arrange/Items/ArrangeItem.hpp>
-#include <libslic3r/Arrange/Tasks/ArrangeTask.hpp>
-
-#include <libslic3r/Arrange/SceneBuilder.hpp>
+#include <arrange-wrapper/Arrange.hpp>
+#include <arrange-wrapper/Items/ArrangeItem.hpp>
+#include <arrange-wrapper/Tasks/ArrangeTask.hpp>
+#include <arrange-wrapper/SceneBuilder.hpp>
+#include <arrange-wrapper/ModelArrange.hpp>
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Format/3mf.hpp"
-#include "libslic3r/ModelArrange.hpp"
+
+using namespace Catch;
 
 static Slic3r::Model get_example_model_with_20mm_cube()
 {
@@ -135,7 +143,7 @@ TEST_CASE("ModelInstance should be retrievable when imbued into ArrangeItem",
     arr2::ArrangeItem itm;
     arr2::PhysicalOnlyVBedHandler vbedh;
     auto vbedh_ptr = static_cast<arr2::VirtualBedHandler *>(&vbedh);
-    auto arrbl = arr2::ArrangeableModelInstance{mi, vbedh_ptr, nullptr, {0, 0}};
+    auto arrbl = arr2::ArrangeableModelInstance{mi, vbedh_ptr, nullptr, {0, 0}, std::nullopt};
     arr2::imbue_id(itm, arrbl.id());
 
     std::optional<ObjectID> id_returned = arr2::retrieve_id(itm);
@@ -330,7 +338,7 @@ auto create_vbed_handler<Slic3r::arr2::YStriderVBedHandler>(const Slic3r::Boundi
 template<>
 auto create_vbed_handler<Slic3r::arr2::GridStriderVBedHandler>(const Slic3r::BoundingBox &bedbb, coord_t gap)
 {
-    return Slic3r::arr2::GridStriderVBedHandler{bedbb, gap};
+    return Slic3r::arr2::GridStriderVBedHandler{bedbb, {gap, gap}};
 }
 
 TEMPLATE_TEST_CASE("Common virtual bed handlers",
@@ -628,7 +636,7 @@ TEMPLATE_TEST_CASE("Bed needs to be completely filled with 1cm cubes",
 
     ModelObject* new_object = m.add_object();
     new_object->name = "10mm_box";
-    new_object->add_instance();
+    ModelInstance *instance = new_object->add_instance();
     TriangleMesh mesh = make_cube(10., 10., 10.);
     ModelVolume* new_volume = new_object->add_volume(mesh);
     new_volume->name = new_object->name;
@@ -641,11 +649,15 @@ TEMPLATE_TEST_CASE("Bed needs to be completely filled with 1cm cubes",
 
     arr2::FixedSelection sel({{true}});
 
+    arr2::BedConstraints constraints;
+    constraints.insert({instance->id(), 0});
+
     arr2::Scene scene{arr2::SceneBuilder{}
                                  .set_model(m)
                                  .set_arrange_settings(settings)
                                  .set_selection(&sel)
-                                 .set_bed(cfg)};
+                                 .set_bed_constraints(std::move(constraints))
+                                 .set_bed(cfg, Point::new_scale(10, 10))};
 
     auto task = arr2::FillBedTask<ArrItem>::create(scene);
     auto result = task->process_native(arr2::DummyCtl{});
@@ -654,7 +666,7 @@ TEMPLATE_TEST_CASE("Bed needs to be completely filled with 1cm cubes",
     store_3mf("fillbed_10mm_result.3mf", &m, &cfg, false);
 
     Points bedpts = get_bed_shape(cfg);
-    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts);
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(bedpts, Point::new_scale(10, 10));
 
     REQUIRE(bed.which() == 1); // Rectangle bed
 
@@ -799,7 +811,7 @@ TEST_CASE("Testing arrangement involving virtual beds", "[arrange2][integration]
     DynamicPrintConfig cfg;
     cfg.load_from_ini(std::string(TEST_DATA_DIR PATH_SEPARATOR) + "default_fff.ini",
                       ForwardCompatibilitySubstitutionRule::Enable);
-    auto bed = arr2::to_arrange_bed(get_bed_shape(cfg));
+    auto bed = arr2::to_arrange_bed(get_bed_shape(cfg), Point::new_scale(10, 10));
     auto bedbb = bounding_box(bed);
     auto bedsz = unscaled(bedbb.size());
 
@@ -815,7 +827,7 @@ TEST_CASE("Testing arrangement involving virtual beds", "[arrange2][integration]
     arr2::Scene scene{arr2::SceneBuilder{}
                           .set_model(model)
                           .set_arrange_settings(settings)
-                          .set_bed(cfg)};
+                          .set_bed(cfg, Point::new_scale(10, 10))};
 
     auto itm_conv = arr2::ArrangeableToItemConverter<arr2::ArrangeItem>::create(scene);
 
@@ -883,7 +895,7 @@ public:
 };
 
 class MocWTH : public WipeTowerHandler {
-    std::function<bool()> m_sel_pred;
+    std::function<bool(int)> m_sel_pred;
     ObjectID m_id;
 
 public:
@@ -891,17 +903,21 @@ public:
 
     void visit(std::function<void(Arrangeable &)> fn) override
     {
-        MocWT wt{m_id, Polygon{}, m_sel_pred};
+        MocWT wt{m_id, Polygon{}, 0, m_sel_pred};
         fn(wt);
     }
     void visit(std::function<void(const Arrangeable &)> fn) const override
     {
-        MocWT wt{m_id, Polygon{}, m_sel_pred};
+        MocWT wt{m_id, Polygon{}, 0, m_sel_pred};
         fn(wt);
     }
-    void set_selection_predicate(std::function<bool()> pred) override
+    void set_selection_predicate(std::function<bool(int)> pred) override
     {
         m_sel_pred = std::move(pred);
+    }
+
+    ObjectID get_id() const override {
+        return m_id;
     }
 };
 
@@ -974,7 +990,7 @@ TEST_CASE("Test SceneBuilder", "[arrange2][integration]")
 
         WHEN("a scene is built with a bed initialized from this DynamicPrintConfig")
         {
-            arr2::Scene scene(arr2::SceneBuilder{}.set_bed(cfg));
+            arr2::Scene scene(arr2::SceneBuilder{}.set_bed(cfg, Point::new_scale(10, 10)));
 
             auto bedbb = bounding_box(get_bed_shape(cfg));
 
@@ -1001,7 +1017,10 @@ TEST_CASE("Test SceneBuilder", "[arrange2][integration]")
         arr2::SceneBuilder bld;
         Model mdl;
         bld.set_model(mdl);
-        bld.set_wipe_tower_handler(std::make_unique<arr2::MocWTH>(mdl.wipe_tower.id()));
+
+        std::vector<AnyPtr<arr2::WipeTowerHandler>> handlers;
+        handlers.push_back(std::make_unique<arr2::MocWTH>(wipe_tower_instance_id(0)));
+        bld.set_wipe_tower_handlers(std::move(handlers));
 
         WHEN("the selection mask is initialized as a fallback default in the created scene")
         {
@@ -1014,7 +1033,7 @@ TEST_CASE("Test SceneBuilder", "[arrange2][integration]")
 
                 bool wt_selected = false;
                 scene.model()
-                    .visit_arrangeable(mdl.wipe_tower.id(),
+                    .visit_arrangeable(wipe_tower_instance_id(0),
                                        [&wt_selected](
                                            const arr2::Arrangeable &arrbl) {
                                            wt_selected = arrbl.is_selected();
@@ -1077,42 +1096,4 @@ TEST_CASE("Testing duplicate function to really duplicate the whole Model",
 
     REQUIRE(is_collision_free(range(task->selected)));
 }
-
-// TODO:
-//TEST_CASE("Testing fit-into-bed rotation search", "[arrange2][integration]")
-//{
-//    using namespace Slic3r;
-
-//    Model model;
-
-//    ModelObject* new_object = model.add_object();
-//    new_object->name = "big_cube";
-//    new_object->add_instance();
-//    TriangleMesh mesh = make_cube(205., 220., 10.);
-//    mesh.rotate_z(15 * PI / 180);
-
-//    ModelVolume* new_volume = new_object->add_volume(mesh);
-//    new_volume->name = new_object->name;
-
-//    store_3mf("rotfail.3mf", &model, nullptr, false);
-
-//    arr2::RectangleBed bed{scaled(250.), scaled(210.)};
-
-//    arr2::Scene scene{
-//        arr2::SceneBuilder{}
-//            .set_bed(bed)
-//            .set_model(model)
-//            .set_arrange_settings(arr2::ArrangeSettings{}
-//                .set_distance_from_objects(0.)
-//                .set_rotation_enabled(true)
-//            )
-//    };
-
-//    auto task   = arr2::ArrangeTask<arr2::ArrangeItem>::create(scene);
-//    auto result = task->process_native(arr2::DummyCtl{});
-
-//    REQUIRE(result->items.size() == 1);
-//    REQUIRE(arr2::get_rotation(result->items.front()) > 0.);
-//    REQUIRE(arr2::is_arranged(result->items.front()));
-//}
 

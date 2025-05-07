@@ -25,6 +25,14 @@ using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
 
 namespace {
+
+// Used to move slice (text line) on place where is approx vertical center of text
+// When copy value const double ASCENT_CENTER from Emboss.cpp and Vertical align is center than
+// text line will cross object center
+const double ascent_ratio_offset = 1 / 3.;
+
+double calc_line_height_in_mm(const Slic3r::Emboss::FontFile& ff, const FontProp& fp); // return lineheight in mm
+
 // Be careful it is not water tide and contain self intersections
 // It is only for visualization purposes
 indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radius, size_t steps = 20)
@@ -238,63 +246,13 @@ void TextLinesModel::init(const Transform3d      &text_tr,
     const FontFile &ff = *ff_ptr;
     const FontProp &fp = style_manager.get_font_prop();
 
-    FontProp::VerticalAlign align = fp.align.second;
-
-    double line_height_mm = calc_line_height_in_mm(ff, fp);
-    assert(line_height_mm > 0);
-    if (line_height_mm <= 0)
-        return;
-
     m_model.reset();
-    m_lines.clear();
 
-    // size_in_mm .. contain volume scale and should be ascent value in mm 
-    double line_offset = fp.size_in_mm * ascent_ratio_offset;
-    double first_line_center = line_offset + get_align_y_offset_in_mm(align, count_lines, ff, fp);    
-    std::vector<float> line_centers(count_lines);
-    for (size_t i = 0; i < count_lines; ++i)
-        line_centers[i] = static_cast<float>(first_line_center - i * line_height_mm);
-
-    // contour transformation
-    Transform3d c_trafo = text_tr * get_rotation();
-    Transform3d c_trafo_inv = c_trafo.inverse();
-
-    std::vector<Polygons> line_contours(count_lines);
-    for (const ModelVolume *volume : volumes_to_slice) {
-        MeshSlicingParams slicing_params;
-        slicing_params.trafo = c_trafo_inv * volume->get_matrix();
-        for (size_t i = 0; i < count_lines; ++i) {
-            const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, line_centers[i], slicing_params);
-            if (polys.empty())
-                continue;
-            Polygons &contours = line_contours[i];
-            contours.insert(contours.end(), polys.begin(), polys.end());
-        }
-    }
-
-    // fix for text line out of object
-    // When move text close to edge - line center could be out of object
-    for (Polygons &contours: line_contours) {
-        if (!contours.empty())
-            continue;
-
-        // use line center at zero, there should be some contour.
-        float line_center = 0.f;
-        for (const ModelVolume *volume : volumes_to_slice) {
-            MeshSlicingParams slicing_params;
-            slicing_params.trafo = c_trafo_inv * volume->get_matrix();
-            const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, line_center, slicing_params);
-            if (polys.empty())
-                continue;
-            contours.insert(contours.end(), polys.begin(), polys.end());
-        }
-    }
-
-    m_lines = select_closest_contour(line_contours);
-    assert(m_lines.size() == count_lines);
-    assert(line_centers.size() == count_lines);
-    for (size_t i = 0; i < count_lines; ++i)
-        m_lines[i].y = line_centers[i];
+    double line_height_mm;
+    m_lines = Slic3r::Emboss::create_text_lines(
+        text_tr, volumes_to_slice, ff, fp, count_lines, &line_height_mm);
+    if (m_lines.empty())
+        return;
 
     bool is_mirrored = has_reflection(text_tr);
     float radius = static_cast<float>(line_height_mm / 20.);
@@ -346,9 +304,82 @@ void TextLinesModel::render(const Transform3d &text_world)
     shader->stop_using();
 }
 
-double TextLinesModel::calc_line_height_in_mm(const Slic3r::Emboss::FontFile &ff, const FontProp &fp)
-{
+namespace {
+double calc_line_height_in_mm(const Slic3r::Emboss::FontFile &ff, const FontProp &fp) {
     int line_height = Slic3r::Emboss::get_line_height(ff, fp); // In shape size
     double scale = Slic3r::Emboss::get_text_shape_scale(fp, ff);
     return line_height * scale;
+}
+} // namespace
+
+Slic3r::Emboss::TextLines Slic3r::Emboss::create_text_lines(
+    const Transform3d &text_tr,
+    const ModelVolumePtrs &volumes_to_slice,
+    const FontFile &ff,
+    const FontProp &fp,
+    unsigned count_lines,
+    double *line_height_mm_ptr
+) {
+    FontProp::VerticalAlign align = fp.align.second;
+
+    double line_height_mm = calc_line_height_in_mm(ff, fp);
+    assert(line_height_mm > 0);
+    if (line_height_mm <= 0)
+        return {};
+
+    // size_in_mm .. contain volume scale and should be ascent value in mm
+    double line_offset = fp.size_in_mm * ascent_ratio_offset;
+    double first_line_center = line_offset + get_align_y_offset_in_mm(align, count_lines, ff, fp);
+    std::vector<float> line_centers(count_lines);
+    for (size_t i = 0; i < count_lines; ++i)
+        line_centers[i] = static_cast<float>(first_line_center - i * line_height_mm);
+
+    // contour transformation
+    Transform3d c_trafo = text_tr * get_rotation();
+    Transform3d c_trafo_inv = c_trafo.inverse();
+
+    std::vector<Polygons> line_contours(count_lines);
+    for (const ModelVolume *volume : volumes_to_slice) {
+        MeshSlicingParams slicing_params;
+        slicing_params.trafo = c_trafo_inv * volume->get_matrix();
+        for (size_t i = 0; i < count_lines; ++i) {
+            const Polygons polys =
+                Slic3r::slice_mesh(volume->mesh().its, line_centers[i], slicing_params);
+            if (polys.empty())
+                continue;
+            Polygons &contours = line_contours[i];
+            contours.insert(contours.end(), polys.begin(), polys.end());
+        }
+    }
+
+    // fix for text line out of object
+    // When move text close to edge - line center could be out of object
+    for (Polygons &contours : line_contours) {
+        if (!contours.empty())
+            continue;
+
+        // use line center at zero, there should be some contour.
+        float line_center = 0.f;
+        for (const ModelVolume *volume : volumes_to_slice) {
+            MeshSlicingParams slicing_params;
+            slicing_params.trafo = c_trafo_inv * volume->get_matrix();
+            const Polygons polys =
+                Slic3r::slice_mesh(volume->mesh().its, line_center, slicing_params);
+            if (polys.empty())
+                continue;
+            contours.insert(contours.end(), polys.begin(), polys.end());
+        }
+    }
+
+    TextLines result = select_closest_contour(line_contours);
+    assert(result.size() == count_lines);
+    assert(line_centers.size() == count_lines);
+    // Fill centers
+    for (size_t i = 0; i < count_lines; ++i)
+        result[i].y = line_centers[i];
+
+    if (line_height_mm_ptr != nullptr)
+        *line_height_mm_ptr = line_height_mm;
+
+    return result;
 }

@@ -5,18 +5,28 @@
 #ifndef slic3r_GCodeReader_hpp_
 #define slic3r_GCodeReader_hpp_
 
-#include "libslic3r.h"
+#include <stdint.h>
+#include <string.h>
 #include <cmath>
 #include <cstdlib>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
+#include <cinttypes>
+#include <cstring>
+
+#include "libslic3r.h"
 #include "PrintConfig.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 class GCodeReader {
 public:
+    typedef std::function<void(float)> ProgressCallback;
+
     class GCodeLine {
     public:
         GCodeLine() { reset(); }
@@ -164,6 +174,8 @@ public:
     char   extrusion_axis() const { return m_extrusion_axis; }
 //  void   set_extrusion_axis(char axis) { m_extrusion_axis = axis; }
 
+    void set_progress_callback(ProgressCallback cb) { m_progress_callback = cb; }
+
 private:
     template<typename ParseLineCallback, typename LineEndCallback>
     bool        parse_file_raw_internal(const std::string &filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback);
@@ -195,6 +207,8 @@ private:
     bool        m_verbose;
     // To be set by the callback to stop parsing.
     bool        m_parsing{ false };
+
+    ProgressCallback m_progress_callback{ nullptr };
 };
 
 } /* namespace Slic3r */

@@ -5,11 +5,7 @@
 #ifndef slic3r_ImGuiWrapper_hpp_
 #define slic3r_ImGuiWrapper_hpp_
 
-#include <string>
-#include <string_view>
-#include <map>
-
-#include <imgui/imgui.h>
+#include "ImGuiPureWrap.hpp"
 
 #include <wx/string.h>
 
@@ -26,6 +22,7 @@ struct OptionViewParameters;
 class wxString;
 class wxMouseEvent;
 class wxKeyEvent;
+struct ImRect;
 
 struct IMGUI_API ImGuiWindow;
 
@@ -34,9 +31,9 @@ namespace GUI {
 
 class ImGuiWrapper
 {
+    std::vector<std::tuple<std::string, const ImWchar*, bool>> m_lang_glyphs_info; // language prefix, ranges, whether it needs CLK font
     const ImWchar* m_glyph_ranges{ nullptr };
     // Chinese, Japanese, Korean
-    bool m_font_cjk{ false };
     float m_font_size{ 18.0 };
     unsigned m_font_texture{ 0 };
     float m_style_scaling{ 1.0 };
@@ -64,7 +61,6 @@ public:
     ~ImGuiWrapper();
 
     void set_language(const std::string &language);
-    void set_display_size(float w, float h);
     void set_scaling(float font_size, float scale_style, float scale_both);
     bool update_mouse_data(wxMouseEvent &evt);
     bool update_key_data(wxKeyEvent &evt);
@@ -78,120 +74,29 @@ public:
 
     float scaled(float x) const { return x * m_font_size; }
     ImVec2 scaled(float x, float y) const { return ImVec2(x * m_font_size, y * m_font_size); }
-    /// <summary>
-    /// Extend ImGui::CalcTextSize to use string_view
-    /// </summary>
-    static ImVec2 calc_text_size(std::string_view text, bool  hide_text_after_double_hash = false, float wrap_width = -1.0f);
-    static ImVec2 calc_text_size(const std::string& text, bool  hide_text_after_double_hash = false, float wrap_width = -1.0f);
-    static ImVec2 calc_text_size(const wxString &text, bool  hide_text_after_double_hash = false, float wrap_width = -1.0f);
-    ImVec2 calc_button_size(const wxString &text, const ImVec2 &button_size = ImVec2(0, 0)) const;
 
-    ImVec2 get_item_spacing() const;
-    float  get_slider_float_height() const;
     const LastSliderStatus& get_last_slider_status() const { return m_last_slider_status; }
     LastSliderStatus& get_last_slider_status() { return m_last_slider_status; }
 
-    void set_next_window_pos(float x, float y, int flag, float pivot_x = 0.0f, float pivot_y = 0.0f);
-    void set_next_window_bg_alpha(float alpha);
-	void set_next_window_size(float x, float y, ImGuiCond cond);
-
-    bool begin(const std::string &name, int flags = 0);
-    bool begin(const wxString &name, int flags = 0);
-    bool begin(const std::string& name, bool* close, int flags = 0);
-    bool begin(const wxString& name, bool* close, int flags = 0);
-    void end();
-
-    bool button(const wxString &label, const wxString& tooltip = {});
-    bool button(const wxString& label, float width, float height);
-    bool button(const wxString& label, const ImVec2 &size, bool enable); // default size = ImVec2(0.f, 0.f)
-    bool radio_button(const wxString &label, bool active);
+    bool button(const std::string& label, const ImVec2 &size, bool enable); // default size = ImVec2(0.f, 0.f)
     void draw_icon(ImGuiWindow& window, const ImVec2& pos, float size, wchar_t icon_id);
-    bool draw_radio_button(const std::string& name, float size, bool active, std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback);
-    bool checkbox(const wxString &label, bool &value);
-    static void text(const char *label);
-    static void text(const std::string &label);
-    static void text(const wxString &label);
-    static void text_colored(const ImVec4& color, const char* label);
-    static void text_colored(const ImVec4& color, const std::string& label);
-    static void text_colored(const ImVec4& color, const wxString& label);
-    void text_wrapped(const char *label, float wrap_width);
-    void text_wrapped(const std::string &label, float wrap_width);
-    void text_wrapped(const wxString &label, float wrap_width);
-    void tooltip(const char *label, float wrap_width);
-    void tooltip(const wxString &label, float wrap_width);
 
     // Float sliders: Manually inserted values aren't clamped by ImGui.Using this wrapper function does (when clamp==true).
-    ImVec2 get_slider_icon_size() const;
     bool slider_float(const char* label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
     bool slider_float(const std::string& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
     bool slider_float(const wxString& label, float* v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true);
 
-    bool image_button(ImTextureID user_texture_id, const ImVec2& size, const ImVec2& uv0 = ImVec2(0.0, 0.0), const ImVec2& uv1 = ImVec2(1.0, 1.0), int frame_padding = -1, const ImVec4& bg_col = ImVec4(0.0, 0.0, 0.0, 0.0), const ImVec4& tint_col = ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags flags = 0);
-    bool image_button(const wchar_t icon, const wxString& tooltip = L"");
-
-    // Use selection = -1 to not mark any option as selected
-    bool combo(const std::string& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags = 0, float label_width = 0.0f, float item_width = 0.0f);
-    bool combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags = 0, float label_width = 0.0f, float item_width = 0.0f);
-    bool undo_redo_list(const ImVec2& size, const bool is_undo, bool (*items_getter)(const bool, int, const char**), int& hovered, int& selected, int& mouse_wheel);
+    bool image_button(const wchar_t icon, const std::string& tooltip = {}, bool highlight_on_hover = true);
     void search_list(const ImVec2& size, bool (*items_getter)(int, const char** label, const char** tooltip), char* search_str,
                      Search::OptionViewParameters& view_params, int& selected, bool& edited, int& mouse_wheel, bool is_localized);
-    void title(const std::string& str);
 
     void disabled_begin(bool disabled);
     void disabled_end();
 
-    bool want_mouse() const;
-    bool want_keyboard() const;
-    bool want_text_input() const;
-    bool want_any_input() const;
-
-    // Optional inputs are used for set up value inside of an optional, with default value
-    // 
-    // Extended function ImGui::InputInt to work with std::optional<int>, when value == def_val optional is released.
-    static bool input_optional_int(const char *label, std::optional<int>& v, int step=1, int step_fast=100, ImGuiInputTextFlags flags=0, int def_val = 0);    
-    // Extended function ImGui::InputFloat to work with std::optional<float> value near def_val cause release of optional
-    static bool input_optional_float(const char* label, std::optional<float> &v, float step = 0.0f, float step_fast = 0.0f, const char* format = "%.3f", ImGuiInputTextFlags flags = 0, float def_val = .0f);
-    // Extended function ImGui::DragFloat to work with std::optional<float> value near def_val cause release of optional
-    static bool drag_optional_float(const char* label, std::optional<float> &v, float v_speed, float v_min, float v_max, const char* format, float power, float def_val = .0f);
     // Extended function ImGuiWrapper::slider_float to work with std::optional<float> value near def_val cause release of optional
     bool slider_optional_float(const char* label, std::optional<float> &v, float v_min, float v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true, float def_val = .0f);
     // Extended function ImGuiWrapper::slider_float to work with std::optional<int>, when value == def_val than optional release its value
     bool slider_optional_int(const char* label, std::optional<int> &v, int v_min, int v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true, int def_val = 0);
-
-    /// <summary>
-    /// Change position of imgui window
-    /// </summary>
-    /// <param name="window_name">ImGui identifier of window</param>
-    /// <param name="output_window_offset">[output] optional </param>
-    /// <param name="try_to_fix">When True Only move to be full visible otherwise reset position</param>
-    /// <returns>New offset of window for function ImGui::SetNextWindowPos</returns>
-    static std::optional<ImVec2> change_window_position(const char *window_name, bool try_to_fix);
-
-    /// <summary>
-    /// Use ImGui internals to unactivate (lose focus) in input.
-    /// When input is activ it can't change value by application.
-    /// </summary>
-    static void left_inputs();
-
-    /// <summary>
-    /// Truncate text by ImGui draw function to specific width
-    /// NOTE 1: ImGui must be initialized
-    /// NOTE 2: Calculation for actual acive imgui font
-    /// </summary>
-    /// <param name="text">Text to be truncated</param>
-    /// <param name="width">Maximal width before truncate</param>
-    /// <param name="tail">String puted on end of text to be visible truncation</param>
-    /// <returns>Truncated text</returns>
-    static std::string trunc(const std::string &text,
-                             float              width,
-                             const char        *tail = " ..");
-
-    /// <summary>
-    /// Escape ## in data by add space between hashes
-    /// Needed when user written text is visualized by ImGui.
-    /// </summary>
-    /// <param name="text">In/Out text to be escaped</param>
-    static void escape_double_hash(std::string &text);
 
     /// <summary>
     /// Suggest loacation of dialog window,
@@ -217,55 +122,14 @@ public:
     /// <param name="thickness">Width of polygon line</param>
     static void draw(const Polygon &polygon,
                      ImDrawList *   draw_list = ImGui::GetOverlayDrawList(),
-                     ImU32 color     = ImGui::GetColorU32(COL_ORANGE_LIGHT),
+                     ImU32 color     = ImGui::GetColorU32(ImGuiPureWrap::COL_ORANGE_LIGHT),
                      float thickness = 3.f);
-
-    /// <summary>
-    /// Draw symbol of cross hair
-    /// </summary>
-    /// <param name="position">Center of cross hair</param>
-    /// <param name="radius">Circle radius</param>
-    /// <param name="color">Color of symbol</param>
-    /// <param name="num_segments">Precission of circle</param>
-    /// <param name="thickness">Thickness of Line in symbol</param>
-    static void draw_cross_hair(const ImVec2 &position,
-                                float         radius       = 16.f,
-                                ImU32         color        = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f)),
-                                int           num_segments = 0,
-                                float         thickness    = 4.f);
-
-    /// <summary>
-    /// Check that font ranges contain all chars in string
-    /// (rendered Unicodes are stored in GlyphRanges)
-    /// </summary>
-    /// <param name="font">Contain glyph ranges</param>
-    /// <param name="text">Vector of character to check</param>
-    /// <returns>True when all glyphs from text are in font ranges</returns>
-    static bool contain_all_glyphs(const ImFont *font, const std::string &text);
-    static bool is_chars_in_ranges(const ImWchar *ranges, const char *chars_ptr);
-    static bool is_char_in_ranges(const ImWchar *ranges, unsigned int letter);
 
     bool requires_extra_frame() const { return m_requires_extra_frame; }
     void set_requires_extra_frame() { m_requires_extra_frame = true; }
     void reset_requires_extra_frame() { m_requires_extra_frame = false; }
 
-    void disable_background_fadeout_animation();
-
-    static ImU32 to_ImU32(const ColorRGBA& color);
-    static ImVec4 to_ImVec4(const ColorRGBA& color);
-    static ColorRGBA from_ImU32(const ImU32& color);
-    static ColorRGBA from_ImVec4(const ImVec4& color);
-
     ImFontAtlasCustomRect* GetTextureCustomRect(const wchar_t& tex_id);
-
-    static const ImVec4 COL_GREY_DARK;
-    static const ImVec4 COL_GREY_LIGHT;
-    static const ImVec4 COL_ORANGE_DARK;
-    static const ImVec4 COL_ORANGE_LIGHT;
-    static const ImVec4 COL_WINDOW_BACKGROUND;
-    static const ImVec4 COL_BUTTON_BACKGROUND;
-    static const ImVec4 COL_BUTTON_HOVERED;
-    static const ImVec4 COL_BUTTON_ACTIVE;
 
 private:
     void init_font(bool compress);
@@ -282,6 +146,13 @@ private:
     LastSliderStatus m_last_slider_status;
 };
 
+namespace ImGuiPSWrap
+{
+    ImU32       to_ImU32(const ColorRGBA& color);
+    ImVec4      to_ImVec4(const ColorRGBA& color);
+    ColorRGBA   from_ImU32(const ImU32& color);
+    ColorRGBA   from_ImVec4(const ImVec4& color);
+}
 
 } // namespace GUI
 } // namespace Slic3r

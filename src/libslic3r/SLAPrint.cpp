@@ -4,7 +4,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "SLAPrint.hpp"
-#include "SLAPrintSteps.hpp"
+#include "SLAPrintSteps.hpp" // IWYU pragma: keep
 #include "CSGMesh/CSGMeshCopy.hpp"
 #include "CSGMesh/PerformCSGMeshBooleans.hpp"
 #include "format.hpp"
@@ -21,6 +21,8 @@
 #include <tbb/parallel_for.h>
 #include <boost/filesystem/path.hpp>
 #include <boost/log/trivial.hpp>
+
+#include "libslic3r/MultipleBeds.hpp"
 
 // #define SLAPRINT_DO_BENCHMARK
 
@@ -219,10 +221,8 @@ static t_config_option_keys print_config_diffs(const StaticPrintConfig     &curr
         "branchingsupport_head_width"sv,
         "branchingsupport_pillar_diameter"sv,
         "support_points_density_relative"sv,
-        "relative_correction_x"sv,
-        "relative_correction_y"sv,
-        "relative_correction_z"sv,
         "elefant_foot_compensation"sv,
+        "absolute_correction"sv,
     };
 
     static constexpr auto material_ow_prefix = "material_ow_";
@@ -260,7 +260,7 @@ static t_config_option_keys print_config_diffs(const StaticPrintConfig     &curr
 }
 
 
-SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig config)
+SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings)
 {
 #ifdef _DEBUG
     check_model_ids_validity(model);
@@ -299,6 +299,16 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
         update_apply_status(this->invalidate_state_by_config_options(printer_diff, invalidate_all_model_objects));
     if (! material_diff.empty())
         update_apply_status(this->invalidate_state_by_config_options(material_diff, invalidate_all_model_objects));
+
+    // Multiple beds hack: We currently use one SLAPrint for all beds. It must be invalidated
+    // when beds are switched. If not done explicitly, supports from previously sliced object
+    // might end up with wrong offset.
+    static int last_bed_idx = s_multiple_beds.get_active_bed();
+    int current_bed = s_multiple_beds.get_active_bed();
+    if (current_bed != last_bed_idx) {
+        invalidate_all_model_objects = true;
+        last_bed_idx = current_bed;
+    }
 
     // Apply variables to placeholder parser. The placeholder parser is currently used
     // only to generate the output file name.
@@ -685,6 +695,12 @@ std::string SLAPrint::validate(std::vector<std::string>*) const
         }
     }
 
+    if ((!m_material_config.use_tilt.get_at(0) && is_approx(m_material_config.tower_hop_height.get_at(0), 0.))
+        || (!m_material_config.use_tilt.get_at(1) && is_approx(m_material_config.tower_hop_height.get_at(1), 0.)))
+        return _u8L("Disabling the 'Use tilt' function causes the object to separate away from the film in the "
+                    "vertical direction only. Therefore, it is necessary to set the 'Tower hop height' parameter "
+                    "to reasonable value. The recommended value is 5 mm.");
+
     return "";
 }
 
@@ -695,6 +711,16 @@ void SLAPrint::export_print(const std::string &fname, const ThumbnailsList &thum
     else {
         throw ExportError(format(_u8L("Unknown archive format: %s"), m_printer_config.sla_archive_format.value));
     }
+}
+
+bool SLAPrint::is_prusa_print(const std::string& printer_model)
+{
+    static const std::vector<std::string> prusa_printer_models = { "SL1", "SL1S", "M1", "SLX" };
+    for (const std::string& model : prusa_printer_models)
+        if (model == printer_model)
+            return true;
+
+    return false;
 }
 
 bool SLAPrint::invalidate_step(SLAPrintStep step)
@@ -838,6 +864,7 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "absolute_correction"sv,
         "elefant_foot_compensation"sv,
         "elefant_foot_min_width"sv,
+        "zcorrection_layers"sv,
         "gamma_correction"sv,
     };
 
@@ -858,7 +885,26 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "display_mirror_y"sv,
         "display_orientation"sv,
         "sla_archive_format"sv,
-        "sla_output_precision"sv
+        "sla_output_precision"sv,
+        // tilt params
+        "delay_before_exposure"sv,
+        "delay_after_exposure"sv,
+        "tower_hop_height"sv,
+        "tower_speed"sv,
+        "use_tilt"sv,
+        "tilt_down_initial_speed"sv,
+        "tilt_down_offset_steps"sv,
+        "tilt_down_offset_delay"sv,
+        "tilt_down_finish_speed"sv,
+        "tilt_down_cycles"sv,
+        "tilt_down_delay"sv,
+        "tilt_up_initial_speed"sv,
+        "tilt_up_offset_steps"sv,
+        "tilt_up_offset_delay"sv,
+        "tilt_up_finish_speed"sv,
+        "tilt_up_cycles"sv,
+        "tilt_up_delay"sv,
+        "area_fill"sv,
     };
 
     static StaticSet steps_ignore = {
@@ -869,7 +915,6 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "fast_tilt_time"sv,
         "slow_tilt_time"sv,
         "high_viscosity_tilt_time"sv,
-        "area_fill"sv,
         "bottle_cost"sv,
         "bottle_volume"sv,
         "bottle_weight"sv,
@@ -884,9 +929,8 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "material_ow_branchingsupport_head_width"sv,
         "material_ow_elefant_foot_compensation"sv,
         "material_ow_support_points_density_relative"sv,
-        "material_ow_relative_correction_x"sv,
-        "material_ow_relative_correction_y"sv,
-        "material_ow_relative_correction_z"sv
+        "material_ow_absolute_correction"sv,
+        "printer_model"sv,
     };
 
     std::vector<SLAPrintStep> steps;
@@ -971,7 +1015,6 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
         } else if (
                opt_key == "support_points_density_relative"
             || opt_key == "support_enforcers_only"
-            || opt_key == "support_points_minimal_distance"
             ) {
             steps.emplace_back(slaposSupportPoints);
         } else if (
@@ -1200,7 +1243,7 @@ SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
 
     std::vector<csg::CSGPart> ret;
 
-    for (unsigned int step = 0; step < s; ++step) {
+    for (unsigned int step = 0; step <= s; ++step) {
         auto r = m_mesh_to_slice.equal_range(SLAPrintObjectStep(step));
         csg::copy_csgrange_shallow(Range{r.first, r.second}, std::back_inserter(ret));
     }
@@ -1211,8 +1254,12 @@ SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
 sla::SupportPoints SLAPrintObject::transformed_support_points() const
 {
     assert(model_object());
-
-    return sla::transformed_support_points(*model_object(), trafo());
+    auto spts = model_object()->sla_support_points;
+    Transform3f tr = trafo().cast<float>();
+    for (sla::SupportPoint &suppt : spts) {
+        suppt.pos = tr * suppt.pos;
+    }
+    return spts;
 }
 
 sla::DrainHoles SLAPrintObject::transformed_drainhole_points() const

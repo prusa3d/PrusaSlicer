@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <algorithm>
 
 #include "libslic3r/KDTreeIndirect.hpp"
 #include "libslic3r/Execution/ExecutionSeq.hpp"
@@ -83,6 +84,23 @@ TEST_CASE("Test kdtree query for a Box", "[KDTreeIndirect]")
     double volratio = (queryvolume / gridvolume);
     REQUIRE(call_count < 3 * volratio * pgrid.point_count());
     REQUIRE(call_count < pgrid.point_count());
+}
+
+TEST_CASE("Test kdtree closests points", "[KDTreeIndirect]") {
+    Points pts{
+        Point{-9000000,  9000000},
+        Point{-9000000, -9000000},
+        Point{ 9000000, -9000000},
+        Point{ 9000000,  9000000},
+        Point{25, 25}
+    };
+    auto point_accessor = [&pts](size_t idx, size_t dim) -> coord_t & {
+        return pts[idx][dim];
+    };
+    KDTreeIndirect<2, coord_t, decltype(point_accessor)> tree(point_accessor, pts.size());
+
+    std::array<size_t, 5> closest = find_closest_points<5>(tree, Point{0, 0});
+    CHECK(closest[0] == 4);
 }
 
 //TEST_CASE("Test kdtree query for a Sphere", "[KDTreeIndirect]") {

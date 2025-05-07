@@ -5,22 +5,29 @@
 #include "MinAreaBoundingBox.hpp"
 
 #include <libslic3r/ExPolygon.hpp>
-#include <BoundingBox.hpp>
+#include <libslic3r/BoundingBox.hpp>
 
 #if defined(_MSC_VER) && defined(__clang__)
 #define BOOST_NO_CXX17_HDR_STRING_VIEW
 #endif
 
 #include <boost/rational.hpp>
-
-#include <libslic3r/Int128.hpp>
+#include <Int128.hpp>
 
 #if !defined(HAS_INTRINSIC_128_TYPE) || defined(__APPLE__)
 #include <boost/multiprecision/integer.hpp>
 #endif
 
-#include <libnest2d/backends/libslic3r/geometries.hpp>
+#include <libnest2d/backends/libslic3r/geometries.hpp> // IWYU pragma: keep
 #include <libnest2d/utils/rotcalipers.hpp>
+#include <cmath>
+#include <cinttypes>
+#include <cstdlib>
+
+#include "libnest2d/common.hpp"
+#include "libnest2d/geometry_traits.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

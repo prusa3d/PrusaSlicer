@@ -10,7 +10,9 @@
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <iostream>
+#include <regex>
 
 #include "format.hpp"
 #include "GUI.hpp"
@@ -22,21 +24,6 @@ namespace GUI {
 const size_t DOWNLOAD_MAX_CHUNK_SIZE	= 10 * 1024 * 1024;
 const size_t DOWNLOAD_SIZE_LIMIT		= 1024 * 1024 * 1024;
 
-std::string FileGet::escape_url(const std::string& unescaped)
-{
-	std::string ret_val;
-	CURL* curl = curl_easy_init();
-	if (curl) {
-		int decodelen;
-		char* decoded = curl_easy_unescape(curl, unescaped.c_str(), unescaped.size(), &decodelen);
-		if (decoded) {
-			ret_val = std::string(decoded);
-			curl_free(decoded);
-		}
-		curl_easy_cleanup(curl);
-	}
-	return ret_val;
-}
 bool FileGet::is_subdomain(const std::string& url, const std::string& domain)
 {
 	// domain should be f.e. printables.com (.com including)
@@ -82,10 +69,30 @@ unsigned get_current_pid()
 	return ::getpid();
 #endif
 }
+
+std::string extract_filename_from_header(const std::string& headers) {
+    // Split the headers into lines
+    std::istringstream header_stream(headers);
+    std::string line;
+
+    while (std::getline(header_stream, line)) {
+        if (line.find("content-disposition") != std::string::npos) {
+            // Apply regex to extract filename from the content-disposition line
+            std::regex filename_regex("filename\\s*=\\s*\"([^\"]+)\"", std::regex::icase);
+            std::smatch match;
+
+            if (std::regex_search(line, match, filename_regex) && match.size() > 1) {
+                return match.str(1);
+            }
+        }
+    }
+
+    return {};
+}
 }
 
 // int = DOWNLOAD ID; string = file path
-wxDEFINE_EVENT(EVT_DWNLDR_FILE_COMPLETE, wxCommandEvent);
+wxDEFINE_EVENT(EVT_DWNLDR_FILE_COMPLETE, Event<DownloadEventData>);
 // int = DOWNLOAD ID; string = error msg
 wxDEFINE_EVENT(EVT_DWNLDR_FILE_ERROR, wxCommandEvent);
 // int = DOWNLOAD ID; string = progress percent
@@ -111,18 +118,22 @@ struct FileGet::priv
 	std::atomic_bool m_stopped { false }; // either canceled or paused - download is not running
 	size_t m_written { 0 };
 	size_t m_absolute_size { 0 };
-	priv(int ID, std::string&& url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder);
+    bool m_load_after;
+	priv(int ID, std::string&& url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder, bool load_after);
 
 	void get_perform();
 };
 
-FileGet::priv::priv(int ID, std::string&& url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder)
+FileGet::priv::priv(int ID, std::string&& url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder, bool load_after)
 	: m_id(ID)
 	, m_url(std::move(url))
 	, m_filename(filename)
 	, m_evt_handler(evt_handler)
 	, m_dest_folder(dest_folder)
+    , m_load_after(load_after)
 {
+    // Prevent ':' in filename
+    m_filename.erase(std::remove(m_filename.begin(), m_filename.end(), ':'), m_filename.end());
 }
 
 void FileGet::priv::get_perform()
@@ -141,7 +152,7 @@ void FileGet::priv::get_perform()
 		std::string extension = dest_path.extension().string();
 		std::string just_filename = m_filename.substr(0, m_filename.size() - extension.size());
 		std::string final_filename = just_filename;
-        // Find unsed filename 
+        // Find unused filename 
 		try {
 			size_t version = 0;
 			while (boost::filesystem::exists(m_dest_folder / (final_filename + extension)) || boost::filesystem::exists(m_dest_folder / (final_filename + extension + "." + std::to_string(get_current_pid()) + ".download")))
@@ -166,36 +177,30 @@ void FileGet::priv::get_perform()
 		}
 		
 		m_filename = final_filename + extension;
-
 		m_tmp_path = m_dest_folder / (m_filename + "." + std::to_string(get_current_pid()) + ".download");
 
 		wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_NAME_CHANGE);
-		evt->SetString(boost::nowide::widen(m_filename));
+		evt->SetString(from_u8(m_filename));
 		evt->SetInt(m_id);
 		m_evt_handler->QueueEvent(evt);
 	}
 	
 	boost::filesystem::path dest_path = m_dest_folder / m_filename;
-
-	wxString temp_path_wstring(m_tmp_path.wstring());
-	
-	//std::cout << "dest_path: " << dest_path.string() << std::endl;
-	//std::cout << "m_tmp_path: " << m_tmp_path.string() << std::endl;
 	
 	BOOST_LOG_TRIVIAL(info) << GUI::format("Starting download from %1% to %2%. Temp path is %3%",m_url, dest_path, m_tmp_path);
 
 	FILE* file;
 	// open file for writting
 	if (m_written == 0)
-		file = fopen(temp_path_wstring.c_str(), "wb");
+		file = boost::nowide::fopen(m_tmp_path.string().c_str(), "wb");
 	else 
-		file = fopen(temp_path_wstring.c_str(), "ab");
+		file = boost::nowide::fopen(m_tmp_path.string().c_str(), "ab");
 
 	//assert(file != NULL);
 	if (file == NULL) {
 		wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
 		// TRN %1% = file path
-		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%"), temp_path_wstring));
+		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%"), m_tmp_path.string()));
 		evt->SetInt(m_id);
 		m_evt_handler->QueueEvent(evt);
 		return;
@@ -264,13 +269,48 @@ void FileGet::priv::get_perform()
 					m_written = written_previously + written_this_session;
 				}
 				wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_PROGRESS);
-				int percent_total = (written_previously + progress.dlnow) * 100 / m_absolute_size;
+				int percent_total = m_absolute_size == 0 ? 0 : (written_previously + progress.dlnow) * 100 / m_absolute_size;
 				evt->SetString(std::to_string(percent_total));
 				evt->SetInt(m_id);
 				m_evt_handler->QueueEvent(evt);
 			}
 			
 		})
+        .on_headers([&](const std::string& headers) {
+            // we are looking for content-disposition header in response, to use it as correct filename
+            std::string new_filename = extract_filename_from_header(headers);
+            if (new_filename.empty()) {
+                return;
+            }
+            // Find unused filename
+            boost::filesystem::path temp_dest_path = m_dest_folder / new_filename;
+		    std::string extension = temp_dest_path.extension().string();
+		    std::string just_filename = new_filename.substr(0, new_filename.size() - extension.size());
+		    std::string final_filename = just_filename;
+            try {
+			    size_t version = 0;
+			    while (boost::filesystem::exists(m_dest_folder / (final_filename + extension)))
+			    {
+				    ++version;
+				    if (version > 999) {
+                        BOOST_LOG_TRIVIAL(error) << GUI::format("Failed to find suitable filename. Last name: %1%." , (m_dest_folder / (final_filename + extension)).string());
+					    return;
+				    }
+				    final_filename = GUI::format("%1%(%2%)", just_filename, std::to_string(version));
+			    }
+		    } catch (const boost::filesystem::filesystem_error& e)
+		    {
+			    BOOST_LOG_TRIVIAL(error) << "Failed to resolved filename from headers.";
+			    return;
+		    }
+            m_filename = final_filename + extension;
+            dest_path = m_dest_folder / m_filename;
+
+            wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_NAME_CHANGE);
+		    evt->SetString(from_u8(m_filename));
+		    evt->SetInt(m_id);
+		    m_evt_handler->QueueEvent(evt);
+        })
 		.on_error([&](std::string body, std::string error, unsigned http_status) {
 			if (file != NULL)
 				fclose(file);
@@ -283,48 +323,42 @@ void FileGet::priv::get_perform()
 			m_evt_handler->QueueEvent(evt);
 		})
 		.on_complete([&](std::string body, unsigned /* http_status */) {
-
-			// TODO: perform a body size check
-			// 
-			//size_t body_size = body.size();
-			//if (body_size != expected_size) {
-			//	return;
-			//}
 			try
 			{
-				/*
-				if (m_written < body.size())
-				{
-					// this code should never be entered. As there should be on_progress call after last bit downloaded.
-					std::string part_for_write = body.substr(m_written);
-					fwrite(part_for_write.c_str(), 1, part_for_write.size(), file);
-				}
-				*/
+                // If server is not sending Content-Length header, the progress function does not write all data to file.
+                // We need to write it now.
+                if (written_this_session < body.size())  {
+                    std::string part_for_write = body.substr(written_this_session);
+				    fwrite(part_for_write.c_str(), 1, part_for_write.size(), file);
+                }
 				fclose(file);
 				boost::filesystem::rename(m_tmp_path, dest_path);
 			}
-			catch (const std::exception& /*e*/)
+			catch (const std::exception& e)
 			{
 				//TODO: report?
 				//error_message = GUI::format("Failed to write and move %1% to %2%", tmp_path, dest_path);
 				wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
-				evt->SetString("Failed to write and move.");
+				evt->SetString(GUI::format("Failed to write and move %1% to %2%", m_tmp_path, dest_path));
 				evt->SetInt(m_id);
 				m_evt_handler->QueueEvent(evt);
 				return;
 			}
-
-			wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_COMPLETE);
-			evt->SetString(dest_path.wstring());
+            wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_PROGRESS);
+			int percent_total = 100;
+			evt->SetString(std::to_string(percent_total));
 			evt->SetInt(m_id);
 			m_evt_handler->QueueEvent(evt);
+
+            DownloadEventData event_data = {m_id, dest_path.wstring(), m_load_after};
+            wxQueueEvent(m_evt_handler, new Event<DownloadEventData>(EVT_DWNLDR_FILE_COMPLETE, event_data));
 		})
 		.perform_sync();
 
 }
 
-FileGet::FileGet(int ID, std::string url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder)
-	: p(new priv(ID, std::move(url), filename, evt_handler, dest_folder))
+FileGet::FileGet(int ID, std::string url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder, bool load_after)
+	: p(new priv(ID, std::move(url), filename, evt_handler, dest_folder, load_after))
 {}
 
 FileGet::FileGet(FileGet&& other) : p(std::move(other.p)) {}

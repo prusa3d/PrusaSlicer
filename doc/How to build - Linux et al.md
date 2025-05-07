@@ -17,7 +17,7 @@ You need at least 8GB of RAM on your system. Linking on a 4GB RAM system will li
 
 GNU build tools, CMake, git and other libraries have to be installed on the build machine.
 Unless that's already the case, install them as usual from your distribution packages.
-E.g. on Ubuntu 20.10, run
+E.g. on Ubuntu 24.04 / Debian 12, run
 ```shell
 sudo apt-get install  -y \
 git \
@@ -27,7 +27,8 @@ cmake \
 libglu1-mesa-dev \
 libgtk-3-dev \
 libdbus-1-dev \
-
+libwebkit2gtk-4.1-dev \
+texinfo
 ```
 The names of the packages may be different on different distros.
 
@@ -72,8 +73,27 @@ And that's it. It is now possible to run the freshly built PrusaSlicer binary:
     cd src
     ./prusa-slicer
 
+#### 4. Running Unit Tests
 
+For the most complete unit testing, use the Debug build option `-DCMAKE_BUILD_TYPE=Debug` when running cmake.
+Without the Debug build, internal assert statements are not tested.
 
+To run the unit tests:
+
+    cd build
+    make test
+
+To run a specific unit test:
+
+    cd build/tests/
+
+The unit tests can be found by
+
+    `ls */*_tests`
+
+Any of these unit tests can be run directly e.g.
+
+    `./fff_print/fff_print_tests`
 
 ## Useful CMake flags when building dependencies
 

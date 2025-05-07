@@ -3,6 +3,17 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "Subdivide.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <map>
+#include <queue>
+#include <tuple>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+
 #include "Point.hpp"
 
 namespace Slic3r{

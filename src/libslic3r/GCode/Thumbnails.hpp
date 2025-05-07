@@ -5,21 +5,29 @@
 #ifndef slic3r_GCodeThumbnails_hpp_
 #define slic3r_GCodeThumbnails_hpp_
 
-#include "../Point.hpp"
-#include "../PrintConfig.hpp"
-#include "ThumbnailData.hpp"
-
+#include <LibBGCode/binarize/binarize.hpp>
+#include <boost/beast/core/detail/base64.hpp>
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
+#include <boost/beast/core.hpp>
+#include <boost/format.hpp>
+#include <core/core.hpp>
 #include <vector>
 #include <memory>
 #include <string_view>
+#include <algorithm>
+#include <string>
+#include <utility>
 
-#include <LibBGCode/binarize/binarize.hpp>
-
-#include <boost/beast/core/detail/base64.hpp>
-
-#include "../libslic3r/enum_bitmask.hpp"
+#include "../Point.hpp"
+#include "../PrintConfig.hpp"
+#include "ThumbnailData.hpp"
+#include "libslic3r/enum_bitmask.hpp"
 
 namespace Slic3r {
+class ConfigBase;
+
     enum class ThumbnailError : int { InvalidVal, OutOfRange, InvalidExt };
     using ThumbnailErrors = enum_bitmask<ThumbnailError>;
     ENABLE_ENUM_BITMASK_OPERATORS(ThumbnailError);

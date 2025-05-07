@@ -3,7 +3,12 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "IntersectionPoints.hpp"
+
 #include <libslic3r/AABBTreeLines.hpp>
+
+#include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Exception.hpp"
 
 //NOTE: using CGAL SweepLines is slower !!! (example in git history)
 

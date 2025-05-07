@@ -1,10 +1,11 @@
 #include "WifiScanner.hpp"
-
+#include "slic3r/GUI/GUI.hpp"
 
 #include <boost/log/trivial.hpp>
-#include <boost/nowide/system.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/filesystem.hpp>
+#include <regex>
+#include <boost/nowide/convert.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -41,6 +42,7 @@ bool ptree_get_value(const boost::property_tree::ptree& pt, const std::string& t
 
     return false;  // Element not found in this subtree
 }
+
 #elif __APPLE__
 void get_connected_ssid(std::string& connected_ssid)
 {
@@ -459,7 +461,7 @@ void WifiScanner::fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& c
                 {
                     wxString xml(xmlstr);
                     boost::property_tree::ptree pt;
-                    std::stringstream ss(boost::nowide::narrow(xml));
+                    std::stringstream ss(Slic3r::GUI::into_u8(xml));
                     boost::property_tree::read_xml(ss, pt);
                     std::string password;
                     std::string psk_protected;

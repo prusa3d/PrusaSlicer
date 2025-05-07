@@ -7,18 +7,24 @@
 #define slic3r_Fill3DHoneycomb_hpp_
 
 #include <map>
+#include <utility>
 
-#include "../libslic3r.h"
-
+#include "libslic3r/libslic3r.h"
 #include "FillBase.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
+class Point;
 
 class Fill3DHoneycomb : public Fill
 {
 public:
     Fill* clone() const override { return new Fill3DHoneycomb(*this); };
     ~Fill3DHoneycomb() override {}
+
+// note: updated 3D Honeycomb doesn't need bridge flow because the
+//       pattern is placed on top of previous layers
 
 protected:
 	void _fill_surface_single(

@@ -87,7 +87,8 @@ public:
 
 
 
-    PresetCollection&           get_presets(Preset::Type preset_type);
+    const PresetCollection&           get_presets(Preset::Type preset_type) const;
+          PresetCollection&           get_presets(Preset::Type preset_type);
 
     // The project configuration values are kept separated from the print/filament/printer preset,
     // they are being serialized / deserialized from / to the .amf, .3mf, .config, .gcode, 
@@ -153,7 +154,7 @@ public:
         const std::string &path, LoadConfigBundleAttributes flags, ForwardCompatibilitySubstitutionRule compatibility_rule);
 
     // Export a config bundle file containing all the presets and the names of the active presets.
-    void                        export_configbundle(const std::string &path, bool export_system_settings = false, bool export_physical_printers = false);
+    void                        export_configbundle(const std::string &path, bool export_system_settings = false, bool export_physical_printers = false, std::function<bool(const std::string&, const std::string&, std::string&)> secret_callback = nullptr);
 
     // Enable / disable the "- default -" preset.
     void                        set_default_suppressed(bool default_suppressed);
@@ -182,6 +183,7 @@ public:
     void                        load_installed_printers(const AppConfig &config);
 
     const std::string&          get_preset_name_by_alias(const Preset::Type& preset_type, const std::string& alias, int extruder_id = -1);
+    const std::string&          get_preset_name_by_alias_invisible(const Preset::Type& preset_type, const std::string& alias) const;
 
     // Save current preset of a provided type under a new name. If the name is different from the old one,
     // Unselected option would be reverted to the beginning values

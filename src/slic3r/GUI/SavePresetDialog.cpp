@@ -33,7 +33,7 @@ constexpr auto BORDER_W = 10;
 
 std::string SavePresetDialog::Item::get_init_preset_name(const std::string &suffix)
 {
-    PresetBundle*     preset_bundle = dynamic_cast<SavePresetDialog*>(m_parent)->get_preset_bundle();
+    const PresetBundle*     preset_bundle = dynamic_cast<SavePresetDialog*>(m_parent)->get_preset_bundle();
     if (!preset_bundle)
         preset_bundle = wxGetApp().preset_bundle;
     m_presets = &preset_bundle->get_presets(m_type);
@@ -50,6 +50,37 @@ std::string SavePresetDialog::Item::get_init_preset_name(const std::string &suff
     }
 
     return preset_name;
+}
+
+void SavePresetDialog::Item::init_casei_preset_names()
+{
+    m_casei_preset_names.clear();
+
+    auto add_names_from_collection = [this](const PresetCollection& presets) {
+        for (const Preset& preset : presets)
+            if (!preset.is_default)
+                m_casei_preset_names.emplace_back(PresetName({ boost::to_lower_copy<std::string>(preset.name), preset.name }));
+    };
+
+    if (m_presets) {
+        // This item is a part of SavePresetDialog and will check names inside selected PresetCollection
+        m_casei_preset_names.reserve(m_presets->size());
+        add_names_from_collection(*m_presets);
+    }
+    else // This item is a part of ConfigWizard and will check names inside all PresetCollections in respect to the m_printer_technology
+    if (m_preset_bundle) {
+        auto types_list = PresetBundle::types_list(m_printer_technology);
+
+        size_t presets_cnt = 0;
+        for (const Preset::Type& type : types_list)
+            presets_cnt += m_preset_bundle->get_presets(type).size();
+        m_casei_preset_names.reserve(presets_cnt);
+
+        for (const Preset::Type& type : types_list)
+            add_names_from_collection(m_preset_bundle->get_presets(type));
+    }
+
+    std::sort(m_casei_preset_names.begin(), m_casei_preset_names.end());
 }
 
 void SavePresetDialog::Item::init_input_name_ctrl(wxBoxSizer *input_name_sizer, const std::string preset_name)
@@ -114,6 +145,8 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
     input_name_sizer->Add(m_valid_bmp,    0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
     init_input_name_ctrl(input_name_sizer, get_init_preset_name(suffix));
 
+    init_casei_preset_names();
+
     if (label_top)
         sizer->Add(label_top,   0, wxEXPAND | wxTOP| wxBOTTOM, BORDER_W);
     sizer->Add(input_name_sizer,0, wxEXPAND | (label_top ? 0 : wxTOP) | wxBOTTOM, BORDER_W);
@@ -125,8 +158,9 @@ SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBox
     update();
 }
 
-SavePresetDialog::Item::Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PrinterTechnology pt /*= ptFFF*/):
+SavePresetDialog::Item::Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PresetBundle* preset_bundle, PrinterTechnology pt /*= ptFFF*/):
     m_preset_name(def_name),
+    m_preset_bundle(preset_bundle),
     m_printer_technology(pt),
     m_parent(parent),
     m_valid_bmp(new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("tick_mark"))),
@@ -138,21 +172,55 @@ SavePresetDialog::Item::Item(wxWindow* parent, wxBoxSizer* sizer, const std::str
     input_name_sizer->Add(m_valid_bmp,    0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
     init_input_name_ctrl(input_name_sizer, m_preset_name);
 
+    init_casei_preset_names();
+
     sizer->Add(input_name_sizer,0, wxEXPAND | wxBOTTOM, BORDER_W);
     sizer->Add(m_valid_label,   0, wxEXPAND | wxLEFT,   3*BORDER_W);
 
     update();
 }
 
+static std::string get_conflict_name(const std::vector<SavePresetDialog::Item::PresetName>& casei_names, const std::string& preset_name)
+{
+    if (!casei_names.empty()) {
+        const std::string lower_name = boost::to_lower_copy<std::string>(preset_name);
+        auto it = Slic3r::lower_bound_by_predicate(casei_names.begin(), casei_names.end(), 
+                                                   [lower_name](const auto& l) { return l.casei_name < lower_name;  });
+        if (it != casei_names.end() && it->casei_name == lower_name)
+            return it->name;
+    }
+    return std::string();
+}
+
+std::string SavePresetDialog::Item::preset_name() const
+{
+    if (m_use_text_ctrl)
+        return m_preset_name;
+
+    const std::string existed_preset_name = get_conflict_name(m_casei_preset_names, m_preset_name);
+    if (existed_preset_name.empty())
+        return m_preset_name;
+
+    return existed_preset_name;
+}
+
 const Preset* SavePresetDialog::Item::get_existing_preset() const 
 {
-    if (m_presets)
-        return m_presets->find_preset(m_preset_name, false);
+    std::string existed_preset_name = get_conflict_name(m_casei_preset_names, m_preset_name);
+    if (existed_preset_name.empty()) {
+        // Preset has not been not found in the sorted list of non-default presets. Try the defaults.
+        return nullptr;
+    }
 
-    for (const Preset::Type& type : PresetBundle::types_list(m_printer_technology)) {
-        const PresetCollection& presets = wxGetApp().preset_bundle->get_presets(type);
-        if (const Preset* preset = presets.find_preset(m_preset_name, false))
-            return preset;
+    if (m_presets)
+        return m_presets->find_preset(existed_preset_name, false);
+
+    if (m_preset_bundle) {
+        for (const Preset::Type& type : PresetBundle::types_list(m_printer_technology)) {
+            const PresetCollection& presets = m_preset_bundle->get_presets(type);
+            if (const Preset* preset = presets.find_preset(existed_preset_name, false))
+                return preset;
+        }
     }
 
     return nullptr;
@@ -191,6 +259,7 @@ void SavePresetDialog::Item::update()
     if (m_valid_type == ValidationType::Valid && existing && (existing->is_default || existing->is_system)) {
         info_line = m_use_text_ctrl ? _L("This name is used for a system profile name, use another.") :
                              _L("Cannot overwrite a system profile.");
+        info_line += "\n" + GUI::format_wxstr("(%1%)", existing->name);
         m_valid_type = ValidationType::NoValid;
     }
 
@@ -211,10 +280,11 @@ void SavePresetDialog::Item::update()
         }
         else {
             if (existing->is_compatible)
-                info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists.")) % m_preset_name).str());
+                info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists.")) % existing->name).str());
             else
-                info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists and is incompatible with selected printer.")) % m_preset_name).str());
-            info_line += "\n" + _L("Note: This preset will be replaced after saving");
+                info_line = from_u8((boost::format(_u8L("Preset with name \"%1%\" already exists and is incompatible with selected printer.")) % existing->name).str());
+            info_line += "\n" + (m_use_text_ctrl ? _L("Note: This preset will be replaced after renaming") :
+                                _L("Note: Preset modifications will be saved exactly into this preset"));
             m_valid_type = ValidationType::Warning;
         }
     }
@@ -273,8 +343,6 @@ void SavePresetDialog::Item::update_valid_bmp()
 
 void SavePresetDialog::Item::accept()
 {
-    if (m_valid_type == ValidationType::Warning)
-        m_presets->delete_preset(m_preset_name);
 }
 
 void SavePresetDialog::Item::Enable(bool enable /*= true*/)

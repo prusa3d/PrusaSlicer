@@ -11,14 +11,20 @@
 #ifndef slic3r_FillConcentric_hpp_
 #define slic3r_FillConcentric_hpp_
 
+#include <utility>
+
 #include "FillBase.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
+class Point;
 
 class FillConcentric : public Fill
 {
 public:
     ~FillConcentric() override = default;
+    bool is_self_crossing() override { return false; }
 
 protected:
     Fill* clone() const override { return new FillConcentric(*this); };

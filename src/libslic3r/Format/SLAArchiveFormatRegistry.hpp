@@ -5,11 +5,19 @@
 #ifndef SLA_ARCHIVE_FORMAT_REGISTRY_HPP
 #define SLA_ARCHIVE_FORMAT_REGISTRY_HPP
 
+#include <cstring>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
 #include "SLAArchiveWriter.hpp"
 #include "SLAArchiveReader.hpp"
-#include <cstring>
 
 namespace Slic3r {
+class SLAPrinterConfig;
 
 // Factory function that returns an implementation of SLAArchiveWriter given
 // a printer configuration.

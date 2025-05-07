@@ -22,7 +22,6 @@
 class wxBoxSizer;
 class wxBitmapComboBox;
 class wxMenuItem;
-class MenuWithSeparators;
 
 namespace Slic3r {
 class ConfigOptionsGroup;
@@ -115,6 +114,9 @@ private:
     int             m_selected_layers_range_idx {-1};
 
     Clipboard       m_clipboard;
+#ifdef __WXMSW__
+    bool            m_mouse_left_down{ false };
+#endif
 
     struct dragged_item_data
     {
@@ -408,7 +410,6 @@ public:
     void set_extruder_for_selected_items(const int extruder) const ;
     wxDataViewItemArray reorder_volumes_and_get_selection(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     void apply_volumes_order();
-    bool has_paint_on_segmentation();
 
     bool is_editing() const { return m_is_editing_started; }
 

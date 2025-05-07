@@ -1,0 +1,12 @@
+name: Build flatpak
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build_flatpak:
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_flatpak.yml@master
+    secrets: inherit
+    with:
+      actions_branch: master

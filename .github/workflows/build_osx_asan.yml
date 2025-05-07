@@ -1,0 +1,15 @@
+name: Build osx asan
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build_osx_asan:
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_osx.yml@master
+    secrets: inherit
+    with:
+      with_asan: true
+      actions_branch: master

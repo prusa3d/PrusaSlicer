@@ -8,10 +8,12 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "BoundingBox.hpp"
-#include <algorithm>
-#include <assert.h>
 
-#include <Eigen/Dense>
+#include <algorithm>
+
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
@@ -54,6 +56,13 @@ BoundingBox BoundingBox::rotated(double angle, const Point &center) const
     out.merge(this->max.rotated(angle, center));
     out.merge(Point(this->min.x(), this->max.y()).rotated(angle, center));
     out.merge(Point(this->max.x(), this->min.y()).rotated(angle, center));
+    return out;
+}
+
+BoundingBox BoundingBox::scaled(double factor) const
+{
+    BoundingBox out(*this);
+    out.scale(factor);
     return out;
 }
 

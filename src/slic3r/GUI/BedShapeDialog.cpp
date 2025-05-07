@@ -19,8 +19,9 @@
 #include <wx/tooltip.h>
 
 #include "libslic3r/BoundingBox.hpp"
-#include "libslic3r/Model.hpp"
 #include "libslic3r/Polygon.hpp"
+#include "libslic3r/FileReader.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -266,7 +267,7 @@ ConfigOptionsGroupShp BedShapePanel::init_shape_options_page(const wxString& tit
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Settings"));
 
     optgroup->label_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
 	
@@ -290,7 +291,7 @@ wxPanel* BedShapePanel::init_texture_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Texture"));
 
     optgroup->label_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
 
@@ -363,7 +364,7 @@ wxPanel* BedShapePanel::init_model_panel()
     ConfigOptionsGroupShp optgroup = std::make_shared<ConfigOptionsGroup>(panel, _L("Model"));
 
     optgroup->label_width = 10;
-    optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+    optgroup->on_change = [this](t_config_option_key opt_key, boost::any value) {
         update_shape();
     };
 
@@ -535,17 +536,15 @@ void BedShapePanel::load_stl()
     }
 
     wxBusyCursor wait;
-
-	Model model;
-	try {
-        model = Model::read_from_file(file_name);
-	}
-	catch (std::exception &) {
-        show_error(this, _L("Error! Invalid model"));
+    TriangleMesh mesh;
+    try {
+        mesh = FileReader::load_mesh(file_name);
+    }
+    catch (std::exception& e) {
+        show_error(this, e.what());
         return;
     }
 
-	auto mesh = model.mesh();
 	auto expolygons = mesh.horizontal_projection();
 
 	if (expolygons.size() == 0) {

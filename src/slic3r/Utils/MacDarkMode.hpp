@@ -5,6 +5,8 @@
 #ifndef slic3r_MacDarkMode_hpp_
 #define slic3r_MacDarkMode_hpp_
 
+#include <wx/event.h>
+
 namespace Slic3r {
 namespace GUI {
 

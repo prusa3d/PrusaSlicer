@@ -3,8 +3,13 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PolygonTrimmer.hpp"
+
+#include <cassert>
+
 #include "EdgeGrid.hpp"
 #include "Geometry.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

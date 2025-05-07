@@ -7,6 +7,11 @@
 #ifndef slic3r_SlicingAdaptive_hpp_
 #define slic3r_SlicingAdaptive_hpp_
 
+#include <stddef.h>
+#include <utility>
+#include <vector>
+#include <cstddef>
+
 #include "Slicing.hpp"
 #include "admesh/stl.h"
 
@@ -14,6 +19,7 @@ namespace Slic3r
 {
 
 class ModelVolume;
+class ModelObject;
 
 class SlicingAdaptive
 {

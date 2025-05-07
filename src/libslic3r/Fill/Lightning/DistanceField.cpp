@@ -2,10 +2,20 @@
 //CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "DistanceField.hpp" //Class we're implementing.
+
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <cmath>
+#include <utility>
+#include <cstdlib>
+
 #include "../FillRectilinear.hpp"
 #include "../../ClipperUtils.hpp"
-
-#include <tbb/parallel_for.h>
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
 
 #ifdef LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT
 #include "../../SVG.hpp"

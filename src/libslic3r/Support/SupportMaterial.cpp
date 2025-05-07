@@ -10,27 +10,47 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "../ClipperUtils.hpp"
-#include "../ExtrusionEntityCollection.hpp"
-#include "../Layer.hpp"
-#include "../Print.hpp"
-#include "../Fill/FillBase.hpp"
-#include "../Geometry.hpp"
-#include "../Point.hpp"
-#include "../MutablePolygon.hpp"
-
-#include "Support/SupportCommon.hpp"
-#include "SupportMaterial.hpp"
-
-#include <clipper/clipper_z.hpp>
-
+#include <boost/log/trivial.hpp>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/task_group.h>
 #include <cmath>
 #include <memory>
-#include <boost/log/trivial.hpp>
-#include <boost/container/static_vector.hpp>
+#include <algorithm>
+#include <iterator>
+#include <numeric>
+#include <tuple>
+#include <utility>
+#include <cfloat>
+#include <cinttypes>
+#include <cstdlib>
 
-#include <tbb/parallel_for.h>
-#include <tbb/task_group.h>
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/Print.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/MutablePolygon.hpp"
+#include "libslic3r/Support/SupportCommon.hpp"
+#include "SupportMaterial.hpp"
+#include "agg/agg_renderer_base.h"
+#include "agg/agg_rendering_buffer.h"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/MultiMaterialSegmentation.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Slicing.hpp"
+#include "libslic3r/Support/SupportLayer.hpp"
+#include "libslic3r/Support/SupportParameters.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/TriangleSelector.hpp"
+#include "tcbspan/span.hpp"
 
 #define SUPPORT_USE_AGG_RASTERIZER
 
@@ -40,7 +60,6 @@
     #include <agg/agg_scanline_p.h>
     #include <agg/agg_rasterizer_scanline_aa.h>
     #include <agg/agg_path_storage.h>
-    #include "PNGReadWrite.hpp"
 #else
     #include "EdgeGrid.hpp"
 #endif // SUPPORT_USE_AGG_RASTERIZER
@@ -1106,8 +1125,8 @@ struct SupportAnnotations
         buildplate_covered(buildplate_covered)
     {
         // Append custom supports.
-        object.project_and_append_custom_facets(false, EnforcerBlockerType::ENFORCER, enforcers_layers);
-        object.project_and_append_custom_facets(false, EnforcerBlockerType::BLOCKER, blockers_layers);
+        object.project_and_append_custom_facets(false, TriangleStateType::ENFORCER, enforcers_layers);
+        object.project_and_append_custom_facets(false, TriangleStateType::BLOCKER, blockers_layers);
     }
 
     std::vector<Polygons>         enforcers_layers;
@@ -2146,7 +2165,7 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
            extremes.front()->layer_type == SupporLayerType::TopContact || // first extreme is a top contact layer
            extremes.front()->extreme_z() > m_slicing_params.first_print_layer_height - EPSILON)));
 
-    bool synchronize = this->synchronize_layers();
+    const bool synchronize = this->synchronize_layers();
 
 #ifdef _DEBUG
     // Verify that the extremes are separated by m_support_layer_height_min.
@@ -2158,6 +2177,9 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
                (extremes[i]->layer_type == SupporLayerType::BottomContact && extremes[i - 1]->layer_type == SupporLayerType::TopContact));
     }
 #endif
+
+    // Threshold for snapping support layers to nearest object layers.
+    const coordf_t SUPPORT_LAYER_SNAP_THRESHOLD = m_slicing_params.layer_height / 10.;
 
     // Generate intermediate layers.
     // The first intermediate layer is the same as the 1st layer if there is no raft,
@@ -2269,22 +2291,30 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
                 if (-- n_layers_extra == 0)
                     continue;
             }
-            coordf_t extr2z_large_steps = extr2z;
+
+            const coordf_t extr2z_large_steps = extr2z;
             // Take the largest allowed step in the Z axis until extr2z_large_steps is reached.
-            for (size_t i = 0; i < n_layers_extra; ++ i) {
+            for (size_t i = 0; i < n_layers_extra; ++i) {
                 SupportGeneratorLayer &layer_new = layer_storage.allocate_unguarded(SupporLayerType::Intermediate);
                 if (i + 1 == n_layers_extra) {
                     // Last intermediate layer added. Align the last entered layer with extr2z_large_steps exactly.
                     layer_new.bottom_z = (i == 0) ? extr1z : intermediate_layers.back()->print_z;
-                    layer_new.print_z = extr2z_large_steps;
+                    layer_new.print_z  = extr2z_large_steps;
+                    layer_new.height   = layer_new.print_z - layer_new.bottom_z;
+                } else {
+                    // Intermediate layer, not the last added.
+                    layer_new.bottom_z = (i == 0) ? extr1z : intermediate_layers.back()->print_z;
+
+                    const coordf_t next_print_z = extr1z + coordf_t(i + 1) * step;
+                    if (const Layer *layer_to_snap = object.get_layer_at_printz(next_print_z, SUPPORT_LAYER_SNAP_THRESHOLD); layer_to_snap != nullptr) {
+                        layer_new.print_z = layer_to_snap->print_z;
+                    } else {
+                        layer_new.print_z = next_print_z;
+                    }
+
                     layer_new.height = layer_new.print_z - layer_new.bottom_z;
                 }
-                else {
-                    // Intermediate layer, not the last added.
-                    layer_new.height = step;
-                    layer_new.bottom_z = extr1z + i * step;
-                    layer_new.print_z = layer_new.bottom_z + step;
-                }
+
                 assert(intermediate_layers.empty() || intermediate_layers.back()->print_z <= layer_new.print_z);
                 intermediate_layers.push_back(&layer_new);
             }

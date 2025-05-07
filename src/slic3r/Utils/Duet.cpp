@@ -101,7 +101,7 @@ bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn e
 	if (dsf) {
 		http.set_put_body(upload_data.source_path);
 		if (connect_msg.empty())
-			http.header("X-Session-Key", boost::nowide::narrow(connect_msg));
+            http.header("X-Session-Key", GUI::into_u8(connect_msg));
 	} else {
 		http.set_post_body(upload_data.source_path);
 	}

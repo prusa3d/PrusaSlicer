@@ -1,10 +1,10 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <libslic3r/CutSurface.hpp>
 #include <libslic3r/TriangleMesh.hpp> // its_make_cube + its_merge
 
 using namespace Slic3r;
-TEST_CASE("Cut character from surface", "[]")
+TEST_CASE("Cut character from surface", "[Emboss]")
 {
     std::string font_path = std::string(TEST_DATA_DIR) +
                             "/../../resources/fonts/NotoSans-Regular.ttf";

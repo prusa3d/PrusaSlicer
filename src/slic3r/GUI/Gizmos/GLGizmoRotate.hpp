@@ -177,8 +177,6 @@ private:
 
     class RotoptimzeWindow
     {
-        ImGuiWrapper *m_imgui = nullptr;
-
     public:
         struct State {
             float  accuracy  = 1.f;

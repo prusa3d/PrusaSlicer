@@ -4,9 +4,21 @@
 #ifndef LIGHTNING_DISTANCE_FIELD_H
 #define LIGHTNING_DISTANCE_FIELD_H
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <algorithm>
+#include <functional>
+#include <limits>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstddef>
+
 #include "../../BoundingBox.hpp"
 #include "../../Point.hpp"
 #include "../../Polygon.hpp"
+#include "libslic3r/libslic3r.h"
 
 //#define LIGHTNING_DISTANCE_FIELD_DEBUG_OUTPUT
 

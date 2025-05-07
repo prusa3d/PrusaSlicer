@@ -1,3 +1,11 @@
+min_slic3r_version = 2.9.1-alpha0
+2.1.0 Extruder clearance moved to printer settings.
+min_slic3r_version = 2.8.0-alpha0
+2.0.1 Fixed compatible printer condition.
+2.0.0 Updated for PS2.8.0.
+max_slic3r_version = 2.7.9
+min_slic3r_version = 2.6.0
+1.1.0 Refactored code to have remove duplicate values and match some updated Cura values. Adds Ultimaker 2 DXUv2 mod. Adds Ultimaker S-line printers (S3, S5, S7)
 min_slic3r_version = 2.4.0-beta0
 1.0.2 Fixed start g-code.
 1.0.1 Updated start g-code.

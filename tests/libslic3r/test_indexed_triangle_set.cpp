@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
-#include <catch2/catch.hpp>
+#include <random>
+#include <catch2/catch_test_macros.hpp>
 
 #include "libslic3r/TriangleMesh.hpp"
 

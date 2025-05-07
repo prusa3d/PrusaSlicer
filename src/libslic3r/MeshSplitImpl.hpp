@@ -6,7 +6,6 @@
 #define MESHSPLITIMPL_HPP
 
 #include "TriangleMesh.hpp"
-#include "libnest2d/tools/benchmark.h"
 #include "Execution/ExecutionTBB.hpp"
 
 namespace Slic3r {
@@ -50,7 +49,7 @@ struct NeighborVisitor {
     void visit(Visitor visitor)
     {
         // find the next unvisited facet and push the index
-        auto facet = std::find(m_visited.begin() + m_seed, m_visited.end(), false);
+        auto facet = std::find(m_visited.begin() + m_seed, m_visited.end(), 0);
         m_seed = facet - m_visited.begin();
 
         if (facet != m_visited.end()) {

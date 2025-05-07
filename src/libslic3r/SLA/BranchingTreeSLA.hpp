@@ -5,12 +5,14 @@
 #ifndef BRANCHINGTREESLA_HPP
 #define BRANCHINGTREESLA_HPP
 
+#include <boost/log/trivial.hpp>
+
 #include "libslic3r/BranchingTree/BranchingTree.hpp"
 #include "SupportTreeBuilder.hpp"
 
-#include <boost/log/trivial.hpp>
-
 namespace Slic3r { namespace sla {
+class SupportTreeBuilder;
+struct SupportableMesh;
 
 void create_branching_tree(SupportTreeBuilder& builder, const SupportableMesh &sm);
 

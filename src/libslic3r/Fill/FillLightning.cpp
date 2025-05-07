@@ -4,9 +4,11 @@
 ///|/
 #include "../Print.hpp"
 #include "../ShortestPath.hpp"
-
-#include "FillLightning.hpp"
 #include "Lightning/Generator.hpp"
+#include "libslic3r/Fill/FillLightning.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/Fill/Lightning/Layer.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r::FillLightning {
 

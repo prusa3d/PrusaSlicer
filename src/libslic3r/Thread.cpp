@@ -13,12 +13,16 @@
 	#endif // __APPLE__
 #endif
 
-#include <atomic>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <oneapi/tbb/task_arena.h>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
-#include <tbb/parallel_for.h>
-#include <tbb/task_arena.h>
+#include <algorithm>
+#include <ostream>
+#include <cassert>
+#include <cstddef>
 
 #include "Thread.hpp"
 #include "Utils.hpp"
@@ -127,8 +131,8 @@ std::optional<std::string> get_current_thread_name()
 		return std::nullopt;
 
 	wchar_t *ptr = nullptr;
-	s_fnGetThreadDescription(::GetCurrentThread(), &ptr);
-	return (ptr == nullptr) ? std::string() : boost::nowide::narrow(ptr);
+    s_fnGetThreadDescription(::GetCurrentThread(), &ptr);
+    return (ptr == nullptr) ? std::string() : boost::nowide::narrow(ptr);
 }
 
 #else // _WIN32

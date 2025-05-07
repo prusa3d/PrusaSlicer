@@ -10,6 +10,7 @@
 // FIXME: extract absolute units -> em
 
 #include "ConfigWizard_private.hpp"
+#include "ConfigWizardWebViewPage.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -61,29 +62,30 @@
 #include "Field.hpp"
 #include "DesktopIntegrationDialog.hpp"
 #include "slic3r/Config/Snapshot.hpp"
-#include "slic3r/Utils/PresetUpdater.hpp"
 #include "format.hpp"
 #include "MsgDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
+#include "UpdatesUIManager.hpp"
+#include "Plater.hpp" // #ysFIXME - implement getter for preset_archive_database from GetApp()???
 #include "slic3r/Utils/AppUpdater.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/Config/Version.hpp"
 
+
+/* ysFIXME - delete after testing and release
+// it looks like this workaround is no need any more after update of the wxWidgets to 3.2.0
 #if defined(__linux__) && defined(__WXGTK3__)
 #define wxLinux_gtk3 true
 #else
 #define wxLinux_gtk3 false
 #endif //defined(__linux__) && defined(__WXGTK3__)
+*/
 
 namespace Slic3r {
 namespace GUI {
 
-
 using Config::Snapshot;
 using Config::SnapshotDB;
-
-
-// Configuration data structures extensions needed for the wizard
 
 bool Bundle::load(fs::path source_path, BundleLocation location, bool ais_prusa_bundle)
 {
@@ -113,6 +115,7 @@ bool Bundle::load(fs::path source_path, BundleLocation location, bool ais_prusa_
     return true;
 }
 
+// Configuration data structures extensions needed for the wizard
 Bundle::Bundle(Bundle &&other)
     : preset_bundle(std::move(other.preset_bundle))
     , vendor_profile(other.vendor_profile)
@@ -126,6 +129,7 @@ BundleMap BundleMap::load()
 {
     BundleMap res;
 
+    const Slic3r::PresetUpdaterWrapper* preset_updater_wrapper = wxGetApp().get_preset_updater_wrapper();
     const auto vendor_dir = (boost::filesystem::path(Slic3r::data_dir()) / "vendor").make_preferred();
     const auto archive_dir = (boost::filesystem::path(Slic3r::data_dir()) / "cache" / "vendor").make_preferred();
     const auto rsrc_vendor_dir = (boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
@@ -167,11 +171,11 @@ BundleMap BundleMap::load()
                 
                 fs::path idx_path (archive_dir / (id + ".idx"));
                 if (!boost::filesystem::exists(idx_path)) {
-                    BOOST_LOG_TRIVIAL(error) << format("Missing index %1% when loading bundle %2%. Going to search for it in cache folder.", idx_path.string(), id);
+                    BOOST_LOG_TRIVIAL(info) << format("Missing index %1% when loading bundle %2%. Going to search for it in cache folder.", idx_path.string(), id);
                     idx_path = fs::path(cache_dir / (id + ".idx"));
                 }
                 if (!boost::filesystem::exists(idx_path)) {
-                    BOOST_LOG_TRIVIAL(error) << format("Missing index %1% when loading bundle %2%. Going to search for it in vendor folder. Is it a 3rd party profile?", idx_path.string(), id);
+                    BOOST_LOG_TRIVIAL(info) << format("Missing index %1% when loading bundle %2%. Going to search for it in vendor folder. Is it a 3rd party profile?", idx_path.string(), id);
                     idx_path = fs::path(vendor_dir / (id + ".idx"));
                 }
                 if (!boost::filesystem::exists(idx_path)) {
@@ -194,6 +198,21 @@ BundleMap BundleMap::load()
                 }
                 const auto recommended = recommended_it->config_version;
                 VendorProfile vp;
+                // Check if in selected repo.
+                try {
+                    vp = VendorProfile::from_ini(dir_entry, false);
+                }
+                catch (const std::exception& e) {
+                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to corrupted profile file %2%. Message: %3%", id, dir_entry.path().string(), e.what());
+                    continue;
+                }
+                if (vp.repo_id.empty() || !preset_updater_wrapper->is_selected_repository_by_id(vp.repo_id)) {
+                    continue;
+                }
+                // Don't load
+                if (vp.config_version > recommended)
+                    continue;
+                // Load full VP.
                 try {
                     vp = VendorProfile::from_ini(dir_entry, true);
                 }
@@ -201,10 +220,6 @@ BundleMap BundleMap::load()
                     BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to corrupted profile file %2%. Message: %3%", id, dir_entry.path().string(), e.what());
                     continue;
                 }
-                // Don't load
-                if (vp.config_version > recommended)
-                    continue;
-
                 Bundle bundle;
                 if (bundle.load(dir_entry.path(), dir.second))
                     res.emplace(std::move(id), std::move(bundle));
@@ -261,6 +276,7 @@ const std::string PrinterPicker::PRINTER_PLACEHOLDER = "printer_placeholder.png"
 PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxString title, size_t max_cols, const AppConfig &appconfig, const ModelFilter &filter)
     : wxPanel(parent)
     , vendor_id(vendor.id)
+    , vendor_repo_id(vendor.repo_id)
     , width(0)
 {
     wxGetApp().UpdateDarkUI(this);
@@ -314,7 +330,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
                 % model.thumbnail
                 % vendor.id
                 % model.id;
-            load_bitmap(Slic3r::var(PRINTER_PLACEHOLDER), bitmap, bitmap_width);
+            load_bitmap(GUI::from_u8(Slic3r::var(PRINTER_PLACEHOLDER)), bitmap, bitmap_width);
         }
         
         wxStaticText* title = new wxStaticText(this, wxID_ANY, from_u8(model.name), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
@@ -535,10 +551,14 @@ ConfigWizardPage::ConfigWizardPage(ConfigWizard *parent, wxString title, wxStrin
 
     SetSizer(sizer);
 
+    /* ysFIXME - delete after testing and release
+    // Update!!! -> it looks like this workaround is no need any more after update of the wxWidgets to 3.2.0
+
     // There is strange layout on Linux with GTK3, 
     // see https://github.com/prusa3d/PrusaSlicer/issues/5103 and https://github.com/prusa3d/PrusaSlicer/issues/4861
     // So, non-active pages will be hidden later, on wxEVT_SHOW, after completed Layout() for all pages 
     if (!wxLinux_gtk3)
+    */
         this->Hide();
 
     Bind(wxEVT_SIZE, [this](wxSizeEvent &event) {
@@ -588,7 +608,7 @@ PageWelcome::PageWelcome(ConfigWizard *parent)
 {
     welcome_text->Hide();
     cbox_reset->Hide();
-    cbox_integrate->Hide();    
+    cbox_integrate->Hide();
 }
 
 void PageWelcome::set_run_reason(ConfigWizard::RunReason run_reason)
@@ -606,6 +626,66 @@ void PageWelcome::set_run_reason(ConfigWizard::RunReason run_reason)
 #endif
 }
 
+PageUpdateManager::PageUpdateManager(ConfigWizard* parent_in)
+    : ConfigWizardPage(parent_in, _L("Configuration sources"), _L("Configuration Sources"))
+{
+    this->SetFont(wxGetApp().normal_font());
+
+    const int em = em_unit(this);
+
+    manager = std::make_unique<RepositoryUpdateUIManager>(this, wxGetApp().get_preset_updater_wrapper(), em);
+
+    warning_text = new wxStaticText(this, wxID_ANY, _L("WARNING: Select at least one source."));
+    warning_text->SetFont(wxGetApp().bold_font());
+    warning_text->Hide();
+
+    warning_text->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& event) {
+        const bool show_warning = !manager->has_selections();
+        if (warning_text->IsShown() != show_warning) {
+            warning_text->Show(show_warning);
+            this->Layout();
+        }
+    });
+
+    auto sizer = manager->get_sizer();
+    sizer->Add(warning_text, 0, wxEXPAND | wxTOP, 2 * em);
+
+    append(sizer, 0, wxTOP, 2 * em);
+
+    this->Bind(wxEVT_SHOW, [this, parent_in](wxShowEvent& evt) {
+
+        auto revert_page_selection = [this]() -> void {
+            CallAfter([this]() { 
+                wizard_p()->index->go_to(this);
+                if (!this->IsShown())
+                    this->Show();
+            });
+        };
+
+        if (evt.IsShown())
+            is_active = true;
+        else if (is_active && parent_in->IsShown()) {
+            if (manager->has_selections()) {
+
+                if (wizard_p()->can_clear_printer_pages()) {
+                    wxBusyCursor wait;
+                    if (manager->set_selected_repositories()) {
+                        wizard_p()->is_config_from_archive = true;
+                        wizard_p()->set_config_updated_from_archive(true, true);
+                    }
+                    else
+                        revert_page_selection();
+                }
+                else
+                    revert_page_selection();
+            }
+            else 
+                revert_page_selection();
+
+            is_active = false;
+        }
+    });
+}
 
 PagePrinters::PagePrinters(ConfigWizard *parent,
     wxString title,
@@ -656,6 +736,53 @@ void PagePrinters::select_all(bool select, bool alternates)
 {
     for (auto picker : printer_pickers) {
         picker->select_all(select, alternates);
+    }
+}
+
+void PagePrinters::unselect_all_presets()
+{
+    assert(!printer_pickers.empty());
+    const std::string vendor_id = printer_pickers[0]->vendor_id;
+
+    PresetBundle* preset_bundle{ nullptr };
+    for (const auto& [bundle_name, bundle] : wizard_p()->bundles) {
+        if (bundle_name == vendor_id) {
+            preset_bundle = bundle.preset_bundle.get();
+            break; 
+        }
+    }
+
+    if (preset_bundle) {
+        auto unselect = [preset_bundle](const std::string& vendor_id, const std::string& model, const std::string& variant) {
+            for (auto& preset : preset_bundle->printers) {
+                if (preset.config.opt_string("printer_model") == model
+                    && preset.config.opt_string("printer_variant") == variant) {
+                    preset.is_visible = false;
+                }
+            }
+        };
+
+        // unselect presets in preset bundle, if related model and variant was checked in Picker
+        for (auto picker : printer_pickers) {
+            for (const auto& cb : picker->cboxes) {
+                if (cb->GetValue())
+                    unselect(picker->vendor_id, cb->model, cb->variant);
+            }
+
+            for (const auto& cb : picker->cboxes_alt) {
+                if (cb->GetValue())
+                    unselect(picker->vendor_id, cb->model, cb->variant);
+            }
+        }
+    }
+
+    // remove vendor from appconfig_new
+    AppConfig* appconfig = &wizard_p()->appconfig_new;
+
+    AppConfig::VendorMap new_vendors = appconfig->vendors();
+    if (new_vendors.find(vendor_id) != new_vendors.end()) {
+        new_vendors.erase(vendor_id);
+        appconfig->set_vendors(new_vendors);
     }
 }
 
@@ -766,6 +893,10 @@ PageMaterials::PageMaterials(ConfigWizard *parent, Materials *materials, wxStrin
 
     html_window = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition,
         wxSize(60 * em, 20 * em), wxHW_SCROLLBAR_AUTO);
+    html_window->Bind(wxEVT_HTML_LINK_CLICKED, [](wxHtmlLinkEvent& event) {
+        wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref());
+        event.Skip(false);
+        });
     append(html_window, 0, wxEXPAND);
 
 	list_printer->Bind(wxEVT_LISTBOX, [this](wxCommandEvent& evt) {
@@ -855,9 +986,19 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
         // TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
         text = format_wxstr(_L("%1% visible for <b>(\"Template\")</b> printer are universal profiles available for all printers. These might not be compatible with your printer."), materials->technology == T_FFF ? _L("Filaments") : _L("SLA materials"));
     } else {
+        bool has_medical = false;
+        for (const Preset *printer : materials->printers) {
+            if (printer->vendor && printer->vendor->id == "PrusaProMedical") {
+                has_medical = true;
+            }
+        }
+        // TRN PrusaSlicer-Medical ConfigWizard: Materials"
+        wxString zero_line = _L("The list of validated workflows for Medical One can be found in this <a href=\"prusa.io/m1-validation\">article</a>. Profiles for other materials are not verified by the material manufacturer and therefore may not correspond to the current version of the material.");
+        if (!has_medical) {
+            zero_line.Clear();
+        }
         // TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
         wxString first_line = format_wxstr(_L("%1% marked with <b>*</b> are <b>not</b> compatible with some installed printers."), materials->technology == T_FFF ? _L("Filaments") : _L("SLA materials"));
-
         if (all_printers) {
             // TRN ConfigWizard: Materials : "%1%" = "filament"/"SLA material"
             wxString second_line = format_wxstr(_L("All installed printers are compatible with the selected %1%."), materials->technology == T_FFF ? _L("filament") : _L("SLA material"));
@@ -868,12 +1009,14 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
                 "</style>"
                 "<body bgcolor= %s>"
                 "<font color=%s>"
-                "%s<br /><br />%s"
+                "<font size=\"3\">"
+                "%s<br /><br />%s<br /><br />%s"
                 "</font>"
                 "</body>"
                 "</html>"
                 , bgr_clr_str
                 , text_clr_str
+                , zero_line
                 , first_line
                 , second_line
             );
@@ -891,13 +1034,16 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
                 "</style>"
                 "<body bgcolor= %s>"
                 "<font color=%s>"
-                "%s<br /><br />%s"
+                "<font size=\"3\">"
+                "%s<br /><br />%s<br /><br />%s"
                 "<table>"
                 "<tr>"
                 , bgr_clr_str
                 , text_clr_str
+                , zero_line
                 , first_line
-                , second_line);
+                , second_line
+            );
             for (size_t i = 0; i < printer_names.size(); ++i)
             {
                 text += wxString::Format("<td>%s</td>", boost::nowide::widen(printer_names[i]));
@@ -1000,6 +1146,7 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
         // Refresh type list
 		list_type->Clear();
 		list_type->append(_L("(All)"), &EMPTY);
+        std::vector<std::string> appended_types;
 		if (sel_printers_count > 1) {
             // If all is selected with other printers
             // unselect "all" or all printers depending on last value
@@ -1034,10 +1181,11 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
                         break;
                     }
                 }
-                materials->filter_presets(printer, printer_name, EMPTY, EMPTY, [this](const Preset* p) {
+                materials->filter_presets(printer, printer_name, EMPTY, EMPTY, [this, &appended_types](const Preset* p) {
                     const std::string& type = this->materials->get_type(p);
-                    if (list_type->find(type) == wxNOT_FOUND) {
+                    if (std::find(appended_types.begin(), appended_types.end(), type) == appended_types.end()) {
                         list_type->append(type, &type);
+                        appended_types.emplace_back(type);
                     }
                     });
             }
@@ -1048,10 +1196,11 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
             list_printer->SetSelection(0);
             sel_printers_count = list_printer->GetSelections(sel_printers);
 
-            materials->filter_presets(nullptr, EMPTY, EMPTY, EMPTY, [this](const Preset* p) {
+            materials->filter_presets(nullptr, EMPTY, EMPTY, EMPTY, [this, &appended_types](const Preset* p) {
                 const std::string& type = this->materials->get_type(p);
-                if (list_type->find(type) == wxNOT_FOUND) {
+                if (std::find(appended_types.begin(), appended_types.end(), type) == appended_types.end()) {
                     list_type->append(type, &type);
+                    appended_types.emplace_back(type);
                 }
                 });
         }
@@ -1062,10 +1211,11 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
             sel_printers_count = list_printer->GetSelections(sel_printers);
             template_shown = true;
             materials->filter_presets(nullptr, TEMPLATES, EMPTY, EMPTY, 
-                [this](const Preset* p) {
+                [this, &appended_types](const Preset* p) {
                     const std::string& type = this->materials->get_type(p);
-                    if (list_type->find(type) == wxNOT_FOUND) {
+                    if (std::find(appended_types.begin(), appended_types.end(), type) == appended_types.end()) {
                         list_type->append(type, &type);
+                        appended_types.emplace_back(type);
                     }
                 });
         }
@@ -1086,6 +1236,7 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
 
 		list_vendor->Clear();
 		list_vendor->append(_L("(All)"), &EMPTY);
+        std::vector<std::string> appended_vendors;
 		if (sel_printers_count != 0 && sel_type != wxNOT_FOUND) {
 			const std::string& type = list_type->get_data(sel_type);
 			// find printer preset
@@ -1098,10 +1249,11 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
 						break;
 					}
 				}
-				materials->filter_presets(printer, printer_name, type, EMPTY, [this](const Preset* p) {
+				materials->filter_presets(printer, printer_name, type, EMPTY, [this, &appended_vendors](const Preset* p) {
 					const std::string& vendor = this->materials->get_vendor(p);
-					if (list_vendor->find(vendor) == wxNOT_FOUND) {
+					if (std::find(appended_vendors.begin(), appended_vendors.end(), vendor) == appended_vendors.end()) {
 						list_vendor->append(vendor, &vendor);
+                        appended_vendors.emplace_back(vendor);
 					}
 					});
 			}
@@ -1119,6 +1271,7 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
 		// Refresh material list
 
 		list_profile->Clear();
+        std::vector<std::string> appended_aliases;
         clear_compatible_printers_label();
 		if (sel_printers_count != 0 && sel_type != wxNOT_FOUND && sel_vendor != wxNOT_FOUND) {
 			const std::string& type = list_type->get_data(sel_type);
@@ -1134,17 +1287,20 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
 						break;
 					}
 				}
-				materials->filter_presets(printer, printer_name, type, vendor, [this, &to_list](const Preset* p) {
+				materials->filter_presets(printer, printer_name, type, vendor, [this, &to_list, &appended_aliases](const Preset* p) {
 					const std::string& section = materials->appconfig_section();
                     bool checked = wizard_p()->appconfig_new.has(section, p->name);
                     bool was_checked = false;
 
-                    int cur_i = list_profile->find(p->alias);
-                    if (cur_i == wxNOT_FOUND) {
+                    auto it = std::find(appended_aliases.begin(), appended_aliases.end(), p->alias);
+                    size_t cur_i = 0;
+                    if (it == appended_aliases.end()) {
                         cur_i = list_profile->append(p->alias + (materials->get_omnipresent(p) || template_shown ? "" : " *"), &p->alias);
+                        appended_aliases.emplace_back(p->alias);
                         to_list.emplace_back(p->alias, materials->get_omnipresent(p), checked);
                     }
                     else {
+                        cur_i = it - appended_aliases.begin();
                         was_checked = list_profile->IsChecked(cur_i);
                         to_list[cur_i].checked = checked || was_checked;
                     }
@@ -1325,7 +1481,7 @@ PageCustom::PageCustom(ConfigWizard *parent)
     auto *label = new wxStaticText(this, wxID_ANY, _L("Custom profile name:"));
 
     wxBoxSizer* profile_name_sizer = new wxBoxSizer(wxVERTICAL);
-    profile_name_editor = new SavePresetDialog::Item{ this, profile_name_sizer, default_profile_name };
+    profile_name_editor = new SavePresetDialog::Item{ this, profile_name_sizer, default_profile_name, wxGetApp().preset_bundle};
     profile_name_editor->Enable(false);
 
     cb_custom->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &) {
@@ -1426,7 +1582,7 @@ Worker::Worker(wxWindow* parent)
     wxGetApp().SetWindowVariantForButton(button_path);
     this->Add(button_path, 0, wxEXPAND | wxTOP | wxLEFT, 5);
     button_path->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
-        boost::filesystem::path chosen_dest(boost::nowide::narrow(m_input_path->GetValue()));
+        boost::filesystem::path chosen_dest(into_u8(m_input_path->GetValue()));
 
         wxDirDialog dialog(m_parent, _L("Choose folder") + ":", chosen_dest.string() );
         if (dialog.ShowModal() == wxID_OK)
@@ -1536,11 +1692,13 @@ bool PageDownloader::on_finish_downloader() const
     return m_downloader->on_finish();
 }
 
-bool DownloaderUtils::Worker::perform_register(const std::string& path_override/* = {}*/)
+#ifdef __linux__
+bool DownloaderUtils::Worker::perform_registration_linux = false;
+#endif // __linux__
+
+bool DownloaderUtils::Worker::perform_download_register(const std::string& path)
 {
-    boost::filesystem::path aux_dest (GUI::into_u8(path_name()));
-    if (!path_override.empty())
-        aux_dest = boost::filesystem::path(path_override);
+    boost::filesystem::path aux_dest (path);
     boost::system::error_code ec;
     boost::filesystem::path chosen_dest = boost::filesystem::absolute(aux_dest, ec);
     if(ec)
@@ -1549,11 +1707,15 @@ bool DownloaderUtils::Worker::perform_register(const std::string& path_override/
     if (chosen_dest.empty() || !boost::filesystem::is_directory(chosen_dest, ec) || ec) {
         std::string err_msg = GUI::format("%1%\n\n%2%",_L("Chosen directory for downloads does not exist.") ,chosen_dest.string());
         BOOST_LOG_TRIVIAL(error) << err_msg;
-        show_error(m_parent, err_msg);
+        show_error(/*m_parent*/ nullptr, err_msg);
         return false;
     }
     BOOST_LOG_TRIVIAL(info) << "Downloader registration: Directory for downloads: " << chosen_dest.string();
     wxGetApp().app_config->set("url_downloader_dest", chosen_dest.string());
+    return perform_url_register();
+}
+bool DownloaderUtils::Worker::perform_url_register()
+{
 #ifdef _WIN32
     // Registry key creation for "prusaslicer://" URL
 
@@ -1613,12 +1775,12 @@ bool DownloaderUtils::Worker::on_finish() {
     BOOST_LOG_TRIVIAL(debug) << "PageDownloader::on_finish_downloader ac_value " << ac_value << " downloader_checked " << downloader_checked;
     if (ac_value && downloader_checked) {
         // already registered but we need to do it again
-        if (!perform_register())
+        if (!perform_download_register(GUI::into_u8(path_name())))
             return false;
         app_config->set("downloader_url_registered", "1");
     } else if (!ac_value && downloader_checked) {
         // register
-        if (!perform_register())
+        if (!perform_download_register(GUI::into_u8(path_name())))
             return false;
         app_config->set("downloader_url_registered", "1");
     } else if (ac_value && !downloader_checked) {
@@ -1705,8 +1867,17 @@ void PageMode::serialize_mode(AppConfig *app_config) const
     app_config->set("use_inches", check_inch->GetValue() ? "1" : "0");
 }
 
-PageVendors::PageVendors(ConfigWizard *parent)
-    : ConfigWizardPage(parent, _L("Other Vendors"), _L("Other Vendors"))
+wxString repo_title(const std::string& repo_id, const std::string& repo_name)
+{
+    if (repo_name.empty())
+    {
+        return repo_id.empty() ? wxString::FromUTF8("Unknown repo") : format_wxstr("Unnamed repo (ID %1%)", repo_id);
+    }
+    return repo_name;
+}
+
+PageVendors::PageVendors(ConfigWizard* parent, std::string repo_id /*= wxEmptyString*/, std::string repo_name)
+    : ConfigWizardPage(parent, repo_title(repo_id, repo_name),repo_title(repo_id, repo_name))
 {
     const AppConfig &appconfig = this->wizard_p()->appconfig_new;
 
@@ -1717,20 +1888,65 @@ PageVendors::PageVendors(ConfigWizard *parent)
     // Copy vendors from bundle map to vector, so we can sort it without case sensitivity
     std::vector<std::pair<std::wstring, const VendorProfile*>> vendors;
     for (const auto& pair : wizard_p()->bundles) {
+        if (pair.second.vendor_profile->repo_id != repo_id)
+            continue;
+
         vendors.emplace_back(boost::algorithm::to_lower_copy(boost::nowide::widen(pair.second.vendor_profile->name)),pair.second.vendor_profile);
     }
+
     std::sort(vendors.begin(), vendors.end(), [](const std::pair<std::wstring, const VendorProfile*>& a, const std::pair<std::wstring, const VendorProfile*>& b) {
         return a.first < b.first;
         });
 
     for (const std::pair<std::wstring, const VendorProfile*>& v : vendors) {
         const VendorProfile* vendor = v.second;
-        if (vendor->id == PresetBundle::PRUSA_BUNDLE) { continue; }
+//!        if (vendor->id == PresetBundle::PRUSA_BUNDLE) { continue; }
         if (vendor && vendor->templates_profile)
             continue;
 
         auto *cbox = new wxCheckBox(this, wxID_ANY, vendor->name);
         cbox->Bind(wxEVT_CHECKBOX, [=](wxCommandEvent &event) {
+            if (cbox->IsChecked()) {
+                // create PrinterPages for this vendor, if they aren't created jet
+                {
+                    auto repo = wizard_p()->get_repo(repo_id);
+                    assert(repo);
+                    if (repo->printers_pages.find(vendor->id) == repo->printers_pages.end()) {
+                        wxWindowUpdateLocker freeze_guard(parent);
+                        wizard_p()->create_vendor_printers_page(repo_id, vendor);
+                    }
+                }
+
+                wxString    user_presets_list{ wxString() };
+                int         user_presets_cnt { 0 };
+                
+                // Check if some of preset doesn't exist as a user_preset
+                // to avoid rewrite those user_presets by new installed system presets
+                const PresetCollection& presets = wizard_p()->bundles.at(vendor->id).preset_bundle.get()->printers;
+                for (const Preset& preset : presets)
+                    if (!preset.is_default && boost::filesystem::exists(preset.file)) {
+                        user_presets_list += " * " + from_u8(preset.name) + "\n";
+                        user_presets_cnt++;
+                    }
+
+                if (!user_presets_list.IsEmpty()) {
+                    wxString message = format_wxstr(_L_PLURAL("Existing user preset '%2%' has the same name as one of new system presets from vendor '%1%'.\n"
+                                                              "Please note that this user preset will be rewritten by the system preset.\n\n"
+                                                              "Do you still wish to add presets from vendor '%1%'?",
+                                                              "Existing user presets (%2%) have the same names as some of new system presets from vendor '%1%'.\n"
+                                                              "Please note that these user presets will be rewritten by the system presets.\n\n"
+                                                              "Do you still wish to add presets from vendor '%1%'?",
+                                                    user_presets_cnt), vendor->name, user_presets_list);
+
+                    MessageDialog msg(this->GetParent(), message, _L("Notice"), wxYES_NO);
+                    if (msg.ShowModal() == wxID_NO) {
+                        // uncheck checked ckeckbox
+                        cbox->SetValue(false);
+                        return;
+                    }
+                }
+            }
+
             wizard_p()->on_3rdparty_install(vendor, cbox->IsChecked());
         });
 
@@ -1738,12 +1954,7 @@ PageVendors::PageVendors(ConfigWizard *parent)
         const bool enabled = acvendors.find(vendor->id) != acvendors.end();
         if (enabled) {
             cbox->SetValue(true);
-
-            auto pages = wizard_p()->pages_3rdparty.find(vendor->id);
-            wxCHECK_RET(pages != wizard_p()->pages_3rdparty.end(), "Internal error: 3rd party vendor printers page not created");
-
-            for (PagePrinters* page : { pages->second.first, pages->second.second })
-                if (page) page->install = true;
+            wizard_p()->create_vendor_printers_page(repo_id, vendor, true);
         }
 
         append(cbox);
@@ -2148,12 +2359,12 @@ void ConfigWizardIndex::go_to(size_t i)
     if (i != item_active
         && i < items.size()
         && items[i].page != nullptr) {
-        auto *new_active = items[i].page;
         auto *former_active = active_page();
         if (former_active != nullptr) {
             former_active->Hide();
         }
 
+        auto *new_active = items[i].page;
         item_active = i;
         new_active->Show();
 
@@ -2353,69 +2564,88 @@ void ConfigWizard::priv::load_pages()
     wxWindowUpdateLocker freeze_guard(q);
     (void)freeze_guard;
 
-    const ConfigWizardPage *former_active = index->active_page();
+    const ConfigWizardPage* former_active = index->active_page();
 
     index->clear();
 
     index->add_page(page_welcome);
+    index->add_page(page_login);
+    index->add_page(page_update_manager);
 
-    // Printers
-    if (!only_sla_mode)
-        index->add_page(page_fff);
-    index->add_page(page_msla);
-    if (!only_sla_mode) {
-        index->add_page(page_vendors);
+    if (is_config_from_archive) {
 
-        // Copy pages names from map to vector, so we can sort it without case sensitivity
-        std::vector<std::pair<std::wstring, std::string>> sorted_vendors;
-        for (const auto& pages : pages_3rdparty) {
-            sorted_vendors.emplace_back(boost::algorithm::to_lower_copy(boost::nowide::widen(pages.first)), pages.first);
-        }
-        std::sort(sorted_vendors.begin(), sorted_vendors.end(), [](const std::pair<std::wstring, std::string>& a, const std::pair<std::wstring, std::string>& b) {
-            return a.first < b.first;
-            });
+        // Printers
+        if (!only_sla_mode)
+            for (const auto page : pages_fff)
+                index->add_page(page);
 
-        for (const std::pair<std::wstring, std::string> &v : sorted_vendors) {
-            const auto& pages = pages_3rdparty.find(v.second);
-            if (pages == pages_3rdparty.end())
-                continue; // Should not happen
-            for ( PagePrinters* page : { pages->second.first, pages->second.second })
-                if (page && page->install)
-                    index->add_page(page);
+        for (const auto page : pages_msla)
+            index->add_page(page);
+
+        if (!only_sla_mode) {
+
+            for (const auto& repos : repositories) {
+                if (!repos.vendors_page)
+                    continue;
+                index->add_page(repos.vendors_page);
+
+                // Copy pages names from map to vector, so we can sort it without case sensitivity
+                std::vector<std::pair<std::wstring, std::string>> sorted_vendors;
+                for (const auto& pages : repos.printers_pages) {
+                    sorted_vendors.emplace_back(boost::algorithm::to_lower_copy(boost::nowide::widen(pages.first)), pages.first);
+                }
+                std::sort(sorted_vendors.begin(), sorted_vendors.end(), [](const std::pair<std::wstring, std::string>& a, const std::pair<std::wstring, std::string>& b) {
+                    return a.first < b.first;
+                    });
+
+                for (const std::pair<std::wstring, std::string>& v : sorted_vendors) {
+                    const auto& pages = repos.printers_pages.find(v.second);
+                    if (pages == repos.printers_pages.end())
+                        continue; // Should not happen
+                    for (PagePrinters* page : { pages->second.first, pages->second.second })
+                        if (page && page->install)
+                            index->add_page(page);
+                }
+            }
+
+            index->add_page(page_custom);
+            if (page_custom->custom_wanted()) {
+                index->add_page(page_firmware);
+                index->add_page(page_bed);
+                index->add_page(page_bvolume);
+                index->add_page(page_diams);
+                index->add_page(page_temps);
+            }
+
+            // Filaments & Materials
+            if (any_fff_selected) { index->add_page(page_filaments); }
+            // Filaments page if only custom printer is selected 
+            const AppConfig* app_config = wxGetApp().app_config;
+            if (!any_fff_selected && (custom_printer_selected || custom_printer_in_bundle) && (app_config->get("no_templates") == "0")) {
+                update_materials(T_ANY);
+                index->add_page(page_filaments);
+            }
         }
 
-        index->add_page(page_custom);
-        if (page_custom->custom_wanted()) {
-            index->add_page(page_firmware);
-            index->add_page(page_bed);
-            index->add_page(page_bvolume);
-            index->add_page(page_diams);
-            index->add_page(page_temps);
-        }
-   
-        // Filaments & Materials
-        if (any_fff_selected) { index->add_page(page_filaments); }
-        // Filaments page if only custom printer is selected 
-        const AppConfig* app_config = wxGetApp().app_config;
-        if (!any_fff_selected && (custom_printer_selected || custom_printer_in_bundle) && (app_config->get("no_templates") == "0")) {
-            update_materials(T_ANY);
-            index->add_page(page_filaments);
-        }
+        if (any_sla_selected) 
+            index->add_page(page_sla_materials);
+
+        index->add_page(page_update);
+        index->add_page(page_downloader);
+        index->add_page(page_reload_from_disk);
+    #ifdef _WIN32
+        index->add_page(page_files_association);
+    #endif // _WIN32
+        index->add_page(page_mode);
+
     }
-    if (any_sla_selected) { index->add_page(page_sla_materials); }
 
-    // there should to be selected at least one printer
-    btn_finish->Enable(any_fff_selected || any_sla_selected || custom_printer_selected || custom_printer_in_bundle);
-
-    index->add_page(page_update);
-    index->add_page(page_downloader);
-    index->add_page(page_reload_from_disk);
-#ifdef _WIN32
-    index->add_page(page_files_association);
-#endif // _WIN32
-    index->add_page(page_mode);
-
-    index->go_to(former_active);   // Will restore the active item/page if possible
+    if (former_active != page_update_manager) {
+        if (pages_fff.empty() && pages_msla.empty() && installed_multivendors_repos())
+            index->go_to(repositories[0].vendors_page); // Activate Vendor page, if no one printer is selected
+        else
+            index->go_to(former_active);   // Will restore the active item/page if possible
+    }
 
     q->Layout();
 // This Refresh() is needed to avoid ugly artifacts after printer selection, when no one vendor was selected from the very beginnig
@@ -2436,7 +2666,15 @@ void ConfigWizard::priv::init_dialog_size()
         9*disp_rect.width / 10,
         9*disp_rect.height / 10);
 
-    const int width_hint = index->GetSize().GetWidth() + std::max(90 * em(), (only_sla_mode ? page_msla->get_width() : page_fff->get_width()) + 30 * em());    // XXX: magic constant, I found no better solution
+    int min_width = em();
+    if (only_sla_mode)
+        for (auto page : pages_msla)
+            min_width = std::max(min_width, page->get_width());
+    else
+        for (auto page : pages_fff)
+            min_width = std::max(min_width, page->get_width());
+
+    const int width_hint = index->GetSize().GetWidth() + std::max(90 * em(), min_width + 30 * em());    // XXX: magic constant, I found no better solution
     if (width_hint < window_rect.width) {
         window_rect.x += (window_rect.width - width_hint) / 2;
         window_rect.width = width_hint;
@@ -2518,7 +2756,7 @@ void ConfigWizard::priv::load_vendors()
 
 void ConfigWizard::priv::add_page(ConfigWizardPage *page)
 {
-    const int proportion = (page->shortname == _L("Filaments")) || (page->shortname == _L("SLA Materials")) ? 1 : 0;
+    const int proportion = (page == page_login || page == page_filaments || page == page_sla_materials);
     hscroll_sizer->Add(page, proportion, wxEXPAND);
     all_pages.push_back(page);
 }
@@ -2532,9 +2770,28 @@ void ConfigWizard::priv::enable_next(bool enable)
 void ConfigWizard::priv::set_start_page(ConfigWizard::StartPage start_page)
 {
     switch (start_page) {
-        case ConfigWizard::SP_PRINTERS: 
-            index->go_to(page_fff); 
-            btn_next->SetFocus();
+        case ConfigWizard::SP_PRINTERS: {
+                // find start 
+                PagePrinters* page = !pages_fff.empty()  ? pages_fff[0]  : 
+                                     !pages_msla.empty() ? pages_msla[0] : nullptr;
+                for (const auto& repo : repositories) {
+                    if (page)
+                        break;
+                    for (const auto& [name, pages] : repo.printers_pages) {
+                        if (pages.first && pages.first->install) {
+                            page = pages.first;
+                            break;
+                        }
+                        if (pages.second && pages.second->install) {
+                            page = pages.second;
+                            break;
+                        }
+                    }
+                }
+
+                index->go_to(page);
+                btn_next->SetFocus();
+            }
             break;
         case ConfigWizard::SP_FILAMENTS:
             index->go_to(page_filaments);
@@ -2551,37 +2808,68 @@ void ConfigWizard::priv::set_start_page(ConfigWizard::StartPage start_page)
     }
 }
 
-void ConfigWizard::priv::create_3rdparty_pages()
+ConfigWizard::priv::Repository* ConfigWizard::priv::get_repo(const std::string& repo_id)
 {
-    for (const auto &pair : bundles) {
-        const VendorProfile *vendor = pair.second.vendor_profile;
-        if (vendor->id == PresetBundle::PRUSA_BUNDLE) { continue; }
+    auto it = std::find(repositories.begin(), repositories.end(), repo_id);
+    if (it == repositories.end())
+        return nullptr;
+    return &repositories[it - repositories.begin()];
+}
 
-        bool is_fff_technology = false;
-        bool is_sla_technology = false;
+void ConfigWizard::priv::create_vendor_printers_page(const std::string& repo_id, const VendorProfile* vendor, bool install/* = false*/, bool from_single_vendor_repo /*= false*/)
+{
+    bool is_fff_technology = false;
+    bool is_sla_technology = false;
 
-        for (auto& model: vendor->models)
-        {
-            if (!is_fff_technology && model.technology == ptFFF)
-                 is_fff_technology = true;
-            if (!is_sla_technology && model.technology == ptSLA)
-                 is_sla_technology = true;
+    for (auto& model: vendor->models)
+    {
+        if (!is_fff_technology && model.technology == ptFFF)
+            is_fff_technology = true;
+        if (!is_sla_technology && model.technology == ptSLA)
+            is_sla_technology = true;
+
+        if (is_fff_technology && is_sla_technology)
+            break;
+    }
+
+    PagePrinters* pageFFF = nullptr;
+    PagePrinters* pageSLA = nullptr;
+
+    const bool is_prusa_vendor = vendor->name.find("Prusa") != std::string::npos;
+    const unsigned indent = from_single_vendor_repo ? 0 : 1;
+
+    if (is_fff_technology) 
+    {
+        pageFFF = new PagePrinters(q, vendor->name + " " +_L("FFF Technology Printers"), vendor->name + (is_prusa_vendor ? "" : " FFF"), *vendor, indent, T_FFF);
+        pageFFF->install = install;
+        if (only_sla_mode)
+            only_sla_mode = false;
+        add_page(pageFFF);
+    }
+
+    if (is_sla_technology) 
+    {
+        pageSLA = new PagePrinters(q, vendor->name + " " + _L("SLA Technology Printers"), vendor->name + (is_prusa_vendor ? "" : " MLSA"), *vendor, indent, T_SLA);
+        pageSLA->install = install;
+        add_page(pageSLA);
+    }
+
+    if (from_single_vendor_repo)
+    {
+        // single vendor repository
+        if (pageFFF) {
+            pages_fff.emplace_back(pageFFF);
         }
-
-        PagePrinters* pageFFF = nullptr;
-        PagePrinters* pageSLA = nullptr;
-
-        if (is_fff_technology) {
-            pageFFF = new PagePrinters(q, vendor->name + " " +_L("FFF Technology Printers"), vendor->name+" FFF", *vendor, 1, T_FFF);
-            add_page(pageFFF);
+        if (pageSLA) {
+            pages_msla.emplace_back(pageSLA);
         }
-
-        if (is_sla_technology) {
-            pageSLA = new PagePrinters(q, vendor->name + " " + _L("SLA Technology Printers"), vendor->name+" MSLA", *vendor, 1, T_SLA);
-            add_page(pageSLA);
-        }
-
-        pages_3rdparty.insert({vendor->id, {pageFFF, pageSLA}});
+    }
+    if (pageFFF || pageSLA)
+    {
+        // multiple vendor repository
+        auto repo = get_repo(repo_id);
+        assert(repo);
+        repo->printers_pages.insert({vendor->id, {pageFFF, pageSLA}});
     }
 }
 
@@ -2684,8 +2972,18 @@ void ConfigWizard::priv::on_printer_pick(PagePrinters *page, const PrinterPicker
 
     if (page->technology & T_FFF) {
         page_filaments->clear();
+        if (!any_fff_selected) {
+            // clear all filament's info, when no one printer is selected
+            filaments.clear();
+            aliases_fff.clear();
+        }
     } else if (page->technology & T_SLA) {
         page_sla_materials->clear();
+        if (!any_sla_selected) {
+            // clear all material's info, when no one printer is selected
+            sla_materials.clear();
+            aliases_sla.clear();
+        }
     }
 }
 
@@ -2755,21 +3053,60 @@ void ConfigWizard::priv::select_default_materials_for_printer_models(Technology 
 
 void ConfigWizard::priv::on_3rdparty_install(const VendorProfile *vendor, bool install)
 {
-    auto it = pages_3rdparty.find(vendor->id);
-    wxCHECK_RET(it != pages_3rdparty.end(), "Internal error: GUI page not found for 3rd party vendor profile");
+    for (const auto& repo : repositories) {
+        if (repo.id_name != vendor->repo_id)
+            continue;
 
-    for (PagePrinters* page : { it->second.first, it->second.second }) 
-        if (page) {
-            if (page->install && !install)
-                page->select_all(false);
-            page->install = install;
-            // if some 3rd vendor is selected, select first printer for them
-            if (install)
-                page->printer_pickers[0]->select_one(0, true);
-            page->Layout();
-        }
+        auto pages = repo.printers_pages.find(vendor->id);
+        wxCHECK_RET(pages != repo.printers_pages.end(), "Internal error: 3rd party vendor printers page not created");
+        for (PagePrinters* page : { pages->second.first, pages->second.second })
+            if (page) {
+                if (page->install && !install)
+                    page->select_all(false);
+                page->install = install;
+                // if some 3rd vendor is selected, select first printer for them
+                if (install)
+                    page->printer_pickers[0]->select_one(0, true);
+                page->Layout();
+            }
+
+        break;
+    }
 
     load_pages();
+}
+
+bool ConfigWizard::priv::can_finish()
+{
+    if (index->active_page() == page_update_manager)
+        return false;
+    // Set enabling fo "Finish" button -> there should to be selected at least one printer
+    return any_fff_selected || any_sla_selected || custom_printer_selected || custom_printer_in_bundle;
+}
+
+bool ConfigWizard::priv::can_go_next()
+{
+    if (index->active_page() == page_update_manager)
+        return page_update_manager->manager->has_selections();
+    return true;
+}
+
+bool ConfigWizard::priv::can_show_next()
+{
+    const bool is_last = index->active_is_last();
+
+    if (index->active_page() == page_update_manager && is_last)
+        return true;
+
+    return !is_last;
+}
+
+bool ConfigWizard::priv::can_select_all()
+{
+    if (index->active_page() == page_update_manager)
+        return false;
+    // set enabling for "Select all..." -> there should to be exist at least one printer page
+    return !pages_fff.empty() || !pages_msla.empty();
 }
 
 bool ConfigWizard::priv::on_bnt_finish()
@@ -2883,7 +3220,6 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 
     const auto ask_and_select_default_materials = [this](const wxString &message, const std::set<const VendorProfile::PrinterModel*> &printer_models, Technology technology)
     {
-        //wxMessageDialog msg(q, message, _L("Notice"), wxYES_NO);
         MessageDialog msg(q, message, _L("Notice"), wxYES_NO);
         if (msg.ShowModal() == wxID_YES)
             select_default_materials_for_printer_models(technology, printer_models);
@@ -2969,15 +3305,16 @@ static std::string get_first_added_preset(const std::map<std::string, std::strin
     return *diff.begin();
 }
 
-bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes)
+bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdaterWrapper *updater, bool& apply_keeped_changes)
 {
     wxString header, caption = _L("Configuration is edited in ConfigWizard");
     const auto enabled_vendors = appconfig_new.vendors();
     const auto enabled_vendors_old = app_config->vendors();
 
-    bool suppress_sla_printer = model_has_multi_part_objects(wxGetApp().model());
+    bool show_info_msg = false;
+    bool suppress_sla_printer = model_has_parameter_modifiers_in_objects(wxGetApp().model());
     PrinterTechnology preferred_pt = ptAny;
-    auto get_preferred_printer_technology = [enabled_vendors, enabled_vendors_old, suppress_sla_printer](const std::string& bundle_name, const Bundle& bundle) {
+    auto get_preferred_printer_technology = [enabled_vendors, enabled_vendors_old, suppress_sla_printer, &show_info_msg](const std::string& bundle_name, const Bundle& bundle) {
         const auto config = enabled_vendors.find(bundle_name);
         PrinterTechnology pt = ptAny;
         if (config != enabled_vendors.end()) {
@@ -2987,17 +3324,21 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
                     pt = model.technology;
                     const auto config_old = enabled_vendors_old.find(bundle_name);
                     if (config_old == enabled_vendors_old.end() || config_old->second.find(model.id) == config_old->second.end()) {
-                        // if preferred printer model has SLA printer technology it's important to check the model for multi-part state
-                        if (pt == ptSLA && suppress_sla_printer)
+                        // if preferred printer model has SLA printer technology it's important to check the model for modifiers
+                        if (pt == ptSLA && suppress_sla_printer) {
+                            show_info_msg = true;
                             continue;
+                        }
                         return pt;
                     }
 
                     if (const auto model_it_old = config_old->second.find(model.id);
                         model_it_old == config_old->second.end() || model_it_old->second != model_it->second) {
-                        // if preferred printer model has SLA printer technology it's important to check the model for multi-part state
-                        if (pt == ptSLA && suppress_sla_printer)
+                        // if preferred printer model has SLA printer technology it's important to check the model for modifiers
+                        if (pt == ptSLA && suppress_sla_printer) {
+                            show_info_msg = true;
                             continue;
+                        }
                         return pt;
                     }
                 }
@@ -3019,8 +3360,9 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         }
     }
 
-    if (preferred_pt == ptSLA && !wxGetApp().may_switch_to_SLA_preset(caption))
-        return false;
+    if (show_info_msg)
+        show_info(nullptr, _L("It's impossible to print object(s) which contains parameter modifiers with SLA technology.\n\n"
+                              "SLA-printer preset will not be selected"), caption);
 
     bool check_unsaved_preset_changes = page_welcome->reset_user_profile();
     if (check_unsaved_preset_changes)
@@ -3065,10 +3407,10 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
 #if defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)
     // Desktop integration on Linux
-    BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->m_downloader->get_perform_registration_linux();
+    BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << DownloaderUtils::Worker::perform_registration_linux;
     if (page_welcome->integrate_desktop())
         DesktopIntegrationDialog::perform_desktop_integration();
-    if (page_downloader->m_downloader->get_perform_registration_linux())
+    if (DownloaderUtils::Worker::perform_registration_linux)
         DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif //(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)
 
@@ -3103,7 +3445,6 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
     if (install_bundles.size() > 0) {
         // Install bundles from resources or cache / vendor.
         // Don't create snapshot - we've already done that above if applicable.
-        
         bool install_result = updater->install_bundles_rsrc_or_cache_vendor(std::move(install_bundles), false);
         if (!install_result)
             return false;
@@ -3207,6 +3548,36 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         }
     }
 
+    // Save used repo into manifest.
+    std::vector<std::string> used_repo_ids;
+    for (const auto& vendor : enabled_vendors) {
+        // here vendor might be empty - it causes false has_installed_printers : 1 entries in manifest.
+        if (vendor.second.empty()){
+            continue;
+        }
+        bool not_empty = false;
+        for (const auto& it : vendor.second) {
+            if (!it.second.empty())  {
+                not_empty = true;
+                break;
+            }
+        }
+        if (!not_empty) {
+            continue;
+        }
+
+        const auto& it = bundles.find(vendor.first);
+        // This is a last resort solution of missing secret repo in manifest while some of its printers are installed.
+        if (it == bundles.end()) { 
+            continue;
+        }
+        const std::string repo_id = it->second.vendor_profile->repo_id;
+        if (std::find(used_repo_ids.begin(), used_repo_ids.end(), repo_id) == used_repo_ids.end()) {
+            used_repo_ids.emplace_back(repo_id);
+        }
+    }
+    wxGetApp().get_preset_updater_wrapper()->set_installed_printer_repositories(std::move(used_repo_ids));
+
     // apply materials in app_config
     for (const std::string& section_name : {AppConfig::SECTION_FILAMENTS, AppConfig::SECTION_MATERIALS})
         if (appconfig_new.has_section(section_name))
@@ -3285,20 +3656,270 @@ void ConfigWizard::priv::update_presets_in_config(const std::string& section, co
 
 bool ConfigWizard::priv::check_fff_selected()
 {
-    bool ret = page_fff->any_selected();
-    for (const auto& printer: pages_3rdparty)
-        if (printer.second.first)               // FFF page
-            ret |= printer.second.first->any_selected();
-    return ret;
+    for (const auto page : pages_fff)
+        if (page->any_selected())
+            return true;
+
+    for (const auto& repos : repositories)
+        for (const auto& printers : repos.printers_pages)
+            if (const auto page = printers.second.first;// FFF page
+                page && page->any_selected())
+                return true;
+
+    return false;
 }
 
 bool ConfigWizard::priv::check_sla_selected()
 {
-    bool ret = page_msla->any_selected();
-    for (const auto& printer: pages_3rdparty)
-        if (printer.second.second)               // SLA page
-            ret |= printer.second.second->any_selected();
-    return ret;
+    for (const auto page : pages_msla)
+        if (page->any_selected())
+            return true;
+
+    for (const auto& repos : repositories)
+        for (const auto& printers : repos.printers_pages)
+            if (const auto page = printers.second.second;// SLA page
+                page && page->any_selected())
+                return true;
+
+    return false;
+}
+
+void ConfigWizard::priv::set_config_updated_from_archive(bool load_installed_printers, bool run_preset_updater) 
+{
+    if (run_preset_updater)  {   
+        // TRN: Progress dialog title
+        wxGetApp().get_preset_updater_wrapper()->wizard_sync(wxGetApp().preset_bundle, wxGetApp().app_config->orig_version(), q, true, _L("Updating Configuration sources"));
+        // We have now probably changed data. We need to rebuild database from which wizards constructs.
+        // Just reload bundles and upadte installed printer from appconfig_new.
+        bundles = BundleMap::load();
+    }
+    if (load_installed_printers) {
+        // Initialize the is_visible flag in printer Presets
+        for (auto& pair : bundles)
+            pair.second.preset_bundle->load_installed_printers(appconfig_new);
+    }
+
+    load_pages_from_archive();
+}
+
+bool ConfigWizard::priv::any_installed_vendor_for_repo(const std::string& repo_id, std::vector<const VendorProfile*>& vendors_for_repo)
+{
+    // fill vendors_for_repo
+    for (const auto& pair : bundles) {
+        if (pair.second.vendor_profile->repo_id != repo_id)
+            continue;
+        vendors_for_repo.emplace_back(pair.second.vendor_profile);
+    }
+
+    // check if any of vendor is installed
+    const auto& appconf_vendors = appconfig_new.vendors();
+    for (const VendorProfile* vendor : vendors_for_repo) {
+        if (vendor && !vendor->templates_profile)
+            if (appconf_vendors.find(vendor->id) != appconf_vendors.end())
+                return true;
+    }
+
+    return false;
+}
+
+static bool to_delete(PagePrinters* page, const std::set<std::string>& selected_uuids)
+{
+    const SharedArchiveRepositoryVector& archs = wxGetApp().get_preset_updater_wrapper()->get_all_archive_repositories();
+
+    bool unselect_all = true;
+
+    for (const auto& archive : archs) {
+        if (page->get_vendor_repo_id() == archive->get_manifest().id) {
+            if (selected_uuids.find(archive->get_uuid()) != selected_uuids.end())
+                unselect_all = false;
+            //break; ! don't break here, because there can be several archives with same repo_id
+        }
+    }
+    return unselect_all;
+}
+
+static void unselect(PagePrinters* page)
+{
+    const Slic3r::PresetUpdaterWrapper*    puw              = wxGetApp().get_preset_updater_wrapper();
+    const SharedArchiveRepositoryVector&    archs           = puw->get_all_archive_repositories();
+
+    bool unselect_all = true;
+
+    for (const auto* archive : archs) {
+        if (page->get_vendor_repo_id() == archive->get_manifest().id) {
+            if (puw->is_selected_repository_by_uuid(archive->get_uuid()))
+                unselect_all = false;
+            //break; ! don't break here, because there can be several archives with same repo_id
+        }
+    }
+
+    if (unselect_all)
+        page->unselect_all_presets();
+}
+
+bool ConfigWizard::priv::can_clear_printer_pages()
+{
+    const auto& selected_uuids = page_update_manager->manager->get_selected_uuids();
+
+    wxString msg;
+
+    for (Repository& repo : repositories) {
+        for (auto& [name, printers] : repo.printers_pages) {
+            if (PagePrinters* page = printers.first;
+                page && to_delete(page, selected_uuids))
+                    msg += "* " + page->shortname + "\n";
+
+            if (PagePrinters* page = printers.second;
+                page && to_delete(page, selected_uuids))
+                    msg += "* " + page->shortname + "\n";
+        }
+    }
+
+    if (msg.IsEmpty())
+        return true;
+
+    // TRN: %1% contains list of pages to be removed, each on its own line and ending with a line break.
+    wxString message = format_wxstr( _L("Following Configuration Wizard pages will be removed after the configuration update:\n\n%1%\n"
+                                        "Installed presets for the respective printers will also be removed.\n"
+                                        "Do you want to continue?"), msg);
+
+    MessageDialog msg_dlg(this->q, message, _L("Notice"), wxYES_NO);
+    return msg_dlg.ShowModal() == wxID_YES;
+}
+
+void ConfigWizard::priv::clear_printer_pages()
+{
+    auto delelete_page = [this](PagePrinters* page) {
+        // unselect page to correct process those changes in app_config
+        unselect(page);
+
+        // remove page
+        hscroll->RemoveChild(page);// Under OSX call of Reparent(nullptr) causes a crash, so as a workaround use RemoveChild() instead
+        page->Destroy();
+    };
+
+    for (PagePrinters* page : pages_fff)
+        delelete_page(page);
+    pages_fff.clear();
+
+    for (PagePrinters* page : pages_msla)
+        delelete_page(page);
+    pages_msla.clear();
+
+    for (Repository& repo : repositories) {
+        if (!repo.vendors_page)
+            continue;
+        for (auto& [name, printers] : repo.printers_pages) {
+            if (printers.first) delelete_page(printers.first);
+            if (printers.second) delelete_page(printers.second);
+        }
+    }
+    repositories.clear();
+}
+
+bool ConfigWizard::priv::installed_multivendors_repos()
+{
+    for (const auto& repo : repositories)
+        if (repo.vendors_page)
+            return true;
+    return false;
+}
+
+void ConfigWizard::priv::load_pages_from_archive()
+{
+    if (!is_config_from_archive)
+        return;
+
+    wxBusyCursor wait; 
+    wxWindowUpdateLocker freeze_guard(q);
+
+    // clear vendors and printers pages if any exists
+    clear_printer_pages();
+
+    // fill vendors and printers pages from Update manager
+
+    const auto* puw = wxGetApp().get_preset_updater_wrapper();
+
+    const SharedArchiveRepositoryVector& archs = puw->get_all_archive_repositories();
+
+    only_sla_mode = true;
+    bool is_primary_printer_page_set = false;
+
+    for (const auto* archive : archs) {
+        const auto& data = archive->get_manifest();
+        const bool is_selected_arch     = puw->is_selected_repository_by_uuid(archive->get_uuid());
+
+        std::vector<const VendorProfile*> vendors;
+        const bool any_installed_vendor = any_installed_vendor_for_repo(data.id, vendors);
+
+        const bool is_already_added_repo = std::find(repositories.begin(), repositories.end(), data.id) != repositories.end();
+
+        if (is_already_added_repo || (!is_selected_arch && !any_installed_vendor))
+            continue;
+
+        if (!vendors.empty())
+        {
+            // repository item with repo_id needs to be added into repositories before page_vendors creation
+            repositories.push_back({ data.id });
+
+            const bool is_non_prusa = data.id.find("non-prusa") == 0;
+            if (is_non_prusa || vendors.size() > 1)
+            {
+                // it's multiple vendor or non-prusa repository
+
+                PageVendors* page_vendors = new PageVendors(q, data.id, data.name);
+                repositories[repositories.size() - 1].vendors_page = page_vendors;
+
+                add_page(page_vendors);
+            }
+            else
+            {
+                // it's single prusa vendor repository
+                create_vendor_printers_page(data.id, vendors[0], true, true);
+
+                if (!is_primary_printer_page_set && !pages_fff.empty())
+                {
+                    pages_fff.back()->is_primary_printer_page = true;
+                    is_primary_printer_page_set = true;
+                }
+                else if (!is_primary_printer_page_set && !pages_msla.empty())
+                {
+                    pages_msla.back()->is_primary_printer_page = true;
+                    is_primary_printer_page_set = true;
+                }
+            }
+        }
+
+    }
+
+    if (only_sla_mode && installed_multivendors_repos()) {
+        only_sla_mode = false;
+    }
+
+    if (!only_sla_mode) {
+        add_page(page_custom = new PageCustom(q));
+        custom_printer_selected = page_custom->custom_wanted();
+    }
+
+    any_sla_selected = check_sla_selected();
+    any_fff_selected = !only_sla_mode && check_fff_selected();
+
+    if(!only_sla_mode && !page_filaments)
+        add_page(page_filaments = new PageMaterials(q, &filaments,
+            _L("Filament Profiles Selection"), _L("Filaments"), _L("Type:")));
+    if (!page_sla_materials)
+        add_page(page_sla_materials = new PageMaterials(q, &sla_materials,
+            _L("SLA Material Profiles Selection") + " ", _L("SLA Materials"), _L("Type:")));
+    
+    check_and_install_missing_materials(T_ANY);
+    update_materials(T_ANY);
+    if (any_fff_selected)
+        page_filaments->reload_presets();
+
+    if (any_sla_selected)
+        page_sla_materials->reload_presets();
+
+    load_pages();
 }
 
 
@@ -3362,46 +3983,14 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     wxGetApp().SetWindowVariantForButton(p->btn_finish);
     wxGetApp().SetWindowVariantForButton(p->btn_cancel);
 
-    const auto prusa_it = p->bundles.find("PrusaResearch");
-    wxCHECK_RET(prusa_it != p->bundles.cend(), "Vendor PrusaResearch not found");
-    const VendorProfile *vendor_prusa = prusa_it->second.vendor_profile;
-
     p->add_page(p->page_welcome = new PageWelcome(this));
+    p->add_page(p->page_login = new ConfigWizardWebViewPage(this));
+    p->add_page(p->page_update_manager = new PageUpdateManager(this));
 
-    
-    p->page_fff = new PagePrinters(this, _L("Prusa FFF Technology Printers"), "Prusa FFF", *vendor_prusa, 0, T_FFF);
-    p->only_sla_mode = !p->page_fff->has_printers;
-    if (!p->only_sla_mode) {
-        p->add_page(p->page_fff);
-        p->page_fff->is_primary_printer_page = true;
-    }
-  
+    // other pages will be loaded later after confirm repositories selection
 
-    p->page_msla = new PagePrinters(this, _L("Prusa MSLA Technology Printers"), "Prusa MSLA", *vendor_prusa, 0, T_SLA);
-    p->add_page(p->page_msla);
-    if (p->only_sla_mode) {
-        p->page_msla->is_primary_printer_page = true;
-    }
-
-    if (!p->only_sla_mode) {
-	    // Pages for 3rd party vendors
-	    p->create_3rdparty_pages();   // Needs to be done _before_ creating PageVendors
-	    p->add_page(p->page_vendors = new PageVendors(this));
-	    p->add_page(p->page_custom = new PageCustom(this));
-        p->custom_printer_selected = p->page_custom->custom_wanted();
-    }
-
-    p->any_sla_selected = p->check_sla_selected();
-    p->any_fff_selected = ! p->only_sla_mode && p->check_fff_selected();
-
-    p->update_materials(T_ANY);
-    if (!p->only_sla_mode)
-        p->add_page(p->page_filaments = new PageMaterials(this, &p->filaments,
-            _L("Filament Profiles Selection"), _L("Filaments"), _L("Type:") ));
-
-    p->add_page(p->page_sla_materials = new PageMaterials(this, &p->sla_materials,
-        _L("SLA Material Profiles Selection") + " ", _L("SLA Materials"), _L("Type:") ));
-
+    p->load_pages();
+    p->index->go_to(size_t{ 0 });
     
     p->add_page(p->page_update   = new PageUpdate(this));
     p->add_page(p->page_downloader = new PageDownloader(this));
@@ -3415,9 +4004,6 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     p->add_page(p->page_bvolume  = new PageBuildVolume(this));
     p->add_page(p->page_diams    = new PageDiameters(this));
     p->add_page(p->page_temps    = new PageTemperatures(this));
-    
-    p->load_pages();
-    p->index->go_to(size_t{0});
 
     vsizer->Add(topsizer, 1, wxEXPAND | wxALL, DIALOG_MARGIN);
     vsizer->Add(hline, 0, wxEXPAND | wxLEFT | wxRIGHT, VERTICAL_SPACING);
@@ -3435,6 +4021,11 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
 
     p->btn_prev->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &) { this->p->index->go_prev(); });
 
+    p->btn_prev->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt)
+    {
+        evt.Enable(p->can_go_next());
+    });
+
     p->btn_next->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &)
     {
         // check, that there is selected at least one filament/material
@@ -3445,7 +4036,18 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
         	! p->check_and_install_missing_materials(dynamic_cast<PageMaterials*>(active_page)->materials->technology))
         	// In that case don't leave the page and the function above queried the user whether to install default materials.
             return;
+        if (active_page == p->page_update_manager && p->index->active_is_last()) {
+            size_t next_active = p->index->pages_cnt();
+            p->page_update_manager->Hide();
+            p->index->go_to(next_active);
+            return;
+        }
         this->p->index->go_next();
+    });
+
+    p->btn_next->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt)
+    {
+        evt.Enable(p->can_go_next());
     });
 
     p->btn_finish->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &)
@@ -3454,23 +4056,39 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
             this->EndModal(wxID_OK);
     });
 
+    p->btn_finish->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt)
+    {
+        evt.Enable(p->can_finish());
+    });
+
     p->btn_sel_all->Bind(wxEVT_BUTTON, [this](const wxCommandEvent &) {
-        p->any_sla_selected = true;
+ //       p->any_sla_selected = true;
         p->load_pages();
-        p->page_fff->select_all(true, false);
-        p->page_msla->select_all(true, false);
+
+        for (auto page : p->pages_msla)
+            page->select_all(true, false);
+        for (auto page : p->pages_fff)
+            page->select_all(true, false);
+
         p->index->go_to(p->page_mode);
     });
 
-    p->index->Bind(EVT_INDEX_PAGE, [this](const wxCommandEvent &) {
-        const bool is_last = p->index->active_is_last();
-        p->btn_next->Show(! is_last);
-        if (is_last)
-            p->btn_finish->SetFocus();
+    p->btn_sel_all->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt)
+    {
+        evt.Enable(p->can_select_all());
+    });
 
+    p->index->Bind(EVT_INDEX_PAGE, [this](const wxCommandEvent &)
+    {
+        p->btn_next->Show(p->can_show_next());
+
+        if (p->index->active_is_last())
+            p->btn_finish->SetFocus();
         Layout();
     });
 
+    /* ysFIXME - delete after testing and release
+    // it looks like this workaround is no need any more after update of the wxWidgets to 3.2.0
     if (wxLinux_gtk3)
         this->Bind(wxEVT_SHOW, [this, vsizer](const wxShowEvent& e) {
             ConfigWizardPage* active_page = p->index->active_page();
@@ -3484,6 +4102,7 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
             // set initial dialog size
             p->init_dialog_size();
         });
+    */
 }
 
 ConfigWizard::~ConfigWizard() {}
@@ -3496,10 +4115,12 @@ bool ConfigWizard::run(RunReason reason, StartPage start_page)
 
     p->set_run_reason(reason);
     p->set_start_page(start_page);
+    p->is_config_from_archive = reason == RR_USER;
+    p->set_config_updated_from_archive(p->is_config_from_archive, false);
 
     if (ShowModal() == wxID_OK) {
         bool apply_keeped_changes = false;
-        if (! p->apply_config(app.app_config, app.preset_bundle, app.preset_updater, apply_keeped_changes))
+        if (! p->apply_config(app.app_config, app.preset_bundle, app.get_preset_updater_wrapper(), apply_keeped_changes))
             return false;
 
         if (apply_keeped_changes)
@@ -3513,6 +4134,17 @@ bool ConfigWizard::run(RunReason reason, StartPage start_page)
     } else {
         BOOST_LOG_TRIVIAL(info) << "ConfigWizard cancelled";
         return false;
+    }
+}
+
+void ConfigWizard::update_login()
+{
+    if (p->page_login && p->page_login->login_changed()) {
+        // repos changed - we need rebuild
+        // TRN: Progress dialog title
+        wxGetApp().get_preset_updater_wrapper()->wizard_sync(wxGetApp().preset_bundle, wxGetApp().app_config->orig_version(), this, false, _L("Updating Configuration sources"));
+        // now change PageUpdateManager
+        p->page_update_manager->manager->update();
     }
 }
 
@@ -3544,8 +4176,9 @@ void ConfigWizard::on_dpi_changed(const wxRect &suggested_rect)
                                     p->btn_next->GetId(),
                                     p->btn_prev->GetId() });
 
-    for (auto printer_picker: p->page_fff->printer_pickers)
-        msw_buttons_rescale(this, em, printer_picker->get_button_indexes());
+    for (auto page : p->pages_fff)
+        for (auto printer_picker : page->printer_pickers)
+            msw_buttons_rescale(this, em, printer_picker->get_button_indexes());
 
     p->init_dialog_size();
 

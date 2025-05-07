@@ -12,26 +12,34 @@
 #ifndef slic3r_Point_hpp_
 #define slic3r_Point_hpp_
 
-#include "libslic3r.h"
+#include <oneapi/tbb/scalable_allocator.h>
+#include <assert.h>
 #include <cstddef>
 #include <vector>
 #include <cmath>
 #include <string>
 #include <sstream>
 #include <unordered_map>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <optional>
+#include <type_traits>
+#include <utility>
+#include <cassert>
 
-#include <oneapi/tbb/scalable_allocator.h>
-
-
-#include <Eigen/Geometry> 
-
+#include "libslic3r.h"
 #include "LocalesUtils.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 class BoundingBox;
 class BoundingBoxf;
 class Point;
+
 using Vector = Point;
 
 // Base template for eigen derived vectors
@@ -264,6 +272,16 @@ inline bool is_approx(const Vec3d &p1, const Vec3d &p2, double epsilon = EPSILON
 {
 	Vec3d d = (p2 - p1).cwiseAbs();
 	return d.x() < epsilon && d.y() < epsilon && d.z() < epsilon;
+}
+
+inline bool is_approx(const Matrix3d &m1, const Matrix3d &m2, double epsilon = EPSILON)
+{
+    for (size_t i = 0; i < 3; i++)
+        for (size_t j = 0; j < 3; j++)
+            if (!is_approx(m1(i, j), m2(i, j), epsilon))
+                return false;
+
+    return true;
 }
 
 inline Point lerp(const Point &a, const Point &b, double t)
@@ -600,6 +618,7 @@ static bool apply(T &val, const MinMax<T> &limit)
 // start Boost
 #include <boost/version.hpp>
 #include <boost/polygon/polygon.hpp>
+
 namespace boost { namespace polygon {
     template <>
     struct geometry_concept<Slic3r::Point> { using type = point_concept; };
@@ -627,6 +646,7 @@ namespace boost { namespace polygon {
 // end Boost
 
 #include <cereal/cereal.hpp>
+
 // Serialization through the Cereal library
 namespace cereal {
 //    template<class Archive> void serialize(Archive& archive, Slic3r::Vec2crd &v) { archive(v.x(), v.y()); }

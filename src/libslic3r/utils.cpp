@@ -12,6 +12,7 @@
 #include <ctime>
 #include <cstdarg>
 #include <stdio.h>
+#include <random>
 
 #include "Platform.hpp"
 #include "Time.hpp"
@@ -41,7 +42,7 @@
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
+#include <boost/log/expressions.hpp> // IWYU pragma: keep
 
 #include <boost/locale.hpp>
 
@@ -941,8 +942,25 @@ unsigned get_current_pid()
 {
 #ifdef WIN32
     return GetCurrentProcessId();
-#else
+#elif __APPLE__
     return ::getpid();
+#else
+    // On flatpak getpid() might return same number for each concurent instances.
+    static std::atomic<unsigned> instance_uuid{0};
+    if (instance_uuid == 0) {
+        unsigned generated_value;
+        {
+            // Use a thread-local random engine
+            thread_local std::random_device rd;
+            thread_local std::mt19937 generator(rd());
+            std::uniform_int_distribution<unsigned> distribution;
+            generated_value = distribution(generator);
+        }
+        unsigned expected = 0;
+        // Atomically initialize the instance_uuid if it has not been set
+        instance_uuid.compare_exchange_strong(expected, generated_value);
+    }
+    return instance_uuid.load();
 #endif
 }
 
@@ -1083,6 +1101,42 @@ std::string format_memsize_MB(size_t n)
     return out + "MB";
 }
 
+std::string format_memsize(size_t bytes, unsigned int decimals)
+{
+		static constexpr const float kb = 1024.0f;
+		static constexpr const float mb = 1024.0f * kb;
+		static constexpr const float gb = 1024.0f * mb;
+		static constexpr const float tb = 1024.0f * gb;
+
+		const float f_bytes = static_cast<float>(bytes);
+		if (f_bytes < kb)
+				return std::to_string(bytes) + " bytes";
+		else if (f_bytes < mb) {
+				const float f_kb = f_bytes / kb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_kb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "KB)";
+		}
+		else if (f_bytes < gb) {
+				const float f_mb = f_bytes / mb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_mb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "MB)";
+		}
+		else if (f_bytes < tb) {
+				const float f_gb = f_bytes / gb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_gb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "GB)";
+		}
+		else {
+				const float f_tb = f_bytes / tb;
+				char buf[64];
+				sprintf(buf, "%.*f", decimals, f_tb);
+				return std::to_string(bytes) + " bytes (" + std::string(buf) + "TB)";
+		}
+}
+
 // Returns platform-specific string to be used as log output or parsed in SysInfoDialog.
 // The latter parses the string with (semi)colons as separators, it should look about as
 // "desc1: value1; desc2: value2" or similar (spaces should not matter).
@@ -1125,7 +1179,7 @@ std::string log_memory_info(bool ignore_loglevel)
             out += "N/A";
     #else // i.e. __linux__
         size_t tSize = 0, resident = 0, share = 0;
-        std::ifstream buffer("/proc/self/statm");
+        boost::nowide::ifstream buffer("/proc/self/statm");
         if (buffer && (buffer >> tSize >> resident >> share)) {
             size_t page_size = (size_t)sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
             size_t rss = resident * page_size;

@@ -38,6 +38,64 @@ void ConfigManipulation::toggle_field(const std::string& opt_key, const bool tog
     cb_toggle_field(opt_key, toggle, opt_index);
 }
 
+std::optional<DynamicPrintConfig> handle_automatic_extrusion_widths(const DynamicPrintConfig &config, const bool is_global_config, wxWindow *msg_dlg_parent)
+{
+    const std::vector<std::string> extrusion_width_parameters = {"extrusion_width", "external_perimeter_extrusion_width", "first_layer_extrusion_width",
+                                                                 "infill_extrusion_width", "perimeter_extrusion_width", "solid_infill_extrusion_width",
+                                                                 "support_material_extrusion_width", "top_infill_extrusion_width"};
+
+    auto is_zero_width = [](const ConfigOptionFloatOrPercent &opt) -> bool {
+        return opt.value == 0. && !opt.percent;
+    };
+
+    auto is_parameters_adjustment_needed = [&is_zero_width, &config, &extrusion_width_parameters]() -> bool {
+        if (!config.opt_bool("automatic_extrusion_widths")) {
+            return false;
+        }
+
+        for (const std::string &extrusion_width_parameter : extrusion_width_parameters) {
+            if (!is_zero_width(*config.option<ConfigOptionFloatOrPercent>(extrusion_width_parameter))) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    if (is_parameters_adjustment_needed()) {
+        wxString msg_text = _(L("The automatic extrusion widths calculation requires:\n"
+                                "- Default extrusion width: 0\n"
+                                "- First layer extrusion width: 0\n"
+                                "- Perimeter extrusion width: 0\n"
+                                "- External perimeter extrusion width: 0\n"
+                                "- Infill extrusion width: 0\n"
+                                "- Solid infill extrusion width: 0\n"
+                                "- Top infill extrusion width: 0\n"
+                                "- Support material extrusion width: 0"));
+
+        if (is_global_config) {
+            msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable automatic extrusion widths calculation?"));
+        }
+
+        MessageDialog dialog(msg_dlg_parent, msg_text, _(L("Automatic extrusion widths calculation")),
+                                  wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
+
+        const int          answer   = dialog.ShowModal();
+        DynamicPrintConfig new_conf = config;
+        if (!is_global_config || answer == wxID_YES) {
+            for (const std::string &extrusion_width_parameter : extrusion_width_parameters) {
+                new_conf.set_key_value(extrusion_width_parameter, new ConfigOptionFloatOrPercent(0., false));
+            }
+        } else {
+            new_conf.set_key_value("automatic_extrusion_widths", new ConfigOptionBool(false));
+        }
+
+        return new_conf;
+    }
+
+    return std::nullopt;
+}
+
 void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, const bool is_global_config)
 {
     // #ys_FIXME_to_delete
@@ -76,7 +134,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     double fill_density = config->option<ConfigOptionPercent>("fill_density")->value;
 
     if (config->opt_bool("spiral_vase") &&
-        ! (config->opt_int("perimeters") == 1 && 
+        ! (config->opt_int("perimeters") == 1 &&
            config->opt_int("top_solid_layers") == 0 &&
            fill_density == 0 &&
            ! config->opt_bool("support_material") &&
@@ -102,7 +160,7 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("fill_density", new ConfigOptionPercent(0));
             new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
-            new_conf.set_key_value("thin_walls", new ConfigOptionBool(false));            
+            new_conf.set_key_value("thin_walls", new ConfigOptionBool(false));
             fill_density = 0;
             support = false;
         }
@@ -213,6 +271,13 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             }
         }
     }
+
+    if (config->opt_bool("automatic_extrusion_widths")) {
+        std::optional<DynamicPrintConfig> new_config = handle_automatic_extrusion_widths(*config, is_global_config, m_msg_dlg_parent);
+        if (new_config.has_value()) {
+            apply(config, &(*new_config));
+        }
+    }
 }
 
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
@@ -227,11 +292,17 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field("overhang_speed_" + std::to_string(i), config->opt_bool("enable_dynamic_overhang_speeds"));
     }
 
-    bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;
+    const bool have_infill                      = config->option<ConfigOptionPercent>("fill_density")->value > 0;
+    const bool has_automatic_infill_combination = config->option<ConfigOptionBool>("automatic_infill_combination")->value;
     // infill_extruder uses the same logic as in Print::extruders()
-    for (auto el : { "fill_pattern", "infill_every_layers", "infill_only_where_needed",
-                    "solid_infill_every_layers", "solid_infill_below_area", "infill_extruder", "infill_anchor_max" })
+    for (auto el : { "fill_pattern","solid_infill_every_layers", "solid_infill_below_area", "infill_extruder",
+                    "infill_anchor_max", "automatic_infill_combination" }) {
         toggle_field(el, have_infill);
+    }
+
+    toggle_field("infill_every_layers", have_infill && !has_automatic_infill_combination);
+    toggle_field("automatic_infill_combination_max_layer_height", have_infill && has_automatic_infill_combination);
+
     // Only allow configuration of open anchors if the anchoring is enabled.
     bool has_infill_anchors = have_infill && config->option<ConfigOptionFloatOrPercent>("infill_anchor_max")->value > 0;
     toggle_field("infill_anchor", has_infill_anchors);
@@ -246,11 +317,12 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
         toggle_field(el, has_solid_infill);
 
     for (auto el : { "fill_angle", "bridge_angle", "infill_extrusion_width",
-                    "infill_speed", "bridge_speed" })
+                    "infill_speed", "bridge_speed", "over_bridge_speed" })
         toggle_field(el, have_infill || has_solid_infill);
 
-    toggle_field("top_solid_min_thickness", ! has_spiral_vase && has_top_solid_infill);
-    toggle_field("bottom_solid_min_thickness", ! has_spiral_vase && has_bottom_solid_infill);
+    const bool has_ensure_vertical_shell_thickness = config->opt_enum<EnsureVerticalShellThickness>("ensure_vertical_shell_thickness") != EnsureVerticalShellThickness::Disabled;
+    toggle_field("top_solid_min_thickness", !has_spiral_vase && has_top_solid_infill && has_ensure_vertical_shell_thickness);
+    toggle_field("bottom_solid_min_thickness", !has_spiral_vase && has_bottom_solid_infill && has_ensure_vertical_shell_thickness);
 
     // Gap fill is newly allowed in between perimeter lines even for empty infill (see GH #1476).
     toggle_field("gap_fill_speed", have_perimeters);
@@ -316,20 +388,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "ironing_type", "ironing_flowrate", "ironing_spacing", "ironing_speed" })
     	toggle_field(el, has_ironing);
 
-    bool have_sequential_printing = config->opt_bool("complete_objects");
-    for (auto el : { "extruder_clearance_radius", "extruder_clearance_height" })
-        toggle_field(el, have_sequential_printing);
-
     bool have_ooze_prevention = config->opt_bool("ooze_prevention");
     toggle_field("standby_temperature_delta", have_ooze_prevention);
 
     bool have_wipe_tower = config->opt_bool("wipe_tower");
-    for (auto el : { "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width", "wipe_tower_cone_angle",
+    for (auto el : { "wipe_tower_width",  "wipe_tower_brim_width", "wipe_tower_cone_angle",
                      "wipe_tower_extra_spacing", "wipe_tower_extra_flow", "wipe_tower_bridging", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming" })
         toggle_field(el, have_wipe_tower);
-
-    bool have_non_zero_mmu_segmented_region_max_width = config->opt_float("mmu_segmented_region_max_width") > 0.;
-    toggle_field("mmu_segmented_region_interlocking_depth", have_non_zero_mmu_segmented_region_max_width);
 
     toggle_field("avoid_crossing_curled_overhangs", !config->opt_bool("avoid_crossing_perimeters"));
     toggle_field("avoid_crossing_perimeters", !config->opt_bool("avoid_crossing_curled_overhangs"));
@@ -345,6 +410,27 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("min_feature_size", have_arachne);
     toggle_field("min_bead_width", have_arachne);
     toggle_field("thin_walls", !have_arachne);
+
+    toggle_field("scarf_seam_placement", !has_spiral_vase);
+    const auto scarf_seam_placement{config->opt_enum<ScarfSeamPlacement>("scarf_seam_placement")};
+    const bool uses_scarf_seam{!has_spiral_vase && scarf_seam_placement != ScarfSeamPlacement::nowhere};
+    toggle_field("scarf_seam_only_on_smooth", uses_scarf_seam);
+    toggle_field("scarf_seam_start_height", uses_scarf_seam);
+    toggle_field("scarf_seam_entire_loop", uses_scarf_seam);
+    toggle_field("scarf_seam_length", uses_scarf_seam);
+    toggle_field("scarf_seam_max_segment_length", uses_scarf_seam);
+    toggle_field("scarf_seam_on_inner_perimeters", uses_scarf_seam);
+
+    bool use_beam_interlocking = config->opt_bool("interlocking_beam");
+    toggle_field("interlocking_beam_width", use_beam_interlocking);
+    toggle_field("interlocking_orientation", use_beam_interlocking);
+    toggle_field("interlocking_beam_layer_count", use_beam_interlocking);
+    toggle_field("interlocking_depth", use_beam_interlocking);
+    toggle_field("interlocking_boundary_avoidance", use_beam_interlocking);
+    toggle_field("mmu_segmented_region_max_width", !use_beam_interlocking);
+
+    bool have_non_zero_mmu_segmented_region_max_width = !use_beam_interlocking && config->opt_float("mmu_segmented_region_max_width") > 0.;
+    toggle_field("mmu_segmented_region_interlocking_depth", have_non_zero_mmu_segmented_region_max_width);
 }
 
 void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
@@ -392,7 +478,6 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     toggle_field("branchingsupport_max_weight_on_model", supports_en && is_branching_tree);
 
     toggle_field("support_points_density_relative", supports_en);
-    toggle_field("support_points_minimal_distance", supports_en);
 
     bool pad_en = config->opt_bool("pad_enable");
 

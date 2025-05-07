@@ -426,14 +426,11 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
-                                      size_t* facet_idx) const
+                                      size_t* facet_idx, const bool require_even_number_of_hits) const
 {
     Vec3d point;
     Vec3d direction;
-    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
-    Transform3d inv = trafo.inverse();
-    point     = inv*point;
-    direction = inv.linear()*direction;
+    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
 
     std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
 
@@ -451,7 +448,7 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
             break;
     }
 
-    if (i==hits.size() || (hits.size()-i) % 2 != 0) {
+    if (i == hits.size() || (require_even_number_of_hits && (hits.size() - i) % 2 != 0)) {
         // All hits are either clipped, or there is an odd number of unclipped
         // hits - meaning the nearest must be from inside the mesh.
         return false;

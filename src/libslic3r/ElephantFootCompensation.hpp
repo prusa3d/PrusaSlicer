@@ -5,9 +5,10 @@
 #ifndef slic3r_ElephantFootCompensation_hpp_
 #define slic3r_ElephantFootCompensation_hpp_
 
+#include <vector>
+
 #include "libslic3r.h"
 #include "ExPolygon.hpp"
-#include <vector>
 
 namespace Slic3r {
 

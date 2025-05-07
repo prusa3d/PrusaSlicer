@@ -1,10 +1,12 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <test_utils.hpp>
 
 #include <libslic3r/TriangleMesh.hpp>
 #include <libslic3r/MeshBoolean.hpp>
 
 using namespace Slic3r;
+using namespace Catch;
 
 TEST_CASE("CGAL and TriangleMesh conversions", "[MeshBoolean]") {
     TriangleMesh sphere = make_sphere(1.);

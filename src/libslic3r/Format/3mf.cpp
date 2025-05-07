@@ -3,18 +3,17 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "../libslic3r.h"
-#include "../Exception.hpp"
-#include "../Model.hpp"
-#include "../Utils.hpp"
-#include "../LocalesUtils.hpp"
-#include "../GCode.hpp"
-#include "../Geometry.hpp"
-#include "../GCode/ThumbnailData.hpp"
-#include "../Semver.hpp"
-#include "../Time.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/Utils.hpp"
+#include "libslic3r/GCode.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/Semver.hpp"
+#include "libslic3r/Time.hpp"
 
-#include "../I18N.hpp"
+#include "libslic3r/I18N.hpp"
 
 #include "3mf.hpp"
 
@@ -38,15 +37,19 @@ namespace pt = boost::property_tree;
 
 #include <expat.h>
 #include <Eigen/Dense>
-#include "miniz_extension.hpp"
+#include <LocalesUtils.hpp>
 
-#include "TextConfiguration.hpp"
-#include "EmbossShape.hpp"
-#include "ExPolygonSerialize.hpp" 
+#include "libslic3r/miniz_extension.hpp"
 
-#include "NSVGUtils.hpp"
+#include "libslic3r/TextConfiguration.hpp"
+#include "libslic3r/EmbossShape.hpp"
+#include "libslic3r/ExPolygonSerialize.hpp" 
 
-#include <fast_float/fast_float.h>
+#include "libslic3r/NSVGUtils.hpp"
+
+#include "libslic3r/MultipleBeds.hpp"
+
+#include <fast_float.h>
 
 // Slightly faster than sprintf("%.9g"), but there is an issue with the karma floating point formatter,
 // https://github.com/boostorg/spirit/pull/586
@@ -89,6 +92,7 @@ const std::string LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config
 const std::string SLA_SUPPORT_POINTS_FILE = "Metadata/Slic3r_PE_sla_support_points.txt";
 const std::string SLA_DRAIN_HOLES_FILE = "Metadata/Slic3r_PE_sla_drain_holes.txt";
 const std::string CUSTOM_GCODE_PER_PRINT_Z_FILE = "Metadata/Prusa_Slicer_custom_gcode_per_print_z.xml";
+const std::string WIPE_TOWER_INFORMATION_FILE = "Metadata/Prusa_Slicer_wipe_tower_information.xml";
 const std::string CUT_INFORMATION_FILE = "Metadata/Prusa_Slicer_cut_information.xml";
 
 static constexpr const char *RELATIONSHIP_TAG = "Relationship";
@@ -131,6 +135,7 @@ static constexpr const char* INSTANCESCOUNT_ATTR = "instances_count";
 static constexpr const char* CUSTOM_SUPPORTS_ATTR = "slic3rpe:custom_supports";
 static constexpr const char* CUSTOM_SEAM_ATTR = "slic3rpe:custom_seam";
 static constexpr const char* MM_SEGMENTATION_ATTR = "slic3rpe:mmu_segmentation";
+static constexpr const char* FUZZY_SKIN_ATTR = "slic3rpe:fuzzy_skin";
 
 static constexpr const char* KEY_ATTR = "key";
 static constexpr const char* VALUE_ATTR = "value";
@@ -372,6 +377,7 @@ namespace Slic3r {
             std::vector<std::string> custom_supports;
             std::vector<std::string> custom_seam;
             std::vector<std::string> mm_segmentation;
+            std::vector<std::string> fuzzy_skin;
 
             bool empty() { return vertices.empty() || triangles.empty(); }
 
@@ -381,6 +387,7 @@ namespace Slic3r {
                 custom_supports.clear();
                 custom_seam.clear();
                 mm_segmentation.clear();
+                fuzzy_skin.clear();
             }
         };
 
@@ -469,7 +476,7 @@ namespace Slic3r {
                 float   r_tolerance;
                 float   h_tolerance;
             };
-            CutObjectBase           id;
+            CutId           id;
             std::vector<Connector>  connectors;
         };
 
@@ -553,6 +560,8 @@ namespace Slic3r {
         void _extract_sla_drain_holes_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat);
 
         void _extract_custom_gcode_per_print_z_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat);
+        void _extract_wipe_tower_information_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model);
+        void _extract_wipe_tower_information_from_archive_legacy(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, Model& model);
 
         void _extract_print_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig& config, ConfigSubstitutionContext& subs_context, const std::string& archive_filename);
         bool _extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model);
@@ -765,6 +774,9 @@ namespace Slic3r {
             }
         }
 
+        // Initialize the wipe tower position (see the end of this function):
+        model.get_wipe_tower_vector().front().position.x() = std::numeric_limits<double>::max();
+
         // Read root model file
         if (start_part_stat.m_file_index < num_entries) {
             try {
@@ -821,6 +833,10 @@ namespace Slic3r {
                     // extract slic3r layer config ranges file
                     _extract_custom_gcode_per_print_z_from_archive(archive, stat);
                 }
+                else if (boost::algorithm::iequals(name, WIPE_TOWER_INFORMATION_FILE)) {
+                    // extract wipe tower information file
+                    _extract_wipe_tower_information_from_archive(archive, stat, model);
+                }
                 else if (boost::algorithm::iequals(name, MODEL_CONFIG_FILE)) {
                     // extract slic3r model config file
                     if (!_extract_model_config_from_archive(archive, stat, model)) {
@@ -831,6 +847,28 @@ namespace Slic3r {
                 } 
                 else if (_is_svg_shape_file(name)) {
                     _extract_embossed_svg_shape_file(name, archive, stat);
+                }
+            }
+        }
+
+
+        if (model.get_wipe_tower_vector().front().position.x() == std::numeric_limits<double>::max()) {
+            // This is apparently an old project from before PS 2.9.0, which saved wipe tower pos and rotation
+            // into config, not into Model. Try to load it from the config file.
+            // First set default in case we do not find it (these were the default values of the config options).
+            model.get_wipe_tower_vector().front().position.x() = 180;
+            model.get_wipe_tower_vector().front().position.y() = 140;
+            model.get_wipe_tower_vector().front().rotation = 0.;
+
+            for (mz_uint i = 0; i < num_entries; ++i) {
+                if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+                    std::string name(stat.m_filename);
+                    std::replace(name.begin(), name.end(), '\\', '/');
+
+                    if (boost::algorithm::iequals(name, PRINT_CONFIG_FILE)) {
+                        _extract_wipe_tower_information_from_archive_legacy(archive, stat, model);
+                        break;
+                    }
                 }
             }
         }
@@ -1149,15 +1187,15 @@ namespace Slic3r {
                     continue;
                 }
 
-                CutObjectBase cut_id;
+                CutId cut_id;
                 std::vector<CutObjectInfo::Connector>  connectors;
 
                 for (const auto& obj_cut_info : object_tree) {
                     if (obj_cut_info.first == "cut_id") {
                         pt::ptree cut_id_tree = obj_cut_info.second;
-                        cut_id = CutObjectBase(ObjectID( cut_id_tree.get<size_t>("<xmlattr>.id")),
-                                                         cut_id_tree.get<size_t>("<xmlattr>.check_sum"),
-                                                         cut_id_tree.get<size_t>("<xmlattr>.connectors_cnt"));
+                        cut_id = CutId(cut_id_tree.get<size_t>("<xmlattr>.id"),
+                                       cut_id_tree.get<size_t>("<xmlattr>.check_sum"),
+                                       cut_id_tree.get<size_t>("<xmlattr>.connectors_cnt"));
                     }
                     if (obj_cut_info.first == "connectors") {
                         pt::ptree cut_connectors_tree = obj_cut_info.second;
@@ -1381,21 +1419,31 @@ namespace Slic3r {
                 std::vector<sla::SupportPoint> sla_support_points;
 
                 if (version == 0) {
+                    assert(object_data_points.size() % 3 == 0);
                     for (unsigned int i=0; i<object_data_points.size(); i+=3)
-                    sla_support_points.emplace_back(float(std::atof(object_data_points[i+0].c_str())),
+                        sla_support_points.push_back(sla::SupportPoint{Vec3f(
+                                                    float(std::atof(object_data_points[i+0].c_str())),
                                                     float(std::atof(object_data_points[i+1].c_str())),
-													float(std::atof(object_data_points[i+2].c_str())),
-                                                    0.4f,
-                                                    false);
+													float(std::atof(object_data_points[i+2].c_str()))),
+                                                    0.4f});
                 }
                 if (version == 1) {
+                    auto get_support_point_type = [](double val)->sla::SupportPointType{
+                        return (std::abs(val - 1.) < EPSILON) ? sla::SupportPointType::island :
+                               (std::abs(val - 2.) < EPSILON) ? sla::SupportPointType::manual_add :
+                               //(std::abs(val - 3.) < EPSILON) ? sla::SupportPointType::slope :
+                                sla::SupportPointType::slope; // default for previous version of store points
+                    };
+                    assert(object_data_points.size() % 5 == 0);
                     for (unsigned int i=0; i<object_data_points.size(); i+=5)
-                    sla_support_points.emplace_back(float(std::atof(object_data_points[i+0].c_str())),
-                                                    float(std::atof(object_data_points[i+1].c_str())),
-                                                    float(std::atof(object_data_points[i+2].c_str())),
-                                                    float(std::atof(object_data_points[i+3].c_str())),
-													//FIXME storing boolean as 0 / 1 and importing it as float.
-                                                    std::abs(std::atof(object_data_points[i+4].c_str()) - 1.) < EPSILON);
+                        sla_support_points.push_back(
+                            sla::SupportPoint{
+                                Vec3f{float(std::atof(object_data_points[i+0].c_str())),
+                                      float(std::atof(object_data_points[i+1].c_str())),
+                                      float(std::atof(object_data_points[i+2].c_str()))},
+                                float(std::atof(object_data_points[i+3].c_str())),
+                                get_support_point_type(std::atof(object_data_points[i+4].c_str()))
+                            });
                 }
 
                 if (!sla_support_points.empty())
@@ -1571,45 +1619,143 @@ namespace Slic3r {
 
             if (main_tree.front().first != "custom_gcodes_per_print_z")
                 return;
-            pt::ptree code_tree = main_tree.front().second;
 
-            m_model->custom_gcode_per_print_z.gcodes.clear();
+            for (CustomGCode::Info& info : m_model->get_custom_gcode_per_print_z_vector())
+                info.gcodes.clear();
 
-            for (const auto& code : code_tree) {
-                if (code.first == "mode") {
-                    pt::ptree tree = code.second;
-                    std::string mode = tree.get<std::string>("<xmlattr>.value");
-                    m_model->custom_gcode_per_print_z.mode = mode == CustomGCode::SingleExtruderMode ? CustomGCode::Mode::SingleExtruder :
-                                                             mode == CustomGCode::MultiAsSingleMode  ? CustomGCode::Mode::MultiAsSingle  :
-                                                             CustomGCode::Mode::MultiExtruder;
+            for (const auto& bed_block : main_tree) {
+                if (bed_block.first != "custom_gcodes_per_print_z")
+                    continue;
+                int bed_idx = 0;
+                try {
+                    bed_idx = bed_block.second.get<int>("<xmlattr>.bed_idx");
+                } catch (const boost::property_tree::ptree_bad_path&) {
+                    // Probably an old project with no bed_idx info. Imagine that we saw 0.
                 }
-                if (code.first != "code")
+                if (bed_idx >= int(m_model->get_custom_gcode_per_print_z_vector().size()))
                     continue;
 
-                pt::ptree tree = code.second;
-                double print_z          = tree.get<double>      ("<xmlattr>.print_z" );
-                int extruder            = tree.get<int>         ("<xmlattr>.extruder");
-                std::string color       = tree.get<std::string> ("<xmlattr>.color"   );
+                pt::ptree code_tree = bed_block.second;
 
-                CustomGCode::Type   type;
-                std::string         extra;
-                pt::ptree attr_tree = tree.find("<xmlattr>")->second;
-                if (attr_tree.find("type") == attr_tree.not_found()) {
-                    // It means that data was saved in old version (2.2.0 and older) of PrusaSlicer
-                    // read old data ... 
-                    std::string gcode       = tree.get<std::string> ("<xmlattr>.gcode");
-                    // ... and interpret them to the new data
-                    type  = gcode == "M600"           ? CustomGCode::ColorChange : 
-                            gcode == "M601"           ? CustomGCode::PausePrint  :   
-                            gcode == "tool_change"    ? CustomGCode::ToolChange  :   CustomGCode::Custom;
-                    extra = type == CustomGCode::PausePrint ? color :
-                            type == CustomGCode::Custom     ? gcode : "";
+                for (const auto& code : code_tree) {
+                    if (code.first == "mode") {
+                        pt::ptree tree = code.second;
+                        std::string mode = tree.get<std::string>("<xmlattr>.value");
+                        m_model->get_custom_gcode_per_print_z_vector()[bed_idx].mode = mode == CustomGCode::SingleExtruderMode ? CustomGCode::Mode::SingleExtruder :
+                                                                   mode == CustomGCode::MultiAsSingleMode  ? CustomGCode::Mode::MultiAsSingle  :
+                                                                   CustomGCode::Mode::MultiExtruder;
+                    }
+                    if (code.first != "code")
+                        continue;
+
+                    pt::ptree tree = code.second;
+                    double print_z          = tree.get<double>      ("<xmlattr>.print_z" );
+                    int extruder            = tree.get<int>         ("<xmlattr>.extruder");
+                    std::string color       = tree.get<std::string> ("<xmlattr>.color"   );
+
+                    CustomGCode::Type   type;
+                    std::string         extra;
+                    pt::ptree attr_tree = tree.find("<xmlattr>")->second;
+                    if (attr_tree.find("type") == attr_tree.not_found()) {
+                        // It means that data was saved in old version (2.2.0 and older) of PrusaSlicer
+                        // read old data ... 
+                        std::string gcode       = tree.get<std::string> ("<xmlattr>.gcode");
+                        // ... and interpret them to the new data
+                        type  = gcode == "M600"           ? CustomGCode::ColorChange : 
+                                gcode == "M601"           ? CustomGCode::PausePrint  :   
+                                gcode == "tool_change"    ? CustomGCode::ToolChange  :   CustomGCode::Custom;
+                        extra = type == CustomGCode::PausePrint ? color :
+                                type == CustomGCode::Custom     ? gcode : "";
+                    }
+                    else {
+                        type  = static_cast<CustomGCode::Type>(tree.get<int>("<xmlattr>.type"));
+                        extra = tree.get<std::string>("<xmlattr>.extra");
+                    }
+                    m_model->get_custom_gcode_per_print_z_vector()[bed_idx].gcodes.push_back(CustomGCode::Item{print_z, type, extruder, color, extra});
                 }
-                else {
-                    type  = static_cast<CustomGCode::Type>(tree.get<int>("<xmlattr>.type"));
-                    extra = tree.get<std::string>("<xmlattr>.extra");
+            }  
+        }
+    }
+
+    void _3MF_Importer::_extract_wipe_tower_information_from_archive(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, Model& model)
+    {
+        if (stat.m_uncomp_size > 0) {
+            std::string buffer((size_t)stat.m_uncomp_size, 0);
+            mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
+            if (res == 0) {
+                add_error("Error while reading wipe tower information data to buffer");
+                return;
+            }
+
+            std::istringstream iss(buffer); // wrap returned xml to istringstream
+            pt::ptree main_tree;
+            pt::read_xml(iss, main_tree);
+
+            for (const auto& bed_block : main_tree) {
+                if (bed_block.first != "wipe_tower_information")
+                    continue;
+                try {
+                    int bed_idx = 0;
+                    try {
+                        bed_idx = bed_block.second.get<int>("<xmlattr>.bed_idx");
+                    } catch (const boost::property_tree::ptree_bad_path&) {
+                        // Probably an old project with no bed_idx info - pretend that we saw 0.
+                    }
+                    if (bed_idx >= int(m_model->get_wipe_tower_vector().size()))
+                        continue;                
+                    double pos_x = bed_block.second.get<double>("<xmlattr>.position_x");
+                    double pos_y = bed_block.second.get<double>("<xmlattr>.position_y");
+                    double rot_deg = bed_block.second.get<double>("<xmlattr>.rotation_deg");
+                    model.get_wipe_tower_vector()[bed_idx].position = Vec2d(pos_x, pos_y);
+                    model.get_wipe_tower_vector()[bed_idx].rotation = rot_deg;
                 }
-                m_model->custom_gcode_per_print_z.gcodes.push_back(CustomGCode::Item{print_z, type, extruder, color, extra}) ;
+                catch (const boost::property_tree::ptree_bad_path&) {
+                    // Handles missing node or attribute.
+                    add_error("Error while reading wipe tower information.");
+                    return;
+                }
+            }
+
+        }
+    }
+
+    void _3MF_Importer::_extract_wipe_tower_information_from_archive_legacy(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, Model& model)
+    {
+        if (stat.m_uncomp_size > 0) {
+            std::string buffer((size_t)stat.m_uncomp_size, 0);
+            mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
+            if (res == 0) {
+                add_error("Error while reading config data to buffer");
+                return;
+            }
+
+            // Try to find wipe tower data in the config, where pre-2.9.0 slicers saved them.
+            // Do not load the config as usual, it no longer knows those values.
+            std::istringstream iss(buffer);
+            std::string line;
+
+            while (iss) {
+                std::getline(iss, line);
+                boost::algorithm::trim_left_if(line, [](char ch) { return std::isspace(ch) || ch == ';'; });
+                if (boost::starts_with(line, "wipe_tower_x") || boost::starts_with(line, "wipe_tower_y") || boost::starts_with(line, "wipe_tower_rotation_angle")) {
+                    std::string value_str;
+                    try {
+                        value_str = line.substr(line.find("=") + 1, std::string::npos);
+                    } catch (const std::out_of_range&) {
+                        continue;
+                    }
+                    double val = 0.;
+                    std::istringstream value_ss(value_str);
+                    value_ss >> val;
+                    if (! value_ss.fail()) {
+                        if (boost::starts_with(line, "wipe_tower_x"))
+                            model.get_wipe_tower_vector().front().position.x() = val;
+                        else if (boost::starts_with(line, "wipe_tower_y"))
+                            model.get_wipe_tower_vector().front().position.y() = val;
+                        else
+                            model.get_wipe_tower_vector().front().rotation = val;
+                    }
+                }
             }
         }
     }
@@ -1971,6 +2117,7 @@ namespace Slic3r {
 
         m_curr_object.geometry.custom_supports.push_back(get_attribute_value_string(attributes, num_attributes, CUSTOM_SUPPORTS_ATTR));
         m_curr_object.geometry.custom_seam.push_back(get_attribute_value_string(attributes, num_attributes, CUSTOM_SEAM_ATTR));
+        m_curr_object.geometry.fuzzy_skin.push_back(get_attribute_value_string(attributes, num_attributes, FUZZY_SKIN_ATTR));
 
         // Now load MM segmentation data. Unfortunately, BambuStudio has changed the attribute name after they forked us,
         // leading to https://github.com/prusa3d/PrusaSlicer/issues/12502. Let's try to load both keys if the usual
@@ -2475,25 +2622,26 @@ namespace Slic3r {
             if (has_transform)
                 volume->source.transform = Slic3r::Geometry::Transformation(volume_matrix_to_object);
 
-            // recreate custom supports, seam and mm segmentation from previously loaded attribute
+            // recreate custom supports, seam, mm segmentation and fuzzy skin from previously loaded attribute
             volume->supported_facets.reserve(triangles_count);
             volume->seam_facets.reserve(triangles_count);
             volume->mm_segmentation_facets.reserve(triangles_count);
+            volume->fuzzy_skin_facets.reserve(triangles_count);
             for (size_t i=0; i<triangles_count; ++i) {
                 size_t index = volume_data.first_triangle_id + i;
                 assert(index < geometry.custom_supports.size());
                 assert(index < geometry.custom_seam.size());
                 assert(index < geometry.mm_segmentation.size());
-                if (! geometry.custom_supports[index].empty())
-                    volume->supported_facets.set_triangle_from_string(i, geometry.custom_supports[index]);
-                if (! geometry.custom_seam[index].empty())
-                    volume->seam_facets.set_triangle_from_string(i, geometry.custom_seam[index]);
-                if (! geometry.mm_segmentation[index].empty())
-                    volume->mm_segmentation_facets.set_triangle_from_string(i, geometry.mm_segmentation[index]);
+
+                volume->supported_facets.set_triangle_from_string(i, geometry.custom_supports[index]);
+                volume->seam_facets.set_triangle_from_string(i, geometry.custom_seam[index]);
+                volume->mm_segmentation_facets.set_triangle_from_string(i, geometry.mm_segmentation[index]);
+                volume->fuzzy_skin_facets.set_triangle_from_string(i, geometry.fuzzy_skin[index]);
             }
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mm_segmentation_facets.shrink_to_fit();
+            volume->fuzzy_skin_facets.shrink_to_fit();
 
             if (auto &es = volume_data.shape_configuration; es.has_value())
                 volume->emboss_shape = std::move(es);            
@@ -2644,9 +2792,10 @@ namespace Slic3r {
         bool _add_layer_config_ranges_file_to_archive(mz_zip_archive& archive, Model& model);
         bool _add_sla_support_points_file_to_archive(mz_zip_archive& archive, Model& model);
         bool _add_sla_drain_holes_file_to_archive(mz_zip_archive& archive, Model& model);
-        bool _add_print_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig &config);
+        bool _add_print_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig &config, const Model& model);
         bool _add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, const IdToObjectDataMap &objects_data);
         bool _add_custom_gcode_per_print_z_file_to_archive(mz_zip_archive& archive, Model& model, const DynamicPrintConfig* config);
+        bool _add_wipe_tower_information_file_to_archive( mz_zip_archive& archive, Model& model);
     };
 
     bool _3MF_Exporter::save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
@@ -2753,10 +2902,19 @@ namespace Slic3r {
             return false;
         }
 
+
+        // Adds wipe tower information ("Metadata/Prusa_Slicer_wipe_tower_information.xml").
+        if (!_add_wipe_tower_information_file_to_archive(archive, model)) {
+            close_zip_writer(&archive);
+            boost::filesystem::remove(filename);
+            return false;
+        }
+
+
         // Adds slic3r print config file ("Metadata/Slic3r_PE.config").
         // This file contains the content of FullPrintConfing / SLAFullPrintConfig.
         if (config != nullptr) {
-            if (!_add_print_config_file_to_archive(archive, *config)) {
+            if (!_add_print_config_file_to_archive(archive, *config, model)) {
                 close_zip_writer(&archive);
                 boost::filesystem::remove(filename);
                 return false;
@@ -3166,6 +3324,15 @@ namespace Slic3r {
                     output_buffer += "\"";
                 }
 
+                std::string fuzzy_skin_data_string = volume->fuzzy_skin_facets.get_triangle_as_string(i);
+                if (!fuzzy_skin_data_string.empty()) {
+                    output_buffer += " ";
+                    output_buffer += FUZZY_SKIN_ATTR;
+                    output_buffer += "=\"";
+                    output_buffer += fuzzy_skin_data_string;
+                    output_buffer += "\"";
+                }
+
                 output_buffer += "/>\n";
 
                 if (! flush())
@@ -3232,7 +3399,7 @@ namespace Slic3r {
             pt::ptree& cut_id_tree = obj_tree.add("cut_id", "");
 
             // store cut_id atributes
-            cut_id_tree.put("<xmlattr>.id",             object->cut_id.id().id);
+            cut_id_tree.put("<xmlattr>.id",             object->cut_id.id());
             cut_id_tree.put("<xmlattr>.check_sum",      object->cut_id.check_sum());
             cut_id_tree.put("<xmlattr>.connectors_cnt", object->cut_id.connectors_cnt());
 
@@ -3382,10 +3549,22 @@ namespace Slic3r {
             if (!sla_support_points.empty()) {
                 sprintf(buffer, "object_id=%d|", count);
                 out += buffer;
-
+                auto support_point_type_to_float = [](sla::SupportPointType t) -> float {
+                    switch (t) {
+                    case Slic3r::sla::SupportPointType::manual_add: return 2.f;
+                    case Slic3r::sla::SupportPointType::island: return 1.f;
+                    case Slic3r::sla::SupportPointType::slope: return 3.f;
+                    default: assert(false); return 0.f;
+                    }
+                };
                 // Store the layer height profile as a single space separated list.
                 for (size_t i = 0; i < sla_support_points.size(); ++i) {
-                    sprintf(buffer, (i==0 ? "%f %f %f %f %f" : " %f %f %f %f %f"),  sla_support_points[i].pos(0), sla_support_points[i].pos(1), sla_support_points[i].pos(2), sla_support_points[i].head_front_radius, (float)sla_support_points[i].is_new_island);
+                    sprintf(buffer, (i==0 ? "%f %f %f %f %f" : " %f %f %f %f %f"), 
+                        sla_support_points[i].pos(0), 
+                        sla_support_points[i].pos(1), 
+                        sla_support_points[i].pos(2),
+                        sla_support_points[i].head_front_radius,
+                        support_point_type_to_float(sla_support_points[i].type));
                     out += buffer;
                 }
                 out += "\n";
@@ -3455,16 +3634,39 @@ namespace Slic3r {
         return true;
     }
 
-    bool _3MF_Exporter::_add_print_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig &config)
+    bool _3MF_Exporter::_add_print_config_file_to_archive(mz_zip_archive& archive, const DynamicPrintConfig &config, const Model& model)
     {
         assert(is_decimal_separator_point());
         char buffer[1024];
         sprintf(buffer, "; %s\n\n", header_slic3r_generated().c_str());
         std::string out = buffer;
 
-        for (const std::string &key : config.keys())
-            if (key != "compatible_printers")
-                out += "; " + key + " = " + config.opt_serialize(key) + "\n";
+        t_config_option_keys keys = config.keys();
+
+        // Wipe tower values were historically stored in the config, but they were moved into
+        // Model in PS 2.9.0. Keep saving the old values to maintain forward compatibility.
+        for (const std::string s : {"wipe_tower_x", "wipe_tower_y", "wipe_tower_rotation_angle"})
+            if (! config.has(s))
+                keys.emplace_back(s);
+        sort_remove_duplicates(keys);
+
+        for (const std::string& key : keys) {
+            if (key == "compatible_printers")
+                continue;
+
+            std::string opt_serialized;
+            
+            if (key == "wipe_tower_x")
+                opt_serialized = float_to_string_decimal_point(model.get_wipe_tower_vector().front().position.x());
+            else if (key == "wipe_tower_y")
+                opt_serialized = float_to_string_decimal_point(model.get_wipe_tower_vector().front().position.y());
+            else if (key == "wipe_tower_rotation_angle")
+                opt_serialized = float_to_string_decimal_point(model.get_wipe_tower_vector().front().rotation);
+            else
+                opt_serialized = config.opt_serialize(key);
+
+            out += "; " + key + " = " + opt_serialized + "\n";
+        }
 
         if (!out.empty()) {
             if (!mz_zip_writer_add_mem(&archive, PRINT_CONFIG_FILE.c_str(), (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION)) {
@@ -3614,33 +3816,42 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
 {
     std::string out = "";
 
-    if (!model.custom_gcode_per_print_z.gcodes.empty()) {
+    if (std::any_of(model.get_custom_gcode_per_print_z_vector().begin(), model.get_custom_gcode_per_print_z_vector().end(), [](const auto& cg) { return !cg.gcodes.empty(); })) {
         pt::ptree tree;
-        pt::ptree& main_tree = tree.add("custom_gcodes_per_print_z", "");
+        for (size_t bed_idx=0; bed_idx<model.get_custom_gcode_per_print_z_vector().size(); ++bed_idx) {
+            if (bed_idx != 0 && model.get_custom_gcode_per_print_z_vector()[bed_idx].gcodes.empty()) {
+                // Always save the first bed so older slicers are able to tell
+                // that there are no color changes on it.
+                continue;
+            }
 
-        for (const CustomGCode::Item& code : model.custom_gcode_per_print_z.gcodes) {
-            pt::ptree& code_tree = main_tree.add("code", "");
+            pt::ptree& main_tree = tree.add("custom_gcodes_per_print_z", "");
+            main_tree.put("<xmlattr>.bed_idx"   , bed_idx);
 
-            // store data of custom_gcode_per_print_z
-            code_tree.put("<xmlattr>.print_z"   , code.print_z  );
-            code_tree.put("<xmlattr>.type"      , static_cast<int>(code.type));
-            code_tree.put("<xmlattr>.extruder"  , code.extruder );
-            code_tree.put("<xmlattr>.color"     , code.color    );
-            code_tree.put("<xmlattr>.extra"     , code.extra    );
+            for (const CustomGCode::Item& code : model.get_custom_gcode_per_print_z_vector()[bed_idx].gcodes) {
+                pt::ptree& code_tree = main_tree.add("code", "");
 
-            // add gcode field data for the old version of the PrusaSlicer
-            std::string gcode = code.type == CustomGCode::ColorChange ? config->opt_string("color_change_gcode")    :
-                                code.type == CustomGCode::PausePrint  ? config->opt_string("pause_print_gcode")     :
-                                code.type == CustomGCode::Template    ? config->opt_string("template_custom_gcode") :
-                                code.type == CustomGCode::ToolChange  ? "tool_change"   : code.extra; 
-            code_tree.put("<xmlattr>.gcode"     , gcode   );
+                // store data of custom_gcode_per_print_z
+                code_tree.put("<xmlattr>.print_z"   , code.print_z  );
+                code_tree.put("<xmlattr>.type"      , static_cast<int>(code.type));
+                code_tree.put("<xmlattr>.extruder"  , code.extruder );
+                code_tree.put("<xmlattr>.color"     , code.color    );
+                code_tree.put("<xmlattr>.extra"     , code.extra    );
+
+                // add gcode field data for the old version of the PrusaSlicer
+                std::string gcode = code.type == CustomGCode::ColorChange ? config->opt_string("color_change_gcode")    :
+                                    code.type == CustomGCode::PausePrint  ? config->opt_string("pause_print_gcode")     :
+                                    code.type == CustomGCode::Template    ? config->opt_string("template_custom_gcode") :
+                                    code.type == CustomGCode::ToolChange  ? "tool_change"   : code.extra; 
+                code_tree.put("<xmlattr>.gcode"     , gcode   );
+            }
+
+            pt::ptree& mode_tree = main_tree.add("mode", "");
+            // store mode of a custom_gcode_per_print_z 
+            mode_tree.put("<xmlattr>.value", model.custom_gcode_per_print_z().mode == CustomGCode::Mode::SingleExtruder ? CustomGCode::SingleExtruderMode :
+                                             model.custom_gcode_per_print_z().mode == CustomGCode::Mode::MultiAsSingle ? CustomGCode::MultiAsSingleMode :
+                                             CustomGCode::MultiExtruderMode);
         }
-
-        pt::ptree& mode_tree = main_tree.add("mode", "");
-        // store mode of a custom_gcode_per_print_z 
-        mode_tree.put("<xmlattr>.value", model.custom_gcode_per_print_z.mode == CustomGCode::Mode::SingleExtruder ? CustomGCode::SingleExtruderMode :
-                                         model.custom_gcode_per_print_z.mode == CustomGCode::Mode::MultiAsSingle ?  CustomGCode::MultiAsSingleMode :
-                                         CustomGCode::MultiExtruderMode);
 
         if (!tree.empty()) {
             std::ostringstream oss;
@@ -3662,9 +3873,47 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
     return true;
 }
 
-// Perform conversions based on the config values available.
-static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config, const boost::optional<Semver>& prusaslicer_generator_version)
+bool _3MF_Exporter::_add_wipe_tower_information_file_to_archive( mz_zip_archive& archive, Model& model)
 {
+    std::string out = "";
+
+    pt::ptree tree;
+
+    size_t bed_idx = 0;
+    for (const ModelWipeTower& wipe_tower : model.get_wipe_tower_vector()) {
+        pt::ptree& main_tree = tree.add("wipe_tower_information", "");
+
+        main_tree.put("<xmlattr>.bed_idx", bed_idx);
+        main_tree.put("<xmlattr>.position_x", wipe_tower.position.x());
+        main_tree.put("<xmlattr>.position_y", wipe_tower.position.y());
+        main_tree.put("<xmlattr>.rotation_deg", wipe_tower.rotation);
+        ++bed_idx;
+        if (bed_idx >= s_multiple_beds.get_number_of_beds())
+            break;
+    }
+    
+    std::ostringstream oss;
+    boost::property_tree::write_xml(oss, tree);
+    out = oss.str();
+
+    // Post processing("beautification") of the output string
+    boost::replace_all(out, "><", ">\n<");
+    
+    if (!out.empty()) {
+        if (!mz_zip_writer_add_mem(&archive, WIPE_TOWER_INFORMATION_FILE.c_str(), (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION)) {
+            add_error("Unable to add wipe tower information file to archive");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Perform conversions based on the config values available.
+static void handle_legacy_project_loaded(
+    DynamicPrintConfig& config,
+    const boost::optional<Semver>& prusaslicer_generator_version
+) {
     if (! config.has("brim_separation")) {
         if (auto *opt_elephant_foot   = config.option<ConfigOptionFloat>("elefant_foot_compensation", false); opt_elephant_foot) {
             // Conversion from older PrusaSlicer which applied brim separation equal to elephant foot compensation.
@@ -3672,7 +3921,7 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
             opt_brim_separation->value = opt_elephant_foot->value;
         }
     }
-    
+
     // In PrusaSlicer 2.5.0-alpha2 and 2.5.0-alpha3, we introduce several parameters for Arachne that depend
     // on nozzle size . Later we decided to make default values for those parameters computed automatically
     // until the user changes them.
@@ -3691,37 +3940,62 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
     }
 }
 
-bool is_project_3mf(const std::string& filename)
+// Project = either it contains our config OR it is stamped as being produced
+// by PrusaSlicer (in which case the version is passed out).
+std::pair<bool, std::optional<Semver>> is_project_3mf(const std::string& filename)
 {
+    std::pair<bool, std::optional<Semver>> out = std::make_pair(false, std::nullopt);
+
     mz_zip_archive archive;
     mz_zip_zero_struct(&archive);
 
     if (!open_zip_reader(&archive, filename))
-        return false;
+        return out;
+    ScopeGuard guard([&archive]() {close_zip_reader(&archive); });
 
     mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
 
     // loop the entries to search for config
     mz_zip_archive_file_stat stat;
-    bool config_found = false;
     for (mz_uint i = 0; i < num_entries; ++i) {
         if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+            if (mz_zip_reader_is_file_a_directory(&archive, i))
+                continue;
             std::string name(stat.m_filename);
             std::replace(name.begin(), name.end(), '\\', '/');
-
-            if (boost::algorithm::iequals(name, PRINT_CONFIG_FILE)) {
-                config_found = true;
-                break;
+            if (boost::algorithm::iequals(name, PRINT_CONFIG_FILE))
+                out.first = true;
+            if (boost::algorithm::iequals(name, MODEL_FILE)) {
+                if (auto* iter = mz_zip_reader_extract_iter_new(&archive, i, 0)) {
+                    ScopeGuard g([&iter]() { mz_zip_reader_extract_iter_free(iter); });
+                    char buffer[1024];
+                    memset(buffer, 0, sizeof(buffer));
+                    if (size_t bytes_read = mz_zip_reader_extract_iter_read(iter, buffer, sizeof(buffer)); bytes_read > 0) {
+                        std::string header(buffer);
+                        boost::regex pattern(R"(^\s*<metadata name="Application".*?PrusaSlicer-(.*?)</metadata>$)");
+                        boost::sregex_iterator it(header.begin(), header.end(), pattern);
+                        boost::sregex_iterator end;
+                        if (it != end) {
+                            Semver semver;
+                            semver.parse((*it)[1].str());
+                            out.second = semver;
+                        }
+                    }
+                }
             }
         }
     }
-
-    close_zip_reader(&archive);
-
-    return config_found;
+    return out;
 }
 
-bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model* model, bool check_version)
+bool load_3mf(
+    const char* path,
+    DynamicPrintConfig& config,
+    ConfigSubstitutionContext& config_substitutions,
+    Model* model,
+    bool check_version,
+    boost::optional<Semver> &prusaslicer_generator_version
+)
 {
     if (path == nullptr || model == nullptr)
         return false;
@@ -3731,7 +4005,8 @@ bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionCo
     _3MF_Importer         importer;
     bool res = importer.load_model_from_file(path, *model, config, config_substitutions, check_version);
     importer.log_errors();
-    handle_legacy_project_loaded(importer.version(), config, importer.prusaslicer_generator_version());
+    handle_legacy_project_loaded(config, importer.prusaslicer_generator_version());
+    prusaslicer_generator_version = importer.prusaslicer_generator_version();
 
     return res;
 }
