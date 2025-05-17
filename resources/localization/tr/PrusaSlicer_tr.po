@@ -17204,8 +17204,12 @@ msgstr ""
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr "Yazıcı hazır mı? Baskı tablası  yerinde, boş ve temiz mi?"
 
-#: src/slic3r/GUI/Plater.cpp:6819 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:6819
 msgid "Upload and Print"
+msgstr "Yükle ve Yazdır"
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:136
+msgid "Upload and &Print"
 msgstr "Yükle ve Yazdır"
 
 #: src/slic3r/GUI/Plater.cpp:7194
@@ -18144,15 +18148,15 @@ msgid "Upload filename doesn't end with \"%s\". Do you wish to continue?"
 msgstr "Yüklenen dosya adı \"%s\" ile bitmiyor. Devam etmek ister misiniz?"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:116
-msgid "Upload"
+msgid "&Upload"
 msgstr "Yükle"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:126
-msgid "Upload to Queue"
+msgid "Upload to &Queue"
 msgstr "Kuyruğa Yükle"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:147
-msgid "Upload and Simulate"
+msgid "Upload and &Simulate"
 msgstr "Yükle ve Simüle Et"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:302

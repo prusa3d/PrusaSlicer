@@ -113,7 +113,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
         return true;
     };
 
-    auto* btn_ok = add_button(wxID_OK, true, _L("Upload"));
+    auto* btn_ok = add_button(wxID_OK, true, _L("&Upload"));
     btn_ok->Bind(wxEVT_BUTTON, [this, validate_path](wxCommandEvent&) {
         if (validate_path(txt_filename->GetValue())) {
             post_upload_action = PrintHostPostUploadAction::None;
@@ -123,7 +123,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
     txt_filename->SetFocus();
     
     if (post_actions.has(PrintHostPostUploadAction::QueuePrint)) {
-        auto* btn_print = add_button(wxID_ADD, false, _L("Upload to Queue"));
+        auto* btn_print = add_button(wxID_ADD, false, _L("Upload to &Queue"));
         btn_print->Bind(wxEVT_BUTTON, [this, validate_path](wxCommandEvent&) {
             if (validate_path(txt_filename->GetValue())) {
                 post_upload_action = PrintHostPostUploadAction::QueuePrint;
@@ -133,7 +133,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
     }
 
     if (post_actions.has(PrintHostPostUploadAction::StartPrint)) {
-        auto* btn_print = add_button(wxID_YES, false, _L("Upload and Print"));
+        auto* btn_print = add_button(wxID_YES, false, _L("Upload and &Print"));
         btn_print->Bind(wxEVT_BUTTON, [this, validate_path](wxCommandEvent&) {
             if (validate_path(txt_filename->GetValue())) {
                 post_upload_action = PrintHostPostUploadAction::StartPrint;
@@ -144,7 +144,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
 
     if (post_actions.has(PrintHostPostUploadAction::StartSimulation)) {
         // Using wxID_MORE as a button identifier to be different from the other buttons, wxID_MORE has no other meaning here.
-        auto* btn_simulate = add_button(wxID_MORE, false, _L("Upload and Simulate"));
+        auto* btn_simulate = add_button(wxID_MORE, false, _L("Upload and &Simulate"));
         btn_simulate->Bind(wxEVT_BUTTON, [this, validate_path](wxCommandEvent&) {
             if (validate_path(txt_filename->GetValue())) {
                 post_upload_action = PrintHostPostUploadAction::StartSimulation;

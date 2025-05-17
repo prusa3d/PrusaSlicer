@@ -714,16 +714,16 @@ msgid "Bottom is open."
 msgstr "La parte inferior está abierta."
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:116
-msgid "Upload"
-msgstr "Enviar"
+msgid "&Upload"
+msgstr "&Enviar"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:126
-msgid "Upload to Queue"
-msgstr "Cargar a la Cola"
+msgid "Upload to &Queue"
+msgstr "Cargar a la &Cola"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:147
-msgid "Upload and Simulate"
-msgstr "Enviar y simular"
+msgid "Upload and &Simulate"
+msgstr "Enviar y &Simular"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:302
 msgid "ID"
@@ -5594,9 +5594,13 @@ msgstr ""
 "¿Está lista la impresora? ¿Está la lámina de impresión en su sitio, vacía y "
 "limpia?"
 
-#: src/slic3r/GUI/Plater.cpp:6819 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:6819
 msgid "Upload and Print"
-msgstr "Enviar e imprimir"
+msgstr "Enviar e Imprimir"
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:136
+msgid "Upload and &Print"
+msgstr "Enviar e &Imprimir"
 
 #. TRN: This is the dialog title.
 #: src/slic3r/GUI/WifiConfigDialog.cpp:28

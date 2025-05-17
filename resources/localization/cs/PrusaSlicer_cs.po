@@ -699,15 +699,15 @@ msgid "Bottom is open."
 msgstr "Spodní část je otevřená."
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:116
-msgid "Upload"
+msgid "&Upload"
 msgstr "Nahrát"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:126
-msgid "Upload to Queue"
+msgid "Upload to &Queue"
 msgstr "Odeslat do fronty"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:147
-msgid "Upload and Simulate"
+msgid "Upload and &Simulate"
 msgstr "Nahrát a simulovat"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:302
@@ -5582,8 +5582,12 @@ msgstr "Odeslat vše do služby Connect"
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr "Je tiskarna připravená k tisku? Je podložka prázdná a čistá?"
 
-#: src/slic3r/GUI/Plater.cpp:6819 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:6819
 msgid "Upload and Print"
+msgstr "Nahrát a Tisknout"
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:136
+msgid "Upload and &Print"
 msgstr "Nahrát a Tisknout"
 
 #. TRN: This is the dialog title.

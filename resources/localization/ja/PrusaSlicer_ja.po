@@ -692,15 +692,15 @@ msgid "Bottom is open."
 msgstr "底部が開いています。"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:116
-msgid "Upload"
+msgid "&Upload"
 msgstr "アップロード"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:126
-msgid "Upload to Queue"
+msgid "Upload to &Queue"
 msgstr "キューにアップロード"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:147
-msgid "Upload and Simulate"
+msgid "Upload and &Simulate"
 msgstr "アップロードとシミュレーション"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:302
@@ -5491,8 +5491,12 @@ msgstr ""
 "プリンター準備はできていますか？プリントシートの上は空で、きれいな状態で装着"
 "されていますか？"
 
-#: src/slic3r/GUI/Plater.cpp:6819 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:6819
 msgid "Upload and Print"
+msgstr "アップロードとプリント"
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:136
+msgid "Upload and &Print"
 msgstr "アップロードとプリント"
 
 #. TRN: This is the dialog title.

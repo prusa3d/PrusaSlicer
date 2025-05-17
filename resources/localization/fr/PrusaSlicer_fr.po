@@ -728,15 +728,15 @@ msgid "Bottom is open."
 msgstr "Le fond est ouvert."
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:116
-msgid "Upload"
+msgid "&Upload"
 msgstr "Télécharger"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:126
-msgid "Upload to Queue"
+msgid "Upload to &Queue"
 msgstr "Télécharger dans la file"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:147
-msgid "Upload and Simulate"
+msgid "Upload and &Simulate"
 msgstr "Télécharger et Simuler"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:302
@@ -5646,8 +5646,12 @@ msgstr ""
 "L'imprimante est-elle prête ? La plaque d'impression est-elle en place, vide "
 "et propre ?"
 
-#: src/slic3r/GUI/Plater.cpp:6819 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:6819
 msgid "Upload and Print"
+msgstr "Télécharger et Imprimer"
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:136
+msgid "Upload and &Print"
 msgstr "Télécharger et Imprimer"
 
 #. TRN: This is the dialog title.
