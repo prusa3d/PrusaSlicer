@@ -347,6 +347,18 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 						      const std::vector<bool>            &lepox_to_next,
 						      bool                                trans_bed_lepox);
 
+void assume_ConsequentialTemporalLepoxAgainstFixed(z3::solver                         &Solver,
+						   z3::context                        &Context,
+						   const z3::expr_vector              &dec_vars_T,
+						   std::vector<Rational>              &dec_values_T,
+						   const std::vector<int>             &fixed,
+						   const std::vector<int>             &undecided,
+						   int                                 temporal_spread,
+						   const std::vector<Slic3r::Polygon> &SEQ_UNUSED(polygons),
+						   const std::vector<bool>            &lepox_to_next,
+						   bool                                trans_bed_lepox,
+						   z3::expr_vector                    &lepox_assumptions);
+
 /*----------------------------------------------------------------*/
 
 void introduce_LineNonIntersection(z3::solver         &Solver,

@@ -79,7 +79,7 @@ static void getNamedSolids(const TopLoc_Location& location, const Handle(XCAFDoc
     }
 }
 
-extern "C" OCCTWRAPPER_EXPORT bool load_step_internal(const char *path, OCCTResult* res /*BBS:, ImportStepProgressFn proFn*/)
+extern "C" OCCTWRAPPER_EXPORT bool load_step_internal(const char *path, OCCTResult* res /*BBS:, ImportStepProgressFn proFn*/, std::optional<std::pair<double, double>> deflections /*= std::nullopt*/)
 {
 try {
     //bool cb_cancel = false;
@@ -129,7 +129,9 @@ try {
     res->object_name = obj_name;
 
     for (const NamedSolid &namedSolid : namedSolids) {
-        BRepMesh_IncrementalMesh mesh(namedSolid.solid, STEP_TRANS_CHORD_ERROR, false, STEP_TRANS_ANGLE_RES, true);
+        BRepMesh_IncrementalMesh mesh(namedSolid.solid, 
+                                      deflections.has_value() ? deflections.value().first  : STEP_TRANS_CHORD_ERROR, false, 
+                                      deflections.has_value() ? deflections.value().second : STEP_TRANS_ANGLE_RES, true);
         res->volumes.emplace_back();
 
         std::vector<Vec3f>      vertices;

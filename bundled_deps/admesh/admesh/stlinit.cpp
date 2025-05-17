@@ -222,6 +222,15 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 		}
 #endif
 
+		for (int j = 0; j < 3; ++j) {
+			for (int u = 0; u < 3; ++u) {
+				if (std::isnan(facet.vertex[j](u)) || std::isinf(facet.vertex[j](u))) {
+					BOOST_LOG_TRIVIAL(error) << "stl_read: facet " << i << ": vertex " << j << "contains invalid coordinate";
+					return false;
+				}
+			}
+		}
+
 		// Write the facet into memory.
 		stl->facet_start[i] = facet;
 		stl_facet_stats(stl, facet, first);

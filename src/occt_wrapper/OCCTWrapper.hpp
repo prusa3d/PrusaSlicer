@@ -5,6 +5,8 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <utility>
+#include <optional>
 
 struct stl_facet;
 
@@ -21,7 +23,7 @@ struct OCCTResult {
     std::vector<OCCTVolume> volumes;
 };
 
-using LoadStepFn = bool (*)(const char *path, OCCTResult* occt_result);
+using LoadStepFn = bool (*)(const char *path, OCCTResult* occt_result, std::optional<std::pair<double, double>> deflections);
 
 }; // namespace Slic3r
 

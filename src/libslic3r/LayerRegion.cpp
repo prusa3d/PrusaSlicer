@@ -316,9 +316,9 @@ Surfaces merge_bridges(
             // union_safety_offset_ex(acc)
 
             for (ExPolygon &bridge_expolygon : merged_bridges) {
-                Surface surface{ stBottomBridge, std::move(bridge_expolygon) };
                 const Lines lines{to_lines(diff_pl(to_polylines(bridge_expolygon), expand(expansions, float(SCALED_EPSILON))))};
                 auto [bridging_dir, unsupported_dist] = detect_bridging_direction(lines, to_polygons(bridge_expolygon));
+                Surface surface{ stBottomBridge, std::move(bridge_expolygon) };
                 surface.bridge_angle = M_PI + std::atan2(bridging_dir.y(), bridging_dir.x());
                 result.push_back(std::move(surface));
             }

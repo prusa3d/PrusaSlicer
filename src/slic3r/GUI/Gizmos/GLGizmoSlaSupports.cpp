@@ -885,8 +885,21 @@ void GLGizmoSlaSupports::draw_island_config() {
     ImGui::SameLine();
     ImGui::Text("head radius %.2f mm", unscale<float>(sample_config.head_radius));
 
-    bool exist_change = false;
+    // copied from SLAPrint::Steps::support_points()
+    const SLAPrintObject *po = m_c->selection_info()->print_object();
+    const SLAPrintObjectConfig &cfg = po->config();
+    float head_diameter = (cfg.support_tree_type == sla::SupportTreeType::Branching) ?
+        float(cfg.branchingsupport_head_front_diameter):
+        float(cfg.support_head_front_diameter); // SupportTreeType::Organic
+    std::string button_title = "apply " + std::to_string(head_diameter);
+    ImGui::SameLine();
+    if (ImGui::Button(button_title.c_str())) {
+        float density_relative = float(cfg.support_points_density_relative / 100.f); 
+        sample_config = sla::SampleConfigFactory::apply_density(
+            sla::SampleConfigFactory::create(head_diameter), density_relative);
+    }
 
+    bool exist_change = false;
     if (float max_for_one = unscale<float>(sample_config.max_length_for_one_support_point); // [in mm]
         ImGui::InputFloat("One support", &max_for_one, .1f, 1.f, "%.2f mm")) {
         sample_config.max_length_for_one_support_point = scale_(max_for_one);
@@ -1462,6 +1475,7 @@ SlaGizmoHelpDialog::SlaGizmoHelpDialog()
     SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
     const wxString ctrl = GUI::shortkey_ctrl_prefix();
     const wxString alt  = GUI::shortkey_alt_prefix();
+    const wxString shift = wxString("Shift+");
 
 
     // fonts
@@ -1489,9 +1503,9 @@ SlaGizmoHelpDialog::SlaGizmoHelpDialog()
     shortcuts.push_back(std::make_pair(_L("Left click"),              _L("Add point")));
     shortcuts.push_back(std::make_pair(_L("Right click"),             _L("Remove point")));
     shortcuts.push_back(std::make_pair(_L("Drag"),                    _L("Move point")));
-    shortcuts.push_back(std::make_pair(ctrl+_L("Left click"),         _L("Add point to selection")));
+    shortcuts.push_back(std::make_pair(shift+_L("Left click"),        _L("Add point to selection")));
     shortcuts.push_back(std::make_pair(alt+_L("Left click"),          _L("Remove point from selection")));
-    shortcuts.push_back(std::make_pair(wxString("Shift+")+_L("Drag"), _L("Select by rectangle")));
+    shortcuts.push_back(std::make_pair(shift+_L("Drag"),              _L("Select by rectangle")));
     shortcuts.push_back(std::make_pair(alt+_(L("Drag")),              _L("Deselect by rectangle")));
     shortcuts.push_back(std::make_pair(ctrl+"A",                      _L("Select all points")));
     shortcuts.push_back(std::make_pair("Delete",                      _L("Remove selected points")));

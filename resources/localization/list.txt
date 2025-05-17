@@ -88,6 +88,7 @@ src/slic3r/GUI/Jobs/SLAImportDialog.hpp
 src/slic3r/GUI/Jobs/SLAImportJob.cpp
 src/slic3r/GUI/KBShortcutsDialog.cpp
 src/slic3r/GUI/BulkExportDialog.cpp
+src/slic3r/GUI/LoadStepDialog.cpp
 src/slic3r/GUI/LoginDialog.cpp
 src/slic3r/GUI/MainFrame.cpp
 src/slic3r/GUI/Mouse3DController.cpp

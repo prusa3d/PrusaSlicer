@@ -135,7 +135,7 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		downloader->set_path_name(app_config->get("url_downloader_dest"));
 		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
 
-		for (const std::string opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button"})
+		for (const std::string opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button", "show_step_import_parameters"})
 			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
 		// by default "Log in" button is visible
 		if (!app_config->has("show_login_button"))
@@ -628,6 +628,11 @@ void PreferencesDialog::build()
 			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
 			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
 			app_config->get_bool("suppress_hyperlinks"));
+
+		append_bool_option(m_optgroup_other, "show_step_import_parameters",
+			L("Show STEP file import parameters"),
+			L("If enabled, PrusaSlicer will show a dialog with quality selection when importing a STEP file."),
+			app_config->get_bool("show_step_import_parameters"));
 
 		append_bool_option(m_optgroup_other, "show_login_button",
 			L("Show \"Log in\" button in application top bar"),

@@ -67,6 +67,8 @@ public:
     //<bool - false if canceled(int - attempt number, unsigned - ms to next attempt, 0 if last)>
     typedef std::function<bool(int, unsigned)> RetryFn;
 
+    typedef std::function<void(const std::string&)> HeadersFn;
+
 	Http(Http &&other);
 
 	// Note: strings are expected to be UTF-8-encoded
@@ -146,6 +148,8 @@ public:
 	Http& on_ip_resolve(IPResolveFn fn);
 
     Http& on_retry(RetryFn fn);
+
+    Http& on_headers(HeadersFn fn);
 
 	Http& cookie_file(const std::string& file_path);
 	Http& cookie_jar(const std::string& file_path);

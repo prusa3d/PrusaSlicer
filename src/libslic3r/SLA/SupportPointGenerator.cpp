@@ -719,12 +719,12 @@ std::optional<SmallPart> create_small_part(
     /// Recursive fast check function without storing any already searched data
     /// NOTE: Small part with holes could slow down checking
     /// </summary>
-    /// <param name="check_layer_i">Index of layer with part</param>
-    /// <param name="check_part_i">Index of part in layer.parts</param>
+    /// <param name="check">Index of layer and part</param>
     /// <param name="allowed_depth">Recursion protection</param>
-    std::function<bool(const LayerPartIndex &, size_t)> check_parts;
+    /// <param name="prev_check">To prevent cycling calls</param>
+    std::function<bool(const LayerPartIndex &, size_t, const LayerPartIndex &)> check_parts;
     check_parts = [&range_bb, &check_parts, &layers, &island, radius_in_mm]
-    (const LayerPartIndex& check, size_t allowed_depth) -> bool {
+    (const LayerPartIndex& check, size_t allowed_depth, const LayerPartIndex& prev_check) -> bool {
         const Layer &check_layer = layers[check.layer_index];
         const LayerPart &check_part = check_layer.parts[check.part_index];
         for (const PartLink &link : check_part.next_parts)
@@ -732,6 +732,9 @@ std::optional<SmallPart> create_small_part(
             if (!range_bb.contains(link->shape_extent.min) ||
                 !range_bb.contains(link->shape_extent.max))
                 return false; // part is too large
+
+        if ((check_layer.print_z - layers[island.layer_index].print_z) > radius_in_mm)
+            return false; // parts is large in Z direction
 
         --allowed_depth;
         if (allowed_depth == 0)
@@ -741,7 +744,10 @@ std::optional<SmallPart> create_small_part(
         size_t next_layer_i = check.layer_index + 1;
         for (const PartLink& link : check_part.next_parts) {
             size_t next_part_i = link - layers[next_layer_i].parts.cbegin();
-            if (!check_parts({next_layer_i, next_part_i}, allowed_depth))
+            if (next_layer_i == prev_check.layer_index &&
+                next_part_i == prev_check.part_index)
+                continue; // checked in lambda caller contex
+            if (!check_parts({next_layer_i, next_part_i}, allowed_depth, check))
                 return false;
         }
 
@@ -753,12 +759,7 @@ std::optional<SmallPart> create_small_part(
             // Investigate only the first island(lower index into parts).
             if (check.part_index < island.part_index)
                 return false; // part is already checked
-        }
-
-        
-        if (float max_z = radius_in_mm + layers[island.layer_index].print_z;
-            check_layer.print_z > max_z)
-            return false; // too far in Z
+        }                
 
         // NOTE: multiple investigation same part seems more relevant 
         // instead of store and search for already checked parts
@@ -774,20 +775,28 @@ std::optional<SmallPart> create_small_part(
         for (const PartLink &link : check_part.prev_parts) {
             size_t prev_layer_i = check.layer_index - 1; // exist only when exist prev parts - cant be negative
             size_t prev_part_i = link - layers[prev_layer_i].parts.cbegin();
+
+            if (prev_layer_i == prev_check.layer_index && 
+                prev_part_i == prev_check.part_index)
+                continue; // checked in lambda caller contex
+
             // Improve: check only parts which are not already checked
-            if (!check_parts({prev_layer_i, prev_part_i}, allowed_depth))
+            if (!check_parts({prev_layer_i, prev_part_i}, allowed_depth, check))
                 return false;
         }
         return true;
     };
 
-    float layer_height = layers[1].print_z - layers[0].print_z;
+    float layer_height = (island.layer_index == 0) ?
+        layers[1].print_z - layers[0].print_z:
+        layers[island.layer_index].print_z - layers[island.layer_index-1].print_z;
+
     assert(layer_height > 0.f);
-    float safe_multiplicator = 1.3f; // 30% more layers than radius for zigzag(up & down layer) search
-    size_t allowed_depth = static_cast<size_t>(std::ceil(radius_in_mm / layer_height * safe_multiplicator));
+    float safe_multiplicator = 1.4f; // 40% more layers than radius for zigzag(up & down layer) search
+    size_t allowed_depth = static_cast<size_t>(std::ceil((radius_in_mm / layer_height + 1) * safe_multiplicator));
     // Check Bounding boxes and do not create any data - FAST CHECK
     // NOTE: it could check model parts multiple times those there is allowed_depth
-    if (!check_parts(island, allowed_depth))
+    if (!check_parts(island, allowed_depth, island))
         return {};
 
     SmallPart collected; // sorted by layer_i, part_i

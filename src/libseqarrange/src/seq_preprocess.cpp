@@ -470,6 +470,15 @@ Slic3r::Polygon scaleUp_PolygonForSlicer(coord_t scale_factor, const Polygon &po
 }
 
 
+Slic3r::Polygon truncate_PolygonAsSeenBySequentialSolver(coord_t scale_factor, const Slic3r::Polygon &polygon)
+{
+    Slic3r::Polygon scale_down_polygon = scaleDown_PolygonForSequentialSolver(scale_factor, polygon);
+    Slic3r::Polygon scale_up_polygon = scaleUp_PolygonForSlicer(scale_factor, scale_down_polygon);
+
+    return scale_up_polygon;
+}
+
+
 void ground_PolygonByBoundingBox(Slic3r::Polygon &polygon)
 {    
     BoundingBox polygon_box = get_extents(polygon);
@@ -610,9 +619,30 @@ void decimate_PolygonForSequentialSolver(double                 DP_tolerance,
 	    {
 		if (extra_safety)
 		{
-		    grow_PolygonForContainedness(center_x, center_y, decimated_polygon);
+		    Slic3r::Polygon prefinal_polygon = decimated_polygon;
+
+		    while (true)
+		    {
+			grow_PolygonForContainedness(center_x, center_y, decimated_polygon);
+			Slic3r::Polygon truncated_polygon = truncate_PolygonAsSeenBySequentialSolver(SEQ_SLICER_SCALE_FACTOR, decimated_polygon);
+
+			bool trunc_contains = true;		    
+			for (unsigned int i = 0; i < prefinal_polygon.points.size(); ++i)
+			{
+			    if (!Slic3r::contains(truncated_polygon, prefinal_polygon.points[i], false))
+			    {
+				trunc_contains = false;
+				break;
+			    }
+			}
+
+			if (trunc_contains)
+			{
+			    return;
+			}
+		    }
 		}
-		break;
+		return;
 	    }
 	}
     }

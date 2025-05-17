@@ -14,6 +14,8 @@
 
 #include "PrintConfig.hpp"
 #include "enum_bitmask.hpp"
+#include <utility>
+#include <optional>
 
 namespace Slic3r {
 
@@ -46,7 +48,8 @@ namespace FileReader
     // Exceptions don't catched inside
     Model           load_model(const std::string& input_file,
                                LoadAttributes options = LoadAttribute::AddDefaultInstances, 
-                               LoadStats* statistics = nullptr);
+                               LoadStats* statistics = nullptr,
+                               std::optional<std::pair<double, double>> step_deflections = std::nullopt);
 
     // Load model, config and config substitutions from input file and fill statistics if it's required.
     // Exceptions don't catched inside
