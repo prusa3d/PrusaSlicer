@@ -1,7 +1,7 @@
 add_cmake_project(
     TBB
-    URL "https://github.com/oneapi-src/oneTBB/archive/refs/tags/v2021.5.0.zip"
-    URL_HASH SHA256=83ea786c964a384dd72534f9854b419716f412f9d43c0be88d41874763e7bb47
+    URL "https://github.com/oneapi-src/oneTBB/archive/refs/tags/v2021.10.0.tar.gz"
+    URL_HASH SHA256=487023a955e5a3cc6d3a0d5f89179f9b6c0ae7222613a7185b0227ba0c83700b
     CMAKE_ARGS          
         -DTBB_BUILD_SHARED=${BUILD_SHARED_LIBS}
         -DTBB_TEST=OFF

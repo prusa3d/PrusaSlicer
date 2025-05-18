@@ -7,9 +7,12 @@ add_library(libseqarrange STATIC src/seq_interface.cpp src/seq_preprocess.cpp sr
 target_include_directories(libseqarrange PUBLIC include PRIVATE src )
 target_link_libraries(libseqarrange PUBLIC libslic3r PRIVATE z3::libz3)
 
+include_directories(${CMAKE_SOURCE_DIR}/deps/build/destdir/usr/local/include)
+link_directories(${CMAKE_SOURCE_DIR}/deps/build/destdir/usr/local/lib)
 add_executable(sequential_decimator src/sequential_decimator.cpp)
 target_include_directories(sequential_decimator PRIVATE include)
 target_link_libraries(sequential_decimator PRIVATE libseqarrange)
+target_link_libraries(sequential_decimator PRIVATE Imath)
 
 
 

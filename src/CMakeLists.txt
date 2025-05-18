@@ -142,6 +142,9 @@ endif ()
 
 
 target_link_libraries(PrusaSlicer PRIVATE libslic3r libcereal slic3r-arrange-wrapper libseqarrange stb_image)
+target_link_libraries(PrusaSlicer PRIVATE Imath)
+link_directories(${CMAKE_SOURCE_DIR}/deps/build/destdir/usr/local/lib)
+include_directories(${CMAKE_SOURCE_DIR}/deps/build/destdir/usr/local/include)
 
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
