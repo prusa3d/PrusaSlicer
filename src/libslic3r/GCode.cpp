@@ -1298,8 +1298,8 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
                 file.write(this->writer().travel_to_z_force(last_z, "ensure z position"));
                 const double travel_z = std::max(last_z, double(m_max_layer_z));
                 file.write(this->writer().travel_to_z_force(travel_z, "ensure z position to clear all already printed objects"));
-                const Vec3crd from{to_3d(*this->last_position, scaled(this->m_last_layer_z))};
-                const Vec3crd to{0, 0, scaled(this->m_last_layer_z)};
+                const Vec3crd from{to_3d(*this->last_position, scaled(travel_z))};
+                const Vec3crd to{0, 0, scaled(travel_z)};
                 file.write(this->travel_to(from, to, ExtrusionRole::None, "move to origin position for next object", [](){return "";}));
                 m_enable_cooling_markers = true;
                 // Disable motion planner when traveling to first object point.
@@ -2351,7 +2351,7 @@ std::pair<GCode::SmoothPath, std::size_t> split_with_seam(
                 loop, flipped, scaled_resolution, *seam_point, seam_point_merge_distance_threshold
             ),
             0};
-    } else if (scarf != nullptr && scarf->start_point == scarf->end_point) {
+    } else if (scarf != nullptr && scarf->start_point == scarf->end_point && !scarf->entire_loop) {
         return {smooth_path_cache.resolve_or_fit_split_with_seam(
             loop, flipped, scaled_resolution, scarf->start_point, seam_point_merge_distance_threshold
         ), 0};
@@ -2762,7 +2762,11 @@ LayerResult GCodeGenerator::process_layer(
             if (m_current_instance != next_instance) {
                 m_avoid_crossing_perimeters.use_external_mp_once = true;
             }
-            gcode += this->travel_to_first_position(first_point - to_3d(shift, 0), print_z, ExtrusionRole::Mixed, [this]() {
+
+            const double writer_z{m_writer.get_position().z()};
+            const double previous_z{writer_z <= std::numeric_limits<double>::epsilon() ? print_z : writer_z};
+
+            gcode += this->travel_to_first_position(first_point - to_3d(shift, 0), previous_z, ExtrusionRole::Mixed, [this]() {
                 if (m_writer.multiple_extruders) {
                     return std::string{""};
                 }

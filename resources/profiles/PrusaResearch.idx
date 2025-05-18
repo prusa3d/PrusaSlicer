@@ -1,4 +1,8 @@
 min_slic3r_version = 2.9.1-alpha0
+2.2.7 Updated FW version notification (6.3.1 CORE One). Updated PA values for Prusament PC Blend (MINI). Updated support material extrusion width for some profiles.
+2.2.6 Updated end print parking position in accordance with FW6.3.1 (CORE One).
+2.2.5 Updated FW version notification. Updated PETG cooling thresholds (CORE One). Updated Spectrum PCTG PA values. BASF vendor renamed to Forward AM.
+2.2.4 Updated profile for Prusament PP Carbon Fiber (CORE One) and Spectrum PCTG.
 2.2.3 Updated FW version notification. Added filament profiles.
 2.2.2 Added filament profiles for Sunlu PLA+ 2.0; Elegoo Rapid PLA+; Overture PETG; Overture HS TPU, Polymaker PolyTerra PLA. Increased PETG nominal chamber temperature (C1).
 2.2.1 Updated values for 1st layer solid infill speed and speed over bridges. Updated PLA idle temperature (C1). 

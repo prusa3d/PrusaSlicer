@@ -1,4 +1,5 @@
 min_slic3r_version = 2.9.1-alpha0
+1.2.1 Add Polymaker Polyflex TPU95-HF and 3D Fuel PCTG. Minor fixes and tweaks.
 1.2.0 Extruder clearance moved to printer settings.
 min_slic3r_version = 2.8.0-alpha0
 1.1.0 Major updates to material profiles. Better cooling settings, and new firmware features for detecting filament.

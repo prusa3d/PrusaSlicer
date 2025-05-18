@@ -1133,7 +1133,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             else {
                 ClosestInfo& info = candidates[0];
             
-                const double N0dD = n0.dot(D);
+                double N0dD = n0.dot(D);
                 const Vec3d normProj = N0dD * n0;
                 const Vec3d compProj = D - normProj;
                 Vec3d U = compProj;
@@ -1194,6 +1194,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
                         distance = (c1 - c0).norm();
                         info.circle0Closest = c0;
                         info.circle1Closest = c1;
+                        N0dD = 0.0;
                     }
                 }
 

@@ -235,6 +235,15 @@ void AppConfig::set_defaults()
         set("sys_menu_enabled", "1");
 #endif // _WIN32
 
+    if (get("show_step_import_parameters").empty())
+        set("show_step_import_parameters", "1");
+
+    if (get("linear_precision").empty())
+        set("linear_precision", "0.005");
+
+    if (get("angle_precision").empty())
+        set("angle_precision", "1.");
+
     // Remove legacy window positions/sizes
     erase("", "main_frame_maximized");
     erase("", "main_frame_pos");

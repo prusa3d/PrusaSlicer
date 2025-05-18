@@ -522,7 +522,7 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 		}
 		#endif
 		//Solver.add(dec_vars_T[undecided[i]] + temporal_spread < dec_vars_T[next_i] && dec_vars_T[undecided[i]] + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]);		
-		Solver.add((dec_vars_T[undecided[i]] < 0 || dec_vars_T[next_i] < 0) || dec_vars_T[undecided[i]] + temporal_spread < dec_vars_T[next_i] && dec_vars_T[undecided[i]] + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]);
+		Solver.add((dec_vars_T[undecided[i]] < 0 || dec_vars_T[next_i] < 0) || (dec_vars_T[undecided[i]] + temporal_spread < dec_vars_T[next_i] && dec_vars_T[undecided[i]] + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]));
 	    }
 	    /* Undecided --> missing */
 	    else
@@ -585,6 +585,168 @@ void introduce_ConsequentialTemporalLepoxAgainstFixed(z3::solver                
 		    */
 		    Solver.add(dec_vars_T[undecided[j]] < 0 || (   Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) > dec_vars_T[undecided[j]] + temporal_spread
 							        || Context.real_val(dec_values_T[next_i].numerator, dec_values_T[next_i].denominator) + temporal_spread < dec_vars_T[undecided[j]]));
+		}	    
+	    }
+	}
+    }
+    
+    #ifdef DEBUG
+    {
+	printf("Origo\n");
+	for (unsigned int i = 0; i < fixed.size(); ++i)
+	{
+	    printf("%.3f\n", dec_values_T[fixed[i]].as_double());
+	}
+    }
+    #endif
+}
+
+
+void assume_ConsequentialTemporalLepoxAgainstFixed(z3::solver                         &Solver,
+						   z3::context                        &Context,
+						   const z3::expr_vector              &dec_vars_T,
+						   std::vector<Rational>              &dec_values_T,
+						   const std::vector<int>             &fixed,
+						   const std::vector<int>             &undecided,
+						   int                                 temporal_spread,
+						   const std::vector<Slic3r::Polygon> &SEQ_UNUSED(polygons),
+						   const std::vector<bool>            &lepox_to_next,
+						   bool                                trans_bed_lepox,
+						   z3::expr_vector                    &lepox_assumptions)
+{
+    #ifdef DEBUG
+    {
+	if (trans_bed_lepox)
+	{
+	    printf("Trans bed lepox.\n");
+	}
+	printf("Undecided:\n");
+	for (unsigned int i = 0; i < undecided.size(); ++i)
+	{
+	    printf("%d", undecided[i]);
+	    if (lepox_to_next[undecided[i]])
+	    {
+		printf("-> ");
+	    }
+	    printf("  ");	    
+	}
+	printf("\n");
+
+	printf("Fixed:\n");
+	for (unsigned int i = 0; i < fixed.size(); ++i)
+	{
+	    printf("%d", fixed[i]);
+	    if (lepox_to_next[fixed[i]])
+	    {
+		printf("-> ");
+	    }
+	    printf("  ");	    
+	}
+	printf("\n");	
+    }
+    #endif
+
+    /* Bed --> Bed */
+    if (trans_bed_lepox)
+    {
+	if (is_undecided(0, undecided))
+	{
+	    #ifdef DEBUG
+	    {
+		printf("Bed --> Bed: undecided 0 first\n");
+	    }
+	    #endif
+	    for (unsigned int j = 1; j < undecided.size(); ++j)
+	    {
+		lepox_assumptions.push_back(dec_vars_T[undecided[j]] < 0 || dec_vars_T[0] + temporal_spread < dec_vars_T[undecided[j]]);
+	    }
+	}
+	else if (is_fixed(0, fixed))
+	{
+	    #ifdef DEBUG	    
+	    {
+		printf("Bed --> Bed: fixed 0 still first\n");
+	    }
+	    #endif
+	    for (unsigned int j = 0; j < undecided.size(); ++j)
+	    {
+		lepox_assumptions.push_back(dec_vars_T[undecided[j]] < 0 || Context.real_val(dec_values_T[0].numerator, dec_values_T[0].denominator) + temporal_spread < dec_vars_T[undecided[j]]);
+	    }
+	}
+	else
+	{
+	    // should not happen
+	    assert(false);
+	}
+    }
+
+    for (unsigned int i = 0; i < undecided.size(); ++i)
+    {
+	if (lepox_to_next[undecided[i]])
+	{
+	    int next_i = undecided[i] + 1;
+
+	    /* Undecided --> Undecided */
+	    if (is_undecided(next_i, undecided))
+	    {
+		#ifdef DEBUG
+		{
+		    printf("Undecided --> Undecided: %d --> %d standard\n", undecided[i], next_i);
+		}
+		#endif
+		lepox_assumptions.push_back((dec_vars_T[undecided[i]] < 0 || dec_vars_T[next_i] < 0) || (dec_vars_T[undecided[i]] + temporal_spread < dec_vars_T[next_i] && dec_vars_T[undecided[i]] + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]));
+	    }
+	    /* Undecided --> missing */
+	    else
+	    {
+                #ifdef DEBUG
+		{
+		    printf("Undecided --> Undecided: %d missing\n", undecided[i]);
+		}
+		#endif
+		for (unsigned int j = 0; j < undecided.size(); ++j)
+		{
+		    if (i != j)
+		    {
+			lepox_assumptions.push_back(dec_vars_T[undecided[j]] < 0 || dec_vars_T[undecided[j]] + temporal_spread < dec_vars_T[undecided[i]]);
+		    }
+		}
+		for (unsigned int j = 0; j < fixed.size(); ++j)
+		{
+		    lepox_assumptions.push_back(dec_vars_T[undecided[i]] < 0 || Context.real_val(dec_values_T[fixed[j]].numerator, dec_values_T[fixed[j]].denominator) + temporal_spread < dec_vars_T[undecided[i]]);
+		}
+	    }
+	}
+    }
+    for (unsigned int i = 0; i < fixed.size(); ++i)
+    {
+	if (lepox_to_next[fixed[i]])
+	{	
+	    int next_i = fixed[i] + 1;
+
+	    /* Fixed --> Undecided */
+	    if (is_undecided(next_i, undecided))
+	    {
+	        #ifdef DEBUG
+		{
+		    printf("Fixed --> Undecided: %d --> %d standard\n", fixed[i], next_i);
+		}
+	        #endif
+		lepox_assumptions.push_back(dec_vars_T[next_i] < 0 || (   Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) + temporal_spread < dec_vars_T[next_i]
+								       && Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) + temporal_spread + temporal_spread / 2 > dec_vars_T[next_i]));
+	    }
+	    /* Fixed --> Fixed */
+	    else if (is_fixed(next_i, fixed))
+	    {
+		#ifdef DEBUG
+		{ 
+		    printf("All out of the link: %d --> %d\n", fixed[i], next_i);
+		}
+		#endif
+		for (unsigned int j = 0; j < undecided.size(); ++j)
+		{
+		    lepox_assumptions.push_back(dec_vars_T[undecided[j]] < 0 || (   Context.real_val(dec_values_T[fixed[i]].numerator, dec_values_T[fixed[i]].denominator) > dec_vars_T[undecided[j]] + temporal_spread
+										 || Context.real_val(dec_values_T[next_i].numerator, dec_values_T[next_i].denominator) + temporal_spread < dec_vars_T[undecided[j]]));
 		}	    
 	    }
 	}
@@ -11194,17 +11356,6 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 							    undecided,
 							    solver_configuration.temporal_spread,
 							    polygons);
-
-	introduce_ConsequentialTemporalLepoxAgainstFixed(z_solver,
-							 z_context,
-							 local_dec_vars_T,
-							 local_values_T,
-							 decided_polygons,
-							 undecided,
-							 solver_configuration.temporal_spread,
-							 polygons,
-							 lepox_to_next,
-							 trans_bed_lepox);
 	
 	std::vector<int> missing;
 	std::vector<int> remaining_local;	
@@ -11212,7 +11363,19 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 	while(object_group_size > 0)
 	{
 	    z3::expr_vector presence_assumptions(z_context);
+	    
 	    assume_ConsequentialObjectPresence(z_context, local_dec_vars_T, undecided, missing, presence_assumptions);
+	    assume_ConsequentialTemporalLepoxAgainstFixed(z_solver,
+							  z_context,
+							  local_dec_vars_T,
+							  local_values_T,
+							  decided_polygons,
+							  undecided,
+							  solver_configuration.temporal_spread,
+							  polygons,
+							  lepox_to_next,
+							  trans_bed_lepox,
+							  presence_assumptions);
 	    
 	    #ifdef DEBUG
 	    {
@@ -11371,9 +11534,9 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 									int                                progress_total_object_phases,
 									std::function<void(int)>           progress_callback)
 {
-    std::vector<int> undecided;
-
+    std::vector<int> undecided;    
     decided_polygons.clear();
+    
     remaining_polygons.clear();
     
     dec_values_X.resize(solvable_objects.size());
@@ -11419,9 +11582,10 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 	unreachable_polygons.push_back(solvable_object.unreachable_polygons);
 	lepox_to_next.push_back(solvable_object.lepox_to_next);
     }
-    
-    for (unsigned int curr_polygon = 0; curr_polygon < solvable_objects.size(); /* nothing */)
-    {	
+
+    unsigned int curr_polygon;    
+    for (curr_polygon = 0; curr_polygon < solvable_objects.size(); /* nothing */)
+    {
 	bool optimized = false;
 	z3::set_param("timeout", solver_configuration.optimization_timeout.c_str());
 	    
@@ -11489,24 +11653,24 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 							    undecided,
 							    solver_configuration.temporal_spread,
 							    polygons);
-
-	introduce_ConsequentialTemporalLepoxAgainstFixed(z_solver,
-							 z_context,
-							 local_dec_vars_T,
-							 local_values_T,
-							 decided_polygons,
-							 undecided,
-							 solver_configuration.temporal_spread,
-							 polygons,
-							 lepox_to_next,
-							 trans_bed_lepox);
-	std::vector<int> missing;
-	std::vector<int> remaining_local;	
+	
+	std::vector<int> remaining_local;
     
 	while(object_group_size > 0)
-	{	    
+	{
 	    z3::expr_vector presence_assumptions(z_context);
-	    assume_ConsequentialObjectPresence(z_context, local_dec_vars_T, undecided, missing, presence_assumptions);
+	    assume_ConsequentialObjectPresence(z_context, local_dec_vars_T, undecided, remaining_local, presence_assumptions);
+	    assume_ConsequentialTemporalLepoxAgainstFixed(z_solver,
+							  z_context,
+							  local_dec_vars_T,
+							  local_values_T,
+							  decided_polygons,
+							  undecided,
+							  solver_configuration.temporal_spread,
+							  polygons,
+							  lepox_to_next,
+							  trans_bed_lepox,
+							  presence_assumptions);	    
 	    
 	    #ifdef DEBUG
 	    {
@@ -11630,7 +11794,7 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 		    progress_callback((SEQ_PROGRESS_RANGE * progress_object_phases_done) / progress_total_object_phases);
 		    return true;
 		}		
-		curr_polygon += solver_configuration.object_group_size;
+		curr_polygon += object_group_size;
 		progress_callback((SEQ_PROGRESS_RANGE * progress_object_phases_done) / progress_total_object_phases);
 		break;
 	    }
@@ -11646,18 +11810,30 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 		    ++progress_object_phases_done;
 		}
 		remaining_local.push_back(undecided.back());
-	    }
-	    missing.push_back(undecided.back());
-	    undecided.pop_back();	    
+		undecided.pop_back();	    
 
-	    --object_group_size;
-	    progress_callback((SEQ_PROGRESS_RANGE * progress_object_phases_done) / progress_total_object_phases);
+		--object_group_size;
+		progress_callback((SEQ_PROGRESS_RANGE * progress_object_phases_done) / progress_total_object_phases);
+	    }
 	}
 
 	std::reverse(remaining_local.begin(), remaining_local.end());
 	remaining_polygons.insert(remaining_polygons.end(), remaining_local.begin(), remaining_local.end());
-	
-	if (!optimized)
+
+	if (optimized)
+	{
+	    if (object_group_size < solver_configuration.object_group_size)
+	    {
+		int group_size_diff = solver_configuration.object_group_size - object_group_size;
+		if (curr_polygon + group_size_diff < solvable_objects.size())
+		{
+		    curr_polygon += group_size_diff;
+		    break;
+		}
+		return true;
+	    }
+	}
+	else
 	{
 	    if (curr_polygon <= 0)
 	    {
@@ -11668,17 +11844,24 @@ bool optimize_SubglobalConsequentialPolygonNonoverlappingBinaryCentered(const So
 		if (curr_polygon + solver_configuration.object_group_size < solvable_objects.size())		
 		{
 		    curr_polygon += solver_configuration.object_group_size;
-
-		    for (; curr_polygon < solvable_objects.size(); ++curr_polygon)
-		    {
-			remaining_polygons.push_back(curr_polygon);			
-		    }
+		    break;
 		}
 		return true;		   
 	    }
 	}
     }
-    assert(remaining_polygons.empty());
+    for (; curr_polygon < solvable_objects.size(); ++curr_polygon)
+    {
+	remaining_polygons.push_back(curr_polygon);			
+    }
+    #ifdef DEBUG
+    {
+	for (unsigned int i = 0; i < remaining_polygons.size(); ++i)
+	{
+	    printf("Remaining: %d\n", remaining_polygons[i]);
+	}
+    }
+    #endif    
 	
     return true;    
 }

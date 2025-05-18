@@ -30,6 +30,7 @@
 #include <string>
 #include <regex>
 #include <future>
+#include <utility>
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/optional.hpp>
@@ -138,6 +139,7 @@
 #include "ConfigWizardWebViewPage.hpp"
 #include "PresetArchiveDatabase.hpp"
 #include "BulkExportDialog.hpp"
+#include "LoadStepDialog.hpp"
 
 #include "libslic3r/ArrangeHelper.hpp"
 
@@ -325,6 +327,7 @@ struct Plater::priv
     static const std::regex pattern_prusa;
     static const std::regex pattern_zip;
     static const std::regex pattern_printRequest;
+    static const std::regex pattern_step;
 
     priv(Plater *q, MainFrame *main_frame);
     ~priv();
@@ -615,11 +618,13 @@ private:
 	bool show_warning_dialog { false };
 };
 
+// FIXME: Some of the regex patterns are wrong (missing [.] before file extension).
 const std::regex Plater::priv::pattern_bundle(".*[.](amf|amf[.]xml|3mf)", std::regex::icase);
 const std::regex Plater::priv::pattern_3mf(".*3mf", std::regex::icase);
 const std::regex Plater::priv::pattern_any_amf(".*[.](amf|amf[.]xml|zip[.]amf)", std::regex::icase);
 const std::regex Plater::priv::pattern_zip(".*zip", std::regex::icase);
 const std::regex Plater::priv::pattern_printRequest(".*printRequest", std::regex::icase);
+const std::regex Plater::priv::pattern_step(".*[.](step|stp)", std::regex::icase);
 
 Plater::priv::priv(Plater* q, MainFrame* main_frame)
     : q(q)
@@ -1288,6 +1293,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
     int answer_convert_from_meters          = wxOK_DEFAULT;
     int answer_convert_from_imperial_units  = wxOK_DEFAULT;
     int answer_consider_as_multi_part_objects = wxOK_DEFAULT;
+    bool apply_step_import_parameters_to_all   { false }; 
 
     bool in_temp = false; 
     const fs::path temp_path = wxStandardPaths::Get().GetTempDir().utf8_str().data();
@@ -1303,7 +1309,26 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
         const auto &path = input_files[i];
 #endif // _WIN32
         in_temp = (path.parent_path() == temp_path);
-        const auto filename = path.filename();
+        const boost::filesystem::path filename = path.filename();
+
+        const bool type_step = std::regex_match(path.string(), pattern_step);
+        if (type_step && !apply_step_import_parameters_to_all && 
+            wxGetApp().app_config->get_bool("show_step_import_parameters")) {
+
+            double linear_precision = string_to_double_decimal_point(wxGetApp().app_config->get("linear_precision"));
+            double angle_precision = string_to_double_decimal_point(wxGetApp().app_config->get("angle_precision"));
+
+            LoadStepDialog dlg(q, filename.string(), linear_precision, angle_precision, (input_files_size - i) > 1);
+            if (dlg.ShowModal() == wxID_OK) {
+                wxGetApp().app_config->set("linear_precision", float_to_string_decimal_point(dlg.get_linear_precision()));
+                wxGetApp().app_config->set("angle_precision", float_to_string_decimal_point(dlg.get_angle_precision()));
+                if (dlg.IsCheckBoxChecked())
+                    wxGetApp().app_config->set("show_step_import_parameters", "0");
+                apply_step_import_parameters_to_all = dlg.IsApplyToAllClicked();
+            } else
+                continue;
+        }
+
         if (progress_dlg) {
             progress_dlg->Update(static_cast<int>(100.0f * static_cast<float>(i) / static_cast<float>(input_files.size())), _L("Loading file") + ": " + from_path(filename));
             progress_dlg->Fit();
@@ -1352,7 +1377,14 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 model = FileReader::load_model_with_config(path.string(), &config_loaded, &config_substitutions, prusaslicer_generator_version, FileReader::LoadAttribute::CheckVersion, &load_stats);
             }
             else if (load_model) {
-                model = FileReader::load_model(path.string(), FileReader::LoadAttributes{}, &load_stats);
+                if (type_step) {
+                    double linear_precision = string_to_double_decimal_point(wxGetApp().app_config->get("linear_precision"));
+                    double angle_precision = string_to_double_decimal_point(wxGetApp().app_config->get("angle_precision"));
+                    model = FileReader::load_model(path.string(), FileReader::LoadAttributes{}, &load_stats, 
+                                                   std::make_pair(linear_precision, angle_precision));
+                }
+                else
+                    model = FileReader::load_model(path.string(), FileReader::LoadAttributes{}, &load_stats);
             }
         } catch (const ConfigurationError &e) {
             std::string message = GUI::format(_L("Failed loading file \"%1%\" due to an invalid configuration."), filename.string()) + "\n\n" + e.what();

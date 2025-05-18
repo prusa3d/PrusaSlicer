@@ -1320,7 +1320,7 @@ void VoronoiGraphUtils::draw(SVG &               svg,
             std::stringstream ss;
             ss << prefix << std::hex << reinterpret_cast<intptr_t>(addr);
             std::string s = ss.str();
-            svg.draw_text(p, s.c_str(), color, 6);
+            svg.draw_text(p, s.c_str(), color, 1);
         }
     };
 
@@ -1329,25 +1329,56 @@ void VoronoiGraphUtils::draw(SVG &               svg,
         "yellowgreen", // on way to thin (max is above thin)
         "limegreen", // between (inside histerezis)
         "forestgreen", // on way to thick (min is belove thick)
-        "darkgreen" // thick (min+max above thick)
+        "darkgreen", // thick (min+max above thick)
+        "brown" // cross histereze
     };
-    auto get_color = [&](const VoronoiGraph::Node::Neighbor &n) {
-        if (n.min_width() > config.thin_max_width){
+    std::vector<std::string> color_description{
+        "thin (min+max belowe thin " + std::to_string(config.thick_min_width) + ")",
+        "on way to thin (max is above thin)",
+        "between (inside histerezis)",
+        "on way to thick (min is belove thick)",
+        "thick (min+max above thick " + std::to_string(config.thin_max_width) + ")",
+        "cross histereze"
+    };
+    Point legend_position = lines.front().a;
+    for (const Line& l: lines){
+        if (legend_position.x() < l.a.x())
+            legend_position.x() = l.a.x();
+        if (legend_position.y() < l.a.y())
+            legend_position.y() = l.a.y();
+    }
+    for (size_t i = 0; i < 6; i++) {        
+        Point p(legend_position.x(), legend_position.y() - static_cast<coord_t>(i * 1.3 / SCALING_FACTOR));
+        std::string text = color_description[i] + " (" + skeleton_colors[i] + ")"; 
+        svg.draw_text(p, text.c_str(), skeleton_colors[i], 8);
+    }
+
+    auto get_color = [&skeleton_colors, 
+        min_limit = config.thick_min_width, 
+        max_limit = config.thin_max_width]
+    (const VoronoiGraph::Node::Neighbor &n) {
+        assert(n.min_width() <= n.max_width());
+        coord_t min_width = n.min_width();
+        coord_t max_width = n.max_width();
+        if (min_width >= max_limit){
             return skeleton_colors[4];
-        } else if (n.max_width() < config.thick_min_width){
+        } else if (max_width <= min_limit){
             return skeleton_colors[0];
-        } else if (n.min_width() < config.thin_max_width &&
-                   n.max_width() > config.thick_min_width){
+        } else if (min_width >= min_limit &&
+                   max_width <= max_limit){
             return skeleton_colors[2];
-        } else if (n.min_width() < config.thick_min_width){
+        } else if (min_width <= min_limit &&
+                   max_width >= max_limit){
+            return skeleton_colors[5];
+        } else if (min_width <= min_limit){
             return skeleton_colors[1];
-        } else if (n.max_width() > config.thin_max_width) {
+        } else if (max_width >= max_limit) {
             return skeleton_colors[3];
         }
         assert(false);
         return "gray";        
     };
-
+        
     for (const auto &[key, value] : graph.data) {
         Point p(key->x(), key->y());
         svg.draw(p, "lightgray", width);
@@ -1357,17 +1388,16 @@ void VoronoiGraphUtils::draw(SVG &               svg,
             Point to   = to_point(n.edge->vertex1());
             bool  is_second = n.edge->vertex0() > n.edge->vertex1();
             Point center    = (from + to) / 2;
-            Point p        = center + ((is_second) ? Point(0., -2e6) :
-                                                            Point(0., 2e6));
+            Point p = center + ((is_second) ? Point(0., -2e5) : Point(0., 2e5));
             print_address(p, "neighbor ptr ", (void *) &n, "gray");
             if (is_second) continue;
             const char *color = get_color(n);
             if (pointer_caption) {
                 std::string width_str = "width min=" + std::to_string(n.min_width()) +
                                         " max=" + std::to_string(n.max_width());
-                svg.draw_text(center + Point(-6e6, 0.), width_str.c_str(), color, 6);
+                svg.draw_text(center, width_str.c_str(), color, 3);
             }
-            draw(svg, *n.edge, lines, color, width);
+            draw(svg, *n.edge, lines, color, 2*width);
         }
     }
 }

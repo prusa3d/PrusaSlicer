@@ -106,7 +106,9 @@ Slic3r::Polygon scaleUp_PolygonForSlicer(const Slic3r::Polygon &polygon);
 Slic3r::Polygon scaleUp_PolygonForSlicer(coord_t scale_factor, const Slic3r::Polygon &polygon);
     
 Slic3r::Polygon scaleUp_PolygonForSlicer(const Slic3r::Polygon &polygon, double x_pos, double y_pos);
-Slic3r::Polygon scaleUp_PolygonForSlicer(coord_t scale_factor, const Slic3r::Polygon &polygon, double x_pos, double y_pos);    
+Slic3r::Polygon scaleUp_PolygonForSlicer(coord_t scale_factor, const Slic3r::Polygon &polygon, double x_pos, double y_pos);
+
+Slic3r::Polygon truncate_PolygonAsSeenBySequentialSolver(coord_t scale_factor, const Slic3r::Polygon &polygon);
     
 void ground_PolygonByBoundingBox(Slic3r::Polygon &polygon);
 void ground_PolygonByFirstPoint(Slic3r::Polygon &polygon);

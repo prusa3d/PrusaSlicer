@@ -630,3 +630,29 @@ TEST_CASE("Disable visualization", "[hide]")
     CHECK(is_uniform_support_island_visualization_disabled());
 }
 
+TEST_CASE("SPE-2714 3DBenchy - Sample island with config", "[SupportIsland]") {
+    // set_logging_level(5);
+    SampleConfig cfg{
+        /*thin_max_distance*/ 5832568,
+        /*thick_inner_max_distance*/ 7290710,
+        /*thick_outline_max_distance*/ 5468032,
+        /*head_radius*/ 250000,
+        /*minimal_distance_from_outline*/ 250000,
+        /*maximal_distance_from_outline*/ 1944189,
+        /*max_length_for_one_support_point*/ 1869413,
+        /*max_length_for_two_support_points*/ 7290710,
+        /*max_length_ratio_for_two_support_points*/ 0.250000000f,
+        /*thin_max_width*/ 4673532,
+        /*thick_min_width*/ 4019237,
+        /*min_part_length*/ 5832568,
+        /*minimal_move*/ 100000,
+        /*count_iteration*/ 30,
+        /*max_align_distance*/ 3645355,
+        /*simplification_tolerance*/ 50000.000000000007
+        //*path*/, "C:/data/temp/islands/spe_2714_<<order>>.svg" // define OPTION_TO_STORE_ISLAND in SampleConfig.hpp
+    };
+    std::string dir = std::string(TEST_DATA_DIR PATH_SEPARATOR) + "sla_islands/";
+    ExPolygon island = load_svg(dir + "SPE-2714.svg"); // Bad field creation
+    SupportIslandPoints points = test_island_sampling(island, cfg);
+    CHECK(points.size() > 22); // Before fix it not finished
+}

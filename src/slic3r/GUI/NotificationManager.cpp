@@ -1119,6 +1119,11 @@ void NotificationManager::URLDownloadWithPrintablesLinkNotification::render_text
 
 
 //------URLDownloadNotification----------------
+void NotificationManager::URLDownloadNotification::set_filename(const std::string& filename_line)
+{
+    m_text1 = filename_line;
+    init();
+}
 
 void NotificationManager::URLDownloadNotification::render_close_button(const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
@@ -2620,6 +2625,19 @@ void NotificationManager::set_download_URL_error(size_t id, const std::string& t
 			ntf->set_error_message(text);
 			if (ntf->get_percentage() != percent_b4)
 				wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+			return;
+		}
+	}
+}
+void NotificationManager::set_download_URL_filename(size_t id, const std::string& filename)
+{
+	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
+		if (notification->get_type() == NotificationType::URLDownload) {
+			URLDownloadNotification* ntf = dynamic_cast<URLDownloadNotification*>(notification.get());
+			if (ntf->get_download_id() != id)
+				continue;
+			ntf->set_filename(_u8L("Download") + ": " + filename);
+			wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
 			return;
 		}
 	}

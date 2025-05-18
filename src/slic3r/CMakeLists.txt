@@ -143,6 +143,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Sidebar.hpp
     GUI/Plater.cpp
     GUI/Plater.hpp
+    GUI/LoadStepDialog.cpp
+    GUI/LoadStepDialog.hpp
     GUI/PresetComboBoxes.hpp
     GUI/PresetComboBoxes.cpp
     GUI/BitmapComboBox.hpp
