@@ -1201,7 +1201,7 @@ void PrintConfigDef::init_fff_params()
                    "at its minimum speed. Useful for PLA, harmful for ABS.");
     def->set_default_value(new ConfigOptionBools { false });
 
-    def = this->add("fan_below_layer_time", coInts);
+    def = this->add("fan_below_layer_time", coFloats);
     def->label = L("Enable fan if layer print time is below");
     def->tooltip = L("If layer print time is estimated below this number of seconds, fan will be enabled "
                    "and its speed will be calculated by interpolating the minimum and maximum speeds.");
@@ -1209,7 +1209,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 1000;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionInts { 60 });
+    def->set_default_value(new ConfigOptionFloats { 60 });
 
     def = this->add("filament_colour", coStrings);
     def->label = L("Color");
@@ -2931,7 +2931,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(1));
 
-    def = this->add("slowdown_below_layer_time", coInts);
+    def = this->add("slowdown_below_layer_time", coFloats);
     def->label = L("Slow down if layer print time is below");
     def->tooltip = L("If layer print time is estimated below this number of seconds, print moves "
                    "speed will be scaled down to extend duration to this value.");
@@ -2939,7 +2939,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 1000;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionInts { 5 });
+    def->set_default_value(new ConfigOptionFloats { 5 });
 
     def = this->add("small_perimeter_speed", coFloatOrPercent);
     def->label = L("Small perimeters");
