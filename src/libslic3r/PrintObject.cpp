@@ -3086,6 +3086,13 @@ void PrintObject::discover_horizontal_shells()
 // combine fill surfaces across layers to honor the "infill every N layers" option
 // Idempotence of this method is guaranteed by the fact that we don't remove things from
 // fill_surfaces but we only turn them into VOID surfaces, thus preserving the boundaries.
+static inline ExPolygons internal_sparse(const LayerRegion* lr)
+{
+    // stInternal may include both sparse and stInternalSolid, strip the latter.
+    const ExPolygons internal_all   = to_expolygons(lr->fill_surfaces().filter_by_type(stInternal));
+    const ExPolygons internal_solid = to_expolygons(lr->fill_surfaces().filter_by_type(stInternalSolid));
+    return diff_ex(internal_all, internal_solid);
+}
 void PrintObject::combine_infill()
 {
     // Work on each region separately.
@@ -3101,8 +3108,7 @@ void PrintObject::combine_infill()
 
         // Limit the number of combined layers to the maximum height allowed by this regions' nozzle.
         //FIXME limit the layer height to max_layer_height
-        const double nozzle_diameter = std::min(this->print()->config().nozzle_diameter.get_at(region.config().infill_extruder.value - 1),
-                                                this->print()->config().nozzle_diameter.get_at(region.config().solid_infill_extruder.value - 1));
+        const double nozzle_diameter = this->print()->config().nozzle_diameter.get_at(region.config().infill_extruder.value - 1);
 
         const double automatic_infill_combination_max_layer_height = region.config().automatic_infill_combination_max_layer_height.get_abs_value(nozzle_diameter);
         const double max_combine_layer_height                      = automatic_infill_combination ? std::min(automatic_infill_combination_max_layer_height, nozzle_diameter) : nozzle_diameter;
@@ -3149,10 +3155,10 @@ void PrintObject::combine_infill()
                 layerms.emplace_back(m_layers[i]->regions()[region_id]);
             // We need to perform a multi-layer intersection, so let's split it in pairs.
             // Initialize the intersection with the candidates of the lowest layer.
-            ExPolygons intersection = to_expolygons(layerms.front()->fill_surfaces().filter_by_type(stInternal));
+            ExPolygons intersection = internal_sparse(layerms.front());
             // Start looping from the second layer and intersect the current intersection with it.
             for (size_t i = 1; i < layerms.size(); ++ i)
-                intersection = intersection_ex(layerms[i]->fill_surfaces().filter_by_type(stInternal), intersection);
+                intersection = intersection_ex(internal_sparse(layerms[i]), intersection);
             double area_threshold = layerms.front()->infill_area_threshold();
             if (! intersection.empty() && area_threshold > 0.)
                 intersection.erase(std::remove_if(intersection.begin(), intersection.end(), 
