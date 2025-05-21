@@ -1,16 +1,20 @@
 ///|/ Copyright (c) Prusa Research 2023 Tomáš Mészáros @tamasmeszaros, Pavel Mikuš @Godrak
+///|/ Copyright (c) 2024 Felix Reißmann @Felix-Rm
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+
 #include <set>
 #include <memory>
 
+#include "AnycubicSLA.hpp"
+#include "GOO.hpp"
 #include "SL1.hpp"
 #include "SL1_SVG.hpp"
-#include "AnycubicSLA.hpp"
-#include "libslic3r/I18N.hpp"
 #include "SLAArchiveFormatRegistry.hpp"
+
 #include "libslic3r/Format/SLAArchiveReader.hpp"
+#include "libslic3r/I18N.hpp"
 #include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
@@ -75,6 +79,22 @@ class Registry {
                 anycubic_sla_format_versioned("pmx2", "Photon Mono X2", ANYCUBIC_SLA_VERSION_515),
                 anycubic_sla_format_versioned("pm3r", "Photon M3 Premium", ANYCUBIC_SLA_VERSION_515),
             */
+             {
+                "GOO",         // id
+                L("Goo"),      // description
+                "goo",         // main extension
+                {},            // extension aliases
+
+                // Writer factory
+                [] (const auto &cfg) {
+                    return std::make_unique<GOOWriter>(cfg);
+                },
+
+                // Reader factory
+                [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) {
+                    return std::make_unique<GOOReader>(fname, quality, progr);
+                }
+            },
         };
     }
 
