@@ -13,7 +13,11 @@
 #define slic3r_ExPolygon_hpp_
 
 #include <assert.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/scalable_allocator.h>
+#endif
 #include <stdint.h>
 #include <vector>
 #include <algorithm>
