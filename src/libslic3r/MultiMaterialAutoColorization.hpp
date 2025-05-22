@@ -69,7 +69,7 @@ void apply_auto_colorization(ModelObject& model_object, const MMUAutoColorizatio
 
 // Generate a preview of the auto-colorization without modifying the model
 // Returns a vector of triangle selectors with the colorization applied
-std::vector<std::unique_ptr<TriangleSelectorGUI>> preview_auto_colorization(
+std::vector<std::unique_ptr<TriangleSelector>> preview_auto_colorization(
     const ModelObject& model_object, 
     const MMUAutoColorizationParams& params);
 

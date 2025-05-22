@@ -308,8 +308,13 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     if (!m_c->selection_info()->model_object())
         return;
 
-    const float approx_height = m_imgui->scaled(25.35f);
-                            y = std::min(y, bottom_limit - approx_height);
+    // Increase the approximate height to account for the auto-colorization section
+    const float approx_height = m_imgui->scaled(35.0f);
+    // Position the window higher up to ensure it fits on screen
+    y = std::min(y, bottom_limit - approx_height);
+    // Move the window up a bit to make room for the auto-colorization options
+    // but not too much to keep it visible
+    y -= m_imgui->scaled(20.0f);
     ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
 
     ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -578,7 +583,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImGui::Separator();
     
     // Add auto-colorization section
-    if (ImGuiPureWrap::collapsing_header(m_desc.at("auto_colorize"), ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader(m_desc.at("auto_colorize").c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
         render_auto_colorization_ui(x, y, bottom_limit, ImGui::GetContentRegionAvail().x);
     }
     
@@ -890,7 +895,7 @@ void GLGizmoMmuSegmentation::preview_auto_colorization()
                                   UndoRedo::SnapshotType::GizmoAction);
     
     // Generate a preview of the auto-colorization
-    auto preview_selectors = preview_auto_colorization(*mo, m_auto_colorize_params);
+    auto preview_selectors = Slic3r::preview_auto_colorization(*mo, m_auto_colorize_params);
     
     // Apply the preview to the triangle selectors
     int idx = -1;
@@ -922,7 +927,7 @@ void GLGizmoMmuSegmentation::apply_auto_colorization()
                                   UndoRedo::SnapshotType::GizmoAction);
     
     // Apply the auto-colorization to the model object
-    apply_auto_colorization(*mo, m_auto_colorize_params);
+    Slic3r::apply_auto_colorization(*mo, m_auto_colorize_params);
     
     // Update the triangle selectors from the model
     update_from_model_object();
@@ -965,7 +970,7 @@ void GLGizmoMmuSegmentation::render_auto_colorization_ui(float x, float y, float
         
         // Checkbox to enable/disable this extruder
         bool extruder_enabled = m_auto_colorize_params.extruders[i] > 0;
-        if (ImGuiPureWrap::checkbox(m_desc.at("extruder_use") + " " + std::to_string(i + 1), &extruder_enabled)) {
+        if (ImGui::Checkbox((m_desc.at("extruder_use") + " " + std::to_string(i + 1)).c_str(), &extruder_enabled)) {
             m_auto_colorize_params.extruders[i] = extruder_enabled ? int(i + 1) : 0;
         }
         
@@ -1002,7 +1007,7 @@ void GLGizmoMmuSegmentation::render_auto_colorization_ui(float x, float y, float
             m_imgui->slider_float("##height_end", &m_auto_colorize_params.height_end_percent, 0.0f, 100.0f, "%.1f%%");
             
             // Reverse direction
-            ImGuiPureWrap::checkbox(m_desc.at("height_reverse"), &m_auto_colorize_params.height_reverse);
+            ImGui::Checkbox(m_desc.at("height_reverse").c_str(), &m_auto_colorize_params.height_reverse);
             break;
         }
         
@@ -1015,7 +1020,7 @@ void GLGizmoMmuSegmentation::render_auto_colorization_ui(float x, float y, float
             m_imgui->slider_float("##radial_radius", &m_auto_colorize_params.radial_radius, 1.0f, 200.0f, "%.1f");
             
             // Reverse direction
-            ImGuiPureWrap::checkbox(m_desc.at("radial_reverse"), &m_auto_colorize_params.radial_reverse);
+            ImGui::Checkbox(m_desc.at("radial_reverse").c_str(), &m_auto_colorize_params.radial_reverse);
             break;
         }
         
@@ -1038,7 +1043,7 @@ void GLGizmoMmuSegmentation::render_auto_colorization_ui(float x, float y, float
             }
             
             // Reverse direction
-            ImGuiPureWrap::checkbox(m_desc.at("spiral_reverse"), &m_auto_colorize_params.spiral_reverse);
+            ImGui::Checkbox(m_desc.at("spiral_reverse").c_str(), &m_auto_colorize_params.spiral_reverse);
             break;
         }
         
@@ -1074,13 +1079,13 @@ void GLGizmoMmuSegmentation::render_auto_colorization_ui(float x, float y, float
     ImGui::Separator();
     
     // Preview and Apply buttons
-    if (ImGuiPureWrap::button(m_desc.at("preview"), ImVec2(window_width * 0.48f, 0))) {
+    if (ImGui::Button(m_desc.at("preview").c_str(), ImVec2(window_width * 0.48f, 0))) {
         preview_auto_colorization();
     }
     
     ImGui::SameLine();
     
-    if (ImGuiPureWrap::button(m_desc.at("apply"), ImVec2(window_width * 0.48f, 0))) {
+    if (ImGui::Button(m_desc.at("apply").c_str(), ImVec2(window_width * 0.48f, 0))) {
         apply_auto_colorization();
     }
 }

@@ -484,7 +484,7 @@ void apply_auto_colorization(ModelObject& model_object, const MMUAutoColorizatio
 }
 
 // Generate a preview of the auto-colorization without modifying the model
-std::vector<std::unique_ptr<TriangleSelectorGUI>> preview_auto_colorization(
+std::vector<std::unique_ptr<TriangleSelector>> preview_auto_colorization(
     const ModelObject& model_object, 
     const MMUAutoColorizationParams& params) 
 {
@@ -492,7 +492,7 @@ std::vector<std::unique_ptr<TriangleSelectorGUI>> preview_auto_colorization(
     MMUAutoColorizationParams validated_params = validate_auto_colorization_params(params);
     
     // Create a vector to store the triangle selectors
-    std::vector<std::unique_ptr<TriangleSelectorGUI>> selectors;
+    std::vector<std::unique_ptr<TriangleSelector>> result_selectors;
     
     // Process each volume in the model object
     for (const ModelVolume* volume : model_object.volumes) {
@@ -500,7 +500,7 @@ std::vector<std::unique_ptr<TriangleSelectorGUI>> preview_auto_colorization(
             continue;
             
         // Create a triangle selector for this volume
-        auto selector = std::make_unique<TriangleSelectorGUI>(volume->mesh());
+        auto selector = std::make_unique<TriangleSelector>(volume->mesh());
         
         // Apply the selected pattern
         switch (validated_params.pattern_type) {
@@ -526,10 +526,10 @@ std::vector<std::unique_ptr<TriangleSelectorGUI>> preview_auto_colorization(
         }
         
         // Add the selector to the vector
-        selectors.push_back(std::move(selector));
+        result_selectors.push_back(std::move(selector));
     }
     
-    return selectors;
+    return result_selectors;
 }
 
 } // namespace Slic3r
