@@ -197,8 +197,13 @@ void apply_radial_gradient(TriangleSelector& selector, const ModelVolume& volume
     const TriangleMesh& mesh = volume.mesh();
     const Transform3d& volume_transform = volume.get_matrix();
     
+    // Calculate the center of the mesh for determining outward-facing triangles
+    Vec3d mesh_center = mesh.bounding_box().center().cast<double>();
+    mesh_center = volume_transform * mesh_center;
+    
     // Process each triangle
     for (size_t i = 0; i < mesh.its.indices.size(); ++i) {
+            
         const stl_triangle_vertex_indices& indices = mesh.its.indices[i];
         
         // Calculate the center of the triangle
@@ -239,8 +244,13 @@ void apply_spiral_pattern(TriangleSelector& selector, const ModelVolume& volume,
     const TriangleMesh& mesh = volume.mesh();
     const Transform3d& volume_transform = volume.get_matrix();
     
+    // Calculate the center of the mesh for determining outward-facing triangles
+    Vec3d mesh_center = mesh.bounding_box().center().cast<double>();
+    mesh_center = volume_transform * mesh_center;
+    
     // Process each triangle
     for (size_t i = 0; i < mesh.its.indices.size(); ++i) {
+            
         const stl_triangle_vertex_indices& indices = mesh.its.indices[i];
         
         // Calculate the center of the triangle
