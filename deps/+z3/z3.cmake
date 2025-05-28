@@ -1,6 +1,7 @@
 add_cmake_project(z3
   URL https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.13.0.zip
   URL_HASH SHA256=81543736dcbbbcb037a7df55d0be596245d509f3f69f56610df32728e48ee050
+  PATCH_COMMAND git apply --ignore-whitespace ${CMAKE_CURRENT_LIST_DIR}/z3-CXX23-fix.patch
   CMAKE_ARGS
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     -DZ3_INCLUDE_GIT_HASH=OFF
