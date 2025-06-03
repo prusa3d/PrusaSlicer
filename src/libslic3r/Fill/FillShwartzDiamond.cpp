@@ -112,6 +112,10 @@ static std::vector<Vec2d> make_one_period(double width, double scaleFactor, doub
     return points;
 }
 
+static double scaled_floor(double x,double scale){
+	return std::floor(x/scale)*scale;
+}
+
 static Polylines make_gyroid_waves(double gridZ, double density_adjusted, double line_spacing, double width, double height)
 {
     const double scaleFactor = scale_(line_spacing) / density_adjusted;
@@ -122,36 +126,53 @@ static Polylines make_gyroid_waves(double gridZ, double density_adjusted, double
 
     //scale factor for 5% : 8 712 388
     // 1z = 10^-6 mm ?
-    const double z     = gridZ / scaleFactor;
-    const double z_sin = sin(z);
-    const double z_cos = cos(z);
-
-    bool vertical = (std::abs(z_sin) <= std::abs(z_cos));
-    double lower_bound = 0.;
-    double upper_bound = height;
-    bool flip = true;
-    if (vertical) {
-        flip = false;
-        lower_bound = -M_PI;
-        upper_bound = width - M_PI_2;
-        std::swap(width,height);
-    }
-
-    std::vector<Vec2d> one_period_odd = make_one_period(width, scaleFactor, z_cos, z_sin, vertical, flip, tolerance); // creates one period of the waves, so it doesn't have to be recalculated all the time
-    flip = !flip;                                                                   // even polylines are a bit shifted
-    std::vector<Vec2d> one_period_even = make_one_period(width, scaleFactor, z_cos, z_sin, vertical, flip, tolerance);
+    const double z = gridZ / scaleFactor;
     Polylines result;
 
-    for (double y0 = lower_bound; y0 < upper_bound + EPSILON; y0 += M_PI) {
-        // creates odd polylines
-        result.emplace_back(make_wave(one_period_odd, width, height, y0, scaleFactor, z_cos, z_sin, vertical, flip));
-        // creates even polylines
-        y0 += M_PI;
-        if (y0 < upper_bound + EPSILON) {
-            result.emplace_back(make_wave(one_period_even, width, height, y0, scaleFactor, z_cos, z_sin, vertical, flip));
-        }
-    }
-
+	//sin(x)*sin(y)*sin(z)-cos(x)*cos(y)*cos(z)=0
+	//2*sin(x)*sin(y)*sin(z)-2*cos(x)*cos(y)*cos(z)=0
+	//(cos(x-y)-cos(x+y))*sin(z)-(cos(x-y)+cos(x+y))*cos(z)=0
+	//(sin(z)-cos(z))*cos(x-y)-(sin(z)+cos(z))*cos(x+y)=0
+	const double a=sin(z)-cos(z);
+	const double b=sin(z)+cos(z);
+	//a*cos(x-y)-b*cos(x+y)=0
+	//u=x-y, v=x+y
+	const double minU=0-height;
+	const double maxU=width-0;
+	const double minV=0+0;
+	const double maxV=width+height;
+	//a*cos(u)-b*cos(v)=0
+	if(std::abs(a)>=std::abs(b)) {//u(v)=acos(b/a*cos(v)) is a continuous line
+		for(double uShift=scaled_floor(minU,2*M_PI);uShift<maxU+2*M_PI;uShift+=2*M_PI)
+		{
+			for(bool forwardRoot:{false,true})
+			{
+				result.emplace_back();
+				for(double v=minV;v<maxV;v+=tolerance) {
+					const double u=(forwardRoot?1.:-1.)*acos(b/a*cos(v))+uShift;
+					const double x=(u+v)/2;
+					const double y=(v-u)/2;
+					result.back().points.emplace_back(x*scaleFactor,y*scaleFactor);
+				}
+			}
+		}
+	}
+	else {//v(u)=acos(a/b*cos(u)) is a continuous line
+		for(double vShift=scaled_floor(minV,2*M_PI);vShift<maxV+2*M_PI;vShift+=2*M_PI)
+		{
+			for(bool forwardRoot:{false,true})
+			{
+				result.emplace_back();
+				for(double u=minU;u<maxU;u+=tolerance) {
+					const double v=(forwardRoot?1.:-1.)*acos(a/b*cos(u))+vShift;
+					const double x=(u+v)/2;
+					const double y=(v-u)/2;
+					result.back().points.emplace_back(x*scaleFactor,y*scaleFactor);
+				}
+			}
+		}
+	}
+	//todo: select the step better
     return result;
 }
 
