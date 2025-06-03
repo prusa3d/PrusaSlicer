@@ -19,104 +19,11 @@
 
 namespace Slic3r {
 
-static inline double f(double x, double z_sin, double z_cos, bool vertical, bool flip)
-{
-    if (vertical) {
-        double phase_offset = (z_cos < 0 ? M_PI : 0) + M_PI;
-        double a   = sin(x + phase_offset);
-        double b   = - z_cos;
-        double res = z_sin * cos(x + phase_offset + (flip ? M_PI : 0.));
-        double r   = sqrt(sqr(a) + sqr(b));
-        return asin(a/r) + asin(res/r) + M_PI;
-    }
-    else {
-        double phase_offset = z_sin < 0 ? M_PI : 0.;
-        double a   = cos(x + phase_offset);
-        double b   = - z_sin;
-        double res = z_cos * sin(x + phase_offset + (flip ? 0 : M_PI));
-        double r   = sqrt(sqr(a) + sqr(b));
-        return (asin(a/r) + asin(res/r) + 0.5 * M_PI);
-    }
-}
-
-static inline Polyline make_wave(
-    const std::vector<Vec2d>& one_period, double width, double height, double offset, double scaleFactor,
-    double z_cos, double z_sin, bool vertical, bool flip)
-{
-    std::vector<Vec2d> points = one_period;
-    double period = points.back()(0);
-    if (width != period) // do not extend if already truncated
-    {
-        points.reserve(one_period.size() * size_t(floor(width / period)));
-        points.pop_back();
-
-        size_t n = points.size();
-        do {
-            points.emplace_back(points[points.size()-n].x() + period, points[points.size()-n].y());
-        } while (points.back()(0) < width - EPSILON);
-
-        points.emplace_back(Vec2d(width, f(width, z_sin, z_cos, vertical, flip)));
-    }
-
-    // and construct the final polyline to return:
-    Polyline polyline;
-    polyline.points.reserve(points.size());
-    for (auto& point : points) {
-        point(1) += offset;
-        point(1) = std::clamp(double(point.y()), 0., height);
-        if (vertical)
-            std::swap(point(0), point(1));
-        polyline.points.emplace_back((point * scaleFactor).cast<coord_t>());
-    }
-
-    return polyline;
-}
-
-static std::vector<Vec2d> make_one_period(double width, double scaleFactor, double z_cos, double z_sin, bool vertical, bool flip, double tolerance)
-{
-    std::vector<Vec2d> points;
-    double dx = M_PI_2; // exact coordinates on main inflexion lobes
-    double limit = std::min(2*M_PI, width);
-    points.reserve(coord_t(ceil(limit / tolerance / 3)));
-
-    for (double x = 0.; x < limit - EPSILON; x += dx) {
-        points.emplace_back(Vec2d(x, f(x, z_sin, z_cos, vertical, flip)));
-    }
-    points.emplace_back(Vec2d(limit, f(limit, z_sin, z_cos, vertical, flip)));
-
-    // piecewise increase in resolution up to requested tolerance
-    for(;;)
-    {
-        size_t size = points.size();
-        for (unsigned int i = 1;i < size; ++i) {
-            auto& lp = points[i-1]; // left point
-            auto& rp = points[i];   // right point
-            double x = lp(0) + (rp(0) - lp(0)) / 2;
-            double y = f(x, z_sin, z_cos, vertical, flip);
-            Vec2d ip = {x, y};
-            if (std::abs(cross2(Vec2d(ip - lp), Vec2d(ip - rp))) > sqr(tolerance)) {
-                points.emplace_back(std::move(ip));
-            }
-        }
-
-        if (size == points.size())
-            break;
-        else
-        {
-            // insert new points in order
-            std::sort(points.begin(), points.end(),
-                      [](const Vec2d &lhs, const Vec2d &rhs) { return lhs(0) < rhs(0); });
-        }
-    }
-
-    return points;
-}
-
 static double scaled_floor(double x,double scale){
 	return std::floor(x/scale)*scale;
 }
 
-static Polylines make_gyroid_waves(double gridZ, double density_adjusted, double line_spacing, double width, double height)
+static Polylines make_waves(double gridZ, double density_adjusted, double line_spacing, double width, double height)
 {
     const double scaleFactor = scale_(line_spacing) / density_adjusted;
 
@@ -200,7 +107,7 @@ void FillShwartzDiamond::_fill_surface_single(
     bb.merge(align_to_grid(bb.min, Point(2*M_PI*distance, 2*M_PI*distance)));
 
     // generate pattern
-    Polylines polylines = make_gyroid_waves(
+    Polylines polylines = make_waves(
         scale_(this->z),
         density_adjusted,
         this->spacing,
