@@ -185,48 +185,52 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
 		        if (is_bridge) {
 		            params.extrusion_role = ExtrusionRole::BridgeInfill;
-                } else {
-                    if (surface.is_solid()) {
-                        if (surface.is_top()) {
-                            params.extrusion_role = ExtrusionRole::TopSolidInfill;
-                        } else if (surface.surface_type == stSolidOverBridge) {
-                            params.extrusion_role = ExtrusionRole::InfillOverBridge;
-                        } else {
-                            params.extrusion_role = ExtrusionRole::SolidInfill;
-                        }
-                    } else {
-                        params.extrusion_role = ExtrusionRole::InternalInfill;
-                    }
-                }
+			} else {
+			  if (surface.is_solid()){
+			        if (surface.is_top()) {
+				    params.extrusion_role = ExtrusionRole::TopSolidInfill;
+				} else if (surface.surface_type == stSolidOverBridge) {
+				    params.extrusion_role = ExtrusionRole::InfillOverBridge;
+				} else {
+				    params.extrusion_role = ExtrusionRole::SolidInfill;
+				}
+			    } else {
+			        params.extrusion_role = ExtrusionRole::InternalInfill;
+			    }
+			}
 		        params.bridge_angle = float(surface.bridge_angle);
-		        params.angle 		= float(Geometry::deg2rad(region_config.fill_angle.value));
+		        params.angle 	    = float(Geometry::deg2rad(region_config.fill_angle.value));
 
 		        // Calculate the actual flow we'll be using for this infill.
 		        params.bridge = is_bridge || Fill::use_bridge_flow(params.pattern);
-				params.flow   = params.bridge ?
-					// Always enable thick bridges for internal bridges.
-					layerm.bridging_flow(extrusion_role, surface.is_bridge() && ! surface.is_external()) :
-					layerm.flow(extrusion_role, (surface.thickness == -1) ? layer.height : surface.thickness);
+			params.flow   = params.bridge ?
+			    // Always enable thick bridges for internal bridges.
+			    layerm.bridging_flow(extrusion_role, surface.is_bridge() && ! surface.is_external()) :
+			    layerm.flow(extrusion_role, (surface.thickness == -1) ? layer.height : surface.thickness);
 
-				// Calculate flow spacing for infill pattern generation.
-		        if (surface.is_solid() || is_bridge) {
+			// Calculate flow spacing for infill pattern generation.
+		        if (surface.is_solid() || is_bridge || params.density >= 99.9999f ) {
 		            params.spacing = params.flow.spacing();
-		            // Don't limit anchor length for solid or bridging infill.
-		            params.anchor_length = 1000.f;
-					params.anchor_length_max = 1000.f;
+			    if (surface.is_solid() || is_bridge) {
+			      // Don't limit anchor length for solid or bridging infill.
+			      params.anchor_length = 1000.f;
+			      params.anchor_length_max = 1000.f;
+			    }
 		        } else {
-					// Internal infill. Calculating infill line spacing independent of the current layer height and 1st layer status,
-					// so that internall infill will be aligned over all layers of the current region.
+			    // Internal infill. Calculating infill line spacing independent of the current layer height and 1st layer status,
+			    // so that internall infill will be aligned over all layers of the current region.
 		            params.spacing = layerm.region().flow(*layer.object(), frInfill, layer.object()->config().layer_height, false).spacing();
+			    // If we altered the spacing due to thickness != layer_height, then width needs to be adjusted to avoid over/underextrusion. 
+			    params.flow=params.flow.with_spacing(params.spacing);
 		            // Anchor a sparse infill to inner perimeters with the following anchor length:
-			        params.anchor_length = float(region_config.infill_anchor);
-					if (region_config.infill_anchor.percent)
-						params.anchor_length = float(params.anchor_length * 0.01 * params.spacing);
-					params.anchor_length_max = float(region_config.infill_anchor_max);
-					if (region_config.infill_anchor_max.percent)
-						params.anchor_length_max = float(params.anchor_length_max * 0.01 * params.spacing);
-					params.anchor_length = std::min(params.anchor_length, params.anchor_length_max);
-				}
+			    params.anchor_length = float(region_config.infill_anchor);
+			    if (region_config.infill_anchor.percent)
+			        params.anchor_length = float(params.anchor_length * 0.01 * params.spacing);
+			    params.anchor_length_max = float(region_config.infill_anchor_max);
+			    if (region_config.infill_anchor_max.percent)
+			        params.anchor_length_max = float(params.anchor_length_max * 0.01 * params.spacing);
+			    params.anchor_length = std::min(params.anchor_length, params.anchor_length_max);
+			}
 
 		        auto it_params = set_surface_params.find(params);
 		        if (it_params == set_surface_params.end())
