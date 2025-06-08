@@ -40,42 +40,31 @@ static Polylines make_waves(double gridZ, double density_adjusted, double line_s
 	//2*sin(x)*sin(y)*sin(z)-2*cos(x)*cos(y)*cos(z)=0
 	//(cos(x-y)-cos(x+y))*sin(z)-(cos(x-y)+cos(x+y))*cos(z)=0
 	//(sin(z)-cos(z))*cos(x-y)-(sin(z)+cos(z))*cos(x+y)=0
-	const double a=sin(z)-cos(z);
-	const double b=sin(z)+cos(z);
+	double a=sin(z)-cos(z);
+	double b=sin(z)+cos(z);
 	//a*cos(x-y)-b*cos(x+y)=0
 	//u=x-y, v=x+y
-	const double minU=0-height;
-	const double maxU=width-0;
-	const double minV=0+0;
-	const double maxV=width+height;
+	double minU=0-height;
+	double maxU=width-0;
+	double minV=0+0;
+	double maxV=width+height;
 	//a*cos(u)-b*cos(v)=0
-	if(std::abs(a)>=std::abs(b)) {//u(v)=acos(b/a*cos(v)) is a continuous line
-		for(double uShift=scaled_floor(minU,2*M_PI);uShift<maxU+2*M_PI;uShift+=2*M_PI)
-		{
-			for(bool forwardRoot:{false,true})
-			{
-				result.emplace_back();
-				for(double v=minV;v<maxV;v+=tolerance) {
-					const double u=(forwardRoot?1.:-1.)*acos(b/a*cos(v))+uShift;
-					const double x=(u+v)/2;
-					const double y=(v-u)/2;
-					result.back().points.emplace_back(x*scaleFactor,y*scaleFactor);
-				}
-			}
-		}
+	//if abs(b)<abs(a), then u=acos(b/a*cos(v)) is a continuous line
+	//otherwise we swap u and v
+	const bool swapUV=(std::abs(a)>std::abs(b));
+	if(swapUV) {
+		std::swap(a,b);
+		std::swap(minU,minV);
+		std::swap(maxU,maxV);
 	}
-	else {//v(u)=acos(a/b*cos(u)) is a continuous line
-		for(double vShift=scaled_floor(minV,2*M_PI);vShift<maxV+2*M_PI;vShift+=2*M_PI)
-		{
-			for(bool forwardRoot:{false,true})
-			{
-				result.emplace_back();
-				for(double u=minU;u<maxU;u+=tolerance) {
-					const double v=(forwardRoot?1.:-1.)*acos(a/b*cos(u))+vShift;
-					const double x=(u+v)/2;
-					const double y=(v-u)/2;
-					result.back().points.emplace_back(x*scaleFactor,y*scaleFactor);
-				}
+	for(double vShift=scaled_floor(minV,2*M_PI);vShift<maxV+2*M_PI;vShift+=2*M_PI) {
+		for(bool forwardRoot:{false,true}) {
+			result.emplace_back();
+			for(double u=minU;u<maxU;u+=tolerance) {
+				const double v=(forwardRoot?1.:-1.)*acos(a/b*cos(u))+vShift;
+				const double x=(u+v)/2;
+				const double y=(v-u)/2*(swapUV?-1:1);
+				result.back().points.emplace_back(x*scaleFactor,y*scaleFactor);
 			}
 		}
 	}
