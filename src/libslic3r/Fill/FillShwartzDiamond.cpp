@@ -57,11 +57,38 @@ static Polylines make_waves(double gridZ, double density_adjusted, double line_s
 		std::swap(minU,minV);
 		std::swap(maxU,maxV);
 	}
+	std::vector<std::pair<double,double>> wave;
+	{//fill one wave
+		const auto v=[&](double u){return acos(a/b*cos(u));};
+		for(int c=0;c<=4;++c){
+			const double u=minU+2*M_PI*c/4;
+			wave.emplace_back(u,v(u));
+		}
+		{//refine
+			int current=0;
+			while(current+1<int(wave.size())){
+				const double u1=wave[current].first;
+				const double u2=wave[current+1].first;
+				const double middleU=(u1+u2)/2;
+				const double v1=wave[current].second;
+				const double v2=wave[current+1].second;
+				const double middleV=v((u1+u2)/2);
+				if(std::abs(middleV-(v1+v2)/2)>tolerance)
+					wave.emplace(wave.begin()+current+1,middleU,middleV);
+				else
+					++current;
+			}
+		}
+		for(int c=1;c<int(wave.size()) && wave.back().first<maxU;++c)//we start from 1 because the 0-th one is already duplicated as the last one in a period
+			wave.emplace_back(wave[c].first+2*M_PI,wave[c].second);
+	}
 	for(double vShift=scaled_floor(minV,2*M_PI);vShift<maxV+2*M_PI;vShift+=2*M_PI) {
 		for(bool forwardRoot:{false,true}) {
 			result.emplace_back();
-			for(double u=minU;u<maxU;u+=tolerance) {
-				const double v=(forwardRoot?1.:-1.)*acos(a/b*cos(u))+vShift;
+			for(const auto &pair:wave) {
+				const double u=pair.first;
+				double v=pair.second;
+				v=(forwardRoot?v:-v)+vShift;
 				const double x=(u+v)/2;
 				const double y=(v-u)/2*(swapUV?-1:1);
 				result.back().points.emplace_back(x*scaleFactor,y*scaleFactor);
