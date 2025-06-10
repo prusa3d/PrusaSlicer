@@ -6,7 +6,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include <boost/nowide/fstream.hpp>
-#include <GL/glew.h>
+#include <glad/gl.h>
 #include <boost/log/trivial.hpp>
 #include <cassert>
 #include <algorithm>

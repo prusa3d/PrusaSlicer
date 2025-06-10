@@ -33,8 +33,12 @@ else()
         endif()
 endif()
 
-option(SLIC3R_STATIC 			"Compile PrusaSlicer with static libraries (Boost, TBB, glew)" ${SLIC3R_STATIC_INITIAL})
+option(SLIC3R_STATIC 			"Compile PrusaSlicer with static libraries (Boost, TBB)" ${SLIC3R_STATIC_INITIAL})
 option(SLIC3R_GUI    			"Compile PrusaSlicer with GUI components (OpenGL, wxWidgets)" 1)
+# A lot of Linux distribution don't build wxWidgets with EGL support yet. This
+# is why by default this option is set to OFF. If a Linux distribution has
+# built wxWidgets EGL support, you should turn that on!
+option(SLIC3R_EGL               "Compile PrusaSlicer with Wayland (EGL) support" OFF)
 option(SLIC3R_FHS               "Assume PrusaSlicer is to be installed in a FHS directory structure" 0)
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
@@ -473,14 +477,6 @@ find_package(PNG REQUIRED)
 
 set(OpenGL_GL_PREFERENCE "LEGACY")
 find_package(OpenGL REQUIRED)
-
-# Find glew or use bundled version
-if (SLIC3R_STATIC AND NOT SLIC3R_STATIC_EXCLUDE_GLEW)
-    set(GLEW_USE_STATIC_LIBS ON)
-    set(GLEW_VERBOSE ON)
-endif()
-
-find_package(GLEW REQUIRED)
 
 # Find the Cereal serialization library
 find_package(cereal REQUIRED)
