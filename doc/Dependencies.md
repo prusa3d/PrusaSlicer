@@ -6,7 +6,6 @@
 * tbb
 * boost
 * eigen
-* glew
 * expat
 * openssl
 * nlopt
@@ -19,6 +18,7 @@
 * ad-mesh: Lots of customization, have to be bundled in the source tree.
 * avrdude: Like ad-mesh, many customization, need to be in the source tree.
 * clipper: An important library we have to have full control over it. We also have some slicer specific modifications.
+* glad: Multi-Language Vulkan/GL/GLES/EGL/GLX/WGL Loader-Generator.
 * glu-libtess: This is an extract of the mesa/glu library not officially available as a package.
 * imgui: no packages for debian, author suggests using in the source tree
 * miniz: No packages, author suggests using in the source tree
