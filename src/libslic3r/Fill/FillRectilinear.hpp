@@ -82,6 +82,19 @@ public:
     bool no_sort() const override { return true; }
 };
 
+class FillAlignedMonotonic : public FillRectilinear 
+{
+public:
+    Fill* clone() const override { return new FillAlignedMonotonic(*this); }
+    ~FillAlignedMonotonic() override = default;
+    Polylines fill_surface(const Surface *surface, const FillParams &params) override;
+	bool no_sort() const override { return true; }
+
+protected:
+    // Always generate infill at the same angle.
+    virtual float _layer_angle(size_t idx) const override { return 0.f; }
+};
+
 class FillGrid : public FillRectilinear
 {
 public:
