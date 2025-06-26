@@ -209,15 +209,19 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 					layerm.flow(extrusion_role, (surface.thickness == -1) ? layer.height : surface.thickness);
 
 				// Calculate flow spacing for infill pattern generation.
-		        if (surface.is_solid() || is_bridge) {
+		        if (surface.is_solid() || is_bridge || params.density >= 99.9999f ) {
 		            params.spacing = params.flow.spacing();
-		            // Don't limit anchor length for solid or bridging infill.
-		            params.anchor_length = 1000.f;
-					params.anchor_length_max = 1000.f;
+                            if (surface.is_solid() || is_bridge) {
+			        // Don't limit anchor length for solid or bridging infill.
+		                params.anchor_length = 1000.f;
+				params.anchor_length_max = 1000.f;
+			    }
 		        } else {
 					// Internal infill. Calculating infill line spacing independent of the current layer height and 1st layer status,
 					// so that internall infill will be aligned over all layers of the current region.
 		            params.spacing = layerm.region().flow(*layer.object(), frInfill, layer.object()->config().layer_height, false).spacing();
+                            // If we altered the spacing due to thickness != layer_height, then width needs to be adjusted to avoid over/underextrusion. 
+                            params.flow = params.flow.with_spacing(params.spacing);
 		            // Anchor a sparse infill to inner perimeters with the following anchor length:
 			        params.anchor_length = float(region_config.infill_anchor);
 					if (region_config.infill_anchor.percent)
