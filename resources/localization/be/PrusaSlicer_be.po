@@ -17624,8 +17624,12 @@ msgstr ""
 "Ці гатовая друкарка?\n"
 "Ліст для друку на месцы, пусты і чысты?"
 
-#: src/slic3r/GUI/Plater.cpp:6819 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:6819
 msgid "Upload and Print"
+msgstr "Загрузіць і надрукаваць"
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:136
+msgid "Upload and &Print"
 msgstr "Загрузіць і надрукаваць"
 
 #: src/slic3r/GUI/Plater.cpp:7194
@@ -18578,15 +18582,15 @@ msgstr ""
 "Ці жадаеце вы працягнуць?"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:116
-msgid "Upload"
+msgid "&Upload"
 msgstr "Загрузіць"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:126
-msgid "Upload to Queue"
+msgid "Upload to &Queue"
 msgstr "Загрузіць у чаргу"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:147
-msgid "Upload and Simulate"
+msgid "Upload and &Simulate"
 msgstr "Загрузіць і імітаваць"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:302

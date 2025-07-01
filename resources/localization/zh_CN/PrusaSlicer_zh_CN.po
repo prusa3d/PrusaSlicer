@@ -16567,8 +16567,12 @@ msgstr ""
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr "打印机准备好了吗？打印材料是否到位，空且干净？"
 
-#: src/slic3r/GUI/Plater.cpp:6819 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:6819
 msgid "Upload and Print"
+msgstr "上传和打印"
+
+#: src/slic3r/GUI/PrintHostDialogs.cpp:136
+msgid "Upload and &Print"
 msgstr "上传和打印"
 
 #: src/slic3r/GUI/Plater.cpp:7194
@@ -17442,15 +17446,15 @@ msgid "Upload filename doesn't end with \"%s\". Do you wish to continue?"
 msgstr "上传文件名不以 \"%s\" 结尾。你想继续吗？"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:116
-msgid "Upload"
+msgid "&Upload"
 msgstr "上载"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:126
-msgid "Upload to Queue"
+msgid "Upload to &Queue"
 msgstr "上载到队列"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:147
-msgid "Upload and Simulate"
+msgid "Upload and &Simulate"
 msgstr "上传并模拟"
 
 #: src/slic3r/GUI/PrintHostDialogs.cpp:302
