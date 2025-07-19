@@ -5,14 +5,18 @@
 #ifndef slic3r_Utils_UndoRedo_hpp_
 #define slic3r_Utils_UndoRedo_hpp_
 
+#include <libslic3r/ObjectID.hpp>
+#include <libslic3r/Config.hpp>
+#include <stddef.h>
+#include <stdint.h>
 #include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
 #include <cassert>
-
-#include <libslic3r/ObjectID.hpp>
-#include <libslic3r/Config.hpp>
+#include <utility>
+#include <cinttypes>
+#include <cstddef>
 
 typedef double                          coordf_t;
 typedef std::pair<coordf_t, coordf_t>   t_layer_height_range;

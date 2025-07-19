@@ -23,6 +23,7 @@ GCodeExtrusionRole extrusion_role_to_gcode_extrusion_role(ExtrusionRole role)
     }
     if (role == ExtrusionRole::InternalInfill)      return GCodeExtrusionRole::InternalInfill;
     if (role == ExtrusionRole::SolidInfill)         return GCodeExtrusionRole::SolidInfill;
+    if (role == ExtrusionRole::InfillOverBridge)    return GCodeExtrusionRole::SolidInfill;
     if (role == ExtrusionRole::TopSolidInfill)      return GCodeExtrusionRole::TopSolidInfill;
     if (role == ExtrusionRole::Ironing)             return GCodeExtrusionRole::Ironing;
     if (role == ExtrusionRole::BridgeInfill)        return GCodeExtrusionRole::BridgeInfill;

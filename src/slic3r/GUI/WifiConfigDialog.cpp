@@ -14,6 +14,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/nowide/cstdio.hpp>
 
 #include "Widgets/ComboBox.hpp"
 
@@ -162,7 +163,7 @@ void WifiConfigDialog::on_retrieve_password(wxCommandEvent& e)
         return;
     }
     
-    std::string psk = m_wifi_scanner->get_psk(boost::nowide::narrow(m_ssid_combo->GetValue()));
+    std::string psk = m_wifi_scanner->get_psk(into_u8(m_ssid_combo->GetValue()));
     if (psk.empty()) {
         // TRN Alert message when retrieving password for wifi from keychain. Probably will display only on Apple so keychain is MacOS term.
         wxString msg = _L("No password in the keychain for given SSID.");
@@ -208,7 +209,7 @@ void WifiConfigDialog::rescan_networks(bool select)
     std::string current = m_wifi_scanner->get_current_ssid();
     const auto& map = m_wifi_scanner->get_map();
     m_ssid_combo->Clear();
-    for (const auto &pair : map) {
+    for (const auto& pair : map) {
         m_ssid_combo->Append(pair.first);
         // select ssid of current network (if connected)
         if (current == pair.first)
@@ -230,7 +231,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
         return;
     }
    
-    std::string selected_path = boost::nowide::narrow(m_drive_combo->GetValue());
+    std::string selected_path = into_u8(m_drive_combo->GetValue());
 
     if (selected_path.empty()) {
         // TRN Alert message when writing WiFi configuration file to usb drive.
@@ -250,7 +251,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
     }
 
     if (boost::filesystem::exists(file_path)) {
-        // TRN placeholder 1 is path to file
+        // TRN placeholder %1% is path to file
         wxString msg_text = GUI::format_wxstr(_L("%1% already exists. Do you want to rewrite it?\n(Other items than Wi-Fi credentials will stay unchanged)"), file_path.string());
         WarningDialog dialog(m_parent, msg_text, _L("Warning"), wxYES | wxNO);
         if (dialog.ShowModal() == wxID_NO) {
@@ -294,7 +295,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
 
     m_used_path = boost::nowide::widen(file_path.string());
     FILE* file;
-    file = fopen(file_path.string().c_str(), "w");
+    file = boost::nowide::fopen(file_path.string().c_str(), "w");
     if (file == NULL) {
         BOOST_LOG_TRIVIAL(error) << "Failed to write to file " << file_path;
         // TODO show error

@@ -26,6 +26,7 @@ add_executable(${_TEST_NAME}_tests
 	test_stl.cpp
 	test_meshboolean.cpp
 	test_marchingsquares.cpp
+    test_multiple_beds.cpp
 	test_region_expansion.cpp
 	test_timeutils.cpp
 	test_utils.cpp
@@ -42,6 +43,7 @@ add_executable(${_TEST_NAME}_tests
     test_anyptr.cpp
     test_jump_point_search.cpp
     test_support_spots_generator.cpp
+    test_layer_region.cpp
     ../data/prusaparts.cpp
     ../data/prusaparts.hpp
      test_static_map.cpp

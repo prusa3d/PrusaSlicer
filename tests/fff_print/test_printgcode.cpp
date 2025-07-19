@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/GCodeReader.hpp"
@@ -10,6 +11,7 @@
 
 using namespace Slic3r;
 using namespace Slic3r::Test;
+using namespace Catch;
 
 boost::regex perimeters_regex("G1 X[-0-9.]* Y[-0-9.]* E[-0-9.]* ; perimeter");
 boost::regex infill_regex("G1 X[-0-9.]* Y[-0-9.]* E[-0-9.]* ; infill");

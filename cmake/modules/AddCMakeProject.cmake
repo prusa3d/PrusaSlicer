@@ -12,6 +12,11 @@ if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "Forcing CMAKE_BUILD_TYPE to Release as it was not specified.")
 endif ()
 
+# This is a wrapper function around ExternalProject_Add to simplify adding 
+# CMake based external projects. It will forward common build configuration from the parent
+# project and set up multithreaded build for various generators.
+# The function signiture is identical to that of ExternalProject_Add, except that the 
+# BUILD_COMMAND, INSTALL_COMMAND and INSTALL_DIR arguments are ignored. 
 # The value of CMAKE_BUILD_TYPE will be used for building each dependency even if the 
 # generator is multi-config. Use this var to specify build type regardless of the generator. 
 function(add_cmake_project projectname)
@@ -53,7 +58,6 @@ function(add_cmake_project projectname)
     
     ExternalProject_Add(
         dep_${projectname}
-        EXCLUDE_FROM_ALL    ON  # Not built by default, dep_${projectname} needs to be added to ALL target
         INSTALL_DIR         ${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
         DOWNLOAD_DIR        ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/${projectname}
         BINARY_DIR          ${CMAKE_CURRENT_BINARY_DIR}/builds/${projectname}

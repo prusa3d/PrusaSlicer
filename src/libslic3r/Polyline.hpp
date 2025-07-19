@@ -11,16 +11,26 @@
 #ifndef slic3r_Polyline_hpp_
 #define slic3r_Polyline_hpp_
 
+#include <stddef.h>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <initializer_list>
+#include <iterator>
+#include <utility>
+#include <cstddef>
+
 #include "libslic3r.h"
 #include "Line.hpp"
 #include "MultiPoint.hpp"
-#include <string>
-#include <vector>
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 class Polyline;
 struct ThickPolyline;
+class BoundingBox;
+
 typedef std::vector<Polyline> Polylines;
 typedef std::vector<ThickPolyline> ThickPolylines;
 
@@ -110,30 +120,40 @@ inline double total_length(const Polylines &polylines) {
     return total;
 }
 
-inline Lines to_lines(const Polyline &poly) 
-{
+inline size_t total_lines_count(const Polylines &polylines) {
+    size_t lines_cnt = 0;
+    for (const Polyline &polyline : polylines) {
+        if (polyline.points.size() > 1) {
+            lines_cnt += polyline.points.size() - 1;
+        }
+    }
+
+    return lines_cnt;
+}
+
+inline Lines to_lines(const Polyline &poly) {
     Lines lines;
     if (poly.points.size() >= 2) {
         lines.reserve(poly.points.size() - 1);
-        for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
-            lines.push_back(Line(*it, *(it + 1)));
+        for (Points::const_iterator it = poly.points.begin(); it != poly.points.end() - 1; ++it) {
+            lines.emplace_back(*it, *(it + 1));
+        }
     }
+
     return lines;
 }
 
-inline Lines to_lines(const Polylines &polys) 
-{
-    size_t n_lines = 0;
-    for (size_t i = 0; i < polys.size(); ++ i)
-        if (polys[i].points.size() > 1)
-            n_lines += polys[i].points.size() - 1;
+inline Lines to_lines(const Polylines &polylines) {
+    const size_t lines_cnt = total_lines_count(polylines);
+
     Lines lines;
-    lines.reserve(n_lines);
-    for (size_t i = 0; i < polys.size(); ++ i) {
-        const Polyline &poly = polys[i];
-        for (Points::const_iterator it = poly.points.begin(); it != poly.points.end()-1; ++it)
-            lines.push_back(Line(*it, *(it + 1)));
+    lines.reserve(lines_cnt);
+    for (const Polyline &polyline : polylines) {
+        for (Points::const_iterator it = polyline.points.begin(); it != polyline.points.end() - 1; ++it) {
+            lines.emplace_back(*it, *(it + 1));
+        }
     }
+
     return lines;
 }
 
@@ -222,6 +242,8 @@ struct ThickPolyline {
     // On open ThickPolyline make no effect.
     void start_at_index(int index);
 
+    BoundingBox bounding_box() const;
+
     Points                  points;
     // vector of startpoint width and endpoint width of each line segment. The size should be always (points.size()-1) * 2
     // e.g. let four be points a,b,c,d. that are three lines ab, bc, cd. for each line, there should be start width, so the width vector is:
@@ -241,6 +263,14 @@ inline ThickPolylines to_thick_polylines(Polylines &&polylines, const coordf_t w
     }
     return out;
 }
+
+size_t total_lines_count(const ThickPolylines &thick_polylines);
+
+Lines to_lines(const ThickPolyline &thick_polyline);
+Lines to_lines(const ThickPolylines &thick_polylines);
+
+BoundingBox get_extents(const ThickPolyline &thick_polyline);
+BoundingBox get_extents(const ThickPolylines &thick_polylines);
 
 class Polyline3 : public MultiPoint3
 {

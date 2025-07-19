@@ -5,9 +5,16 @@
 #ifndef slic3r_AvoidCrossingPerimeters_hpp_
 #define slic3r_AvoidCrossingPerimeters_hpp_
 
-#include "../libslic3r.h"
-#include "../ExPolygon.hpp"
-#include "../EdgeGrid.hpp"
+#include <vector>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/EdgeGrid.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/ShortestPath.hpp"
 
 namespace Slic3r {
 
@@ -21,11 +28,10 @@ class AvoidCrossingPerimeters
 public:
     // Routing around the objects vs. inside a single object.
     void        use_external_mp(bool use = true) { m_use_external_mp = use; };
-    void        use_external_mp_once()  { m_use_external_mp_once = true; }
-    bool        used_external_mp_once() { return m_use_external_mp_once; }
+    bool        used_external_mp_once() { return use_external_mp_once; }
     void        disable_once()          { m_disabled_once = true; }
     bool        disabled_once() const   { return m_disabled_once; }
-    void        reset_once_modifiers()  { m_use_external_mp_once = false; m_disabled_once = false; }
+    void        reset_once_modifiers()  { use_external_mp_once = false; m_disabled_once = false; }
 
     void        init_layer(const Layer &layer);
 
@@ -54,10 +60,10 @@ public:
         }
     };
 
+    // just for the next travel move
+    bool           use_external_mp_once { false };
 private:
     bool           m_use_external_mp { false };
-    // just for the next travel move
-    bool           m_use_external_mp_once { false };
     // this flag disables avoid_crossing_perimeters just for the next travel move
     // we enable it by default for the first travel move in print
     bool           m_disabled_once { true };

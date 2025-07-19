@@ -4,7 +4,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "HintNotification.hpp"
-#include "ImGuiWrapper.hpp"
+#include "ImGuiPureWrap.hpp"
 #include "format.hpp"
 #include "I18N.hpp"
 #include "GUI_ObjectList.hpp"
@@ -424,7 +424,7 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
 					std::string		opt = dict["hypertext_settings_opt"];
 					Preset::Type	type = static_cast<Preset::Type>(std::atoi(dict["hypertext_settings_type"].c_str()));
 					std::wstring	category = boost::nowide::widen(dict["hypertext_settings_category"]);
-					HintData		hint_data{ id_string, text1, weight, was_displayed, hypertext_text, follow_text, disabled_tags, enabled_tags, true, documentation_link, [opt, type, category]() { GUI::wxGetApp().sidebar().jump_to_option(opt, type, category); } };
+					HintData		hint_data{ id_string, text1, weight, was_displayed, hypertext_text, follow_text, disabled_tags, enabled_tags, true, documentation_link, [opt, type, category]() { GUI::wxGetApp().jump_to_option(opt, type, category); } };
 					m_loaded_hints.emplace_back(hint_data);
 				// open preferences
 				} else if(dict["hypertext_type"] == "preferences") {
@@ -736,7 +736,7 @@ void NotificationManager::HintNotification::init()
 		m_state = EState::Shown;
 }
 
-void NotificationManager::HintNotification::set_next_window_size(ImGuiWrapper& imgui)
+void NotificationManager::HintNotification::set_next_window_size()
 {
 	/*
 	m_window_height = m_multiline ?
@@ -755,7 +755,7 @@ bool NotificationManager::HintNotification::on_text_click()
 	return false;
 }
 
-void NotificationManager::HintNotification::render_text(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
+void NotificationManager::HintNotification::render_text(const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
     if (!m_has_hint_data) {
         retrieve_data();
@@ -795,15 +795,15 @@ void NotificationManager::HintNotification::render_text(ImGuiWrapper& imgui, con
 			last_end = m_endlines[i];
 			if (m_text1.size() > m_endlines[i])
 				last_end += (m_text1[m_endlines[i]] == '\n' || m_text1[m_endlines[i]] == ' ' ? 1 : 0);
-			imgui.text(line.c_str());
+			ImGuiPureWrap::text(line.c_str());
 		}
 			
 	}
 	//hyperlink text
 	if (!m_multiline && m_lines_count > 2) {
-		render_hypertext(imgui, x_offset + ImGui::CalcTextSize((line + " ").c_str()).x, starting_y + shift_y, _u8L("More"), true);
+		render_hypertext(x_offset + ImGui::CalcTextSize((line + " ").c_str()).x, starting_y + shift_y, _u8L("More"), true);
 	} else if (!m_hypertext.empty()) {
-		render_hypertext(imgui, x_offset + ImGui::CalcTextSize((line + (line.empty()? "": " ")).c_str()).x, starting_y + (m_endlines.size() - 1) * shift_y, m_hypertext);
+		render_hypertext(x_offset + ImGui::CalcTextSize((line + (line.empty()? "": " ")).c_str()).x, starting_y + (m_endlines.size() - 1) * shift_y, m_hypertext);
 	}
 
 	// text2
@@ -831,14 +831,14 @@ void NotificationManager::HintNotification::render_text(ImGuiWrapper& imgui, con
 				last_end = m_endlines2[i];
 				if (m_text2.size() > m_endlines2[i])
 					last_end += (m_text2[m_endlines2[i]] == '\n' || m_text2[m_endlines2[i]] == ' ' ? 1 : 0);
-				imgui.text(line.c_str());
+				ImGuiPureWrap::text(line.c_str());
 			}
 
 		}
 	}
 }
 
-void NotificationManager::HintNotification::render_close_button(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
+void NotificationManager::HintNotification::render_close_button(const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
 	ImVec2 win_size(win_size_x, win_size_y);
 	ImVec2 win_pos(win_pos_x, win_pos_y);
@@ -869,7 +869,7 @@ void NotificationManager::HintNotification::render_close_button(ImGuiWrapper& im
 		ImGui::SetCursorPosX(win_size.x - m_line_height * 2.75f);
 		ImGui::SetCursorPosY(win_size.y / 2 - button_size.y);
 	}
-	if (imgui.button(button_text.c_str(), button_size.x, button_size.y))
+	if (ImGuiPureWrap::button(button_text.c_str(), button_size.x, button_size.y))
 	{
 		close();
 	}
@@ -877,7 +877,7 @@ void NotificationManager::HintNotification::render_close_button(ImGuiWrapper& im
 	//invisible large button
 	ImGui::SetCursorPosX(win_size.x - m_line_height * 2.35f);
 	ImGui::SetCursorPosY(0);
-	if (imgui.button(" ", m_line_height * 2.125, win_size.y -  2 * m_line_height))
+	if (ImGuiPureWrap::button(" ", m_line_height * 2.125, win_size.y -  2 * m_line_height))
 	{
 		close();
 	}
@@ -886,16 +886,16 @@ void NotificationManager::HintNotification::render_close_button(ImGuiWrapper& im
 
 
 	//render_right_arrow_button(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
-	render_logo(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
-	render_preferences_button(imgui, win_pos_x, win_pos_y);
+	render_logo(win_size_x, win_size_y, win_pos_x, win_pos_y);
+	render_preferences_button(win_pos_x, win_pos_y);
 	if (!m_documentation_link.empty() && !wxGetApp().app_config->get_bool("suppress_hyperlinks"))
 	{
-		render_documentation_button(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
+		render_documentation_button(win_size_x, win_size_y, win_pos_x, win_pos_y);
 	}
 	
 }
 
-void NotificationManager::HintNotification::render_preferences_button(ImGuiWrapper& imgui, const float win_pos_x, const float win_pos_y)
+void NotificationManager::HintNotification::render_preferences_button(const float win_pos_x, const float win_pos_y)
 {
 	
 	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(.0f, .0f, .0f, .0f));
@@ -914,9 +914,9 @@ void NotificationManager::HintNotification::render_preferences_button(ImGuiWrapp
 		// tooltip
 		long time_now = wxGetLocalTime();
 		if (m_prefe_hover_time > 0 && m_prefe_hover_time < time_now) {
-			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiWrapper::COL_WINDOW_BACKGROUND);
+			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiPureWrap::COL_WINDOW_BACKGROUND);
 			ImGui::BeginTooltip();
-			imgui.text(_u8L("Open Preferences."));
+			ImGuiPureWrap::text(_u8L("Open Preferences."));
 			ImGui::EndTooltip();
 			ImGui::PopStyleColor();
 		}
@@ -933,7 +933,7 @@ void NotificationManager::HintNotification::render_preferences_button(ImGuiWrapp
 	} else {
 		ImGui::SetCursorPosY(m_window_height - button_size.y - m_close_b_w / 4.f);
 	}
-	if (imgui.button(button_text.c_str(), button_size.x, button_size.y))
+	if (ImGuiPureWrap::button(button_text.c_str(), button_size.x, button_size.y))
 	{
 		wxGetApp().open_preferences("show_hints", "GUI");
 	}
@@ -942,7 +942,7 @@ void NotificationManager::HintNotification::render_preferences_button(ImGuiWrapp
 	// preferences button is in place of minimize button
 	m_minimize_b_visible = true;	
 }
-void NotificationManager::HintNotification::render_right_arrow_button(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
+void NotificationManager::HintNotification::render_right_arrow_button(const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
 	// Used for debuging
 
@@ -965,14 +965,14 @@ void NotificationManager::HintNotification::render_right_arrow_button(ImGuiWrapp
 		ImGui::SetCursorPosY(m_close_b_y + m_close_b_w / 4.f * 7.f);
 	else
 		ImGui::SetCursorPosY(m_window_height - button_size.y - m_close_b_w / 4.f);
-	if (imgui.button(button_text.c_str(), button_size.x * 0.8f, button_size.y * 1.f))
+	if (ImGuiPureWrap::button(button_text.c_str(), button_size.x * 0.8f, button_size.y * 1.f))
 	{
 		retrieve_data();
 	}
 
 	ImGui::PopStyleColor(5);
 }
-void NotificationManager::HintNotification::render_logo(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
+void NotificationManager::HintNotification::render_logo(const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
 	std::string placeholder_text;
 	placeholder_text = ImGui::EjectButton;
@@ -981,9 +981,9 @@ void NotificationManager::HintNotification::render_logo(ImGuiWrapper& imgui, con
 	text = ImGui::ClippyMarker;
 	ImGui::SetCursorPosX(button_pic_size.x / 3);
 	ImGui::SetCursorPosY(win_size_y / 2 - button_pic_size.y * 2.f);
-	imgui.text(text.c_str());
+	ImGuiPureWrap::text(text.c_str());
 }
-void NotificationManager::HintNotification::render_documentation_button(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
+void NotificationManager::HintNotification::render_documentation_button(const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
 	ImVec2 win_size(win_size_x, win_size_y);
 	ImVec2 win_pos(win_pos_x, win_pos_y);
@@ -1006,9 +1006,9 @@ void NotificationManager::HintNotification::render_documentation_button(ImGuiWra
 		// tooltip
 		long time_now = wxGetLocalTime();
 		if (m_docu_hover_time > 0 && m_docu_hover_time < time_now) {
-			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiWrapper::COL_WINDOW_BACKGROUND);
+			ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiPureWrap::COL_WINDOW_BACKGROUND);
 			ImGui::BeginTooltip();
-			imgui.text(_u8L("Open Documentation in web browser."));
+			ImGuiPureWrap::text(_u8L("Open Documentation in web browser."));
 			ImGui::EndTooltip();
 			ImGui::PopStyleColor();
 		}
@@ -1022,7 +1022,7 @@ void NotificationManager::HintNotification::render_documentation_button(ImGuiWra
 	ImVec2 button_size(button_pic_size.x * 1.25f, button_pic_size.y * 1.25f);
 	ImGui::SetCursorPosX(win_size.x - m_line_height * 5.0f);
 	ImGui::SetCursorPosY(win_size.y / 2 - button_size.y);
-	if (imgui.button(button_text.c_str(), button_size.x, button_size.y))
+	if (ImGuiPureWrap::button(button_text.c_str(), button_size.x, button_size.y))
 	{
 		open_documentation();
 	}
@@ -1030,7 +1030,7 @@ void NotificationManager::HintNotification::render_documentation_button(ImGuiWra
 	//invisible large button
 	ImGui::SetCursorPosX(win_size.x - m_line_height * 4.625f);
 	ImGui::SetCursorPosY(0);
-	if (imgui.button("  ", m_line_height * 2.f, win_size.y - 2 * m_line_height))
+	if (ImGuiPureWrap::button("  ", m_line_height * 2.f, win_size.y - 2 * m_line_height))
 	{
 		open_documentation();
 	}

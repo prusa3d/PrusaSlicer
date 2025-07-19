@@ -1,9 +1,25 @@
 #ifndef slic3r_Geometry_ArcWelder_hpp_
 #define slic3r_Geometry_ArcWelder_hpp_
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <optional>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <complex>
+#include <cstddef>
 
 #include "../Point.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r { namespace Geometry { namespace ArcWelder {
 
@@ -407,6 +423,9 @@ struct Segment
     float       radius{ 0.f };
     // CCW or CW. Ignored for zero radius (linear segment).
     Orientation orientation{ Orientation::CCW };
+
+    float height_fraction{ 1.f };
+    float e_fraction{ 1.f };
 
     bool    linear() const { return radius == 0; }
     bool    ccw() const { return orientation == Orientation::CCW; }

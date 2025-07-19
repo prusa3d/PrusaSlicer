@@ -9,15 +9,21 @@
 #ifndef slic3r_GCodeWriter_hpp_
 #define slic3r_GCodeWriter_hpp_
 
-#include "../libslic3r.h"
-#include "../Extruder.hpp"
-#include "../Point.hpp"
-#include "../PrintConfig.hpp"
-#include "CoolingBuffer.hpp"
-
+#include <string.h>
 #include <string>
 #include <string_view>
 #include <charconv>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <vector>
+#include <cstring>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Extruder.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "CoolingBuffer.hpp"
 
 namespace Slic3r {
 
@@ -52,6 +58,7 @@ public:
     std::string postamble() const;
     std::string set_temperature(unsigned int temperature, bool wait = false, int tool = -1) const;
     std::string set_bed_temperature(unsigned int temperature, bool wait = false);
+    std::string set_chamber_temperature(unsigned int temperature, bool wait, bool accurate) const;
     std::string set_print_acceleration(unsigned int acceleration)   { return set_acceleration_internal(Acceleration::Print, acceleration); }
     std::string set_travel_acceleration(unsigned int acceleration)  { return set_acceleration_internal(Acceleration::Travel, acceleration); }
     std::string reset_e(bool force = false);
@@ -67,26 +74,46 @@ public:
     std::string toolchange(unsigned int extruder_id);
     std::string set_speed(double F, const std::string_view comment = {}, const std::string_view cooling_marker = {}) const;
 
-    std::string get_travel_to_xy_gcode(const Vec2d &point, const std::string_view comment) const;
-    std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
-    std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
-
     /**
-     * @brief Return gcode with all three axis defined. Optionally adds feedrate.
+     * @brief Return gcode to travel to the specified point.
+     * Feed rate is computed based on the vector (to - m_pos).
+     * Maintains the internal m_pos position.
+     * Movements less than XYZ_EPSILON generate no output.
      *
-     * Feedrate is added the starting point "from" is specified.
-     *
-     * @param from Optional starting point of the travel.
      * @param to Where to travel to.
      * @param comment Description of the travel purpose.
      */
-    std::string get_travel_to_xyz_gcode(const Vec3d &from, const Vec3d &to, const std::string_view comment) const;
-    std::string travel_to_xyz(const Vec3d &from, const Vec3d &to, const std::string_view comment = {});
-    std::string get_travel_to_z_gcode(double z, const std::string_view comment) const;
+    std::string travel_to_xyz(const Vec3d &to, const std::string_view comment = {});
+    std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
     std::string travel_to_z(double z, const std::string_view comment = {});
+
+    std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
+
+    /**
+     * @brief Generate G-Code to travel to the specified point unconditionally.
+     * Feed rate is computed based on the vector (to - m_pos).
+     * Maintains the internal m_pos position.
+     * The distance test XYZ_EPSILON is not performed.
+     * @param to The point to travel to.
+     * @param comment Description of the travel purpose.
+     */
+    std::string travel_to_xyz_force(const Vec3d &to, const std::string_view comment = {});
+    std::string travel_to_xy_force(const Vec2d &point, const std::string_view comment = {});
+    std::string travel_to_z_force(double z, const std::string_view comment = {});
+
+    /**
+     * @brief Generate G-Code to move to the specified point while extruding.
+     * Maintains the internal m_pos position.
+     * The distance test XYZ_EPSILON is not performed.
+     * @param point The point to move to.
+     * @param dE The E-steps to extrude while moving.
+     * @param comment Description of the movement purpose.
+     */
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
+    std::string extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment = {});
+
     std::string extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment);
-//    std::string extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment = {});
+
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
     std::string unretract();
@@ -168,6 +195,9 @@ public:
     static constexpr const std::array<double, 10> pow_10    {   1.,     10.,    100.,    1000.,    10000.,    100000.,    1000000.,    10000000.,    100000000.,    1000000000.};
     static constexpr const std::array<double, 10> pow_10_inv{1./1.,  1./10., 1./100., 1./1000., 1./10000., 1./100000., 1./1000000., 1./10000000., 1./100000000., 1./1000000000.};
 
+    // Compute XYZ_EPSILON based on XYZF_EXPORT_DIGITS
+    static constexpr double XYZ_EPSILON = pow_10_inv[XYZF_EXPORT_DIGITS];
+
     // Quantize doubles to a resolution of the G-code.
     static double                                 quantize(double v, size_t ndigits) { return std::round(v * pow_10[ndigits]) * pow_10_inv[ndigits]; }
     static double                                 quantize_xyzf(double v) { return quantize(v, XYZF_EXPORT_DIGITS); }
@@ -176,6 +206,8 @@ public:
         { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS) }; }
     static Vec3d                                  quantize(const Vec3d &pt)
         { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS), quantize(pt.z(), XYZF_EXPORT_DIGITS) }; }
+    static Vec2d                                  quantize(const Vec2f &pt)
+        { return { quantize(double(pt.x()), XYZF_EXPORT_DIGITS), quantize(double(pt.y()), XYZF_EXPORT_DIGITS) }; }
 
     void emit_axis(const char axis, const double v, size_t digits);
 
@@ -202,6 +234,10 @@ public:
     }
 
     void emit_e(const std::string_view axis, double v) {
+        const double precision{std::pow(10.0, -E_EXPORT_DIGITS)};
+        if (std::abs(v) < precision) {
+            v = v < 0 ? -precision : precision;
+        }
         if (! axis.empty()) {
             // not gcfNoExtrusion
             this->emit_axis(axis[0], v, E_EXPORT_DIGITS);

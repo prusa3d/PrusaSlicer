@@ -24,12 +24,14 @@ namespace Slic3r {
 
 namespace GUI {
 
+using t_link_clicked = std::function<void(const std::string&)>;
+
 struct HtmlContent
 {
-	wxString                                msg{ wxEmptyString };
-	bool                                    is_monospaced_font{ false };
-	bool                                    is_marked_msg{ false };
-	std::function<void(const std::string&)> on_link_clicked{ nullptr };
+	wxString        msg{ wxEmptyString };
+	bool            is_monospaced_font{ false };
+	bool            is_marked_msg{ false };
+	t_link_clicked	on_link_clicked{ nullptr };
 };
 
 // A message / query dialog with a bitmap on the left and any content on the right
@@ -75,7 +77,7 @@ public:
 	// If monospaced_font is true, the error message is displayed using html <code><pre></pre></code> tags,
 	// so that the code formatting will be preserved. This is useful for reporting errors from the placeholder parser.
 	ErrorDialog(wxWindow *parent, const wxString &msg, bool courier_font);
-	ErrorDialog(wxWindow *parent, const wxString &msg, const std::function<void(const std::string&)>& on_link_clicked);
+	ErrorDialog(wxWindow *parent, const wxString &msg, const t_link_clicked& on_link_clicked);
 	ErrorDialog(ErrorDialog &&) = delete;
 	ErrorDialog(const ErrorDialog &) = delete;
 	ErrorDialog &operator=(ErrorDialog &&) = delete;

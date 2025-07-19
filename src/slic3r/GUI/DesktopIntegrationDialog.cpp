@@ -14,9 +14,10 @@
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Config.hpp"
+#include "libslic3r/Utils/DirectoriesUtils.hpp"
 
-#include <boost/nowide/fstream.hpp>
-#include <boost/filesystem.hpp>
+#include <boost/nowide/fstream.hpp> // IWYU pragma: keep
+#include <boost/nowide/convert.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -123,7 +124,7 @@ void resolve_path_from_var(const std::string& var, std::vector<std::string>& pat
     wxString wxdirs;
     if (! wxGetEnv(boost::nowide::widen(var), &wxdirs) || wxdirs.empty() )
         return;
-    std::string dirs = boost::nowide::narrow(wxdirs);
+    std::string dirs = into_u8(wxdirs);
     for (size_t i = dirs.find(':'); i != std::string::npos; i = dirs.find(':'))
     {
         paths.push_back(dirs.substr(0, i));
@@ -138,20 +139,35 @@ bool contains_path_dir(const std::string& p, const std::string& dir_name)
     if (p.empty() || dir_name.empty()) 
        return false;
     boost::filesystem::path path(p + (p[p.size()-1] == '/' ? "" : "/") + dir_name);
-    if (boost::filesystem::exists(path) && boost::filesystem::is_directory(path)) {
+    boost::system::error_code ec;
+    if (boost::filesystem::exists(path, ec) && !ec) {
         //BOOST_LOG_TRIVIAL(debug) << path.string() << " " << std::oct << boost::filesystem::status(path).permissions();
-        return true; //boost::filesystem::status(path).permissions() & boost::filesystem::owner_write;
+        return boost::filesystem::is_directory(path); //boost::filesystem::status(path).permissions() & boost::filesystem::owner_write;
     } else
         BOOST_LOG_TRIVIAL(debug) << path.string() << " doesnt exists";
     return false;
 }
+
+boost::filesystem::path get_existing_dir(const std::string& sub, const std::string& dir_name)
+{
+    assert(!sub.empty() && !dir_name.empty());
+    boost::filesystem::path path = boost::filesystem::path(sub) / dir_name;
+    boost::system::error_code ec;
+    if (!boost::filesystem::exists(path, ec) || ec) {
+        return boost::filesystem::path();
+    }
+    if (!boost::filesystem::is_directory(path, ec) || ec) {
+        return boost::filesystem::path();
+    }    
+    return path;
+}
 // Creates directory in path if not exists yet
 void create_dir(const boost::filesystem::path& path)
 {
-    if (boost::filesystem::exists(path))
+    boost::system::error_code ec;
+    if (boost::filesystem::exists(path, ec) && !ec)
         return;
     BOOST_LOG_TRIVIAL(debug)<< "creating " << path.string();
-    boost::system::error_code ec;
     boost::filesystem::create_directory(path, ec);
     if (ec)
         BOOST_LOG_TRIVIAL(error)<< "create directory failed: " << ec.message();
@@ -192,7 +208,7 @@ bool copy_icon(const std::string& icon_path, const std::string& dest_path)
 bool create_desktop_file(const std::string& path, const std::string& data)
 {    
     BOOST_LOG_TRIVIAL(debug) <<".desktop to "<< path;
-    std::ofstream output(path);
+    boost::nowide::ofstream output(path);
     output << data;
     struct stat buffer;
     if (stat(path.c_str(), &buffer) == 0)
@@ -208,6 +224,7 @@ bool create_desktop_file(const std::string& path, const std::string& data)
 // methods that actually do / undo desktop integration. Static to be accesible from anywhere.
 bool DesktopIntegrationDialog::is_integrated()
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     const AppConfig *app_config = wxGetApp().app_config;
     std::string path(app_config->get("desktop_integration_app_path"));
     BOOST_LOG_TRIVIAL(debug) << "Desktop integration desktop file path: " << path;
@@ -221,10 +238,12 @@ bool DesktopIntegrationDialog::is_integrated()
 }
 bool DesktopIntegrationDialog::integration_possible()
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     return true;
 }
 void DesktopIntegrationDialog::perform_desktop_integration()
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
 	BOOST_LOG_TRIVIAL(debug) << "performing desktop integration.";
     // Path to appimage
     const char *appimage_env = std::getenv("APPIMAGE");
@@ -308,7 +327,7 @@ void DesktopIntegrationDialog::perform_desktop_integration()
         // if all failed - try creating default home folder
         if (i == target_candidates.size() - 1) {
             // create $HOME/.local/share
-              create_path(boost::nowide::narrow(wxFileName::GetHomeDir()), ".local/share/icons" + icon_theme_dirs);
+              create_path(into_u8(wxFileName::GetHomeDir()), ".local/share/icons" + icon_theme_dirs);
               // copy icon
              target_dir_icons = GUI::format("%1%/.local/share",wxFileName::GetHomeDir());
               std::string icon_path = GUI::format("%1%/icons/PrusaSlicer.png",resources_dir());
@@ -364,7 +383,7 @@ void DesktopIntegrationDialog::perform_desktop_integration()
     // if all failed - try creating default home folder
     if (!candidate_found) {
         // create $HOME/.local/share
-        create_path(boost::nowide::narrow(wxFileName::GetHomeDir()), ".local/share/applications");
+        create_path(into_u8(wxFileName::GetHomeDir()), ".local/share/applications");
         // create desktop file
         target_dir_desktop = GUI::format("%1%/.local/share", wxFileName::GetHomeDir());
         std::string path = GUI::format("%1%/applications/PrusaSlicer%2%.desktop", target_dir_desktop, version_suffix);
@@ -430,8 +449,9 @@ void DesktopIntegrationDialog::perform_desktop_integration()
     }
     wxGetApp().plater()->get_notification_manager()->push_notification(NotificationType::DesktopIntegrationSuccess);
 }
-void DesktopIntegrationDialog::undo_desktop_intgration()
+void DesktopIntegrationDialog::undo_desktop_integration()
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     const AppConfig *app_config = wxGetApp().app_config;
     // slicer .desktop
     std::string path = std::string(app_config->get("desktop_integration_app_path"));
@@ -513,12 +533,12 @@ void DesktopIntegrationDialog::perform_downloader_desktop_integration()
     std::string version(SLIC3R_VERSION);
     if (version.find("alpha") != std::string::npos)
     {
-        version_suffix = "-alpha";
+        version_suffix = "_alpha";
         name_suffix = " - alpha";
     }
     else if (version.find("beta") != std::string::npos)
     {
-        version_suffix = "-beta";
+        version_suffix = "_beta";
         name_suffix = " - beta";
     }
 
@@ -582,7 +602,7 @@ void DesktopIntegrationDialog::perform_downloader_desktop_integration()
     // if all failed - try creating default home folder
     if (!candidate_found) {
         // create $HOME/.local/share
-        create_path(boost::nowide::narrow(wxFileName::GetHomeDir()), ".local/share/applications");
+        create_path(into_u8(wxFileName::GetHomeDir()), ".local/share/applications");
         // create desktop file
         target_dir_desktop = GUI::format("%1%/.local/share", wxFileName::GetHomeDir());
         std::string path = GUI::format("%1%/applications/PrusaSlicerURLProtocol%2%.desktop", target_dir_desktop, version_suffix);
@@ -618,6 +638,7 @@ void DesktopIntegrationDialog::perform_downloader_desktop_integration()
 }
 void DesktopIntegrationDialog::undo_downloader_registration()
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     const AppConfig *app_config = wxGetApp().app_config;
     std::string path = std::string(app_config->get("desktop_integration_URL_path"));
     if (!path.empty()) {
@@ -625,6 +646,90 @@ void DesktopIntegrationDialog::undo_downloader_registration()
         std::remove(path.c_str());  
     }
     // There is no need to undo xdg-mime default command. It is done automatically when desktop file is deleted.
+}
+void DesktopIntegrationDialog::undo_downloader_registration_rigid()
+{
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
+    // Try ro find any PrusaSlicerURLProtocol.desktop files including alpha and beta and get rid of them
+
+    // $XDG_DATA_HOME defines the base directory relative to which user specific data files should be stored. 
+    // If $XDG_DATA_HOME is either not set or empty, a default equal to $HOME/.local/share should be used. 
+    // $XDG_DATA_DIRS defines the preference-ordered set of base directories to search for data files in addition to the $XDG_DATA_HOME base directory.
+    // The directories in $XDG_DATA_DIRS should be seperated with a colon ':'.
+    // If $XDG_DATA_DIRS is either not set or empty, a value equal to /usr/local/share/:/usr/share/ should be used. 
+    std::vector<std::string>target_candidates;
+    target_candidates.emplace_back(GUI::into_u8(wxFileName::GetHomeDir()) + "/.local/share");
+    resolve_path_from_var("XDG_DATA_HOME", target_candidates);
+    resolve_path_from_var("XDG_DATA_DIRS", target_candidates);
+    for (const std::string& cand : target_candidates) {
+        boost::filesystem::path apps_path = get_existing_dir(cand, "applications");
+        if (apps_path.empty()) {
+            continue;
+        }
+        for (const std::string& suffix : {"" , "-beta", "-alpha" , "_beta", "_alpha"}) {
+            boost::filesystem::path file_path = apps_path / GUI::format("PrusaSlicerURLProtocol%1%.desktop", suffix);
+            boost::system::error_code ec;
+            if (!boost::filesystem::exists(file_path, ec) || ec) {
+                continue;
+            }
+            if (!boost::filesystem::remove(file_path, ec) || ec) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to remove file " << file_path << " ec: " << ec.message();
+                continue;
+            } 
+            BOOST_LOG_TRIVIAL(info) << "Desktop File removed: " << file_path;
+        }
+    }
+}
+
+void DesktopIntegrationDialog::find_all_desktop_files(std::vector<boost::filesystem::path>& results)
+{
+    // Try ro find any PrusaSlicer.desktop and PrusaSlicerGcodeViewer.desktop and PrusaSlicerURLProtocol.desktop files including alpha and beta
+
+    // For regular apps (f.e. appimage) this is true:
+    // $XDG_DATA_HOME defines the base directory relative to which user specific data files should be stored. 
+    // If $XDG_DATA_HOME is either not set or empty, a default equal to $HOME/.local/share should be used. 
+    // $XDG_DATA_DIRS defines the preference-ordered set of base directories to search for data files in addition to the $XDG_DATA_HOME base directory.
+    // The directories in $XDG_DATA_DIRS should be seperated with a colon ':'.
+    // If $XDG_DATA_DIRS is either not set or empty, a value equal to /usr/local/share/:/usr/share/ should be used. 
+
+    // But flatpak resets XDG_DATA_HOME and XDG_DATA_DIRS, so we do not look into them
+    // Lets look into $HOME/.local/share, /usr/local/share/, /usr/share/
+    std::vector<std::string> target_candidates;
+    if (auto home_config_dir = Slic3r::get_home_local_dir(); home_config_dir) {
+        target_candidates.emplace_back((*home_config_dir).string() + "/share");
+    }
+    target_candidates.emplace_back("usr/local/share/");
+    target_candidates.emplace_back("usr/share/");
+    for (const std::string& cand : target_candidates) {
+        boost::filesystem::path apps_path = get_existing_dir(cand, "applications");
+        if (apps_path.empty()) {
+            continue;
+        }
+        for (const std::string& filename : {"PrusaSlicer","PrusaSlicerGcodeViewer","PrusaSlicerURLProtocol"}) {
+            for (const std::string& suffix : {"" , "-beta", "-alpha", "_beta", "_alpha"}) {
+                boost::filesystem::path file_path = apps_path / GUI::format("%1%%2%.desktop", filename, suffix);
+                boost::system::error_code ec;
+                if (!boost::filesystem::exists(file_path, ec) || ec) {
+                    continue;
+                }
+                BOOST_LOG_TRIVIAL(debug) << "Desktop File found: " << file_path;
+                results.emplace_back(std::move(file_path));
+            }
+        }
+    }
+}
+
+void DesktopIntegrationDialog::remove_desktop_file_list(const std::vector<boost::filesystem::path>& list, std::vector<boost::filesystem::path>& fails)
+{
+    for (const boost::filesystem::path& entry : list) {
+        boost::system::error_code ec;
+        if (!boost::filesystem::remove(entry, ec) || ec) {
+            BOOST_LOG_TRIVIAL(error) << "Failed to remove file " << entry << " ec: " << ec.message();
+            fails.emplace_back(entry);
+            continue;
+        }
+        BOOST_LOG_TRIVIAL(info) << "Desktop File removed: " << entry;
+    }
 }
 
 DesktopIntegrationDialog::DesktopIntegrationDialog(wxWindow *parent)
@@ -657,7 +762,7 @@ DesktopIntegrationDialog::DesktopIntegrationDialog(wxWindow *parent)
 	if (can_undo){
 		wxButton *btn_undo = new wxButton(this, wxID_ANY, _L("Undo"));
 		btn_szr->Add(btn_undo, 0, wxALL, 10);
-		btn_undo->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { DesktopIntegrationDialog::undo_desktop_intgration(); EndModal(wxID_ANY); });
+		btn_undo->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { DesktopIntegrationDialog::undo_desktop_integration(); EndModal(wxID_ANY); });
 	}
 	wxButton *btn_cancel = new wxButton(this, wxID_ANY, _L("Cancel"));
 	btn_szr->Add(btn_cancel, 0, wxALL, 10);
@@ -670,7 +775,6 @@ DesktopIntegrationDialog::DesktopIntegrationDialog(wxWindow *parent)
 
 DesktopIntegrationDialog::~DesktopIntegrationDialog()
 {
-
 }
 
 } // namespace GUI

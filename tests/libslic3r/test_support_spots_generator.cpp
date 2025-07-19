@@ -1,9 +1,12 @@
 #include "libslic3r/Point.hpp"
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <libslic3r/SupportSpotsGenerator.hpp>
 
 using namespace Slic3r;
 using namespace SupportSpotsGenerator;
+using namespace Catch;
 
 namespace Rectangle {
 const float width = 10;

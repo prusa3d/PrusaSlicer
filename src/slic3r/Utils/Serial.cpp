@@ -128,8 +128,8 @@ std::vector<SerialPortInfo> scan_serial_ports_extended()
 				wchar_t pszPortName[4096];
 				DWORD dwSize = sizeof(pszPortName);
 				DWORD dwType = 0;
-				if (RegQueryValueEx(hDeviceKey, L"PortName", NULL, &dwType, (LPBYTE)pszPortName, &dwSize) == ERROR_SUCCESS)
-					port_info.port = boost::nowide::narrow(pszPortName);
+                if (RegQueryValueEx(hDeviceKey, L"PortName", NULL, &dwType, (LPBYTE)pszPortName, &dwSize) == ERROR_SUCCESS)
+                    port_info.port = boost::nowide::narrow(pszPortName);
 				RegCloseKey(hDeviceKey);
 				if (port_info.port.empty())
 					continue;
@@ -142,8 +142,8 @@ std::vector<SerialPortInfo> scan_serial_ports_extended()
 			std::vector<wchar_t> hardware_id(reqSize > 1 ? reqSize : 1);
 			// Now store it in a buffer.
 			if (! SetupDiGetDeviceRegistryProperty(hDeviceInfo, &devInfoData, SPDRP_HARDWAREID, &regDataType, (BYTE*)hardware_id.data(), reqSize, nullptr))
-				continue;
-			parse_hardware_id(boost::nowide::narrow(hardware_id.data()), port_info);
+                continue;
+            parse_hardware_id(boost::nowide::narrow(hardware_id.data()), port_info);
 
 			// Find the size required to hold the friendly name.
 			reqSize = 0;
@@ -153,8 +153,8 @@ std::vector<SerialPortInfo> scan_serial_ports_extended()
 			// Now store it in a buffer.
 			if (! SetupDiGetDeviceRegistryProperty(hDeviceInfo, &devInfoData, SPDRP_FRIENDLYNAME, nullptr, (BYTE*)friendly_name.data(), reqSize, nullptr)) {
 				port_info.friendly_name = port_info.port;
-			} else {
-				port_info.friendly_name = boost::nowide::narrow(friendly_name.data());
+            } else {
+                port_info.friendly_name = boost::nowide::narrow(friendly_name.data());
 				port_info.is_printer = looks_like_printer(port_info.friendly_name);
 			}
 			output.emplace_back(std::move(port_info));

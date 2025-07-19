@@ -4,14 +4,22 @@
 ///|/
 
 #include "CutUtils.hpp"
+
+#include <boost/log/trivial.hpp>
+#include <cmath>
+#include <string>
+#include <utility>
+#include <cassert>
+#include <cstddef>
+
 #include "Geometry.hpp"
 #include "libslic3r.h"
 #include "Model.hpp"
 #include "TriangleMeshSlicer.hpp"
-#include "TriangleSelector.hpp"
-#include "ObjectID.hpp"
-
-#include <boost/log/trivial.hpp>
+#include "admesh/stl.h"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 namespace Slic3r {
 
@@ -398,12 +406,17 @@ static void distribute_modifiers_from_object(ModelObject* from_obj, const int in
             // Don't add modifiers which are processed connectors
             if (vol->cut_info.is_connector && !vol->cut_info.is_processed)
                 continue;
+
+            // Modifiers are not cut, but we still need to add the instance transformation
+            // to the modifier volume transformation to preserve their shape properly.
+            const auto modifier_trafo = Transformation(from_obj->instances[instance_idx]->get_transformation().get_matrix_no_offset() * vol->get_matrix());
+
             auto bb = vol->mesh().transformed_bounding_box(inst_matrix * vol->get_matrix());
             // Don't add modifiers which are not intersecting with solid parts
             if (obj1_bb.intersects(bb))
-                to_obj1->add_volume(*vol);
+                to_obj1->add_volume(*vol)->set_transformation(modifier_trafo);
             if (obj2_bb.intersects(bb))
-                to_obj2->add_volume(*vol);
+                to_obj2->add_volume(*vol)->set_transformation(modifier_trafo);
         }
 }
 
@@ -627,8 +640,12 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 
         // add modifiers
         for (const ModelVolume* volume : cut_mo->volumes)
-            if (!volume->is_model_part())
-                upper->add_volume(*volume);
+            if (!volume->is_model_part()) {
+                // Modifiers are not cut, but we still need to add the instance transformation
+                // to the modifier volume transformation to preserve their shape properly.
+                const auto modifier_trafo = Transformation(cut_mo->instances[m_instance]->get_transformation().get_matrix_no_offset() * volume->get_matrix());
+                upper->add_volume(*volume)->set_transformation(modifier_trafo);
+        }
 
         cut_object_ptrs.push_back(upper);
 
@@ -636,7 +653,11 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
         cut_object_ptrs.push_back(lower);
     }
     else {
-        // add modifiers if object has any
+        reset_instance_transformation(upper, m_instance, m_cut_matrix);
+        reset_instance_transformation(lower, m_instance, m_cut_matrix);
+
+        // Add modifiers if object has any
+        // Note: make it after all transformations are reset for upper/lower object
         for (const ModelVolume* volume : cut_mo->volumes)
             if (!volume->is_model_part()) {
                 distribute_modifiers_from_object(cut_mo, m_instance, upper, lower);

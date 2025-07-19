@@ -1,4 +1,6 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
+#include <catch2/catch_approx.hpp>
 #include <libslic3r/GCode/Travels.hpp>
 #include <libslic3r/ExPolygon.hpp>
 #include <libslic3r/GCode.hpp>
@@ -6,8 +8,9 @@
 
 using namespace Slic3r;
 using namespace Slic3r::GCode::Impl::Travels;
+using namespace Catch;
 
-struct ApproxEqualsPoints : public Catch::MatcherBase<Points> {
+struct ApproxEqualsPoints : public Catch::Matchers::MatcherBase<Points> {
     ApproxEqualsPoints(const Points& expected, unsigned tolerance): expected(expected), tolerance(tolerance) {}
     bool match(const Points& points) const override {
         if (points.size() != expected.size()) {

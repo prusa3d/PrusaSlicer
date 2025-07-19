@@ -6,16 +6,23 @@
 #ifndef slic3r_GCode_PressureEqualizer_hpp_
 #define slic3r_GCode_PressureEqualizer_hpp_
 
-#include "../libslic3r.h"
-#include "../PrintConfig.hpp"
-#include "../ExtrusionRole.hpp"
-
+#include <assert.h>
+#include <stddef.h>
 #include <queue>
+#include <algorithm>
+#include <cmath>
+#include <string>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
 
 namespace Slic3r {
 
 struct LayerResult;
-
 class GCodeG1Formatter;
 
 //#define PRESSURE_EQUALIZER_STATISTIC
@@ -128,8 +135,9 @@ private:
         float       feedrate()      const { return pos_end[4]; }
         float       time()          const { return dist_xyz() / feedrate(); }
         float       time_inv()      const { return feedrate() / dist_xyz(); }
-        float       volumetric_correction_avg() const { 
-            float avg_correction = 0.5f * (volumetric_extrusion_rate_start + volumetric_extrusion_rate_end) / volumetric_extrusion_rate; 
+        float       volumetric_correction_avg() const {
+            // Cap the correction to 0.05 - 1.00000001 to avoid zero feedrate.
+            float avg_correction = std::max(0.05f, 0.5f * (volumetric_extrusion_rate_start + volumetric_extrusion_rate_end) / volumetric_extrusion_rate);
             assert(avg_correction > 0.f);
             assert(avg_correction <= 1.00000001f);
             return avg_correction;
@@ -170,9 +178,12 @@ private:
 
         bool        adjustable_flow       = false;
 
-        bool        extrude_set_speed_tag = false;
-        bool        extrude_end_tag       = false;
+        void        update_end_position(const float *position_end, const bool *position_provided_original);
+        void        update_end_position(const float *position_start, const float *position_end, float t, const bool *position_provided_original);
     };
+
+    using GCodeLines = std::vector<GCodeLine>;
+    using GCodeLinesConstIt = GCodeLines::const_iterator;
 
     // Output buffer will only grow. It will not be reallocated over and over.
     std::vector<char>               output_buffer;
@@ -187,9 +198,11 @@ private:
     bool process_line(const char *line, const char *line_end, GCodeLine &buf);
     void output_gcode_line(size_t line_idx);
 
+    GCodeLinesConstIt advance_segment_beyond_small_gap(const GCodeLinesConstIt &last_extruding_line_it) const;
+
     // Go back from the current circular_buffer_pos and lower the feedtrate to decrease the slope of the extrusion rate changes.
     // Then go forward and adjust the feedrate to decrease the slope of the extrusion rate changes.
-    void adjust_volumetric_rate();
+    void adjust_volumetric_rate(size_t first_line_idx, size_t last_line_idx);
 
     // Push the text to the end of the output_buffer.
     inline void push_to_output(GCodeG1Formatter &formatter);

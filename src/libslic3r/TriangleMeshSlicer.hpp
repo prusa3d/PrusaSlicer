@@ -5,12 +5,22 @@
 #ifndef slic3r_TriangleMeshSlicer_hpp_
 #define slic3r_TriangleMeshSlicer_hpp_
 
+#include <stddef.h>
+#include <stdint.h>
 #include <functional>
 #include <vector>
+#include <cinttypes>
+#include <cstddef>
+
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+
+struct indexed_triangle_set;
 
 namespace Slic3r {
+
+struct indexed_triangle_set_with_color;
 
 struct MeshSlicingParams
 {
@@ -28,6 +38,9 @@ struct MeshSlicingParams
         // This mode is useful for slicing complex objects in vase mode.
         PositiveLargestContour,
     };
+
+    MeshSlicingParams() = default;
+    explicit MeshSlicingParams(const Transform3d &trafo) : trafo(trafo) {}
 
     SlicingMode   mode { SlicingMode::Regular };
     // For vase mode: below this layer a different slicing mode will be used to produce a single contour.
@@ -67,11 +80,22 @@ std::vector<Polygons>           slice_mesh(
     const MeshSlicingParams          &params,
     std::function<void()>             throw_on_cancel = []{});
 
+std::vector<ColorPolygons>      slice_mesh(
+    const indexed_triangle_set_with_color &mesh,
+    const std::vector<float>              &zs,
+    const MeshSlicingParams               &params,
+    std::function<void()>                  throw_on_cancel = []{});
+
 // Specialized version for a single slicing plane only, running on a single thread.
 Polygons                        slice_mesh(
     const indexed_triangle_set       &mesh,
-    const float                       plane_z,
+    float                             plane_z,
     const MeshSlicingParams          &params);
+
+ColorPolygons                   slice_mesh(
+    const indexed_triangle_set_with_color &mesh,
+    float                                  plane_z,
+    const MeshSlicingParams               &params);
 
 std::vector<ExPolygons>         slice_mesh_ex(
     const indexed_triangle_set       &mesh,

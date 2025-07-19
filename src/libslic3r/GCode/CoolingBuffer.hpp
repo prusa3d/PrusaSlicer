@@ -11,15 +11,22 @@
 #ifndef slic3r_CoolingBuffer_hpp_
 #define slic3r_CoolingBuffer_hpp_
 
-#include "../libslic3r.h"
+#include <stddef.h>
 #include <map>
 #include <string>
+#include <array>
+#include <vector>
+#include <cstddef>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 class GCodeGenerator;
 class Layer;
 struct PerExtruderAdjustments;
+class PrintConfig;
 
 // A standalone G-code filter, to control cooling of the print.
 // The G-code is processed per layer. Once a layer is collected, fan start / stop commands are edited

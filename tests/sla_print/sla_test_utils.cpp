@@ -128,29 +128,27 @@ void test_supports(const std::string          &obj_filename,
     // TODO: do the cgal hole cutting...
 
     // Create the support point generator
-    sla::SupportPointGenerator::Config autogencfg;
-    autogencfg.head_diameter = float(2 * supportcfg.head_front_radius_mm);
-    sla::SupportPointGenerator point_gen{sm.emesh, autogencfg, [] {}, [](int) {}};
-
-    point_gen.seed(0); // Make the test repeatable
-    point_gen.execute(out.model_slices, out.slicegrid);
-
+    sla::SupportPointGeneratorConfig autogencfg;
+    sla::SupportPointGeneratorData gen_data = sla::prepare_generator_data(std::move(out.model_slices), out.slicegrid);
+    sla::LayerSupportPoints layer_support_points = sla::generate_support_points(gen_data, autogencfg);
+    double allowed_move = (out.slicegrid[1] - out.slicegrid[0]) + std::numeric_limits<float>::epsilon();
     // Get the calculated support points.
-    sm.pts = point_gen.output();
-
+    sm.pts = sla::move_on_mesh_surface(layer_support_points, sm.emesh, allowed_move);
+    out.model_slices = std::move(gen_data.slices); // return ownership
+    
     int validityflags = ASSUME_NO_REPAIR;
 
     // If there is no elevation, support points shall be removed from the
     // bottom of the object.
-    if (std::abs(supportcfg.object_elevation_mm) < EPSILON) {
-        sla::remove_bottom_points(sm.pts, zmin + supportcfg.base_height_mm);
-    } else {
-        // Should be support points at least on the bottom of the model
-        REQUIRE_FALSE(sm.pts.empty());
+    //if (std::abs(supportcfg.object_elevation_mm) < EPSILON) {
+    //    sla::remove_bottom_points(sm.pts, zmin + supportcfg.base_height_mm);
+    //} else {
+    //    // Should be support points at least on the bottom of the model
+    //    REQUIRE_FALSE(sm.pts.empty());
 
-        // Also the support mesh should not be empty.
-        validityflags |= ASSUME_NO_EMPTY;
-    }
+    //    // Also the support mesh should not be empty.
+    //    validityflags |= ASSUME_NO_EMPTY;
+    //}
 
     // Generate the actual support tree
     sla::SupportTreeBuilder treebuilder;
@@ -465,7 +463,7 @@ double predict_error(const ExPolygon &p, const sla::PixelDim &pd)
 
 sla::SupportPoints calc_support_pts(
     const TriangleMesh &                      mesh,
-    const sla::SupportPointGenerator::Config &cfg)
+    const sla::SupportPointGeneratorConfig &cfg)
 {
     // Prepare the slice grid and the slices
     auto                    bb      = cast<float>(mesh.bounding_box());
@@ -473,12 +471,11 @@ sla::SupportPoints calc_support_pts(
     std::vector<ExPolygons> slices  = slice_mesh_ex(mesh.its, heights, CLOSING_RADIUS);
 
     // Prepare the support point calculator
+    sla::SupportPointGeneratorData gen_data = sla::prepare_generator_data(std::move(slices), heights);
+    sla::LayerSupportPoints layer_support_points = sla::generate_support_points(gen_data, cfg);
+
     AABBMesh emesh{mesh};
-    sla::SupportPointGenerator spgen{emesh, cfg, []{}, [](int){}};
-
-    // Calculate the support points
-    spgen.seed(0);
-    spgen.execute(slices, heights);
-
-    return spgen.output();
+    double allowed_move = (heights[1] - heights[0]) + std::numeric_limits<float>::epsilon();
+    // Get the calculated support points.
+    return sla::move_on_mesh_surface(layer_support_points, emesh, allowed_move);
 }

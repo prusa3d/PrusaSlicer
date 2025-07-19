@@ -4,12 +4,11 @@
 ///|/
 #include "Time.hpp"
 
-#include <iomanip>
 #include <sstream>
 #include <chrono>
 #include <cassert>
 #include <ctime>
-#include <cstdio>
+#include <locale>
 
 #ifdef _MSC_VER
 #include <map>

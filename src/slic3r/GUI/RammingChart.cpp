@@ -115,6 +115,7 @@ void Chart::mouse_right_button_clicked(wxMouseEvent& event) {
 
 
 void Chart::mouse_clicked(wxMouseEvent& event) {
+    m_uniform = (event.GetModifiers() == wxMOD_CONTROL);
     wxPoint point = event.GetPosition();
     int button_index = which_button_is_clicked(point);
     if ( button_index != -1) {
@@ -136,7 +137,15 @@ void Chart::mouse_moved(wxMouseEvent& event) {
     }    
     int delta_x = pos.x - m_previous_mouse.x;
     int delta_y = pos.y - m_previous_mouse.y;
-    m_dragged->move(fixed_x?0:double(delta_x)/m_rect.GetWidth() * visible_area.m_width,-double(delta_y)/m_rect.GetHeight() * visible_area.m_height); 
+
+    double new_y = m_dragged->get_pos().m_y - double(delta_y) / m_rect.GetHeight() * visible_area.m_height;
+
+    if (m_uniform)
+        for (ButtonToDrag& b : m_buttons)
+            b.move(fixed_x?0:double(delta_x)/m_rect.GetWidth() * visible_area.m_width, new_y - b.get_pos().m_y); 
+    else
+        m_dragged->move(fixed_x?0:double(delta_x)/m_rect.GetWidth() * visible_area.m_width, new_y - m_dragged->get_pos().m_y); 
+
     m_previous_mouse = pos;
     recalculate_line();
 }
@@ -263,7 +272,7 @@ std::vector<float> Chart::get_ramming_speed(float sampling) const {
     std::vector<float> speeds_out;
     
     const int number_of_samples = std::round( visible_area.m_width / sampling);
-    if (number_of_samples>0) {
+    if (number_of_samples>0 && !m_line_to_draw.empty()) {
         const int dx = (m_line_to_draw.size()-1) / number_of_samples;
         for (int j=0;j<number_of_samples;++j) {
             float left =  screen_to_math(wxPoint(0,m_line_to_draw[j*dx])).m_y;

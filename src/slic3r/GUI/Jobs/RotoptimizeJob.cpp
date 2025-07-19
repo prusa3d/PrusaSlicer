@@ -121,6 +121,7 @@ void RotoptimizeJob::finalize(bool canceled, std::exception_ptr &eptr)
 
         // Correct the z offset of the object which was corrupted be
         // the rotation
+        o->invalidate_bounding_box();
         o->ensure_on_bed();
     }
 

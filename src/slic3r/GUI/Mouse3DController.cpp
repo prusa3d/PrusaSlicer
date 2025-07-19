@@ -451,11 +451,11 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
     Size cnv_size = canvas.get_canvas_size();
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
-    imgui.set_next_window_pos(0.5f * (float)cnv_size.get_width(), 0.5f * (float)cnv_size.get_height(), ImGuiCond_Always, 0.5f, 0.5f);
+    ImGuiPureWrap::set_next_window_pos(0.5f * (float)cnv_size.get_width(), 0.5f * (float)cnv_size.get_height(), ImGuiCond_Always, 0.5f, 0.5f);
 
     static ImVec2 last_win_size(0.0f, 0.0f);
     bool shown = true;
-    if (imgui.begin(_L("3Dconnexion settings"), &shown, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse)) {
+    if (ImGuiPureWrap::begin(_u8L("3Dconnexion settings"), &shown, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse)) {
         if (shown) {
             ImVec2 win_size = ImGui::GetWindowSize();
             if (last_win_size.x != win_size.x || last_win_size.y != win_size.y) {
@@ -466,12 +466,12 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
             }
 
             const ImVec4& color = ImGui::GetStyleColorVec4(ImGuiCol_Separator);
-            imgui.text_colored(color, _L("Device:"));
+            ImGuiPureWrap::text_colored(color, _u8L("Device:"));
             ImGui::SameLine();
-            imgui.text(m_device_str);
+            ImGuiPureWrap::text(m_device_str);
 
             ImGui::Separator();
-            imgui.text_colored(color, _L("Speed:"));
+            ImGuiPureWrap::text_colored(color, _u8L("Speed:"));
 
             float translation_scale = float(params_copy.translation.scale) / float(Params::DefaultTranslationScale);
             if (imgui.slider_float(_L("Translation"), &translation_scale, float(Params::MinTranslationScale), float(Params::MaxTranslationScale), "%.1f")) {
@@ -492,7 +492,7 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
             }
 
             ImGui::Separator();
-            imgui.text_colored(color, _L("Deadzone:"));
+            ImGuiPureWrap::text_colored(color, _u8L("Deadzone:"));
 
             float translation_deadzone = (float)params_copy.translation.deadzone;
             if (imgui.slider_float(_L("Translation") + "/" + _L("Zoom"), &translation_deadzone, 0.0f, (float)Params::MaxTranslationDeadzone, "%.2f")) {
@@ -507,10 +507,10 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
             }
 
             ImGui::Separator();
-            imgui.text_colored(color, _L("Options:"));
+            ImGuiPureWrap::text_colored(color, _u8L("Options:"));
 
             bool swap_yz = params_copy.swap_yz;
-            if (imgui.checkbox(_L("Swap Y/Z axes"), swap_yz)) {
+            if (ImGuiPureWrap::checkbox(_u8L("Swap Y/Z axes"), swap_yz)) {
                 params_copy.swap_yz = swap_yz;
                 params_changed = true;
             }
@@ -518,14 +518,14 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
 #if ENABLE_3DCONNEXION_DEVICES_DEBUG_OUTPUT
             ImGui::Separator();
             ImGui::Separator();
-            imgui.text_colored(color, "DEBUG:");
-            imgui.text_colored(color, "Vectors:");
+            ImGuiPureWrap::text_colored(color, "DEBUG:");
+            ImGuiPureWrap::text_colored(color, "Vectors:");
             Vec3f translation = m_state.get_first_vector_of_type(State::QueueItem::TranslationType).cast<float>();
             Vec3f rotation = m_state.get_first_vector_of_type(State::QueueItem::RotationType).cast<float>();
             ImGui::InputFloat3("Translation##2", translation.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
             ImGui::InputFloat3("Rotation##3", rotation.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
 
-            imgui.text_colored(color, "Queue size:");
+            ImGuiPureWrap::text_colored(color, "Queue size:");
 
             int input_queue_size_current[2] = { int(m_state.input_queue_size_current()), int(m_state.input_queue_max_size_achieved) };
             ImGui::InputInt2("Current", input_queue_size_current, ImGuiInputTextFlags_ReadOnly);
@@ -539,13 +539,13 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
             }
 
             ImGui::Separator();
-            imgui.text_colored(color, "Camera:");
+            ImGuiPureWrap::text_colored(color, "Camera:");
             Vec3f target = wxGetApp().plater()->get_camera().get_target().cast<float>();
             ImGui::InputFloat3("Target", target.data(), "%.3f", ImGuiInputTextFlags_ReadOnly);
 #endif // ENABLE_3DCONNEXION_DEVICES_DEBUG_OUTPUT
 
             ImGui::Separator();
-            if (imgui.button(_L("Close"))) {
+            if (ImGuiPureWrap::button(_u8L("Close"))) {
                 // the user clicked on the [Close] button
                 m_settings_dialog_closed_by_user = true;
                 canvas.set_as_dirty();
@@ -558,7 +558,7 @@ void Mouse3DController::render_settings_dialog(GLCanvas3D& canvas) const
         }
     }
 
-    imgui.end();
+    ImGuiPureWrap::end();
 
     if (params_changed) {
         // Synchronize front end parameters to back end.
@@ -976,12 +976,12 @@ bool Mouse3DController::connect_device()
     if (m_device != nullptr) {
         wchar_t buffer[1024];
         hid_get_manufacturer_string(m_device, buffer, 1024);
-        m_device_str = boost::nowide::narrow(buffer);
+        m_device_str = into_u8(buffer);
         // #3479 seems to show that sometimes an extra whitespace is added, so we remove it
         boost::algorithm::trim(m_device_str);
 
         hid_get_product_string(m_device, buffer, 1024);
-        m_device_str += "/" + boost::nowide::narrow(buffer);
+        m_device_str += "/" + into_u8(buffer);
         // #3479 seems to show that sometimes an extra whitespace is added, so we remove it
         boost::algorithm::trim(m_device_str);
 

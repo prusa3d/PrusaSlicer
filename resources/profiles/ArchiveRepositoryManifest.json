@@ -1,0 +1,33 @@
+[{
+	"name": "Prusa FFF",
+	"description": "Prusa FFF printers",
+	"visibility": "",
+	"id": "prusa-fff",
+	"url": "https://preset-repo-api.prusa3d.com/v1/repos/prusa-fff/",
+	"index_url": "https://preset-repo-api.prusa3d.com/v1/repos/prusa-fff/vendor_indices.zip",
+	"selected": 1
+}, {
+	"name": "Prusa SLA",
+	"description": "Prusa SLA printers",
+	"visibility": "",
+	"id": "prusa-sla",
+	"url": "https://preset-repo-api.prusa3d.com/v1/repos/prusa-sla/",
+	"index_url": "https://preset-repo-api.prusa3d.com/v1/repos/prusa-sla/vendor_indices.zip",
+	"selected": 1
+}, {
+	"name": "Other FFF",
+	"description": "FFF Printers by other vendors",
+	"visibility": "",
+	"id": "non-prusa-fff",
+	"url": "https://preset-repo-api.prusa3d.com/v1/repos/non-prusa-fff/",
+	"index_url": "https://preset-repo-api.prusa3d.com/v1/repos/non-prusa-fff/vendor_indices.zip",
+	"selected": 1
+}, {
+	"name": "Other SLA",
+	"description": "SLA printers by other vendors",
+	"visibility": "",
+	"id": "non-prusa-sla",
+	"url": "https://preset-repo-api.prusa3d.com/v1/repos/non-prusa-sla/",
+	"index_url": "https://preset-repo-api.prusa3d.com/v1/repos/non-prusa-sla/vendor_indices.zip",
+	"selected": 1
+}]

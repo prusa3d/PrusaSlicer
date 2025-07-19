@@ -7,10 +7,25 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstdlib>
 
 #include "Point.hpp"
 #include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 namespace EdgeGrid {

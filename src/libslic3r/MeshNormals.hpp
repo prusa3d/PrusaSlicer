@@ -5,12 +5,17 @@
 #ifndef MESHNORMALS_HPP
 #define MESHNORMALS_HPP
 
-#include "AABBMesh.hpp"
+#include <Eigen/Geometry>
+#include <functional>
+#include <vector>
 
+#include "AABBMesh.hpp"
 #include "libslic3r/Execution/ExecutionSeq.hpp"
 #include "libslic3r/Execution/ExecutionTBB.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
+class AABBMesh;
 
 // Get a good approximation of the normal for any picking point on the mesh.
 // For points projecting to a face, this is the face normal, but when the

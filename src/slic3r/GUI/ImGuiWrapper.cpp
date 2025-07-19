@@ -46,6 +46,43 @@
 // suggest location
 #include "libslic3r/ClipperUtils.hpp" // Slic3r::intersection
 
+
+// Following two sets keeps characters that ImGui tried to render, but they were not in the atlas,
+// and ones that we already tried to add into the atlas.
+std::set<ImWchar> s_missing_chars;
+std::set<ImWchar> s_fixed_chars;
+bool              s_font_cjk;
+
+// This is a free function that ImGui calls when it renders
+// a fallback glyph for c.
+void imgui_rendered_fallback_glyph(ImWchar c)
+{
+    if (c == 0)
+        return;
+
+    if (ImGui::GetIO().Fonts->Fonts[0] == ImGui::GetFont()) {
+        // Only do this when we are using the default ImGui font. Otherwise this would conflict with
+        // EmbossStyleManager's font handling and we would load glyphs needlessly.
+        auto it = s_fixed_chars.find(c);
+        if (it == s_fixed_chars.end()) {
+            // This is the first time we are trying to fix this character.
+            s_missing_chars.emplace(c);
+        } else {
+            // We already tried to add this, but it is still not there. There is a chance
+            // that loading the CJK font would make this available.
+            if (! s_font_cjk) {
+                s_font_cjk = true;
+                s_missing_chars.emplace(c);
+                s_fixed_chars.erase(it);
+            } else {
+                // We did everything we could. The glyph was not available.
+                // Do not try to add it anymore.
+            }
+        }
+    }
+}
+
+
 namespace Slic3r {
 namespace GUI {
 
@@ -73,6 +110,11 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::PlugMarker            , "plug"                          },
     {ImGui::DowelMarker           , "dowel"                         },
     {ImGui::SnapMarker            , "snap"                          },
+    {ImGui::HorizontalHide        , "horizontal_hide"               },
+    {ImGui::HorizontalShow        , "horizontal_show"               },
+    {ImGui::PrintIdle             , "print_idle"                    },
+    {ImGui::PrintRunning          , "print_running"                 },
+    {ImGui::PrintFinished         , "print_finished"                },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
@@ -114,18 +156,31 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::SlaViewProcessed        , "sla_view_processed"              },
 };
 
-static const std::map<const wchar_t, std::string> font_icons_extra_large = {
-    {ImGui::ClippyMarker            , "notification_clippy"             },
+static const std::map<const wchar_t, std::string> font_icons_medium = {
+    {ImGui::Lock                    , "lock_closed"                     },
+    {ImGui::LockHovered             , "lock_closed_f"                   },
+    {ImGui::Unlock                  , "lock_open"                       },
+    {ImGui::UnlockHovered           , "lock_open_f"                     },
+    {ImGui::DSRevert                , "undo"                            },
+    {ImGui::DSRevertHovered         , "undo_f"                          },
+    {ImGui::DSSettings              , "cog"                             },
+    {ImGui::DSSettingsHovered       , "cog_f"                           },
+
+    {ImGui::ErrorTick               , "error_tick"                      },
+    {ImGui::ErrorTickHovered        , "error_tick_f"                    },
+    {ImGui::PausePrint              , "pause_print"                     },
+    {ImGui::PausePrintHovered       , "pause_print_f"                   },
+    {ImGui::EditGCode               , "edit_gcode"                      },
+    {ImGui::EditGCodeHovered        , "edit_gcode_f"                    },
+    {ImGui::RemoveTick              , "colorchange_del"                 },
+    {ImGui::RemoveTickHovered       , "colorchange_del_f"               },
 };
 
-const ImVec4 ImGuiWrapper::COL_GREY_DARK         = { 0.33f, 0.33f, 0.33f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_GREY_LIGHT        = { 0.4f, 0.4f, 0.4f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_DARK       = { 0.67f, 0.36f, 0.19f, 1.0f };
-const ImVec4 ImGuiWrapper::COL_ORANGE_LIGHT      = to_ImVec4(ColorRGBA::ORANGE());
-const ImVec4 ImGuiWrapper::COL_WINDOW_BACKGROUND = { 0.13f, 0.13f, 0.13f, 0.8f };
-const ImVec4 ImGuiWrapper::COL_BUTTON_BACKGROUND = COL_ORANGE_DARK;
-const ImVec4 ImGuiWrapper::COL_BUTTON_HOVERED    = COL_ORANGE_LIGHT;
-const ImVec4 ImGuiWrapper::COL_BUTTON_ACTIVE     = COL_BUTTON_HOVERED;
+static const std::map<const wchar_t, std::string> font_icons_extra_large = {
+    {ImGui::ClippyMarker            , "notification_clippy"             },
+    {ImGui::SliceAllBtnIcon         , "slice_all"                       },
+    {ImGui::WarningMarkerDisabled   , "notification_warning_grey"       },
+};
 
 ImGuiWrapper::ImGuiWrapper()
 {
@@ -135,6 +190,47 @@ ImGuiWrapper::ImGuiWrapper()
     init_style();
 
     ImGui::GetIO().IniFilename = nullptr;
+
+    static const ImWchar ranges_latin2[] =
+    {
+        0x0020, 0x00FF, // Basic Latin + Latin Supplement
+        0x0100, 0x017F, // Latin Extended-A
+        0,
+    };
+    static const ImWchar ranges_turkish[] = {
+	    0x0020, 0x01FF, // Basic Latin + Latin Supplement
+	    0x0100, 0x017F, // Latin Extended-A
+	    0x0180, 0x01FF, // Turkish
+	    0,
+    };
+    static const ImWchar ranges_vietnamese[] =
+    {
+        0x0020, 0x00FF, // Basic Latin
+        0x0102, 0x0103,
+        0x0110, 0x0111,
+        0x0128, 0x0129,
+        0x0168, 0x0169,
+        0x01A0, 0x01A1,
+        0x01AF, 0x01B0,
+        0x1EA0, 0x1EF9,
+        0,
+    };
+
+    m_lang_glyphs_info.emplace_back("cs",   ranges_latin2, false);
+    m_lang_glyphs_info.emplace_back("pl",   ranges_latin2, false);
+    m_lang_glyphs_info.emplace_back("hu",   ranges_latin2, false);
+    m_lang_glyphs_info.emplace_back("sl",   ranges_latin2, false);
+    m_lang_glyphs_info.emplace_back("ru",   ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(), false); // Default + about 400 Cyrillic characters
+    m_lang_glyphs_info.emplace_back("uk",   ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(), false);
+    m_lang_glyphs_info.emplace_back("be",   ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(), false);
+    m_lang_glyphs_info.emplace_back("tr",   ranges_turkish,    false);
+    m_lang_glyphs_info.emplace_back("vi",   ranges_vietnamese, false);
+    m_lang_glyphs_info.emplace_back("ja",   ImGui::GetIO().Fonts->GetGlyphRangesJapanese(), true);         // Default + Hiragana, Katakana, Half-Width, Selection of 1946 Ideographs
+    m_lang_glyphs_info.emplace_back("ko",   ImGui::GetIO().Fonts->GetGlyphRangesKorean(),   true);         // Default + Korean characters
+    m_lang_glyphs_info.emplace_back("zh_TW",ImGui::GetIO().Fonts->GetGlyphRangesChineseFull(), true);      // Traditional Chinese: Default + Half-Width + Japanese Hiragana/Katakana + full set of about 21000 CJK Unified Ideographs
+    m_lang_glyphs_info.emplace_back("zh",   ImGui::GetIO().Fonts->GetGlyphRangesChineseSimplifiedCommon(), true); // Simplified Chinese: Default + Half-Width + Japanese Hiragana/Katakana + set of 2500 CJK Unified Ideographs for common simplified Chinese
+    m_lang_glyphs_info.emplace_back("th",   ImGui::GetIO().Fonts->GetGlyphRangesThai(),     false);
+    m_lang_glyphs_info.emplace_back("else", ImGui::GetIO().Fonts->GetGlyphRangesDefault(),  false);
 }
 
 ImGuiWrapper::~ImGuiWrapper()
@@ -154,73 +250,22 @@ void ImGuiWrapper::set_language(const std::string &language)
     }
 
     const ImWchar *ranges = nullptr;
-    size_t idx = language.find('_');
-    std::string lang = (idx == std::string::npos) ? language : language.substr(0, idx);
-    static const ImWchar ranges_latin2[] =
-    {
-        0x0020, 0x00FF, // Basic Latin + Latin Supplement
-        0x0100, 0x017F, // Latin Extended-A
-        0,
-    };
-	static const ImWchar ranges_turkish[] = {
-		0x0020, 0x01FF, // Basic Latin + Latin Supplement
-		0x0100, 0x017F, // Latin Extended-A
-		0x0180, 0x01FF, // Turkish
-		0,
-	};
-    static const ImWchar ranges_vietnamese[] =
-    {
-        0x0020, 0x00FF, // Basic Latin
-        0x0102, 0x0103,
-        0x0110, 0x0111,
-        0x0128, 0x0129,
-        0x0168, 0x0169,
-        0x01A0, 0x01A1,
-        0x01AF, 0x01B0,
-        0x1EA0, 0x1EF9,
-        0,
-    };
-    m_font_cjk = false;
-    if (lang == "cs" || lang == "pl" || lang == "hu") {
-        ranges = ranges_latin2;
-    } else if (lang == "ru" || lang == "uk" || lang == "be") {
-        ranges = ImGui::GetIO().Fonts->GetGlyphRangesCyrillic(); // Default + about 400 Cyrillic characters
-    } else if (lang == "tr") {
-        ranges = ranges_turkish;
-    } else if (lang == "vi") {
-        ranges = ranges_vietnamese;
-    } else if (lang == "ja") {
-        ranges = ImGui::GetIO().Fonts->GetGlyphRangesJapanese(); // Default + Hiragana, Katakana, Half-Width, Selection of 1946 Ideographs
-        m_font_cjk = true;
-    } else if (lang == "ko") {
-        ranges = ImGui::GetIO().Fonts->GetGlyphRangesKorean(); // Default + Korean characters
-        m_font_cjk = true;
-    } else if (lang == "zh") {
-        ranges = (language == "zh_TW") ?
-            // Traditional Chinese
-            // Default + Half-Width + Japanese Hiragana/Katakana + full set of about 21000 CJK Unified Ideographs
-            ImGui::GetIO().Fonts->GetGlyphRangesChineseFull() :
-            // Simplified Chinese
-            // Default + Half-Width + Japanese Hiragana/Katakana + set of 2500 CJK Unified Ideographs for common simplified Chinese
-            ImGui::GetIO().Fonts->GetGlyphRangesChineseSimplifiedCommon();
-        m_font_cjk = true;
-    } else if (lang == "th") {
-        ranges = ImGui::GetIO().Fonts->GetGlyphRangesThai(); // Default + Thai characters
-    } else {
-        ranges = ImGui::GetIO().Fonts->GetGlyphRangesDefault(); // Basic Latin, Extended Latin
+
+    // Get glyph ranges for current language, std CLK flag to inform which font files need to be loaded.
+    for (const auto& [lang_str, lang_ranges, lang_cjk] : m_lang_glyphs_info) {
+        if (boost::istarts_with(language, lang_str) || lang_str == "else") {
+            ranges = lang_ranges;
+            s_font_cjk = lang_cjk;
+        }
     }
+
+    s_missing_chars.clear();
+    s_fixed_chars.clear();
 
     if (ranges != m_glyph_ranges) {
         m_glyph_ranges = ranges;
         destroy_font();
     }
-}
-
-void ImGuiWrapper::set_display_size(float w, float h)
-{
-    ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(w, h);
-    io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
 }
 
 void ImGuiWrapper::set_scaling(float font_size, float scale_style, float scale_both)
@@ -261,9 +306,9 @@ bool ImGuiWrapper::update_mouse_data(wxMouseEvent& evt)
     unsigned buttons = (evt.LeftIsDown() ? 1 : 0) | (evt.RightIsDown() ? 2 : 0) | (evt.MiddleIsDown() ? 4 : 0);
     m_mouse_buttons = buttons;
 
-    if (want_mouse())
+    if (ImGuiPureWrap::want_mouse())
         new_frame();
-    return want_mouse();
+    return ImGuiPureWrap::want_mouse();
 }
 
 bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
@@ -310,7 +355,7 @@ bool ImGuiWrapper::update_key_data(wxKeyEvent &evt)
         io.KeyAlt = evt.AltDown();
         io.KeySuper = evt.MetaDown();
     }
-    bool ret = want_keyboard() || want_text_input();
+    bool ret = ImGuiPureWrap::want_keyboard() || ImGuiPureWrap::want_text_input();
     if (ret)
         new_frame();
     return ret;
@@ -365,137 +410,23 @@ void ImGuiWrapper::render()
     ImGui::Render();
     render_draw_data(ImGui::GetDrawData());
     m_new_frame_open = false;
-}
 
-ImVec2 ImGuiWrapper::calc_text_size(std::string_view text,
-                                    bool  hide_text_after_double_hash,
-                                    float wrap_width)
-{
-    return ImGui::CalcTextSize(text.data(), text.data() + text.length(),
-                               hide_text_after_double_hash, wrap_width);
-}
-
-ImVec2 ImGuiWrapper::calc_text_size(const std::string& text,
-                                    bool  hide_text_after_double_hash,
-                                    float wrap_width)
-{
-    return ImGui::CalcTextSize(text.c_str(), NULL, hide_text_after_double_hash, wrap_width);
-}
-
-ImVec2 ImGuiWrapper::calc_text_size(const wxString &text,
-                                    bool  hide_text_after_double_hash,
-                                    float wrap_width)
-{
-    auto text_utf8 = into_u8(text);
-    ImVec2 size = ImGui::CalcTextSize(text_utf8.c_str(), NULL, hide_text_after_double_hash, wrap_width);
-
-/*#ifdef __linux__
-    size.x *= m_style_scaling;
-    size.y *= m_style_scaling;
-#endif*/
-
-    return size;
-}
-
-ImVec2 ImGuiWrapper::calc_button_size(const wxString &text, const ImVec2 &button_size) const
-{
-    const ImVec2        text_size = this->calc_text_size(text);
-    const ImGuiContext &g         = *GImGui;
-    const ImGuiStyle   &style     = g.Style;
-
-    return ImGui::CalcItemSize(button_size, text_size.x + style.FramePadding.x * 2.0f, text_size.y + style.FramePadding.y * 2.0f);
-}
-
-ImVec2 ImGuiWrapper::get_item_spacing() const
-{
-    const ImGuiContext &g     = *GImGui;
-    const ImGuiStyle   &style = g.Style;
-    return style.ItemSpacing;
-}
-
-float ImGuiWrapper::get_slider_float_height() const
-{
-    const ImGuiContext& g = *GImGui;
-    const ImGuiStyle& style = g.Style;
-    return g.FontSize + style.FramePadding.y * 2.0f + style.ItemSpacing.y;
-}
-
-void ImGuiWrapper::set_next_window_pos(float x, float y, int flag, float pivot_x, float pivot_y)
-{
-    ImGui::SetNextWindowPos(ImVec2(x, y), (ImGuiCond)flag, ImVec2(pivot_x, pivot_y));
-    ImGui::SetNextWindowSize(ImVec2(0.0, 0.0));
-}
-
-void ImGuiWrapper::set_next_window_bg_alpha(float alpha)
-{
-    ImGui::SetNextWindowBgAlpha(alpha);
-}
-
-void ImGuiWrapper::set_next_window_size(float x, float y, ImGuiCond cond)
-{
-	ImGui::SetNextWindowSize(ImVec2(x, y), cond);
-}
-
-bool ImGuiWrapper::begin(const std::string &name, int flags)
-{
-    return ImGui::Begin(name.c_str(), nullptr, (ImGuiWindowFlags)flags);
-}
-
-bool ImGuiWrapper::begin(const wxString &name, int flags)
-{
-    return begin(into_u8(name), flags);
-}
-
-bool ImGuiWrapper::begin(const std::string& name, bool* close, int flags)
-{
-    return ImGui::Begin(name.c_str(), close, (ImGuiWindowFlags)flags);
-}
-
-bool ImGuiWrapper::begin(const wxString& name, bool* close, int flags)
-{
-    return begin(into_u8(name), close, flags);
-}
-
-void ImGuiWrapper::end()
-{
-    ImGui::End();
-}
-
-bool ImGuiWrapper::button(const wxString &label, const wxString& tooltip)
-{
-    auto label_utf8 = into_u8(label);
-    const bool ret = ImGui::Button(label_utf8.c_str());
-
-    if (!tooltip.IsEmpty() && ImGui::IsItemHovered()) {
-        auto tooltip_utf8 = into_u8(tooltip);
-        ImGui::SetTooltip(tooltip_utf8.c_str(), nullptr);
+    if (! s_missing_chars.empty()) {
+        // If there were some characters that ImGui was unable to render, we will destroy current font.
+        // It will be rebuilt in the next call of new_frame including these.
+        destroy_font();
+        this->set_requires_extra_frame();
     }
-
-    return ret;
 }
 
-bool ImGuiWrapper::button(const wxString& label, float width, float height)
-{
-	auto label_utf8 = into_u8(label);
-	return ImGui::Button(label_utf8.c_str(), ImVec2(width, height));
-}
-
-bool ImGuiWrapper::button(const wxString& label, const ImVec2 &size, bool enable)
+bool ImGuiWrapper::button(const std::string& label, const ImVec2 &size, bool enable)
 {
     disabled_begin(!enable);
 
-    auto label_utf8 = into_u8(label);
-    bool res = ImGui::Button(label_utf8.c_str(), size);
+    bool res = ImGui::Button(label.c_str(), size);
 
     disabled_end();
     return (enable) ? res : false;
-}
-
-
-bool ImGuiWrapper::radio_button(const wxString &label, bool active)
-{
-    auto label_utf8 = into_u8(label);
-    return ImGui::RadioButton(label_utf8.c_str(), active);
 }
 
 void ImGuiWrapper::draw_icon(ImGuiWindow& window, const ImVec2& pos, float size, wchar_t icon_id)
@@ -507,120 +438,7 @@ void ImGuiWrapper::draw_icon(ImGuiWindow& window, const ImVec2& pos, float size,
     const ImFontAtlas::CustomRect* const rect = GetTextureCustomRect(icon_id);
     const ImVec2 uv0 = { static_cast<float>(rect->X) / tex_w, static_cast<float>(rect->Y) / tex_h };
     const ImVec2 uv1 = { static_cast<float>(rect->X + rect->Width) / tex_w, static_cast<float>(rect->Y + rect->Height) / tex_h };
-    window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGuiWrapper::to_ImU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
-}
-
-bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool active,
-    std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback)
-{
-    ImGuiWindow& window = *ImGui::GetCurrentWindow();
-    if (window.SkipItems)
-        return false;
-
-    ImGuiContext& g = *GImGui;
-    const ImGuiStyle& style = g.Style;
-    const ImGuiID id = window.GetID(name.c_str());
-
-    const ImVec2 pos = window.DC.CursorPos;
-    const ImRect total_bb(pos, pos + ImVec2(size, size + style.FramePadding.y * 2.0f));
-    ImGui::ItemSize(total_bb, style.FramePadding.y);
-    if (!ImGui::ItemAdd(total_bb, id))
-        return false;
-
-    bool hovered, held;
-    bool pressed = ImGui::ButtonBehavior(total_bb, id, &hovered, &held);
-    if (pressed)
-        ImGui::MarkItemEdited(id);
-
-    if (hovered)
-        window.DrawList->AddRect({ pos.x - 1.0f, pos.y - 1.0f }, { pos.x + size + 1.0f, pos.y + size + 1.0f }, ImGui::GetColorU32(ImGuiCol_CheckMark));
-
-    if (active)
-        window.DrawList->AddRect(pos, { pos.x + size, pos.y + size }, ImGui::GetColorU32(ImGuiCol_CheckMark));
-
-    draw_callback(window, pos, size);
-
-    IMGUI_TEST_ENGINE_ITEM_INFO(id, label, window.DC.LastItemStatusFlags);
-    return pressed;
-}
-
-bool ImGuiWrapper::checkbox(const wxString &label, bool &value)
-{
-    auto label_utf8 = into_u8(label);
-    return ImGui::Checkbox(label_utf8.c_str(), &value);
-}
-
-void ImGuiWrapper::text(const char *label)
-{
-    ImGui::Text("%s", label);
-}
-
-void ImGuiWrapper::text(const std::string &label)
-{
-    ImGuiWrapper::text(label.c_str());
-}
-
-void ImGuiWrapper::text(const wxString &label)
-{
-    auto label_utf8 = into_u8(label);
-    ImGuiWrapper::text(label_utf8.c_str());
-}
-
-void ImGuiWrapper::text_colored(const ImVec4& color, const char* label)
-{
-    ImGui::TextColored(color, "%s", label);
-}
-
-void ImGuiWrapper::text_colored(const ImVec4& color, const std::string& label)
-{
-    ImGuiWrapper::text_colored(color, label.c_str());
-}
-
-void ImGuiWrapper::text_colored(const ImVec4& color, const wxString& label)
-{
-    auto label_utf8 = into_u8(label);
-    ImGuiWrapper::text_colored(color, label_utf8.c_str());
-}
-
-void ImGuiWrapper::text_wrapped(const char *label, float wrap_width)
-{
-    ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + wrap_width);
-    this->text(label);
-    ImGui::PopTextWrapPos();
-}
-
-void ImGuiWrapper::text_wrapped(const std::string &label, float wrap_width)
-{
-    this->text_wrapped(label.c_str(), wrap_width);
-}
-
-void ImGuiWrapper::text_wrapped(const wxString &label, float wrap_width)
-{
-    auto label_utf8 = into_u8(label);
-    this->text_wrapped(label_utf8.c_str(), wrap_width);
-}
-
-void ImGuiWrapper::tooltip(const char *label, float wrap_width)
-{
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 4.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 4.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 8.0f, 8.0f });
-    ImGui::BeginTooltip();
-    ImGui::PushTextWrapPos(wrap_width);
-    ImGui::TextUnformatted(label);
-    ImGui::PopTextWrapPos();
-    ImGui::EndTooltip();
-    ImGui::PopStyleVar(3);
-}
-
-void ImGuiWrapper::tooltip(const wxString &label, float wrap_width)
-{
-    tooltip(label.ToUTF8().data(), wrap_width);
-}
-
-ImVec2 ImGuiWrapper::get_slider_icon_size() const
-{
-    return this->calc_button_size(std::wstring(&ImGui::SliderFloatEditBtnIcon, 1));
+    window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGuiPSWrap::to_ImU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
 }
 
 bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float v_max, const char* format/* = "%.3f"*/, float power/* = 1.0f*/, bool clamp /*= true*/, const wxString& tooltip /*= ""*/, bool show_edit_btn /*= true*/)
@@ -649,7 +467,7 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         m_last_slider_status.can_take_snapshot = ImGui::IsItemClicked();
 
     if (!tooltip.empty() && ImGui::IsItemHovered())
-        this->tooltip(into_u8(tooltip).c_str(), max_tooltip_width);
+        ImGuiPureWrap::tooltip(into_u8(tooltip).c_str(), max_tooltip_width);
 
     if (clamp)
         *v = std::clamp(*v, v_min, v_max);
@@ -675,7 +493,7 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
 
         int frame_padding = style.ItemSpacing.y / 2; // keep same line height for input and slider
         const ImTextureID tex_id = io.Fonts->TexID;
-        if (image_button(tex_id, size, uv0, uv1, frame_padding, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
+        if (ImGuiPureWrap::image_button(tex_id, size, uv0, uv1, frame_padding, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
             if (!slider_editing)
                 ImGui::SetKeyboardFocusHere(-1);
             else
@@ -686,7 +504,7 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         ImGui::PopStyleColor(3);
 
         if (ImGui::IsItemHovered())
-            this->tooltip(into_u8(_L("Edit")).c_str(), max_tooltip_width);
+            ImGuiPureWrap::tooltip(into_u8(_L("Edit")).c_str(), max_tooltip_width);
 
         ImGui::PopStyleVar();
     }
@@ -700,7 +518,7 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
 
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 1, style.ItemSpacing.y });
         ImGui::SameLine();
-        this->text(out_label.c_str());
+        ImGuiPureWrap::text(out_label.c_str());
         ImGui::PopStyleVar();
     }
 
@@ -718,49 +536,7 @@ bool ImGuiWrapper::slider_float(const wxString& label, float* v, float v_min, fl
     return this->slider_float(label_utf8.c_str(), v, v_min, v_max, format, power, clamp, tooltip, show_edit_btn);
 }
 
-static bool image_button_ex(ImGuiID id, ImTextureID texture_id, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec2& padding, const ImVec4& bg_col, const ImVec4& tint_col, ImGuiButtonFlags flags)
-{
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = ImGui::GetCurrentWindow();
-    if (window->SkipItems)
-        return false;
-
-    const ImRect bb(window->DC.CursorPos, window->DC.CursorPos + size + padding * 2);
-    ImGui::ItemSize(bb);
-    if (!ImGui::ItemAdd(bb, id))
-        return false;
-
-    bool hovered, held;
-    bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held, flags);
-
-    // Render
-    const ImU32 col = ImGui::GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
-    ImGui::RenderNavHighlight(bb, id);
-    ImGui::RenderFrame(bb.Min, bb.Max, col, true, ImClamp((float)ImMin(padding.x, padding.y), 0.0f, g.Style.FrameRounding));
-    if (bg_col.w > 0.0f)
-        window->DrawList->AddRectFilled(bb.Min + padding, bb.Max - padding, ImGui::GetColorU32(bg_col));
-    window->DrawList->AddImage(texture_id, bb.Min + padding, bb.Max - padding, uv0, uv1, ImGui::GetColorU32(tint_col));
-
-    return pressed;
-}
-
-bool ImGuiWrapper::image_button(ImTextureID user_texture_id, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, int frame_padding, const ImVec4& bg_col, const ImVec4& tint_col, ImGuiButtonFlags flags)
-{
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-    if (window->SkipItems)
-        return false;
-
-    // Default to using texture ID as ID. User can still push string/integer prefixes.
-    ImGui::PushID((void*)(intptr_t)user_texture_id);
-    const ImGuiID id = window->GetID("#image");
-    ImGui::PopID();
-
-    const ImVec2 padding = (frame_padding >= 0) ? ImVec2((float)frame_padding, (float)frame_padding) : g.Style.FramePadding;
-    return image_button_ex(id, user_texture_id, size, uv0, uv1, padding, bg_col, tint_col, flags);
-}
-
-bool ImGuiWrapper::image_button(const wchar_t icon, const wxString& tooltip)
+bool ImGuiWrapper::image_button(const wchar_t icon, const std::string& tooltip, bool highlight_on_hover/* = true*/)
 {
     const ImGuiIO& io = ImGui::GetIO();
     const ImTextureID tex_id = io.Fonts->TexID;
@@ -771,111 +547,16 @@ bool ImGuiWrapper::image_button(const wchar_t icon, const wxString& tooltip)
     const ImVec2 size = { float(rect->Width), float(rect->Height) };
     const ImVec2 uv0 = ImVec2(float(rect->X) * inv_tex_w, float(rect->Y) * inv_tex_h);
     const ImVec2 uv1 = ImVec2(float(rect->X + rect->Width) * inv_tex_w, float(rect->Y + rect->Height) * inv_tex_h);
-    ImGui::PushStyleColor(ImGuiCol_Button, { 0.25f, 0.25f, 0.25f, 0.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.25f, 0.25f, 0.25f, 1.0f });
-    const bool res = image_button(tex_id, size, uv0, uv1);
+    ImGui::PushStyleColor(ImGuiCol_Button,        { 0.25f, 0.25f, 0.25f, 0.0f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {  0.4f, 0.4f,  0.4f,  highlight_on_hover ? 1.0f : 0.0f });
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,  { 0.25f, 0.25f, 0.25f, highlight_on_hover ? 1.0f : 0.0f });
+    const bool res = ImGuiPureWrap::image_button(tex_id, size, uv0, uv1);
     ImGui::PopStyleColor(3);
 
     if (!tooltip.empty() && ImGui::IsItemHovered())
-        this->tooltip(tooltip, ImGui::GetFontSize() * 20.0f);
+        ImGuiPureWrap::tooltip(tooltip, ImGui::GetFontSize() * 20.0f);
 
     return res;
-}
-
-bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags/* = 0*/, float label_width/* = 0.0f*/, float item_width/* = 0.0f*/)
-{
-    return combo(into_u8(label), options, selection, flags, label_width, item_width);
-}
-
-bool ImGuiWrapper::combo(const std::string& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags/* = 0*/, float label_width/* = 0.0f*/, float item_width/* = 0.0f*/)
-{
-    // this is to force the label to the left of the widget:
-    const bool hidden_label = boost::starts_with(label, "##");
-    if (!label.empty() && !hidden_label) {
-        text(label);
-        ImGui::SameLine(label_width);
-    }
-    ImGui::PushItemWidth(item_width);
-
-    int selection_out = selection;
-    bool res = false;
-
-    const char *selection_str = selection < int(options.size()) && selection >= 0 ? options[selection].c_str() : "";
-    if (ImGui::BeginCombo(hidden_label ? label.c_str() : ("##" + label).c_str(), selection_str, flags)) {
-        for (int i = 0; i < (int)options.size(); i++) {
-            if (ImGui::Selectable(options[i].c_str(), i == selection)) {
-                selection_out = i;
-                res = true;
-            }
-        }
-
-        ImGui::EndCombo();
-    }
-
-    selection = selection_out;
-    return res;
-}
-
-// Scroll up for one item 
-static void scroll_up()
-{
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-
-    float item_size_y = window->DC.PrevLineSize.y + g.Style.ItemSpacing.y;
-    float win_top = window->Scroll.y;
-
-    ImGui::SetScrollY(win_top - item_size_y);
-}
-
-// Scroll down for one item 
-static void scroll_down()
-{
-    ImGuiContext& g = *GImGui;
-    ImGuiWindow* window = g.CurrentWindow;
-
-    float item_size_y = window->DC.PrevLineSize.y + g.Style.ItemSpacing.y;
-    float win_top = window->Scroll.y;
-
-    ImGui::SetScrollY(win_top + item_size_y);
-}
-
-static void process_mouse_wheel(int& mouse_wheel)
-{
-    if (mouse_wheel > 0)
-        scroll_up();
-    else if (mouse_wheel < 0)
-        scroll_down();
-    mouse_wheel = 0;
-}
-
-bool ImGuiWrapper::undo_redo_list(const ImVec2& size, const bool is_undo, bool (*items_getter)(const bool , int , const char**), int& hovered, int& selected, int& mouse_wheel)
-{
-    bool is_hovered = false;
-    ImGui::ListBoxHeader("", size);
-
-    int i=0;
-    const char* item_text;
-    while (items_getter(is_undo, i, &item_text)) {
-        ImGui::Selectable(item_text, i < hovered);
-
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", item_text);
-            hovered = i;
-            is_hovered = true;
-        }
-
-        if (ImGui::IsItemClicked())
-            selected = i;
-        i++;
-    }
-
-    if (is_hovered)
-        process_mouse_wheel(mouse_wheel);
-
-    ImGui::ListBoxFooter();
-    return is_hovered;
 }
 
 // It's a copy of IMGui::Selactable function.
@@ -1149,12 +830,12 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
 
     // Process mouse wheel
     if (mouse_hovered > 0)
-        process_mouse_wheel(mouse_wheel);
+        ImGuiPureWrap::process_mouse_wheel(mouse_wheel);
 
     // process Up/DownArrows and Enter
     process_key_down(ImGuiKey_UpArrow, [&hovered_id, mouse_hovered]() {
         if (mouse_hovered > 0)
-            scroll_up();
+            ImGuiPureWrap::scroll_up();
         else {
             if (hovered_id > 0)
                 --hovered_id;
@@ -1164,7 +845,7 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
 
     process_key_down(ImGuiKey_DownArrow, [&hovered_id, mouse_hovered, i]() {
         if (mouse_hovered > 0)
-            scroll_down();
+            ImGuiPureWrap::scroll_down();
         else {
             if (hovered_id < 0)
                 hovered_id = 0;
@@ -1180,10 +861,10 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
 
     ImGui::ListBoxFooter();
 
-    auto check_box = [&edited, this](const wxString& label, bool& check) {
+    auto check_box = [&edited](const std::string& label, bool& check) {
         ImGui::SameLine();
         bool ch = check;
-        checkbox(label, ch);
+        ImGuiPureWrap::checkbox(label, ch);
         if (ImGui::IsItemClicked()) {
             check = !check;
             edited = true;
@@ -1193,16 +874,10 @@ void ImGuiWrapper::search_list(const ImVec2& size_, bool (*items_getter)(int, co
     ImGui::AlignTextToFramePadding();
 
     // add checkboxes for show/hide Categories and Groups
-    text(_L("Use for search")+":");
-    check_box(_L("Category"),   view_params.category);
+    ImGuiPureWrap::text(_u8L("Use for search")+":");
+    check_box(_u8L("Category"),   view_params.category);
     if (is_localized)
-        check_box(_L("Search in English"), view_params.english);
-}
-
-void ImGuiWrapper::title(const std::string& str)
-{
-    text(str);
-    ImGui::Separator();
+        check_box(_u8L("Search in English"), view_params.english);
 }
 
 void ImGuiWrapper::disabled_begin(bool disabled)
@@ -1225,54 +900,28 @@ void ImGuiWrapper::disabled_end()
     }
 }
 
-bool ImGuiWrapper::want_mouse() const
-{
-    return ImGui::GetIO().WantCaptureMouse;
-}
-
-bool ImGuiWrapper::want_keyboard() const
-{
-    return ImGui::GetIO().WantCaptureKeyboard;
-}
-
-bool ImGuiWrapper::want_text_input() const
-{
-    return ImGui::GetIO().WantTextInput;
-}
-
-bool ImGuiWrapper::want_any_input() const
-{
-    const auto io = ImGui::GetIO();
-    return io.WantCaptureMouse || io.WantCaptureKeyboard || io.WantTextInput;
-}
-
 ImFontAtlasCustomRect* ImGuiWrapper::GetTextureCustomRect(const wchar_t& tex_id)
 {
     auto item = m_custom_glyph_rects_ids.find(tex_id);
     return (item != m_custom_glyph_rects_ids.end()) ? ImGui::GetIO().Fonts->GetCustomRectByIndex(m_custom_glyph_rects_ids[tex_id]) : nullptr;
 }
 
-void ImGuiWrapper::disable_background_fadeout_animation()
-{
-    GImGui->DimBgRatio = 1.0f;
-}
-
-ImU32 ImGuiWrapper::to_ImU32(const ColorRGBA& color)
+ImU32 ImGuiPSWrap::to_ImU32(const ColorRGBA& color)
 {
     return ImGui::GetColorU32({ color.r(), color.g(), color.b(), color.a() });
 }
 
-ImVec4 ImGuiWrapper::to_ImVec4(const ColorRGBA& color)
+ImVec4 ImGuiPSWrap::to_ImVec4(const ColorRGBA& color)
 {
     return { color.r(), color.g(), color.b(), color.a() };
 }
 
-ColorRGBA ImGuiWrapper::from_ImU32(const ImU32& color)
+ColorRGBA ImGuiPSWrap::from_ImU32(const ImU32& color)
 {
     return from_ImVec4(ImGui::ColorConvertU32ToFloat4(color));
 }
 
-ColorRGBA ImGuiWrapper::from_ImVec4(const ImVec4& color)
+ColorRGBA ImGuiPSWrap::from_ImVec4(const ImVec4& color)
 {
     return { color.x, color.y, color.z, color.w };
 }
@@ -1293,58 +942,6 @@ static bool input_optional(std::optional<T> &v, Func& f, std::function<bool(cons
         }
     }
     return false;
-}
-
-bool ImGuiWrapper::input_optional_int(const char *        label,
-                                      std::optional<int>& v,
-                                      int                 step,
-                                      int                 step_fast,
-                                      ImGuiInputTextFlags flags,
-                                      int                 def_val)
-{
-    auto func = [&](int &value) {
-        return ImGui::InputInt(label, &value, step, step_fast, flags);
-    };
-    std::function<bool(const int &)> is_default = 
-        [def_val](const int &value) -> bool { return value == def_val; };
-    return input_optional(v, func, is_default, def_val);
-}
-
-bool ImGuiWrapper::input_optional_float(const char *          label,
-                                        std::optional<float> &v,
-                                        float                 step,
-                                        float                 step_fast,
-                                        const char *          format,
-                                        ImGuiInputTextFlags   flags,
-                                        float                 def_val)
-{
-    auto func = [&](float &value) {
-        return ImGui::InputFloat(label, &value, step, step_fast, format, flags);
-    };
-    std::function<bool(const float &)> is_default =
-        [def_val](const float &value) -> bool {
-        return std::fabs(value-def_val) <= std::numeric_limits<float>::epsilon();
-    };
-    return input_optional(v, func, is_default, def_val);
-}
-
-bool ImGuiWrapper::drag_optional_float(const char *          label,
-                                       std::optional<float> &v,
-                                       float                 v_speed,
-                                       float                 v_min,
-                                       float                 v_max,
-                                       const char *          format,
-                                       float                 power,
-                                       float                 def_val)
-{
-    auto func = [&](float &value) {
-        return ImGui::DragFloat(label, &value, v_speed, v_min, v_max, format, power);
-    };
-    std::function<bool(const float &)> is_default =
-        [def_val](const float &value) -> bool {
-        return std::fabs(value-def_val) <= std::numeric_limits<float>::epsilon();
-    };
-    return input_optional(v, func, is_default, def_val);
 }
 
 bool ImGuiWrapper::slider_optional_float(const char           *label,
@@ -1397,101 +994,6 @@ bool ImGuiWrapper::slider_optional_int(const char         *label,
             v.reset(); 
         return true;
     } else return false;
-}
-
-std::optional<ImVec2> ImGuiWrapper::change_window_position(const char *window_name, bool try_to_fix) {
-    ImGuiWindow *window = ImGui::FindWindowByName(window_name);
-    // is window just created
-    if (window == NULL)
-        return {};
-
-    // position of window on screen
-    ImVec2 position = window->Pos;
-    ImVec2 size     = window->SizeFull;
-
-    // screen size
-    ImVec2 screen = ImGui::GetMainViewport()->Size;
-
-    std::optional<ImVec2> output_window_offset;
-    if (position.x < 0) {
-        if (position.y < 0)
-            // top left 
-            output_window_offset = ImVec2(0, 0); 
-        else
-            // only left
-            output_window_offset = ImVec2(0, position.y); 
-    } else if (position.y < 0) {
-        // only top
-        output_window_offset = ImVec2(position.x, 0); 
-    } else if (screen.x < (position.x + size.x)) {
-        if (screen.y < (position.y + size.y))
-            // right bottom
-            output_window_offset = ImVec2(screen.x - size.x, screen.y - size.y);
-        else
-            // only right
-            output_window_offset = ImVec2(screen.x - size.x, position.y);
-    } else if (screen.y < (position.y + size.y)) {
-        // only bottom
-        output_window_offset = ImVec2(position.x, screen.y - size.y);
-    }
-
-    if (!try_to_fix && output_window_offset.has_value())
-        output_window_offset = ImVec2(-1, -1); // Put on default position
-
-    return output_window_offset;
-}
-
-void ImGuiWrapper::left_inputs() { 
-    ImGui::ClearActiveID(); 
-}
-
-std::string ImGuiWrapper::trunc(const std::string &text,
-                                float              width,
-                                const char *       tail)
-{
-    float text_width = ImGui::CalcTextSize(text.c_str()).x;
-    if (text_width < width) return text;
-    float tail_width = ImGui::CalcTextSize(tail).x;
-    assert(width > tail_width);
-    if (width <= tail_width) return "Error: Can't add tail and not be under wanted width.";
-    float allowed_width = width - tail_width;
-    
-    // guess approx count of letter
-    float average_letter_width = calc_text_size(std::string_view("n")).x; // average letter width
-    unsigned count_letter  = static_cast<unsigned>(allowed_width / average_letter_width);
-
-    std::string_view text_ = text;
-    std::string_view result_text = text_.substr(0, count_letter);
-    text_width = calc_text_size(result_text).x;
-    if (text_width < allowed_width) {
-        // increase letter count
-        while (count_letter < text.length()) {
-            ++count_letter;
-            std::string_view act_text = text_.substr(0, count_letter);
-            text_width = calc_text_size(act_text).x;
-            if (text_width > allowed_width) break;
-            result_text = act_text;
-        }
-    } else {
-        // decrease letter count
-        while (count_letter > 1) {
-            --count_letter;
-            result_text = text_.substr(0, count_letter);
-            text_width  = calc_text_size(result_text).x;
-            if (text_width < allowed_width) break;            
-        } 
-    }
-    return std::string(result_text) + tail;
-}
-
-void ImGuiWrapper::escape_double_hash(std::string &text)
-{
-    // add space between hashes
-    const std::string search  = "##";
-    const std::string replace = "# #";
-    size_t pos = 0;
-    while ((pos = text.find(search, pos)) != std::string::npos) 
-        text.replace(pos, search.length(), replace);
 }
 
 ImVec2 ImGuiWrapper::suggest_location(const ImVec2 &dialog_size,
@@ -1586,55 +1088,6 @@ void ImGuiWrapper::draw(
     }
 }
 
-void ImGuiWrapper::draw_cross_hair(const ImVec2 &position, float radius, ImU32 color, int num_segments, float thickness) {
-    auto draw_list = ImGui::GetOverlayDrawList();
-    draw_list->AddCircle(position, radius, color, num_segments, thickness);
-    auto dirs = {ImVec2{0, 1}, ImVec2{1, 0}, ImVec2{0, -1}, ImVec2{-1, 0}};
-    for (const ImVec2 &dir : dirs) {
-        ImVec2 start(position.x + dir.x * 0.5 * radius, position.y + dir.y * 0.5 * radius);
-        ImVec2 end(position.x + dir.x * 1.5 * radius, position.y + dir.y * 1.5 * radius);
-        draw_list->AddLine(start, end, color, thickness);
-    }
-}
-
-bool ImGuiWrapper::contain_all_glyphs(const ImFont      *font,
-                                     const std::string &text)
-{
-    if (font == nullptr) return false;
-    if (!font->IsLoaded()) return false;
-    const ImFontConfig *fc = font->ConfigData;
-    if (fc == nullptr) return false;
-    if (text.empty()) return true;
-    return is_chars_in_ranges(fc->GlyphRanges, text.c_str());
-}
-
-bool ImGuiWrapper::is_char_in_ranges(const ImWchar *ranges,
-                                     unsigned int   letter)
-{
-    for (const ImWchar *range = ranges; range[0] && range[1]; range += 2) {
-        ImWchar from = range[0];
-        ImWchar to   = range[1];
-        if (from <= letter && letter <= to) return true;
-        if (letter < to) return false; // ranges should be sorted
-    }
-    return false;
-};
-
-bool ImGuiWrapper::is_chars_in_ranges(const ImWchar *ranges,
-                                     const char    *chars_ptr)
-{
-    while (*chars_ptr) {
-        unsigned int c = 0;
-        // UTF-8 to 32-bit character need imgui_internal
-        int c_len = ImTextCharFromUtf8(&c, chars_ptr, NULL);
-        chars_ptr += c_len;
-        if (c_len == 0) break;
-        if (!is_char_in_ranges(ranges, c)) return false;
-    }
-    return true;
-}
-
-
 #ifdef __APPLE__
 static const ImWchar ranges_keyboard_shortcuts[] =
 {
@@ -1688,22 +1141,29 @@ void ImGuiWrapper::init_font(bool compress)
     io.Fonts->Clear();
 
     // Create ranges of characters from m_glyph_ranges, possibly adding some OS specific special characters.
-	ImVector<ImWchar> ranges;
+    ImVector<ImWchar> ranges;
     ImFontGlyphRangesBuilder builder;
-	builder.AddRanges(m_glyph_ranges);
+    builder.AddRanges(m_glyph_ranges);
 
     builder.AddChar(ImWchar(0x2026)); // …
 
-    if (m_font_cjk) {
-        // This is a temporary fix of https://github.com/prusa3d/PrusaSlicer/issues/8171. The translation
-        // contains characters not in the ImGui ranges for simplified Chinese. For now, just add them manually.
-        // In future, it might be worth to parse the dictionary and add all the necessary characters.
+    if (s_font_cjk) {
+        // https://github.com/prusa3d/PrusaSlicer/issues/8171: The translation
+        // contains characters not in the ImGui ranges for simplified Chinese. Add them manually.
+        // This should no longer be needed because the following block would add them automatically.
         builder.AddChar(ImWchar(0x5ED3));
         builder.AddChar(ImWchar(0x8F91));
     }
 
+    // Add the characters that that needed the fallback character.
+    for (ImWchar c : s_missing_chars) {
+        builder.AddChar(c);
+        s_fixed_chars.emplace(c);
+    }
+    s_missing_chars.clear();
+
 #ifdef __APPLE__
-	if (m_font_cjk)
+	if (s_font_cjk)
 		// Apple keyboard shortcuts are only contained in the CJK fonts.
 		builder.AddRanges(ranges_keyboard_shortcuts);
 #endif
@@ -1711,23 +1171,19 @@ void ImGuiWrapper::init_font(bool compress)
 
     //FIXME replace with io.Fonts->AddFontFromMemoryTTF(buf_decompressed_data, (int)buf_decompressed_size, m_font_size, nullptr, ranges.Data);
     //https://github.com/ocornut/imgui/issues/220
-	ImFont* font = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/" + (m_font_cjk ? "NotoSansCJK-Regular.ttc" : "NotoSans-Regular.ttf")).c_str(), m_font_size, nullptr, ranges.Data);
+    ImFont* font = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/" + "NotoSans-Regular.ttf").c_str(), m_font_size, nullptr, ranges.Data);
+    if (s_font_cjk) {
+        ImFontConfig config;
+        config.MergeMode = true;
+        io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/" + "NotoSansCJK-Regular.ttc").c_str(), m_font_size, &config, ranges.Data);
+    }
+    
     if (font == nullptr) {
         font = io.Fonts->AddFontDefault();
         if (font == nullptr) {
             throw Slic3r::RuntimeError("ImGui: Could not load deafult font");
         }
     }
-
-#ifdef __APPLE__
-    ImFontConfig config;
-    config.MergeMode = true;
-    if (! m_font_cjk) {
-		// Apple keyboard shortcuts are only contained in the CJK fonts.
-        [[maybe_unused]]ImFont *font_cjk = io.Fonts->AddFontFromFileTTF((Slic3r::resources_dir() + "/fonts/NotoSansCJK-Regular.ttc").c_str(), m_font_size, &config, ranges_keyboard_shortcuts);
-        assert(font_cjk != nullptr);
-    }
-#endif
 
     float font_scale = m_font_size/15;
     int icon_sz = lround(16 * font_scale); // default size of icon is 16 px
@@ -1737,6 +1193,11 @@ void ImGuiWrapper::init_font(bool compress)
     for (auto& icon : font_icons) {
         m_custom_glyph_rects_ids[icon.first] =
             io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz, icon_sz, 3.0 * font_scale + icon_sz);
+    }
+    const int icon_sz_m = int(1.25 * icon_sz); // default size of medium icon is 20 px
+    for (auto& icon : font_icons_medium) {
+        m_custom_glyph_rects_ids[icon.first] =
+            io.Fonts->AddCustomRectFontGlyph(font, icon.first, icon_sz_m, icon_sz_m, 3.0 * font_scale + icon_sz_m);
     }
     for (auto& icon : font_icons_large) {
         m_custom_glyph_rects_ids[icon.first] =
@@ -1774,6 +1235,10 @@ void ImGuiWrapper::init_font(bool compress)
         load_icon_from_svg(icon, icon_sz);
     }
 
+    for (auto icon : font_icons_medium) {
+        load_icon_from_svg(icon, icon_sz_m);
+    }
+
     icon_sz *= 2; // default size of large icon is 32 px
     for (auto icon : font_icons_large) {
         load_icon_from_svg(icon, icon_sz);
@@ -1786,6 +1251,7 @@ void ImGuiWrapper::init_font(bool compress)
 
     // Upload texture to graphics system
     GLint last_texture;
+    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     glsafe(::glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
     glsafe(::glGenTextures(1, &m_font_texture));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_font_texture));
@@ -1851,48 +1317,48 @@ void ImGuiWrapper::init_style()
 
     // Window
     style.WindowRounding = 4.0f;
-    set_color(ImGuiCol_WindowBg, COL_WINDOW_BACKGROUND);
-    set_color(ImGuiCol_TitleBgActive, COL_ORANGE_DARK);
+    set_color(ImGuiCol_WindowBg,        ImGuiPureWrap::COL_WINDOW_BACKGROUND);
+    set_color(ImGuiCol_TitleBgActive,   ImGuiPureWrap::COL_ORANGE_DARK);
 
     // Generics
-    set_color(ImGuiCol_FrameBg, COL_GREY_DARK);
-    set_color(ImGuiCol_FrameBgHovered, COL_GREY_LIGHT);
-    set_color(ImGuiCol_FrameBgActive, COL_GREY_LIGHT);
+    set_color(ImGuiCol_FrameBg,         ImGuiPureWrap::COL_GREY_DARK);
+    set_color(ImGuiCol_FrameBgHovered,  ImGuiPureWrap::COL_GREY_LIGHT);
+    set_color(ImGuiCol_FrameBgActive,   ImGuiPureWrap::COL_GREY_LIGHT);
 
     // Text selection
-    set_color(ImGuiCol_TextSelectedBg, COL_ORANGE_DARK);
+    set_color(ImGuiCol_TextSelectedBg,  ImGuiPureWrap::COL_ORANGE_DARK);
 
     // Buttons
-    set_color(ImGuiCol_Button, COL_BUTTON_BACKGROUND);
-    set_color(ImGuiCol_ButtonHovered, COL_BUTTON_HOVERED);
-    set_color(ImGuiCol_ButtonActive, COL_BUTTON_ACTIVE);
+    set_color(ImGuiCol_Button,          ImGuiPureWrap::COL_BUTTON_BACKGROUND);
+    set_color(ImGuiCol_ButtonHovered,   ImGuiPureWrap::COL_BUTTON_HOVERED);
+    set_color(ImGuiCol_ButtonActive,    ImGuiPureWrap::COL_BUTTON_ACTIVE);
 
     // Checkbox
-    set_color(ImGuiCol_CheckMark, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_CheckMark,       ImGuiPureWrap::COL_ORANGE_LIGHT);
 
     // ComboBox items
-    set_color(ImGuiCol_Header, COL_ORANGE_DARK);
-    set_color(ImGuiCol_HeaderHovered, COL_ORANGE_LIGHT);
-    set_color(ImGuiCol_HeaderActive, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_Header,          ImGuiPureWrap::COL_ORANGE_DARK);
+    set_color(ImGuiCol_HeaderHovered,   ImGuiPureWrap::COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_HeaderActive,    ImGuiPureWrap::COL_ORANGE_LIGHT);
 
     // Slider
-    set_color(ImGuiCol_SliderGrab, COL_ORANGE_DARK);
-    set_color(ImGuiCol_SliderGrabActive, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_SliderGrab,      ImGuiPureWrap::COL_ORANGE_DARK);
+    set_color(ImGuiCol_SliderGrabActive,ImGuiPureWrap::COL_ORANGE_LIGHT);
 
     // Separator
-    set_color(ImGuiCol_Separator, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_Separator,       ImGuiPureWrap::COL_ORANGE_LIGHT);
 
     // Tabs
-    set_color(ImGuiCol_Tab, COL_ORANGE_DARK);
-    set_color(ImGuiCol_TabHovered, COL_ORANGE_LIGHT);
-    set_color(ImGuiCol_TabActive, COL_ORANGE_LIGHT);
-    set_color(ImGuiCol_TabUnfocused, COL_GREY_DARK);
-    set_color(ImGuiCol_TabUnfocusedActive, COL_GREY_LIGHT);
+    set_color(ImGuiCol_Tab,                 ImGuiPureWrap::COL_ORANGE_DARK);
+    set_color(ImGuiCol_TabHovered,          ImGuiPureWrap::COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_TabActive,           ImGuiPureWrap::COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_TabUnfocused,        ImGuiPureWrap::COL_GREY_DARK);
+    set_color(ImGuiCol_TabUnfocusedActive,  ImGuiPureWrap::COL_GREY_LIGHT);
 
     // Scrollbars
-    set_color(ImGuiCol_ScrollbarGrab, COL_ORANGE_DARK);
-    set_color(ImGuiCol_ScrollbarGrabHovered, COL_ORANGE_LIGHT);
-    set_color(ImGuiCol_ScrollbarGrabActive, COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_ScrollbarGrab,       ImGuiPureWrap::COL_ORANGE_DARK);
+    set_color(ImGuiCol_ScrollbarGrabHovered,ImGuiPureWrap::COL_ORANGE_LIGHT);
+    set_color(ImGuiCol_ScrollbarGrabActive, ImGuiPureWrap::COL_ORANGE_LIGHT);
 }
 
 void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
@@ -1917,14 +1383,15 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
 
     shader->start_using();
 
-#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
     // Backup GL state
     GLenum last_active_texture;       glsafe(::glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture));
     GLuint last_program;              glsafe(::glGetIntegerv(GL_CURRENT_PROGRAM, (GLint*)&last_program));
     GLuint last_texture;              glsafe(::glGetIntegerv(GL_TEXTURE_BINDING_2D, (GLint*)&last_texture));
     GLuint last_array_buffer;         glsafe(::glGetIntegerv(GL_ARRAY_BUFFER_BINDING, (GLint*)&last_array_buffer));
     GLuint last_vertex_array_object = 0;
-    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+#if !SLIC3R_OPENGL_ES
+    if (OpenGLManager::get_gl_info().is_core_profile())
+#endif // !SLIC3R_OPENGL_ES
         glsafe(::glGetIntegerv(GL_VERTEX_ARRAY_BINDING, (GLint*)&last_vertex_array_object));
     GLint last_viewport[4];           glsafe(::glGetIntegerv(GL_VIEWPORT, last_viewport));
     GLint last_scissor_box[4];        glsafe(::glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box));
@@ -1949,25 +1416,6 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     glsafe(::glDisable(GL_DEPTH_TEST));
     glsafe(::glDisable(GL_STENCIL_TEST));
     glsafe(::glEnable(GL_SCISSOR_TEST));
-#else
-    // We are using the OpenGL fixed pipeline to make the example code simpler to read!
-    // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, vertex/texcoord/color pointers, polygon fill.
-    GLint last_texture;          glsafe(::glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture));
-    GLint last_polygon_mode[2];  glsafe(::glGetIntegerv(GL_POLYGON_MODE, last_polygon_mode));
-    GLint last_viewport[4];      glsafe(::glGetIntegerv(GL_VIEWPORT, last_viewport));
-    GLint last_scissor_box[4];   glsafe(::glGetIntegerv(GL_SCISSOR_BOX, last_scissor_box));
-    GLint last_texture_env_mode; glsafe(::glGetTexEnviv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, &last_texture_env_mode));
-    glsafe(::glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT));
-    glsafe(::glEnable(GL_BLEND));
-    glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-    glsafe(::glDisable(GL_CULL_FACE));
-    glsafe(::glDisable(GL_DEPTH_TEST));
-    glsafe(::glDisable(GL_STENCIL_TEST));
-    glsafe(::glEnable(GL_SCISSOR_TEST));
-    glsafe(::glEnable(GL_TEXTURE_2D));
-    glsafe(::glPolygonMode(GL_FRONT_AND_BACK, GL_FILL));
-    glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE));
-#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
     // Setup viewport, orthographic projection matrix
     // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
@@ -1999,13 +1447,15 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
         const GLsizeiptr vtx_buffer_size = (GLsizeiptr)cmd_list->VtxBuffer.Size * (int)sizeof(ImDrawVert);
         const GLsizeiptr idx_buffer_size = (GLsizeiptr)cmd_list->IdxBuffer.Size * (int)sizeof(ImDrawIdx);
 
-#if ENABLE_GL_CORE_PROFILE
         GLuint vao_id = 0;
-        if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0)) {
+#if !SLIC3R_OPENGL_ES
+        if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
             glsafe(::glGenVertexArrays(1, &vao_id));
             glsafe(::glBindVertexArray(vao_id));
+#if !SLIC3R_OPENGL_ES
         }
-#endif // ENABLE_GL_CORE_PROFILE
+#endif // !SLIC3R_OPENGL_ES
 
         GLuint vbo_id;
         glsafe(::glGenBuffers(1, &vbo_id));
@@ -2067,17 +1517,22 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
 
         glsafe(::glDeleteBuffers(1, &ibo_id));
         glsafe(::glDeleteBuffers(1, &vbo_id));
-#if ENABLE_GL_CORE_PROFILE
-        if (vao_id > 0)
-        glsafe(::glDeleteVertexArrays(1, &vao_id));
-#endif // ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
+        if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
+            if (vao_id > 0)
+                glsafe(::glDeleteVertexArrays(1, &vao_id));
+#if !SLIC3R_OPENGL_ES
+        }
+#endif // !SLIC3R_OPENGL_ES
     }
 
-#if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
     // Restore modified GL state
     glsafe(::glBindTexture(GL_TEXTURE_2D, last_texture));
     glsafe(::glActiveTexture(last_active_texture));
-    if (OpenGLManager::get_gl_info().is_version_greater_or_equal_to(3, 0))
+#if !SLIC3R_OPENGL_ES
+    if (OpenGLManager::get_gl_info().is_core_profile())
+#endif // !SLIC3R_OPENGL_ES
         glsafe(::glBindVertexArray(last_vertex_array_object));
     glsafe(::glBindBuffer(GL_ARRAY_BUFFER, last_array_buffer));
     glsafe(::glBlendEquationSeparate(last_blend_equation_rgb, last_blend_equation_alpha));
@@ -2089,16 +1544,6 @@ void ImGuiWrapper::render_draw_data(ImDrawData *draw_data)
     if (last_enable_scissor_test) glsafe(::glEnable(GL_SCISSOR_TEST)); else glsafe(::glDisable(GL_SCISSOR_TEST));
     glsafe(::glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]));
     glsafe(::glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]));
-#else
-    // Restore modified state
-    glsafe(::glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, last_texture_env_mode));
-    glsafe(::glBindTexture(GL_TEXTURE_2D, (GLuint)last_texture));
-    glsafe(::glPopAttrib());
-    glsafe(::glPolygonMode(GL_FRONT, (GLenum)last_polygon_mode[0]);
-    glsafe(::glPolygonMode(GL_BACK, (GLenum)last_polygon_mode[1])));
-    glsafe(::glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]));
-    glsafe(::glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]));
-#endif // ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
 
     shader->stop_using();
 
@@ -2119,6 +1564,13 @@ void ImGuiWrapper::destroy_font()
         io.Fonts->TexID = 0;
         glsafe(::glDeleteTextures(1, &m_font_texture));
         m_font_texture = 0;
+
+        // We have destroyed current font, including all characters that we may have added dynamically.
+        // Move move all characters that we already added into the list of missing chars again,
+        // so they are all added at once.
+        for (ImWchar c : s_fixed_chars)
+            s_missing_chars.emplace(c);
+        s_fixed_chars.clear();
     }
 }
 
@@ -2156,6 +1608,7 @@ void ImGuiWrapper::clipboard_set(void* /* user_data */, const char* text)
         wxTheClipboard->Close();
     }
 }
+
 
 
 } // namespace GUI

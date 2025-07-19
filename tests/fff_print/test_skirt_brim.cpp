@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include "libslic3r/GCodeReader.hpp"
 #include "libslic3r/Config.hpp"
@@ -10,6 +11,7 @@
 
 using namespace Slic3r::Test;
 using namespace Slic3r;
+using namespace Catch;
 
 /// Helper method to find the tool used for the brim (always the first extrusion)
 static int get_brim_tool(const std::string &gcode)

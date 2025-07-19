@@ -4,34 +4,30 @@
 ///|/
 #include "UndoRedo.hpp"
 
+#include <cereal/types/polymorphic.hpp> // IWYU pragma: keep
+#include <cereal/types/map.hpp> // IWYU pragma: keep
+#include <cereal/types/string.hpp> // IWYU pragma: keep
+#include <cereal/types/utility.hpp> // IWYU pragma: keep
+#include <cereal/types/vector.hpp> // IWYU pragma: keep
+#include <cereal/archives/binary.hpp> // IWYU pragma: keep
+#include <boost/format.hpp>
+#include <cereal/cereal.hpp>
 #include <algorithm>
-#include <iostream>
 #include <fstream>
 #include <memory>
-#include <typeinfo> 
 #include <cassert>
-#include <cstddef>
+#include <map>
+#include <type_traits>
+#include <cstring>
 
-#include <cereal/types/polymorphic.hpp>
-#include <cereal/types/map.hpp> 
-#include <cereal/types/string.hpp> 
-#include <cereal/types/utility.hpp> 
-#include <cereal/types/vector.hpp> 
-#include <cereal/archives/binary.hpp>
 #define CEREAL_FUTURE_EXPERIMENTAL
 #include <cereal/archives/adapters.hpp>
-
-#include <libslic3r/PrintConfig.hpp>
 #include <libslic3r/ObjectID.hpp>
 #include <libslic3r/Utils.hpp>
 
-#include "slic3r/GUI/3DScene.hpp"
-
-#include <boost/foreach.hpp>
-
-#ifndef NDEBUG
-// #define SLIC3R_UNDOREDO_DEBUG
-#endif /* NDEBUG */
+#include "slic3r/GUI/3DScene.hpp" // IWYU pragma: keep
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Exception.hpp"
 #if 0
 	// Stop at a fraction of the normal Undo / Redo stack size.
 	#define UNDO_REDO_DEBUG_LOW_MEM_FACTOR 10000
@@ -700,13 +696,8 @@ using OutputArchive = cereal::UserDataAdapter<StackImpl, cereal::BinaryOutputArc
 
 } // namespace UndoRedo
 
-class Model;
-class ModelObject;
-class ModelVolume;
-class ModelInstance;
-class ModelMaterial;
-class DynamicPrintConfig;
-class TriangleMesh;
+class DynamicPrintConfig; // IWYU pragma: keep
+class TriangleMesh; // IWYU pragma: keep
 
 } // namespace Slic3r
 
@@ -800,10 +791,10 @@ namespace cereal
 	}
 }
 
-#include <libslic3r/Model.hpp>
-#include <libslic3r/TriangleMesh.hpp>
-#include <slic3r/GUI/Selection.hpp>
-#include <slic3r/GUI/Gizmos/GLGizmosManager.hpp>
+#include <libslic3r/Model.hpp> // IWYU pragma: keep
+#include <libslic3r/TriangleMesh.hpp> // IWYU pragma: keep
+#include <slic3r/GUI/Selection.hpp> // IWYU pragma: keep
+#include <slic3r/GUI/Gizmos/GLGizmosManager.hpp> // IWYU pragma: keep
 
 namespace Slic3r {
 namespace UndoRedo {

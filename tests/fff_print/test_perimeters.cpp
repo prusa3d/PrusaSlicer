@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <numeric>
 #include <sstream>
@@ -46,6 +46,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         ExtrusionEntityCollection gap_fill;
         ExPolygons                fill_expolygons;
         Flow                      flow(1., 1., 1.);
+        PerimeterRegions          perimeter_regions;
         PerimeterGenerator::Parameters perimeter_generator_params(
             1., // layer height
             -1, // layer ID
@@ -53,6 +54,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
             static_cast<const PrintRegionConfig&>(config),
             static_cast<const PrintObjectConfig&>(config),
             static_cast<const PrintConfig&>(config),
+            perimeter_regions,
             false); // spiral_vase
         Polygons lower_layer_polygons_cache;
         for (const Surface &surface : slices)
@@ -64,6 +66,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
                 // input:
                 perimeter_generator_params,
                 surface,
+                nullptr,
                 nullptr,
                 // cache:
                 lower_layer_polygons_cache,

@@ -18,6 +18,8 @@
 #include "BitmapCache.hpp"
 #include "Camera.hpp"
 
+#include "Gizmos/GLGizmoMmuSegmentation.hpp"
+
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/ExtrusionEntityCollection.hpp"
@@ -32,6 +34,7 @@
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Tesselate.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,10 +150,10 @@ void GLVolume::NonManifoldEdges::render()
 {
     update();
 
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
     if (!GUI::OpenGLManager::get_gl_info().is_core_profile())
-#endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth(2.0f));
+#endif // !SLIC3R_OPENGL_ES
 
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
@@ -159,12 +162,16 @@ void GLVolume::NonManifoldEdges::render()
     const GUI::Camera& camera = GUI::wxGetApp().plater()->get_camera();
     shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_parent.world_matrix());
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-#if ENABLE_GL_CORE_PROFILE
-    const std::array<int, 4>& viewport = camera.get_viewport();
-    shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
-    shader->set_uniform("width", 0.5f);
-    shader->set_uniform("gap_size", 0.0f);
-#endif // ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
+    if (GUI::OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 0.5f);
+        shader->set_uniform("gap_size", 0.0f);
+#if !SLIC3R_OPENGL_ES
+    }
+#endif // !SLIC3R_OPENGL_ES
     m_model.set_color(complementary(m_parent.render_color));
     m_model.render();
 }
@@ -242,7 +249,6 @@ GLVolume::GLVolume(float r, float g, float b, float a)
     , is_outside(false)
     , hover(HS_None)
     , is_modifier(false)
-    , is_wipe_tower(false)
     , is_extrusion_path(false)
     , force_native_color(false)
     , force_neutral_color(false)
@@ -493,22 +499,22 @@ int GLVolumeCollection::load_object_volume(
     return int(this->volumes.size() - 1);
 }
 
-#if ENABLE_OPENGL_ES
-int GLVolumeCollection::load_wipe_tower_preview(
+#if SLIC3R_OPENGL_ES
+GLVolume* GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle,
-    float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh)
+    float rotation_angle, bool size_unknown, float brim_width, size_t idx, TriangleMesh* out_mesh)
 #else
-int GLVolumeCollection::load_wipe_tower_preview(
+GLVolume* GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle,
-    float rotation_angle, bool size_unknown, float brim_width)
-#endif // ENABLE_OPENGL_ES
+    float rotation_angle, bool size_unknown, float brim_width, size_t idx)
+#endif // SLIC3R_OPENGL_ES
 {
     if (height == 0.0f)
         height = 0.1f;
 
     // Because the GLVolume is also used for arrangement, it must be safely larger
     // than the actual extruded tower, otherwise the arranged tower ends up out of bed.
-    float offset = 0.3;
+    const float offset = 0.3f;
     pos_x -= offset;
     pos_y -= offset;
     width += 2.f * offset;
@@ -585,25 +591,25 @@ int GLVolumeCollection::load_wipe_tower_preview(
         mesh.merge(cone_mesh);
     }
 
-
-    volumes.emplace_back(new GLVolume(color));
-    GLVolume& v = *volumes.back();
-#if ENABLE_OPENGL_ES
+    GLVolume* result{new GLVolume(color)};
+    GLVolume& v = *result;
+#if SLIC3R_OPENGL_ES
     if (out_mesh != nullptr)
         *out_mesh = mesh;
-#endif // ENABLE_OPENGL_ES
+#endif // SLIC3R_OPENGL_ES
     v.model.init_from(mesh);
     v.model.set_color(color);
     v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
     v.set_convex_hull(mesh.convex_hull_3d());
     v.set_volume_offset(Vec3d(pos_x, pos_y, 0.0));
     v.set_volume_rotation(Vec3d(0., 0., (M_PI / 180.) * rotation_angle));
-    v.composite_id = GLVolume::CompositeID(INT_MAX, 0, 0);
+    v.composite_id = GLVolume::CompositeID(INT_MAX - idx, 0, 0);
     v.geometry_id.first = 0;
-    v.geometry_id.second = wipe_tower_instance_id().id;
-    v.is_wipe_tower = true;
+    v.geometry_id.second = wipe_tower_instance_id(idx).id;
+    v.wipe_tower_bed_index = idx;
     v.shader_outside_printer_detection_enabled = !size_unknown;
-    return int(volumes.size() - 1);
+
+    return result;
 }
 
 // Load SLA auxiliary GLVolumes (for support trees or pad).
@@ -651,6 +657,7 @@ void GLVolumeCollection::load_object_auxiliary(
             std::shared_ptr<const indexed_triangle_set> preview_mesh_ptr = print_object->get_mesh_to_print();
             if (preview_mesh_ptr != nullptr)
                 backend_mesh = TriangleMesh(*preview_mesh_ptr);
+            backend_mesh.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()).cast<float>());
             if (!backend_mesh.empty()) {
                 backend_mesh.transform(mesh_trafo_inv);
                 TriangleMesh convex_hull = backend_mesh.convex_hull_3d();
@@ -665,6 +672,7 @@ void GLVolumeCollection::load_object_auxiliary(
     // Get the support mesh.
     if (milestone == SLAPrintObjectStep::slaposSupportTree) {
         TriangleMesh supports_mesh = print_object->support_mesh();
+        supports_mesh.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()).cast<float>());
         if (!supports_mesh.empty()) {
             supports_mesh.transform(mesh_trafo_inv);
             TriangleMesh convex_hull = supports_mesh.convex_hull_3d();
@@ -678,6 +686,7 @@ void GLVolumeCollection::load_object_auxiliary(
     // Get the pad mesh.
     if (milestone == SLAPrintObjectStep::slaposPad) {
         TriangleMesh pad_mesh = print_object->pad_mesh();
+        pad_mesh.translate(s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed()).cast<float>());
         if (!pad_mesh.empty()) {
             pad_mesh.transform(mesh_trafo_inv);
             TriangleMesh convex_hull = pad_mesh.convex_hull_3d();
@@ -744,16 +753,19 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     if (to_render.empty())
         return;
 
-    GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
-    if (shader == nullptr)
+    GLShaderProgram* curr_shader = GUI::wxGetApp().get_current_shader();
+    GLShaderProgram* sink_shader = GUI::wxGetApp().get_shader("flat");
+#if SLIC3R_OPENGL_ES
+    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("dashed_lines");
+#else
+    GLShaderProgram* edges_shader = GUI::OpenGLManager::get_gl_info().is_core_profile() ? GUI::wxGetApp().get_shader("dashed_thick_lines") : GUI::wxGetApp().get_shader("flat");
+#endif // SLIC3R_OPENGL_ES
+    GLShaderProgram* mmu_painted_shader = GUI::wxGetApp().get_shader("mm_gouraud");
+    if (curr_shader == nullptr || sink_shader == nullptr || edges_shader == nullptr || mmu_painted_shader == nullptr)
         return;
 
-    GLShaderProgram* sink_shader  = GUI::wxGetApp().get_shader("flat");
-#if ENABLE_GL_CORE_PROFILE
-    GLShaderProgram* edges_shader = GUI::OpenGLManager::get_gl_info().is_core_profile() ? GUI::wxGetApp().get_shader("dashed_thick_lines") : GUI::wxGetApp().get_shader("flat");
-#else
-    GLShaderProgram* edges_shader = GUI::wxGetApp().get_shader("flat");
-#endif // ENABLE_GL_CORE_PROFILE
+    GLShaderProgram* shader = curr_shader;
+    shader->stop_using();
 
     if (type == ERenderType::Transparent) {
         glsafe(::glEnable(GL_BLEND));
@@ -765,12 +777,41 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     if (disable_cullface)
         glsafe(::glDisable(GL_CULL_FACE));
 
+
+    // This block is here to render the pained triangles. It is not very nice, but it works.
+    // There is a cache that holds the OpenGL models of the painted areas to render, one for
+    // each ModelVolume. The cache is invalidated based on changes in extruder_colors,
+    // default extruder idx and timestamp of the painted data. The data belonging to objects
+    // // which no longer exist are removed from the cache periodically.
+    const ModelObjectPtrs& model_objects = GUI::wxGetApp().model().objects;
+    const std::vector<ColorRGBA> extruders_colors = GUI::wxGetApp().plater()->get_extruder_colors_from_plater_config();
+    const bool is_render_as_mmu_painted_enabled = !model_objects.empty() && !extruders_colors.empty();
+
+    if (m_mm_paint_cache.extruders_colors != extruders_colors) {
+        m_mm_paint_cache.extruders_colors = extruders_colors;
+        m_mm_paint_cache.volume_data.clear();
+    }
+    auto time_now = std::chrono::system_clock::now();
+
+
+
+
     for (GLVolumeWithIdAndZ& volume : to_render) {
-        const Transform3d& world_matrix = volume.first->world_matrix();
+        if (!volume.first->is_active)
+            continue;
+
+        const Transform3d world_matrix = volume.first->world_matrix();
+        const Matrix3d world_matrix_inv_transp = world_matrix.linear().inverse().transpose();
+        const Matrix3d view_normal_matrix = view_matrix.linear() * world_matrix_inv_transp;
+        const int obj_idx = volume.first->object_idx();
+        const int vol_idx = volume.first->volume_idx();
+        const bool render_as_mmu_painted = is_render_as_mmu_painted_enabled && !volume.first->selected &&
+            !volume.first->is_outside && volume.first->hover == GLVolume::HS_None && !volume.first->is_wipe_tower() && obj_idx >= 0 && vol_idx >= 0 &&
+            !model_objects[obj_idx]->volumes[vol_idx]->mm_segmentation_facets.empty() &&
+            type != GLVolumeCollection::ERenderType::Transparent; // to filter out shells (not very nice)
         volume.first->set_render_color(true);
 
         // render sinking contours of non-hovered volumes
-        shader->stop_using();
         if (sink_shader != nullptr) {
             sink_shader->start_using();
             if (m_show_sinking_contours) {
@@ -781,50 +822,114 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
             }
             sink_shader->stop_using();
         }
-        shader->start_using();
 
-        shader->set_uniform("z_range", m_z_range);
-        shader->set_uniform("clipping_plane", m_clipping_plane);
-        shader->set_uniform("use_color_clip_plane", m_use_color_clip_plane);
-        shader->set_uniform("color_clip_plane", m_color_clip_plane);
-        shader->set_uniform("uniform_color_clip_plane_1", m_color_clip_plane_colors[0]);
-        shader->set_uniform("uniform_color_clip_plane_2", m_color_clip_plane_colors[1]);
-        shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
-        shader->set_uniform("print_volume.xy_data", m_print_volume.data);
-        shader->set_uniform("print_volume.z_data", m_print_volume.zs);
-        shader->set_uniform("volume_world_matrix", world_matrix);
-        shader->set_uniform("slope.actived", m_slope.active && !volume.first->is_modifier && !volume.first->is_wipe_tower);
-        shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(world_matrix.matrix().block(0, 0, 3, 3).inverse().transpose().cast<float>()));
-        shader->set_uniform("slope.normal_z", m_slope.normal_z);
+        if (render_as_mmu_painted && shader != mmu_painted_shader)
+            shader = mmu_painted_shader;
+        else if (!render_as_mmu_painted && shader != curr_shader)
+            shader = curr_shader;
+
+        if (render_as_mmu_painted) {
+            shader->start_using();
+            const std::array<float, 4> clp_data = { 0.0f, 0.0f, 1.0f, FLT_MAX };
+            const std::array<float, 2> z_range = { -FLT_MAX, FLT_MAX };
+            const bool is_left_handed = volume.first->is_left_handed();
+            shader->set_uniform("volume_world_matrix", world_matrix);
+            shader->set_uniform("volume_mirrored", is_left_handed);
+            shader->set_uniform("clipping_plane", clp_data);
+            shader->set_uniform("z_range", z_range);
+            shader->set_uniform("view_model_matrix", view_matrix * world_matrix);
+            shader->set_uniform("projection_matrix", projection_matrix);
+            shader->set_uniform("view_normal_matrix", view_normal_matrix);
+
+            if (is_left_handed)
+                glsafe(::glFrontFace(GL_CW));
+
+            const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
+            const size_t extruder_idx = ModelVolume::get_extruder_color_idx(model_volume, GUI::wxGetApp().extruders_edited_cnt());
+
+
+            // This block retrieves the painted geometry from the cache or adds it to it.
+            ObjectID vol_id = model_volume.id();
+            auto it = m_mm_paint_cache.volume_data.find(vol_id);
+            GUI::TriangleSelectorMmGui* ts = nullptr;
+            uint64_t timestamp = model_volume.mm_segmentation_facets.timestamp();
+            if (it == m_mm_paint_cache.volume_data.end() || it->second.extruder_id != extruder_idx || timestamp != it->second.mm_timestamp) {
+                auto ts_uptr = std::make_unique<GUI::TriangleSelectorMmGui>(model_volume.mesh(), m_mm_paint_cache.extruders_colors, m_mm_paint_cache.extruders_colors[extruder_idx]);
+                ts = ts_uptr.get();
+                ts->deserialize(model_volume.mm_segmentation_facets.get_data(), true);
+                ts->request_update_render_data();
+                m_mm_paint_cache.volume_data[vol_id] = MMPaintCachePerVolume{ extruder_idx, std::move(ts_uptr), std::chrono::system_clock::now(), timestamp };
+            }
+            else {
+                ts = it->second.triangle_selector_mm.get();
+                it->second.time_used = time_now;
+            }
+
+            
+            ts->render(nullptr, world_matrix);
+
+            if (is_left_handed)
+                glsafe(::glFrontFace(GL_CCW));
+
+            shader->stop_using();
+        }
+        else {
+            shader->start_using();
+            shader->set_uniform("z_range", m_z_range);
+            shader->set_uniform("clipping_plane", m_clipping_plane);
+            shader->set_uniform("use_color_clip_plane", m_use_color_clip_plane);
+            shader->set_uniform("color_clip_plane", m_color_clip_plane);
+            shader->set_uniform("uniform_color_clip_plane_1", m_color_clip_plane_colors[0]);
+            shader->set_uniform("uniform_color_clip_plane_2", m_color_clip_plane_colors[1]);
+            shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
+            shader->set_uniform("print_volume.xy_data", m_print_volume.data);
+            shader->set_uniform("print_volume.z_data", m_print_volume.zs);
+            shader->set_uniform("volume_world_matrix", world_matrix);
+            shader->set_uniform("slope.actived", m_slope.active && !volume.first->is_modifier && !volume.first->is_wipe_tower());
+            shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(world_matrix_inv_transp.cast<float>()));
+            shader->set_uniform("slope.normal_z", m_slope.normal_z);
 
 #if ENABLE_ENVIRONMENT_MAP
-        unsigned int environment_texture_id = GUI::wxGetApp().plater()->get_environment_texture_id();
-        bool use_environment_texture = environment_texture_id > 0 && GUI::wxGetApp().app_config->get_bool("use_environment_map");
-        shader->set_uniform("use_environment_tex", use_environment_texture);
-        if (use_environment_texture)
-            glsafe(::glBindTexture(GL_TEXTURE_2D, environment_texture_id));
+            unsigned int environment_texture_id = GUI::wxGetApp().plater()->get_environment_texture_id();
+            bool use_environment_texture = environment_texture_id > 0 && GUI::wxGetApp().app_config->get_bool("use_environment_map");
+            shader->set_uniform("use_environment_tex", use_environment_texture);
+            if (use_environment_texture)
+                glsafe(::glBindTexture(GL_TEXTURE_2D, environment_texture_id));
 #endif // ENABLE_ENVIRONMENT_MAP
-        glcheck();
+            glcheck();
 
-        volume.first->model.set_color(volume.first->render_color);
-        const Transform3d model_matrix = world_matrix;
-        shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
-        shader->set_uniform("projection_matrix", projection_matrix);
-        const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-        shader->set_uniform("view_normal_matrix", view_normal_matrix);
-        volume.first->render();
+            volume.first->model.set_color(volume.first->render_color);
+            shader->set_uniform("view_model_matrix", view_matrix * world_matrix);
+            shader->set_uniform("projection_matrix", projection_matrix);
+            shader->set_uniform("view_normal_matrix", view_normal_matrix);
+            volume.first->render();
 
 #if ENABLE_ENVIRONMENT_MAP
-        if (use_environment_texture)
-            glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
+            if (use_environment_texture)
+                glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 #endif // ENABLE_ENVIRONMENT_MAP
 
-        glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
-        glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+            glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+            glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+            shader->stop_using();
+        }
     }
 
+
+    // Purge the painted triangles cache from everything that was not used for some time.
+    // Only do this occasionally (once a second).
+    using namespace std::chrono_literals;
+    static auto time_since_last_check = time_now;
+    if (time_now - time_since_last_check > 1000ms)
+        for (auto it = m_mm_paint_cache.volume_data.begin(); it != m_mm_paint_cache.volume_data.end(); ) {
+            auto it_delete = it; // The iterator to the deleted element will be invalidated, the others will not.
+            ++it;
+            if (time_now - it_delete->second.time_used > 5000ms)
+                m_mm_paint_cache.volume_data.erase(it_delete);
+    }
+
+
     if (m_show_sinking_contours) {
-        shader->stop_using();
         if (sink_shader != nullptr) {
             sink_shader->start_using();
             for (GLVolumeWithIdAndZ& volume : to_render) {
@@ -836,12 +941,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
                     glsafe(::glDepthFunc(GL_LESS));
                 }
             }
-            sink_shader->start_using();
+            sink_shader->stop_using();
         }
-        shader->start_using();
     }
 
-    shader->stop_using();
     if (edges_shader != nullptr) {
         edges_shader->start_using();
         if (m_show_non_manifold_edges && GUI::wxGetApp().app_config->get_bool("non_manifold_edges")) {
@@ -851,7 +954,8 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         }
         edges_shader->stop_using();
     }
-    shader->start_using();
+
+    curr_shader->start_using();
 
     if (disable_cullface)
         glsafe(::glEnable(GL_CULL_FACE));
@@ -911,7 +1015,7 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
     }
 
     for (GLVolume* volume : volumes) {
-        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->is_sla_pad() || volume->is_sla_support())
+        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower() || volume->is_sla_pad() || volume->is_sla_support())
             continue;
 
         int extruder_id = volume->extruder_id - 1;

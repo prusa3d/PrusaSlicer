@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <test_utils.hpp>
 
 #include "libslic3r/SLAPrint.hpp"
@@ -6,6 +6,7 @@
 #include "libslic3r/Format/SLAArchiveFormatRegistry.hpp"
 #include "libslic3r/Format/SLAArchiveWriter.hpp"
 #include "libslic3r/Format/SLAArchiveReader.hpp"
+#include "libslic3r/FileReader.hpp"
 
 #include <boost/filesystem.hpp>
 
@@ -20,7 +21,7 @@ TEST_CASE("Archive export test", "[sla_archives]") {
         SLAPrint print;
         SLAFullPrintConfig fullcfg;
 
-        auto m = Model::read_from_file(TEST_DATA_DIR PATH_SEPARATOR + std::string(pname) + ".obj", nullptr);
+        auto m = FileReader::load_model(TEST_DATA_DIR PATH_SEPARATOR + std::string(pname) + ".obj");
 
         fullcfg.printer_technology.setInt(ptSLA); // FIXME this should be ensured
         fullcfg.set("sla_archive_format", entry.id);

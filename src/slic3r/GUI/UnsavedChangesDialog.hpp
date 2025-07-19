@@ -17,10 +17,7 @@ class ScalableButton;
 class wxStaticText;
 
 namespace Slic3r {
-namespace GUI{
-
-wxDECLARE_EVENT(EVT_DIFF_DIALOG_TRANSFER,       SimpleEvent);
-wxDECLARE_EVENT(EVT_DIFF_DIALOG_UPDATE_PRESETS, SimpleEvent);
+namespace GUI {
 
 // ----------------------------------------------------------------------------
 //                  ModelNode: a node inside DiffModel
@@ -178,6 +175,7 @@ public:
 
     wxDataViewItem  Delete(const wxDataViewItem& item);
     void            Clear();
+    wxDataViewItem  GetItemByName(wxString name);
 
     wxDataViewItem  GetParent(const wxDataViewItem& item) const override;
     unsigned int    GetChildren(const wxDataViewItem& parent, wxDataViewItemArray& array) const override;
@@ -244,6 +242,7 @@ public:
     bool        has_unselected_options();
     bool        has_long_strings() { return m_has_long_strings; }
     bool        has_new_value_column() { return this->GetColumnCount() == DiffModel::colMax; }
+    void        update_item_enabling(wxDataViewItem item);
 
     std::vector<std::string> options(Preset::Type type, bool selected);
     std::vector<std::string> selected_options();
@@ -364,8 +363,8 @@ class DiffPresetDialog : public DPIDialog
 
     Preset::Type            m_view_type         { Preset::TYPE_INVALID };
     PrinterTechnology       m_pr_technology;
-    std::unique_ptr<PresetBundle>   m_preset_bundle_left;
-    std::unique_ptr<PresetBundle>   m_preset_bundle_right;
+    PresetBundle            m_preset_bundle_left;
+    PresetBundle            m_preset_bundle_right;
 
     void create_buttons();
     void create_edit_sizer();
@@ -412,8 +411,7 @@ public:
     void show(Preset::Type type = Preset::TYPE_INVALID);
     void update_presets(Preset::Type type = Preset::TYPE_INVALID, bool update_preset_bundles_from_app = true);
 
-    Preset::Type        view_type() const           { return m_view_type; }
-    PrinterTechnology   printer_technology() const  { return m_pr_technology; }
+    void process_options(std::function<void(Preset::Type)> process);
 
     std::string get_left_preset_name(Preset::Type type);
     std::string get_right_preset_name(Preset::Type type);

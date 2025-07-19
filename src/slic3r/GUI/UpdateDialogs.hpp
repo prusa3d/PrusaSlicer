@@ -15,6 +15,8 @@
 #include "libslic3r/Semver.hpp"
 #include "MsgDialog.hpp"
 
+#include "slic3r/Utils/PresetUpdater.hpp"
+
 class wxBoxSizer;
 class wxCheckBox;
 
@@ -46,7 +48,7 @@ private:
 class AppUpdateAvailableDialog : public MsgDialog
 {
 public:
-	AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user);
+	AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user, bool browser_on_next);
 	AppUpdateAvailableDialog(AppUpdateAvailableDialog&&) = delete;
 	AppUpdateAvailableDialog(const AppUpdateAvailableDialog&) = delete;
 	AppUpdateAvailableDialog& operator=(AppUpdateAvailableDialog&&) = delete;
@@ -102,7 +104,7 @@ public:
 	};
 
 	// force_before_wizard - indicates that check of updated is forced before ConfigWizard opening
-	MsgUpdateConfig(const std::vector<Update> &updates, bool force_before_wizard = false);
+	MsgUpdateConfig(const std::vector<Update> &updates, PresetUpdater::UpdateParams update_params);
 	MsgUpdateConfig(MsgUpdateConfig &&) = delete;
 	MsgUpdateConfig(const MsgUpdateConfig &) = delete;
 	MsgUpdateConfig &operator=(MsgUpdateConfig &&) = delete;

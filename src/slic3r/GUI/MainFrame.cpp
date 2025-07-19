@@ -20,9 +20,13 @@
 #include <wx/menu.h>
 #include <wx/progdlg.h>
 #include <wx/tooltip.h>
+#include <wx/accel.h>
 //#include <wx/glcanvas.h>
 #include <wx/filename.h>
 #include <wx/debug.h>
+#if wxUSE_SECRETSTORE 
+#include <wx/secretstore.h>
+#endif
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -34,7 +38,6 @@
 #include "libslic3r/PresetBundle.hpp"
 
 #include "Tab.hpp"
-#include "ProgressStatusBar.hpp"
 #include "3DScene.hpp"
 #include "PrintHostDialogs.hpp"
 #include "wxExtensions.hpp"
@@ -47,6 +50,7 @@
 #include "Plater.hpp"
 #include "../Utils/Process.hpp"
 #include "format.hpp"
+#include "slic3r/GUI/InstanceCheck.hpp" // IWYU pragma: keep
 
 #include <fstream>
 #include <string_view>
@@ -54,12 +58,14 @@
 #include "GUI_App.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "MsgDialog.hpp"
-#include "Notebook.hpp"
+#include "TopBar.hpp"
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GalleryDialog.hpp"
 #include "NotificationManager.hpp"
 #include "Preferences.hpp"
+#include "WebViewPanel.hpp"
+#include "UserAccount.hpp"
 
 #ifdef _WIN32
 #include <dbt.h>
@@ -167,14 +173,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     // Load the icon either from the exe, or from the ico file.
     SetIcon(main_frame_icon(wxGetApp().get_app_mode()));
 
-	// initialize status bar
-//    m_statusbar = std::make_shared<ProgressStatusBar>(this);
-//    m_statusbar->set_font(GUI::wxGetApp().normal_font());
-//    if (wxGetApp().is_editor())
-//        m_statusbar->embed(this);
-//    m_statusbar->set_status_text(_L("Version") + " " +
-//        SLIC3R_VERSION + " - " +
-//       _L("Remember to check for updates at https://github.com/prusa3d/PrusaSlicer/releases"));
+    wxGetApp().set_searcher(&m_searcher);
 
     // initialize tabpanel and menubar
     init_tabpanel();
@@ -183,18 +182,33 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     else
         init_menubar_as_editor();
 
+#ifndef __APPLE__
+    std::vector<wxAcceleratorEntry*>& entries_cache = accelerator_entries_cache();
+    assert(entries_cache.size() + 6 < 100);
+    wxAcceleratorEntry entries[100];
+
+    int id = 0;
+    //for (const auto* entry : entries_cache)
+    //    entries[id++].Set(entry->GetFlags(), entry->GetKeyCode(), entry->GetMenuItem()->GetId());
+
 #if _WIN32
     // This is needed on Windows to fake the CTRL+# of the window menu when using the numpad
-    wxAcceleratorEntry entries[6];
-    entries[0].Set(wxACCEL_CTRL, WXK_NUMPAD1, wxID_HIGHEST + 1);
-    entries[1].Set(wxACCEL_CTRL, WXK_NUMPAD2, wxID_HIGHEST + 2);
-    entries[2].Set(wxACCEL_CTRL, WXK_NUMPAD3, wxID_HIGHEST + 3);
-    entries[3].Set(wxACCEL_CTRL, WXK_NUMPAD4, wxID_HIGHEST + 4);
-    entries[4].Set(wxACCEL_CTRL, WXK_NUMPAD5, wxID_HIGHEST + 5);
-    entries[5].Set(wxACCEL_CTRL, WXK_NUMPAD6, wxID_HIGHEST + 6);
-    wxAcceleratorTable accel(6, entries);
-    SetAcceleratorTable(accel);
+    entries[id++].Set(wxACCEL_CTRL, WXK_NUMPAD1, wxID_HIGHEST + 1);
+    entries[id++].Set(wxACCEL_CTRL, WXK_NUMPAD2, wxID_HIGHEST + 2);
+    entries[id++].Set(wxACCEL_CTRL, WXK_NUMPAD3, wxID_HIGHEST + 3);
+    entries[id++].Set(wxACCEL_CTRL, WXK_NUMPAD4, wxID_HIGHEST + 4);
+    entries[id++].Set(wxACCEL_CTRL, WXK_NUMPAD5, wxID_HIGHEST + 5);
+    entries[id++].Set(wxACCEL_CTRL, WXK_NUMPAD6, wxID_HIGHEST + 6);
 #endif // _WIN32
+
+    wxAcceleratorTable accel(id, entries);
+    SetAcceleratorTable(accel);
+
+    // clear cache with wxAcceleratorEntry, because it's no need anymore
+    for (auto entry : entries_cache)
+        delete entry;
+    entries_cache.clear();
+#endif
 
     // set default tooltip timer in msec
     // SetAutoPop supposedly accepts long integers but some bug doesn't allow for larger values
@@ -260,22 +274,37 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     //FIXME it seems this method is not called on application start-up, at least not on Windows. Why?
     // The same applies to wxEVT_CREATE, it is not being called on startup on Windows.
     Bind(wxEVT_ACTIVATE, [this](wxActivateEvent& event) {
-        if (m_plater != nullptr && event.GetActive())
-            m_plater->on_activate();
+        if (m_plater != nullptr)
+            m_plater->on_activate(event.GetActive());
         event.Skip();
     });
 
+    Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
+        event.Skip();
+#ifdef _WIN32
+        // Update window property to mainframe so other instances can indentify it.
+        wxGetApp().other_instance_message_handler()->update_windows_properties(this);
+#endif //WIN32
+        if (m_layout == ESettingsLayout::Dlg || m_layout == ESettingsLayout::Old) {
+            if (m_layout == ESettingsLayout::Old)
+                m_tabpanel->UpdateSearchSizeAndPosition();
+            else
+                m_tmp_top_bar->UpdateSearchSizeAndPosition();
+        }
+    });
+
+    Bind(wxEVT_MOVE, [](wxMoveEvent& event) {
 // OSX specific issue:
 // When we move application between Retina and non-Retina displays, The legend on a canvas doesn't redraw
 // So, redraw explicitly canvas, when application is moved
 //FIXME maybe this is useful for __WXGTK3__ as well?
 #if __APPLE__
-    Bind(wxEVT_MOVE, [](wxMoveEvent& event) {
         wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
         wxGetApp().plater()->get_current_canvas3D()->request_extra_frame();
+#endif
+        wxGetApp().searcher().update_dialog_position();
         event.Skip();
     });
-#endif
 
     wxGetApp().persist_window_geometry(this, true);
     wxGetApp().persist_window_geometry(&m_settings_dialog, true);
@@ -283,136 +312,23 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     update_ui_from_settings();    // FIXME (?)
 
     if (m_plater != nullptr) {
+#if ENABLE_HACK_GCODEVIEWER_SLOW_ON_MAC
+        // When the application is run as GCodeViewer the collapse toolbar is set as enabled, but rendered outside of the screen
+        m_plater->get_collapse_toolbar().set_enabled(wxGetApp().is_gcode_viewer() ?
+            true : wxGetApp().app_config->get_bool("show_collapse_button"));
+#else
         m_plater->get_collapse_toolbar().set_enabled(wxGetApp().app_config->get_bool("show_collapse_button"));
+#endif // ENABLE_HACK_GCODEVIEWER_SLOW_ON_MAC
         m_plater->show_action_buttons(true);
 
         preferences_dialog = new PreferencesDialog(this);
     }
 
-    // bind events from DiffDlg
-
-    bind_diff_dialog();
-}
-
-void MainFrame::bind_diff_dialog()
-{
-    auto get_tab = [](Preset::Type type) {
-        Tab* null_tab = nullptr;
-        for (Tab* tab : wxGetApp().tabs_list)
-            if (tab->type() == type)
-                return tab;
-        return null_tab;
-    };
-
-    auto transfer = [this, get_tab](Preset::Type type) {
-        get_tab(type)->transfer_options(diff_dialog.get_left_preset_name(type),
-                                        diff_dialog.get_right_preset_name(type),
-                                        diff_dialog.get_selected_options(type));
-    };
-
-    auto update_presets = [this, get_tab](Preset::Type type) {
-        get_tab(type)->update_preset_choice();
-        m_plater->sidebar().update_presets(type);
-    };
-
-    auto process_options = [this](std::function<void(Preset::Type)> process) {
-        const Preset::Type diff_dlg_type = diff_dialog.view_type();
-        if (diff_dlg_type == Preset::TYPE_INVALID) {
-            for (const Preset::Type& type : diff_dialog.types_list() )
-                process(type);
-        }
-        else
-            process(diff_dlg_type);
-    };
-
-    diff_dialog.Bind(EVT_DIFF_DIALOG_TRANSFER,      [process_options, transfer](SimpleEvent&)         { process_options(transfer); });
-
-    diff_dialog.Bind(EVT_DIFF_DIALOG_UPDATE_PRESETS,[process_options, update_presets](SimpleEvent&)   { process_options(update_presets); });
-}
-
-
-#ifdef _MSW_DARK_MODE
-static wxString pref() { return " [ "; }
-static wxString suff() { return " ] "; }
-static void append_tab_menu_items_to_menubar(wxMenuBar* bar, PrinterTechnology pt, bool is_mainframe_menu)
-{
-    if (is_mainframe_menu)
-        bar->Append(new wxMenu(), pref() + _L("Plater") + suff());
-    for (const wxString& title : { is_mainframe_menu    ? _L("Print Settings")       : pref() + _L("Print Settings") + suff(),
-                                   pt == ptSLA          ? _L("Material Settings")    : _L("Filament Settings"),
-                                   _L("Printer Settings") })
-        bar->Append(new wxMenu(), title);
-}
-
-// update markers for selected/unselected menu items
-static void update_marker_for_tabs_menu(wxMenuBar* bar, const wxString& title, bool is_mainframe_menu)
-{
-    if (!bar)
-        return;
-    size_t items_cnt = bar->GetMenuCount();
-    for (size_t id = items_cnt - (is_mainframe_menu ? 4 : 3); id < items_cnt; id++) {
-        wxString label = bar->GetMenuLabel(id);
-        if (label.First(pref()) == 0) {
-            if (label == pref() + title + suff())
-                return;
-            label.Remove(size_t(0), pref().Len());
-            label.RemoveLast(suff().Len());
-            bar->SetMenuLabel(id, label);
-            break;
-        }
+    if (wxGetApp().is_editor()) {
+        // jump to found option from SearchDialog
+        Bind(wxCUSTOMEVT_JUMP_TO_OPTION, [](wxCommandEvent& evt) { wxGetApp().jump_to_option(evt.GetInt()); });
     }
-    if (int id = bar->FindMenu(title); id != wxNOT_FOUND)
-        bar->SetMenuLabel(id, pref() + title + suff());
 }
-
-static void add_tabs_as_menu(wxMenuBar* bar, MainFrame* main_frame, wxWindow* bar_parent)
-{
-    PrinterTechnology pt = main_frame->plater() ? main_frame->plater()->printer_technology() : ptFFF;
-
-    bool is_mainframe_menu = bar_parent == main_frame;
-    if (!is_mainframe_menu)
-        append_tab_menu_items_to_menubar(bar, pt, is_mainframe_menu);
-
-    bar_parent->Bind(wxEVT_MENU_OPEN, [main_frame, bar, is_mainframe_menu](wxMenuEvent& event) {
-        wxMenu* const menu = event.GetMenu();
-        if (!menu || menu->GetMenuItemCount() > 0) {
-            // If we are here it means that we open regular menu and not a tab used as a menu
-            event.Skip(); // event.Skip() is verry important to next processing of the wxEVT_UPDATE_UI by this menu items.
-                          // If wxEVT_MENU_OPEN will not be pocessed in next event queue then MenuItems of this menu will never caught wxEVT_UPDATE_UI 
-                          // and, as a result, "check/radio value" will not be updated
-            return;
-        }
-
-        // update tab selection
-
-        const wxString& title = menu->GetTitle();
-        if (title == _L("Plater"))
-            main_frame->select_tab(size_t(0));
-        else if (title == _L("Print Settings"))
-            main_frame->select_tab(wxGetApp().get_tab(main_frame->plater()->printer_technology() == ptFFF ? Preset::TYPE_PRINT : Preset::TYPE_SLA_PRINT));
-        else if (title == _L("Filament Settings"))
-            main_frame->select_tab(wxGetApp().get_tab(Preset::TYPE_FILAMENT));
-        else if (title == _L("Material Settings"))
-            main_frame->select_tab(wxGetApp().get_tab(Preset::TYPE_SLA_MATERIAL));
-        else if (title == _L("Printer Settings"))
-            main_frame->select_tab(wxGetApp().get_tab(Preset::TYPE_PRINTER));
-
-        // update markers for selected/unselected menu items
-        update_marker_for_tabs_menu(bar, title, is_mainframe_menu);
-    });
-}
-
-void MainFrame::show_tabs_menu(bool show)
-{
-    if (show)
-        append_tab_menu_items_to_menubar(m_menubar, plater() ? plater()->printer_technology() : ptFFF, true);
-    else
-        while (m_menubar->GetMenuCount() >= 8) {
-            if (wxMenu* menu = m_menubar->Remove(7))
-                delete menu;
-        }
-}
-#endif // _MSW_DARK_MODE
 
 void MainFrame::update_layout()
 {
@@ -447,6 +363,7 @@ void MainFrame::update_layout()
             m_settings_dialog.Close();
 
         m_tabpanel->Hide();
+        m_tmp_top_bar->Hide();
         m_plater->Hide();
 
         Layout();
@@ -454,7 +371,6 @@ void MainFrame::update_layout()
 
     ESettingsLayout layout = wxGetApp().is_gcode_viewer() ? ESettingsLayout::GCodeViewer :
         (wxGetApp().app_config->get_bool("old_settings_layout_mode") ? ESettingsLayout::Old :
-         wxGetApp().app_config->get_bool("new_settings_layout_mode") ? ( wxGetApp().tabs_as_menu() ? ESettingsLayout::Old : ESettingsLayout::New) :
          wxGetApp().app_config->get_bool("dlg_settings_layout_mode") ? ESettingsLayout::Dlg : ESettingsLayout::Old);
 
     if (m_layout == layout)
@@ -479,7 +395,6 @@ void MainFrame::update_layout()
                                  layout   == ESettingsLayout::Dlg       ? State::toDlg      : State::noUpdate;
 #endif //__WXMSW__
 
-    ESettingsLayout old_layout = m_layout;
     m_layout = layout;
 
     // From the very beginning the Print settings should be selected
@@ -495,70 +410,46 @@ void MainFrame::update_layout()
     case ESettingsLayout::Old:
     {
         m_plater->Reparent(m_tabpanel);
-#ifdef _MSW_DARK_MODE
         m_plater->Layout();
-        if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater, _L("Plater"), std::string("plater"), true);
-        else
-#endif
-        m_tabpanel->InsertPage(0, m_plater, _L("Plater"));
+
         m_main_sizer->Add(m_tabpanel, 1, wxEXPAND | wxTOP, 1);
         m_plater->Show();
-        m_tabpanel->Show();
-        // update Tabs
-        if (old_layout == ESettingsLayout::Dlg)
-            if (int sel = m_tabpanel->GetSelection(); sel != wxNOT_FOUND)
-                m_tabpanel->SetSelection(sel+1);// call SetSelection to correct layout after switching from Dlg to Old mode
-#ifdef _MSW_DARK_MODE
-        if (wxGetApp().tabs_as_menu())
-            show_tabs_menu(true);
-#endif
-        break;
-    }
-    case ESettingsLayout::New:
-    {
-        m_main_sizer->Add(m_plater, 1, wxEXPAND);
-        m_tabpanel->Hide();
-        m_main_sizer->Add(m_tabpanel, 1, wxEXPAND);
-        m_plater_page = new wxPanel(m_tabpanel);
-#ifdef _MSW_DARK_MODE
-        if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->InsertPage(0, m_plater_page, _L("Plater"), std::string("plater"), true);
-        else
-#endif
-        m_tabpanel->InsertPage(0, m_plater_page, _L("Plater")); // empty panel just for Plater tab */
-        m_plater->Show();
+        m_tabpanel->ShowFull();
+        m_tmp_top_bar->Hide();
         break;
     }
     case ESettingsLayout::Dlg:
     {
-        m_main_sizer->Add(m_plater, 1, wxEXPAND);
-        m_tabpanel->Reparent(&m_settings_dialog);
-        m_settings_dialog.GetSizer()->Add(m_tabpanel, 1, wxEXPAND | wxTOP, 2);
-        m_tabpanel->Show();
+        const int sel = m_tabpanel->GetSelection();
+
+        m_plater->Reparent(this);
+        m_main_sizer->Add(m_tmp_top_bar, 0, wxEXPAND | wxTOP, 1);
+        m_main_sizer->Add(m_plater, 1, wxEXPAND | wxTOP, 1);
+        m_plater->Layout();
+        m_tmp_top_bar->ShowFull();
         m_plater->Show();
 
-#ifdef _MSW_DARK_MODE
-        if (wxGetApp().tabs_as_menu())
-            show_tabs_menu(false);
-#endif
+        m_tabpanel->Reparent(&m_settings_dialog);
+        m_tabpanel->SetSelection(sel > 0 ? (sel - 1) : 0);
+        m_tabpanel->ShowJustMode();
+        m_settings_dialog.GetSizer()->Add(m_tabpanel, 1, wxEXPAND | wxTOP, 2);
+        m_settings_dialog.Layout();
         break;
     }
     case ESettingsLayout::GCodeViewer:
     {
         m_main_sizer->Add(m_plater, 1, wxEXPAND);
         m_plater->set_default_bed_shape();
+#if ENABLE_HACK_GCODEVIEWER_SLOW_ON_MAC
+        m_plater->get_collapse_toolbar().set_enabled(true);
+#else
         m_plater->get_collapse_toolbar().set_enabled(false);
+#endif // !ENABLE_HACK_GCODEVIEWER_SLOW_ON_MAC
         m_plater->collapse_sidebar(true);
         m_plater->Show();
         break;
     }
     }
-
-#ifdef _MSW_DARK_MODE
-    // Sizer with buttons for mode changing
-    m_plater->sidebar().show_mode_sizer(wxGetApp().tabs_as_menu() || m_layout != ESettingsLayout::Old);
-#endif
 
 #ifdef __WXMSW__
     if (update_scaling_state != State::noUpdate)
@@ -590,24 +481,11 @@ void MainFrame::update_layout()
     }
 #endif //__WXMSW__
 
-//#ifdef __APPLE__
-//    // Using SetMinSize() on Mac messes up the window position in some cases
-//    // cf. https://groups.google.com/forum/#!topic/wx-users/yUKPBBfXWO0
-//    // So, if we haven't possibility to set MinSize() for the MainFrame, 
-//    // set the MinSize() as a half of regular  for the m_plater and m_tabpanel, when settings layout is in slNew mode
-//    // Otherwise, MainFrame will be maximized by height
-//    if (m_layout == ESettingsLayout::New) {
-//        wxSize size = wxGetApp().get_min_size();
-//        size.SetHeight(int(0.5 * size.GetHeight()));
-//        m_plater->SetMinSize(size);
-//        m_tabpanel->SetMinSize(size);
-//    }
-//#endif
+    if (m_layout == ESettingsLayout::Old)
+        m_tabpanel->InsertNewPage(0, m_plater, _L("Plater"), "", true);
 
-#ifdef __APPLE__
-    m_plater->sidebar().change_top_border_for_mode_sizer(m_layout != ESettingsLayout::Old);
-#endif
-    
+    update_topbars();
+
     Layout();
     Thaw();
 }
@@ -723,40 +601,99 @@ void MainFrame::update_title()
     SetTitle(title);
 }
 
+static wxString GetTooltipForSettingsButton(PrinterTechnology pt)
+{
+    std::string tooltip = _u8L("Switch to Settings") + "\n" + "[" + shortkey_ctrl_prefix() + "2] - " + _u8L("Print Settings Tab") +
+                                                       "\n" + "[" + shortkey_ctrl_prefix() + "3] - " + (pt == ptFFF ? _u8L("Filament Settings Tab") : _u8L("Material Settings Tab")) +
+                                                       "\n" + "[" + shortkey_ctrl_prefix() + "4] - " + _u8L("Printer Settings Tab");
+    return from_u8(tooltip);
+}
+
+void MainFrame::update_topbars()
+{
+    if (wxGetApp().is_gcode_viewer())
+        return;
+
+    const bool show_login = !wxGetApp().app_config->has("show_login_button") || wxGetApp().app_config->get_bool("show_login_button");
+    m_tmp_top_bar->ShowUserAccount(show_login);
+    m_tabpanel->ShowUserAccount(show_login);
+
+    if (!show_login) {
+        if (auto user_account = wxGetApp().plater()->get_user_account();
+            user_account && user_account->is_logged())
+            user_account->do_logout();
+    }
+}
+
+void MainFrame::set_callbacks_for_topbar_menus()
+{
+    m_bar_menus.set_workspaces_menu_callbacks(
+        []()                             -> int         { return wxGetApp().get_mode(); },
+        [](/*ConfigOptionMode*/int mode) -> void        { wxGetApp().save_mode(mode); },
+        [](/*ConfigOptionMode*/int mode) -> std::string { return wxGetApp().get_mode_btn_color(mode); }
+    );
+
+    m_bar_menus.set_account_menu_callbacks(
+        []() -> void { wxGetApp().plater()->act_with_user_account(); },
+        [this]() -> void {
+            wxString preferences_item = _L("Show Log in button in application top bar");
+            wxString msg =
+                _L("PrusaSlicer will remember your choice.") + "\n\n" +
+                format_wxstr(_L("Visit \"Preferences\" and check \"%1%\"\nto changes your choice."), preferences_item);
+
+            MessageDialog msg_dlg(this, msg, _L("PrusaSlicer: Don't ask me again"), wxOK | wxCANCEL | wxICON_INFORMATION);
+            if (msg_dlg.ShowModal() == wxID_OK) {
+                wxGetApp().app_config->set("show_login_button", "0");
+
+                m_bar_menus.RemoveHideLoginItem();
+                update_topbars();
+            }
+        },
+        []() -> TopBarMenus::UserAccountInfo {
+            if (auto user_account = wxGetApp().plater()->get_user_account())
+                return { user_account->is_logged(),
+                         user_account->get_username(),
+                         user_account->get_avatar_path(true) };
+            return TopBarMenus::UserAccountInfo();
+        }
+    );
+
+    // we need "Hide Log in button" menu item only till "show_login_button" wasn't changed
+    if (wxGetApp().app_config->has("show_login_button"))
+        m_bar_menus.RemoveHideLoginItem();
+}
+
 void MainFrame::init_tabpanel()
 {
     wxGetApp().update_ui_colours_from_appconfig();
 
+    set_callbacks_for_topbar_menus();
+
+    if (wxGetApp().is_editor()) {
+        m_tmp_top_bar = new TopBar(this, &m_bar_menus, [this]() -> void { select_tab(); });
+        m_tmp_top_bar->SetFont(Slic3r::GUI::wxGetApp().normal_font());
+        m_tmp_top_bar->Hide();
+    }
+
     // wxNB_NOPAGETHEME: Disable Windows Vista theme for the Notebook background. The theme performance is terrible on Windows 10
     // with multiple high resolution displays connected.
-#ifdef _MSW_DARK_MODE
-    if (wxGetApp().tabs_as_menu()) {
-        m_tabpanel = new wxSimplebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
-//        wxGetApp().UpdateDarkUI(m_tabpanel);
-    }
-    else
-        m_tabpanel = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME, true);
-#else
-    m_tabpanel = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
-#endif
-
-    wxGetApp().UpdateDarkUI(m_tabpanel);
+    m_tabpanel = new TopBar(this, &m_bar_menus);
 
     m_tabpanel->SetFont(Slic3r::GUI::wxGetApp().normal_font());
     m_tabpanel->Hide();
     m_settings_dialog.set_tabpanel(m_tabpanel);
 
-#ifdef __WXMSW__
     m_tabpanel->Bind(wxEVT_BOOKCTRL_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
-#else
-    m_tabpanel->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
-#endif
         if (int old_selection = e.GetOldSelection();
             old_selection != wxNOT_FOUND && old_selection < static_cast<int>(m_tabpanel->GetPageCount())) {
             Tab* old_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(old_selection));
             if (old_tab)
                 old_tab->validate_custom_gcodes();
         }
+
+#ifndef __APPLE__
+        on_tab_change_rename_reload_item(e.GetSelection());
+#endif // !__APPLE__
 
         wxWindow* panel = m_tabpanel->GetCurrentPage();
         Tab* tab = dynamic_cast<Tab*>(panel);
@@ -765,25 +702,25 @@ void MainFrame::init_tabpanel()
         if (panel == nullptr || (tab != nullptr && !tab->supports_printer_technology(m_plater->printer_technology())))
             return;
 
+        // temporary fix - WebViewPanel is not inheriting from Tab -> would jump to select Plater
+        if (panel && !tab)
+            return;
+
         auto& tabs_list = wxGetApp().tabs_list;
         if (tab && std::find(tabs_list.begin(), tabs_list.end(), tab) != tabs_list.end()) {
             // On GTK, the wxEVT_NOTEBOOK_PAGE_CHANGED event is triggered
             // before the MainFrame is fully set up.
             tab->OnActivate();
             m_last_selected_tab = m_tabpanel->GetSelection();
-#ifdef _MSW_DARK_MODE
-            if (wxGetApp().tabs_as_menu())
-                tab->SetFocus();
-#endif
         }
         else
             select_tab(size_t(0)); // select Plater
     });
 
     m_plater = new Plater(this, this);
+    wxGetApp().plater_ = m_plater;
     m_plater->Hide();
 
-    wxGetApp().plater_ = m_plater;
 
     if (wxGetApp().is_editor())
         create_preset_tabs();
@@ -796,8 +733,11 @@ void MainFrame::init_tabpanel()
         // Show a correct number of filament fields.
         // nozzle_diameter is undefined when SLA printer is selected
         if (full_config.has("nozzle_diameter")) {
-            m_plater->on_extruders_change(full_config.option<ConfigOptionFloats>("nozzle_diameter")->values.size());
+            m_plater->sidebar().set_extruders_count(full_config.option<ConfigOptionFloats>("nozzle_diameter")->values.size());
         }
+
+        if (wxGetApp().is_editor())
+            m_tmp_top_bar->SetSettingsButtonTooltip(GetTooltipForSettingsButton(m_plater->printer_technology()));
     }
 }
 
@@ -864,6 +804,238 @@ void MainFrame::create_preset_tabs()
     add_created_tab(new TabSLAPrint(m_tabpanel), "cog");
     add_created_tab(new TabSLAMaterial(m_tabpanel), "resin");
     add_created_tab(new TabPrinter(m_tabpanel), wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? "printer" : "sla_printer");
+    
+    m_printables_webview = new PrintablesWebViewPanel(m_tabpanel);
+    add_printables_webview_tab();
+   
+    m_connect_webview = new ConnectWebViewPanel(m_tabpanel);
+    m_printer_webview = new PrinterWebViewPanel(m_tabpanel, L"");
+   
+    // new created tabs have to be hidden by default
+    m_connect_webview->Hide();
+    m_printer_webview->Hide();
+
+}
+
+void MainFrame::on_account_login(const std::string& token)
+{
+    add_connect_webview_tab();
+    assert (m_printables_webview);
+    m_printables_webview->login(token);
+}
+void MainFrame::on_account_will_refresh()
+{
+    m_printables_webview->send_will_refresh();
+}
+void MainFrame::on_account_did_refresh(const std::string& token)
+{
+    m_printables_webview->send_refreshed_token(token);
+}
+void MainFrame::on_account_logout()
+{
+    remove_connect_webview_tab();
+    assert (m_printables_webview);
+    m_printables_webview->logout();
+}
+
+void MainFrame::add_connect_webview_tab()
+{
+    if (m_connect_webview_added) {
+        m_connect_webview->resend_config();
+        return;
+    }
+    // parameters of InsertNewPage (to prevent ambigous overloaded function)
+    // insert "Connect" tab to position next to "Printer" tab
+    // order of tabs: Plater - Print Settings - Filaments - Printers - Prusa Connect - Prusa Link
+
+    int n = m_tabpanel->FindPage(m_printables_webview) + 1;
+    wxWindow* page = m_connect_webview;
+    const wxString text(L"Prusa Connect");
+    const std::string bmp_name = "";
+    bool bSelect = false;
+    m_tabpanel->InsertNewPage(n, page, text, bmp_name, bSelect);
+    m_connect_webview->set_create_browser();
+    m_connect_webview_added = true;
+}
+void MainFrame::remove_connect_webview_tab()
+{
+    if (!m_connect_webview_added) {
+        return;
+    }
+    int n = m_tabpanel->FindPage(m_connect_webview);
+    if (m_tabpanel->GetSelection() == n)
+        m_tabpanel->SetSelection(0);
+    m_tabpanel->RemovePage(size_t(n));
+    m_connect_webview_added = false;
+    m_connect_webview->logout();
+    m_connect_webview->destroy_browser();
+}
+
+void MainFrame::show_connect_tab(const wxString& url)
+{
+    if (!m_connect_webview_added) {
+        return;
+    }
+    m_connect_webview->prohibit_after_show_func_once();
+    m_tabpanel->SetSelection(m_tabpanel->FindPage(m_connect_webview));
+    m_connect_webview->set_load_default_url_on_next_error(true);
+    m_connect_webview->load_url(url);
+}
+void MainFrame::show_printables_tab(const std::string& url)
+{
+     if (!m_printables_webview_added) {
+        return;
+    }
+    // we have to set next url first, than show the tab
+    // printables_tab has to reload on show everytime
+    // so it is not possible load_url right after show
+    m_printables_webview->set_load_default_url_on_next_error(true);
+    m_printables_webview->set_next_show_url(url);
+    m_tabpanel->SetSelection(m_tabpanel->FindPage(m_printables_webview));
+}
+void MainFrame::add_printables_webview_tab()
+{
+    if (m_printables_webview_added) {
+        return;
+    }
+
+    int n = m_tabpanel->FindPage(wxGetApp().get_tab(Preset::TYPE_PRINTER)) + 1;
+    wxWindow* page = m_printables_webview;
+    const wxString text(L"Printables");
+    const std::string bmp_name = "";
+    m_tabpanel->InsertNewPage(n, page, text, bmp_name, false);
+    m_printables_webview->set_create_browser();
+    m_printables_webview_added = true;
+}
+
+// no longer needed?
+void MainFrame::remove_printables_webview_tab()
+{
+    if (!m_printables_webview_added) {
+        return;
+    }
+    int n = m_tabpanel->FindPage(m_printables_webview);
+    if (m_tabpanel->GetSelection() == n)
+        m_tabpanel->SetSelection(0);
+    m_tabpanel->RemovePage(size_t(n));
+    m_printables_webview_added = false;
+    m_printables_webview->destroy_browser();
+}
+
+void MainFrame::show_printer_webview_tab(DynamicPrintConfig* dpc)
+{
+    
+    remove_printer_webview_tab();
+    // if physical printer is selected
+    if (dpc && dpc->option<ConfigOptionEnum<PrintHostType>>("host_type")->value != htPrusaConnect) {
+        std::string url = dpc->opt_string("print_host");
+        if (url.find("http://") != 0 && url.find("https://") != 0) {
+            url = "http://" + url;
+        }
+        // set password / api key
+        if (dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(dpc->option("printhost_authorization_type"))->value == AuthorizationType::atKeyPassword) {
+            set_printer_webview_api_key(dpc->opt_string("printhost_apikey"));
+        }
+        else {
+            set_printer_webview_credentials(dpc->opt_string("printhost_user"), dpc->opt_string("printhost_password"));
+        }
+        add_printer_webview_tab(from_u8(url));
+    }
+}
+
+void MainFrame::add_printer_webview_tab(const wxString& url)
+{
+    if (m_printer_webview_added) {
+        //set_printer_webview_tab_url(url);
+        return;
+    }
+    m_printer_webview_added = true;
+    // add as the last (rightmost) panel
+    m_tabpanel->AddNewPage(m_printer_webview, _L("Physical Printer"), "");
+    m_printer_webview->set_default_url(url);
+    m_printer_webview->set_create_browser();
+}
+void MainFrame::remove_printer_webview_tab()
+{
+    if (!m_printer_webview_added) {
+        return;
+    }
+    if (m_tabpanel->GetPageText(m_tabpanel->GetSelection()) == _L("Physical Printer"))
+            select_tab(size_t(0));
+    m_printer_webview_added = false;
+    m_printer_webview->Hide();
+    m_tabpanel->RemovePage(m_tabpanel->FindPage(m_printer_webview));
+    m_printer_webview->destroy_browser();
+}
+
+void MainFrame::set_printer_webview_api_key(const std::string& key)
+{
+    m_printer_webview->set_api_key(key);
+}
+void MainFrame::set_printer_webview_credentials(const std::string& usr, const std::string& psk)
+{
+    m_printer_webview->set_credentials(usr, psk);
+}
+
+bool MainFrame::is_any_webview_selected()
+{
+    int selection = m_tabpanel->GetSelection();
+    if ( selection == m_tabpanel->FindPage(m_printables_webview)) 
+        return true;
+    if (m_connect_webview_added && selection == m_tabpanel->FindPage(m_connect_webview)) 
+        return true;
+    if (m_printer_webview_added && selection == m_tabpanel->FindPage(m_printer_webview)) 
+        return true;
+    return false;
+}
+
+void MainFrame::reload_selected_webview()
+{
+    int selection = m_tabpanel->GetSelection();
+    if ( selection == m_tabpanel->FindPage(m_printables_webview)) 
+       m_printables_webview->do_reload();
+    if (m_connect_webview_added && selection == m_tabpanel->FindPage(m_connect_webview)) 
+        m_connect_webview->do_reload();
+    if (m_printer_webview_added && selection == m_tabpanel->FindPage(m_printer_webview)) 
+        m_printer_webview->do_reload();
+}
+
+void MainFrame::on_tab_change_rename_reload_item(int new_tab)
+{
+    if (!m_tabpanel) {
+        return;
+    }
+    if ( new_tab == m_tabpanel->FindPage(m_printables_webview) 
+        || (m_connect_webview_added && new_tab == m_tabpanel->FindPage(m_connect_webview)) 
+        || (m_printer_webview_added && new_tab == m_tabpanel->FindPage(m_printer_webview))) 
+    {
+        m_menu_item_reload->SetItemLabel(_L("Re&load Web Content") + "\tF5");
+        m_menu_item_reload->SetHelp(_L("Reload Web Content"));
+    } else {
+        m_menu_item_reload->SetItemLabel(_L("Re&load from Disk") + "\tF5");
+        m_menu_item_reload->SetHelp(_L("Reload the plater from disk"));
+    }
+}
+
+bool MainFrame::reload_item_condition_cb()
+{
+    return is_any_webview_selected() ? true :
+    !m_plater->model().objects.empty();
+}
+void MainFrame::reload_item_function_cb()
+{
+    is_any_webview_selected() 
+        ? reload_selected_webview()
+        : m_plater->reload_all_from_disk();
+}
+
+void Slic3r::GUI::MainFrame::refresh_account_menu(bool avatar/* = false */)
+{
+    // Update User name in TopBar
+    m_bar_menus.UpdateAccountMenu();
+
+    m_tabpanel->GetTopBarItemsCtrl()->UpdateAccountButton(avatar);
+    m_tmp_top_bar->GetTopBarItemsCtrl()->UpdateAccountButton(avatar);
 }
 
 void MainFrame::add_created_tab(Tab* panel,  const std::string& bmp_name /*= ""*/)
@@ -873,12 +1045,7 @@ void MainFrame::add_created_tab(Tab* panel,  const std::string& bmp_name /*= ""*
     const auto printer_tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
 
     if (panel->supports_printer_technology(printer_tech))
-#ifdef _MSW_DARK_MODE
-        if (!wxGetApp().tabs_as_menu())
-            dynamic_cast<Notebook*>(m_tabpanel)->AddPage(panel, panel->title(), bmp_name);
-        else
-#endif
-        m_tabpanel->AddPage(panel, panel->title());
+        m_tabpanel->AddNewPage(panel, panel->title(), bmp_name);
 }
 
 bool MainFrame::is_active_and_shown_tab(Tab* tab)
@@ -890,9 +1057,6 @@ bool MainFrame::is_active_and_shown_tab(Tab* tab)
 
     if (m_layout == ESettingsLayout::Dlg)
         return m_settings_dialog.IsShown();
-
-    if (m_layout == ESettingsLayout::New)
-        return m_main_sizer->IsShown(m_tabpanel);
     
     return true;
 }
@@ -952,7 +1116,7 @@ bool MainFrame::can_export_supports() const
         return false;
 
     bool can_export = false;
-    const PrintObjects& objects = m_plater->sla_print().objects();
+    const PrintObjects& objects = m_plater->active_sla_print().objects();
     for (const SLAPrintObject* object : objects)
     {
         if (!object->support_mesh().empty() || !object->pad_mesh().empty())
@@ -1021,7 +1185,6 @@ bool MainFrame::can_change_view() const
     switch (m_layout)
     {
     default:                   { return false; }
-    case ESettingsLayout::New: { return m_plater->IsShown(); }
     case ESettingsLayout::Dlg: { return true; }
     case ESettingsLayout::Old: { 
         int page_id = m_tabpanel->GetSelection();
@@ -1061,10 +1224,10 @@ void MainFrame::on_dpi_changed(const wxRect& suggested_rect)
     wxGetApp().update_fonts(this);
     this->SetFont(this->normal_font());
 
-#ifdef _MSW_DARK_MODE
-    // update common mode sizer
-    if (!wxGetApp().tabs_as_menu())
-        dynamic_cast<Notebook*>(m_tabpanel)->Rescale();
+#ifdef _WIN32
+    if (m_tmp_top_bar && m_tmp_top_bar->IsShown())
+        m_tmp_top_bar->Rescale();
+    m_tabpanel->Rescale();
 #endif
 
     // update Plater
@@ -1074,6 +1237,10 @@ void MainFrame::on_dpi_changed(const wxRect& suggested_rect)
     if (m_layout != ESettingsLayout::Dlg) // Do not update tabs if the Settings are in the separated dialog
         for (auto tab : wxGetApp().tabs_list)
             tab->msw_rescale();
+
+    wxGetApp().searcher().dlg_msw_rescale();
+
+    return; // #ysFIXME - delete_after_testing - It looks like next code is no need any more
 
     // Workarounds for correct Window rendering after rescale
 
@@ -1103,41 +1270,47 @@ void MainFrame::on_sys_color_changed()
 
     // update label colors in respect to the system mode
     wxGetApp().init_ui_colours();
+
+    if (wxGetApp().is_gcode_viewer()) {
+        MenuFactory::sys_color_changed(m_menubar);
+        return;
+    }
+
     // but if there are some ui colors in appconfig, they have to be applied
     wxGetApp().update_ui_colours_from_appconfig();
 #ifdef __WXMSW__
     wxGetApp().UpdateDarkUI(m_tabpanel);
-#ifdef _MSW_DARK_MODE
-    // update common mode sizer
-    if (!wxGetApp().tabs_as_menu())
-        dynamic_cast<Notebook*>(m_tabpanel)->OnColorsChanged();
+    wxGetApp().UpdateDarkUI(m_tmp_top_bar);
 #endif
-#endif
+    m_tabpanel->OnColorsChanged();
+    m_tmp_top_bar->OnColorsChanged();
 
     // update Plater
     wxGetApp().plater()->sys_color_changed();
 
     // update Tabs
-    for (auto tab : wxGetApp().tabs_list)
+    for (Tab* tab : wxGetApp().tabs_list)
         tab->sys_color_changed();
+
+    if (m_printables_webview)
+        m_printables_webview->sys_color_changed();
+    if (m_connect_webview)
+        m_connect_webview->sys_color_changed();
+    if (m_printer_webview)
+        m_printer_webview->sys_color_changed();
 
     MenuFactory::sys_color_changed(m_menubar);
 
     this->Refresh();
+
+    wxGetApp().searcher().dlg_sys_color_changed();
 }
 
 void MainFrame::update_mode_markers()
 {
-#ifdef __WXMSW__
-#ifdef _MSW_DARK_MODE
     // update markers in common mode sizer
-    if (!wxGetApp().tabs_as_menu())
-        dynamic_cast<Notebook*>(m_tabpanel)->UpdateModeMarkers();
-#endif
-#endif
-
-    // update mode markers on side_bar
-    wxGetApp().sidebar().update_mode_markers();
+    m_tmp_top_bar->UpdateModeMarkers();
+    m_tabpanel->UpdateModeMarkers();
 
     // update mode markers in tabs
     for (auto tab : wxGetApp().tabs_list)
@@ -1370,10 +1543,6 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(export_menu, wxID_ANY, _L("Export Plate as STL/OBJ &Including Supports") + dots, _L("Export current plate as STL/OBJ including supports"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->export_stl_obj(true); }, "export_plater", nullptr,
             [this](){return can_export_supports(); }, this);
-// Deprecating AMF export. Let's wait for user feedback.
-//        append_menu_item(export_menu, wxID_ANY, _L("Export Plate as &AMF") + dots, _L("Export current plate as AMF"),
-//            [this](wxCommandEvent&) { if (m_plater) m_plater->export_amf(); }, "export_plater", nullptr,
-//            [this](){return can_export_model(); }, this);
         export_menu->AppendSeparator();
         append_menu_item(export_menu, wxID_ANY, _L("Export &Toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->export_toolpaths_to_obj(); }, "export_plater", nullptr,
@@ -1470,15 +1639,20 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + dots + "\tCtrl+Shift+R",
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
             "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
+        m_menu_item_reload = append_menu_item(editMenu, wxID_ANY, _L("Re&load Web Content") + "\tF5",
+            _L("Reload Web Content"), [this](wxCommandEvent&) {  reload_selected_webview(); },
+            "", nullptr, [this]() {return is_any_webview_selected(); }, this);
 #else
-        append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + sep + "F5",
-            _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
-            "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
+        m_menu_item_reload = append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + "\tF5",
+            _L("Reload the plater from disk"), [this](wxCommandEvent&) {  reload_item_function_cb(); },
+            "", nullptr, [this]() {return reload_item_condition_cb(); }, this);
 #endif // __APPLE__
 
         editMenu->AppendSeparator();
         append_menu_item(editMenu, wxID_ANY, _L("Searc&h") + "\tCtrl+F",
-            _L("Search in settings"), [this](wxCommandEvent&) { m_plater->search(m_plater->IsShown()); },
+            _L("Search in settings"), [this](wxCommandEvent&) {
+				m_tabpanel->GetTopBarItemsCtrl()->TriggerSearch();
+            },
             "search", nullptr, []() {return true; }, this);
     }
 
@@ -1564,6 +1738,27 @@ void MainFrame::init_menubar_as_editor()
     // Help menu
     auto helpMenu = generate_help_menu();
 
+#if 0//ndef__APPLE__
+    // append menus for Menu button from TopBar
+
+    m_bar_menus.AppendMenuItem(fileMenu, _L("&File"));
+    if (editMenu) 
+        m_bar_menus.AppendMenuItem(editMenu, _L("&Edit"));
+
+    m_bar_menus.AppendMenuSeparaorItem();
+
+    m_bar_menus.AppendMenuItem(windowMenu, _L("&Window"));
+    if (viewMenu) 
+        m_bar_menus.AppendMenuItem(viewMenu, _L("&View"));
+    
+    m_bar_menus.AppendMenuItem(wxGetApp().get_config_menu(this), _L("&Configuration"));
+
+    m_bar_menus.AppendMenuSeparaorItem();
+
+    m_bar_menus.AppendMenuItem(helpMenu, _L("&Help"));
+
+#else
+
     // menubar
     // assign menubar to frame after appending items, otherwise special items
     // will not be handled correctly
@@ -1574,26 +1769,16 @@ void MainFrame::init_menubar_as_editor()
     m_menubar->Append(windowMenu, _L("&Window"));
     if (viewMenu) m_menubar->Append(viewMenu, _L("&View"));
     // Add additional menus from C++
-    wxGetApp().add_config_menu(m_menubar);
+    m_menubar->Append(wxGetApp().get_config_menu(this), _L("&Configuration"));
     m_menubar->Append(helpMenu, _L("&Help"));
 
-#ifdef _MSW_DARK_MODE
-    if (wxGetApp().tabs_as_menu()) {
-        // Add separator 
-        m_menubar->Append(new wxMenu(), "          ");
-        add_tabs_as_menu(m_menubar, this, this);
-    }
-#endif
     SetMenuBar(m_menubar);
-
-#ifdef _MSW_DARK_MODE
-    if (wxGetApp().tabs_as_menu())
-        m_menubar->EnableTop(6, false);
-#endif
 
 #ifdef __APPLE__
     init_macos_application_menu(m_menubar, this);
 #endif // __APPLE__
+
+#endif
 
     if (plater()->printer_technology() == ptSLA)
         update_menubar();
@@ -1679,7 +1864,7 @@ void MainFrame::init_menubar_as_gcodeviewer()
     m_menubar->Append(fileMenu, _L("&File"));
     if (viewMenu != nullptr) m_menubar->Append(viewMenu, _L("&View"));
     // Add additional menus from C++
-    wxGetApp().add_config_menu(m_menubar);
+    m_menubar->Append(wxGetApp().get_config_menu(this), _L("&Configuration"));
     m_menubar->Append(helpMenu, _L("&Help"));
     SetMenuBar(m_menubar);
 
@@ -1833,9 +2018,54 @@ void MainFrame::export_configbundle(bool export_physical_printers /*= false*/)
         file = dlg.GetPath();
     if (!file.IsEmpty()) {
         // Export the config bundle.
+#if wxUSE_SECRETSTORE
+        bool passwords_to_plain = false;
+        bool passwords_dialog_shown = false;
+#endif
+        // callback function thats going to be passed to preset bundle (so preset bundle doesnt have to include WX secret lib)
+        std::function<bool(const std::string&, const std::string&, std::string&)> load_password = [&](const std::string& printer_id, const std::string& opt, std::string& out_psswd)->bool{
+            out_psswd = std::string();
+#if wxUSE_SECRETSTORE
+            // First password prompts user with dialog
+            if (!passwords_dialog_shown) {
+                wxString msg = _L("Some of the exported printers contain passwords, which are stored in the system password store." 
+                                  " Do you want to include the passwords in the plain text form in the exported file?");
+                MessageDialog dlg_psswd(this, msg, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
+                if (dlg_psswd.ShowModal() == wxID_YES)
+                    passwords_to_plain = true;
+                passwords_dialog_shown = true;
+            }
+            if (!passwords_to_plain)
+                return false;
+            wxSecretStore store = wxSecretStore::GetDefault();
+            wxString errmsg;
+            if (!store.IsOk(&errmsg)) {
+                std::string msg = GUI::format("%1% (%2%).", _u8L("Failed to load credentials from the system password store."), errmsg);
+                BOOST_LOG_TRIVIAL(error) << msg;
+                show_error(nullptr, msg);
+                // Do not try again. System store is not reachable.
+                passwords_to_plain = false;
+                return false;
+            }
+            const wxString service = GUI::format_wxstr(L"%1%/PhysicalPrinter/%2%/%3%", SLIC3R_APP_NAME, printer_id, opt);
+            wxString username;
+            wxSecretValue password;
+            if (!store.Load(service, username, password)) {
+                std::string msg = GUI::format(_u8L("Failed to load credentials from the system password store for printer %1%."), printer_id);
+                BOOST_LOG_TRIVIAL(error) << msg;
+                show_error(nullptr, msg);
+                return false;
+            }
+            out_psswd = into_u8(password.GetAsString());
+            return true;
+#else
+            return false;
+#endif // wxUSE_SECRETSTORE 
+        };
+
         wxGetApp().app_config->update_config_dir(get_dir_name(file));
         try {
-            wxGetApp().preset_bundle->export_configbundle(file.ToUTF8().data(), false, export_physical_printers);
+            wxGetApp().preset_bundle->export_configbundle(file.ToUTF8().data(), false, export_physical_printers, load_password);
         } catch (const std::exception &ex) {
 			show_error(this, ex.what());
         }
@@ -1919,6 +2149,13 @@ void MainFrame::load_config(const DynamicPrintConfig& config)
 #endif
 }
 
+void MainFrame::update_search_lines(const std::string search_line)
+{
+    wxString search = from_u8(search_line);
+    m_tabpanel   ->UpdateSearch(search);
+    m_tmp_top_bar->UpdateSearch(search);
+}
+
 void MainFrame::select_tab(Tab* tab)
 {
     if (!tab)
@@ -1931,6 +2168,8 @@ void MainFrame::select_tab(Tab* tab)
 
 void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
 {
+    if (!wxGetApp().is_editor())
+        return;
     bool tabpanel_was_hidden = false;
 
     // Controls on page are created on active page of active tab now.
@@ -1941,14 +2180,7 @@ void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
 
         if (m_tabpanel->GetSelection() != (int)new_selection)
             m_tabpanel->SetSelection(new_selection);
-#ifdef _MSW_DARK_MODE
-        if (wxGetApp().tabs_as_menu()) {
-            if (Tab* cur_tab = dynamic_cast<Tab*>(m_tabpanel->GetPage(new_selection)))
-                update_marker_for_tabs_menu((m_layout == ESettingsLayout::Old ? m_menubar : m_settings_dialog.menubar()), cur_tab->title(), m_layout == ESettingsLayout::Old);
-            else if (tab == 0 && m_layout == ESettingsLayout::Old)
-                m_plater->get_current_canvas3D()->render();
-        }
-#endif
+
         if (tab == 0 && m_layout == ESettingsLayout::Old)
             m_plater->canvas3D()->render();
         else if (was_hidden) {
@@ -1962,9 +2194,6 @@ void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
         if (tab==0) {
             if (m_settings_dialog.IsShown())
                 this->SetFocus();
-            // plater should be focused for correct navigation inside search window
-            if (m_plater->canvas3D()->is_search_pressed())
-                m_plater->SetFocus();
             return;
         }
         // Show/Activate Settings Dialog
@@ -1992,26 +2221,11 @@ void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
         if (m_settings_dialog.IsIconized())
             m_settings_dialog.Iconize(false);
     }
-    else if (m_layout == ESettingsLayout::New) {
-        m_main_sizer->Show(m_plater, tab == 0);
-        tabpanel_was_hidden = !m_main_sizer->IsShown(m_tabpanel);
-        select(tabpanel_was_hidden);
-        m_main_sizer->Show(m_tabpanel, tab != 0);
-
-        // plater should be focused for correct navigation inside search window
-        if (tab == 0)
-            m_plater->SetFocus();
-        Layout();
-    }
     else {
         select(false);
-#ifdef _MSW_DARK_MODE
-        if (wxGetApp().tabs_as_menu() && tab == 0)
-            m_plater->SetFocus();
-#endif
     }
 
-    // When we run application in ESettingsLayout::New or ESettingsLayout::Dlg mode, tabpanel is hidden from the very beginning
+    // When we run application in ESettingsLayout::Dlg mode, tabpanel is hidden from the very beginning
     // and as a result Tab::update_changed_tree_ui() function couldn't update m_is_nonsys_values values,
     // which are used for update TreeCtrl and "revert_buttons".
     // So, force the call of this function for Tabs, if tab panel was hidden
@@ -2059,24 +2273,6 @@ void MainFrame::on_presets_changed(SimpleEvent &event)
     }
 }
 
-// #ys_FIXME_to_delete
-void MainFrame::on_value_changed(wxCommandEvent& event)
-{
-    auto *tab = dynamic_cast<Tab*>(event.GetEventObject());
-    wxASSERT(tab != nullptr);
-    if (tab == nullptr)
-        return;
-
-    auto opt_key = event.GetString();
-    if (m_plater) {
-        m_plater->on_config_change(*tab->get_config()); // propagate config change events to the plater
-        if (opt_key == "extruders_count") {
-            auto value = event.GetInt();
-            m_plater->on_extruders_change(value);
-        }
-    }
-}
-
 void MainFrame::on_config_changed(DynamicPrintConfig* config) const
 {
     if (m_plater)
@@ -2100,8 +2296,12 @@ void MainFrame::add_to_recent_projects(const wxString& filename)
 
 void MainFrame::technology_changed()
 {
-    // update menu titles
     PrinterTechnology pt = plater()->printer_technology();
+    m_tmp_top_bar->SetSettingsButtonTooltip(GetTooltipForSettingsButton(pt));
+
+    if (!m_menubar)
+        return;
+    // update menu titles
     if (int id = m_menubar->FindMenu(pt == ptFFF ? _L("Material Settings") : _L("Filament Settings")); id != wxNOT_FOUND)
         m_menubar->SetMenuLabel(id , pt == ptSLA ? _L("Material Settings") : _L("Filament Settings"));
 
@@ -2120,6 +2320,8 @@ void MainFrame::update_ui_from_settings()
 //    m_plater->sidebar().show_reslice(!bp_on);
 //    m_plater->sidebar().show_export(bp_on);
 //    m_plater->sidebar().Layout();
+
+    update_topbars();
 
     if (m_plater)
         m_plater->update_ui_from_settings();
@@ -2179,10 +2381,13 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
 #else /* __APPLE__ */
                 case WXK_CONTROL_F:
 #endif /* __APPLE__ */
-                case 'F': { m_main_frame->plater()->search(false); break; }
+                case 'F': { m_tabpanel->GetTopBarItemsCtrl()->TriggerSearch();
+                			break; }
                 default:break;
                 }
             }
+
+            evt.Skip();
         };
 
         if (evt.IsShown()) {
@@ -2198,14 +2403,11 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
     //just hide the Frame on closing
     this->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& evt) { this->Hide(); });
 
-#ifdef _MSW_DARK_MODE
-    if (wxGetApp().tabs_as_menu()) {
-        // menubar
-        m_menubar = new wxMenuBar();
-        add_tabs_as_menu(m_menubar, mainframe, this);
-        this->SetMenuBar(m_menubar);
-    }
-#endif
+    this->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
+        event.Skip();
+        if (m_tabpanel)
+            m_tabpanel->UpdateSearchSizeAndPosition();
+    });
 
     // initialize layout
     auto sizer = new wxBoxSizer(wxVERTICAL);
@@ -2223,6 +2425,11 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
     SetSize(GetMinSize());
 #endif
     Layout();
+
+    Bind(wxEVT_MOVE, [](wxMoveEvent& event) {
+        wxGetApp().searcher().update_dialog_position();
+        event.Skip();
+    });
 }
 
 void SettingsDialog::on_dpi_changed(const wxRect& suggested_rect)
@@ -2230,22 +2437,22 @@ void SettingsDialog::on_dpi_changed(const wxRect& suggested_rect)
     if (wxGetApp().is_gcode_viewer())
         return;
 
-    const int& em = em_unit();
-    const wxSize& size = wxSize(85 * em, 50 * em);
+// #ysFIXME - delete_after_testing
+//    const int& em = em_unit();
+//    const wxSize& size = wxSize(85 * em, 50 * em);
 
-#ifdef _MSW_DARK_MODE
-    // update common mode sizer
-    if (!wxGetApp().tabs_as_menu())
-        dynamic_cast<Notebook*>(m_tabpanel)->Rescale();
+#ifdef _WIN32
+    m_tabpanel->Rescale();
 #endif
 
     // update Tabs
     for (auto tab : wxGetApp().tabs_list)
         tab->msw_rescale();
 
-    SetMinSize(size);
-    Fit();
-    Refresh();
+// #ysFIXME - delete_after_testing
+//    SetMinSize(size);
+//    Fit();
+//    Refresh();
 }
 
 

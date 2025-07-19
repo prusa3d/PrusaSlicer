@@ -7,11 +7,15 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <algorithm>
+#include <cmath>
+
 #include "../ClipperUtils.hpp"
 #include "../ShortestPath.hpp"
-#include "../Surface.hpp"
-
 #include "FillHoneycomb.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r {
 

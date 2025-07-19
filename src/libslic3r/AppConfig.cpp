@@ -16,7 +16,6 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/nowide/cenv.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/ptree_fwd.hpp>
@@ -64,9 +63,6 @@ void AppConfig::reset()
 void AppConfig::set_defaults()
 {
     if (m_mode == EAppMode::Editor) {
-        // Reset the empty fields to defaults.
-        if (get("autocenter").empty())
-            set("autocenter", "0");
         // Disable background processing by default as it is not stable.
         if (get("background_processing").empty())
             set("background_processing", "0");
@@ -102,9 +98,6 @@ void AppConfig::set_defaults()
         if (get("associate_stl").empty())
             set("associate_stl", "0");
 
-        if (get("tabs_as_menu").empty())
-            set("tabs_as_menu", "0");
-
         if (get("suppress_round_corners").empty())
             set("suppress_round_corners", "1");
 #endif // _WIN32
@@ -112,11 +105,6 @@ void AppConfig::set_defaults()
         // remove old 'use_legacy_opengl' parameter from this config, if present
         if (!get("use_legacy_opengl").empty())
             erase("", "use_legacy_opengl");
-
-#ifdef __APPLE__
-        if (get("use_retina_opengl").empty())
-            set("use_retina_opengl", "1");
-#endif
 
         if (get("single_instance").empty())
             set("single_instance", 
@@ -186,6 +174,11 @@ void AppConfig::set_defaults()
 #endif // _WIN32
     }
 
+#ifdef __APPLE__
+    if (get("use_retina_opengl").empty())
+        set("use_retina_opengl", "1");
+#endif // __APPLE__
+
     if (get("seq_top_layer_only").empty())
         set("seq_top_layer_only", "1");
 
@@ -216,6 +209,21 @@ void AppConfig::set_defaults()
     if (get("wifi_config_dialog_declined").empty())
         set("wifi_config_dialog_declined", "0");
 
+    if (get("connect_polling").empty())
+        set("connect_polling", "1");
+
+    if (get("auth_login_dialog_confirmed").empty())
+        set("auth_login_dialog_confirmed", "0");
+
+    if (get("show_estimated_times_in_dbl_slider").empty())
+        set("show_estimated_times_in_dbl_slider", "1");
+
+    if (get("show_ruler_in_dbl_slider").empty())
+        set("show_ruler_in_dbl_slider", "0");
+
+    if (get("show_ruler_bg_in_dbl_slider").empty())
+        set("show_ruler_bg_in_dbl_slider", "1");
+
 #ifdef _WIN32
     if (get("use_legacy_3DConnexion").empty())
         set("use_legacy_3DConnexion", "0");
@@ -226,6 +234,15 @@ void AppConfig::set_defaults()
     if (get("sys_menu_enabled").empty())
         set("sys_menu_enabled", "1");
 #endif // _WIN32
+
+    if (get("show_step_import_parameters").empty())
+        set("show_step_import_parameters", "1");
+
+    if (get("linear_precision").empty())
+        set("linear_precision", "0.005");
+
+    if (get("angle_precision").empty())
+        set("angle_precision", "1.");
 
     // Remove legacy window positions/sizes
     erase("", "main_frame_maximized");

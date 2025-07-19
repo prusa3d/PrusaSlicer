@@ -12,6 +12,7 @@
 #include "ConfigWizard.hpp"
 #include "OpenGLManager.hpp"
 #include "libslic3r/Preset.hpp"
+#include "I18N.hpp"
 
 #include <wx/app.h>
 #include <wx/colour.h>
@@ -33,11 +34,15 @@ namespace Slic3r {
 
 class AppConfig;
 class PresetBundle;
-class PresetUpdater;
+class PresetUpdaterWrapper;
 class ModelObject;
 class PrintHostJobQueue;
 class Model;
 class AppUpdater;
+
+namespace Search {
+    class OptionsSearcher;
+}
 
 namespace GUI{
 
@@ -54,8 +59,7 @@ class NotificationManager;
 class Downloader;
 struct GUI_InitParams;
 class GalleryDialog;
-
-
+class PresetArchiveDatabase;
 
 enum FileType
 {
@@ -115,6 +119,20 @@ static wxString dots("…", wxConvUTF8);
     #define SUPPORTS_MARKUP
 #endif
 
+
+// A wrapper class to allow ignoring some known warnings 
+// and not bothering users with redundant messages. 
+// see https://github.com/prusa3d/PrusaSlicer/issues/12920
+class LogGui : public wxLogGui
+{
+protected:
+    void DoLogText(const wxString& msg) override;
+    void DoLogRecord(wxLogLevel level, const wxString& msg, const wxLogRecordInfo& info) override;
+
+private:
+    bool ignorred_message(const wxString& msg);
+};
+
 class GUI_App : public wxApp
 {
 public:
@@ -137,12 +155,13 @@ private:
     wxColour        m_color_label_sys;
     wxColour        m_color_label_default;
     wxColour        m_color_window_default;
-#ifdef _WIN32
+//#ifdef _WIN32
     wxColour        m_color_highlight_label_default;
     wxColour        m_color_hovered_btn_label;
     wxColour        m_color_default_btn_label;
     wxColour        m_color_highlight_default;
     wxColour        m_color_selected_btn_bg;
+#ifdef _WIN32
     bool            m_force_colors_update { false };
 #endif
     std::vector<std::string>     m_mode_palette;
@@ -164,16 +183,19 @@ private:
 
     OpenGLManager m_opengl_mgr;
 
-    std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
-
-    std::unique_ptr<ImGuiWrapper> m_imgui;
-    std::unique_ptr<PrintHostJobQueue> m_printhost_job_queue;
-	std::unique_ptr <OtherInstanceMessageHandler> m_other_instance_message_handler;
-    std::unique_ptr <AppUpdater> m_app_updater;
-    std::unique_ptr <wxSingleInstanceChecker> m_single_instance_checker;
-    std::unique_ptr <Downloader> m_downloader;
+    std::unique_ptr<RemovableDriveManager>          m_removable_drive_manager;
+    std::unique_ptr<ImGuiWrapper>                   m_imgui;
+    std::unique_ptr<PrintHostJobQueue>              m_printhost_job_queue;
+	std::unique_ptr<OtherInstanceMessageHandler>    m_other_instance_message_handler;
+    std::unique_ptr<AppUpdater>                     m_app_updater;
+    std::unique_ptr<wxSingleInstanceChecker>        m_single_instance_checker;
+    std::unique_ptr<Downloader>                     m_downloader;
+    
     std::string m_instance_hash_string;
 	size_t m_instance_hash_int;
+
+    Search::OptionsSearcher* m_searcher{ nullptr };
+    LogGui*                  m_log_gui { nullptr };
 
 public:
     bool            OnInit() override;
@@ -187,6 +209,16 @@ public:
     bool is_gcode_viewer() const { return m_app_mode == EAppMode::GCodeViewer; }
     bool is_recreating_gui() const { return m_is_recreating_gui; }
     std::string logo_name() const { return is_editor() ? "PrusaSlicer" : "PrusaSlicer-gcodeviewer"; }
+
+    Search::OptionsSearcher& searcher() noexcept { return *m_searcher; }
+    void                     set_searcher(Search::OptionsSearcher* searcher) { m_searcher = searcher; }
+    void                     check_and_update_searcher(ConfigOptionMode mode = comExpert);
+    void                     jump_to_option(size_t selected);
+    void                     jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category);
+    // jump to option which is represented by composite key : "opt_key;tab_name"
+    void                     jump_to_option(const std::string& composite_key);
+    void                     update_search_lines();
+    void                     show_search_dialog();
 
     // To be called after the GUI is fully built up.
     // Process command line parameters cached in this->init_params,
@@ -231,7 +263,7 @@ public:
     std::vector<wxColour>   get_mode_palette();
     void                    set_mode_palette(const std::vector<wxColour> &palette);
 
-#ifdef _WIN32
+//#ifdef _WIN32
     const wxColour& get_label_highlight_clr()   { return m_color_highlight_label_default; }
     const wxColour& get_highlight_default_clr() { return m_color_highlight_default; }
     const wxColour& get_color_hovered_btn_label() { return m_color_hovered_btn_label; }
@@ -240,7 +272,7 @@ public:
 #ifdef _MSW_DARK_MODE
     void            force_menu_update();
 #endif //_MSW_DARK_MODE
-#endif
+//#endif
 
     const wxFont&   small_font()            { return m_small_font; }
     const wxFont&   bold_font()             { return m_bold_font; }
@@ -248,11 +280,10 @@ public:
     const wxFont&   code_font()             { return m_code_font; }
     const wxFont&   link_font()             { return m_link_font; }
     int             em_unit() const         { return m_em_unit; }
-    bool            tabs_as_menu() const;
     bool            suppress_round_corners() const;
     wxSize          get_min_size(wxWindow* display_win) const;
     int             get_max_font_pt_size();
-    float           toolbar_icon_scale(const bool is_limited = false) const;
+    float           toolbar_icon_scale(bool& is_custom) const;
     void            set_auto_toolbar_icon_scale(float scale) const;
     void            check_printer_presets();
 
@@ -277,7 +308,7 @@ public:
     bool            save_mode(const /*ConfigOptionMode*/int mode) ;
     void            update_mode();
 
-    void            add_config_menu(wxMenuBar *menu);
+    wxMenu*         get_config_menu(MainFrame* main_frame);
     bool            has_unsaved_preset_changes() const;
     bool            has_current_preset_changes() const;
     void            update_saved_preset_from_current_preset();
@@ -301,6 +332,7 @@ public:
     // Calls wxLaunchDefaultBrowser if user confirms in dialog.
     // Add "Rememeber my choice" checkbox to question dialog, when it is forced or a "suppress_hyperlinks" option has empty value
     bool            open_browser_with_warning_dialog(const wxString& url, wxWindow* parent = nullptr, bool force_remember_choice = true, int flags = 0);
+    bool            open_login_browser_with_dialog(const wxString& url, wxWindow* parent = nullptr, int flags = 0);
 #ifdef __APPLE__
     void            OSXStoreOpenFiles(const wxArrayString &files) override;
     // wxWidgets override to get an event on open files.
@@ -325,11 +357,9 @@ public:
 
     AppConfig*      app_config{ nullptr };
     PresetBundle*   preset_bundle{ nullptr };
-    PresetUpdater*  preset_updater{ nullptr };
     MainFrame*      mainframe{ nullptr };
     Plater*         plater_{ nullptr };
-
-	PresetUpdater*  get_preset_updater() { return preset_updater; }
+	PresetUpdaterWrapper*  get_preset_updater_wrapper() { return m_preset_updater_wrapper.get(); }
 
     wxBookCtrlBase* tab_panel() const ;
     int             extruders_cnt() const;
@@ -353,6 +383,7 @@ public:
     void            open_web_page_localized(const std::string &http_address);
     bool            may_switch_to_SLA_preset(const wxString& caption);
     bool            run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page = ConfigWizard::SP_WELCOME);
+    void            update_wizard_login_page();
     void            show_desktop_integration_dialog();
     void            show_downloader_registration_dialog();
 
@@ -381,12 +412,34 @@ public:
 
     void            open_wifi_config_dialog(bool forced, const wxString& drive_path = {});
     bool            get_wifi_config_dialog_shown() const { return m_wifi_config_dialog_shown; }
+    
+    bool            select_printer_from_connect(const std::string& cmd);
+    void            select_filament_from_connect(const std::string& cmd);
+    void            handle_connect_request_printer_select(const std::string& cmd);
+    void            handle_connect_request_printer_select_inner(const std::string& cmd);
+    void            show_printer_webview_tab();
+    // return true if preset vas invisible and we have to installed it to make it selectable
+    bool            select_printer_preset(const Preset* printer_preset);
+    bool            select_filament_preset(const Preset* filament_preset, size_t extruder_index);
+    void            search_and_select_filaments(const std::string& material, bool avoid_abrasive, size_t extruder_index, std::string& out_message);
+    void            handle_script_message(std::string msg) {}
+    void            request_model_download(std::string import_json) {}
+    void            download_project(std::string project_id) {}
+    void            request_project_download(std::string project_id) {}
+    void            request_open_project(std::string project_id) {}
+    void            request_remove_project(std::string project_id) {}
+    void            printables_download_request(const std::string& download_url, const std::string& model_url);
+    void            printables_slice_request(const std::string& download_url, const std::string& model_url);
+    void            printables_login_request();
+    void            open_link_in_printables(const std::string& url);
+    bool            is_account_logged_in() const;
 private:
     bool            on_init_inner();
 	void            init_app_config();
     // returns old config path to copy from if such exists,
     // returns an empty string if such config path does not exists or if it cannot be loaded.
     std::string     check_older_app_config(Semver current_version, bool backup);
+    void            legacy_app_config_vendor_check();
     void            window_pos_save(wxTopLevelWindow* window, const std::string &name);
     void            window_pos_restore(wxTopLevelWindow* window, const std::string &name, bool default_maximized = false);
     void            window_pos_sanitize(wxTopLevelWindow* window);
@@ -395,15 +448,24 @@ private:
     bool            config_wizard_startup();
     // Returns true if the configuration is fine. 
     // Returns true if the configuration is not compatible and the user decided to rather close the slicer instead of reconfiguring.
-	bool            check_updates(const bool verbose);
+	bool            check_updates(const bool invoked_automatically);
     void            on_version_read(wxCommandEvent& evt);
     // if the data from version file are already downloaded, shows dialogs to start download of new version of app
     void            app_updater(bool from_user);
     // inititate read of version file online in separate thread
     void            app_version_check(bool from_user);
+#if defined(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION) 
+    void            remove_desktop_files_dialog();
+#endif //(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION)
 
-    bool                    m_datadir_redefined { false }; 
     bool                    m_wifi_config_dialog_shown { false };
+    bool                    m_wifi_config_dialog_was_declined { false };
+    // change to vector of items when adding more items that require update
+    //wxMenuItem*    m_login_config_menu_item { nullptr };
+    std::map< ConfigMenuIDs, wxMenuItem*> m_config_menu_updatable_items;
+
+    ConfigWizard* m_config_wizard {nullptr};
+    std::unique_ptr<PresetUpdaterWrapper> m_preset_updater_wrapper; 
 };
 
 DECLARE_APP(GUI_App)

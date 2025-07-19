@@ -11,10 +11,14 @@
 #ifndef slic3r_Line_hpp_
 #define slic3r_Line_hpp_
 
+#include <type_traits>
+#include <cmath>
+#include <utility>
+#include <vector>
+#include <complex>
+
 #include "libslic3r.h"
 #include "Point.hpp"
-
-#include <type_traits>
 
 namespace Slic3r {
 
@@ -24,6 +28,7 @@ class Line3;
 class Linef3;
 class Polyline;
 class ThickLine;
+
 typedef std::vector<Line> Lines;
 typedef std::vector<Line3> Lines3;
 typedef std::vector<ThickLine> ThickLines;
@@ -185,12 +190,16 @@ template<class L> bool intersection(const L &l1, const L &l2, Vec<Dim<L>, Scalar
     return false; // not intersecting
 }
 
+inline Point midpoint(const Point &a, const Point &b) {
+    return (a + b) / 2;
+}
+
 } // namespace line_alg
 
 class Line
 {
 public:
-    Line() {}
+    Line() = default;
     Line(const Point& _a, const Point& _b) : a(_a), b(_b) {}
     explicit operator Lines() const { Lines lines; lines.emplace_back(*this); return lines; }
     void   scale(double factor) { this->a *= factor; this->b *= factor; }
@@ -199,7 +208,7 @@ public:
     void   rotate(double angle, const Point &center) { this->a.rotate(angle, center); this->b.rotate(angle, center); }
     void   reverse() { std::swap(this->a, this->b); }
     double length() const { return (b.cast<double>() - a.cast<double>()).norm(); }
-    Point  midpoint() const { return (this->a + this->b) / 2; }
+    Point  midpoint() const { return line_alg::midpoint(this->a, this->b); }
     bool   intersection_infinite(const Line &other, Point* point) const;
     bool   operator==(const Line &rhs) const { return this->a == rhs.a && this->b == rhs.b; }
     double distance_to_squared(const Point &point) const { return distance_to_squared(point, this->a, this->b); }
@@ -207,6 +216,7 @@ public:
     double distance_to(const Point &point) const { return distance_to(point, this->a, this->b); }
     double distance_to_infinite_squared(const Point &point, Point *closest_point) const { return line_alg::distance_to_infinite_squared(*this, point, closest_point); }
     double perp_distance_to(const Point &point) const;
+    double perp_signed_distance_to(const Point &point) const;
     bool   parallel_to(double angle) const;
     bool   parallel_to(const Line& line) const;
     bool   perpendicular_to(double angle) const;
@@ -315,6 +325,7 @@ BoundingBox get_extents(const Lines &lines);
 
 // start Boost
 #include <boost/polygon/polygon.hpp>
+
 namespace boost { namespace polygon {
     template <>
     struct geometry_concept<Slic3r::Line> { typedef segment_concept type; };

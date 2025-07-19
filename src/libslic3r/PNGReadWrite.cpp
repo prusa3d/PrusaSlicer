@@ -7,13 +7,15 @@
 ///|/
 #include "PNGReadWrite.hpp"
 
-#include <memory>
-
-#include <cstdio>
 #include <png.h>
-
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/cstdio.hpp>
+#include <pngconf.h>
+#include <pnglibconf.h>
+#include <cstdio>
+#include <cassert>
+#include <csetjmp>
+#include <cstring>
 
 namespace Slic3r { namespace png {
 
@@ -187,6 +189,34 @@ png_create_write_struct_failed:
 fopen_failed:
     return result;
 }
+
+
+bool decode_png(const std::string& png_data, std::vector<unsigned char>& image_data, unsigned& width, unsigned& height)
+{
+    png_image image;
+    memset(&image, 0, sizeof(image));
+    image.version = PNG_IMAGE_VERSION;
+
+    if (!png_image_begin_read_from_memory(&image, png_data.data(), png_data.size()))
+        return false;
+
+    image.format = PNG_FORMAT_RGBA;
+
+    // Allocate memory for the image data
+    image_data.resize(PNG_IMAGE_SIZE(image));
+    if (!png_image_finish_read(&image, nullptr, image_data.data(), 0, nullptr)) {
+        png_image_free(&image);
+        return false;
+    }
+
+    width = image.width;
+    height = image.height;
+
+    png_image_free(&image);
+    return true;
+}
+
+
 
 bool write_rgb_to_file(const char *file_name_utf8, size_t width, size_t height, const uint8_t *data_rgb)
 {

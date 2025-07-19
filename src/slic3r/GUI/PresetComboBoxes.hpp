@@ -16,6 +16,7 @@
 class wxString;
 class wxTextCtrl;
 class wxStaticText;
+class wxGenericStaticText;
 class ScalableButton;
 class wxBoxSizer;
 class wxComboBox;
@@ -39,6 +40,8 @@ class PresetComboBox : public BitmapComboBox
 public:
     PresetComboBox(wxWindow* parent, Preset::Type preset_type, const wxSize& size = wxDefaultSize, PresetBundle* preset_bundle = nullptr);
     ~PresetComboBox();
+
+    void init_from_bundle(PresetBundle* preset_bundle);
 
 	enum LabelItemType {
 		LABEL_ITEM_PHYSICAL_PRINTER = 0xffffff01,
@@ -81,6 +84,10 @@ public:
     virtual void sys_color_changed();
     virtual void OnSelect(wxCommandEvent& evt);
 
+    // used by Filaments list to update preset list according to the particular extruder
+    void set_extruder_idx(int extruder_idx) { m_extruder_idx = extruder_idx; }
+    int  get_extruder_idx()                 { return m_extruder_idx; }
+
 protected:
     typedef std::size_t Marker;
     std::function<void(int)>    on_selection_changed { nullptr };
@@ -102,6 +109,9 @@ protected:
     int m_last_selected;
     int m_em_unit;
     bool m_suppress_change { true };
+
+    // This parameter is used by FilamentSettings tab to show filament setting related to the active extruder
+    int  m_extruder_idx{ 0 };
 
     // parameters for an icon's drawing
     int icon_height;
@@ -154,8 +164,17 @@ public:
 
     ScalableButton* edit_btn { nullptr };
 
-    void set_extruder_idx(const int extr_idx)   { m_extruder_idx = extr_idx; }
-    int  get_extruder_idx() const               { return m_extruder_idx; }
+#ifdef _WIN32
+    wxBoxSizer*             connect_info_sizer      { nullptr };
+    wxGenericStaticText*    connect_available_info  { nullptr };
+    wxGenericStaticText*    connect_printing_info   { nullptr };
+    wxGenericStaticText*    connect_offline_info    { nullptr };
+#else
+    wxFlexGridSizer*        connect_info_sizer      { nullptr };
+    wxStaticText*           connect_available_info  { nullptr };
+    wxStaticText*           connect_printing_info   { nullptr };
+    wxStaticText*           connect_offline_info    { nullptr };
+#endif
 
     void switch_to_tab();
     void change_extruder_color();
@@ -169,9 +188,6 @@ public:
     void OnSelect(wxCommandEvent& evt) override;
 
     std::string get_selected_ph_printer_name() const;
-
-private:
-    int     m_extruder_idx = -1;
 };
 
 
@@ -183,8 +199,6 @@ class TabPresetComboBox : public PresetComboBox
 {
     bool show_incompatible {false};
     bool m_enable_all {false};
-    // This parameter is used by FilamentSettings tab to show filament setting related to the active extruder
-    int  m_active_extruder_idx {0};
 
 public:
     TabPresetComboBox(wxWindow *parent, Preset::Type preset_type);
@@ -203,9 +217,6 @@ public:
 
     PresetCollection*   presets()   const { return m_collection; }
     Preset::Type        type()      const { return m_type; }
-
-    // used by Filaments tab to update preset list according to the particular extruder
-    void set_active_extruder(int extruder_idx) { m_active_extruder_idx = extruder_idx; }
 };
 
 } // namespace GUI

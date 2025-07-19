@@ -1,7 +1,8 @@
 #ifndef SLA_TEST_UTILS_HPP
 #define SLA_TEST_UTILS_HPP
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <test_utils.hpp>
 
 // Debug
@@ -22,6 +23,7 @@
 #include "libslic3r/SVG.hpp"
 
 using namespace Slic3r;
+using Catch::Approx;
 
 enum e_validity {
     ASSUME_NO_EMPTY = 1,
@@ -134,6 +136,6 @@ double predict_error(const ExPolygon &p, const sla::PixelDim &pd);
 
 sla::SupportPoints calc_support_pts(
     const TriangleMesh &                      mesh,
-    const sla::SupportPointGenerator::Config &cfg = {});
+    const sla::SupportPointGeneratorConfig &cfg = {});
 
 #endif // SLA_TEST_UTILS_HPP

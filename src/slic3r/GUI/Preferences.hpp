@@ -57,7 +57,6 @@ class PreferencesDialog : public DPIDialog
 	wxSizer*                            m_icon_size_sizer {nullptr};
 	wxSlider*							m_icon_size_slider {nullptr};
 	wxRadioButton*						m_rb_old_settings_layout_mode {nullptr};
-	wxRadioButton*						m_rb_new_settings_layout_mode {nullptr};
 	wxRadioButton*						m_rb_dlg_settings_layout_mode {nullptr};
 
 	wxColourPickerCtrl*					m_sys_colour {nullptr};

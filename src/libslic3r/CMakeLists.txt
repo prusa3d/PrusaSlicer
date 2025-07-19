@@ -34,6 +34,10 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
+    ArrangeHelper.cpp
+    ArrangeHelper.hpp
+    Algorithm/LineSegmentation/LineSegmentation.cpp
+    Algorithm/LineSegmentation/LineSegmentation.hpp
     Algorithm/PathSorting.hpp
     Algorithm/RegionExpansion.hpp
     Algorithm/RegionExpansion.cpp
@@ -86,7 +90,13 @@ set(SLIC3R_SOURCES
     ExtrusionRole.hpp
     ExtrusionSimulator.cpp
     ExtrusionSimulator.hpp
+    Feature/Interlocking/InterlockingGenerator.cpp
+    Feature/Interlocking/InterlockingGenerator.hpp
+    Feature/Interlocking/VoxelUtils.cpp
+    Feature/Interlocking/VoxelUtils.hpp
     FileParserError.hpp
+    Feature/FuzzySkin/FuzzySkin.cpp
+    Feature/FuzzySkin/FuzzySkin.hpp
     Fill/Fill.cpp
     Fill/Fill3DHoneycomb.cpp
     Fill/Fill3DHoneycomb.hpp
@@ -149,6 +159,8 @@ set(SLIC3R_SOURCES
     Format/SVG.cpp
     Format/SLAArchiveFormatRegistry.hpp
     Format/SLAArchiveFormatRegistry.cpp
+    Format/PrintRequest.cpp
+    Format/PrintRequest.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp
@@ -177,6 +189,26 @@ set(SLIC3R_SOURCES
     GCode/SpiralVase.hpp
     GCode/SeamPlacer.cpp
     GCode/SeamPlacer.hpp
+    GCode/SeamChoice.cpp
+    GCode/SeamChoice.hpp
+    GCode/SeamPerimeters.cpp
+    GCode/SeamPerimeters.hpp
+    GCode/SeamShells.cpp
+    GCode/SeamShells.hpp
+    GCode/SeamGeometry.cpp
+    GCode/SeamGeometry.hpp
+    GCode/SeamAligned.cpp
+    GCode/SeamAligned.hpp
+    GCode/SeamRear.cpp
+    GCode/SeamRear.hpp
+    GCode/SeamRandom.cpp
+    GCode/SeamRandom.hpp
+    GCode/SeamPainting.cpp
+    GCode/SeamPainting.hpp
+    GCode/SeamScarf.cpp
+    GCode/SeamScarf.hpp
+    GCode/ModelVisibility.cpp
+    GCode/ModelVisibility.hpp
     GCode/SmoothPath.cpp
     GCode/SmoothPath.hpp
     GCode/ToolOrdering.cpp
@@ -193,6 +225,8 @@ set(SLIC3R_SOURCES
     GCode/AvoidCrossingPerimeters.hpp
     GCode/Travels.cpp
     GCode/Travels.hpp
+    GCode/ExtrusionOrder.cpp
+    GCode/ExtrusionOrder.hpp
     GCode.cpp
     GCode.hpp
     GCodeReader.cpp
@@ -217,12 +251,14 @@ set(SLIC3R_SOURCES
     Geometry/VoronoiUtils.hpp
     Geometry/VoronoiUtils.cpp
     Geometry/VoronoiVisualUtils.hpp
-    Int128.hpp
+    InfillAboveBridges.hpp
+    InfillAboveBridges.cpp
     JumpPointSearch.cpp
     JumpPointSearch.hpp
     KDTreeIndirect.hpp
     Layer.cpp
     Layer.hpp
+    LayerRegion.hpp
     LayerRegion.cpp
     libslic3r.h
     "${CMAKE_CURRENT_BINARY_DIR}/libslic3r_version.h"
@@ -230,14 +266,14 @@ set(SLIC3R_SOURCES
     Line.hpp
     BlacklistedLibraryCheck.cpp
     BlacklistedLibraryCheck.hpp
-    LocalesUtils.cpp
-    LocalesUtils.hpp
     CutUtils.cpp
     CutUtils.hpp
     Model.cpp
     Model.hpp
-    ModelArrange.hpp
-    ModelArrange.cpp
+    ModelProcessing.cpp
+    ModelProcessing.hpp
+    FileReader.cpp
+    FileReader.hpp
     MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
     MeshNormals.hpp
@@ -247,55 +283,6 @@ set(SLIC3R_SOURCES
     MeasureUtils.hpp
     CustomGCode.cpp
     CustomGCode.hpp
-    Arrange/Arrange.hpp
-    Arrange/ArrangeImpl.hpp
-    Arrange/Items/ArrangeItem.hpp
-    Arrange/Items/ArrangeItem.cpp
-    Arrange/Items/SimpleArrangeItem.hpp
-    Arrange/Items/SimpleArrangeItem.cpp
-    Arrange/Items/TrafoOnlyArrangeItem.hpp
-    Arrange/Items/MutableItemTraits.hpp
-    Arrange/Items/ArbitraryDataStore.hpp
-    Arrange/ArrangeSettingsView.hpp
-    Arrange/ArrangeSettingsDb_AppCfg.hpp
-    Arrange/ArrangeSettingsDb_AppCfg.cpp
-    Arrange/Scene.hpp
-    Arrange/Scene.cpp
-    Arrange/SceneBuilder.hpp
-    Arrange/SceneBuilder.cpp
-    Arrange/Tasks/ArrangeTask.hpp
-    Arrange/Tasks/ArrangeTaskImpl.hpp
-    Arrange/Tasks/FillBedTask.hpp
-    Arrange/Tasks/FillBedTaskImpl.hpp
-    Arrange/Tasks/MultiplySelectionTask.hpp
-    Arrange/Tasks/MultiplySelectionTaskImpl.hpp
-    Arrange/SegmentedRectangleBed.hpp
-    Arrange/Core/ArrangeItemTraits.hpp
-    Arrange/Core/DataStoreTraits.hpp
-    Arrange/Core/ArrangeBase.hpp
-    Arrange/Core/PackingContext.hpp
-    Arrange/Core/ArrangeFirstFit.hpp
-    Arrange/Core/Beds.hpp
-    Arrange/Core/Beds.cpp
-    Arrange/Core/NFP/NFP.hpp
-    Arrange/Core/NFP/NFP.cpp
-    Arrange/Core/NFP/NFPConcave_CGAL.hpp
-    Arrange/Core/NFP/NFPConcave_CGAL.cpp
-    Arrange/Core/NFP/NFPConcave_Tesselate.hpp
-    Arrange/Core/NFP/NFPConcave_Tesselate.cpp
-    Arrange/Core/NFP/EdgeCache.hpp
-    Arrange/Core/NFP/EdgeCache.cpp
-    Arrange/Core/NFP/CircularEdgeIterator.hpp
-    Arrange/Core/NFP/NFPArrangeItemTraits.hpp
-    Arrange/Core/NFP/PackStrategyNFP.hpp
-    Arrange/Core/NFP/RectangleOverfitPackingStrategy.hpp
-    Arrange/Core/NFP/Kernels/KernelTraits.hpp
-    Arrange/Core/NFP/Kernels/GravityKernel.hpp
-    Arrange/Core/NFP/Kernels/TMArrangeKernel.hpp
-    Arrange/Core/NFP/Kernels/CompactifyKernel.hpp
-    Arrange/Core/NFP/Kernels/RectangleOverfitKernelWrapper.hpp
-    Arrange/Core/NFP/Kernels/SVGDebugOutputKernelWrapper.hpp
-    Arrange/Core/NFP/Kernels/KernelUtils.hpp
     MultiPoint.cpp
     MultiPoint.hpp
     MutablePriorityQueue.hpp
@@ -419,6 +406,8 @@ set(SLIC3R_SOURCES
     miniz_extension.hpp
     miniz_extension.cpp
     MarchingSquares.hpp
+    MultipleBeds.cpp
+    MultipleBeds.hpp
     Execution/Execution.hpp
     Execution/ExecutionSeq.hpp
     Execution/ExecutionTBB.hpp
@@ -462,6 +451,38 @@ set(SLIC3R_SOURCES
     SLA/DefaultSupportTree.cpp
     SLA/BranchingTreeSLA.hpp
     SLA/BranchingTreeSLA.cpp
+    SLA/ZCorrection.hpp
+    SLA/ZCorrection.cpp    
+    SLA/SupportIslands/EvaluateNeighbor.cpp
+    SLA/SupportIslands/EvaluateNeighbor.hpp
+    SLA/SupportIslands/ExpandNeighbor.cpp
+    SLA/SupportIslands/ExpandNeighbor.hpp
+    SLA/SupportIslands/IStackFunction.hpp
+    SLA/SupportIslands/LineUtils.cpp
+    SLA/SupportIslands/LineUtils.hpp
+    SLA/SupportIslands/NodeDataWithResult.hpp
+    SLA/SupportIslands/Parabola.hpp
+    SLA/SupportIslands/ParabolaUtils.cpp
+    SLA/SupportIslands/ParabolaUtils.hpp
+    SLA/SupportIslands/PointUtils.cpp
+    SLA/SupportIslands/PointUtils.hpp
+    SLA/SupportIslands/PolygonUtils.cpp
+    SLA/SupportIslands/PolygonUtils.hpp
+    SLA/SupportIslands/PostProcessNeighbor.cpp
+    SLA/SupportIslands/PostProcessNeighbor.hpp
+    SLA/SupportIslands/PostProcessNeighbors.cpp
+    SLA/SupportIslands/PostProcessNeighbors.hpp
+    SLA/SupportIslands/SampleConfig.hpp
+    SLA/SupportIslands/SampleConfigFactory.cpp
+    SLA/SupportIslands/SampleConfigFactory.hpp
+    SLA/SupportIslands/SupportIslandPoint.cpp
+    SLA/SupportIslands/SupportIslandPoint.hpp
+    SLA/SupportIslands/UniformSupportIsland.cpp
+    SLA/SupportIslands/UniformSupportIsland.hpp
+    SLA/SupportIslands/VectorUtils.hpp
+    SLA/SupportIslands/VoronoiGraph.hpp
+    SLA/SupportIslands/VoronoiGraphUtils.cpp
+    SLA/SupportIslands/VoronoiGraphUtils.hpp
     BranchingTree/BranchingTree.cpp
     BranchingTree/BranchingTree.hpp
     BranchingTree/PointCloud.cpp
@@ -481,7 +502,6 @@ set(SLIC3R_SOURCES
     Arachne/BeadingStrategy/WideningBeadingStrategy.hpp
     Arachne/BeadingStrategy/WideningBeadingStrategy.cpp
     Arachne/utils/ExtrusionJunction.hpp
-    Arachne/utils/ExtrusionJunction.cpp
     Arachne/utils/ExtrusionLine.hpp
     Arachne/utils/ExtrusionLine.cpp
     Arachne/utils/HalfEdge.hpp
@@ -499,6 +519,8 @@ set(SLIC3R_SOURCES
     Geometry/Voronoi.cpp
     Geometry/VoronoiUtils.hpp
     Geometry/VoronoiUtils.cpp
+    Arachne/PerimeterOrder.hpp
+    Arachne/PerimeterOrder.cpp
     Arachne/SkeletalTrapezoidation.hpp
     Arachne/SkeletalTrapezoidation.cpp
     Arachne/SkeletalTrapezoidationEdge.hpp
@@ -508,7 +530,17 @@ set(SLIC3R_SOURCES
     Arachne/WallToolPaths.hpp
     Arachne/WallToolPaths.cpp
     StaticMap.hpp
+    Utils/DirectoriesUtils.hpp
+    Utils/DirectoriesUtils.cpp
+    Utils/JsonUtils.hpp
+    Utils/JsonUtils.cpp
 )
+
+if (APPLE)
+    list(APPEND SLIC3R_SOURCES
+            MacUtils.mm
+        )
+endif ()
 
 add_library(libslic3r STATIC ${SLIC3R_SOURCES})
 
@@ -522,6 +554,9 @@ foreach(_source IN ITEMS ${SLIC3R_SOURCES})
     source_group("${_group_path}" FILES "${_source}")
 endforeach()
 
+# Create the source groups for source tree with root at CMAKE_CURRENT_SOURCE_DIR.
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST_SLA})
+
 if (SLIC3R_STATIC)
     set(CGAL_Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
 endif ()
@@ -532,15 +567,17 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC 
+add_library(libslic3r_cgal STATIC
     CutSurface.hpp CutSurface.cpp
     Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
     IntersectionPoints.hpp IntersectionPoints.cpp
     MeshBoolean.hpp MeshBoolean.cpp
     TryCatchSignal.hpp TryCatchSignal.cpp
     Triangulation.hpp Triangulation.cpp
+    SLA/SupportIslands/VoronoiDiagramCGAL.hpp SLA/SupportIslands/VoronoiDiagramCGAL.cpp
 )
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(libslic3r_cgal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 # Reset compile options of libslic3r_cgal. Despite it being linked privately, CGAL options
 # (-frounding-math) still propagate to dependent libs which is not desired.
@@ -559,6 +596,7 @@ if (_opts)
 endif()
 
 target_link_libraries(libslic3r_cgal PRIVATE ${_cgal_tgt} libigl)
+target_link_libraries(libslic3r_cgal PUBLIC semver admesh localesutils)
 
 if (MSVC AND "${CMAKE_SIZEOF_VOID_P}" STREQUAL "4") # 32 bit MSVC workaround
     target_compile_definitions(libslic3r_cgal PRIVATE CGAL_DO_NOT_USE_MPZF)
@@ -567,24 +605,19 @@ endif ()
 encoding_check(libslic3r)
 
 target_compile_definitions(libslic3r PUBLIC -DUSE_TBB -DTBB_USE_CAPTURED_EXCEPTION=0)
-target_include_directories(libslic3r PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(libslic3r PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(libslic3r PUBLIC ${EXPAT_INCLUDE_DIRS})
 
 find_package(JPEG REQUIRED)
 
-target_link_libraries(libslic3r
+target_link_libraries(libslic3r PRIVATE
     libnest2d
-    admesh
     libcereal
-    libigl
-    miniz
     boost_libs
     clipper
-    nowide
     libexpat
     glu-libtess
     qhull
-    semver
     TBB::tbb
     TBB::tbbmalloc
     libslic3r_cgal
@@ -593,20 +626,35 @@ target_link_libraries(libslic3r
     ZLIB::ZLIB
 	JPEG::JPEG
     qoi
+    fastfloat
+    int128
+)
+target_link_libraries(libslic3r PUBLIC
+    Eigen3::Eigen
+    semver
+    admesh
+    localesutils
     LibBGCode::bgcode_convert
-    )
+    tcbspan
+    miniz
+    libigl
+    agg
+    ankerl
+    boost_headeronly
+    libseqarrange
+)
 
 if (APPLE)
     # TODO: we need to fix notarization with the separate shared library
-    target_link_libraries(libslic3r OCCTWrapper)
+    target_link_libraries(libslic3r PUBLIC OCCTWrapper)
 endif ()
 
 if (TARGET OpenVDB::openvdb)
-    target_link_libraries(libslic3r OpenVDB::openvdb)
+    target_link_libraries(libslic3r PUBLIC OpenVDB::openvdb)
 endif()
 
 if(WIN32)
-    target_link_libraries(libslic3r Psapi.lib)
+    target_link_libraries(libslic3r PUBLIC Psapi.lib)
 endif()
 
 if (APPLE)

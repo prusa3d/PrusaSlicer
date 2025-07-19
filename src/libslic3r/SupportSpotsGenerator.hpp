@@ -5,15 +5,31 @@
 #ifndef SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 #define SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 
+#include <boost/log/trivial.hpp>
+#include <cstddef>
+#include <vector>
+#include <algorithm>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <utility>
+
 #include "Layer.hpp"
 #include "Line.hpp"
 #include "PrintBase.hpp"
 #include "PrintConfig.hpp"
-#include <boost/log/trivial.hpp>
-#include <cstddef>
-#include <vector>
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
+class ExtrusionEntity;
+class ExtrusionEntityCollection;
+class Layer;
+class PrintObject;
+class SupportLayer;
 
 namespace SupportSpotsGenerator {
 

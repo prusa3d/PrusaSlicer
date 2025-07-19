@@ -5,16 +5,29 @@
 #ifndef slic3r_Emboss_hpp_
 #define slic3r_Emboss_hpp_
 
+#include <admesh/stl.h> // indexed_triangle_set
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <vector>
 #include <set>
 #include <optional>
 #include <memory>
-#include <admesh/stl.h> // indexed_triangle_set
+#include <Eigen/Geometry>
+#include <functional>
+#include <map>
+#include <string>
+#include <utility>
+#include <cassert>
+#include <cinttypes>
+#include <cstddef>
+
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
 #include "EmbossShape.hpp" // ExPolygonsWithIds
 #include "BoundingBox.hpp"
 #include "TextConfiguration.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
@@ -282,8 +295,6 @@ namespace Emboss
     class IProjection : public IProject3d
     {
     public:
-        virtual ~IProjection() = default;
-
         /// <summary>
         /// convert 2d point to 3d points
         /// </summary>
@@ -461,7 +472,11 @@ namespace Emboss
     /// <param name="polygon">Polygon know neighbor of point</param>
     /// <returns>angle(atan2) of normal in polygon point</returns>
     double calculate_angle(int32_t distance, PolygonPoint polygon_point, const Polygon &polygon);
-    std::vector<double> calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon);
+    std::vector<double> calculate_angles(
+        const BoundingBoxes &glyph_sizes,
+        const PolygonPoints &polygon_points,
+        const Polygon &polygon
+    );
 
 } // namespace Emboss
 

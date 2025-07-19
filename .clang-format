@@ -95,6 +95,7 @@ PenaltyBreakString: 600
 PenaltyBreakTemplateDeclaration: 10
 PenaltyExcessCharacter: 50
 PenaltyReturnTypeOnItsOwnLine: 300
+PenaltyIndentedWhitespace: 10
 PointerAlignment: Right
 ReflowComments:  true
 SortIncludes:    false

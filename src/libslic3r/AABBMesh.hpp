@@ -5,11 +5,16 @@
 #ifndef PRUSASLICER_AABBMESH_H
 #define PRUSASLICER_AABBMESH_H
 
-#include <memory>
-#include <vector>
-
 #include <libslic3r/Point.hpp>
 #include <libslic3r/TriangleMesh.hpp>
+#include <assert.h>
+#include <stddef.h>
+#include <memory>
+#include <vector>
+#include <cmath>
+#include <limits>
+#include <cassert>
+#include <cstddef>
 
 // There is an implementation of a hole-aware raycaster that was eventually
 // not used in production version. It is now hidden under following define

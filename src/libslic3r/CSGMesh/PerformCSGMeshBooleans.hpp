@@ -136,6 +136,9 @@ void perform_csgmesh_booleans(MeshBoolean::cgal::CGALMeshPtr &cgalm,
     cgalm = std::move(opstack.top().cgalptr);
 }
 
+// Check if all requirements for doing mesh booleans are met by the input csgrange.
+// Returns the iterator to the first part which breaks criteria or csgrange.end() if all the parts
+// are ok. The Visitor vfn is called for each "bad" part.
 template<class It, class Visitor>
 It check_csgmesh_booleans(const Range<It> &csgrange, Visitor &&vfn)
 {
@@ -186,6 +189,7 @@ It check_csgmesh_booleans(const Range<It> &csgrange, Visitor &&vfn)
     return ret;
 }
 
+// Overload of the previous check_csgmesh_booleans without the visitor argument
 template<class It>
 It check_csgmesh_booleans(const Range<It> &csgrange)
 {

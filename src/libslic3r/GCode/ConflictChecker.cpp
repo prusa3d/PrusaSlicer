@@ -5,12 +5,23 @@
 ///|/
 #include "ConflictChecker.hpp"
 
-#include <tbb/parallel_for.h>
-#include <tbb/concurrent_vector.h>
-
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/concurrent_vector.h>
+#include <oneapi/tbb/parallel_for.h>
 #include <map>
 #include <functional>
-#include <atomic>
+#include <cmath>
+#include <cstdint>
+#include <algorithm>
+#include <cassert>
+#include <cfloat>
+#include <cstdlib>
+
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
@@ -295,7 +306,12 @@ ConflictComputeOpt ConflictChecker::find_inter_of_lines(const LineWithIDs &lines
 ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(SpanOfConstPtrs<PrintObject> objs,
                                                                     const WipeTowerData& wipe_tower_data) // find the first intersection point of lines in different objects
 {
-    if (objs.empty() || (objs.size() == 1 && objs.front()->instances().size() == 1)) { return {}; }
+    // There is no conflict when there are no objects,
+    // or when there is only one object with a single instance and the wipe tower is disabled.
+    if (objs.empty()
+     || (objs.size() == 1 && objs.front()->instances().size() == 1 && wipe_tower_data.z_and_depth_pairs.empty())) {
+        return {};
+    }
 
     // The code ported from BS uses void* to identify objects...
     // Let's use the address of this variable to represent the wipe tower.

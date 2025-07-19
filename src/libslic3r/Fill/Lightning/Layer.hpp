@@ -4,19 +4,25 @@
 #ifndef LIGHTNING_LAYER_H
 #define LIGHTNING_LAYER_H
 
-#include "../../EdgeGrid.hpp"
-#include "../../Polygon.hpp"
-
 #include <memory>
 #include <vector>
 #include <list>
 #include <unordered_map>
 #include <optional>
+#include <functional>
+
+#include "../../EdgeGrid.hpp"
+#include "../../Polygon.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r::FillLightning
 {
 
 class Node;
+
 using NodeSPtr = std::shared_ptr<Node>;
 using SparseNodeGrid = std::unordered_multimap<Point, std::weak_ptr<Node>, PointHash>;
 

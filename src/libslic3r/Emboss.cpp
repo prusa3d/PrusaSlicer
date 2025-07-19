@@ -2,25 +2,40 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <numeric>
-#include "Emboss.hpp"
-#include <stdio.h>
+#include <boost/nowide/convert.hpp>
+#include <boost/nowide/cstdio.hpp>
+#include <boost/log/trivial.hpp>
 #include <numeric>
 #include <cstdlib>
-#include <boost/nowide/convert.hpp>
-#include <boost/log/trivial.hpp>
-#include <ClipperUtils.hpp> // union_ex + for boldness(polygon extend(offset))
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <iterator>
+#include <limits>
+
+#include "Emboss.hpp"
 #include "IntersectionPoints.hpp"
+#include "admesh/stl.h"
+#include "libslic3r/AABBTreeIndirect.hpp"
+#include "libslic3r/EmbossShape.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/TextConfiguration.hpp"
 
 #define STB_TRUETYPE_IMPLEMENTATION // force following include to generate implementation
-#include "imgui/imstb_truetype.h" // stbtt_fontinfo
+
+#include <libslic3r/Triangulation.hpp> // CGAL project
+
+// Explicit horror include (used to be implicit) - libslic3r "officialy" does not depend on imgui.
+#include "../../bundled_deps/imgui/imgui/imstb_truetype.h" // stbtt_fontinfo
 #include "Utils.hpp" // ScopeGuard
-
-#include <Triangulation.hpp> // CGAL project
 #include "libslic3r.h"
-
 // to heal shape
-#include "ExPolygonsIndex.hpp"
+#include "libslic3r/ClipperUtils.hpp" // union_ex + for boldness(polygon extend(offset))
+#include "libslic3r/ExPolygonsIndex.hpp"
 #include "libslic3r/AABBTreeLines.hpp" // search structure for found close points
 #include "libslic3r/Line.hpp"
 #include "libslic3r/BoundingBox.hpp"
@@ -56,6 +71,8 @@ namespace {
 // for debug purpose only
 // NOTE: check scale when store svg !!
 #include "libslic3r/SVG.hpp" // for visualize_heal
+
+Points get_unique_intersections(const Slic3r::IntersectionsLines &intersections); // fast forward declaration
 static std::string visualize_heal_svg_filepath = "C:/data/temp/heal.svg";
 void               visualize_heal(const std::string &svg_filepath, const ExPolygons &expolygons)
 {
@@ -639,6 +656,10 @@ bool heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
             expoly = create_bounding_rect({expoly});
         }
     }
+        
+    // After insert bounding box unify and heal
+    shape = union_ex(shape);
+    heal_dupl_inter(shape, 1);
     return false;
 }
 
@@ -770,14 +791,13 @@ const Glyph* get_glyph(
     unsigned int font_index = font_prop.collection_number.value_or(0);
     if (!is_valid(font, font_index)) return nullptr;
 
-    if (!font_info_opt.has_value()) {
-        
-        font_info_opt  = load_font_info(font.data->data(), font_index);
+    if (!font_info_opt.has_value()) {        
+        font_info_opt = load_font_info(font.data->data(), font_index);
         // can load font info?
         if (!font_info_opt.has_value()) return nullptr;
     }
 
-    float flatness = font.infos[font_index].ascent * RESOLUTION / font_prop.size_in_mm;
+    float flatness = font.infos[font_index].unit_per_em / font_prop.size_in_mm * RESOLUTION;
 
     // Fix for very small flatness because it create huge amount of points from curve
     if (flatness < RESOLUTION) flatness = RESOLUTION;
@@ -1061,18 +1081,17 @@ std::unique_ptr<FontFile> Emboss::create_font_file(
         int ascent, descent, linegap;
         stbtt_GetFontVMetrics(info, &ascent, &descent, &linegap);
 
-        float pixels       = 1000.; // value is irelevant
-        float em_pixels    = stbtt_ScaleForMappingEmToPixels(info, pixels);
-        int   units_per_em = static_cast<int>(std::round(pixels / em_pixels));
-
-        infos.emplace_back(FontFile::Info{ascent, descent, linegap, units_per_em});
+        float pixels      = 1000.; // value is irelevant
+        float em_pixels   = stbtt_ScaleForMappingEmToPixels(info, pixels);
+        int   unit_per_em = static_cast<int>(std::round(pixels / em_pixels));
+        infos.emplace_back(FontFile::Info{ascent, descent, linegap, unit_per_em});
     }
     return std::make_unique<FontFile>(std::move(data), std::move(infos));
 }
 
 std::unique_ptr<FontFile> Emboss::create_font_file(const char *file_path)
 {
-    FILE *file = std::fopen(file_path, "rb");
+    FILE *file = boost::nowide::fopen(file_path, "rb");
     if (file == nullptr) {
         assert(false);
         BOOST_LOG_TRIVIAL(error) << "Couldn't open " << file_path << " for reading.";
@@ -1195,15 +1214,13 @@ int Emboss::get_line_height(const FontFile &font, const FontProp &prop) {
 
 namespace {
 ExPolygons letter2shapes(
-    wchar_t letter, Point &cursor, FontFileWithCache &font_with_cache, const FontProp &font_prop, fontinfo_opt& font_info_cache)
-{
-    assert(font_with_cache.has_value());
-    if (!font_with_cache.has_value())
-        return {};
-
-    Glyphs &cache = *font_with_cache.cache;
-    const FontFile &font  = *font_with_cache.font_file;
-
+    wchar_t letter,
+    Point &cursor,
+    const FontFile &font,
+    Glyphs &cache,
+    const FontProp &font_prop,
+    fontinfo_opt &font_info_cache
+) {
     if (letter == '\n') {
         cursor.x() = 0;
         // 2d shape has opposit direction of y
@@ -1317,12 +1334,16 @@ void align_shape(ExPolygonsWithIds &shapes, const std::wstring &text, const Font
 
 ExPolygonsWithIds Emboss::text2vshapes(FontFileWithCache &font_with_cache, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled){
     assert(font_with_cache.has_value());
+    if (!font_with_cache.has_value())
+        return {};
+
     const FontFile &font = *font_with_cache.font_file;
     unsigned int font_index = font_prop.collection_number.value_or(0);
     if (!is_valid(font, font_index))
         return {};
 
-    unsigned counter = 0;
+    std::shared_ptr<Glyphs> cache = font_with_cache.cache; // copy pointer
+    unsigned counter = CANCEL_CHECK-1; // it is needed to validate using of cache
     Point cursor(0, 0);
 
     fontinfo_opt font_info_cache;  
@@ -1335,14 +1356,13 @@ ExPolygonsWithIds Emboss::text2vshapes(FontFileWithCache &font_with_cache, const
                 return {};
         }
         unsigned id = static_cast<unsigned>(letter);
-        result.push_back({id, letter2shapes(letter, cursor, font_with_cache, font_prop, font_info_cache)});
+        result.push_back({id, letter2shapes(letter, cursor, font, *cache, font_prop, font_info_cache)});
     }
 
     align_shape(result, text, font_prop, font);
     return result;
 }
 
-#include <boost/range/adaptor/reversed.hpp>
 unsigned Emboss::get_count_lines(const std::wstring& ws)
 {
     if (ws.empty())
@@ -1882,12 +1902,27 @@ double Emboss::calculate_angle(int32_t distance, PolygonPoint polygon_point, con
     return std::atan2(norm_d.y(), norm_d.x());
 }
 
-std::vector<double> Emboss::calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon)
+std::vector<double> Emboss::calculate_angles(const BoundingBoxes &glyph_sizes, const PolygonPoints& polygon_points, const Polygon &polygon)
 {
+    const int32_t default_distance = static_cast<int32_t>(std::round(scale_(5.)));
+    const int32_t min_distance = static_cast<int32_t>(std::round(scale_(.1)));
+
     std::vector<double> result;
     result.reserve(polygon_points.size());
-    for(const PolygonPoint& pp: polygon_points)
-        result.emplace_back(calculate_angle(distance, pp, polygon));
+    assert(glyph_sizes.size() == polygon_points.size());
+    if (glyph_sizes.size() != polygon_points.size()) {
+        // only backup solution should not be used
+        for (const PolygonPoint &pp : polygon_points)
+            result.emplace_back(calculate_angle(default_distance, pp, polygon));
+        return result;
+    }
+
+    for (size_t i = 0; i < polygon_points.size(); i++) {
+        int32_t distance = glyph_sizes[i].size().x() / 2;
+        if (distance < min_distance) // too small could lead to false angle
+            distance = default_distance;
+        result.emplace_back(calculate_angle(distance, polygon_points[i], polygon));
+    }
     return result;
 }
 
@@ -2029,6 +2064,7 @@ double Emboss::get_align_y_offset_in_mm(FontProp::VerticalAlign align, unsigned 
 
 #ifdef REMOVE_SPIKES
 #include <Geometry.hpp>
+
 void remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc)
 {
     enum class Type {

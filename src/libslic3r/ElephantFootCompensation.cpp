@@ -2,7 +2,13 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "clipper/clipper_z.hpp"
+#include <cmath>
+#include <cassert>
+#include <algorithm>
+#include <limits>
+#include <utility>
+#include <vector>
+#include <cstddef>
 
 #include "libslic3r.h"
 #include "ClipperUtils.hpp"
@@ -11,11 +17,10 @@
 #include "ElephantFootCompensation.hpp"
 #include "Flow.hpp"
 #include "Geometry.hpp"
-#include "SVG.hpp"
 #include "Utils.hpp"
-
-#include <cmath>
-#include <cassert>
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
 
 // #define CONTOUR_DISTANCE_DEBUG_SVG
 

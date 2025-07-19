@@ -99,7 +99,7 @@ bool MsgUpdateSlic3r::disable_version_check() const
 
  wxSize AppUpdateAvailableDialog::AUAD_size;
 // AppUpdater
-AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user)
+AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user, bool browser_on_next)
 	: MsgDialog(nullptr, _(L("App Update available")), wxString::Format(_(L("New version of %s is available.\nDo you wish to download it?")), SLIC3R_APP_NAME))
 {
 	auto* versions = new wxFlexGridSizer(1, 0, VERT_SPACING);
@@ -116,6 +116,12 @@ AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, co
 	}
 	content_sizer->AddSpacer(VERT_SPACING);
 	
+    if (browser_on_next)
+    {
+        content_sizer->Add(new wxStaticText(this, wxID_ANY, _L("Clicking \'Next\' will open a browser window where you can select which variant of PrusaSlicer you want to download.")));
+        content_sizer->AddSpacer(VERT_SPACING);
+    }
+
 	AUAD_size = content_sizer->GetSize();
 	
 
@@ -271,9 +277,9 @@ boost::filesystem::path AppUpdateDownloadDialog::get_download_path() const
 
 // MsgUpdateConfig
 
-MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_before_wizard/* = false*/) :
-	MsgDialog(nullptr, force_before_wizard ? _L("Opening Configuration Wizard") : _L("Configuration update"), 
-					   force_before_wizard ? _L("PrusaSlicer is not using the newest configuration available.\n"
+MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, PresetUpdater::UpdateParams update_params) :
+	MsgDialog(nullptr, update_params == PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD  ? _L("Opening Configuration Wizard") : _L("Configuration update"), 
+					   update_params == PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD ? _L("PrusaSlicer is not using the newest configuration available.\n"
 												"Configuration Wizard may not offer the latest printers, filaments and SLA materials to be installed.") : 
 											 _L("Configuration update is available"), wxICON_ERROR)
 {
@@ -327,12 +333,19 @@ MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(2*VERT_SPACING);
 
-	add_button(wxID_OK, true, force_before_wizard ? _L("Install") : "OK");
-	if (force_before_wizard) {
-		auto* btn = add_button(wxID_CLOSE, false, _L("Don't install"));
+    if (update_params == PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD) {
+        add_button(wxID_OK, true,  _L("Install"));
+        auto* btn = add_button(wxID_CLOSE, false, _L("Don't install"));
 		btn->Bind(wxEVT_BUTTON, [this](const wxCommandEvent&) { this->EndModal(wxID_CLOSE); });
-	}
-	add_button(wxID_CANCEL);
+        add_button(wxID_CANCEL);
+    } else if (update_params == PresetUpdater::UpdateParams::SHOW_TEXT_BOX_YES_NO) {
+        add_button(wxID_OK, true, _L("Yes"));
+	    add_button(wxID_CANCEL, false, _L("No"));
+    } else {
+        assert(update_params == PresetUpdater::UpdateParams::SHOW_TEXT_BOX);
+        add_button(wxID_OK, true, "OK");
+	    add_button(wxID_CANCEL);
+    }
 
 	finalize();
 }

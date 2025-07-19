@@ -6,8 +6,12 @@
 #define slic3r_Geometry_ConvexHull_hpp_
 
 #include <vector>
+#include <utility>
 
 #include "../ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
 
 namespace Slic3r {
 

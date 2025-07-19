@@ -12,6 +12,10 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/MeasureUtils.hpp"
 
+#include <imgui/imgui.h>
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif
 #include <imgui/imgui_internal.h>
 
 #include <numeric>
@@ -1168,24 +1172,29 @@ void GLGizmoMeasure::render_dimensioning()
 
         const Transform3d ss_to_ndc_matrix = TransformHelper::ndc_to_ss_matrix_inverse(viewport);
 
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
         if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
             shader->stop_using();
 
+#if SLIC3R_OPENGL_ES
+            shader = wxGetApp().get_shader("dashed_lines");
+#else
             shader = wxGetApp().get_shader("dashed_thick_lines");
+#endif // SLIC3R_OPENGL_ES
             if (shader == nullptr)
                 return;
 
             shader->start_using();
             shader->set_uniform("projection_matrix", Transform3d::Identity());
-            const std::array<int, 4>& viewport = camera.get_viewport();
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 1.0f);
             shader->set_uniform("gap_size", 0.0f);
+#if !SLIC3R_OPENGL_ES
         }
         else
-#endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glLineWidth(2.0f));
+#endif // !SLIC3R_OPENGL_ES
 
         // stem
         shader->set_uniform("view_model_matrix", overlap ?
@@ -1194,8 +1203,9 @@ void GLGizmoMeasure::render_dimensioning()
         m_dimensioning.line.set_color(ColorRGBA::WHITE());
         m_dimensioning.line.render();
 
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
         if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
             shader->stop_using();
 
             shader = wxGetApp().get_shader("flat");
@@ -1203,10 +1213,11 @@ void GLGizmoMeasure::render_dimensioning()
                 return;
 
             shader->start_using();
+#if !SLIC3R_OPENGL_ES
         }
         else
-#endif // ENABLE_GL_CORE_PROFILE
             glsafe(::glLineWidth(1.0f));
+#endif // !SLIC3R_OPENGL_ES
 
         // arrow 1
         shader->set_uniform("view_model_matrix", overlap ?
@@ -1228,14 +1239,14 @@ void GLGizmoMeasure::render_dimensioning()
         static double edit_value = 0.0;
 
         const Vec2d label_position = 0.5 * (v1ss + v2ss);
-        m_imgui->set_next_window_pos(label_position.x(), viewport[3] - label_position.y(), ImGuiCond_Always, 0.0f, 1.0f);
-        m_imgui->set_next_window_bg_alpha(0.0f);
+        ImGuiPureWrap::set_next_window_pos(label_position.x(), viewport[3] - label_position.y(), ImGuiCond_Always, 0.0f, 1.0f);
+        ImGuiPureWrap::set_next_window_bg_alpha(0.0f);
 
         if (!m_editing_distance) {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 1.0f, 1.0f });
-            m_imgui->begin(std::string("distance"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
+            ImGuiPureWrap::begin(std::string("distance"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
             ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
             ImGui::AlignTextToFramePadding();
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -1244,16 +1255,16 @@ void GLGizmoMeasure::render_dimensioning()
             ImVec2 txt_size = ImGui::CalcTextSize(txt.c_str());
             const ImGuiStyle& style = ImGui::GetStyle();
             draw_list->AddRectFilled({ pos.x - style.FramePadding.x, pos.y + style.FramePadding.y }, { pos.x + txt_size.x + 2.0f * style.FramePadding.x , pos.y + txt_size.y + 2.0f * style.FramePadding.y },
-              ImGuiWrapper::to_ImU32(ColorRGBA(0.5f, 0.5f, 0.5f, 0.5f)));
+              ImGuiPSWrap::to_ImU32(ColorRGBA(0.5f, 0.5f, 0.5f, 0.5f)));
             ImGui::SetCursorScreenPos({ pos.x + style.FramePadding.x, pos.y });
-            m_imgui->text(txt);
+            ImGuiPureWrap::text(txt);
             ImGui::SameLine();
-            if (m_imgui->image_button(ImGui::SliderFloatEditBtnIcon, _L("Edit to scale"))) {
+            if (m_imgui->image_button(ImGui::SliderFloatEditBtnIcon, _u8L("Edit to scale"))) {
                 m_editing_distance = true;
                 edit_value = curr_value;
                 m_imgui->requires_extra_frame();
             }
-            m_imgui->end();
+            ImGuiPureWrap::end();
             ImGui::PopStyleVar(3);
         }
 
@@ -1355,7 +1366,7 @@ void GLGizmoMeasure::render_dimensioning()
                 action_exit();
             };
 
-            m_imgui->disable_background_fadeout_animation();
+            ImGuiPureWrap::disable_background_fadeout_animation();
             ImGui::PushItemWidth(value_str_width);
             if (ImGui::InputDouble("##distance", &edit_value, 0.0f, 0.0f, "%.3f")) {
             }
@@ -1374,10 +1385,10 @@ void GLGizmoMeasure::render_dimensioning()
                 action_exit();
 
             ImGui::SameLine();
-            if (m_imgui->button(_CTX(L_CONTEXT("Scale", "Verb"), "Verb")))
+            if (ImGuiPureWrap::button(_CTX_utf8(L_CONTEXT("Scale", "Verb"), "Verb")))
                 action_scale(edit_value, curr_value);
             ImGui::SameLine();
-            if (m_imgui->button(_L("Cancel")))
+            if (ImGuiPureWrap::button(_u8L("Cancel")))
                 action_exit();
             ImGui::EndPopup();
         }
@@ -1462,11 +1473,16 @@ void GLGizmoMeasure::render_dimensioning()
         }
 
         const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
         if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
             shader->stop_using();
 
+#if SLIC3R_OPENGL_ES
+            shader = wxGetApp().get_shader("dashed_lines");
+#else
             shader = wxGetApp().get_shader("dashed_thick_lines");
+#endif // SLIC3R_OPENGL_ES
             if (shader == nullptr)
                 return;
 
@@ -1476,18 +1492,20 @@ void GLGizmoMeasure::render_dimensioning()
             shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
             shader->set_uniform("width", 1.0f);
             shader->set_uniform("gap_size", 0.0f);
+#if !SLIC3R_OPENGL_ES
         }
         else
-#endif // ENABLE_GL_CORE_PROFILE
-          glsafe(::glLineWidth(2.0f));
+            glsafe(::glLineWidth(2.0f));
+#endif // !SLIC3R_OPENGL_ES
 
         // arc
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("view_model_matrix", camera.get_view_matrix() * Geometry::translation_transform(center));
         m_dimensioning.arc.render();
 
-#if ENABLE_GL_CORE_PROFILE
+#if !SLIC3R_OPENGL_ES
         if (OpenGLManager::get_gl_info().is_core_profile()) {
+#endif // !SLIC3R_OPENGL_ES
             shader->stop_using();
 
             shader = wxGetApp().get_shader("flat");
@@ -1495,10 +1513,11 @@ void GLGizmoMeasure::render_dimensioning()
                 return;
 
             shader->start_using();
+#if !SLIC3R_OPENGL_ES
         }
         else
-#endif // ENABLE_GL_CORE_PROFILE
-          glsafe(::glLineWidth(1.0f));
+            glsafe(::glLineWidth(1.0f));
+#endif // !SLIC3R_OPENGL_ES
 
         // arrows
         auto render_arrow = [this, shader, &camera, &normal, &center, &e1_unit, draw_radius, step, resolution](unsigned int endpoint_id) {
@@ -1550,10 +1569,10 @@ void GLGizmoMeasure::render_dimensioning()
         const Vec2d label_position_ss = TransformHelper::world_to_ss(label_position_world,
             camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix(), viewport);
 
-        m_imgui->set_next_window_pos(label_position_ss.x(), viewport[3] - label_position_ss.y(), ImGuiCond_Always, 0.0f, 1.0f);
-        m_imgui->set_next_window_bg_alpha(0.0f);
+        ImGuiPureWrap::set_next_window_pos(label_position_ss.x(), viewport[3] - label_position_ss.y(), ImGuiCond_Always, 0.0f, 1.0f);
+        ImGuiPureWrap::set_next_window_bg_alpha(0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        m_imgui->begin(wxString("##angle"), ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+        ImGuiPureWrap::begin("##angle", ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
         ImGui::AlignTextToFramePadding();
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -1562,10 +1581,10 @@ void GLGizmoMeasure::render_dimensioning()
         ImVec2 txt_size = ImGui::CalcTextSize(txt.c_str());
         const ImGuiStyle& style = ImGui::GetStyle();
         draw_list->AddRectFilled({ pos.x - style.FramePadding.x, pos.y + style.FramePadding.y }, { pos.x + txt_size.x + 2.0f * style.FramePadding.x , pos.y + txt_size.y + 2.0f * style.FramePadding.y },
-          ImGuiWrapper::to_ImU32(ColorRGBA(0.5f, 0.5f, 0.5f, 0.5f)));
+          ImGuiPSWrap::to_ImU32(ColorRGBA(0.5f, 0.5f, 0.5f, 0.5f)));
         ImGui::SetCursorScreenPos({ pos.x + style.FramePadding.x, pos.y });
-        m_imgui->text(txt);
-        m_imgui->end();
+        ImGuiPureWrap::text(txt);
+        ImGuiPureWrap::end();
         ImGui::PopStyleVar();
     };
 
@@ -1703,9 +1722,9 @@ static void add_row_to_table(std::function<void(void)> col_1 = nullptr, std::fun
     col_2();
 }
 
-static void add_strings_row_to_table(ImGuiWrapper& imgui, const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color)
+static void add_strings_row_to_table(const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color)
 {
-    add_row_to_table([&]() { imgui.text_colored(col_1_color, col_1); }, [&]() { imgui.text_colored(col_2_color, col_2); });
+    add_row_to_table([&]() { ImGuiPureWrap::text_colored(col_1_color, col_1); }, [&]() { ImGuiPureWrap::text_colored(col_2_color, col_2); });
 };
 
 #if ENABLE_MEASURE_GIZMO_DEBUG
@@ -1713,27 +1732,27 @@ void GLGizmoMeasure::render_debug_dialog()
 {
     auto add_feature_data = [this](const SelectedFeatures::Item& item) {
         const std::string text = (item.source == item.feature) ? surface_feature_type_as_string(item.feature->get_type()) : point_on_feature_type_as_string(item.source->get_type(), m_hover_id);
-        add_strings_row_to_table(*m_imgui, "Type", ImGuiWrapper::COL_ORANGE_LIGHT, text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        add_strings_row_to_table(*m_imgui, "Type", ImGuiPureWrap::COL_ORANGE_LIGHT, text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
         switch (item.feature->get_type())
         {
         case Measure::SurfaceFeatureType::Point:
         {
-            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(item.feature->get_point()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(item.feature->get_point()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             break;
         }
         case Measure::SurfaceFeatureType::Edge:
         {
             auto [from, to] = item.feature->get_edge();
-            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(from), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(to), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(from), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(to), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             break;
         }
         case Measure::SurfaceFeatureType::Plane:
         {
             auto [idx, normal, origin] = item.feature->get_plane();
-            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(origin), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            add_strings_row_to_table(*m_imgui, "m_value", ImGuiWrapper::COL_ORANGE_LIGHT, format_double(idx), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(origin), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_value", ImGuiPureWrap::COL_ORANGE_LIGHT, format_double(idx), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             break;
         }
         case Measure::SurfaceFeatureType::Circle:
@@ -1741,18 +1760,18 @@ void GLGizmoMeasure::render_debug_dialog()
             auto [center, radius, normal] = item.feature->get_circle();
             const Vec3d on_circle = center + radius * Measure::get_orthogonal(normal, true);
             radius = (on_circle - center).norm();
-            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(center), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
-            add_strings_row_to_table(*m_imgui, "m_value", ImGuiWrapper::COL_ORANGE_LIGHT, format_double(radius), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt1", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(center), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt2", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(normal), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_value", ImGuiPureWrap::COL_ORANGE_LIGHT, format_double(radius), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             break;
         }
         }
         std::optional<Vec3d> extra_point = item.feature->get_extra_point();
         if (extra_point.has_value())
-            add_strings_row_to_table(*m_imgui, "m_pt3", ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(*extra_point), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(*m_imgui, "m_pt3", ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(*extra_point), ImGui::GetStyleColorVec4(ImGuiCol_Text));
     };
 
-    m_imgui->begin("Measure tool debug", ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    ImGuiPureWrap::begin("Measure tool debug", ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
     if (ImGui::BeginTable("Mode", 2)) {
         std::string txt;
         switch (m_mode)
@@ -1761,39 +1780,39 @@ void GLGizmoMeasure::render_debug_dialog()
         case EMode::PointSelection:   { txt = "Point selection"; break; }
         default:                      { assert(false); break; }
         }
-        add_strings_row_to_table(*m_imgui, "Mode", ImGuiWrapper::COL_ORANGE_LIGHT, txt, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        add_strings_row_to_table(*m_imgui, "Mode", ImGuiPureWrap::COL_ORANGE_LIGHT, txt, ImGui::GetStyleColorVec4(ImGuiCol_Text));
         ImGui::EndTable();
     }
 
     ImGui::Separator();
     if (ImGui::BeginTable("Hover", 2)) {
-        add_strings_row_to_table(*m_imgui, "Hover id", ImGuiWrapper::COL_ORANGE_LIGHT, std::to_string(m_hover_id), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        add_strings_row_to_table(*m_imgui, "Hover id", ImGuiPureWrap::COL_ORANGE_LIGHT, std::to_string(m_hover_id), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         const std::string txt = m_curr_feature.has_value() ? surface_feature_type_as_string(m_curr_feature->get_type()) : "None";
-        add_strings_row_to_table(*m_imgui, "Current feature", ImGuiWrapper::COL_ORANGE_LIGHT, txt, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        add_strings_row_to_table(*m_imgui, "Current feature", ImGuiPureWrap::COL_ORANGE_LIGHT, txt, ImGui::GetStyleColorVec4(ImGuiCol_Text));
         ImGui::EndTable();
     }
 
     ImGui::Separator();
     if (!m_selected_features.first.feature.has_value() && !m_selected_features.second.feature.has_value())
-        m_imgui->text("Empty selection");
+        ImGuiPureWrap::text("Empty selection");
     else {
         const ImGuiTableFlags flags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersH;
         if (m_selected_features.first.feature.has_value()) {
-            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Selection 1");
+            ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, "Selection 1");
             if (ImGui::BeginTable("Selection 1", 2, flags)) {
                 add_feature_data(m_selected_features.first);
                 ImGui::EndTable();
             }
         }
         if (m_selected_features.second.feature.has_value()) {
-            m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Selection 2");
+            ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, "Selection 2");
             if (ImGui::BeginTable("Selection 2", 2, flags)) {
                 add_feature_data(m_selected_features.second);
                 ImGui::EndTable();
             }
         }
     }
-    m_imgui->end();
+    ImGuiPureWrap::end();
 }
 #endif // ENABLE_MEASURE_GIZMO_DEBUG
 
@@ -1809,7 +1828,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     if (m_editing_distance)
         return;
 
-    m_imgui->begin(get_name(), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
     // adjust window position to avoid overlap the view toolbar
     const float win_h = ImGui::GetWindowHeight();
@@ -1827,8 +1846,8 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     if (ImGui::BeginTable("Commands", 2)) {
         unsigned int row_count = 1;
         add_row_to_table(
-            [this]() {
-                m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Left mouse button"));
+            []() {
+                ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, _u8L("Left mouse button"));
             },
             [this]() {
                 std::string text;
@@ -1942,37 +1961,37 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
 
                 assert(!text.empty());
 
-                m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), text);
+                ImGuiPureWrap::text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), text);
                 ImGui::SameLine();
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const float rect_size = ImGui::GetTextLineHeight();
-                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x + 1.0f, pos.y + 1.0f), ImVec2(pos.x + rect_size, pos.y + rect_size), ImGuiWrapper::to_ImU32(color));
+                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x + 1.0f, pos.y + 1.0f), ImVec2(pos.x + rect_size, pos.y + rect_size), ImGuiPSWrap::to_ImU32(color));
                 ImGui::Dummy(ImVec2(rect_size, rect_size));
             }
             );
 
         if (m_mode == EMode::FeatureSelection && m_hover_id != -1) {
-            add_strings_row_to_table(*m_imgui, "Shift", ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Enable point selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table("Shift", ImGuiPureWrap::COL_ORANGE_LIGHT, _u8L("Enable point selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ++row_count;
         }
 
         if (m_selected_features.first.feature.has_value()) {
-            add_strings_row_to_table(*m_imgui, "Delete", ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table("Delete", ImGuiPureWrap::COL_ORANGE_LIGHT, _u8L("Restart selection"), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             ++row_count;
         }
 
         if (m_selected_features.first.feature.has_value() || m_selected_features.second.feature.has_value()) {
           add_row_to_table(
-            [this]() {
-                m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Esc");
+            []() {
+                ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, "Esc");
             },
             [this]() {
-                m_imgui->text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), _u8L("Unselect"));
+                ImGuiPureWrap::text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), _u8L("Unselect"));
                 ImGui::SameLine();
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const float rect_size = ImGui::GetTextLineHeight();
                 const ColorRGBA color = m_selected_features.second.feature.has_value() ? SELECTED_2ND_COLOR : SELECTED_1ST_COLOR;
-                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x + 1.0f, pos.y + 1.0f), ImVec2(pos.x + rect_size, pos.y + rect_size), ImGuiWrapper::to_ImU32(color));
+                ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos.x + 1.0f, pos.y + 1.0f), ImVec2(pos.x + rect_size, pos.y + rect_size), ImGuiPSWrap::to_ImU32(color));
                 ImGui::Dummy(ImVec2(rect_size, rect_size));
             }
             );
@@ -1982,7 +2001,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
 
         // add dummy rows to keep dialog size fixed
         for (unsigned int i = row_count; i < 4; ++i) {
-            add_strings_row_to_table(*m_imgui, " ", ImGuiWrapper::COL_ORANGE_LIGHT, " ", ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(" ", ImGuiPureWrap::COL_ORANGE_LIGHT, " ", ImGui::GetStyleColorVec4(ImGuiCol_Text));
         }
 
         ImGui::EndTable();
@@ -2018,15 +2037,15 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             return text;
         };
 
-        add_strings_row_to_table(*m_imgui, _u8L("Selection") + " 1:", ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR), format_item_text(m_selected_features.first),
-          ImGuiWrapper::to_ImVec4(SELECTED_1ST_COLOR));
-        add_strings_row_to_table(*m_imgui, _u8L("Selection") + " 2:", ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR), format_item_text(m_selected_features.second),
-          ImGuiWrapper::to_ImVec4(SELECTED_2ND_COLOR));
+        add_strings_row_to_table(_u8L("Selection") + " 1:", ImGuiPSWrap::to_ImVec4(SELECTED_1ST_COLOR), format_item_text(m_selected_features.first),
+            ImGuiPSWrap::to_ImVec4(SELECTED_1ST_COLOR));
+        add_strings_row_to_table(_u8L("Selection") + " 2:", ImGuiPSWrap::to_ImVec4(SELECTED_2ND_COLOR), format_item_text(m_selected_features.second),
+            ImGuiPSWrap::to_ImVec4(SELECTED_2ND_COLOR));
         ImGui::EndTable();
     }
 
     m_imgui->disabled_begin(!m_selected_features.first.feature.has_value());
-        if (m_imgui->button(_L("Restart selection"))) {
+        if (ImGuiPureWrap::button(_u8L("Restart selection"))) {
             m_selected_features.reset();
             m_selected_sphere_raycasters.clear();
             m_imgui->set_requires_extra_frame();
@@ -2036,11 +2055,11 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     auto add_measure_row_to_table = [this](const std::string& col_1, const ImVec4& col_1_color, const std::string& col_2, const ImVec4& col_2_color) {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        m_imgui->text_colored(col_1_color, col_1);
+        ImGuiPureWrap::text_colored(col_1_color, col_1);
         ImGui::TableSetColumnIndex(1);
-        m_imgui->text_colored(col_2_color, col_2);
+        ImGuiPureWrap::text_colored(col_2_color, col_2);
         ImGui::TableSetColumnIndex(2);
-        if (m_imgui->image_button(ImGui::ClipboardBtnIcon, _L("Copy to clipboard"))) {
+        if (m_imgui->image_button(ImGui::ClipboardBtnIcon, _u8L("Copy to clipboard"))) {
             wxTheClipboard->Open();
             wxTheClipboard->SetData(new wxTextDataObject(col_1 + ": " + col_2));
             wxTheClipboard->Close();
@@ -2048,7 +2067,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     };
 
     ImGui::Separator();
-    m_imgui->text(_u8L("Measure"));
+    ImGuiPureWrap::text(_u8L("Measure"));
 
     const unsigned int max_measure_row_count = 2;
     unsigned int measure_row_count = 0;
@@ -2057,7 +2076,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
             const Measure::MeasurementResult& measure = m_measurement_result;
             if (measure.angle.has_value()) {
                 ImGui::PushID("ClipboardAngle");
-                add_measure_row_to_table(_u8L("Angle"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(measure.angle->angle)) + "°",
+                add_measure_row_to_table(_u8L("Angle"), ImGuiPureWrap::COL_ORANGE_LIGHT, format_double(Geometry::rad2deg(measure.angle->angle)) + "°",
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();
@@ -2071,7 +2090,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
                 ImGui::PushID("ClipboardDistanceInfinite");
-                add_measure_row_to_table(show_strict ? _u8L("Perpendicular distance") : _u8L("Distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
+                add_measure_row_to_table(show_strict ? _u8L("Perpendicular distance") : _u8L("Distance"), ImGuiPureWrap::COL_ORANGE_LIGHT, format_double(distance) + units,
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();
@@ -2081,7 +2100,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
                 ImGui::PushID("ClipboardDistanceStrict");
-                add_measure_row_to_table(_u8L("Direct distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
+                add_measure_row_to_table(_u8L("Direct distance"), ImGuiPureWrap::COL_ORANGE_LIGHT, format_double(distance) + units,
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();
@@ -2091,7 +2110,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
                 ImGui::PushID("ClipboardDistanceXYZ");
-                add_measure_row_to_table(_u8L("Distance XYZ"), ImGuiWrapper::COL_ORANGE_LIGHT, format_vec3(distance),
+                add_measure_row_to_table(_u8L("Distance XYZ"), ImGuiPureWrap::COL_ORANGE_LIGHT, format_vec3(distance),
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();
@@ -2100,7 +2119,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
 
         // add dummy rows to keep dialog size fixed
         for (unsigned int i = measure_row_count; i < max_measure_row_count; ++i) {
-            add_strings_row_to_table(*m_imgui, " ", ImGuiWrapper::COL_ORANGE_LIGHT, " ", ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            add_strings_row_to_table(" ", ImGuiPureWrap::COL_ORANGE_LIGHT, " ", ImGui::GetStyleColorVec4(ImGuiCol_Text));
         }
         ImGui::EndTable();
     }
@@ -2113,7 +2132,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
         m_imgui->set_requires_extra_frame();
     }
 
-    m_imgui->end();
+    ImGuiPureWrap::end();
 }
 
 void GLGizmoMeasure::on_register_raycasters_for_picking()

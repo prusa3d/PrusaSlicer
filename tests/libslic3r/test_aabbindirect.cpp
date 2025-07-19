@@ -1,5 +1,6 @@
 #include <algorithm>
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <test_utils.hpp>
 
 #include <libslic3r/TriangleMesh.hpp>
@@ -7,6 +8,7 @@
 #include <libslic3r/AABBTreeLines.hpp>
 
 using namespace Slic3r;
+using namespace Catch;
 
 TEST_CASE("Building a tree over a box, ray caster and closest query", "[AABBIndirect]")
 {

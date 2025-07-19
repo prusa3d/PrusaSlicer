@@ -58,6 +58,7 @@ inline void perform_csg(CSGType op, VoxelGridPtr &dst, VoxelGridPtr &src)
 
 } // namespace detail
 
+// Convert the input csgrange to a voxel grid performing the boolean operations in the voxel realm.
 template<class It>
 VoxelGridPtr voxelize_csgmesh(const Range<It>      &csgrange,
                               const VoxelizeParams &params = {})

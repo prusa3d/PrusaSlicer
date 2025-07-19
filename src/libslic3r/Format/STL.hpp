@@ -14,6 +14,7 @@ namespace Slic3r {
 
 class TriangleMesh;
 class ModelObject;
+class Model;
 
 // Load an STL file into a provided model.
 extern bool load_stl(const char *path, Model *model, const char *object_name = nullptr);

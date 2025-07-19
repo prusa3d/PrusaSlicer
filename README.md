@@ -46,7 +46,7 @@ Other major features are:
 * several infill patterns including honeycomb, spirals, Hilbert curves
 * support material, raft, brim, skirt
 * **standby temperature** and automatic wiping for multi-extruder printing
-* [customizable **G-code macros**](https://github.com/prusa3d/PrusaSlicer/wiki/Slic3r-Prusa-Edition-Macro-Language) and output filename with variable placeholders
+* [customizable **G-code macros**](https://github.com/prusa3d/PrusaSlicer/wiki/PrusaSlicer-Macro-Language) and output filename with variable placeholders
 * support for **post-processing scripts**
 * **cooling logic** controlling fan speed and dynamic print speed
 

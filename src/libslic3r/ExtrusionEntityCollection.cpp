@@ -7,10 +7,11 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "ExtrusionEntityCollection.hpp"
-#include "ShortestPath.hpp"
+
 #include <algorithm>
-#include <cmath>
-#include <map>
+#include <limits>
+
+#include "libslic3r/ExtrusionEntity.hpp"
 
 namespace Slic3r {
 

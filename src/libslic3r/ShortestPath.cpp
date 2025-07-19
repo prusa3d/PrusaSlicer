@@ -8,14 +8,24 @@
 	#undef assert
 #endif
 
-#include "clipper.hpp"
+#include <cmath>
+#include <cassert>
+#include <iterator>
+#include <limits>
+#include <algorithm>
+
 #include "ShortestPath.hpp"
 #include "KDTreeIndirect.hpp"
 #include "MutablePriorityQueue.hpp"
 #include "Print.hpp"
-
-#include <cmath>
-#include <cassert>
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/Line.hpp"
+#include "libslic3r/MultiMaterialSegmentation.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/libslic3r.h"
+#include "tcbspan/span.hpp"
 
 namespace Slic3r {
 
@@ -1100,29 +1110,32 @@ void chain_and_reorder_extrusion_paths(std::vector<ExtrusionPath> &extrusion_pat
 	reorder_extrusion_paths(extrusion_paths, chain_extrusion_paths(extrusion_paths, start_near));
 }
 
-std::vector<size_t> chain_points(const Points &points, Point *start_near)
+std::vector<size_t> chain_points(const Points &points, const Point *start_near)
 {
-	auto segment_end_point = [&points](size_t idx, bool /* first_point */) -> const Point& { return points[idx]; };
-	std::vector<std::pair<size_t, bool>> ordered = chain_segments_greedy<Point, decltype(segment_end_point)>(segment_end_point, points.size(), start_near);
-	std::vector<size_t> out;
-	out.reserve(ordered.size());
-	for (auto &segment_and_reversal : ordered)
-		out.emplace_back(segment_and_reversal.first);
-	return out;
+    auto segment_end_point = [&points](size_t idx, bool /* first_point */) -> const Point & {
+        return points[idx];
+    };
+
+    std::vector<std::pair<size_t, bool>> ordered = chain_segments_greedy<Point, decltype(segment_end_point)>(segment_end_point, points.size(), start_near);
+    std::vector<size_t> out;
+    out.reserve(ordered.size());
+    for (auto &segment_and_reversal : ordered) {
+        out.emplace_back(segment_and_reversal.first);
+    }
+
+    return out;
 }
 
-std::vector<size_t> chain_expolygons(const ExPolygons &expolygons, Point *start_near)
+std::vector<size_t> chain_expolygons(const ExPolygons &expolygons)
 {
     Points ordering_points;
     ordering_points.reserve(expolygons.size());
-    for (const ExPolygon &ex : expolygons)
+    for (const ExPolygon &ex : expolygons) {
         ordering_points.push_back(ex.contour.first_point());
+    }
+
     return chain_points(ordering_points);
 }
-
-#ifndef NDEBUG
-	// #define DEBUG_SVG_OUTPUT
-#endif /* NDEBUG */
 
 #ifdef DEBUG_SVG_OUTPUT
 void svg_draw_polyline_chain(const char *name, size_t idx, const Polylines &polylines)
@@ -1951,14 +1964,15 @@ static inline void improve_ordering_by_two_exchanges_with_segment_flipping(Polyl
 	for (const FlipEdge &edge : edges) {
 		Polyline &pl = polylines[edge.source_index];
 		out.emplace_back(std::move(pl));
-		if (edge.p2 == pl.first_point().cast<double>()) {
+		if (edge.p2 == out.back().first_point().cast<double>()) {
 			// Polyline is flipped.
 			out.back().reverse();
 		} else {
 			// Polyline is not flipped.
-			assert(edge.p1 == pl.first_point().cast<double>());
+			assert(edge.p1 == out.back().first_point().cast<double>());
 		}
 	}
+	polylines = out;
 
 #ifndef NDEBUG
 	double cost_final = cost();
@@ -2093,6 +2107,35 @@ Polylines chain_lines(const std::vector<Line> &lines, const double point_distanc
             out.emplace_back(std::move(pl));
         }
     return out;
+}
+
+std::vector<size_t> chain_layer_islands(const std::vector<std::reference_wrapper<const LayerIsland>> &islands, const Point *start_near)
+{
+    Points ordering_points;
+    ordering_points.reserve(islands.size());
+    for (const LayerIsland &island : islands) {
+        ordering_points.push_back(island.boundary.contour.first_point());
+    }
+
+    return chain_points(ordering_points, start_near);
+}
+
+void reorder_layer_islands(std::vector<std::reference_wrapper<const LayerIsland>> &islands, const std::vector<size_t> &chain)
+{
+    assert(islands.size() == chain.size());
+    std::vector<std::reference_wrapper<const LayerIsland>> islands_out;
+    islands_out.reserve(islands.size());
+
+    for (size_t island_idx : chain) {
+        islands_out.emplace_back(islands[island_idx]);
+    }
+
+    islands.swap(islands_out);
+}
+
+void chain_and_reorder_layer_islands(std::vector<std::reference_wrapper<const LayerIsland>> &islands, const Point *start_near)
+{
+    reorder_layer_islands(islands, chain_layer_islands(islands, start_near));
 }
 
 } // namespace Slic3r
