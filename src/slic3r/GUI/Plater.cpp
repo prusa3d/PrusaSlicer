@@ -973,7 +973,7 @@ void Plater::priv::init()
             if (user_account->on_user_id_success(evt.data, username, after_token_success)) {
                 if (who != username) {
                     // show notification only on login (not refresh).
-                    std::string text = format(_u8L("Logged to Prusa Account as %1%."), username);
+                    std::string text = format(_u8L("Logged in to Prusa Account as %1%."), username);
                     // login notification
                     this->notification_manager->close_notification_of_type(NotificationType::UserAccountID);
                     this->notification_manager->close_notification_of_type(NotificationType::FailedSecretVendorUpdateSync);
