@@ -911,7 +911,7 @@ bool PresetArchiveDatabase::sync_blocking(PresetUpdaterUIStatus* ui_status)
     assert(ui_status);
 	std::string manifest;
     bool sync_res = false;
-    ui_status->set_target("Archive Database Mainfest");
+    ui_status->set_target("Archive Database Manifest");
     sync_res = sync_inner(manifest, ui_status);
     if (!sync_res) {
         return false;
