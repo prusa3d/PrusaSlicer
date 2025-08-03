@@ -607,11 +607,11 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("chamber_minimal_temperature", coInts);
     // TRN: Label of a configuration parameter: Minimal chamber temperature
-    def->label = L("Minimal");
-    def->full_label = L("Chamber minimal temperature");
-    def->tooltip = L("Minimal chamber temperature that the printer waits for before the print starts. This allows "
-                     "to start the print before the nominal chamber temperature is reached.\nWhen set to zero, "
-                     "the minimal chamber temperature is not set in the G-code.");
+    def->label = L("Minimum");
+    def->full_label = L("Chamber minimum temperature");
+    def->tooltip = L("Minimum chamber temperature that the printer waits for before the print starts. This allows "
+                     "the print to start before the nominal chamber temperature is reached.\nWhen set to zero, "
+                     "this minimum chamber temperature is not set in the G-code.");
     def->sidetext = L("°C");
     def->min = 0;
     def->max = 1000;
@@ -1334,7 +1334,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats { 2.2 });
 
     def = this->add("filament_minimal_purge_on_wipe_tower", coFloats);
-    def->label = L("Minimal purge on wipe tower");
+    def->label = L("Minimum purge on wipe tower");
     def->tooltip = L("After a tool change, the exact position of the newly loaded filament inside "
                      "the nozzle may not be known, and the filament pressure is likely not yet stable. "
                      "Before purging the print head into an infill or a sacrificial object, Slic3r will always prime "
@@ -2351,7 +2351,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloats { 10. });
 
     def = this->add("min_skirt_length", coFloat);
-    def->label = L("Minimal filament extrusion length");
+    def->label = L("Minimum filament extrusion length");
     def->tooltip = L("Generate no less than the number of skirt loops required to consume "
                    "the specified amount of filament on the bottom layer. For multi-extruder machines, "
                    "this minimum applies to each extruder.");
