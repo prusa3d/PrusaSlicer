@@ -3454,7 +3454,12 @@ std::string GCodeGenerator::_extrude(
         } else {
             throw Slic3r::InvalidArgument("Invalid speed");
         }
+    // Special case bridges and pick the lower of the two.
+    } else if (path_attr.role.is_bridge()) {
+        assert(path_attr.role.is_perimeter() || path_attr.role == ExtrusionRole::BridgeInfill);
+        speed = std::min(m_config.get_abs_value("bridge_speed"), speed);
     }
+
     if (m_volumetric_speed != 0. && speed == 0)
         speed = m_volumetric_speed / path_attr.mm3_per_mm;
     if (this->on_first_layer()) {
