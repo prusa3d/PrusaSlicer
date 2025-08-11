@@ -5694,7 +5694,7 @@ CLIInputConfigDef::CLIInputConfigDef()
     def = this->add("material-profile", coStrings);
     def->label = ("Material preset name(s)");
     def->tooltip = ("Name(s) of the material preset(s) used for slicing.\n"
-        "Could be filaments or sla_material preset name(s) depending on printer tochnology");
+        "Could be filaments or sla_material preset name(s) depending on printer technology");
     def->set_default_value(new ConfigOptionStrings());
 }
 
