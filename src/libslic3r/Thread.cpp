@@ -13,9 +13,15 @@
 	#endif // __APPLE__
 #endif
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/task_arena.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/task_arena.h>
+#endif
 #include <condition_variable>
 #include <mutex>
 #include <thread>
