@@ -208,7 +208,9 @@ void Fill3DHoneycomb::_fill_surface_single(
     ExPolygon                        expolygon,
     Polylines                       &polylines_out)
 {
-    // no rotation is supported for this infill pattern
+    // Support infill angle 
+    auto infill_angle   = float(this->angle);
+    if (std::abs(infill_angle) >= EPSILON) expolygon.rotate(-infill_angle);
     BoundingBox bb = expolygon.contour.bounding_box();
 
     // Note: with equally-scaled X/Y/Z, the pattern will create a vertically-stretched
@@ -279,6 +281,12 @@ void Fill3DHoneycomb::_fill_surface_single(
 
     // clip pattern to boundaries, chain the clipped polylines
     polylines = intersection_pl(polylines, expolygon);
+
+	// rotate back based on stored infill_angle
+	if (std::abs(infill_angle) >= EPSILON) {
+          for (auto it = polylines.begin(); it != polylines.end(); ++it) 
+            it->rotate(infill_angle);
+    }
 
     // connect lines if needed
     if (params.dont_connect() || polylines.size() <= 1)
