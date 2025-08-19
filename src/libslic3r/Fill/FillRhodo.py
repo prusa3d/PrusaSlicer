@@ -1,136 +1,118 @@
 """
-This creates an animation of generating a rhombic dodecahedron point by point. 
-It works by generating each layer based on a the current z-height, and the
-target hexagon edge length. This is a precursor to the g-code infill version of
-the same geometry, used for 3d printing to maximize isometric specific strength
-(most strength in all directions for the lowest weight)
+This creates rhombic dodecahedron infill pattern for 3d printing to maximize
+isometric specific strength (most strength in all directions for the lowest
+weight). It works by generating each layer based on a the current z-height. And
+each point point by point.Each layer is normalized to a global grid to preserve
+layer alignment.
 """
 
 import math
-import time
-import pygame
+from typing import List
 
-DEG_TO_RAD = math.pi / 180
-SQRT3 = 3**0.5
+from .fill_base import Fill, FillParams, Segment
 
-size = 720
+class FillRhodo(Fill):
+    def _fill_surface_single(self, params: FillParams, thickness_layers: int, surface) -> List[Segment]:
+        min_spacing    = params.spacing
+        hex_side       = min_spacing / params.density;
+        hex_width      = hex_side * math.sqrt(3);
+        pattern_height = hex_side * 1.5
+        z              = (params.z / hex_side) % 3 # normalize it from 1 to 3, relative to hex_side
 
-def main():
-    z = 0
-    pygame.init()
-    screen = pygame.display.set_mode([size, size])
-    running = True
-    while running:
-        #time.sleep(0.2)
-        screen.fill((255, 255, 255))
+        permutation = 0 # perm0 is upright triangles, perm1 is upside down triangles
+        if z < 1: # phase 1 hex hold
+            tri_frac = 0
+        elif z < 1.25: # phase 2 transition
+            tri_frac = (z - 1) * 4
+        elif z < 1.5: # phase 3 perm1 reverse transition
+            tri_frac = (1.5 - z) * 4
+            permutation = 1
+        elif z < 2.5: # phase 4 perm1 hex hold
+            tri_frac = 0
+            permutation = 1
+        elif z < 2.75: # phase 5 perm1 transition
+            tri_frac = (z - 2.5) * 4
+            permutation = 1
+        else: # phase 6 reverse transition
+            tri_frac = (3 - z) * 4
 
-        layer_points = get_layer_points(z, 64)
-        for i in range(1, len(layer_points)):
-            if pygame.QUIT in (event.type for event in pygame.event.get()):
-                running = False
-                break
-            
-            pygame.draw.line(screen, pygame.Color("black"), layer_points[i-1], layer_points[i])
-            time.sleep(0.001)
-            pygame.display.flip()
+        tri_w       = hex_width * tri_frac # width of triangle
+        tri_half_w  = tri_w / 2
+
+        xmin, ymin, xmax, ymax = surface.bbox
+        xmin = surface.align_to_grid(xmin, hex_width) # rhodo width
+        ymin = surface.align_to_grid(ymin, hex_side * 3) # rhodo height
+        w = xmax - xmin
+        h = ymax - ymin
+        num_rows = 2 + math.ceil(h / pattern_height)
+        num_cols = 2 + math.ceil(w / hex_width) 
         
-        z += 1
-    pygame.quit()
+        polylines: List[List[Point]] = []
+        for i in range(num_rows):
+            polyline: List[Point] = []
+            if permutation == 0:
+                y_offset = ymin + (i-1) * pattern_height
 
-# raw_z: raw z height
-# l: hexagon edge length
-def get_layer_points(raw_z: float, l: float):
-    z = (raw_z / l) % 3 # normalize it from 1 to 3, which is relative to l
-    permutation = 0 # perm0 is upright triangles, perm1 is upside down triangles
-    if z < 1: # phase 1 hex hold
-        tri_frac = 0
-    elif z < 1.25: # phase 2 transition
-        tri_frac = (z - 1) * 4
-    elif z < 1.5: # phase 3 perm1 reverse transition
-        tri_frac = (1.5 - z) * 4
-        permutation = 1
-    elif z < 2.5: # phase 4 perm1 hex hold
-        tri_frac = 0
-        permutation = 1
-    elif z < 2.75: # phase 5 perm1 transition
-        tri_frac = (z - 2.5) * 4
-        permutation = 1
-    else: # phase 6 reverse transition
-        tri_frac = (3 - z) * 4
-
-    w = l * SQRT3 # width of hexagon
-    tri_w = w * tri_frac # width of triangle
-    tri_half_w = tri_w / 2
-    layer_points = []
-
-    num_rows = 2 + math.ceil(size / w)
-    num_cols = 2 + math.ceil(size / w) 
-    for i in range(num_rows):
-        if permutation == 0:
-            row_offset = (i-1) * (l + l / 2)
-
-            if i % 2 == 0:
-                for j in range(num_cols):
-                    col_offset = j * w
-                    top_left_tri_origin = (col_offset - w / 2, row_offset - l/2) # left hex top center
-                    layer_points.append((top_left_tri_origin[0] + tri_half_w, top_left_tri_origin[1] + tri_half_w / SQRT3)) # top left tri right
-                    layer_points.append((col_offset, row_offset)) # hex top left
-                    left_tri_origin = (col_offset, row_offset + l) # hex bottom left
-                    layer_points.append((left_tri_origin[0], left_tri_origin[1] - tri_w * SQRT3 / 3)) # left tri top
-                    layer_points.append((left_tri_origin[0] - tri_half_w, left_tri_origin[1] + tri_half_w / SQRT3)) # left tri left
-                    if j == num_cols - 1: break
-                    layer_points.append((left_tri_origin[0] + tri_half_w, left_tri_origin[1] + tri_half_w / SQRT3)) # left tri right
-                    layer_points.append((left_tri_origin[0], left_tri_origin[1] - tri_w * SQRT3 / 3)) # left tri top
-                    layer_points.append((col_offset, row_offset)) # hex top left
-                    top_tri_origin = (col_offset + w / 2, row_offset - l/2) # hex top center
-                    layer_points.append((top_tri_origin[0] - tri_half_w, top_tri_origin[1] + tri_half_w / SQRT3)) # top tri left
+                if i % 2 == 0:
+                    for j in range(num_cols):
+                        x_offset = xmin + j * hex_width
+                        top_left_tri_origin = (x_offset - hex_width / 2, y_offset - hex_side/2) # left hex top center
+                        polyline.append((top_left_tri_origin[0] + tri_half_w, top_left_tri_origin[1] + tri_half_w / math.sqrt(3))) # top left tri right
+                        polyline.append((x_offset, y_offset)) # hex top left
+                        left_tri_origin = (x_offset, y_offset + hex_side) # hex bottom left
+                        polyline.append((left_tri_origin[0], left_tri_origin[1] - tri_w * math.sqrt(3) / 3)) # left tri top
+                        polyline.append((left_tri_origin[0] - tri_half_w, left_tri_origin[1] + tri_half_w / math.sqrt(3))) # left tri left
+                        if j == num_cols - 1: break
+                        polyline.append((left_tri_origin[0] + tri_half_w, left_tri_origin[1] + tri_half_w / math.sqrt(3))) # left tri right
+                        polyline.append((left_tri_origin[0], left_tri_origin[1] - tri_w * math.sqrt(3) / 3)) # left tri top
+                        polyline.append((x_offset, y_offset)) # hex top left
+                        top_tri_origin = (x_offset + hex_width / 2, y_offset - hex_side/2) # hex top center
+                        polyline.append((top_tri_origin[0] - tri_half_w, top_tri_origin[1] + tri_half_w / math.sqrt(3))) # top tri left
+                else:
+                    for j in range(num_cols - 1, -1, -1):
+                        x_offset = xmin + j * hex_width - hex_width / 2
+                        polyline.append((x_offset, y_offset)) # hex top right
+                        right_tri_origin = (x_offset, y_offset + hex_side) # hex bottom right
+                        polyline.append((right_tri_origin[0], right_tri_origin[1] - tri_w * math.sqrt(3) / 3)) # right tri top
+                        polyline.append((right_tri_origin[0] + tri_half_w, right_tri_origin[1] + tri_half_w / math.sqrt(3))) # right tri right
+                        if j == 0: break
+                        polyline.append((right_tri_origin[0] - tri_half_w, right_tri_origin[1] + tri_half_w / math.sqrt(3))) # right tri left
+                        polyline.append((right_tri_origin[0], right_tri_origin[1] - tri_w * math.sqrt(3) / 3)) # right tri top
+                        polyline.append((x_offset, y_offset)) # hex top right
+                        top_tri_origin = (x_offset - hex_width / 2, y_offset - hex_side/2) # hex top center
+                        polyline.append((top_tri_origin[0] + tri_half_w, top_tri_origin[1] + tri_half_w / math.sqrt(3))) # top tri right
+                        polyline.append((top_tri_origin[0] - tri_half_w, top_tri_origin[1] + tri_half_w / math.sqrt(3))) # top tri left
             else:
-                for j in range(num_cols - 1, -1, -1):
-                    col_offset = j * w - w / 2
-                    layer_points.append((col_offset, row_offset)) # hex top right
-                    right_tri_origin = (col_offset, row_offset + l) # hex bottom right
-                    layer_points.append((right_tri_origin[0], right_tri_origin[1] - tri_w * SQRT3 / 3)) # right tri top
-                    layer_points.append((right_tri_origin[0] + tri_half_w, right_tri_origin[1] + tri_half_w / SQRT3)) # right tri right
-                    if j == 0: break
-                    layer_points.append((right_tri_origin[0] - tri_half_w, right_tri_origin[1] + tri_half_w / SQRT3)) # right tri left
-                    layer_points.append((right_tri_origin[0], right_tri_origin[1] - tri_w * SQRT3 / 3)) # right tri top
-                    layer_points.append((col_offset, row_offset)) # hex top right
-                    top_tri_origin = (col_offset - w / 2, row_offset - l/2) # hex top center
-                    layer_points.append((top_tri_origin[0] + tri_half_w, top_tri_origin[1] + tri_half_w / SQRT3)) # top tri right
-                    layer_points.append((top_tri_origin[0] - tri_half_w, top_tri_origin[1] + tri_half_w / SQRT3)) # top tri left
-        else:
-            row_offset = (i-1) * (l + l / 2) + l / 2
-            if i % 2 == 0:
-                for j in range(num_cols):
-                    col_offset = j * w - w / 2
-                    left_tri_origin = (col_offset, row_offset) # hex top left
-                    layer_points.append((left_tri_origin[0] + tri_half_w, left_tri_origin[1] - tri_half_w / SQRT3)) # left tri right
-                    layer_points.append((left_tri_origin[0], left_tri_origin[1] + tri_w * SQRT3 / 3)) # left tri bot
-                    layer_points.append((col_offset, row_offset + l)) # hex bottom left
-                    bot_tri_origin = (col_offset + w / 2, row_offset+ 3*l/2) # hex bottom center
-                    layer_points.append((bot_tri_origin[0] - tri_half_w, bot_tri_origin[1] - tri_half_w / SQRT3)) # bot tri left
-                    if j == num_cols - 1: break
-                    layer_points.append((bot_tri_origin[0] + tri_half_w, bot_tri_origin[1] - tri_half_w / SQRT3)) # bot tri right
-                    layer_points.append((col_offset + w, row_offset + l)) # hex bottom right
-                    right_tri_origin = (col_offset + w, row_offset) # hex top right
-                    layer_points.append((right_tri_origin[0], right_tri_origin[1] + tri_w * SQRT3 / 3)) # right tri bot
-                    layer_points.append((right_tri_origin[0] - tri_half_w, right_tri_origin[1] - tri_half_w / SQRT3)) # right tri left
-            else:
-                for j in range(num_cols - 1, -1, -1):
-                    col_offset = j * w
-                    right_tri_origin = (col_offset, row_offset) # hex top right
-                    layer_points.append((right_tri_origin[0] - tri_half_w, right_tri_origin[1] - tri_half_w / SQRT3)) # right tri left
-                    layer_points.append((right_tri_origin[0], right_tri_origin[1] + tri_w * SQRT3 / 3)) # right tri bot
-                    layer_points.append((col_offset, row_offset + l)) # hex bottom right
-                    bot_tri_origin = (col_offset - w / 2, row_offset + 3*l/2) # hex bottom center
-                    layer_points.append((bot_tri_origin[0] + tri_half_w, bot_tri_origin[1] - tri_half_w / SQRT3)) # bot tri right
-                    if j == 0: break
-                    layer_points.append((bot_tri_origin[0] - tri_half_w, bot_tri_origin[1] - tri_half_w / SQRT3)) # bot tri left
-                    layer_points.append((col_offset - w, row_offset + l)) # hex bottom left
-                    left_tri_origin = (col_offset - w, row_offset) # hex top left
-                    layer_points.append((left_tri_origin[0], left_tri_origin[1] + tri_w * SQRT3 / 3)) # left tri bot
-                    layer_points.append((left_tri_origin[0] + tri_half_w, left_tri_origin[1] - tri_half_w / SQRT3)) # left tri right
-
-    return layer_points
-
-main()
+                y_offset = ymin + (i-1) * pattern_height + hex_side / 2
+                if i % 2 == 0:
+                    for j in range(num_cols):
+                        x_offset = xmin + j * hex_width - hex_width / 2
+                        left_tri_origin = (x_offset, y_offset) # hex top left
+                        polyline.append((left_tri_origin[0] + tri_half_w, left_tri_origin[1] - tri_half_w / math.sqrt(3))) # left tri right
+                        polyline.append((left_tri_origin[0], left_tri_origin[1] + tri_w * math.sqrt(3) / 3)) # left tri bot
+                        polyline.append((x_offset, y_offset + hex_side)) # hex bottom left
+                        bot_tri_origin = (x_offset + hex_width / 2, y_offset+ 3*hex_side/2) # hex bottom center
+                        polyline.append((bot_tri_origin[0] - tri_half_w, bot_tri_origin[1] - tri_half_w / math.sqrt(3))) # bot tri left
+                        if j == num_cols - 1: break
+                        polyline.append((bot_tri_origin[0] + tri_half_w, bot_tri_origin[1] - tri_half_w / math.sqrt(3))) # bot tri right
+                        polyline.append((x_offset + hex_width, y_offset + hex_side)) # hex bottom right
+                        right_tri_origin = (x_offset + hex_width, y_offset) # hex top right
+                        polyline.append((right_tri_origin[0], right_tri_origin[1] + tri_w * math.sqrt(3) / 3)) # right tri bot
+                        polyline.append((right_tri_origin[0] - tri_half_w, right_tri_origin[1] - tri_half_w / math.sqrt(3))) # right tri left
+                else:
+                    for j in range(num_cols - 1, -1, -1):
+                        x_offset = xmin + j * hex_width
+                        right_tri_origin = (x_offset, y_offset) # hex top right
+                        polyline.append((right_tri_origin[0] - tri_half_w, right_tri_origin[1] - tri_half_w / math.sqrt(3))) # right tri left
+                        polyline.append((right_tri_origin[0], right_tri_origin[1] + tri_w * math.sqrt(3) / 3)) # right tri bot
+                        polyline.append((x_offset, y_offset + hex_side)) # hex bottom right
+                        bot_tri_origin = (x_offset - hex_width / 2, y_offset + 3*hex_side/2) # hex bottom center
+                        polyline.append((bot_tri_origin[0] + tri_half_w, bot_tri_origin[1] - tri_half_w / math.sqrt(3))) # bot tri right
+                        if j == 0: break
+                        polyline.append((bot_tri_origin[0] - tri_half_w, bot_tri_origin[1] - tri_half_w / math.sqrt(3))) # bot tri left
+                        polyline.append((x_offset - hex_width, y_offset + hex_side)) # hex bottom left
+                        left_tri_origin = (x_offset - hex_width, y_offset) # hex top left
+                        polyline.append((left_tri_origin[0], left_tri_origin[1] + tri_w * math.sqrt(3) / 3)) # left tri bot
+                        polyline.append((left_tri_origin[0] + tri_half_w, left_tri_origin[1] - tri_half_w / math.sqrt(3))) # left tri right
+            polylines.append(polyline)
+        return polylines
