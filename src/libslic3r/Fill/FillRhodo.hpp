@@ -1,4 +1,4 @@
-///|/ Copyright (c) 2025
+///|/ Copyright (c) 2025 Andre Vallestero
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -36,5 +36,3 @@ protected:
 } // namespace Slic3r
 
 #endif // slic3r_FillRhodo_hpp_
-
-
