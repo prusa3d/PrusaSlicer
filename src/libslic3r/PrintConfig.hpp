@@ -845,6 +845,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              filament_cooling_initial_speed))
     ((ConfigOptionFloats,              filament_minimal_purge_on_wipe_tower))
     ((ConfigOptionFloats,              filament_cooling_final_speed))
+    ((ConfigOptionBools,               filament_cooling_wait_for_temp))
     ((ConfigOptionPercents,            filament_purge_multiplier))
     ((ConfigOptionStrings,             filament_ramming_parameters))
     ((ConfigOptionBools,               filament_multitool_ramming))
