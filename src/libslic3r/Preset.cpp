@@ -513,6 +513,7 @@ static std::vector<std::string> s_Preset_print_options {
     "automatic_extrusion_widths", "automatic_infill_combination", "automatic_infill_combination_max_layer_height",
     "bed_temperature_extruder", "interlocking_beam", "interlocking_orientation", "interlocking_beam_layer_count", "interlocking_depth", "interlocking_boundary_avoidance", "interlocking_beam_width",
     "travel_short_distance_acceleration",
+    "wipe_tower_disable_linear_advance",
 };
 
 static std::vector<std::string> s_Preset_filament_options {

@@ -3201,6 +3201,12 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("wipe_tower_disable_linear_advance", coBool);
+    def->label = L("Disable linear advance");
+    def->tooltip = L("If enabled, linear advance will be disabled before purging an extruder.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("slice_closing_radius", coFloat);
     def->label = L("Slice gap closing radius");
     def->category = L("Advanced");
