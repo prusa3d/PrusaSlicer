@@ -17,9 +17,11 @@ static inline void reset_polyline(
 	Polyline     &polyline,
 	Polylines    &all_polylines)
 {
-	if (polyline.points.size() < 2) return;
-	polyline.rotate(-angle, hex_center); // rotate back to model frame if any points were collected
-	all_polylines.emplace_back(std::move(polyline));
+	if (polyline.points.size() == 0) return;
+	if (polyline.points.size() > 1) {
+		polyline.rotate(-angle, hex_center); // rotate back to model frame if any points were collected
+		all_polylines.emplace_back(std::move(polyline));
+	}
 	polyline.points.clear();
 }
 
@@ -37,13 +39,15 @@ void FillRhodo::_fill_surface_single(
 	const coord_t tile_height    = coord_t(hex_side * 3); // tilable / periodic every other row
 	const Point   hex_center     = Point(hex_width / 2, hex_side);
 
-	// Compute normalized z phase in [0, 3) relative to hex_side, using double for phase only.
+	// Compute normalized z phase in [0, 4.5) relative to hex_side, using double for phase only.
 	const double  unscaled_z = this->z; // mm
 	const double  unscaled_hex_side = this->spacing / params.density;
-	const double  z_phase = std::fmod(unscaled_z / unscaled_hex_side, 3.0);
+	const double  z_phase = std::fmod(unscaled_z / unscaled_hex_side, 4.5);
 
 	int    permutation = 0; // 0: upright triangles, 1: upside-down
 	double tri_frac = 0.0;
+	coord_t phase_y_offset = 0;
+	coord_t phase_x_offset = 0;
 	if (z_phase < 1.0) {
 		tri_frac = 0.0;
 	} else if (z_phase < 1.25) {
@@ -51,14 +55,32 @@ void FillRhodo::_fill_surface_single(
 	} else if (z_phase < 1.5) {
 		tri_frac = (1.5 - z_phase) * 4.0;
 		permutation = 1;
+		phase_y_offset = hex_side / 2.0;
 	} else if (z_phase < 2.5) {
 		tri_frac = 0.0;
 		permutation = 1;
+		phase_y_offset = hex_side / 2.0;
 	} else if (z_phase < 2.75) {
 		tri_frac = (z_phase - 2.5) * 4.0;
-		permutation = 1;
-	} else {
+		phase_y_offset = hex_side / 2.0;
+		phase_x_offset = -hex_width / 2.0;
+	} else if (z_phase < 3.0) {
 		tri_frac = (3.0 - z_phase) * 4.0;
+		permutation = 1;
+		phase_y_offset = hex_side;
+		phase_x_offset = -hex_width / 2.0;
+	} else if (z_phase < 4.0) {
+		tri_frac = 0.0;
+		permutation = 1;
+		phase_y_offset = hex_side;
+		phase_x_offset = -hex_width / 2.0;
+	} else if (z_phase < 4.25) {
+		tri_frac = (z_phase - 4.0) * 4.0;
+		phase_y_offset = hex_side;
+	} else {
+		tri_frac = (4.5 - z_phase) * 4.0;
+		permutation = 1;
+		phase_x_offset = -hex_width / 2.0;
 	}
 
 	const coord_t tri_w      = coord_t(std::llround(hex_width * tri_frac));
@@ -90,13 +112,13 @@ void FillRhodo::_fill_surface_single(
 	for (size_t i = 0; i < num_rows; ++i) {
 		Polyline polyline;
 		// Row y origin in aligned grid frame
-		coord_t y_offset = y_start + coord_t(i) * pattern_height;
+		coord_t y_offset = y_start + phase_y_offset + coord_t(i) * pattern_height;
 		if (permutation == 0) {
 			// phase with triangles at top-left/top-center transitions
 			// even/odd rows alternate direction
 			if ((i % 2) == 0) {
 				for (size_t j = 0; j < num_cols; ++j) {
-					coord_t x_offset = bbox.min(0) + coord_t(j) * hex_width;
+					coord_t x_offset = bbox.min(0) + phase_x_offset + coord_t(j) * hex_width;
 					// top-left tri right
 					polyline.points.emplace_back(x_offset - hex_width / 2 + tri_half_w, y_offset - hex_side / 2 + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// hex top left
@@ -119,7 +141,7 @@ void FillRhodo::_fill_surface_single(
 				}
 			} else {
 				for (size_t j = num_cols; j-- > 0; ) {
-					coord_t x_offset = bbox.min(0) + coord_t(j) * hex_width - hex_width / 2;
+					coord_t x_offset = bbox.min(0) + phase_x_offset + coord_t(j) * hex_width - hex_width / 2;
 					// hex top right
 					polyline.points.emplace_back(x_offset, y_offset);
 					// right tri top
@@ -142,11 +164,9 @@ void FillRhodo::_fill_surface_single(
 				}
 			}
 		} else {
-			// permutation 1, shifted by hex_side/2 vertically
-			y_offset += hex_side / 2;
 			if ((i % 2) == 0) {
 				for (size_t j = 0; j < num_cols; ++j) {
-					coord_t x_offset = bbox.min(0) + coord_t(j) * hex_width - hex_width / 2;
+					coord_t x_offset = bbox.min(0) + phase_x_offset + coord_t(j) * hex_width - hex_width / 2;
 					// left tri right
 					polyline.points.emplace_back(x_offset + tri_half_w, y_offset - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// left tri bottom
@@ -169,7 +189,7 @@ void FillRhodo::_fill_surface_single(
 				}
 			} else {
 				for (size_t j = num_cols; j-- > 0; ) {
-					coord_t x_offset = bbox.min(0) + coord_t(j) * hex_width;
+					coord_t x_offset = bbox.min(0) + phase_x_offset + coord_t(j) * hex_width;
 					// right tri left
 					polyline.points.emplace_back(x_offset - tri_half_w, y_offset - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// right tri bottom
