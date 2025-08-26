@@ -17,6 +17,7 @@
 #include "TriangleMesh.hpp"
 
 #include "Format/AMF.hpp"
+#include "Format/DRC.hpp"
 #include "Format/OBJ.hpp"
 #include "Format/STL.hpp"
 #include "Format/3mf.hpp"
@@ -62,10 +63,12 @@ static Model read_model_from_file(const std::string& input_file, LoadAttributes 
         result = load_3mf(input_file.c_str(), temp_config, temp_config_substitutions_context, &model, false, prusaslicer_generator_version);
     } else if (boost::algorithm::iends_with(input_file, ".svg"))
         result = load_svg(input_file, model);
+    else if (boost::ends_with(input_file, ".drc"))
+        result = load_drc(input_file.c_str(), &model);
     else if (boost::ends_with(input_file, ".printRequest"))
         result = load_printRequest(input_file.c_str(), &model);
     else
-        throw Slic3r::RuntimeError(L("Unknown file format. Input file must have .stl, .obj, .step/.stp, .svg, .amf(.xml) or extension .3mf(.zip)."));
+        throw Slic3r::RuntimeError(L("Unknown file format. Input file must have .stl, .obj, .step/.stp, .svg, .drc, .amf(.xml), or .3mf(.zip) extension."));
 
     if (!result)
         throw Slic3r::RuntimeError(L("Loading of a model file failed."));
