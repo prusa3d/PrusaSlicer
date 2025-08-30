@@ -9,35 +9,20 @@
 
 namespace Slic3r {
 
-// Helper to emit current polyline segment into output, rotated back to model frame.
-// We reset multiple multiple times per row to avoid overlapping polylines
-static inline void reset_polyline(
-	const float   angle,
-	const Point  &hex_center,
-	Polyline     &polyline,
-	Polylines    &all_polylines)
-{
-	if (polyline.points.size() == 0) return;
-	if (polyline.points.size() > 1) {
-		polyline.rotate(-angle, hex_center); // rotate back to model frame if any points were collected
-		all_polylines.emplace_back(std::move(polyline));
-	}
-	polyline.points.clear();
-}
-
 void FillRhodo::_fill_surface_single(
 	const FillParams              &params,
-	unsigned int                   /*thickness_layers*/,
+	unsigned int                   thickness_layers,
 	const std::pair<float, Point> &direction,
 	ExPolygon                      expolygon,
 	Polylines                     &polylines_out)
 {
-	const coord_t min_spacing    = coord_t(scale_(this->spacing));
-	const coord_t hex_side       = coord_t(min_spacing / params.density);
-	const coord_t hex_width      = coord_t(hex_side * sqrt(3));
-	const coord_t pattern_height = coord_t(hex_side * 3 / 2); // pattern height = hex_side * 1.5
-	const coord_t tile_height    = coord_t(hex_side * 3); // tilable / periodic every other row
-	const Point   hex_center     = Point(hex_width / 2, hex_side);
+	const coord_t min_spacing      = coord_t(scale_(this->spacing));
+	const coord_t min_spacing_half = coord_t(scale_(this->spacing)) / 2;
+	const coord_t hex_side         = coord_t(min_spacing / params.density);
+	const coord_t hex_width        = coord_t(hex_side * sqrt(3));
+	const coord_t tile_height      = coord_t(hex_side * 3) + min_spacing * 2; // tilable / periodic every other row
+	const coord_t pattern_height   = tile_height / 2; // pattern height = hex_side * 1.5
+	const Point   hex_center       = Point(hex_width / 2, hex_side);
 
 	// Compute normalized z phase in [0, 4.5) relative to hex_side, using double for phase only.
 	const double  unscaled_z = this->z; // mm
@@ -96,7 +81,7 @@ void FillRhodo::_fill_surface_single(
         Polygon bb_polygon = bbox.polygon();
         bb_polygon.rotate(angle, hex_center);
         bbox = bb_polygon.bounding_box();
-        bbox.merge(align_to_grid(bbox.min, Point(hex_width, tile_height)));
+        bbox.merge(align_to_grid(bbox.min, Point(hex_width + min_spacing, tile_height)));
     }
 
 	// Expand bbox to cover entire surface with a margin of two cells as in reference.
@@ -106,11 +91,11 @@ void FillRhodo::_fill_surface_single(
 	const size_t  num_cols = size_t(2 + (w + hex_width - 1) / std::max<coord_t>(hex_width, 1));
 
 	Polylines all_polylines;
-	all_polylines.reserve(num_rows * num_cols * 2);
-	// Start one row above to guarantee coverage before clipping, similar to Python (i-1)
+	all_polylines.reserve(1);
+	Polyline polyline;
+	// Start one row above to guarantee coverage before
 	const coord_t y_start = bbox.min(1) - pattern_height;
 	for (size_t i = 0; i < num_rows; ++i) {
-		Polyline polyline;
 		// Row y origin in aligned grid frame
 		coord_t y_offset = y_start + phase_y_offset + coord_t(i) * pattern_height;
 		if (permutation == 0) {
@@ -122,43 +107,39 @@ void FillRhodo::_fill_surface_single(
 					// top-left tri right
 					polyline.points.emplace_back(x_offset - hex_width / 2 + tri_half_w, y_offset - hex_side / 2 + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// hex top left
-					polyline.points.emplace_back(x_offset, y_offset);
+					polyline.points.emplace_back(x_offset - min_spacing_half, y_offset);
 					// left tri top
-					polyline.points.emplace_back(x_offset, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
+					polyline.points.emplace_back(x_offset - min_spacing_half, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
 					// left tri left
 					polyline.points.emplace_back(x_offset - tri_half_w, y_offset + hex_side + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					if (j + 1 == num_cols) break;
 					// left tri right
 					polyline.points.emplace_back(x_offset + tri_half_w, y_offset + hex_side + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// left tri top
-					polyline.points.emplace_back(x_offset, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
-					reset_polyline(angle, hex_center, polyline, all_polylines);
+					polyline.points.emplace_back(x_offset + min_spacing_half, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
 					// hex top left
-					polyline.points.emplace_back(x_offset, y_offset);
+					polyline.points.emplace_back(x_offset + min_spacing_half, y_offset);
 					// top tri left
 					polyline.points.emplace_back(x_offset + hex_width / 2 - tri_half_w, y_offset - hex_side / 2 + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
-					reset_polyline(angle, hex_center, polyline, all_polylines);
 				}
 			} else {
 				for (size_t j = num_cols; j-- > 0; ) {
 					coord_t x_offset = bbox.min(0) + phase_x_offset + coord_t(j) * hex_width - hex_width / 2;
 					// hex top right
-					polyline.points.emplace_back(x_offset, y_offset);
+					polyline.points.emplace_back(x_offset + min_spacing_half, y_offset);
 					// right tri top
-					polyline.points.emplace_back(x_offset, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
+					polyline.points.emplace_back(x_offset + min_spacing_half, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
 					// right tri right
 					polyline.points.emplace_back(x_offset + tri_half_w, y_offset + hex_side + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					if (j == 0) break;
 					// right tri left
 					polyline.points.emplace_back(x_offset - tri_half_w, y_offset + hex_side + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// right tri top
-					polyline.points.emplace_back(x_offset, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
-					reset_polyline(angle, hex_center, polyline, all_polylines);
+					polyline.points.emplace_back(x_offset - min_spacing_half, y_offset + coord_t(std::llround(double(hex_side) - double(tri_w) * sqrt(3) / 3.0)));
 					// hex top right
-					polyline.points.emplace_back(x_offset, y_offset);
+					polyline.points.emplace_back(x_offset - min_spacing_half, y_offset);
 					// top tri right
 					polyline.points.emplace_back(x_offset - hex_width / 2 + tri_half_w, y_offset - hex_side / 2 + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
-					reset_polyline(angle, hex_center, polyline, all_polylines);
 					// top tri left
 					polyline.points.emplace_back(x_offset - hex_width / 2 - tri_half_w, y_offset - hex_side / 2 + coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 				}
@@ -170,22 +151,20 @@ void FillRhodo::_fill_surface_single(
 					// left tri right
 					polyline.points.emplace_back(x_offset + tri_half_w, y_offset - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// left tri bottom
-					polyline.points.emplace_back(x_offset, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
+					polyline.points.emplace_back(x_offset + min_spacing_half, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
 					// hex bottom left
-					polyline.points.emplace_back(x_offset, y_offset + hex_side);
+					polyline.points.emplace_back(x_offset + min_spacing_half, y_offset + hex_side);
 					// bottom tri left
 					polyline.points.emplace_back(x_offset + hex_width / 2 - tri_half_w, y_offset + 3 * hex_side / 2 - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					if (j + 1 == num_cols) break;
 					// bottom tri right
 					polyline.points.emplace_back(x_offset + hex_width / 2 + tri_half_w, y_offset + 3 * hex_side / 2 - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// hex bottom right
-					polyline.points.emplace_back(x_offset + hex_width, y_offset + hex_side);
-					reset_polyline(angle, hex_center, polyline, all_polylines);
+					polyline.points.emplace_back(x_offset + hex_width - min_spacing_half, y_offset + hex_side);
 					// right tri bottom
-					polyline.points.emplace_back(x_offset + hex_width, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
+					polyline.points.emplace_back(x_offset + hex_width - min_spacing_half, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
 					// right tri left
 					polyline.points.emplace_back(x_offset + hex_width - tri_half_w, y_offset - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
-					reset_polyline(angle, hex_center, polyline, all_polylines);
 				}
 			} else {
 				for (size_t j = num_cols; j-- > 0; ) {
@@ -193,28 +172,27 @@ void FillRhodo::_fill_surface_single(
 					// right tri left
 					polyline.points.emplace_back(x_offset - tri_half_w, y_offset - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// right tri bottom
-					polyline.points.emplace_back(x_offset, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
+					polyline.points.emplace_back(x_offset - min_spacing_half, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
 					// hex bottom right
-					polyline.points.emplace_back(x_offset, y_offset + hex_side);
+					polyline.points.emplace_back(x_offset - min_spacing_half, y_offset + hex_side);
 					// bottom tri right
 					polyline.points.emplace_back(x_offset - hex_width / 2 + tri_half_w, y_offset + 3 * hex_side / 2 - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					if (j == 0) break;
 					// bottom tri left
 					polyline.points.emplace_back(x_offset - hex_width / 2 - tri_half_w, y_offset + 3 * hex_side / 2 - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
 					// hex bottom left
-					polyline.points.emplace_back(x_offset - hex_width, y_offset + hex_side);
-					reset_polyline(angle, hex_center, polyline, all_polylines);
+					polyline.points.emplace_back(x_offset - hex_width + min_spacing_half, y_offset + hex_side);
 					// left tri bottom
-					polyline.points.emplace_back(x_offset - hex_width, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
+					polyline.points.emplace_back(x_offset - hex_width + min_spacing_half, y_offset + coord_t(std::llround(double(tri_w) * sqrt(3) / 3.0)));
 					// left tri right
 					polyline.points.emplace_back(x_offset - hex_width + tri_half_w, y_offset - coord_t(std::llround(double(tri_half_w) / sqrt(3))));
-					reset_polyline(angle, hex_center, polyline, all_polylines);
 				}
 			}
 		}
-		
-		reset_polyline(angle, hex_center, polyline, all_polylines);
+	
 	}
+
+	all_polylines.emplace_back(std::move(polyline));
 
 	// Clip to the surface polygon
 	all_polylines = intersection_pl(std::move(all_polylines), expolygon);
