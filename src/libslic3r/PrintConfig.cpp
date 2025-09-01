@@ -1208,6 +1208,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats { 1. });
 
+    def = this->add("print_extrusion_multiplier", coFloat);
+    def->label = L("Extrusion multiplier");
+    def->category = L("Advanced");
+    def->tooltip = L("This print setting is multiplied with the extrusion_multiplier from the filament tab. "
+        "Its only purpose is to offer the same functionality but on a per-object basis.");
+    def->mode = comAdvanced;
+    def->max = 2;
+    def->set_default_value(new ConfigOptionFloat(1));
+
     def = this->add("extrusion_width", coFloatOrPercent);
     def->label = L("Default extrusion width");
     def->category = L("Extrusion Width");
