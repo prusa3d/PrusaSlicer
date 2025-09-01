@@ -114,6 +114,8 @@ set(SLIC3R_SOURCES
     Fill/FillGyroid.hpp
     Fill/FillPlanePath.cpp
     Fill/FillPlanePath.hpp
+    Fill/FillShwartzDiamond.cpp
+    Fill/FillShwartzDiamond.hpp
     Fill/FillLine.cpp
     Fill/FillLine.hpp
     Fill/FillLightning.cpp

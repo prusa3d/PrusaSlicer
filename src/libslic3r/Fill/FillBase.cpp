@@ -30,6 +30,7 @@
 #include "Fill3DHoneycomb.hpp"
 #include "FillGyroid.hpp"
 #include "FillPlanePath.hpp"
+#include "FillShwartzDiamond.hpp"
 #include "FillLine.hpp"
 #include "FillRectilinear.hpp"
 #include "FillAdaptive.hpp"
@@ -50,6 +51,7 @@ Fill* Fill::new_from_type(const InfillPattern type)
     case ipHoneycomb:           return new FillHoneycomb();
     case ip3DHoneycomb:         return new Fill3DHoneycomb();
     case ipGyroid:              return new FillGyroid();
+    case ipShwartzDiamond:      return new FillShwartzDiamond();
     case ipRectilinear:         return new FillRectilinear();
     case ipAlignedRectilinear:  return new FillAlignedRectilinear();
     case ipMonotonic:           return new FillMonotonic();
