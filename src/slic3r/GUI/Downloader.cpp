@@ -168,7 +168,7 @@ void Downloader::start_download(const std::string& full_url)
     
     size_t id = get_next_id();
 
-    if (!boost::starts_with(escaped_url, "https://") || !is_any_subdomain(escaped_url, {"printables.com", "thingiverse.com"})) {
+    if (!boost::starts_with(escaped_url, "https://") || !is_any_subdomain(escaped_url, {"printables.com", "thingiverse.com", "cults3d.com"})) {
 		std::string msg = format(_L("Download won't start. Download URL doesn't point to allowed subdomains : %1%"), escaped_url);
 		BOOST_LOG_TRIVIAL(error) << msg;
 		NotificationManager* ntf_mngr = wxGetApp().notification_manager();

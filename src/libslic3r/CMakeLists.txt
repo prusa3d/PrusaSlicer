@@ -285,6 +285,8 @@ set(SLIC3R_SOURCES
     MeasureUtils.hpp
     CustomGCode.cpp
     CustomGCode.hpp
+    CustomParametersHandling.cpp
+    CustomParametersHandling.hpp
     MultiPoint.cpp
     MultiPoint.hpp
     MutablePriorityQueue.hpp
@@ -611,6 +613,7 @@ target_include_directories(libslic3r PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMA
 target_include_directories(libslic3r PUBLIC ${EXPAT_INCLUDE_DIRS})
 
 find_package(JPEG REQUIRED)
+find_package(nlohmann_json REQUIRED)
 find_package(draco REQUIRED)
 
 target_link_libraries(libslic3r PRIVATE
@@ -632,6 +635,7 @@ target_link_libraries(libslic3r PRIVATE
     qoi
     fastfloat
     int128
+    nlohmann_json::nlohmann_json
 )
 target_link_libraries(libslic3r PUBLIC
     Eigen3::Eigen
