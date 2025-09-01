@@ -35,6 +35,7 @@
 #include "FillAdaptive.hpp"
 #include "FillLightning.hpp"
 #include "FillEnsuring.hpp"
+#include "FillRhodo.hpp"
 #include "libslic3r/Config.hpp"
 #include "libslic3r/Line.hpp"
 #include "libslic3r/ShortestPath.hpp"
@@ -68,6 +69,7 @@ Fill* Fill::new_from_type(const InfillPattern type)
     case ipLightning:           return new FillLightning::Filler();
     case ipEnsuring:            return new FillEnsuring();
     case ipZigZag:              return new FillZigZag();
+    case ipRhodo:               return new FillRhodo();
     default: throw Slic3r::InvalidArgument("unknown type");
     }
 }
