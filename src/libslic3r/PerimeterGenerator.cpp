@@ -55,7 +55,7 @@
 
 namespace Slic3r {
 
-ExtrusionMultiPath PerimeterGenerator::thick_polyline_to_multi_path(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance)
+ExtrusionMultiPath PerimeterGenerator::thick_polyline_to_multi_path(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, const float tolerance, const float merge_tolerance, const std::optional<uint32_t> &perimeter_index)
 {
     ExtrusionMultiPath multi_path;
     ExtrusionPath      path(role);
@@ -120,7 +120,8 @@ ExtrusionMultiPath PerimeterGenerator::thick_polyline_to_multi_path(const ThickP
         if (path.empty()) {
             // Convert from spacing to extrusion width based on the extrusion model
             // of a square extrusion ended with semi circles.
-            path = { ExtrusionAttributes{ path.role(), new_flow } };
+            path = { perimeter_index.has_value() ? ExtrusionAttributes{ path.role(), new_flow, static_cast<uint16_t>(*perimeter_index) }
+                                                 : ExtrusionAttributes{ path.role(), new_flow} };
             path.polyline.append(line.a);
             path.polyline.append(line.b);
             #ifdef SLIC3R_DEBUG
@@ -146,14 +147,14 @@ ExtrusionMultiPath PerimeterGenerator::thick_polyline_to_multi_path(const ThickP
     return multi_path;
 }
 
-static void variable_width_classic(const ThickPolylines &polylines, ExtrusionRole role, const Flow &flow, std::vector<ExtrusionEntity *> &out)
+static void variable_width_classic(const ThickPolylines &polylines, ExtrusionRole role, const Flow &flow, const std::optional<uint32_t> &perimeter_index, std::vector<ExtrusionEntity *> &out)
 {
     // This value determines granularity of adaptive width, as G-code does not allow
     // variable extrusion within a single move; this value shall only affect the amount
     // of segments, and any pruning shall be performed before we apply this tolerance.
     const auto tolerance = float(scale_(0.05));
     for (const ThickPolyline &p : polylines) {
-        ExtrusionMultiPath multi_path = PerimeterGenerator::thick_polyline_to_multi_path(p, role, flow, tolerance, tolerance);
+        ExtrusionMultiPath multi_path = PerimeterGenerator::thick_polyline_to_multi_path(p, role, flow, tolerance, tolerance, perimeter_index);
         // Append paths to collection.
         if (!multi_path.paths.empty()) {
             for (auto it = std::next(multi_path.paths.begin()); it != multi_path.paths.end(); ++it) {
@@ -210,9 +211,10 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
     for (const PerimeterGeneratorLoop &loop : loops) {
         bool is_external = loop.is_external();
         
-        ExtrusionLoopRole loop_role;
-        ExtrusionRole role_normal   = is_external ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter;
-        ExtrusionRole role_overhang = role_normal | ExtrusionRoleModifier::Bridge;
+        ExtrusionLoopRole   loop_role;
+        const ExtrusionRole role_normal     = is_external ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter;
+        const ExtrusionRole role_overhang   = role_normal | ExtrusionRoleModifier::Bridge;
+        const uint16_t      perimeter_index = static_cast<uint16_t>(loop.depth);
         if (loop.is_internal_contour()) {
             // Note that we set loop role to ContourInternalPerimeter
             // also when loop is both internal and external (i.e.
@@ -241,9 +243,10 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
                     role_normal,
                     ExtrusionFlow{ is_external ? params.ext_mm3_per_mm : params.mm3_per_mm,
                                    is_external ? params.ext_perimeter_flow.width() : params.perimeter_flow.width(),
-                                   float(params.layer_height)
-                } });
-            
+                                   float(params.layer_height) },
+                    perimeter_index
+                });
+
             // get overhang paths by checking what parts of this loop fall 
             // outside the grown lower slices (thus where the distance between
             // the loop centerline and original lower slices is >= half nozzle diameter
@@ -252,7 +255,8 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
                 diff_pl({ polygon }, lower_slices_polygons_clipped),
                 ExtrusionAttributes{
                     role_overhang,
-                    ExtrusionFlow{ params.mm3_per_mm_overhang, params.overhang_flow.width(), params.overhang_flow.height() }
+                    ExtrusionFlow{ params.mm3_per_mm_overhang, params.overhang_flow.width(), params.overhang_flow.height() },
+                    perimeter_index
                 });
 
             if (paths.empty()) {
@@ -270,7 +274,8 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
                         is_external ? params.ext_mm3_per_mm : params.mm3_per_mm,
                         is_external ? params.ext_perimeter_flow.width() : params.perimeter_flow.width(),
                         float(params.layer_height)
-                    }
+                    },
+                    perimeter_index
                 });
         }
        
@@ -279,7 +284,7 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
     
     // Append thin walls to the nearest-neighbor search (only for first iteration)
     if (! thin_walls.empty()) {
-        variable_width_classic(thin_walls, ExtrusionRole::ExternalPerimeter, params.ext_perimeter_flow, coll.entities);
+        variable_width_classic(thin_walls, ExtrusionRole::ExternalPerimeter, params.ext_perimeter_flow, 0, coll.entities);
         thin_walls.clear();
     }
     
@@ -465,13 +470,13 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
 
             // get non-overhang paths by intersecting this loop with the grown lower slices
             extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctIntersection), role_normal,
-                                   is_external ? params.ext_perimeter_flow : params.perimeter_flow);
+                                   is_external ? params.ext_perimeter_flow : params.perimeter_flow, extrusion.inset_idx);
 
             // get overhang paths by checking what parts of this loop fall
             // outside the grown lower slices (thus where the distance between
             // the loop centerline and original lower slices is >= half nozzle diameter
             extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference), role_overhang,
-                                   params.overhang_flow);
+                                   params.overhang_flow, extrusion.inset_idx);
 
             // Reapply the nearest point search for starting point.
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
@@ -511,7 +516,7 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
                 chain_and_reorder_extrusion_paths(paths, &start_point);
             }
         } else {
-            extrusion_paths_append(paths, extrusion, role_normal, is_external ? params.ext_perimeter_flow : params.perimeter_flow);
+            extrusion_paths_append(paths, extrusion, role_normal, is_external ? params.ext_perimeter_flow : params.perimeter_flow, extrusion.inset_idx);
         }
 
         // Append paths to collection.
@@ -1469,7 +1474,7 @@ void PerimeterGenerator::process_classic(
             ex.medial_axis(min, max, &polylines);
         if (! polylines.empty()) {
 			ExtrusionEntityCollection gap_fill;
-			variable_width_classic(polylines, ExtrusionRole::GapFill, params.solid_infill_flow, gap_fill.entities);
+			variable_width_classic(polylines, ExtrusionRole::GapFill, params.solid_infill_flow, std::nullopt, gap_fill.entities);
             /*  Make sure we don't infill narrow parts that are already gap-filled
                 (we only consider this surface's gaps to reduce the diff() complexity).
                 Growing actual extrusions ensures that gaps not filled by medial axis

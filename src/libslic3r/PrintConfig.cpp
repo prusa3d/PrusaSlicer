@@ -321,6 +321,13 @@ static const t_config_enum_values s_keys_map_EnsureVerticalShellThickness {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(EnsureVerticalShellThickness)
 
+static const t_config_enum_values s_keys_map_CoolingSlowdownLogicType {
+    { "uniform_cooling",    int(CoolingSlowdownLogicType::UniformCooling)    },
+    { "consistent_surface", int(CoolingSlowdownLogicType::ConsistentSurface) },
+    { "proportional",       int(CoolingSlowdownLogicType::Proportional)      },
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CoolingSlowdownLogicType)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -936,6 +943,26 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("This flag enables the automatic cooling logic that adjusts print speed "
                    "and fan speed according to layer printing time.");
     def->set_default_value(new ConfigOptionBools { true });
+
+    def = this->add("cooling_slowdown_logic", coEnums);
+    def->label = L("Cooling slowdown logic");
+    def->tooltip = L("Determines how the printer slows down layer printing when the minimum layer time isn't reached. "
+                     "'Consistent surface' first tries to preserve the print speeds of the first two perimeters by slowing all other features. "
+                     "Only if this isn't sufficient, it also slows down those first two perimeters. "
+                     "'Uniform cooling' slows down all print features, including the first two perimeters.");
+    def->set_enum<CoolingSlowdownLogicType>({
+        { "uniform_cooling",    L("Uniform cooling")    },
+        { "consistent_surface", L("Consistent surface") },
+    });
+    def->set_default_value(new ConfigOptionEnums<CoolingSlowdownLogicType>{ CoolingSlowdownLogicType::UniformCooling });
+
+    def = this->add("cooling_perimeter_transition_distance", coFloats);
+    def->label = L("Perimeter transition distance");
+    def->tooltip = L("Distance in millimeters before non-slowed perimeters where the original unslowed print speed is restored. "
+                     "This reduces print quality issues when transitioning from heavily slowed feature to fast perimeter printing.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloats { 0.0 });
 
     def = this->add("cooling_tube_retraction", coFloat);
     def->label = L("Cooling tube position");
@@ -1838,6 +1865,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("travel_short_distance_acceleration", coFloat);
+    def->label = L("Travel short distance acceleration");
+    def->tooltip = L("Acceleration used for short travel moves. Short travel distance is determined by the retract_before_travel setting.");
+    def->sidetext = L("mm/s²");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("infill_every_layers", coInt);
     def->label = L("Combine infill every");
     def->category = L("Infill");
@@ -2368,6 +2403,22 @@ void PrintConfigDef::init_fff_params()
     def->full_width = true;
     def->height = 13;
     def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("custom_parameters_print", coString);
+    def->label = L("Custom print parameters");
+    const std::string custom_parameter_tooltip_templ =
+        L("JSON-encoded string defining extra parameters, which can later be expanded in Custom G-code macro language. "
+          "Each of the parameters is prepended by %1% prefix before it is passed into the parser. "
+          "For example, defining '{\"my_key\": \"my_value\"}' allows to use '%1%_my_key'.\n\n"
+          "The JSON must be single level (no arrays and objects). All value types are allowed, but nulls "
+          "will be rejected by the parser."
+    );
+    def->tooltip = custom_parameter_tooltip_templ;
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 13;
+    def->mode = comExpert;
     def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("nozzle_diameter", coFloats);
@@ -3058,6 +3109,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(true));
 
+    def = this->add("custom_parameters_printer", coString);
+    def->label = L("Custom printer parameters");
+    def->tooltip = custom_parameter_tooltip_templ;
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 12;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString(""));
+
     def = this->add("start_gcode", coString);
     def->label = L("Start G-code");
     def->tooltip = L("This start procedure is inserted at the beginning, possibly prepended by "
@@ -3067,6 +3127,15 @@ void PrintConfigDef::init_fff_params()
     def->height = 12;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionString("G28 ; home all axes\nG1 Z5 F5000 ; lift nozzle\n"));
+
+    def = this->add("custom_parameters_filament", coStrings);
+    def->label = L("Custom filament parameters");
+    def->tooltip = custom_parameter_tooltip_templ;
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 12;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionStrings { "" });
 
     def = this->add("start_filament_gcode", coStrings);
     def->label = L("Start G-code");

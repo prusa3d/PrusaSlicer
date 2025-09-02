@@ -29,6 +29,7 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "libslic3r/GCode/GCodeWriter.hpp"
 #include "libslic3r/GCode/Thumbnails.hpp"
+#include "libslic3r/CustomParametersHandling.hpp"
 
 #include "slic3r/Utils/Http.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
@@ -1412,6 +1413,16 @@ void Tab::update_frequently_changed_parameters()
     }
 }
 
+static void validate_custom_parameters(Tab* tab, const t_config_option_key& opt_key, const boost::any& value)
+{
+    if (! bool(parse_custom_parameters(boost::any_cast<std::string>(value)))) {
+        MessageDialog dialog(wxGetApp().mainframe, _L("Unable to parse custom parameters."), _L("Error"), wxICON_WARNING | wxOK);
+        dialog.ShowModal();
+    }
+    tab->update_dirty();
+    tab->on_value_change(opt_key, value);
+}
+
 void TabPrint::build()
 {
     m_presets = &m_preset_bundle->prints;
@@ -1623,6 +1634,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("first_layer_acceleration_over_raft");
         optgroup->append_single_option_line("wipe_tower_acceleration");
         optgroup->append_single_option_line("travel_acceleration");
+        optgroup->append_single_option_line("travel_short_distance_acceleration");
         optgroup->append_single_option_line("default_acceleration");
 
         optgroup = page->new_optgroup(L("Autospeed (advanced)"));
@@ -1705,6 +1717,14 @@ void TabPrint::build()
         optgroup->append_single_option_line("min_bead_width");
         optgroup->append_single_option_line("min_feature_size");
 
+        optgroup = page->new_optgroup(L("Custom parameters"), 0);
+        auto option = optgroup->get_option("custom_parameters_print");
+        option.opt.is_code = true;
+        optgroup->append_single_option_line(option);
+        optgroup->on_change = [this](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_parameters(this, opt_key, value);
+        };
+
     page = add_options_page(L("Output options"), "output+page_white");
         optgroup = page->new_optgroup(L("Sequential printing"));
         optgroup->append_single_option_line("complete_objects", "sequential-printing_124589");
@@ -1725,7 +1745,7 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Output file"));
         optgroup->append_single_option_line("gcode_comments");
         optgroup->append_single_option_line("gcode_label_objects");
-        Option option = optgroup->get_option("output_filename_format");
+        option = optgroup->get_option("output_filename_format");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
 
@@ -2229,6 +2249,8 @@ void TabFilament::build()
         optgroup = page->new_optgroup(L("Enable"));
         optgroup->append_single_option_line("fan_always_on");
         optgroup->append_single_option_line("cooling");
+        optgroup->append_single_option_line("cooling_slowdown_logic");
+        optgroup->append_single_option_line("cooling_perimeter_transition_distance");
 
         line = { "", "" };
         line.full_width = 1;
@@ -2330,6 +2352,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("filament_multitool_ramming_flow");
 
 
+
     add_filament_overrides_page();
 
 
@@ -2358,6 +2381,14 @@ void TabFilament::build()
         option.opt.is_code = true;
         option.opt.height = gcode_field_height;// 150;
         optgroup->append_single_option_line(option);
+
+        optgroup = page->new_optgroup(L("Custom parameters"), 0);
+        option = optgroup->get_option("custom_parameters_filament");
+        option.opt.is_code = true;
+        optgroup->append_single_option_line(option);
+        optgroup->on_change = [this](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_parameters(this, opt_key, value);
+        };
 
     page = add_options_page(L("Notes"), "note");
         optgroup = page->new_optgroup(L("Notes"), 0);
@@ -2422,7 +2453,7 @@ void TabFilament::toggle_options()
         bool cooling = m_config->opt_bool("cooling", 0);
         bool fan_always_on = cooling || m_config->opt_bool("fan_always_on", 0);
 
-        for (auto el : { "max_fan_speed", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed" })
+        for (auto el : { "max_fan_speed", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed", "cooling_slowdown_logic" })
             toggle_option(el, cooling);
 
         for (auto el : { "min_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer" })
@@ -2432,6 +2463,9 @@ void TabFilament::toggle_options()
         for (int i = 0; i < 4; i++) {
             toggle_option("overhang_fan_speed_"+std::to_string(i),dynamic_fan_speeds);
         }
+
+        bool cooling_preserve_perimeters = cooling && static_cast<CoolingSlowdownLogicType>(m_config->option("cooling_slowdown_logic")->getInts().at(0)) == CoolingSlowdownLogicType::ConsistentSurface;
+        toggle_option("cooling_perimeter_transition_distance", cooling_preserve_perimeters);
     }
 
     if (m_active_page->title() == "Advanced")
@@ -2945,6 +2979,14 @@ void TabPrinter::build_fff()
         option.opt.is_code = true;
         option.opt.height = gcode_field_height;//150;
         optgroup->append_single_option_line(option);
+
+        optgroup = page->new_optgroup(L("Custom parameters"), 0);
+        option = optgroup->get_option("custom_parameters_printer");
+        option.opt.is_code = true;
+        optgroup->append_single_option_line(option);
+        optgroup->on_change = [this](const t_config_option_key& opt_key, const boost::any& value) {
+            validate_custom_parameters(this, opt_key, value);
+        };
 
     page = add_options_page(L("Notes"), "note");
         optgroup = page->new_optgroup(L("Notes"), 0);
