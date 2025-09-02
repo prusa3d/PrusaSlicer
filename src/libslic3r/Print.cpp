@@ -157,6 +157,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "travel_max_lift",
         "travel_lift_before_obstacle",
         "retract_before_travel",
+        "min_wipe_length",
         "retract_before_wipe",
         "retract_layer_change",
         "retract_length",
