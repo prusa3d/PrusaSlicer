@@ -23,9 +23,12 @@ public:
     Fill* clone() const override { return new Fill3DHoneycomb(*this); };
     ~Fill3DHoneycomb() override {}
 
-	// require bridge flow since most of this pattern hangs in air
-    bool use_bridge_flow() const override { return true; }
-    bool is_self_crossing() override { return false; }
+// note: updated 3D Honeycomb doesn't need bridge flow because the
+//       pattern is placed on top of previous layers
+bool use_bridge_flow() const override { return false; }
+
+// the pattern doesn't cross over itself
+bool is_self_crossing() override { return false; }
 
 protected:
 	void _fill_surface_single(
