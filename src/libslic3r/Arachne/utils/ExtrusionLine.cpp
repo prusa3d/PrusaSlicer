@@ -275,17 +275,17 @@ BoundingBox get_extents(const ExtrusionLine &extrusion_line) {
 } // namespace Slic3r::Arachne
 
 namespace Slic3r {
-void extrusion_paths_append(ExtrusionPaths &dst, const ClipperLib_Z::Paths &extrusion_paths, const ExtrusionRole role, const Flow &flow)
+void extrusion_paths_append(ExtrusionPaths &dst, const ClipperLib_Z::Paths &extrusion_paths, const ExtrusionRole role, const Flow &flow, const uint32_t perimeter_index)
 {
     for (const ClipperLib_Z::Path &extrusion_path : extrusion_paths) {
         ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion_path);
-        Slic3r::append(dst, PerimeterGenerator::thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON)).paths);
+        Slic3r::append(dst, PerimeterGenerator::thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON), perimeter_index).paths);
     }
 }
 
-void extrusion_paths_append(ExtrusionPaths &dst, const Arachne::ExtrusionLine &extrusion, const ExtrusionRole role, const Flow &flow)
+void extrusion_paths_append(ExtrusionPaths &dst, const Arachne::ExtrusionLine &extrusion, const ExtrusionRole role, const Flow &flow, const uint32_t perimeter_index)
 {
     ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion);
-    Slic3r::append(dst, PerimeterGenerator::thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON)).paths);
+    Slic3r::append(dst, PerimeterGenerator::thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON), perimeter_index).paths);
 }
 } // namespace Slic3r

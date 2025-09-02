@@ -276,6 +276,10 @@ Option::Option(const ConfigOptionDef& _opt, t_config_option_key id) : opt(_opt),
         if (opt.opt_key.rfind("branching", 0) == 0)
             tooltip = _L("Unavailable for this method.") + "\n";
         tooltip += _(opt.tooltip);
+        if (opt.opt_key.rfind("custom_parameters_", 0) == 0) {
+            //"custom_parameters_*" contains just a template tooltip which has to be formated after localization
+            tooltip = format_wxstr(tooltip, opt.opt_key);
+        }
 
         // edit tooltip : change Slic3r to SLIC3R_APP_KEY
         // Temporary workaround for localization

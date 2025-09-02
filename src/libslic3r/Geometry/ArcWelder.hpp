@@ -107,6 +107,37 @@ inline typename Derived::Scalar arc_angle(
         (a < Float(-1.) ? Float(M_PI) : Float(2. * M_PI) + Float(2.) * std::asin(a));
 }
 
+// Calculate angle of an arc given two points, center and orientation.
+template<typename Derived, typename Derived2, typename Derived3>
+inline typename Derived::Scalar arc_angle(
+    const Eigen::MatrixBase<Derived>   &start_pos,
+    const Eigen::MatrixBase<Derived2>  &end_pos,
+    const Eigen::MatrixBase<Derived3>  &center_pos,
+    const bool                          ccw)
+{
+    static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "arc_angle(): first parameter is not a 2D vector");
+    static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "arc_angle(): second parameter is not a 2D vector");
+    static_assert(Derived3::IsVectorAtCompileTime && int(Derived3::SizeAtCompileTime) == 2, "arc_angle(): third parameter is not a 2D vector");
+    static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value &&
+                  std::is_same<typename Derived::Scalar, typename Derived3::Scalar>::value, "arc_angle(): All third points must be of the same type.");
+
+    using Float = typename Derived::Scalar;
+
+    auto  vstart = start_pos - center_pos;
+    auto  vend   = end_pos - center_pos;
+    Float angle  = atan2(double(cross2(vstart, vend)), double(vstart.dot(vend)));
+    if (!ccw) {
+        angle *= Float(-1.);
+    }
+
+    if (angle < 0) {
+        angle += Float(2. * M_PI);
+    }
+
+    assert(angle >= Float(0.) && angle < Float(2. * M_PI + EPSILON));
+    return angle;
+}
+
 // Calculate positive length of an arc given two points and a radius.
 // positive radius: take shorter arc
 // negative radius: take longer arc
@@ -148,6 +179,41 @@ inline typename Derived::Scalar arc_length(
         angle += Float(2. * M_PI);
     assert(angle >= Float(0.) && angle < Float(2. * M_PI + EPSILON));
     return angle * radius;
+}
+
+// Calculate a point on an arc at a specified distance from the start point.
+// The arc is defined by start_pos, end_pos, center_pos and orientation (ccw).
+// The function interpolates along the arc from start_pos toward end_pos,
+// returning the point at the given distance from the start.
+// If split_at_distance exceeds the arc length, the end point is returned.
+// If split_at_distance is negative or zero, the start point is returned.
+template<typename Derived, typename Derived2, typename Derived3>
+inline typename Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> arc_point_at_distance(
+
+    const Eigen::MatrixBase<Derived>  &start_pos,
+    const Eigen::MatrixBase<Derived2> &end_pos,
+    const Eigen::MatrixBase<Derived3> &center_pos,
+    const bool                         ccw,
+    const typename Derived::Scalar     split_at_distance)
+{
+    static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "arc_split(): first parameter is not a 2D vector");
+    static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "arc_split(): second parameter is not a 2D vector");
+    static_assert(Derived3::IsVectorAtCompileTime && int(Derived3::SizeAtCompileTime) == 2, "arc_split(): third parameter is not a 2D vector");
+    static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value &&
+                  std::is_same<typename Derived::Scalar, typename Derived3::Scalar>::value, "arc_split(): All third points must be of the same type.");
+
+    using Float  = typename Derived::Scalar;
+    using Vector = Eigen::Matrix<Float, 2, 1, Eigen::DontAlign>;
+
+    const Vector arc_radius_vec = start_pos - center_pos;
+    const Float  arc_angle_val  = arc_angle(start_pos, end_pos, center_pos, ccw);
+    const Float  arc_length_val = arc_length(start_pos, end_pos, center_pos, ccw);
+
+    const Float t                       = std::clamp(split_at_distance / arc_length_val, static_cast<Float>(0.), static_cast<Float>(1.));
+    const Float split_at_angle          = t * arc_angle_val;
+    const Float split_at_angle_oriented = ccw ? split_at_angle : -split_at_angle;
+
+    return center_pos + Eigen::Rotation2D<Float>(split_at_angle_oriented) * arc_radius_vec;
 }
 
 // Be careful! This version has a strong bias towards small circles with small radii

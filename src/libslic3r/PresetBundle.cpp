@@ -11,6 +11,7 @@
 #include "Utils.hpp"
 #include "Model.hpp"
 #include "format.hpp"
+#include "CustomParametersHandling.hpp"
 
 #include <algorithm>
 #include <set>
@@ -1379,8 +1380,22 @@ static void flatten_configbundle_hierarchy(boost::property_tree::ptree &tree, co
             		// Don't inherit "renamed_from" flag, it does not make sense. The "renamed_from" flag only makes sense for a concrete preset.
             		if (boost::starts_with((*it_inherits)->name, "*"))
 			            BOOST_LOG_TRIVIAL(error) << boost::format("Nonpublic intermediate preset %1% contains a \"renamed_from\" field, which is ignored") % (*it_inherits)->name;
-				} else if (prst->node->find(it->first) == prst->node->not_found())
-                    prst->node->add_child(it->first, it->second);
+                } else {
+                    if (prst->node->find(it->first) == prst->node->not_found()) {
+                        // The child does not have this. Propagate value from parent.
+                        prst->node->add_child(it->first, it->second);
+                    } else {
+                        // Child redefines this. Nothing needs to be done except for one case:
+                        // custom parameter JSONs shall be merged, not replaced.
+                        if (boost::starts_with(it->first, "custom_parameters_")) {
+                            auto&           child_node     = prst->node->find(it->first)->second;
+                            const auto&     parent_node    = it->second;
+                            const auto&     child_value    = child_node.get_value<std::string>();
+                            const auto&     parent_value   = parent_node.get_value<std::string>();
+                            child_node.put_value(merge_json(parent_value, child_value));
+                        }
+                    }
+                }
     }
 
     // Remove the "internal" presets from the ptree. These presets are marked with '*'.
