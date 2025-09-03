@@ -135,6 +135,24 @@ _e.g._ `echo 'export PATH="/opt/homebrew/opt/m4/bin:$PATH"' >> ~/.bash_profile`
 
 If you see a message similar this, you can fix it by adding an argument like this `-DCMAKE_OSX_DEPLOYMENT_TARGET=14.5` to the `cmake` command. Ensure that you give it the macOS version that you are building for.
 
+### Running `cmake` causes build issues with `dep_Blosc` / `zlib-1.2.8`
+
+If you receive errors when building `dep_Blosc` / `zlib-1.2.8` of the form
+
+```
+... call to undeclared function 'read'; ISO C99 and later do not support implicit function declarations
+```
+
+then you may force the usage of the `zlib` installed by `brew` by indicating the location of the `zlib` headers with
+
+```
+export LDFLAGS="-L/opt/homebrew/opt/zlib/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/zlib/include"
+```
+
+as mentioned after `zlib` is installed with `brew`. These lines can either be run in the same terminal session as
+building with `cmake` and `make`, or they may be added to your shell's configutation script, such as `~/.zshenv`. You must delete the `build` directory and rerun `cmake` after adding these flags.
+
 # TL;DR
 
 Works on a fresh installation of macOS Sequoia 15.5
