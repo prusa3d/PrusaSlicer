@@ -315,7 +315,7 @@ static void hide_rich_tip(wxButton* btn)
 // Sidebar / public
 
 Sidebar::Sidebar(Plater *parent)
-    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(42 * wxGetApp().em_unit(), -1)), m_plater(parent)
+    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(22 * wxGetApp().em_unit(), -1)), m_plater(parent)
 {
     m_scrolled_panel = new wxScrolledWindow(this);
     m_scrolled_panel->SetScrollRate(0, 5);
@@ -791,7 +791,7 @@ void Sidebar::update_reslice_btn_tooltip()
 
 void Sidebar::msw_rescale()
 {
-    SetMinSize(wxSize(42 * wxGetApp().em_unit(), -1));
+    SetMinSize(wxSize(22 * wxGetApp().em_unit(), -1));
     m_combo_print       ->msw_rescale();
     m_combo_sla_print   ->msw_rescale();
     m_combo_sla_material->msw_rescale();
