@@ -21,6 +21,7 @@ if (TARGET OpenVDB::openvdb)
     set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp OpenVDBUtilsLegacy.hpp)
 endif()
 
+find_package(Qhull REQUIRED COMPONENTS qhullcpp qhull_r)
 find_package(LibBGCode REQUIRED COMPONENTS Convert)
 slic3r_remap_configs(LibBGCode::bgcode_core RelWithDebInfo Release)
 slic3r_remap_configs(LibBGCode::bgcode_binarize RelWithDebInfo Release)
@@ -573,7 +574,11 @@ add_library(libslic3r_cgal STATIC
     CutSurface.hpp CutSurface.cpp
     Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
     IntersectionPoints.hpp IntersectionPoints.cpp
+    TriangleMesh.hpp TriangleMesh.cpp
+    TriangleMeshSlicer.hpp TriangleMeshSlicer.cpp
     MeshBoolean.hpp MeshBoolean.cpp
+    Tesselate.cpp
+    Tesselate.hpp
     TryCatchSignal.hpp TryCatchSignal.cpp
     Triangulation.hpp Triangulation.cpp
     SLA/SupportIslands/VoronoiDiagramCGAL.hpp SLA/SupportIslands/VoronoiDiagramCGAL.cpp
@@ -597,7 +602,7 @@ if (_opts)
     target_compile_options(libslic3r_cgal PRIVATE "${_opts_bad}")
 endif()
 
-target_link_libraries(libslic3r_cgal PRIVATE ${_cgal_tgt} libigl)
+target_link_libraries(libslic3r_cgal PRIVATE ${_cgal_tgt} libigl ankerl qhull glu-libtess)
 target_link_libraries(libslic3r_cgal PUBLIC semver admesh localesutils)
 
 if (MSVC AND "${CMAKE_SIZEOF_VOID_P}" STREQUAL "4") # 32 bit MSVC workaround
@@ -621,6 +626,7 @@ target_link_libraries(libslic3r PRIVATE
     libexpat
     glu-libtess
     qhull
+    qhull_r
     TBB::tbb
     TBB::tbbmalloc
     libslic3r_cgal
@@ -637,13 +643,13 @@ target_link_libraries(libslic3r PUBLIC
     Eigen3::Eigen
     semver
     admesh
+    ankerl
     localesutils
     LibBGCode::bgcode_convert
     tcbspan
     miniz
     libigl
     agg
-    ankerl
     boost_headeronly
     libseqarrange
 )

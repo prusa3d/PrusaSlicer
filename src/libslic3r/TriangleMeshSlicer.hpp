@@ -103,23 +103,18 @@ std::vector<ExPolygons>         slice_mesh_ex(
     const MeshSlicingParamsEx        &params,
     std::function<void()>             throw_on_cancel = []{});
 
+std::vector<ExPolygons>  slice_mesh_ex(
+    const indexed_triangle_set       &mesh,
+    const std::vector<float>         &zs,
+    float                             closing_radius,
+    std::function<void()>             throw_on_cancel = []{});
+
 inline std::vector<ExPolygons>  slice_mesh_ex(
     const indexed_triangle_set       &mesh,
     const std::vector<float>         &zs,
     std::function<void()>             throw_on_cancel = []{})
 {
     return slice_mesh_ex(mesh, zs, MeshSlicingParamsEx{}, throw_on_cancel);
-}
-
-inline std::vector<ExPolygons>  slice_mesh_ex(
-    const indexed_triangle_set       &mesh,
-    const std::vector<float>         &zs,
-    float                             closing_radius,
-    std::function<void()>             throw_on_cancel = []{})
-{
-    MeshSlicingParamsEx params;
-    params.closing_radius = closing_radius;
-    return slice_mesh_ex(mesh, zs, params, throw_on_cancel);
 }
 
 // Slice a triangle set with a set of Z slabs (thick layers).
