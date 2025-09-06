@@ -1,4 +1,21 @@
+min_slic3r_version = 2.9.3-alpha0
+2.3.3 Renamed cooling slowdown options.
+2.3.2 Updated BALANCED profiles for CORE One.
+2.3.1 Added BALANCED profiles for CORE One.
+2.3.0 Added values for short travel acceleration (CORE One/XL/MK4/MK3.9/MK3.5/MINI family). Enabled new cooling slowdown logic (CORE One/XL/MK4/MK3.9 family).
 min_slic3r_version = 2.9.1-alpha0
+2.2.19 Slightly adjusted perimeter speeds in "Structural" profiles for quieter printing (CORE One). Updated PA values for Buddy3D PETG.
+2.2.18 Updated FW version notification (CORE One). Added filament profile for Sunlu PETG.
+2.2.17 Added filament profile for Prusament PP Glass Fiber.
+2.2.16 Added filament profile for 3DJAKE ecoPLA. Increased support material extrusion width (0.4mm nozzle). Updated filament settings.
+2.2.15 Updated specific filament profiles and print settings. Added Blend/Silk filament variants for MINI/MK3.5 (see changelog).
+2.2.14 Added filament profiles for Tectonic-3D filaments.
+2.2.13 Added filament profile for Prusament TPU 95A.
+2.2.12 Updated collision model for sequential prints (CORE One MMU3).
+2.2.11 Added profiles for CORE One MMU3. Updated FW version notification (6.3.3 for CORE One).
+2.2.10 Updated FW version notification (6.2.5 for XL). Updated filament profile for Hatchbox PLA.
+2.2.9 Removed 440x240 (QOI) thumbnail resolution. Updated PNG thumbnail resolution.
+2.2.8 Updated firmware version notification.
 2.2.7 Updated FW version notification (6.3.1 CORE One). Updated PA values for Prusament PC Blend (MINI). Updated support material extrusion width for some profiles.
 2.2.6 Updated end print parking position in accordance with FW6.3.1 (CORE One).
 2.2.5 Updated FW version notification. Updated PETG cooling thresholds (CORE One). Updated Spectrum PCTG PA values. BASF vendor renamed to Forward AM.
@@ -8,6 +25,7 @@ min_slic3r_version = 2.9.1-alpha0
 2.2.1 Updated values for 1st layer solid infill speed and speed over bridges. Updated PLA idle temperature (C1). 
 2.2.0 Extruder clearance moved to printer settings. Added BREAKAWAY print profiles (XL).
 min_slic3r_version = 2.8.1-rc0
+2.1.14 Updated FW version notification.
 2.1.13 Updated FW version notification.
 2.1.12 Added filament profiles for Sunlu PLA+ 2.0; Elegoo Rapid PLA+; Overture PETG; Polymaker PolyTerra PLA.
 2.1.11 Added filament profiles for Elegoo PLA and Elegoo Rapid PETG. Updated filament settings.

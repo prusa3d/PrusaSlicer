@@ -25,6 +25,7 @@ static const std::string EXTRUSION_ROLE_TAG = ";_EXTRUSION_ROLE:";
 static const std::string EXTRUDE_END_TAG = ";_EXTRUDE_END";
 static const std::string EXTRUDE_SET_SPEED_TAG = ";_EXTRUDE_SET_SPEED";
 static const std::string EXTERNAL_PERIMETER_TAG = ";_EXTERNAL_PERIMETER";
+static const std::string INTERNAL_PERIMETER_TAG = ";_INTERNAL_PERIMETER";
 
 // Maximum segment length to split a long segment if the initial and the final flow rate differ.
 // Smaller value means a smoother transition between two different flow rates.
@@ -268,10 +269,13 @@ static inline float parse_float(const char *&line, const size_t line_length)
 bool PressureEqualizer::process_line(const char *line, const char *line_end, GCodeLine &buf)
 {
     const size_t len = line_end - line;
+    const std::string str_line(line, line_end);
     if (strncmp(line, EXTRUSION_ROLE_TAG.data(), EXTRUSION_ROLE_TAG.length()) == 0) {
         line += EXTRUSION_ROLE_TAG.length();
         int role = atoi(line);
         m_current_extrusion_role = GCodeExtrusionRole(role);
+        m_current_perimeter_index.reset();
+
 #ifdef PRESSURE_EQUALIZER_DEBUG
         ++line_idx;
 #endif
@@ -297,9 +301,9 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     buf.volumetric_extrusion_rate_end = 0.f;
     buf.max_volumetric_extrusion_rate_slope_positive = 0.f;
     buf.max_volumetric_extrusion_rate_slope_negative = 0.f;
-    buf.extrusion_role = m_current_extrusion_role;
+    buf.extrusion_role  = m_current_extrusion_role;
+    buf.perimeter_index = m_current_perimeter_index;
 
-    std::string str_line(line, line_end);
     const bool found_extrude_set_speed_tag = boost::contains(str_line, EXTRUDE_SET_SPEED_TAG);
     const bool found_extrude_end_tag = boost::contains(str_line, EXTRUDE_END_TAG);
     assert(!found_extrude_set_speed_tag || !found_extrude_end_tag);
@@ -359,6 +363,26 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
                     eatws(line);
                 }
             }
+
+            if (m_current_extrusion_role == GCodeExtrusionRole::ExternalPerimeter) {
+                m_current_perimeter_index = 0;
+            } else if (m_current_extrusion_role == GCodeExtrusionRole::Perimeter) {
+                auto internal_perimeter_it_range = boost::find_last(str_line, INTERNAL_PERIMETER_TAG);
+                if (!internal_perimeter_it_range.empty()) {
+                    uint16_t    perimetr_index = 0;
+                    const char* start_ptr      = str_line.data() + std::distance(str_line.begin(), internal_perimeter_it_range.end());
+                    const char* end_ptr        = str_line.data() + str_line.size();
+                    const auto  res            = std::from_chars(start_ptr, end_ptr,perimetr_index);
+                    if (res.ec == std::errc()) {
+                        m_current_perimeter_index = perimetr_index;
+                    }
+                }
+            } else {
+                m_current_perimeter_index.reset();
+            }
+
+            buf.perimeter_index = m_current_perimeter_index;
+
             if (changed[3]) {
                 // Extrusion, retract or unretract.
                 float diff = new_pos[3] - m_current_pos[3];
@@ -821,8 +845,12 @@ void PressureEqualizer::push_line_to_output(const size_t line_idx, float new_fee
     GCodeG1Formatter feedrate_formatter;
     feedrate_formatter.emit_f(new_feedrate);
     feedrate_formatter.emit_string(std::string(EXTRUDE_SET_SPEED_TAG.data(), EXTRUDE_SET_SPEED_TAG.length()));
-    if (line.extrusion_role == GCodeExtrusionRole::ExternalPerimeter)
+    if (line.extrusion_role == GCodeExtrusionRole::ExternalPerimeter) {
         feedrate_formatter.emit_string(std::string(EXTERNAL_PERIMETER_TAG.data(), EXTERNAL_PERIMETER_TAG.length()));
+    } else if (line.extrusion_role == GCodeExtrusionRole::Perimeter && line.perimeter_index.has_value()) {
+        feedrate_formatter.emit_string(std::string(INTERNAL_PERIMETER_TAG.data(), INTERNAL_PERIMETER_TAG.length()) + std::to_string(*line.perimeter_index));
+    }
+
     push_to_output(feedrate_formatter);
 
     GCodeG1Formatter extrusion_formatter;

@@ -640,8 +640,8 @@ void PreferencesDialog::build()
 			app_config->get_bool("show_login_button"));
 
 		append_bool_option(m_optgroup_other, "downloader_url_registered",
-			L("Allow downloads from Printables.com"),
-			L("If enabled, PrusaSlicer will be allowed to download from Printables.com"),
+			L("Allow downloads from supported websites (like Printables.com)"),
+			L("If enabled, PrusaSlicer can download and open files from supported websites"),
 			app_config->get_bool("downloader_url_registered"));
 
 		activate_options_tab(m_optgroup_other);

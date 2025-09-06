@@ -3539,8 +3539,13 @@ std::string GCodeGenerator::_extrude(
             cooling_marker_setspeed_comments = ";_EXTRUDE_SET_SPEED";
         }
 
-        if (path_attr.role == ExtrusionRole::ExternalPerimeter) {
+        if (path_attr.role.is_external_perimeter()) {
             cooling_marker_setspeed_comments += ";_EXTERNAL_PERIMETER";
+        } else if (path_attr.role.is_perimeter()) {
+            assert(path_attr.perimeter_index.has_value());
+            if (path_attr.perimeter_index.has_value()) {
+                cooling_marker_setspeed_comments += ";_INTERNAL_PERIMETER" + std::to_string(*path_attr.perimeter_index);
+            }
         }
     }
 
@@ -3634,19 +3639,20 @@ std::string GCodeGenerator::generate_travel_gcode(
     const Points3& travel,
     const std::string& comment,
     const std::function<std::string()>& insert_gcode,
-    const EnforceFirstZ enforce_first_z
+    const EnforceFirstZ enforce_first_z,
+    const std::function<bool()>& use_short_distance_acceleration
 ) {
-    std::string gcode;
-
-    const unsigned acceleration =(unsigned)(m_config.travel_acceleration.value + 0.5);
-
     if (travel.empty()) {
         return "";
     }
 
-    // generate G-code for the travel move
-    // use G1 because we rely on paths being straight (G0 may make round paths)
-    gcode += this->m_writer.set_travel_acceleration(acceleration);
+    const unsigned travel_acceleration                = static_cast<unsigned>(m_config.travel_acceleration.value + 0.5);
+    const unsigned travel_short_distance_acceleration = static_cast<unsigned>(m_config.travel_short_distance_acceleration.value + 0.5);
+
+    std::string gcode;
+    // Generate G-code for the travel move.
+    // Use G1 because we rely on paths being straight (G0 may make round paths).
+    gcode += this->m_writer.set_travel_acceleration(use_short_distance_acceleration() ? travel_short_distance_acceleration : travel_acceleration);
 
     bool already_inserted{false};
     for (std::size_t i{0}; i < travel.size(); ++i) {
@@ -3670,13 +3676,21 @@ std::string GCodeGenerator::generate_travel_gcode(
         } else {
             gcode += this->m_writer.travel_to_xyz(gcode_point, comment);
         }
+
         this->last_position = point.head<2>();
     }
 
-    if (! GCodeWriter::supports_separate_travel_acceleration(config().gcode_flavor)) {
+    // This is mainly for parts of the G-code export that don't take into account that travel acceleration could change during printing.
+    // Those parts of the G-code export always use the travel acceleration that was set last.
+    if (use_short_distance_acceleration() && travel_short_distance_acceleration != travel_acceleration) {
+        gcode += this->m_writer.set_travel_acceleration(travel_acceleration);
+    }
+
+    if (!GCodeWriter::supports_separate_travel_acceleration(config().gcode_flavor)) {
         // In case that this flavor does not support separate print and travel acceleration,
         // reset acceleration to default.
-        gcode += this->m_writer.set_travel_acceleration(acceleration);
+        // TODO: This doesn't seem to perform what the comment describes.
+        gcode += this->m_writer.set_travel_acceleration(travel_acceleration);
     }
 
     return gcode;
@@ -3834,6 +3848,12 @@ std::string GCodeGenerator::travel_to(
         travel.pop_back();
     }
     travel.emplace_back(end_point);
+
+    if (this->config().travel_short_distance_acceleration > 0.) {
+        return wipe_retract_gcode + generate_travel_gcode(travel, comment, insert_gcode, enforce_first_z, [&]() {
+                   return role.is_external_perimeter() && xy_path.length() < scaled<double>(EXTRUDER_CONFIG(retract_before_travel));
+               });
+    }
 
     return wipe_retract_gcode + generate_travel_gcode(travel, comment, insert_gcode, enforce_first_z);
 }

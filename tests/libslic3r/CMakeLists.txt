@@ -47,8 +47,9 @@ add_executable(${_TEST_NAME}_tests
     test_mmu_auto_colorization.cpp
     ../data/prusaparts.cpp
     ../data/prusaparts.hpp
-    test_static_map.cpp
-	)
+     test_static_map.cpp
+     test_custom_parameters_handling.cpp
+ )
 
 if (TARGET OpenVDB::openvdb)
     target_sources(${_TEST_NAME}_tests PRIVATE test_hollowing.cpp)
