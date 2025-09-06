@@ -76,6 +76,9 @@ std::vector<std::unique_ptr<TriangleSelector>> preview_auto_colorization(
 // Helper function to validate and normalize the auto-colorization parameters
 MMUAutoColorizationParams validate_auto_colorization_params(const MMUAutoColorizationParams& params);
 
+// Helper function to assign color based on distribution (exposed for testing)
+int assign_color_from_distribution(float normalized_value, const std::vector<int>& extruders, const std::vector<float>& distribution);
+
 } // namespace Slic3r
 
 #endif // slic3r_MultiMaterialAutoColorization_hpp_
