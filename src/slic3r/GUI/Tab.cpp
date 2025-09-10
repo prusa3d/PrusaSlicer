@@ -1499,6 +1499,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("fuzzy_skin_point_dist", category_path + "fuzzy-skin-point-distance");
 
         optgroup = page->new_optgroup(L("Only one perimeter"));
+        category_path = "layers-and-perimeters_1748/#";
         optgroup->append_single_option_line("top_one_perimeter_type", category_path + "top-one-perimeter-type");
         optgroup->append_single_option_line("only_one_perimeter_first_layer", category_path + "only-one-perimeter-first-layer");
 
