@@ -1,0 +1,63 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - boss
+      - release/*
+    paths:
+      - "deps/**"
+      - "src/**"
+      - "**/CMakeLists.txt"
+      - "version.inc"
+      - "resources/**"
+      - ".github/workflows/*.yml"
+      - "build_release_linux.sh"
+      - "build_release_macos.sh"
+      - "build_win.bat"
+
+  pull_request:
+    branches:
+      - boss
+      - release/*
+    paths:
+      - "deps/**"
+      - "src/**"
+      - "**/CMakeLists.txt"
+      - "version.inc"
+      - ".github/workflows/*.yml"
+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_linux:
+    name: Build on Linux
+    uses: ./.github/workflows/build_linux.yml
+    secrets: inherit
+
+  build_macos:
+    name: Build on MacOS
+    uses: ./.github/workflows/build_macos.yml
+    secrets: inherit
+
+  build_windows:
+    name: Build on Windows
+    uses: ./.github/workflows/build_windows.yml
+    secrets: inherit
+
+  release:
+    name: Release
+    uses: ./.github/workflows/release.yml
+    needs:
+      - build_linux
+      - build_macos
+      - build_windows
+    secrets: inherit
+    permissions:
+      contents: write
+      pages: write
+      id-token: write

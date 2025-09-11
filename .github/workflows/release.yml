@@ -1,0 +1,147 @@
+name: Create Release
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  create_nightly:
+    name: Create Nightly Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.ref == 'refs/heads/boss'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PrusaSlicer Version
+        run: |
+          ver_pure=$(grep 'set(SLIC3R_VERSION' version.inc | cut -d '"' -f2)
+          echo "ver_pure=$ver_pure" >> $GITHUB_ENV
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: PrusaSlicer-*BOSS*
+          merge-multiple: true
+
+      - name: Delete existing nightly release
+        run: |
+          gh release delete nightly --cleanup-tag --yes --repo $GITHUB_REPOSITORY || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate a changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: ${{ github.workspace }}/.github/cliff.toml
+          args: --unreleased --verbose --output ${{ runner.temp }}/CHANGELOG.md
+
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "PrusaSlicer-*BOSS+win64*,PrusaSlicer-*BOSS+MacOS-universal*,PrusaSlicer-*+BOSS+Linux*"
+          allowUpdates: false
+          artifactErrorsFailBuild: true
+          bodyFile: ${{ runner.temp }}/CHANGELOG.md
+          commit: ${{ github.sha }}
+          draft: false
+          makeLatest: false
+          prerelease: true
+          name: PrusaSlicer (BOSS) Nightly Build
+          removeArtifacts: true
+          replacesArtifacts: true
+          immutableCreate: true
+          tag: nightly
+
+  create_release:
+    name: Create PrusaSlicer (BOSS) GitHub Release
+    runs-on: ubuntu-latest
+    env:
+      ver_pure:
+    permissions:
+      contents: write
+    if: startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PrusaSlicer Version
+        run: |
+          ver_pure=$(grep 'set(SLIC3R_VERSION' version.inc | cut -d '"' -f2)
+          echo "ver_pure=$ver_pure" >> $GITHUB_ENV
+
+      - name: Download PrusaSlicer (BOSS) Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: PrusaSlicer-*BOSS*
+          merge-multiple: true
+
+      - name: Generate a changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: ${{ github.workspace }}/.github/cliff.toml
+          args: --unreleased --verbose --output ${{ runner.temp }}/CHANGELOG.md --tag ${{ env.ver_pure }}
+
+      - name: Create PrusaSlicer (BOSS) GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "PrusaSlicer-*BOSS+win64*,PrusaSlicer-*BOSS+MacOS-universal*,PrusaSlicer-*+BOSS+Linux*"
+          allowUpdates: false
+          artifactErrorsFailBuild: true
+          bodyFile: ${{ runner.temp }}/CHANGELOG.md
+          commit: ${{ github.sha }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc')}}
+          makeLatest: ${{ !contains(github.ref, '-alpha') && !contains(github.ref, '-beta') && !contains(github.ref, '-rc')}}
+          name: PrusaSlicer ${{ env.ver_pure }} (BOSS)
+          removeArtifacts: true
+          replacesArtifacts: true
+          skipIfReleaseExists: true
+          immutableCreate: true
+          tag: version_${{ env.ver_pure }}+boss
+
+  publish:
+    name: Publish Version Information
+    needs: create_release
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Create Version File
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p ${{ github.workspace }}/build
+          python3 ${{ github.workspace }}/.github/scripts/create_version.py build/PrusaSlicer.version
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'build'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

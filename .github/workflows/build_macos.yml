@@ -1,0 +1,212 @@
+name: Build MacOS
+
+on:
+  workflow_call:
+
+jobs:
+  build_macos:
+    name: Compile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: x86_64
+          - os: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      date: ""
+      ver: ""
+      ver_pure: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub environment
+        run: |
+          ver_pure=$(grep 'set(SLIC3R_VERSION' version.inc | cut -d '"' -f2)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            ver="PR-${{ github.event.number }}"
+          else
+            ver="$ver_pure+BOSS"
+          fi
+          echo "ver=$ver" >> $GITHUB_ENV
+          echo "ver_pure=$ver_pure" >> $GITHUB_ENV
+          echo "date=$(date +'%Y%m%d')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Determine Cache Keys
+        id: cache-keys
+        run: |
+          echo cache-path=${{ github.workspace }}/deps/build_${{ matrix.arch }}/PrusaSlicer_dep_${{ matrix.arch }} >> "$GITHUB_OUTPUT"
+          echo cache-key=${{ runner.os }}_${{ matrix.arch }}-cache-Prusaslicer_deps-build-${{ hashFiles('deps/**') }} >> "$GITHUB_OUTPUT"
+
+      - name: Cache build dependencies
+        id: cache-build-deps
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-keys.outputs.cache-path }}
+          key: ${{ steps.cache-keys.outputs.cache-key }}
+
+      - name: Install dependencies
+        run: |
+          brew install automake git gettext libtool texinfo m4 zlib
+
+      - name: Downgrade automake
+        run: |
+          brew remove -f automake
+          (cd $(brew --repository homebrew/core)/Formula/a; git checkout 0b91bfb32c1 automake.rb);
+          HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_FROM_API=1 brew install automake
+
+      - name: Select Xcode Version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Uninstall zstd
+        run: |
+          brew uninstall --ignore-dependencies zstd
+
+      - name: Build PrusaSlicer (BOSS) ${{ matrix.arch }} Dependencies
+        if: steps.cache-build-deps.outputs.cache-hit != 'true'
+        working-directory: ${{ github.workspace }}
+        run: |
+            mkdir -p ${{ github.workspace }}/deps/build_${{ matrix.arch }}
+            mkdir -p ${{ github.workspace }}/deps/build_${{ matrix.arch }}/PrusaSlicer_dep_${{ matrix.arch }}
+            ./build_release_macos.sh -dp -a ${{ matrix.arch }} -t 11.3
+
+      - name: Install zstd
+        run: |
+          brew install zstd            
+
+      - name: Build PrusaSlicer (BOSS) ${{ matrix.arch }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          ./build_release_macos.sh -s -n -a ${{matrix.arch}} -t 11.3
+
+      - name: Bundle PrusaSlicer (BOSS) ${{ matrix.arch }} release build
+        if: (github.ref == 'refs/heads/boss' || startsWith(github.ref, 'refs/heads/release/'))
+        working-directory: ${{ github.workspace }}
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          CERTIFICATE_ID: ${{ secrets.MACOS_CERTIFICATE_ID }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode > $CERTIFICATE_PATH
+          security create-keychain -p $KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p $KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P $P12_PASSWORD -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $P12_PASSWORD $KEYCHAIN_PATH
+          codesign --deep --force --verbose --options runtime --timestamp --entitlements ${{ github.workspace }}/.github/scripts/disable_validation.entitlements --sign "$CERTIFICATE_ID" ${{ github.workspace }}/build_${{matrix.arch}}/PrusaSlicer/PrusaSlicer.app
+          ln -s /Applications ${{ github.workspace }}/build_${{matrix.arch}}/PrusaSlicer/Applications
+          hdiutil create -volname "PrusaSlicer" -srcfolder ${{ github.workspace }}/build_${{matrix.arch}}/PrusaSlicer -ov -format UDZO PrusaSlicer-${{ env.ver }}+MacOS-${{matrix.arch}}-${{ env.date }}.dmg
+          codesign --deep --force --verbose --options runtime --timestamp --entitlements ${{ github.workspace }}/.github/scripts/disable_validation.entitlements --sign "$CERTIFICATE_ID" PrusaSlicer-${{ env.ver }}+MacOS-${{matrix.arch}}-${{ env.date }}.dmg
+          xcrun notarytool store-credentials "notarytool-profile" --apple-id "${{ secrets.APPLE_DEV_ACCOUNT }}" --team-id "${{ secrets.TEAM_ID }}" --password "${{ secrets.APP_PWD }}"
+          xcrun notarytool submit "PrusaSlicer-${{ env.ver }}+MacOS-${{matrix.arch}}-${{ env.date }}.dmg" --keychain-profile "notarytool-profile" --wait
+          xcrun stapler staple PrusaSlicer-${{ env.ver }}+MacOS-${{matrix.arch}}-${{ env.date }}.dmg
+
+      - name: Bundle PrusaSlicer (BOSS) ${{ matrix.arch }} development build
+        if: (github.ref != 'refs/heads/boss' && !startsWith(github.ref, 'refs/heads/release/'))
+        working-directory: ${{ github.workspace }}
+        run: |
+          ln -s /Applications ${{ github.workspace }}/build_${{matrix.arch}}/PrusaSlicer/Applications
+          hdiutil create -volname "PrusaSlicer" -srcfolder ${{ github.workspace }}/build_${{matrix.arch}}/PrusaSlicer -ov -format UDZO PrusaSlicer-${{ env.ver }}+MacOS-${{matrix.arch}}-${{ env.date }}.dmg
+
+      - name: Upload MacOS PrusaSlicer (BOSS) ${{ matrix.arch }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrusaSlicer-${{ env.ver }}+MacOS-${{matrix.arch}}-${{ env.date }}
+          path: ${{ github.workspace }}/PrusaSlicer-${{ env.ver }}+MacOS-${{matrix.arch}}-${{ env.date }}.dmg
+
+  bundle_macos:
+    name: Bundle DMG
+    runs-on: macos-15
+    needs: [build_macos]
+    env:
+      date: ""
+      ver: ""
+      ver_pure: ""
+      DMG_UNIVERSAL: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub environment
+        run: |
+          ver_pure=$(grep 'set(SLIC3R_VERSION' version.inc | cut -d '"' -f2)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            ver="PR-${{ github.event.number }}"
+          else
+            ver="$ver_pure+BOSS"
+          fi
+          echo "ver=$ver" >> $GITHUB_ENV
+          echo "ver_pure=$ver_pure" >> $GITHUB_ENV
+          echo "date=$(date +'%Y%m%d')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Download MacOS PrusaSlicer (BOSS) Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: PrusaSlicer-*MacOS-*
+          merge-multiple: true
+
+      - name: Create Universal MacOS PrusaSlicer (BOSS) Binary
+        run: |
+          WORK_DIR=$(mktemp -d)
+          DMG_ARM64=$(realpath $(ls ${GITHUB_WORKSPACE}/artifacts/PrusaSlicer*+MacOS-arm64*.dmg|head -n1))
+          DMG_X86_64=$(realpath $(ls ${GITHUB_WORKSPACE}/artifacts/PrusaSlicer*+MacOS-x86_64*.dmg|head -n1))
+          DMG_UNIVERSAL=$(echo "${DMG_ARM64}" | sed -e 's/arm64/universal/')
+          pushd ${WORK_DIR} &>/dev/null
+          hdiutil attach -mountpoint ./arm64 ${DMG_ARM64}
+          hdiutil attach -mountpoint ./x86_64 ${DMG_X86_64}
+
+          rsync -aq arm64/ universal/
+          lipo \
+            arm64/PrusaSlicer.app/Contents/MacOS/PrusaSlicer \
+            x86_64/PrusaSlicer.app/Contents/MacOS/PrusaSlicer \
+            -create -output universal/PrusaSlicer.app/Contents/MacOS/PrusaSlicer
+
+          hdiutil detach -quiet ./arm64
+          hdiutil detach -quiet ./x86_64
+
+          hdiutil create -volname "PrusaSlicer" -srcfolder ./universal -ov -format UDZO ${DMG_UNIVERSAL}
+          popd &>/dev/null
+          echo "DMG_UNIVERSAL=$(ls ${GITHUB_WORKSPACE}/artifacts/PrusaSlicer*+MacOS-universal*.dmg|head -n1)" >> $GITHUB_ENV
+
+      - name: Sign MacOS PrusaSlicer (BOSS) Universal Binary
+        if: (github.ref == 'refs/heads/boss' || startsWith(github.ref, 'refs/heads/release/'))
+        working-directory: ${{ github.workspace }}
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          CERTIFICATE_ID: ${{ secrets.MACOS_CERTIFICATE_ID }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output $CERTIFICATE_PATH
+          security create-keychain -p $KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p $KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P $P12_PASSWORD -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $P12_PASSWORD $KEYCHAIN_PATH
+          codesign --deep --force --verbose --options runtime --timestamp --entitlements ${{ github.workspace }}/.github/scripts/disable_validation.entitlements --sign "$CERTIFICATE_ID" "${{ env.DMG_UNIVERSAL }}"
+          xcrun notarytool store-credentials "notarytool-profile" --apple-id "${{ secrets.APPLE_DEV_ACCOUNT }}" --team-id "${{ secrets.TEAM_ID }}" --password "${{ secrets.APP_PWD }}"
+          xcrun notarytool submit "${{ env.DMG_UNIVERSAL }}" --keychain-profile "notarytool-profile" --wait
+          xcrun stapler staple "${{ env.DMG_UNIVERSAL }}"
+
+      - name: Upload MacOS PrusaSlicer (BOSS) Universal
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrusaSlicer-${{ env.ver }}+MacOS-universal-${{ env.date }}
+          path: ${{ env.DMG_UNIVERSAL }}
