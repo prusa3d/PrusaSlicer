@@ -273,7 +273,7 @@ else ()
             COMMENT "Symlinking the G-code viewer to PrusaSlicer"
             VERBATIM)
     endif ()
-    if (XCODE)
+    if (CMAKE_CONFIGURATION_TYPES)
         # Because of Debug/Release/etc. configurations (similar to MSVC) the slic3r binary is located in an extra level
         set(BIN_RESOURCES_DIR "${CMAKE_CURRENT_BINARY_DIR}/resources")
     else ()
