@@ -1,0 +1,27 @@
+From a9123efb21e79316282fae90b7b313331ed74eac Mon Sep 17 00:00:00 2001
+From: Elia Devito <eliadevito@gmail.com>
+Date: Sat, 11 Nov 2023 16:17:59 +0100
+Subject: [PATCH] apply TBB patch
+
+---
+ deps/+TBB/TBB.cmake | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/deps/+TBB/TBB.cmake b/deps/+TBB/TBB.cmake
+index 95ac76b69..8cd59a928 100644
+--- a/deps/+TBB/TBB.cmake
++++ b/deps/+TBB/TBB.cmake
+@@ -1,7 +1,10 @@
++set(_patch_command ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/GNU.cmake cmake/compilers/GNU.cmake)
++
+ add_cmake_project(
+     TBB
+     URL "https://github.com/oneapi-src/oneTBB/archive/refs/tags/v2021.5.0.zip"
+     URL_HASH SHA256=83ea786c964a384dd72534f9854b419716f412f9d43c0be88d41874763e7bb47
++    PATCH_COMMAND ${_patch_command}
+     CMAKE_ARGS          
+         -DTBB_BUILD_SHARED=${BUILD_SHARED_LIBS}
+         -DTBB_TEST=OFF
+-- 
+2.41.0
+

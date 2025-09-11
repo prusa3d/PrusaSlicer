@@ -1,0 +1,22 @@
+From 7f25f88a4f4c06a1579208a2e955c9d81cbcff9a Mon Sep 17 00:00:00 2001
+From: Elia Devito <eliadevito@gmail.com>
+Date: Fri, 13 Sep 2024 09:34:04 +0200
+Subject: [PATCH] don't build occt doc
+
+---
+ deps/+OCCT/OCCT.cmake | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/deps/+OCCT/OCCT.cmake b/deps/+OCCT/OCCT.cmake
+index 81cdf46de..4dde27cb0 100644
+--- a/deps/+OCCT/OCCT.cmake
++++ b/deps/+OCCT/OCCT.cmake
+@@ -22,4 +22,5 @@ add_cmake_project(OCCT
+ 		-DBUILD_MODULE_ModelingAlgorithms=OFF
+ 		-DBUILD_MODULE_ModelingData=OFF
+ 		-DBUILD_MODULE_Visualization=OFF
++		-DBUILD_DOC_Overview=OFF
+ )
+-- 
+2.46.0
+

@@ -1,0 +1,437 @@
+app-id: io.github.mjonuschat.PrusaSlicer
+runtime: org.gnome.Platform
+runtime-version: "48"
+sdk: org.gnome.Sdk
+command: entrypoint
+desktop-file-name-suffix: ""
+separate-locales: true
+finish-args:
+- --share=ipc
+- --socket=x11
+- --share=network
+- --device=all
+- --filesystem=home
+- --filesystem=xdg-run/gvfs # make GnomeVFS accessible
+- --filesystem=/run/media
+- --filesystem=/media
+# Allow PrusaSlicer to own its session bus.
+- --own-name=io.github.mjonuschat.PrusaSlicer.*
+- --system-talk-name=org.freedesktop.UDisks2
+- --talk-name=org.freedesktop.DBus.Introspectable.*
+- --talk-name=io.github.mjonuschat.PrusaSlicer.InstanceCheck.*
+# set dark theme
+- --env=PRUSA_SLICER_DARK_THEME=false
+
+build-options:
+  strip: true
+  cflags: ""
+  cflags-override: true
+  cxxflags: ""
+  cxxflags-override: true
+  cppflags: ""
+  cppflags-override: true
+  ldflags: ""
+  ldflags-override: true
+
+modules:
+# xprop, xlib is needed to manipulate the X11 window and set _GTK_THEME_VARIANT dark on X11
+# and paint the window dark when PRUSA_SLICER_DARK_THEME is true
+# see: entrypoint & set-dark-theme-variant.py (originated from spotify client flatpak)
+- name: xprop
+  sources:
+  - type: archive
+    url: https://xorg.freedesktop.org/archive/individual/app/xprop-1.2.5.tar.gz
+    sha256: b7bf6b6be6cf23e7966a153fc84d5901c14f01ee952fbd9d930aa48e2385d670
+- name: python-setuptools_scm
+  buildsystem: simple
+  build-commands:
+  - pip3 install --no-deps --no-build-isolation --verbose --prefix=${FLATPAK_DEST} .
+  sources:
+  - type: archive
+    url: https://files.pythonhosted.org/packages/57/38/930b1241372a9f266a7df2b184fb9d4f497c2cef2e016b014f82f541fe7c/setuptools_scm-6.0.1.tar.gz
+    sha256: d1925a69cb07e9b29416a275b9fadb009a23c148ace905b2fb220649a6c18e92
+- name: python-xlib
+  buildsystem: simple
+  build-commands:
+  - pip3 install --no-deps --no-build-isolation --verbose --prefix=${FLATPAK_DEST} .
+  sources:
+  - type: archive
+    url: https://files.pythonhosted.org/packages/86/f5/8c0653e5bb54e0cbdfe27bf32d41f27bc4e12faa8742778c17f2a71be2c0/python-xlib-0.33.tar.gz
+    sha256: 55af7906a2c75ce6cb280a584776080602444f75815a7aff4d287bb2d7018b32
+
+- name: glu
+  config-opts:
+  - --disable-static
+  sources:
+  - type: archive
+    url: https://mesa.freedesktop.org/archive/glu/glu-9.0.2.tar.xz
+    sha256: 6e7280ff585c6a1d9dfcdf2fca489251634b3377bfc33c29e4002466a38d02d4
+  cleanup:
+  - /include
+  - /lib/*.a
+  - /lib/*.la
+  - /lib/pkgconfig
+
+# https://docs.flatpak.org/en/latest/module-sources.html
+- name: cmake
+  buildsystem: simple
+  build-commands:
+  - mkdir -p /app/cmake
+  - tar -xf cmake.tar.gz --strip-components=1 -C /app/cmake
+  sources:
+  - type: file
+    url: https://cmake.org/files/v3.27/cmake-3.27.0-linux-x86_64.tar.gz
+    sha256: 89c7e74d29f442e4734954310e09dd12d13636991f2d90d0ed1bececb8bf9b9c
+    dest-filename: cmake.tar.gz
+    only-arches:
+    - x86_64
+  - type: file
+    url: https://cmake.org/files/v3.27/cmake-3.27.0-linux-aarch64.tar.gz
+    sha256: 97c2f8cf9e063a7acf9f15ed472d87c511bf5cb62d3e42b9c90524fb0c2e4748
+    dest-filename: cmake.tar.gz
+    only-arches:
+    - aarch64
+  cleanup:
+  - "*"
+
+- name: PrusaSlicerDeps
+  buildsystem: simple
+  build-commands:
+  # start build
+  - |
+    set -e
+    mkdir -p deps/build && cd deps/build
+    /app/cmake/bin/cmake ../ \
+      -DDEP_WX_GTK3=1 \
+      -DDEP_DOWNLOAD_DIR=/run/build/PrusaSlicerDeps/external-packages \
+      -DDESTDIR=/app/deps
+    /app/cmake/bin/cmake --build . --parallel 4
+  cleanup:
+  - '*'
+  sources:
+
+  # PrusaSlicer dependencies source
+  - type: dir
+    path: ".."
+
+  # Cereal
+  - type: file
+    url: https://github.com/USCiLab/cereal/archive/refs/tags/v1.3.0.zip
+    dest: external-packages/Cereal
+    sha256: 71642cb54658e98c8f07a0f0d08bf9766f1c3771496936f6014169d3726d9657
+
+  # EXPAT
+  - type: file
+    url: https://github.com/libexpat/libexpat/archive/refs/tags/R_2_4_3.zip
+    dest: external-packages/EXPAT
+    sha256: 8851e199d763dc785277d6d414ed3e70ff683915158b51b8d8781df0e3af950a
+
+  # OCCT
+  - type: file
+    url: https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/V7_6_1.zip
+    dest: external-packages/OCCT
+    sha256: b7cf65430d6f099adc9df1749473235de7941120b5b5dd356067d12d0909b1d3
+
+  # NLopt
+  - type: file
+    url: https://github.com/stevengj/nlopt/archive/v2.5.0.tar.gz
+    dest: external-packages/NLopt
+    sha256: c6dd7a5701fff8ad5ebb45a3dc8e757e61d52658de3918e38bab233e7fd3b4ae
+
+  # Eigen
+  - type: file
+    url: https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.zip
+    dest: external-packages/Eigen
+    sha256: 4815118c085ff1d5a21f62218a3b2ac62555e9b8d7bacd5093892398e7a92c4b
+
+  # JPEG
+  - type: file
+    url: https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.0.1.zip
+    dest: external-packages/JPEG
+    sha256: d6d99e693366bc03897677650e8b2dfa76b5d6c54e2c9e70c03f0af821b0a52f
+
+  # ZLIB
+  - type: file
+    url: https://github.com/madler/zlib/releases/download/v1.3.1/zlib131.zip
+    dest: external-packages/ZLIB
+    sha256: 72af66d44fcc14c22013b46b814d5d2514673dda3d115e64b690c1ad636e7b17
+
+  # heatshrink
+  - type: file
+    url: https://github.com/atomicobject/heatshrink/archive/refs/tags/v0.4.1.zip
+    dest: external-packages/heatshrink
+    sha256: 2e2db2366bdf36cb450f0b3229467cbc6ea81a8c690723e4227b0b46f92584fe
+
+  # PNG
+  - type: file
+    url: https://github.com/glennrp/libpng/archive/refs/tags/v1.6.35.zip
+    dest: external-packages/PNG
+    sha256: 3d22d46c566b1761a0e15ea397589b3a5f36ac09b7c785382e6470156c04247f
+
+  # Boost
+  - type: file
+    url: https://github.com/boostorg/boost/releases/download/boost-1.83.0/boost-1.83.0.zip
+    dest: external-packages/Boost
+    sha256: 9effa3d7f9d92b8e33e2b41d82f4358f97ff7c588d5918720339f2b254d914c6
+
+  # MPFR
+  - type: file
+    url: https://www.mpfr.org/mpfr-4.2.1/mpfr-4.2.1.tar.bz2
+    dest: external-packages/MPFR
+    sha256: b9df93635b20e4089c29623b19420c4ac848a1b29df1cfd59f26cab0d2666aa0
+
+  # OpenEXR
+  - type: file
+    url: https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v2.5.5.zip
+    dest: external-packages/OpenEXR
+    sha256: 0307a3d7e1fa1e77e9d84d7e9a8694583fbbbfd50bdc6884e2c96b8ef6b902de
+
+  # Blosc
+  - type: file
+    url: https://github.com/Blosc/c-blosc/archive/8724c06e3da90f10986a253814af18ca081d8de0.zip
+    dest: external-packages/Blosc
+    sha256: 53986fd04210b3d94124b7967c857f9766353e576a69595a9393999e0712c035
+
+  # Catch2
+  - type: file
+    url: https://github.com/catchorg/Catch2/archive/refs/tags/v3.8.0.zip
+    dest: external-packages/Catch2
+    sha256: bffd2c45a84e5a4b0c17e695798e8d2f65931cbaf5c7556d40388d1d8d04eb83
+
+  # CGAL
+  - type: file
+    url: https://github.com/CGAL/cgal/archive/refs/tags/v5.6.2.zip
+    dest: external-packages/CGAL
+    sha256: 29acaeee5a76a95029fac23131bb1c3a4a75df9a0e7e43b465a1f32d0628f45d
+
+  # GMP
+  - type: file
+    url: https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2
+    dest: external-packages/GMP
+    sha256: eae9326beb4158c386e39a356818031bd28f3124cf915f8c5b1dc4c7a36b4d7c
+
+  # TBB
+  - type: file
+    url: https://github.com/oneapi-src/oneTBB/archive/refs/tags/v2021.5.0.zip
+    dest: external-packages/TBB
+    sha256: 83ea786c964a384dd72534f9854b419716f412f9d43c0be88d41874763e7bb47
+
+  # GLEW
+  - type: file
+    url: https://sourceforge.net/projects/glew/files/glew/2.2.0/glew-2.2.0.zip
+    dest: external-packages/GLEW
+    sha256: a9046a913774395a095edcc0b0ac2d81c3aacca61787b39839b941e9be14e0d4
+
+  # wxWidgets
+  - type: file
+    url: https://github.com/prusa3d/wxWidgets/archive/5462e7d7cfac645926188443e842171e107b312c.zip
+    dest: external-packages/wxWidgets
+    sha256: 3ebb971ddb45ceea6d9b965c3d0266f44edae71f2a7daa5d48db34bd95aa878b
+
+  # json
+  - type: file
+    url: https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.zip
+    dest: external-packages/json
+    sha256: 34660b5e9a407195d55e8da705ed26cc6d175ce5a6b1fb957e701fb4d5b04022
+
+  # OpenCSG
+  - type: file
+    url: https://github.com/floriankirsch/OpenCSG/archive/refs/tags/opencsg-1-4-2-release.zip
+    dest: external-packages/OpenCSG
+    sha256: 51afe0db79af8386e2027d56d685177135581e0ee82ade9d7f2caff8deab5ec5
+
+  # z3
+  - type: file
+    url: https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.15.1.zip
+    dest: external-packages/z3
+    sha256: 5072309889a8fe73381303949114391ae2c976b7df64886f4cbdae349dd39cae
+
+  # NanoSVG
+  - type: file
+    url: https://github.com/fltk/nanosvg/archive/abcd277ea45e9098bed752cf9c6875b533c0892f.zip
+    dest: external-packages/NanoSVG
+    sha256: e859938fbaee4b351bd8a8b3d3c7a75b40c36885ce00b73faa1ce0b98aa0ad34
+
+  # OpenVDB
+  - type: file
+    url: https://github.com/prusa3d/openvdb/archive/339ee88230da33e3fefb133d8c1a9e16bef09144.zip
+    dest: external-packages/OpenVDB
+    sha256: 098c67620a3884b7c09775e5819e88ff09e6c69b09c07695a4301f77f9382664
+
+  # OpenSSL
+  - type: file
+    url: https://github.com/openssl/openssl/archive/OpenSSL_1_1_0l.tar.gz
+    dest: external-packages/OpenSSL
+    sha256: e2acf0cf58d9bff2b42f2dc0aee79340c8ffe2c5e45d3ca4533dd5d4f5775b1d
+
+  # CURL
+  - type: file
+    url: https://github.com/curl/curl/archive/refs/tags/curl-7_75_0.zip
+    dest: external-packages/CURL
+    sha256: a63ae025bb0a14f119e73250f2c923f4bf89aa93b8d4fafa4a9f5353a96a765a
+
+  # Qhull
+  - type: file
+    url: https://github.com/qhull/qhull/archive/refs/tags/v8.1-alpha3.zip
+    dest: external-packages/Qhull
+    sha256: 7bd9b5ffae01e69c2ead52f9a9b688af6c65f9a1da05da0a170fa20d81404c06
+
+  # LibBGCode
+  - type: file
+    url: https://github.com/prusa3d/libbgcode/archive/5041c093b33e2748e76d6b326f2251310823f3df.zip
+    dest: external-packages/LibBGCode
+    sha256: c323aa196a82d75f08a5b114c95f2d1a019e84b555a196e55d8ea52e5787284c
+
+  - type: file # Patched TBB cmake to make build without lto flag
+    dest: deps/+TBB
+    path: patches/TBB/GNU.cmake
+
+  # Apply TTB patches to fix build failure. More info: https://github.com/prusa3d/PrusaSlicer/issues/8922
+  - type: patch
+    path: patches/0001-apply-TBB-patch.patch
+
+  # Build fail during generation of OCCT overview documentation, disable it fix problem
+  - type: patch
+    path: patches/0001-don-t-build-occt-doc.patch
+
+- name: PrusaSlicer
+  buildsystem: simple
+  build-commands:
+  - |
+    mkdir -p build && cd build
+    /app/cmake/bin/cmake ../ \
+      -GNinja \
+      -DCMAKE_INSTALL_PREFIX=/app \
+      -DCMAKE_INSTALL_LIBDIR=/app/lib \
+      -DCMAKE_PREFIX_PATH=/app/deps/usr/local \
+      -DSLIC3R_PCH=OFF \
+      -DSLIC3R_FHS=ON \
+      -DSLIC3R_ASAN=OFF \
+      -DSLIC3R_GTK=3 \
+      -DSLIC3R_STATIC=ON \
+      -DSLIC3R_BUILD_TESTS=OFF \
+      -DSLIC3R_DESKTOP_INTEGRATION=OFF \
+      -DCMAKE_BUILD_TYPE=Release
+    /app/cmake/bin/cmake --build . --parallel 4
+    /app/cmake/bin/cmake --build . --target install > /dev/null
+
+  post-install:
+
+  - |
+    mkdir -p /app/share/runtime/locale
+    for i in $(ls /app/share/PrusaSlicer/localization)
+    do
+      lang=${i%[_@]*}
+      mkdir -p /app/share/runtime/locale/${lang}
+      mv /app/share/PrusaSlicer/localization/${i} /app/share/runtime/locale/${lang}
+      ln -rs /app/share/runtime/locale/${lang}/${i} /app/share/PrusaSlicer/localization/${i}
+    done
+  - |
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.metainfo.xml /app/share/metainfo/io.github.mjonuschat.PrusaSlicer.metainfo.xml
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.svg /app/share/icons/hicolor/scalable/apps/io.github.mjonuschat.PrusaSlicer.svg
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.png /app/share/icons/hicolor/256x256/apps/io.github.mjonuschat.PrusaSlicer.png
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.desktop /app/share/applications/io.github.mjonuschat.PrusaSlicer.desktop
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.desktop /app/share/applications/io.github.mjonuschat.PrusaSlicer.desktop
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.GCodeViewer.svg /app/share/icons/hicolor/scalable/apps/io.github.mjonuschat.PrusaSlicer.GCodeViewer.svg
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.GCodeViewer.png /app/share/icons/hicolor/256x256/apps/io.github.mjonuschat.PrusaSlicer.GCodeViewer.png
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.GCodeViewer.desktop /app/share/applications/io.github.mjonuschat.PrusaSlicer.GCodeViewer.desktop
+    install set-dark-theme-variant.py /app/bin
+    install entrypoint /app/bin
+    install umount /app/bin
+  - |
+    mkdir -p /app/share/mime/packages/
+    install -m644 -p -t /app/share/mime/packages io.github.mjonuschat.PrusaSlicer.mime.xml
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.application-vnd-ms-3mfdocument.svg \
+      /app/share/icons/hicolor/scalable/mimetypes/io.github.mjonuschat.PrusaSlicer.application-vnd-ms-3mfdocument.svg
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.application-vnd-ms-3mfdocument.png \
+      /app/share/icons/hicolor/128x128/mimetypes/io.github.mjonuschat.PrusaSlicer.application-vnd-ms-3mfdocument.png
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.text-x-gcode.svg \
+      /app/share/icons/hicolor/scalable/mimetypes/io.github.mjonuschat.PrusaSlicer.text-x-gcode.svg
+    install -Dm644 io.github.mjonuschat.PrusaSlicer.text-x-gcode.png \
+      /app/share/icons/hicolor/128x128/mimetypes/io.github.mjonuschat.PrusaSlicer.text-x-gcode.png
+    update-mime-database /app/share/mime
+  sources:
+  - type: dir
+    path: ".."
+  - type: patch # Fix download from printables. More info: https://github.com/prusa3d/PrusaSlicer/pull/12785
+    path: patches/0001-don-t-call-show_downloader_registration_dialog-if-SL.patch
+
+  # Pre-Build
+  - type: shell
+    commands:
+    # Set PrusaSlicer version for build and reference Flathub.org for better bug seperation.
+    - sed -i 's/+UNKNOWN//g' version.inc
+    - |
+      cp src/platform/unix/PrusaSlicer.desktop ./io.github.mjonuschat.PrusaSlicer.desktop
+      cp src/platform/unix/PrusaGcodeviewer.desktop ./io.github.mjonuschat.PrusaSlicer.GCodeViewer.desktop
+    - |
+      sed -i 's/^\(MimeType=.*\)/\1x-scheme-handler\/prusaslicer;/g' io.github.mjonuschat.PrusaSlicer.desktop
+    - |
+      sed -i 's/Exec=prusa-slicer %F/Exec=entrypoint --single-instance-on-url %u/g' io.github.mjonuschat.PrusaSlicer.desktop
+      sed -i 's/Exec=prusa-slicer/Exec=entrypoint/g' io.github.mjonuschat.PrusaSlicer.GCodeViewer.desktop
+
+      cat <<EOT >> io.github.mjonuschat.PrusaSlicer.desktop
+      Actions=GCodeViewer;
+
+      [Desktop Action GCodeViewer]
+      Exec=entrypoint --gcodeviewer %F
+      Name=G-Code Viewer
+      Name[de]=G-Code Vorschau
+      Icon=io.github.mjonuschat.PrusaSlicer.GCodeViewer
+
+      EOT
+    - |
+      sed -i 's/Icon=PrusaSlicer-gcodeviewer/Icon=io.github.mjonuschat.PrusaSlicer.GCodeViewer/g' io.github.mjonuschat.PrusaSlicer.GCodeViewer.desktop
+      sed -i 's/Icon=PrusaSlicer-gcodeviewer/Icon=io.github.mjonuschat.PrusaSlicer.GCodeViewer/g' io.github.mjonuschat.PrusaSlicer.desktop
+      sed -i 's/Icon=PrusaSlicer/Icon=io.github.mjonuschat.PrusaSlicer/g' io.github.mjonuschat.PrusaSlicer.desktop
+  - type: file
+    path: io.github.mjonuschat.PrusaSlicer.metainfo.xml
+
+  # script to set dark theme variant
+  - type: file
+    path: set-dark-theme-variant.py
+
+  # script to detect if host uses dark theme
+  - type: file
+    path: uses-dark-theme.py
+
+  # start-up script
+  # README: workaround for the following issues, also enables dark theme variant:
+  # SEE: https://github.com/flathub/io.github.mjonuschat.PrusaSlicer/issues/27
+  # SEE: https://github.com/flathub/io.github.mjonuschat.PrusaSlicer/issues/3
+  # SEE: https://github.com/prusa3d/PrusaSlicer/issues/2365
+  - type: file
+    path: entrypoint
+
+  # umount wrapper used to redirect umount calls to udisk2
+  - type: file
+    path: umount
+
+  # TODO: remove mime when PR created and is merged upstream
+  # Adding MIME type for 3mf
+  - type: file
+    path: io.github.mjonuschat.PrusaSlicer.mime.xml
+
+  # icon for 3mf mime type
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.application-vnd-ms-3mfdocument.svg
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.application-vnd-ms-3mfdocument.png
+
+  # icon for gcode mime type
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.text-x-gcode.svg
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.text-x-gcode.png
+
+  # app icons
+  # The icon should be SVG, or a PNG with a size greater or equal to 256x256 pixels. It has to be square.
+  # See: https://docs.flathub.org/docs/for-app-authors/metainfo-guidelines/quality-guidelines/#icon-size
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.svg
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.png
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.GCodeViewer.svg
+  - type: file
+    path: icons/io.github.mjonuschat.PrusaSlicer.GCodeViewer.png

@@ -1,0 +1,32 @@
+From 4b14521ae566bbde58747870633ec22696102950 Mon Sep 17 00:00:00 2001
+From: Elia Devito <eliadevito@gmail.com>
+Date: Fri, 7 Jun 2024 12:16:11 +0200
+Subject: [PATCH] don't call show_downloader_registration_dialog() if 
+ SLIC3R_DESKTOP_INTEGRATION = 0
+
+---
+ src/slic3r/GUI/GUI_App.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/slic3r/GUI/GUI_App.cpp b/src/slic3r/GUI/GUI_App.cpp
+index 4e343939c..864a32168 100644
+--- a/src/slic3r/GUI/GUI_App.cpp
++++ b/src/slic3r/GUI/GUI_App.cpp
+@@ -3329,12 +3329,12 @@ bool GUI_App::config_wizard_startup()
+         run_wizard(ConfigWizard::RR_DATA_LEGACY);
+         return true;
+     } 
+-#ifndef __APPLE__    
++#if !defined(__APPLE__) && ((defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)) || !defined(__linux__))
+     else if (is_editor() && m_last_app_conf_lower_version && app_config->get_bool("downloader_url_registered")) {
+         show_downloader_registration_dialog();
+         return true;
+     }
+-#endif
++#endif //!defined(__APPLE__) && ((defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)) || !defined(__linux__))
+     return false;
+ }
+ 
+-- 
+2.45.1
+
