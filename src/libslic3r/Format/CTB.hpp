@@ -2,7 +2,7 @@
 #ifndef _SLIC3R_FORMAT_CTB_HPP_
 #define _SLIC3R_FORMAT_CTB_HPP_
 
-#include "SLA/RasterBase.hpp"
+#include "libslic3r/SLA/RasterBase.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "SLAArchiveFormatRegistry.hpp"

@@ -7,8 +7,8 @@
 #include "openssl/sha.h"
 #include "openssl/evp.h"
 
-#include "GCode/ThumbnailData.hpp"
-#include "SLA/RasterBase.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/SLA/RasterBase.hpp"
 #include "libslic3r/SLAPrint.hpp"
 
 #include <boost/log/trivial.hpp>
@@ -608,7 +608,7 @@ void CtbSLAArchive::export_print(
         decrypted_format_header header_struct{};
         char buffer[sizeof(decrypted_format_header)];
     };
-    union decrypt_header decrypted_header {};
+    union decrypt_header decrypted_header{};
     unencrypted_format_layer_header layer_header{};
     unencrypted_format_layer_pointers layer_pointers{};
 
