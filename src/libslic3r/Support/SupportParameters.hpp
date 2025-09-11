@@ -5,12 +5,18 @@
 #ifndef slic3r_SupportParameters_hpp_
 #define slic3r_SupportParameters_hpp_
 
-#include "../libslic3r.h"
-#include "../Flow.hpp"
+#include <math.h>
+#include <stddef.h>
+#include <cmath>
+#include <cstddef>
+
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/Flow.hpp"
 
 namespace Slic3r {
 
 class PrintObject;
+
 enum InfillPattern : int;
 
 namespace FFFSupport {

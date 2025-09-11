@@ -40,8 +40,11 @@ public:
             Warning
         };
 
+        // Item as an item inside of the SavePresetDialog
         Item(Preset::Type type, const std::string& suffix, wxBoxSizer* sizer, SavePresetDialog* parent, bool is_for_multiple_save);
-        Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PresetCollection* presets, PrinterTechnology pt = ptFFF);
+
+        // Item as a separate control(f.e. as a part of ConfigWizard to check name of the new custom priter)
+        Item(wxWindow* parent, wxBoxSizer* sizer, const std::string& def_name, PresetBundle* preset_bundle, PrinterTechnology pt = ptFFF);
 
         void            update_valid_bmp();
         void            accept();
@@ -71,7 +74,8 @@ public:
         wxTextCtrl*         m_text_ctrl     {nullptr};
         wxStaticText*       m_valid_label   {nullptr};
 
-        PresetCollection*   m_presets       {nullptr};
+        const PresetCollection* m_presets       {nullptr};
+        const PresetBundle*     m_preset_bundle {nullptr};
 
         std::vector<PresetName> m_casei_preset_names;
 
@@ -108,7 +112,7 @@ public:
 
     void AddItem(Preset::Type type, const std::string& suffix, bool is_for_multiple_save);
 
-    PresetBundle*   get_preset_bundle() const { return m_preset_bundle; }
+    const PresetBundle* get_preset_bundle() const { return m_preset_bundle; }
     std::string     get_name();
     std::string     get_name(Preset::Type type);
 

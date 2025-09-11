@@ -1,7 +1,14 @@
 #ifndef slic3r_GCode_PerimeterOrder_hpp_
 #define slic3r_GCode_PerimeterOrder_hpp_
 
-#include <Arachne/utils/ExtrusionLine.hpp>
+#include <stddef.h>
+#include <limits>
+#include <vector>
+#include <cstddef>
+
+#include "libslic3r/Arachne/utils/ExtrusionLine.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/Polygon.hpp"
 
 namespace Slic3r::Arachne::PerimeterOrder {
 
@@ -24,9 +31,6 @@ struct PerimeterExtrusion
     // How far is this perimeter from the nearest external perimeter. Contour is always preferred over holes.
     size_t                             depth                      = std::numeric_limits<size_t>::max();
     PerimeterExtrusion                *nearest_external_perimeter = nullptr;
-
-    // Should this extrusion be fuzzyfied during path generation?
-    bool                               fuzzify = false;
 
     // Returns if ExtrusionLine is a contour or a hole.
     bool is_contour() const { return extrusion.is_contour(); }

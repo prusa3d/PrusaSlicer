@@ -6,15 +6,19 @@
 #ifndef slic3r_PlaceholderParser_hpp_
 #define slic3r_PlaceholderParser_hpp_
 
-#include "libslic3r.h"
 #include <map>
 #include <random>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <memory>
+
+#include "libslic3r.h"
 #include "PrintConfig.hpp"
+#include "libslic3r/Config.hpp"
 
 namespace Slic3r {
+class DynamicPrintConfig;
 
 class PlaceholderParser
 {
@@ -38,11 +42,11 @@ public:
     // This contains keys, which are found in rhs, but not in m_config.
     std::vector<std::string> config_diff(const DynamicPrintConfig &rhs);
     // Return true if modified.
-    bool apply_config(const DynamicPrintConfig &config);
-    void apply_config(DynamicPrintConfig &&config);
+    bool apply_config(const DynamicConfig &config);
+    void apply_config(DynamicConfig &&config);
     // To be called on the values returned by PlaceholderParser::config_diff().
     // The keys should already be valid.
-    void apply_only(const DynamicPrintConfig &config, const std::vector<std::string> &keys);
+    void apply_only(const DynamicConfig &config, const std::vector<std::string> &keys);
     void apply_env_variables();
 
     // Add new ConfigOption values to m_config.

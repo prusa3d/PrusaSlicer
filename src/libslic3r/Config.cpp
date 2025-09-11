@@ -19,36 +19,34 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "Config.hpp"
-#include "format.hpp"
-#include "Utils.hpp"
-#include "LocalesUtils.hpp"
 
-#include <assert.h>
-#include <fstream>
-#include <iostream>
-#include <iomanip>
-#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/erase.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/config.hpp>
-#include <boost/foreach.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/nowide/cstdlib.hpp>
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/property_tree/ini_parser.hpp>
-#include <boost/format.hpp>
-#include <string.h>
-
 #include <LibBGCode/binarize/binarize.hpp>
+#include <boost/algorithm/string/join.hpp>
+#include <boost/multi_index_container.hpp>
+#include <cereal/cereal.hpp>
+#include <core/core.hpp>
+#include <iostream>
+#include <iomanip>
+#include <cstddef>
+#include <set>
+#include <cstdlib>
+#include <cstring>
 
-//FIXME for GCodeFlavor and gcfMarlin (for forward-compatibility conversion)
-// This is not nice, likely it would be better to pass the ConfigSubstitutionContext to handle_legacy().
-#include "PrintConfig.hpp"
+#include "format.hpp"
+#include "Utils.hpp"
+#include "LocalesUtils.hpp"
+#include "libslic3r/Exception.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Semver.hpp"
 
 namespace Slic3r {
 
@@ -352,105 +350,6 @@ void ConfigDef::finalize()
             assert(! def.enum_def);
         }
     }
-}
-
-std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, std::function<bool(const ConfigOptionDef &)> filter) const
-{
-    // prepare a function for wrapping text
-    auto wrap = [](const std::string& text, size_t line_length) -> std::string {
-        std::istringstream words(text);
-        std::ostringstream wrapped;
-        std::string word;
- 
-        if (words >> word) {
-            wrapped << word;
-            size_t space_left = line_length - word.length();
-            while (words >> word) {
-                if (space_left < word.length() + 1) {
-                    wrapped << '\n' << word;
-                    space_left = line_length - word.length();
-                } else {
-                    wrapped << ' ' << word;
-                    space_left -= word.length() + 1;
-                }
-            }
-        }
-        return wrapped.str();
-    };
-
-    // get the unique categories
-    std::set<std::string> categories;
-    for (const auto& opt : this->options) {
-        const ConfigOptionDef& def = opt.second;
-        if (filter(def))
-            categories.insert(def.category);
-    }
-    
-    for (const std::string& category : categories) {
-        if (category != "") {
-            out << category << ":" << std::endl;
-        } else if (categories.size() > 1) {
-            out << "Misc options:" << std::endl;
-        }
-        
-        for (const auto& opt : this->options) {
-            const ConfigOptionDef& def = opt.second;
-			if (def.category != category || def.cli == ConfigOptionDef::nocli || !filter(def))
-                continue;
-            
-            // get all possible variations: --foo, --foobar, -f...
-            std::vector<std::string> cli_args = def.cli_args(opt.first);
-			if (cli_args.empty())
-				continue;
-
-            for (auto& arg : cli_args) {
-                arg.insert(0, (arg.size() == 1) ? "-" : "--");
-                if (def.type == coFloat || def.type == coInt || def.type == coFloatOrPercent
-                    || def.type == coFloats || def.type == coInts) {
-                    arg += " N";
-                } else if (def.type == coPoint) {
-                    arg += " X,Y";
-                } else if (def.type == coPoint3) {
-                    arg += " X,Y,Z";
-                } else if (def.type == coString || def.type == coStrings) {
-                    arg += " ABCD";
-                }
-            }
-            
-            // left: command line options
-            const std::string cli = boost::algorithm::join(cli_args, ", ");
-            out << " " << std::left << std::setw(20) << cli;
-            
-            // right: option description
-            std::string descr = def.tooltip;
-            bool show_defaults_this = show_defaults || def.opt_key == "config_compatibility";
-            if (show_defaults_this && def.default_value && def.type != coBool
-                && (def.type != coString || !def.default_value->serialize().empty())) {
-                descr += " (";
-                if (!def.sidetext.empty()) {
-                    descr += def.sidetext + ", ";
-                } else if (def.enum_def && def.enum_def->has_values()) {
-                    descr += boost::algorithm::join(def.enum_def->values(), ", ") + "; ";
-                }
-                descr += "default: " + def.default_value->serialize() + ")";
-            }
-            
-            // wrap lines of description
-            descr = wrap(descr, 80);
-            std::vector<std::string> lines;
-            boost::split(lines, descr, boost::is_any_of("\n"));
-            
-            // if command line options are too long, print description in new line
-            for (size_t i = 0; i < lines.size(); ++i) {
-                if (i == 0 && cli.size() > 19)
-                    out << std::endl;
-                if (i > 0 || cli.size() > 19)
-                    out << std::string(21, ' ');
-                out << lines[i] << std::endl;
-            }
-        }
-    }
-    return out;
 }
 
 std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<int> values)
@@ -1216,127 +1115,6 @@ const ConfigOption* DynamicConfig::optptr(const t_config_option_key &opt_key) co
     return (it == options.end()) ? nullptr : it->second.get();
 }
 
-bool DynamicConfig::read_cli(int argc, const char* const argv[], t_config_option_keys* extra, t_config_option_keys* keys)
-{
-    // cache the CLI option => opt_key mapping
-    std::map<std::string,std::string> opts;
-    for (const auto &oit : this->def()->options)
-        for (const std::string &t : oit.second.cli_args(oit.first))
-            opts[t] = oit.first;
-    
-    bool parse_options = true;
-    for (int i = 1; i < argc; ++ i) {
-        std::string token = argv[i];
-        // Store non-option arguments in the provided vector.
-        if (! parse_options || ! boost::starts_with(token, "-")) {
-            extra->push_back(token);
-            continue;
-        }
-#ifdef __APPLE__
-        if (boost::starts_with(token, "-psn_"))
-            // OSX launcher may add a "process serial number", for example "-psn_0_989382" to the command line.
-            // While it is supposed to be dropped since OSX 10.9, we will rather ignore it.
-            continue;
-#endif /* __APPLE__ */
-        // Stop parsing tokens as options when -- is supplied.
-        if (token == "--") {
-            parse_options = false;
-            continue;
-        }
-        // Remove leading dashes (one or two).
-        token.erase(token.begin(), token.begin() + (boost::starts_with(token, "--") ? 2 : 1));
-        // Read value when supplied in the --key=value form.
-        std::string value;
-        {
-            size_t equals_pos = token.find("=");
-            if (equals_pos != std::string::npos) {
-                value = token.substr(equals_pos+1);
-                token.erase(equals_pos);
-            }
-        }
-        // Look for the cli -> option mapping.
-        auto it = opts.find(token);
-        bool no = false;
-        if (it == opts.end()) {
-            // Remove the "no-" prefix used to negate boolean options.
-            std::string yes_token;
-            if (boost::starts_with(token, "no-")) {
-                yes_token = token.substr(3);
-                it = opts.find(yes_token);
-                no = true;
-            }
-            if (it == opts.end()) {
-                boost::nowide::cerr << "Unknown option --" << token.c_str() << std::endl;
-                return false;
-            }
-            if (no)
-                token = yes_token;
-        }
-
-        const t_config_option_key &opt_key = it->second;
-        const ConfigOptionDef     &optdef  = *this->option_def(opt_key);
-
-        // If the option type expects a value and it was not already provided,
-        // look for it in the next token.
-        if (value.empty() && optdef.type != coBool && optdef.type != coBools) {
-            if (i == argc-1) {
-                boost::nowide::cerr << "No value supplied for --" << token.c_str() << std::endl;
-                return false;
-            }
-            value = argv[++ i];
-        }
-
-        if (no) {
-            assert(optdef.type == coBool || optdef.type == coBools);
-            if (! value.empty()) {
-                boost::nowide::cerr << "Boolean options negated by the --no- prefix cannot have a value." << std::endl;
-                return false;
-            }
-        }
-
-        // Store the option value.
-        const bool               existing   = this->has(opt_key);
-        if (keys != nullptr && ! existing) {
-            // Save the order of detected keys.
-            keys->push_back(opt_key);
-        }
-        ConfigOption            *opt_base   = this->option(opt_key, true);
-        ConfigOptionVectorBase  *opt_vector = opt_base->is_vector() ? static_cast<ConfigOptionVectorBase*>(opt_base) : nullptr;
-        if (opt_vector) {
-			if (! existing)
-				// remove the default values
-				opt_vector->clear();
-            // Vector values will be chained. Repeated use of a parameter will append the parameter or parameters
-            // to the end of the value.
-            if (opt_base->type() == coBools && value.empty())
-                static_cast<ConfigOptionBools*>(opt_base)->values.push_back(!no);
-            else
-                // Deserialize any other vector value (ConfigOptionInts, Floats, Percents, Points) the same way
-                // they get deserialized from an .ini file. For ConfigOptionStrings, that means that the C-style unescape
-                // will be applied for values enclosed in quotes, while values non-enclosed in quotes are left to be
-                // unescaped by the calling shell.
-				opt_vector->deserialize(value, true);
-        } else if (opt_base->type() == coBool) {
-            if (value.empty())
-                static_cast<ConfigOptionBool*>(opt_base)->value = !no;
-            else
-                opt_base->deserialize(value);
-        } else if (opt_base->type() == coString) {
-            // Do not unescape single string values, the unescaping is left to the calling shell.
-            static_cast<ConfigOptionString*>(opt_base)->value = value;
-        } else {
-            // Just bail out if the configuration value is not understood.
-            ConfigSubstitutionContext context(ForwardCompatibilitySubstitutionRule::Disable);
-            // Any scalar value of a type different from Bool and String.
-            if (! this->set_deserialize_nothrow(opt_key, value, context, false)) {
-				boost::nowide::cerr << "Invalid value supplied for --" << token.c_str() << std::endl;
-				return false;
-			}
-        }
-    }
-    return true;
-}
-
 t_config_option_keys DynamicConfig::keys() const
 {
     t_config_option_keys keys;
@@ -1431,7 +1209,8 @@ t_config_option_keys DynamicConfig::equal(const DynamicConfig &other) const
 
 }
 
-#include <cereal/types/polymorphic.hpp>
+#include <cereal/types/polymorphic.hpp> // IWYU pragma: keep
+
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOption)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<double>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<int>)

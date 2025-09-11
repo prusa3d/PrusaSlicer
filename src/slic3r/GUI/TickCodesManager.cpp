@@ -4,9 +4,18 @@
 ///|/
 #include "TickCodesManager.hpp"
 
+#include <algorithm>
+#include <random>
+#include <cmath>
+
 #include "I18N.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Color.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/GCode/ToolOrdering.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/libslic3r.h"
 
 using namespace Slic3r;
 using namespace CustomGCode;
@@ -650,6 +659,9 @@ ConflictType TickCodeManager::is_conflict_tick(const TickCode& tick, Mode main_m
         // We should mark a tick as a "MeaninglessToolChange", 
         // if it has a ToolChange to the same extruder
         auto it = ticks.find(tick);
+        if (it->extruder > colors.size())
+            return ctNotPossibleToolChange;
+
         if (it == ticks.begin())
             return tick.extruder == std::max<int>(only_extruder_id, 1) ? ctMeaninglessToolChange : ctNone;
 
@@ -666,6 +678,9 @@ ConflictType TickCodeManager::is_conflict_tick(const TickCode& tick, Mode main_m
 std::string TickCodeManager::get_color_for_tool_change_tick(std::set<TickCode>::const_iterator it) const
 {
     const int current_extruder = it->extruder == 0 ? std::max<int>(only_extruder_id, 1) : it->extruder;
+
+    if (current_extruder > colors.size())
+        return it->color;
 
     auto it_n = it;
     while (it_n != ticks.begin()) {

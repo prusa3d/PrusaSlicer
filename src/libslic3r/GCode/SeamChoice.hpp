@@ -1,21 +1,20 @@
 #ifndef libslic3r_SeamChoice_hpp_
 #define libslic3r_SeamChoice_hpp_
 
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <utility>
+
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/GCode/SeamShells.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/GCode/SeamGeometry.hpp"
+#include "libslic3r/GCode/SeamPerimeters.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r::Seams {
-
-/**
- * When previous_index == next_index, the point is at the point.
- * Otherwise the point is at the edge.
- */
-struct SeamChoice
-{
-    std::size_t previous_index{};
-    std::size_t next_index{};
-    Vec2d position{Vec2d::Zero()};
-};
+using SeamChoice = Perimeters::PointOnPerimeter;
 
 struct SeamPerimeterChoice
 {

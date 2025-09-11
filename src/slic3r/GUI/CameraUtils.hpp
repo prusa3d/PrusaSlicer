@@ -5,10 +5,18 @@
 #ifndef slic3r_CameraUtils_hpp_
 #define slic3r_CameraUtils_hpp_
 
+#include <vector>
+
 #include "Camera.hpp"
 #include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+
 namespace Slic3r {
 class GLVolume;
+
+namespace GUI {
+struct Camera;
+}  // namespace GUI
 }
 	
 namespace Slic3r::GUI {

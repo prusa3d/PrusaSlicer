@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <libslic3r/libslic3r.h>
 #include <libslic3r/Algorithm/RegionExpansion.hpp>
@@ -8,6 +9,7 @@
 #include <libslic3r/SVG.cpp>
 
 using namespace Slic3r;
+using namespace Catch;
 
 //#define DEBUG_TEMP_DIR "d:\\temp\\"
 
@@ -282,3 +284,31 @@ SCENARIO("Region expansion basics", "[RegionExpansion]") {
         }
     }
 }
+
+TEST_CASE("WaveSeed - ZFillFunction - SPE-2698", "[WaveSeedZFillFunctionSPE2698]")
+{
+    const ExPolygons boundary = {{
+        Point(-5900000, -20000000),
+        Point(-6518889, -22009467),
+        Point(-5779768, -22315621),
+        Point(-5662934, -22033558),
+        Point(-5615689, -21919501),
+        Point(-5779767, -22315622),
+        Point(-5040682, -22621761),
+        Point(-4000000, -20000000),
+    }};
+
+    const ExPolygons src = {{
+        Point(-5615689, -21919501),
+        Point(-5662934, -22033558),
+        Point(-5779768, -22315621),
+        Point(-5779767, -22315622),
+    }};
+
+    std::vector<Slic3r::Algorithm::WaveSeed> wave_seeds = Slic3r::Algorithm::wave_seeds(src, boundary, 83561.8046, true);
+    for (const Slic3r::Algorithm::WaveSeed &wave_seed : wave_seeds) {
+        REQUIRE(wave_seed.src < src.size());
+        REQUIRE(wave_seed.boundary < boundary.size());
+    }
+}
+

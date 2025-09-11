@@ -8,8 +8,20 @@
 #include <libslic3r/ClipperZUtils.hpp>
 #include <libslic3r/ClipperUtils.hpp>
 #include <libslic3r/Utils.hpp>
-
+#include <clipper/clipper_z.hpp>
 #include <numeric>
+#include <cmath>
+#include <iterator>
+#include <utility>
+#include <algorithm>
+#include <cassert>
+
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 namespace Algorithm {
@@ -271,6 +283,11 @@ std::vector<WaveSeed> wave_seeds(
             // Hope that at least one end of an open polyline is clipped by the boundary, thus an intersection point is created.
             (front.z() < 0 || back.z() < 0));
 
+        if (front != back && front.z() >= 0 && back.z() >= 0) {
+            // Very rare case when both endpoints intersect boundary ExPolygons in existing points.
+            // So the ZFillFunction callback hasn't been called.
+            continue;
+        } else
         if (front == back && (front.z() < idx_boundary_end)) {
             // This should be a very rare exception.
             // See https://github.com/prusa3d/PrusaSlicer/issues/12469.

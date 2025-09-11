@@ -5,16 +5,27 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "AnycubicSLA.hpp"
-#include "GCode/ThumbnailData.hpp"
-#include "SLA/RasterBase.hpp"
-#include "libslic3r/SLAPrint.hpp"
-
-#include <sstream>
-#include <iostream>
-#include <fstream>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/log/trivial.hpp>
+#include <fstream> // IWYU pragma: keep
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <exception>
+#include <iterator>
+#include <map>
+#include <vector>
+#include <cassert>
+#include <cstdio>
+
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/SLA/RasterBase.hpp"
+#include "libslic3r/SLAPrint.hpp"
+#include "LocalesUtils.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/libslic3r.h"
 
 
 #define TAG_INTRO "ANYCUBIC\0\0\0\0"

@@ -8,20 +8,30 @@
 #ifndef slic3r_ExtrusionEntity_hpp_
 #define slic3r_ExtrusionEntity_hpp_
 
+#include <assert.h>
+#include <stddef.h>
+#include <optional>
+#include <string_view>
+#include <numeric>
+#include <cmath>
+#include <limits>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+
 #include "libslic3r.h"
 #include "ExtrusionRole.hpp"
 #include "Flow.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
-
-#include <assert.h>
-#include <optional>
-#include <string_view>
-#include <numeric>
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r {
 
 class ExPolygon;
+
 using ExPolygons = std::vector<ExPolygon>;
 class ExtrusionEntityCollection;
 class Extruder;
@@ -134,6 +144,7 @@ struct ExtrusionAttributes : ExtrusionFlow
     ExtrusionAttributes(ExtrusionRole role) : role{ role } {}
     ExtrusionAttributes(ExtrusionRole role, const Flow &flow) : role{ role }, ExtrusionFlow{ flow } {}
     ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow) : role{ role }, ExtrusionFlow{ flow } {}
+    ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow, const uint16_t perimeter_index) : role{ role }, ExtrusionFlow{ flow }, perimeter_index{ perimeter_index } {}
     ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow, const bool maybe_self_crossing)
         : role{role}, ExtrusionFlow{flow}, maybe_self_crossing(maybe_self_crossing) {}
 
@@ -143,6 +154,8 @@ struct ExtrusionAttributes : ExtrusionFlow
     // OVerhangAttributes are currently computed for perimeters if dynamic overhangs are enabled. 
     // They are used to control fan and print speed in export.
     std::optional<OverhangAttributes> overhang_attributes;
+    // Set only for external and internal perimeters. The external perimeter has value 0, the first internal perimeter has 1, and so on.
+    std::optional<uint16_t> perimeter_index;
 };
 
 inline bool operator==(const ExtrusionAttributes &lhs, const ExtrusionAttributes &rhs)
@@ -290,7 +303,7 @@ class ExtrusionLoop : public ExtrusionEntity
 {
 public:
     ExtrusionPaths paths;
-    
+
     ExtrusionLoop() = default;
     ExtrusionLoop(ExtrusionLoopRole role) : m_loop_role(role) {}
     ExtrusionLoop(const ExtrusionPaths &paths, ExtrusionLoopRole role = elrDefault) : paths(paths), m_loop_role(role) {}

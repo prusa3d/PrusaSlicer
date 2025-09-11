@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <sstream>
 #include <fstream>
 
@@ -7,6 +8,7 @@
 
 using namespace Slic3r;
 using namespace Test;
+using namespace Catch;
 
 constexpr bool debug_files{false};
 
@@ -168,7 +170,7 @@ TEST_CASE_METHOD(CancelObjectFixture, "Single extruder", "[CancelObject]") {
 }
 
 TEST_CASE_METHOD(CancelObjectFixture, "Sequential print", "[CancelObject]") {
-    config.set_deserialize_strict({{"complete_objects", 1}});
+    config.set_deserialize_strict({{"complete_objects", 1} });
 
     Print print;
     print.apply(two_cubes, config);

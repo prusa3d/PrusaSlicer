@@ -1,7 +1,8 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <numeric>
 #include <sstream>
+#include <algorithm>
 
 #include "test_data.hpp" // get access to init_print, etc
 

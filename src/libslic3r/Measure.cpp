@@ -2,16 +2,24 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <boost/container/small_vector.hpp>
+#include <algorithm>
+#include <array>
+#include <iterator>
+#include <limits>
+#include <set>
+#include <cinttypes>
+
 #include "libslic3r/libslic3r.h"
 #include "Measure.hpp"
 #include "MeasureUtils.hpp"
-
 #include "libslic3r/Geometry/Circle.hpp"
 #include "libslic3r/SurfaceMesh.hpp"
-
-
-#include <numeric>
-#include <tbb/parallel_for.h>
+#include "admesh/stl.h"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 #define DEBUG_EXTRACT_ALL_FEATURES_AT_ONCE 0
 
@@ -1125,7 +1133,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
             else {
                 ClosestInfo& info = candidates[0];
             
-                const double N0dD = n0.dot(D);
+                double N0dD = n0.dot(D);
                 const Vec3d normProj = N0dD * n0;
                 const Vec3d compProj = D - normProj;
                 Vec3d U = compProj;
@@ -1186,6 +1194,7 @@ MeasurementResult get_measurement(const SurfaceFeature& a, const SurfaceFeature&
                         distance = (c1 - c0).norm();
                         info.circle0Closest = c0;
                         info.circle1Closest = c1;
+                        N0dD = 0.0;
                     }
                 }
 

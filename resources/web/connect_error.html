@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='UTF-8' />
+  <meta content='width=device-width, initial-scale=1.0' name='viewport' />
+  <title>Connect-Slicer integration</title>
+  <style>
+    body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f6f6f6;
+            color: #333;
+        }
+        .reload-button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            color: black;
+            background-color: white;
+            border: 2px solid black;
+            border-radius: 5px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .reload-button:hover {
+            background-color: black;
+            color: white;
+        }
+
+        .reload-button:focus {
+            outline: none;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+  </style>
+</head>
+<body>
+<!-- This page is not served anywhere, only to be copy 'n' pasted into Slicer as a fallback loading screen. -->
+<div id='loading-screen' style='width: 100%; height: 100%'>
+  <div style='position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center'>
+    <p>
+      <svg style='width: 80px'
+           viewBox='-250 -250 500 500' xmlns='http://www.w3.org/2000/svg'>
+        <style type='text/css'>
+            .filament {
+                stroke: #FF0033;
+            }
+
+            .spool {
+                stroke: #231F20;
+                fill: none;
+            }
+
+            .filament line {
+                stroke-linecap: round;
+            }
+        </style>
+        <defs>
+          <pattern class='spool' height='100' id='hexagon' patternTransform='scale(0.875)' patternUnits='userSpaceOnUse'
+                   viewBox='-0.866025 -1.5 1.73205 3'
+                   width='57.735'
+          >
+            <polygon fill='none' points='0,1 0.866025,0.5 0.866025,-0.5 0,-1 -0.866025,-0.5 -0.866025,0.5'
+                     stroke-width='0.34' />
+            <line stroke-width='0.34' x1='0' x2='0' y1='1' y2='1.5'></line>
+            <line stroke-width='0.34' x1='0' x2='0' y1='-1' y2='-1.5'></line>
+          </pattern>
+        </defs>
+        <g class='filament'>
+          <circle fill='none' r='145' stroke-width='130'>
+            <!-- <animate attributeName='r' dur='6s' repeatCount='indefinite' values='145;80;145' />-->
+            <!-- <animate attributeName='stroke-width' dur='6s' repeatCount='indefinite' values='130;0;130' />-->
+          </circle>
+          <line stroke-width='12' x1='204' x2='204' y1='0' y2='245'>
+            <!-- <animate attributeName='x1' dur='6s' repeatCount='indefinite' values='204;74;204' />-->
+            <!-- <animate attributeName='x2' dur='6s' repeatCount='indefinite' values='204;74;204' />-->
+          </line>
+        </g>
+        <g class='spool'>
+          <circle fill='none' r='157' stroke='url(#hexagon)' stroke-width='171' />
+          <circle r='244' stroke-width='12' />
+          <circle r='71' stroke-width='18' />
+          <!-- <animateTransform
+            attributeName='transform' begin='0s'
+            dur='6s'
+            fill='freeze'
+            repeatCount='indefinite'
+            type='rotate'
+            values='0;540;0'
+          />-->
+        </g>
+      </svg>
+    </p>
+    <p style="font-size: 24px;">Something went wrong.</p>
+    <button class="reload-button" onclick="window._prusaSlicer.postMessage(JSON.stringify({ action: 'RELOAD_HOME_PAGE' }))">Reload</button>
+  </div>
+</div>
+</body>
+</html>

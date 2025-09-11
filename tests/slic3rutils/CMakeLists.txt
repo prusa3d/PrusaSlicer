@@ -8,7 +8,7 @@ add_executable(${_TEST_NAME}_tests
     )
 
 # mold linker for successful linking needs also to link TBB library and link it before libslic3r.
-target_link_libraries(${_TEST_NAME}_tests test_common TBB::tbb TBB::tbbmalloc libslic3r_gui libslic3r)
+target_link_libraries(${_TEST_NAME}_tests test_common TBB::tbb TBB::tbbmalloc libslic3r_gui libslic3r libseqarrange)
 
 if (MSVC)
     target_link_libraries(${_TEST_NAME}_tests Setupapi.lib)

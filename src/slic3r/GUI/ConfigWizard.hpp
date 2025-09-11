@@ -22,14 +22,10 @@ namespace Slic3r {
 
 class PresetBundle;
 class PresetUpdater;
+class AppConfig;
+class PresetArchiveDatabase;
 
 namespace GUI {
-
-class ConfigWizardLoadingDialog : public wxDialog
-{
-public:
-    ConfigWizardLoadingDialog(wxWindow* parent, const wxString& message);
-};
 
 namespace DownloaderUtils {
     class Worker : public wxBoxSizer
@@ -52,7 +48,8 @@ namespace DownloaderUtils {
         void set_path_name(const std::string& name);
 
         bool on_finish();
-        static bool perform_register(const std::string& path);
+        static bool perform_download_register(const std::string& path);
+        static bool perform_url_register();
 #ifdef __linux__
         static bool perform_registration_linux;
 #endif // __linux__
@@ -100,8 +97,6 @@ private:
 
     friend struct ConfigWizardPage;
 };
-
-
 
 }
 }

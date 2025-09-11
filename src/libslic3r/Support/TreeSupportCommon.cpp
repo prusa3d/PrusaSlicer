@@ -12,6 +12,13 @@
 
 #include "TreeSupportCommon.hpp"
 
+#include <limits>
+#include <cstdio>
+
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/Print.hpp"
+#include "libslic3r/Utils.hpp"
+
 namespace Slic3r::FFFTreeSupport {
 
 TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &print_object)

@@ -8,17 +8,19 @@ namespace Slic3r {
 
 size_t ObjectBase::s_last_id = 0;
 
-// Unique object / instance ID for the wipe tower.
-ObjectID wipe_tower_object_id()
-{
-    static ObjectBase mine;
-    return mine.id();
-}
+struct WipeTowerId : public ObjectBase {
+    // Need to inherit because ObjectBase
+    // destructor is protected.
+    using ObjectBase::ObjectBase;
+};
 
-ObjectID wipe_tower_instance_id()
+ObjectID wipe_tower_instance_id(size_t bed_idx)
 {
-    static ObjectBase mine;
-    return mine.id();
+    static std::vector<WipeTowerId> mine;
+    if (bed_idx >= mine.size()) {
+        mine.resize(bed_idx + 1);
+    }
+    return mine[bed_idx].id();
 }
 
 ObjectWithTimestamp::Timestamp ObjectWithTimestamp::s_last_timestamp = 1;

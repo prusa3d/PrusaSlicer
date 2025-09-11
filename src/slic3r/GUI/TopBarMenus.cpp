@@ -106,7 +106,7 @@ void TopBarMenus::UpdateAccountMenu()
 void TopBarMenus::RemoveHideLoginItem()
 {
     if (m_hide_login_item)
-        account.Remove(m_hide_login_item);
+        account.Destroy(m_hide_login_item);
 }
 
 void TopBarMenus::Popup(TopBarItemsCtrl* popup_ctrl, wxMenu* menu, wxPoint pos)

@@ -387,7 +387,7 @@ void PrintHostQueueDialog::append_job(const PrintHostJob &job)
     // Both strings are UTF-8 encoded.
     upload_names.emplace_back(job.printhost->get_host(), job.upload_data.upload_path.string());
 
-    wxGetApp().notification_manager()->push_upload_job_notification(job_list->GetItemCount(), (float)size_i / 1024 / 1024, job.upload_data.upload_path.string(), job.printhost->get_host());
+    wxGetApp().notification_manager()->push_upload_job_notification(job_list->GetItemCount(), (float)size_i / 1024 / 1024, job.upload_data.upload_path.string(), job.printhost->get_notification_host());
 }
 
 void PrintHostQueueDialog::on_dpi_changed(const wxRect &suggested_rect)
@@ -467,9 +467,9 @@ void PrintHostQueueDialog::on_progress(Event &evt)
         wxVariant nm, hst;
         job_list->GetValue(nm, evt.job_id, COL_FILENAME);
         job_list->GetValue(hst, evt.job_id, COL_HOST);
-        const wchar_t * nm_str = nm.GetString();
-        const wchar_t * hst_str = hst.GetString();
-        wxGetApp().notification_manager()->set_upload_job_notification_percentage(evt.job_id + 1, into_u8(nm_str), into_u8(hst_str), evt.progress / 100.f);
+        const std::string& nm_str = into_u8(nm.GetString());
+        const std::string& hst_str = into_u8(hst.GetString());
+        wxGetApp().notification_manager()->set_upload_job_notification_percentage(evt.job_id + 1, nm_str, hst_str, evt.progress / 100.f);
     }
 }
 
@@ -528,6 +528,13 @@ void PrintHostQueueDialog::on_info(Event& evt)
         wxGetApp().notification_manager()->set_upload_job_notification_status(evt.job_id + 1, into_u8(evt.status));
     } else if (evt.tag == L"set_complete_off") {
         wxGetApp().notification_manager()->set_upload_job_notification_comp_on_100(evt.job_id + 1, false);
+    } else if (evt.tag == L"prusaconnect_printer_address") {
+        wxGetApp().notification_manager()->set_upload_job_notification_hypertext(evt.job_id + 1
+            , [evt](wxEvtHandler *) {
+                wxGetApp().mainframe->show_connect_tab(into_u8(evt.status));
+                return false ;
+            }
+            );
     }
 }
 

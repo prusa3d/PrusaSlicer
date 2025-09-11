@@ -1,11 +1,17 @@
 #include "libslic3r/GCode/SeamGeometry.hpp"
-#include "ClipperUtils.hpp"
-#include "KDTreeIndirect.hpp"
-#include "Layer.hpp"
-#include <fstream>
+
 #include <numeric>
-#include <oneapi/tbb/blocked_range.h>
-#include <oneapi/tbb/parallel_for.h>
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <cinttypes>
+
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/AABBTreeLines.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
 
 namespace Slic3r::Seams::Geometry {
 
@@ -60,7 +66,7 @@ Vec2d get_polygon_normal(
     std::optional<std::size_t> previous_index;
     std::optional<std::size_t> next_index;
 
-    visit_near_forward(index, points.size(), [&](const std::size_t index_candidate) {
+    visit_forward(index, points.size(), [&](const std::size_t index_candidate) {
         if (index == index_candidate) {
             return false;
         }
@@ -71,7 +77,7 @@ Vec2d get_polygon_normal(
         }
         return false;
     });
-    visit_near_backward(index, points.size(), [&](const std::size_t index_candidate) {
+    visit_backward(index, points.size(), [&](const std::size_t index_candidate) {
         const double distance{(points[index_candidate] - points[index]).norm()};
         if (distance > min_arm_length) {
             previous_index = index_candidate;
@@ -132,12 +138,14 @@ Extrusion::Extrusion(
     Polygon &&polygon,
     BoundingBox bounding_box,
     const double width,
-    const ExPolygon &island_boundary
+    const ExPolygon &island_boundary,
+    Overhangs &&overhangs
 )
-    : polygon(polygon)
+    : polygon(std::move(polygon))
     , bounding_box(std::move(bounding_box))
     , width(width)
-    , island_boundary(island_boundary) {
+    , island_boundary(island_boundary)
+    , overhangs(std::move(overhangs)) {
     this->island_boundary_bounding_boxes.push_back(island_boundary.contour.bounding_box());
 
     std::transform(
@@ -145,6 +153,66 @@ Extrusion::Extrusion(
         std::back_inserter(this->island_boundary_bounding_boxes),
         [](const Polygon &polygon) { return polygon.bounding_box(); }
     );
+}
+
+Overhangs get_overhangs(const ExtrusionPaths& paths) {
+    if (paths.empty()) {
+        return {};
+    }
+
+    Overhangs result;
+    std::optional<Point> start_point;
+    if (paths.front().role().is_bridge()) {
+        start_point = paths.front().first_point();
+    }
+    Point previous_last_point{paths.front().last_point()};
+    for (const ExtrusionPath& path : tcb::span{paths}.subspan(1)) {
+        if(path.role().is_bridge() && !start_point) {
+            start_point = path.first_point();
+        }
+        if(!path.role().is_bridge() && start_point) {
+            result.push_back(Overhang{*start_point, previous_last_point});
+            start_point = std::nullopt;
+        }
+        previous_last_point = path.last_point();
+    }
+    if (start_point) {
+        result.push_back(Overhang{*start_point, previous_last_point});
+    }
+    return result;
+}
+
+Overhangs get_overhangs(const ExtrusionEntity *entity) {
+    Overhangs result;
+    if (auto path{dynamic_cast<const ExtrusionPath *>(entity)}) {
+        if(path->role().is_bridge()) {
+            result.emplace_back(Overhang{
+                path->first_point(),
+                path->last_point()
+            });
+        }
+    } else if (auto path{dynamic_cast<const ExtrusionMultiPath *>(entity)}) {
+        const Overhangs overhangs{get_overhangs(path->paths)};
+        result.insert(result.end(), overhangs.begin(), overhangs.end());
+    } else if (auto path{dynamic_cast<const ExtrusionLoop *>(entity)}) {
+        const bool bridge_loop{std::all_of(
+            path->paths.begin(),
+            path->paths.end(),
+            [](const ExtrusionPath& path){
+                return path.role().is_bridge();
+            }
+        )};
+
+        if (bridge_loop) {
+            result.emplace_back(LoopOverhang{});
+        } else {
+            const Overhangs overhangs{get_overhangs(path->paths)};
+            result.insert(result.end(), overhangs.begin(), overhangs.end());
+        }
+    } else {
+        throw std::runtime_error{"Unknown extrusion entity!"};
+    }
+    return result;
 }
 
 Geometry::Extrusions get_external_perimeters(const Slic3r::Layer &layer, const LayerSlice &slice) {
@@ -157,10 +225,11 @@ Geometry::Extrusions get_external_perimeters(const Slic3r::Layer &layer, const L
             )};
             for (const ExtrusionEntity *entity : *collection) {
                 if (entity->role().is_external_perimeter()) {
+                    Overhangs overhangs{get_overhangs(entity)};
                     Polygon polygon{entity->as_polyline().points};
                     const BoundingBox bounding_box{polygon.bounding_box()};
                     const double width{layer_region.flow(FlowRole::frExternalPerimeter).width()};
-                    result.emplace_back(std::move(polygon), bounding_box, width, island.boundary);
+                    result.emplace_back(std::move(polygon), bounding_box, width, island.boundary, std::move(overhangs));
                 }
             }
         }
@@ -209,19 +278,33 @@ BoundedPolygons project_to_geometry(const Geometry::Extrusions &external_perimet
             )};
 
             if (distance > max_bb_distance) {
-                Polygons expanded_extrusion{expand(external_perimeter.polygon, external_perimeter.width / 2.0)};
+                const Polygons expanded_extrusion{expand(external_perimeter.polygon, Slic3r::scaled(external_perimeter.width / 2.0))};
                 if (!expanded_extrusion.empty()) {
                     return BoundedPolygon{
-                        expanded_extrusion.front(), expanded_extrusion.front().bounding_box(), external_perimeter.polygon.is_clockwise()
+                        expanded_extrusion.front(),
+                        external_perimeter.overhangs,
+                        expanded_extrusion.front().bounding_box(),
+                        external_perimeter.polygon.is_clockwise(),
                     };
                 }
+                return BoundedPolygon{
+                    external_perimeter.polygon,
+                    external_perimeter.overhangs,
+                    external_perimeter.polygon.bounding_box(),
+                    external_perimeter.polygon.is_clockwise()
+                };
             }
 
             const bool is_hole{choosen_index != 0};
             const Polygon &adjacent_boundary{
                 !is_hole ? external_perimeter.island_boundary.contour :
                            external_perimeter.island_boundary.holes[choosen_index - 1]};
-            return BoundedPolygon{adjacent_boundary, external_perimeter.island_boundary_bounding_boxes[choosen_index], is_hole};
+            return BoundedPolygon{
+                adjacent_boundary,
+                external_perimeter.overhangs,
+                external_perimeter.island_boundary_bounding_boxes[choosen_index],
+                is_hole,
+            };
         }
     );
     return result;
@@ -253,14 +336,14 @@ std::vector<Vec2d> oversample_edge(const Vec2d &from, const Vec2d &to, const dou
     return result;
 }
 
-void visit_near_forward(
+void visit_forward(
     const std::size_t start_index,
     const std::size_t loop_size,
     const std::function<bool(std::size_t)> &visitor
 ) {
     std::size_t last_index{loop_size - 1};
     std::size_t index{start_index};
-    for (unsigned _{0}; _ < 30; ++_) { // Do not visit too far.
+    for (unsigned _{0}; _ < loop_size + 1; ++_) {
         if (visitor(index)) {
             return;
         }
@@ -268,14 +351,14 @@ void visit_near_forward(
     }
 }
 
-void visit_near_backward(
+void visit_backward(
     const std::size_t start_index,
     const std::size_t loop_size,
     const std::function<bool(std::size_t)> &visitor
 ) {
     std::size_t last_index{loop_size - 1};
     std::size_t index{start_index == 0 ? loop_size - 1 : start_index - 1};
-    for (unsigned _{0}; _ < 30; ++_) { // Do not visit too far.
+    for (unsigned _{0}; _ < loop_size; ++_) {
         if (visitor(index)) {
             return;
         }
@@ -310,34 +393,6 @@ Points scaled(const std::vector<Vec2d> &points) {
     return result;
 }
 
-std::vector<double> get_embedding_distances(
-    const std::vector<Vec2d> &points, const AABBTreeLines::LinesDistancer<Linef> &perimeter_distancer
-) {
-    std::vector<double> result;
-    result.reserve(points.size());
-    using std::transform, std::back_inserter;
-    transform(points.begin(), points.end(), back_inserter(result), [&](const Vec2d &point) {
-        const double distance{perimeter_distancer.distance_from_lines<true>(point)};
-        return distance < 0 ? -distance : 0.0;
-    });
-    return result;
-}
-
-std::vector<double> get_overhangs(
-    const std::vector<Vec2d> &points,
-    const AABBTreeLines::LinesDistancer<Linef> &previous_layer_perimeter_distancer,
-    const double layer_height
-) {
-    std::vector<double> result;
-    result.reserve(points.size());
-    using std::transform, std::back_inserter;
-    transform(points.begin(), points.end(), back_inserter(result), [&](const Vec2d &point) {
-        const double distance{previous_layer_perimeter_distancer.distance_from_lines<true>(point)};
-        return distance > 0 ? M_PI / 2 - std::atan(layer_height / distance) : 0.0;
-    });
-    return result;
-}
-
 // Measured from outside, convex is positive
 std::vector<double> get_vertex_angles(const std::vector<Vec2d> &points, const double min_arm_length) {
     std::vector<double> result;
@@ -347,7 +402,7 @@ std::vector<double> get_vertex_angles(const std::vector<Vec2d> &points, const do
         std::optional<std::size_t> previous_index;
         std::optional<std::size_t> next_index;
 
-        visit_near_forward(index, points.size(), [&](const std::size_t index_candidate) {
+        visit_forward(index, points.size(), [&](const std::size_t index_candidate) {
             if (index == index_candidate) {
                 return false;
             }
@@ -358,7 +413,7 @@ std::vector<double> get_vertex_angles(const std::vector<Vec2d> &points, const do
             }
             return false;
         });
-        visit_near_backward(index, points.size(), [&](const std::size_t index_candidate) {
+        visit_backward(index, points.size(), [&](const std::size_t index_candidate) {
             const double distance{(points[index_candidate] - points[index]).norm()};
             if (distance > min_arm_length) {
                 previous_index = index_candidate;
@@ -413,4 +468,5 @@ Polygon to_polygon(const ExtrusionLoop &loop) {
     }
     return Polygon{loop_points};
 }
+
 } // namespace Slic3r::Seams::Geometry

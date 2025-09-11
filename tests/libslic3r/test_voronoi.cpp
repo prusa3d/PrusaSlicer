@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <libslic3r/Polygon.hpp>
 #include <libslic3r/Polyline.hpp>
@@ -6,6 +6,7 @@
 #include <libslic3r/Geometry/VoronoiOffset.hpp>
 
 #include <numeric>
+#include <random>
 
 //#define VORONOI_DEBUG_OUT
 
@@ -2282,3 +2283,81 @@ TEST_CASE("Voronoi cell doesn't contain a source point - SPE-2298", "[VoronoiCel
 
     REQUIRE(vd.is_valid());
 }
+// */
+
+/*
+//#include <libslic3r/SLA/SupportIslands/LineUtils.hpp>
+TEST_CASE("bad vertex cause overflow of data type precisin when use VD result", "[VoronoiDiagram]")
+{
+    // Points are almost in line
+    Points points = {
+        {-106641371, 61644934},
+        {-56376476, 32588892},
+        {0, 0}
+    };
+
+    //auto perp_distance = sla::LineUtils::perp_distance;
+    auto perp_distance = [](const Linef &line, Vec2d p) {
+        Vec2d v  = line.b - line.a; // direction
+        Vec2d va = p - line.a;
+        return std::abs(cross2(v, va)) / v.norm();
+    };
+
+    using VD      = Slic3r::Geometry::VoronoiDiagram;
+    VD vd;
+    vd.construct_voronoi(points.begin(), points.end());
+
+    // edge between source index 0 and 1 has bad vertex
+    size_t bad_index0 = 0;
+    size_t bad_index1 = 1;
+    for (auto &edge : vd.edges()) {
+        size_t i1 = edge.cell()->source_index();
+        size_t i2 = edge.twin()->cell()->source_index();
+        if ((i1 == bad_index0 && i2 == bad_index1) ||
+            (i1 == bad_index1 && i2 == bad_index0)) {
+            Vec2d p1 = points[bad_index0].cast<double>();
+            Vec2d p2 = points[bad_index1].cast<double>();
+            Vec2d middle = (p1 + p2) / 2;
+            // direction for edge is perpendicular point connection
+            Vec2d direction(p2.y() - p1.y(), p1.x() - p2.x());
+            const VD::vertex_type *vrtx = (edge.vertex0() == nullptr) ?
+                                                edge.vertex1() :
+                                                edge.vertex0();
+            if (vrtx == nullptr) continue;
+            Vec2d vertex(vrtx->x(), vrtx->y());
+
+            double point_distance = (p1 - p2).norm();
+            [[maybe_unused]] double half_point_distance = point_distance / 2;
+
+            Linef line_from_middle(middle, middle + direction); // line between source points
+            double distance_vertex = perp_distance(line_from_middle, vertex);
+            [[maybe_unused]] double distance_p1 = perp_distance(line_from_middle, p1);
+            [[maybe_unused]] double distance_p2 = perp_distance(line_from_middle, p2);
+
+            Linef line_from_vertex(vertex, vertex + direction);
+            [[maybe_unused]] double distance_middle = perp_distance(line_from_vertex, middle);
+            [[maybe_unused]] double distance_p1_ = perp_distance(line_from_vertex, p1);
+            [[maybe_unused]] double distance_p2_ = perp_distance(line_from_vertex, p2);
+
+            double maximal_distance = 9e6;
+            Vec2d  vertex_direction = (vertex - middle);
+            Vec2d  vertex_dir_abs(fabs(vertex_direction.x()),
+                                 fabs(vertex_direction.y()));
+            double divider = (vertex_dir_abs.x() > vertex_dir_abs.y()) ?
+                                 vertex_dir_abs.x() / maximal_distance :
+                                 vertex_dir_abs.y() / maximal_distance;
+            Vec2d  vertex_dir_short = vertex_direction / divider;
+            Vec2d start_point      = middle + vertex_dir_short;
+            Linef  line_short(start_point, start_point + direction);
+            double distance_short_vertex  = perp_distance(line_short, vertex);
+            double distance_short_middle = perp_distance(line_short, middle);
+            [[maybe_unused]] double distance_p1_short = perp_distance(line_short, p1);
+            [[maybe_unused]] double distance_p2_short = perp_distance(line_short, p2);
+
+            CHECK(distance_vertex < 10);
+            //CHECK(distance_middle < 10); // This is bad
+            CHECK(distance_short_vertex < 10);
+            CHECK(distance_short_middle < 10);
+        }
+    }
+}*/

@@ -4,7 +4,15 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "MultiPoint.hpp"
+
+#include <cmath>
+#include <limits>
+#include <queue>
+#include <cstdlib>
+
 #include "BoundingBox.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

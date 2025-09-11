@@ -1,6 +1,6 @@
 add_cmake_project(ZLIB
-  URL https://github.com/madler/zlib/archive/refs/tags/v1.2.11.zip
-  URL_HASH SHA256=f5cc4ab910db99b2bdbba39ebbdc225ffc2aa04b4057bc2817f1b94b6978cfc3
+  URL https://github.com/madler/zlib/releases/download/v1.3.1/zlib131.zip
+  URL_HASH SHA256=72af66d44fcc14c22013b46b814d5d2514673dda3d115e64b690c1ad636e7b17
   PATCH_COMMAND ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/0001-Respect-BUILD_SHARED_LIBS.patch
   CMAKE_ARGS
     -DSKIP_INSTALL_FILES=ON         # Prevent installation of man pages et al.

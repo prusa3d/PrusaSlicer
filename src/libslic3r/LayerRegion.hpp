@@ -1,17 +1,36 @@
 #ifndef slic3r_LayerRegion_hpp_
 #define slic3r_LayerRegion_hpp_
 
+#include <assert.h>
+#include <stdint.h>
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+
 #include "BoundingBox.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "SurfaceCollection.hpp"
 #include "libslic3r/Algorithm/RegionExpansion.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/Surface.hpp"
 
 
 namespace Slic3r {
 
 class Layer;
+class PrintObject;
+
 using LayerPtrs = std::vector<Layer*>;
 class PrintRegion;
+
+struct PerimeterRegion;
+using PerimeterRegions = std::vector<PerimeterRegion>;
 
 // Range of indices, providing support for range based loops.
 template<typename T>
@@ -103,6 +122,8 @@ public:
     void    make_perimeters(
         // Input slices for which the perimeters, gap fills and fill expolygons are to be generated.
         const SurfaceCollection                                &slices,
+        // Configuration regions that will be applied to parts of created perimeters.
+        const PerimeterRegions                                 &perimeter_regions,
         // Ranges of perimeter extrusions and gap fill extrusions per suface, referencing
         // newly created extrusions stored at this LayerRegion.
         std::vector<std::pair<ExtrusionRange, ExtrusionRange>> &perimeter_and_gapfill_ranges,
@@ -136,9 +157,10 @@ protected:
 
 private:
     // Modifying m_slices
-    friend std::string fix_slicing_errors(LayerPtrs&, const std::function<void()>&);
     template<typename ThrowOnCancel>
-    friend void apply_mm_segmentation(PrintObject& print_object, ThrowOnCancel throw_on_cancel);
+    friend void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel);
+    template<typename ThrowOnCancel>
+    friend void apply_fuzzy_skin_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel);
 
     Layer                      *m_layer;
     const PrintRegion          *m_region;

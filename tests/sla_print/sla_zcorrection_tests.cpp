@@ -1,4 +1,6 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <test_utils.hpp>
 
 #include <algorithm>
@@ -7,6 +9,8 @@
 #include "libslic3r/SLA/ZCorrection.hpp"
 #include "libslic3r/MTUtils.hpp"
 #include "libslic3r/SVG.hpp"
+
+using Catch::Approx;
 
 void print_depthmap(std::string_view prefix,
                     const Slic3r::BoundingBox &bb,

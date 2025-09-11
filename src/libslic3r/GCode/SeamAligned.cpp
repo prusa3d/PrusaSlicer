@@ -1,7 +1,17 @@
 #include "libslic3r/GCode/SeamAligned.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <stdexcept>
+#include <utility>
+
 #include "libslic3r/GCode/SeamGeometry.hpp"
 #include "libslic3r/GCode/ModelVisibility.hpp"
-#include <fstream>
+#include "libslic3r/KDTreeIndirect.hpp"
+#include "libslic3r/Line.hpp"
+#include "tcbspan/span.hpp"
 
 namespace Slic3r::Seams::Aligned {
 using Perimeters::PointType;
@@ -31,42 +41,17 @@ const Perimeters::Perimeter::OptionalPointTree &pick_tree(
     throw std::runtime_error("Point tree for classification does not exist.");
 }
 
-unsigned point_value(PointType point_type, PointClassification point_classification) {
-    // Better be explicit than smart.
-    switch (point_type) {
-    case PointType::enforcer:
-        switch (point_classification) {
-        case PointClassification::embedded: return 9;
-        case PointClassification::common: return 8;
-        case PointClassification::overhang: return 7;
-        }
-    case PointType::common:
-        switch (point_classification) {
-        case PointClassification::embedded: return 6;
-        case PointClassification::common: return 5;
-        case PointClassification::overhang: return 4;
-        }
-    case PointType::blocker:
-        switch (point_classification) {
-        case PointClassification::embedded: return 3;
-        case PointClassification::common: return 2;
-        case PointClassification::overhang: return 1;
-        }
-    }
-    return 0;
-}
-
 SeamChoice pick_seam_option(const Perimeters::Perimeter &perimeter, const SeamOptions &options) {
     const std::vector<PointType> &types{perimeter.point_types};
     const std::vector<PointClassification> &classifications{perimeter.point_classifications};
     const std::vector<Vec2d> &positions{perimeter.positions};
 
     unsigned closeset_point_value =
-        point_value(types.at(options.closest), classifications[options.closest]);
+        get_point_value(types.at(options.closest), classifications[options.closest]);
 
     if (options.snapped) {
         unsigned snapped_point_value =
-            point_value(types.at(*options.snapped), classifications[*options.snapped]);
+            get_point_value(types.at(*options.snapped), classifications[*options.snapped]);
         if (snapped_point_value >= closeset_point_value) {
             const Vec2d position{positions.at(*options.snapped)};
             return {*options.snapped, *options.snapped, position};
@@ -74,7 +59,7 @@ SeamChoice pick_seam_option(const Perimeters::Perimeter &perimeter, const SeamOp
     }
 
     unsigned adjacent_point_value =
-        point_value(types.at(options.adjacent), classifications[options.adjacent]);
+        get_point_value(types.at(options.adjacent), classifications[options.adjacent]);
     if (adjacent_point_value < closeset_point_value) {
         const Vec2d position = positions[options.closest];
         return {options.closest, options.closest, position};
@@ -112,8 +97,8 @@ std::optional<std::size_t> snap_to_angle(
         }
         return false;
     }};
-    Geometry::visit_near_backward(search_start, positions.size(), visitor);
-    Geometry::visit_near_forward(search_start, positions.size(), visitor);
+    Geometry::visit_backward(search_start, positions.size(), visitor);
+    Geometry::visit_forward(search_start, positions.size(), visitor);
     if (match) {
         return match;
     }
@@ -121,8 +106,8 @@ std::optional<std::size_t> snap_to_angle(
     min_distance = std::numeric_limits<double>::infinity();
     angle_type = AngleType::concave;
 
-    Geometry::visit_near_backward(search_start, positions.size(), visitor);
-    Geometry::visit_near_forward(search_start, positions.size(), visitor);
+    Geometry::visit_backward(search_start, positions.size(), visitor);
+    Geometry::visit_forward(search_start, positions.size(), visitor);
 
     return match;
 }
@@ -318,7 +303,6 @@ SeamCandidate get_seam_candidate(
                 choice_visibilities[slice_index] >
                 least_visible.visibility + params.jump_visibility_threshold};
             const bool can_be_on_edge{
-                !is_on_edge &&
                 perimeter.angle_types[least_visible.choice.next_index] != AngleType::smooth};
             if (is_too_far || (can_be_on_edge  && is_too_visible)) {
                 candidate = least_visible.choice;

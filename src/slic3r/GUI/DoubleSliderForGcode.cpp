@@ -5,6 +5,8 @@
 
 #include "DoubleSliderForGcode.hpp"
 
+#include <algorithm>
+
 namespace DoubleSlider {
 
 static const float LEFT_MARGIN             = 13.0f + 100.0f;  // avoid thumbnail toolbar

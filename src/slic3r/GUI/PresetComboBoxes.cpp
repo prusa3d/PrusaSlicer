@@ -216,20 +216,28 @@ void PresetComboBox::update_selection()
 // A workaround for a set of issues related to text fitting into gtk widgets:
 // See e.g.: https://github.com/prusa3d/PrusaSlicer/issues/4584
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
-    GList* cells = gtk_cell_layout_get_cells(GTK_CELL_LAYOUT(m_widget));
-
-    // 'cells' contains the GtkCellRendererPixBuf for the icon,
-    // 'cells->next' contains GtkCellRendererText for the text we need to ellipsize
-    if (!cells || !cells->next) return;
-
-    auto cell = static_cast<GtkCellRendererText *>(cells->next->data);
-
-    if (!cell) return;
-
-    g_object_set(G_OBJECT(cell), "ellipsize", PANGO_ELLIPSIZE_END, (char*)NULL);
-
-    // Only the list of cells must be freed, the renderer isn't ours to free
-    g_list_free(cells);
+    GtkWidget* widget = m_widget;
+    if (GTK_IS_CONTAINER(widget)) {
+        GList* children = gtk_container_get_children(GTK_CONTAINER(widget));
+        if (children) {
+            widget = GTK_WIDGET(children->data);
+            g_list_free(children);
+        }
+    }
+    if (GTK_IS_ENTRY(widget)) {
+        // Set ellipsization for the entry
+        gtk_entry_set_width_chars(GTK_ENTRY(widget), 20);  // Adjust this value as needed
+        gtk_entry_set_max_width_chars(GTK_ENTRY(widget), 20);  // Adjust this value as needed
+        // Create a PangoLayout for the entry and set ellipsization
+        PangoLayout* layout = gtk_entry_get_layout(GTK_ENTRY(widget));
+        if (layout) {
+            pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
+        } else {
+            g_warning("Unable to get PangoLayout from GtkEntry");
+        }
+    } else {
+        g_warning("Expected GtkEntry, but got %s", G_OBJECT_TYPE_NAME(widget));
+    }
 #endif
 }
 
@@ -969,18 +977,18 @@ static std::string get_connect_state_suffix_for_printer(const Preset& printer_pr
     if (auto printer_state_map = wxGetApp().plater()->get_user_account()->get_printer_state_map();
         !printer_state_map.empty()) {
         
-        for (const auto& [printer_model_nozzle_pair, states] : printer_state_map) {
-            if (printer_model_nozzle_pair.first == printer_preset.config.opt_string("printer_model")
-                && printer_model_nozzle_pair.second == printer_preset.config.opt_string("printer_variant")) 
-            {
-                PrinterStatesCount states_cnt = get_printe_states_count(states);
-
-                if (states_cnt.available_cnt > 0)
-                    return "_available";
-                if (states_cnt.busy_cnt > 0)
-                    return "_busy";
-                return "_offline";
+        const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(printer_preset);
+        const std::string trimmed_preset_name = printer_preset.trim_vendor_repo_prefix(printer_preset.name, printer_with_vendor.vendor);
+        for (const auto& [preset_name_from_map, states] : printer_state_map) {
+            if (trimmed_preset_name != preset_name_from_map) {
+                continue;
             }
+            PrinterStatesCount states_cnt = get_printe_states_count(states);
+            if (states_cnt.available_cnt > 0)
+                return "_available";
+            if (states_cnt.busy_cnt > 0)
+                return "_busy";
+            return "_offline";
         }
     }
 
@@ -1001,23 +1009,24 @@ static bool fill_data_to_connect_info_line(  const Preset& printer_preset,
     if (auto printer_state_map = wxGetApp().plater()->get_user_account()->get_printer_state_map();
         !printer_state_map.empty()) {
 
-        for (const auto& [printer_model_nozzle_pair, states] : printer_state_map) {
-            if (printer_model_nozzle_pair.first == printer_preset.config.opt_string("printer_model")
-                &&  printer_model_nozzle_pair.second == printer_preset.config.opt_string("printer_variant")) 
-            {
-                PrinterStatesCount states_cnt = get_printe_states_count(states);
-
-#ifdef _WIN32
-                connect_available_info->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.available_cnt), _L("available")));
-                connect_offline_info  ->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.offline_cnt),   _L("offline")));
-                connect_printing_info ->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.busy_cnt),      _L("printing")));
-#else
-                connect_available_info->SetLabel(format_wxstr("%1% ", states_cnt.available_cnt));
-                connect_offline_info  ->SetLabel(format_wxstr("%1% ", states_cnt.offline_cnt));
-                connect_printing_info ->SetLabel(format_wxstr("%1% ", states_cnt.busy_cnt));
-#endif
-                return true;
+        const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(printer_preset);
+        const std::string trimmed_preset_name = printer_preset.trim_vendor_repo_prefix(printer_preset.name, printer_with_vendor.vendor);
+        for (const auto& [preset_name_from_map, states] : printer_state_map) {
+            if (trimmed_preset_name != preset_name_from_map) {
+                continue;
             }
+            
+            PrinterStatesCount states_cnt = get_printe_states_count(states);
+#ifdef _WIN32
+            connect_available_info->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.available_cnt), _L("available")));
+            connect_offline_info  ->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.offline_cnt),   _L("offline")));
+            connect_printing_info ->SetLabelMarkup(format_wxstr("%1% %2%", format("<b>%1%</b>", states_cnt.busy_cnt),      _L("printing")));
+#else
+            connect_available_info->SetLabel(format_wxstr("%1% ", states_cnt.available_cnt));
+            connect_offline_info  ->SetLabel(format_wxstr("%1% ", states_cnt.offline_cnt));
+            connect_printing_info ->SetLabel(format_wxstr("%1% ", states_cnt.busy_cnt));
+#endif
+            return true;
         }
     }
     return false;

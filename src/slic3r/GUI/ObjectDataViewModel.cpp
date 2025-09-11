@@ -68,12 +68,13 @@ struct InfoItemAtributes {
 
 const std::map<InfoItemType, InfoItemAtributes> INFO_ITEMS{
 //           info_item Type                         info_item Name              info_item BitmapName
-            { InfoItemType::CustomSupports,      {L("Paint-on supports"),       "fdm_supports_" },     },
-            { InfoItemType::CustomSeam,          {L("Paint-on seam"),           "seam_" },             },
-            { InfoItemType::CutConnectors,       {L("Connectors"),              "cut_connectors" },    },
-            { InfoItemType::MmuSegmentation,     {L("Multimaterial painting"),  "mmu_segmentation_"},  },
-            { InfoItemType::Sinking,             {L("Sinking"),                 "sinking"},            },
-            { InfoItemType::VariableLayerHeight, {L("Variable layer height"),   "layers"},             },
+            { InfoItemType::CustomSupports,      {L("Paint-on supports"),       "fdm_supports_" },        },
+            { InfoItemType::CustomSeam,          {L("Paint-on seam"),           "seam_" },                },
+            { InfoItemType::CutConnectors,       {L("Connectors"),              "cut_connectors" },       },
+            { InfoItemType::MmSegmentation,      {L("Multimaterial painting"),  "mmu_segmentation_" },    },
+            { InfoItemType::Sinking,             {L("Sinking"),                 "sinking" },              },
+            { InfoItemType::VariableLayerHeight, {L("Variable layer height"),   "layers" },               },
+            { InfoItemType::FuzzySkin,           {L("Paint-on fuzzy skin"),     "fuzzy_skin_painting_" }, },
 };
 
 ObjectDataViewModelNode::ObjectDataViewModelNode(ObjectDataViewModelNode*   parent,

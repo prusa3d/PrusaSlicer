@@ -121,20 +121,20 @@
 #include <cereal/types/base_class.hpp>
 
 #include <clipper/clipper_z.hpp>
-#include "clipper.hpp"
-#include "BoundingBox.hpp"
-#include "ClipperUtils.hpp"
-#include "Config.hpp"
-#include "enum_bitmask.hpp"
-#include "format.hpp"
-#include "I18N.hpp"
-#include "MultiPoint.hpp"
-#include "Point.hpp"
-#include "Polygon.hpp"
-#include "Polyline.hpp"
-#include "SVG.hpp"
+#include "libslic3r/clipper.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/enum_bitmask.hpp"
+#include "libslic3r/format.hpp"
+#include "libslic3r/I18N.hpp"
+#include "libslic3r/MultiPoint.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/SVG.hpp"
 
-#include "libslic3r.h"
+#include "libslic3r/libslic3r.h"
 #include "libslic3r_version.h"
 
 #include <admesh/stl.h>

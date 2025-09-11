@@ -6,12 +6,21 @@
 #ifndef _SLIC3R_FORMAT_PWMX_HPP_
 #define _SLIC3R_FORMAT_PWMX_HPP_
 
+#include <stdint.h>
 #include <string>
+#include <memory>
+#include <utility>
+#include <cinttypes>
 
 #include "SLAArchiveWriter.hpp"
 #include "SLAArchiveFormatRegistry.hpp"
-
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
+#include "libslic3r/SLA/RasterBase.hpp"
+
+namespace Slic3r {
+class SLAPrint;
+}  // namespace Slic3r
 
 constexpr uint16_t ANYCUBIC_SLA_FORMAT_VERSION_1 = 1;
 constexpr uint16_t ANYCUBIC_SLA_FORMAT_VERSION_515 = 515;

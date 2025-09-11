@@ -1,3 +1,4 @@
+#include <catch2/catch_test_macros.hpp>
 #include "test_data.hpp"
 
 #include "libslic3r/TriangleMesh.hpp"
@@ -7,6 +8,8 @@
 #include "libslic3r/Format/OBJ.hpp"
 #include "libslic3r/Format/STL.hpp"
 
+#include <arrange-wrapper/ModelArrange.hpp>
+
 #include <cstdlib>
 #include <string>
 
@@ -14,7 +17,6 @@
 #include <boost/nowide/fstream.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/regex.hpp>
-#include <libslic3r/ModelArrange.hpp>
 
 using namespace std;
 
@@ -254,7 +256,7 @@ void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r
     double distance = min_object_distance(config);
     arr2::ArrangeSettings arrange_settings{};
     arrange_settings.set_distance_from_objects(distance);
-    arr2::ArrangeBed bed{arr2::to_arrange_bed(get_bed_shape(config))};
+    arr2::ArrangeBed bed{arr2::to_arrange_bed(get_bed_shape(config), Vec2crd{0, 0})};
     if (duplicate_count > 1) {
         duplicate(model, duplicate_count, bed, arrange_settings);
     }
@@ -398,7 +400,6 @@ bool contains_regex(const std::string &data, const std::string &pattern)
 
 } } // namespace Slic3r::Test
 
-#include <catch2/catch.hpp>
 
 SCENARIO("init_print functionality", "[test_data]") {
 	GIVEN("A default config") {

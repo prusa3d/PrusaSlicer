@@ -5,14 +5,13 @@
 #ifndef slic3r_ImGuiPureWrap_hpp_
 #define slic3r_ImGuiPureWrap_hpp_
 
+#include <imgui/imgui.h>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
 #include <optional>
 #include <functional>
-
-#include <imgui/imgui.h>
 
 struct IMGUI_API ImGuiWindow;
 

@@ -22,7 +22,11 @@
 #include "slic3r/Utils/FixModelByWin10.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
+#include "libslic3r/ModelProcessing.hpp"
 
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif
 #include "imgui/imgui_internal.h"
 #include "slic3r/GUI/MsgDialog.hpp"
 
@@ -1895,7 +1899,7 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
     // split to parts
     for (int id = int(volumes.size())-1; id >= 0; id--)
         if (volumes[id]->is_splittable() && volumes[id]->is_model_part()) // we have to split just solid volumes
-            volumes[id]->split(1);
+            ModelProcessing::split(volumes[id], 1);
 
     m_parts.clear();
     for (const ModelVolume* volume : volumes) {
@@ -3253,7 +3257,7 @@ Transform3d GLGizmoCut3D::get_cut_matrix(const Selection& selection)
     return translation_transform(cut_center_offset) * m_rotation_m;
 }
 
-void update_object_cut_id(CutObjectBase& cut_id, ModelObjectCutAttributes attributes, const int dowels_count)
+void update_object_cut_id(CutId& cut_id, ModelObjectCutAttributes attributes, const int dowels_count)
 {
     // we don't save cut information, if result will not contains all parts of initial object
     if (!attributes.has(ModelObjectCutAttribute::KeepUpper) ||
@@ -3261,7 +3265,7 @@ void update_object_cut_id(CutObjectBase& cut_id, ModelObjectCutAttributes attrib
         attributes.has(ModelObjectCutAttribute::InvalidateCutInfo))
         return;
 
-    if (cut_id.id().invalid())
+    if (! cut_id.valid())
         cut_id.init();
     // increase check sum, if it's needed
     {
@@ -3290,8 +3294,8 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
         if (connectors_count != connectors_names.size())
             err_objects_names.push_back(object->name);
 
-        // check manifol/repairs
-        auto stats = object->get_object_stl_stats();
+        // check manifold/repairs
+        auto stats = ModelProcessing::get_object_mesh_stats(object);
         if (!stats.manifold() || stats.repaired())
             err_objects_idxs.push_back(obj_idx);
         obj_idx++;
@@ -3374,11 +3378,11 @@ static void check_objects_after_cut(const ModelObjectPtrs& objects)
     }
 }
 
-void synchronize_model_after_cut(Model& model, const CutObjectBase& cut_id)
+void synchronize_model_after_cut(Model& model, const CutId& cut_id)
 {
     for (ModelObject* obj : model.objects)
         if (obj->is_cut() && obj->cut_id.has_same_id(cut_id) && !obj->cut_id.is_equal(cut_id))
-            obj->cut_id.copy(cut_id);
+            obj->cut_id = cut_id;
 }
 
 void GLGizmoCut3D::perform_cut(const Selection& selection)
@@ -3429,7 +3433,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                                               only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
                                               only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) |
                                               only_if(dowels_count > 0, ModelObjectCutAttribute::CreateDowels) |
-                                              only_if(!has_connectors && !cut_with_groove && cut_mo->cut_id.id().invalid(), ModelObjectCutAttribute::InvalidateCutInfo);
+                                              only_if(!has_connectors && !cut_with_groove && ! cut_mo->cut_id.valid(), ModelObjectCutAttribute::InvalidateCutInfo);
 
         // update cut_id for the cut object in respect to the attributes
         update_object_cut_id(cut_mo->cut_id, attributes, dowels_count);
@@ -3442,7 +3446,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         check_objects_after_cut(new_objects);
 
         // save cut_id to post update synchronization
-        const CutObjectBase cut_id = cut_mo->cut_id;
+        const CutId cut_id = cut_mo->cut_id;
 
         // update cut results on plater and in the model 
         plater->apply_cut_object_to_model(object_idx, new_objects);

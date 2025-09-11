@@ -3,19 +3,21 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <memory.h>
+#include <fast_float.h>
+#include <boost/algorithm/string/predicate.hpp>
 #include <cstring>
-#include <cfloat>
 #include <algorithm>
+#include <array>
+#include <iterator>
+#include <limits>
+#include <cctype>
+#include <cstdlib>
 
-#include "../libslic3r.h"
-#include "../PrintConfig.hpp"
-#include "../LocalesUtils.hpp"
-#include "../GCode.hpp"
-
-#include "PressureEqualizer.hpp"
-#include "fast_float/fast_float.h"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/GCode.hpp"
 #include "GCodeWriter.hpp"
+#include "libslic3r/GCode/PressureEqualizer.hpp"
+#include "libslic3r/Exception.hpp"
 
 namespace Slic3r {
 
@@ -23,6 +25,7 @@ static const std::string EXTRUSION_ROLE_TAG = ";_EXTRUSION_ROLE:";
 static const std::string EXTRUDE_END_TAG = ";_EXTRUDE_END";
 static const std::string EXTRUDE_SET_SPEED_TAG = ";_EXTRUDE_SET_SPEED";
 static const std::string EXTERNAL_PERIMETER_TAG = ";_EXTERNAL_PERIMETER";
+static const std::string INTERNAL_PERIMETER_TAG = ";_INTERNAL_PERIMETER";
 
 // Maximum segment length to split a long segment if the initial and the final flow rate differ.
 // Smaller value means a smoother transition between two different flow rates.
@@ -38,6 +41,11 @@ static constexpr int max_look_back_limit = 128;
 // This exists because often there are tiny travel moves between stuff like infill.
 // Lines where some extruder pressure will remain (so we should equalize between these small travels).
 static constexpr double max_ignored_gap_between_extruding_segments = 3.;
+
+// Minimum feedrate change that will be emitted into the G-code.
+// Changes below this value will not be emitted into the G-code to filter out tiny changes
+// of feedrate and reduce the size of the G-code.
+static constexpr float min_emitted_feedrate_change = 0.20f * 60.f;
 
 PressureEqualizer::PressureEqualizer(const Slic3r::GCodeConfig &config) : m_use_relative_e_distances(config.use_relative_e_distances.value)
 {
@@ -261,10 +269,13 @@ static inline float parse_float(const char *&line, const size_t line_length)
 bool PressureEqualizer::process_line(const char *line, const char *line_end, GCodeLine &buf)
 {
     const size_t len = line_end - line;
+    const std::string str_line(line, line_end);
     if (strncmp(line, EXTRUSION_ROLE_TAG.data(), EXTRUSION_ROLE_TAG.length()) == 0) {
         line += EXTRUSION_ROLE_TAG.length();
         int role = atoi(line);
         m_current_extrusion_role = GCodeExtrusionRole(role);
+        m_current_perimeter_index.reset();
+
 #ifdef PRESSURE_EQUALIZER_DEBUG
         ++line_idx;
 #endif
@@ -290,9 +301,9 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     buf.volumetric_extrusion_rate_end = 0.f;
     buf.max_volumetric_extrusion_rate_slope_positive = 0.f;
     buf.max_volumetric_extrusion_rate_slope_negative = 0.f;
-    buf.extrusion_role = m_current_extrusion_role;
+    buf.extrusion_role  = m_current_extrusion_role;
+    buf.perimeter_index = m_current_perimeter_index;
 
-    std::string str_line(line, line_end);
     const bool found_extrude_set_speed_tag = boost::contains(str_line, EXTRUDE_SET_SPEED_TAG);
     const bool found_extrude_end_tag = boost::contains(str_line, EXTRUDE_END_TAG);
     assert(!found_extrude_set_speed_tag || !found_extrude_end_tag);
@@ -322,8 +333,6 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
         {
             // G0, G1: A FFF 3D printer does not make a difference between the two.
             buf.adjustable_flow = this->opened_extrude_set_speed_block;
-            buf.extrude_set_speed_tag = found_extrude_set_speed_tag;
-            buf.extrude_end_tag = found_extrude_end_tag;
             float new_pos[5];
             memcpy(new_pos, m_current_pos, sizeof(float)*5);
             bool  changed[5] = { false, false, false, false, false };
@@ -354,6 +363,26 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
                     eatws(line);
                 }
             }
+
+            if (m_current_extrusion_role == GCodeExtrusionRole::ExternalPerimeter) {
+                m_current_perimeter_index = 0;
+            } else if (m_current_extrusion_role == GCodeExtrusionRole::Perimeter) {
+                auto internal_perimeter_it_range = boost::find_last(str_line, INTERNAL_PERIMETER_TAG);
+                if (!internal_perimeter_it_range.empty()) {
+                    uint16_t    perimetr_index = 0;
+                    const char* start_ptr      = str_line.data() + std::distance(str_line.begin(), internal_perimeter_it_range.end());
+                    const char* end_ptr        = str_line.data() + str_line.size();
+                    const auto  res            = std::from_chars(start_ptr, end_ptr,perimetr_index);
+                    if (res.ec == std::errc()) {
+                        m_current_perimeter_index = perimetr_index;
+                    }
+                }
+            } else {
+                m_current_perimeter_index.reset();
+            }
+
+            buf.perimeter_index = m_current_perimeter_index;
+
             if (changed[3]) {
                 // Extrusion, retract or unretract.
                 float diff = new_pos[3] - m_current_pos[3];
@@ -475,6 +504,30 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     return true;
 }
 
+void PressureEqualizer::GCodeLine::update_end_position(const float *position_end, const bool *position_provided_original)
+{
+    assert(position_end != nullptr);
+    if (position_end == nullptr)
+        return;
+
+    for (int i = 0; i < 4; ++i) {
+        this->pos_end[i]      = position_end[i];
+        this->pos_provided[i] = position_provided_original[i] || (this->pos_end[i] != this->pos_start[i]);
+    }
+}
+
+void PressureEqualizer::GCodeLine::update_end_position(const float *position_start, const float *position_end, const float t, const bool *position_provided_original)
+{
+    assert(position_start != nullptr && position_end != nullptr);
+    if (position_start == nullptr || position_end == nullptr)
+        return;
+
+    for (size_t i = 0; i < 4; ++i) {
+        this->pos_end[i]      = position_start[i] + (position_end[i] - position_start[i]) * t;
+        this->pos_provided[i] = position_provided_original[i] || (this->pos_end[i] != this->pos_start[i]);
+    }
+}
+
 void PressureEqualizer::output_gcode_line(const size_t line_idx)
 {
     GCodeLine &line = m_gcode_lines[line_idx];
@@ -491,21 +544,27 @@ void PressureEqualizer::output_gcode_line(const size_t line_idx)
         comment = nullptr;
 
     // Emit the line with lowered extrusion rates.
-    float l = line.dist_xyz();
-    if (auto nSegments = size_t(ceil(l / max_segment_length)); nSegments == 1) { // Just update this segment.
+    const float l              = line.dist_xyz();
+    const float feedrate_start = line.volumetric_extrusion_rate_start * line.feedrate() / line.volumetric_extrusion_rate;
+    const float feedrate_end   = line.volumetric_extrusion_rate_end   * line.feedrate() / line.volumetric_extrusion_rate;
+    const float feedrate_avg   = 0.5f * (feedrate_start + feedrate_end);
+    if (std::abs(feedrate_avg - line.pos_end[4]) <= min_emitted_feedrate_change) {
+        // The average feedrate is close to the original feedrate, so we emit the line with the original feedrate.
+        push_line_to_output(line_idx, line.pos_end[4], comment);
+    } else if (auto nSegments = size_t(ceil(l / max_segment_length)); nSegments == 1) { // Just update this segment.
         push_line_to_output(line_idx, line.feedrate() * line.volumetric_correction_avg(), comment);
     } else {
         bool accelerating = line.volumetric_extrusion_rate_start < line.volumetric_extrusion_rate_end;
         // Update the initial and final feed rate values.
-        line.pos_start[4] = line.volumetric_extrusion_rate_start * line.pos_end[4] / line.volumetric_extrusion_rate;
-        line.pos_end  [4] = line.volumetric_extrusion_rate_end   * line.pos_end[4] / line.volumetric_extrusion_rate;
-        float feed_avg = 0.5f * (line.pos_start[4] + line.pos_end[4]);
+        line.pos_start[4] = feedrate_start;
+        line.pos_end  [4] = feedrate_end;
+
         // Limiting volumetric extrusion rate slope for this segment.
         float max_volumetric_extrusion_rate_slope = accelerating ? line.max_volumetric_extrusion_rate_slope_positive :
                                                                    line.max_volumetric_extrusion_rate_slope_negative;
         // Total time for the segment, corrected for the possibly lowered volumetric feed rate,
         // if accelerating / decelerating over the complete segment.
-        float t_total = line.dist_xyz() / feed_avg;
+        float t_total = line.dist_xyz() / feedrate_avg;
         // Time of the acceleration / deceleration part of the segment, if accelerating / decelerating
         // with the maximum volumetric extrusion rate slope.
         float t_acc    = 0.5f * (line.volumetric_extrusion_rate_start + line.volumetric_extrusion_rate_end) / max_volumetric_extrusion_rate_slope;
@@ -513,7 +572,7 @@ void PressureEqualizer::output_gcode_line(const size_t line_idx)
         float l_steady = 0.f;
         if (t_acc < t_total) {
             // One may achieve higher print speeds if part of the segment is not speed limited.
-            l_acc    = t_acc * feed_avg;
+            l_acc    = t_acc * feedrate_avg;
             l_steady = l - l_acc;
             if (l_steady < 0.5f * max_segment_length) {
                 l_acc    = l;
@@ -521,11 +580,15 @@ void PressureEqualizer::output_gcode_line(const size_t line_idx)
             } else
                 nSegments = size_t(ceil(l_acc / max_segment_length));
         }
+
         float pos_start[5];
         float pos_end[5];
         float pos_end2[4];
         memcpy(pos_start, line.pos_start, sizeof(float) * 5);
         memcpy(pos_end, line.pos_end, sizeof(float) * 5);
+
+        bool pos_provided_original[5];
+        memcpy(pos_provided_original, line.pos_provided, sizeof(bool) * 5);
         if (l_steady > 0.f) {
             // There will be a steady feed segment emitted.
             if (accelerating) {
@@ -534,15 +597,11 @@ void PressureEqualizer::output_gcode_line(const size_t line_idx)
                 float t = l_acc / l;
                 for (int i = 0; i < 4; ++ i) {
                     pos_end[i] = pos_start[i] + (pos_end[i] - pos_start[i]) * t;
-                    line.pos_provided[i] = true;
                 }
             } else {
                 // Emit the steady feed rate segment.
-                float t = l_steady / l;
-                for (int i = 0; i < 4; ++ i) {
-                    line.pos_end[i] = pos_start[i] + (pos_end[i] - pos_start[i]) * t;
-                    line.pos_provided[i] = true;
-                }
+                const float t = l_steady / l;
+                line.update_end_position(pos_start, pos_end, t, pos_provided_original);
                 push_line_to_output(line_idx, pos_start[4], comment);
                 comment = nullptr;
 
@@ -555,29 +614,23 @@ void PressureEqualizer::output_gcode_line(const size_t line_idx)
                 pos_start[4] = new_pos_start_feedrate;
             }
         }
+
         // Split the segment into pieces.
         for (size_t i = 1; i < nSegments; ++ i) {
-            float t = float(i) / float(nSegments);
-            for (size_t j = 0; j < 4; ++ j) {
-                line.pos_end[j] = pos_start[j] + (pos_end[j] - pos_start[j]) * t;
-                line.pos_provided[j] = true;
-            }
+            const float t = float(i) / float(nSegments);
+            line.update_end_position(pos_start, pos_end, t, pos_provided_original);
+
             // Interpolate the feed rate at the center of the segment.
             push_line_to_output(line_idx, pos_start[4] + (pos_end[4] - pos_start[4]) * (float(i) - 0.5f) / float(nSegments), comment);
             comment = nullptr;
             memcpy(line.pos_start, line.pos_end, sizeof(float)*5);
         }
+
         if (l_steady > 0.f && accelerating) {
-            for (int i = 0; i < 4; ++ i) {
-                line.pos_end[i] = pos_end2[i];
-                line.pos_provided[i] = true;
-            }
+            line.update_end_position(pos_end2, pos_provided_original);
             push_line_to_output(line_idx, pos_end[4], comment);
         } else {
-            for (int i = 0; i < 4; ++ i) {
-                line.pos_end[i] = pos_end[i];
-                line.pos_provided[i] = true;
-            }
+            line.update_end_position(pos_end, pos_provided_original);
             push_line_to_output(line_idx, pos_end[4], comment);
         }
     }
@@ -638,7 +691,7 @@ void PressureEqualizer::adjust_volumetric_rate(const size_t first_line_idx, cons
             }
 
             if (line.adjustable_flow) {
-                float rate_start = rate_end + rate_slope * line.time_corrected();
+                float rate_start = sqrt(rate_end * rate_end + 2 * line.volumetric_extrusion_rate * line.dist_xyz() * rate_slope / line.feedrate());
                 if (rate_start < line.volumetric_extrusion_rate_start) {
                     // Limit the volumetric extrusion rate at the start of this segment due to a segment
                     // of ExtrusionType iRole, which will be extruded in the future.
@@ -695,7 +748,7 @@ void PressureEqualizer::adjust_volumetric_rate(const size_t first_line_idx, cons
             }
 
             if (line.adjustable_flow) {
-                float rate_end = rate_start + rate_slope * line.time_corrected();
+                float rate_end = sqrt(rate_start * rate_start + 2 * line.volumetric_extrusion_rate * line.dist_xyz() * rate_slope / line.feedrate());
                 if (rate_end < line.volumetric_extrusion_rate_end) {
                     // Limit the volumetric extrusion rate at the start of this segment due to a segment
                     // of ExtrusionType iRole, which was extruded before.
@@ -774,8 +827,10 @@ inline bool is_just_line_with_extrude_set_speed_tag(const std::string &line)
     return p_line <= line_end && is_eol(*p_line);
 }
 
-void PressureEqualizer::push_line_to_output(const size_t line_idx, const float new_feedrate, const char *comment)
-{
+void PressureEqualizer::push_line_to_output(const size_t line_idx, float new_feedrate, const char *comment) {
+    // Ensure the minimum feedrate will not be below 1 mm/s.
+    new_feedrate = std::max(60.f, new_feedrate);
+
     const GCodeLine &line = m_gcode_lines[line_idx];
     if (line_idx > 0 && output_buffer_length > 0) {
         const std::string prev_line_str = std::string(output_buffer.begin() + int(this->output_buffer_prev_length),
@@ -790,8 +845,12 @@ void PressureEqualizer::push_line_to_output(const size_t line_idx, const float n
     GCodeG1Formatter feedrate_formatter;
     feedrate_formatter.emit_f(new_feedrate);
     feedrate_formatter.emit_string(std::string(EXTRUDE_SET_SPEED_TAG.data(), EXTRUDE_SET_SPEED_TAG.length()));
-    if (line.extrusion_role == GCodeExtrusionRole::ExternalPerimeter)
+    if (line.extrusion_role == GCodeExtrusionRole::ExternalPerimeter) {
         feedrate_formatter.emit_string(std::string(EXTERNAL_PERIMETER_TAG.data(), EXTERNAL_PERIMETER_TAG.length()));
+    } else if (line.extrusion_role == GCodeExtrusionRole::Perimeter && line.perimeter_index.has_value()) {
+        feedrate_formatter.emit_string(std::string(INTERNAL_PERIMETER_TAG.data(), INTERNAL_PERIMETER_TAG.length()) + std::to_string(*line.perimeter_index));
+    }
+
     push_to_output(feedrate_formatter);
 
     GCodeG1Formatter extrusion_formatter;

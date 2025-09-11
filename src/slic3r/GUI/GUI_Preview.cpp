@@ -21,13 +21,14 @@
 #include "DoubleSliderForLayers.hpp"
 #include "ExtruderSequenceDialog.hpp"
 #include "Plater.hpp"
+#include "Tab.hpp"
 #include "MainFrame.hpp"
 #include "MsgDialog.hpp"
 #include "format.hpp"
 
 #include <wx/listbook.h>
 #include <wx/notebook.h>
-#include <wx/glcanvas.h>
+#include <wx/glcanvas.h> // IWYU pragma: keep
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/choice.h>
@@ -40,6 +41,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "NotificationManager.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 
 #ifdef _WIN32
 #include "BitmapComboBox.hpp"
@@ -183,10 +185,10 @@ void View3D::render()
 
 Preview::Preview(
     wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config,
-    BackgroundSlicingProcess* process, GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process_func)
+    BackgroundSlicingProcess* process, std::vector<GCodeProcessorResult>* gcode_results, std::function<void()> schedule_background_process_func)
     : m_config(config)
     , m_process(process)
-    , m_gcode_result(gcode_result)
+    , m_gcode_results(gcode_results)
     , m_schedule_background_process(schedule_background_process_func)
 {
     if (init(parent, bed, model))
@@ -197,6 +199,11 @@ void Preview::set_layers_slider_values_range(int bottom, int top)
 {
     m_layers_slider->SetSelectionSpan(std::min(top, m_layers_slider->GetMaxPos()),
                                       std::max(bottom, m_layers_slider->GetMinPos()));
+}
+
+GCodeProcessorResult* Preview::active_gcode_result()
+{
+    return &(*m_gcode_results)[s_multiple_beds.get_active_bed()];
 }
 
 bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
@@ -276,11 +283,6 @@ void Preview::set_drop_target(wxDropTarget* target)
         SetDropTarget(target);
 }
 
-void Preview::load_gcode_shells()
-{
-    m_canvas->load_gcode_shells();
-}
-
 void Preview::load_print(bool keep_z_range)
 {
     PrinterTechnology tech = m_process->current_printer_technology();
@@ -299,6 +301,7 @@ void Preview::reload_print()
 
     m_loaded = false;
     load_print();
+    m_layers_slider->seq_top_layer_only(wxGetApp().app_config->get_bool("seq_top_layer_only"));
 }
 
 void Preview::msw_rescale()
@@ -336,14 +339,14 @@ void Preview::render_sliders(GLCanvas3D& canvas)
 
 float Preview::get_moves_slider_height() const
 {
-    if (m_moves_slider && m_moves_slider->IsShown())
+    if (!s_multiple_beds.is_autoslicing() && m_moves_slider && m_moves_slider->IsShown())
         return m_moves_slider->GetHeight();
     return 0.0f;
 }
 
-float Preview::get_layers_slider_width() const
+float Preview::get_layers_slider_width(bool disregard_visibility) const
 {
-    if (m_layers_slider && m_layers_slider->IsShown())
+    if (!s_multiple_beds.is_autoslicing() && m_layers_slider && (m_layers_slider->IsShown() || disregard_visibility))
         return m_layers_slider->GetWidth();
     return 0.0f;
 }
@@ -401,6 +404,7 @@ void Preview::create_sliders()
     m_layers_slider->SetEmUnit(wxGetApp().em_unit());
     m_layers_slider->set_imgui_wrapper(wxGetApp().imgui());
     m_layers_slider->show_estimated_times(wxGetApp().app_config->get_bool("show_estimated_times_in_dbl_slider"));
+    m_layers_slider->seq_top_layer_only(wxGetApp().app_config->get_bool("seq_top_layer_only"));
     m_layers_slider->show_ruler(wxGetApp().app_config->get_bool("show_ruler_in_dbl_slider"), wxGetApp().app_config->get_bool("show_ruler_bg_in_dbl_slider"));
 
     m_layers_slider->SetDrawMode(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA,
@@ -408,14 +412,16 @@ void Preview::create_sliders()
 
     m_layers_slider->set_callback_on_thumb_move( [this]() -> void { Preview::on_layers_slider_scroll_changed(); } );
 
-    m_layers_slider->set_callback_on_change_app_config([](const std::string& key, const std::string& val)   -> void {
+    m_layers_slider->set_callback_on_change_app_config([this](const std::string& key, const std::string& val)   -> void {
         wxGetApp().app_config->set(key, val);
+        if (key == "seq_top_layer_only")
+            reload_print();
     });
 
     if (wxGetApp().is_editor()) {
         m_layers_slider->set_callback_on_ticks_changed([this]()                 -> void {
             Model& model = wxGetApp().plater()->model();
-            model.custom_gcode_per_print_z = m_layers_slider->GetTicksValues();
+            model.custom_gcode_per_print_z() = m_layers_slider->GetTicksValues();
             m_schedule_background_process();
 
             m_keep_current_preview_type = false;
@@ -436,7 +442,7 @@ void Preview::create_sliders()
         });
 
         m_layers_slider->set_callback_on_get_print([]()                         -> const Print& {
-            return GUI::wxGetApp().plater()->fff_print();
+            return GUI::wxGetApp().plater()->active_fff_print();
         });
 
         m_layers_slider->set_callback_on_get_custom_code([](const std::string& code_in, double height) -> std::string 
@@ -456,7 +462,7 @@ void Preview::create_sliders()
                     return "";
 
                 value = into_u8(dlg.GetValue());
-                valid = true;// GUI::Tab::validate_custom_gcode("Custom G-code", value); // !ysFIXME validate_custom_gcode
+                valid = Tab::validate_custom_gcode("Custom G-code", value);
             } while (!valid);
             return value;
         });
@@ -608,15 +614,15 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     Plater* plater = wxGetApp().plater();
     CustomGCode::Info ticks_info_from_model;
     if (wxGetApp().is_editor())
-        ticks_info_from_model = plater->model().custom_gcode_per_print_z;
+        ticks_info_from_model = plater->model().custom_gcode_per_print_z();
     else {
         ticks_info_from_model.mode = CustomGCode::Mode::SingleExtruder;
-        ticks_info_from_model.gcodes = m_gcode_result->custom_gcode_per_print_z;
+        ticks_info_from_model.gcodes = active_gcode_result()->custom_gcode_per_print_z;
     }
     check_layers_slider_values(ticks_info_from_model.gcodes, layers_z);
 
     //first of all update extruder colors to avoid crash, when we are switching printer preset from MM to SM
-    m_layers_slider->SetExtruderColors(plater->get_extruder_color_strings_from_plater_config(wxGetApp().is_editor() ? nullptr : m_gcode_result));
+    m_layers_slider->SetExtruderColors(plater->get_extruder_color_strings_from_plater_config(wxGetApp().is_editor() ? nullptr : active_gcode_result()));
     m_layers_slider->SetSliderValues(layers_z);
     m_layers_slider->force_ruler_update();
     assert(m_layers_slider->GetMinPos() == 0);
@@ -646,9 +652,9 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     bool sequential_print = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("complete_objects");
     m_layers_slider->SetDrawMode(sla_print_technology, sequential_print);
     if (sla_print_technology)
-        m_layers_slider->SetLayersTimes(plater->sla_print().print_statistics().layers_times_running_total);
+        m_layers_slider->SetLayersTimes(plater->active_sla_print().print_statistics().layers_times_running_total);
     else
-        m_layers_slider->SetLayersTimes(m_canvas->get_gcode_layers_times_cache(), m_gcode_result->print_statistics.modes.front().time);
+        m_layers_slider->SetLayersTimes(m_canvas->get_gcode_layers_times_cache(), active_gcode_result()->print_statistics.modes.front().time);
 
     m_layers_slider->Thaw();
 
@@ -663,7 +669,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
     auto get_print_obj_idxs = [plater]() ->std::string {
         if (plater->printer_technology() == ptSLA)
             return "sla";
-        const Print& print = GUI::wxGetApp().plater()->fff_print();
+        const Print& print = GUI::wxGetApp().plater()->active_fff_print();
         std::string idxs;
         for (auto object : print.objects())
             idxs += std::to_string(object->id().id) + "_";
@@ -675,7 +681,7 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
         wxGetApp().app_config->get_bool("allow_auto_color_change") &&
         m_layers_slider->is_new_print(get_print_obj_idxs()))
     {
-        const Print& print = wxGetApp().plater()->fff_print();
+        const Print& print = wxGetApp().plater()->active_fff_print();
 
         //bool is_possible_auto_color_change = false;
         for (auto object : print.objects()) {
@@ -840,7 +846,7 @@ void Preview::update_sliders_from_canvas(wxKeyEvent& event)
 
 void Preview::update_moves_slider(std::optional<int> visible_range_min, std::optional<int> visible_range_max)
 {
-    if (m_gcode_result->moves.empty())
+    if (active_gcode_result()->moves.empty())
         return;
 
     const libvgcode::Interval& range = m_canvas->get_gcode_view_enabled_range();
@@ -936,7 +942,9 @@ void Preview::load_print_as_fff(bool keep_z_range)
     }
 
     if (wxGetApp().is_editor() && !has_layers) {
+        m_canvas->reset_gcode_toolpaths();
         m_canvas->reset_gcode_layers_times_cache();
+        m_canvas->load_gcode_shells();
         hide_layers_slider();
         m_moves_slider->Hide();
         m_canvas_widget->Refresh();
@@ -944,15 +952,16 @@ void Preview::load_print_as_fff(bool keep_z_range)
     }
 
     libvgcode::EViewType gcode_view_type = m_canvas->get_gcode_view_type();
-    const bool gcode_preview_data_valid = !m_gcode_result->moves.empty();
+    const bool gcode_preview_data_valid = !active_gcode_result()->moves.empty();
     const bool is_pregcode_preview = !gcode_preview_data_valid && wxGetApp().is_editor();
 
-    const std::vector<std::string> tool_colors = wxGetApp().plater()->get_extruder_color_strings_from_plater_config(m_gcode_result);
+    const std::vector<std::string> tool_colors = wxGetApp().plater()->get_extruder_color_strings_from_plater_config(active_gcode_result());
     const std::vector<CustomGCode::Item>& color_print_values = wxGetApp().is_editor() ?
-        wxGetApp().plater()->model().custom_gcode_per_print_z.gcodes : m_gcode_result->custom_gcode_per_print_z;
+        wxGetApp().plater()->model().custom_gcode_per_print_z().gcodes : active_gcode_result()->custom_gcode_per_print_z;
+
     std::vector<std::string> color_print_colors;
     if (!color_print_values.empty()) {
-        color_print_colors = wxGetApp().plater()->get_color_strings_for_color_print(m_gcode_result);
+        color_print_colors = wxGetApp().plater()->get_color_strings_for_color_print(active_gcode_result());
         color_print_colors.push_back("#808080"); // gray color for pause print or custom G-code 
     }
 
@@ -962,7 +971,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
         m_canvas->set_selected_extruder(0);
         if (gcode_preview_data_valid) {
             // Load the real G-code preview.
-            m_canvas->load_gcode_preview(*m_gcode_result, tool_colors, color_print_colors);
+            m_canvas->load_gcode_preview(*active_gcode_result(), tool_colors, color_print_colors);
             // the view type may have been changed by the call m_canvas->load_gcode_preview()
             gcode_view_type = m_canvas->get_gcode_view_type();
             zs = m_canvas->get_gcode_layers_zs();
@@ -971,6 +980,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
         else if (is_pregcode_preview) {
             // Load the initial preview based on slices, not the final G-code.
             m_canvas->load_preview(tool_colors, color_print_colors, color_print_values);
+            m_canvas->load_gcode_shells();
             // the view type has been changed by the call m_canvas->load_gcode_preview()
             if (gcode_view_type == libvgcode::EViewType::ColorPrint && !color_print_values.empty())
                 m_canvas->set_gcode_view_type(gcode_view_type);

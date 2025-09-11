@@ -2,6 +2,8 @@
 #define slic3r_JsonUtils_hpp_
 
 #include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree_fwd.hpp>
+#include <string>
 
 namespace Slic3r {
 

@@ -7,6 +7,7 @@
 #include "libslic3r/Model.hpp"
 
 //#include "slic3r/GUI/3DScene.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 #include "libslic3r/SupportSpotsGenerator.hpp"
 #include "libslic3r/TriangleSelectorWrapper.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -103,7 +104,7 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     if (! m_c->selection_info()->model_object())
         return;
 
-    const float approx_height = m_imgui->scaled(25.f);
+    const float approx_height = m_imgui->scaled(26.3f);
     y = std::min(y, bottom_limit - approx_height);
     ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
 
@@ -115,7 +116,7 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     const float cursor_slider_left             = ImGuiPureWrap::calc_text_size(m_desc.at("cursor_size")).x + m_imgui->scaled(1.f);
     const float smart_fill_slider_left         = ImGuiPureWrap::calc_text_size(m_desc.at("smart_fill_angle")).x + m_imgui->scaled(1.f);
     const float autoset_slider_label_max_width = m_imgui->scaled(7.5f);
-    const float autoset_slider_left            = ImGuiPureWrap::calc_text_size(m_desc.at("highlight_by_angle"), autoset_slider_label_max_width).x + m_imgui->scaled(1.f);
+    const float autoset_slider_left            = ImGuiPureWrap::calc_text_size(m_desc.at("highlight_by_angle"), false, autoset_slider_label_max_width).x + m_imgui->scaled(1.f);
 
     const float cursor_type_radio_circle  = ImGuiPureWrap::calc_text_size(m_desc["circle"]).x + m_imgui->scaled(2.5f);
     const float cursor_type_radio_sphere  = ImGuiPureWrap::calc_text_size(m_desc["sphere"]).x + m_imgui->scaled(2.5f);
@@ -301,11 +302,12 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
 
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel")))
-            for (auto &triangle_selector : m_triangle_selectors) {
+        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel"))) {
+            for (auto &triangle_selector: m_triangle_selectors) {
                 triangle_selector->seed_fill_unselect_all_triangles();
                 triangle_selector->request_update_render_data();
             }
+        }
     }
 
     ImGui::Separator();
@@ -324,7 +326,7 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     auto clp_dist = float(m_c->object_clipper()->get_position());
     ImGui::SameLine(sliders_left_width);
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-    if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, _L("Ctrl + Mouse wheel")))
+    if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, from_u8(GUI::shortkey_ctrl_prefix()) + _L("Mouse wheel")))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
     ImGui::Separator();
@@ -459,7 +461,7 @@ void GLGizmoFdmSupports::update_model_object() const
         if (! mv->is_model_part())
             continue;
         ++idx;
-        updated |= mv->supported_facets.set(*m_triangle_selectors[idx].get());
+        updated |= mv->supported_facets.set(*m_triangle_selectors[idx]);
     }
 
     if (updated) {
@@ -518,7 +520,7 @@ bool GLGizmoFdmSupports::has_backend_supports()
 
 void GLGizmoFdmSupports::auto_generate()
 {
-    std::string err = wxGetApp().plater()->fff_print().validate();
+    std::string err = wxGetApp().plater()->active_fff_print().validate();
     if (!err.empty()) {
         MessageDialog dlg(GUI::wxGetApp().plater(), _L("Automatic painting requires valid print setup.") + " \n" + from_u8(err), _L("Warning"), wxOK);
         dlg.ShowModal();
@@ -531,6 +533,14 @@ void GLGizmoFdmSupports::auto_generate()
         MessageDialog dlg(GUI::wxGetApp().plater(), _L("Automatic painting requires printable object."), _L("Warning"), wxOK);
         dlg.ShowModal();
         return;
+    }
+
+    const auto first_instance_bed{s_multiple_beds.get_inst_map().find(mo->instances.front()->id())};
+    if (
+        first_instance_bed != s_multiple_beds.get_inst_map().end()
+        && s_multiple_beds.get_active_bed() != first_instance_bed->second
+    ) {
+        s_multiple_beds.set_active_bed(first_instance_bed->second);
     }
 
     bool not_painted = std::all_of(mo->volumes.begin(), mo->volumes.end(), [](const ModelVolume* vol){

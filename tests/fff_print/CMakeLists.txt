@@ -14,12 +14,14 @@ add_executable(${_TEST_NAME}_tests
 	test_gaps.cpp
 	test_gcode.cpp
 	test_gcode_travels.cpp
+    test_infill_above_bridges.cpp
     test_seam_perimeters.cpp
     test_seam_shells.cpp
     test_seam_geometry.cpp
     test_seam_aligned.cpp
     test_seam_rear.cpp
     test_seam_random.cpp
+    test_seam_scarf.cpp
     benchmark_seams.cpp
 	test_gcodefindreplace.cpp
 	test_gcodewriter.cpp
@@ -38,7 +40,7 @@ add_executable(${_TEST_NAME}_tests
 	test_thin_walls.cpp
 	test_trianglemesh.cpp
 	)
-target_link_libraries(${_TEST_NAME}_tests test_common libslic3r)
+target_link_libraries(${_TEST_NAME}_tests test_common slic3r-arrange-wrapper)
 set_property(TARGET ${_TEST_NAME}_tests PROPERTY FOLDER "tests")
 target_compile_definitions(${_TEST_NAME}_tests PUBLIC CATCH_CONFIG_ENABLE_BENCHMARKING)
 

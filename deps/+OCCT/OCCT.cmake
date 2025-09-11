@@ -1,7 +1,9 @@
 add_cmake_project(OCCT
-    #LMBBS: changed version to 7.6.2
-    URL https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/V7_6_2.zip
-    URL_HASH SHA256=c696b923593e8c18d059709717dbf155b3e72fdd283c8522047a790ec3a432c5
+	# Versions newer than 7.6.1 contain a bug that causes chamfers to be triangulated incorrectly.
+	# So, before any updating, it is necessary to check whether SPE-2257 is still happening.
+	# In version 7.8.1, this bug has still not been fixed.
+    URL https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/V7_6_1.zip
+	URL_HASH SHA256=b7cf65430d6f099adc9df1749473235de7941120b5b5dd356067d12d0909b1d3
 
     PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/occt_toolkit.cmake ./adm/cmake/
     CMAKE_ARGS

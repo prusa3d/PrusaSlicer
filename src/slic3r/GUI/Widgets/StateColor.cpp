@@ -1,5 +1,7 @@
 #include "StateColor.hpp"
 
+#include <cstddef>
+
 StateColor::StateColor(wxColour const &color) { append(color, 0); }
 
 StateColor::StateColor(wxString const &color) { append(color, 0); }

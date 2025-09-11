@@ -5,15 +5,24 @@
 #ifndef slic3r_FillLightning_hpp_
 #define slic3r_FillLightning_hpp_
 
+#include <functional>
+#include <memory>
+#include <utility>
+
 #include "FillBase.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
 class PrintObject;
+class Point;
 
 namespace FillLightning {
 
 class Generator;
+
 // To keep the definition of Octree opaque, we have to define a custom deleter.
 struct GeneratorDeleter { void operator()(Generator *p); };
 using  GeneratorPtr = std::unique_ptr<Generator, GeneratorDeleter>;

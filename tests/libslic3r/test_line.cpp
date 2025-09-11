@@ -2,7 +2,9 @@
  * Ported from xs/t/10_line.t
  */
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+
 #include <libslic3r/Line.hpp>
 #include "test_utils.hpp"
 
@@ -37,7 +39,7 @@ TEST_CASE("Parallel lines under angles", "[Line]") {
     CHECK(line.parallel_to(line.direction()));
     INFO("Line is parallel to its direction + PI");
     line.parallel_to(line.direction() + M_PI);
-    INFO("line is parallel to its direction - PI")
+    INFO("line is parallel to its direction - PI");
     line.parallel_to(line.direction() - M_PI);
 
     SECTION("Line is parallel within epsilon") {

@@ -50,6 +50,7 @@
 #include "Plater.hpp"
 #include "../Utils/Process.hpp"
 #include "format.hpp"
+#include "slic3r/GUI/InstanceCheck.hpp" // IWYU pragma: keep
 
 #include <fstream>
 #include <string_view>
@@ -63,7 +64,7 @@
 #include "GalleryDialog.hpp"
 #include "NotificationManager.hpp"
 #include "Preferences.hpp"
-#include "WebViewDialog.hpp"
+#include "WebViewPanel.hpp"
 #include "UserAccount.hpp"
 
 #ifdef _WIN32
@@ -187,8 +188,8 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     wxAcceleratorEntry entries[100];
 
     int id = 0;
-    for (const auto* entry : entries_cache)
-        entries[id++].Set(entry->GetFlags(), entry->GetKeyCode(), entry->GetMenuItem()->GetId());
+    //for (const auto* entry : entries_cache)
+    //    entries[id++].Set(entry->GetFlags(), entry->GetKeyCode(), entry->GetMenuItem()->GetId());
 
 #if _WIN32
     // This is needed on Windows to fake the CTRL+# of the window menu when using the numpad
@@ -690,6 +691,10 @@ void MainFrame::init_tabpanel()
                 old_tab->validate_custom_gcodes();
         }
 
+#ifndef __APPLE__
+        on_tab_change_rename_reload_item(e.GetSelection());
+#endif // !__APPLE__
+
         wxWindow* panel = m_tabpanel->GetCurrentPage();
         Tab* tab = dynamic_cast<Tab*>(panel);
 
@@ -713,9 +718,9 @@ void MainFrame::init_tabpanel()
     });
 
     m_plater = new Plater(this, this);
+    wxGetApp().plater_ = m_plater;
     m_plater->Hide();
 
-    wxGetApp().plater_ = m_plater;
 
     if (wxGetApp().is_editor())
         create_preset_tabs();
@@ -800,12 +805,37 @@ void MainFrame::create_preset_tabs()
     add_created_tab(new TabSLAMaterial(m_tabpanel), "resin");
     add_created_tab(new TabPrinter(m_tabpanel), wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? "printer" : "sla_printer");
     
+    m_printables_webview = new PrintablesWebViewPanel(m_tabpanel);
+    add_printables_webview_tab();
+   
     m_connect_webview = new ConnectWebViewPanel(m_tabpanel);
     m_printer_webview = new PrinterWebViewPanel(m_tabpanel, L"");
+   
     // new created tabs have to be hidden by default
     m_connect_webview->Hide();
     m_printer_webview->Hide();
 
+}
+
+void MainFrame::on_account_login(const std::string& token)
+{
+    add_connect_webview_tab();
+    assert (m_printables_webview);
+    m_printables_webview->login(token);
+}
+void MainFrame::on_account_will_refresh()
+{
+    m_printables_webview->send_will_refresh();
+}
+void MainFrame::on_account_did_refresh(const std::string& token)
+{
+    m_printables_webview->send_refreshed_token(token);
+}
+void MainFrame::on_account_logout()
+{
+    remove_connect_webview_tab();
+    assert (m_printables_webview);
+    m_printables_webview->logout();
 }
 
 void MainFrame::add_connect_webview_tab()
@@ -818,13 +848,13 @@ void MainFrame::add_connect_webview_tab()
     // insert "Connect" tab to position next to "Printer" tab
     // order of tabs: Plater - Print Settings - Filaments - Printers - Prusa Connect - Prusa Link
 
-    int n = m_tabpanel->FindPage(wxGetApp().get_tab(Preset::TYPE_PRINTER)) + 1;
+    int n = m_tabpanel->FindPage(m_printables_webview) + 1;
     wxWindow* page = m_connect_webview;
     const wxString text(L"Prusa Connect");
     const std::string bmp_name = "";
     bool bSelect = false;
     m_tabpanel->InsertNewPage(n, page, text, bmp_name, bSelect);
-    m_connect_webview->load_default_url_delayed();
+    m_connect_webview->set_create_browser();
     m_connect_webview_added = true;
 }
 void MainFrame::remove_connect_webview_tab()
@@ -838,78 +868,104 @@ void MainFrame::remove_connect_webview_tab()
     m_tabpanel->RemovePage(size_t(n));
     m_connect_webview_added = false;
     m_connect_webview->logout();
+    m_connect_webview->destroy_browser();
+}
+
+void MainFrame::show_connect_tab(const wxString& url)
+{
+    if (!m_connect_webview_added) {
+        return;
+    }
+    m_connect_webview->prohibit_after_show_func_once();
+    m_tabpanel->SetSelection(m_tabpanel->FindPage(m_connect_webview));
+    m_connect_webview->set_load_default_url_on_next_error(true);
+    m_connect_webview->load_url(url);
+}
+void MainFrame::show_printables_tab(const std::string& url)
+{
+     if (!m_printables_webview_added) {
+        return;
+    }
+    // we have to set next url first, than show the tab
+    // printables_tab has to reload on show everytime
+    // so it is not possible load_url right after show
+    m_printables_webview->set_load_default_url_on_next_error(true);
+    m_printables_webview->set_next_show_url(url);
+    m_tabpanel->SetSelection(m_tabpanel->FindPage(m_printables_webview));
+}
+void MainFrame::add_printables_webview_tab()
+{
+    if (m_printables_webview_added) {
+        return;
+    }
+
+    int n = m_tabpanel->FindPage(wxGetApp().get_tab(Preset::TYPE_PRINTER)) + 1;
+    wxWindow* page = m_printables_webview;
+    const wxString text(L"Printables");
+    const std::string bmp_name = "";
+    m_tabpanel->InsertNewPage(n, page, text, bmp_name, false);
+    m_printables_webview->set_create_browser();
+    m_printables_webview_added = true;
+}
+
+// no longer needed?
+void MainFrame::remove_printables_webview_tab()
+{
+    if (!m_printables_webview_added) {
+        return;
+    }
+    int n = m_tabpanel->FindPage(m_printables_webview);
+    if (m_tabpanel->GetSelection() == n)
+        m_tabpanel->SetSelection(0);
+    m_tabpanel->RemovePage(size_t(n));
+    m_printables_webview_added = false;
+    m_printables_webview->destroy_browser();
 }
 
 void MainFrame::show_printer_webview_tab(DynamicPrintConfig* dpc)
 {
+    
+    remove_printer_webview_tab();
     // if physical printer is selected
     if (dpc && dpc->option<ConfigOptionEnum<PrintHostType>>("host_type")->value != htPrusaConnect) {
         std::string url = dpc->opt_string("print_host");
-
         if (url.find("http://") != 0 && url.find("https://") != 0) {
             url = "http://" + url;
         }
-
         // set password / api key
         if (dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(dpc->option("printhost_authorization_type"))->value == AuthorizationType::atKeyPassword) {
             set_printer_webview_api_key(dpc->opt_string("printhost_apikey"));
         }
-#if 0 // The user password authentication is not working in prusa link as of now.
         else {
-            mset_printer_webview_credentials(dpc->opt_string("printhost_user"), dpc->opt_string("printhost_password"));
+            set_printer_webview_credentials(dpc->opt_string("printhost_user"), dpc->opt_string("printhost_password"));
         }
-#endif // 0
-        // add printer or change url
-        if (get_printer_webview_tab_added()) {
-            set_printer_webview_tab_url(from_u8(url));
-        }
-        else {
-            add_printer_webview_tab(from_u8(url));
-        }
-    }
-    // if physical printer isn't selected, so delete page from TopBar
-    else {
-        if (m_tabpanel->GetPageText(m_tabpanel->GetSelection()) == _L("Physical Printer"))
-            select_tab(size_t(0));
-        remove_printer_webview_tab();
+        add_printer_webview_tab(from_u8(url));
     }
 }
 
 void MainFrame::add_printer_webview_tab(const wxString& url)
 {
     if (m_printer_webview_added) {
-        set_printer_webview_tab_url(url);
+        //set_printer_webview_tab_url(url);
         return;
     }
     m_printer_webview_added = true;
     // add as the last (rightmost) panel
     m_tabpanel->AddNewPage(m_printer_webview, _L("Physical Printer"), "");
     m_printer_webview->set_default_url(url);
-    m_printer_webview->load_default_url_delayed();
+    m_printer_webview->set_create_browser();
 }
 void MainFrame::remove_printer_webview_tab()
 {
     if (!m_printer_webview_added) {
         return;
     }
+    if (m_tabpanel->GetPageText(m_tabpanel->GetSelection()) == _L("Physical Printer"))
+            select_tab(size_t(0));
     m_printer_webview_added = false;
     m_printer_webview->Hide();
     m_tabpanel->RemovePage(m_tabpanel->FindPage(m_printer_webview));
-}
-void MainFrame::set_printer_webview_tab_url(const wxString& url)
-{
-    if (!m_printer_webview_added) {
-        add_printer_webview_tab(url);
-        return;
-    }
-    m_printer_webview->clear();
-    m_printer_webview->set_default_url(url);
-
-    if (m_tabpanel->GetSelection() == m_tabpanel->FindPage(m_printer_webview)) {
-        m_printer_webview->load_url(url);
-    } else {
-        m_printer_webview->load_default_url_delayed();
-    }
+    m_printer_webview->destroy_browser();
 }
 
 void MainFrame::set_printer_webview_api_key(const std::string& key)
@@ -919,6 +975,58 @@ void MainFrame::set_printer_webview_api_key(const std::string& key)
 void MainFrame::set_printer_webview_credentials(const std::string& usr, const std::string& psk)
 {
     m_printer_webview->set_credentials(usr, psk);
+}
+
+bool MainFrame::is_any_webview_selected()
+{
+    int selection = m_tabpanel->GetSelection();
+    if ( selection == m_tabpanel->FindPage(m_printables_webview)) 
+        return true;
+    if (m_connect_webview_added && selection == m_tabpanel->FindPage(m_connect_webview)) 
+        return true;
+    if (m_printer_webview_added && selection == m_tabpanel->FindPage(m_printer_webview)) 
+        return true;
+    return false;
+}
+
+void MainFrame::reload_selected_webview()
+{
+    int selection = m_tabpanel->GetSelection();
+    if ( selection == m_tabpanel->FindPage(m_printables_webview)) 
+       m_printables_webview->do_reload();
+    if (m_connect_webview_added && selection == m_tabpanel->FindPage(m_connect_webview)) 
+        m_connect_webview->do_reload();
+    if (m_printer_webview_added && selection == m_tabpanel->FindPage(m_printer_webview)) 
+        m_printer_webview->do_reload();
+}
+
+void MainFrame::on_tab_change_rename_reload_item(int new_tab)
+{
+    if (!m_tabpanel) {
+        return;
+    }
+    if ( new_tab == m_tabpanel->FindPage(m_printables_webview) 
+        || (m_connect_webview_added && new_tab == m_tabpanel->FindPage(m_connect_webview)) 
+        || (m_printer_webview_added && new_tab == m_tabpanel->FindPage(m_printer_webview))) 
+    {
+        m_menu_item_reload->SetItemLabel(_L("Re&load Web Content") + "\tF5");
+        m_menu_item_reload->SetHelp(_L("Reload Web Content"));
+    } else {
+        m_menu_item_reload->SetItemLabel(_L("Re&load from Disk") + "\tF5");
+        m_menu_item_reload->SetHelp(_L("Reload the plater from disk"));
+    }
+}
+
+bool MainFrame::reload_item_condition_cb()
+{
+    return is_any_webview_selected() ? true :
+    !m_plater->model().objects.empty();
+}
+void MainFrame::reload_item_function_cb()
+{
+    is_any_webview_selected() 
+        ? reload_selected_webview()
+        : m_plater->reload_all_from_disk();
 }
 
 void Slic3r::GUI::MainFrame::refresh_account_menu(bool avatar/* = false */)
@@ -1008,7 +1116,7 @@ bool MainFrame::can_export_supports() const
         return false;
 
     bool can_export = false;
-    const PrintObjects& objects = m_plater->sla_print().objects();
+    const PrintObjects& objects = m_plater->active_sla_print().objects();
     for (const SLAPrintObject* object : objects)
     {
         if (!object->support_mesh().empty() || !object->pad_mesh().empty())
@@ -1184,6 +1292,8 @@ void MainFrame::on_sys_color_changed()
     for (Tab* tab : wxGetApp().tabs_list)
         tab->sys_color_changed();
 
+    if (m_printables_webview)
+        m_printables_webview->sys_color_changed();
     if (m_connect_webview)
         m_connect_webview->sys_color_changed();
     if (m_printer_webview)
@@ -1529,15 +1639,20 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + dots + "\tCtrl+Shift+R",
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
             "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
+        m_menu_item_reload = append_menu_item(editMenu, wxID_ANY, _L("Re&load Web Content") + "\tF5",
+            _L("Reload Web Content"), [this](wxCommandEvent&) {  reload_selected_webview(); },
+            "", nullptr, [this]() {return is_any_webview_selected(); }, this);
 #else
-        append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + sep + "F5",
-            _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
-            "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
+        m_menu_item_reload = append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + "\tF5",
+            _L("Reload the plater from disk"), [this](wxCommandEvent&) {  reload_item_function_cb(); },
+            "", nullptr, [this]() {return reload_item_condition_cb(); }, this);
 #endif // __APPLE__
 
         editMenu->AppendSeparator();
         append_menu_item(editMenu, wxID_ANY, _L("Searc&h") + "\tCtrl+F",
-            _L("Search in settings"), [](wxCommandEvent&) { wxGetApp().show_search_dialog(); },
+            _L("Search in settings"), [this](wxCommandEvent&) {
+				m_tabpanel->GetTopBarItemsCtrl()->TriggerSearch();
+            },
             "search", nullptr, []() {return true; }, this);
     }
 
@@ -1623,7 +1738,7 @@ void MainFrame::init_menubar_as_editor()
     // Help menu
     auto helpMenu = generate_help_menu();
 
-#ifndef __APPLE__
+#if 0//ndef__APPLE__
     // append menus for Menu button from TopBar
 
     m_bar_menus.AppendMenuItem(fileMenu, _L("&File"));
@@ -1659,9 +1774,11 @@ void MainFrame::init_menubar_as_editor()
 
     SetMenuBar(m_menubar);
 
+#ifdef __APPLE__
     init_macos_application_menu(m_menubar, this);
-
 #endif // __APPLE__
+
+#endif
 
     if (plater()->printer_technology() == ptSLA)
         update_menubar();
@@ -2264,7 +2381,8 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
 #else /* __APPLE__ */
                 case WXK_CONTROL_F:
 #endif /* __APPLE__ */
-                case 'F': { wxGetApp().show_search_dialog(); break; }
+                case 'F': { m_tabpanel->GetTopBarItemsCtrl()->TriggerSearch();
+                			break; }
                 default:break;
                 }
             }

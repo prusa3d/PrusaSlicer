@@ -5,15 +5,30 @@
 #ifndef POINTCLOUD_HPP
 #define POINTCLOUD_HPP
 
+#include <assert.h>
+#include <stddef.h>
+#include <boost/geometry.hpp>
 #include <optional>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <cmath>
+#include <type_traits>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cstdlib>
 
 #include "BranchingTree.hpp"
-
 //#include "libslic3r/Execution/Execution.hpp"
 #include "libslic3r/MutablePriorityQueue.hpp"
-
 #include "libslic3r/BoostAdapter.hpp"
 #include "boost/geometry/index/rtree.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
+
+struct indexed_triangle_set;
 
 namespace Slic3r { namespace branchingtree {
 

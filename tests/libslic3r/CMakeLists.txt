@@ -26,6 +26,7 @@ add_executable(${_TEST_NAME}_tests
 	test_stl.cpp
 	test_meshboolean.cpp
 	test_marchingsquares.cpp
+    test_multiple_beds.cpp
 	test_region_expansion.cpp
 	test_timeutils.cpp
 	test_utils.cpp
@@ -46,7 +47,8 @@ add_executable(${_TEST_NAME}_tests
     ../data/prusaparts.cpp
     ../data/prusaparts.hpp
      test_static_map.cpp
-	)
+     test_custom_parameters_handling.cpp
+ )
 
 if (TARGET OpenVDB::openvdb)
     target_sources(${_TEST_NAME}_tests PRIVATE test_hollowing.cpp)

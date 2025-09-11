@@ -3,18 +3,18 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "GCodeReader.hpp"
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/nowide/fstream.hpp>
+
 #include <boost/nowide/cstdio.hpp>
-#include <fstream>
+#include <fast_float.h>
 #include <iostream>
 #include <iomanip>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+
 #include "Utils.hpp"
-
-#include "LocalesUtils.hpp"
-
-#include <fast_float/fast_float.h>
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

@@ -135,17 +135,18 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		downloader->set_path_name(app_config->get("url_downloader_dest"));
 		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
 
-		for (const std::string& opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button"})
+		for (const std::string opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button", "show_step_import_parameters"})
 			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
 		// by default "Log in" button is visible
 		if (!app_config->has("show_login_button"))
 			m_optgroup_other->set_value("show_login_button", true);
 
-		for (const std::string& opt_key : { "default_action_on_close_application"
+		for (const std::string opt_key : { "default_action_on_close_application"
 										   ,"default_action_on_new_project"
 										   ,"default_action_on_select_preset" })
 			m_optgroup_general->set_value(opt_key, app_config->get(opt_key) == "none");
 		m_optgroup_general->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty());
+		m_optgroup_gui->set_value("seq_top_layer_only", app_config->get_bool("seq_top_layer_only"));
 
 		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
@@ -157,6 +158,9 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		for (size_t mode = 0; mode < color_pickres.size(); ++mode)
 			update_color(color_pickres[mode], palette[mode]);
 	}
+
+	// invalidate this flag before show preferences
+	m_settings_layout_changed = false;
 
 	this->ShowModal();
 }
@@ -297,11 +301,6 @@ void PreferencesDialog::build()
 			L("Remember output directory"),
 			L("If this is enabled, Slic3r will prompt the last output directory instead of the one containing the input files."),
 			app_config->has("remember_output_path") ? app_config->get_bool("remember_output_path") : true);
-
-		append_bool_option(m_optgroup_general, "autocenter", 
-			L("Auto-center parts"),
-			L("If this is enabled, Slic3r will auto-center objects around the print bed center."),
-			app_config->get_bool("autocenter"));
 
 		append_bool_option(m_optgroup_general, "background_processing", 
 			L("Background processing"),
@@ -630,14 +629,19 @@ void PreferencesDialog::build()
 			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
 			app_config->get_bool("suppress_hyperlinks"));
 
+		append_bool_option(m_optgroup_other, "show_step_import_parameters",
+			L("Show STEP file import parameters"),
+			L("If enabled, PrusaSlicer will show a dialog with quality selection when importing a STEP file."),
+			app_config->get_bool("show_step_import_parameters"));
+
 		append_bool_option(m_optgroup_other, "show_login_button",
 			L("Show \"Log in\" button in application top bar"),
 			L("If enabled, PrusaSlicer will show up \"Log in\" button in application top bar."),
 			app_config->get_bool("show_login_button"));
-		
+
 		append_bool_option(m_optgroup_other, "downloader_url_registered",
-			L("Allow downloads from Printables.com"),
-			L("If enabled, PrusaSlicer will be allowed to download from Printables.com"),
+			L("Allow downloads from supported websites (e.g. Printables.com)"),
+			L("If enabled, PrusaSlicer can download and open files from supported websites"),
 			app_config->get_bool("downloader_url_registered"));
 
 		activate_options_tab(m_optgroup_other);
@@ -787,7 +791,6 @@ void PreferencesDialog::accept(wxEvent&)
 	if (auto it = m_values.find("seq_top_layer_only"); it != m_values.end())
 		m_seq_top_layer_only_changed = app_config->get("seq_top_layer_only") != it->second;
 
-	m_settings_layout_changed = false;
 	for (const std::string& key : { "old_settings_layout_mode",
 								    "dlg_settings_layout_mode" })
 	{

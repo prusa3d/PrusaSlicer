@@ -5,12 +5,17 @@
 #ifndef slic3r_GUI_DoubleSliderForLayers_hpp_
 #define slic3r_GUI_DoubleSliderForLayers_hpp_
 
+#include <vector>
+#include <set>
+#include <functional>
+#include <string>
+
 #include "ImGuiDoubleSlider.hpp"
 #include "RulerForDoubleSlider.hpp"
 #include "TickCodesManager.hpp"
+#include "libslic3r/CustomGCode.hpp"
 
-#include <vector>
-#include <set>
+struct ImVec2;
 
 namespace Slic3r {
 class Print;
@@ -86,6 +91,7 @@ public:
     void    set_imgui_wrapper(Slic3r::GUI::ImGuiWrapper* imgui) { m_imgui = imgui; }
     void    show_estimated_times(bool show)                     { m_show_estimated_times = show; }
     void    show_ruler(bool show, bool show_bg)                 { m_show_ruler = show; m_show_ruler_bg = show_bg; }
+    void    seq_top_layer_only(bool show)                       { m_seq_top_layer_only = show; }
 
     // manipulation with slider from keyboard
 
@@ -146,6 +152,7 @@ private:
     bool        m_show_ruler_bg         { true };
     bool        m_show_cog_menu         { false };
     bool        m_show_edit_menu        { false };
+    bool        m_seq_top_layer_only    { false };
     int         m_pos_on_move           { -1 };
 
     DrawMode    m_draw_mode             { dmRegular };

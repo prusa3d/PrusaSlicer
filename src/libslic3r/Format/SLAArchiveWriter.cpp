@@ -4,7 +4,9 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "SLAArchiveWriter.hpp"
+
 #include "SLAArchiveFormatRegistry.hpp"
+#include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r {
 

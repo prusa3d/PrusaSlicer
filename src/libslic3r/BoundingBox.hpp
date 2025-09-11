@@ -6,12 +6,20 @@
 #ifndef slic3r_BoundingBox_hpp_
 #define slic3r_BoundingBox_hpp_
 
+#include <assert.h>
+#include <algorithm>
+#include <vector>
+#include <cassert>
+#include <cmath>
+#include <cstddef>
+
 #include "libslic3r.h"
 #include "Exception.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
 
 namespace Slic3r {
+class BoundingBox;
 
 template <typename PointType, typename APointsType = std::vector<PointType>>
 class BoundingBoxBase
@@ -212,7 +220,9 @@ public:
     BoundingBox(const BoundingBoxBase<Vec2crd> &bb): BoundingBox(bb.min, bb.max) {}
     BoundingBox(const Points &points) : BoundingBoxBase<Point, Points>(points) {}
 
-    BoundingBox inflated(coordf_t delta) const throw() { BoundingBox out(*this); out.offset(delta); return out; }
+    BoundingBox inflated(coordf_t delta) const noexcept { BoundingBox out(*this); out.offset(delta); return out; }
+
+    BoundingBox scaled(double factor) const;
 
     friend BoundingBox get_extents_rotated(const Points &points, double angle);
 };
@@ -321,6 +331,23 @@ inline double bbox_point_distance_squared(const BoundingBox &bbox, const Point &
         return Slic3r::sqr<double>(pt.y() < bbox.min.y() ? bbox.min.y() - pt.y() :
                                    pt.y() > bbox.max.y() ? pt.y() - bbox.max.y() :
                                    coord_t(0));
+}
+
+// Minimum distance between two Bounding boxes.
+// Returns zero when Bounding boxes overlap.
+inline double bbox_bbox_distance(const BoundingBox &first_bbox, const BoundingBox &second_bbox) {
+    if (first_bbox.overlap(second_bbox))
+        return 0.;
+
+    double bboxes_distance_squared = 0.;
+
+    for (size_t axis = 0; axis < 2; ++axis) {
+        const coord_t axis_distance = std::max(std::max(0, first_bbox.min[axis] - second_bbox.max[axis]),
+                                               second_bbox.min[axis] - first_bbox.max[axis]);
+        bboxes_distance_squared += Slic3r::sqr(static_cast<double>(axis_distance));
+    }
+
+    return std::sqrt(bboxes_distance_squared);
 }
 
 template<class T>

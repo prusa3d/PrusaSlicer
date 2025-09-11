@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Print.hpp"
@@ -8,6 +9,7 @@
 
 using namespace Slic3r;
 using namespace Slic3r::Test;
+using namespace Catch;
 
 SCENARIO("PrintObject: object layer heights", "[PrintObject]") {
     GIVEN("20mm cube and default initial config, initial layer height of 2mm") {

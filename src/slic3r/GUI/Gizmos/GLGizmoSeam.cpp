@@ -79,7 +79,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     if (! m_c->selection_info()->model_object())
         return;
 
-    const float approx_height = m_imgui->scaled(12.5f);
+    const float approx_height = m_imgui->scaled(13.45f);
     y = std::min(y, bottom_limit - approx_height);
     ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
     ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -168,7 +168,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     auto clp_dist = float(m_c->object_clipper()->get_position());
     ImGui::SameLine(sliders_left_width);
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-    if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, _L("Ctrl + Mouse wheel")))
+    if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, from_u8(GUI::shortkey_ctrl_prefix()) + _L("Mouse wheel")))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
     ImGui::Separator();
@@ -201,7 +201,7 @@ void GLGizmoSeam::update_model_object() const
         if (! mv->is_model_part())
             continue;
         ++idx;
-        updated |= mv->seam_facets.set(*m_triangle_selectors[idx].get());
+        updated |= mv->seam_facets.set(*m_triangle_selectors[idx]);
     }
 
     if (updated) {

@@ -7,9 +7,18 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include <assert.h>
-#include <stdio.h>
+#include <oneapi/tbb/scalable_allocator.h>
+#include <boost/container/vector.hpp>
 #include <memory>
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <set>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstdlib>
 
 #include "../ClipperUtils.hpp"
 #include "../Geometry.hpp"
@@ -19,15 +28,30 @@
 #include "../Surface.hpp"
 // for Arachne based infills
 #include "../PerimeterGenerator.hpp"
-
 #include "FillBase.hpp"
 #include "FillRectilinear.hpp"
 #include "FillLightning.hpp"
-#include "FillConcentric.hpp"
 #include "FillEnsuring.hpp"
-#include "Polygon.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/Point.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/libslic3r.h"
+#include "libslic3r/ShortestPath.hpp"
 
 namespace Slic3r {
+namespace FillAdaptive {
+struct Octree;
+}  // namespace FillAdaptive
+namespace FillLightning {
+class Generator;
+}  // namespace FillLightning
 
 //static constexpr const float NarrowInfillAreaThresholdMM = 3.f;
 
@@ -159,15 +183,24 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        } else if (params.density <= 0)
 		            continue;
 
-		        params.extrusion_role =
-		            is_bridge ?
-		                ExtrusionRole::BridgeInfill :
-		                (surface.is_solid() ?
-		                    (surface.is_top() ? ExtrusionRole::TopSolidInfill : ExtrusionRole::SolidInfill) :
-							ExtrusionRole::InternalInfill);
+		        if (is_bridge) {
+		            params.extrusion_role = ExtrusionRole::BridgeInfill;
+                } else {
+                    if (surface.is_solid()) {
+                        if (surface.is_top()) {
+                            params.extrusion_role = ExtrusionRole::TopSolidInfill;
+                        } else if (surface.surface_type == stSolidOverBridge) {
+                            params.extrusion_role = ExtrusionRole::InfillOverBridge;
+                        } else {
+                            params.extrusion_role = ExtrusionRole::SolidInfill;
+                        }
+                    } else {
+                        params.extrusion_role = ExtrusionRole::InternalInfill;
+                    }
+                }
 		        params.bridge_angle = float(surface.bridge_angle);
 		        params.angle 		= float(Geometry::deg2rad(region_config.fill_angle.value));
-		        
+
 		        // Calculate the actual flow we'll be using for this infill.
 		        params.bridge = is_bridge || Fill::use_bridge_flow(params.pattern);
 				params.flow   = params.bridge ?
@@ -318,7 +351,9 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
     // Use ipEnsuring pattern for all internal Solids.
     {
         for (size_t surface_fill_id = 0; surface_fill_id < surface_fills.size(); ++surface_fill_id)
-            if (SurfaceFill &fill = surface_fills[surface_fill_id]; fill.surface.surface_type == stInternalSolid) {
+            if (SurfaceFill &fill = surface_fills[surface_fill_id];
+                    fill.surface.surface_type == stInternalSolid
+                    || fill.surface.surface_type == stSolidOverBridge) {
                 fill.params.pattern = ipEnsuring;
             }
     }
@@ -445,10 +480,6 @@ void Layer::clear_fills()
 void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator)
 {
 	this->clear_fills();
-
-#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-//	this->export_region_fill_surfaces_to_svg_debug("10_fill-initial");
-#endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
     std::vector<SurfaceFill>  surface_fills       = group_fills(*this);
     const Slic3r::BoundingBox bbox                = this->object()->bounding_box();
@@ -659,7 +690,8 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         case ipGyroid:
         case ipHilbertCurve:
         case ipArchimedeanChords:
-        case ipOctagramSpiral: break;
+        case ipOctagramSpiral:
+        case ipZigZag: break;
         }
 
         // Create the filler object.

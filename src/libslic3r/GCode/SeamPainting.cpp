@@ -1,5 +1,8 @@
 #include "libslic3r/GCode/SeamPainting.hpp"
 
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/TriangleSelector.hpp"
+
 namespace Slic3r::Seams::ModelInfo {
 Painting::Painting(const Transform3d &obj_transform, const ModelVolumePtrs &volumes) {
     for (const ModelVolume *mv : volumes) {

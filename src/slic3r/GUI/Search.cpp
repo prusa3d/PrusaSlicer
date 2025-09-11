@@ -455,6 +455,12 @@ void OptionsSearcher::update_dialog_position()
 
 void OptionsSearcher::check_and_hide_dialog()
 {
+#ifdef __linux__
+    // Temporary linux specific workaround:
+    // has_focus(search_dialog) always returns false
+    // That's why search dialog will be hidden whole the time
+    return;
+#endif
     if (search_dialog && search_dialog->IsShown() && !has_focus(search_dialog))
         show_dialog(false);
 }
@@ -468,7 +474,7 @@ void OptionsSearcher::set_focus_to_parent()
 void OptionsSearcher::show_dialog(bool show /*= true*/)
 {
     if (search_dialog && !show) {
-        search_dialog->EndModal(wxID_CLOSE);
+        search_dialog->Hide();
         return;
     }
 
@@ -490,6 +496,7 @@ void OptionsSearcher::show_dialog(bool show /*= true*/)
     search_dialog->Popup();
     if (!search_input->HasFocus())
         search_input->SetFocus();
+    wxYield();
 }
 
 void OptionsSearcher::dlg_sys_color_changed()
@@ -521,10 +528,13 @@ void OptionsSearcher::edit_search_input()
 void OptionsSearcher::process_key_down_from_input(wxKeyEvent& e)
 {
     int key = e.GetKeyCode();
-    if (key == WXK_ESCAPE)
-        search_dialog->EndModal(wxID_CLOSE);
-    else if (search_dialog && (key == WXK_UP || key == WXK_DOWN || key == WXK_NUMPAD_ENTER || key == WXK_RETURN))
+    if (key == WXK_ESCAPE) {
+        set_focus_to_parent();
+        search_dialog->Hide();
+    }
+    else if (search_dialog && (key == WXK_UP || key == WXK_DOWN || key == WXK_NUMPAD_ENTER || key == WXK_RETURN)) {
         search_dialog->KeyDown(e);
+    }
 }
 
 void OptionsSearcher::set_search_input(TextInput* input_ctrl)
@@ -667,7 +677,7 @@ void SearchDialog::ProcessSelection(wxDataViewItem selection)
 {
     if (!selection.IsOk())
         return;
-    this->EndModal(wxID_CLOSE);
+    this->Hide();
 
     // If call GUI::wxGetApp().sidebar.jump_to_option() directly from here,
     // then mainframe will not have focus and found option will not be "active" (have cursor) as a result
@@ -697,7 +707,7 @@ void SearchDialog::OnKeyDown(wxKeyEvent& event)
     if (key == WXK_UP || key == WXK_DOWN)
     {
         // So, for the next correct navigation, set focus on the search_list
- //       search_list->SetFocus(); // #ys_delete_after_test -> Looks like no need anymore
+        search_list->SetFocus();
 
         auto item = search_list->GetSelection();
 

@@ -6,22 +6,49 @@
 #ifndef slic3r_SLAPrint_hpp_
 #define slic3r_SLAPrint_hpp_
 
+#include <boost/functional/hash.hpp>
+#include <stdlib.h>
 #include <cstdint>
 #include <mutex>
 #include <set>
+#include <Eigen/Geometry>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "PrintBase.hpp"
 #include "SLA/SupportTree.hpp"
+#include "SLA/SupportPointGenerator.hpp" // SupportPointGeneratorData
 #include "Point.hpp"
 #include "Format/SLAArchiveWriter.hpp"
-#include "GCode/ThumbnailData.hpp"
+#include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/CSGMesh/CSGMesh.hpp"
 #include "libslic3r/MeshBoolean.hpp"
 #include "libslic3r/OpenVDBUtils.hpp"
-
-#include <boost/functional/hash.hpp>
+#include "admesh/stl.h"
+#include "libslic3r/AnyPtr.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/Model.hpp"
+#include "libslic3r/ObjectID.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/SLA/Hollowing.hpp"
+#include "libslic3r/SLA/Pad.hpp"
+#include "libslic3r/SLA/SupportPoint.hpp"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
+namespace sla {
+struct JobController;
+}  // namespace sla
 
 enum SLAPrintStep : unsigned int {
     slapsMergeSlicesAndEval,
@@ -341,6 +368,9 @@ private:
 
     std::vector<float>                      m_model_height_levels;
 
+    // Precalculated data needed for interactive automatic support placement.
+    sla::SupportPointGeneratorData          m_support_point_generator_data;
+
     struct SupportData
     {
         sla::SupportableMesh    input; // the input
@@ -464,7 +494,7 @@ public:
     bool                empty() const override { return m_objects.empty(); }
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
-    ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
+    ApplyStatus         apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings = nullptr) override;
     void                set_task(const TaskParams &params) override { PrintBaseWithState<SLAPrintStep, slapsCount>::set_task_impl(params, m_objects); }
     void                process() override;
     void                finalize() override { PrintBaseWithState<SLAPrintStep, slapsCount>::finalize_impl(m_objects); }
@@ -556,6 +586,8 @@ public:
     void export_print(const std::string    &fname,
                       const ThumbnailsList &thumbnails,
                       const std::string    &projectname = "");
+
+    static bool is_prusa_print(const std::string& printer_model);
     
 private:
     

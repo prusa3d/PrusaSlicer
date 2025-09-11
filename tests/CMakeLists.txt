@@ -1,7 +1,9 @@
 # TODO Add individual tests as executables in separate directories
 # add_subirectory(<testcase>)
 
-find_package(Catch2 2.9 REQUIRED)
+find_package(Catch2 3.8 REQUIRED)
+slic3r_remap_configs(Catch2::Catch2 RelWithDebInfo Release)
+slic3r_remap_configs(Catch2::Catch2WithMain RelWithDebInfo Release)
 
 include(Catch)
 
@@ -13,7 +15,7 @@ set(CATCH_EXTRA_ARGS "" CACHE STRING "Extra arguments for catch2 test suites.")
 add_library(test_common INTERFACE)
 target_include_directories(test_common INTERFACE ${CMAKE_CURRENT_LIST_DIR})
 target_compile_definitions(test_common INTERFACE TEST_DATA_DIR=R"\(${TEST_DATA_DIR}\)" CATCH_CONFIG_FAST_COMPILE)
-target_link_libraries(test_common INTERFACE Catch2::Catch2)
+target_link_libraries(test_common INTERFACE Catch2::Catch2WithMain)
 
 if (APPLE)
     target_link_libraries(test_common INTERFACE "-liconv -framework IOKit" "-framework CoreFoundation" -lc++)

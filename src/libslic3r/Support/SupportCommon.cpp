@@ -2,24 +2,42 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "../ClipperUtils.hpp"
-#include "../ClipperZUtils.hpp"
-#include "../ExtrusionEntityCollection.hpp"
-#include "../Layer.hpp"
-#include "../Print.hpp"
-#include "../Fill/FillBase.hpp"
-#include "../MutablePolygon.hpp"
-#include "../Geometry.hpp"
-#include "../Point.hpp"
-
-#include <cmath>
 #include <boost/container/static_vector.hpp>
+#include <oneapi/tbb/blocked_range.h>
+#include <oneapi/tbb/parallel_for.h>
+#include <boost/log/trivial.hpp>
+#include <cmath>
+#include <initializer_list>
+#include <limits>
+#include <memory>
+#include <unordered_map>
+#include <cstdlib>
 
-#include <tbb/parallel_for.h>
-
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/ClipperZUtils.hpp" // IWYU pragma: keep
+#include "libslic3r/ExtrusionEntityCollection.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/Print.hpp"
+#include "libslic3r/Fill/FillBase.hpp"
+#include "libslic3r/MutablePolygon.hpp"
+#include "libslic3r/Geometry.hpp"
+#include "libslic3r/Point.hpp"
 #include "SupportCommon.hpp"
 #include "SupportLayer.hpp"
 #include "SupportParameters.hpp"
+#include "libslic3r/BoundingBox.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/LayerRegion.hpp"
+#include "libslic3r/MultiMaterialSegmentation.hpp"
+#include "libslic3r/Polygon.hpp"
+#include "libslic3r/Polyline.hpp"
+#include "libslic3r/Slicing.hpp"
+#include "libslic3r/Surface.hpp"
+#include "libslic3r/Utils.hpp"
+#include "libslic3r/libslic3r.h"
 
 // #define SLIC3R_DEBUG
 

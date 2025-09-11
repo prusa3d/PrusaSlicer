@@ -12,6 +12,7 @@
 #include <wx/accel.h>
 
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/log/trivial.hpp>
 
 #include "BitmapCache.hpp"
 #include "GUI.hpp"
@@ -116,6 +117,10 @@ wxMenuItem* append_menu_item(wxMenu* menu, int id, const wxString& string, const
         if (std::find(special_keys.begin(), special_keys.end(), entry->GetKeyCode()) == special_keys.end()) {
             entry->SetMenuItem(item);
             accelerator_entries_cache().push_back(entry);
+        }
+        else {
+            delete entry;
+            entry = nullptr;
         }
     }
 #endif
@@ -483,8 +488,11 @@ ScalableBitmap::ScalableBitmap(wxWindow* parent, boost::filesystem::path& icon_p
     const std::string ext = icon_path.extension().string();
 
     if (ext == ".png" || ext == ".jpg") {
-        bitmap.LoadFile(path, ext == ".png" ? wxBITMAP_TYPE_PNG : wxBITMAP_TYPE_JPEG);
-
+        if (!bitmap.LoadFile(path, ext == ".png" ? wxBITMAP_TYPE_PNG : wxBITMAP_TYPE_JPEG)) {
+            BOOST_LOG_TRIVIAL(error) << "Failed to load bitmap " << path;
+            return;
+        }
+        
         // check if the bitmap has a square shape
 
         if (wxSize sz = bitmap.GetSize(); sz.x != sz.y) {
@@ -727,11 +735,33 @@ void HighlighterForWx::init(std::pair<OG_CustomCtrl*, bool*> params)
     if (!Highlighter::init(!params.first && !params.second))
         return;
 
-    m_custom_ctrl = params.first;
-    m_show_blink_ptr = params.second;
+    assert(m_blinking_custom_ctrls.empty());
+    m_blinking_custom_ctrls.push_back({params.first, params.second});
 
-    *m_show_blink_ptr = true;
-    m_custom_ctrl->Refresh();
+    BlinkingCustomCtrl &blinking_custom_ctrl = m_blinking_custom_ctrls.back();
+    *blinking_custom_ctrl.show_blink_ptr     = true;
+    blinking_custom_ctrl.custom_ctrl_ptr->Refresh();
+}
+
+void HighlighterForWx::init(const std::vector<std::pair<OG_CustomCtrl *, bool *>> &blinking_custom_ctrls_params)
+{
+    this->invalidate();
+
+    const bool input_failed = blinking_custom_ctrls_params.empty() ||
+                              std::any_of(blinking_custom_ctrls_params.cbegin(), blinking_custom_ctrls_params.cend(),
+                                          [](auto &params) { return params.first == nullptr || params.second == nullptr; });
+
+    if (!Highlighter::init(input_failed))
+        return;
+
+    assert(m_blinking_custom_ctrls.empty());
+    for (const std::pair<OG_CustomCtrl *, bool *> &blinking_custom_ctrl_params : blinking_custom_ctrls_params) {
+        m_blinking_custom_ctrls.push_back({blinking_custom_ctrl_params.first, blinking_custom_ctrl_params.second});
+
+        BlinkingCustomCtrl &blinking_custom_ctrl = m_blinking_custom_ctrls.back();
+        *blinking_custom_ctrl.show_blink_ptr     = true;
+        blinking_custom_ctrl.custom_ctrl_ptr->Refresh();
+    }
 }
 
 // - using a BlinkingBitmap. Change state of this bitmap
@@ -749,13 +779,15 @@ void HighlighterForWx::invalidate()
 {
     Highlighter::invalidate();
 
-    if (m_custom_ctrl && m_show_blink_ptr) {
-        *m_show_blink_ptr = false;
-        m_custom_ctrl->Refresh();
-        m_show_blink_ptr = nullptr;
-        m_custom_ctrl = nullptr;
-    }
-    else if (m_blinking_bitmap) {
+    if (!m_blinking_custom_ctrls.empty()) {
+        for (BlinkingCustomCtrl &blinking_custom_ctrl : m_blinking_custom_ctrls) {
+            assert(blinking_custom_ctrl.is_valid());
+            *blinking_custom_ctrl.show_blink_ptr = false;
+            blinking_custom_ctrl.custom_ctrl_ptr->Refresh();
+        }
+
+        m_blinking_custom_ctrls.clear();
+    } else if (m_blinking_bitmap) {
         m_blinking_bitmap->invalidate();
         m_blinking_bitmap = nullptr;
     }
@@ -763,14 +795,17 @@ void HighlighterForWx::invalidate()
 
 void HighlighterForWx::blink()
 {
-    if (m_custom_ctrl && m_show_blink_ptr) {
-        *m_show_blink_ptr = !*m_show_blink_ptr;
-        m_custom_ctrl->Refresh();
-    }
-    else if (m_blinking_bitmap)
+    if (!m_blinking_custom_ctrls.empty()) {
+        for (BlinkingCustomCtrl &blinking_custom_ctrl : m_blinking_custom_ctrls) {
+            assert(blinking_custom_ctrl.is_valid());
+            *blinking_custom_ctrl.show_blink_ptr = !*blinking_custom_ctrl.show_blink_ptr;
+            blinking_custom_ctrl.custom_ctrl_ptr->Refresh();
+        }
+    } else if (m_blinking_bitmap) {
         m_blinking_bitmap->blink();
-    else
+    } else {
         return;
+    }
 
     Highlighter::blink();
 }

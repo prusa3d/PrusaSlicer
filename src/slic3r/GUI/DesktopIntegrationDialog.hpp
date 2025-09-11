@@ -7,6 +7,8 @@
 #define slic3r_DesktopIntegrationDialog_hpp_
 
 #include <wx/dialog.h>
+#include <boost/filesystem.hpp>
+
 
 namespace Slic3r {
 namespace GUI {
@@ -35,12 +37,13 @@ public:
 	// Regiters PrusaSlicer to start on prusaslicer:// URL
 	static void perform_desktop_integration();
 	// Deletes Desktop files and icons for both PrusaSlicer and GcodeViewer at paths stored in App Config.
-	static void undo_desktop_intgration();
+	static void undo_desktop_integration();
 
 	static void perform_downloader_desktop_integration();
 	static void undo_downloader_registration();
-private:
-
+    static void undo_downloader_registration_rigid();    
+    static void find_all_desktop_files(std::vector<boost::filesystem::path>& results);
+    static void remove_desktop_file_list(const std::vector<boost::filesystem::path>& list, std::vector<boost::filesystem::path>& fails);
 };
 } // namespace GUI
 } // namespace Slic3r

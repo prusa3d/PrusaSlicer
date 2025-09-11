@@ -2,9 +2,14 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <boost/chrono/duration.hpp>
+#include <boost/variant/get.hpp>
 #include <exception>
 
 #include "BoostThreadWorker.hpp"
+#include "libslic3r/Thread.hpp"
+#include "slic3r/GUI/Jobs/ProgressIndicator.hpp"
+#include "slic3r/GUI/Jobs/ThreadSafeQueue.hpp"
 
 namespace Slic3r { namespace GUI {
 

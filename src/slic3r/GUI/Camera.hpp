@@ -17,6 +17,7 @@ struct Camera
     static const double DefaultDistance;
     static const double DefaultZoomToBoxMarginFactor;
     static const double DefaultZoomToVolumesMarginFactor;
+    static double SceneBoxScaleFactor;
     static double FrustrumMinZRange;
     static double FrustrumMinNearZ;
     static double FrustrumZMargin;
@@ -48,6 +49,7 @@ private:
     Eigen::Quaterniond m_view_rotation{ 1.0, 0.0, 0.0, 0.0 };
     Transform3d m_projection_matrix{ Transform3d::Identity() };
     std::pair<double, double> m_frustrum_zs;
+    double m_scene_box_scale_factor{ SceneBoxScaleFactor };
 
     BoundingBoxf3 m_scene_box;
 
@@ -65,6 +67,8 @@ public:
 
     const Vec3d& get_target() const { return m_target; }
     void set_target(const Vec3d& target);
+
+    BoundingBoxf3 get_target_validation_box() const;
 
     double get_distance() const { return (get_position() - m_target).norm(); }
     double get_gui_scale() const { return m_gui_scale; }
@@ -139,7 +143,9 @@ public:
     void look_at(const Vec3d& position, const Vec3d& target, const Vec3d& up);
 
     double max_zoom() const { return 250.0; }
-    double min_zoom() const { return 0.7 * calc_zoom_to_bounding_box_factor(m_scene_box); }
+    double min_zoom() const { return 0.25 * calc_zoom_to_bounding_box_factor(m_scene_box); }
+
+    void set_distance(double distance);
 
 private:
     // returns tight values for nearZ and farZ plane around the given bounding box
@@ -147,7 +153,6 @@ private:
     std::pair<double, double> calc_tight_frustrum_zs_around(const BoundingBoxf3& box);
     double calc_zoom_to_bounding_box_factor(const BoundingBoxf3& box, double margin_factor = DefaultZoomToBoxMarginFactor) const;
     double calc_zoom_to_volumes_factor(const GLVolumePtrs& volumes, Vec3d& center, double margin_factor = DefaultZoomToVolumesMarginFactor) const;
-    void set_distance(double distance);
 
     void set_default_orientation();
     Vec3d validate_target(const Vec3d& target) const;

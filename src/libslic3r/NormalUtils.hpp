@@ -5,8 +5,11 @@
 #ifndef slic3r_NormalUtils_hpp_
 #define slic3r_NormalUtils_hpp_
 
+#include <vector>
+
 #include "Point.hpp"
 #include "Model.hpp"
+#include "admesh/stl.h"
 
 namespace Slic3r {
 

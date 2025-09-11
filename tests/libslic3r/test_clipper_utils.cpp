@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <numeric>
 #include <iostream>
@@ -9,6 +10,7 @@
 #include "libslic3r/SVG.hpp"
 
 using namespace Slic3r;
+using namespace Catch;
 
 SCENARIO("Various Clipper operations - xs/t/11_clipper.t", "[ClipperUtils]") {
 	// CCW oriented contour

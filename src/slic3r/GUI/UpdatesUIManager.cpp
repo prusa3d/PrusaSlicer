@@ -5,7 +5,7 @@
 #include "UpdatesUIManager.hpp"
 #include "I18N.hpp"
 #include "wxExtensions.hpp"
-#include "PresetArchiveDatabase.hpp"
+#include "slic3r/Utils/PresetUpdaterWrapper.hpp"
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -22,9 +22,9 @@ namespace fs = boost::filesystem;
 namespace Slic3r { 
 namespace GUI {
 
-RepositoryUpdateUIManager::RepositoryUpdateUIManager(wxWindow* parent, PresetArchiveDatabase* pad, int em) :
+RepositoryUpdateUIManager::RepositoryUpdateUIManager(wxWindow* parent, Slic3r::PresetUpdaterWrapper* puw, int em) :
     m_parent(parent)
-    ,m_pad(pad)
+    ,m_puw(puw)
     ,m_main_sizer(new wxBoxSizer(wxVERTICAL))
 {
     auto online_label = new wxStaticText(m_parent, wxID_ANY, _L("Online sources"));
@@ -104,10 +104,10 @@ void RepositoryUpdateUIManager::fill_entries(bool init_selection/* = false*/)
     m_online_entries.clear();
     m_offline_entries.clear();
 
-    const SharedArchiveRepositoryVector&  archs = m_pad->get_all_archive_repositories();
+    const SharedArchiveRepositoryVector&  archs = m_puw->get_all_archive_repositories();
     for (const auto* archive : archs) {
         const std::string&  uuid   = archive->get_uuid();
-        if (init_selection && m_pad->is_selected_repository_by_uuid(uuid))
+        if (init_selection && m_puw->is_selected_repository_by_uuid(uuid))
             m_selected_uuids.emplace(uuid);
 
         const bool  is_selected = m_selected_uuids.find(uuid) != m_selected_uuids.end();
@@ -115,7 +115,7 @@ void RepositoryUpdateUIManager::fill_entries(bool init_selection/* = false*/)
 
         if (data.source_path.empty()) {
             // online repo
-            m_online_entries.push_back({ is_selected, uuid, data.name, data.description, data.visibility });
+            m_online_entries.push_back({ is_selected, uuid, data.name, data.description, data.visibility, data.not_in_manifest });
         }
         else {
             // offline repo
@@ -161,12 +161,26 @@ void RepositoryUpdateUIManager::fill_grids()
                 });
             add(chb);
 
-            if (entry.visibility.empty())
-                add(new wxStaticText(m_parent, wxID_ANY, ""));
-            else {
+            if (entry.not_in_manifest) {
+                wxStaticBitmap* bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("notification_warning"));
+                //wxGetApp().plater()->get_user_account()
+                if (wxGetApp().is_account_logged_in()) {
+                    // TRN tooltip in Configuration Wizard - Configuration Sources
+                    bmp->SetToolTip(_L("Some vendors were installed from this source, but you do not have the rights to receive updates from it.\n"
+                        "This source may no longer be active, or your account may no longer be subscribed.\n"
+                        "Please consider unsubscribing from this source."));
+                } else {
+                    // TRN tooltip in Configuration Wizard - Configuration Sources
+                    bmp->SetToolTip(_L("Some vendors were installed from this source, but you do not have rights to receive updates from it.\n"
+                        "Please log in to restore access to all your subscribed sources or consider unsubscribing from this source."));
+                }
+                add(bmp);
+            } else if (!entry.visibility.empty()) {
                 wxStaticBitmap* bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("info"));
                 bmp->SetToolTip(from_u8(entry.visibility));
                 add(bmp);
+            } else {
+                add(new wxStaticText(m_parent, wxID_ANY, ""));
             }
 
             add(new wxStaticText(m_parent, wxID_ANY, from_u8(entry.name) + " "));
@@ -260,7 +274,7 @@ void RepositoryUpdateUIManager::update()
 
 void RepositoryUpdateUIManager::remove_offline_repos(const std::string& id)
 {
-    m_pad->remove_local_archive(id);
+    m_puw->remove_local_archive(id);
     m_selected_uuids.erase(id);
     check_selection();
 
@@ -291,7 +305,7 @@ void RepositoryUpdateUIManager::load_offline_repos()
         try {
             fs::path input_path = fs::path(input_file);
             std::string msg;
-            std::string uuid = m_pad->add_local_archive(input_path, msg);
+            std::string uuid = m_puw->add_local_archive(input_path, msg);
             if (uuid.empty()) {
                 ErrorDialog(m_parent, from_u8(msg), false).ShowModal();
             }
@@ -314,7 +328,7 @@ bool RepositoryUpdateUIManager::set_selected_repositories()
 
     std::string msg;
 
-    if (m_pad->set_selected_repositories(used_ids, msg)) {
+    if (m_puw->set_selected_repositories(used_ids, msg)) {
         check_selection();
         return true;
     }
@@ -328,7 +342,7 @@ bool RepositoryUpdateUIManager::set_selected_repositories()
 
 void RepositoryUpdateUIManager::check_selection()
 {
-    for (const auto& [uuid, is_selected] : m_pad->get_selected_repositories_uuid() )
+    for (const auto& [uuid, is_selected] : m_puw->get_selected_repositories_uuid() )
         if ((is_selected && m_selected_uuids.find(uuid) == m_selected_uuids.end() )||
             (!is_selected && m_selected_uuids.find(uuid) != m_selected_uuids.end())) {
             m_is_selection_changed = true;
@@ -338,7 +352,7 @@ void RepositoryUpdateUIManager::check_selection()
     m_is_selection_changed = false;
 }
 
-ManagePresetRepositoriesDialog::ManagePresetRepositoriesDialog(PresetArchiveDatabase* pad)
+ManagePresetRepositoriesDialog::ManagePresetRepositoriesDialog(Slic3r::PresetUpdaterWrapper* puw)
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY,
         format_wxstr("%1% - %2%", SLIC3R_APP_NAME, _L("Manage Updates")),
         wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
@@ -346,7 +360,7 @@ ManagePresetRepositoriesDialog::ManagePresetRepositoriesDialog(PresetArchiveData
     this->SetFont(wxGetApp().normal_font());
     const int em = em_unit();
 
-    m_manager = std::make_unique<RepositoryUpdateUIManager>(this, pad, em);
+    m_manager = std::make_unique<RepositoryUpdateUIManager>(this, puw, em);
 
     auto sizer = m_manager->get_sizer();
 

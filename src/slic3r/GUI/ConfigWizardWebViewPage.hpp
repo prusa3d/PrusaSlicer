@@ -2,15 +2,18 @@
 #define slic3r_ConfigWizardWebViewPage_hpp_
 
 #include "ConfigWizard_private.hpp"
-#include "Event.hpp"
+#include <wx/event.h>
 
 class wxWebView;
 class wxWebViewEvent;
+
+wxDECLARE_EVENT(EVT_OPEN_EXTERNAL_LOGIN_WIZARD, wxCommandEvent);
 
 namespace Slic3r { 
 namespace GUI {
 
 wxDECLARE_EVENT(EVT_LOGIN_VIA_WIZARD, Event<std::string>);
+
 /*
 struct ConfigWizardPage: wxPanel
 {
@@ -50,6 +53,7 @@ public:
     void on_error(wxWebViewEvent &evt);
     void on_navigation_request(wxWebViewEvent &evt);
     void on_idle(wxIdleEvent &evt);
+    void on_script_message(wxWebViewEvent& evt);
     void load_error_page();
     // returns true if logged in - wizard needs to update repos
     bool login_changed();
@@ -61,6 +65,7 @@ private:
     wxStaticText *m_text{nullptr};
     bool m_load_error_page{false};
     bool m_vetoed{false};
+    bool m_evt_sent{false};
 };
 
 }} // namespace Slic3r::GUI

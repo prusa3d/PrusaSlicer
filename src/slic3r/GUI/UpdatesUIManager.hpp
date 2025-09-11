@@ -14,21 +14,22 @@ class wxSizer;
 class wxFlexGridSizer;
 
 namespace Slic3r { 
+
+class PresetUpdaterWrapper;
+
 namespace GUI {
-
-class PresetArchiveDatabase;
-
 class RepositoryUpdateUIManager
 {
     struct OnlineEntry {
-        OnlineEntry(bool use, const std::string &id, const std::string &name, const std::string &description, const std::string &visibility) :
-            use(use), id(id), name(name), description(description), visibility(visibility) {}
+        OnlineEntry(bool use, const std::string &id, const std::string &name, const std::string &description, const std::string &visibility, bool not_in_manifest) :
+            use(use), id(id), name(name), description(description), visibility(visibility) ,not_in_manifest(not_in_manifest) {}
 
         bool            use;
         std::string     id;
         std::string     name;
         std::string     description;
         std::string   	visibility;
+        bool            not_in_manifest;
     };
 
     struct OfflineEntry {
@@ -44,7 +45,7 @@ class RepositoryUpdateUIManager
         boost::filesystem::path source_path;
     };
 
-    PresetArchiveDatabase*      m_pad           { nullptr };
+    PresetUpdaterWrapper*       m_puw           { nullptr };
     wxWindow*                   m_parent        { nullptr };
     wxSizer*                    m_main_sizer    { nullptr };
 
@@ -68,7 +69,7 @@ class RepositoryUpdateUIManager
 
 public:
     RepositoryUpdateUIManager() {}
-    RepositoryUpdateUIManager(wxWindow* parent, PresetArchiveDatabase* pad, int em);
+    RepositoryUpdateUIManager(wxWindow* parent, Slic3r::PresetUpdaterWrapper* puw, int em);
     ~RepositoryUpdateUIManager() {}
 
     void update();
@@ -83,7 +84,7 @@ public:
 class ManagePresetRepositoriesDialog : public DPIDialog
 {
 public:
-    ManagePresetRepositoriesDialog(PresetArchiveDatabase* pad);
+    ManagePresetRepositoriesDialog(PresetUpdaterWrapper* puw);
     ~ManagePresetRepositoriesDialog() {}
 
 protected:

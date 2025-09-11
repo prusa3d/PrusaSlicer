@@ -10,6 +10,7 @@
 
 #include "SeamPlacer.hpp"
 
+#include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/GCode/SeamShells.hpp"
 #include "libslic3r/GCode/SeamAligned.hpp"
 #include "libslic3r/GCode/SeamRear.hpp"
@@ -38,7 +39,9 @@ ObjectLayerPerimeters get_perimeters(
         const Perimeters::LayerInfos layer_infos{Perimeters::get_layer_infos(
             print_object->layers(), params.perimeter.elephant_foot_compensation
         )};
-        const std::vector<Geometry::BoundedPolygons> projected{Geometry::project_to_geometry(extrusions, params.max_distance)};
+        const std::vector<Geometry::BoundedPolygons> projected{
+            Geometry::project_to_geometry(extrusions, params.max_distance)
+        };
         Perimeters::LayerPerimeters perimeters{Perimeters::create_perimeters(projected, layer_infos, painting, params.perimeter)};
 
         throw_if_canceled();
@@ -70,7 +73,7 @@ ObjectSeams precalculate_seams(
     ObjectSeams result;
 
     for (auto &[print_object, layer_perimeters] : seam_data) {
-        switch (params.seam_preference) {
+        switch (print_object->config().seam_position.value) {
         case spAligned: {
             const Transform3d transformation{print_object->trafo_centered()};
             const ModelVolumePtrs &volumes{print_object->model_object()->volumes};
@@ -97,7 +100,8 @@ ObjectSeams precalculate_seams(
             break;
         }
         case spNearest: {
-            throw std::runtime_error("Cannot precalculate seams for nearest position!");
+            // Do not precalculate anything.
+            break;
         }
         }
         throw_if_canceled();
@@ -122,20 +126,19 @@ Params Placer::get_params(const DynamicPrintConfig &config) {
     params.perimeter.convex_threshold = Slic3r::Geometry::deg2rad(10.0);
     params.perimeter.concave_threshold = Slic3r::Geometry::deg2rad(15.0);
 
-    params.seam_preference = config.opt_enum<SeamPosition>("seam_position");
     params.staggered_inner_seams = config.opt_bool("staggered_inner_seams");
 
     params.max_nearest_detour = 1.0;
-    params.rear_tolerance = 0.2;
+    params.rear_tolerance = 1.0;
     params.rear_y_offset = 20;
     params.aligned.jump_visibility_threshold = 0.6;
     params.max_distance = 5.0;
     params.perimeter.oversampling_max_distance = 0.2;
     params.perimeter.embedding_threshold = 0.5;
-    params.perimeter.painting_radius = 0.1;
+    params.perimeter.painting_radius = 0.05;
     params.perimeter.simplification_epsilon = 0.001;
-    params.perimeter.smooth_angle_arm_length = 0.2;
-    params.perimeter.sharp_angle_arm_length = 0.05;
+    params.perimeter.smooth_angle_arm_length = 0.5;
+    params.perimeter.sharp_angle_arm_length = 0.25;
 
     params.visibility.raycasting_visibility_samples_count = 30000;
     params.visibility.fast_decimation_triangle_count_target = 16000;
@@ -159,14 +162,18 @@ void Placer::init(
     }
 
     ObjectLayerPerimeters perimeters{get_perimeters(objects, params, object_painting, throw_if_canceled)};
-    this->params = params;
+    ObjectLayerPerimeters perimeters_for_precalculation;
 
-    if (this->params.seam_preference != spNearest) {
-        this->seams_per_object =
-            precalculate_seams(params, std::move(perimeters), throw_if_canceled);
-    } else {
-        this->perimeters_per_layer = std::move(perimeters);
+    for (auto &[print_object, layer_perimeters] : perimeters) {
+        if (print_object->config().seam_position.value == spNearest) {
+            this->perimeters_per_layer[print_object] = std::move(layer_perimeters);
+        } else {
+            perimeters_for_precalculation[print_object] = std::move(layer_perimeters);
+        }
     }
+
+    this->params = params;
+    this->seams_per_object = precalculate_seams(params, std::move(perimeters_for_precalculation), throw_if_canceled);
 
     BOOST_LOG_TRIVIAL(debug) << "SeamPlacer: init: end";
 }
@@ -187,10 +194,10 @@ const SeamPerimeterChoice &choose_closest_seam(
 }
 
 std::pair<std::size_t, Vec2d> project_to_extrusion_loop(
-    const SeamChoice &seam_choice, const Perimeters::Perimeter &perimeter, const Linesf &loop_lines
+    const SeamChoice &seam_choice,
+    const Perimeters::Perimeter &perimeter,
+    const AABBTreeLines::LinesDistancer<Linef> &distancer
 ) {
-    const AABBTreeLines::LinesDistancer<Linef> distancer{loop_lines};
-
     const bool is_at_vertex{seam_choice.previous_index == seam_choice.next_index};
     const Vec2d edge{
         perimeter.positions[seam_choice.next_index] -
@@ -208,65 +215,244 @@ std::pair<std::size_t, Vec2d> project_to_extrusion_loop(
     return {loop_line_index, loop_point};
 }
 
-std::optional<Vec2d> offset_along_loop_lines(
-    const Vec2d &point,
-    const std::size_t loop_line_index,
-    const Linesf &loop_lines,
-    const double offset
-) {
-    double distance{0};
-    Vec2d previous_point{point};
-    std::optional<Vec2d> offset_point;
-    Geometry::visit_near_forward(loop_line_index, loop_lines.size(), [&](std::size_t index) {
-        const Vec2d next_point{loop_lines[index].b};
-        const Vec2d edge{next_point - previous_point};
-
-        if (distance + edge.norm() > offset) {
-            const double remaining_distance{offset - distance};
-            offset_point = previous_point + remaining_distance * edge.normalized();
-            return true;
-        }
-
-        distance += edge.norm();
-        previous_point = next_point;
-
-        return false;
-    });
-
-    return offset_point;
-}
-
 double get_angle(const SeamChoice &seam_choice, const Perimeters::Perimeter &perimeter) {
     const bool is_at_vertex{seam_choice.previous_index == seam_choice.next_index};
     return is_at_vertex ? perimeter.angles[seam_choice.previous_index] : 0.0;
 }
 
-Point finalize_seam_position(
-    const Polygon &loop_polygon,
-    const SeamChoice &seam_choice,
-    const Perimeters::Perimeter &perimeter,
-    const double loop_width,
-    const bool do_staggering
+SeamChoice to_seam_choice(
+    const Geometry::PointOnLine &point_on_line, const Perimeters::Perimeter &perimeter
 ) {
+    SeamChoice result;
+
+    result.position = point_on_line.point;
+    result.previous_index = point_on_line.line_index;
+    result.next_index = point_on_line.line_index == perimeter.positions.size() - 1 ?
+        0 :
+        point_on_line.line_index + 1;
+    return result;
+}
+
+Geometry::Direction1D get_direction(
+    const bool flipped,
+    const ExPolygon &perimeter_polygon,
+    const ExtrusionLoop &loop
+) {
+    using Dir = Geometry::Direction1D;
+
+    Dir result{flipped ? Dir::forward : Dir::backward};
+
+    // In rare cases it may happen that the original geometry perimeter
+    // polygon has different direction to the actual extrusion loop.
+    // In that case the logic is exactly opposite.
+    if (perimeter_polygon.contour.is_clockwise() != loop.is_clockwise()) {
+        result = result == Dir::forward ? Dir::backward : Dir::forward;
+    }
+    return result;
+}
+
+unsigned get_seam_choice_value(const SeamChoice &seam_choice, const Perimeters::Perimeter& perimeter) {
+    const unsigned previous_value{Perimeters::get_point_value(
+        perimeter.point_types[seam_choice.previous_index],
+        perimeter.point_classifications[seam_choice.previous_index]
+    )};
+
+    const unsigned next_value{Perimeters::get_point_value(
+        perimeter.point_types[seam_choice.next_index],
+        perimeter.point_classifications[seam_choice.next_index]
+    )};
+
+    return std::max(previous_value, next_value);
+}
+
+boost::variant<Point, Scarf::Scarf> finalize_seam_position(
+    const ExtrusionLoop &loop,
+    const PrintRegion *region,
+    SeamChoice seam_choice,
+    const Perimeters::Perimeter &perimeter,
+    const bool staggered_inner_seams,
+    const bool flipped,
+    const bool thick_bridges
+) {
+    using Perimeters::offset_along_perimeter;
+    using Perimeters::PointOnPerimeter;
+
+    const Polygon loop_polygon{Geometry::to_polygon(loop)};
+    const bool do_staggering{staggered_inner_seams && loop.role() == ExtrusionRole::Perimeter};
+    const double loop_width{loop.paths.empty() ? 0.0 : loop.paths.front().width()};
+
+    const ExPolygon perimeter_polygon{Geometry::scaled(perimeter.positions)};
+    const Linesf perimeter_lines{to_unscaled_linesf({perimeter_polygon})};
     const Linesf loop_lines{to_unscaled_linesf({ExPolygon{loop_polygon}})};
-    const auto [loop_line_index, loop_point]{
-        project_to_extrusion_loop(seam_choice, perimeter, loop_lines)};
+    const AABBTreeLines::LinesDistancer<Linef> distancer{loop_lines};
+
+    auto [loop_line_index, loop_point]{
+        project_to_extrusion_loop(seam_choice, perimeter, distancer)};
+
+    const Geometry::Direction1D offset_direction{get_direction(flipped, perimeter_polygon, loop)};
+
+    const auto offset_stop_condition{
+        [choice_value = get_seam_choice_value(seam_choice, perimeter)](
+            const Perimeters::Perimeter &perimeter, const std::size_t index
+        ) {
+            const unsigned current_point_value{Perimeters::get_point_value(
+                perimeter.point_types[index], perimeter.point_classifications[index]
+            )};
+            if (
+                current_point_value < choice_value
+                && (
+                    perimeter.point_types[index] == Perimeters::PointType::blocker
+                    || perimeter.point_classifications[index] == Perimeters::PointClassification::overhang
+                )
+            ) {
+                return true;
+            }
+            return false;
+        }};
 
     // ExtrusionRole::Perimeter is inner perimeter.
     if (do_staggering) {
         const double depth = (loop_point - seam_choice.position).norm() -
             loop_width / 2.0;
-        const double angle{get_angle(seam_choice, perimeter)};
-        const double initial_offset{angle > 0 ? angle / 2.0 * depth : 0.0};
-        const double additional_offset{angle < 0 ? std::cos(angle / 2.0) * depth : depth};
 
-        const double staggering_offset{initial_offset + additional_offset};
+        const double staggering_offset{depth};
 
-        std::optional<Vec2d> staggered_point{
-            offset_along_loop_lines(loop_point, loop_line_index, loop_lines, staggering_offset)};
+        std::optional<PointOnPerimeter> staggered_point{offset_along_perimeter(
+            {seam_choice.previous_index, seam_choice.next_index, loop_point},
+            perimeter,
+            staggering_offset,
+            offset_direction,
+            offset_stop_condition
+        )};
 
         if (staggered_point) {
-            return scaled(*staggered_point);
+            seam_choice = *staggered_point;
+            std::tie(loop_line_index, loop_point) = project_to_extrusion_loop(seam_choice, perimeter, distancer);
+        }
+    }
+
+    bool place_scarf_seam {
+        region->config().scarf_seam_placement == ScarfSeamPlacement::everywhere
+        || (region->config().scarf_seam_placement == ScarfSeamPlacement::countours && !perimeter.is_hole)
+    };
+    const bool is_smooth{
+        seam_choice.previous_index != seam_choice.next_index ||
+        perimeter.angle_types[seam_choice.previous_index] == Perimeters::AngleType::smooth
+    };
+
+    if (perimeter.layer_index == 0) {
+        place_scarf_seam = false;
+    }
+
+    if (region->config().scarf_seam_only_on_smooth && !is_smooth) {
+        place_scarf_seam = false;
+    }
+
+    if (region->config().scarf_seam_length.value <= std::numeric_limits<double>::epsilon()) {
+        place_scarf_seam = false;
+    }
+
+    const bool is_overhang{
+        perimeter.point_classifications[seam_choice.previous_index] == Perimeters::PointClassification::overhang
+        || perimeter.point_classifications[seam_choice.next_index] == Perimeters::PointClassification::overhang
+    };
+
+    if (thick_bridges && is_overhang) {
+        place_scarf_seam = false;
+    }
+
+    if (place_scarf_seam) {
+        Scarf::Scarf scarf{};
+        scarf.entire_loop = region->config().scarf_seam_entire_loop;
+        scarf.max_segment_length = region->config().scarf_seam_max_segment_length;
+        scarf.start_height = std::min(region->config().scarf_seam_start_height.get_abs_value(1.0), 1.0);
+
+        const double offset{scarf.entire_loop ? 0.0 : region->config().scarf_seam_length.value};
+        const std::optional<PointOnPerimeter> outter_scarf_start_point{offset_along_perimeter(
+            seam_choice,
+            perimeter,
+            offset,
+            offset_direction,
+            offset_stop_condition
+        )};
+        if (!outter_scarf_start_point) {
+            return scaled(loop_point);
+        }
+
+        if (loop.role() != ExtrusionRole::Perimeter) { // Outter perimeter
+            const Vec2d start_point_candidate{project_to_extrusion_loop(
+                *outter_scarf_start_point,
+                perimeter,
+                distancer
+            ).second};
+            if ((start_point_candidate - outter_scarf_start_point->position).norm() > 5.0) {
+                return scaled(loop_point);
+            }
+            scarf.start_point = scaled(start_point_candidate);
+            scarf.end_point = scaled(loop_point);
+            scarf.end_point_previous_index = loop_line_index;
+            return scarf;
+        } else {
+            PointOnPerimeter inner_scarf_end_point{
+                *outter_scarf_start_point
+            };
+
+            if (region->config().external_perimeters_first.value) {
+                const auto external_first_offset_direction{
+                    offset_direction == Geometry::Direction1D::forward ?
+                    Geometry::Direction1D::backward :
+                    Geometry::Direction1D::forward
+                };
+                if (auto result{offset_along_perimeter(
+                    seam_choice,
+                    perimeter,
+                    offset,
+                    external_first_offset_direction,
+                    offset_stop_condition
+                )}) {
+                    inner_scarf_end_point = *result;
+                } else {
+                    return scaled(seam_choice.position);
+                }
+            }
+
+            if (!region->config().scarf_seam_on_inner_perimeters) {
+                return scaled(inner_scarf_end_point.position);
+            }
+
+            const std::optional<PointOnPerimeter> inner_scarf_start_point{offset_along_perimeter(
+                inner_scarf_end_point,
+                perimeter,
+                offset,
+                offset_direction,
+                offset_stop_condition
+            )};
+
+            if (!inner_scarf_start_point) {
+                return scaled(inner_scarf_end_point.position);
+            }
+            const Vec2d start_point_candidate{project_to_extrusion_loop(
+                *inner_scarf_start_point,
+                perimeter,
+                distancer
+            ).second};
+            if ((start_point_candidate - inner_scarf_start_point->position).norm() > 5.0) {
+                return scaled(loop_point);
+            }
+            scarf.start_point = scaled(start_point_candidate);
+
+            const auto [end_point_previous_index, end_point]{project_to_extrusion_loop(
+                inner_scarf_end_point,
+                perimeter,
+                distancer
+            )};
+            if ((end_point - inner_scarf_end_point.position).norm() > 5.0) {
+                return scaled(loop_point);
+            }
+
+            scarf.end_point = scaled(end_point);
+            scarf.end_point_previous_index = end_point_previous_index;
+            return scarf;
         }
     }
 
@@ -346,7 +532,9 @@ int get_perimeter_count(const Layer *layer){
     return count;
 }
 
-Point Placer::place_seam(const Layer *layer, const ExtrusionLoop &loop, const Point &last_pos) const {
+boost::variant<Point, Scarf::Scarf> Placer::place_seam(
+    const Layer *layer, const PrintRegion *region, const ExtrusionLoop &loop, const bool flipped, const Point &last_pos
+) const {
     const PrintObject *po = layer->object();
     // Must not be called with supprot layer.
     assert(dynamic_cast<const SupportLayer *>(layer) == nullptr);
@@ -354,16 +542,17 @@ Point Placer::place_seam(const Layer *layer, const ExtrusionLoop &loop, const Po
     assert(layer->id() >= po->slicing_parameters().raft_layers());
     const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
 
-    const Polygon loop_polygon{Geometry::to_polygon(loop)};
+    const bool thick_bridges{po->config().thick_bridges.value};
 
-    const bool do_staggering{this->params.staggered_inner_seams && loop.role() == ExtrusionRole::Perimeter};
-    const double loop_width{loop.paths.empty() ? 0.0 : loop.paths.front().width()};
-
-
-    if (this->params.seam_preference == spNearest) {
-        const std::vector<Perimeters::BoundedPerimeter> &perimeters{this->perimeters_per_layer.at(po)[layer_index]};
-        const auto [seam_choice, perimeter_index] = place_seam_near(perimeters, loop, last_pos, this->params.max_nearest_detour);
-        return finalize_seam_position(loop_polygon, seam_choice, perimeters[perimeter_index].perimeter, loop_width, do_staggering);
+    if (po->config().seam_position.value == spNearest) {
+        const std::vector<Perimeters::BoundedPerimeter> &perimeters{
+            this->perimeters_per_layer.at(po)[layer_index]};
+        const auto [seam_choice, perimeter_index] =
+            place_seam_near(perimeters, loop, last_pos, this->params.max_nearest_detour);
+        return finalize_seam_position(
+            loop, region, seam_choice, perimeters[perimeter_index].perimeter,
+            this->params.staggered_inner_seams, flipped, thick_bridges
+        );
     } else {
         const std::vector<SeamPerimeterChoice> &seams_on_perimeters{this->seams_per_object.at(po)[layer_index]};
 
@@ -379,14 +568,18 @@ Point Placer::place_seam(const Layer *layer, const ExtrusionLoop &loop, const Po
                     seams_on_perimeters[0].perimeter.is_hole ? seams_on_perimeters[1] :
                                                                seams_on_perimeters[0]};
                 return finalize_seam_position(
-                    loop_polygon, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
-                    loop_width, do_staggering
+                    loop, region, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
+                    this->params.staggered_inner_seams, flipped, thick_bridges
                 );
             }
         }
 
-        const SeamPerimeterChoice &seam_perimeter_choice{choose_closest_seam(seams_on_perimeters, loop_polygon)};
-        return finalize_seam_position(loop_polygon, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter, loop_width, do_staggering);
+        const SeamPerimeterChoice &seam_perimeter_choice{
+            choose_closest_seam(seams_on_perimeters, Geometry::to_polygon(loop))};
+        return finalize_seam_position(
+            loop, region, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
+            this->params.staggered_inner_seams, flipped, thick_bridges
+        );
     }
 }
 } // namespace Slic3r::Seams

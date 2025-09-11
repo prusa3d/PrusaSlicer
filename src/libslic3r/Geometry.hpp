@@ -16,14 +16,28 @@
 #ifndef slic3r_Geometry_hpp_
 #define slic3r_Geometry_hpp_
 
+// Serialization through the Cereal library
+#include <cereal/access.hpp>
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <cereal/cereal.hpp>
+#include <Eigen/Geometry>
+#include <cmath>
+#include <string>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <cinttypes>
+#include <cstdlib>
+
 #include "libslic3r.h"
 #include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
-
-// Serialization through the Cereal library
-#include <cereal/access.hpp>
+#include "libslic3r/Line.hpp"
+#include "libslic3r/Point.hpp"
 
 namespace Slic3r::Geometry {
 

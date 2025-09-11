@@ -4,8 +4,17 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <algorithm>
+#include <vector>
+#include <cmath>
+#include <cstddef>
+
 #include "Exception.hpp"
 #include "Print.hpp"
+#include "libslic3r/Config.hpp"
+#include "libslic3r/Flow.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 

@@ -5,12 +5,14 @@
 #ifndef SLA_PAD_HPP
 #define SLA_PAD_HPP
 
+#include <libslic3r/Point.hpp>
 #include <vector>
 #include <functional>
 #include <cmath>
 #include <string>
 
-#include <libslic3r/Point.hpp>
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/Polygon.hpp"
 
 struct indexed_triangle_set;
 
@@ -18,6 +20,7 @@ namespace Slic3r {
 
 class ExPolygon;
 class Polygon;
+
 using ExPolygons = std::vector<ExPolygon>;
 using Polygons = std::vector<Polygon, PointsAllocator<Polygon>>;
 

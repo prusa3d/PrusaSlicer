@@ -6,14 +6,20 @@
 #ifndef SLA_RASTERBASE_HPP
 #define SLA_RASTERBASE_HPP
 
+#include <libslic3r/ExPolygon.hpp>
+#include <stddef.h>
 #include <ostream>
 #include <memory>
 #include <vector>
 #include <array>
 #include <utility>
 #include <cstdint>
+#include <functional>
+#include <string>
+#include <cstddef>
 
-#include <libslic3r/ExPolygon.hpp>
+#include "libslic3r/Point.hpp"
+#include "libslic3r/libslic3r.h"
 
 namespace Slic3r {
 
