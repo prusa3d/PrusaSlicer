@@ -1,23 +1,124 @@
-name: Build windows
+name: Build Windows
 
 on:
-  push:
-  workflow_dispatch:
-    inputs:
-      create_pdb:
-        description: 'Zip pdbs'
-        default: false
-        type: boolean
-      create_installer:
-        description: 'Create installer'
-        default: false
-        type: boolean
+  workflow_call:
 
 jobs:
-  build_win:
-    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_windows.yml@master
-    secrets: inherit
-    with:
-      actions_branch: master
-      create_pdb: ${{ inputs.create_pdb || false }}
-      create_installer: ${{ inputs.create_installer || false }}
+  build_windows:
+    name: Compile
+    runs-on: windows-latest
+    env:
+      date:
+      ver:
+      ver_pure:
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub environment
+        run: |
+          $date = Get-Date -Format 'yyyyMMdd'
+          $ref = "${{ github.ref }}"
+          $eventName = "${{ github.event_name }}"
+          $prNumber = "${{ github.event.number }}"
+          $versionContent = Get-Content version.inc -Raw
+          if ($versionContent -match 'set\(SLIC3R_VERSION "(.*?)"\)') {
+              $ver_pure = $matches[1]
+          }
+          if ($eventName -eq 'pull_request') {
+              $ver = "PR" + $prNumber
+          } else {
+              $ver=$ver_pure + "+BOSS"
+          }
+
+          echo "ver=$ver" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          echo "ver_pure=$ver_pure" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          echo "date=$date" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          echo "date: ${{ env.date }} version: ${{ env.ver }}"
+        shell: pwsh
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Install NSIS (Nullsoft Scriptable Install System)
+        run: |
+          dir "C:/Program Files (x86)/Windows Kits/10/Include"
+          choco install nsis
+
+      - name: Install Strawberry Perl
+        working-directory: ${{ github.workspace }}
+        run: |
+            choco install strawberryperl   
+
+      - name: Download Visual C++ 2022 Redistributable
+        id: download-vcredist
+        uses: carlosperate/download-file-action@v2
+        with:
+          file-url: https://github.com/abbodi1406/vcredist/releases/download/v0.77.0/VisualCppRedist_AIO_x86_x64.exe
+          file-name: vcredist_14_38_3313_0.7z
+          location:  ${{ runner.temp }}
+          sha256: 74acbc9669fe760cfa3108dc75f49d764751501cef6d4ceace793266f91ea0e8
+
+      - name: Unpack Visual C++ 2022 Runtime
+        run: |
+          7z e ${{ steps.download-vcredist.outputs.file-path }} -o${{ runner.temp }}/vcredist 2022\x64\System64\*.dll
+
+      - name: Determine Cache Keys
+        id: cache-keys
+        run: |
+          echo cache-path=${{ github.workspace }}/deps/build/PrusaSlicer_dep >> $ENV:GITHUB_OUTPUT
+          echo cache-key=${{ runner.os }}-cache-Prusaslicer_deps-build-${{ hashFiles('deps/**') }} >> $ENV:GITHUB_OUTPUT
+
+      - name: Cache build dependencies
+        id: cache-build-deps
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.cache-keys.outputs.cache-path }}
+          key: ${{ steps.cache-keys.outputs.cache-key }}
+
+      - name: Build PrusaSlicer (BOSS) Dependencies
+        if: steps.cache-build-deps.outputs.cache-hit != 'true'
+        working-directory: ${{ github.workspace }}
+        run: |
+            mkdir ${{ github.workspace }}/deps/build
+            mkdir ${{ github.workspace }}/deps/build/PrusaSlicer_dep
+            .\build_win.bat -v=17 -d=.\deps\build\PrusaSlicer_dep -c=Release -r=none -s=deps
+            .\build_win.bat -v=17 -d=.\deps\build\PrusaSlicer_dep -c=Release -r=none -s=pack
+            cd ${{ github.workspace }}/deps/build
+          
+      - name: Build PrusaSlicer (BOSS)
+        working-directory: ${{ github.workspace }}
+        run: |
+          .\build_win.bat -v=17 -d=.\deps\build\PrusaSlicer_dep -c=Release -s=app -r=none
+
+      - name: Provide Visual C++ 2022 System Runtime
+        working-directory: ${{ github.workspace }}/build/src/Release
+        run: |
+          move ${{ runner.temp }}\vcredist\vcruntime140.dll .
+          move ${{ runner.temp }}\vcredist\vcruntime140_1.dll .
+          move ${{ runner.temp }}\vcredist\msvcp140.dll .
+          move ${{ runner.temp }}\vcredist\msvcp140_codecvt_ids.dll .
+
+      - name: Create installer Win
+        working-directory: ${{ github.workspace }}/build
+        run: |
+          cpack -G NSIS
+
+      - name: Pack app
+        working-directory: ${{ github.workspace }}/build/src/Release
+        run: |
+          7z a -tzip ${{ github.workspace }}\build\PrusaSlicer-${{ env.ver }}+win64-${{ env.date }}.zip resources *.exe *.dll mesa/opengl32.dll
+          7z l ${{ github.workspace }}\build\PrusaSlicer-${{ env.ver }}+win64-${{ env.date }}.zip
+
+      - name: Upload PrusaSlicer (BOSS) Portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrusaSlicer-${{ env.ver }}+win64-${{ env.date }}
+          path: ${{ github.workspace }}\build\PrusaSlicer-${{ env.ver }}+win64-${{ env.date }}.zip
+
+      - name: Upload PrusaSlicer (BOSS) Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrusaSlicer-Installer-${{ env.ver }}+win64-${{ env.date }}
+          path: ${{ github.workspace }}\build\PrusaSlicer-Installer*.exe

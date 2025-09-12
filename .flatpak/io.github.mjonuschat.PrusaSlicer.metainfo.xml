@@ -1,0 +1,79 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<component type="desktop">
+    <id>io.github.mjonuschat.PrusaSlicer</id>
+    <launchable type="desktop-id">io.github.mjonuschat.PrusaSlicer.desktop</launchable>
+    <name>PrusaSlicer (BOSS Edition)</name>
+    <summary>The Slicer for Every Maker</summary>
+    <developer id="mojocode.de">
+        <name>Morton Jonuschat</name>
+    </developer>
+    <url type="homepage">https://github.com/mjonuschat/PrusaSlicer/</url>
+    <url type="help">https://help.prusa3d.com</url>
+    <url type="bugtracker">https://github.com/mjonuschat/PrusaSlicer/issues</url>
+    <metadata_license>0BSD</metadata_license>
+    <project_license>AGPL-3.0-only</project_license>
+    <content_rating type="oars-1.1" />
+    <requires>
+        <display_length compare="gt">768</display_length>
+    </requires>
+    <recommends>
+        <control>keyboard</control>
+        <control>pointing</control>
+    </recommends>
+    <provides>
+        <id>prusa-slicer.desktop</id>
+        <mediatype>text/x.gcode</mediatype>
+        <mediatype>model/stl</mediatype>
+        <mediatype>application/x-amf</mediatype>
+        <mediatype>application/prs.wavefront-obj</mediatype>
+        <mediatype>application/vnd.ms-3mfdocument</mediatype>
+    </provides>
+    <branding>
+        <color type="primary" scheme_preference="light">#ff6e00</color>
+        <color type="primary" scheme_preference="dark">#666666</color>
+    </branding>
+    <screenshots>
+        <screenshot type="default">
+            <image>https://raw.githubusercontent.com/flathub/com.prusa3d.PrusaSlicer/59900c957ae1b1f51f855cfdb7692797385ed2ff/screenshots/plater.png</image>
+            <caption>Clear and simple UI</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/flathub/com.prusa3d.PrusaSlicer/59900c957ae1b1f51f855cfdb7692797385ed2ff/screenshots/preview.png</image>
+            <caption>Detailed GCode preview</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/flathub/com.prusa3d.PrusaSlicer/59900c957ae1b1f51f855cfdb7692797385ed2ff/screenshots/multiplebed.png</image>
+            <caption>Multiple bed support</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/flathub/com.prusa3d.PrusaSlicer/59900c957ae1b1f51f855cfdb7692797385ed2ff/screenshots/plater_sidebar.png</image>
+            <caption>Multiple material support</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/flathub/com.prusa3d.PrusaSlicer/59900c957ae1b1f51f855cfdb7692797385ed2ff/screenshots/printables.png</image>
+            <caption>Intergration of printables.com</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/flathub/com.prusa3d.PrusaSlicer/59900c957ae1b1f51f855cfdb7692797385ed2ff/screenshots/connect.png</image>
+            <caption>Prusa Connect integration</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/flathub/com.prusa3d.PrusaSlicer/59900c957ae1b1f51f855cfdb7692797385ed2ff/screenshots/SLA.png</image>
+            <caption>SLA slicing</caption>
+        </screenshot>
+    </screenshots>
+    <description>
+        <p>
+            PrusaSlicer is a powerful, lightweight slicing software designed for precision and flexibility in 3D printing.
+            Compatible with a wide range of printers and materials, it combines advanced customization options with an efficient,
+            streamlined workflow, delivering high-quality results on Linux, macOS, and Windows.
+            Developed by Prusa Research, PrusaSlicer is fully open-source, supported by a vibrant community,
+            and built on the solid foundation of the Slic3r project, originally created by Alessandro Ranellucci.
+        </p>
+    </description>
+    <releases>
+        <release version="nightly" date="2024-09-19">
+            <url>https://github.com/mjonuschat/PrusaSlicer/releases/tag/nightly</url>
+        </release>
+    </releases>
+</component>

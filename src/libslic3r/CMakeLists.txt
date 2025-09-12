@@ -135,6 +135,8 @@ set(SLIC3R_SOURCES
     Format/3mf.hpp
     Format/AMF.cpp
     Format/AMF.hpp
+    Format/CTB.hpp
+    Format/CTB.cpp
     Format/OBJ.cpp
     Format/OBJ.hpp
     Format/objparser.cpp
@@ -454,7 +456,7 @@ set(SLIC3R_SOURCES
     SLA/BranchingTreeSLA.hpp
     SLA/BranchingTreeSLA.cpp
     SLA/ZCorrection.hpp
-    SLA/ZCorrection.cpp    
+    SLA/ZCorrection.cpp
     SLA/SupportIslands/EvaluateNeighbor.cpp
     SLA/SupportIslands/EvaluateNeighbor.hpp
     SLA/SupportIslands/ExpandNeighbor.cpp
@@ -611,6 +613,7 @@ target_include_directories(libslic3r PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMA
 target_include_directories(libslic3r PUBLIC ${EXPAT_INCLUDE_DIRS})
 
 find_package(JPEG REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 target_link_libraries(libslic3r PRIVATE
@@ -621,6 +624,9 @@ target_link_libraries(libslic3r PRIVATE
     libexpat
     glu-libtess
     qhull
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    semver
     TBB::tbb
     TBB::tbbmalloc
     libslic3r_cgal

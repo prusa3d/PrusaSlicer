@@ -1,0 +1,40 @@
+#!/usr/bin/env sh
+
+# Starting from release 2.7.2 we register prusaslicer:// protocol handler directly inside flatpak dekstop file.
+# If exists a previous integration remove them
+DESKTOP_FILE=~/.local/share/applications/PrusaSlicerURLProtocol.desktop
+if [ -f "$DESKTOP_FILE" ]; then
+    if grep -q flatpak "$DESKTOP_FILE"; then
+      rm -f "$DESKTOP_FILE"
+    fi
+fi
+
+PRUSA_SLICER_APP_LOCALE_ERROR="An error occured while setting up locale"
+PRUSA_SLICER_APP_FALLBACK_LOCALE=en_US.UTF-8
+USE_LOCALE_WORKAROUND=$( (/app/bin/prusa-slicer --help 2>&1 | grep "$PRUSA_SLICER_APP_LOCALE_ERROR") >/dev/null && echo true || echo false )
+
+echo "--------------------------------------------------------------------------"
+echo "Message: $(date +%T): Starting PrusaSlicer flatpak with entrypoint script"
+echo "--------------------------------------------------------------------------"
+
+if [ $USE_LOCALE_WORKAROUND = true ]; then
+    echo "WARN: detected locale error, trying to use fallback locale"
+    # Check if LANG is in locale -a output
+    LANG_PRESENT=$( (locale -a | grep -q "^$LANG$") && echo true || echo false )
+    if [ $LANG_PRESENT = true ]; then
+        export LC_ALL=$LANG
+        echo "WARN: $LANG is available, setting LC_ALL to $LC_ALL."
+    else
+        export LC_ALL=$PRUSA_SLICER_APP_FALLBACK_LOCALE
+        echo "WARN: $LANG is not available in locale -a. Setting LC_ALL to $LC_ALL."
+    fi
+fi
+
+if XDG_CONFIG_HOME=$HOME/.config /app/bin/uses-dark-theme.py; then
+    export GTK_THEME='Adwaita:dark'
+    export PRUSA_SLICER_DARK_THEME='true'
+    echo "Message: $(date +%T): INFO: using dark theme variant"
+fi
+
+exec /app/bin/prusa-slicer "$@" &
+$(/app/bin/set-dark-theme-variant.py) &

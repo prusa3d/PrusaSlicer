@@ -1,0 +1,61 @@
+name: Build Linux
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  build_flatpak:
+    name: Compile & Bundle Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-47
+      options: --privileged
+    env:
+      date: ""
+      date_long: ""
+      ver: ""
+      ver_pure: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GitHub environment
+        run: |
+          ver_pure=$(grep 'set(SLIC3R_VERSION' version.inc | cut -d '"' -f2)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            ver="PR-${{ github.event.number }}"
+          else
+            ver="$ver_pure+BOSS"
+          fi
+          echo "ver=$ver" >> $GITHUB_ENV
+          echo "ver_pure=$ver_pure" >> $GITHUB_ENV
+          echo "date=$(date +'%Y%m%d')" >> $GITHUB_ENV
+          echo "date_long=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Update version information
+        if: startsWith(github.ref, 'refs/heads/release/')
+        shell: bash
+        run: |
+          sed --in-place -e 's/"nightly"/"${{ env.ver }}+"/g' .flatpak/io.github.mjonuschat.PrusaSlicer.metainfo.xml
+          sed --in-place -e 's/tag\/nightly/tag\/version_${{ env.ver }}+boss/g' .flatpak/io.github.mjonuschat.PrusaSlicer.metainfo.xml
+
+      - name: Update date information
+        shell: bash
+        run: |
+          sed --in-place -e 's/2024-09-19/${{ env.date_long }}/g' .flatpak/io.github.mjonuschat.PrusaSlicer.metainfo.xml
+
+      - name: Build PrusaSlicer (BOSS) Linux Flatpak
+        uses: flathub-infra/flatpak-github-actions/flatpak-builder@master
+        with:
+          bundle: PrusaSlicer-${{ env.ver }}+Linux-${{ env.date }}.flatpak
+          manifest-path: .flatpak/io.github.mjonuschat.PrusaSlicer.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PrusaSlicer-${{ env.ver }}+Linux-${{ env.date }}
+          path: PrusaSlicer-${{ env.ver }}+Linux-${{ env.date }}.flatpak
+          if-no-files-found: error
