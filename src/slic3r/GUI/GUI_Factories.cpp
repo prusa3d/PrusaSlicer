@@ -1411,7 +1411,7 @@ void MenuFactory::append_menu_items_instance_manipulation(wxMenu* menu)
 void MenuFactory::update_menu_items_instance_manipulation(MenuType type)
 {
     wxMenu* menu = type == mtObjectFFF ? &m_object_menu : type == mtObjectSLA ? &m_sla_object_menu : nullptr;
-    if (menu)
+    if (!menu)
         return;
     // Remove/Prepend "increase/decrease instances" menu items according to the view mode.
     // Suppress to show those items for a Simple mode
