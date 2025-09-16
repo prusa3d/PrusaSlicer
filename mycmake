@@ -1,0 +1,2 @@
+export NLOPT=~/Downloads/src/Prusa/deps/build/destdir/usr/local
+cmake .. -DSLIC3R_STATIC=1 -DSLIC3R_GTK=3 -DSLIC3R_PCH=OFF -DCMAKE_PREFIX_PATH=/home/k/Downloads/src/PrusaSlicer/../deps/build/destdir/usr/local -DCMAKE_POLICY_VERSION_MINIMUM=3.5

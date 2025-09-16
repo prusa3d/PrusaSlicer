@@ -1,0 +1,8 @@
+#cd deps
+mkdir build
+cd build
+#patch -p1 < dep_GMP.patch
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake .. -DDEP_WX_GTK3=ON -DCMAKE_CXX_FLAGS="-fno-lto" -DCMAKE_C_FLAGS="-fno-lto"
+make
+cd ../..

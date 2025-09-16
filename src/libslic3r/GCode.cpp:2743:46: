@@ -1,0 +1,6 @@
+
+/home/k/Downloads/src/PrusaSlicer/src/libslic3r/ShortestPath.cpp:852:25: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+/home/k/Downloads/src/PrusaSlicer/src/libslic3r/MultipleBeds.cpp:319:36: warning: comparison of integer expressions of different signedness: 'const int' and 'const size_t' {aka 'const long unsigned int'} [-Wsign-compare]
+/home/k/Downloads/src/PrusaSlicer/src/libslic3r/Support/TreeModelVolumes.cpp:881:150: warning: suggest parentheses around '&&' within '||' [-Wparentheses]
+
+/home/k/Downloads/src/PrusaSlicer/src/libslic3r/ArrangeHelper.cpp:244:68: warning: comparison of integer expressions of different signedness: 'int' and 'size_t' {aka 'long unsigned int'} [-Wsign-compare]

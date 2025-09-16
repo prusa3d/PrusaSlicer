@@ -1,0 +1,3 @@
+cmake .. -DSLIC3R_STATIC=1 -DSLIC3R_GTK=3 -DSLIC3R_PCH=OFF \
+    -DCMAKE_PREFIX_PATH=$(pwd)/../deps/build/destdir/usr/local \
+    -DCMAKE_BUILD_TYPE=Debug

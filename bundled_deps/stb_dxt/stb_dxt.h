@@ -852,8 +852,8 @@ void rgbToYCoCgBlock( unsigned char * dst, const unsigned char * src )
     int extents = 0;
     int n = 0;
     int iY, iCo, iCg; //, r, g, b;
-    int blockCo[16];
-    int blockCg[16];
+   //  int blockCo[16];
+   //  int blockCg[16];
     int i;
 
     const unsigned char *px = src;
@@ -866,8 +866,8 @@ void rgbToYCoCgBlock( unsigned char * dst, const unsigned char * src )
         if(-iCg > extents) extents = -iCg;
         if( iCg > extents) extents = iCg;
 
-        blockCo[n] = iCo;
-        blockCg[n++] = iCg;
+      //   blockCo[n] = iCo;
+      //   blockCg[n++] = iCg;
 
         px += 4;
     }
