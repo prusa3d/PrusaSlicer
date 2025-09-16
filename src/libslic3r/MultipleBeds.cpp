@@ -316,7 +316,7 @@ void MultipleBeds::set_instances_outside_outside_bed_unprintable(Model& model, c
 
 void MultipleBeds::move_from_bed_to_first_bed(Model& model, const int bed_index) const
 {
-    if (bed_index < 0 || bed_index >= MAX_NUMBER_OF_BEDS) {
+    if (bed_index < 0 || bed_index >= (const int)MAX_NUMBER_OF_BEDS) {
         assert(false);
         return;
     }
@@ -461,7 +461,7 @@ Vec2crd MultipleBeds::get_bed_gap() const {
 
 void MultipleBeds::ensure_wipe_towers_on_beds(Model& model, const std::vector<std::unique_ptr<Print>>& prints)
 {
-    for (size_t bed_idx = 0; bed_idx < get_number_of_beds(); ++bed_idx) {
+    for (size_t bed_idx = 0; bed_idx < (size_t)get_number_of_beds(); ++bed_idx) {
         ModelWipeTower& mwt = model.get_wipe_tower_vector()[bed_idx];
         double depth = prints[bed_idx]->wipe_tower_data().depth;
         double width = prints[bed_idx]->wipe_tower_data().width;

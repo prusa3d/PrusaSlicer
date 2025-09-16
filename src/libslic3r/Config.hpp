@@ -771,7 +771,7 @@ public:
 
 private:
 	friend class cereal::access;
-    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double, NULLABLE>>(this)); }
+    template<class Archive> void serialize_cereal(Archive &ar) { ar(this->value); }
 };
 
 template<bool NULLABLE>
@@ -894,7 +894,7 @@ protected:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionVector<double>>(this)); }
+	template<class Archive> void serialize_cereal(Archive &ar) { ar(this->values); }
 };
 
 using ConfigOptionFloat = ConfigOptionFloatTempl<false>;
@@ -958,7 +958,7 @@ public:
 
 private:
 	friend class cereal::access;
-    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int, NULLABLE>>(this)); }
+    template<class Archive> void serialize_cereal(Archive &ar) { ar(this->value); }
 };
 
 using ConfigOptionInt = ConfigOptionIntTempl<false>;
@@ -1048,7 +1048,7 @@ private:
 	}
 
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionVector<int>>(this)); }
+	template<class Archive> void serialize_cereal(Archive &ar) { ar(this->values); }
 };
 
 using ConfigOptionInts   	   = ConfigOptionIntsTempl<false>;
@@ -1407,7 +1407,7 @@ protected:
 
 private:
     friend class cereal::access;
-    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionVector<FloatOrPercent>>(this)); }
+    template<class Archive> void serialize_cereal(Archive &ar) { ar(this->values); }
 };
 
 using ConfigOptionFloatsOrPercents          = ConfigOptionFloatsOrPercentsTempl<false>;
@@ -1446,7 +1446,7 @@ public:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<Vec2d>>(this)); }
+	template<class Archive> void serialize_cereal(Archive &ar) { ar(this->value); }
 };
 
 class ConfigOptionPoints : public ConfigOptionVector<Vec2d>
@@ -1563,7 +1563,7 @@ public:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<Vec3d>>(this)); }
+	template<class Archive> void serialize_cereal(Archive &ar) { ar(this->value); }
 };
 
 class ConfigOptionBool : public ConfigOptionSingle<bool>
@@ -1602,7 +1602,7 @@ public:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<bool>>(this)); }
+	template<class Archive> void serialize_cereal(Archive &ar) { ar(this->value); }
 };
 
 template<bool NULLABLE>
@@ -1708,7 +1708,7 @@ protected:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionVector<unsigned char>>(this)); }
+	template<class Archive> void serialize_cereal(Archive &ar) { ar(this->values); }
 };
 
 using ConfigOptionBools    	    = ConfigOptionBoolsTempl<false>;
