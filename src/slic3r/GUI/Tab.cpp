@@ -2940,6 +2940,9 @@ void TabPrinter::build_fff()
         option.opt.height = gcode_field_height;//150;
         optgroup->append_single_option_line(option);
 
+        optgroup = page->new_optgroup(L("Tool change G-Code options"));
+        optgroup->append_single_option_line("autoemit_toolchange_commands");
+
         optgroup = page->new_optgroup(L("Between objects G-code (for sequential printing)"), 0);
         optgroup->on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
             validate_custom_gcode_cb(this, optgroup_title, opt_key, value);
@@ -5155,7 +5158,7 @@ bool Tab::validate_custom_gcodes()
         if (!opt_group->is_activated())
             break;
         std::string key = opt_group->opt_map().begin()->first;
-        if (key == "autoemit_temperature_commands")
+        if (key == "autoemit_temperature_commands" || key == "autoemit_toolchange_commands")
             continue;
         valid &= validate_custom_gcode(opt_group->title, boost::any_cast<std::string>(opt_group->get_value(key)));
         if (!valid)
