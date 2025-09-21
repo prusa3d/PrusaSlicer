@@ -4053,7 +4053,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
         }
         // do not process the dragging if the left mouse was set down in another canvas
-        else if (evt.LeftIsDown()) {
+        else if (wxGetApp().app_config->get_bool("reverse_mouse_buttons") ? evt.RightIsDown() : evt.LeftIsDown()) {
             // if dragging over blank area with left button, rotate
             if (!m_moving) {
                 if ((any_gizmo_active || evt.CmdDown() || m_hover_volume_idxs.empty()) && m_mouse.is_start_position_3D_defined()) {
@@ -4076,7 +4076,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 m_mouse.drag.start_position_3D = Vec3d((double)pos.x(), (double)pos.y(), 0.0);
             }
         }
-        else if (evt.MiddleIsDown() || evt.RightIsDown()) {
+        else if (evt.MiddleIsDown() || wxGetApp().app_config->get_bool("reverse_mouse_buttons") ? evt.LeftIsDown() : evt.RightIsDown()) {
             Camera& camera = wxGetApp().plater()->get_camera();
             // If dragging over blank area with right/middle button, pan.
             if (m_mouse.is_start_position_2D_defined()) {
