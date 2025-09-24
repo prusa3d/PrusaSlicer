@@ -706,6 +706,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                bridge_angle))
     ((ConfigOptionInt,                  bottom_solid_layers))
     ((ConfigOptionFloat,                bottom_solid_min_thickness))
+    ((ConfigOptionFloat,                print_extrusion_multiplier))
     ((ConfigOptionFloat,                bridge_flow_ratio))
     ((ConfigOptionFloat,                bridge_speed))
     ((ConfigOptionEnum<EnsureVerticalShellThickness>, ensure_vertical_shell_thickness))
