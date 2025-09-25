@@ -147,6 +147,7 @@ coord_t Fill::_adjust_solid_spacing(const coord_t width, const coord_t distance)
 std::pair<float, Point> Fill::_infill_direction(const Surface *surface) const
 {
     // set infill angle
+    bool ignore_radian_adjustment = false;
     float out_angle = this->angle;
 
 	if (out_angle == FLT_MAX) {
@@ -180,11 +181,25 @@ std::pair<float, Point> Fill::_infill_direction(const Surface *surface) const
     } else if (this->layer_id != size_t(-1)) {
         // alternate fill direction
         out_angle += this->_layer_angle(this->layer_id / surface->thickness_layers);
+
+        //For the Zig Zag infill, we can define angles to alternate the direction
+        //This property will be empty for other infill types
+        std::vector<int> zigzag_angles = this->zigzag_infill_angles;
+        
+        int num_angles = zigzag_angles.size();
+
+        if (num_angles > 1) {
+            float adjusted_angle = out_angle;
+            adjusted_angle = zigzag_angles[((this->layer_id / surface->thickness_layers) % num_angles)];
+            out_angle = float(Geometry::deg2rad(adjusted_angle));
+            ignore_radian_adjustment = true;
+        } 
     } else {
 //    	printf("Layer_ID undefined!\n");
     }
 
-    out_angle += float(M_PI/2.);
+    if (!ignore_radian_adjustment)
+        out_angle += float(M_PI/2.);
     return std::pair<float, Point>(out_angle, out_shift);
 }
 
