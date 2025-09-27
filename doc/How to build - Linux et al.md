@@ -105,10 +105,12 @@ Any of these unit tests can be run directly e.g.
 
 
 ## Useful CMake flags when building PrusaSlicer
-- `-DSLIC3R_ASAN=ON` enables gcc/clang address sanitizer (defaults to `OFF`, requires gcc>4.8 or clang>3.1)
 - `-DSLIC3R_GTK=3` to use GTK3 (defaults to `2`). Note that wxWidgets must be built against the same GTK version.
 - `-DSLIC3R_STATIC=ON` for static build (defaults to `OFF`)
 - `-DCMAKE_BUILD_TYPE=Debug` to build in debug mode (defaults to `Release`)
+- `-DCMAKE_BUILD_TYPE=AddressSanitizer` to build with Address Sanitizer
+- `-DCMAKE_BUILD_TYPE=UndefinedSanitizer` to build with Undefined Sanitizer
+- `-DCMAKE_BUILD_TYPE=MemorySanitizer` to build with Memory Sanitizer
 - `-DSLIC3R_GUI=no` to build the console variant of PrusaSlicer
 
 See the CMake files to get the complete list.
