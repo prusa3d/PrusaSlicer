@@ -3578,12 +3578,12 @@ bool GUI_App::config_wizard_startup()
         run_wizard(ConfigWizard::RR_DATA_LEGACY);
         return true;
     } 
-#ifndef __APPLE__    
+#if !defined(__APPLE__) && ((defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)) || !defined(__linux__))
     else if (is_editor() && m_last_app_conf_lower_version && app_config->get_bool("downloader_url_registered")) {
         show_downloader_registration_dialog();
         return true;
     }
-#endif
+#endif //!defined(__APPLE__) && ((defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION)) || !defined(__linux__))
     return false;
 }
 
