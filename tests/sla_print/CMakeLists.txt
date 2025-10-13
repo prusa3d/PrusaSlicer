@@ -4,6 +4,10 @@ add_executable(${_TEST_NAME}_tests ${_TEST_NAME}_tests_main.cpp
     sla_test_utils.hpp sla_test_utils.cpp
     sla_supptgen_tests.cpp
     sla_raycast_tests.cpp
+    sla_parabola_tests.cpp
+    sla_voronoi_graph_tests.cpp
+    sla_vectorUtils_tests.cpp
+    sla_lineUtils_tests.cpp
     sla_supptreeutils_tests.cpp
     sla_archive_readwrite_tests.cpp
     sla_zcorrection_tests.cpp)
@@ -18,3 +22,11 @@ endif()
 
 # catch_discover_tests(${_TEST_NAME}_tests TEST_PREFIX "${_TEST_NAME}: ")
 add_test(${_TEST_NAME}_tests ${_TEST_NAME}_tests ${CATCH_EXTRA_ARGS})
+
+if (WIN32)
+    # Adds a post-build copy of libgmp-10.dll
+    add_custom_command(TARGET ${_TEST_NAME}_tests POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${CMAKE_PREFIX_PATH}/bin/libgmp-10.dll"
+          $<TARGET_FILE_DIR:${_TEST_NAME}_tests>)
+endif()

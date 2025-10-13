@@ -773,6 +773,11 @@ void DSForLayers::render_cog_menu()
             if (m_cb_change_app_config)
                 m_cb_change_app_config("show_estimated_times_in_dbl_slider", m_show_estimated_times ? "1" : "0");
         }
+        if (ImGuiPureWrap::menu_item_with_icon(_u8L("Sequential slider applied only to top layer").c_str(), "", icon_sz, 0, m_seq_top_layer_only)) {
+            m_seq_top_layer_only = !m_seq_top_layer_only;
+            if (m_cb_change_app_config)
+                m_cb_change_app_config("seq_top_layer_only", m_seq_top_layer_only ? "1" : "0");
+        }
         if (m_mode == MultiAsSingle && m_draw_mode == dmRegular && 
             ImGuiPureWrap::menu_item_with_icon(_u8L("Set extruder sequence for the entire print").c_str(), "")) {
             if (m_ticks.edit_extruder_sequence(m_ctrl.GetMaxPos(), m_mode))

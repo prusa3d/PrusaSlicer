@@ -7,6 +7,7 @@
 #include "libslic3r/Model.hpp"
 
 //#include "slic3r/GUI/3DScene.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 #include "libslic3r/SupportSpotsGenerator.hpp"
 #include "libslic3r/TriangleSelectorWrapper.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -532,6 +533,14 @@ void GLGizmoFdmSupports::auto_generate()
         MessageDialog dlg(GUI::wxGetApp().plater(), _L("Automatic painting requires printable object."), _L("Warning"), wxOK);
         dlg.ShowModal();
         return;
+    }
+
+    const auto first_instance_bed{s_multiple_beds.get_inst_map().find(mo->instances.front()->id())};
+    if (
+        first_instance_bed != s_multiple_beds.get_inst_map().end()
+        && s_multiple_beds.get_active_bed() != first_instance_bed->second
+    ) {
+        s_multiple_beds.set_active_bed(first_instance_bed->second);
     }
 
     bool not_painted = std::all_of(mo->volumes.begin(), mo->volumes.end(), [](const ModelVolume* vol){

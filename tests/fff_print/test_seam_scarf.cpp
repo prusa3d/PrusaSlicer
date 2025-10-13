@@ -1,9 +1,11 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <libslic3r/GCode/SeamScarf.hpp>
 #include <libslic3r/GCode/SmoothPath.hpp>
 
 using namespace Slic3r;
 using Seams::Scarf::Impl::PathPoint;
+using namespace Catch;
 
 TEST_CASE("Get path point", "[Seams][Scarf]") {
     using Seams::Scarf::Impl::get_path_point;

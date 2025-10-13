@@ -11,6 +11,7 @@
 #include "Utils.hpp"
 #include "Model.hpp"
 #include "format.hpp"
+#include "CustomParametersHandling.hpp"
 
 #include <algorithm>
 #include <set>
@@ -1379,8 +1380,22 @@ static void flatten_configbundle_hierarchy(boost::property_tree::ptree &tree, co
             		// Don't inherit "renamed_from" flag, it does not make sense. The "renamed_from" flag only makes sense for a concrete preset.
             		if (boost::starts_with((*it_inherits)->name, "*"))
 			            BOOST_LOG_TRIVIAL(error) << boost::format("Nonpublic intermediate preset %1% contains a \"renamed_from\" field, which is ignored") % (*it_inherits)->name;
-				} else if (prst->node->find(it->first) == prst->node->not_found())
-                    prst->node->add_child(it->first, it->second);
+                } else {
+                    if (prst->node->find(it->first) == prst->node->not_found()) {
+                        // The child does not have this. Propagate value from parent.
+                        prst->node->add_child(it->first, it->second);
+                    } else {
+                        // Child redefines this. Nothing needs to be done except for one case:
+                        // custom parameter JSONs shall be merged, not replaced.
+                        if (boost::starts_with(it->first, "custom_parameters_")) {
+                            auto&           child_node     = prst->node->find(it->first)->second;
+                            const auto&     parent_node    = it->second;
+                            const auto&     child_value    = child_node.get_value<std::string>();
+                            const auto&     parent_value   = parent_node.get_value<std::string>();
+                            child_node.put_value(merge_json(parent_value, child_value));
+                        }
+                    }
+                }
     }
 
     // Remove the "internal" presets from the ptree. These presets are marked with '*'.
@@ -1532,12 +1547,6 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
                     dst = &this->obsolete_presets.printers;
                 if (dst)
                     unescape_strings_cstyle(kvp.second.data(), *dst);
-            }
-        } else if (section.first == "settings") {
-            // Load the settings.
-            for (auto &kvp : section.second) {
-                if (kvp.first == "autocenter") {
-                }
             }
         } else
             // Ignore an unknown section.
@@ -2045,13 +2054,6 @@ void PresetBundle::export_configbundle(const std::string &path, bool export_syst
 
     if (export_physical_printers && this->physical_printers.get_selected_idx() >= 0)
         c << "physical_printer = " << this->physical_printers.get_selected_printer_name() << std::endl;
-#if 0
-    // Export the following setting values from the provided setting repository.
-    static const char *settings_keys[] = { "autocenter" };
-    c << "[settings]" << std::endl;
-    for (size_t i = 0; i < sizeof(settings_keys) / sizeof(settings_keys[0]); ++ i)
-        c << settings_keys[i] << " = " << settings.serialize(settings_keys[i]) << std::endl;
-#endif
 
     c.close();
 }

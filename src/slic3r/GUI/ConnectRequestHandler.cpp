@@ -56,7 +56,7 @@ void ConnectRequestHandler::handle_message(const std::string& message)
     }
 
     if (action_string.empty()) {
-        BOOST_LOG_TRIVIAL(error) << "Recieved invalid message from _prusaConnect (missing action). Message: " << message;
+        BOOST_LOG_TRIVIAL(error) << "Received invalid message from _prusaConnect (missing action). Message: " << message;
         return;
     }
     assert(m_actions.find(action_string) != m_actions.end()); // this assert means there is a action that has no handling.

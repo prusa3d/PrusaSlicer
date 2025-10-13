@@ -1,0 +1,23 @@
+name: Build windows
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      create_pdb:
+        description: 'Zip pdbs'
+        default: false
+        type: boolean
+      create_installer:
+        description: 'Create installer'
+        default: false
+        type: boolean
+
+jobs:
+  build_win:
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_windows.yml@master
+    secrets: inherit
+    with:
+      actions_branch: master
+      create_pdb: ${{ inputs.create_pdb || false }}
+      create_installer: ${{ inputs.create_installer || false }}

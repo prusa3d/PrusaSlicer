@@ -79,8 +79,27 @@ void LabelObjects::init(const SpanOfConstPtrs<PrintObject>& objects, LabelObject
             bool object_has_more_instances = print_instances.size() > 1u;
             int instance_id = int(std::find(model_object->instances.begin(), model_object->instances.end(), pi->model_instance) - model_object->instances.begin());
 
-            // Now compose the name of the object and define whether indexing is 0 or 1-based.
+            // Get object name and trim it so we do not run into https://github.com/prusa3d/PrusaSlicer/issues/13314.
+            // The limit in FW is 96 chars, OctoPrint may add no more than 12 chars at the end (checksum).
+            // PrusaSlicer may add instance designation couple of lines below. Let's limit the name itself
+            // to 60 characters in all cases so we do not complicate it too much.
             std::string name = model_object->name;
+            const size_t len_lim = 60;
+            if (name.size() > len_lim) {
+                // Make sure that we tear no UTF-8 sequence apart.
+                auto is_utf8_start_byte = [](char c) {
+                    return (c & 0b10000000) == 0           // ASCII byte (0xxxxxxx)
+                        || (c & 0b11100000) == 0b11000000  // Start of 2-byte sequence
+                        || (c & 0b11110000) == 0b11100000  // Start of 3-byte sequence
+                        || (c & 0b11111000) == 0b11110000; // Start of 4-byte sequence
+                };
+                size_t i = len_lim;
+                while (i > 0 && ! is_utf8_start_byte(name[i]))
+                    --i;
+                name = name.substr(0,i) + "...";
+            }
+
+            // Now compose the name of the object and define whether indexing is 0 or 1-based.
             if (m_label_objects_style == LabelObjectsStyle::Octoprint) {
                 // use zero-based indexing for objects and instances, as we always have done
                 name += " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id); 

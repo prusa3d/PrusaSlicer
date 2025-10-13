@@ -26,6 +26,7 @@
 
 #include "PrintBase.hpp"
 #include "SLA/SupportTree.hpp"
+#include "SLA/SupportPointGenerator.hpp" // SupportPointGeneratorData
 #include "Point.hpp"
 #include "Format/SLAArchiveWriter.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
@@ -367,6 +368,9 @@ private:
 
     std::vector<float>                      m_model_height_levels;
 
+    // Precalculated data needed for interactive automatic support placement.
+    sla::SupportPointGeneratorData          m_support_point_generator_data;
+
     struct SupportData
     {
         sla::SupportableMesh    input; // the input
@@ -490,7 +494,7 @@ public:
     bool                empty() const override { return m_objects.empty(); }
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
-    ApplyStatus         apply(const Model &model, DynamicPrintConfig config) override;
+    ApplyStatus         apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings = nullptr) override;
     void                set_task(const TaskParams &params) override { PrintBaseWithState<SLAPrintStep, slapsCount>::set_task_impl(params, m_objects); }
     void                process() override;
     void                finalize() override { PrintBaseWithState<SLAPrintStep, slapsCount>::finalize_impl(m_objects); }
@@ -582,6 +586,8 @@ public:
     void export_print(const std::string    &fname,
                       const ThumbnailsList &thumbnails,
                       const std::string    &projectname = "");
+
+    static bool is_prusa_print(const std::string& printer_model);
     
 private:
     

@@ -15,7 +15,6 @@
 
 #include <libslic3r/PresetBundle.hpp> // IWYU pragma: keep
 
-
 #include <wx/webview.h>
 #include <wx/display.h>
 
@@ -80,7 +79,7 @@ WebViewDialog::WebViewDialog(wxWindow* parent, const wxString& url, const wxStri
         topsizer->Add(text, 0, wxALIGN_LEFT | wxBOTTOM, 10);
         return;
     }
-    WebView::webview_create(m_browser, this, GUI::format_wxstr("file://%1%/web/%2%.html", boost::filesystem::path(resources_dir()).generic_string(), m_loading_html), m_script_message_hadler_names);
+    WebView::webview_create(m_browser, this, url, m_script_message_hadler_names);
     
     if (Utils::ServiceConfig::instance().webdev_enabled()) {
         m_browser->EnableContextMenu();
@@ -139,7 +138,6 @@ WebViewDialog::WebViewDialog(wxWindow* parent, const wxString& url, const wxStri
 
     Bind(wxEVT_CLOSE_WINDOW, ([this](wxCloseEvent& evt) { EndModal(wxID_CANCEL); }));
 
-    m_browser->LoadURL(url);   
 #ifdef DEBUG_URL_PANEL
     m_url->SetLabelText(url);
 #endif
@@ -148,14 +146,25 @@ WebViewDialog::~WebViewDialog()
 {
 }
 
+constexpr bool is_linux =
+#if defined(__linux__)
+true;
+#else
+false;
+#endif
+
 void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
 {
     if (!m_browser)
         return;
     if (m_browser->IsBusy()) {
-        wxSetCursor(wxCURSOR_ARROWWAIT);
-    }  else {
-        wxSetCursor(wxNullCursor);
+       if constexpr (!is_linux) { 
+            wxSetCursor(wxCURSOR_ARROWWAIT);
+        }
+    } else {
+        if constexpr (!is_linux) { 
+            wxSetCursor(wxNullCursor);
+        }
         if (m_load_error_page) {
             m_load_error_page = false;
             m_browser->LoadURL(GUI::format_wxstr("file://%1%/web/error_no_reload.html", boost::filesystem::path(resources_dir()).generic_string()));
@@ -443,13 +452,14 @@ void WebViewDialog::EndModal(int retCode)
     wxDialog::EndModal(retCode);
 }
 
-PrinterPickWebViewDialog::PrinterPickWebViewDialog(wxWindow* parent, std::string& ret_val)
+PrinterPickWebViewDialog::PrinterPickWebViewDialog(wxWindow* parent, std::string& ret_val, bool multiple_beds)
     : WebViewDialog(parent
         , GUI::from_u8(Utils::ServiceConfig::instance().connect_select_printer_url())
         , _L("Choose a printer")
         , wxSize(parent->GetClientSize().x / 4 * 3, parent->GetClientSize().y/ 4 * 3)
         ,{"_prusaSlicer"}
         , "connect_loading")
+        , m_multiple_beds(multiple_beds)
     , m_ret_val(ret_val)
 {
     
@@ -487,7 +497,7 @@ void PrinterPickWebViewDialog::on_script_message(wxWebViewEvent& evt)
 void PrinterPickWebViewDialog::on_connect_action_select_printer(const std::string& message_data)
 {
     // SELECT_PRINTER request is not defined for PrinterPickWebViewDialog
-    assert(true);
+    assert(false);
 }
 void PrinterPickWebViewDialog::on_connect_action_print(const std::string& message_data)
 {
@@ -566,23 +576,14 @@ void PrinterPickWebViewDialog::request_compatible_printers_FFF() {
     filament_abrasive_serialized += "]";
     
     std::string printer_model_serialized = full_config.option("printer_model")->serialize();
-    std::string vendor_repo_prefix;
-    if (selected_printer.vendor) {
-        vendor_repo_prefix = selected_printer.vendor->repo_prefix;
-    } else if (std::string inherits = selected_printer.inherits(); !inherits.empty()) {
-        const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
-        if (parent && parent->vendor) {
-            vendor_repo_prefix = parent->vendor->repo_prefix;
-        }
-    }
-    if (printer_model_serialized.find(vendor_repo_prefix) == 0) {
-        printer_model_serialized = printer_model_serialized.substr(vendor_repo_prefix.size());
-        boost::trim_left(printer_model_serialized);
-    }
+    const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(selected_printer);
+    printer_model_serialized = selected_printer.trim_vendor_repo_prefix(printer_model_serialized, printer_with_vendor.vendor);
 
     const std::string uuid = wxGetApp().plater()->get_user_account()->get_current_printer_uuid_from_connect(printer_model_serialized);
     const std::string filename = wxGetApp().plater()->get_upload_filename();
-    //filament_abrasive
+
+    const std::string multiple_beds_value = m_multiple_beds ? "true" : "false";
+
     std::string request = GUI::format(
         "{"
         "\"printerUuid\": \"%4%\", "
@@ -591,9 +592,10 @@ void PrinterPickWebViewDialog::request_compatible_printers_FFF() {
         "\"material\": %1%, "
         "\"filename\": \"%5%\", "
         "\"filament_abrasive\": %6%,"
-        "\"high_flow\": %7%"
+        "\"high_flow\": %7%,"
+        "\"multiple_beds\": %8%"
         "}"
-        , filament_type_serialized, nozzle_diameter_serialized, printer_model_serialized, uuid, filename, filament_abrasive_serialized, nozzle_high_flow_serialized);
+        , filament_type_serialized, nozzle_diameter_serialized, printer_model_serialized, uuid, filename, filament_abrasive_serialized, nozzle_high_flow_serialized, multiple_beds_value);
 
     wxString script = GUI::format_wxstr("window._prusaConnect_v2.requestCompatiblePrinter(%1%)", request);
     run_script(script);
@@ -604,29 +606,22 @@ void PrinterPickWebViewDialog::request_compatible_printers_SLA()
     std::string printer_model_serialized = selected_printer.config.option("printer_model")->serialize();
     
     std::string vendor_repo_prefix;
-    if (selected_printer.vendor) {
-        vendor_repo_prefix = selected_printer.vendor->repo_prefix;
-    } else if (std::string inherits = selected_printer.inherits(); !inherits.empty()) {
-        const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
-        if (parent && parent->vendor) {
-            vendor_repo_prefix = parent->vendor->repo_prefix;
-        }
-    }
-    if (printer_model_serialized.find(vendor_repo_prefix) == 0) {
-        printer_model_serialized = printer_model_serialized.substr(vendor_repo_prefix.size());
-        boost::trim_left(printer_model_serialized);
-    }
+    const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(selected_printer);
+    printer_model_serialized = selected_printer.trim_vendor_repo_prefix(printer_model_serialized, printer_with_vendor.vendor);
+
     const Preset& selected_material = wxGetApp().preset_bundle->sla_materials.get_selected_preset();
     const std::string material_type_serialized = selected_material.config.option("material_type")->serialize();
     const std::string uuid = wxGetApp().plater()->get_user_account()->get_current_printer_uuid_from_connect(printer_model_serialized);
     const std::string filename = wxGetApp().plater()->get_upload_filename();
+    const std::string multiple_beds_value = m_multiple_beds ? "true" : "false";
     const std::string request = GUI::format(
         "{"
         "\"printerUuid\": \"%3%\", "
         "\"material\": \"%1%\", "
         "\"printerModel\": \"%2%\", "
-        "\"filename\": \"%4%\" "
-        "}", material_type_serialized, printer_model_serialized, uuid, filename);
+        "\"filename\": \"%4%\", "
+        "\"multiple_beds\": \"%5%\" "
+        "}", material_type_serialized, printer_model_serialized, uuid, filename, multiple_beds_value);
 
     wxString script = GUI::format_wxstr("window._prusaConnect_v2.requestCompatiblePrinter(%1%)", request);
     run_script(script);
@@ -673,17 +668,17 @@ void PrintablesConnectUploadDialog::on_script_message(wxWebViewEvent& evt)
 void PrintablesConnectUploadDialog::on_connect_action_select_printer(const std::string& message_data)
 {
     // SELECT_PRINTER request is not defined for PrintablesConnectUploadDialog
-    assert(true);
+    assert(false);
 }
 void PrintablesConnectUploadDialog::on_connect_action_print(const std::string& message_data)
 {
-     assert(true);
+     assert(false);
 }
 
 void PrintablesConnectUploadDialog::on_connect_action_webapp_ready(const std::string& message_data)
 {
     // WEBAPP_READY request is not defined for PrintablesConnectUploadDialog
-    assert(true);
+    assert(false);
 }
 
 void PrintablesConnectUploadDialog::on_reload_event(const std::string& message_data)
@@ -704,19 +699,28 @@ LoginWebViewDialog::LoginWebViewDialog(wxWindow *parent, std::string &ret_val, c
     , m_ret_val(ret_val)
     , p_evt_handler(evt_handler)
 {
+    m_force_quit_timer.SetOwner(this, 0);
+    Bind(wxEVT_TIMER, [this](wxTimerEvent &evt)
+    {
+        m_force_quit = true;
+    });
     Centre();
 }
 void LoginWebViewDialog::on_navigation_request(wxWebViewEvent &evt)
 {
     wxString url = evt.GetURL();
     if (url.starts_with(L"prusaslicer")) {
-        delete_cookies(m_browser, Utils::ServiceConfig::instance().account_url());
-        delete_cookies(m_browser, "https://accounts.google.com");
-        delete_cookies(m_browser, "https://appleid.apple.com");
-        delete_cookies(m_browser, "https://facebook.com");
+        m_waiting_for_counters = true;
+        m_atomic_counter = 0;
+        m_counter_to_match = 4;
+        delete_cookies_with_counter(m_browser, Utils::ServiceConfig::instance().account_url(), m_atomic_counter);
+        delete_cookies_with_counter(m_browser, "https://accounts.google.com", m_atomic_counter);
+        delete_cookies_with_counter(m_browser, "https://appleid.apple.com", m_atomic_counter);
+        delete_cookies_with_counter(m_browser, "https://facebook.com", m_atomic_counter);
         evt.Veto();
         m_ret_val = into_u8(url);
-        EndModal(wxID_OK);
+        m_force_quit_timer.Start(2000, wxTIMER_ONE_SHOT);
+        // End modal is moved to on_idle        
     } else if (url.Find(L"accounts.google.com") != wxNOT_FOUND
         || url.Find(L"appleid.apple.com") != wxNOT_FOUND
         || url.Find(L"facebook.com") != wxNOT_FOUND) {         
@@ -737,5 +741,36 @@ void LoginWebViewDialog::on_dpi_changed(const wxRect &suggested_rect)
     Fit();
     Refresh();
 }
+
+void LoginWebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
+{
+    if (!m_browser)
+        return;
+    if (m_browser->IsBusy()) {
+       if constexpr (!is_linux) { 
+            wxSetCursor(wxCURSOR_ARROWWAIT);
+        }
+    } else {
+        if constexpr (!is_linux) { 
+            wxSetCursor(wxNullCursor);
+        }
+        if (m_load_error_page) {
+            m_load_error_page = false;
+            m_browser->LoadURL(GUI::format_wxstr("file://%1%/web/error_no_reload.html", boost::filesystem::path(resources_dir()).generic_string()));
+        }
+        if (m_waiting_for_counters && m_atomic_counter == m_counter_to_match)
+        {
+            EndModal(wxID_OK);
+        }
+        if (m_force_quit)
+        {
+            EndModal(wxID_OK);
+        }
+    }
+#ifdef DEBUG_URL_PANEL
+    m_button_stop->Enable(m_browser->IsBusy());
+#endif
+}
+
 } // GUI
 } // Slic3r

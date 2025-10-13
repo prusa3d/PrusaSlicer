@@ -50,9 +50,9 @@ ExtrusionPaths split_paths(ExtrusionPaths &&paths, const PathPoint &path_point) 
     std::pair<ExtrusionPath, ExtrusionPath> split{
         split_path(result[path_point.path_index], path_point.point, path_point.previous_point_on_path_index)};
 
-    const auto path_iterator{result.begin() + path_point.path_index};
-    result.erase(path_iterator);
-    result.insert(path_iterator, split.second);
+    auto path_iterator{result.begin() + path_point.path_index};
+    path_iterator = result.erase(path_iterator);
+    path_iterator = result.insert(path_iterator, split.second);
     result.insert(path_iterator, split.first);
 
     return result;

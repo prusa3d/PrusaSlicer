@@ -467,9 +467,9 @@ void PrintHostQueueDialog::on_progress(Event &evt)
         wxVariant nm, hst;
         job_list->GetValue(nm, evt.job_id, COL_FILENAME);
         job_list->GetValue(hst, evt.job_id, COL_HOST);
-        const wchar_t * nm_str = nm.GetString();
-        const wchar_t * hst_str = hst.GetString();
-        wxGetApp().notification_manager()->set_upload_job_notification_percentage(evt.job_id + 1, into_u8(nm_str), into_u8(hst_str), evt.progress / 100.f);
+        const std::string& nm_str = into_u8(nm.GetString());
+        const std::string& hst_str = into_u8(hst.GetString());
+        wxGetApp().notification_manager()->set_upload_job_notification_percentage(evt.job_id + 1, nm_str, hst_str, evt.progress / 100.f);
     }
 }
 

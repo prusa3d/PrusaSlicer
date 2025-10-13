@@ -96,6 +96,9 @@ public:
     void draw_text(const Point &pt, const char *text, const char *color, coordf_t font_size = 20.f);
     void draw_legend(const Point &pt, const char *text, const char *color, coordf_t font_size = 10.f);
 
+    // Draw no scaled expolygon coordinates
+    void draw_original(const ExPolygon &exPoly);
+
     void Close();
     
     private:

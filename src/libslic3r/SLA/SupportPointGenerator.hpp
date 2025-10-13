@@ -1,250 +1,232 @@
-///|/ Copyright (c) Prusa Research 2020 - 2022 Vojtěch Bubník @bubnikv, Tomáš Mészáros @tamasmeszaros, Lukáš Matěna @lukasmatena
+///|/ Copyright (c) Prusa Research 2024 Filip Sykala @Jony01
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #ifndef SLA_SUPPORTPOINTGENERATOR_HPP
 #define SLA_SUPPORTPOINTGENERATOR_HPP
 
-#include <libslic3r/AABBMesh.hpp>
-#include <libslic3r/SLA/SupportPoint.hpp>
-#include <libslic3r/BoundingBox.hpp>
-#include <libslic3r/ClipperUtils.hpp>
-#include <libslic3r/Point.hpp>
-#include <boost/container/small_vector.hpp>
-#include <stdint.h>
-#include <random>
-#include <cmath>
-#include <cstddef>
-#include <functional>
-#include <unordered_map>
-#include <utility>
 #include <vector>
-#include <cinttypes>
+#include <functional>
 
+#include <boost/container/small_vector.hpp>
+
+#include "libslic3r/Point.hpp"
 #include "libslic3r/ExPolygon.hpp"
-#include "libslic3r/Polygon.hpp"
-#include "libslic3r/libslic3r.h"
+#include "libslic3r/SLA/SupportPoint.hpp"
+#include "libslic3r/SLA/SupportIslands/SampleConfig.hpp"
 
-namespace Slic3r {
-class AABBMesh;
-}  // namespace Slic3r
+namespace Slic3r::sla {
 
-// #define SLA_SUPPORTPOINTGEN_DEBUG
+std::vector<Vec2f> create_default_support_curve();
+SampleConfig create_default_island_configuration(float head_diameter_in_mm);
 
-namespace Slic3r { namespace sla {
+/// <summary>
+/// Configuration for automatic support placement
+/// </summary>
+struct SupportPointGeneratorConfig{
+    /// <summary>
+    /// 0 mean only one support point for each island
+    /// lower than one mean less amount of support points
+    /// 1 mean fine tuned sampling
+    /// more than one mean bigger amout of support points
+    /// </summary>
+    float density_relative{1.f};
 
-class SupportPointGenerator {
-public:
-    struct Config {
-        float density_relative {1.f};
-        float minimal_distance {1.f};
-        float head_diameter {0.4f};
+    /// <summary>
+    /// Size range for support point interface (head)
+    /// </summary>
+    float head_diameter = 0.4f; // [in mm]
 
-        // Originally calibrated to 7.7f, reduced density by Tamas to 70% which is 11.1 (7.7 / 0.7) to adjust for new algorithm changes in tm_suppt_gen_improve
-        inline float support_force() const { return 11.1f / density_relative; } // a force one point can support       (arbitrary force unit)
-        inline float tear_pressure() const { return 1.f; }  // pressure that the display exerts    (the force unit per mm2)
-    };
-    
-    SupportPointGenerator(const AABBMesh& emesh, const std::vector<ExPolygons>& slices,
-                    const std::vector<float>& heights, const Config& config, std::function<void(void)> throw_on_cancel, std::function<void(int)> statusfn);
-    
-    SupportPointGenerator(const AABBMesh& emesh, const Config& config, std::function<void(void)> throw_on_cancel, std::function<void(int)> statusfn);
-    
-    const std::vector<SupportPoint>& output() const { return m_output; }
-    std::vector<SupportPoint>& output() { return m_output; }
-    
-    struct MyLayer;
-    
-    struct Structure {
-        Structure(MyLayer &layer, const ExPolygon& poly, const BoundingBox &bbox, const Vec2f &centroid, float area, float h) :
-            layer(&layer), polygon(&poly), bbox(bbox), centroid(centroid), area(area), zlevel(h)
-#ifdef SLA_SUPPORTPOINTGEN_DEBUG
-            , unique_id(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()))
-#endif /* SLA_SUPPORTPOINTGEN_DEBUG */
-        {}
-        MyLayer *layer;
-        const ExPolygon* polygon = nullptr;
-        const BoundingBox bbox;
-        const Vec2f centroid = Vec2f::Zero();
-        const float area = 0.f;
-        float zlevel = 0;
-        // How well is this ExPolygon held to the print base?
-        // Positive number, the higher the better.
-        float supports_force_this_layer     = 0.f;
-        float supports_force_inherited      = 0.f;
-        float supports_force_total() const { return this->supports_force_this_layer + this->supports_force_inherited; }
-#ifdef SLA_SUPPORTPOINTGEN_DEBUG
-        std::chrono::milliseconds unique_id;
-#endif /* SLA_SUPPORTPOINTGEN_DEBUG */
-        
-        struct Link {
-            Link(Structure *island, float overlap_area) : island(island), overlap_area(overlap_area) {}
-            Structure   *island;
-            float        overlap_area;
-        };
+    // maximal distance to nearest support point(define radiuses per layer)
+    // x axis .. mean distance on layer(XY)
+    // y axis .. mean difference of height(Z)
+    // Points of lines [in mm]
+    std::vector<Vec2f> support_curve = create_default_support_curve();
 
-#ifdef NDEBUG
-        // In release mode, use the optimized container.
-        boost::container::small_vector<Link, 4> islands_above;
-        boost::container::small_vector<Link, 4> islands_below;
-#else
-        // In debug mode, use the standard vector, which is well handled by debugger visualizer.
-        std::vector<Link>					 	islands_above;
-        std::vector<Link>						islands_below;
-#endif
-        // Overhangs, that are dangling considerably.
-        ExPolygons                              dangling_areas;
-        // Complete overhands.
-        ExPolygons                              overhangs;
-        // Overhangs, where the surface must slope.
-        ExPolygons                              overhangs_slopes;
-        float                                   overhangs_area = 0.f;
-        
-        bool overlaps(const Structure &rhs) const { 
-            return this->bbox.overlap(rhs.bbox) && this->polygon->overlaps(*rhs.polygon);
-        }
-        float overlap_area(const Structure &rhs) const { 
-            double out = 0.;
-            if (this->bbox.overlap(rhs.bbox)) {
-                Polygons polys = intersection(*this->polygon, *rhs.polygon);
-                for (const Polygon &poly : polys)
-                    out += poly.area();
-            }
-            return float(out);
-        }
-        float area_below() const { 
-            float area = 0.f; 
-            for (const Link &below : this->islands_below) 
-                area += below.island->area; 
-            return area;
-        }
-        Polygons polygons_below() const { 
-            size_t cnt = 0;
-            for (const Link &below : this->islands_below)
-                cnt += 1 + below.island->polygon->holes.size();
-            Polygons out;
-            out.reserve(cnt);
-            for (const Link &below : this->islands_below) {
-                out.emplace_back(below.island->polygon->contour);
-                append(out, below.island->polygon->holes);
-            }
-            return out;
-        }
-        ExPolygons expolygons_below() const { 
-            ExPolygons out;
-            out.reserve(this->islands_below.size());
-            for (const Link &below : this->islands_below)
-                out.emplace_back(*below.island->polygon);
-            return out;
-        }
-        // Positive deficit of the supports. If negative, this area is well supported. If positive, more supports need to be added.
-        float support_force_deficit(const float tear_pressure) const { return this->area * tear_pressure - this->supports_force_total(); }
-    };
-    
-    struct MyLayer {
-        MyLayer(const size_t layer_id, coordf_t print_z) : layer_id(layer_id), print_z(print_z) {}
-        size_t                  layer_id;
-        coordf_t                print_z;
-        std::vector<Structure>  islands;
-    };
-    
-    struct RichSupportPoint {
-        Vec3f        position;
-        Structure   *island;
-    };
-    
-    struct PointGrid3D {
-        struct GridHash {
-            std::size_t operator()(const Vec3i &cell_id) const {
-                return std::hash<int>()(cell_id.x()) ^ std::hash<int>()(cell_id.y() * 593) ^ std::hash<int>()(cell_id.z() * 7919);
-            }
-        };
-        typedef std::unordered_multimap<Vec3i, RichSupportPoint, GridHash> Grid;
-        
-        Vec3f   cell_size;
-        Grid    grid;
-        
-        Vec3i cell_id(const Vec3f &pos) {
-            return Vec3i(int(floor(pos.x() / cell_size.x())),
-                         int(floor(pos.y() / cell_size.y())),
-                         int(floor(pos.z() / cell_size.z())));
-        }
-        
-        void insert(const Vec2f &pos, Structure *island) {
-            RichSupportPoint pt;
-            pt.position = Vec3f(pos.x(), pos.y(), float(island->layer->print_z));
-            pt.island   = island;
-            grid.emplace(cell_id(pt.position), pt);
-        }
-        
-        bool collides_with(const Vec2f &pos, float print_z, float radius) {
-            Vec3f pos3d(pos.x(), pos.y(), print_z);
-            Vec3i cell = cell_id(pos3d);
-            std::pair<Grid::const_iterator, Grid::const_iterator> it_pair = grid.equal_range(cell);
-            if (collides_with(pos3d, radius, it_pair.first, it_pair.second))
-                return true;
-            for (int i = -1; i < 2; ++ i)
-                for (int j = -1; j < 2; ++ j)
-                    for (int k = -1; k < 1; ++ k) {
-                        if (i == 0 && j == 0 && k == 0)
-                            continue;
-                        it_pair = grid.equal_range(cell + Vec3i(i, j, k));
-                        if (collides_with(pos3d, radius, it_pair.first, it_pair.second))
-                            return true;
-                    }
-            return false;
-        }
-        
-    private:
-        bool collides_with(const Vec3f &pos, float radius, Grid::const_iterator it_begin, Grid::const_iterator it_end) {
-            for (Grid::const_iterator it = it_begin; it != it_end; ++ it) {
-                float dist2 = (it->second.position - pos).squaredNorm();
-                if (dist2 < radius * radius)
-                    return true;
-            }
-            return false;
-        }
-    };
-    
-    void execute(const std::vector<ExPolygons> &slices,
-                 const std::vector<float> &     heights);
-    
-    void seed(std::mt19937::result_type s) { m_rng.seed(s); }
-private:
-    std::vector<SupportPoint> m_output;
-    
-    SupportPointGenerator::Config m_config;
-    
-    void process(const std::vector<ExPolygons>& slices, const std::vector<float>& heights);
+    // Configuration for sampling island
+    SampleConfig island_configuration = create_default_island_configuration(head_diameter);
 
-public:
-    enum IslandCoverageFlags : uint8_t { icfNone = 0x0, icfIsNew = 0x1, icfWithBoundary = 0x2 };
-
-private:
-
-    void uniformly_cover(const ExPolygons& islands, Structure& structure, float deficit, PointGrid3D &grid3d, IslandCoverageFlags flags = icfNone);
-
-    void add_support_points(Structure& structure, PointGrid3D &grid3d);
-
-    void project_onto_mesh(std::vector<SupportPoint>& points) const;
-
-#ifdef SLA_SUPPORTPOINTGEN_DEBUG
-    static void output_expolygons(const ExPolygons& expolys, const std::string &filename);
-    static void output_structures(const std::vector<Structure> &structures);
-#endif // SLA_SUPPORTPOINTGEN_DEBUG
-    
-    const AABBMesh& m_emesh;
-    std::function<void(void)> m_throw_on_cancel;
-    std::function<void(int)>  m_statusfn;
-    
-    std::mt19937 m_rng;
+    // maximal allowed distance to layer part for permanent(manual edited) support
+    // helps to identify not wanted support points during automatic support generation.
+    double max_allowed_distance_sq = scale_(1) * scale_(1); // 1mm
 };
 
-void remove_bottom_points(std::vector<SupportPoint> &pts, float lvl);
+struct LayerPart; // forward decl.
+using LayerParts = std::vector<LayerPart>;
 
-std::vector<Vec2f> sample_expolygon(const ExPolygon &expoly, float samples_per_mm2, std::mt19937 &rng);
-void sample_expolygon_boundary(const ExPolygon &expoly, float samples_per_mm, std::vector<Vec2f> &out, std::mt19937 &rng);
+using PartLink = LayerParts::const_iterator;
+#ifdef NDEBUG
+// In release mode, use the optimized container.
+using PartLinks = boost::container::small_vector<PartLink, 4>;
+#else
+// In debug mode, use the standard vector, which is well handled by debugger visualizer.
+using PartLinks = std::vector<PartLink>;
+#endif
 
-}} // namespace Slic3r::sla
+// Large one layer overhang that needs to be supported on the overhanging side
+struct Peninsula{
+    // shape of peninsula
+    //ExPolygon shape;
 
-#endif // SUPPORTPOINTGENERATOR_HPP
+    // Prev layer is extended by self support const and subtracted from current one.
+    // This part of layer is supported as island
+    ExPolygon unsuported_area;
+
+    // Flag for unsuported_area line about source
+    // Same size as Slic3r::to_lines(unsuported_area)
+    // True .. peninsula outline(coast)
+    // False .. connection to land(already supported by previous layer)
+    std::vector<bool> is_outline;
+};
+using Peninsulas = std::vector<Peninsula>;
+
+// Part on layer is defined by its shape 
+struct LayerPart {
+    // Pointer to expolygon stored in input
+    const ExPolygon *shape;
+
+    // To detect irelevant support poinst for part
+    ExPolygons extend_shape;
+
+    // rectangular bounding box of shape
+    BoundingBox shape_extent;
+
+    // uniformly sampled shape contour
+    Points samples;
+
+    // Parts from previous printed layer, which is connected to current part
+    PartLinks prev_parts;
+    PartLinks next_parts;
+
+    // half island is supported as special case
+    Peninsulas peninsulas;
+};
+
+/// <summary>
+/// Extend support point with information from layer
+/// </summary>
+struct LayerSupportPoint: public SupportPoint
+{
+    // 2d coordinate on layer
+    // use only when part is not nullptr
+    Point position_on_layer; // [scaled_ unit]
+
+    // index into curve to faster found radius for current layer
+    size_t radius_curve_index = 0;
+    coord_t current_radius = 0; // [in scaled mm]
+
+    // information whether support point is active in current investigated layer
+    // Flagged false when no part on layer in Radius 'r' around support point
+    // Tool to support overlapped overhang area multiple times
+    bool active_in_part = true;
+
+    // When true support point position is not generated by algorithm
+    bool is_permanent = false;
+};
+using LayerSupportPoints = std::vector<LayerSupportPoint>;
+
+/// <summary>
+/// One slice divided into 
+/// </summary>
+struct Layer
+{
+    // Absolute distance from Zero - copy value from heights<float>
+    // It represents center of layer(range of layer is half layer size above and belowe)
+    float print_z; // [in mm]
+
+    // data for one expolygon
+    LayerParts parts;
+};
+using Layers = std::vector<Layer>;
+
+/// <summary>
+/// Keep state of Support Point generation
+/// Used for resampling with different configuration
+/// </summary>
+struct SupportPointGeneratorData
+{
+    // Input slices of mesh
+    std::vector<ExPolygons> slices;
+
+    // Keep information about layer and its height
+    // and connection between layers for its part
+    // NOTE: contain links into slices
+    Layers layers;
+
+    // Manualy edited supports by user should be permanent
+    SupportPoints permanent_supports;
+};
+
+// call during generation of support points to check cancel event
+using ThrowOnCancel = std::function<void(void)>;
+// call to say progress of generation into gui in range from 0 to 100
+using StatusFunction= std::function<void(int)>;
+
+struct PrepareGeneratorDataConfig
+{
+    // Discretization of overhangs outline,
+    // smaller will slow down the process but will be more precise
+    double discretize_overhang_sample_in_mm = 2.; // [in mm]
+
+    // Define minimal width of overhang to be considered as peninsula
+    // (partialy island - sampled not on edge)
+    coord_t peninsula_width = scale_(2.); // [in scaled mm]
+};
+
+/// <summary>
+/// Prepare data for generate support points
+/// Used for interactive resampling to store permanent data between configuration changes.,
+/// Everything which could be prepared are stored into result.
+/// Need to regenerate on mesh change(Should be connected with ObjectId) OR change of slicing heights
+/// </summary>
+/// <param name="slices">Countour cut from mesh</param>
+/// <param name="heights">Heights of the slices - Same size as slices</param>
+/// <param name="config">Preparation parameters</param>
+/// <param name="throw_on_cancel">Call in meanwhile to check cancel event</param>
+/// <param name="statusfn">Say progress of generation into gui</param>
+/// <returns>Data prepared for generate support points</returns>
+SupportPointGeneratorData prepare_generator_data(
+    std::vector<ExPolygons> &&slices,
+    const std::vector<float> &heights,
+    const PrepareSupportConfig &config = {},
+    ThrowOnCancel throw_on_cancel = []() {},
+    StatusFunction statusfn = [](int) {}
+);
+
+/// <summary>
+/// Generate support points on islands by configuration parameters
+/// </summary>
+/// <param name="data">Preprocessed data needed for sampling</param>
+/// <param name="config">Define density of samples</param>
+/// <param name="throw_on_cancel">Call in meanwhile to check cancel event</param>
+/// <param name="statusfn">Progress of generation into gui</param>
+/// <returns>Generated support points</returns>
+LayerSupportPoints generate_support_points(
+    const SupportPointGeneratorData &data,
+    const SupportPointGeneratorConfig &config,
+    ThrowOnCancel throw_on_cancel = []() {},
+    StatusFunction statusfn = [](int) {}
+);
+} // namespace Slic3r::sla
+
+// TODO: Not sure if it is neccessary & Should be in another file
+namespace Slic3r{
+class AABBMesh;
+namespace sla {
+/// <summary>
+/// Move support points on surface of mesh
+/// </summary>
+/// <param name="points">Support points to move on surface</param>
+/// <param name="mesh">Define surface for move points</param>
+/// <param name="throw_on_cancel">Call in meanwhile to check cancel event</param>
+/// <returns>Support points laying on mesh surface</returns>
+SupportPoints move_on_mesh_surface(
+    const LayerSupportPoints &points,
+    const AABBMesh &mesh,
+    double allowed_move,
+    ThrowOnCancel throw_on_cancel = []() {}
+);
+
+}}
+
+#endif // SLA_SUPPORTPOINTGENERATOR_HPP

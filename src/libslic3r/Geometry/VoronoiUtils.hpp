@@ -40,6 +40,8 @@ template<typename PT> struct PointCellRange
 
     PointCellRange() = delete;
     explicit PointCellRange(const PT &source_point) : source_point(source_point) {}
+    PointCellRange(const PT &source_point, const VD::edge_type *edge_begin, const VD::edge_type *edge_end)
+        : source_point(source_point), edge_begin(edge_begin), edge_end(edge_end) {}
 
     bool is_valid() const { return edge_begin && edge_end && edge_begin != edge_end; }
 };

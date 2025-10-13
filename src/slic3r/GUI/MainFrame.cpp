@@ -691,6 +691,10 @@ void MainFrame::init_tabpanel()
                 old_tab->validate_custom_gcodes();
         }
 
+#ifndef __APPLE__
+        on_tab_change_rename_reload_item(e.GetSelection());
+#endif // !__APPLE__
+
         wxWindow* panel = m_tabpanel->GetCurrentPage();
         Tab* tab = dynamic_cast<Tab*>(panel);
 
@@ -872,6 +876,7 @@ void MainFrame::show_connect_tab(const wxString& url)
     if (!m_connect_webview_added) {
         return;
     }
+    m_connect_webview->prohibit_after_show_func_once();
     m_tabpanel->SetSelection(m_tabpanel->FindPage(m_connect_webview));
     m_connect_webview->set_load_default_url_on_next_error(true);
     m_connect_webview->load_url(url);
@@ -993,6 +998,35 @@ void MainFrame::reload_selected_webview()
         m_connect_webview->do_reload();
     if (m_printer_webview_added && selection == m_tabpanel->FindPage(m_printer_webview)) 
         m_printer_webview->do_reload();
+}
+
+void MainFrame::on_tab_change_rename_reload_item(int new_tab)
+{
+    if (!m_tabpanel) {
+        return;
+    }
+    if ( new_tab == m_tabpanel->FindPage(m_printables_webview) 
+        || (m_connect_webview_added && new_tab == m_tabpanel->FindPage(m_connect_webview)) 
+        || (m_printer_webview_added && new_tab == m_tabpanel->FindPage(m_printer_webview))) 
+    {
+        m_menu_item_reload->SetItemLabel(_L("Re&load Web Content") + "\tF5");
+        m_menu_item_reload->SetHelp(_L("Reload Web Content"));
+    } else {
+        m_menu_item_reload->SetItemLabel(_L("Re&load from Disk") + "\tF5");
+        m_menu_item_reload->SetHelp(_L("Reload the plater from disk"));
+    }
+}
+
+bool MainFrame::reload_item_condition_cb()
+{
+    return is_any_webview_selected() ? true :
+    !m_plater->model().objects.empty();
+}
+void MainFrame::reload_item_function_cb()
+{
+    is_any_webview_selected() 
+        ? reload_selected_webview()
+        : m_plater->reload_all_from_disk();
 }
 
 void Slic3r::GUI::MainFrame::refresh_account_menu(bool avatar/* = false */)
@@ -1605,16 +1639,18 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + dots + "\tCtrl+Shift+R",
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
             "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
+        m_menu_item_reload = append_menu_item(editMenu, wxID_ANY, _L("Re&load Web Content") + "\tF5",
+            _L("Reload Web Content"), [this](wxCommandEvent&) {  reload_selected_webview(); },
+            "", nullptr, [this]() {return is_any_webview_selected(); }, this);
 #else
-        append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + sep + "F5",
-            _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_all_from_disk(); },
-            "", nullptr, [this]() {return !m_plater->model().objects.empty(); }, this);
+        m_menu_item_reload = append_menu_item(editMenu, wxID_ANY, _L("Re&load from Disk") + "\tF5",
+            _L("Reload the plater from disk"), [this](wxCommandEvent&) {  reload_item_function_cb(); },
+            "", nullptr, [this]() {return reload_item_condition_cb(); }, this);
 #endif // __APPLE__
 
         editMenu->AppendSeparator();
         append_menu_item(editMenu, wxID_ANY, _L("Searc&h") + "\tCtrl+F",
             _L("Search in settings"), [this](wxCommandEvent&) {
-//             wxGetApp().show_search_dialog(); 
 				m_tabpanel->GetTopBarItemsCtrl()->TriggerSearch();
             },
             "search", nullptr, []() {return true; }, this);
@@ -1697,10 +1733,6 @@ void MainFrame::init_menubar_as_editor()
                 wxFULLSCREEN_NOSTATUSBAR | wxFULLSCREEN_NOBORDER | wxFULLSCREEN_NOCAPTION); }, 
             this, []() { return true; }, [this]() { return this->IsFullScreen(); }, this);
 #endif // __APPLE__
-
-        viewMenu->AppendSeparator();
-        append_menu_item(viewMenu, wxID_ANY, _L("&Reload Web Content") + "\tF5", _L("Reload WebView"), 
-            [this](wxCommandEvent&) { reload_selected_webview(); }, "", nullptr, [this]() {return is_any_webview_selected(); }, this);
     }
 
     // Help menu

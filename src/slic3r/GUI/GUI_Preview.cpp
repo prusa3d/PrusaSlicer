@@ -283,11 +283,6 @@ void Preview::set_drop_target(wxDropTarget* target)
         SetDropTarget(target);
 }
 
-void Preview::load_gcode_shells()
-{
-    m_canvas->load_gcode_shells();
-}
-
 void Preview::load_print(bool keep_z_range)
 {
     PrinterTechnology tech = m_process->current_printer_technology();
@@ -306,6 +301,7 @@ void Preview::reload_print()
 
     m_loaded = false;
     load_print();
+    m_layers_slider->seq_top_layer_only(wxGetApp().app_config->get_bool("seq_top_layer_only"));
 }
 
 void Preview::msw_rescale()
@@ -343,14 +339,14 @@ void Preview::render_sliders(GLCanvas3D& canvas)
 
 float Preview::get_moves_slider_height() const
 {
-    if (m_moves_slider && m_moves_slider->IsShown())
+    if (!s_multiple_beds.is_autoslicing() && m_moves_slider && m_moves_slider->IsShown())
         return m_moves_slider->GetHeight();
     return 0.0f;
 }
 
 float Preview::get_layers_slider_width(bool disregard_visibility) const
 {
-    if (m_layers_slider && (m_layers_slider->IsShown() || disregard_visibility))
+    if (!s_multiple_beds.is_autoslicing() && m_layers_slider && (m_layers_slider->IsShown() || disregard_visibility))
         return m_layers_slider->GetWidth();
     return 0.0f;
 }
@@ -408,6 +404,7 @@ void Preview::create_sliders()
     m_layers_slider->SetEmUnit(wxGetApp().em_unit());
     m_layers_slider->set_imgui_wrapper(wxGetApp().imgui());
     m_layers_slider->show_estimated_times(wxGetApp().app_config->get_bool("show_estimated_times_in_dbl_slider"));
+    m_layers_slider->seq_top_layer_only(wxGetApp().app_config->get_bool("seq_top_layer_only"));
     m_layers_slider->show_ruler(wxGetApp().app_config->get_bool("show_ruler_in_dbl_slider"), wxGetApp().app_config->get_bool("show_ruler_bg_in_dbl_slider"));
 
     m_layers_slider->SetDrawMode(wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA,
@@ -415,8 +412,10 @@ void Preview::create_sliders()
 
     m_layers_slider->set_callback_on_thumb_move( [this]() -> void { Preview::on_layers_slider_scroll_changed(); } );
 
-    m_layers_slider->set_callback_on_change_app_config([](const std::string& key, const std::string& val)   -> void {
+    m_layers_slider->set_callback_on_change_app_config([this](const std::string& key, const std::string& val)   -> void {
         wxGetApp().app_config->set(key, val);
+        if (key == "seq_top_layer_only")
+            reload_print();
     });
 
     if (wxGetApp().is_editor()) {
@@ -943,7 +942,9 @@ void Preview::load_print_as_fff(bool keep_z_range)
     }
 
     if (wxGetApp().is_editor() && !has_layers) {
+        m_canvas->reset_gcode_toolpaths();
         m_canvas->reset_gcode_layers_times_cache();
+        m_canvas->load_gcode_shells();
         hide_layers_slider();
         m_moves_slider->Hide();
         m_canvas_widget->Refresh();
@@ -979,6 +980,7 @@ void Preview::load_print_as_fff(bool keep_z_range)
         else if (is_pregcode_preview) {
             // Load the initial preview based on slices, not the final G-code.
             m_canvas->load_preview(tool_colors, color_print_colors, color_print_values);
+            m_canvas->load_gcode_shells();
             // the view type has been changed by the call m_canvas->load_gcode_preview()
             if (gcode_view_type == libvgcode::EViewType::ColorPrint && !color_print_values.empty())
                 m_canvas->set_gcode_view_type(gcode_view_type);

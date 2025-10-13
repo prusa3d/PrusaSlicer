@@ -3,12 +3,12 @@
 #include <optional>
 #include <vector>
 
+#include "libslic3r/GCode/SeamGeometry.hpp"
 #include "libslic3r/GCode/SeamChoice.hpp"
 #include "libslic3r/GCode/SeamPerimeters.hpp"
 
 namespace Slic3r {
 namespace Seams {
-struct SeamChoice;
 struct SeamPerimeterChoice;
 }  // namespace Seams
 }  // namespace Slic3r

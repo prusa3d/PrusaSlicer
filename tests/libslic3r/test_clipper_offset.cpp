@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <iostream>
 #include <boost/filesystem.hpp>
@@ -8,6 +9,7 @@
 #include "libslic3r/SVG.hpp"
 
 using namespace Slic3r;
+using namespace Catch;
 
 // #define TESTS_EXPORT_SVGS
 

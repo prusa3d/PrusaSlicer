@@ -10,7 +10,7 @@ public:
     const std::string& connect_url() const { return m_connect_url; }
 
     std::string connect_status_url() const { return m_connect_url + "/slicer/status"; }
-    std::string connect_printer_list_url() const { return m_connect_url + "/slicer/printer_list"; }
+    std::string connect_printer_list_url() const { return m_connect_url + "/slicer/v1/printers"; }
     std::string connect_select_printer_url() const { return m_connect_url + "/slicer-select-printer"; }
     std::string connect_printers_url() const { return m_connect_url + "/app/printers/"; }
     std::string connect_teams_url() const { return m_connect_url + "/app/teams"; }

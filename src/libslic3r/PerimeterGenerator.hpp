@@ -134,7 +134,7 @@ void process_arachne(
     // Infills without the gap fills
     ExPolygons                 &out_fill_expolygons);
 
-ExtrusionMultiPath thick_polyline_to_multi_path(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, float tolerance, float merge_tolerance);
+ExtrusionMultiPath thick_polyline_to_multi_path(const ThickPolyline &thick_polyline, ExtrusionRole role, const Flow &flow, float tolerance, float merge_tolerance, const std::optional<uint32_t> &perimeter_index = std::nullopt);
 
 } // namespace Slic3r::PerimeterGenerator
 

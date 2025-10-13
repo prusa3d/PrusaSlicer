@@ -94,6 +94,7 @@ void GLGizmoSlaBase::update_volumes()
 
         const int object_idx   = m_parent.get_selection().get_object_idx();
         const int instance_idx = m_parent.get_selection().get_instance_idx();
+
         const Geometry::Transformation& inst_trafo = po->model_object()->instances[instance_idx]->get_transformation();
         const double current_elevation = po->get_current_elevation();
 

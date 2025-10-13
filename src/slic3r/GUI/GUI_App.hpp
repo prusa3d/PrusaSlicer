@@ -432,6 +432,7 @@ public:
     void            printables_slice_request(const std::string& download_url, const std::string& model_url);
     void            printables_login_request();
     void            open_link_in_printables(const std::string& url);
+    bool            is_account_logged_in() const;
 private:
     bool            on_init_inner();
 	void            init_app_config();
@@ -453,6 +454,9 @@ private:
     void            app_updater(bool from_user);
     // inititate read of version file online in separate thread
     void            app_version_check(bool from_user);
+#if defined(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION) 
+    void            remove_desktop_files_dialog();
+#endif //(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION)
 
     bool                    m_wifi_config_dialog_shown { false };
     bool                    m_wifi_config_dialog_was_declined { false };

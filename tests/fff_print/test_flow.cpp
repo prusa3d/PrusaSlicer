@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <numeric>
 #include <sstream>
@@ -12,6 +13,7 @@
 
 using namespace Slic3r::Test;
 using namespace Slic3r;
+using namespace Catch;
 
 SCENARIO("Extrusion width specifics", "[Flow]") {
 

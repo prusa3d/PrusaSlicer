@@ -330,7 +330,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
                 % model.thumbnail
                 % vendor.id
                 % model.id;
-            load_bitmap(Slic3r::var(PRINTER_PLACEHOLDER), bitmap, bitmap_width);
+            load_bitmap(GUI::from_u8(Slic3r::var(PRINTER_PLACEHOLDER)), bitmap, bitmap_width);
         }
         
         wxStaticText* title = new wxStaticText(this, wxID_ANY, from_u8(model.name), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
@@ -1652,12 +1652,14 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
         const auto bgr_clr_str = wxGetApp().get_html_bg_color(parent);
         const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
 
-        const wxString link = format_wxstr("<a href = \"%1%\">%1%</a>", "printables.com");
+        const wxString link_web = format_wxstr("<a href = \"%1%\">%1%</a>", "Printables.com");
+        // TRN ConfigWizard : "link" is a word from phrase
+        // "For a list of supported websites, follow this link"
+        const wxString link_help = format_wxstr("<a href = \"%1%\">%2%</a>", "https://help.prusa3d.com/article/opening-models-in-prusaslicer-from-supported-websites_399198", _L("link"));
 
-        // TRN ConfigWizard : Downloader : %1% = "printables.com", %2% = "PrusaSlicer"
-        const wxString main_text = format_wxstr(_L("If enabled, you will be able to open models from the %1% "
-                                                   "online database with a single click (using a %2% logo button)."
-        ), link, SLIC3R_APP_NAME);
+        // TRN ConfigWizard : Downloader : %1% = "printables.com", "%2%" = "link"
+        const wxString main_text = format_wxstr(_L("Enable this option to open models from supported websites (e.g. %1%) with a single click. For a list of supported websites, follow this %2%."
+        ), link_web, link_help);
 
         const wxFont& font = this->GetFont();
         const int fs = font.GetPointSize();

@@ -31,6 +31,7 @@
 #include "libslic3r/Slicing.hpp"
 #include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/libslic3r.h"
+#include "libslic3r/CustomParametersHandling.hpp"
 
 namespace Slic3r {
 
@@ -1050,7 +1051,23 @@ static PrintObjectRegions* generate_print_object_regions(
     return out.release();
 }
 
-Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_config)
+static void validate_print_config_change(const PrintConfig &old_config, const DynamicPrintConfig &new_config, std::vector<std::string> *warnings)
+{
+    if (warnings == nullptr) {
+        return;
+    }
+
+    if (old_config.bed_temperature_extruder > 0 && old_config.bed_temperature_extruder == new_config.option("bed_temperature_extruder")->getInt()) {
+        // Bed temperature extruder is set, and it didn't change with the new config.
+        if (old_config.bed_temperature.values != new_config.option("bed_temperature")->getInts()
+         || old_config.first_layer_bed_temperature.values != new_config.option("first_layer_bed_temperature")->getInts()) {
+            // When any bed temperature changes, we warn the user that the bed temperature extruder may need to be changed.
+            warnings->emplace_back("_BED_TEMPS_CHANGED");
+        }
+    }
+}
+
+Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_config, std::vector<std::string> *warnings)
 {
 #ifdef _DEBUG
     check_model_ids_validity(model);
@@ -1075,6 +1092,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     // Collect changes to object and region configs.
     t_config_option_keys object_diff      = m_default_object_config.diff(new_full_config);
     t_config_option_keys region_diff      = m_default_region_config.diff(new_full_config);
+
+    // Check if the print config change will produce any warnings.
+    validate_print_config_change(m_config, new_full_config, warnings);
 
     // Do not use the ApplyStatus as we will use the max function when updating apply_status.
     unsigned int apply_status = APPLY_STATUS_UNCHANGED;
@@ -1107,6 +1127,19 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 		m_placeholder_parser.apply_config(filament_overrides);
 	    // It is also safe to change m_config now after this->invalidate_state_by_config_options() call.
 	    m_config.apply_only(new_full_config, print_diff, true);
+
+        try {
+            DynamicConfig custom_pars = parse_custom_parameters_to_dynamic_config(
+                m_config.custom_parameters_print,
+                m_config.custom_parameters_printer,
+                m_config.custom_parameters_filament.values
+            );
+            m_placeholder_parser.apply_config(std::move(custom_pars));
+        } catch (const std::runtime_error& ex) {
+            // Ignore any errors. The user will be prompted when Print::validate is called.
+            BOOST_LOG_TRIVIAL(error) << "Unable to parse custom parameters: " << ex.what();
+        }
+        
 	    //FIXME use move semantics once ConfigBase supports it.
         // Some filament_overrides may contain values different from new_full_config, but equal to m_config.
         // As long as these config options don't reallocate memory when copying, we are safe overriding a value, which is in use by a worker thread.
@@ -1126,6 +1159,10 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     if (model.wipe_tower() != m_model.wipe_tower())
         update_apply_status(this->invalidate_step(psSkirtBrim));
     m_model.wipe_tower() = model.wipe_tower();
+    // Inform the placeholder parser about the position and rotation of the wipe tower.
+    m_placeholder_parser.set("wipe_tower_x", model.wipe_tower().position.x());
+    m_placeholder_parser.set("wipe_tower_y", model.wipe_tower().position.y());
+    m_placeholder_parser.set("wipe_tower_rotation_angle", model.wipe_tower().rotation);
 
     ModelObjectStatusDB model_object_status_db;
 
@@ -1162,8 +1199,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 
             update_apply_status(
                 (num_extruders_changed || tool_change_differ || multi_extruder_differ || color_change_differ) ?
-            	// The Tool Ordering and the Wipe Tower are no more valid.
-            	this->invalidate_steps({ psWipeTower, psGCodeExport }) :
+                // The Tool Ordering and the Wipe Tower are no more valid.
+                // Because G-code export (PlaceholderParser) accesses the first layer convex hull, we need to also invalidate psSkirtBrim.
+            	this->invalidate_steps({ psWipeTower, psGCodeExport, psSkirtBrim }) :
             	// There is no change in Tool Changes stored in custom_gcode_per_print_z, therefore there is no need to update Tool Ordering.
             	this->invalidate_step(psGCodeExport));
             m_model.custom_gcode_per_print_z() = model.custom_gcode_per_print_z();
@@ -1335,7 +1373,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             if (model_object.instances.size() != model_object_new.instances.size() || 
             	! std::equal(model_object.instances.begin(), model_object.instances.end(), model_object_new.instances.begin(), [](auto l, auto r){ return l->id() == r->id(); })) {
             	// G-code generator accesses model_object.instances to generate sequential print ordering matching the Plater object list.
-            	update_apply_status(this->invalidate_step(psGCodeExport));
+                // WipingExtrusions::mark_wiping_extrusions() precalculate data based on the number of instances when wiping into infill/object is enabled.
+                update_apply_status(this->invalidate_steps({psGCodeExport, psWipeTower}));
+
 	            model_object.clear_instances();
 	            model_object.instances.reserve(model_object_new.instances.size());
 	            for (const ModelInstance *model_instance : model_object_new.instances) {
@@ -1469,7 +1509,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                     for (size_t state_idx = 1; state_idx < std::min(volume_used_facet_states.size(), used_facet_states.size()); ++state_idx) {
                         used_facet_states[state_idx] |= volume_used_facet_states[state_idx];
                     }
-
+#if 0
                     // When the default facet state (TriangleStateType::NONE) is used, then we mark the volume extruder also as the used extruder.
                     const bool used_volume_extruder = !volume_used_facet_states.empty() && volume_used_facet_states[static_cast<size_t>(TriangleStateType::NONE)];
                     if (const int volume_extruder_id = volume->extruder_id(); used_volume_extruder && volume_extruder_id >= 0) {
@@ -1478,6 +1518,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                 } else if (const int volume_extruder_id = volume->extruder_id(); volume_extruder_id >= 0) {
                     used_facet_states[volume_extruder_id] |= true;
                 }
+#else
+                }
+#endif
             }
 
             for (size_t state_idx = static_cast<size_t>(TriangleStateType::Extruder1); state_idx < used_facet_states.size(); ++state_idx) {

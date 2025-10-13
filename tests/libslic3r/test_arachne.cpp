@@ -1,4 +1,4 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include "libslic3r/Arachne/WallToolPaths.hpp"
 #include "libslic3r/ClipperUtils.hpp"
@@ -846,4 +846,58 @@ TEST_CASE("Arachne - SPE-2298 - Missing twin edge - 2", "[ArachneMissingTwinEdge
     std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
 
     REQUIRE(!perimeters.empty());
+}
+
+TEST_CASE("Arachne - SPE-2496 - Negative extrusion width", "[Arachne_Negative_Extrusion_Width_SPE-2496]") {
+    Polygon poly_0 = {
+        Point(-4982523, -5994247),
+        Point(-4700644, -6050605),
+        Point( 5959771,  4609799),
+        Point( 5901029,  4779898),
+        Point( 5871716,  4899000),
+        Point( 5864557,  5026026),
+        Point( 5890832,  5722622),
+        Point( 5870131,  5738234),
+        Point( 5304622,  5553229),
+        Point( 4580330,  5240254),
+        Point( 4109435,  4998946),
+        Point( 3606964,  4699087),
+        Point( 2676357,  4015459),
+        Point( 1076547,  2101298),
+        Point(- 900993,    41373),
+        Point(-1481954, - 514246),
+        Point(-4119704, -2738265),
+        Point(-4484070, -3261707),
+        Point(-4628548, -3650430),
+        Point(-4712361, -3810835),
+        Point(-5329484, -4699252),
+        Point(-5670086, -5625540),
+        Point(-5727314, -6080805),
+        Point(-5726304, -6081822)
+    };
+
+    Polygons polygons = {poly_0};
+    coord_t  ext_perimeter_spacing = 407079;
+    coord_t  perimeter_spacing     = 407079;
+    coord_t  inset_count           = 3;
+
+    PrintObjectConfig print_object_config      = PrintObjectConfig::defaults();
+    print_object_config.min_bead_width         = ConfigOptionFloatOrPercent(0.1, false);
+
+    Arachne::WallToolPaths wall_tool_paths(polygons, ext_perimeter_spacing, perimeter_spacing, inset_count, 0, 0.2, print_object_config, PrintConfig::defaults());
+    wall_tool_paths.generate();
+    Arachne::Perimeters perimeters = wall_tool_paths.getToolPaths();
+
+    bool has_negative_extrusion_width = false;
+    for (const Arachne::Perimeter &perimeter : perimeters) {
+        for (const Arachne::ExtrusionLine &extrusion_line : perimeter) {
+            for (const Arachne::ExtrusionJunction &extrusion_junction : extrusion_line) {
+                if (extrusion_junction.w <= 0.) {
+                    has_negative_extrusion_width = true;
+                }
+            }
+        }
+    }
+
+    REQUIRE(!has_negative_extrusion_width);
 }

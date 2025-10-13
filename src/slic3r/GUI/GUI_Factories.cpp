@@ -5,6 +5,7 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/ModelProcessing.hpp"
 
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectList.hpp"

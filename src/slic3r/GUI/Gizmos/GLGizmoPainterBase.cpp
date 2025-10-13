@@ -318,21 +318,26 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 }
 
 void GLGizmoPainterBase::render_cursor_height_range(const Transform3d &trafo) const {
-    const ModelObject   &model_object = *m_c->selection_info()->model_object();
-    const BoundingBoxf3  mesh_bbox    = model_object.volumes[m_rr.mesh_id]->mesh().bounding_box();
+    const ModelObject   &model_object   = *m_c->selection_info()->model_object();
+    const Vec3f          mesh_hit_world = (trafo * m_rr.hit.cast<double>()).cast<float>();
 
-    const std::array<float, 2> z_range = {
-            std::min(m_rr.hit.z() - m_height_range_z_range / 2.f, float(mesh_bbox.max.z())),
-            std::max(m_rr.hit.z() + m_height_range_z_range / 2.f, float(mesh_bbox.min.z()))
+    const std::array<float, 2> z_range = {mesh_hit_world.z() - m_height_range_z_range / 2.f,
+                                          mesh_hit_world.z() + m_height_range_z_range / 2.f};
+
+    struct SlicedPolygonsAtZ
+    {
+        float    z;
+        Polygons polygons;
     };
 
-    std::vector<Polygons> slice_polygons_per_z;
-    for (const float z: z_range)
-        slice_polygons_per_z.emplace_back(slice_mesh(model_object.volumes[m_rr.mesh_id]->mesh().its, z, MeshSlicingParams()));
+    std::vector<SlicedPolygonsAtZ> sliced_polygons_per_z;
+    for (const float z: z_range) {
+        sliced_polygons_per_z.push_back({z, slice_mesh(model_object.volumes[m_rr.mesh_id]->mesh().its, z, MeshSlicingParams(trafo))});
+    }
 
-    const size_t max_vertices_cnt = std::accumulate(slice_polygons_per_z.begin(), slice_polygons_per_z.end(), 0,
-                                                    [](const size_t sum, const Polygons &polygons) {
-                                                        return sum + count_points(polygons);
+    const size_t max_vertices_cnt = std::accumulate(sliced_polygons_per_z.cbegin(), sliced_polygons_per_z.cend(), 0,
+                                                    [](const size_t sum, const SlicedPolygonsAtZ &polygons_at_z) {
+                                                        return sum + count_points(polygons_at_z.polygons);
                                                     });
 
     GLModel::Geometry z_range_geometry;
@@ -342,11 +347,10 @@ void GLGizmoPainterBase::render_cursor_height_range(const Transform3d &trafo) co
     z_range_geometry.color = ColorRGBA::WHITE();
 
     size_t vertices_cnt = 0;
-    for (const float z: z_range) {
-        const Polygons slice_polygons = slice_mesh(model_object.volumes[m_rr.mesh_id]->mesh().its, z, MeshSlicingParams());
-        for (const Polygon &polygon: slice_polygons) {
+    for (const SlicedPolygonsAtZ &polygons_at_z : sliced_polygons_per_z) {
+        for (const Polygon &polygon: polygons_at_z.polygons) {
             for (const Point &pt: polygon.points)
-                z_range_geometry.add_vertex(Vec3f(unscaled<float>(pt.x()), unscaled<float>(pt.y()), z));
+                z_range_geometry.add_vertex(Vec3f(unscaled<float>(pt.x()), unscaled<float>(pt.y()), polygons_at_z.z));
 
             for (size_t pt_idx = 1; pt_idx < polygon.points.size(); ++pt_idx)
                 z_range_geometry.add_line(vertices_cnt + pt_idx - 1, vertices_cnt + pt_idx);
@@ -361,8 +365,8 @@ void GLGizmoPainterBase::render_cursor_height_range(const Transform3d &trafo) co
     if (!z_range_geometry.is_empty())
         z_range_model.init_from(std::move(z_range_geometry));
 
-    const Camera      &camera = wxGetApp().plater()->get_camera();
-    const Transform3d  view_model_matrix = camera.get_view_matrix() * trafo;
+    const Camera     &camera            = wxGetApp().plater()->get_camera();
+    const Transform3d view_model_matrix = camera.get_view_matrix();
 
     GLShaderProgram *shader = wxGetApp().get_shader("mm_contour");
     if (shader == nullptr)

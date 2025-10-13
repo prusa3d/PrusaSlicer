@@ -73,11 +73,15 @@ public:
     virtual void sys_color_changed();
 
     void set_load_default_url_on_next_error(bool val) { m_load_default_url_on_next_error = val; }
-
+   
+    void on_app_quit_event(const std::string& message_data);
+    void on_app_minimize_event(const std::string& message_data);
+    void prohibit_after_show_func_once() {m_after_show_func_prohibited_once = true; }
 protected:
     virtual void late_create();
-
+    virtual void define_css();
     virtual void on_page_will_load();
+
 
     wxWebView* m_browser { nullptr };
     bool m_load_default_url { false };
@@ -109,6 +113,7 @@ protected:
     wxString m_response_js;
     wxString m_default_url;
     bool m_reached_default_url {false};
+    bool m_after_show_func_prohibited_once {false};
 
     std::string m_loading_html;
     std::string m_error_html;
@@ -118,6 +123,7 @@ protected:
     bool m_shown { false };
     bool m_load_default_url_on_next_error { false };
     bool m_do_late_webview_create {false};
+    bool m_styles_defined {false};
 
     std::vector<std::string> m_script_message_hadler_names;
 }; 
@@ -141,8 +147,10 @@ protected:
     void on_page_will_load() override;
     void on_connect_action_error(const std::string &message_data) override;
     void on_reload_event(const std::string& message_data) override;
-    void on_connect_action_close_dialog(const std::string& message_data) override {assert(true);}
+    void on_connect_action_close_dialog(const std::string& message_data) override {assert(false);}
     void on_user_token(UserAccountSuccessEvent& e);
+    void define_css() override;
+    void after_on_show(wxShowEvent& evt) override;
 private:
     static wxString get_login_script(bool refresh);
     static wxString get_logout_script();
@@ -171,11 +179,18 @@ public:
         m_psk = psk;
     }
     void clear() { m_api_key.clear(); m_usr.clear(); m_psk.clear(); m_api_key_sent = false; }
+
+    void on_reload_event(const std::string& message_data);
+protected:
+    void define_css() override;
 private:
     std::string m_api_key;
     std::string m_usr;
     std::string m_psk;
     bool m_api_key_sent {false};
+
+    void handle_message(const std::string& message);
+    std::map<std::string, std::function<void(const std::string&)>> m_events;
 };
 
 class PrintablesWebViewPanel : public WebViewPanel
@@ -194,17 +209,21 @@ public:
     void send_will_refresh();
     wxString get_default_url() const override;
     void set_next_show_url(const std::string& url) {m_next_show_url = Utils::ServiceConfig::instance().printables_url() + url; }
+protected:
+    void define_css() override;
 private:
      void handle_message(const std::string& message);
+     void on_printables_event_dummy(const std::string& message_data) {}
      void on_printables_event_access_token_expired(const std::string& message_data);
      void on_reload_event(const std::string& message_data);
      void on_printables_event_print_gcode(const std::string& message_data);
      void on_printables_event_download_file(const std::string& message_data);
      void on_printables_event_slice_file(const std::string& message_data);
      void on_printables_event_required_login(const std::string& message_data);
+     void on_printables_event_open_url(const std::string& message_data);
+     void on_dummy_event(const std::string& message_data) {}
      void load_default_url() override;
      std::string get_url_lang_theme(const wxString& url) const;
-     void define_css();
      void show_download_notification(const std::string& filename);
      void show_loading_overlay();
      void hide_loading_overlay();
@@ -213,7 +232,6 @@ private:
      std::string m_next_show_url;
 
      bool m_refreshing_token {false};
-     bool m_styles_defined {false};
 #ifdef _WIN32
      bool m_remove_request_auth { false };
 #endif

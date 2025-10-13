@@ -24,8 +24,7 @@ double Camera::FrustrumMinZRange = 50.0;
 double Camera::FrustrumMinNearZ = 100.0;
 double Camera::FrustrumZMargin = 10.0;
 double Camera::MaxFovDeg = 60.0;
-double Camera::SingleBedSceneBoxScaleFactor = 1.5;
-double Camera::MultipleBedSceneBoxScaleFactor = 4.0;
+double Camera::SceneBoxScaleFactor = 2.5;
 
 std::string Camera::get_type_as_string() const
 {
@@ -65,8 +64,18 @@ void Camera::set_target(const Vec3d& target)
         Transform3d inv_view_matrix = m_view_matrix.inverse();
         inv_view_matrix.translation() = m_target - m_distance * get_dir_forward();
         m_view_matrix = inv_view_matrix.inverse();
-        m_rotation_pivot = m_target;
     }
+}
+
+BoundingBoxf3 Camera::get_target_validation_box() const
+{
+    const Vec3d center = m_scene_box.center();
+    Vec3d size = m_scene_box.size();
+    size.x() *= m_scene_box_scale_factor;
+    size.y() *= m_scene_box_scale_factor;
+    size.z() *= 1.5;
+    const Vec3d half_size = 0.5 * size;
+    return BoundingBoxf3(center - half_size, center + half_size);
 }
 
 void Camera::set_zoom(double zoom)
@@ -265,6 +274,8 @@ void Camera::apply_projection(double left, double right, double bottom, double t
 
 void Camera::zoom_to_box(const BoundingBoxf3& box, double margin_factor)
 {
+    m_distance = DefaultDistance;
+
     // Calculate the zoom factor needed to adjust the view around the given box.
     const double zoom = calc_zoom_to_bounding_box_factor(box, margin_factor);
     if (zoom > 0.0) {
@@ -276,6 +287,8 @@ void Camera::zoom_to_box(const BoundingBoxf3& box, double margin_factor)
 
 void Camera::zoom_to_volumes(const GLVolumePtrs& volumes, double margin_factor)
 {
+    m_distance = DefaultDistance;
+
     Vec3d center;
     const double zoom = calc_zoom_to_volumes_factor(volumes, center, margin_factor);
     if (zoom > 0.0) {
@@ -299,7 +312,6 @@ void Camera::debug_render() const
 
     Vec3f position = get_position().cast<float>();
     Vec3f target = m_target.cast<float>();
-    Vec3f pivot = m_rotation_pivot.cast<float>();
     float distance = (float)get_distance();
     float zenit = (float)m_zenit;
     Vec3f forward = get_dir_forward().cast<float>();
@@ -317,7 +329,6 @@ void Camera::debug_render() const
     ImGui::Separator();
     ImGui::InputFloat3("Position", position.data(), "%.6f", ImGuiInputTextFlags_ReadOnly);
     ImGui::InputFloat3("Target", target.data(), "%.6f", ImGuiInputTextFlags_ReadOnly);
-    ImGui::InputFloat3("Pivot", pivot.data(), "%.6f", ImGuiInputTextFlags_ReadOnly);
     ImGui::InputFloat("Distance", &distance, 0.0f, 0.0f, "%.6f", ImGuiInputTextFlags_ReadOnly);
     ImGui::Separator();
     ImGui::InputFloat("Zenit", &zenit, 0.0f, 0.0f, "%.6f", ImGuiInputTextFlags_ReadOnly);
@@ -354,31 +365,11 @@ void Camera::rotate_on_sphere(double delta_azimut_rad, double delta_zenit_rad, b
         }
     }
 
-    const Vec3d translation = m_view_matrix.translation() + m_view_rotation * m_rotation_pivot;
+    const Vec3d translation = m_view_matrix.translation() + m_view_rotation * m_target;
     const auto rot_z = Eigen::AngleAxisd(delta_azimut_rad, Vec3d::UnitZ());
     m_view_rotation *= rot_z * Eigen::AngleAxisd(delta_zenit_rad, rot_z.inverse() * get_dir_right());
     m_view_rotation.normalize();
-    m_view_matrix.fromPositionOrientationScale(m_view_rotation * (-m_rotation_pivot) + translation, m_view_rotation, Vec3d(1., 1., 1.));
-
-    // adjust target from position
-    const Vec3d pivot = m_rotation_pivot;
-    if (!m_target.isApprox(pivot)) {
-        const Vec3d position = get_position();
-        const Vec3d forward = get_dir_forward();
-        const Vec3d new_target = position + m_distance * forward;
-        if (!is_target_valid()) {
-            const float forward_dot_unitZ = forward.dot(Vec3d::UnitZ());
-            if (std::abs(forward_dot_unitZ) > EPSILON) {
-                const float dist_to_xy = -position.dot(Vec3d::UnitZ()) / forward_dot_unitZ;
-                set_target(position + dist_to_xy * forward);
-            }
-            else
-                set_target(new_target);
-        }
-        else
-            set_target(new_target);
-        set_rotation_pivot(pivot);
-    }
+    m_view_matrix.fromPositionOrientationScale(m_view_rotation * (-m_target) + translation, m_view_rotation, Vec3d(1., 1., 1.));
 }
 
 // Virtual trackball, rotate around an axis, where the eucledian norm of the axis gives the rotation angle in radians.
@@ -399,8 +390,6 @@ std::pair<double, double> Camera::calc_tight_frustrum_zs_around(const BoundingBo
 {
     std::pair<double, double> ret;
     auto& [near_z, far_z] = ret;
-
-    set_distance(DefaultDistance);
 
     // box in eye space
     const BoundingBoxf3 eye_box = box.transformed(m_view_matrix);
@@ -589,21 +578,6 @@ void Camera::look_at(const Vec3d& position, const Vec3d& target, const Vec3d& up
     update_zenit();
 }
 
-bool Camera::is_target_valid() const
-{
-    if (m_target.isApprox(m_rotation_pivot))
-        return true;
-
-    const Vec3d box_size = m_scene_box.size();
-    BoundingBoxf3 test_box = m_scene_box;
-    const Vec3d scene_box_center = m_scene_box.center();
-    test_box.translate(-scene_box_center);
-    test_box.scale(m_scene_box_scale_factor);
-    test_box.translate(scene_box_center);
-    test_box.offset(EPSILON);
-    return test_box.contains(get_position() + m_distance * get_dir_forward());
-}
-
 void Camera::set_default_orientation()
 {
     m_zenit = 45.0f;
@@ -618,15 +592,10 @@ void Camera::set_default_orientation()
 
 Vec3d Camera::validate_target(const Vec3d& target) const
 {
-    BoundingBoxf3 test_box = m_scene_box;
-    test_box.translate(-m_scene_box.center());
-    // We may let this factor be customizable
-    test_box.scale(m_scene_box_scale_factor);
-    test_box.translate(m_scene_box.center());
-
-    return { std::clamp(target(0), test_box.min.x(), test_box.max.x()),
-             std::clamp(target(1), test_box.min.y(), test_box.max.y()),
-             std::clamp(target(2), test_box.min.z(), test_box.max.z())};
+    const BoundingBoxf3 test_box = get_target_validation_box();
+    return { std::clamp(target.x(), test_box.min.x(), test_box.max.x()),
+             std::clamp(target.y(), test_box.min.y(), test_box.max.y()),
+             std::clamp(target.z(), test_box.min.z(), test_box.max.z())};
 }
 
 void Camera::update_zenit()

@@ -107,8 +107,10 @@ void PrintBase::status_update_warnings(int step, PrintStateBase::WarningLevel /*
         auto status = print_object ? SlicingStatus(*print_object, step) : SlicingStatus(*this, step);
         m_status_callback(status);
     }
-    else if (! message.empty())
+    else if (! message.empty()) {
         printf("%s warning: %s\n",  print_object ? "print_object" : "print", message.c_str());
+        std::fflush(stdout);
+    }
 }
 
 std::mutex& PrintObjectBase::state_mutex(PrintBase *print)

@@ -107,16 +107,15 @@ std::string to_json(const SLAPrint& print, const ConfMap &m)
         switch (opt->type()) {
         case coFloats: {
             auto values = static_cast<const ConfigOptionFloats*>(opt);
-            // those options have to be exported in ms instead of s
-            below_node.put<double>(get_key(opt_key), int(1000 * values->get_at(0)));
-            above_node.put<double>(get_key(opt_key), int(1000 * values->get_at(1)));
+            double koef = opt_key == "tower_hop_height" ? 1000000. : 1000.; // export in nm (instead of mm), resp. in ms (instead of s)
+            below_node.put<double>(get_key(opt_key), int(koef * values->get_at(0)));
+            above_node.put<double>(get_key(opt_key), int(koef * values->get_at(1)));
         }
         break;
         case coInts: {
             auto values = static_cast<const ConfigOptionInts*>(opt);
-            int koef = opt_key == "tower_hop_height" ? 1000000 : 1;
-            below_node.put<int>(get_key(opt_key), koef * values->get_at(0));
-            above_node.put<int>(get_key(opt_key), koef * values->get_at(1));
+            below_node.put<int>(get_key(opt_key), values->get_at(0));
+            above_node.put<int>(get_key(opt_key), values->get_at(1));
         }
         break;
         case coBools: {

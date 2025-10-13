@@ -115,7 +115,7 @@ void RepositoryUpdateUIManager::fill_entries(bool init_selection/* = false*/)
 
         if (data.source_path.empty()) {
             // online repo
-            m_online_entries.push_back({ is_selected, uuid, data.name, data.description, data.visibility });
+            m_online_entries.push_back({ is_selected, uuid, data.name, data.description, data.visibility, data.not_in_manifest });
         }
         else {
             // offline repo
@@ -161,12 +161,26 @@ void RepositoryUpdateUIManager::fill_grids()
                 });
             add(chb);
 
-            if (entry.visibility.empty())
-                add(new wxStaticText(m_parent, wxID_ANY, ""));
-            else {
+            if (entry.not_in_manifest) {
+                wxStaticBitmap* bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("notification_warning"));
+                //wxGetApp().plater()->get_user_account()
+                if (wxGetApp().is_account_logged_in()) {
+                    // TRN tooltip in Configuration Wizard - Configuration Sources
+                    bmp->SetToolTip(_L("Some vendors were installed from this source, but you do not have the rights to receive updates from it.\n"
+                        "This source may no longer be active, or your account may no longer be subscribed.\n"
+                        "Please consider unsubscribing from this source."));
+                } else {
+                    // TRN tooltip in Configuration Wizard - Configuration Sources
+                    bmp->SetToolTip(_L("Some vendors were installed from this source, but you do not have rights to receive updates from it.\n"
+                        "Please log in to restore access to all your subscribed sources or consider unsubscribing from this source."));
+                }
+                add(bmp);
+            } else if (!entry.visibility.empty()) {
                 wxStaticBitmap* bmp = new wxStaticBitmap(m_parent, wxID_ANY, *get_bmp_bundle("info"));
                 bmp->SetToolTip(from_u8(entry.visibility));
                 add(bmp);
+            } else {
+                add(new wxStaticText(m_parent, wxID_ANY, ""));
             }
 
             add(new wxStaticText(m_parent, wxID_ANY, from_u8(entry.name) + " "));

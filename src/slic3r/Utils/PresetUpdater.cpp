@@ -311,7 +311,8 @@ void PresetUpdater::priv::sync_config(const VendorMap& vendors, const ArchiveRep
 	// Download profiles archive zip
 	fs::path archive_path(cache_path / "vendor_indices.zip");
 	if (!archive_repository->get_archive(archive_path, ui_status)) {
-		BOOST_LOG_TRIVIAL(error) << "Download of vedor profiles archive zip of " << archive_repository->get_manifest().id << " repository has failed.";
+		BOOST_LOG_TRIVIAL(error) << "Download of vendor profiles archive zip of " << archive_repository->get_manifest().id << " repository has failed.";
+        ui_status->add_failed_archive(archive_repository->get_manifest().id);
 		return;
 	}
 	if (ui_status->get_canceled()) { 

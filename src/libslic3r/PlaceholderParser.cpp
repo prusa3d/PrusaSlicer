@@ -139,7 +139,7 @@ std::vector<std::string> PlaceholderParser::config_diff(const DynamicPrintConfig
 // are expected to be addressed by the extruder ID, therefore
 // if a vector configuration value is addressed without an index,
 // a current extruder ID is used.
-bool PlaceholderParser::apply_config(const DynamicPrintConfig &rhs)
+bool PlaceholderParser::apply_config(const DynamicConfig &rhs)
 {
     bool modified = false;
     for (const t_config_option_key &opt_key : rhs.keys()) {
@@ -151,13 +151,13 @@ bool PlaceholderParser::apply_config(const DynamicPrintConfig &rhs)
     return modified;
 }
 
-void PlaceholderParser::apply_only(const DynamicPrintConfig &rhs, const std::vector<std::string> &keys)
+void PlaceholderParser::apply_only(const DynamicConfig &rhs, const std::vector<std::string> &keys)
 {
     for (const t_config_option_key &opt_key : keys)
         this->set(opt_key, rhs.option(opt_key)->clone());
 }
 
-void PlaceholderParser::apply_config(DynamicPrintConfig &&rhs)
+void PlaceholderParser::apply_config(DynamicConfig &&rhs)
 {
 	m_config += std::move(rhs);
 }

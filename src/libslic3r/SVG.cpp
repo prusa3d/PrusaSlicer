@@ -19,6 +19,7 @@
 #include "libslic3r/Line.hpp"
 #include "libslic3r/Surface.hpp"
 #include "libslic3r/libslic3r.h"
+#include "libslic3r/Utils.hpp"
 
 namespace Slic3r {
 
@@ -108,6 +109,19 @@ void SVG::draw(const ExPolygon &expolygon, std::string fill, const float fill_op
     for (const Polygon &p : to_polygons(expolygon))
         d += this->get_path_d(p, true) + " ";
     this->path(d, true, 0, fill_opacity);
+}
+
+void SVG::draw_original(const ExPolygon &expolygon) {
+    std::ostringstream d;
+    auto write_d = [&d](const Points &pts) {
+        d << "M ";
+        for (const Point& p: pts)
+            d << p.x() << " " << p.y() << " ";
+        d << "z "; // closed path
+    };
+    for (const Polygon &p : to_polygons(expolygon))
+        write_d(p.points);
+    path(d.str(), false /*fill*/, 1 /*stroke_width*/, 0.f /*fill opacity*/);
 }
 
 void SVG::draw_outline(const ExPolygon &expolygon, std::string stroke_outer, std::string stroke_holes, coordf_t stroke_width)

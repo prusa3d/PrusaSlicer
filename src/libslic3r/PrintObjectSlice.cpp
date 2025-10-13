@@ -22,6 +22,7 @@
 #include "Print.hpp"
 #include "ShortestPath.hpp"
 #include "admesh/stl.h"
+#include "libslic3r/Feature/Interlocking/InterlockingGenerator.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/Exception.hpp"
@@ -595,12 +596,13 @@ void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_can
                 BoundingBox bbox;
             };
 
-            std::vector<ByExtruder> by_extruder;
             struct ByRegion {
-                ExPolygons  expolygons;
-                bool        needs_merge { false };
+                ExPolygons expolygons;
+                bool       needs_merge { false };
             };
-            std::vector<ByRegion> by_region;
+
+            std::vector<ByExtruder> by_extruder;
+            std::vector<ByRegion>   by_region;
             for (size_t layer_id = range.begin(); layer_id < range.end(); ++layer_id) {
                 throw_on_cancel();
                 Layer &layer = *print_object.get_layer(int(layer_id));
@@ -645,34 +647,36 @@ void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_can
 
                     assert(&parent_print_region == layer_range.volume_regions[it_first_painted_region->parent].region);
 
-                    // Find the first PaintedRegion with different parent PrintRegion.
-                    auto it_last_painted_region = std::find_if(it_first_painted_region, layer_range.painted_regions.cend(), [&it_first_painted_region](const auto &painted_region) {
-                        return painted_region.parent != it_first_painted_region->parent;
-                    });
-
                     // Update the beginning PaintedRegion iterator for the next iteration.
-                    it_painted_region_begin = it_last_painted_region;
+                    it_painted_region_begin = it_first_painted_region;
 
                     const BoundingBox parent_layer_region_bbox = get_extents(parent_layer_region.slices().surfaces);
                     bool              self_trimmed             = false;
                     int               self_extruder_id         = -1; // 1-based extruder ID
-                    for (auto it_painted_region = it_first_painted_region; it_painted_region != it_last_painted_region; ++it_painted_region) {
-                        const int extruder_id = int(it_painted_region->extruder_id); // 1-based extruder ID
-                        assert(extruder_id > 0 && (extruder_id - 1) < int(by_extruder.size()));
-                        assert(layer_range.volume_regions[it_painted_region->parent].region == &parent_print_region);
-
+                    for (int extruder_id = 1; extruder_id <= int(by_extruder.size()); ++extruder_id) {
                         const ByExtruder &segmented = by_extruder[extruder_id - 1];
                         if (!segmented.bbox.defined || !parent_layer_region_bbox.overlap(segmented.bbox))
                             continue;
 
+                        // Find the first target region iterator.
+                        auto it_target_region = std::find_if(it_painted_region_begin, layer_range.painted_regions.cend(), [extruder_id](const auto &painted_region) {
+                            return int(painted_region.extruder_id) >= extruder_id;
+                        });
+
+                        assert(it_target_region != layer_range.painted_regions.end());
+                        assert(layer_range.volume_regions[it_target_region->parent].region == &parent_print_region && int(it_target_region->extruder_id) == extruder_id);
+
+                        // Update the beginning PaintedRegion iterator for the next iteration.
+                        it_painted_region_begin = it_target_region;
+
                         // FIXME: Don't trim by self, it is not reliable.
-                        if (it_painted_region->region == &parent_print_region) {
+                        if (it_target_region->region == &parent_print_region) {
                             self_extruder_id = extruder_id;
                             continue;
                         }
 
                         // Steal from this region.
-                        int        target_region_id = it_painted_region->region->print_object_region_id();
+                        int        target_region_id = it_target_region->region->print_object_region_id();
                         ExPolygons stolen           = intersection_ex(parent_layer_region.slices().surfaces, segmented.expolygons);
                         if (!stolen.empty()) {
                             ByRegion &dst = by_region[target_region_id];
@@ -918,6 +922,12 @@ void PrintObject::slice_volumes()
 
         BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - Fuzzy skin segmentation";
         apply_fuzzy_skin_segmentation(*this, [print]() { print->throw_if_canceled(); });
+    }
+
+    if (m_config.interlocking_beam) {
+        BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - Applying multi-material interlocking";
+        InterlockingGenerator::generate_interlocking_structure(*this);
+        m_print->throw_if_canceled();
     }
 
     BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - make_slices in parallel - begin";

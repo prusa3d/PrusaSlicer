@@ -133,7 +133,7 @@ void NotificationManager::NotificationIDProvider::release_id(int) {}
 #endif
 
 //------PopNotification--------
-NotificationManager::PopNotification::PopNotification(const NotificationData &n, NotificationIDProvider &id_provider, wxEvtHandler* evt_handler) :
+NotificationManager::PopNotification::PopNotification(const NotificationData &n, NotificationIDProvider &id_provider, wxEvtHandler* evt_handler, const bool multiline) :
 	  m_data                (n)
 	, m_id_provider   		(id_provider)
 	, m_text1               (n.text1)
@@ -141,6 +141,7 @@ NotificationManager::PopNotification::PopNotification(const NotificationData &n,
 	, m_text2               (n.text2)
 	, m_evt_handler         (evt_handler)
 	, m_notification_start  (GLCanvas3D::timestamp_now())
+    , m_multiline           (multiline)
 {}
 
 void NotificationManager::PopNotification::render(GLCanvas3D& canvas, float initial_y, bool move_from_overlay, float overlay_width)
@@ -1118,6 +1119,11 @@ void NotificationManager::URLDownloadWithPrintablesLinkNotification::render_text
 
 
 //------URLDownloadNotification----------------
+void NotificationManager::URLDownloadNotification::set_filename(const std::string& filename_line)
+{
+    m_text1 = filename_line;
+    init();
+}
 
 void NotificationManager::URLDownloadNotification::render_close_button(const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
@@ -2157,10 +2163,11 @@ void NotificationManager::push_notification(NotificationType type,
                                             const std::string& hypertext,
                                             std::function<bool(wxEvtHandler*)> callback,
 											const std::string& text_after,
-                                            int timestamp)
+                                            const int timestamp,
+                                            const bool multiline)
 {
 	int duration = get_standard_duration(level);
-    push_notification_data({ type, level, duration, text, hypertext, callback, text_after }, timestamp);
+    push_notification_data({ type, level, duration, text, hypertext, callback, text_after }, timestamp, multiline);
 }
 
 void NotificationManager::push_delayed_notification(const NotificationType type, std::function<bool(void)> condition_callback, int64_t initial_delay, int64_t delay_interval)
@@ -2348,7 +2355,15 @@ void NotificationManager::push_exporting_finished_notification(const std::string
 {
 	close_notification_of_type(NotificationType::ExportFinished);
 	NotificationData data{ NotificationType::ExportFinished, NotificationLevel::RegularNotificationLevel, on_removable ? 0 : 20,  _u8L("Exporting finished.") + "\n" + path };
-	push_notification_data(std::make_unique<NotificationManager::ExportFinishedNotification>(data, m_id_provider, m_evt_handler, on_removable, path, dir_path), 0);
+	push_notification_data(std::make_unique<NotificationManager::ExportFinishedNotification>(data, m_id_provider, m_evt_handler, on_removable, dir_path), 0);
+	set_slicing_progress_hidden();
+}
+
+void NotificationManager::push_bulk_exporting_finished_notification(const std::string& dir_path, bool on_removable)
+{
+	close_notification_of_type(NotificationType::ExportFinished);
+	NotificationData data{ NotificationType::ExportFinished, NotificationLevel::RegularNotificationLevel, on_removable ? 0 : 20,  _u8L("Bulk export finished.") + "\n" + dir_path};
+	push_notification_data(std::make_unique<NotificationManager::ExportFinishedNotification>(data, m_id_provider, m_evt_handler, on_removable, dir_path), 0);
 	set_slicing_progress_hidden();
 }
 
@@ -2614,6 +2629,19 @@ void NotificationManager::set_download_URL_error(size_t id, const std::string& t
 		}
 	}
 }
+void NotificationManager::set_download_URL_filename(size_t id, const std::string& filename)
+{
+	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
+		if (notification->get_type() == NotificationType::URLDownload) {
+			URLDownloadNotification* ntf = dynamic_cast<URLDownloadNotification*>(notification.get());
+			if (ntf->get_download_id() != id)
+				continue;
+			ntf->set_filename(_u8L("Download") + ": " + filename);
+			wxGetApp().plater()->get_current_canvas3D()->schedule_extra_frame(0);
+			return;
+		}
+	}
+}
 
 void NotificationManager::init_slicing_progress_notification(std::function<bool()> cancel_callback)
 {
@@ -2839,9 +2867,9 @@ void NotificationManager::push_updated_item_info_notification(InfoItemType type)
 	}
 
 }
-bool NotificationManager::push_notification_data(const NotificationData& notification_data, int timestamp)
+bool NotificationManager::push_notification_data(const NotificationData& notification_data, int timestamp, const bool multiline)
 {
-	return push_notification_data(std::make_unique<PopNotification>(notification_data, m_id_provider, m_evt_handler), timestamp);
+	return push_notification_data(std::make_unique<PopNotification>(notification_data, m_id_provider, m_evt_handler, multiline), timestamp);
 }
 bool NotificationManager::push_notification_data(std::unique_ptr<NotificationManager::PopNotification> notification, int timestamp)
 {

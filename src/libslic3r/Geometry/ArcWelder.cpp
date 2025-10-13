@@ -739,10 +739,17 @@ double clip_end(Path &path, double distance)
                 // Rotate the segment end point in reverse towards the start point.
                 if (last.ccw())
                     angle *= -1.;
-                path.push_back({
-                    last.point.rotated(angle * (distance / len),
-                        arc_center(path.back().point.cast<double>(), last.point.cast<double>(), double(last.radius), last.ccw()).cast<coord_t>()),
-                    last.radius, last.orientation });
+
+                const double rotate_by_angle = angle * (distance / len);
+
+                // When we are clipping the arc with a negative radius (we are taking the longer angle here),
+                // we have to check if we still need to take the longer angle after clipping.
+                // Otherwise, we must flip the radius sign to take the shorter angle.
+                const bool flip_radius_sign = last.radius < 0 && std::abs(angle) > M_PI && std::abs(angle - rotate_by_angle) <= M_PI;
+
+                path.push_back({last.point.rotated(rotate_by_angle, arc_center(path.back().point.cast<double>(), last.point.cast<double>(), double(last.radius), last.ccw()).cast<coord_t>()),
+                                (flip_radius_sign ? -last.radius : last.radius), last.orientation});
+
                 // Length to go is zero.
                 return 0;
             }

@@ -1,7 +1,7 @@
 project(slic3r-arrange-wrapper)
 cmake_minimum_required(VERSION 3.13)
 
-add_library(slic3r-arrange-wrapper
+add_library(slic3r-arrange-wrapper STATIC
     include/arrange-wrapper/Arrange.hpp
     include/arrange-wrapper/ArrangeSettingsDb_AppCfg.hpp
     include/arrange-wrapper/ArrangeSettingsView.hpp

@@ -800,9 +800,7 @@ void GUI_App::post_init()
             if (plater()->load_files(fns) && this->init_params->input_files.size() == 1) {
                 // Update application titlebar when opening a project file
                 const std::string& filename = this->init_params->input_files.front();
-                if (boost::algorithm::iends_with(filename, ".amf") ||
-                    boost::algorithm::iends_with(filename, ".amf.xml") ||
-                    boost::algorithm::iends_with(filename, ".3mf"))
+                if (boost::algorithm::iends_with(filename, ".3mf"))
                     this->plater()->set_project_filename(from_u8(filename));
             }
             if (this->init_params->delete_after_load) {
@@ -909,7 +907,7 @@ wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
     return m_opengl_mgr.init_glcontext(canvas);
 #else
     return m_opengl_mgr.init_glcontext(canvas, init_params != nullptr ? init_params->opengl_version : std::make_pair(0, 0),
-        init_params != nullptr ? init_params->opengl_compatibiity_profile : false, init_params != nullptr ? init_params->opengl_debug : false);
+        init_params != nullptr ? init_params->opengl_compatibility_profile : false, init_params != nullptr ? init_params->opengl_debug : false);
 #endif // SLIC3R_OPENGL_ES
 }
 
@@ -1311,6 +1309,31 @@ static int get_app_font_pt_size(const AppConfig* app_config)
     return (font_pt_size > max_font_pt_size) ? max_font_pt_size : font_pt_size;
 }
 
+#if defined(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION)  
+void GUI_App::remove_desktop_files_dialog()
+{
+    // Find all old existing desktop file
+    std::vector<boost::filesystem::path> found_desktop_files;
+    DesktopIntegrationDialog::find_all_desktop_files(found_desktop_files);
+    if(found_desktop_files.empty()) {
+        return;
+    }
+    // Delete files.
+    std::vector<boost::filesystem::path> fails;
+    DesktopIntegrationDialog::remove_desktop_file_list(found_desktop_files, fails);
+    if (fails.empty()) {
+        return;
+    }
+    // Inform about fails.
+    std::string text = "Failed to remove desktop files:"; 
+    text += "\n";
+    for (const boost::filesystem::path& entry : fails) { 
+        text += GUI::format("%1%\n",entry.string());
+    }
+    BOOST_LOG_TRIVIAL(error) << text;
+}
+#endif //(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION)
+
 bool GUI_App::on_init_inner()
 {
     // TODO: remove this when all asserts are gone.
@@ -1515,6 +1538,15 @@ bool GUI_App::on_init_inner()
             this->check_updates(false);
         });
 
+        Bind(EVT_CONFIG_UPDATER_FAILED_ARCHIVE, [this](const wxCommandEvent& evt) {
+            assert(!evt.GetString().empty());
+            // TRN Notification text, %1% is list of vendors.
+            std::string notification_text = format(_u8L("Update check failed for the following vendors:\n\n%1%\nThis may be due to an account logout or a lost connection. Please verify your account status and internet connection. Then select \"Check for Configuration Updates\" to repeat."), evt.GetString());
+            notification_manager()->push_notification(NotificationType::FailedSecretVendorUpdateSync,
+                NotificationManager::NotificationLevel::WarningNotificationLevel,
+                notification_text);
+        });
+
         Bind(wxEVT_ACTIVATE_APP, [this](const wxActivateEvent &evt) {
             if (plater_) {
                 if (auto user_account = plater_->get_user_account())
@@ -1569,6 +1601,10 @@ bool GUI_App::on_init_inner()
     // Call this check only after appconfig was loaded to mainframe, otherwise there will be duplicity error.
     legacy_app_config_vendor_check();
 
+#if defined(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION) 
+    remove_desktop_files_dialog();
+#endif //(__linux__) && !defined(SLIC3R_DESKTOP_INTEGRATION) 
+
     sidebar().obj_list()->init_objects(); // propagate model objects to object list
     update_mode(); // mode sizer doesn't exist anymore, so we came update mode here, before load_current_presets
     SetTopWindow(mainframe);
@@ -1604,6 +1640,10 @@ bool GUI_App::on_init_inner()
         update_mode(); // update view mode after fix of the object_list size
 
     show_printer_webview_tab();
+
+#ifdef _WIN32
+    mainframe->update_title(); // To ensure taskbar icons is updated.
+#endif
 
 #ifdef __APPLE__
     other_instance_message_handler()->bring_instance_forward();
@@ -2723,7 +2763,7 @@ wxMenu* GUI_App::get_config_menu(MainFrame* main_frame)
 #ifdef __linux__
         case ConfigMenuDesktopIntegration:
             show_desktop_integration_dialog();
-            break;
+            break;   
 #endif
         case ConfigMenuTakeSnapshot:
             // Take a configuration snapshot.
@@ -3304,8 +3344,8 @@ void GUI_App::open_web_page_localized(const std::string &http_address)
     open_browser_with_warning_dialog(from_u8(http_address + "&lng=") + this->current_language_code_safe(), nullptr, false);
 }
 
-// If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have a part(s).
-// Because of we can't to print the multi-part objects with SLA technology.
+// If we are switching from the FFF-preset to the SLA, we should to control the printed objects if they have modifiers.
+// Modifiers are not supported in SLA mode.
 bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
 {
     if (model_has_parameter_modifiers_in_objects(model())) {
@@ -3376,9 +3416,9 @@ void GUI_App::show_downloader_registration_dialog()
     InfoDialog msg(nullptr
         , format_wxstr(_L("Welcome to %1% version %2%."), SLIC3R_APP_NAME, SLIC3R_VERSION)
         , format_wxstr(_L(
-            "Do you wish to register downloads from <b>Printables.com</b>"
+            "Do you wish to register downloads from supported websites"
             "\nfor this <b>%1% %2%</b> executable?"
-            "\n\nDownloads can be registered for only 1 executable at time."
+            "\n\nDownloads can be registered for only 1 executable at a time."
             ), SLIC3R_APP_NAME, SLIC3R_VERSION)
         , true, wxYES_NO);
     if (msg.ShowModal() == wxID_YES) {
@@ -3888,20 +3928,8 @@ const Preset* find_preset_by_nozzle_and_options(
     for (const Preset &preset : collection) {
         // trim repo prefix
         std::string printer_model = preset.config.opt_string("printer_model");
-        std::string vendor_repo_prefix;
-        if (preset.vendor) {
-            vendor_repo_prefix = preset.vendor->repo_prefix;
-        } else if (std::string inherits = preset.inherits(); !inherits.empty()) {
-            const Preset *parent = wxGetApp().preset_bundle->printers.find_preset(inherits);
-            if (parent && parent->vendor) {
-                vendor_repo_prefix = parent->vendor->repo_prefix;
-            }
-        }
-        if (printer_model.find(vendor_repo_prefix) == 0) {
-            printer_model = printer_model.substr(vendor_repo_prefix.size()
-            );
-            boost::trim_left(printer_model);
-        }
+        const PresetWithVendorProfile& printer_with_vendor = collection.get_preset_with_vendor_profile(preset);
+        printer_model = preset.trim_vendor_repo_prefix(printer_model, printer_with_vendor.vendor);
        
         if (!preset.is_system || printer_model != model_id)
             continue;
@@ -3924,7 +3952,7 @@ const Preset* find_preset_by_nozzle_and_options(
                 case coStrings:  opt_val = static_cast<const ConfigOptionStrings*>(preset.config.option(opt.first))->values[0]; break;
                 case coBools:    opt_val = static_cast<const ConfigOptionBools*>(preset.config.option(opt.first))->values[0] ? "1" : "0"; break;
                 default:
-                   assert(true);
+                   assert(false);
                    continue;
                 }
             }
@@ -4104,7 +4132,7 @@ void GUI_App::select_filament_from_connect(const std::string& msg)
     }
     // test if currently selected is same type
     size_t extruder_count = preset_bundle->extruders_filaments.size();
-    if (extruder_count != materials.size()) {
+    if (extruder_count < materials.size()) {
         BOOST_LOG_TRIVIAL(error) << format("Failed to select filament from Connect. Selected printer has %1% extruders while data from Connect contains %2% materials.", extruder_count, materials.size());
         plater()->get_notification_manager()->close_notification_of_type(NotificationType::SelectFilamentFromConnect);
         // TRN: Notification text.
@@ -4112,7 +4140,7 @@ void GUI_App::select_filament_from_connect(const std::string& msg)
         return;
     }
     std::string notification_text;
-    for (size_t i = 0; i < extruder_count; i++) {
+    for (size_t i = 0; i < materials.size(); i++) {
         search_and_select_filaments(materials[i], avoid_abrasive.size() > i ? avoid_abrasive[i] : false, i, notification_text);
     }
 
@@ -4201,10 +4229,19 @@ void GUI_App::open_link_in_printables(const std::string& url)
     mainframe->show_printables_tab(url);
 }
 
+ bool GUI_App::is_account_logged_in() const
+ {
+     if (!plater_ || !plater_->get_user_account()) {
+         return false;
+     }
+     return plater_->get_user_account()->is_logged();
+ }
+
 bool LogGui::ignorred_message(const wxString& msg)
 {    
     for(const wxString& err : std::initializer_list<wxString>{ wxString("cHRM chunk does not match sRGB"),
-                                                               wxString("known incorrect sRGB profile") }) {
+                                                               wxString("known incorrect sRGB profile"),
+                                                               wxString("Error running JavaScript")}) {
         if (msg.Contains(err))
             return true;
     }

@@ -106,13 +106,24 @@ void ConfigWizardWebViewPage::load_error_page() {
     m_load_error_page = true;
 }
 
+constexpr bool is_linux =
+#if defined(__linux__)
+true;
+#else
+false;
+#endif
+
 void ConfigWizardWebViewPage::on_idle(wxIdleEvent &WXUNUSED(evt)) {
     if (!m_browser)
         return;
     if (m_browser->IsBusy()) {
-        wxSetCursor(wxCURSOR_ARROWWAIT);
+        if constexpr (!is_linux) { 
+            wxSetCursor(wxCURSOR_ARROWWAIT);
+        }
     } else {
-        wxSetCursor(wxNullCursor);
+        if constexpr (!is_linux) { 
+            wxSetCursor(wxNullCursor);
+        }
 
         if (!m_vetoed && m_load_error_page) {
             m_load_error_page = false;

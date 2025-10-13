@@ -163,6 +163,7 @@ namespace Slic3r {
         bool spiral_vase_mode;
 
         ConflictResultOpt conflict_result;
+        std::optional<std::pair<std::string, std::string>> sequential_collision_detected;
 
         void reset();
     };
@@ -778,10 +779,6 @@ namespace Slic3r {
         void update_estimated_statistics();
 
         double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
-
-        AxisCoords create_axis_coords(const Vec3f &vec) {
-            return AxisCoords{vec[0], vec[1], vec[2], 0};
-        }
 
    };
 

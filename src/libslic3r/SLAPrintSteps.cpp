@@ -18,6 +18,7 @@
 #include <libslic3r/OpenVDBUtils.hpp>
 #include <libslic3r/QuadricEdgeCollapse.hpp>
 #include <libslic3r/ClipperUtils.hpp>
+#include <libslic3r/KDTreeIndirect.hpp>
 #include <chrono>
 #include <algorithm>
 #include <array>
@@ -51,9 +52,9 @@
 #include "libslic3r/SLA/Hollowing.hpp"
 #include "libslic3r/SLA/JobController.hpp"
 #include "libslic3r/SLA/RasterBase.hpp"
-#include "libslic3r/SLA/SupportPoint.hpp"
 #include "libslic3r/SLA/SupportTree.hpp"
 #include "libslic3r/SLA/SupportTreeStrategies.hpp"
+#include "libslic3r/SLA/SupportIslands/SampleConfigFactory.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 
@@ -105,7 +106,76 @@ std::string PRINT_STEP_LABELS(size_t idx)
     assert(false); return "Out of bounds!";
 }
 
+using namespace sla;
+
+/// <summary>
+/// Copy permanent support points from model to permanent_supports
+/// </summary>
+/// <param name="permanent_supports">OUTPUT</param>
+/// <param name="object_supports"></param>
+/// <param name="emesh"></param>
+void prepare_permanent_support_points(
+    SupportPoints &permanent_supports, 
+    const SupportPoints &object_supports, 
+    const Transform3d &object_trafo,
+    const AABBMesh &emesh) {
+    // update permanent support points
+    permanent_supports.clear(); // previous supports are irelevant
+    for (const SupportPoint &p : object_supports) {
+        if (p.type != SupportPointType::manual_add)
+            continue;
+
+        // TODO: remove transformation
+        // ?? Why need transform the position?
+        Vec3f pos = (object_trafo * p.pos.cast<double>()).cast<float>();
+        double dist_sq = emesh.squared_distance(pos.cast<double>());
+        if (dist_sq >= sqr(p.head_front_radius)) {
+            // TODO: inform user about skipping points, which are far from surface
+            assert(false);
+            continue; // skip points outside the mesh
+        }
+        permanent_supports.push_back(p); // copy
+        permanent_supports.back().pos = pos; // ?? Why need transform the position?
+    }
+
+    // Prevent overlapped permanent supports
+    auto point_accessor = [&permanent_supports](size_t idx, size_t dim) -> float & {
+        return permanent_supports[idx].pos[dim]; };
+    std::vector<size_t> indices(permanent_supports.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    KDTreeIndirect<3, float, decltype(point_accessor)> tree(point_accessor, indices);
+    for (SupportPoint &p : permanent_supports) {
+        if (p.head_front_radius < 0.f)
+            continue; // already marked for erase
+
+        std::vector<size_t> near_indices = find_nearby_points(tree, p.pos, p.head_front_radius);
+        assert(!near_indices.empty());
+        if (near_indices.size() == 1)
+            continue; // only support itself
+
+        size_t index = &p - &permanent_supports.front();
+        for (size_t near_index : near_indices) {
+            if (near_index == index)
+                continue; // support itself
+            SupportPoint p_near = permanent_supports[near_index];
+            if ((p.pos - p_near.pos).squaredNorm() > sqr(p.head_front_radius))
+                continue; // not near point
+            // IMPROVE: investigate neighbors of the near point
+            
+            // TODO: inform user about skip near point
+            assert(false);
+            permanent_supports[near_index].head_front_radius = -1.0f; // mark for erase
+        }
+    }
+
+    permanent_supports.erase(std::remove_if(permanent_supports.begin(), permanent_supports.end(), 
+        [](const SupportPoint &p) { return p.head_front_radius < 0.f; }),permanent_supports.end());
+
+    std::sort(permanent_supports.begin(), permanent_supports.end(), 
+        [](const SupportPoint& p1,const SupportPoint& p2){ return p1.pos.z() < p2.pos.z(); });
 }
+
+} // namespace
 
 SLAPrint::Steps::Steps(SLAPrint *print)
     : m_print{print}
@@ -469,6 +539,29 @@ template<class Cont> BoundingBoxf3 csgmesh_positive_bb(const Cont &csg)
     return bb3d;
 }
 
+void SLAPrint::Steps::prepare_for_generate_supports(SLAPrintObject &po) {
+    using namespace sla;
+    std::vector<ExPolygons> slices = po.get_model_slices(); // copy
+    const std::vector<float> &heights = po.m_model_height_levels;
+#ifdef USE_ISLAND_GUI_FOR_SETTINGS
+    const PrepareSupportConfig &prepare_cfg = SampleConfigFactory::get_sample_config(po.config().support_head_front_diameter).prepare_config; // use configuration edited by GUI
+#else // USE_ISLAND_GUI_FOR_SETTINGS
+    const PrepareSupportConfig prepare_cfg; // use Default values of the configuration
+#endif // USE_ISLAND_GUI_FOR_SETTINGS
+    ThrowOnCancel cancel = [this]() { throw_if_canceled(); };
+
+    // scaling for the sub operations
+    double d = objectstep_scale * OBJ_STEP_LEVELS[slaposSupportPoints] / 200.0;
+    double init = current_status();
+    StatusFunction status = [this, d, init](unsigned st) {
+        double current = init + st * d;
+        if (std::round(current_status()) < std::round(current))
+            report_status(current, OBJ_STEP_LABELS(slaposSupportPoints));
+    };
+    po.m_support_point_generator_data =
+        prepare_generator_data(std::move(slices), heights, prepare_cfg, cancel, status);
+}
+
 // The slicing will be performed on an imaginary 1D grid which starts from
 // the bottom of the bounding box created around the supported model. So
 // the first layer which is usually thicker will be part of the supports
@@ -512,7 +605,8 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
 
     if(slindex_it == po.m_slice_index.end())
         //TRN To be shown at the status bar on SLA slicing error.
-        throw Slic3r::RuntimeError(format("Model named: %s can not be sliced. Please check if the model is sane.", po.model_object()->name));
+        throw Slic3r::RuntimeError(format("Model named: %s can not be sliced. This can be caused by the model mesh being broken. "
+                                          "Repairing it might fix the problem.", po.model_object()->name));
 
     po.m_model_height_levels.clear();
     po.m_model_height_levels.reserve(po.m_slice_index.size());
@@ -542,6 +636,10 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     // We apply the printer correction offset here.
     apply_printer_corrections(po, soModel);
 
+    // Prepare data for the support point generator only when supports are enabled
+    if (po.m_config.supports_enable.getBool())
+        // We need to prepare data in previous step to create interactive support point generation
+        prepare_for_generate_supports(po);
 //    po.m_preview_meshes[slaposObjectSlice] = po.get_mesh_to_print();
 //    report_status(-2, "", SlicingStatus::RELOAD_SLA_PREVIEW);
 }
@@ -609,6 +707,7 @@ static void filter_support_points_by_modifiers(sla::SupportPoints &pts,
 // support points. Then we sprinkle the rest of the mesh.
 void SLAPrint::Steps::support_points(SLAPrintObject &po)
 {
+    using namespace sla;
     // If supports are disabled, we can skip the model scan.
     if(!po.m_config.supports_enable.getBool()) return;
 
@@ -627,86 +726,115 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
     BOOST_LOG_TRIVIAL(debug) << "Support point count "
                              << mo.sla_support_points.size();
 
-    // Unless the user modified the points or we already did the calculation,
-    // we will do the autoplacement. Otherwise we will just blindly copy the
-    // frontend data into the backend cache.
-    if (mo.sla_points_status != sla::PointsStatus::UserModified) {
-
-        // calculate heights of slices (slices are calculated already)
-        const std::vector<float>& heights = po.m_model_height_levels;
-
-        throw_if_canceled();
-        sla::SupportPointGenerator::Config config;
-        const SLAPrintObjectConfig& cfg = po.config();
-
-        // the density config value is in percents:
-        config.density_relative = float(cfg.support_points_density_relative / 100.f);
-        config.minimal_distance = float(cfg.support_points_minimal_distance);
-        switch (cfg.support_tree_type) {
-        case sla::SupportTreeType::Default:
-        case sla::SupportTreeType::Organic:
-            config.head_diameter = float(cfg.support_head_front_diameter);
-            break;
-        case sla::SupportTreeType::Branching:
-            config.head_diameter = float(cfg.branchingsupport_head_front_diameter);
-            break;
-        }
-
-        // scaling for the sub operations
-        double d = objectstep_scale * OBJ_STEP_LEVELS[slaposSupportPoints] / 100.0;
-        double init = current_status();
-
-        auto statuscb = [this, d, init](unsigned st)
-        {
-            double current = init + st * d;
-            if(std::round(current_status()) < std::round(current))
-                report_status(current, OBJ_STEP_LABELS(slaposSupportPoints));
-        };
-
-        // Construction of this object does the calculation.
-        throw_if_canceled();
-        sla::SupportPointGenerator auto_supports(
-            po.m_supportdata->input.emesh, po.get_model_slices(),
-            heights, config, [this]() { throw_if_canceled(); }, statuscb);
-
-        // Now let's extract the result.
-        std::vector<sla::SupportPoint>& points = auto_supports.output();
-        throw_if_canceled();
-
-        MeshSlicingParamsEx params;
-        params.closing_radius = float(po.config().slice_closing_radius.value);
-        std::vector<ExPolygons> blockers =
-            slice_volumes(po.model_object()->volumes,
-                          po.m_model_height_levels, po.trafo(), params,
-                          [](const ModelVolume *vol) {
-                              return vol->is_support_blocker();
-                          });
-
-        std::vector<ExPolygons> enforcers =
-            slice_volumes(po.model_object()->volumes,
-                          po.m_model_height_levels, po.trafo(), params,
-                          [](const ModelVolume *vol) {
-                              return vol->is_support_enforcer();
-                          });
-
-        SuppPtMask mask{blockers, enforcers, po.config().support_enforcers_only.getBool()};
-        filter_support_points_by_modifiers(points, mask, po.m_model_height_levels);
-
-        po.m_supportdata->input.pts = points;
-
-        BOOST_LOG_TRIVIAL(debug)
-            << "Automatic support points: "
-            << po.m_supportdata->input.pts.size();
-
-        // Using RELOAD_SLA_SUPPORT_POINTS to tell the Plater to pass
-        // the update status to GLGizmoSlaSupports
-        report_status(-1, _u8L("Generating support points"),
-                      SlicingStatus::RELOAD_SLA_SUPPORT_POINTS);
-    } else {
+    if (mo.sla_points_status == PointsStatus::UserModified) {
         // There are either some points on the front-end, or the user
         // removed them on purpose. No calculation will be done.
         po.m_supportdata->input.pts = po.transformed_support_points();
+        return;
     }
+    // Unless the user modified the points or we already did the calculation,
+    // we will do the autoplacement. Otherwise we will just blindly copy the
+    // frontend data into the backend cache.
+    // if (mo.sla_points_status != PointsStatus::UserModified) 
+
+    throw_if_canceled();
+    const SLAPrintObjectConfig& cfg = po.config();
+
+    // the density config value is in percents:
+    SupportPointGeneratorConfig config;
+    config.density_relative = float(cfg.support_points_density_relative / 100.f);
+        
+    switch (cfg.support_tree_type) {
+    case SupportTreeType::Default:
+    case SupportTreeType::Organic:
+        config.head_diameter = float(cfg.support_head_front_diameter);
+        break;
+    case SupportTreeType::Branching:
+        config.head_diameter = float(cfg.branchingsupport_head_front_diameter);
+        break;
+    }
+    
+    // copy current configuration for sampling islands
+#ifdef USE_ISLAND_GUI_FOR_SETTINGS
+    // use static variable to propagate data from GUI
+    config.island_configuration = SampleConfigFactory::get_sample_config(config.density_relative);
+#else // USE_ISLAND_GUI_FOR_SETTINGS
+    config.island_configuration = SampleConfigFactory::apply_density(
+            SampleConfigFactory::create(config.head_diameter), config.density_relative);
+#endif // USE_ISLAND_GUI_FOR_SETTINGS
+
+    // scaling for the sub operations
+    double d = objectstep_scale * OBJ_STEP_LEVELS[slaposSupportPoints] / 100.0;
+    double init = current_status();
+
+    auto statuscb = [this, d, init](unsigned st)
+    {
+        double current = init + st * d;
+        if(std::round(current_status()) < std::round(current))
+            report_status(current, OBJ_STEP_LABELS(slaposSupportPoints));
+    };
+
+    // Construction of this object does the calculation.
+    throw_if_canceled();
+
+    // TODO: filter small unprintable islands in slices
+    // (Island with area smaller than 1 pixel was skipped in support generator)
+
+    SupportPointGeneratorData &data = po.m_support_point_generator_data; 
+    SupportPoints &permanent_supports = data.permanent_supports;
+    const SupportPoints &object_supports = po.model_object()->sla_support_points;
+    const Transform3d& object_trafo = po.trafo();
+    const AABBMesh& emesh = po.m_supportdata->input.emesh;
+    prepare_permanent_support_points(permanent_supports, object_supports, object_trafo, emesh);
+
+    ThrowOnCancel cancel = [this]() { throw_if_canceled(); };
+    StatusFunction status = statuscb;
+    LayerSupportPoints layer_support_points = generate_support_points(data, config, cancel, status);
+
+    // Maximal move of support point to mesh surface,
+    // no more than height of layer
+    assert(po.m_model_height_levels.size() > 1);
+    double allowed_move = (po.m_model_height_levels[1] - po.m_model_height_levels[0]) +
+        std::numeric_limits<float>::epsilon();
+    SupportPoints support_points = 
+        move_on_mesh_surface(layer_support_points, emesh, allowed_move, cancel);
+
+    // The Generator count with permanent support positions but do not convert to LayerSupportPoints.
+    // To preserve permanent 3d position it is necessary to append points after move_on_mesh_surface
+    support_points.insert(support_points.end(), 
+        permanent_supports.begin(), permanent_supports.end());
+
+    throw_if_canceled();
+
+    MeshSlicingParamsEx params;
+    params.closing_radius = float(po.config().slice_closing_radius.value);
+    std::vector<ExPolygons> blockers =
+        slice_volumes(po.model_object()->volumes,
+                        po.m_model_height_levels, po.trafo(), params,
+                        [](const ModelVolume *vol) {
+                            return vol->is_support_blocker();
+                        });
+
+    std::vector<ExPolygons> enforcers =
+        slice_volumes(po.model_object()->volumes,
+                        po.m_model_height_levels, po.trafo(), params,
+                        [](const ModelVolume *vol) {
+                            return vol->is_support_enforcer();
+                        });
+
+    SuppPtMask mask{blockers, enforcers, po.config().support_enforcers_only.getBool()};
+    filter_support_points_by_modifiers(support_points, mask, po.m_model_height_levels);
+
+    po.m_supportdata->input.pts = support_points;
+
+    BOOST_LOG_TRIVIAL(debug)
+        << "Automatic support points: "
+        << po.m_supportdata->input.pts.size();
+
+    // Using RELOAD_SLA_SUPPORT_POINTS to tell the Plater to pass
+    // the update status to GLGizmoSlaSupports
+    report_status(-1, _u8L("Generating support points"),
+                    SlicingStatus::RELOAD_SLA_SUPPORT_POINTS);
 }
 
 void SLAPrint::Steps::support_tree(SLAPrintObject &po)
@@ -716,10 +844,17 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
     // If the zero elevation mode is engaged, we have to filter out all the
     // points that are on the bottom of the object
     if (is_zero_elevation(po.config())) {
-        remove_bottom_points(po.m_supportdata->input.pts,
-                             float(
-                                 po.m_supportdata->input.zoffset +
-                                 EPSILON));
+        // remove_bottom_points
+        std::vector<sla::SupportPoint> &pts = po.m_supportdata->input.pts;
+        float lvl(po.m_supportdata->input.zoffset + EPSILON); 
+
+        // get iterator to the reorganized vector end
+        auto endit = std::remove_if(pts.begin(), pts.end(), 
+            [lvl](const sla::SupportPoint &sp) {
+                return sp.pos.z() <= lvl; });
+
+        // erase all elements after the new end
+        pts.erase(endit, pts.end());
     }
 
     po.m_supportdata->input.cfg = make_support_cfg(po.m_config);
@@ -1040,7 +1175,7 @@ struct ExposureProfile {
         tilt_down_delay_ms          = int(1000 * config.tilt_down_delay.get_at(opt_id));
         tilt_up_offset_delay_ms     = int(1000 * config.tilt_up_offset_delay.get_at(opt_id));
         tilt_up_delay_ms            = int(1000 * config.tilt_up_delay.get_at(opt_id));
-        tower_hop_height_nm         = config.tower_hop_height.get_at(opt_id) * 1000000;
+        tower_hop_height_nm         = int(config.tower_hop_height.get_at(opt_id) * 1000000);
         tilt_down_offset_steps      = config.tilt_down_offset_steps.get_at(opt_id);
         tilt_down_cycles            = config.tilt_down_cycles.get_at(opt_id);
         tilt_up_offset_steps        = config.tilt_up_offset_steps.get_at(opt_id);
@@ -1148,8 +1283,7 @@ void SLAPrint::Steps::merge_slices_and_eval_stats() {
     ExposureProfile above(material_config, 1);
 
     const int           first_slow_layers   = fade_layers_cnt + first_extra_slow_layers;
-    const std::string   printer_model       = printer_config.printer_model;
-    const bool          is_prusa_print      = printer_model == "SL1" || printer_model == "SL1S" || printer_model == "M1";
+    const bool          is_prusa_print = SLAPrint::is_prusa_print(printer_config.printer_model);
 
     const auto width          = scaled<double>(printer_config.display_width.getFloat());
     const auto height         = scaled<double>(printer_config.display_height.getFloat());

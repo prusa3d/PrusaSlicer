@@ -407,7 +407,7 @@ void GCodeProcessor::TimeMachine::calculate_time(GCodeProcessorResult& result, P
         // update times for remaining time to printer stop placeholders
         auto it_stop_time = std::lower_bound(stop_times.begin(), stop_times.end(), block.g1_line_id,
             [](const StopTime& t, unsigned int value) { return t.g1_line_id < value; });
-        if (it_stop_time != stop_times.end() && it_stop_time->g1_line_id == block.g1_line_id)
+        if (it_stop_time != stop_times.end() && it_stop_time->g1_line_id >= block.g1_line_id)
             it_stop_time->elapsed_time = float(time);
     }
 
@@ -538,6 +538,7 @@ void GCodeProcessorResult::reset() {
     custom_gcode_per_print_z = std::vector<CustomGCode::Item>();
     spiral_vase_mode = false;
     conflict_result = std::nullopt;
+    sequential_collision_detected = std::nullopt;
 }
 
 const std::vector<std::pair<GCodeProcessor::EProducer, std::string>> GCodeProcessor::Producers = {
@@ -2844,12 +2845,14 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
             && m_extrusion_role != GCodeExtrusionRole::OverhangPerimeter
         )
     )) {
-        const Vec3f curr_pos(m_end_position[X], m_end_position[Y], m_end_position[Z]);
+        const AxisCoords curr_pos = m_end_position;
         const Vec3f new_pos = m_result.moves.back().position - m_extruder_offsets[m_extruder_id];
-
-        m_end_position = create_axis_coords(new_pos + m_z_offset * Vec3f::UnitZ());
+        for (unsigned char a = X; a < E; ++a) {
+            m_end_position[a] = double(new_pos[a]);
+        }
+        m_end_position[Z] += m_z_offset;
         store_move_vertex(EMoveType::Seam);
-        m_end_position = create_axis_coords(curr_pos);
+        m_end_position = curr_pos;
 
         m_seams_detector.activate(false);
     } else if (type == EMoveType::Extrude && m_extrusion_role == GCodeExtrusionRole::ExternalPerimeter) {
@@ -4002,8 +4005,10 @@ void GCodeProcessor::post_process()
                     m_statistics.add_line(out_line.length());
 #endif // NDEBUG
                     m_size += out_line.length();
+
                     // synchronize gcode lines map
-                    for (auto map_it = m_gcode_lines_map.rbegin(); map_it != m_gcode_lines_map.rbegin() + rev_it_dist - 1; ++map_it) {
+                    const auto map_end_it = rev_it_dist <= m_gcode_lines_map.size() ? m_gcode_lines_map.rbegin() + (rev_it_dist - 1) : m_gcode_lines_map.rend();
+                    for (auto map_it = m_gcode_lines_map.rbegin(); map_it != map_end_it; ++map_it) {
                         ++map_it->second;
                     }
 

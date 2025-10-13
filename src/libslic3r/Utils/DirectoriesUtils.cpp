@@ -59,10 +59,10 @@ std::optional<std::string> get_env(std::string_view key) {
     return std::string{result};
 }
 
-namespace Slic3r {
-std::optional<boost::filesystem::path> get_home_config_dir() {
+namespace {
+std::optional<boost::filesystem::path> get_home_dir(const std::string& subfolder) {
     if (auto result{get_env("HOME")}) {
-        return *result + "/.config";
+        return *result + subfolder;
     } else {
         std::optional<std::string> user_name{get_env("USER")};
         if (!user_name) {
@@ -78,10 +78,20 @@ std::optional<boost::filesystem::path> get_home_config_dir() {
             who = getpwuid(getuid());
         }
         if (who) {
-            return std::string{who->pw_dir} + "/.config";
+            return std::string{who->pw_dir} + subfolder;
         }
     }
     return std::nullopt;
+}
+}
+
+namespace Slic3r {
+std::optional<boost::filesystem::path> get_home_config_dir() {
+    return get_home_dir("/.config");
+}
+
+std::optional<boost::filesystem::path> get_home_local_dir() {
+    return get_home_dir("/.local");
 }
 }
 

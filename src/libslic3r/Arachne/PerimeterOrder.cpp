@@ -162,9 +162,14 @@ struct GroupedPerimeterExtrusions
 };
 
 // Returns vector of indexes that represent the order of grouped extrusions in grouped_extrusions.
-static std::vector<size_t> order_of_grouped_perimeter_extrusions_to_minimize_distances(Point current_position, std::vector<GroupedPerimeterExtrusions> grouped_extrusions) {
+static std::vector<size_t> order_of_grouped_perimeter_extrusions_to_minimize_distances(const std::vector<GroupedPerimeterExtrusions> &grouped_extrusions, Point current_position) {
+    std::vector<size_t> grouped_extrusions_sorted_indices(grouped_extrusions.size());
+    std::iota(grouped_extrusions_sorted_indices.begin(), grouped_extrusions_sorted_indices.end(), 0);
+
     // Ensure that holes will be placed before contour and open extrusions before the closed one.
-    std::sort(grouped_extrusions.begin(), grouped_extrusions.end(), [](const GroupedPerimeterExtrusions &l, const GroupedPerimeterExtrusions &r) -> bool {
+    std::sort(grouped_extrusions_sorted_indices.begin(), grouped_extrusions_sorted_indices.end(), [&grouped_extrusions = std::as_const(grouped_extrusions)](const size_t l_idx, const size_t r_idx) -> bool {
+        const GroupedPerimeterExtrusions &l = grouped_extrusions[l_idx];
+        const GroupedPerimeterExtrusions &r = grouped_extrusions[r_idx];
         return (l.external_perimeter_extrusion->is_contour() <  r.external_perimeter_extrusion->is_contour()) ||
                (l.external_perimeter_extrusion->is_contour() == r.external_perimeter_extrusion->is_contour()  && l.external_perimeter_extrusion->is_closed() < r.external_perimeter_extrusion->is_closed());
     });
@@ -181,8 +186,9 @@ static std::vector<size_t> order_of_grouped_perimeter_extrusions_to_minimize_dis
         bool   is_nearest_closed              = false;
 
         // First we order all holes and then we start ordering contours.
-        const size_t grouped_extrusion_end = grouped_extrusions_order.size() < holes_cnt ? holes_cnt: grouped_extrusions.size();
-        for (size_t grouped_extrusion_idx = 0; grouped_extrusion_idx < grouped_extrusion_end; ++grouped_extrusion_idx) {
+        const size_t grouped_extrusions_sorted_indices_end = (grouped_extrusions_order.size() < holes_cnt) ? holes_cnt : grouped_extrusions_sorted_indices.size();
+        for (size_t grouped_extrusions_sorted_idx = 0; grouped_extrusions_sorted_idx < grouped_extrusions_sorted_indices_end; ++grouped_extrusions_sorted_idx) {
+            const size_t grouped_extrusion_idx = grouped_extrusions_sorted_indices[grouped_extrusions_sorted_idx];
             if (already_selected[grouped_extrusion_idx])
                 continue;
 
@@ -200,6 +206,7 @@ static std::vector<size_t> order_of_grouped_perimeter_extrusions_to_minimize_dis
 
         grouped_extrusions_order.emplace_back(nearest_grouped_extrusions_idx);
         already_selected[nearest_grouped_extrusions_idx]             = true;
+
         const GroupedPerimeterExtrusions &nearest_grouped_extrusions = grouped_extrusions[nearest_grouped_extrusions_idx];
         const ExtrusionLine              &last_extrusion_line        = nearest_grouped_extrusions.extrusions.back()->extrusion;
         current_position                                             = get_end_position(last_extrusion_line);
@@ -257,7 +264,7 @@ static PerimeterExtrusions extract_ordered_perimeter_extrusions(const PerimeterE
             std::reverse(grouped_extrusions.back().extrusions.begin(), grouped_extrusions.back().extrusions.end());
     }
 
-    const std::vector<size_t> grouped_extrusion_order = order_of_grouped_perimeter_extrusions_to_minimize_distances(Point::Zero(), grouped_extrusions);
+    const std::vector<size_t> grouped_extrusion_order = order_of_grouped_perimeter_extrusions_to_minimize_distances(grouped_extrusions, Point::Zero());
 
     PerimeterExtrusions ordered_extrusions;
     for (size_t order_idx : grouped_extrusion_order) {

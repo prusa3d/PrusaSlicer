@@ -2,11 +2,13 @@
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/SVG.hpp"
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <libslic3r/LayerRegion.hpp>
 
 using namespace Slic3r;
 using namespace Slic3r::Algorithm;
+using namespace Catch;
 
 constexpr bool export_svgs = false;
 

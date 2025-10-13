@@ -1419,21 +1419,31 @@ namespace Slic3r {
                 std::vector<sla::SupportPoint> sla_support_points;
 
                 if (version == 0) {
+                    assert(object_data_points.size() % 3 == 0);
                     for (unsigned int i=0; i<object_data_points.size(); i+=3)
-                    sla_support_points.emplace_back(float(std::atof(object_data_points[i+0].c_str())),
+                        sla_support_points.push_back(sla::SupportPoint{Vec3f(
+                                                    float(std::atof(object_data_points[i+0].c_str())),
                                                     float(std::atof(object_data_points[i+1].c_str())),
-													float(std::atof(object_data_points[i+2].c_str())),
-                                                    0.4f,
-                                                    false);
+													float(std::atof(object_data_points[i+2].c_str()))),
+                                                    0.4f});
                 }
                 if (version == 1) {
+                    auto get_support_point_type = [](double val)->sla::SupportPointType{
+                        return (std::abs(val - 1.) < EPSILON) ? sla::SupportPointType::island :
+                               (std::abs(val - 2.) < EPSILON) ? sla::SupportPointType::manual_add :
+                               //(std::abs(val - 3.) < EPSILON) ? sla::SupportPointType::slope :
+                                sla::SupportPointType::slope; // default for previous version of store points
+                    };
+                    assert(object_data_points.size() % 5 == 0);
                     for (unsigned int i=0; i<object_data_points.size(); i+=5)
-                    sla_support_points.emplace_back(float(std::atof(object_data_points[i+0].c_str())),
-                                                    float(std::atof(object_data_points[i+1].c_str())),
-                                                    float(std::atof(object_data_points[i+2].c_str())),
-                                                    float(std::atof(object_data_points[i+3].c_str())),
-													//FIXME storing boolean as 0 / 1 and importing it as float.
-                                                    std::abs(std::atof(object_data_points[i+4].c_str()) - 1.) < EPSILON);
+                        sla_support_points.push_back(
+                            sla::SupportPoint{
+                                Vec3f{float(std::atof(object_data_points[i+0].c_str())),
+                                      float(std::atof(object_data_points[i+1].c_str())),
+                                      float(std::atof(object_data_points[i+2].c_str()))},
+                                float(std::atof(object_data_points[i+3].c_str())),
+                                get_support_point_type(std::atof(object_data_points[i+4].c_str()))
+                            });
                 }
 
                 if (!sla_support_points.empty())
@@ -1618,7 +1628,7 @@ namespace Slic3r {
                     continue;
                 int bed_idx = 0;
                 try {
-                    bed_block.second.get<int>("<xmlattr>.bed_idx");
+                    bed_idx = bed_block.second.get<int>("<xmlattr>.bed_idx");
                 } catch (const boost::property_tree::ptree_bad_path&) {
                     // Probably an old project with no bed_idx info. Imagine that we saw 0.
                 }
@@ -3539,10 +3549,22 @@ namespace Slic3r {
             if (!sla_support_points.empty()) {
                 sprintf(buffer, "object_id=%d|", count);
                 out += buffer;
-
+                auto support_point_type_to_float = [](sla::SupportPointType t) -> float {
+                    switch (t) {
+                    case Slic3r::sla::SupportPointType::manual_add: return 2.f;
+                    case Slic3r::sla::SupportPointType::island: return 1.f;
+                    case Slic3r::sla::SupportPointType::slope: return 3.f;
+                    default: assert(false); return 0.f;
+                    }
+                };
                 // Store the layer height profile as a single space separated list.
                 for (size_t i = 0; i < sla_support_points.size(); ++i) {
-                    sprintf(buffer, (i==0 ? "%f %f %f %f %f" : " %f %f %f %f %f"),  sla_support_points[i].pos(0), sla_support_points[i].pos(1), sla_support_points[i].pos(2), sla_support_points[i].head_front_radius, (float)sla_support_points[i].is_new_island);
+                    sprintf(buffer, (i==0 ? "%f %f %f %f %f" : " %f %f %f %f %f"), 
+                        sla_support_points[i].pos(0), 
+                        sla_support_points[i].pos(1), 
+                        sla_support_points[i].pos(2),
+                        sla_support_points[i].head_front_radius,
+                        support_point_type_to_float(sla_support_points[i].type));
                     out += buffer;
                 }
                 out += "\n";
@@ -3888,8 +3910,10 @@ bool _3MF_Exporter::_add_wipe_tower_information_file_to_archive( mz_zip_archive&
 }
 
 // Perform conversions based on the config values available.
-static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config, const boost::optional<Semver>& prusaslicer_generator_version)
-{
+static void handle_legacy_project_loaded(
+    DynamicPrintConfig& config,
+    const boost::optional<Semver>& prusaslicer_generator_version
+) {
     if (! config.has("brim_separation")) {
         if (auto *opt_elephant_foot   = config.option<ConfigOptionFloat>("elefant_foot_compensation", false); opt_elephant_foot) {
             // Conversion from older PrusaSlicer which applied brim separation equal to elephant foot compensation.
@@ -3897,7 +3921,7 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
             opt_brim_separation->value = opt_elephant_foot->value;
         }
     }
-    
+
     // In PrusaSlicer 2.5.0-alpha2 and 2.5.0-alpha3, we introduce several parameters for Arachne that depend
     // on nozzle size . Later we decided to make default values for those parameters computed automatically
     // until the user changes them.
@@ -3916,37 +3940,62 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
     }
 }
 
-bool is_project_3mf(const std::string& filename)
+// Project = either it contains our config OR it is stamped as being produced
+// by PrusaSlicer (in which case the version is passed out).
+std::pair<bool, std::optional<Semver>> is_project_3mf(const std::string& filename)
 {
+    std::pair<bool, std::optional<Semver>> out = std::make_pair(false, std::nullopt);
+
     mz_zip_archive archive;
     mz_zip_zero_struct(&archive);
 
     if (!open_zip_reader(&archive, filename))
-        return false;
+        return out;
+    ScopeGuard guard([&archive]() {close_zip_reader(&archive); });
 
     mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
 
     // loop the entries to search for config
     mz_zip_archive_file_stat stat;
-    bool config_found = false;
     for (mz_uint i = 0; i < num_entries; ++i) {
         if (mz_zip_reader_file_stat(&archive, i, &stat)) {
+            if (mz_zip_reader_is_file_a_directory(&archive, i))
+                continue;
             std::string name(stat.m_filename);
             std::replace(name.begin(), name.end(), '\\', '/');
-
-            if (boost::algorithm::iequals(name, PRINT_CONFIG_FILE)) {
-                config_found = true;
-                break;
+            if (boost::algorithm::iequals(name, PRINT_CONFIG_FILE))
+                out.first = true;
+            if (boost::algorithm::iequals(name, MODEL_FILE)) {
+                if (auto* iter = mz_zip_reader_extract_iter_new(&archive, i, 0)) {
+                    ScopeGuard g([&iter]() { mz_zip_reader_extract_iter_free(iter); });
+                    char buffer[1024];
+                    memset(buffer, 0, sizeof(buffer));
+                    if (size_t bytes_read = mz_zip_reader_extract_iter_read(iter, buffer, sizeof(buffer)); bytes_read > 0) {
+                        std::string header(buffer);
+                        boost::regex pattern(R"(^\s*<metadata name="Application".*?PrusaSlicer-(.*?)</metadata>$)");
+                        boost::sregex_iterator it(header.begin(), header.end(), pattern);
+                        boost::sregex_iterator end;
+                        if (it != end) {
+                            Semver semver;
+                            semver.parse((*it)[1].str());
+                            out.second = semver;
+                        }
+                    }
+                }
             }
         }
     }
-
-    close_zip_reader(&archive);
-
-    return config_found;
+    return out;
 }
 
-bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model* model, bool check_version)
+bool load_3mf(
+    const char* path,
+    DynamicPrintConfig& config,
+    ConfigSubstitutionContext& config_substitutions,
+    Model* model,
+    bool check_version,
+    boost::optional<Semver> &prusaslicer_generator_version
+)
 {
     if (path == nullptr || model == nullptr)
         return false;
@@ -3956,7 +4005,8 @@ bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionCo
     _3MF_Importer         importer;
     bool res = importer.load_model_from_file(path, *model, config, config_substitutions, check_version);
     importer.log_errors();
-    handle_legacy_project_loaded(importer.version(), config, importer.prusaslicer_generator_version());
+    handle_legacy_project_loaded(config, importer.prusaslicer_generator_version());
+    prusaslicer_generator_version = importer.prusaslicer_generator_version();
 
     return res;
 }

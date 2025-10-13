@@ -1363,7 +1363,9 @@ static void chain_open_polylines_close_gaps(std::vector<OpenPolyline>           
                     opl->points.pop_back();
                 } else {
                     // The end points are different, keep both of them.
-                    midpoint_inserted = handle_color_at_gap_between_open_polylines<mesh_info>(*opl, opl->points.front(), opl->colors.front());
+                    if constexpr (mesh_info == AdditionalMeshInfo::Color) {
+                        midpoint_inserted = handle_color_at_gap_between_open_polylines<mesh_info>(*opl, opl->points.front(), opl->colors.front());
+                    }
                 }
 
                 // When we split the gap into two pieces by adding a midpoint, then a valid polygon has at least 4 points.
@@ -2434,7 +2436,10 @@ Polygons project_mesh(
     std::vector<Polygons> top, bottom;
     std::vector<float>    zs { -1e10, 1e10 };
     slice_mesh_slabs(mesh, zs, trafo, &top, &bottom, throw_on_cancel);
-    return union_(top.front(), bottom.back());
+
+    // We typically perform a union operation on a lot of overlapping polygons, which can be slow in some cases.
+    // To address this, we use parallel reduction, which can be significantly faster in such cases.
+    return union_(union_parallel_reduce(top.front()), union_parallel_reduce(bottom.back()));
 }
 
 void cut_mesh(const indexed_triangle_set &mesh, float z, indexed_triangle_set *upper, indexed_triangle_set *lower, bool triangulate_caps)

@@ -216,7 +216,17 @@ void SceneBuilder::build_arrangeable_slicer_model(ArrangeableSlicerModel &amodel
     if (m_fff_print && !m_xl_printer)
         m_xl_printer = is_XL_printer(m_fff_print->config());
 
-    const bool has_wipe_tower = !m_wipetower_handlers.empty();
+    const bool has_wipe_tower{std::any_of(
+        m_wipetower_handlers.begin(),
+        m_wipetower_handlers.end(),
+        [](const AnyPtr<WipeTowerHandler> &handler){
+            bool is_on_current_bed{false};
+            handler->visit([&](const Arrangeable &arrangeable){
+                is_on_current_bed = arrangeable.get_bed_index() == s_multiple_beds.get_active_bed();
+            });
+            return is_on_current_bed;
+        }
+    )};
 
     if (m_xl_printer && !has_wipe_tower) {
         m_bed = XLBed{bounding_box(m_bed), bed_gap(m_bed)};

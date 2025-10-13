@@ -1,4 +1,5 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <cstdlib>
 
@@ -11,6 +12,7 @@
 #include "test_data.hpp"
 
 using namespace Slic3r;
+using namespace Catch;
 
 static inline Slic3r::Point random_point(float LO=-50, float HI=50) 
 {

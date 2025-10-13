@@ -266,8 +266,8 @@ void TopBarItemsCtrl::CreateSearch()
 
     m_search->Bind(wxEVT_KILL_FOCUS, [](wxFocusEvent& e)
     {
-        e.Skip();
         wxGetApp().searcher().check_and_hide_dialog();
+        e.Skip();
     });
 
     wxTextCtrl* ctrl = m_search->GetTextCtrl();
@@ -303,6 +303,8 @@ void TopBarItemsCtrl::TriggerSearch()
     {
     	wxGetApp().searcher().set_search_input(m_search);
         wxGetApp().show_search_dialog();
+        wxTextCtrl* ctrl = m_search->GetTextCtrl();
+        ctrl->SetFocus(); // set focus back to search bar for typing
 	}
 }
 

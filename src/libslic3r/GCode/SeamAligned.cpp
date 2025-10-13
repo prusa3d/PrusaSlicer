@@ -41,42 +41,17 @@ const Perimeters::Perimeter::OptionalPointTree &pick_tree(
     throw std::runtime_error("Point tree for classification does not exist.");
 }
 
-unsigned point_value(PointType point_type, PointClassification point_classification) {
-    // Better be explicit than smart.
-    switch (point_type) {
-    case PointType::enforcer:
-        switch (point_classification) {
-        case PointClassification::embedded: return 9;
-        case PointClassification::common: return 8;
-        case PointClassification::overhang: return 7;
-        }
-    case PointType::common:
-        switch (point_classification) {
-        case PointClassification::embedded: return 6;
-        case PointClassification::common: return 5;
-        case PointClassification::overhang: return 4;
-        }
-    case PointType::blocker:
-        switch (point_classification) {
-        case PointClassification::embedded: return 3;
-        case PointClassification::common: return 2;
-        case PointClassification::overhang: return 1;
-        }
-    }
-    return 0;
-}
-
 SeamChoice pick_seam_option(const Perimeters::Perimeter &perimeter, const SeamOptions &options) {
     const std::vector<PointType> &types{perimeter.point_types};
     const std::vector<PointClassification> &classifications{perimeter.point_classifications};
     const std::vector<Vec2d> &positions{perimeter.positions};
 
     unsigned closeset_point_value =
-        point_value(types.at(options.closest), classifications[options.closest]);
+        get_point_value(types.at(options.closest), classifications[options.closest]);
 
     if (options.snapped) {
         unsigned snapped_point_value =
-            point_value(types.at(*options.snapped), classifications[*options.snapped]);
+            get_point_value(types.at(*options.snapped), classifications[*options.snapped]);
         if (snapped_point_value >= closeset_point_value) {
             const Vec2d position{positions.at(*options.snapped)};
             return {*options.snapped, *options.snapped, position};
@@ -84,7 +59,7 @@ SeamChoice pick_seam_option(const Perimeters::Perimeter &perimeter, const SeamOp
     }
 
     unsigned adjacent_point_value =
-        point_value(types.at(options.adjacent), classifications[options.adjacent]);
+        get_point_value(types.at(options.adjacent), classifications[options.adjacent]);
     if (adjacent_point_value < closeset_point_value) {
         const Vec2d position = positions[options.closest];
         return {options.closest, options.closest, position};

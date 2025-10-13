@@ -418,14 +418,14 @@ void PresetArchiveDatabase::set_installed_printer_repositories(const std::vector
         
         if (selected_uuid.empty() && unselected_uuid.empty()) {
             // there is id in used_ids that is not in m_archive_repositories - BAD
-            assert(true);
+            assert(false);
             continue;
         } else if (selected_uuid.size() == 1){
             // regular case
              m_has_installed_printer_repositories_uuid[selected_uuid.front()] = true;
         } else if (selected_uuid.size() > 1) {
             // this should not happen, only one repo of same id should be selected (online / local conflict)
-            assert(true);
+            assert(false);
             // select first one to solve the conflict
             m_has_installed_printer_repositories_uuid[selected_uuid.front()] = true;
             // unselect the rest
@@ -517,7 +517,7 @@ void PresetArchiveDatabase::load_app_manifest_json()
 		file.close();
 	}
 	else {
-		assert(true);
+		assert(false);
 		BOOST_LOG_TRIVIAL(error) << "Failed to read Archive Source Manifest at " << path;
 	}
 	if (data.empty()) {
@@ -544,14 +544,14 @@ void PresetArchiveDatabase::load_app_manifest_json()
 				if(const auto used = subtree.second.get_optional<bool>("selected"); used) {
                     m_selected_repositories_uuid[uuid] = extracted && *used;
 				} else {
-					assert(true);
+					assert(false);
                     m_selected_repositories_uuid[uuid] = extracted;
 				}
 				// "has_installed_printers" flag
                 if (const auto used = subtree.second.get_optional<bool>("has_installed_printers"); used) {
                     m_has_installed_printer_repositories_uuid[uuid] = extracted && *used;
                 } else {
-                    assert(true);
+                    assert(false);
                     m_has_installed_printer_repositories_uuid[uuid] = false;
                 }
 				m_archive_repositories.emplace_back(std::make_unique<LocalArchiveRepository>(std::move(uuid), std::move(manifest), extracted));
@@ -562,7 +562,7 @@ void PresetArchiveDatabase::load_app_manifest_json()
 			ArchiveRepository::RepositoryManifest manifest;
 			std::string uuid = get_next_uuid();
 			if (!extract_repository_header(subtree.second, manifest)) {
-				assert(true);
+				assert(false);
 				BOOST_LOG_TRIVIAL(error) << "Failed to read one of source headers.";
 				continue;
 			}
@@ -570,14 +570,14 @@ void PresetArchiveDatabase::load_app_manifest_json()
 			if (const auto used = subtree.second.get_optional<bool>("selected"); used) {
 				m_selected_repositories_uuid[uuid] = *used;
 			} else {
-				assert(true);
+				assert(false);
                 m_selected_repositories_uuid[uuid] = true;
 			}
             // "has_installed_printers" flag
             if (const auto used = subtree.second.get_optional<bool>("has_installed_printers"); used) {
                 m_has_installed_printer_repositories_uuid[uuid] = *used;
             } else {
-                assert(true);
+                assert(false);
                 m_has_installed_printer_repositories_uuid[uuid] = false;
             }
 			m_archive_repositories.emplace_back(std::make_unique<OnlineArchiveRepository>(std::move(uuid), std::move(manifest)));
@@ -679,7 +679,7 @@ void PresetArchiveDatabase::save_app_manifest_json() const
 		file << data;
 		file.close();
 	} else {
-		assert(true);
+		assert(false);
 		BOOST_LOG_TRIVIAL(error) << "Failed to write Archive Repository Manifest to " << path;
 	}
 }
@@ -757,7 +757,7 @@ void PresetArchiveDatabase::read_server_manifest(const std::string& json_body)
 	for (const auto& subtree : ptree) {
 		ArchiveRepository::RepositoryManifest manifest;
 		if (!extract_repository_header(subtree.second, manifest)) {
-			assert(true);
+			assert(false);
 			BOOST_LOG_TRIVIAL(error) << "Failed to read one of repository headers.";
 			continue;
 		}
@@ -786,6 +786,7 @@ void PresetArchiveDatabase::read_server_manifest(const std::string& json_body)
             ) == m_archive_repositories.end())
 		{
             ArchiveRepository::RepositoryManifest manifest(repo_ptr->get_manifest());
+            manifest.not_in_manifest = true;
             m_archive_repositories.emplace_back(std::make_unique<OnlineArchiveRepository>(repo_ptr->get_uuid(), std::move(manifest)));
 	    }
 	}
@@ -809,8 +810,7 @@ SharedArchiveRepositoryVector PresetArchiveDatabase::get_selected_archive_reposi
 {
     SharedArchiveRepositoryVector result;
     result.reserve(m_archive_repositories.size());
-    for (const auto &repo_ptr : m_archive_repositories) 
-    {
+    for (const auto &repo_ptr : m_archive_repositories) {
         auto it = m_selected_repositories_uuid.find(repo_ptr->get_uuid());
         assert(it != m_selected_repositories_uuid.end());
         if (it->second) {

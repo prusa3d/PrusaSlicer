@@ -112,7 +112,9 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::SnapMarker            , "snap"                          },
     {ImGui::HorizontalHide        , "horizontal_hide"               },
     {ImGui::HorizontalShow        , "horizontal_show"               },
-    {ImGui::SliceAllBtnIcon       , "slice_all"                     },
+    {ImGui::PrintIdle             , "print_idle"                    },
+    {ImGui::PrintRunning          , "print_running"                 },
+    {ImGui::PrintFinished         , "print_finished"                },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
@@ -176,6 +178,8 @@ static const std::map<const wchar_t, std::string> font_icons_medium = {
 
 static const std::map<const wchar_t, std::string> font_icons_extra_large = {
     {ImGui::ClippyMarker            , "notification_clippy"             },
+    {ImGui::SliceAllBtnIcon         , "slice_all"                       },
+    {ImGui::WarningMarkerDisabled   , "notification_warning_grey"       },
 };
 
 ImGuiWrapper::ImGuiWrapper()

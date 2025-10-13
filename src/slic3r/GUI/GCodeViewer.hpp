@@ -115,6 +115,7 @@ public:
         class Marker
         {
             GLModel m_model;
+            GLModel m_model_ht90_rod;
             Vec3f m_world_position;
             // For seams, the position of the marker is on the last endpoint of the toolpath containing it.
             // This offset is used to show the correct value of tool position in the "ToolPosition" window.
@@ -127,14 +128,21 @@ public:
             bool m_visible{ true };
             bool m_fixed_screen_size{ false };
             float m_scale_factor{ 1.0f };
+            bool m_generic_marker{ true };
+            bool m_is_ht90{false};
 #if ENABLE_ACTUAL_SPEED_DEBUG
             ActualSpeedImguiWidget m_actual_speed_imgui_widget;
 #endif // ENABLE_ACTUAL_SPEED_DEBUG
 
         public:
-            void init();
+            void init(std::optional<std::unique_ptr<GLModel>>& model_opt, bool is_ht90);
 
-            const BoundingBoxf3& get_bounding_box() const { return m_model.get_bounding_box(); }
+            BoundingBoxf3 get_bounding_box() const {
+                auto bb = m_model.get_bounding_box();
+                if (m_is_ht90)
+                    bb.max.z() += scale_(400);
+                return bb;
+            }
 
             void set_world_position(const Vec3f& position) { m_world_position = position; }
             void set_world_offset(const Vec3f& offset) { m_world_offset = offset; }
@@ -260,6 +268,7 @@ private:
     bool m_contained_in_bed{ true };
 
     ConflictResultOpt m_conflict_result;
+    std::optional<std::pair<std::string, std::string>> m_sequential_collision_detected;
 
     libvgcode::Viewer m_viewer;
     bool m_loaded_as_preview{ false };
@@ -356,6 +365,7 @@ public:
     void invalidate_legend() { m_legend_resizer.reset(); }
 
     const ConflictResultOpt& get_conflict_result() const { return m_conflict_result; }
+    std::optional<std::pair<std::string, std::string>> get_sequential_collision_detected() const { return m_sequential_collision_detected; }
 
     void load_shells(const Print& print);
 

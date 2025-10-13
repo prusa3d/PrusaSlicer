@@ -4,6 +4,8 @@
 #include <boost/log/trivial.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <boost/filesystem.hpp>
+#include <regex>
+#include <boost/nowide/convert.hpp>
 
 #ifdef _WIN32
 #include <windows.h>

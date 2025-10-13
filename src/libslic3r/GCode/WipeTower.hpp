@@ -277,6 +277,7 @@ private:
 
 	bool   m_semm               = true; // Are we using a single extruder multimaterial printer?
 	bool   m_is_mk4mmu3         = false;
+    bool   m_switch_filament_monitoring = false;
     Vec2f  m_wipe_tower_pos; 			// Left front corner of the wipe tower in mm.
 	float  m_wipe_tower_width; 			// Width of the wipe tower.
 	float  m_wipe_tower_depth 	= 0.f; 	// Depth of the wipe tower

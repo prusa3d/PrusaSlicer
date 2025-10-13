@@ -305,9 +305,11 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                     }
                 }
                 else {
-                    show_error(m_parent, _L("Input value is out of range"));
-                    if (m_opt.min > val) val = m_opt.min;
-                    if (val > m_opt.max) val = m_opt.max;
+                    if (val < (m_opt.min - EPSILON) || val > (m_opt.max + EPSILON)) {
+                        show_error(m_parent, _L("Input value is out of range"));
+                    }
+
+                    val = std::clamp(static_cast<float>(val), m_opt.min, m_opt.max);
                     set_value(double_to_string(val), true);
                 }
             }

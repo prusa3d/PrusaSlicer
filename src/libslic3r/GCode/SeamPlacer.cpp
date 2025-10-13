@@ -40,8 +40,6 @@ ObjectLayerPerimeters get_perimeters(
             print_object->layers(), params.perimeter.elephant_foot_compensation
         )};
         const std::vector<Geometry::BoundedPolygons> projected{
-            print_object->config().seam_position == spRandom ?
-            Geometry::convert_to_geometry(extrusions) :
             Geometry::project_to_geometry(extrusions, params.max_distance)
         };
         Perimeters::LayerPerimeters perimeters{Perimeters::create_perimeters(projected, layer_infos, painting, params.perimeter)};
@@ -137,7 +135,7 @@ Params Placer::get_params(const DynamicPrintConfig &config) {
     params.max_distance = 5.0;
     params.perimeter.oversampling_max_distance = 0.2;
     params.perimeter.embedding_threshold = 0.5;
-    params.perimeter.painting_radius = 0.1;
+    params.perimeter.painting_radius = 0.05;
     params.perimeter.simplification_epsilon = 0.001;
     params.perimeter.smooth_angle_arm_length = 0.5;
     params.perimeter.sharp_angle_arm_length = 0.25;
@@ -235,14 +233,50 @@ SeamChoice to_seam_choice(
     return result;
 }
 
+Geometry::Direction1D get_direction(
+    const bool flipped,
+    const ExPolygon &perimeter_polygon,
+    const ExtrusionLoop &loop
+) {
+    using Dir = Geometry::Direction1D;
+
+    Dir result{flipped ? Dir::forward : Dir::backward};
+
+    // In rare cases it may happen that the original geometry perimeter
+    // polygon has different direction to the actual extrusion loop.
+    // In that case the logic is exactly opposite.
+    if (perimeter_polygon.contour.is_clockwise() != loop.is_clockwise()) {
+        result = result == Dir::forward ? Dir::backward : Dir::forward;
+    }
+    return result;
+}
+
+unsigned get_seam_choice_value(const SeamChoice &seam_choice, const Perimeters::Perimeter& perimeter) {
+    const unsigned previous_value{Perimeters::get_point_value(
+        perimeter.point_types[seam_choice.previous_index],
+        perimeter.point_classifications[seam_choice.previous_index]
+    )};
+
+    const unsigned next_value{Perimeters::get_point_value(
+        perimeter.point_types[seam_choice.next_index],
+        perimeter.point_classifications[seam_choice.next_index]
+    )};
+
+    return std::max(previous_value, next_value);
+}
+
 boost::variant<Point, Scarf::Scarf> finalize_seam_position(
     const ExtrusionLoop &loop,
     const PrintRegion *region,
     SeamChoice seam_choice,
     const Perimeters::Perimeter &perimeter,
     const bool staggered_inner_seams,
-    const bool flipped
+    const bool flipped,
+    const bool thick_bridges
 ) {
+    using Perimeters::offset_along_perimeter;
+    using Perimeters::PointOnPerimeter;
+
     const Polygon loop_polygon{Geometry::to_polygon(loop)};
     const bool do_staggering{staggered_inner_seams && loop.role() == ExtrusionRole::Perimeter};
     const double loop_width{loop.paths.empty() ? 0.0 : loop.paths.front().width()};
@@ -255,8 +289,26 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
     auto [loop_line_index, loop_point]{
         project_to_extrusion_loop(seam_choice, perimeter, distancer)};
 
-    const Geometry::Direction1D offset_direction{
-        flipped ? Geometry::Direction1D::forward : Geometry::Direction1D::backward};
+    const Geometry::Direction1D offset_direction{get_direction(flipped, perimeter_polygon, loop)};
+
+    const auto offset_stop_condition{
+        [choice_value = get_seam_choice_value(seam_choice, perimeter)](
+            const Perimeters::Perimeter &perimeter, const std::size_t index
+        ) {
+            const unsigned current_point_value{Perimeters::get_point_value(
+                perimeter.point_types[index], perimeter.point_classifications[index]
+            )};
+            if (
+                current_point_value < choice_value
+                && (
+                    perimeter.point_types[index] == Perimeters::PointType::blocker
+                    || perimeter.point_classifications[index] == Perimeters::PointClassification::overhang
+                )
+            ) {
+                return true;
+            }
+            return false;
+        }};
 
     // ExtrusionRole::Perimeter is inner perimeter.
     if (do_staggering) {
@@ -265,13 +317,16 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
 
         const double staggering_offset{depth};
 
-        std::optional<Geometry::PointOnLine> staggered_point{Geometry::offset_along_lines(
-            loop_point, seam_choice.previous_index, perimeter_lines, staggering_offset,
-            offset_direction
+        std::optional<PointOnPerimeter> staggered_point{offset_along_perimeter(
+            {seam_choice.previous_index, seam_choice.next_index, loop_point},
+            perimeter,
+            staggering_offset,
+            offset_direction,
+            offset_stop_condition
         )};
 
         if (staggered_point) {
-            seam_choice = to_seam_choice(*staggered_point, perimeter);
+            seam_choice = *staggered_point;
             std::tie(loop_line_index, loop_point) = project_to_extrusion_loop(seam_choice, perimeter, distancer);
         }
     }
@@ -285,11 +340,24 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
         perimeter.angle_types[seam_choice.previous_index] == Perimeters::AngleType::smooth
     };
 
+    if (perimeter.layer_index == 0) {
+        place_scarf_seam = false;
+    }
+
     if (region->config().scarf_seam_only_on_smooth && !is_smooth) {
         place_scarf_seam = false;
     }
 
     if (region->config().scarf_seam_length.value <= std::numeric_limits<double>::epsilon()) {
+        place_scarf_seam = false;
+    }
+
+    const bool is_overhang{
+        perimeter.point_classifications[seam_choice.previous_index] == Perimeters::PointClassification::overhang
+        || perimeter.point_classifications[seam_choice.next_index] == Perimeters::PointClassification::overhang
+    };
+
+    if (thick_bridges && is_overhang) {
         place_scarf_seam = false;
     }
 
@@ -300,28 +368,32 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
         scarf.start_height = std::min(region->config().scarf_seam_start_height.get_abs_value(1.0), 1.0);
 
         const double offset{scarf.entire_loop ? 0.0 : region->config().scarf_seam_length.value};
-        const std::optional<Geometry::PointOnLine> outter_scarf_start_point{Geometry::offset_along_lines(
-            seam_choice.position,
-            seam_choice.previous_index,
-            perimeter_lines,
+        const std::optional<PointOnPerimeter> outter_scarf_start_point{offset_along_perimeter(
+            seam_choice,
+            perimeter,
             offset,
-            offset_direction
+            offset_direction,
+            offset_stop_condition
         )};
         if (!outter_scarf_start_point) {
             return scaled(loop_point);
         }
 
         if (loop.role() != ExtrusionRole::Perimeter) { // Outter perimeter
-            scarf.start_point = scaled(project_to_extrusion_loop(
-                to_seam_choice(*outter_scarf_start_point, perimeter),
+            const Vec2d start_point_candidate{project_to_extrusion_loop(
+                *outter_scarf_start_point,
                 perimeter,
                 distancer
-            ).second);
+            ).second};
+            if ((start_point_candidate - outter_scarf_start_point->position).norm() > 5.0) {
+                return scaled(loop_point);
+            }
+            scarf.start_point = scaled(start_point_candidate);
             scarf.end_point = scaled(loop_point);
             scarf.end_point_previous_index = loop_line_index;
             return scarf;
         } else {
-            Geometry::PointOnLine inner_scarf_end_point{
+            PointOnPerimeter inner_scarf_end_point{
                 *outter_scarf_start_point
             };
 
@@ -331,12 +403,12 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
                     Geometry::Direction1D::backward :
                     Geometry::Direction1D::forward
                 };
-                if (auto result{Geometry::offset_along_lines(
-                    seam_choice.position,
-                    seam_choice.previous_index,
-                    perimeter_lines,
+                if (auto result{offset_along_perimeter(
+                    seam_choice,
+                    perimeter,
                     offset,
-                    external_first_offset_direction
+                    external_first_offset_direction,
+                    offset_stop_condition
                 )}) {
                     inner_scarf_end_point = *result;
                 } else {
@@ -345,32 +417,39 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
             }
 
             if (!region->config().scarf_seam_on_inner_perimeters) {
-                return scaled(inner_scarf_end_point.point);
+                return scaled(inner_scarf_end_point.position);
             }
 
-            const std::optional<Geometry::PointOnLine> inner_scarf_start_point{Geometry::offset_along_lines(
-                inner_scarf_end_point.point,
-                inner_scarf_end_point.line_index,
-                perimeter_lines,
+            const std::optional<PointOnPerimeter> inner_scarf_start_point{offset_along_perimeter(
+                inner_scarf_end_point,
+                perimeter,
                 offset,
-                offset_direction
+                offset_direction,
+                offset_stop_condition
             )};
 
             if (!inner_scarf_start_point) {
-                return scaled(inner_scarf_end_point.point);
+                return scaled(inner_scarf_end_point.position);
             }
-
-            scarf.start_point = scaled(project_to_extrusion_loop(
-                to_seam_choice(*inner_scarf_start_point, perimeter),
+            const Vec2d start_point_candidate{project_to_extrusion_loop(
+                *inner_scarf_start_point,
                 perimeter,
                 distancer
-            ).second);
+            ).second};
+            if ((start_point_candidate - inner_scarf_start_point->position).norm() > 5.0) {
+                return scaled(loop_point);
+            }
+            scarf.start_point = scaled(start_point_candidate);
 
             const auto [end_point_previous_index, end_point]{project_to_extrusion_loop(
-                to_seam_choice(inner_scarf_end_point, perimeter),
+                inner_scarf_end_point,
                 perimeter,
                 distancer
             )};
+            if ((end_point - inner_scarf_end_point.position).norm() > 5.0) {
+                return scaled(loop_point);
+            }
+
             scarf.end_point = scaled(end_point);
             scarf.end_point_previous_index = end_point_previous_index;
             return scarf;
@@ -463,6 +542,8 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
     assert(layer->id() >= po->slicing_parameters().raft_layers());
     const size_t layer_index = layer->id() - po->slicing_parameters().raft_layers();
 
+    const bool thick_bridges{po->config().thick_bridges.value};
+
     if (po->config().seam_position.value == spNearest) {
         const std::vector<Perimeters::BoundedPerimeter> &perimeters{
             this->perimeters_per_layer.at(po)[layer_index]};
@@ -470,7 +551,7 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
             place_seam_near(perimeters, loop, last_pos, this->params.max_nearest_detour);
         return finalize_seam_position(
             loop, region, seam_choice, perimeters[perimeter_index].perimeter,
-            this->params.staggered_inner_seams, flipped
+            this->params.staggered_inner_seams, flipped, thick_bridges
         );
     } else {
         const std::vector<SeamPerimeterChoice> &seams_on_perimeters{this->seams_per_object.at(po)[layer_index]};
@@ -488,7 +569,7 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
                                                                seams_on_perimeters[0]};
                 return finalize_seam_position(
                     loop, region, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
-                    this->params.staggered_inner_seams, flipped
+                    this->params.staggered_inner_seams, flipped, thick_bridges
                 );
             }
         }
@@ -497,7 +578,7 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
             choose_closest_seam(seams_on_perimeters, Geometry::to_polygon(loop))};
         return finalize_seam_position(
             loop, region, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
-            this->params.staggered_inner_seams, flipped
+            this->params.staggered_inner_seams, flipped, thick_bridges
         );
     }
 }

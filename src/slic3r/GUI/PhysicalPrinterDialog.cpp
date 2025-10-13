@@ -17,6 +17,7 @@
 #include <wx/button.h>
 #include <wx/statbox.h>
 #include <wx/wupdlock.h>
+#include <wx/tooltip.h>
 #if wxUSE_SECRETSTORE 
 #include <wx/secretstore.h>
 #endif
@@ -607,7 +608,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     // Always fill in the "printhost_port" combo box from the config and select it.
     {
         Choice* choice = dynamic_cast<Choice*>(m_optgroup->get_field("printhost_port"));
-        choice->set_values({ m_config->opt_string("printhost_port") });
+        const std::vector<std::string> ports = { m_config->opt_string("printhost_port") };
+        choice->set_values(ports);
         choice->set_selection();
     }
 
@@ -703,6 +705,7 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
         bool supported { true };
         wxString label;
     } link, connect;
+#if 0 // Functions replaced with model_supports_prusa_service as all new printers will support both services.
     // allowed models are: all MINI, all MK3 and newer, MK2.5 and MK2.5S  
     auto model_supports_prusalink = [](const std::string& model) {
         return model.size() >= 2 &&
@@ -725,30 +728,32 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
                 || boost::starts_with(model, "CORE")
                 );
     };
+#endif // 0
+    auto model_supports_prusa_service = [](const std::string& model) {
+        // We used to name all supported services, which causes headache with each now model line
+        // The only unsupported models are MK2 variants (MK2.5 is supported)
+        if (boost::starts_with(model, "MK2") && !boost::starts_with(model, "MK2.5")) {
+            return false;
+        }
+        return true;
+    };
 
     // set all_presets_are_prusalink_supported
     for (PresetForPrinter* prstft : m_presets) {
         std::string preset_name = prstft->get_preset_name();
         if (Preset* preset = wxGetApp().preset_bundle->printers.find_preset(preset_name)) {
             std::string model_id = preset->config.opt_string("printer_model"); 
-            if (preset->vendor) {
-                std::string model_id_no_pref = model_id;
-                std::string vendor_repo_prefix;
-                vendor_repo_prefix = preset->vendor->repo_prefix;
-                if (model_id_no_pref.find(vendor_repo_prefix) == 0) {
-                    model_id_no_pref = model_id_no_pref.substr(vendor_repo_prefix.size());
-                    boost::trim_left(model_id_no_pref);
-                }
-                if (preset->vendor->name.find("Prusa Research") != std::string::npos) {
-                    const std::vector<VendorProfile::PrinterModel>& models = preset->vendor->models;
+            const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(*preset);
+            std::string model_id_no_pref = preset->trim_vendor_repo_prefix(model_id, printer_with_vendor.vendor);
+            if (printer_with_vendor.vendor) {
+                if (printer_with_vendor.vendor->name.find("Prusa Research") != std::string::npos) {
+                    const std::vector<VendorProfile::PrinterModel>& models = printer_with_vendor.vendor->models;
                     auto it = std::find_if(models.begin(), models.end(),
                         [model_id](const VendorProfile::PrinterModel& model) { return model.id == model_id; });
-                    if (it != models.end() && model_supports_prusalink(model_id_no_pref))
+                    if (it != models.end() && model_supports_prusa_service(model_id_no_pref))
                         continue;
                 }
             }
-            else if (model_supports_prusalink(model_id))
-                continue;
         }
         link.supported = false;
         break;
@@ -763,21 +768,14 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
             break;
         }
         std::string model_id = preset->config.opt_string("printer_model");
-        // remove prefix from printer_model
-        if (preset->vendor) {
-            std::string vendor_repo_prefix;
-            vendor_repo_prefix = preset->vendor->repo_prefix;
-            if (model_id.find(vendor_repo_prefix) == 0) {
-                model_id = model_id.substr(vendor_repo_prefix.size());
-                boost::trim_left(model_id);
-            }
-        }
-        if (preset->vendor && preset->vendor->name.find("Prusa Research") == std::string::npos) {
+        const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(*preset);
+        model_id = preset->trim_vendor_repo_prefix(model_id, printer_with_vendor.vendor);
+        if (!printer_with_vendor.vendor || printer_with_vendor.vendor->name.find("Prusa Research") == std::string::npos) {
             connect.supported = false;
             break;
         }
         // model id should be enough for this case
-        if (!model_supports_prusaconnect(model_id)) {
+        if (!model_supports_prusa_service(model_id)) {
             connect.supported = false;
             break;
         }

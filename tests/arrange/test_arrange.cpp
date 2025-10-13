@@ -1,4 +1,7 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/catch_approx.hpp>
 #include "test_utils.hpp"
 
 #include <libslic3r/Execution/ExecutionSeq.hpp>
@@ -35,6 +38,8 @@
 #include <boost/geometry/algorithms/convert.hpp>
 
 #include <random>
+
+using namespace Catch;
 
 template<class ArrItem = Slic3r::arr2::ArrangeItem>
 static std::vector<ArrItem> prusa_parts(double infl = 0.) {

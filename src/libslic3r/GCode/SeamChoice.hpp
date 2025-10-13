@@ -14,17 +14,7 @@
 #include "libslic3r/Point.hpp"
 
 namespace Slic3r::Seams {
-
-/**
- * When previous_index == next_index, the point is at the point.
- * Otherwise the point is at the edge.
- */
-struct SeamChoice
-{
-    std::size_t previous_index{};
-    std::size_t next_index{};
-    Vec2d position{Vec2d::Zero()};
-};
+using SeamChoice = Perimeters::PointOnPerimeter;
 
 struct SeamPerimeterChoice
 {

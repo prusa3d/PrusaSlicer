@@ -94,6 +94,7 @@ class MainFrame : public DPIFrame
     TopBarMenus m_bar_menus;
 
     wxMenuItem* m_menu_item_reslice_now { nullptr };
+    wxMenuItem* m_menu_item_reload { nullptr };
     wxSizer*    m_main_sizer{ nullptr };
 
     size_t      m_last_selected_tab;
@@ -129,7 +130,9 @@ class MainFrame : public DPIFrame
 
     void    add_connect_webview_tab();
     void    remove_connect_webview_tab();
-
+    void    on_tab_change_rename_reload_item(int new_tab);
+    bool    reload_item_condition_cb();
+    void    reload_item_function_cb();
     // MenuBar items changeable in respect to printer technology 
     enum MenuItems
     {                   //   FFF                  SLA

@@ -14,6 +14,7 @@ namespace Slic3r {
 
 // Only defined on linux.
 std::optional<boost::filesystem::path> get_home_config_dir();
+std::optional<boost::filesystem::path> get_home_local_dir();
 
 std::string get_default_datadir();
 

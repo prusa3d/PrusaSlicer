@@ -3,13 +3,19 @@
 #include "UserAccountUtils.hpp"
 #include "format.hpp"
 #include "GUI.hpp"
+#include "GUI_App.hpp"
 
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Preset.hpp"
+#include "libslic3r/PresetBundle.hpp"
 
 #include <boost/regex.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/log/trivial.hpp>
+
+#include "InstanceCheck.hpp"
+#include "GUI_App.hpp"
 
 #include <wx/stdpaths.h>
 
@@ -27,10 +33,10 @@ UserAccount::UserAccount(wxEvtHandler* evt_handler, AppConfig* app_config, const
 UserAccount::~UserAccount()
 {}
 
-void UserAccount::set_username(const std::string& username)
+void UserAccount::set_username(const std::string& username, bool store)
 {
     m_username = username;
-    m_communication->set_username(username);
+    m_communication->set_username(username, store);
 }
 
 void UserAccount::clear()
@@ -54,7 +60,7 @@ bool UserAccount::get_remember_session()
     return m_communication->get_remember_session();
 }
 
-bool UserAccount::is_logged()
+bool UserAccount::is_logged() const
 {
     return m_communication->is_logged();
 }
@@ -64,7 +70,9 @@ void UserAccount::do_login()
 }
 void UserAccount::do_logout()
 {
+    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__;
     m_communication->do_logout();
+    Slic3r::GUI::wxGetApp().other_instance_message_handler()->multicast_message("STORE_READ"); 
 }
 
 std::string UserAccount::get_access_token()
@@ -95,9 +103,13 @@ void UserAccount::enqueue_connect_status_action()
 {
     m_communication->enqueue_connect_status_action();
 }
-void UserAccount::enqueue_avatar_action()
+void UserAccount::enqueue_avatar_old_action()
 {
-    m_communication->enqueue_avatar_action(m_account_user_data["avatar"]);
+    m_communication->enqueue_avatar_old_action(m_account_user_data["avatar"]);
+}
+void UserAccount::enqueue_avatar_new_action(const std::string& url)
+{
+    m_communication->enqueue_avatar_new_action(url);
 }
 void UserAccount::enqueue_printer_data_action(const std::string& uuid)
 {
@@ -114,7 +126,7 @@ bool UserAccount::on_login_code_recieved(const std::string& url_message)
     return true;
 }
 
-bool UserAccount::on_user_id_success(const std::string data, std::string& out_username)
+bool UserAccount::on_user_id_success(const std::string data, std::string& out_username, bool after_token_success)
 {
     boost::property_tree::ptree ptree;
     try {
@@ -129,7 +141,7 @@ bool UserAccount::on_user_id_success(const std::string data, std::string& out_us
     for (const auto& section : ptree) {
         const auto opt = ptree.get_optional<std::string>(section.first);
         if (opt) {
-            BOOST_LOG_TRIVIAL(debug) << static_cast<std::string>(section.first) << "    " << *opt;
+            //BOOST_LOG_TRIVIAL(debug) << static_cast<std::string>(section.first) << "    " << *opt;
             m_account_user_data[section.first] = *opt;
         }
        
@@ -139,13 +151,22 @@ bool UserAccount::on_user_id_success(const std::string data, std::string& out_us
         return false;
     }
     std::string public_username = m_account_user_data["public_username"];
-    set_username(public_username);
+    set_username(public_username, after_token_success);
     out_username = public_username;
     // enqueue GET with avatar url
-    if (m_account_user_data.find("avatar") != m_account_user_data.end()) {
+
+    if (m_account_user_data.find("avatar_small") != m_account_user_data.end()) {
+        const boost::filesystem::path server_file(m_account_user_data["avatar_small"]);
+        m_avatar_extension = server_file.extension().string();
+        enqueue_avatar_new_action(m_account_user_data["avatar_small"]);
+    } else if (m_account_user_data.find("avatar_large") != m_account_user_data.end()) {
+        const boost::filesystem::path server_file(m_account_user_data["avatar_large"]);
+        m_avatar_extension = server_file.extension().string();
+        enqueue_avatar_new_action(m_account_user_data["avatar_large"]);
+    } else if (m_account_user_data.find("avatar") != m_account_user_data.end()) {
         const boost::filesystem::path server_file(m_account_user_data["avatar"]);
         m_avatar_extension = server_file.extension().string();
-        enqueue_avatar_action();
+        enqueue_avatar_old_action();
     }
     else {
         BOOST_LOG_TRIVIAL(error) << "User ID message from PrusaAuth did not contain avatar.";
@@ -165,11 +186,14 @@ void UserAccount::on_communication_fail()
     }
 }
 
-
+void UserAccount::on_race_lost()
+{
+    m_communication->on_race_lost();
+}
 
 bool UserAccount::on_connect_printers_success(const std::string& data, AppConfig* app_config, bool& out_printers_changed)
 {
-    BOOST_LOG_TRIVIAL(debug) << "Prusa Connect printers message: " << data;
+    BOOST_LOG_TRIVIAL(trace) << "Prusa Connect printers message: " << data;
     pt::ptree ptree;
     try {
         std::stringstream ss(data);
@@ -203,22 +227,24 @@ bool UserAccount::on_connect_printers_success(const std::string& data, AppConfig
         if (auto pair = printer_state_table.find(*printer_state); pair != printer_state_table.end()) {
             state = pair->second;
         } else {
-            assert(true); // On this assert, printer_state_table needs to be updated with *state_opt and correct ConnectPrinterState
+            assert(false); // On this assert, printer_state_table needs to be updated with *state_opt and correct ConnectPrinterState
             continue;
         }
         if (m_printer_uuid_map.find(*printer_uuid) == m_printer_uuid_map.end()) {
-            BOOST_LOG_TRIVIAL(error) << "Missing printer model for printer uuid: " << *printer_uuid;
+            BOOST_LOG_TRIVIAL(trace) << "Missing printer model for printer uuid: " << *printer_uuid;
             continue;
         }
-        std::pair<std::string, std::string> model_nozzle_pair = m_printer_uuid_map[*printer_uuid];
+        
+        std::string printer_name = m_printer_uuid_map[*printer_uuid];
 
-        if (new_printer_map.find(model_nozzle_pair) == new_printer_map.end()) {
-            new_printer_map[model_nozzle_pair].reserve(static_cast<size_t>(ConnectPrinterState::CONNECT_PRINTER_STATE_COUNT));
+        if (new_printer_map.find(printer_name) == new_printer_map.end()) {
+            new_printer_map[printer_name].reserve(static_cast<size_t>(ConnectPrinterState::CONNECT_PRINTER_STATE_COUNT));
             for (size_t i = 0; i < static_cast<size_t>(ConnectPrinterState::CONNECT_PRINTER_STATE_COUNT); i++) {
-                new_printer_map[model_nozzle_pair].push_back(0);
+                new_printer_map[printer_name].push_back(0);
             }
         }
-        new_printer_map[model_nozzle_pair][static_cast<size_t>(state)] += 1;
+        new_printer_map[printer_name][static_cast<size_t>(state)] += 1;
+        
     }
 
     // compare new and old printer map and update old map into new
@@ -256,27 +282,43 @@ bool UserAccount::on_connect_uiid_map_success(const std::string& data, AppConfig
         BOOST_LOG_TRIVIAL(error) << "Could not parse prusaconnect message. " << e.what();
         return false;
     }
+    pt::ptree printers_ptree;
+    if (auto it = ptree.find("printers"); it != ptree.not_found()) {
+        printers_ptree = it->second;
+    } else {
+        BOOST_LOG_TRIVIAL(error) << "Could not parse prusaconnect message. \"printers\" subtree is missing.";
+        return false;
+    }
 
-    for (const auto& printer_tree : ptree) {
-        const auto printer_uuid = printer_tree.second.get_optional<std::string>("printer_uuid");
+    for (const auto& printer_sub : printers_ptree) {
+        const pt::ptree &printer_ptree = printer_sub.second;
+        const auto printer_uuid = printer_ptree.get_optional<std::string>("uuid");
         if (!printer_uuid) {
             continue;
         }
-        const auto printer_model = printer_tree.second.get_optional<std::string>("printer_model");
+        const auto printer_model = printer_ptree.get_optional<std::string>("printer_model");
         if (!printer_model) {
             continue;
         }
-        const auto nozzle_diameter_opt = printer_tree.second.get_optional<std::string>("nozzle_diameter");
-        const std::string nozzle_diameter = (nozzle_diameter_opt && *nozzle_diameter_opt != "0.0") ? *nozzle_diameter_opt : std::string();
-        std::pair<std::string, std::string> model_nozzle_pair = { *printer_model, nozzle_diameter };
-        m_printer_uuid_map[*printer_uuid] = model_nozzle_pair;
+
+        std::map<std::string, std::vector<std::string>> config_options_to_match; 
+        UserAccountUtils::fill_config_options_from_json(printer_ptree, config_options_to_match);
+        const Preset* printer_preset = UserAccountUtils::find_preset_by_nozzle_and_options(wxGetApp().preset_bundle->printers, *printer_model, config_options_to_match);
+        if (printer_preset) {
+            // Preset can have repo prefix
+            std::string trimmed_name = printer_preset->name;
+            const PresetWithVendorProfile& printer_with_vendor = wxGetApp().preset_bundle->printers.get_preset_with_vendor_profile(*printer_preset);
+            trimmed_name = printer_preset->trim_vendor_repo_prefix(trimmed_name, printer_with_vendor.vendor);
+            m_printer_uuid_map[*printer_uuid] = trimmed_name;
+        } else {
+            BOOST_LOG_TRIVIAL(trace) << "Failed to find preset for printer model: " << *printer_model;
+        }
     }
     m_communication->on_uuid_map_success();
     return on_connect_printers_success(data, app_config, out_printers_changed);
 }
 
-std::string UserAccount::get_current_printer_uuid_from_connect(const std::string &selected_printer_id
-) const {
+std::string UserAccount::get_current_printer_uuid_from_connect(const std::string &selected_printer_id) const {
     if (m_current_printer_data_json_from_connect.empty() || m_current_printer_uuid_from_connect.empty()) {
         return {};
     }

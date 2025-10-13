@@ -64,6 +64,7 @@
 #include "libslic3r/TriangleSelector.hpp"
 #include "tcbspan/span.hpp"
 #include "libslic3r/Point.hpp"
+#include "libslic3r/InfillAboveBridges.hpp"
 
 using namespace std::literals;
 
@@ -412,6 +413,20 @@ void PrintObject::prepare_infill()
     } // for each layer
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
+
+    PrepareInfill::SurfaceRefs surfaces;
+    for (const Layer *layer : m_layers) {
+        surfaces.emplace_back();
+        for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
+            LayerRegion *layerm = layer->m_regions[region_id];
+            if (!layerm->fill_surfaces().empty() && layerm->region().config().over_bridge_speed > 0) {
+                surfaces.back().push_back(std::ref(layerm->m_fill_surfaces));
+            }
+        }
+    }
+    constexpr double infill_over_bridges_expand{1.0};
+    PrepareInfill::separate_infill_above_bridges(surfaces, infill_over_bridges_expand);
+
     this->set_done(posPrepareInfill);
 }
 
@@ -745,7 +760,13 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "raft_layers"
             || opt_key == "raft_contact_distance"
             || opt_key == "slice_closing_radius"
-            || opt_key == "slicing_mode") {
+            || opt_key == "slicing_mode"
+            || opt_key == "interlocking_beam"
+            || opt_key == "interlocking_orientation"
+            || opt_key == "interlocking_beam_layer_count"
+            || opt_key == "interlocking_depth"
+            || opt_key == "interlocking_boundary_avoidance"
+            || opt_key == "interlocking_beam_width") {
             steps.emplace_back(posSlice);
 		} else if (
                opt_key == "elefant_foot_compensation"
@@ -808,6 +829,8 @@ bool PrintObject::invalidate_state_by_config_options(
                opt_key == "interface_shells"
             || opt_key == "infill_only_where_needed"
             || opt_key == "infill_every_layers"
+            || opt_key == "automatic_infill_combination"
+            || opt_key == "automatic_infill_combination_max_layer_height"
             || opt_key == "solid_infill_every_layers"
             || opt_key == "ensure_vertical_shell_thickness"
             || opt_key == "bottom_solid_min_thickness"
@@ -831,6 +854,18 @@ bool PrintObject::invalidate_state_by_config_options(
             steps.emplace_back(posInfill);
         } else if (opt_key == "fill_pattern") {
             steps.emplace_back(posPrepareInfill);
+        } else if (opt_key == "over_bridge_speed") {
+            const auto *old_speed = old_config.option<ConfigOptionFloat>(opt_key);
+            const auto *new_speed = new_config.option<ConfigOptionFloat>(opt_key);
+            if (
+                old_speed == nullptr
+                || new_speed == nullptr
+                || old_speed->value == 0
+                || new_speed->value == 0
+            ) {
+                steps.emplace_back(posPrepareInfill);
+            }
+            invalidated |= m_print->invalidate_step(psGCodeExport);
         } else if (opt_key == "fill_density") {
             // One likely wants to reslice only when switching between zero infill to simulate boolean difference (subtracting volumes),
             // normal infill and 100% (solid) infill.
@@ -891,6 +926,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "external_perimeter_speed"
             || opt_key == "small_perimeter_speed"
             || opt_key == "solid_infill_speed"
+            || opt_key == "first_layer_infill_speed"
             || opt_key == "top_solid_infill_speed") {
             invalidated |= m_print->invalidate_step(psGCodeExport);
         } else if (
@@ -3053,16 +3089,24 @@ void PrintObject::discover_horizontal_shells()
 void PrintObject::combine_infill()
 {
     // Work on each region separately.
-    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
-        const PrintRegion &region = this->printing_region(region_id);
-        const size_t every = region.config().infill_every_layers.value;
-        if (every < 2 || region.config().fill_density == 0.)
+    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id) {
+        const PrintRegion &region                        = this->printing_region(region_id);
+        const size_t       combine_infill_every_n_layers = region.config().infill_every_layers.value;
+        const bool         automatic_infill_combination  = region.config().automatic_infill_combination;
+        const bool         enable_combine_infill         = automatic_infill_combination || combine_infill_every_n_layers >= 2;
+
+        if (!enable_combine_infill || region.config().fill_density == 0.) {
             continue;
+        }
+
         // Limit the number of combined layers to the maximum height allowed by this regions' nozzle.
         //FIXME limit the layer height to max_layer_height
-        double nozzle_diameter = std::min(
-            this->print()->config().nozzle_diameter.get_at(region.config().infill_extruder.value - 1),
-            this->print()->config().nozzle_diameter.get_at(region.config().solid_infill_extruder.value - 1));
+        const double nozzle_diameter = std::min(this->print()->config().nozzle_diameter.get_at(region.config().infill_extruder.value - 1),
+                                                this->print()->config().nozzle_diameter.get_at(region.config().solid_infill_extruder.value - 1));
+
+        const double automatic_infill_combination_max_layer_height = region.config().automatic_infill_combination_max_layer_height.get_abs_value(nozzle_diameter);
+        const double max_combine_layer_height                      = automatic_infill_combination ? std::min(automatic_infill_combination_max_layer_height, nozzle_diameter) : nozzle_diameter;
+
         // define the combinations
         std::vector<size_t> combine(m_layers.size(), 0);
         {
@@ -3070,19 +3114,21 @@ void PrintObject::combine_infill()
             size_t num_layers = 0;
             for (size_t layer_idx = 0; layer_idx < m_layers.size(); ++ layer_idx) {
                 m_print->throw_if_canceled();
-                const Layer *layer = m_layers[layer_idx];
-                if (layer->id() == 0)
+                const Layer &layer = *m_layers[layer_idx];
+                if (layer.id() == 0)
                     // Skip first print layer (which may not be first layer in array because of raft).
                     continue;
+
                 // Check whether the combination of this layer with the lower layers' buffer
                 // would exceed max layer height or max combined layer count.
-                if (current_height + layer->height >= nozzle_diameter + EPSILON || num_layers >= every) {
+                if (current_height + layer.height >= max_combine_layer_height + EPSILON || (!automatic_infill_combination && num_layers >= combine_infill_every_n_layers)) {
                     // Append combination to lower layer.
                     combine[layer_idx - 1] = num_layers;
                     current_height = 0.;
                     num_layers = 0;
                 }
-                current_height += layer->height;
+
+                current_height += layer.height;
                 ++ num_layers;
             }
             

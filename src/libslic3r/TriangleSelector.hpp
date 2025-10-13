@@ -125,7 +125,7 @@ public:
         Transform3f trafo;
         Vec3f       source;
 
-        bool        uniform_scaling;
+        bool        use_world_coordinates;
         Transform3f trafo_normal;
         float       radius;
         float       radius_sqr;

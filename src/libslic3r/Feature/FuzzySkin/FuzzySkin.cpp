@@ -203,7 +203,7 @@ Arachne::ExtrusionLine apply_fuzzy_skin(const Arachne::ExtrusionLine &extrusion,
     }
 
     ExtrusionRegionSegments segments = extrusion_segmentation(extrusion, base_config, perimeter_regions);
-    ExtrusionLine           fuzzified_extrusion;
+    ExtrusionLine           fuzzified_extrusion(extrusion.inset_idx, extrusion.is_odd, extrusion.is_closed);
 
     for (ExtrusionRegionSegment &segment : segments) {
         const PrintRegionConfig &config = segment.config;

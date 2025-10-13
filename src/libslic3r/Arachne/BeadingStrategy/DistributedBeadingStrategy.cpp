@@ -26,41 +26,82 @@ DistributedBeadingStrategy::DistributedBeadingStrategy(const coord_t optimal_wid
     name = "DistributedBeadingStrategy";
 }
 
-DistributedBeadingStrategy::Beading DistributedBeadingStrategy::compute(const coord_t thickness, const coord_t bead_count) const
+std::vector<float> DistributedBeadingStrategy::calc_normalized_weights(const coord_t to_be_divided, const coord_t bead_count) const
+{
+    const float middle = static_cast<float>(bead_count - 1) / 2.f;
+
+    const auto calc_weight = [middle, &self = std::as_const(*this)](const size_t bead_idx) -> float {
+        const float dev_from_middle = static_cast<float>(bead_idx) - middle;
+        return std::max(0.f, 1.f - self.one_over_distribution_radius_squared * Slic3r::sqr(dev_from_middle));
+    };
+
+    std::vector<float> weights(bead_count);
+    for (size_t bead_idx = 0; bead_idx < bead_count; ++bead_idx) {
+        weights[bead_idx] = calc_weight(bead_idx);
+    }
+
+    // Normalize weights.
+    const float total_weight = std::accumulate(weights.begin(), weights.end(), 0.f);
+    std::transform(weights.begin(), weights.end(), weights.begin(), [total_weight](float weight) { return weight / total_weight; });
+
+    // Find the maximum adjustment needed to prevent negative bead width.
+    const float max_allowed_weight = -static_cast<float>(optimal_width) / static_cast<float>(to_be_divided) / total_weight;
+    float       max_adjustment     = 0.f;
+    size_t      adjustment_cnt     = 0;
+
+    for (float weight : weights) {
+        if (weight > max_allowed_weight) {
+            max_adjustment = std::max(weight - max_allowed_weight, max_adjustment);
+            ++adjustment_cnt;
+        }
+    }
+
+    if (const size_t increaseable_weight_cnt = weights.size() - adjustment_cnt; adjustment_cnt > 0 && increaseable_weight_cnt > 0) {
+        // There is at least one weight that can increased.
+        std::vector<float> new_weights;
+        for (float &weight : weights) {
+            if (weight <= max_allowed_weight) {
+                new_weights.emplace_back(std::max(0.f, weight + (max_adjustment / static_cast<float>(increaseable_weight_cnt))));
+            }
+        }
+
+        return new_weights;
+    }
+
+    return weights;
+}
+
+DistributedBeadingStrategy::Beading DistributedBeadingStrategy::compute(const coord_t thickness, coord_t bead_count) const
 {
     Beading ret;
-
     ret.total_thickness = thickness;
+
+    const coord_t            to_be_divided      = thickness - bead_count * optimal_width;
+    const std::vector<float> normalized_weights = this->calc_normalized_weights(to_be_divided, bead_count);
+
+    // Update the bead count based on calculated weights because the adjustment of bead widths
+    // may cause one bead to be entirely removed.
+    bead_count = static_cast<coord_t>(normalized_weights.size());
+
     if (bead_count > 2) {
-        const coord_t to_be_divided = thickness - bead_count * optimal_width;
-        const float middle = static_cast<float>(bead_count - 1) / 2;
-
-        const auto getWeight = [middle, this](coord_t bead_idx) {
-            const float dev_from_middle = bead_idx - middle;
-            return std::max(0.0f, 1.0f - one_over_distribution_radius_squared * dev_from_middle * dev_from_middle);
-        };
-
-        std::vector<float> weights;
-        weights.resize(bead_count);
-        for (coord_t bead_idx = 0; bead_idx < bead_count; bead_idx++)
-            weights[bead_idx] = getWeight(bead_idx);
-
-        const float total_weight      = std::accumulate(weights.cbegin(), weights.cend(), 0.f);
-        coord_t     accumulated_width = 0;
-        for (coord_t bead_idx = 0; bead_idx < bead_count; bead_idx++) {
-            const float   weight_fraction          = weights[bead_idx] / total_weight;
-            const coord_t splitup_left_over_weight = to_be_divided * weight_fraction;
-            const coord_t width                    = (bead_idx == bead_count - 1) ? thickness - accumulated_width : optimal_width + splitup_left_over_weight;
+        coord_t accumulated_width = 0;
+        for (size_t bead_idx = 0; bead_idx < bead_count; ++bead_idx) {
+            const coord_t splitup_left_over_weight = static_cast<coord_t>(static_cast<float>(to_be_divided) * normalized_weights[bead_idx]);
+            const coord_t width                    = (bead_idx == bead_count - 1) ? thickness - accumulated_width :
+                                                                                    std::max(0, optimal_width + splitup_left_over_weight);
 
             // Be aware that toolpath_locations is computed by dividing the width by 2, so toolpath_locations
             // could be off by 1 because of rounding errors.
-            if (bead_idx == 0)
+            if (bead_idx == 0) {
                 ret.toolpath_locations.emplace_back(width / 2);
-            else
+            } else {
                 ret.toolpath_locations.emplace_back(ret.toolpath_locations.back() + (ret.bead_widths.back() + width) / 2);
+            }
+
             ret.bead_widths.emplace_back(width);
             accumulated_width += width;
         }
+
         ret.left_over = 0;
         assert((accumulated_width + ret.left_over) == thickness);
     } else if (bead_count == 2) {
