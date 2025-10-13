@@ -36,6 +36,7 @@
 #include "libslic3r/GCode/ConflictChecker.hpp"
 #include "Utils.hpp"
 #include "BuildVolume.hpp"
+#include "MultipleBeds.hpp"
 #include "format.hpp"
 #include "ArrangeHelper.hpp"
 #include "CustomParametersHandling.hpp"
@@ -1574,6 +1575,7 @@ std::string Print::output_filename(const std::string &filename_base) const
     DynamicConfig config = this->finished() ? this->print_statistics().config() : this->print_statistics().placeholders();
     config.set_key_value("num_extruders", new ConfigOptionInt((int)m_config.nozzle_diameter.size()));
     config.set_key_value("default_output_extension", new ConfigOptionString(".gcode"));
+    config.set_key_value("bed_number", new ConfigOptionString(get_bed_number_formatted()));
 
     // Handle output_filename_format. There is a hack related to binary G-codes: gcode / bgcode substitution.
     std::string output_filename_format = m_config.output_filename_format.value;
@@ -1583,6 +1585,14 @@ std::string Print::output_filename(const std::string &filename_base) const
         output_filename_format.erase(output_filename_format.end()-6);
 
     return this->PrintBase::output_filename(output_filename_format, ".gcode", filename_base, &config);
+}
+
+std::string Print::get_bed_number_formatted() const
+{
+    std::string bed_number = std::to_string(s_multiple_beds.get_active_bed() + 1);
+    static const size_t n_zero = 2;
+
+    return std::string(n_zero - std::min(n_zero, bed_number.length()), '0') + bed_number;
 }
 
 // Returns if all used filaments have same shrinkage compensations.
