@@ -628,10 +628,11 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_producer = EProducer::PrusaSlicer;
     m_flavor = config.gcode_flavor;
 
-    m_result.backtrace_enabled = is_XL_printer(config);
-
     size_t extruders_count = config.nozzle_diameter.values.size();
     m_result.extruders_count = extruders_count;
+
+    m_single_extruder_multi_material = config.single_extruder_multi_material;
+    m_result.backtrace_enabled = is_XL_printer(config) || (!m_single_extruder_multi_material && extruders_count > 1);
 
     m_extruder_offsets.resize(extruders_count);
     m_extruder_colors.resize(extruders_count);
@@ -682,8 +683,6 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     for (size_t i = 0; i < config.filament_unload_time.values.size(); ++i) {
         m_time_processor.filament_unload_times[i] = static_cast<float>(config.filament_unload_time.values[i]);
     }
-
-    m_single_extruder_multi_material = config.single_extruder_multi_material;
 
     // With MM setups like Prusa MMU2, the filaments may be expected to be parked at the beginning.
     // Remember the parking position so the initial load is not included in filament estimate.
@@ -4319,12 +4318,19 @@ void GCodeProcessor::post_process()
                 // line inserter
                 [tool_number, this](unsigned int id, const std::vector<float>& time_diffs) {
                     const int temperature = int(m_layer_id != 1 ? m_extruder_temps_config[tool_number] : m_extruder_temps_first_layer_config[tool_number]);
-                    std::string out = "M104.1 T" + std::to_string(tool_number);
-                    if (time_diffs.size() > 0)
-                        out += " P" + std::to_string(int(std::round(time_diffs[0])));
-                    if (time_diffs.size() > 1)
-                        out += " Q" + std::to_string(int(std::round(time_diffs[1])));
-                    out += " S" + std::to_string(temperature) + "\n";
+                    std::string out;
+                    if (m_is_XL_printer) {
+                        out = "M104.1 T" + std::to_string(tool_number);
+                        if (time_diffs.size() > 0)
+                            out += " P" + std::to_string(int(std::round(time_diffs[0])));
+                        if (time_diffs.size() > 1)
+                            out += " Q" + std::to_string(int(std::round(time_diffs[1])));
+                        out += " S" + std::to_string(temperature) + "\n";
+                    } else {
+                        out = "M104 S" + std::to_string(temperature) + " T" + std::to_string(tool_number) +
+                            " ; preheat T" + std::to_string(tool_number) +
+                            " time: " + std::to_string((int) std::round(time_diffs[0])) + "s\n";
+                    }
                     return out;
                 },
                 // line replacer
