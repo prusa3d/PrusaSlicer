@@ -147,6 +147,9 @@ public:
 
     // Is there any valid extrusion assigned to this LayerRegion?
     bool    has_extrusions() const { return ! this->perimeters().empty() || ! this->fills().empty(); }
+    // True if infill is sparse enough that it requires bridge flow above, false if infill is
+    // dense enough to support normal solid infill layer above.
+    bool    needs_bridge_over_infill() const;
 
 protected:
     friend class Layer;
