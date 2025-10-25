@@ -2878,10 +2878,7 @@ void Plater::priv::reload_from_disk()
         // ask user to select the missing file
         fs::path search = missing_input_paths.back();
         wxString title = _L("Please select the file to reload");
-#if defined(__APPLE__)
-        title += " (" + from_u8(search.filename().string()) + ")";
-#endif // __APPLE__
-        title += ":";
+        title += " (" + from_u8(search.filename().string()) + "):";
         wxFileDialog dialog(q, title, "", from_u8(search.filename().string()), file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (dialog.ShowModal() != wxID_OK)
             return;
