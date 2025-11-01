@@ -6,9 +6,15 @@
 #include "SupportSpotsGenerator.hpp"
 
 #include <boost/log/trivial.hpp>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/concurrent_vector.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/blocked_range.h>
+#else
+#include <tbb/concurrent_vector.h>
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
+#endif
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -34,6 +40,7 @@
 #include "PrintBase.hpp"
 #include "PrintConfig.hpp"
 #include "libslic3r.h"
+
 #include "AABBTreeLines.hpp"
 #include "KDTreeIndirect.hpp"
 #include "libslic3r/Layer.hpp"

@@ -31,8 +31,13 @@ using namespace Slic3r;
 #include <CGAL/Exact_integer.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Cartesian_converter.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#endif
 #include <boost/property_map/property_map.hpp>
 #include <algorithm>
 #include <array>

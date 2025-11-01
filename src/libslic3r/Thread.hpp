@@ -8,7 +8,9 @@
 #include <boost/thread.hpp>
 #include <tbb/task_scheduler_observer.h>
 #include <tbb/enumerable_thread_specific.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/task_scheduler_observer.h>
+#endif
 #include <boost/thread/thread.hpp>
 #include <utility>
 #include <string>

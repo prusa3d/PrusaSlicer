@@ -15,7 +15,11 @@
 
 #include <assert.h>
 #include <math.h>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/scalable_allocator.h>
+#endif
 #include <stddef.h>
 #include <string_view>
 #include <algorithm>

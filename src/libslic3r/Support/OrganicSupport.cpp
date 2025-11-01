@@ -4,9 +4,15 @@
 ///|/
 #include "OrganicSupport.hpp"
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/partitioner.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/partitioner.h>
+#endif
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 #include <cassert>
