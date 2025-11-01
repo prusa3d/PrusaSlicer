@@ -363,7 +363,7 @@ GCodeGenerator::ObjectsLayerToPrint GCodeGenerator::collect_layers_to_print(cons
             // Allow empty support layers, as the support generator may produce no extrusions for non-empty support regions.
             || (layer_to_print.support_layer /* && layer_to_print.support_layer->has_extrusions() */)) {
             double top_cd = object.config().support_material_contact_distance;
-            double bottom_cd = object.config().support_material_bottom_contact_distance == 0. ? top_cd : object.config().support_material_bottom_contact_distance;
+            double bottom_cd = object.config().support_material_bottom_contact_distance == -1 ? top_cd : object.config().support_material_bottom_contact_distance;
 
             double extra_gap = (layer_to_print.support_layer ? bottom_cd : top_cd);
 
