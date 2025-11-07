@@ -35,7 +35,7 @@ add_executable(${_TEST_NAME}_tests
     test_png_io.cpp
     test_surface_mesh.cpp
     test_timeutils.cpp
-        test_quadric_edge_collapse.cpp
+    test_quadric_edge_collapse.cpp
     test_triangulation.cpp
     test_emboss.cpp
     test_indexed_triangle_set.cpp
@@ -44,6 +44,7 @@ add_executable(${_TEST_NAME}_tests
     test_jump_point_search.cpp
     test_support_spots_generator.cpp
     test_layer_region.cpp
+    test_mmu_auto_colorization.cpp
     ../data/prusaparts.cpp
     ../data/prusaparts.hpp
      test_static_map.cpp
