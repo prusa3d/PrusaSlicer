@@ -3036,7 +3036,7 @@ bool GUI_App::check_and_keep_current_preset_changes(const wxString& caption, con
 
                 wxString text = dlg.msg_success_saved_modifications(preset_names_and_types.size());
                 if (!is_called_from_configwizard)
-                    text += "\n\n" + _L("For new project all modifications will be reseted");
+                    text += "\n\n" + _L("For new project all modifications will be reset");
 
                 MessageDialog(nullptr, text).ShowModal();
                 reset_modifications();
