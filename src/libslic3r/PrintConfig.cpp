@@ -5286,7 +5286,14 @@ void DynamicPrintConfig::normalize_fdm()
         }
     }
 
-    if (this->has("wipe_tower_extruder")) {
+    // This method is called repeatedly while building configuration.  We may
+    // not have enough info yet to determine whether the extruder is valid;
+    // wait until we do before checking.
+    //
+    // NOTE:  other extruder validation (e.g. perimeter_extruder, infill_extruder)
+    // happens elsewhere, as those settings can be modified for specific print
+    // objects or sometimes even regions of objects.
+    if (this->has("wipe_tower_extruder") && this->has("nozzle_diameter")) {
         // If invalid, replace with 0.
         int extruder = this->opt<ConfigOptionInt>("wipe_tower_extruder")->value;
         int num_extruders = this->opt<ConfigOptionFloats>("nozzle_diameter")->size();
