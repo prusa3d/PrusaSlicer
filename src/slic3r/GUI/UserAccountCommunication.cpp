@@ -11,6 +11,7 @@
 #include <boost/beast/core/detail/base64.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/nowide/convert.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/nowide/convert.hpp>
