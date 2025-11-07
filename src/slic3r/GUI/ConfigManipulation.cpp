@@ -411,6 +411,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("min_bead_width", have_arachne);
     toggle_field("thin_walls", !have_arachne);
 
+    bool have_make_overhang_printable = config->opt_bool("make_overhang_printable");
+    toggle_field("make_overhang_printable_angle", have_make_overhang_printable);
+    toggle_field("make_overhang_printable_hole_size", have_make_overhang_printable);
+
     toggle_field("scarf_seam_placement", !has_spiral_vase);
     const auto scarf_seam_placement{config->opt_enum<ScarfSeamPlacement>("scarf_seam_placement")};
     const bool uses_scarf_seam{!has_spiral_vase && scarf_seam_placement != ScarfSeamPlacement::nowhere};

@@ -559,6 +559,35 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(100., true));
 
+    def = this->add("make_overhang_printable", coBool);
+    def->label = L("Make overhangs printable");
+    def->category = L("Quality");
+    def->tooltip = L("Modify the geometry to print overhangs without support material.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("make_overhang_printable_angle", coFloat);
+    def->label = L("Make overhangs printable - Maximum angle");
+    def->category = L("Quality");
+    def->tooltip = L("Maximum angle of overhangs to allow after making more steep overhangs printable."
+                     "90° will not change the model at all and allow any overhang, while 0 will "
+                     "replace all overhangs with conical material.");
+    def->sidetext = u8"°";	// degrees, don't need translation
+    def->mode = comAdvanced;
+    def->min = 0.;
+    def->max = 90.;
+    def->set_default_value(new ConfigOptionFloat(55.));
+
+    def = this->add("make_overhang_printable_hole_size", coFloat);
+    def->label = L("Make overhangs printable - Hole area");
+    def->category = L("Quality");
+    def->tooltip = L("Maximum area of a hole in the base of the model before it's filled by conical material. "
+                     "A value of 0 will fill all the holes in the model base.");
+    def->sidetext = u8"mm²";	// square millimeters, don't need translation
+    def->mode = comAdvanced;
+    def->min = 0.;
+    def->set_default_value(new ConfigOptionFloat(0.));
+
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;
     def = this->add("avoid_crossing_curled_overhangs", coBool);

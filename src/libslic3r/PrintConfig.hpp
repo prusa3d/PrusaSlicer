@@ -689,7 +689,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                thick_bridges))
     ((ConfigOptionFloat,               xy_size_compensation))
     ((ConfigOptionBool,                wipe_into_objects))
-
+    ((ConfigOptionFloat,               make_overhang_printable_angle))
+    ((ConfigOptionFloat,               make_overhang_printable_hole_size))
     ((ConfigOptionBool,                interlocking_beam))
     ((ConfigOptionFloat,               interlocking_beam_width))
     ((ConfigOptionFloat,               interlocking_orientation))
@@ -763,6 +764,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                top_solid_min_thickness))
     ((ConfigOptionFloatOrPercent,       top_solid_infill_speed))
     ((ConfigOptionBool,                 wipe_into_infill))
+    ((ConfigOptionBool,                 make_overhang_printable))
     // Single perimeter.
     ((ConfigOptionEnum<TopOnePerimeterType>, top_one_perimeter_type))
     ((ConfigOptionBool,                 only_one_perimeter_first_layer))

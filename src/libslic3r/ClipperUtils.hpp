@@ -463,6 +463,7 @@ Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons &subject, const Slic3r::Surf
 Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
+Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygons& subject, const Slic3r::ExPolygon& clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::Polylines  diff_pl(const Slic3r::Polyline &subject, const Slic3r::Polygons &clip);
 Slic3r::Polylines  diff_pl(const Slic3r::Polylines &subject, const Slic3r::Polygons &clip);
 Slic3r::Polylines  diff_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip);
@@ -498,6 +499,7 @@ Slic3r::ExPolygons intersection_ex(const Slic3r::Surfaces &subject, const Slic3r
 Slic3r::ExPolygons intersection_ex(const Slic3r::Surfaces &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::ExPolygons intersection_ex(const Slic3r::Surfaces &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::ExPolygons intersection_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
+Slic3r::ExPolygons intersection_ex(const Slic3r::ExPolygons& subject, const Slic3r::ExPolygon& clip, ApplySafetyOffset do_safety_offset = ApplySafetyOffset::No);
 Slic3r::Polylines  intersection_pl(const Slic3r::Polylines &subject, const Slic3r::Polygon &clip);
 Slic3r::Polylines  intersection_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip);
 Slic3r::Polylines  intersection_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygon &clip);
