@@ -40,6 +40,8 @@ private:
     ScalableBitmap  m_off_disabled;
     ScalableBitmap  m_on_focused;
     ScalableBitmap  m_off_focused;
+
+    wxString m_accessibility_label;
 };
 
 #endif // !slic3r_GUI_CheckBox_hpp_

@@ -15,6 +15,7 @@
 #include "GUI_App.hpp"
 #include "OG_CustomCtrl.hpp"
 #include "format.hpp"
+#include "Accessibility.hpp"
 
 #include <utility>
 #include <wx/bookctrl.h> // IWYU pragma: keep
@@ -124,6 +125,8 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
 		if (!m_disabled)
 			this->back_to_sys_value(opt_id);
 	};
+
+	Accessibility::ClearLabelString();
 
 	// assign function objects for callbacks, etc.
     return field;
@@ -393,6 +396,7 @@ void OptionsGroup::append_separator()
 
 void OptionsGroup::activate_line(Line& line)
 {
+    if(!line.label.IsEmpty()) Accessibility::SetNextLabelString(line.label);
     if (line.is_separator())
         return;
 

@@ -1,4 +1,5 @@
 #include "CheckBox.hpp"
+#include "slic3r/GUI/Accessibility.hpp"
 
 //#include "../wxExtensions.hpp"
 
@@ -13,6 +14,11 @@ CheckBox::CheckBox(wxWindow* parent, const wxString& name)
     , m_on_focused(this, "check_on_focused", px_cnt)
     , m_off_focused(this, "check_off_focused", px_cnt)
 {
+    if(Slic3r::GUI::Accessibility::IsLabelAvailable())
+     m_accessibility_label = Slic3r::GUI::Accessibility::GetLastLabelString();
+    else
+     m_accessibility_label = "";
+
 #ifdef __WXOSX__ // State not fully implement on MacOS
     Bind(wxEVT_SET_FOCUS, &CheckBox::updateBitmap, this);
     Bind(wxEVT_KILL_FOCUS, &CheckBox::updateBitmap, this);
@@ -57,6 +63,8 @@ void CheckBox::update()
     if (GetBitmapMargins().GetWidth() == 0 && !GetLabelText().IsEmpty())
         SetBitmapMargins(4, 0);
     update_size();
+
+    this->SetLabel(m_accessibility_label+((val)?(" X"):("")));
 }
 
 #ifdef __WXMSW__
