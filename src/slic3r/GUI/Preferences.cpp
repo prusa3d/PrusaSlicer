@@ -135,7 +135,7 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		downloader->set_path_name(app_config->get("url_downloader_dest"));
 		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
 
-		for (const std::string opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button", "show_step_import_parameters"})
+		for (const std::string opt_key : {"suppress_hyperlinks", "downloader_url_registered", "show_login_button"})
 			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
 		// by default "Log in" button is visible
 		if (!app_config->has("show_login_button"))
@@ -643,6 +643,11 @@ void PreferencesDialog::build()
 			L("Allow downloads from supported websites (e.g. Printables.com)"),
 			L("If enabled, PrusaSlicer can download and open files from supported websites"),
 			app_config->get_bool("downloader_url_registered"));
+
+		append_bool_option(m_optgroup_other, "show_printables_button",
+			L("Show \"Printables\" button in application top bar"),
+			L("If enabled, PrusaSlicer will show the \"Printables\" button in application top bar."),
+			app_config->get_bool("show_printables_button"));
 
 		activate_options_tab(m_optgroup_other);
 
