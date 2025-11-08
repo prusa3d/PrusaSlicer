@@ -19,7 +19,7 @@
 #include "MainFrame.hpp"
 #include "MsgDialog.hpp"
 
-#include <GL/glew.h> //  Fix for fatal  error C1189: #error:  gl.h included before glew.h (compiling source file C:\git\slicer2\src\slic3r\GUI\GUI_ObjectManipulation.cpp)
+#include <glad/gl.h>
 #include <wx/glcanvas.h>
 
 #include <boost/algorithm/string.hpp>
