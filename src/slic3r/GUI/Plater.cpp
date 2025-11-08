@@ -43,6 +43,7 @@
 #include <boost/property_tree/json_parser.hpp>
 
 #include <wx/sizer.h>
+#include <wx/splitter.h>
 #include <wx/stattext.h>
 #include <wx/button.h>
 #include <wx/bmpcbox.h>
@@ -694,13 +695,58 @@ void Plater::priv::init()
 
     update();
 
-    auto *hsizer = new wxBoxSizer(wxHORIZONTAL);
+    // Create the splitter window
+    wxSplitterWindow* splitter = new wxSplitterWindow(q, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_3D | wxSP_LIVE_UPDATE);
+
+    // Set up the left panel to hold panel_sizer
+    wxPanel* left_panel = new wxPanel(splitter, wxID_ANY);
+
+    // Reparent view3D and preview to left_panel (since they were originally created with q as parent)
+    view3D->Reparent(left_panel);
+    preview->Reparent(left_panel);
+
+    // Create the panel_sizer for the left side (view3D and preview)
     panel_sizer = new wxBoxSizer(wxHORIZONTAL);
     panel_sizer->Add(view3D, 1, wxEXPAND | wxALL, 0);
     panel_sizer->Add(preview, 1, wxEXPAND | wxALL, 0);
-    hsizer->Add(panel_sizer, 1, wxEXPAND | wxALL, 0);
-    hsizer->Add(sidebar, 0, wxEXPAND | wxLEFT | wxRIGHT, 0);
-    q->SetSizer(hsizer);
+    left_panel->SetSizerAndFit(panel_sizer);
+
+    // Reparent sidebar to splitter
+    sidebar->Reparent(splitter);
+    
+    // Set the splitter windows: left_panel on the left, sidebar on the right
+    splitter->SplitVertically(left_panel, sidebar);
+
+    // Set initial sash position (e.g., 70% of width for left panel)
+    int initial_width = q->GetSize().GetWidth();
+    splitter->SetSashPosition(static_cast<int>(initial_width * 0.7));
+     // Ensure the left panel is visible and sidebar has a minimum width
+    splitter->Bind(wxEVT_SPLITTER_SASH_POS_CHANGED, [this, splitter](wxSplitterEvent& event) {
+        // Prevent the sash from being dragged too far to the left
+        int min_sash_pos = 22 * wxGetApp().em_unit();
+        if (event.GetSashPosition() < min_sash_pos) {
+            splitter->SetSashPosition(min_sash_pos);
+        }
+        event.Skip();
+    });
+    splitter->Bind(wxEVT_SIZE, [this, splitter](wxSizeEvent& event) {
+        // Maintain the sash position as a percentage of the window width
+        int new_width = event.GetSize().GetWidth();
+        int new_sash_pos = static_cast<int>(new_width * 0.7);
+        splitter->SetSashPosition(new_sash_pos);
+    });
+
+    // Ensure the left panel is visible and sidebar has a minimum width
+    splitter->SetMinimumPaneSize(22 * wxGetApp().em_unit()); // Minimum size for sidebar (right pane)
+
+    // Set the splitter as the main sizer for the Plater
+    auto* main_sizer = new wxBoxSizer(wxVERTICAL);
+    main_sizer->Add(splitter, 1, wxEXPAND | wxALL, 0);
+    q->SetSizer(main_sizer);
+
+    // Layout and refresh
+    q->Layout();
+    q->Refresh();
 
     if (wxGetApp().is_editor()) {
         menus.init(q);
@@ -1200,6 +1246,20 @@ void Plater::priv::collapse_sidebar(bool collapse)
     collapse_toolbar.set_enabled(collapse || wxGetApp().app_config->get_bool("show_collapse_button"));
 
     notification_manager->set_sidebar_collapsed(collapse);
+
+    // Adjust splitter behavior when collapsing or expanding the sidebar
+    wxSplitterWindow* splitter = static_cast<wxSplitterWindow*>(sidebar->GetParent());
+    int sz = static_cast<int>(splitter->GetSize().GetWidth() * 0.7);
+    if (collapse) {
+        // Hide the sidebar
+        sidebar->Hide();
+        splitter->Unsplit(sidebar); // Remove the sidebar from the splitter
+    } else {
+        sidebar->Show();
+        splitter->SplitVertically(splitter->GetWindow1(), sidebar, splitter->GetSize().GetWidth() * 0.7);
+    }
+    q->Layout();
+    q->Refresh();
 }
 
 
