@@ -203,7 +203,8 @@ static bool stl_read(stl_file *stl, FILE *fp, int first_facet, bool first)
 			    sscanf(normal_buf[2], "%f", &facet.normal(2)) != 1) {
 			    // Normal was mangled. Maybe denormals or "not a number" were stored?
 			  	// Just reset the normal and silently ignore it.
-			  	memset(&facet.normal, 0, sizeof(facet.normal));
+			  	// Avoid raw-memory writes into non-trivially-copyable Eigen types.
+			  	facet.normal.setZero();
 			}
 		}
 
@@ -288,3 +289,4 @@ void stl_facet_stats(stl_file *stl, stl_facet facet, bool &first)
 		stl->stats.max = stl->stats.max.cwiseMax(facet.vertex[i]);
 	}
 }
+

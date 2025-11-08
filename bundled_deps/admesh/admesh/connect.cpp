@@ -140,12 +140,12 @@ struct HashTableEdges {
 
 	void insert_edge_exact(stl_file *stl, const HashEdge &edge)
 	{
-		this->insert_edge(stl, edge, [stl](const HashEdge& edge1, const HashEdge& edge2) { record_neighbors(stl, edge1, edge2); });
+		this->insert_edge(stl, edge, [stl](const HashEdge& edge1, const HashEdge& edge2) { HashTableEdges::record_neighbors(stl, edge1, edge2); });
 	}
 
 	void insert_edge_nearby(stl_file *stl, const HashEdge &edge)
 	{
-		this->insert_edge(stl, edge, [stl](const HashEdge& edge1, const HashEdge& edge2) { match_neighbors_nearby(stl, edge1, edge2); });
+		this->insert_edge(stl, edge, [stl](const HashEdge& edge1, const HashEdge& edge2) { HashTableEdges::match_neighbors_nearby(stl, edge1, edge2); });
 	}
 
 	// Hash table on edges
@@ -216,7 +216,6 @@ private:
 					// This is a match.  Record result in neighbors list.
 					match_neighbors(edge, *link->next);
 					// Delete the matched edge from the list.
-					HashEdge *temp = link->next;
 					link->next = link->next->next;
 					// pool.destroy(temp);
 #ifndef NDEBUG
@@ -482,9 +481,10 @@ void stl_check_facets_nearby(stl_file *stl, float tolerance)
 {
 	assert(stl->stats.connected_facets_3_edge <= stl->stats.connected_facets_2_edge);
 	assert(stl->stats.connected_facets_2_edge <= stl->stats.connected_facets_1_edge);
-	assert(stl->stats.connected_facets_1_edge <= stl->stats.number_of_facets);
+	// cast number_of_facets to int to avoid signed/unsigned comparison warnings
+	assert(stl->stats.connected_facets_1_edge <= static_cast<int>(stl->stats.number_of_facets));
 
-  	if (stl->stats.connected_facets_3_edge == stl->stats.number_of_facets)
+  	if (stl->stats.connected_facets_3_edge == static_cast<int>(stl->stats.number_of_facets))
     	// No need to check any further.  All facets are connected.
     	return;
 
@@ -533,7 +533,8 @@ void stl_remove_unconnected_facets(stl_file *stl)
 		  	for (int i = 0; i < 3; ++ i)
 		    	if (neighbors.neighbor[i] != -1) {
 			    	int &other_face_idx = stl->neighbors_start[neighbors.neighbor[i]].neighbor[(neighbors.which_vertex_not[i] + 1) % 3];
-			  		if (other_face_idx != stl->stats.number_of_facets) {
+			  		// compare with casted value to avoid signed/unsigned mismatch
+			  		if (other_face_idx != static_cast<int>(stl->stats.number_of_facets)) {
 			  			BOOST_LOG_TRIVIAL(info) << "in remove_facet: neighbor = " << other_face_idx << " numfacets = " << stl->stats.number_of_facets << " this is wrong";
 			    		return;
 			  		}

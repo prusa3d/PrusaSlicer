@@ -680,9 +680,9 @@ indexed_triangle_set Slic3r::cut2model(const SurfaceCut         &cut,
         assert(i.x() + back_offset < result.vertices.size());
         assert(i.y() + back_offset < result.vertices.size());
         assert(i.z() + back_offset < result.vertices.size());
-        assert(i.x() >= 0 && i.x() < cut.vertices.size());
-        assert(i.y() >= 0 && i.y() < cut.vertices.size());
-        assert(i.z() >= 0 && i.z() < cut.vertices.size());
+        assert(i.x() >= 0 && i.x() < static_cast<int>(cut.vertices.size()));
+        assert(i.y() >= 0 && i.y() < static_cast<int>(cut.vertices.size()));
+        assert(i.z() >= 0 && i.z() < static_cast<int>(cut.vertices.size()));
         // Y and Z is swapped CCW triangles for back side
         result.indices.emplace_back(i.x() + back_offset,
                                     i.z() + back_offset,
