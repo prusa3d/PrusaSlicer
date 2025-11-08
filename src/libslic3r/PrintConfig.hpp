@@ -1,4 +1,5 @@
 ///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas, Tomáš Mészáros @tamasmeszaros, Pavel Mikuš @Godrak, David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral, Enrico Turri @enricoturri1966
+///|/ Copyright (c) 2024 Felix Reißmann @Felix-Rm
 ///|/ Copyright (c) 2023 Pedro Lamas @PedroLamas
 ///|/ Copyright (c) 2020 Sergey Kovalev @RandoMan70
 ///|/ Copyright (c) 2021 Martin Budden
@@ -1038,6 +1039,8 @@ PRINT_CONFIG_CLASS_DEFINE(
 
     //Number of the layers needed for the exposure time fade [3;20]
     ((ConfigOptionInt,  faded_layers))/*= 10*/
+    //Number of layers the initial exposure time is repeated for [1;20]
+    ((ConfigOptionInt,  bottom_layers))/*= 2*/
 
     ((ConfigOptionFloat, slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>, slicing_mode))
@@ -1246,6 +1249,30 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                       material_density))
     ((ConfigOptionFloat,                       exposure_time))
     ((ConfigOptionFloat,                       initial_exposure_time))
+    ((ConfigOptionInt,                         exposure_pwm))
+    ((ConfigOptionInt,                         initial_exposure_pwm))
+    ((ConfigOptionFloat,                       sla_initial_primary_lift_distance))
+    ((ConfigOptionFloat,                       sla_initial_primary_lift_speed))
+    ((ConfigOptionFloat,                       sla_initial_primary_retract_distance))
+    ((ConfigOptionFloat,                       sla_initial_primary_retract_speed))
+    ((ConfigOptionFloat,                       sla_initial_secondary_lift_distance))
+    ((ConfigOptionFloat,                       sla_initial_secondary_lift_speed))
+    ((ConfigOptionFloat,                       sla_initial_secondary_retract_distance))
+    ((ConfigOptionFloat,                       sla_initial_secondary_retract_speed))
+    ((ConfigOptionFloat,                       sla_initial_wait_before_lift))
+    ((ConfigOptionFloat,                       sla_initial_wait_after_lift))
+    ((ConfigOptionFloat,                       sla_initial_wait_after_retract))
+    ((ConfigOptionFloat,                       sla_primary_lift_distance))
+    ((ConfigOptionFloat,                       sla_primary_lift_speed))
+    ((ConfigOptionFloat,                       sla_primary_retract_distance))
+    ((ConfigOptionFloat,                       sla_primary_retract_speed))
+    ((ConfigOptionFloat,                       sla_secondary_lift_distance))
+    ((ConfigOptionFloat,                       sla_secondary_lift_speed))
+    ((ConfigOptionFloat,                       sla_secondary_retract_distance))
+    ((ConfigOptionFloat,                       sla_secondary_retract_speed))
+    ((ConfigOptionFloat,                       sla_wait_before_lift))
+    ((ConfigOptionFloat,                       sla_wait_after_lift))
+    ((ConfigOptionFloat,                       sla_wait_after_retract))
     ((ConfigOptionFloats,                      material_correction))
     ((ConfigOptionFloat,                       material_correction_x))
     ((ConfigOptionFloat,                       material_correction_y))
@@ -1307,9 +1334,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                      elefant_foot_compensation))
     ((ConfigOptionFloat,                      elefant_foot_min_width))
     ((ConfigOptionFloat,                      gamma_correction))
-    ((ConfigOptionFloat,                      fast_tilt_time))
-    ((ConfigOptionFloat,                      slow_tilt_time))
-    ((ConfigOptionFloat,                      high_viscosity_tilt_time))
+    ((ConfigOptionFloat,                      time_estimate_correction))
+    ((ConfigOptionFloatNullable,              fast_tilt_time))
+    ((ConfigOptionFloatNullable,              slow_tilt_time))
+    ((ConfigOptionFloatNullable,              high_viscosity_tilt_time))
 //    ((ConfigOptionFloat,                      area_fill))
     ((ConfigOptionFloat,                      min_exposure_time))
     ((ConfigOptionFloat,                      max_exposure_time))
