@@ -642,7 +642,15 @@ std::vector<coordf_t> generate_object_layers(
                 const coordf_t z2 = layer_height_profile[next] * shrinkage_compensation_z;
                 const coordf_t h2 = layer_height_profile[next + 1];
                 height = lerp(h1, h2, (slice_z - z1) / (z2 - z1));
-                assert(height >= slicing_params.min_layer_height - EPSILON && height <= slicing_params.max_layer_height + EPSILON);
+                // FIXME: This function needs error return.
+                // Going to try aborting with empty {} instead of assert.
+                if (height < slicing_params.min_layer_height - EPSILON) {
+                    std::cerr << "Error: Layer height (" << height << ") below printer's minimum (" << slicing_params.min_layer_height << ").\n";
+                    return {};
+                } else if (height > slicing_params.max_layer_height + EPSILON) {
+                    std::cerr << "Error: Layer height (" << height << ") above printer's maximum (" << slicing_params.max_layer_height << ").\n";
+                    return {};
+                }
             }
         }
         slice_z = print_z + 0.5 * height;

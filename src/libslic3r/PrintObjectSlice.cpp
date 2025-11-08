@@ -573,7 +573,7 @@ void PrintObject::slice()
             }
         });
     if (m_layers.empty())
-        throw Slic3r::SlicingError("No layers were detected. You might want to repair your STL file(s) or check their size or thickness and retry.\n");    
+        throw Slic3r::SlicingError("No layers were detected. Either variable layer height exceeded this printer's min/max layer height capabilities or STL file(s) need repair. Change sizes or thickness and retry slicing.\n");    
     this->set_done(posSlice);
 }
 
