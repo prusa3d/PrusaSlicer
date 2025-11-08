@@ -2746,7 +2746,7 @@ LayerResult GCodeGenerator::process_layer(
             m_last_processor_extrusion_role = GCodeExtrusionRole::WipeTower;
 
         if (has_custom_gcode_to_emit && extruder_id_for_custom_gcode == int(extruder_extrusions.extruder_id)) {
-            assert(m_writer.extruder()->id() == extruder_id_for_custom_gcode);
+            assert(int(m_writer.extruder()->id()) == extruder_id_for_custom_gcode);
             assert(m_pending_pre_extrusion_gcode.empty());
             // Now we have picked the right extruder, so we can emit the custom g-code.
             gcode += ProcessLayer::emit_custom_gcode_per_print_z(*this, *layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());

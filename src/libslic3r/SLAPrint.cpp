@@ -674,7 +674,7 @@ std::string SLAPrint::validate(std::vector<std::string>*) const
     if (iexpt_cur < iexpt_min || iexpt_cur > iexpt_max)
         return _u8L("Initial exposition time is out of printer profile bounds.");
 
-    for (const std::string& prefix : { "", "branching" }) {
+    for (const std::string prefix : { "", "branching" }) {
 
         double head_penetration = m_full_print_config.opt_float(prefix + "support_head_penetration");
         double head_width       = m_full_print_config.opt_float(prefix + "support_head_width");

@@ -847,10 +847,12 @@ std::vector<std::pair<size_t, bool>> chain_segments_greedy_constrained_reversals
 		    	Chain *chain2 = (end_point2_chain_id == 0) ? nullptr : &chains.chain(end_point2_chain_id);
 				assert(chain1 == nullptr || (chain1_flip ? (chain1->begin == end_point1_other || chain1->end == end_point1_other) : (chain1->begin == end_point1 || chain1->end == end_point1)));
 				assert(chain2 == nullptr || (chain2_flip ? (chain2->begin == end_point2_other || chain2->end == end_point2_other) : (chain2->begin == end_point2 || chain2->end == end_point2)));
-				if (chain1_flip)
+				if (chain1_flip) {
 		    		chain1->flip(end_points);
-		    	if (chain2_flip)
+                }
+		    	if (chain2_flip) {
 		    		chain2->flip(end_points);
+                }
 				assert(chain1 == nullptr || chain1->begin == end_point1 || chain1->end == end_point1);
 				assert(chain2 == nullptr || chain2->begin == end_point2 || chain2->end == end_point2);
 		    	size_t chain_id = chains.merge(end_point1_chain_id, end_point2_chain_id);

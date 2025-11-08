@@ -180,7 +180,7 @@ void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Tra
         const BoundingBoxf bb = this->build_volume().bounding_volume2d();
 
         for (int i : beds_to_render) {
-            if (i + 1 >= m_digits_models.size())
+            if (static_cast<size_t>(i) + 1 >= m_digits_models.size())
                 break;
 
             double size_x = std::max(10., std::min(bb.size().x(), bb.size().y()) * 0.11);

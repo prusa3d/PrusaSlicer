@@ -771,7 +771,7 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 {
 	boost::any value;
 	if (opt_key == "bed_shape") {
-        for (const std::string& key : {"bed_custom_texture", "bed_custom_model"}) {
+        for (const std::string key : {"bed_custom_texture", "bed_custom_model"}) {
             value = config.opt_string(key);
             this->change_opt_value(key, value);
         }

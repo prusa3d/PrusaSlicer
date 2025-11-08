@@ -2752,7 +2752,7 @@ static void create_nodes_from_area(
                     if (elem.state.result_on_layer_is_set()) {
                         double radius_increase = support_element_radius(config, elem) - support_element_radius(config, parent);
                         assert(radius_increase >= 0);
-                        double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
+                        // double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
                         //FIXME this assert fails a lot. Is it correct?
 //                        assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
                     }
