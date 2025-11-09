@@ -6,6 +6,7 @@
 #define slic3r_GLGizmoScale_hpp_
 
 #include "GLGizmoBase.hpp"
+#include "slic3r/GUI/Selection.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -16,6 +17,10 @@ class GLGizmoScale3D : public GLGizmoBase
 {
     static const double Offset;
 
+    struct AdjacentVolumes
+    {
+        Selection::IndicesList    volumes[3][2]; // [X/Y/Z][Max/Min]
+    };
     struct StartingData
     {
         bool ctrl_down{ false };
@@ -25,6 +30,14 @@ class GLGizmoScale3D : public GLGizmoBase
         Vec3d instance_center{ Vec3d::Zero() };
         Vec3d constraint_position{ Vec3d::Zero() };
         BoundingBoxf3 box;
+        AdjacentVolumes adjacent_volumes;
+    };
+
+    // Indicates which other parts around the selected part will move.
+    enum class PartsRelationsAdjustment
+    {
+        MoveNone = 0,
+        MoveAll
     };
 
     BoundingBoxf3 m_bounding_box;
@@ -34,6 +47,15 @@ class GLGizmoScale3D : public GLGizmoBase
     Vec3d m_scale{ Vec3d::Ones() };
     double m_snap_step{ 0.05 };
     StartingData m_starting;
+    bool  m_imperial_units{ false };
+    PartsRelationsAdjustment m_relations_adjustment_mode{PartsRelationsAdjustment::MoveNone};
+    std::vector<std::string> m_relations_adjustment_modes{};
+    float m_label_width{ 0.f };
+    float m_control_width{ 200.f };
+    bool m_show_shortcuts{ false };
+    std::vector<std::pair<std::string, std::string>>  m_shortcuts;
+    float m_shortcut_label_width{ -1.f };
+
 
     struct GrabberConnection
     {
@@ -77,6 +99,9 @@ protected:
     virtual void on_render() override;
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
+    void on_render_input_window(float x, float y, float bottom_limit) override;
+    void render_shortcuts();
+    void adjust_window_position(float x, float y, float bottom_limit);
 
 private:
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color);
@@ -86,6 +111,9 @@ private:
 
     double calc_ratio(const UpdateData& data) const;
     void update_render_data();
+    static AdjacentVolumes get_adjacent_volumes(
+        Selection &selection, const BoundingBoxf3& world_bounding_box
+    );
 };
 
 
