@@ -43,6 +43,7 @@
 #include "BitmapCache.hpp"
 #include "BonjourDialog.hpp"
 #include "MsgDialog.hpp"
+#include "SecretStore.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -160,79 +161,6 @@ void PresetForPrinter::on_sys_color_changed()
     m_delete_preset_btn->sys_color_changed();
 }
 
-namespace {
-
-bool is_secret_store_ok()
-{
-#if wxUSE_SECRETSTORE 
-    wxSecretStore store = wxSecretStore::GetDefault();
-    wxString errmsg;
-    if (!store.IsOk(&errmsg)) {
-        BOOST_LOG_TRIVIAL(warning) << "wxSecretStore is not supported: " << errmsg;
-        return false;
-    }
-    return true;
-#else
-    return false;
-#endif
-}
-bool save_secret(const std::string& id, const std::string& opt, const std::string& usr, const std::string& psswd)
-{
-#if wxUSE_SECRETSTORE 
-    wxSecretStore store = wxSecretStore::GetDefault();
-    wxString errmsg;
-    if (!store.IsOk(&errmsg)) {
-        std::string msg = GUI::format("%1% (%2%).", _u8L("This system doesn't support storing passwords securely"), errmsg);
-        BOOST_LOG_TRIVIAL(error) << msg;
-        show_error(nullptr, msg);
-        return false;
-    }
-    const wxString service = GUI::format_wxstr(L"%1%/PhysicalPrinter/%2%/%3%", SLIC3R_APP_NAME, id, opt);
-    const wxString username = boost::nowide::widen(usr);
-    const wxSecretValue password(boost::nowide::widen(psswd));
-    if (!store.Save(service, username, password)) {
-        std::string msg(_u8L("Failed to save credentials to the system password store."));
-        BOOST_LOG_TRIVIAL(error) << msg;
-        show_error(nullptr, msg);
-        return false;
-    }
-    return true;
-#else
-    BOOST_LOG_TRIVIAL(error) << "wxUSE_SECRETSTORE not supported. Cannot save password to the system store.";
-    return false;
-#endif // wxUSE_SECRETSTORE 
-}
-bool load_secret(const std::string& id, const std::string& opt, std::string& usr, std::string& psswd)
-{
-#if wxUSE_SECRETSTORE
-    wxSecretStore store = wxSecretStore::GetDefault();
-    wxString errmsg;
-    if (!store.IsOk(&errmsg)) {
-        std::string msg = GUI::format("%1% (%2%).", _u8L("This system doesn't support storing passwords securely"), errmsg);
-        BOOST_LOG_TRIVIAL(error) << msg;
-        show_error(nullptr, msg);
-        return false;
-    }
-    const wxString service = GUI::format_wxstr(L"%1%/PhysicalPrinter/%2%/%3%", SLIC3R_APP_NAME, id, opt);
-    wxString username;
-    wxSecretValue password;
-    if (!store.Load(service, username, password)) {
-        std::string msg(_u8L("Failed to load credentials from the system password store."));
-        BOOST_LOG_TRIVIAL(error) << msg;
-        show_error(nullptr, msg);
-        return false;
-    }
-    usr = into_u8(username);
-    psswd = into_u8(password.GetAsString());
-    return true;
-#else
-    BOOST_LOG_TRIVIAL(error) << "wxUSE_SECRETSTORE not supported. Cannot load password from the system store.";
-    return false;
-#endif // wxUSE_SECRETSTORE 
-}
-}
-
-
 //------------------------------------------
 //          PhysicalPrinterDialog
 //------------------------------------------
@@ -281,31 +209,8 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
         const std::set<std::string>& preset_names = printer->get_preset_names();
         for (const std::string& preset_name : preset_names)
             m_presets.emplace_back(new PresetForPrinter(this, preset_name));
-        // "stored" indicates data are stored secretly, load them from store.
-        if (m_printer.config.opt_string("printhost_user") == "stored" && m_printer.config.opt_string("printhost_password") == "stored") {
-            std::string username;
-            std::string password;
-            if (load_secret(m_printer.name, "printhost_password", username, password)) {
-                if (!username.empty())
-                    m_printer.config.opt_string("printhost_user") = username;
-                if (!password.empty())
-                    m_printer.config.opt_string("printhost_password") = password;
-            } else {
-                m_printer.config.opt_string("printhost_user") = std::string();
-                m_printer.config.opt_string("printhost_password") = std::string();
-            }
-        }
-
-        if (m_printer.config.opt_string("printhost_apikey") == "stored") {
-            std::string dummy;
-            std::string apikey;
-            if (load_secret(m_printer.name, "printhost_apikey", dummy, apikey)) {
-                if (!apikey.empty())
-                    m_printer.config.opt_string("printhost_apikey") = apikey;
-            } else {
-                m_printer.config.opt_string("printhost_apikey") = std::string();
-            }
-        }
+        // Load stored credentials
+        SecretStore::load_printer_credentials(m_printer.name, &m_printer.config);
     }
 
     if (m_presets.size() == 1)
@@ -542,8 +447,8 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         m_optgroup->append_line(line);
     }
 
-    // Text line with info how passwords and api keys are stored 
-    if (is_secret_store_ok()) {
+    // Text line with info how passwords and api keys are stored
+    if (SecretStore::is_supported()) {
         Line line{ "", "" };
         line.full_width = 1;
         line.widget = [ca_file_hint](wxWindow* parent) {
@@ -977,19 +882,8 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
     //update printer name, if it was changed
     m_printer.set_name(into_u8(printer_name));
 
-    // save access data secretly
-    if (!m_printer.config.opt_string("printhost_password").empty()) {
-        if (save_secret(m_printer.name, "printhost_password", m_printer.config.opt_string("printhost_user"), m_printer.config.opt_string("printhost_password"))) {
-            m_printer.config.opt_string("printhost_password", false) = "stored";
-        }
-    }
-    if (!m_printer.config.opt_string("printhost_apikey").empty()) {
-        if (save_secret(m_printer.name, "printhost_apikey",
-                        "apikey", /* username will be ignored */
-                        m_printer.config.opt_string("printhost_apikey"))) {
-            m_printer.config.opt_string("printhost_apikey", false) = "stored";
-        }
-    }
+    // Save credentials to secret store
+    SecretStore::save_printer_credentials(m_printer.name, &m_printer.config);
 
     // save new physical printer
     printers.save_printer(m_printer, renamed_from);

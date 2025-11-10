@@ -133,6 +133,7 @@
 #include "FileArchiveDialog.hpp"
 #include "UserAccount.hpp"
 #include "UserAccountUtils.hpp"
+#include "SecretStore.hpp"
 #include "DesktopIntegrationDialog.hpp"
 #include "WebViewDialog.hpp"
 #include "WebViewPanel.hpp"
@@ -6499,36 +6500,6 @@ void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &
     this->reslice_until_step_inner(SLAPrintObjectStep(step), object, postpone_error_messages);
 }
 
-namespace {
-bool load_secret(const std::string& id, const std::string& opt, std::string& usr, std::string& psswd)
-{
-#if wxUSE_SECRETSTORE
-    wxSecretStore store = wxSecretStore::GetDefault();
-    wxString errmsg;
-    if (!store.IsOk(&errmsg)) {
-        std::string msg = GUI::format("%1% (%2%).", _u8L("This system doesn't support storing passwords securely"), errmsg);
-        BOOST_LOG_TRIVIAL(error) << msg;
-        show_error(nullptr, msg);
-        return false;
-    }
-    const wxString service = GUI::format_wxstr(L"%1%/PhysicalPrinter/%2%/%3%", SLIC3R_APP_NAME, id, opt);
-    wxString username;
-    wxSecretValue password;
-    if (!store.Load(service, username, password)) {
-        std::string msg(_u8L("Failed to load credentials from the system password store."));
-        BOOST_LOG_TRIVIAL(error) << msg;
-        show_error(nullptr, msg);
-        return false;
-    }
-    usr = into_u8(username);
-    psswd = into_u8(password.GetAsString());
-    return true;
-#else
-    BOOST_LOG_TRIVIAL(error) << "wxUSE_SECRETSTORE not supported. Cannot load password from the system store.";
-    return false;
-#endif // wxUSE_SECRETSTORE 
-}
-}
 
 
 void Plater::printables_to_connect_gcode(const std::string& url)
@@ -6695,31 +6666,10 @@ void Plater::send_gcode()
     if (! physical_printer_config || p->model.objects.empty())
         return;
 
-    // Passwords and API keys
-    // "stored" indicates data are stored secretly, load them from store.
+    // Load stored credentials
     std::string printer_name = wxGetApp().preset_bundle->physical_printers.get_selected_printer().name;
-    if (physical_printer_config->opt_string("printhost_user") == "stored" && physical_printer_config->opt_string("printhost_password") == "stored") {
-        std::string username;
-        std::string password;
-        if (load_secret(printer_name, "printhost_password", username, password)) {
-            if (!username.empty())
-                physical_printer_config->opt_string("printhost_user") = username;
-            if (!password.empty())
-                physical_printer_config->opt_string("printhost_password") = password;
-        }
-        else {
-            physical_printer_config->opt_string("printhost_user") = std::string();
-            physical_printer_config->opt_string("printhost_password") = std::string();
-        }
-    }
-    if (physical_printer_config->opt_string("printhost_apikey") == "stored") {
-        std::string dummy;
-        std::string apikey;
-        if (load_secret(printer_name, "printhost_apikey", dummy, apikey) && !apikey.empty())
-            physical_printer_config->opt_string("printhost_apikey") = apikey;
-        else
-            physical_printer_config->opt_string("printhost_apikey") = std::string();
-    }
+    SecretStore::load_printer_credentials(printer_name, physical_printer_config);
+
     send_gcode_inner(physical_printer_config);
 }
 
