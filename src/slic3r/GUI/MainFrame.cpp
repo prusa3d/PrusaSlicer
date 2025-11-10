@@ -66,6 +66,7 @@
 #include "Preferences.hpp"
 #include "WebViewPanel.hpp"
 #include "UserAccount.hpp"
+#include "SecretStore.hpp"
 
 #ifdef _WIN32
 #include <dbt.h>
@@ -932,11 +933,15 @@ void MainFrame::show_printer_webview_tab(DynamicPrintConfig* dpc)
         if (url.find("http://") != 0 && url.find("https://") != 0) {
             url = "http://" + url;
         }
-        // set password / api key
+
+        // Load stored credentials
+        std::string printer_name = wxGetApp().preset_bundle->physical_printers.get_selected_printer().name;
+        SecretStore::load_printer_credentials(printer_name, dpc);
+
+        // Set credentials for webview
         if (dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(dpc->option("printhost_authorization_type"))->value == AuthorizationType::atKeyPassword) {
             set_printer_webview_api_key(dpc->opt_string("printhost_apikey"));
-        }
-        else {
+        } else {
             set_printer_webview_credentials(dpc->opt_string("printhost_user"), dpc->opt_string("printhost_password"));
         }
         add_printer_webview_tab(from_u8(url));

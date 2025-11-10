@@ -157,6 +157,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/BulkExportDialog.cpp
     GUI/PhysicalPrinterDialog.hpp
     GUI/PhysicalPrinterDialog.cpp
+    GUI/SecretStore.hpp
+    GUI/SecretStore.cpp
     GUI/GUI_Factories.cpp
     GUI/GUI_Factories.hpp
     GUI/GUI_ObjectList.cpp
