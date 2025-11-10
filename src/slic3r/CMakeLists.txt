@@ -447,7 +447,7 @@ target_link_libraries(
     libcereal
     imgui
     libvgcode
-    GLEW::GLEW
+    GLAD::GL
     OpenGL::GL
     hidapi
     libcurl

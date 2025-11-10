@@ -4,7 +4,7 @@
 ///|/
 #include "EmbossStyleManager.hpp"
 #include <optional>
-#include <GL/glew.h> // Imgui texture
+#include <glad/gl.h>
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif

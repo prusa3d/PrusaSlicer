@@ -1,6 +1,7 @@
 add_subdirectory(admesh)
 add_subdirectory(avrdude)
 add_subdirectory(miniz)
+add_subdirectory(glad)
 add_subdirectory(glu-libtess)
 add_subdirectory(agg)
 add_subdirectory(libigl)
