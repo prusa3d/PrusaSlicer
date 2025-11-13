@@ -2706,6 +2706,13 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats { 2. });
 
+    def = this->add("min_wipe_length", coFloats);
+    def->label = L("Minimum wipe length");
+    def->tooltip = L("Minimum length to move while wiping, even if retraction finishes earlier.");
+    def->sidetext = L("mm");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats { 0.0 });
+
     def = this->add("retract_before_wipe", coPercents);
     def->label = L("Retract amount before wipe");
     def->tooltip = L("With bowden extruders, it may be wise to do some amount of quick retract "
@@ -3984,6 +3991,7 @@ void PrintConfigDef::init_fff_params()
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed",
         "travel_max_lift",
         "deretract_speed", "retract_restart_extra", "retract_before_travel", "retract_length_toolchange", "retract_restart_extra_toolchange",
+        "min_wipe_length",
         // bools
         "retract_layer_change", "wipe", "travel_lift_before_obstacle", "travel_ramping_lift",
         // percents
@@ -4049,7 +4057,7 @@ void PrintConfigDef::init_extruder_option_keys()
     m_extruder_option_keys = {
         "nozzle_diameter", "min_layer_height", "max_layer_height", "extruder_offset",
         "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed",
-        "retract_before_wipe", "retract_restart_extra", "retract_before_travel", "wipe",
+        "retract_before_wipe", "retract_restart_extra", "retract_before_travel", "wipe", "min_wipe_length",
         "travel_slope", "travel_max_lift", "travel_ramping_lift", "travel_lift_before_obstacle",
         "retract_layer_change", "retract_length_toolchange", "retract_restart_extra_toolchange", "extruder_colour",
         "default_filament_profile", "nozzle_high_flow"
@@ -4057,6 +4065,7 @@ void PrintConfigDef::init_extruder_option_keys()
 
     m_extruder_retract_keys = {
         "deretract_speed",
+        "min_wipe_length",
         "retract_before_travel",
         "retract_before_wipe",
         "retract_layer_change",
