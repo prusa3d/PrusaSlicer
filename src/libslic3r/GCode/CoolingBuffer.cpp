@@ -1263,13 +1263,13 @@ std::string CoolingBuffer::apply_layer_cooldown(
         }
 
         if (line->type & CoolingLine::TYPE_SET_TOOL) {
+            new_gcode.append(line_start, line_end - line_start);
             unsigned int new_extruder = 0;
             auto res = std::from_chars(line_start + m_toolchange_prefix.size(), line_end, new_extruder);
             if (res.ec != std::errc::invalid_argument && new_extruder != m_current_extruder) {
                 m_current_extruder = new_extruder;
                 change_extruder_set_fan();
             }
-            new_gcode.append(line_start, line_end - line_start);
         } else if (line->type & CoolingLine::TYPE_SET_FAN_SPEED) {
             change_extruder_set_fan(line->fan_speed);
         } else if (line->type & CoolingLine::TYPE_RESET_FAN_SPEED){
