@@ -533,7 +533,9 @@ static std::vector<std::string> s_Preset_filament_options {
     // Profile compatibility
     "filament_vendor", "compatible_prints", "compatible_prints_condition", "compatible_printers", "compatible_printers_condition", "inherits",
     // Shrinkage compensation
-    "filament_shrinkage_compensation_xy", "filament_shrinkage_compensation_z",
+    "filament_shrinkage_compensation_x",
+    "filament_shrinkage_compensation_y",
+    "filament_shrinkage_compensation_z",
     // Seams overrides
     "filament_seam_gap_distance"
 };

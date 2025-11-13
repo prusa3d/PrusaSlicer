@@ -219,7 +219,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             // In Spiral Vase mode, holes are closed and only the largest area contour is kept at each layer.
             // Therefore toggling the Spiral Vase on / off requires complete reslicing.
             || opt_key == "spiral_vase"
-            || opt_key == "filament_shrinkage_compensation_xy"
+            || opt_key == "filament_shrinkage_compensation_x"
+            || opt_key == "filament_shrinkage_compensation_y"
             || opt_key == "filament_shrinkage_compensation_z"
             || opt_key == "prefer_clockwise_movements") {
             osteps.emplace_back(posSlice);
@@ -1591,12 +1592,15 @@ bool Print::has_same_shrinkage_compensations() const {
     if (extruders.empty())
         return false;
 
-    const double filament_shrinkage_compensation_xy = m_config.filament_shrinkage_compensation_xy.get_at(extruders.front());
-    const double filament_shrinkage_compensation_z  = m_config.filament_shrinkage_compensation_z.get_at(extruders.front());
+    const unsigned first_extr = extruders.front();
+    const double x_comp0 = m_config.filament_shrinkage_compensation_x.get_at(first_extr);
+    const double y_comp0 = m_config.filament_shrinkage_compensation_y.get_at(first_extr);
+    const double z_comp0 = m_config.filament_shrinkage_compensation_z.get_at(first_extr);
 
     for (unsigned int extruder : extruders) {
-        if (filament_shrinkage_compensation_xy != m_config.filament_shrinkage_compensation_xy.get_at(extruder) ||
-            filament_shrinkage_compensation_z  != m_config.filament_shrinkage_compensation_z.get_at(extruder)) {
+        if (x_comp0 != m_config.filament_shrinkage_compensation_x.get_at(extruder)
+        || y_comp0 != m_config.filament_shrinkage_compensation_y.get_at(extruder)
+        || z_comp0 != m_config.filament_shrinkage_compensation_z.get_at(extruder)) {
             return false;
         }
     }
@@ -1611,12 +1615,15 @@ Vec3d Print::shrinkage_compensation() const
         return Vec3d::Ones();
 
     const unsigned int first_extruder          = this->extruders().front();
-    const double       xy_compensation_percent = std::clamp(m_config.filament_shrinkage_compensation_xy.get_at(first_extruder), -99., 99.);
-    const double       z_compensation_percent  = std::clamp(m_config.filament_shrinkage_compensation_z.get_at(first_extruder), -99., 99.);
-    const double       xy_compensation         = 100. / (100. - xy_compensation_percent);
-    const double       z_compensation          = 100. / (100. - z_compensation_percent);
+    const double x_percent = std::clamp(m_config.filament_shrinkage_compensation_x.get_at(first_extruder), -99., 99.);
+    const double y_percent = std::clamp(m_config.filament_shrinkage_compensation_y.get_at(first_extruder), -99., 99.);
+    const double z_percent = std::clamp(m_config.filament_shrinkage_compensation_z.get_at(first_extruder), -99., 99.);
 
-    return { xy_compensation, xy_compensation, z_compensation };
+    const double x_comp = 100. / (100. - x_percent);
+    const double y_comp = 100. / (100. - y_percent);
+    const double z_comp = 100. / (100. - z_percent);
+
+    return { x_comp, y_comp, z_comp };
 }
 
 const std::string PrintStatistics::FilamentUsedG     = "filament used [g]";
