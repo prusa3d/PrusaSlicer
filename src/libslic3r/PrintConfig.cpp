@@ -1379,6 +1379,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloats { 3.4 });
 
+    def = this->add("filament_cooling_wait_for_temp", coBools);
+    def->label = L("Wait for the nozzle to cool before the last cooling move");
+    def->tooltip = L("During the cooling moves, the nozzle gradually approaches the optimal temperature for forming "
+                     "a good filament tip prior to unloading. If the ambient temperature is too high, the nozzle may not "
+                     "reach the desired temperature, resulting in stringing which can cause blobs or misloads later. "
+                     "When checked, the printer will wait for the optimal temperature before finishing the last cooling "
+                     "move to increase the chances of a good tip. This option requires at least 2 cooling moves to work.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBools { false });
+
     def = this->add("filament_purge_multiplier", coPercents);
     def->label = L("Purge volume multiplier");
     def->tooltip = L("Purging volume on the wipe tower is determined by 'multimaterial_purging' in Printer Settings. "

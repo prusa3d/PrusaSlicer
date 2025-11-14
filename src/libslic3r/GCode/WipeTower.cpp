@@ -350,11 +350,11 @@ public:
 		return *this;
 	}
 
-	// Set extruder temperature, don't wait by default.
-	WipeTowerWriter& set_extruder_temp(int temperature, bool wait = false)
+	// Set extruder temperature, optionally wait.
+	WipeTowerWriter& set_extruder_temp(int temperature, bool wait)
 	{
         m_gcode += "G4 S0\n"; // to flush planner queue
-        m_gcode += "M" + std::to_string(wait ? 109 : 104) + " S" + std::to_string(temperature) + "\n";
+        m_gcode += "M" + std::string(wait ? "109 R" : "104 S") + std::to_string(temperature) + "\n";
         return *this;
     }
 
@@ -639,6 +639,7 @@ void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
         m_filpar[idx].cooling_moves           = config.filament_cooling_moves.get_at(idx);
         m_filpar[idx].cooling_initial_speed   = float(config.filament_cooling_initial_speed.get_at(idx));
         m_filpar[idx].cooling_final_speed     = float(config.filament_cooling_final_speed.get_at(idx));
+        m_filpar[idx].cooling_wait_for_temp   = float(config.filament_cooling_wait_for_temp.get_at(idx));
         m_filpar[idx].filament_stamping_loading_speed     = float(config.filament_stamping_loading_speed.get_at(idx));
         m_filpar[idx].filament_stamping_distance          = float(config.filament_stamping_distance.get_at(idx));
     }
@@ -898,13 +899,14 @@ void WipeTower::toolchange_Unload(
 
     const bool do_ramming = m_semm || m_filpar[m_current_tool].multitool_ramming;
     const bool cold_ramming = m_is_mk4mmu3;
+    const int cold_ramming_temperature = old_temperature - 20;
 
     if (do_ramming) {
         writer.travel(ramming_start_pos); // move to starting position
         if (! m_is_mk4mmu3)
             writer.disable_linear_advance();
         if (cold_ramming)
-            writer.set_extruder_temp(old_temperature - 20);
+            writer.set_extruder_temp(cold_ramming_temperature, false);
     }
     else
         writer.set_position(ramming_start_pos);
@@ -1042,9 +1044,13 @@ void WipeTower::toolchange_Unload(
                 writer.retract(stamping_dist_e, m_filpar[m_current_tool].unloading_speed * 60.f);
             }
 
+            if (m_filpar[m_current_tool].cooling_wait_for_temp && i == number_of_cooling_moves - 2 && cold_ramming) {
+                // Do at least one full cycle at the cooling temperature before warming up again.
+                writer.set_extruder_temp(cold_ramming_temperature, true);
+            }
             if (i == number_of_cooling_moves - 1 && change_temp_later) {
                 // If cold_ramming, the temperature change should be done before the last cooling move.
-                    writer.set_extruder_temp(new_temperature, false);
+                writer.set_extruder_temp(new_temperature, false);
             }
 
             float speed = initial_speed + speed_inc * 2*i;

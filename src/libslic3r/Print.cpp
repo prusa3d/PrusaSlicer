@@ -238,6 +238,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "filament_minimal_purge_on_wipe_tower"
             || opt_key == "filament_cooling_initial_speed"
             || opt_key == "filament_cooling_final_speed"
+            || opt_key == "filament_cooling_wait_for_temp"
             || opt_key == "filament_purge_multiplier"
             || opt_key == "filament_ramming_parameters"
             || opt_key == "filament_multitool_ramming"
