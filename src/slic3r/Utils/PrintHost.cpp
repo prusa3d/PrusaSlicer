@@ -30,6 +30,7 @@
 #include "MKS.hpp"
 #include "Moonraker.hpp"
 #include "PrusaConnect.hpp"
+#include "3DPrinterOS.hpp"
 #include "../GUI/PrintHostDialogs.hpp"
 
 namespace fs = boost::filesystem;
@@ -67,6 +68,7 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
             case htPrusaConnectNew: return new PrusaConnectNew(config);
             case htMKS:       return new MKS(config);
             case htMoonraker: return new Moonraker(config);
+            case ht3DPrinterOS: return new C3DPrinterOS(config);
             default:          return nullptr;
         }
     } else {

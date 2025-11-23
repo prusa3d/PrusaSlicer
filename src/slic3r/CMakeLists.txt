@@ -394,6 +394,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/PrusaConnect.cpp
     Utils/ServiceConfig.hpp
     Utils/ServiceConfig.cpp
+    Utils/3DPrinterOS.hpp
+    Utils/3DPrinterOS.cpp
 )
 
 find_package(NanoSVG REQUIRED)

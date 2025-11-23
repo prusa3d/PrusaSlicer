@@ -78,6 +78,10 @@ public:
     virtual std::string get_unusable_symbols() const { return {}; }
 
     static PrintHost* get_print_host(DynamicPrintConfig *config);
+    // Support for cloud webui login
+    virtual bool is_cloud() const { return false; }
+    virtual bool is_logged_in() const { return false; }
+    virtual void log_out() const {}
 
 protected:
     virtual wxString format_error(const std::string &body, const std::string &error, unsigned status) const;
