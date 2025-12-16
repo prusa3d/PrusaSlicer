@@ -1933,6 +1933,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
 
+    def = this->add("first_layer_travel_acceleration", coFloat);
+    def->label = L("First layer travel");
+    def->tooltip = L("This is the acceleration your printer will use for travel moves during the first layer. If set to zero, travel_acceleration will be used.");
+    def->sidetext = L("mm/s²");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("infill_every_layers", coInt);
     def->label = L("Combine infill every");
     def->category = L("Infill");
@@ -3791,6 +3799,15 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.));
+
+    def = this->add("first_layer_travel_speed", coFloat);
+    def->label = L("First layer travel");
+    def->tooltip = L("Speed for travel moves (jumps between distant extrusion points).\nWhen set to zero, the value is ignored and regular travel speed is used instead.");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.));
+
 
     def = this->add("use_firmware_retraction", coBool);
     def->label = L("Use firmware retraction");

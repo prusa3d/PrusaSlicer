@@ -84,8 +84,8 @@ public:
      * @param to Where to travel to.
      * @param comment Description of the travel purpose.
      */
-    std::string travel_to_xyz(const Vec3d &to, const std::string_view comment = {});
-    std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
+    std::string travel_to_xyz(const Vec3d &to, const std::string_view comment = {}, bool on_first_layer = false);
+    std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {}, bool on_first_layer = false);
     std::string travel_to_z(double z, const std::string_view comment = {});
 
     std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
@@ -98,8 +98,8 @@ public:
      * @param to The point to travel to.
      * @param comment Description of the travel purpose.
      */
-    std::string travel_to_xyz_force(const Vec3d &to, const std::string_view comment = {});
-    std::string travel_to_xy_force(const Vec2d &point, const std::string_view comment = {});
+    std::string travel_to_xyz_force(const Vec3d &to, const std::string_view comment = {}, bool on_first_layer = false);
+    std::string travel_to_xy_force(const Vec2d &point, const std::string_view comment = {}, bool on_first_layer = false);
     std::string travel_to_z_force(double z, const std::string_view comment = {});
 
     /**
