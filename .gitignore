@@ -1,23 +1,96 @@
+# Build directories
 Build
 Build.bat
 /build/
+build/
+build-*/
+build-linux/*
+_build
+deps/build*
+deps/build-*/
+deps/build-linux/*
+
+# CMake build files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+*.cmake.user
+CMakeUserPresets.json
+
+# CMake generated files in deps/
+deps/CMakeCache.txt
+deps/CMakeFiles/
+deps/cmake_install.cmake
+deps/Makefile
+deps/CTestTestfile.cmake
+deps/downloads/
+deps/destdir/
+
+# Compiled Object files
+*.o
+*.obj
+*.lo
+*.slo
+*.ko
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# IDE and Editor files
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Perl build files (legacy)
 MYMETA.json
 MYMETA.yml
-_build
 blib
 xs/buildtmp
-*.o
 MANIFEST.bak
 xs/MANIFEST.bak
 xs/assertlib*
 .init_bundle.ini
-.vs/*
+
+# Other
 /src/TAGS
-/.vscode/
-build-linux/*
-deps/build*
-deps/build-linux/*
-**/.DS_Store
-**/.idea/
 .pkg_cache
-CMakeUserPresets.json
+**/.DS_Store
