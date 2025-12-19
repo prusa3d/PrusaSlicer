@@ -6111,6 +6111,55 @@ void TabSLAPrint::clear_pages()
     m_support_object_elevation_description_line = nullptr;
 }
 
+void TabFiber::build()
+{
+    m_presets = &m_preset_bundle->prints;
+    load_initial_data();
+
+    auto page = add_options_page(L("Basic Settings"), "fiber_basic");
+        auto optgroup = page->new_optgroup(L("Enable Fiber Reinforcement"));
+        optgroup->append_single_option_line("enable_fiber_reinforcement");
+        optgroup->append_single_option_line("fiber_type");
+        optgroup->append_single_option_line("fiber_print_method");
+
+    page = add_options_page(L("Placement"), "fiber_placement");
+        optgroup = page->new_optgroup(L("Pattern"));
+        optgroup->append_single_option_line("fiber_pattern");
+        optgroup->append_single_option_line("fiber_spacing");
+        optgroup->append_single_option_line("fiber_angle");
+        optgroup->append_single_option_line("fiber_placement_zone");
+
+        optgroup = page->new_optgroup(L("Layer Selection"));
+        optgroup->append_single_option_line("fiber_layer_interval");
+        optgroup->append_single_option_line("fiber_start_layer");
+        optgroup->append_single_option_line("fiber_end_layer");
+
+    page = add_options_page(L("Extruders"), "fiber_extruders");
+        optgroup = page->new_optgroup(L("Extruder Assignment"));
+        optgroup->append_single_option_line("plastic_extruder_id");
+        optgroup->append_single_option_line("fiber_extruder_id");
+        optgroup->append_single_option_line("embedded_fiber_extruder_id");
+
+    page = add_options_page(L("Print Sequence"), "fiber_sequence");
+        optgroup = page->new_optgroup(L("Sequence"));
+        optgroup->append_single_option_line("fiber_print_sequence");
+        optgroup->append_single_option_line("fiber_delay_after_plastic");
+        optgroup->append_single_option_line("fiber_cooling_time");
+        optgroup->append_single_option_line("fiber_wait_for_cooling");
+
+    page = add_options_page(L("Speed and Control"), "fiber_speed");
+        optgroup = page->new_optgroup(L("Speed"));
+        optgroup->append_single_option_line("fiber_speed");
+        optgroup->append_single_option_line("fiber_pressure");
+
+    page = add_options_page(L("G-code"), "fiber_gcode");
+        optgroup = page->new_optgroup(L("G-code Commands"));
+        optgroup->append_single_option_line("fiber_start_command");
+        optgroup->append_single_option_line("fiber_stop_command");
+        optgroup->append_single_option_line("fiber_speed_command");
+        optgroup->append_single_option_line("fiber_enable_comments");
+}
+
 ConfigManipulation Tab::get_config_manipulation()
 {
     auto load_config = [this]()

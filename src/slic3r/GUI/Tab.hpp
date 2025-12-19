@@ -460,6 +460,21 @@ private:
 	SubstitutionManager m_subst_manager;
 };
 
+class TabFiber : public Tab
+{
+public:
+	TabFiber(wxBookCtrlBase* parent) :
+        Tab(parent, _(L("Fiber Reinforcement")), Slic3r::Preset::TYPE_PRINT) {}
+	~TabFiber() {}
+
+	void		build() override;
+	void		update_description_lines() override {}
+	void		toggle_options() override {}
+	void		update() override {}
+	void		clear_pages() override {}
+	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+};
+
 class TabFilament : public Tab
 {
     BitmapComboBox* m_extruders_cb {nullptr};

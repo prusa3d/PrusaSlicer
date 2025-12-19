@@ -116,6 +116,8 @@ public:
         CenterOfGravity,
         Shells,
         ToolMarker,
+        FiberPaths,      // Phase 7.2: Fiber path visibility
+        FiberArrows,     // Phase 7.2: Fiber direction arrows visibility
     };
 
     Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
@@ -170,6 +172,9 @@ private:
 
     void load_print_as_fff(bool keep_z_range = false);
     void load_print_as_sla();
+    
+    // Load fiber paths for preview (Phase 7.2)
+    void load_fiber_paths(const Print* print);
 
     void on_layers_slider_scroll_changed();
     void on_moves_slider_scroll_changed();

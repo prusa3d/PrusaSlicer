@@ -2068,13 +2068,23 @@ wxSize GUI_App::get_min_size(wxWindow* display_win) const
 
     const wxDisplay display = wxDisplay(display_win);
     wxRect display_rect = display.GetGeometry();
-    display_rect.width  *= 0.75;
-    display_rect.height *= 0.75;
+    
+    // Safety check: ensure display geometry is valid (fixes WSL/GTK assertion failure)
+    if (display_rect.GetWidth() > 0 && display_rect.GetHeight() > 0) {
+        display_rect.width  *= 0.75;
+        display_rect.height *= 0.75;
 
-    if (min_size.x > display_rect.GetWidth())
-        min_size.x = display_rect.GetWidth();
-    if (min_size.y > display_rect.GetHeight())
-        min_size.y = display_rect.GetHeight();
+        if (min_size.x > display_rect.GetWidth())
+            min_size.x = display_rect.GetWidth();
+        if (min_size.y > display_rect.GetHeight())
+            min_size.y = display_rect.GetHeight();
+    }
+    // If display geometry is invalid, use default min_size (already calculated above)
+    
+    // Final safety check: ensure returned size is valid
+    if (min_size.GetWidth() <= 0 || min_size.GetHeight() <= 0) {
+        min_size = wxSize(760, 490);  // Fallback to safe default
+    }
 
     return min_size;
 }

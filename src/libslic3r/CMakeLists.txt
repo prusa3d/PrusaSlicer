@@ -342,6 +342,26 @@ set(SLIC3R_SOURCES
     SLAPrintSteps.cpp
     SLAPrintSteps.hpp
     SLAPrint.hpp
+    FiberPrint.cpp
+    FiberPrintSteps.cpp
+    FiberPrintSteps.hpp
+    FiberPrint.hpp
+    Fiber/FiberLayer.cpp
+    Fiber/FiberLayer.hpp
+    Fiber/FiberPrintObject.cpp
+    Fiber/FiberPrintObject.hpp
+    Fiber/FiberPlacement.cpp
+    Fiber/FiberPlacement.hpp
+    Fiber/PathPlanner.cpp
+    Fiber/PathPlanner.hpp
+    Fiber/FiberPlasticCoordinator.cpp
+    Fiber/FiberPlasticCoordinator.hpp
+    Fiber/FiberGCode.cpp
+    Fiber/FiberGCode.hpp
+    Fiber/FiberAdvanced.cpp
+    Fiber/FiberAdvanced.hpp
+    Fiber/FiberStatistics.cpp
+    Fiber/FiberStatistics.hpp
     Slicing.cpp
     Slicing.hpp
     SlicesToTriangleMesh.hpp

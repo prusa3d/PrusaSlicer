@@ -18,6 +18,7 @@
 #include "libslic3r/PrintBase.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/FiberPrint.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 
@@ -91,6 +92,7 @@ public:
 	void set_temp_output_path(int bed_idx);
 	void set_fff_print(Print* print) { if (m_fff_print != print) stop(); m_fff_print = print; }
     void set_sla_print(SLAPrint *print) { if (m_sla_print != print) stop(); m_sla_print = print; }
+    void set_fiber_print(FiberPrint *print) { if (m_fiber_print != print) stop(); m_fiber_print = print; }
 	void set_thumbnail_cb(ThumbnailsGeneratorCallback cb) { m_thumbnail_cb = cb; }
 	void set_gcode_result(GCodeProcessorResult* result) { m_gcode_result = result; }
 
@@ -118,6 +120,7 @@ public:
 	const PrintBase*    current_print() const { return m_print; }
 	const Print* 		fff_print() const { return m_fff_print; }
 	const SLAPrint* 	sla_print() const { return m_sla_print; }
+	const FiberPrint*   fiber_print() const { return m_fiber_print; }
     // Take the project path (if provided), extract the name of the project, run it through the macro processor and save it next to the project file.
     // If the project_path is empty, just run output_filepath().
 	std::string 		output_filepath_for_project(const boost::filesystem::path &project_path);
@@ -225,6 +228,7 @@ private:
 	// Non-owned pointers to Print instances.
 	Print 					   *m_fff_print 		 = nullptr;
 	SLAPrint 				   *m_sla_print			 = nullptr;
+	FiberPrint				   *m_fiber_print		 = nullptr;
 	// Data structure, to which the G-code export writes its annotations.
 	GCodeProcessorResult     *m_gcode_result 		 = nullptr;
 	// Callback function, used to write thumbnails into gcode.

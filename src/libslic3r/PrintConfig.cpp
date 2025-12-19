@@ -20,6 +20,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PrintConfig.hpp"
+#include "FiberPrintConfig.hpp"
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
@@ -327,6 +328,44 @@ static const t_config_enum_values s_keys_map_CoolingSlowdownLogicType {
     { "proportional",       int(CoolingSlowdownLogicType::Proportional)      },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CoolingSlowdownLogicType)
+
+// Fiber configuration enums
+static const t_config_enum_values s_keys_map_FiberPatternType {
+    { "grid",       int(FiberPatternType::fpGrid) },
+    { "concentric", int(FiberPatternType::fpConcentric) },
+    { "custom",     int(FiberPatternType::fpCustom) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPatternType)
+
+static const t_config_enum_values s_keys_map_FiberPlacementZoneType {
+    { "perimeter",  int(FiberPlacementZoneType::fpzPerimeter) },
+    { "infill",     int(FiberPlacementZoneType::fpzInfill) },
+    { "both",       int(FiberPlacementZoneType::fpzBoth) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPlacementZoneType)
+
+static const t_config_enum_values s_keys_map_FiberPrintMethodType {
+    { "dual_printhead",        int(FiberPrintMethodType::fpmDualPrinthead) },
+    { "co_extrusion",          int(FiberPrintMethodType::fpmCoExtrusion) },
+    { "pre_embedded_filament", int(FiberPrintMethodType::fpmPreEmbeddedFilament) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPrintMethodType)
+
+static const t_config_enum_values s_keys_map_FiberPrintSequenceType {
+    { "plastic_first", int(FiberPrintSequenceType::fpsPlasticFirst) },
+    { "alternating",   int(FiberPrintSequenceType::fpsAlternating) },
+    { "fiber_on_top",  int(FiberPrintSequenceType::fpsFiberOnTop) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPrintSequenceType)
+
+static const t_config_enum_values s_keys_map_FiberTypeEnum {
+    { "carbon", int(FiberTypeEnum::ftCarbon) },
+    { "glass",  int(FiberTypeEnum::ftGlass) },
+    { "kevlar", int(FiberTypeEnum::ftKevlar) },
+    { "basalt", int(FiberTypeEnum::ftBasalt) },
+    { "custom", int(FiberTypeEnum::ftCustom) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberTypeEnum)
 
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
@@ -4041,6 +4080,286 @@ void PrintConfigDef::init_fff_params()
             }
         }
     }
+
+    // Fiber Reinforcement Settings
+    def = this->add("enable_fiber_reinforcement", coBool);
+    def->label = L("Enable fiber reinforcement");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Enable continuous fiber reinforcement for enhanced part strength. "
+                     "This feature allows embedding continuous fiber strands within the plastic print.\n\n"
+                     "Fiber reinforcement adds continuous fiber strands (carbon, glass, or Kevlar) to your prints, "
+                     "significantly increasing strength and stiffness. This is useful for functional parts that need "
+                     "high mechanical properties.\n\n"
+                     "Example: Enable this for parts that need to withstand high loads or impacts.");
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("fiber_type", coEnum);
+    def->label = L("Fiber type");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Type of fiber material to use for reinforcement.\n\n"
+                     "• Carbon fiber: Highest strength and stiffness, most expensive\n"
+                     "• Glass fiber: Good balance of strength and cost\n"
+                     "• Kevlar: High impact resistance, good for flexible parts\n"
+                     "• Basalt fiber: Good thermal resistance\n\n"
+                     "Example: Use carbon fiber for maximum strength, glass fiber for cost-effective reinforcement.");
+    def->set_enum<FiberTypeEnum>({
+        { "carbon",  L("Carbon fiber") },
+        { "glass",   L("Glass fiber") },
+        { "kevlar",  L("Kevlar") },
+        { "basalt",  L("Basalt fiber") },
+        { "custom",  L("Custom") }
+    });
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionEnum<FiberTypeEnum>(FiberTypeEnum::ftCarbon));
+
+    def = this->add("fiber_pattern", coEnum);
+    def->label = L("Fiber pattern");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Pattern used to place fiber strands within the print.\n\n"
+                     "• Grid: Parallel lines in a grid pattern (good for uniform strength)\n"
+                     "• Concentric: Concentric loops following part contours (good for curved parts)\n"
+                     "• Custom: User-defined paths\n\n"
+                     "Example: Use grid for rectangular parts, concentric for circular parts.");
+    def->set_enum<FiberPatternType>({
+        { "grid",       L("Grid") },
+        { "concentric", L("Concentric") },
+        { "custom",     L("Custom") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPatternType>(FiberPatternType::fpGrid));
+
+    def = this->add("fiber_print_method", coEnum);
+    def->label = L("Fiber print method");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Method used to print fiber reinforcement. "
+                     "Dual printhead uses separate extruders for plastic and fiber. "
+                     "Pre-embedded filament uses fiber already embedded in the filament spool.");
+    def->set_enum<FiberPrintMethodType>({
+        { "dual_printhead",        L("Dual printhead") },
+        { "co_extrusion",          L("Co-extrusion (placeholder)") },
+        { "pre_embedded_filament", L("Pre-embedded filament") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPrintMethodType>(FiberPrintMethodType::fpmDualPrinthead));
+
+    def = this->add("fiber_spacing", coFloat);
+    def->label = L("Fiber spacing");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Spacing between adjacent fiber strands in millimeters.\n\n"
+                     "Smaller spacing = more fiber = stronger but slower print.\n"
+                     "Larger spacing = less fiber = weaker but faster print.\n\n"
+                     "Example: 5mm spacing is a good starting point. Use 2-3mm for high-strength parts, "
+                     "10mm for lightweight reinforcement.");
+    def->sidetext = L("mm");
+    def->min = 0.1;
+    def->max = 50.0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(5.0));
+
+    def = this->add("fiber_angle", coFloat);
+    def->label = L("Fiber angle");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Angle of fiber strands relative to the X-axis. 0° is along X-axis, 90° is along Y-axis.\n\n"
+                     "Use different angles on different layers for multi-directional strength.\n\n"
+                     "Example: 0° for X-direction strength, 90° for Y-direction strength, "
+                     "45° for balanced strength in both directions.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 180;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("fiber_placement_zone", coEnum);
+    def->label = L("Fiber placement zone");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Where to place fiber strands within the print.\n\n"
+                     "• Perimeter only: Place fiber only in perimeters (outer walls)\n"
+                     "• Infill only: Place fiber only in infill areas\n"
+                     "• Both: Place fiber in both perimeters and infill\n\n"
+                     "Example: Use 'Both' for maximum strength, 'Perimeter only' for surface reinforcement.");
+    def->set_enum<FiberPlacementZoneType>({
+        { "perimeter", L("Perimeter only") },
+        { "infill",    L("Infill only") },
+        { "both",      L("Perimeter and infill") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPlacementZoneType>(FiberPlacementZoneType::fpzBoth));
+
+    def = this->add("fiber_layer_interval", coInt);
+    def->label = L("Fiber layer interval");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Place fiber reinforcement every N layers. Set to 1 to place fiber on every layer.\n\n"
+                     "Placing fiber on every layer provides maximum strength but increases print time.\n"
+                     "Placing fiber every few layers reduces print time while still providing reinforcement.\n\n"
+                     "Example: Use 1 for maximum strength, 3-5 for balanced strength and speed.");
+    def->sidetext = L("layers");
+    def->min = 1;
+    def->max = 100;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("fiber_start_layer", coInt);
+    def->label = L("Fiber start layer");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Start placing fiber reinforcement from this layer number. Layer 0 is the first layer.");
+    def->sidetext = L("layer");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("fiber_end_layer", coInt);
+    def->label = L("Fiber end layer");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Stop placing fiber reinforcement at this layer number. Set to -1 to place fiber on all layers.");
+    def->sidetext = L("layer");
+    def->min = -1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(-1));
+
+    def = this->add("fiber_extruder_id", coInt);
+    def->label = L("Fiber extruder");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Extruder ID to use for fiber printing (Method 1: Dual printhead). First extruder is 1.");
+    def->min = 1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("plastic_extruder_id", coInt);
+    def->label = L("Plastic extruder");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Extruder ID to use for plastic printing. First extruder is 1.");
+    def->min = 1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("embedded_fiber_extruder_id", coInt);
+    def->label = L("Embedded fiber extruder");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Extruder ID to use for pre-embedded fiber filament (Method 2). First extruder is 1.");
+    def->min = 1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("fiber_print_sequence", coEnum);
+    def->label = L("Fiber print sequence");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Sequence strategy for printing plastic and fiber layers.\n\n"
+                     "• Plastic first: Print all plastic layers, then all fiber layers (fastest)\n"
+                     "• Alternating: Alternate between plastic and fiber layers (balanced)\n"
+                     "• Fiber on top: Place fiber immediately after each plastic layer (strongest bond)\n\n"
+                     "Example: Use 'Plastic first' for speed, 'Fiber on top' for maximum adhesion.");
+    def->set_enum<FiberPrintSequenceType>({
+        { "plastic_first", L("Plastic first") },
+        { "alternating",   L("Alternating") },
+        { "fiber_on_top",  L("Fiber on top") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPrintSequenceType>(FiberPrintSequenceType::fpsPlasticFirst));
+
+    def = this->add("fiber_delay_after_plastic", coFloat);
+    def->label = L("Delay after plastic");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Delay in seconds after printing plastic before starting fiber placement.");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 300;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("fiber_cooling_time", coFloat);
+    def->label = L("Fiber cooling time");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Required cooling time in seconds for plastic before fiber placement.");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 300;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("fiber_wait_for_cooling", coBool);
+    def->label = L("Wait for cooling");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Wait for plastic to cool before placing fiber reinforcement.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("fiber_speed", coFloat);
+    def->label = L("Fiber speed");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Printing speed for fiber placement in millimeters per second.\n\n"
+                     "Fiber placement speed is typically slower than plastic printing speed to ensure proper adhesion.\n\n"
+                     "Example: 30 mm/s is a good starting point. Use 20-40 mm/s for most materials. "
+                     "Slower speeds (10-20 mm/s) for difficult materials or tight corners.");
+    def->sidetext = L("mm/s");
+    def->min = 1;
+    def->max = 300;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(30.0));
+
+    def = this->add("fiber_pressure", coFloat);
+    def->label = L("Fiber pressure");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Pressure or tension applied to fiber during printing.");
+    def->sidetext = L("units");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(50.0));
+
+    def = this->add("fiber_start_command", coString);
+    def->label = L("Fiber start command");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("G-code command to start fiber placement. Use {fiber_speed} placeholder for speed.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("M106 S255 ; Start fiber"));
+
+    def = this->add("fiber_stop_command", coString);
+    def->label = L("Fiber stop command");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("G-code command to stop fiber placement.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("M107 ; Stop fiber"));
+
+    def = this->add("fiber_speed_command", coString);
+    def->label = L("Fiber speed command");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("G-code command to set fiber speed. Use {fiber_speed} placeholder for speed value.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("M106 S{fiber_speed} ; Set fiber speed"));
+
+    def = this->add("fiber_enable_comments", coBool);
+    def->label = L("Enable G-code comments");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Add comments to G-code for fiber operations to aid debugging.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(true));
+    
+    // Phase 7.2: Visualization options
+    def = this->add("fiber_path_color", coString);
+    def->label = L("Fiber path color");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Color for fiber paths in 3D preview (RGB hex format, e.g., #4D4D4D)");
+    def->gui_type = ConfigOptionDef::GUIType::color;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString("#4D4D4D"));  // Dark gray
+    
+    def = this->add("fiber_arrow_color", coString);
+    def->label = L("Fiber arrow color");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Color for fiber direction arrows in 3D preview (RGB hex format, e.g., #8080CC)");
+    def->gui_type = ConfigOptionDef::GUIType::color;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString("#8080CC"));  // Light blue
+    
+    def = this->add("fiber_arrow_density", coFloat);
+    def->label = L("Fiber arrow density");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Number of arrows per path (0 = auto, based on path length)");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(10.0f));
+    def->min = 0.0f;
+    def->max = 100.0f;
 }
 
 void PrintConfigDef::init_extruder_option_keys()
@@ -5750,7 +6069,8 @@ std::string validate(const FullPrintConfig &cfg)
     }
 PRINT_CONFIG_CACHE_INITIALIZE((
     PrintObjectConfig, PrintRegionConfig, MachineEnvelopeConfig, GCodeConfig, PrintConfig, FullPrintConfig, 
-    SLAMaterialConfig, SLAPrintConfig, SLAPrintObjectConfig, SLAPrinterConfig, SLAFullPrintConfig))
+    SLAMaterialConfig, SLAPrintConfig, SLAPrintObjectConfig, SLAPrinterConfig, SLAFullPrintConfig,
+    FiberPrintConfig))
 static int print_config_static_initialized = print_config_static_initializer();
 
 CLIInputConfigDef::CLIInputConfigDef()

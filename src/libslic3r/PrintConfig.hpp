@@ -69,6 +69,7 @@ class SLAMaterialConfig;
 class SLAPrintConfig;
 class SLAPrintObjectConfig;
 class SLAPrinterConfig;
+class FiberPrintConfig;
 
 enum class ArcFittingType {
     Disabled,
@@ -245,6 +246,13 @@ enum class CoolingSlowdownLogicType
     Proportional,
 };
 
+// Forward declare FiberPrintConfig enums (defined in FiberPrintConfig.hpp)
+enum class FiberPatternType;
+enum class FiberPlacementZoneType;
+enum class FiberPrintMethodType;
+enum class FiberPrintSequenceType;
+enum class FiberTypeEnum;
+
 #define CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NAME) \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names(); \
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values();
@@ -276,6 +284,11 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TopOnePerimeterType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(EnsureVerticalShellThickness)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(CoolingSlowdownLogicType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberPatternType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberPlacementZoneType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberPrintMethodType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberPrintSequenceType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberTypeEnum)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -1018,9 +1031,39 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              z_offset))
 )
 
+PRINT_CONFIG_CLASS_DEFINE(
+    FiberPrintConfig,
+    ((ConfigOptionBool, enable_fiber_reinforcement))
+    ((ConfigOptionEnum<FiberTypeEnum>, fiber_type))
+    ((ConfigOptionEnum<FiberPatternType>, fiber_pattern))
+    ((ConfigOptionEnum<FiberPrintMethodType>, fiber_print_method))
+    ((ConfigOptionFloat, fiber_spacing))
+    ((ConfigOptionFloat, fiber_angle))
+    ((ConfigOptionEnum<FiberPlacementZoneType>, fiber_placement_zone))
+    ((ConfigOptionInt, fiber_layer_interval))
+    ((ConfigOptionInt, fiber_start_layer))
+    ((ConfigOptionInt, fiber_end_layer))
+    ((ConfigOptionInt, fiber_extruder_id))
+    ((ConfigOptionInt, plastic_extruder_id))
+    ((ConfigOptionInt, embedded_fiber_extruder_id))
+    ((ConfigOptionEnum<FiberPrintSequenceType>, fiber_print_sequence))
+    ((ConfigOptionFloat, fiber_delay_after_plastic))
+    ((ConfigOptionFloat, fiber_cooling_time))
+    ((ConfigOptionBool, fiber_wait_for_cooling))
+    ((ConfigOptionFloat, fiber_speed))
+    ((ConfigOptionFloat, fiber_pressure))
+    ((ConfigOptionString, fiber_start_command))
+    ((ConfigOptionString, fiber_stop_command))
+    ((ConfigOptionString, fiber_speed_command))
+    ((ConfigOptionBool, fiber_enable_comments))
+    ((ConfigOptionString, fiber_path_color))
+    ((ConfigOptionString, fiber_arrow_color))
+    ((ConfigOptionFloat, fiber_arrow_density))
+)
+
 PRINT_CONFIG_CLASS_DERIVED_DEFINE0(
     FullPrintConfig,
-    (PrintObjectConfig, PrintRegionConfig, PrintConfig)
+    (PrintObjectConfig, PrintRegionConfig, PrintConfig, FiberPrintConfig)
 )
 
 // Validate the FullPrintConfig. Returns an empty string on success, otherwise an error message is returned.

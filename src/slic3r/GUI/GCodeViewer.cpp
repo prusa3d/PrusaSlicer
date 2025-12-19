@@ -2948,6 +2948,15 @@ void GCodeViewer::render_legend(float& legend_height)
         case Preview::OptionType::CenterOfGravity: { active = m_cog.is_visible(); break; }
         case Preview::OptionType::ToolMarker:      { active = m_sequential_view.marker.is_visible(); break; }
         case Preview::OptionType::Shells:          { active = m_shells.visible; break; }
+        // Phase 7.2: Fiber paths are handled in GLCanvas3D
+        case Preview::OptionType::FiberPaths:     { 
+            active = wxGetApp().plater() ? wxGetApp().plater()->get_current_canvas3D()->get_fiber_paths_visible() : false; 
+            break; 
+        }
+        case Preview::OptionType::FiberArrows:     { 
+            active = wxGetApp().plater() ? wxGetApp().plater()->get_current_canvas3D()->get_fiber_arrows_visible() : false; 
+            break; 
+        }
         default:                                   { active = m_viewer.is_option_visible(libvgcode::convert(type)); break; }
         }
 #endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
@@ -2973,6 +2982,19 @@ void GCodeViewer::render_legend(float& legend_height)
             case Preview::OptionType::CenterOfGravity: { m_cog.set_visible(!active); break; }
             case Preview::OptionType::ToolMarker:      { m_sequential_view.marker.set_visible(!active); break; }
             case Preview::OptionType::Shells:          { m_shells.visible = !active; break; }
+            // Phase 7.2: Fiber paths are handled in GLCanvas3D
+            case Preview::OptionType::FiberPaths:     { 
+                if (wxGetApp().plater()) {
+                    wxGetApp().plater()->get_current_canvas3D()->set_fiber_paths_visible(!active);
+                }
+                break; 
+            }
+            case Preview::OptionType::FiberArrows:     { 
+                if (wxGetApp().plater()) {
+                    wxGetApp().plater()->get_current_canvas3D()->set_fiber_arrows_visible(!active);
+                }
+                break; 
+            }
             default:                                   {
                 m_viewer.toggle_option_visibility(libvgcode::convert(type));
                 break;
@@ -3046,6 +3068,22 @@ void GCodeViewer::render_legend(float& legend_height)
     toggle_button(Preview::OptionType::ToolMarker, _u8L("Tool marker"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
         imgui.draw_icon(window, pos, size, ImGui::LegendToolMarker);
     });
+    
+    // Phase 7.2: Fiber path visibility toggles (only show if fiber reinforcement is enabled)
+    if (wxGetApp().plater() && wxGetApp().plater()->get_current_canvas3D() && 
+        wxGetApp().plater()->get_current_canvas3D()->config() &&
+        wxGetApp().plater()->get_current_canvas3D()->config()->opt_bool("enable_fiber_reinforcement")) {
+        ImGui::SameLine();
+        toggle_button(Preview::OptionType::FiberPaths, _u8L("Fiber paths"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
+            // Draw a simple line icon for fiber paths (reuse LegendTravel style)
+            imgui.draw_icon(window, pos, size, ImGui::LegendTravel);
+        });
+        ImGui::SameLine();
+        toggle_button(Preview::OptionType::FiberArrows, _u8L("Fiber arrows"), [&imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
+            // Draw a simple arrow icon (reuse LegendToolChanges style as placeholder)
+            imgui.draw_icon(window, pos, size, ImGui::LegendToolChanges);
+        });
+    }
 
     bool size_dirty = !ImGui::GetCurrentWindow()->ScrollbarY && ImGui::CalcWindowNextAutoFitSize(ImGui::GetCurrentWindow()).x != ImGui::GetWindowWidth();
     if (m_legend_resizer.dirty || size_dirty != m_legend_resizer.dirty) {

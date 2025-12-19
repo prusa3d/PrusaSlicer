@@ -73,6 +73,9 @@
 // Print now includes tbb, and tbb includes Windows. This breaks compilation of wxWidgets if included before wx.
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/Fiber/FiberLayer.hpp"
+#include "libslic3r/Fiber/FiberStatistics.hpp"
+#include "libslic3r/FiberPrint.hpp"
 
 #include "wxExtensions.hpp"
 
@@ -1789,7 +1792,54 @@ struct StatisticsSum {
     float filament_length{};
     float normal_print_time{};
     float silent_print_time{};
+    // Phase 7.3: Fiber statistics
+    float fiber_length{};
+    float fiber_weight{};
+    float fiber_cost{};
+    float fiber_print_time{};
 };
+
+// Phase 7.3: Get fiber statistics for all beds
+std::vector<std::optional<Slic3r::FiberStatistics>> get_fiber_statistics() {
+    std::vector<std::optional<Slic3r::FiberStatistics>> result;
+    
+    // Get the process from the current canvas
+    GLCanvas3D* canvas = wxGetApp().plater()->get_current_canvas3D();
+    if (canvas == nullptr) {
+        for (int bed_index = 0; bed_index < s_multiple_beds.get_number_of_beds(); ++bed_index) {
+            result.emplace_back(std::nullopt);
+        }
+        return result;
+    }
+    
+    const BackgroundSlicingProcess* process = canvas->m_process;
+    if (process == nullptr || process->fiber_print() == nullptr || process->fiber_print()->empty()) {
+        for (int bed_index = 0; bed_index < s_multiple_beds.get_number_of_beds(); ++bed_index) {
+            result.emplace_back(std::nullopt);
+        }
+        return result;
+    }
+    
+    // Get config from the canvas or preset bundle
+    const DynamicPrintConfig* config = canvas->config();
+    if (config == nullptr) {
+        // Fallback to preset bundle
+        config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    }
+    
+    for (int bed_index = 0; bed_index < s_multiple_beds.get_number_of_beds(); ++bed_index) {
+        const Print* print = wxGetApp().plater()->get_fff_prints()[bed_index].get();
+        if (print == nullptr || print->empty() || !print->finished()) {
+            result.emplace_back(std::nullopt);
+            continue;
+        }
+        
+        // Calculate fiber statistics
+        Slic3r::FiberStatistics fiber_stats = process->fiber_print()->calculate_statistics(config);
+        result.emplace_back(fiber_stats);
+    }
+    return result;
+}
 
 StatisticsSum get_statistics_sum() {
     StatisticsSum result;
@@ -1802,6 +1852,20 @@ StatisticsSum get_statistics_sum() {
         result.filament_length += statistics->get().total_used_filament;
         result.normal_print_time += statistics->get().normal_print_time_seconds;
         result.silent_print_time += statistics->get().silent_print_time_seconds;
+    }
+    
+    // Phase 7.3: Add fiber statistics
+    std::vector<std::optional<Slic3r::FiberStatistics>> fiber_stats = get_fiber_statistics();
+    for (const auto& fiber_stat : fiber_stats) {
+        if (fiber_stat.has_value()) {
+            result.fiber_length += static_cast<float>(fiber_stat->total_fiber_length);
+            result.fiber_weight += static_cast<float>(fiber_stat->total_fiber_weight);
+            result.fiber_cost += static_cast<float>(fiber_stat->total_fiber_cost);
+            result.fiber_print_time += static_cast<float>(fiber_stat->fiber_print_time_seconds);
+            // Add fiber time to total print time
+            result.normal_print_time += static_cast<float>(fiber_stat->fiber_print_time_seconds);
+            result.silent_print_time += static_cast<float>(fiber_stat->fiber_print_time_seconds);
+        }
     }
 
     return result;
@@ -2054,6 +2118,114 @@ void render_print_statistics(float scale) {
         extruder_usage_table(extruder_statistics, scale);
         ImGui::Separator();
     }
+    
+    // Phase 7.3: Display fiber statistics if fiber reinforcement is enabled
+    std::vector<std::optional<Slic3r::FiberStatistics>> fiber_stats = get_fiber_statistics();
+    bool has_fiber_stats = false;
+    for (const auto& stat : fiber_stats) {
+        if (stat.has_value()) {
+            has_fiber_stats = true;
+            break;
+        }
+    }
+    
+    if (has_fiber_stats) {
+        ImGui::NewLine();
+        ImGui::Text("%s", _u8L("Fiber Reinforcement Statistics").c_str());
+        if (ImGui::BeginTable("fiber_statistics_table", 5)) {
+            const float width_gap = 10.f * scale;
+            
+            float width = std::max<float>(ImGui::CalcTextSize(format(_u8L("Bed %1%"), 1).c_str()).x, ImGui::CalcTextSize(_u8L("Total").c_str()).x) + width_gap;
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width);
+            
+            std::string name = _u8L("Fiber Length (m)");
+            width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+            ImGui::TableSetupColumn(name.c_str(), ImGuiTableColumnFlags_WidthFixed, width);
+            
+            name = _u8L("Fiber Weight (g)");
+            width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+            ImGui::TableSetupColumn(name.c_str(), ImGuiTableColumnFlags_WidthFixed, width);
+            
+            name = _u8L("Fiber Cost");
+            width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+            ImGui::TableSetupColumn(name.c_str(), ImGuiTableColumnFlags_WidthFixed, width);
+            
+            name = _u8L("Fiber Print Time");
+            width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+            ImGui::TableSetupColumn(name.c_str(), ImGuiTableColumnFlags_WidthFixed, width);
+            
+            ImGui::TableHeadersRow();
+            
+            float total_fiber_length = 0.0f;
+            float total_fiber_weight = 0.0f;
+            float total_fiber_cost = 0.0f;
+            float total_fiber_time = 0.0f;
+            
+            for (size_t bed_index = 0; bed_index < fiber_stats.size(); ++bed_index) {
+                if (fiber_stats[bed_index].has_value()) {
+                    const auto& stat = fiber_stats[bed_index].value();
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s", format(_u8L("Bed %1%"), bed_index + 1).c_str());
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f", stat.total_fiber_length / 1000.0);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f", stat.total_fiber_weight);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f", stat.total_fiber_cost);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s", get_time_dhms(stat.fiber_print_time_seconds).c_str());
+                    
+                    total_fiber_length += static_cast<float>(stat.total_fiber_length);
+                    total_fiber_weight += static_cast<float>(stat.total_fiber_weight);
+                    total_fiber_cost += static_cast<float>(stat.total_fiber_cost);
+                    total_fiber_time += static_cast<float>(stat.fiber_print_time_seconds);
+                }
+            }
+            
+            if (total_fiber_length > 0.0f) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGuiPureWrap::COL_ORANGE_LIGHT);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", _u8L("Total").c_str());
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f", total_fiber_length / 1000.0);
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f", total_fiber_weight);
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f", total_fiber_cost);
+                ImGui::TableNextColumn();
+                ImGui::Text("%s", get_time_dhms(total_fiber_time).c_str());
+                ImGui::PopStyleColor();
+            }
+            
+            ImGui::EndTable();
+        }
+        
+        // Display validation warnings
+        bool has_warnings = false;
+        for (const auto& stat : fiber_stats) {
+            if (stat.has_value() && !stat->warnings.empty()) {
+                has_warnings = true;
+                break;
+            }
+        }
+        
+        if (has_warnings) {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.0f, 1.0f), "%s", _u8L("Fiber Validation Warnings:").c_str());
+            for (const auto& stat : fiber_stats) {
+                if (stat.has_value()) {
+                    for (const std::string& warning : stat->warnings) {
+                        ImGui::BulletText("%s", warning.c_str());
+                    }
+                }
+            }
+        }
+        
+        ImGui::Separator();
+    }
+    
     ImGui::End();
 }
 
@@ -2165,8 +2337,11 @@ void GLCanvas3D::render()
         _render_bed_axes();
         if (is_looking_downward)
             _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false);
-        if (!m_main_toolbar.is_enabled() && current_printer_technology() != ptSLA)
+        if (!m_main_toolbar.is_enabled() && current_printer_technology() != ptSLA) {
             _render_gcode();
+            if (m_fiber_paths_visible && m_fiber_paths_model.is_initialized())
+                _render_fiber_paths();
+        }
         _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
     #if ENABLE_RENDER_SELECTION_CENTER
@@ -2969,6 +3144,207 @@ void GLCanvas3D::load_preview(const std::vector<std::string>& str_tool_colors, c
     m_gcode_viewer.load_as_preview(std::move(data));
     m_gcode_viewer.set_force_shells_visible(false);
     _set_warning_notification_if_needed(EWarning::ToolpathOutside);
+}
+
+// Phase 7.2: Helper function to parse hex color string to ColorRGBA
+static ColorRGBA parse_hex_color(const std::string& hex_str, const ColorRGBA& default_color)
+{
+    if (hex_str.empty() || hex_str[0] != '#')
+        return default_color;
+    
+    // Parse #RRGGBB format
+    if (hex_str.length() != 7)
+        return default_color;
+    
+    try {
+        unsigned int r = std::stoul(hex_str.substr(1, 2), nullptr, 16);
+        unsigned int g = std::stoul(hex_str.substr(3, 2), nullptr, 16);
+        unsigned int b = std::stoul(hex_str.substr(5, 2), nullptr, 16);
+        return ColorRGBA(r / 255.0f, g / 255.0f, b / 255.0f, 1.0f);
+    } catch (...) {
+        return default_color;
+    }
+}
+
+void GLCanvas3D::load_fiber_paths(const std::vector<FiberLayer>& fiber_layers)
+{
+    // Phase 7.2: Load fiber paths for 3D visualization
+    // Convert FiberLayer data into renderable GLModel format
+    
+    m_fiber_paths_model.reset();
+    m_fiber_layers_data = fiber_layers;  // Store for layer filtering
+    
+    if (fiber_layers.empty())
+        return;
+    
+    // Get color from config or use default
+    ColorRGBA path_color = ColorRGBA(0.3f, 0.3f, 0.3f, 1.0f);  // Default dark gray
+    if (m_config) {
+        std::string color_str = m_config->opt_string("fiber_path_color", 0);
+        if (!color_str.empty()) {
+            path_color = parse_hex_color(color_str, path_color);
+        }
+    }
+    
+    // Build geometry for all fiber paths
+    GLModel::Geometry init_data;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
+    init_data.color = path_color;
+    
+    // Count total vertices needed
+    size_t total_vertices = 0;
+    for (const FiberLayer& layer : fiber_layers) {
+        for (const FiberPath& path : layer.fiber_paths) {
+            if (path.polyline.points.size() >= 2) {
+                // Each path contributes (points.size() - 1) line segments
+                // Each line segment needs 2 vertices
+                total_vertices += (path.polyline.points.size() - 1) * 2;
+            }
+        }
+    }
+    
+    if (total_vertices == 0)
+        return;
+    
+    init_data.reserve_vertices(total_vertices);
+    init_data.reserve_indices(total_vertices);
+    
+    // Store layer data for filtering (we'll need layer IDs for z-range filtering)
+    // For now, we'll store all layers and filter during rendering
+    // Convert each fiber path to 3D vertices
+    for (const FiberLayer& layer : fiber_layers) {
+        const float z = static_cast<float>(layer.print_z);
+        
+        for (const FiberPath& path : layer.fiber_paths) {
+            if (path.polyline.points.size() < 2)
+                continue;
+            
+            // Convert 2D polyline points to 3D vertices
+            for (size_t i = 0; i < path.polyline.points.size() - 1; ++i) {
+                const Point& p1 = path.polyline.points[i];
+                const Point& p2 = path.polyline.points[i + 1];
+                
+                // Convert from scaled coordinates to 3D coordinates
+                Vec3f v1(unscale<float>(p1.x()), unscale<float>(p1.y()), z);
+                Vec3f v2(unscale<float>(p2.x()), unscale<float>(p2.y()), z);
+                
+                // Add line segment (two vertices)
+                size_t idx1 = init_data.vertices_count();
+                init_data.add_vertex(v1);
+                size_t idx2 = init_data.vertices_count();
+                init_data.add_vertex(v2);
+                
+                // Add line indices
+                init_data.add_line(static_cast<unsigned int>(idx1), static_cast<unsigned int>(idx2));
+            }
+        }
+    }
+    
+    if (!init_data.is_empty()) {
+        m_fiber_paths_model.init_from(std::move(init_data));
+    }
+    
+    // Build direction arrows model
+    _build_fiber_arrows_model(fiber_layers);
+    
+    // Initialize z-range to show all layers
+    m_fiber_paths_z_range = { 0, static_cast<unsigned int>(fiber_layers.size()) };
+    
+    // Mark canvas as dirty to trigger re-render
+    set_as_dirty();
+}
+
+void GLCanvas3D::set_fiber_paths_z_range(const std::array<unsigned int, 2>& range)
+{
+    // Phase 7.2: Optimize layer filtering by rebuilding model with only visible layers
+    if (m_fiber_paths_z_range == range && m_fiber_paths_model.is_initialized())
+        return;  // No change needed
+    
+    m_fiber_paths_z_range = range;
+    
+    // If we have stored layer data, rebuild the model with filtered layers
+    if (!m_fiber_layers_data.empty()) {
+        // Filter layers based on z-range (layer indices)
+        // range[0] = lower layer index, range[1] = upper layer index (inclusive)
+        std::vector<FiberLayer> filtered_layers;
+        for (size_t i = 0; i < m_fiber_layers_data.size(); ++i) {
+            // Convert to unsigned int for comparison
+            unsigned int layer_idx = static_cast<unsigned int>(i);
+            if (layer_idx >= range[0] && layer_idx <= range[1]) {
+                filtered_layers.push_back(m_fiber_layers_data[i]);
+            }
+        }
+        
+        // Rebuild models with filtered layers
+        if (!filtered_layers.empty()) {
+            // Get color from config
+            ColorRGBA path_color = ColorRGBA(0.3f, 0.3f, 0.3f, 1.0f);
+            if (m_config) {
+                std::string color_str = m_config->opt_string("fiber_path_color", 0);
+                if (!color_str.empty()) {
+                    path_color = parse_hex_color(color_str, path_color);
+                }
+            }
+            
+            // Rebuild paths model
+            GLModel::Geometry init_data;
+            init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
+            init_data.color = path_color;
+            
+            size_t total_vertices = 0;
+            for (const FiberLayer& layer : filtered_layers) {
+                for (const FiberPath& path : layer.fiber_paths) {
+                    if (path.polyline.points.size() >= 2) {
+                        total_vertices += (path.polyline.points.size() - 1) * 2;
+                    }
+                }
+            }
+            
+            if (total_vertices > 0) {
+                init_data.reserve_vertices(total_vertices);
+                init_data.reserve_indices(total_vertices);
+                
+                for (const FiberLayer& layer : filtered_layers) {
+                    const float z = static_cast<float>(layer.print_z);
+                    
+                    for (const FiberPath& path : layer.fiber_paths) {
+                        if (path.polyline.points.size() < 2)
+                            continue;
+                        
+                        for (size_t i = 0; i < path.polyline.points.size() - 1; ++i) {
+                            const Point& p1 = path.polyline.points[i];
+                            const Point& p2 = path.polyline.points[i + 1];
+                            
+                            Vec3f v1(unscale<float>(p1.x()), unscale<float>(p1.y()), z);
+                            Vec3f v2(unscale<float>(p2.x()), unscale<float>(p2.y()), z);
+                            
+                            size_t idx1 = init_data.vertices_count();
+                            init_data.add_vertex(v1);
+                            size_t idx2 = init_data.vertices_count();
+                            init_data.add_vertex(v2);
+                            
+                            init_data.add_line(static_cast<unsigned int>(idx1), static_cast<unsigned int>(idx2));
+                        }
+                    }
+                }
+                
+                if (!init_data.is_empty()) {
+                    m_fiber_paths_model.init_from(std::move(init_data));
+                }
+            } else {
+                m_fiber_paths_model.reset();
+            }
+            
+            // Rebuild arrows model with filtered layers
+            _build_fiber_arrows_model(filtered_layers);
+        } else {
+            // No layers in range, clear models
+            m_fiber_paths_model.reset();
+            m_fiber_arrows_model.reset();
+        }
+    }
+    
+    set_as_dirty();
 }
 
 void GLCanvas3D::bind_event_handlers()
@@ -4476,6 +4852,135 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_ROTATED));
 
     m_dirty = true;
+}
+
+void GLCanvas3D::_render_fiber_paths()
+{
+    // Phase 7.2: Render fiber paths using GLModel with layer filtering
+    if (!m_fiber_paths_model.is_initialized() || m_fiber_layers_data.empty())
+        return;
+    
+    GLShaderProgram* shader = wxGetApp().get_shader("flat");
+    if (shader == nullptr)
+        return;
+    
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    Transform3d view_model_matrix = camera.get_view_matrix();
+    Transform3d projection_matrix = camera.get_projection_matrix();
+    
+    shader->start_using();
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    shader->set_uniform("projection_matrix", projection_matrix);
+    
+    // Enable line width (if supported)
+    glsafe(::glLineWidth(2.0f));
+    
+    // Render all fiber paths (layer filtering will be handled by z-range clipping if needed)
+    // TODO: Optimize by rebuilding model with only visible layers when range changes
+    m_fiber_paths_model.render();
+    
+    // Render direction arrows if enabled
+    if (m_fiber_arrows_visible && m_fiber_arrows_model.is_initialized()) {
+        glsafe(::glLineWidth(1.5f));
+        m_fiber_arrows_model.render();
+    }
+    
+    glsafe(::glLineWidth(1.0f));
+    shader->stop_using();
+}
+
+void GLCanvas3D::_build_fiber_arrows_model(const std::vector<FiberLayer>& fiber_layers)
+{
+    // Phase 7.2: Build direction arrows to show fiber path direction
+    m_fiber_arrows_model.reset();
+    
+    if (fiber_layers.empty())
+        return;
+    
+    // Get arrow color and density from config or use defaults
+    ColorRGBA arrow_color = ColorRGBA(0.5f, 0.5f, 0.8f, 1.0f);  // Default light blue
+    float arrow_density = 10.0f;  // Default: 10 arrows per path
+    
+    if (m_config) {
+        std::string color_str = m_config->opt_string("fiber_arrow_color", 0);
+        if (!color_str.empty()) {
+            arrow_color = parse_hex_color(color_str, arrow_color);
+        }
+        arrow_density = static_cast<float>(m_config->opt_float("fiber_arrow_density", 0));
+    }
+    
+    GLModel::Geometry init_data;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Lines, GLModel::Geometry::EVertexLayout::P3 };
+    init_data.color = arrow_color;
+    
+    // Arrow parameters
+    const float arrow_length = 1.0f;  // mm
+    const float arrow_width = 0.3f;   // mm (half-width of arrow base)
+    
+    for (const FiberLayer& layer : fiber_layers) {
+        const float z = static_cast<float>(layer.print_z);
+        
+        for (const FiberPath& path : layer.fiber_paths) {
+            if (path.polyline.points.size() < 2)
+                continue;
+            
+            // Calculate arrow interval based on density setting
+            size_t arrow_interval;
+            if (arrow_density <= 0.0f) {
+                // Auto: ~10 arrows per path
+                arrow_interval = std::max<size_t>(5, path.polyline.points.size() / 10);
+            } else {
+                // User-specified density: calculate interval to get approximately that many arrows
+                size_t target_arrows = static_cast<size_t>(arrow_density);
+                arrow_interval = std::max<size_t>(1, path.polyline.points.size() / std::max<size_t>(1, target_arrows));
+            }
+            
+            for (size_t i = arrow_interval - 1; i < path.polyline.points.size() - 1; i += arrow_interval) {
+                const Point& p1 = path.polyline.points[i];
+                const Point& p2 = path.polyline.points[i + 1];
+                
+                // Calculate direction vector
+                Vec2f dir(unscale<float>(p2.x() - p1.x()), unscale<float>(p2.y() - p1.y()));
+                const float dir_length = dir.norm();
+                if (dir_length < 0.01f)  // Skip very short segments
+                    continue;
+                
+                // Normalize direction
+                dir = dir / dir_length;
+                
+                // Arrow tip position (end of segment)
+                Vec3f tip(unscale<float>(p2.x()), unscale<float>(p2.y()), z);
+                
+                // Arrow base (slightly back from tip)
+                Vec3f base = tip - Vec3f(dir.x() * arrow_length, dir.y() * arrow_length, 0.0f);
+                
+                // Calculate perpendicular for arrow wings
+                Vec2f perp(-dir.y(), dir.x());
+                
+                // Arrow wing points
+                Vec3f wing1 = base + Vec3f(perp.x() * arrow_width, perp.y() * arrow_width, 0.0f);
+                Vec3f wing2 = base - Vec3f(perp.x() * arrow_width, perp.y() * arrow_width, 0.0f);
+                
+                // Add arrow lines: tip to base, tip to wing1, tip to wing2
+                size_t tip_idx = init_data.vertices_count();
+                init_data.add_vertex(tip);
+                size_t base_idx = init_data.vertices_count();
+                init_data.add_vertex(base);
+                size_t wing1_idx = init_data.vertices_count();
+                init_data.add_vertex(wing1);
+                size_t wing2_idx = init_data.vertices_count();
+                init_data.add_vertex(wing2);
+                
+                init_data.add_line(static_cast<unsigned int>(tip_idx), static_cast<unsigned int>(base_idx));
+                init_data.add_line(static_cast<unsigned int>(tip_idx), static_cast<unsigned int>(wing1_idx));
+                init_data.add_line(static_cast<unsigned int>(tip_idx), static_cast<unsigned int>(wing2_idx));
+            }
+        }
+    }
+    
+    if (!init_data.is_empty()) {
+        m_fiber_arrows_model.init_from(std::move(init_data));
+    }
 }
 
 void GLCanvas3D::do_scale(const std::string& snapshot_type)

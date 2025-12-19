@@ -23,6 +23,7 @@
 #include "Camera.hpp"
 #include "SceneRaycaster.hpp"
 #include "GUI_Utils.hpp"
+#include "GLModel.hpp"
 
 #include <arrange-wrapper/ArrangeSettingsDb_AppCfg.hpp>
 #include "ArrangeSettingsDialogImgui.hpp"
@@ -57,6 +58,7 @@ class ModelInstance;
 class PrintObject;
 class Print;
 class SLAPrint;
+class FiberLayer;
 namespace CustomGCode { struct Item; }
 
 namespace GUI {
@@ -522,6 +524,14 @@ private:
     std::array<std::optional<BoundingBoxf>, MAX_NUMBER_OF_BEDS> m_wipe_tower_bounding_boxes;
 
     GCodeViewer m_gcode_viewer;
+    
+    // Phase 7.2: Fiber path visualization
+    GLModel m_fiber_paths_model;
+    GLModel m_fiber_arrows_model;  // Direction arrows
+    bool m_fiber_paths_visible{ true };
+    bool m_fiber_arrows_visible{ true };  // Toggle for direction arrows
+    std::array<unsigned int, 2> m_fiber_paths_z_range{ 0, UINT_MAX };  // Layer range for filtering
+    std::vector<FiberLayer> m_fiber_layers_data;  // Store original layer data for filtering
 
     RenderTimer m_render_timer;
 
@@ -847,6 +857,14 @@ public:
     void load_preview(const std::vector<std::string>& str_tool_colors, const std::vector<std::string>& str_color_print_colors,
         const std::vector<CustomGCode::Item>& color_print_values);
     void load_sla_preview();
+    
+    // Phase 7.2: Load fiber paths for 3D visualization
+    void load_fiber_paths(const std::vector<FiberLayer>& fiber_layers);
+    void set_fiber_paths_visible(bool visible) { m_fiber_paths_visible = visible; set_as_dirty(); }
+    bool get_fiber_paths_visible() const { return m_fiber_paths_visible; }
+    void set_fiber_arrows_visible(bool visible) { m_fiber_arrows_visible = visible; set_as_dirty(); }
+    bool get_fiber_arrows_visible() const { return m_fiber_arrows_visible; }
+    void set_fiber_paths_z_range(const std::array<unsigned int, 2>& range);
     void bind_event_handlers();
     void unbind_event_handlers();
 
@@ -1008,6 +1026,8 @@ private:
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode() { m_gcode_viewer.render(); }
     void _render_gcode_cog() { m_gcode_viewer.render_cog(); }
+    void _render_fiber_paths();
+    void _build_fiber_arrows_model(const std::vector<FiberLayer>& fiber_layers);
     void _render_selection();
     bool check_toolbar_icon_size(float init_scale, float& new_scale_to_save, bool is_custom, int counter = 3);
 #if ENABLE_RENDER_SELECTION_CENTER
