@@ -10,7 +10,7 @@ This document provides an overview of the fiber printing integration project for
 
 Fiber printing is an advanced 3D printing technology that embeds continuous fiber strands (carbon fiber, glass fiber, or Kevlar) into plastic parts during printing. This creates parts that are **10-100x stronger** than regular 3D printed parts, making them suitable for industrial and engineering applications.
 
-![Fiber Printing Concept](images/Fiber_Integration_Architecture_Data_Flow_STL_to_G_code_FFF_SLA_Fiber_in_Parallel.png)
+![Fiber Printing Concept](./images/Fiber_Integration_Architecture_data_flow_stl_to_g_code_fff_sla_fiber_in_parallel.png)
 
 *Regular 3D printing (left) vs Fiber-reinforced printing (right) - The fiber acts like rebar in concrete, providing exceptional strength.*
 
@@ -36,13 +36,13 @@ Integrate proprietary continuous fiber reinforcement slicing logic into PrusaSli
 
 The integration follows PrusaSlicer's existing architecture pattern (similar to how SLA printing was added):
 
-![High-Level Architecture](images/Fiber_Integration_Architecture_High_Level_Architecture_Flow.png)
+![High-Level Architecture](./images/Fiber_Integration_Architecture_High_Level_Architecture_Flow.png)
 
 *PrusaSlicer supports three print types: FFF (regular), SLA (resin), and Fiber (our addition).*
 
 ### Integration Approach
 
-![Class Hierarchy](images/Fiber_Integration_Architecture_Class_Hierarchy_Integration.png)
+![Class Hierarchy](./images/Fiber_Integration_Architecture_Class_Hierarchy_Integration.png)
 
 *Fiber printing integrates as a separate module, following the same pattern as SLA printing. This ensures modularity and maintainability.*
 
@@ -52,7 +52,7 @@ The integration follows PrusaSlicer's existing architecture pattern (similar to 
 
 The fiber printing process integrates seamlessly into PrusaSlicer's workflow:
 
-![Detailed Integration Flow](images/Fiber_Integration_Architecture_Detailed_Fiber_Integration_Flow.png)
+![Detailed Integration Flow](./images/Fiber_Integration_Architecture_Detailed_Fiber_Integration_Flow.png)
 
 ### Key Steps:
 
@@ -69,7 +69,7 @@ The fiber printing process integrates seamlessly into PrusaSlicer's workflow:
 
 All three print types (FFF, SLA, Fiber) work in parallel under PrusaSlicer:
 
-![Data Flow](images/Fiber_Integration_Architecture_Data_Flow_STL_to_G_code_FFF_SLA_Fiber_in_Parallel.png)
+![Data Flow](./images/Fiber_Integration_Architecture_Data_Flow_STL_to_G_code_FFF_SLA_Fiber_in_Parallel.png)
 
 *The system is designed to support multiple print technologies simultaneously, with fiber printing as a new addition.*
 
@@ -79,7 +79,7 @@ All three print types (FFF, SLA, Fiber) work in parallel under PrusaSlicer:
 
 ### Project Phases
 
-![Fiber Plan Overview](images/Fiber_Implementation_Roadmap_Visual_Overview.png)
+![Fiber Plan Overview](./images/Fiber_Implementation_Roadmap_Visual_Overview.png)
 
 ### Timeline
 
@@ -104,7 +104,7 @@ All three print types (FFF, SLA, Fiber) work in parallel under PrusaSlicer:
 
 ### New Components
 
-![Integration Points](images/Fiber_Integration_Architecture_Integration_Points_with_Existing_Code.png)
+![Integration Points](./images/Fiber_Integration_Architecture_Integration_Points_with_Existing_Code.png)
 
 **New Code (Green boxes):**
 - `FiberPrint` - Main fiber printing class
@@ -121,7 +121,7 @@ All three print types (FFF, SLA, Fiber) work in parallel under PrusaSlicer:
 
 ### File Structure
 
-![File Structure](images/Fiber_Integration_Architecture_File_Structure_Integration.png)
+![File Structure](./images/Fiber_Integration_Architecture_File_Structure_Integration.png)
 
 *New code is organized in a dedicated `Fiber/` directory, similar to how SLA code is organized.*
 
@@ -142,7 +142,7 @@ All three print types (FFF, SLA, Fiber) work in parallel under PrusaSlicer:
 
 ## Configuration & User Experience
 
-![Configuration Flow](images/Fiber_Integration_Architecture_Configuration_Flow.png)
+![Configuration Flow](./images/Fiber_Integration_Architecture_Configuration_Flow.png)
 
 Users can configure fiber printing through:
 - **GUI**: Visual settings panels (fiber type, pattern, density, angle)
@@ -153,7 +153,7 @@ Users can configure fiber printing through:
 
 ## G-Code Generation
 
-![G-Code Generation Flow](images/Fiber_Integration_Architecture_G_code_Generation_Flow.png)
+![G-Code Generation Flow](./images/Fiber_Integration_Architecture_G_code_Generation_Flow.png)
 
 The system generates G-code that:
 - Contains standard FFF commands (for plastic)

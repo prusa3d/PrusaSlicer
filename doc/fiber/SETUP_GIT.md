@@ -32,11 +32,31 @@ git remote rename origin upstream
 # 3. Add your fork as origin
 git remote add origin https://github.com/YOUR_USERNAME/PrusaSlicer.git
 
-# 4. Verify
+# 4. Verify remotes
 git remote -v
 # Should show:
 # origin    https://github.com/YOUR_USERNAME/PrusaSlicer.git (your fork)
 # upstream  https://github.com/prusa3d/PrusaSlicer.git (original)
+
+# 5. Create feature branch
+git checkout -b feature/fiber-printing
+
+# 6. Stage your changes
+git add .gitignore
+git add "doc/How to build - Linux et al.md"
+git add doc/fiber/
+
+# 7. Commit your work
+git commit -m "Add fiber printing integration documentation and planning
+
+- Add comprehensive documentation in doc/fiber/
+- Update .gitignore for build files
+- Update Linux build instructions with libtool requirement
+- Add Mermaid diagrams for architecture visualization
+- Add implementation roadmap and planning documents"
+
+# 8. Push to your fork
+git push -u origin feature/fiber-printing
 ```
 
 #### Option B: Fresh Clone from Your Fork (Clean Start)
