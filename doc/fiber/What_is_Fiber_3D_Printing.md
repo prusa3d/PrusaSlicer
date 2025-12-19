@@ -6,6 +6,41 @@ Think of regular 3D printing like building with **playdough** - you squeeze out 
 
 **Fiber reinforcement** is like adding **steel rebar** to concrete - you embed strong fibers inside the soft plastic to make it MUCH stronger!
 
+## What Does "Continuous" Mean? (Technical Clarification)
+
+To avoid misunderstandings, it's important to clarify what "continuous fiber" means technically:
+
+- **"Continuous" doesn't mean infinitely long**: The term "continuous" refers to fibers that are long relative to their diameter, not necessarily unbroken strands running forever.
+
+- **Technical definition**: A fiber is considered "continuous" when the mechanical properties of the composite no longer improve with further increases in fiber length. This typically occurs when fibers are longer than about **6 mm**, but in practical 3D printing applications, continuous fibers typically run the **entire length or width of the printed layer** (often centimeters or meters).
+
+- **Why it matters**: Continuous fiber reinforced composites offer the **best combination of strength and stiffness** compared to short/discontinuous fiber composites. The continuous nature allows the fibers to carry load efficiently along their entire length, maximizing the reinforcement effect.
+
+- **In 3D printing context**: When we say "continuous fiber," we mean fiber strands that are laid down as unbroken paths within each layer, as opposed to chopped fibers that are mixed into the plastic material. These continuous strands can span the entire part dimension in one or more directions.
+
+## What Does "Reinforcement" Mean? (Technical Clarification)
+
+In the context of fiber 3D printing, "reinforcement" refers to the process of strengthening a material by adding stronger components:
+
+- **Basic concept**: The plastic material (called the "matrix") is relatively weak on its own. By adding strong fibers (the "reinforcement"), you create a composite material where the fibers carry most of the load, making the final part much stronger.
+
+- **How it works**: 
+  - The **matrix** (plastic) holds everything together and transfers load to the fibers
+  - The **reinforcement** (fibers) carries the primary load and provides strength/stiffness
+  - Together, they create a composite that's stronger than either material alone
+
+- **Analogy**: Think of reinforced concrete:
+  - Concrete = matrix (holds shape, protects reinforcement)
+  - Steel rebar = reinforcement (provides strength)
+  - Together = much stronger than concrete alone
+
+- **In 3D printing**: 
+  - **Without reinforcement**: Parts are weak, especially along layer lines
+  - **With fiber reinforcement**: Parts become strong enough for structural applications (aerospace, automotive, etc.)
+  - The reinforcement fibers are strategically placed where strength is needed most
+
+- **Key point**: "Reinforcement" emphasizes that the fibers are **actively strengthening** the part, not just decorative additions. They're structural elements that significantly improve mechanical properties.
+
 ## Two Types of "Fiber" Materials
 
 ### 1. **Short Fiber Filaments** (What PrusaSlicer Already Supports)
@@ -16,13 +51,16 @@ Think of regular 3D printing like building with **playdough** - you squeeze out 
 - **Think of it like**: Adding sand to cement - it helps, but the sand is just mixed in
 
 ### 2. **Continuous Fiber Reinforcement** (What Your Job is About! 🎯)
-- **What it is**: Long, continuous strands of fiber (like carbon fiber thread) laid down DURING printing
-- **Example**: Markforged printers, Anisoprint printers
+- **What it is**: Long, continuous strands of fiber (like carbon fiber thread) integrated DURING printing. These fibers run unbroken paths within each layer, typically spanning the entire length or width of the part (see technical clarification above).
+- **Two methods**:
+  1. **Fiber laid on top**: Fiber strands placed on top of each plastic layer (dual printhead)
+  2. **Fiber embedded in filament**: Fiber embedded inside the plastic during extrusion (co-extrusion)
+- **Example**: Markforged printers (Method 1), Anisoprint printers (both methods)
 - **How it works**: 
-  - First, print a layer of regular plastic
-  - Then, lay down continuous fiber strands in specific patterns
+  - **Method 1**: Print plastic layer → lay fiber on top → repeat
+  - **Method 2**: Co-extrude plastic with fiber embedded inside → build layers → repeat
   - The fiber acts like "skeleton" inside the part
-- **Strength**: Makes parts **10-100x stronger** in the direction of the fiber!
+- **Strength**: Makes parts **10-100x stronger** in the direction of the fiber! Continuous fibers provide superior strength and stiffness compared to short/discontinuous fibers.
 - **Think of it like**: Building a house with wooden beams inside the walls - the beams carry the load
 
 ## Why Continuous Fiber is Special
@@ -35,7 +73,9 @@ Layer 3: ████████  (just plastic)
 ```
 **Problem**: Weak, breaks easily, especially along layer lines
 
-### With Continuous Fiber:
+### With Continuous Fiber (Two Methods):
+
+**Method 1: Fiber Laid on Top of Layers**
 ```
 Layer 1: ████████  (plastic)
          ━━━━━━━━  (fiber strands laid on top)
@@ -44,7 +84,22 @@ Layer 2: ████████  (plastic)
 Layer 3: ████████  (plastic)
          ━━━━━━━━  (fiber strands)
 ```
-**Result**: Super strong! The fiber carries most of the load.
+- Fiber is placed on top of each plastic layer
+- Requires dual printheads (one for plastic, one for fiber)
+- Example: Markforged printers
+
+**Method 2: Fiber Embedded Within Filament**
+```
+Layer 1: █━█━█━█━  (fiber embedded inside plastic during extrusion)
+Layer 2: █━█━█━█━  (fiber embedded inside plastic)
+Layer 3: █━█━█━█━  (fiber embedded inside plastic)
+```
+- Fiber is embedded INSIDE the plastic filament during extrusion
+- Single printhead that co-extrudes plastic and fiber together
+- The fiber runs continuously through the extruded material
+- Example: Some Anisoprint systems, custom fiber printers
+
+**Result**: Both methods make parts super strong! The fiber carries most of the load.
 
 ## Real-World Analogy 🏗️
 
@@ -60,12 +115,16 @@ Imagine building a bridge:
 
 ## How It Works Technically
 
-### Step 1: Print Base Layer
+There are **two main methods** for continuous fiber reinforcement:
+
+### Method 1: Fiber Laid on Top (Dual Printhead)
+
+**Step 1: Print Base Layer**
 - Extrude regular plastic material (PLA, nylon, etc.)
 - This creates the "matrix" that holds everything together
 
-### Step 2: Lay Down Fiber
-- A special printhead places continuous fiber strands
+**Step 2: Lay Down Fiber**
+- A second printhead places continuous fiber strands on top of the plastic layer
 - The fiber is usually:
   - **Carbon fiber** (strongest, most expensive)
   - **Glass fiber** (strong, cheaper)
@@ -75,10 +134,29 @@ Imagine building a bridge:
   - **Infill**: Inside the part in patterns (grid, concentric, etc.)
   - **Custom paths**: Following stress lines in the part
 
-### Step 3: Repeat
+**Step 3: Repeat**
 - Print another plastic layer
-- Lay down more fiber
+- Lay down more fiber on top
 - Continue until part is complete
+
+### Method 2: Fiber Embedded in Filament (Co-extrusion)
+
+**Step 1: Co-extrude Plastic and Fiber**
+- A special printhead simultaneously extrudes plastic AND continuous fiber
+- The fiber is embedded INSIDE the plastic filament as it's extruded
+- The fiber runs continuously through the extruded material
+- Same fiber types: Carbon fiber, glass fiber, or Kevlar
+
+**Step 2: Build Layer by Layer**
+- Each extruded line contains fiber embedded within the plastic
+- The fiber orientation follows the print path direction
+- Patterns are created by controlling the print path (grid, concentric, etc.)
+
+**Step 3: Repeat**
+- Continue building layers with embedded fiber
+- Fiber runs continuously through each layer
+
+**Key Difference**: Method 1 separates plastic and fiber deposition, while Method 2 combines them during extrusion.
 
 ## Why This is Challenging for Software
 
@@ -100,8 +178,8 @@ Imagine building a bridge:
    - Must be continuous paths
    - Must avoid collisions
 5. **NEW**: Coordinate plastic and fiber printing
-   - Print plastic first, then fiber on top?
-   - Or alternate?
+   - **Method 1**: Print plastic first, then fiber on top (dual printhead)
+   - **Method 2**: Co-extrude plastic and fiber together (single printhead with embedded fiber)
 6. **NEW**: Generate special G-code commands
    - Different commands for fiber vs plastic
    - Fiber might need different speeds, pressures
