@@ -142,14 +142,19 @@ OptionsGroup::OptionsGroup(	wxWindow* _parent, const wxString& title,
 void OptionsGroup::change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
 {
     try {
+		// DynamicPrintConfig::def() returns nullptr, so use print_config_def directly
+		const ConfigDef* config_def = config.def();
+		if (config_def == nullptr) {
+			config_def = &print_config_def;
+		}
 
-        if (config.def()->get(opt_key)->type == coBools && config.def()->get(opt_key)->nullable) {
+        if (config_def->get(opt_key)->type == coBools && config_def->get(opt_key)->nullable) {
             ConfigOptionBoolsNullable* vec_new = new ConfigOptionBoolsNullable{ boost::any_cast<unsigned char>(value) };
             config.option<ConfigOptionBoolsNullable>(opt_key)->set_at(vec_new, opt_index, 0);
             return;
         }
 
-        const ConfigOptionDef* opt_def = config.def()->get(opt_key);
+        const ConfigOptionDef* opt_def = config_def->get(opt_key);
         switch (opt_def->type) {
         case coFloatOrPercent: {
             std::string str = boost::any_cast<std::string>(value);
@@ -201,7 +206,7 @@ void OptionsGroup::change_opt_value(DynamicPrintConfig& config, const t_config_o
                 config.option<ConfigOptionStrings>(opt_key)->values =
                     boost::any_cast<std::vector<std::string>>(value);
             }
-            else if (config.def()->get(opt_key)->gui_flags.compare("serialized") == 0) {
+            else if (config_def->get(opt_key)->gui_flags.compare("serialized") == 0) {
                 std::string str = boost::any_cast<std::string>(value);
                 std::vector<std::string> values{};
                 if (!str.empty()) {
@@ -727,7 +732,13 @@ Option ConfigOptionsGroup::get_option(const std::string& opt_key, int opt_index 
         wxGetApp().searcher().add_key(opt_id, static_cast<Preset::Type>(this->config_type()), title, this->config_category());
     }
 
-	return Option(*m_config->def()->get(opt_key), opt_id);
+	// DynamicPrintConfig::def() returns nullptr, so use print_config_def directly
+	// print_config_def contains ALL option definitions including fiber options
+	const ConfigDef* config_def = m_config->def();
+	if (config_def == nullptr) {
+		config_def = &print_config_def;
+	}
+	return Option(*config_def->get(opt_key), opt_id);
 }
 
 void ConfigOptionsGroup::on_change_OG(const t_config_option_key& opt_id, const boost::any& value)
@@ -1000,7 +1011,12 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 
 	boost::any ret;
 	wxString text_value = wxString("");
-	const ConfigOptionDef* opt = config.def()->get(opt_key);
+	// DynamicPrintConfig::def() returns nullptr, so use print_config_def directly
+	const ConfigDef* config_def = config.def();
+	if (config_def == nullptr) {
+		config_def = &print_config_def;
+	}
+	const ConfigOptionDef* opt = config_def->get(opt_key);
 
     if (opt->nullable)
     {

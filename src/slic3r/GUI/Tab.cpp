@@ -23,6 +23,7 @@
 #include "Tab.hpp"
 #include "PresetHints.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/SLAPrint.hpp"
@@ -6116,13 +6117,19 @@ void TabFiber::build()
     m_presets = &m_preset_bundle->prints;
     load_initial_data();
 
-    auto page = add_options_page(L("Basic Settings"), "fiber_basic");
+    // Note: Fiber options are now included in Preset::print_options(), so they are automatically
+    // initialized with default values when the preset is created (same convention as FFF/SLA).
+    // No manual initialization needed here - following the same pattern as TabPrint and TabSLAPrint.
+
+    // Use existing icon names that are known to work (same as TabPrint uses)
+    // This prevents issues with missing icons causing invalid window dimensions
+    auto page = add_options_page(L("Basic Settings"), "cog");
         auto optgroup = page->new_optgroup(L("Enable Fiber Reinforcement"));
         optgroup->append_single_option_line("enable_fiber_reinforcement");
         optgroup->append_single_option_line("fiber_type");
         optgroup->append_single_option_line("fiber_print_method");
 
-    page = add_options_page(L("Placement"), "fiber_placement");
+    page = add_options_page(L("Placement"), "layers");
         optgroup = page->new_optgroup(L("Pattern"));
         optgroup->append_single_option_line("fiber_pattern");
         optgroup->append_single_option_line("fiber_spacing");
@@ -6134,25 +6141,25 @@ void TabFiber::build()
         optgroup->append_single_option_line("fiber_start_layer");
         optgroup->append_single_option_line("fiber_end_layer");
 
-    page = add_options_page(L("Extruders"), "fiber_extruders");
+    page = add_options_page(L("Extruders"), "printer");
         optgroup = page->new_optgroup(L("Extruder Assignment"));
         optgroup->append_single_option_line("plastic_extruder_id");
         optgroup->append_single_option_line("fiber_extruder_id");
         optgroup->append_single_option_line("embedded_fiber_extruder_id");
 
-    page = add_options_page(L("Print Sequence"), "fiber_sequence");
+    page = add_options_page(L("Print Sequence"), "cog");
         optgroup = page->new_optgroup(L("Sequence"));
         optgroup->append_single_option_line("fiber_print_sequence");
         optgroup->append_single_option_line("fiber_delay_after_plastic");
         optgroup->append_single_option_line("fiber_cooling_time");
         optgroup->append_single_option_line("fiber_wait_for_cooling");
 
-    page = add_options_page(L("Speed and Control"), "fiber_speed");
+    page = add_options_page(L("Speed and Control"), "time");
         optgroup = page->new_optgroup(L("Speed"));
         optgroup->append_single_option_line("fiber_speed");
         optgroup->append_single_option_line("fiber_pressure");
 
-    page = add_options_page(L("G-code"), "fiber_gcode");
+    page = add_options_page(L("G-code"), "cog");
         optgroup = page->new_optgroup(L("G-code Commands"));
         optgroup->append_single_option_line("fiber_start_command");
         optgroup->append_single_option_line("fiber_stop_command");

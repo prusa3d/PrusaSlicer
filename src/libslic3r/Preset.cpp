@@ -513,6 +513,11 @@ static std::vector<std::string> s_Preset_print_options {
     "automatic_extrusion_widths", "automatic_infill_combination", "automatic_infill_combination_max_layer_height",
     "bed_temperature_extruder", "interlocking_beam", "interlocking_orientation", "interlocking_beam_layer_count", "interlocking_depth", "interlocking_boundary_avoidance", "interlocking_beam_width",
     "travel_short_distance_acceleration",
+    // Fiber reinforcement options
+    "enable_fiber_reinforcement", "fiber_type", "fiber_print_method", "fiber_pattern", "fiber_spacing", "fiber_angle", "fiber_placement_zone",
+    "fiber_layer_interval", "fiber_start_layer", "fiber_end_layer", "plastic_extruder_id", "fiber_extruder_id", "embedded_fiber_extruder_id",
+    "fiber_print_sequence", "fiber_delay_after_plastic", "fiber_cooling_time", "fiber_wait_for_cooling", "fiber_speed", "fiber_pressure",
+    "fiber_start_command", "fiber_stop_command", "fiber_speed_command", "fiber_enable_comments", "fiber_path_color", "fiber_arrow_color", "fiber_arrow_density",
 };
 
 static std::vector<std::string> s_Preset_filament_options {

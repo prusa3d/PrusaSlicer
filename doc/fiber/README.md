@@ -1,300 +1,258 @@
-# Fiber Printing Integration for PrusaSlicer
+# Fiber 3D Printing - Documentation Index
 
-## Executive Summary
-
-This document provides an overview of the fiber printing integration project for PrusaSlicer. The goal is to extend PrusaSlicer with continuous fiber reinforcement capabilities, enabling the generation of G-code for advanced composite 3D printing.
+This directory contains comprehensive documentation for the Fiber 3D Printing feature in PrusaSlicer.
 
 ---
 
-## What is Fiber Printing?
+## 📚 Documentation Files
 
-Fiber printing is an advanced 3D printing technology that embeds continuous fiber strands (carbon fiber, glass fiber, or Kevlar) **inside** the plastic filament during extrusion. The fiber is filled within the continuous plastic filament, creating a composite material where the fiber provides strength (like rebar in concrete) while the plastic matrix holds everything together. This creates parts that are **10-100x stronger** than regular 3D printed parts, making them suitable for industrial and engineering applications.
+### User Documentation
 
-![Fiber Printing Concept](./images/Fiber_Integration_Architecture_data_flow_stl_to_g_code_fff_sla_fiber_in_parallel.png)
+1. **[User_Guide.md](User_Guide.md)**
+   - Complete user guide for fiber 3D printing
+   - Getting started instructions
+   - Configuration guide
+   - Troubleshooting
+   - Best practices
+   - Examples
 
-*Regular 3D printing (left) vs Fiber-reinforced printing (right) - The fiber acts like rebar in concrete, providing exceptional strength.*
+2. **[Configuration_Reference.md](Configuration_Reference.md)**
+   - Complete list of all configuration options
+   - Default values
+   - Validation rules
+   - Configuration examples
 
----
+3. **[What_is_Fiber_3D_Printing.md](What_is_Fiber_3D_Printing.md)**
+   - Introduction to fiber 3D printing
+   - Technology overview
+   - Use cases and applications
 
-## Understanding 3D Printing Technologies
+### Developer Documentation
 
-PrusaSlicer supports multiple 3D printing technologies. Here's what each acronym means:
+4. **[Developer_Guide.md](Developer_Guide.md)**
+   - Architecture overview
+   - How to add new patterns
+   - How to extend the system
+   - Code structure
+   - API reference
+   - Testing guide
 
-### **FFF** - Fused Filament Fabrication
-- **Also known as**: FDM (Fused Deposition Modeling)
-- **What it is**: The most common 3D printing method
-- **How it works**: Heats plastic filament and extrudes it layer by layer through a nozzle
-- **Materials**: PLA, ABS, PETG, TPU, and other thermoplastics
-- **Use cases**: Prototyping, hobby projects, functional parts
-- **Example**: Most desktop 3D printers (Prusa, Creality, etc.)
+5. **[Fiber_Integration_Architecture.md](Fiber_Integration_Architecture.md)**
+   - Detailed architecture diagrams
+   - Integration points with PrusaSlicer
+   - Data flow diagrams
+   - Class hierarchy
 
-### **SLA** - Stereolithography
-- **Also known as**: Resin printing, MSLA (Masked Stereolithography)
-- **What it is**: Uses UV light to cure liquid resin into solid parts
-- **How it works**: A UV light source (laser or LCD screen) cures liquid resin layer by layer
-- **Materials**: Photopolymer resins (standard, tough, flexible, etc.)
-- **Use cases**: High-detail miniatures, jewelry, dental models, smooth surfaces
-- **Example**: Formlabs, Elegoo, Anycubic resin printers
+6. **[How_SLA_Was_Added_Guide.md](How_SLA_Was_Added_Guide.md)**
+   - Reference guide for how SLA was integrated
+   - Used as a template for fiber integration
 
-### **Fiber** - Continuous Fiber Reinforcement (Our Addition)
-- **What it is**: Advanced composite 3D printing with embedded fibers
-- **How it works**: The fiber strand (carbon fiber, glass fiber, or Kevlar) is embedded **inside** the plastic filament as it's extruded, creating a continuous composite material. The fiber acts like rebar in concrete - providing strength while the plastic matrix holds everything together.
-- **Materials**: Plastic filament with continuous fiber core (carbon fiber, glass fiber, Kevlar)
-- **Use cases**: Industrial parts, aerospace components, high-strength applications, structural components
-- **Advantage**: Parts are 10-100x stronger than regular 3D printed parts because the continuous fiber provides exceptional tensile strength
-- **Example**: Markforged printers, continuous fiber printers
+### Implementation Documentation
 
-### Other Terms You'll See:
+7. **[Fiber_Implementation_Roadmap.md](Fiber_Implementation_Roadmap.md)**
+   - Complete implementation roadmap
+   - Phase-by-phase breakdown
+   - Estimated timelines
+   - Task lists
 
-- **G-code**: The instruction language that tells 3D printers what to do (move here, extrude there, etc.)
-- **STL/OBJ/3MF**: File formats for 3D models (like PDF for documents)
-- **Slicing**: The process of converting a 3D model into printable layers and G-code
-- **Slicer**: Software (like PrusaSlicer) that performs the slicing process
+8. **[Implementation_Status.md](Implementation_Status.md)**
+   - Current implementation status
+   - Completed phases
+   - Remaining work
+   - Progress tracking
 
----
+9. **[Phase*_Summary.md](Phase*_Summary.md)**
+   - Summary documents for each implementation phase
+   - What was completed
+   - Files created/modified
+   - Current state
 
-## Project Overview
+### Technical Documentation
 
-### Objective
+10. **[Multi_Extruder_Integration.md](Multi_Extruder_Integration.md)**
+    - Multi-extruder integration details
+    - Tool change handling
+    - Extruder assignment
 
-Integrate proprietary continuous fiber reinforcement slicing logic into PrusaSlicer, creating a versatile, extensible system that generates G-code for fiber 3D printers while maintaining full compatibility with existing PrusaSlicer features.
+11. **[Method2_Embedded_Fiber.md](Method2_Embedded_Fiber.md)**
+    - Method 2 (embedded fiber) implementation
+    - Pre-embedded filament support
+    - Co-extrusion placeholder
 
-### Key Advantage
+12. **[GUI_Implementation_Roadmap.md](GUI_Implementation_Roadmap.md)**
+    - GUI integration roadmap
+    - Settings panels
+    - 3D visualization
+    - Preview and validation
 
-**We already have proprietary software** that successfully generates G-code for fiber printers. This means:
-- ✅ **Proven algorithms** - Already working and validated
-- ✅ **60% time savings** - Port existing code vs. building from scratch
-- ✅ **Lower risk** - Battle-tested logic reduces implementation risk
-- ✅ **Faster delivery** - Estimated 6-9 weeks for MVP (vs. 10-14 weeks from scratch)
+### Quick References
 
----
+13. **[Quick_Reference.md](Quick_Reference.md)**
+    - Quick reference card
+    - Common settings
+    - Troubleshooting tips
 
-## Architecture Overview
+14. **[Roadmap_Quick_Summary.md](Roadmap_Quick_Summary.md)**
+    - Quick summary of roadmap
+    - Key milestones
+    - Priority overview
 
-The integration follows PrusaSlicer's existing architecture pattern (similar to how SLA printing was added):
+### Diagrams and Visualizations
 
-![High-Level Architecture](./images/Fiber_Integration_Architecture_high_level_architecture_flow.png)
+15. **[README_Diagrams.md](README_Diagrams.md)**
+    - Description of architecture diagrams
+    - How to regenerate diagrams
 
-*PrusaSlicer supports three print types: FFF (regular), SLA (resin), and Fiber (our addition).*
-
-### Integration Approach
-
-![Class Hierarchy](./images/Fiber_Integration_Architecture_class_hierarchy_integration.png)
-
-*Fiber printing integrates as a separate module, following the same pattern as SLA printing. This ensures modularity and maintainability.*
-
----
-
-## Complete Workflow
-
-The fiber printing process integrates seamlessly into PrusaSlicer's workflow:
-
-![Detailed Integration Flow](./images/Fiber_Integration_Architecture_detailed_fiber_integration_flow.png)
-
-### Key Steps:
-
-1. **Load Model** - User loads STL/OBJ/3MF file (same as regular printing)
-2. **Slice Model** - Reuses existing slicing engine
-3. **Plan Fiber Placement** - NEW: Decides where fiber strands go
-4. **Generate Paths** - NEW: Creates continuous, collision-free fiber paths
-5. **Coordinate Printing** - NEW: Sequences plastic and fiber printing
-6. **Export G-code** - Generates G-code with fiber commands
-
----
-
-## Data Flow
-
-All three print types (FFF, SLA, Fiber) work in parallel under PrusaSlicer:
-
-![Data Flow](./images/Fiber_Integration_Architecture_data_flow_stl_to_g_code_fff_sla_fiber_in_parallel.png)
-
-*The system is designed to support multiple print technologies simultaneously, with fiber printing as a new addition.*
-
----
-
-## Implementation Plan
-
-### Project Phases
-
-![Fiber Plan Overview](./images/Fiber_Implementation_Roadmap_visual_overview.png)
-
-### Timeline
-
-**With Existing Software (Our Case):**
-- **MVP**: 6-9 weeks (1.5-2.25 months)
-- **Full Version**: 12-16 weeks (3-4 months)
-- **With Advanced Features**: 16-20 weeks (4-5 months)
-
-**Key Milestones:**
-1. **Week 1-2**: Foundation & Architecture Setup
-2. **Week 3**: Basic Slicing Integration
-3. **Week 4-5**: Fiber Placement Strategy
-4. **Week 6-8**: Continuous Path Generation (Critical Phase)
-5. **Week 9**: Plastic-Fiber Coordination
-6. **Week 10**: G-Code Generation
-7. **Week 11-12**: GUI Integration
-8. **Week 13-14**: Testing & Validation
+16. **[DIAGRAMS_SUMMARY.md](DIAGRAMS_SUMMARY.md)**
+    - Summary of all diagrams
+    - Diagram locations
 
 ---
 
-## What Gets Built
+## 🚀 Quick Start
 
-### New Components
+### For Users
 
-![Integration Points](./images/Fiber_Integration_Architecture_integration_points_with_existing_code.png)
+1. Start with **[User_Guide.md](User_Guide.md)** for getting started
+2. Refer to **[Configuration_Reference.md](Configuration_Reference.md)** for settings
+3. Check **[Troubleshooting](#troubleshooting)** section in User Guide for issues
 
-**New Code (Green boxes):**
-- `FiberPrint` - Main fiber printing class
-- `FiberPlacement` - Decides where fiber goes
-- `PathPlanner` - Generates continuous paths
-- `FiberGCodeWriter` - Outputs fiber commands
-- `FiberPrintConfig` - Configuration system
+### For Developers
 
-**Reused Code (Blue boxes):**
-- File loading (STL/OBJ parsing)
-- Slicing engine (layer generation)
-- G-code infrastructure
-- Configuration system
+1. Read **[Developer_Guide.md](Developer_Guide.md)** for architecture
+2. Review **[Fiber_Integration_Architecture.md](Fiber_Integration_Architecture.md)** for details
+3. Check **[Implementation_Status.md](Implementation_Status.md)** for current state
 
-### File Structure
+### For Contributors
 
-![File Structure](./images/Fiber_Integration_Architecture_file_structure_integration.png)
-
-*New code is organized in a dedicated `Fiber/` directory, similar to how SLA code is organized.*
+1. Review **[Fiber_Implementation_Roadmap.md](Fiber_Implementation_Roadmap.md)** for planned work
+2. Check **[Phase*_Summary.md](Phase*_Summary.md)** files for what's been done
+3. See **[Developer_Guide.md](Developer_Guide.md)** for how to extend
 
 ---
 
-## Comparison with Existing Print Types
+## 📖 Documentation by Topic
 
-![Processing Steps Comparison](./images/Fiber_Integration_Architecture_processing_steps_comparison.png)
+### Getting Started
+- [User_Guide.md](User_Guide.md) - Getting Started section
+- [What_is_Fiber_3D_Printing.md](What_is_Fiber_3D_Printing.md)
 
-| Feature | FFF | SLA | Fiber (New) |
-|---------|-----|-----|-------------|
-| **Input** | STL/OBJ | STL/OBJ | STL/OBJ |
-| **Output** | G-code | SL1 Images | G-code with Fiber |
-| **Special Logic** | Perimeters, Infill | Supports, Hollowing | **Fiber Path Planning** |
-| **Complexity** | Medium | High | High (Path Planning) |
+### Configuration
+- [User_Guide.md](User_Guide.md) - Configuration Guide section
+- [Configuration_Reference.md](Configuration_Reference.md)
 
----
+### Troubleshooting
+- [User_Guide.md](User_Guide.md) - Troubleshooting section
 
-## Configuration & User Experience
+### Architecture
+- [Developer_Guide.md](Developer_Guide.md) - Architecture Overview
+- [Fiber_Integration_Architecture.md](Fiber_Integration_Architecture.md)
 
-![Configuration Flow](./images/Fiber_Integration_Architecture_configuration_flow.png)
+### Implementation
+- [Fiber_Implementation_Roadmap.md](Fiber_Implementation_Roadmap.md)
+- [Implementation_Status.md](Implementation_Status.md)
+- [Phase*_Summary.md](Phase*_Summary.md) files
 
-Users can configure fiber printing through:
-- **GUI**: Visual settings panels (fiber type, pattern, density, angle)
-- **CLI**: Command-line arguments (`--fiber-type`, `--fiber-density`)
-- **Presets**: Saved configurations (like existing print profiles)
-
----
-
-## G-Code Generation
-
-![G-Code Generation Flow](./images/Fiber_Integration_Architecture_g_code_generation_flow.png)
-
-The system generates G-code that:
-- Contains standard FFF commands (for plastic)
-- Includes fiber-specific commands (M106/M107 or custom)
-- Properly sequences plastic and fiber printing
-- Works with your existing printer
+### Extending the System
+- [Developer_Guide.md](Developer_Guide.md) - Adding New Patterns, Extending the System
+- [How_SLA_Was_Added_Guide.md](How_SLA_Was_Added_Guide.md)
 
 ---
 
-## Risk Mitigation
+## 🔍 Finding Information
 
-### Key Risks & Mitigation Strategies
+### I want to...
 
-1. **Algorithm Complexity** (Path Planning)
-   - ✅ **Mitigation**: We already have working algorithms from proprietary software
-   - ✅ **Approach**: Port and adapt existing code
+**...use fiber printing:**
+→ [User_Guide.md](User_Guide.md)
 
-2. **Integration Challenges**
-   - ✅ **Mitigation**: Follow proven SLA integration pattern
-   - ✅ **Approach**: Study existing code thoroughly before implementation
+**...configure settings:**
+→ [Configuration_Reference.md](Configuration_Reference.md)
 
-3. **Printer Compatibility**
-   - ✅ **Mitigation**: Test with real printer early in development
-   - ✅ **Approach**: Iterate quickly based on printer feedback
+**...troubleshoot issues:**
+→ [User_Guide.md](User_Guide.md) - Troubleshooting section
 
-4. **Performance**
-   - ✅ **Mitigation**: Existing algorithms are already optimized
-   - ✅ **Approach**: Profile and optimize critical paths
+**...understand the architecture:**
+→ [Developer_Guide.md](Developer_Guide.md)
+→ [Fiber_Integration_Architecture.md](Fiber_Integration_Architecture.md)
 
----
+**...add a new pattern:**
+→ [Developer_Guide.md](Developer_Guide.md) - Adding New Patterns
 
-## Success Criteria
+**...extend the system:**
+→ [Developer_Guide.md](Developer_Guide.md) - Extending the System
 
-### Minimum Viable Product (MVP)
-- ✅ Can slice 3D models
-- ✅ Can place fiber in basic patterns (grid)
-- ✅ Can generate continuous fiber paths
-- ✅ Can output valid G-code for printer
-- ✅ Basic GUI for settings
+**...see what's been implemented:**
+→ [Implementation_Status.md](Implementation_Status.md)
+→ [Phase*_Summary.md](Phase*_Summary.md) files
 
-### Full Success
-- ✅ Multiple fiber patterns work
-- ✅ Advanced features implemented
-- ✅ Polished GUI with 3D visualization
-- ✅ Comprehensive documentation
-- ✅ Tested and validated on real printer
+**...see what's planned:**
+→ [Fiber_Implementation_Roadmap.md](Fiber_Implementation_Roadmap.md)
 
 ---
 
-## Business Value
+## 📝 Documentation Status
 
-### Technical Benefits
-- **Modular Architecture** - Easy to maintain and extend
-- **Reuses Existing Code** - Faster development, lower risk
-- **Proven Algorithms** - Already validated in production
-- **Extensible Design** - Easy to add new fiber types/patterns
+### ✅ Complete
+- User Guide
+- Developer Guide
+- Configuration Reference
+- Architecture Documentation
+- Implementation Roadmaps
+- Phase Summaries
+- **GUI Implementation** ✅ - TabFiber is functional and working
 
-### Market Benefits
-- **New Capability** - Enables composite 3D printing
-- **Competitive Advantage** - Advanced printing technology
-- **Industrial Applications** - Opens new market segments
-- **User-Friendly** - Integrated into familiar PrusaSlicer interface
+### ⏳ In Progress
+- Tutorial videos/docs (planned)
+- Advanced examples (planned)
 
----
-
-## Timeline Summary
-
-| Phase | Duration | Key Deliverable |
-|-------|----------|-----------------|
-| **Planning** | 1-2 weeks | Architecture design, requirements |
-| **Foundation** | 1-2 weeks | Basic structure, configuration |
-| **Core Logic** | 4-6 weeks | Path planning, placement algorithms |
-| **Integration** | 2-3 weeks | GUI, G-code generation |
-| **Testing** | 2-3 weeks | Validation, bug fixes |
-| **Total MVP** | **6-9 weeks** | Working fiber printing system |
+### 📋 Planned
+- Video tutorials
+- Step-by-step tutorials with screenshots
+- Advanced use case examples
+- Performance tuning guide
 
 ---
 
-## Next Steps
+## 🤝 Contributing to Documentation
 
-1. **Review & Approve** - This roadmap and architecture
-2. **Resource Allocation** - Assign development team
-3. **Kickoff Meeting** - Align on requirements and timeline
-4. **Begin Phase 0** - Start foundation setup
+When adding new features:
 
----
+1. **Update User Guide** if it affects users
+2. **Update Developer Guide** if it affects developers
+3. **Update Configuration Reference** if new settings are added
+4. **Update Implementation Status** to track progress
+5. **Create Phase Summary** for major phases
 
-## Questions & Contact
-
-For technical questions, refer to:
-- [Fiber Implementation Roadmap](Fiber_Implementation_Roadmap.md) - Detailed technical plan
-- [Fiber Integration Architecture](Fiber_Integration_Architecture.md) - Technical architecture
-- [How SLA Was Added Guide](How_SLA_Was_Added_Guide.md) - Reference implementation
-
----
-
-## Conclusion
-
-This project extends PrusaSlicer with advanced fiber printing capabilities, following proven architectural patterns. With existing proprietary software providing validated algorithms, the implementation risk is low and the timeline is aggressive.
-
-**The result**: A powerful, integrated fiber printing solution that opens new markets and applications for 3D printing technology.
+Documentation follows Markdown format. Use:
+- Clear headings and structure
+- Code blocks for examples
+- Tables for reference data
+- Links between related documents
 
 ---
 
-*Last Updated: 2025*
-*Document Version: 1.0*
+## 📞 Support
+
+For questions or issues:
+1. Check [User_Guide.md](User_Guide.md) Troubleshooting section
+2. Review [Configuration_Reference.md](Configuration_Reference.md)
+3. Check [Implementation_Status.md](Implementation_Status.md) for known issues
+4. Refer to [Developer_Guide.md](Developer_Guide.md) for technical details
+
+---
+
+**Last Updated**: December 2024 - GUI Implementation Complete ✅  
+**Version**: 1.0  
+**Maintained by**: Fiber 3D Printing Development Team
+
+---
+
+## 🎉 Recent Updates
+
+### ✅ GUI Implementation Complete (December 2024)
+- **TabFiber is now functional** - The GUI crash has been resolved
+- Fiber Reinforcement tab is accessible in PrusaSlicer
+- All fiber options are properly initialized and accessible
+- Solution: Added fiber options to `Preset::print_options()` following FFF/SLA convention
 

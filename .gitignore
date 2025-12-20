@@ -94,3 +94,27 @@ xs/assertlib*
 /src/TAGS
 .pkg_cache
 **/.DS_Store
+
+# Phase implementation summaries and status files (internal documentation)
+doc/fiber/Phase*_Summary.md
+doc/fiber/Phase*_Implementation_Status.md
+doc/fiber/Implementation_Status.md
+doc/fiber/*_Implementation_Roadmap.md
+doc/fiber/Phase*_*.md
+
+# Email templates and personal communication files
+doc/fiber/*EMAIL*.md
+doc/fiber/HONEST_EMAIL*.md
+doc/fiber/FOLLOW_UP*.md
+LinkedIn_Message*.md
+LinkedIn_Message_Endless*.md
+
+# GUI debugging and implementation history files
+doc/fiber/GUI_CRASH_DEBUG.md
+doc/fiber/GUI_implementation_history.md
+
+# Build troubleshooting (local documentation)
+doc/fiber/BUILD_TROUBLESHOOTING.md
+
+# Original PrusaSlicer clone (for comparison)
+PrusaSlicer_original/

@@ -228,22 +228,25 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     Fit();
 
     const wxSize min_size = wxGetApp().get_min_size(this);
-    // Safety check: ensure minimum size is valid (fixes WSL/GTK assertion failure)
-    const wxSize safe_min_size = (min_size.GetWidth() > 0 && min_size.GetHeight() > 0) 
-        ? min_size 
-        : wxSize(760, 490);  // Fallback to default size
 #ifdef __APPLE__
     // Using SetMinSize() on Mac messes up the window position in some cases
     // cf. https://groups.google.com/forum/#!topic/wx-users/yUKPBBfXWO0
-    SetSize(safe_min_size);
+    SetSize(min_size/*wxSize(760, 490)*/);
 #else
-    SetMinSize(safe_min_size);
-    const wxSize current_min = GetMinSize();
-    if (current_min.GetWidth() > 0 && current_min.GetHeight() > 0) {
-        SetSize(current_min);
-    } else {
-        SetSize(safe_min_size);
+    SetMinSize(min_size/*wxSize(760, 490)*/);
+    // Safety check: Ensure GetMinSize() returns valid dimensions before setting window size
+    // This prevents GTK assertion failures when tabs are added during initialization
+    wxSize actual_min_size = GetMinSize();
+    if (actual_min_size.GetWidth() <= 0 || actual_min_size.GetHeight() <= 0) {
+        // Fallback to calculated min_size if GetMinSize() returns invalid dimensions
+        actual_min_size = min_size;
+        // Ensure fallback is also valid
+        if (actual_min_size.GetWidth() <= 0)
+            actual_min_size.SetWidth(760);
+        if (actual_min_size.GetHeight() <= 0)
+            actual_min_size.SetHeight(490);
     }
+    SetSize(actual_min_size);
 #endif
     Layout();
 
@@ -808,11 +811,19 @@ void MainFrame::register_win32_callbacks()
 
 void MainFrame::create_preset_tabs()
 {
+    // FFF tabs
     add_created_tab(new TabPrint(m_tabpanel), "cog");
     add_created_tab(new TabFilament(m_tabpanel), "spool");
-    add_created_tab(new TabFiber(m_tabpanel), "cog");  // Using "cog" icon for now (fiber.svg can be added later)
+    
+    // SLA tabs
     add_created_tab(new TabSLAPrint(m_tabpanel), "cog");
     add_created_tab(new TabSLAMaterial(m_tabpanel), "resin");
+    
+    // Fiber tab (separate category)
+    // NOTE: Using "cog" icon temporarily - "fiber" icon doesn't exist yet
+    add_created_tab(new TabFiber(m_tabpanel), "cog");
+    
+    // Printer tab (common to all)
     add_created_tab(new TabPrinter(m_tabpanel), wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? "printer" : "sla_printer");
     
     m_printables_webview = new PrintablesWebViewPanel(m_tabpanel);
@@ -1389,32 +1400,6 @@ static wxMenu* generate_help_menu()
 //                                             wxString::Format(_L("Open the %s manual in your browser"), SLIC3R_APP_NAME),
 //            [this](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("http://manual.slic3r.org/"); });
     helpMenu->AppendSeparator();
-    // Phase 7.4: Add Fiber 3D Printing Info to Help menu
-    append_menu_item(helpMenu, wxID_ANY, _L("Fiber 3D Printing &Info"), _L("Show information about fiber 3D printing"),
-        [](wxCommandEvent&) { 
-            wxString message = _L("Fiber 3D Printing\n\n")
-                + _L("Fiber 3D printing allows you to reinforce plastic prints with continuous fiber strands ")
-                + _L("(carbon, glass, or Kevlar) for enhanced strength and stiffness.\n\n")
-                + _L("Key Features:\n")
-                + _L("• Grid and concentric patterns for flexible fiber placement\n")
-                + _L("• Configurable fiber placement (angle, spacing, layer selection)\n")
-                + _L("• Continuous path planning (no retractions for optimal strength)\n")
-                + _L("• Multiple printing methods:\n")
-                + _L("  - Dual printhead: Separate extruders for plastic and fiber\n")
-                + _L("  - Pre-embedded filament: Fiber already in the filament spool\n")
-                + _L("• 3D visualization of fiber paths with direction arrows\n")
-                + _L("• Statistics and validation (length, weight, coverage, warnings)\n\n")
-                + _L("Getting Started:\n")
-                + _L("1. Enable 'Enable fiber reinforcement' in the Fiber Reinforcement tab\n")
-                + _L("2. Select your fiber type (Carbon, Glass, or Kevlar)\n")
-                + _L("3. Choose a pattern (Grid or Concentric)\n")
-                + _L("4. Configure spacing and angle\n")
-                + _L("5. Set layer selection (which layers get fiber)\n")
-                + _L("6. Configure print method and extruder assignments\n\n")
-                + _L("For detailed settings, see the Fiber Reinforcement settings tab.\n")
-                + _L("Hover over any setting to see tooltips with examples and recommendations.");
-            wxMessageBox(message, _L("Fiber 3D Printing Information"), wxOK | wxICON_INFORMATION);
-        });
     append_menu_item(helpMenu, wxID_ANY, _L("System &Info"), _L("Show system information"),
         [](wxCommandEvent&) { wxGetApp().system_info(); });
     append_menu_item(helpMenu, wxID_ANY, _L("Show &Configuration Folder"), _L("Show user configuration folder (datadir)"),
