@@ -136,6 +136,16 @@ void PresetComboBox::init_from_bundle(PresetBundle* preset_bundle)
         m_main_bitmap_name = "printer";
         break;
     }
+    case Preset::TYPE_SLM_PRINT: {
+        m_collection = &m_preset_bundle->slm_prints;
+        m_main_bitmap_name = "cog";
+        break;
+    }
+    case Preset::TYPE_SLM_MATERIAL: {
+        m_collection = &m_preset_bundle->slm_materials;
+        m_main_bitmap_name = "resin";
+        break;
+    }
     default: break;
     }
 }
@@ -1364,9 +1374,29 @@ void TabPresetComboBox::update()
     Clear();
     invalidate_selection();
 
-    const ExtruderFilaments& extruder_filaments = m_preset_bundle->extruders_filaments[m_extruder_idx];
+    // Safety check: extruder_filaments is only valid for TYPE_FILAMENT
+    // Also check that m_preset_bundle and m_collection are valid
+    if (!m_preset_bundle || !m_collection) {
+        return;
+    }
+
+    // Only access extruder_filaments for filament type, and ensure index is valid
+    const ExtruderFilaments* extruder_filaments_ptr = nullptr;
+    if (m_type == Preset::TYPE_FILAMENT) {
+        if (m_extruder_idx < m_preset_bundle->extruders_filaments.size()) {
+            extruder_filaments_ptr = &m_preset_bundle->extruders_filaments[m_extruder_idx];
+        } else {
+            // Invalid extruder index, return early
+            return;
+        }
+    }
 
     const std::deque<Preset>& presets = m_collection->get_presets();
+    
+    // Safety check: ensure presets is not empty
+    if (presets.empty()) {
+        return;
+    }
     
     struct PresetData {
         wxString        name;
@@ -1382,7 +1412,8 @@ void TabPresetComboBox::update()
     wxString selected = "";
     if (!presets.front().is_visible)
         set_label_marker(Append(separator(L("System presets")), NullBitmapBndl()));
-    size_t idx_selected = m_type == Preset::TYPE_FILAMENT ? extruder_filaments.get_selected_idx() : m_collection->get_selected_idx();
+    size_t idx_selected = (m_type == Preset::TYPE_FILAMENT && extruder_filaments_ptr) ? 
+                          extruder_filaments_ptr->get_selected_idx() : m_collection->get_selected_idx();
 
     if (m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection()) {
         std::string sel_preset_name = m_preset_bundle->physical_printers.get_selected_printer_preset_name();
@@ -1395,7 +1426,8 @@ void TabPresetComboBox::update()
     {
         const Preset& preset = presets[i];
 
-        const bool is_compatible = m_type == Preset::TYPE_FILAMENT ? extruder_filaments.filament(i).is_compatible : preset.is_compatible;
+        const bool is_compatible = (m_type == Preset::TYPE_FILAMENT && extruder_filaments_ptr) ? 
+                                   extruder_filaments_ptr->filament(i).is_compatible : preset.is_compatible;
 
         if (!preset.is_visible || (!show_incompatible && !is_compatible && i != idx_selected))
             continue;

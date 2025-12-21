@@ -246,6 +246,10 @@ enum PrinterTechnology : unsigned char
     ptFFF,
     // Stereolitography
     ptSLA,
+    // Selective Laser Melting
+    ptSLM,
+    // Fiber Reinforcement
+    ptFiber,
     // Unknown, useful for command line processing
     ptUnknown,
     // Any technology, useful for parameters compatible with both ptFFF and ptSLA

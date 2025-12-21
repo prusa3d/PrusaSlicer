@@ -289,6 +289,7 @@ public:
 
     void            recreate_GUI(const wxString& message);
     void            system_info();
+    void            fiber_printing_info();
     void            keyboard_shortcuts();
     void            load_project(wxWindow *parent, wxString& input_file) const;
     void            import_model(wxWindow *parent, wxArrayString& input_files) const;

@@ -149,6 +149,9 @@ EOptionType convert(const Slic3r::GUI::Preview::OptionType& type)
     case Slic3r::GUI::Preview::OptionType::CenterOfGravity: { return EOptionType::COUNT; }
     case Slic3r::GUI::Preview::OptionType::ToolMarker:      { return EOptionType::COUNT; }
 #endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+    // Phase 7.2: Fiber paths are not part of libvgcode, handled separately in GLCanvas3D
+    case Slic3r::GUI::Preview::OptionType::FiberPaths:     { return EOptionType::COUNT; }
+    case Slic3r::GUI::Preview::OptionType::FiberArrows:     { return EOptionType::COUNT; }
     default:                                                { return EOptionType::COUNT; }
     }
 }

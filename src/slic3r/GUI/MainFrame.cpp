@@ -234,7 +234,19 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     SetSize(min_size/*wxSize(760, 490)*/);
 #else
     SetMinSize(min_size/*wxSize(760, 490)*/);
-    SetSize(GetMinSize());
+    // Safety check: Ensure GetMinSize() returns valid dimensions before setting window size
+    // This prevents GTK assertion failures when tabs are added during initialization
+    wxSize actual_min_size = GetMinSize();
+    if (actual_min_size.GetWidth() <= 0 || actual_min_size.GetHeight() <= 0) {
+        // Fallback to calculated min_size if GetMinSize() returns invalid dimensions
+        actual_min_size = min_size;
+        // Ensure fallback is also valid
+        if (actual_min_size.GetWidth() <= 0)
+            actual_min_size.SetWidth(760);
+        if (actual_min_size.GetHeight() <= 0)
+            actual_min_size.SetHeight(490);
+    }
+    SetSize(actual_min_size);
 #endif
     Layout();
 
@@ -799,11 +811,22 @@ void MainFrame::register_win32_callbacks()
 
 void MainFrame::create_preset_tabs()
 {
+    // FFF tabs
     add_created_tab(new TabPrint(m_tabpanel), "cog");
     add_created_tab(new TabFilament(m_tabpanel), "spool");
+    
+    // SLA tabs
     add_created_tab(new TabSLAPrint(m_tabpanel), "cog");
     add_created_tab(new TabSLAMaterial(m_tabpanel), "resin");
-    add_created_tab(new TabPrinter(m_tabpanel), wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? "printer" : "sla_printer");
+    
+    // SLM tabs
+    add_created_tab(new TabSLMPrint(m_tabpanel), "cog");
+    add_created_tab(new TabSLMMaterial(m_tabpanel), "resin");
+    
+    // Printer tab (common to all)
+    PrinterTechnology tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
+    std::string printer_icon = (tech == ptSLA || tech == ptSLM) ? "sla_printer" : "printer";
+    add_created_tab(new TabPrinter(m_tabpanel), printer_icon);
     
     m_printables_webview = new PrintablesWebViewPanel(m_tabpanel);
     add_printables_webview_tab();
@@ -1878,7 +1901,9 @@ void MainFrame::update_menubar()
     if (wxGetApp().is_gcode_viewer())
         return;
 
-    const bool is_fff = plater()->printer_technology() == ptFFF;
+    const PrinterTechnology tech = plater()->printer_technology();
+    const bool is_fff = tech == ptFFF || tech == ptFiber;
+    const bool is_sla_or_slm = tech == ptSLA || tech == ptSLM;
 
     m_changeable_menu_items[miExport]       ->SetItemLabel((is_fff ? _L("Export &G-code")         : _L("E&xport"))        + dots    + "\tCtrl+G");
     m_changeable_menu_items[miSend]         ->SetItemLabel((is_fff ? _L("S&end G-code")           : _L("S&end to print")) + dots    + "\tCtrl+Shift+G");
@@ -1886,7 +1911,7 @@ void MainFrame::update_menubar()
     m_changeable_menu_items[miMaterialTab]  ->SetItemLabel((is_fff ? _L("&Filament Settings Tab") : _L("Mate&rial Settings Tab"))   + "\tCtrl+3");
     m_changeable_menu_items[miMaterialTab]  ->SetBitmap(*get_bmp_bundle(is_fff ? "spool"   : "resin"));
 
-    m_changeable_menu_items[miPrinterTab]   ->SetBitmap(*get_bmp_bundle(is_fff ? "printer" : "sla_printer"));
+    m_changeable_menu_items[miPrinterTab]   ->SetBitmap(*get_bmp_bundle(is_sla_or_slm ? "sla_printer" : "printer"));
 }
 
 

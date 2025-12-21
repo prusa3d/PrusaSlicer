@@ -49,6 +49,8 @@ PresetBundle::PresetBundle() :
     filaments(Preset::TYPE_FILAMENT, Preset::filament_options(), static_cast<const PrintRegionConfig&>(FullPrintConfig::defaults())),
     sla_materials(Preset::TYPE_SLA_MATERIAL, Preset::sla_material_options(), static_cast<const SLAMaterialConfig&>(SLAFullPrintConfig::defaults())), 
     sla_prints(Preset::TYPE_SLA_PRINT, Preset::sla_print_options(), static_cast<const SLAPrintObjectConfig&>(SLAFullPrintConfig::defaults())),
+    slm_prints(Preset::TYPE_SLM_PRINT, Preset::slm_print_options(), static_cast<const SLMPrintConfig&>(SLMPrintConfig::defaults())),
+    slm_materials(Preset::TYPE_SLM_MATERIAL, Preset::slm_material_options(), static_cast<const SLMMaterialConfig&>(SLMMaterialConfig::defaults())),
     printers(Preset::TYPE_PRINTER, Preset::printer_options(), static_cast<const PrintRegionConfig&>(FullPrintConfig::defaults()), "- default FFF -"),
     physical_printers(PhysicalPrinter::printer_options(), this)
 {
@@ -62,6 +64,7 @@ PresetBundle::PresetBundle() :
 
     // Create the ID config keys, as they are not part of the Static print config classes.
     this->prints.default_preset().config.optptr("print_settings_id", true);
+    this->prints.default_preset().config.opt_string("output_filename_format", true) = "[input_filename_base].gcode";
     this->prints.default_preset().compatible_printers_condition();
     this->prints.default_preset().inherits();
 
@@ -82,9 +85,24 @@ PresetBundle::PresetBundle() :
     this->sla_prints.default_preset().compatible_printers_condition();
     this->sla_prints.default_preset().inherits();
 
+    this->slm_prints.default_preset().config.optptr("slm_print_settings_id", true);
+    this->slm_prints.default_preset().config.opt_string("output_filename_format", true) = "[input_filename_base].slm";
+    this->slm_prints.default_preset().compatible_printers_condition();
+    this->slm_prints.default_preset().inherits();
+
+    this->slm_materials.default_preset().config.optptr("slm_material_settings_id", true);
+    this->slm_materials.default_preset().compatible_printers_condition();
+    this->slm_materials.default_preset().inherits();
+    // Set all the nullable values to nils.
+    this->slm_materials.default_preset().config.null_nullables();
+
     this->printers.add_default_preset(Preset::sla_printer_options(), static_cast<const SLAMaterialConfig&>(SLAFullPrintConfig::defaults()), "- default SLA -");
     this->printers.preset(1).printer_technology_ref() = ptSLA;
-    for (size_t i = 0; i < 2; ++ i) {
+    this->printers.add_default_preset(Preset::printer_options(), static_cast<const SLMPrinterConfig&>(SLMPrinterConfig::defaults()), "- default SLM -");
+    this->printers.preset(2).printer_technology_ref() = ptSLM;
+    this->printers.add_default_preset(Preset::printer_options(), static_cast<const PrintRegionConfig&>(FullPrintConfig::defaults()), "- default Fiber -");
+    this->printers.preset(3).printer_technology_ref() = ptFiber;
+    for (size_t i = 0; i < 4; ++ i) {
 		// The following ugly switch is to avoid printers.preset(0) to return the edited instance, as the 0th default is the current one.
 		Preset &preset = this->printers.default_preset(i);
         for (const char *key : { 
@@ -96,9 +114,14 @@ PresetBundle::PresetBundle() :
         if (i == 0) {
             preset.config.optptr("default_print_profile", true);
             preset.config.option<ConfigOptionStrings>("default_filament_profile", true);
-        } else {
+        } else if (i == 1) {
             preset.config.optptr("default_sla_print_profile", true);
             preset.config.optptr("default_sla_material_profile", true);
+        } else if (i == 2) {
+            preset.config.optptr("default_slm_print_profile", true);
+        } else if (i == 3) {
+            preset.config.optptr("default_print_profile", true);
+            preset.config.option<ConfigOptionStrings>("default_filament_profile", true);
         }
         // default_sla_material_profile
         preset.inherits();
@@ -484,6 +507,7 @@ const PresetCollection& PresetBundle::get_presets(Preset::Type type) const
 
     return  type == Preset::TYPE_PRINT          ? prints        :
             type == Preset::TYPE_SLA_PRINT      ? sla_prints    :
+            type == Preset::TYPE_SLM_PRINT      ? slm_prints    :
             type == Preset::TYPE_FILAMENT       ? filaments     :
             type == Preset::TYPE_SLA_MATERIAL   ? sla_materials : printers;
 }

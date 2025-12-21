@@ -501,6 +501,13 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     toggle_field("pad_object_connector_penetration", zero_elev);
 }
 
+void ConfigManipulation::toggle_print_slm_options(DynamicPrintConfig* config)
+{
+    // For now, all SLM options are always enabled
+    // In the future, we can add conditional logic based on other settings
+    // For example, some options might depend on the selected export format
+    // or hatch pattern type
+}
 
 } // GUI
 } // Slic3r

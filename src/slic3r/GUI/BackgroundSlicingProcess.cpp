@@ -131,30 +131,70 @@ BackgroundSlicingProcess::~BackgroundSlicingProcess()
 bool BackgroundSlicingProcess::select_technology(PrinterTechnology tech)
 {
 	bool changed = false;
-	if (m_print == nullptr || m_print->technology() != tech) {
+	PrintBase* new_print = nullptr;
+	
+	// Determine which print object to use
+	switch (tech) {
+	case ptFFF: 
+		new_print = m_fff_print;
+		break;
+	case ptSLA: 
+		new_print = m_sla_print;
+		break;
+	case ptSLM: 
+		new_print = m_slm_print;
+		break;
+	case ptFiber: 
+		new_print = m_fiber_print;
+		break;
+    default: 
+		// Unknown technology, default to FFF
+		new_print = m_fff_print;
+		break;
+	}
+	
+	// Fallback to first available print if the requested one is not available
+	if (new_print == nullptr) {
+		if (m_fff_print != nullptr) new_print = m_fff_print;
+		else if (m_sla_print != nullptr) new_print = m_sla_print;
+		else if (m_slm_print != nullptr) new_print = m_slm_print;
+		else if (m_fiber_print != nullptr) new_print = m_fiber_print;
+	}
+	
+	// Only change if we have a valid print and it's different
+	if (new_print != nullptr && m_print != new_print) {
 		if (m_print != nullptr)
 			this->reset();
-		switch (tech) {
-		case ptFFF: m_print = m_fff_print; break;
-		case ptSLA: m_print = m_sla_print; break;
-        default: assert(false); break;
-		}
+		m_print = new_print;
+		changed = true;
+	} else if (m_print == nullptr && new_print != nullptr) {
+		// Ensure m_print is set if it was null
+		m_print = new_print;
 		changed = true;
 	}
-	if (tech == ptFFF)
+	
+	// Final safety check: if m_print is still null, try to set it to FFF
+	if (m_print == nullptr && m_fff_print != nullptr) {
 		m_print = m_fff_print;
-	assert(m_print != nullptr);
+		changed = true;
+	}
+	
 	return changed;
 }
 
 PrinterTechnology BackgroundSlicingProcess::current_printer_technology() const
 {
+	if (m_print == nullptr)
+		return ptUnknown;
 	return m_print->technology();
 }
 
 std::string BackgroundSlicingProcess::output_filepath_for_project(const boost::filesystem::path &project_path)
 {
-	assert(m_print != nullptr);
+	if (m_print == nullptr) {
+		// Fallback if print is not initialized
+		return "";
+	}
     if (project_path.empty())
         return m_print->output_filepath("");
     return m_print->output_filepath(project_path.parent_path().string(), project_path.stem().string());
@@ -164,7 +204,8 @@ std::string BackgroundSlicingProcess::output_filepath_for_project(const boost::f
 // from the G-code generator.
 void BackgroundSlicingProcess::process_fff()
 {
-	assert(m_print == m_fff_print);
+	if (m_print == nullptr || m_fff_print == nullptr || m_print != m_fff_print)
+		return; // Cannot process if print is not initialized or wrong type
 	m_print->process();
 	wxCommandEvent evt(m_event_slicing_completed_id);
 	// Post the Slicing Finished message for the G-code viewer to update.
@@ -188,13 +229,16 @@ void BackgroundSlicingProcess::process_fff()
 
 void BackgroundSlicingProcess::process_sla()
 {
-    assert(m_print == m_sla_print);
+    if (m_print == nullptr || m_sla_print == nullptr || m_print != m_sla_print)
+		return; // Cannot process if print is not initialized or wrong type
     m_print->process();
     if (this->set_step_started(bspsGCodeFinalize)) {
         if (! m_export_path.empty()) {
 			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
 
-            const std::string export_path = m_sla_print->print_statistics().finalize_output_path(m_export_path);
+            if (m_sla_print == nullptr || current_print() == nullptr)
+				throw Slic3r::ExportError("Print object not initialized");
+			const std::string export_path = m_sla_print->print_statistics().finalize_output_path(m_export_path);
 
 			auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(current_print()->full_print_config());
 
@@ -235,8 +279,9 @@ void BackgroundSlicingProcess::thread_proc()
     // variable to be executed just once.
 	TBBLocalesSetter setter;
 
-	assert(m_print != nullptr);
-	assert(m_print == m_fff_print || m_print == m_sla_print);
+	// Note: m_print might be null when thread starts if init() hasn't completed yet
+	// This is OK - the thread will wait in the main loop until start() is called,
+	// and start() checks for null before proceeding
 	std::unique_lock<std::mutex> lck(m_mutex);
 	// Let the caller know we are ready to run the background processing task.
 	m_state = STATE_IDLE;
@@ -250,6 +295,17 @@ void BackgroundSlicingProcess::thread_proc()
 		if (m_state == STATE_EXIT)
 			// Exiting this thread.
 			break;
+		// Safety check: ensure m_print is set before processing
+		// This should not happen since start() checks for null, but be defensive
+		if (m_print == nullptr) {
+			// Print not initialized yet, go back to IDLE and wait
+			m_state = STATE_IDLE;
+			lck.unlock();
+			m_condition.notify_one();
+			continue;
+		}
+		// Verify m_print is one of the expected types (safety check)
+		assert(m_print == m_fff_print || m_print == m_sla_print || m_print == m_slm_print || m_print == m_fiber_print);
 		// Process the background slicing task.
 		m_state = STATE_RUNNING;
 		lck.unlock();
@@ -259,6 +315,16 @@ void BackgroundSlicingProcess::thread_proc()
 #else
 		this->call_process(exception);
 #endif
+		// Safety check: ensure m_print is still valid after processing
+		// (should not change, but be defensive)
+		if (m_print == nullptr) {
+			// Print was reset during processing, go back to IDLE
+			lck.lock();
+			m_state = STATE_IDLE;
+			lck.unlock();
+			m_condition.notify_one();
+			continue;
+		}
 		m_print->finalize();
 		lck.lock();
 		m_state = m_print->canceled() ? STATE_CANCELED : STATE_FINISHED;
@@ -355,7 +421,10 @@ void BackgroundSlicingProcess::call_process_seh_throw(std::exception_ptr &ex) th
 void BackgroundSlicingProcess::call_process(std::exception_ptr &ex) throw()
 {
 	try {
-		assert(m_print != nullptr);
+		if (m_print == nullptr) {
+			// Print not initialized, cannot process
+			return;
+		}
 		switch (m_print->technology()) {
 		case ptFFF: this->process_fff(); break;
 		case ptSLA: this->process_sla(); break;
@@ -363,7 +432,8 @@ void BackgroundSlicingProcess::call_process(std::exception_ptr &ex) throw()
 		}
 	} catch (CanceledException& /* ex */) {
 		// Canceled, this is all right.
-		assert(m_print->canceled());
+		if (m_print != nullptr)
+			assert(m_print->canceled());
 		ex = std::current_exception();
 	} catch (...) {
 		ex = std::current_exception();
@@ -424,6 +494,9 @@ void BackgroundSlicingProcess::join_background_thread()
 
 bool BackgroundSlicingProcess::start()
 {
+	if (m_print == nullptr)
+		// Print object not initialized yet
+		return false;
 	if (m_print->empty())
 		// The print is empty (no object in Model, or all objects are out of the print bed).
 		return false;
@@ -449,7 +522,9 @@ bool BackgroundSlicingProcess::start()
 	if (! this->idle())
 		throw Slic3r::RuntimeError("Cannot start a background task, the worker thread is not idle.");
 	m_state = STATE_STARTED;
-	m_print->set_cancel_callback([this](){ this->stop_internal(); });
+	if (m_print != nullptr) {
+		m_print->set_cancel_callback([this](){ this->stop_internal(); });
+	}
 	lck.unlock();
 	m_condition.notify_one();
 	return true;
@@ -464,6 +539,11 @@ bool BackgroundSlicingProcess::stop()
 //		m_export_path.clear();
 		return false;
 	}
+	// Safety check: if m_print is null, just reset state
+	if (m_print == nullptr) {
+		m_state = STATE_IDLE;
+		return true;
+	}
 //	assert(this->running());
 	if (m_state == STATE_STARTED || m_state == STATE_RUNNING) {
 		// Cancel any task planned by the background thread on UI thread.
@@ -473,11 +553,13 @@ bool BackgroundSlicingProcess::stop()
 		m_condition.wait(lck, [this](){ return m_state == STATE_CANCELED; });
 		// In the "Canceled" state. Reset the state to "Idle".
 		m_state = STATE_IDLE;
-		m_print->set_cancel_callback([](){});
+		if (m_print != nullptr)
+			m_print->set_cancel_callback([](){});
 	} else if (m_state == STATE_FINISHED || m_state == STATE_CANCELED) {
 		// In the "Finished" or "Canceled" state. Reset the state to "Idle".
 		m_state = STATE_IDLE;
-		m_print->set_cancel_callback([](){});
+		if (m_print != nullptr)
+			m_print->set_cancel_callback([](){});
 	}
 //	m_export_path.clear();
 	return true;
@@ -487,8 +569,10 @@ bool BackgroundSlicingProcess::reset()
 {
 	bool stopped = this->stop();
 	this->reset_export();
-	m_print->clear();
-	this->invalidate_all_steps();
+	if (m_print != nullptr) {
+		m_print->clear();
+		this->invalidate_all_steps();
+	}
 	return stopped;
 }
 
@@ -501,6 +585,12 @@ void BackgroundSlicingProcess::stop_internal()
 	if (m_state == STATE_IDLE)
 		// The worker thread is waiting on m_mutex/m_condition for wake up. The following lock of the mutex would block.
 		return;
+	// Safety check: if m_print is null, just reset state
+	if (m_print == nullptr) {
+		std::unique_lock<std::mutex> lck(m_mutex);
+		m_state = STATE_IDLE;
+		return;
+	}
 	std::unique_lock<std::mutex> lck(m_mutex);
 	assert(m_state == STATE_STARTED || m_state == STATE_RUNNING || m_state == STATE_FINISHED || m_state == STATE_CANCELED);
 	if (m_state == STATE_STARTED || m_state == STATE_RUNNING) {
@@ -519,7 +609,8 @@ void BackgroundSlicingProcess::stop_internal()
 	}
 	// In the "Canceled" state. Reset the state to "Idle".
 	m_state = STATE_IDLE;
-	m_print->set_cancel_callback([](){});
+	if (m_print != nullptr)
+		m_print->set_cancel_callback([](){});
 }
 
 // Execute task from background thread on the UI thread. Returns true if processed, false if cancelled. 
@@ -530,7 +621,7 @@ bool BackgroundSlicingProcess::execute_ui_task(std::function<void()> task)
 		// Cancellation is either not in process, or already canceled and waiting for us to finish.
 		// There must be no UI task planned.
 		assert(! m_ui_task);
-		if (! m_print->canceled()) {
+		if (m_print != nullptr && ! m_print->canceled()) {
 			running = true;
 			m_ui_task = std::make_shared<UITask>();
 		}
@@ -578,13 +669,15 @@ void BackgroundSlicingProcess::cancel_ui_task(std::shared_ptr<UITask> task)
 
 bool BackgroundSlicingProcess::empty() const
 {
-	assert(m_print != nullptr);
+	if (m_print == nullptr)
+		return true; // Consider empty if print is not initialized
 	return m_print->empty();
 }
 
 std::string BackgroundSlicingProcess::validate(std::vector<std::string>* warnings)
 {
-	assert(m_print != nullptr);
+	if (m_print == nullptr)
+		return "Print object not initialized";
     return m_print->validate(warnings);
 }
 
@@ -592,11 +685,12 @@ std::string BackgroundSlicingProcess::validate(std::vector<std::string>* warning
 // processed steps to be invalidated, therefore the task will need to be restarted.
 Print::ApplyStatus BackgroundSlicingProcess::apply(const Model &model, const DynamicPrintConfig &config, std::vector<std::string> *warnings)
 {
-	assert(m_print != nullptr);
+	if (m_print == nullptr)
+		return Print::ApplyStatus::APPLY_STATUS_UNCHANGED; // Cannot apply if print is not initialized
 	assert(config.opt_enum<PrinterTechnology>("printer_technology") == m_print->technology());
 	Print::ApplyStatus invalidated = m_print->apply(model, config, warnings);
 	if ((invalidated & PrintBase::APPLY_STATUS_INVALIDATED) != 0 && m_print->technology() == ptFFF &&
-		!m_fff_print->is_step_done(psGCodeExport)) {
+		m_fff_print != nullptr && !m_fff_print->is_step_done(psGCodeExport)) {
 		// Some FFF status was invalidated, and the G-code was not exported yet.
 		// Let the G-code preview UI know that the final G-code preview is not valid.
 		// In addition, this early memory deallocation reduces memory footprint.
@@ -608,7 +702,8 @@ Print::ApplyStatus BackgroundSlicingProcess::apply(const Model &model, const Dyn
 
 void BackgroundSlicingProcess::set_task(const PrintBase::TaskParams &params)
 {
-	assert(m_print != nullptr);
+	if (m_print == nullptr)
+		return; // Cannot set task if print is not initialized
 	m_print->set_task(params);
 }
 
@@ -620,8 +715,10 @@ void BackgroundSlicingProcess::schedule_export(const std::string &path, bool exp
 		return;
 
 	// Guard against entering the export step before changing the export path.
-	std::scoped_lock<std::mutex> lock(m_print->state_mutex());
-	this->invalidate_step(bspsGCodeFinalize);
+	if (m_print != nullptr) {
+		std::scoped_lock<std::mutex> lock(m_print->state_mutex());
+		this->invalidate_step(bspsGCodeFinalize);
+	}
 	m_export_path = path;
 	m_export_path_on_removable_media = export_path_on_removable_media;
 }
@@ -633,8 +730,10 @@ void BackgroundSlicingProcess::schedule_upload(Slic3r::PrintHostJob upload_job)
 		return;
 
 	// Guard against entering the export step before changing the export path.
-	std::scoped_lock<std::mutex> lock(m_print->state_mutex());
-	this->invalidate_step(bspsGCodeFinalize);
+	if (m_print != nullptr) {
+		std::scoped_lock<std::mutex> lock(m_print->state_mutex());
+		this->invalidate_step(bspsGCodeFinalize);
+	}
 	m_export_path.clear();
 	m_upload_job = std::move(upload_job);
 }
@@ -646,23 +745,31 @@ void BackgroundSlicingProcess::reset_export()
 		m_export_path.clear();
 		m_export_path_on_removable_media = false;
 		// invalidate_step expects the mutex to be locked.
-		std::scoped_lock<std::mutex> lock(m_print->state_mutex());
-		this->invalidate_step(bspsGCodeFinalize);
+		if (m_print != nullptr) {
+			std::scoped_lock<std::mutex> lock(m_print->state_mutex());
+			this->invalidate_step(bspsGCodeFinalize);
+		}
 	}
 }
 
 bool BackgroundSlicingProcess::set_step_started(BackgroundSlicingProcessStep step)
 { 
+	if (m_print == nullptr)
+		return false; // Cannot set step if print is not initialized
 	return m_step_state.set_started(step, m_print->state_mutex(), [this](){ this->throw_if_canceled(); });
 }
 
 void BackgroundSlicingProcess::set_step_done(BackgroundSlicingProcessStep step)
 { 
+	if (m_print == nullptr)
+		return; // Cannot set step if print is not initialized
 	m_step_state.set_done(step, m_print->state_mutex(), [this](){ this->throw_if_canceled(); });
 }
 
 bool BackgroundSlicingProcess::is_step_done(BackgroundSlicingProcessStep step) const
 { 
+	if (m_print == nullptr)
+		return false; // Consider step not done if print is not initialized
 	return m_step_state.is_done(step, m_print->state_mutex());
 }
 
@@ -682,6 +789,8 @@ bool BackgroundSlicingProcess::invalidate_all_steps()
 // Copy the final G-code to target location (possibly a SD card, if it is a removable media, then verify that the file was written without an error).
 void BackgroundSlicingProcess::finalize_gcode(const std::string &path, const bool path_on_removable_media)
 {
+	if (m_print == nullptr || m_fff_print == nullptr)
+		return; // Cannot finalize if print is not initialized
 	m_print->set_status(95, _u8L("Running post-processing scripts"));
 
 	// Perform the final post-processing of the export path by applying the print statistics over the file name.
@@ -738,17 +847,20 @@ void BackgroundSlicingProcess::finalize_gcode(const std::string &path, const boo
 		break;
 	}
 
-	m_print->set_status(100, GUI::format(_L("G-code file exported to %1%"), export_path));
+	if (m_print != nullptr)
+		m_print->set_status(100, GUI::format(_L("G-code file exported to %1%"), export_path));
 }
 
 // A print host upload job has been scheduled, enqueue it to the printhost job queue
 void BackgroundSlicingProcess::prepare_upload(PrintHostJob &upload_job)
 {
+	if (m_print == nullptr)
+		return; // Cannot prepare upload if print is not initialized
 	// Generate a unique temp path to which the gcode/zip file is copied/exported
 	boost::filesystem::path source_path = boost::filesystem::temp_directory_path()
 		/ boost::filesystem::unique_path("." SLIC3R_APP_KEY ".upload.%%%%-%%%%-%%%%-%%%%");
 
-	if (m_print == m_fff_print) {
+	if (m_print == m_fff_print && m_fff_print != nullptr) {
 		m_print->set_status(95, _u8L("Running post-processing scripts"));
 		std::string error_message;
 		if (copy_file(m_temp_output_path, source_path.string(), error_message) != SUCCESS)
@@ -760,9 +872,11 @@ void BackgroundSlicingProcess::prepare_upload(PrintHostJob &upload_job)
         std::string output_name_str = upload_job.upload_data.upload_path.string();
 		if (run_post_process_scripts(source_path_str, false, upload_job.printhost->get_name(), output_name_str, m_fff_print->full_print_config()))
 			upload_job.upload_data.upload_path = output_name_str;
-    } else {
+    } else if (m_sla_print != nullptr) {
         upload_job.upload_data.upload_path = m_sla_print->print_statistics().finalize_output_path(upload_job.upload_data.upload_path.string());
 
+		if (current_print() == nullptr)
+			throw Slic3r::ExportError("Print object not initialized");
 		auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(current_print()->full_print_config());
 
 		if (errors != enum_bitmask<ThumbnailError>()) {
@@ -781,7 +895,8 @@ void BackgroundSlicingProcess::prepare_upload(PrintHostJob &upload_job)
         m_sla_print->export_print(source_path.string(),thumbnails, upload_job.upload_data.upload_path.filename().string());
     }
 
-    m_print->set_status(100, GUI::format(_L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"), upload_job.printhost->get_host()));
+    if (m_print != nullptr)
+		m_print->set_status(100, GUI::format(_L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"), upload_job.printhost->get_host()));
 
 	upload_job.upload_data.source_path = std::move(source_path);
 

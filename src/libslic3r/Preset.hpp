@@ -118,8 +118,10 @@ public:
         TYPE_INVALID,
         TYPE_PRINT,
         TYPE_SLA_PRINT,
+        TYPE_SLM_PRINT,
         TYPE_FILAMENT,
         TYPE_SLA_MATERIAL,
+        TYPE_SLM_MATERIAL,
         TYPE_PRINTER,
         TYPE_COUNT,
         // This type is here to support PresetConfigSubstitutions for physical printers, however it does not belong to the Preset class,
@@ -240,6 +242,8 @@ public:
     static const std::vector<std::string>&  sla_printer_options();
     static const std::vector<std::string>&  sla_material_options();
     static const std::vector<std::string>&  sla_print_options();
+    static const std::vector<std::string>&  slm_print_options();
+    static const std::vector<std::string>&  slm_material_options();
 
 	static void                             update_suffix_modified(const std::string& new_suffix_modified);
     static const std::string&               suffix_modified();

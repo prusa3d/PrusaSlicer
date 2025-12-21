@@ -19,11 +19,12 @@ GNU build tools, CMake, git and other libraries have to be installed on the buil
 Unless that's already the case, install them as usual from your distribution packages.
 E.g. on Ubuntu 24.04 / Debian 12, run
 ```shell
-sudo apt-get install  -y \
+sudo apt-get update && sudo apt-get install -y \
 git \
 build-essential \
 autoconf \
 cmake \
+libtool \
 libglu1-mesa-dev \
 libgtk-3-dev \
 libdbus-1-dev \

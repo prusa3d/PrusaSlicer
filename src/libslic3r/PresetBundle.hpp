@@ -50,10 +50,20 @@ public:
 
     PresetCollection            prints;
     PresetCollection            sla_prints;
+    PresetCollection            slm_prints;
     PresetCollection            filaments;
     PresetCollection            sla_materials;
-	PresetCollection& 			materials(PrinterTechnology pt)       { return pt == ptFFF ? this->filaments : this->sla_materials; }
-	const PresetCollection& 	materials(PrinterTechnology pt) const { return pt == ptFFF ? this->filaments : this->sla_materials; }
+    PresetCollection            slm_materials;
+	PresetCollection& 			materials(PrinterTechnology pt)       { 
+        if (pt == ptFFF) return this->filaments;
+        else if (pt == ptSLM) return this->slm_materials;
+        else return this->sla_materials;
+    }
+	const PresetCollection& 	materials(PrinterTechnology pt) const { 
+        if (pt == ptFFF) return this->filaments;
+        else if (pt == ptSLM) return this->slm_materials;
+        else return this->sla_materials;
+    }
     PrinterPresetCollection     printers;
     PhysicalPrinterCollection   physical_printers;
 
@@ -102,6 +112,7 @@ public:
     struct ObsoletePresets {
         std::vector<std::string> prints;
         std::vector<std::string> sla_prints;
+        std::vector<std::string> slm_prints;
         std::vector<std::string> filaments;
         std::vector<std::string> sla_materials;
         std::vector<std::string> printers;

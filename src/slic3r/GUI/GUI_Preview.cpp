@@ -40,6 +40,9 @@
 // this include must follow the wxWidgets ones or it won't compile on Windows -> see http://trac.wxwidgets.org/ticket/2421
 #include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/FiberPrint.hpp"
+#include "libslic3r/Fiber/FiberLayer.hpp"
+#include "libslic3r/Fiber/FiberPrintObject.hpp"
 #include "NotificationManager.hpp"
 #include "libslic3r/MultipleBeds.hpp"
 
@@ -981,6 +984,12 @@ void Preview::load_print_as_fff(bool keep_z_range)
             // Load the initial preview based on slices, not the final G-code.
             m_canvas->load_preview(tool_colors, color_print_colors, color_print_values);
             m_canvas->load_gcode_shells();
+            
+            // Load fiber paths if fiber reinforcement is enabled
+            if (m_config->opt_bool("enable_fiber_reinforcement")) {
+                load_fiber_paths(print);
+            }
+            
             // the view type has been changed by the call m_canvas->load_gcode_preview()
             if (gcode_view_type == libvgcode::EViewType::ColorPrint && !color_print_values.empty())
                 m_canvas->set_gcode_view_type(gcode_view_type);
@@ -1063,6 +1072,10 @@ void Preview::on_layers_slider_scroll_changed()
         if (tech == ptFFF) {
             m_canvas->set_volumes_z_range({ m_layers_slider->GetLowerValue(), m_layers_slider->GetHigherValue() });
             m_canvas->set_toolpaths_z_range({ static_cast<unsigned int>(m_layers_slider->GetLowerPos()), static_cast<unsigned int>(m_layers_slider->GetHigherPos()) });
+            // Phase 7.2: Also filter fiber paths by layer range
+            if (m_config->opt_bool("enable_fiber_reinforcement")) {
+                m_canvas->set_fiber_paths_z_range({ static_cast<unsigned int>(m_layers_slider->GetLowerPos()), static_cast<unsigned int>(m_layers_slider->GetHigherPos()) });
+            }
             m_canvas->set_as_dirty();
         }
         else if (tech == ptSLA) {
@@ -1079,6 +1092,40 @@ void Preview::on_moves_slider_scroll_changed()
     m_canvas->update_gcode_sequential_view_current(static_cast<unsigned int>(m_moves_slider->GetLowerValue() - 1), static_cast<unsigned int>(m_moves_slider->GetHigherValue() - 1));
     m_canvas->set_as_dirty();
     m_canvas->request_extra_frame();
+}
+
+void Preview::load_fiber_paths(const Print* print)
+{
+    // Phase 7.2: Load fiber paths for 3D visualization
+    
+    // Check if fiber reinforcement is enabled
+    if (!m_config->opt_bool("enable_fiber_reinforcement"))
+        return;
+    
+    // Get FiberPrint instance from BackgroundSlicingProcess
+    const FiberPrint* fiber_print = m_process->fiber_print();
+    if (fiber_print == nullptr || fiber_print->empty())
+        return;
+    
+    // Collect all fiber layers from all objects
+    std::vector<FiberLayer> fiber_layers;
+    
+    // Iterate through FiberPrintObject instances
+    for (const FiberPrintObject* fiber_object : fiber_print->objects()) {
+        const std::vector<FiberLayer>& object_layers = fiber_object->fiber_layers();
+        
+        // Only include layers that have fiber paths
+        for (const FiberLayer& layer : object_layers) {
+            if (layer.has_fibers()) {
+                fiber_layers.push_back(layer);
+            }
+        }
+    }
+    
+    // Pass to canvas for rendering
+    if (!fiber_layers.empty()) {
+        m_canvas->load_fiber_paths(fiber_layers);
+    }
 }
 
 } // namespace GUI

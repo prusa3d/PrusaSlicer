@@ -64,6 +64,9 @@ public:
 
     // SLA print
     void    toggle_print_sla_options(DynamicPrintConfig* config);
+    
+    // SLM print
+    void    toggle_print_slm_options(DynamicPrintConfig* config);
 
     bool    is_initialized_support_material_overhangs_queried() { return m_is_initialized_support_material_overhangs_queried; }
     void    initialize_support_material_overhangs_queried(bool queried)

@@ -164,6 +164,7 @@ public:
 			return *m_item_color;
 	}
     bool get_show() const { return m_show; }
+    void set_show(bool show) { m_show = show; }
 
 protected:
 	// Color of TreeCtrlItem. The wxColour will be updated only if the new wxColour pointer differs from the currently rendered one.
@@ -448,7 +449,7 @@ public:
 	void		toggle_options() override;
 	void		update() override;
 	void		clear_pages() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF || tech == ptFiber; }
 	wxSizer*	create_manage_substitution_widget(wxWindow* parent);
 	wxSizer*	create_substitutions_widget(wxWindow* parent);
 
@@ -458,6 +459,9 @@ private:
 	ogStaticText*	m_post_process_explanation = nullptr;
 	ScalableButton* m_del_all_substitutions_btn{nullptr};
 	SubstitutionManager m_subst_manager;
+	
+	// Fiber page reference for visibility control
+	PageShp m_fiber_page;
 };
 
 class TabFilament : public Tab
@@ -487,7 +491,7 @@ public:
 	void		clear_pages() override;
 	void        msw_rescale() override;
 	void		sys_color_changed() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF || tech == ptFiber; }
     void        load_current_preset() override;
 
     // set actiev extruder and update preset combobox if needed
@@ -524,6 +528,8 @@ private:
 
     std::vector<PageShp>			m_pages_fff;
     std::vector<PageShp>			m_pages_sla;
+    std::vector<PageShp>			m_pages_slm;
+    std::vector<PageShp>			m_pages_fiber;
 
 public:
 	size_t		m_extruders_count;
@@ -542,6 +548,8 @@ public:
 	void		build_print_host_upload_group(Page* page);
     void		build_fff();
     void		build_sla();
+    void		build_slm();
+    void		build_fiber();
 	void		reload_config() override;
 	void		activate_selected_page(std::function<void()> throw_if_canceled) override;
 	void		clear_pages() override;
@@ -549,6 +557,8 @@ public:
     void		update() override;
     void		update_fff();
     void		update_sla();
+    void		update_slm();
+    void		update_fiber();
     void        update_pages(); // update m_pages according to printer technology
 	void		extruders_count_changed(size_t extruders_count);
 	PageShp		build_kinematics_page();
@@ -614,7 +624,38 @@ public:
 	void		toggle_options() override;
     void		update() override;
 	void		clear_pages() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
+    bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
+};
+
+class TabSLMPrint : public Tab
+{
+public:
+    TabSLMPrint(wxBookCtrlBase* parent) :
+        Tab(parent, _(L("Print Settings")), Slic3r::Preset::TYPE_SLM_PRINT) {}
+    ~TabSLMPrint() {}
+
+    void		build() override;
+    void		update() override;
+    void		toggle_options() override;
+    void		clear_pages() override;
+    bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLM; }
+};
+
+class TabSLMMaterial : public Tab
+{
+public:
+    TabSLMMaterial(wxBookCtrlBase* parent) :
+        Tab(parent, _L("Materials"), Slic3r::Preset::TYPE_SLM_MATERIAL) {}
+    ~TabSLMMaterial() {}
+
+    void		build() override;
+    void		update() override;
+    void		toggle_options() override {}
+    void		clear_pages() override;
+    void        msw_rescale() override {}
+    void		sys_color_changed() override {}
+    bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLM; }
+    void		update_description_lines() override {}
 };
 
 } // GUI

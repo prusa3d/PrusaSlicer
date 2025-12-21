@@ -611,6 +611,9 @@ endfunction()
 
 add_subdirectory(build-utils)
 add_subdirectory(bundled_deps)
+# libSLM for SLM file format support
+set(BUILD_PYTHON OFF CACHE BOOL "Build libSLM Python module" FORCE)
+add_subdirectory(src/libSLM)
 # libslic3r, PrusaSlicer GUI and the PrusaSlicer executable.
 add_subdirectory(src)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PrusaSlicer_app_console)

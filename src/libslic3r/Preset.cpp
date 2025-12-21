@@ -513,6 +513,11 @@ static std::vector<std::string> s_Preset_print_options {
     "automatic_extrusion_widths", "automatic_infill_combination", "automatic_infill_combination_max_layer_height",
     "bed_temperature_extruder", "interlocking_beam", "interlocking_orientation", "interlocking_beam_layer_count", "interlocking_depth", "interlocking_boundary_avoidance", "interlocking_beam_width",
     "travel_short_distance_acceleration",
+    // Fiber reinforcement options
+    "enable_fiber_reinforcement", "fiber_type", "fiber_print_method", "fiber_pattern", "fiber_spacing", "fiber_angle", "fiber_placement_zone",
+    "fiber_layer_interval", "fiber_start_layer", "fiber_end_layer", "plastic_extruder_id", "fiber_extruder_id", "embedded_fiber_extruder_id",
+    "fiber_print_sequence", "fiber_delay_after_plastic", "fiber_cooling_time", "fiber_wait_for_cooling", "fiber_speed", "fiber_pressure",
+    "fiber_start_command", "fiber_stop_command", "fiber_speed_command", "fiber_enable_comments", "fiber_path_color", "fiber_arrow_color", "fiber_arrow_density",
 };
 
 static std::vector<std::string> s_Preset_filament_options {
@@ -633,6 +638,33 @@ static std::vector<std::string> s_Preset_sla_print_options {
     "inherits"
 };
 
+static std::vector<std::string> s_Preset_slm_print_options {
+    "output_filename_format",
+    // Laser Parameters
+    "slm_laser_power",
+    "slm_laser_speed",
+    "slm_exposure_time",
+    "slm_point_distance",
+    // Layer Parameters
+    "slm_layer_thickness",
+    "slm_layer_cooling_time",
+    "slm_layer_addition_time",
+    // Hatch Pattern Parameters
+    "slm_hatch_pattern",
+    "slm_hatch_spacing",
+    "slm_hatch_angle",
+    "slm_contour_first",
+    // Scan Strategy Parameters
+    "slm_scan_mode",
+    "slm_scan_vector_spacing",
+    "slm_rotation_angle",
+    // Export Format
+    "slm_export_format",
+    "compatible_printers",
+    "compatible_printers_condition",
+    "inherits"
+};
+
 static std::vector<std::string> s_Preset_sla_material_options {
     "material_colour",
     "material_type",
@@ -695,6 +727,17 @@ const std::vector<std::string>& tilt_options() { return s_Preset_sla_tilt_option
 
 static std::vector<std::string> s_Preset_sla_material_options_all = boost::copy_range<std::vector<std::string>>(boost::join(s_Preset_sla_material_options, s_Preset_sla_tilt_options));
 
+// SLM Material options (powder material settings)
+static std::vector<std::string> s_Preset_slm_material_options {
+    "slm_material_colour",
+    "slm_material_type",  // Powder type (Steel 316, AlSiMg10, Titanium Ti6Al4V, etc.)
+    "slm_material_density",
+    "slm_material_notes",
+    "slm_material_vendor",
+    "compatible_prints", "compatible_prints_condition",
+    "compatible_printers", "compatible_printers_condition", "inherits"
+};
+
 static std::vector<std::string> s_Preset_sla_printer_options {
     "printer_technology",
     "bed_shape", "bed_custom_texture", "bed_custom_model", "max_print_height",
@@ -725,7 +768,9 @@ const std::vector<std::string>& Preset::machine_limits_options() { return s_Pres
 // of the nozzle_diameter vector.
 const std::vector<std::string>& Preset::nozzle_options()         { return print_config_def.extruder_option_keys(); }
 const std::vector<std::string>& Preset::sla_print_options()      { return s_Preset_sla_print_options; }
+const std::vector<std::string>& Preset::slm_print_options()       { return s_Preset_slm_print_options; }
 const std::vector<std::string>& Preset::sla_material_options()   { return s_Preset_sla_material_options_all; }
+const std::vector<std::string>& Preset::slm_material_options()   { return s_Preset_slm_material_options; }
 const std::vector<std::string>& Preset::sla_printer_options()    { return s_Preset_sla_printer_options; }
 
 const std::vector<std::string>& Preset::printer_options()
@@ -1648,6 +1693,7 @@ std::string PresetCollection::name() const
     case Preset::TYPE_FILAMENT:     return L("filament");
     case Preset::TYPE_SLA_PRINT:    return L("SLA print");
     case Preset::TYPE_SLA_MATERIAL: return L("SLA material");
+    case Preset::TYPE_SLM_PRINT:    return L("SLM print");
     case Preset::TYPE_PRINTER:      return L("printer");
     default:                        return "invalid";
     }
@@ -1660,6 +1706,7 @@ std::string PresetCollection::section_name() const
     case Preset::TYPE_FILAMENT:     return "filament";
     case Preset::TYPE_SLA_PRINT:    return "sla_print";
     case Preset::TYPE_SLA_MATERIAL: return "sla_material";
+    case Preset::TYPE_SLM_PRINT:    return "slm_print";
     case Preset::TYPE_PRINTER:      return "printer";
     default:                        return "invalid";
     }

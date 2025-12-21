@@ -20,6 +20,8 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PrintConfig.hpp"
+#include "FiberPrintConfig.hpp"
+#include "SLMPrintConfig.hpp"
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
@@ -71,7 +73,8 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ArcFittingType)
 
 static t_config_enum_values s_keys_map_PrinterTechnology {
     { "FFF",            ptFFF },
-    { "SLA",            ptSLA }
+    { "SLA",            ptSLA },
+    { "SLM",            ptSLM }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrinterTechnology)
 
@@ -328,6 +331,67 @@ static const t_config_enum_values s_keys_map_CoolingSlowdownLogicType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CoolingSlowdownLogicType)
 
+// Fiber configuration enums
+static const t_config_enum_values s_keys_map_FiberPatternType {
+    { "grid",       int(FiberPatternType::fpGrid) },
+    { "concentric", int(FiberPatternType::fpConcentric) },
+    { "custom",     int(FiberPatternType::fpCustom) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPatternType)
+
+static const t_config_enum_values s_keys_map_FiberPlacementZoneType {
+    { "perimeter",  int(FiberPlacementZoneType::fpzPerimeter) },
+    { "infill",     int(FiberPlacementZoneType::fpzInfill) },
+    { "both",       int(FiberPlacementZoneType::fpzBoth) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPlacementZoneType)
+
+static const t_config_enum_values s_keys_map_FiberPrintMethodType {
+    { "dual_printhead",        int(FiberPrintMethodType::fpmDualPrinthead) },
+    { "co_extrusion",          int(FiberPrintMethodType::fpmCoExtrusion) },
+    { "pre_embedded_filament", int(FiberPrintMethodType::fpmPreEmbeddedFilament) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPrintMethodType)
+
+static const t_config_enum_values s_keys_map_FiberPrintSequenceType {
+    { "plastic_first", int(FiberPrintSequenceType::fpsPlasticFirst) },
+    { "alternating",   int(FiberPrintSequenceType::fpsAlternating) },
+    { "fiber_on_top",  int(FiberPrintSequenceType::fpsFiberOnTop) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberPrintSequenceType)
+
+static const t_config_enum_values s_keys_map_FiberTypeEnum {
+    { "carbon", int(FiberTypeEnum::ftCarbon) },
+    { "glass",  int(FiberTypeEnum::ftGlass) },
+    { "kevlar", int(FiberTypeEnum::ftKevlar) },
+    { "basalt", int(FiberTypeEnum::ftBasalt) },
+    { "custom", int(FiberTypeEnum::ftCustom) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberTypeEnum)
+
+static const t_config_enum_values s_keys_map_SLMHatchPatternType {
+    { "grid",       int(SLMHatchPatternType::slmhpGrid) },
+    { "stripe",     int(SLMHatchPatternType::slmhpStripe) },
+    { "concentric", int(SLMHatchPatternType::slmhpConcentric) },
+    { "custom",     int(SLMHatchPatternType::slmhpCustom) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLMHatchPatternType)
+
+static const t_config_enum_values s_keys_map_SLMScanModeType {
+    { "contour_first", int(SLMScanModeType::slmsmContourFirst) },
+    { "hatch_first",   int(SLMScanModeType::slmsmHatchFirst) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLMScanModeType)
+
+static const t_config_enum_values s_keys_map_SLMExportFormatType {
+    { "slm", int(SLMExportFormatType::slmefSLM) },
+    { "mtt", int(SLMExportFormatType::slmefMTT) },
+    { "sli", int(SLMExportFormatType::slmefSLI) },
+    { "cli", int(SLMExportFormatType::slmefCLI) },
+    { "rea", int(SLMExportFormatType::slmefREA) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLMExportFormatType)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -350,6 +414,8 @@ PrintConfigDef::PrintConfigDef()
     this->init_sla_params();
     this->init_sla_tilt_params();
     assign_printer_technology_to_unknown(this->options, ptSLA);
+    this->init_slm_params();
+    assign_printer_technology_to_unknown(this->options, ptSLM);
     this->finalize();
 }
 
@@ -360,7 +426,7 @@ void PrintConfigDef::init_common_params()
     def = this->add("printer_technology", coEnum);
     def->label = L("Printer technology");
     def->tooltip = L("Printer technology");
-    def->set_enum<PrinterTechnology>({ "FFF", "SLA" });
+    def->set_enum<PrinterTechnology>({ "FFF", "SLA", "SLM", "Fiber" });
     def->set_default_value(new ConfigOptionEnum<PrinterTechnology>(ptFFF));
 
     def = this->add("bed_shape", coPoints);
@@ -4041,6 +4107,286 @@ void PrintConfigDef::init_fff_params()
             }
         }
     }
+
+    // Fiber Reinforcement Settings
+    def = this->add("enable_fiber_reinforcement", coBool);
+    def->label = L("Enable fiber reinforcement");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Enable continuous fiber reinforcement for enhanced part strength. "
+                     "This feature allows embedding continuous fiber strands within the plastic print.\n\n"
+                     "Fiber reinforcement adds continuous fiber strands (carbon, glass, or Kevlar) to your prints, "
+                     "significantly increasing strength and stiffness. This is useful for functional parts that need "
+                     "high mechanical properties.\n\n"
+                     "Example: Enable this for parts that need to withstand high loads or impacts.");
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("fiber_type", coEnum);
+    def->label = L("Fiber type");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Type of fiber material to use for reinforcement.\n\n"
+                     "• Carbon fiber: Highest strength and stiffness, most expensive\n"
+                     "• Glass fiber: Good balance of strength and cost\n"
+                     "• Kevlar: High impact resistance, good for flexible parts\n"
+                     "• Basalt fiber: Good thermal resistance\n\n"
+                     "Example: Use carbon fiber for maximum strength, glass fiber for cost-effective reinforcement.");
+    def->set_enum<FiberTypeEnum>({
+        { "carbon",  L("Carbon fiber") },
+        { "glass",   L("Glass fiber") },
+        { "kevlar",  L("Kevlar") },
+        { "basalt",  L("Basalt fiber") },
+        { "custom",  L("Custom") }
+    });
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionEnum<FiberTypeEnum>(FiberTypeEnum::ftCarbon));
+
+    def = this->add("fiber_pattern", coEnum);
+    def->label = L("Fiber pattern");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Pattern used to place fiber strands within the print.\n\n"
+                     "• Grid: Parallel lines in a grid pattern (good for uniform strength)\n"
+                     "• Concentric: Concentric loops following part contours (good for curved parts)\n"
+                     "• Custom: User-defined paths\n\n"
+                     "Example: Use grid for rectangular parts, concentric for circular parts.");
+    def->set_enum<FiberPatternType>({
+        { "grid",       L("Grid") },
+        { "concentric", L("Concentric") },
+        { "custom",     L("Custom") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPatternType>(FiberPatternType::fpGrid));
+
+    def = this->add("fiber_print_method", coEnum);
+    def->label = L("Fiber print method");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Method used to print fiber reinforcement. "
+                     "Dual printhead uses separate extruders for plastic and fiber. "
+                     "Pre-embedded filament uses fiber already embedded in the filament spool.");
+    def->set_enum<FiberPrintMethodType>({
+        { "dual_printhead",        L("Dual printhead") },
+        { "co_extrusion",          L("Co-extrusion (placeholder)") },
+        { "pre_embedded_filament", L("Pre-embedded filament") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPrintMethodType>(FiberPrintMethodType::fpmDualPrinthead));
+
+    def = this->add("fiber_spacing", coFloat);
+    def->label = L("Fiber spacing");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Spacing between adjacent fiber strands in millimeters.\n\n"
+                     "Smaller spacing = more fiber = stronger but slower print.\n"
+                     "Larger spacing = less fiber = weaker but faster print.\n\n"
+                     "Example: 5mm spacing is a good starting point. Use 2-3mm for high-strength parts, "
+                     "10mm for lightweight reinforcement.");
+    def->sidetext = L("mm");
+    def->min = 0.1;
+    def->max = 50.0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(5.0));
+
+    def = this->add("fiber_angle", coFloat);
+    def->label = L("Fiber angle");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Angle of fiber strands relative to the X-axis. 0° is along X-axis, 90° is along Y-axis.\n\n"
+                     "Use different angles on different layers for multi-directional strength.\n\n"
+                     "Example: 0° for X-direction strength, 90° for Y-direction strength, "
+                     "45° for balanced strength in both directions.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 180;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("fiber_placement_zone", coEnum);
+    def->label = L("Fiber placement zone");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Where to place fiber strands within the print.\n\n"
+                     "• Perimeter only: Place fiber only in perimeters (outer walls)\n"
+                     "• Infill only: Place fiber only in infill areas\n"
+                     "• Both: Place fiber in both perimeters and infill\n\n"
+                     "Example: Use 'Both' for maximum strength, 'Perimeter only' for surface reinforcement.");
+    def->set_enum<FiberPlacementZoneType>({
+        { "perimeter", L("Perimeter only") },
+        { "infill",    L("Infill only") },
+        { "both",      L("Perimeter and infill") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPlacementZoneType>(FiberPlacementZoneType::fpzBoth));
+
+    def = this->add("fiber_layer_interval", coInt);
+    def->label = L("Fiber layer interval");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Place fiber reinforcement every N layers. Set to 1 to place fiber on every layer.\n\n"
+                     "Placing fiber on every layer provides maximum strength but increases print time.\n"
+                     "Placing fiber every few layers reduces print time while still providing reinforcement.\n\n"
+                     "Example: Use 1 for maximum strength, 3-5 for balanced strength and speed.");
+    def->sidetext = L("layers");
+    def->min = 1;
+    def->max = 100;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("fiber_start_layer", coInt);
+    def->label = L("Fiber start layer");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Start placing fiber reinforcement from this layer number. Layer 0 is the first layer.");
+    def->sidetext = L("layer");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("fiber_end_layer", coInt);
+    def->label = L("Fiber end layer");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Stop placing fiber reinforcement at this layer number. Set to -1 to place fiber on all layers.");
+    def->sidetext = L("layer");
+    def->min = -1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(-1));
+
+    def = this->add("fiber_extruder_id", coInt);
+    def->label = L("Fiber extruder");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Extruder ID to use for fiber printing (Method 1: Dual printhead). First extruder is 1.");
+    def->min = 1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("plastic_extruder_id", coInt);
+    def->label = L("Plastic extruder");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Extruder ID to use for plastic printing. First extruder is 1.");
+    def->min = 1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("embedded_fiber_extruder_id", coInt);
+    def->label = L("Embedded fiber extruder");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Extruder ID to use for pre-embedded fiber filament (Method 2). First extruder is 1.");
+    def->min = 1;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(1));
+
+    def = this->add("fiber_print_sequence", coEnum);
+    def->label = L("Fiber print sequence");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Sequence strategy for printing plastic and fiber layers.\n\n"
+                     "• Plastic first: Print all plastic layers, then all fiber layers (fastest)\n"
+                     "• Alternating: Alternate between plastic and fiber layers (balanced)\n"
+                     "• Fiber on top: Place fiber immediately after each plastic layer (strongest bond)\n\n"
+                     "Example: Use 'Plastic first' for speed, 'Fiber on top' for maximum adhesion.");
+    def->set_enum<FiberPrintSequenceType>({
+        { "plastic_first", L("Plastic first") },
+        { "alternating",   L("Alternating") },
+        { "fiber_on_top",  L("Fiber on top") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FiberPrintSequenceType>(FiberPrintSequenceType::fpsPlasticFirst));
+
+    def = this->add("fiber_delay_after_plastic", coFloat);
+    def->label = L("Delay after plastic");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Delay in seconds after printing plastic before starting fiber placement.");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 300;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("fiber_cooling_time", coFloat);
+    def->label = L("Fiber cooling time");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Required cooling time in seconds for plastic before fiber placement.");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 300;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("fiber_wait_for_cooling", coBool);
+    def->label = L("Wait for cooling");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Wait for plastic to cool before placing fiber reinforcement.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("fiber_speed", coFloat);
+    def->label = L("Fiber speed");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Printing speed for fiber placement in millimeters per second.\n\n"
+                     "Fiber placement speed is typically slower than plastic printing speed to ensure proper adhesion.\n\n"
+                     "Example: 30 mm/s is a good starting point. Use 20-40 mm/s for most materials. "
+                     "Slower speeds (10-20 mm/s) for difficult materials or tight corners.");
+    def->sidetext = L("mm/s");
+    def->min = 1;
+    def->max = 300;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(30.0));
+
+    def = this->add("fiber_pressure", coFloat);
+    def->label = L("Fiber pressure");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Pressure or tension applied to fiber during printing.");
+    def->sidetext = L("units");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(50.0));
+
+    def = this->add("fiber_start_command", coString);
+    def->label = L("Fiber start command");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("G-code command to start fiber placement. Use {fiber_speed} placeholder for speed.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("M106 S255 ; Start fiber"));
+
+    def = this->add("fiber_stop_command", coString);
+    def->label = L("Fiber stop command");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("G-code command to stop fiber placement.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("M107 ; Stop fiber"));
+
+    def = this->add("fiber_speed_command", coString);
+    def->label = L("Fiber speed command");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("G-code command to set fiber speed. Use {fiber_speed} placeholder for speed value.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("M106 S{fiber_speed} ; Set fiber speed"));
+
+    def = this->add("fiber_enable_comments", coBool);
+    def->label = L("Enable G-code comments");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Add comments to G-code for fiber operations to aid debugging.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(true));
+    
+    // Phase 7.2: Visualization options
+    def = this->add("fiber_path_color", coString);
+    def->label = L("Fiber path color");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Color for fiber paths in 3D preview (RGB hex format, e.g., #4D4D4D)");
+    def->gui_type = ConfigOptionDef::GUIType::color;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString("#4D4D4D"));  // Dark gray
+    
+    def = this->add("fiber_arrow_color", coString);
+    def->label = L("Fiber arrow color");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Color for fiber direction arrows in 3D preview (RGB hex format, e.g., #8080CC)");
+    def->gui_type = ConfigOptionDef::GUIType::color;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString("#8080CC"));  // Light blue
+    
+    def = this->add("fiber_arrow_density", coFloat);
+    def->label = L("Fiber arrow density");
+    def->category = L("Fiber Reinforcement");
+    def->tooltip = L("Number of arrows per path (0 = auto, based on path length)");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(10.0f));
+    def->min = 0.0f;
+    def->max = 100.0f;
 }
 
 void PrintConfigDef::init_extruder_option_keys()
@@ -5070,6 +5416,424 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "support_points_minimal_distance", // End of the using in 2.9.1 (change algorithm for the support generator)
 };
 
+void PrintConfigDef::init_slm_params()
+{
+    ConfigOptionDef* def;
+
+    // SLM Print Settings
+
+    def = this->add("output_filename_format", coString);
+    def->label = L("Output filename format");
+    def->tooltip = L("You can use all configuration options as variables inside this template. "
+                     "For example: [layer_height], [fill_density] etc. You can also use [timestamp], "
+                     "[year], [month], [day], [hour], [minute], [second], [version], [input_filename], "
+                     "[input_filename_base].");
+    def->full_width = true;
+    def->height = 5;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("[input_filename_base].slm"));
+
+    // Laser Parameters
+
+    def = this->add("slm_laser_power", coFloat);
+    def->label = L("Laser power");
+    def->tooltip = L("Laser power in watts");
+    def->sidetext = L("W");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(200.0));
+
+    def = this->add("slm_laser_speed", coFloat);
+    def->label = L("Laser scan speed");
+    def->tooltip = L("Scanning speed of the laser");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->max = 10000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1000.0));
+
+    def = this->add("slm_exposure_time", coFloat);
+    def->label = L("Exposure time");
+    def->tooltip = L("Laser exposure time per point");
+    def->sidetext = L("ms");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(100.0));
+
+    def = this->add("slm_point_distance", coFloat);
+    def->label = L("Point distance");
+    def->tooltip = L("Distance between laser exposure points");
+    def->sidetext = L("μm");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(50.0));
+
+    // Layer Parameters
+
+    def = this->add("slm_layer_thickness", coFloat);
+    def->label = L("Layer thickness");
+    def->tooltip = L("Thickness of each printed layer");
+    def->sidetext = L("mm");
+    def->min = 0.01;
+    def->max = 1.0;
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionFloat(0.05));
+
+    def = this->add("slm_layer_cooling_time", coFloat);
+    def->label = L("Layer cooling time");
+    def->tooltip = L("Time to wait for layer to cool before next layer");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 3600;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(10.0));
+
+    def = this->add("slm_layer_addition_time", coFloat);
+    def->label = L("Layer addition time");
+    def->tooltip = L("Time taken to add new powder layer");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 3600;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(5.0));
+
+    // Hatch Pattern Parameters
+
+    def = this->add("slm_hatch_pattern", coEnum);
+    def->label = L("Hatch pattern");
+    def->tooltip = L("Pattern used for hatching (infill)");
+    def->set_enum<SLMHatchPatternType>({
+        { "grid",       L("Grid") },
+        { "stripe",     L("Stripe") },
+        { "concentric", L("Concentric") },
+        { "custom",     L("Custom") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<SLMHatchPatternType>(SLMHatchPatternType::slmhpGrid));
+
+    def = this->add("slm_hatch_spacing", coFloat);
+    def->label = L("Hatch spacing");
+    def->tooltip = L("Spacing between hatch lines");
+    def->sidetext = L("mm");
+    def->min = 0.01;
+    def->max = 10.0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.1));
+
+    def = this->add("slm_hatch_angle", coFloat);
+    def->label = L("Hatch angle");
+    def->tooltip = L("Angle of hatch lines in degrees");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(45.0));
+
+    def = this->add("slm_contour_first", coBool);
+    def->label = L("Contour first");
+    def->tooltip = L("If enabled, contours are scanned before hatches. Otherwise, hatches are scanned first.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    // Scan Strategy Parameters
+
+    def = this->add("slm_scan_mode", coEnum);
+    def->label = L("Scan mode");
+    def->tooltip = L("Scanning strategy: contour-first or hatch-first");
+    def->set_enum<SLMScanModeType>({
+        { "contour_first", L("Contour first") },
+        { "hatch_first",   L("Hatch first") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<SLMScanModeType>(SLMScanModeType::slmsmContourFirst));
+
+    def = this->add("slm_scan_vector_spacing", coFloat);
+    def->label = L("Scan vector spacing");
+    def->tooltip = L("Spacing between scan vectors");
+    def->sidetext = L("mm");
+    def->min = 0.01;
+    def->max = 10.0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.1));
+
+    def = this->add("slm_rotation_angle", coFloat);
+    def->label = L("Layer rotation angle");
+    def->tooltip = L("Rotation angle for each layer to reduce anisotropy");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 180;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(67.0));
+
+    // Export Format
+
+    def = this->add("slm_export_format", coEnum);
+    def->label = L("Export format");
+    def->tooltip = L("File format for SLM export");
+    def->set_enum<SLMExportFormatType>({
+        { "slm", L("SLM Solutions (.slm)") },
+        { "mtt", L("Renishaw (.mtt)") },
+        { "sli", L("EOS (.sli)") },
+        { "cli", L("Common Layer Interface (.cli)") },
+        { "rea", L("DMG Mori Realizer (.rea)") }
+    });
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionEnum<SLMExportFormatType>(SLMExportFormatType::slmefSLM));
+
+    // SLM Material settings (powder types)
+
+    def = this->add("slm_material_colour", coString);
+    def->label = L("Color");
+    def->tooltip = L("This is only used in the Slic3r interface as a visual help.");
+    def->gui_type = ConfigOptionDef::GUIType::color;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionString("#808080")); // Gray for metal
+
+    def = this->add("slm_material_type", coString);
+    def->label = L("Powder material type");
+    def->tooltip = L("Type of metal powder material");
+    def->gui_flags = "show_value";
+    def->printer_technology = ptSLM;
+    def->set_enum_values(ConfigOptionDef::GUIType::select_open,
+        { "Steel 316", "Steel 316L", "Steel 17-4PH", "Steel 15-5PH", 
+          "Titanium Ti6Al4V", "Titanium CP", "Titanium Ti64",
+          "AlSiMg10", "AlSi10Mg", "AlSi12", "AlSi7Mg",
+          "Inconel 718", "Inconel 625",
+          "CoCr", "Cobalt Chrome",
+          "Nickel Alloy", "Maraging Steel",
+          "Copper", "Bronze",
+          "Custom" });
+    def->set_default_value(new ConfigOptionString("Steel 316"));
+
+    def = this->add("slm_material_density", coFloat);
+    def->label = L("Powder density");
+    def->tooltip = L("Density of the metal powder material");
+    def->sidetext = L("g/cm³");
+    def->min = 0;
+    def->max = 25;
+    def->printer_technology = ptSLM;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(7.9)); // Default for steel
+
+    def = this->add("slm_material_notes", coString);
+    def->label = L("Notes");
+    def->tooltip = L("Additional notes about this powder material");
+    def->full_width = true;
+    def->height = 5;
+    def->printer_technology = ptSLM;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("slm_material_vendor", coString);
+    def->label = L("Vendor");
+    def->tooltip = L("Powder material vendor");
+    def->printer_technology = ptSLM;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    // SLM Support options (similar to SLA)
+    def = this->add("supports_enable", coBool);
+    def->label = L("Generate supports");
+    def->category = L("Supports");
+    def->tooltip = L("Generate supports for the models");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("support_tree_type", coEnum);
+    def->label = L("Support tree type");
+    def->tooltip = L("Support tree building strategy");
+    def->set_enum<sla::SupportTreeType>(
+        ConfigOptionEnum<sla::SupportTreeType>::get_enum_names(),
+        { L("Default"),
+          L("Branching (experimental)") });
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
+
+    def = this->add("support_enforcers_only", coBool);
+    def->label = L("Support only in enforced regions");
+    def->category = L("Supports");
+    def->tooltip = L("Only create support if it lies in a support enforcer.");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("support_buildplate_only", coBool);
+    def->label = L("Support on build plate only");
+    def->category = L("Supports");
+    def->tooltip = L("Only create support if it's on the build plate. Don't create support on a print.");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    // Initialize SLA-style support parameters for SLM (default and branching)
+    // Default support parameters
+    init_sla_support_params("");
+    // Mark all default support parameters as SLM technology
+    for (const char* opt_key : {
+        "support_head_front_diameter", "support_head_penetration", "support_head_width",
+        "support_pillar_diameter", "support_small_pillar_diameter_percent",
+        "support_max_bridges_on_pillar", "support_pillar_connection_mode",
+        "support_pillar_widening_factor", "support_max_weight_on_model",
+        "support_base_diameter", "support_base_height", "support_base_safety_distance",
+        "support_object_elevation", "support_critical_angle",
+        "support_max_bridge_length", "support_max_pillar_link_distance"
+    }) {
+        auto it = this->options.find(opt_key);
+        if (it != this->options.end()) {
+            it->second.printer_technology = ptSLM;
+        }
+    }
+
+    // Branching support parameters
+    init_sla_support_params("branching");
+    // Mark all branching support parameters as SLM technology
+    for (const char* opt_key : {
+        "branchingsupport_head_front_diameter", "branchingsupport_head_penetration", "branchingsupport_head_width",
+        "branchingsupport_pillar_diameter", "branchingsupport_small_pillar_diameter_percent",
+        "branchingsupport_max_bridges_on_pillar", "branchingsupport_pillar_connection_mode",
+        "branchingsupport_pillar_widening_factor", "branchingsupport_max_weight_on_model",
+        "branchingsupport_base_diameter", "branchingsupport_base_height", "branchingsupport_base_safety_distance",
+        "branchingsupport_object_elevation", "branchingsupport_critical_angle",
+        "branchingsupport_max_bridge_length", "branchingsupport_max_pillar_link_distance"
+    }) {
+        auto it = this->options.find(opt_key);
+        if (it != this->options.end()) {
+            it->second.printer_technology = ptSLM;
+        }
+    }
+
+    // SLM Pad options (similar to SLA)
+    def = this->add("pad_enable", coBool);
+    def->label = L("Use pad");
+    def->category = L("Pad");
+    def->tooltip = L("Add a pad underneath the supported model");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("pad_wall_thickness", coFloat);
+    def->label = L("Pad wall thickness");
+    def->category = L("Pad");
+    def->tooltip = L("The thickness of the pad and its optional cavity walls.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 30;
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(2.0));
+
+    def = this->add("pad_wall_height", coFloat);
+    def->label = L("Pad wall height");
+    def->tooltip = L("Defines the pad cavity depth. Set to zero to disable the cavity.");
+    def->category = L("Pad");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 30;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(0.));
+    
+    def = this->add("pad_brim_size", coFloat);
+    def->label = L("Pad brim size");
+    def->tooltip = L("How far should the pad extend around the contained geometry");
+    def->category = L("Pad");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 30;
+    def->mode = comAdvanced;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(1.6));
+
+    def = this->add("pad_max_merge_distance", coFloat);
+    def->label = L("Max merge distance");
+    def->category = L("Pad");
+    def->tooltip = L("Some objects can get along with a few smaller pads "
+                     "instead of a single big one. This parameter defines "
+                     "how far the center of two smaller pads should be. If they"
+                     "are closer, they will get merged into one pad.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(50.0));
+
+    def = this->add("pad_wall_slope", coFloat);
+    def->label = L("Pad wall slope");
+    def->category = L("Pad");
+    def->tooltip = L("The slope of the pad wall relative to the bed plane. "
+                     "90 degrees means straight walls.");
+    def->sidetext = L("°");
+    def->min = 45;
+    def->max = 90;
+    def->mode = comAdvanced;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(90.0));
+
+    def = this->add("pad_around_object", coBool);
+    def->label = L("Pad around object");
+    def->category = L("Pad");
+    def->tooltip = L("Create pad around object and ignore the support elevation");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+    
+    def = this->add("pad_around_object_everywhere", coBool);
+    def->label = L("Pad around object everywhere");
+    def->category = L("Pad");
+    def->tooltip = L("Force pad around object everywhere");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("pad_object_gap", coFloat);
+    def->label = L("Pad object gap");
+    def->category = L("Pad");
+    def->tooltip  = L("The gap between the object bottom and the generated "
+                      "pad in zero elevation mode.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 10;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(1));
+
+    def = this->add("pad_object_connector_stride", coFloat);
+    def->label = L("Pad object connector stride");
+    def->category = L("Pad");
+    def->tooltip = L("Distance between two connector sticks which connect the object and the generated pad.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(10));
+
+    def = this->add("pad_object_connector_width", coFloat);
+    def->label = L("Pad object connector width");
+    def->category = L("Pad");
+    def->tooltip  = L("Width of the connector sticks which connect the object and the generated pad.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(0.5));
+
+    def = this->add("pad_object_connector_penetration", coFloat);
+    def->label = L("Pad object connector penetration");
+    def->category = L("Pad");
+    def->tooltip  = L(
+        "How much should the tiny connectors penetrate into the model body.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(0.3));
+}
+
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
 {
     // handle legacy options
@@ -5750,7 +6514,8 @@ std::string validate(const FullPrintConfig &cfg)
     }
 PRINT_CONFIG_CACHE_INITIALIZE((
     PrintObjectConfig, PrintRegionConfig, MachineEnvelopeConfig, GCodeConfig, PrintConfig, FullPrintConfig, 
-    SLAMaterialConfig, SLAPrintConfig, SLAPrintObjectConfig, SLAPrinterConfig, SLAFullPrintConfig))
+    SLAMaterialConfig, SLAPrintConfig, SLAPrintObjectConfig, SLAPrinterConfig, SLAFullPrintConfig,
+    FiberPrintConfig, SLMPrintConfig, SLMPrintObjectConfig, SLMPrinterConfig, SLMMaterialConfig))
 static int print_config_static_initialized = print_config_static_initializer();
 
 CLIInputConfigDef::CLIInputConfigDef()
@@ -6400,6 +7165,10 @@ Points get_bed_shape(const SLAPrinterConfig &cfg) { return to_points(cfg.bed_sha
 
 std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
 {
+    // Safety check: ensure the option exists before accessing it
+    if (!config.has("support_tree_type")) {
+        return "";
+    }
     const auto *suptreetype = config.option<ConfigOptionEnum<sla::SupportTreeType>>("support_tree_type");
     std::string slatree = "";
     if (suptreetype) {
