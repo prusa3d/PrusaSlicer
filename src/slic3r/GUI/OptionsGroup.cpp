@@ -828,8 +828,25 @@ void ConfigOptionsGroup::reload_config()
 		const std::string &opt_key   = kvp.second.first;
 		// index in the vector option, zero for scalars
 		int 			   opt_index = kvp.second.second;
+		
+		// Safety check: ensure the option exists in m_options before accessing
+		if (m_options.find(opt_id) == m_options.end()) {
+			continue; // Skip if option not found
+		}
+		
 		const ConfigOptionDef &option = m_options.at(opt_id).opt;
-		this->set_value(opt_id, config_value(opt_key, opt_index, option.gui_flags == "serialized"));
+		
+		// Safety check: ensure the option exists in the config before trying to get its value
+		if (!m_config->has(opt_key)) {
+			continue; // Skip if option doesn't exist in config (e.g., technology-specific options)
+		}
+		
+		try {
+			this->set_value(opt_id, config_value(opt_key, opt_index, option.gui_flags == "serialized"));
+		} catch (...) {
+			// Option doesn't exist or wrong type, skip this option
+			continue;
+		}
 	}
 }
 
@@ -1017,52 +1034,114 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 		config_def = &print_config_def;
 	}
 	const ConfigOptionDef* opt = config_def->get(opt_key);
+	
+	// Safety check: if option doesn't exist in config definition, return empty value
+	if (opt == nullptr) {
+		// Option doesn't exist for this technology, return empty/default value
+		return boost::any();
+	}
+	
+	// Safety check: ensure the option exists in the config before accessing
+	if (!config.has(opt_key)) {
+		// Option doesn't exist in config, return empty value
+		return boost::any();
+	}
 
     if (opt->nullable)
     {
         switch (opt->type)
         {
         case coFloat:
-            if (config.option(opt_key)->is_nil())
-                ret = _L("N/A");
-            else
-                ret = double_to_string(config.option<ConfigOptionFloatNullable>(opt_key)->value);
-
+            {
+                const ConfigOption* config_opt = config.option(opt_key);
+                if (config_opt == nullptr) {
+                    return boost::any();
+                }
+                if (config_opt->is_nil())
+                    ret = _L("N/A");
+                else {
+                    const ConfigOptionFloatNullable* float_opt = config.option<ConfigOptionFloatNullable>(opt_key);
+                    if (float_opt == nullptr) {
+                        return boost::any();
+                    }
+                    ret = double_to_string(float_opt->value);
+                }
+            }
             break;
         case coInt:
-            ret = config.option<ConfigOptionIntNullable>(opt_key)->value;
+            {
+                const ConfigOptionIntNullable* int_opt = config.option<ConfigOptionIntNullable>(opt_key);
+                if (int_opt == nullptr) {
+                    return boost::any();
+                }
+                ret = int_opt->value;
+            }
             break;
         case coPercents:
         case coFloats: {
-            if (config.option(opt_key)->is_nil())
+            const ConfigOption* config_opt = config.option(opt_key);
+            if (config_opt == nullptr) {
+                return boost::any();
+            }
+            if (config_opt->is_nil())
                 ret = _(L("N/A"));
             else {
-                double val = opt->type == coFloats ?
-                            config.option<ConfigOptionFloatsNullable>(opt_key)->get_at(idx) :
-                            config.option<ConfigOptionPercentsNullable>(opt_key)->get_at(idx);
-                ret = double_to_string(val); }
+                double val = 0.0;
+                if (opt->type == coFloats) {
+                    const ConfigOptionFloatsNullable* floats_opt = config.option<ConfigOptionFloatsNullable>(opt_key);
+                    if (floats_opt == nullptr) {
+                        return boost::any();
+                    }
+                    val = floats_opt->get_at(idx);
+                } else {
+                    const ConfigOptionPercentsNullable* percents_opt = config.option<ConfigOptionPercentsNullable>(opt_key);
+                    if (percents_opt == nullptr) {
+                        return boost::any();
+                    }
+                    val = percents_opt->get_at(idx);
+                }
+                ret = double_to_string(val);
             }
             break;
+        }
         case coFloatsOrPercents: {
-            if (config.option(opt_key)->is_nil()) {
+            const ConfigOption* config_opt = config.option(opt_key);
+            if (config_opt == nullptr) {
+                return boost::any();
+            }
+            if (config_opt->is_nil()) {
                 ret = _(L("N/A"));
             } else {
-                const auto &config_option = config.option<ConfigOptionFloatsOrPercentsNullable>(opt_key)->get_at(idx);
-
+                const ConfigOptionFloatsOrPercentsNullable* floats_or_percents_opt = config.option<ConfigOptionFloatsOrPercentsNullable>(opt_key);
+                if (floats_or_percents_opt == nullptr) {
+                    return boost::any();
+                }
+                const auto &config_option = floats_or_percents_opt->get_at(idx);
                 text_value = double_to_string(config_option.value);
                 if (config_option.percent) {
                     text_value += "%";
                 }
-
                 ret = text_value;
             }
             break;
         }
         case coBools:
-            ret = config.option<ConfigOptionBoolsNullable>(opt_key)->values[idx];
+            {
+                const ConfigOptionBoolsNullable* bools_opt = config.option<ConfigOptionBoolsNullable>(opt_key);
+                if (bools_opt == nullptr || idx >= bools_opt->values.size()) {
+                    return boost::any();
+                }
+                ret = bools_opt->values[idx];
+            }
             break;
         case coInts:
-            ret = config.option<ConfigOptionIntsNullable>(opt_key)->get_at(idx);
+            {
+                const ConfigOptionIntsNullable* ints_opt = config.option<ConfigOptionIntsNullable>(opt_key);
+                if (ints_opt == nullptr) {
+                    return boost::any();
+                }
+                ret = ints_opt->get_at(idx);
+            }
             break;
         default:
             break;

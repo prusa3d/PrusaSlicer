@@ -70,6 +70,9 @@ class SLAPrintConfig;
 class SLAPrintObjectConfig;
 class SLAPrinterConfig;
 class FiberPrintConfig;
+class SLMPrintConfig;
+class SLMPrintObjectConfig;
+class SLMPrinterConfig;
 
 enum class ArcFittingType {
     Disabled,
@@ -253,6 +256,11 @@ enum class FiberPrintMethodType;
 enum class FiberPrintSequenceType;
 enum class FiberTypeEnum;
 
+// Forward declare SLMPrintConfig enums
+enum class SLMHatchPatternType;
+enum class SLMScanModeType;
+enum class SLMExportFormatType;
+
 #define CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NAME) \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names(); \
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values();
@@ -289,6 +297,9 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberPlacementZoneType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberPrintMethodType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberPrintSequenceType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FiberTypeEnum)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLMHatchPatternType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLMScanModeType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLMExportFormatType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -318,6 +329,7 @@ private:
     void init_sla_params();
     void init_sla_tilt_params();
     void init_sla_support_params(const std::string &method_prefix);
+    void init_slm_params();
 
     std::vector<std::string>    m_extruder_option_keys;
     std::vector<std::string>    m_extruder_retract_keys;
@@ -1361,6 +1373,115 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionString,                     sla_archive_format))
     ((ConfigOptionFloat,                      sla_output_precision))
     ((ConfigOptionString,                     printer_model))
+)
+
+PRINT_CONFIG_CLASS_DEFINE(
+    SLMPrintConfig,
+    ((ConfigOptionString,     output_filename_format))
+    // Laser Parameters
+    ((ConfigOptionFloat,      slm_laser_power))              // Laser power in W
+    ((ConfigOptionFloat,      slm_laser_speed))              // Scan speed in mm/s
+    ((ConfigOptionFloat,      slm_exposure_time))            // Exposure time in ms
+    ((ConfigOptionFloat,      slm_point_distance))           // Point distance in microns
+    // Layer Parameters
+    ((ConfigOptionFloat,      slm_layer_thickness))          // Layer thickness in mm
+    ((ConfigOptionFloat,      slm_layer_cooling_time))       // Cooling time between layers in s
+    ((ConfigOptionFloat,      slm_layer_addition_time))      // Powder addition time in s
+    // Hatch Pattern Parameters
+    ((ConfigOptionEnum<SLMHatchPatternType>, slm_hatch_pattern))  // Hatch pattern type
+    ((ConfigOptionFloat,      slm_hatch_spacing))            // Hatch spacing in mm
+    ((ConfigOptionFloat,      slm_hatch_angle))              // Hatch angle in degrees
+    ((ConfigOptionBool,       slm_contour_first))           // Contour-first or hatch-first
+    // Scan Strategy Parameters
+    ((ConfigOptionEnum<SLMScanModeType>, slm_scan_mode))     // Scan mode
+    ((ConfigOptionFloat,      slm_scan_vector_spacing))     // Scan vector spacing in mm
+    ((ConfigOptionFloat,      slm_rotation_angle))          // Layer rotation angle in degrees
+    // Export Format
+    ((ConfigOptionEnum<SLMExportFormatType>, slm_export_format))  // Export format
+)
+
+PRINT_CONFIG_CLASS_DEFINE(
+    SLMPrintObjectConfig,
+    ((ConfigOptionFloat,      slm_layer_thickness))          // Layer thickness in mm (object-specific override)
+    
+    // Support options (similar to SLA - full support parameter set)
+    ((ConfigOptionBool,        supports_enable))
+    ((ConfigOptionEnum<sla::SupportTreeType>, support_tree_type))
+    ((ConfigOptionBool,        support_buildplate_only))
+    ((ConfigOptionBool,        support_enforcers_only))
+    
+    // Support head parameters
+    ((ConfigOptionFloat,       support_head_front_diameter))
+    ((ConfigOptionFloat,       support_head_penetration))
+    ((ConfigOptionFloat,       support_head_width))
+    
+    // Support pillar parameters
+    ((ConfigOptionFloat,       support_pillar_diameter))
+    ((ConfigOptionPercent,     support_small_pillar_diameter_percent))
+    ((ConfigOptionInt,         support_max_bridges_on_pillar))
+    ((ConfigOptionEnum<SLAPillarConnectionMode>, support_pillar_connection_mode))
+    ((ConfigOptionFloat,       support_pillar_widening_factor))
+    ((ConfigOptionFloat,       support_max_weight_on_model))
+    
+    // Support base parameters
+    ((ConfigOptionFloat,       support_base_diameter))
+    ((ConfigOptionFloat,       support_base_height))
+    ((ConfigOptionFloat,       support_base_safety_distance))
+    ((ConfigOptionFloat,       support_object_elevation))
+    
+    // Support connection parameters
+    ((ConfigOptionFloat,       support_critical_angle))
+    ((ConfigOptionFloat,       support_max_bridge_length))
+    ((ConfigOptionFloat,       support_max_pillar_link_distance))
+    
+    // Branching tree support parameters
+    ((ConfigOptionFloat,       branchingsupport_head_front_diameter))
+    ((ConfigOptionFloat,       branchingsupport_head_penetration))
+    ((ConfigOptionFloat,       branchingsupport_head_width))
+    ((ConfigOptionFloat,       branchingsupport_pillar_diameter))
+    ((ConfigOptionPercent,     branchingsupport_small_pillar_diameter_percent))
+    ((ConfigOptionInt,         branchingsupport_max_bridges_on_pillar))
+    ((ConfigOptionEnum<SLAPillarConnectionMode>, branchingsupport_pillar_connection_mode))
+    ((ConfigOptionFloat,       branchingsupport_pillar_widening_factor))
+    ((ConfigOptionFloat,       branchingsupport_max_weight_on_model))
+    ((ConfigOptionFloat,       branchingsupport_base_diameter))
+    ((ConfigOptionFloat,       branchingsupport_base_height))
+    ((ConfigOptionFloat,       branchingsupport_base_safety_distance))
+    ((ConfigOptionFloat,       branchingsupport_object_elevation))
+    ((ConfigOptionFloat,       branchingsupport_critical_angle))
+    ((ConfigOptionFloat,       branchingsupport_max_bridge_length))
+    ((ConfigOptionFloat,       branchingsupport_max_pillar_link_distance))
+    
+    // Pad options (similar to SLA)
+    ((ConfigOptionBool,        pad_enable))
+    ((ConfigOptionBool,        pad_around_object))
+    ((ConfigOptionFloat,       pad_wall_thickness))
+    ((ConfigOptionFloat,       pad_wall_height))
+    ((ConfigOptionFloat,       pad_brim_size))
+    ((ConfigOptionFloat,       pad_max_merge_distance))
+    ((ConfigOptionFloat,       pad_wall_slope))
+    ((ConfigOptionBool,        pad_around_object_everywhere))
+    ((ConfigOptionFloat,       pad_object_gap))
+    ((ConfigOptionFloat,       pad_object_connector_stride))
+    ((ConfigOptionFloat,       pad_object_connector_width))
+    ((ConfigOptionFloat,       pad_object_connector_penetration))
+)
+
+PRINT_CONFIG_CLASS_DEFINE(
+    SLMPrinterConfig,
+    ((ConfigOptionEnum<PrinterTechnology>,    printer_technology))
+    ((ConfigOptionPoints,                     bed_shape))
+    ((ConfigOptionFloat,                      max_print_height))
+    ((ConfigOptionString,                     printer_model))
+)
+
+PRINT_CONFIG_CLASS_DEFINE(
+    SLMMaterialConfig,
+    ((ConfigOptionString,                     slm_material_colour))
+    ((ConfigOptionString,                     slm_material_type))
+    ((ConfigOptionFloat,                      slm_material_density))
+    ((ConfigOptionString,                     slm_material_notes))
+    ((ConfigOptionString,                     slm_material_vendor))
 )
 
 PRINT_CONFIG_CLASS_DERIVED_DEFINE0(

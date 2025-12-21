@@ -21,6 +21,7 @@
 ///|/
 #include "PrintConfig.hpp"
 #include "FiberPrintConfig.hpp"
+#include "SLMPrintConfig.hpp"
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
@@ -72,7 +73,8 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ArcFittingType)
 
 static t_config_enum_values s_keys_map_PrinterTechnology {
     { "FFF",            ptFFF },
-    { "SLA",            ptSLA }
+    { "SLA",            ptSLA },
+    { "SLM",            ptSLM }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrinterTechnology)
 
@@ -367,6 +369,29 @@ static const t_config_enum_values s_keys_map_FiberTypeEnum {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FiberTypeEnum)
 
+static const t_config_enum_values s_keys_map_SLMHatchPatternType {
+    { "grid",       int(SLMHatchPatternType::slmhpGrid) },
+    { "stripe",     int(SLMHatchPatternType::slmhpStripe) },
+    { "concentric", int(SLMHatchPatternType::slmhpConcentric) },
+    { "custom",     int(SLMHatchPatternType::slmhpCustom) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLMHatchPatternType)
+
+static const t_config_enum_values s_keys_map_SLMScanModeType {
+    { "contour_first", int(SLMScanModeType::slmsmContourFirst) },
+    { "hatch_first",   int(SLMScanModeType::slmsmHatchFirst) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLMScanModeType)
+
+static const t_config_enum_values s_keys_map_SLMExportFormatType {
+    { "slm", int(SLMExportFormatType::slmefSLM) },
+    { "mtt", int(SLMExportFormatType::slmefMTT) },
+    { "sli", int(SLMExportFormatType::slmefSLI) },
+    { "cli", int(SLMExportFormatType::slmefCLI) },
+    { "rea", int(SLMExportFormatType::slmefREA) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLMExportFormatType)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -389,6 +414,8 @@ PrintConfigDef::PrintConfigDef()
     this->init_sla_params();
     this->init_sla_tilt_params();
     assign_printer_technology_to_unknown(this->options, ptSLA);
+    this->init_slm_params();
+    assign_printer_technology_to_unknown(this->options, ptSLM);
     this->finalize();
 }
 
@@ -399,7 +426,7 @@ void PrintConfigDef::init_common_params()
     def = this->add("printer_technology", coEnum);
     def->label = L("Printer technology");
     def->tooltip = L("Printer technology");
-    def->set_enum<PrinterTechnology>({ "FFF", "SLA" });
+    def->set_enum<PrinterTechnology>({ "FFF", "SLA", "SLM", "Fiber" });
     def->set_default_value(new ConfigOptionEnum<PrinterTechnology>(ptFFF));
 
     def = this->add("bed_shape", coPoints);
@@ -5389,6 +5416,424 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "support_points_minimal_distance", // End of the using in 2.9.1 (change algorithm for the support generator)
 };
 
+void PrintConfigDef::init_slm_params()
+{
+    ConfigOptionDef* def;
+
+    // SLM Print Settings
+
+    def = this->add("output_filename_format", coString);
+    def->label = L("Output filename format");
+    def->tooltip = L("You can use all configuration options as variables inside this template. "
+                     "For example: [layer_height], [fill_density] etc. You can also use [timestamp], "
+                     "[year], [month], [day], [hour], [minute], [second], [version], [input_filename], "
+                     "[input_filename_base].");
+    def->full_width = true;
+    def->height = 5;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString("[input_filename_base].slm"));
+
+    // Laser Parameters
+
+    def = this->add("slm_laser_power", coFloat);
+    def->label = L("Laser power");
+    def->tooltip = L("Laser power in watts");
+    def->sidetext = L("W");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(200.0));
+
+    def = this->add("slm_laser_speed", coFloat);
+    def->label = L("Laser scan speed");
+    def->tooltip = L("Scanning speed of the laser");
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->max = 10000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1000.0));
+
+    def = this->add("slm_exposure_time", coFloat);
+    def->label = L("Exposure time");
+    def->tooltip = L("Laser exposure time per point");
+    def->sidetext = L("ms");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(100.0));
+
+    def = this->add("slm_point_distance", coFloat);
+    def->label = L("Point distance");
+    def->tooltip = L("Distance between laser exposure points");
+    def->sidetext = L("μm");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(50.0));
+
+    // Layer Parameters
+
+    def = this->add("slm_layer_thickness", coFloat);
+    def->label = L("Layer thickness");
+    def->tooltip = L("Thickness of each printed layer");
+    def->sidetext = L("mm");
+    def->min = 0.01;
+    def->max = 1.0;
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionFloat(0.05));
+
+    def = this->add("slm_layer_cooling_time", coFloat);
+    def->label = L("Layer cooling time");
+    def->tooltip = L("Time to wait for layer to cool before next layer");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 3600;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(10.0));
+
+    def = this->add("slm_layer_addition_time", coFloat);
+    def->label = L("Layer addition time");
+    def->tooltip = L("Time taken to add new powder layer");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 3600;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(5.0));
+
+    // Hatch Pattern Parameters
+
+    def = this->add("slm_hatch_pattern", coEnum);
+    def->label = L("Hatch pattern");
+    def->tooltip = L("Pattern used for hatching (infill)");
+    def->set_enum<SLMHatchPatternType>({
+        { "grid",       L("Grid") },
+        { "stripe",     L("Stripe") },
+        { "concentric", L("Concentric") },
+        { "custom",     L("Custom") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<SLMHatchPatternType>(SLMHatchPatternType::slmhpGrid));
+
+    def = this->add("slm_hatch_spacing", coFloat);
+    def->label = L("Hatch spacing");
+    def->tooltip = L("Spacing between hatch lines");
+    def->sidetext = L("mm");
+    def->min = 0.01;
+    def->max = 10.0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.1));
+
+    def = this->add("slm_hatch_angle", coFloat);
+    def->label = L("Hatch angle");
+    def->tooltip = L("Angle of hatch lines in degrees");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(45.0));
+
+    def = this->add("slm_contour_first", coBool);
+    def->label = L("Contour first");
+    def->tooltip = L("If enabled, contours are scanned before hatches. Otherwise, hatches are scanned first.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    // Scan Strategy Parameters
+
+    def = this->add("slm_scan_mode", coEnum);
+    def->label = L("Scan mode");
+    def->tooltip = L("Scanning strategy: contour-first or hatch-first");
+    def->set_enum<SLMScanModeType>({
+        { "contour_first", L("Contour first") },
+        { "hatch_first",   L("Hatch first") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<SLMScanModeType>(SLMScanModeType::slmsmContourFirst));
+
+    def = this->add("slm_scan_vector_spacing", coFloat);
+    def->label = L("Scan vector spacing");
+    def->tooltip = L("Spacing between scan vectors");
+    def->sidetext = L("mm");
+    def->min = 0.01;
+    def->max = 10.0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.1));
+
+    def = this->add("slm_rotation_angle", coFloat);
+    def->label = L("Layer rotation angle");
+    def->tooltip = L("Rotation angle for each layer to reduce anisotropy");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 180;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(67.0));
+
+    // Export Format
+
+    def = this->add("slm_export_format", coEnum);
+    def->label = L("Export format");
+    def->tooltip = L("File format for SLM export");
+    def->set_enum<SLMExportFormatType>({
+        { "slm", L("SLM Solutions (.slm)") },
+        { "mtt", L("Renishaw (.mtt)") },
+        { "sli", L("EOS (.sli)") },
+        { "cli", L("Common Layer Interface (.cli)") },
+        { "rea", L("DMG Mori Realizer (.rea)") }
+    });
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionEnum<SLMExportFormatType>(SLMExportFormatType::slmefSLM));
+
+    // SLM Material settings (powder types)
+
+    def = this->add("slm_material_colour", coString);
+    def->label = L("Color");
+    def->tooltip = L("This is only used in the Slic3r interface as a visual help.");
+    def->gui_type = ConfigOptionDef::GUIType::color;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionString("#808080")); // Gray for metal
+
+    def = this->add("slm_material_type", coString);
+    def->label = L("Powder material type");
+    def->tooltip = L("Type of metal powder material");
+    def->gui_flags = "show_value";
+    def->printer_technology = ptSLM;
+    def->set_enum_values(ConfigOptionDef::GUIType::select_open,
+        { "Steel 316", "Steel 316L", "Steel 17-4PH", "Steel 15-5PH", 
+          "Titanium Ti6Al4V", "Titanium CP", "Titanium Ti64",
+          "AlSiMg10", "AlSi10Mg", "AlSi12", "AlSi7Mg",
+          "Inconel 718", "Inconel 625",
+          "CoCr", "Cobalt Chrome",
+          "Nickel Alloy", "Maraging Steel",
+          "Copper", "Bronze",
+          "Custom" });
+    def->set_default_value(new ConfigOptionString("Steel 316"));
+
+    def = this->add("slm_material_density", coFloat);
+    def->label = L("Powder density");
+    def->tooltip = L("Density of the metal powder material");
+    def->sidetext = L("g/cm³");
+    def->min = 0;
+    def->max = 25;
+    def->printer_technology = ptSLM;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(7.9)); // Default for steel
+
+    def = this->add("slm_material_notes", coString);
+    def->label = L("Notes");
+    def->tooltip = L("Additional notes about this powder material");
+    def->full_width = true;
+    def->height = 5;
+    def->printer_technology = ptSLM;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("slm_material_vendor", coString);
+    def->label = L("Vendor");
+    def->tooltip = L("Powder material vendor");
+    def->printer_technology = ptSLM;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString(""));
+
+    // SLM Support options (similar to SLA)
+    def = this->add("supports_enable", coBool);
+    def->label = L("Generate supports");
+    def->category = L("Supports");
+    def->tooltip = L("Generate supports for the models");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("support_tree_type", coEnum);
+    def->label = L("Support tree type");
+    def->tooltip = L("Support tree building strategy");
+    def->set_enum<sla::SupportTreeType>(
+        ConfigOptionEnum<sla::SupportTreeType>::get_enum_names(),
+        { L("Default"),
+          L("Branching (experimental)") });
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
+
+    def = this->add("support_enforcers_only", coBool);
+    def->label = L("Support only in enforced regions");
+    def->category = L("Supports");
+    def->tooltip = L("Only create support if it lies in a support enforcer.");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("support_buildplate_only", coBool);
+    def->label = L("Support on build plate only");
+    def->category = L("Supports");
+    def->tooltip = L("Only create support if it's on the build plate. Don't create support on a print.");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    // Initialize SLA-style support parameters for SLM (default and branching)
+    // Default support parameters
+    init_sla_support_params("");
+    // Mark all default support parameters as SLM technology
+    for (const char* opt_key : {
+        "support_head_front_diameter", "support_head_penetration", "support_head_width",
+        "support_pillar_diameter", "support_small_pillar_diameter_percent",
+        "support_max_bridges_on_pillar", "support_pillar_connection_mode",
+        "support_pillar_widening_factor", "support_max_weight_on_model",
+        "support_base_diameter", "support_base_height", "support_base_safety_distance",
+        "support_object_elevation", "support_critical_angle",
+        "support_max_bridge_length", "support_max_pillar_link_distance"
+    }) {
+        auto it = this->options.find(opt_key);
+        if (it != this->options.end()) {
+            it->second.printer_technology = ptSLM;
+        }
+    }
+
+    // Branching support parameters
+    init_sla_support_params("branching");
+    // Mark all branching support parameters as SLM technology
+    for (const char* opt_key : {
+        "branchingsupport_head_front_diameter", "branchingsupport_head_penetration", "branchingsupport_head_width",
+        "branchingsupport_pillar_diameter", "branchingsupport_small_pillar_diameter_percent",
+        "branchingsupport_max_bridges_on_pillar", "branchingsupport_pillar_connection_mode",
+        "branchingsupport_pillar_widening_factor", "branchingsupport_max_weight_on_model",
+        "branchingsupport_base_diameter", "branchingsupport_base_height", "branchingsupport_base_safety_distance",
+        "branchingsupport_object_elevation", "branchingsupport_critical_angle",
+        "branchingsupport_max_bridge_length", "branchingsupport_max_pillar_link_distance"
+    }) {
+        auto it = this->options.find(opt_key);
+        if (it != this->options.end()) {
+            it->second.printer_technology = ptSLM;
+        }
+    }
+
+    // SLM Pad options (similar to SLA)
+    def = this->add("pad_enable", coBool);
+    def->label = L("Use pad");
+    def->category = L("Pad");
+    def->tooltip = L("Add a pad underneath the supported model");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("pad_wall_thickness", coFloat);
+    def->label = L("Pad wall thickness");
+    def->category = L("Pad");
+    def->tooltip = L("The thickness of the pad and its optional cavity walls.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 30;
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(2.0));
+
+    def = this->add("pad_wall_height", coFloat);
+    def->label = L("Pad wall height");
+    def->tooltip = L("Defines the pad cavity depth. Set to zero to disable the cavity.");
+    def->category = L("Pad");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 30;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(0.));
+    
+    def = this->add("pad_brim_size", coFloat);
+    def->label = L("Pad brim size");
+    def->tooltip = L("How far should the pad extend around the contained geometry");
+    def->category = L("Pad");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 30;
+    def->mode = comAdvanced;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(1.6));
+
+    def = this->add("pad_max_merge_distance", coFloat);
+    def->label = L("Max merge distance");
+    def->category = L("Pad");
+    def->tooltip = L("Some objects can get along with a few smaller pads "
+                     "instead of a single big one. This parameter defines "
+                     "how far the center of two smaller pads should be. If they"
+                     "are closer, they will get merged into one pad.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(50.0));
+
+    def = this->add("pad_wall_slope", coFloat);
+    def->label = L("Pad wall slope");
+    def->category = L("Pad");
+    def->tooltip = L("The slope of the pad wall relative to the bed plane. "
+                     "90 degrees means straight walls.");
+    def->sidetext = L("°");
+    def->min = 45;
+    def->max = 90;
+    def->mode = comAdvanced;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(90.0));
+
+    def = this->add("pad_around_object", coBool);
+    def->label = L("Pad around object");
+    def->category = L("Pad");
+    def->tooltip = L("Create pad around object and ignore the support elevation");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+    
+    def = this->add("pad_around_object_everywhere", coBool);
+    def->label = L("Pad around object everywhere");
+    def->category = L("Pad");
+    def->tooltip = L("Force pad around object everywhere");
+    def->mode = comSimple;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("pad_object_gap", coFloat);
+    def->label = L("Pad object gap");
+    def->category = L("Pad");
+    def->tooltip  = L("The gap between the object bottom and the generated "
+                      "pad in zero elevation mode.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 10;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(1));
+
+    def = this->add("pad_object_connector_stride", coFloat);
+    def->label = L("Pad object connector stride");
+    def->category = L("Pad");
+    def->tooltip = L("Distance between two connector sticks which connect the object and the generated pad.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(10));
+
+    def = this->add("pad_object_connector_width", coFloat);
+    def->label = L("Pad object connector width");
+    def->category = L("Pad");
+    def->tooltip  = L("Width of the connector sticks which connect the object and the generated pad.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(0.5));
+
+    def = this->add("pad_object_connector_penetration", coFloat);
+    def->label = L("Pad object connector penetration");
+    def->category = L("Pad");
+    def->tooltip  = L(
+        "How much should the tiny connectors penetrate into the model body.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->printer_technology = ptSLM;
+    def->set_default_value(new ConfigOptionFloat(0.3));
+}
+
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
 {
     // handle legacy options
@@ -6070,7 +6515,7 @@ std::string validate(const FullPrintConfig &cfg)
 PRINT_CONFIG_CACHE_INITIALIZE((
     PrintObjectConfig, PrintRegionConfig, MachineEnvelopeConfig, GCodeConfig, PrintConfig, FullPrintConfig, 
     SLAMaterialConfig, SLAPrintConfig, SLAPrintObjectConfig, SLAPrinterConfig, SLAFullPrintConfig,
-    FiberPrintConfig))
+    FiberPrintConfig, SLMPrintConfig, SLMPrintObjectConfig, SLMPrinterConfig, SLMMaterialConfig))
 static int print_config_static_initialized = print_config_static_initializer();
 
 CLIInputConfigDef::CLIInputConfigDef()
@@ -6720,6 +7165,10 @@ Points get_bed_shape(const SLAPrinterConfig &cfg) { return to_points(cfg.bed_sha
 
 std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
 {
+    // Safety check: ensure the option exists before accessing it
+    if (!config.has("support_tree_type")) {
+        return "";
+    }
     const auto *suptreetype = config.option<ConfigOptionEnum<sla::SupportTreeType>>("support_tree_type");
     std::string slatree = "";
     if (suptreetype) {

@@ -74,6 +74,8 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/SLMPrint.hpp"
+#include "libslic3r/FiberPrint.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/miniz_extension.hpp"
@@ -270,6 +272,8 @@ struct Plater::priv
     Slic3r::DynamicPrintConfig *config;        // FIXME: leak?
     std::vector<std::unique_ptr<Slic3r::Print>>     fff_prints;
     std::vector<std::unique_ptr<Slic3r::SLAPrint>> sla_prints;
+    std::vector<std::unique_ptr<Slic3r::SLMPrint>> slm_prints;
+    std::vector<std::unique_ptr<Slic3r::FiberPrint>> fiber_prints;
     Slic3r::Model               model;
     PrinterTechnology           printer_technology = ptFFF;
     std::vector<Slic3r::GCodeProcessorResult> gcode_results;
@@ -657,9 +661,13 @@ void Plater::priv::init()
         gcode_results.emplace_back();
         fff_prints.emplace_back(std::make_unique<Print>());
         sla_prints.emplace_back(std::make_unique<SLAPrint>());
+        slm_prints.emplace_back(std::make_unique<SLMPrint>());
+        fiber_prints.emplace_back(std::make_unique<FiberPrint>());
     }
     background_process.set_fff_print(fff_prints.front().get());
     background_process.set_sla_print(sla_prints.front().get());
+    background_process.set_slm_print(slm_prints.front().get());
+    background_process.set_fiber_print(fiber_prints.front().get());
     background_process.set_gcode_result(&gcode_results.front());
     background_process.set_thumbnail_cb([this](const ThumbnailsParams& params) { return this->generate_thumbnails(params, Camera::EType::Ortho); });
     background_process.set_slicing_completed_event(EVT_SLICING_COMPLETED);
@@ -674,6 +682,8 @@ void Plater::priv::init()
     };
     std::for_each(fff_prints.begin(), fff_prints.end(), [statuscb](std::unique_ptr<Print>& p)    { p->set_status_callback(statuscb); });
     std::for_each(sla_prints.begin(), sla_prints.end(), [statuscb](std::unique_ptr<SLAPrint>& p) { p->set_status_callback(statuscb); });
+    std::for_each(slm_prints.begin(), slm_prints.end(), [statuscb](std::unique_ptr<SLMPrint>& p) { p->set_status_callback(statuscb); });
+    std::for_each(fiber_prints.begin(), fiber_prints.end(), [statuscb](std::unique_ptr<FiberPrint>& p) { p->set_status_callback(statuscb); });
     this->q->Bind(EVT_SLICING_UPDATE, &priv::on_slicing_update, this);
 
     view3D = new View3D(q, bed, &model, config, &background_process);
@@ -1138,6 +1148,13 @@ Plater::priv::~priv()
 
 void Plater::priv::update(unsigned int flags)
 {
+    // Safety check: ensure prints are initialized before proceeding
+    if (fff_prints.empty() || sla_prints.empty() || slm_prints.empty() || 
+        fiber_prints.empty() || gcode_results.empty()) {
+        // No prints initialized yet, skip update
+        return;
+    }
+
     unsigned int update_status = 0;
     const bool force_background_processing_restart = this->printer_technology == ptSLA || (flags & (unsigned int)UpdateParams::FORCE_BACKGROUND_PROCESSING_UPDATE);
     if (force_background_processing_restart)
@@ -2327,10 +2344,28 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 {
 //    assert(! s_beds_just_switched || background_process.idle());
 
+    // Safety check: ensure prints are initialized before proceeding
+    if (fff_prints.empty() || sla_prints.empty() || slm_prints.empty() || 
+        fiber_prints.empty() || gcode_results.empty()) {
+        // No prints initialized yet, cannot proceed
+        return 0;
+    }
+
     int active_bed = s_multiple_beds.get_active_bed();
+    // Safety check: ensure active_bed is within bounds
+    if (active_bed < 0 || active_bed >= (int)fff_prints.size() || 
+        active_bed >= (int)slm_prints.size() || active_bed >= (int)fiber_prints.size() ||
+        active_bed >= (int)gcode_results.size()) {
+        // Invalid bed index, use first bed as fallback
+        active_bed = 0;
+        s_multiple_beds.set_active_bed(active_bed);
+    }
     background_process.set_temp_output_path(active_bed);
-    background_process.set_fff_print(&q->active_fff_print());
-    background_process.set_sla_print(&q->active_sla_print());
+    // Use direct access instead of active_fff_print() to avoid double-indexing
+    background_process.set_fff_print(fff_prints[active_bed].get());
+    background_process.set_sla_print(sla_prints.front().get()); // SLA always uses front()
+    background_process.set_slm_print(slm_prints[active_bed].get());
+    background_process.set_fiber_print(fiber_prints[active_bed].get());
     background_process.set_gcode_result(&gcode_results[active_bed]);
     background_process.select_technology(this->printer_technology);
 
@@ -2399,8 +2434,14 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             invalidated = background_process.apply(q->model(), full_config, &warnings);
             apply_statuses[0] = invalidated;
         });
+    } else if (printer_technology == ptSLM || printer_technology == ptFiber) {
+        // SLM and Fiber use similar single-bed model handling as SLA
+        with_single_bed_model_sla(q->model(), s_multiple_beds.get_active_bed(), [&](){
+            invalidated = background_process.apply(q->model(), full_config, &warnings);
+            apply_statuses[0] = invalidated;
+        });
     } else {
-        throw std::runtime_error{"Ivalid printer technology!"};
+        throw std::runtime_error{"Invalid printer technology!"};
     }
 
     for (std::size_t bed_index{}; bed_index < s_multiple_beds.get_number_of_beds(); ++bed_index) {
@@ -2408,12 +2449,12 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             if (apply_statuses[bed_index] != Print::ApplyStatus::APPLY_STATUS_UNCHANGED) {
                 s_print_statuses[bed_index] = PrintStatus::idle;
             }
-        } else if (printer_technology == ptSLA) {
+        } else if (printer_technology == ptSLA || printer_technology == ptSLM || printer_technology == ptFiber) {
             if (apply_statuses[0] != Print::ApplyStatus::APPLY_STATUS_UNCHANGED) {
                 s_print_statuses[bed_index] = PrintStatus::idle;
             }
         } else {
-            throw std::runtime_error{"Ivalid printer technology!"};
+            throw std::runtime_error{"Invalid printer technology!"};
         }
     }
 

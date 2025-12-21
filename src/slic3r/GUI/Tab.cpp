@@ -1061,23 +1061,130 @@ void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bo
 
 static wxString support_combo_value_for_config(const DynamicPrintConfig &config, bool is_fff)
 {
-    std::string slatree = is_fff ? "" : get_sla_suptree_prefix(config);
-
-    const std::string support         = is_fff ? "support_material"                 : "supports_enable";
-    const std::string buildplate_only = is_fff ? "support_material_buildplate_only" : slatree + "support_buildplate_only";
-
-    return
-        ! config.opt_bool(support) ?
-            _("None") :
-               ((is_fff && !config.opt_bool("support_material_auto")) || (!is_fff && config.opt_bool("support_enforcers_only"))) ?
-                _("For support enforcers only") :
-                (config.opt_bool(buildplate_only) ? _("Support on build plate only") :
-                                                    _("Everywhere"));
+    // Determine the actual printer technology
+    PrinterTechnology tech = ptUnknown;
+    if (config.has("printer_technology")) {
+        try {
+            tech = config.opt_enum<PrinterTechnology>("printer_technology");
+        } catch (...) {
+            tech = ptUnknown;
+        }
+    }
+    
+    // Determine technology types
+    bool is_sla = (tech == ptSLA);
+    bool is_fiber = (tech == ptFiber);
+    bool is_slm = (tech == ptSLM);
+    
+    // Fiber uses FFF-style supports, SLM uses SLA-style supports
+    // For FFF and Fiber, use FFF support options
+    if (is_fff || is_fiber) {
+        const std::string support = "support_material";
+        const std::string buildplate_only = "support_material_buildplate_only";
+        
+        // Safety check: ensure support option exists
+        if (!config.has(support)) {
+            return _("None");
+        }
+        
+        bool support_enabled = false;
+        try {
+            support_enabled = config.opt_bool(support);
+        } catch (...) {
+            return _("None");
+        }
+        
+        if (!support_enabled) {
+            return _("None");
+        }
+        
+        // Check for enforcers only (when support_material_auto is false)
+        if (config.has("support_material_auto") && !config.opt_bool("support_material_auto")) {
+            return _("For support enforcers only");
+        }
+        
+        // Check for buildplate only
+        if (config.has(buildplate_only) && config.opt_bool(buildplate_only)) {
+            return _("Support on build plate only");
+        }
+        
+        return _("Everywhere");
+    }
+    
+    // For SLA and SLM, use SLA-style support options
+    if (is_sla || is_slm) {
+        std::string slatree = get_sla_suptree_prefix(config);
+        const std::string support = "supports_enable";
+        const std::string buildplate_only = slatree + "support_buildplate_only";
+        
+        // Safety check: ensure support option exists
+        if (!config.has(support)) {
+            return _("None");
+        }
+        
+        bool support_enabled = false;
+        try {
+            support_enabled = config.opt_bool(support);
+        } catch (...) {
+            return _("None");
+        }
+        
+        if (!support_enabled) {
+            return _("None");
+        }
+        
+        // Check for enforcers only
+        if (config.has("support_enforcers_only") && config.opt_bool("support_enforcers_only")) {
+            return _("For support enforcers only");
+        }
+        
+        // Check for buildplate only
+        if (!buildplate_only.empty() && config.has(buildplate_only) && config.opt_bool(buildplate_only)) {
+            return _("Support on build plate only");
+        }
+        
+        return _("Everywhere");
+    }
+    
+    // Unknown technology or no support options
+    return _("None");
 }
 
 static wxString pad_combo_value_for_config(const DynamicPrintConfig &config)
 {
-    return config.opt_bool("pad_enable") ? (config.opt_bool("pad_around_object") ? _("Around object") : _("Below object")) : _("None");
+    // Pad options are available for SLA and SLM
+    PrinterTechnology tech = ptUnknown;
+    if (config.has("printer_technology")) {
+        try {
+            tech = config.opt_enum<PrinterTechnology>("printer_technology");
+        } catch (...) {
+            tech = ptUnknown;
+        }
+    }
+    
+    // Only SLA and SLM have pad options
+    if (tech != ptSLA && tech != ptSLM) {
+        return _("None");
+    }
+    
+    // Safety check: ensure pad options exist
+    if (!config.has("pad_enable")) {
+        return _("None");
+    }
+    
+    try {
+        if (!config.opt_bool("pad_enable")) {
+            return _("None");
+        }
+        
+        if (config.has("pad_around_object") && config.opt_bool("pad_around_object")) {
+            return _("Around object");
+        }
+        
+        return _("Below object");
+    } catch (...) {
+        return _("None");
+    }
 }
 
 void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
@@ -1093,38 +1200,96 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
 
     const bool is_fff = supports_printer_technology(ptFFF);
     ConfigOptionsGroup* og_freq_chng_params = wxGetApp().sidebar().og_freq_chng_params(is_fff);
-    if (opt_key == "fill_density" || opt_key == "pad_enable")
-    {
-        boost::any val = og_freq_chng_params->get_config_value(*m_config, opt_key);
-        og_freq_chng_params->set_value(opt_key, val);
+    
+    // Determine technology for proper option handling
+    PrinterTechnology tech = ptUnknown;
+    if (m_config->has("printer_technology")) {
+        try {
+            tech = m_config->opt_enum<PrinterTechnology>("printer_technology");
+        } catch (...) {
+            tech = ptUnknown;
+        }
+    }
+    
+    if (opt_key == "fill_density") {
+        // fill_density is FFF-specific
+        if (is_fff) {
+            boost::any val = og_freq_chng_params->get_config_value(*m_config, opt_key);
+            og_freq_chng_params->set_value(opt_key, val);
+        }
+    } else if (opt_key == "pad_enable") {
+        // pad_enable is available for SLA and SLM
+        if (tech == ptSLA || tech == ptSLM) {
+            boost::any val = og_freq_chng_params->get_config_value(*m_config, opt_key);
+            og_freq_chng_params->set_value(opt_key, val);
+        }
     }
     
     if (opt_key == "pad_around_object") {
-        for (PageShp &pg : m_pages) {
-            Field * fld = pg->get_field(opt_key); /// !!! ysFIXME ????
-            if (fld) fld->set_value(value, false);
+        // pad_around_object is available for SLA and SLM
+        if (tech == ptSLA || tech == ptSLM) {
+            for (PageShp &pg : m_pages) {
+                Field * fld = pg->get_field(opt_key); /// !!! ysFIXME ????
+                if (fld) fld->set_value(value, false);
+            }
         }
     }
 
-    if (is_fff ?
-            (opt_key == "support_material" || opt_key == "support_material_auto" || opt_key == "support_material_buildplate_only") :
-            (opt_key == "supports_enable"  || opt_key == "support_tree_type" || opt_key == get_sla_suptree_prefix(*m_config) + "support_buildplate_only" || opt_key == "support_enforcers_only"))
+    // Support options handling - need to check technology properly
+    bool should_update_support = false;
+    if (is_fff || tech == ptFiber) {
+        // FFF and Fiber use FFF-style support options
+        should_update_support = (opt_key == "support_material" || opt_key == "support_material_auto" || opt_key == "support_material_buildplate_only");
+    } else if (tech == ptSLA || tech == ptSLM) {
+        // SLA and SLM use SLA-style support options
+        std::string slatree = get_sla_suptree_prefix(*m_config);
+        should_update_support = (opt_key == "supports_enable" || opt_key == "support_tree_type" || 
+                                 opt_key == slatree + "support_buildplate_only" || opt_key == "support_enforcers_only");
+    }
+    
+    if (should_update_support) {
         og_freq_chng_params->set_value("support", support_combo_value_for_config(*m_config, is_fff));
-
-    if (! is_fff && (opt_key == "pad_enable" || opt_key == "pad_around_object"))
-        og_freq_chng_params->set_value("pad", pad_combo_value_for_config(*m_config));
-
-    if (opt_key == "brim_width")
-    {
-        bool val = m_config->opt_float("brim_width") > 0.0 ? true : false;
-        og_freq_chng_params->set_value("brim", val);
     }
 
-    if (opt_key == "wipe_tower" || opt_key == "single_extruder_multi_material" || opt_key == "extruders_count" )
-        update_wiping_button_visibility();
+    // Pad options are available for SLA and SLM
+    // Note: tech is already determined above (line 1205-1212)
+    if (opt_key == "pad_enable" || opt_key == "pad_around_object") {
+        // Update pad for SLA and SLM technologies
+        if (tech == ptSLA || tech == ptSLM) {
+            og_freq_chng_params->set_value("pad", pad_combo_value_for_config(*m_config));
+        }
+    }
 
-    if (opt_key == "extruders_count")
-        wxGetApp().sidebar().set_extruders_count(boost::any_cast<size_t>(value));
+    // brim_width is FFF-specific only
+    if (opt_key == "brim_width")
+    {
+        if (is_fff) {
+            // Safety check: ensure option exists
+            if (m_config->has("brim_width")) {
+                try {
+                    bool val = m_config->opt_float("brim_width") > 0.0 ? true : false;
+                    og_freq_chng_params->set_value("brim", val);
+                } catch (...) {
+                    // Option doesn't exist or wrong type, skip
+                }
+            }
+        }
+    }
+
+    // wipe_tower, single_extruder_multi_material, and extruders_count are FFF-specific only
+    if (is_fff) {
+        if (opt_key == "wipe_tower" || opt_key == "single_extruder_multi_material" || opt_key == "extruders_count") {
+            update_wiping_button_visibility();
+        }
+
+        if (opt_key == "extruders_count") {
+            try {
+                wxGetApp().sidebar().set_extruders_count(boost::any_cast<size_t>(value));
+            } catch (...) {
+                // Invalid value type, skip
+            }
+        }
+    }
 
     if (m_postpone_update_ui) {
         // It means that not all values are rolled to the system/last saved values jet.
@@ -1375,6 +1540,43 @@ void Tab::update_preset_description_line()
                     description_line += "\n\n\t" + _(L("default SLA print profile")) + ": \n\t\t" + default_sla_print_profile;
                 break;
             }
+            case ptSLM:
+            {
+                // SLM material and print profiles (similar to SLA)
+                if (preset.config.has("default_slm_material_profile")) {
+                    const std::string &default_slm_material_profile = preset.config.opt_string("default_slm_material_profile");
+                    if (!default_slm_material_profile.empty())
+                        description_line += "\n\n\t" + _(L("default SLM material profile")) + ": \n\t\t" + default_slm_material_profile;
+                }
+                if (preset.config.has("default_slm_print_profile")) {
+                    const std::string &default_slm_print_profile = preset.config.opt_string("default_slm_print_profile");
+                    if (!default_slm_print_profile.empty())
+                        description_line += "\n\n\t" + _(L("default SLM print profile")) + ": \n\t\t" + default_slm_print_profile;
+                }
+                break;
+            }
+            case ptFiber:
+            {
+                // Fiber uses FFF-style profiles
+                if (preset.config.has("default_print_profile")) {
+                    const std::string &default_print_profile = preset.config.opt_string("default_print_profile");
+                    if (!default_print_profile.empty())
+                        description_line += "\n\n\t" + _(L("default print profile")) + ": \n\t\t" + default_print_profile;
+                }
+                if (preset.config.has("default_filament_profile")) {
+                    const std::vector<std::string> &default_filament_profiles = preset.config.option<ConfigOptionStrings>("default_filament_profile")->values;
+                    if (!default_filament_profiles.empty())
+                    {
+                        description_line += "\n\n\t" + _(L("default filament profile")) + ": \n\t\t";
+                        for (const std::string& profile : default_filament_profiles) {
+                            if (&profile != &*default_filament_profiles.begin())
+                                description_line += ", ";
+                            description_line += from_u8(profile);
+                        }
+                    }
+                }
+                break;
+            }
             default: break;
             }
         }
@@ -1399,17 +1601,47 @@ void Tab::update_frequently_changed_parameters()
     if (!og_freq_chng_params) return;
 
     og_freq_chng_params->set_value("support", support_combo_value_for_config(*m_config, is_fff));
-    if (! is_fff)
+    
+    // Pad options are available for SLA and SLM
+    PrinterTechnology tech = ptUnknown;
+    if (m_config->has("printer_technology")) {
+        try {
+            tech = m_config->opt_enum<PrinterTechnology>("printer_technology");
+        } catch (...) {
+            tech = ptUnknown;
+        }
+    }
+    
+    if (tech == ptSLA || tech == ptSLM) {
         og_freq_chng_params->set_value("pad", pad_combo_value_for_config(*m_config));
+    }
 
-    const std::string updated_value_key = is_fff ? "fill_density" : "pad_enable";
+    // Determine the appropriate value key based on technology
+    // FFF uses "fill_density", SLA and SLM use "pad_enable", Fiber doesn't have either in frequently changed params
+    std::string updated_value_key;
+    if (is_fff) {
+        updated_value_key = "fill_density";
+    } else if (tech == ptSLA || tech == ptSLM) {
+        updated_value_key = "pad_enable";
+    } else {
+        // Fiber doesn't have frequently changed params equivalent
+        // Skip this update for Fiber technology
+        return;
+    }
 
     const boost::any val = og_freq_chng_params->get_config_value(*m_config, updated_value_key);
     og_freq_chng_params->set_value(updated_value_key, val);
 
     if (is_fff)
     {
-        og_freq_chng_params->set_value("brim", bool(m_config->opt_float("brim_width") > 0.0));
+        // Safety check: ensure brim_width option exists
+        if (m_config->has("brim_width")) {
+            try {
+                og_freq_chng_params->set_value("brim", bool(m_config->opt_float("brim_width") > 0.0));
+            } catch (...) {
+                // Option doesn't exist or wrong type, skip
+            }
+        }
         update_wiping_button_visibility();
     }
 }
@@ -1429,9 +1661,54 @@ void TabPrint::build()
     m_presets = &m_preset_bundle->prints;
     load_initial_data();
 
-    auto page = add_options_page(L("Layers and perimeters"), "layers");
+    // Fiber page (shown only when Fiber printer is selected) - placed at top for visibility
+    auto page = add_options_page(L("Fiber"), "cog");
+        m_fiber_page = page;
+        
+        // Enable Fiber Reinforcement
+        auto optgroup = page->new_optgroup(L("Enable Fiber Reinforcement"));
+        optgroup->append_single_option_line("enable_fiber_reinforcement");
+        optgroup->append_single_option_line("fiber_type");
+        optgroup->append_single_option_line("fiber_print_method");
+
+        // Placement
+        optgroup = page->new_optgroup(L("Placement"));
+        optgroup->append_single_option_line("fiber_pattern");
+        optgroup->append_single_option_line("fiber_spacing");
+        optgroup->append_single_option_line("fiber_angle");
+        optgroup->append_single_option_line("fiber_placement_zone");
+        optgroup->append_single_option_line("fiber_layer_interval");
+        optgroup->append_single_option_line("fiber_start_layer");
+        optgroup->append_single_option_line("fiber_end_layer");
+
+        // Extruder Assignment
+        optgroup = page->new_optgroup(L("Extruder Assignment"));
+        optgroup->append_single_option_line("plastic_extruder_id");
+        optgroup->append_single_option_line("fiber_extruder_id");
+        optgroup->append_single_option_line("embedded_fiber_extruder_id");
+
+        // Print Sequence
+        optgroup = page->new_optgroup(L("Print Sequence"));
+        optgroup->append_single_option_line("fiber_print_sequence");
+        optgroup->append_single_option_line("fiber_delay_after_plastic");
+        optgroup->append_single_option_line("fiber_cooling_time");
+        optgroup->append_single_option_line("fiber_wait_for_cooling");
+
+        // Speed and Control
+        optgroup = page->new_optgroup(L("Speed and Control"));
+        optgroup->append_single_option_line("fiber_speed");
+        optgroup->append_single_option_line("fiber_pressure");
+
+        // G-code Commands
+        optgroup = page->new_optgroup(L("G-code Commands"));
+        optgroup->append_single_option_line("fiber_start_command");
+        optgroup->append_single_option_line("fiber_stop_command");
+        optgroup->append_single_option_line("fiber_speed_command");
+        optgroup->append_single_option_line("fiber_enable_comments");
+
+    page = add_options_page(L("Layers and perimeters"), "layers");
         std::string category_path = "layers-and-perimeters_1748#";
-        auto optgroup = page->new_optgroup(L("Layer height"));
+        optgroup = page->new_optgroup(L("Layer height"));
         optgroup->append_single_option_line("layer_height", category_path + "layer-height");
         optgroup->append_single_option_line("first_layer_height", category_path + "first-layer-height");
 
@@ -1794,6 +2071,13 @@ void TabPrint::build()
         optgroup->append_single_option_line(option);
 
         build_preset_description_line(optgroup.get());
+    
+    // Initialize fiber page visibility based on current printer technology
+    PrinterTechnology tech = m_preset_bundle->printers.get_selected_preset().printer_technology();
+    bool show_fiber = (tech == ptFiber);
+    
+    if (m_fiber_page)
+        m_fiber_page->set_show(show_fiber);
 }
 
 void TabPrint::update_description_lines()
@@ -1832,12 +2116,24 @@ void TabPrint::toggle_options()
     if (!m_active_page) return;
 
     m_config_manipulation.toggle_print_fff_options(m_config);
+    
+    // Show/hide fiber page based on printer technology
+    PrinterTechnology tech = m_preset_bundle->printers.get_selected_preset().printer_technology();
+    bool show_fiber = (tech == ptFiber);
+    
+    if (m_fiber_page)
+        m_fiber_page->set_show(show_fiber);
+    
+    // Rebuild page tree to reflect visibility changes
+    rebuild_page_tree();
 }
 
 void TabPrint::update()
 {
-    if (m_preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA)
-        return; // ys_FIXME
+    PrinterTechnology tech = m_preset_bundle->printers.get_selected_preset().printer_technology();
+    // TabPrint is only for FFF and Fiber technologies
+    if (tech != ptFFF && tech != ptFiber)
+        return; // Skip for SLA and SLM
 
     m_update_cnt++;
 
@@ -1847,11 +2143,20 @@ void TabPrint::update()
     // But it should be corrected when we will have more such sets.
     // Disable check of the compatibility of the "support_material" and "overhangs" options for saved user profile
     // NOTE: Initialization of the support_material_overhangs_queried value have to be processed just ones
-    if (!m_config_manipulation.is_initialized_support_material_overhangs_queried())
+    // support_material and overhangs are FFF-specific options
+    if (tech == ptFFF && !m_config_manipulation.is_initialized_support_material_overhangs_queried())
     {
         const Preset& selected_preset = m_preset_bundle->prints.get_selected_preset();
         bool is_user_and_saved_preset = !selected_preset.is_system && !selected_preset.is_dirty;
-        bool support_material_overhangs_queried = m_config->opt_bool("support_material") && !m_config->opt_bool("overhangs");
+        // Safety check: ensure options exist before accessing
+        bool support_material_overhangs_queried = false;
+        if (m_config->has("support_material") && m_config->has("overhangs")) {
+            try {
+                support_material_overhangs_queried = m_config->opt_bool("support_material") && !m_config->opt_bool("overhangs");
+            } catch (...) {
+                // Options don't exist or wrong type, skip
+            }
+        }
         m_config_manipulation.initialize_support_material_overhangs_queried(is_user_and_saved_preset && support_material_overhangs_queried);
     }
 
@@ -2452,8 +2757,25 @@ void TabFilament::toggle_options()
 
     if (m_active_page->title() == "Cooling")
     {
-        bool cooling = m_config->opt_bool("cooling", 0);
-        bool fan_always_on = cooling || m_config->opt_bool("fan_always_on", 0);
+        // Cooling options are FFF/Fiber-specific - add safety checks
+        bool cooling = false;
+        bool fan_always_on = false;
+        
+        if (m_config->has("cooling")) {
+            try {
+                cooling = m_config->opt_bool("cooling", 0);
+            } catch (...) {
+                // Option doesn't exist or wrong type, skip
+            }
+        }
+        
+        if (m_config->has("fan_always_on")) {
+            try {
+                fan_always_on = cooling || m_config->opt_bool("fan_always_on", 0);
+            } catch (...) {
+                // Option doesn't exist or wrong type, skip
+            }
+        }
 
         for (auto el : { "max_fan_speed", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed", "cooling_slowdown_logic" })
             toggle_option(el, cooling);
@@ -2461,12 +2783,26 @@ void TabFilament::toggle_options()
         for (auto el : { "min_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer" })
             toggle_option(el, fan_always_on);
 
-        bool dynamic_fan_speeds = m_config->opt_bool("enable_dynamic_fan_speeds", 0);
+        bool dynamic_fan_speeds = false;
+        if (m_config->has("enable_dynamic_fan_speeds")) {
+            try {
+                dynamic_fan_speeds = m_config->opt_bool("enable_dynamic_fan_speeds", 0);
+            } catch (...) {
+                // Option doesn't exist or wrong type, skip
+            }
+        }
         for (int i = 0; i < 4; i++) {
             toggle_option("overhang_fan_speed_"+std::to_string(i),dynamic_fan_speeds);
         }
 
-        bool cooling_preserve_perimeters = cooling && static_cast<CoolingSlowdownLogicType>(m_config->option("cooling_slowdown_logic")->getInts().at(0)) == CoolingSlowdownLogicType::ConsistentSurface;
+        bool cooling_preserve_perimeters = false;
+        if (cooling && m_config->has("cooling_slowdown_logic")) {
+            try {
+                cooling_preserve_perimeters = static_cast<CoolingSlowdownLogicType>(m_config->option("cooling_slowdown_logic")->getInts().at(0)) == CoolingSlowdownLogicType::ConsistentSurface;
+            } catch (...) {
+                // Option doesn't exist or wrong type, skip
+            }
+        }
         toggle_option("cooling_perimeter_transition_distance", cooling_preserve_perimeters);
     }
 
@@ -2633,15 +2969,40 @@ void TabPrinter::build()
     // For DiffPresetDialog we use options list which is saved in Searcher class.
     // Options for the Searcher is added in the moment of pages creation.
     // So, build first of all printer pages for non-selected printer technology...
-    std::string def_preset_name = "- default " + std::string(m_printer_technology == ptSLA ? "FFF" : "SLA") + " -";
+    std::string def_preset_name;
+    if (m_printer_technology == ptSLA)
+        def_preset_name = "- default FFF -";
+    else if (m_printer_technology == ptSLM)
+        def_preset_name = "- default FFF -";  // Build FFF pages for non-SLM tech
+    else if (m_printer_technology == ptFiber)
+        def_preset_name = "- default FFF -";  // Build FFF pages for non-Fiber tech
+    else
+        def_preset_name = "- default SLA -";
+    
     m_config = &m_presets->find_preset(def_preset_name)->config;
-    m_printer_technology == ptSLA ? build_fff() : build_sla();
+    
+    if (m_printer_technology == ptSLA)
+        build_fff();
+    else if (m_printer_technology == ptSLM)
+        build_fff();  // Build FFF for non-SLM tech
+    else if (m_printer_technology == ptFiber)
+        build_fff();  // Build FFF for non-Fiber tech
+    else
+        build_sla();
+    
     if (m_printer_technology == ptSLA)
         m_extruders_count_old = 0;// revert this value 
 
     // ... and than for selected printer technology
     load_initial_data();
-    m_printer_technology == ptSLA ? build_sla() : build_fff();
+    if (m_printer_technology == ptFFF)
+        build_fff();
+    else if (m_printer_technology == ptSLA)
+        build_sla();
+    else if (m_printer_technology == ptSLM)
+        build_slm();
+    else if (m_printer_technology == ptFiber)
+        build_fiber();
 }
 
 void TabPrinter::build_print_host_upload_group(Page* page)
@@ -3073,6 +3434,68 @@ void TabPrinter::build_sla()
     option = optgroup->get_option("printer_notes");
     option.opt.full_width = true;
     option.opt.height = notes_field_height;//250;
+    optgroup->append_single_option_line(option);
+
+    page = add_options_page(L("Dependencies"), "wrench");
+    optgroup = page->new_optgroup(L("Profile dependencies"));
+
+    build_preset_description_line(optgroup.get());
+}
+
+void TabPrinter::build_slm()
+{
+    if (!m_pages.empty())
+        m_pages.resize(0);
+    auto page = add_options_page(L("General"), "printer");
+    auto optgroup = page->new_optgroup(L("Size and coordinates"));
+
+    create_line_with_widget(optgroup.get(), "bed_shape", "custom-svg-and-png-bed-textures_124612", [this](wxWindow* parent) {
+        return 	create_bed_shape_widget(parent);
+    });
+    optgroup->append_single_option_line("max_print_height");
+
+    optgroup = page->new_optgroup(L("Printer"));
+    optgroup->append_single_option_line("printer_model");
+
+    build_print_host_upload_group(page.get());
+
+    const int notes_field_height = 25;
+    page = add_options_page(L("Notes"), "note");
+    optgroup = page->new_optgroup(L("Notes"), 0);
+    Option option = optgroup->get_option("printer_notes");
+    option.opt.full_width = true;
+    option.opt.height = notes_field_height;
+    optgroup->append_single_option_line(option);
+
+    page = add_options_page(L("Dependencies"), "wrench");
+    optgroup = page->new_optgroup(L("Profile dependencies"));
+
+    build_preset_description_line(optgroup.get());
+}
+
+void TabPrinter::build_fiber()
+{
+    if (!m_pages.empty())
+        m_pages.resize(0);
+    auto page = add_options_page(L("General"), "printer");
+    auto optgroup = page->new_optgroup(L("Size and coordinates"));
+
+    create_line_with_widget(optgroup.get(), "bed_shape", "custom-svg-and-png-bed-textures_124612", [this](wxWindow* parent) {
+        return 	create_bed_shape_widget(parent);
+    });
+    optgroup->append_single_option_line("max_print_height");
+
+    optgroup = page->new_optgroup(L("Printer Model"));
+    optgroup->append_single_option_line("printer_model");
+
+    build_print_host_upload_group(page.get());
+
+    const int notes_field_height = 25;
+    page = add_options_page(L("Notes"), "note");
+    optgroup = page->new_optgroup(L("Notes"), 0);
+    Option option = optgroup->get_option("printer_notes");
+    option.opt.full_width = true;
+    option.opt.height = notes_field_height;
     optgroup->append_single_option_line(option);
 
     page = add_options_page(L("Dependencies"), "wrench");
@@ -3535,11 +3958,15 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 // this gets executed after preset is loaded and before GUI fields are updated
 void TabPrinter::on_preset_loaded()
 {
-    // update the extruders count field
-    auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
-    size_t extruders_count = nozzle_diameter->values.size();
-    // update the GUI field according to the number of nozzle diameters supplied
-    extruders_count_changed(extruders_count);
+    // update the extruders count field (only for FFF and Fiber printers)
+    if (m_printer_technology == ptFFF || m_printer_technology == ptFiber) {
+        auto   *nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
+        if (nozzle_diameter) {
+            size_t extruders_count = nozzle_diameter->values.size();
+            // update the GUI field according to the number of nozzle diameters supplied
+            extruders_count_changed(extruders_count);
+        }
+    }
 }
 
 void TabPrinter::update_pages()
@@ -3553,7 +3980,14 @@ void TabPrinter::update_pages()
     clear_pages();
 
     // set m_pages to m_pages_(technology before changing)
-    m_printer_technology == ptFFF ? m_pages.swap(m_pages_fff) : m_pages.swap(m_pages_sla);
+    if (m_printer_technology == ptFFF)
+        m_pages.swap(m_pages_fff);
+    else if (m_printer_technology == ptSLA)
+        m_pages.swap(m_pages_sla);
+    else if (m_printer_technology == ptSLM)
+        m_pages.swap(m_pages_slm);
+    else if (m_printer_technology == ptFiber)
+        m_pages.swap(m_pages_fiber);
 
     // build Tab according to the technology, if it's not exist jet OR
     // set m_pages_(technology after changing) to m_pages
@@ -3575,8 +4009,19 @@ void TabPrinter::update_pages()
 
          wxGetApp().sidebar().update_objects_list_extruder_column(m_extruders_count);
     }
-    else
+    else if (new_printer_technology == ptSLA)
+    {
         m_pages_sla.empty() ? build_sla() : m_pages.swap(m_pages_sla);
+    }
+    else if (new_printer_technology == ptSLM)
+    {
+        m_pages_slm.empty() ? build_slm() : m_pages.swap(m_pages_slm);
+    }
+    else if (new_printer_technology == ptFiber)
+    {
+        m_pages_fiber.empty() ? build_fiber() : m_pages.swap(m_pages_fiber);
+        wxGetApp().sidebar().update_objects_list_extruder_column(m_extruders_count);
+    }
 
     rebuild_page_tree();
 }
@@ -3722,7 +4167,15 @@ void TabPrinter::toggle_options()
 void TabPrinter::update()
 {
     m_update_cnt++;
-    m_presets->get_edited_preset().printer_technology() == ptFFF ? update_fff() : update_sla();
+    PrinterTechnology tech = m_presets->get_edited_preset().printer_technology();
+    if (tech == ptFFF)
+        update_fff();
+    else if (tech == ptSLA)
+        update_sla();
+    else if (tech == ptSLM)
+        update_slm();
+    else if (tech == ptFiber)
+        update_fiber();
     m_update_cnt--;
 
     update_description_lines();
@@ -3752,6 +4205,14 @@ void TabPrinter::update_fff()
 }
 
 void TabPrinter::update_sla()
+{
+}
+
+void TabPrinter::update_slm()
+{
+}
+
+void TabPrinter::update_fiber()
 {
 }
 
@@ -3811,14 +4272,23 @@ void Tab::load_current_preset()
                         // Printer tab is shown every time
                         continue;
                     }
+                    int page_id = wxGetApp().tab_panel()->FindPage(tab);
                     if (tab->supports_printer_technology(printer_technology))
                     {
-                        dynamic_cast<TopBar*>(wxGetApp().tab_panel())->InsertNewPage(wxGetApp().tab_panel()->FindPage(this), tab, tab->title(),"");
+                        if (page_id == wxNOT_FOUND) {
+                            // Tab is not in panel, insert it
+                            dynamic_cast<TopBar*>(wxGetApp().tab_panel())->InsertNewPage(wxGetApp().tab_panel()->FindPage(this), tab, tab->title(),"");
+                        } else {
+                            // Tab is already in panel, make sure it's visible
+                            wxGetApp().tab_panel()->GetPage(page_id)->Show(true);
+                        }
                     }
                     else {
-                        int page_id = wxGetApp().tab_panel()->FindPage(tab);
-                        wxGetApp().tab_panel()->GetPage(page_id)->Show(false);
-                        wxGetApp().tab_panel()->RemovePage(page_id);
+                        if (page_id != wxNOT_FOUND) {
+                            // Tab is in panel but doesn't support this technology, remove it
+                            wxGetApp().tab_panel()->GetPage(page_id)->Show(false);
+                            wxGetApp().tab_panel()->RemovePage(page_id);
+                        }
                     }
                 }
                 static_cast<TabPrinter*>(this)->m_printer_technology = printer_technology;
@@ -3947,7 +4417,8 @@ bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
         // whether to discard the changes or keep the current print selection.
         PresetWithVendorProfile printer_profile = m_preset_bundle->printers.get_edited_preset_with_vendor_profile();
         PrinterTechnology  printer_technology = printer_profile.preset.printer_technology();
-        PresetCollection  &dependent = (printer_technology == ptFFF) ? m_preset_bundle->filaments : m_preset_bundle->sla_materials;
+        PresetCollection  &dependent = (printer_technology == ptFFF || printer_technology == ptFiber) ? m_preset_bundle->filaments : 
+                                      (printer_technology == ptSLM) ? m_preset_bundle->slm_materials : m_preset_bundle->sla_materials;
         bool 			   old_preset_dirty = dependent.current_is_dirty();
         bool 			   new_preset_compatible = is_compatible_with_print(dependent.get_edited_preset_with_vendor_profile(), 
         	m_presets->get_preset_with_vendor_profile(*m_presets->find_preset(preset_name, true)), printer_profile);
@@ -3955,7 +4426,8 @@ bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
             canceled = old_preset_dirty && ! new_preset_compatible && ! may_discard_current_dirty_preset(&dependent, preset_name);
         if (! canceled) {
             // The preset will be switched to a different, compatible preset, or the '-- default --'.
-            m_dependent_tabs.emplace_back((printer_technology == ptFFF) ? Preset::Type::TYPE_FILAMENT : Preset::Type::TYPE_SLA_MATERIAL);
+            m_dependent_tabs.emplace_back((printer_technology == ptFFF || printer_technology == ptFiber) ? Preset::Type::TYPE_FILAMENT : 
+                                          (printer_technology == ptSLM) ? Preset::Type::TYPE_SLM_MATERIAL : Preset::Type::TYPE_SLA_MATERIAL);
             if (old_preset_dirty && ! new_preset_compatible)
                 dependent.discard_current_changes();
         }
@@ -6112,59 +6584,190 @@ void TabSLAPrint::clear_pages()
     m_support_object_elevation_description_line = nullptr;
 }
 
-void TabFiber::build()
+void TabSLMPrint::build()
 {
-    m_presets = &m_preset_bundle->prints;
+    m_presets = &m_preset_bundle->slm_prints;
     load_initial_data();
 
-    // Note: Fiber options are now included in Preset::print_options(), so they are automatically
-    // initialized with default values when the preset is created (same convention as FFF/SLA).
-    // No manual initialization needed here - following the same pattern as TabPrint and TabSLAPrint.
+    // Laser Parameters Page
+    auto page = add_options_page(L("Laser Parameters"), "cog");
+    auto optgroup = page->new_optgroup(L("Laser Settings"));
+    optgroup->append_single_option_line("slm_laser_power");
+    optgroup->append_single_option_line("slm_laser_speed");
+    optgroup->append_single_option_line("slm_exposure_time");
+    optgroup->append_single_option_line("slm_point_distance");
 
-    // Use existing icon names that are known to work (same as TabPrint uses)
-    // This prevents issues with missing icons causing invalid window dimensions
-    auto page = add_options_page(L("Basic Settings"), "cog");
-        auto optgroup = page->new_optgroup(L("Enable Fiber Reinforcement"));
-        optgroup->append_single_option_line("enable_fiber_reinforcement");
-        optgroup->append_single_option_line("fiber_type");
-        optgroup->append_single_option_line("fiber_print_method");
+    // Layer Parameters Page
+    page = add_options_page(L("Layer Parameters"), "layers");
+    optgroup = page->new_optgroup(L("Layer Settings"));
+    optgroup->append_single_option_line("slm_layer_thickness");
+    optgroup->append_single_option_line("slm_layer_cooling_time");
+    optgroup->append_single_option_line("slm_layer_addition_time");
 
-    page = add_options_page(L("Placement"), "layers");
-        optgroup = page->new_optgroup(L("Pattern"));
-        optgroup->append_single_option_line("fiber_pattern");
-        optgroup->append_single_option_line("fiber_spacing");
-        optgroup->append_single_option_line("fiber_angle");
-        optgroup->append_single_option_line("fiber_placement_zone");
+    // Hatch Pattern Page
+    page = add_options_page(L("Hatch Pattern"), "layers");
+    optgroup = page->new_optgroup(L("Pattern Settings"));
+    optgroup->append_single_option_line("slm_hatch_pattern");
+    optgroup->append_single_option_line("slm_hatch_spacing");
+    optgroup->append_single_option_line("slm_hatch_angle");
+    optgroup->append_single_option_line("slm_contour_first");
 
-        optgroup = page->new_optgroup(L("Layer Selection"));
-        optgroup->append_single_option_line("fiber_layer_interval");
-        optgroup->append_single_option_line("fiber_start_layer");
-        optgroup->append_single_option_line("fiber_end_layer");
+    // Scan Strategy Page
+    page = add_options_page(L("Scan Strategy"), "cog");
+    optgroup = page->new_optgroup(L("Scan Settings"));
+    optgroup->append_single_option_line("slm_scan_mode");
+    optgroup->append_single_option_line("slm_scan_vector_spacing");
+    optgroup->append_single_option_line("slm_rotation_angle");
 
-    page = add_options_page(L("Extruders"), "printer");
-        optgroup = page->new_optgroup(L("Extruder Assignment"));
-        optgroup->append_single_option_line("plastic_extruder_id");
-        optgroup->append_single_option_line("fiber_extruder_id");
-        optgroup->append_single_option_line("embedded_fiber_extruder_id");
+    // Supports Page (similar to SLA)
+    page = add_options_page(L("Supports"), "support");
+    optgroup = page->new_optgroup(L("Supports"));
+    optgroup->append_single_option_line("supports_enable");
+    optgroup->append_single_option_line("support_tree_type");
+    optgroup->append_single_option_line("support_enforcers_only");
+    
+    // Build SLA-style support parameters (SLM uses same support structure as SLA)
+    // Note: We can't call TabSLAPrint::build_sla_support_params directly, so we'll build the support options manually
+    optgroup = page->new_optgroup(L("Support head"));
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_head_front_diameter");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_head_penetration");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_head_width");
 
-    page = add_options_page(L("Print Sequence"), "cog");
-        optgroup = page->new_optgroup(L("Sequence"));
-        optgroup->append_single_option_line("fiber_print_sequence");
-        optgroup->append_single_option_line("fiber_delay_after_plastic");
-        optgroup->append_single_option_line("fiber_cooling_time");
-        optgroup->append_single_option_line("fiber_wait_for_cooling");
+    optgroup = page->new_optgroup(L("Support pillar"));
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_pillar_diameter");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_small_pillar_diameter_percent");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_max_bridges_on_pillar");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_pillar_connection_mode");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_buildplate_only");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_pillar_widening_factor");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_max_weight_on_model");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_base_diameter");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_base_height");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_base_safety_distance");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_object_elevation");
 
-    page = add_options_page(L("Speed and Control"), "time");
-        optgroup = page->new_optgroup(L("Speed"));
-        optgroup->append_single_option_line("fiber_speed");
-        optgroup->append_single_option_line("fiber_pressure");
+    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_critical_angle");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_max_bridge_length");
+    add_options_into_line(optgroup, {{"", L("Default")}, {"branching", L("Branching")}}, "support_max_pillar_link_distance");
 
-    page = add_options_page(L("G-code"), "cog");
-        optgroup = page->new_optgroup(L("G-code Commands"));
-        optgroup->append_single_option_line("fiber_start_command");
-        optgroup->append_single_option_line("fiber_stop_command");
-        optgroup->append_single_option_line("fiber_speed_command");
-        optgroup->append_single_option_line("fiber_enable_comments");
+    // Pad Page (similar to SLA)
+    page = add_options_page(L("Pad"), "pad");
+    optgroup = page->new_optgroup(L("Pad"));
+    optgroup->append_single_option_line("pad_enable");
+    optgroup->append_single_option_line("pad_wall_thickness");
+    optgroup->append_single_option_line("pad_wall_height");
+    optgroup->append_single_option_line("pad_brim_size");
+    optgroup->append_single_option_line("pad_max_merge_distance");
+    optgroup->append_single_option_line("pad_wall_slope");
+    optgroup->append_single_option_line("pad_around_object");
+    optgroup->append_single_option_line("pad_around_object_everywhere");
+    optgroup->append_single_option_line("pad_object_gap");
+    optgroup->append_single_option_line("pad_object_connector_stride");
+    optgroup->append_single_option_line("pad_object_connector_width");
+    optgroup->append_single_option_line("pad_object_connector_penetration");
+
+    // Export Format Page
+    page = add_options_page(L("Output options"), "output+page_white");
+    optgroup = page->new_optgroup(L("Export Format"));
+    optgroup->append_single_option_line("slm_export_format");
+    Option option = optgroup->get_option("output_filename_format");
+    option.opt.full_width = true;
+    optgroup->append_single_option_line(option);
+
+    // Dependencies Page
+    page = add_options_page(L("Dependencies"), "wrench");
+    optgroup = page->new_optgroup(L("Profile dependencies"));
+
+    create_line_with_widget(optgroup.get(), "compatible_printers", "", [this](wxWindow* parent) {
+        return compatible_widget_create(parent, m_compatible_printers);
+    });
+
+    option = optgroup->get_option("compatible_printers_condition");
+    option.opt.full_width = true;
+    optgroup->append_single_option_line(option);
+
+    build_preset_description_line(optgroup.get());
+}
+
+void TabSLMPrint::update()
+{
+    if (m_preset_bundle->printers.get_selected_preset().printer_technology() == ptFFF ||
+        m_preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA)
+        return;
+
+    m_update_cnt++;
+
+    Layout();
+
+    m_update_cnt--;
+
+    if (m_update_cnt == 0) {
+        toggle_options();
+
+        if (!wxGetApp().plater()->inside_snapshot_capture())
+            wxGetApp().obj_list()->update_and_show_object_settings_item();
+
+        wxGetApp().mainframe->on_config_changed(m_config);
+    }
+}
+
+void TabSLMPrint::toggle_options()
+{
+    if (m_active_page)
+        m_config_manipulation.toggle_print_slm_options(m_config);
+}
+
+void TabSLMPrint::clear_pages()
+{
+    Tab::clear_pages();
+}
+
+void TabSLMMaterial::build()
+{
+    m_presets = &m_preset_bundle->slm_materials;
+    load_initial_data();
+
+    auto page = add_options_page(L("Material"), "resin");
+    auto optgroup = page->new_optgroup(L("Powder Material"));
+    
+    optgroup->append_single_option_line("slm_material_colour");
+    optgroup->append_single_option_line("slm_material_type");
+    optgroup->append_single_option_line("slm_material_density");
+    optgroup->append_single_option_line("slm_material_vendor");
+    
+    page = add_options_page(L("Notes"), "note");
+    optgroup = page->new_optgroup(L("Notes"), 0);
+    Option option = optgroup->get_option("slm_material_notes");
+    option.opt.full_width = true;
+    option.opt.height = 25;
+    optgroup->append_single_option_line(option);
+    
+    page = add_options_page(L("Dependencies"), "wrench");
+    optgroup = page->new_optgroup(L("Profile dependencies"));
+    build_preset_description_line(optgroup.get());
+}
+
+void TabSLMMaterial::update()
+{
+    if (m_preset_bundle->printers.get_selected_preset().printer_technology() != ptSLM)
+        return;
+
+    m_update_cnt++;
+    Layout();
+    m_update_cnt--;
+
+    if (m_update_cnt == 0) {
+        toggle_options();
+        if (!wxGetApp().plater()->inside_snapshot_capture())
+            wxGetApp().obj_list()->update_and_show_object_settings_item();
+        wxGetApp().mainframe->on_config_changed(m_config);
+    }
+}
+
+void TabSLMMaterial::clear_pages()
+{
+    Tab::clear_pages();
 }
 
 ConfigManipulation Tab::get_config_manipulation()

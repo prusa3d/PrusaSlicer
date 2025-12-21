@@ -100,7 +100,17 @@ doc/fiber/Phase*_Summary.md
 doc/fiber/Phase*_Implementation_Status.md
 doc/fiber/Implementation_Status.md
 doc/fiber/*_Implementation_Roadmap.md
+doc/fiber/*Roadmap*.md
 doc/fiber/Phase*_*.md
+doc/fiber/Phase*_Plan.md
+doc/fiber/TODO_*.md
+doc/fiber/test_summary.md
+doc/fiber/WORK_SAMPLE.md
+doc/fiber/TECHNICAL_SUMMARY_FOR_EXPERT.md
+doc/fiber/REPOSITORY_HIGHLIGHTS.md
+doc/fiber/images/*Roadmap*.png
+doc/fiber/images/*Roadmap*.jpg
+doc/fiber/images/*Roadmap*.jpeg
 
 # Email templates and personal communication files
 doc/fiber/*EMAIL*.md
@@ -108,6 +118,8 @@ doc/fiber/HONEST_EMAIL*.md
 doc/fiber/FOLLOW_UP*.md
 LinkedIn_Message*.md
 LinkedIn_Message_Endless*.md
+Follow_Up_Cover_Letter*.md
+Cover_Letter*.md
 
 # GUI debugging and implementation history files
 doc/fiber/GUI_CRASH_DEBUG.md
@@ -115,6 +127,20 @@ doc/fiber/GUI_implementation_history.md
 
 # Build troubleshooting (local documentation)
 doc/fiber/BUILD_TROUBLESHOOTING.md
+
+# Debugging documentation (local development)
+Debug_PrusaSlicer.md
+
+# Phase implementation summaries and status files (internal documentation) - SLM
+doc/slm/Phase*_Summary.md
+doc/slm/Phase*_Implementation_Status.md
+doc/slm/Implementation_Status.md
+doc/slm/*_Implementation_Roadmap.md
+doc/slm/*_Roadmap*.md
+doc/slm/Phase*_*.md
+doc/slm/*_GUI_Implementation_Status.md
+doc/slm/*_TAB_ARCHITECTURE*.md
+doc/slm/TODO_*.md
 
 # Original PrusaSlicer clone (for comparison)
 PrusaSlicer_original/

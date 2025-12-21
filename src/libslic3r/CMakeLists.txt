@@ -346,6 +346,14 @@ set(SLIC3R_SOURCES
     FiberPrintSteps.cpp
     FiberPrintSteps.hpp
     FiberPrint.hpp
+    SLMPrint.cpp
+    SLMPrintSteps.cpp
+    SLMPrintSteps.hpp
+    SLMPrint.hpp
+    SLMScanPath.cpp
+    SLMScanPath.hpp
+    SLMExporter.cpp
+    SLMExporter.hpp
     Fiber/FiberLayer.cpp
     Fiber/FiberLayer.hpp
     Fiber/FiberPrintObject.cpp
@@ -675,6 +683,60 @@ endif ()
 
 if (TARGET OpenVDB::openvdb)
     target_link_libraries(libslic3r PUBLIC OpenVDB::openvdb)
+endif()
+
+# Integrate libSLM for SLM file format support
+# libSLM can be built as either SLM_static (when BUILD_PYTHON=ON) or SLM (when BUILD_PYTHON=OFF)
+# libSLM headers use paths like <App/Layer.h> relative to src/libSLM
+# SLM_Export.h is generated in the binary directory
+set(LIBSLM_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/libSLM")
+set(LIBSLM_BINARY_DIR "${CMAKE_BINARY_DIR}/src/libSLM")
+
+if (TARGET SLM_static)
+    target_include_directories(libslic3r PUBLIC 
+        ${LIBSLM_SOURCE_DIR}
+        ${LIBSLM_BINARY_DIR}
+    )
+    target_link_libraries(libslic3r PRIVATE SLM_static)
+    # Link translator libraries needed for SLM export
+    if (TARGET Realizer_static)
+        target_link_libraries(libslic3r PRIVATE Realizer_static)
+    endif()
+    if (TARGET SLMSol_static)
+        target_link_libraries(libslic3r PRIVATE SLMSol_static)
+    endif()
+    if (TARGET EOS_static)
+        target_link_libraries(libslic3r PRIVATE EOS_static)
+    endif()
+    if (TARGET MTT_static)
+        target_link_libraries(libslic3r PRIVATE MTT_static)
+    endif()
+    if (TARGET CLI_static)
+        target_link_libraries(libslic3r PRIVATE CLI_static)
+    endif()
+elseif (TARGET SLM)
+    # When BUILD_PYTHON is OFF, libSLM is built as a shared library
+    target_include_directories(libslic3r PUBLIC 
+        ${LIBSLM_SOURCE_DIR}
+        ${LIBSLM_BINARY_DIR}
+    )
+    target_link_libraries(libslic3r PRIVATE SLM)
+    # Link translator libraries needed for SLM export
+    if (TARGET Realizer)
+        target_link_libraries(libslic3r PRIVATE Realizer)
+    endif()
+    if (TARGET SLMSol)
+        target_link_libraries(libslic3r PRIVATE SLMSol)
+    endif()
+    if (TARGET EOS)
+        target_link_libraries(libslic3r PRIVATE EOS)
+    endif()
+    if (TARGET MTT)
+        target_link_libraries(libslic3r PRIVATE MTT)
+    endif()
+    if (TARGET CLI)
+        target_link_libraries(libslic3r PRIVATE CLI)
+    endif()
 endif()
 
 if(WIN32)

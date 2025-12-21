@@ -76,7 +76,7 @@ public:
     
     virtual ~FiberPrint() override { this->clear(); }
     
-    PrinterTechnology technology() const noexcept override { return ptFFF; } // Fiber uses FFF base technology
+    PrinterTechnology technology() const noexcept override { return ptFiber; }
     
     void clear() override;
     bool empty() const override { return m_objects.empty(); }

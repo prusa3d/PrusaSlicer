@@ -819,12 +819,14 @@ void MainFrame::create_preset_tabs()
     add_created_tab(new TabSLAPrint(m_tabpanel), "cog");
     add_created_tab(new TabSLAMaterial(m_tabpanel), "resin");
     
-    // Fiber tab (separate category)
-    // NOTE: Using "cog" icon temporarily - "fiber" icon doesn't exist yet
-    add_created_tab(new TabFiber(m_tabpanel), "cog");
+    // SLM tabs
+    add_created_tab(new TabSLMPrint(m_tabpanel), "cog");
+    add_created_tab(new TabSLMMaterial(m_tabpanel), "resin");
     
     // Printer tab (common to all)
-    add_created_tab(new TabPrinter(m_tabpanel), wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF ? "printer" : "sla_printer");
+    PrinterTechnology tech = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
+    std::string printer_icon = (tech == ptSLA || tech == ptSLM) ? "sla_printer" : "printer";
+    add_created_tab(new TabPrinter(m_tabpanel), printer_icon);
     
     m_printables_webview = new PrintablesWebViewPanel(m_tabpanel);
     add_printables_webview_tab();
@@ -1899,7 +1901,9 @@ void MainFrame::update_menubar()
     if (wxGetApp().is_gcode_viewer())
         return;
 
-    const bool is_fff = plater()->printer_technology() == ptFFF;
+    const PrinterTechnology tech = plater()->printer_technology();
+    const bool is_fff = tech == ptFFF || tech == ptFiber;
+    const bool is_sla_or_slm = tech == ptSLA || tech == ptSLM;
 
     m_changeable_menu_items[miExport]       ->SetItemLabel((is_fff ? _L("Export &G-code")         : _L("E&xport"))        + dots    + "\tCtrl+G");
     m_changeable_menu_items[miSend]         ->SetItemLabel((is_fff ? _L("S&end G-code")           : _L("S&end to print")) + dots    + "\tCtrl+Shift+G");
@@ -1907,7 +1911,7 @@ void MainFrame::update_menubar()
     m_changeable_menu_items[miMaterialTab]  ->SetItemLabel((is_fff ? _L("&Filament Settings Tab") : _L("Mate&rial Settings Tab"))   + "\tCtrl+3");
     m_changeable_menu_items[miMaterialTab]  ->SetBitmap(*get_bmp_bundle(is_fff ? "spool"   : "resin"));
 
-    m_changeable_menu_items[miPrinterTab]   ->SetBitmap(*get_bmp_bundle(is_fff ? "printer" : "sla_printer"));
+    m_changeable_menu_items[miPrinterTab]   ->SetBitmap(*get_bmp_bundle(is_sla_or_slm ? "sla_printer" : "printer"));
 }
 
 

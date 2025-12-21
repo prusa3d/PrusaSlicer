@@ -18,6 +18,7 @@
 #include "libslic3r/PrintBase.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/SLMPrint.hpp"
 #include "libslic3r/FiberPrint.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
@@ -30,6 +31,7 @@ namespace Slic3r {
 class DynamicPrintConfig;
 class Model;
 class SLAPrint;
+class SLMPrint;
 
 class SlicingStatusEvent : public wxEvent
 {
@@ -92,6 +94,7 @@ public:
 	void set_temp_output_path(int bed_idx);
 	void set_fff_print(Print* print) { if (m_fff_print != print) stop(); m_fff_print = print; }
     void set_sla_print(SLAPrint *print) { if (m_sla_print != print) stop(); m_sla_print = print; }
+    void set_slm_print(SLMPrint *print) { if (m_slm_print != print) stop(); m_slm_print = print; }
     void set_fiber_print(FiberPrint *print) { if (m_fiber_print != print) stop(); m_fiber_print = print; }
 	void set_thumbnail_cb(ThumbnailsGeneratorCallback cb) { m_thumbnail_cb = cb; }
 	void set_gcode_result(GCodeProcessorResult* result) { m_gcode_result = result; }
@@ -120,6 +123,7 @@ public:
 	const PrintBase*    current_print() const { return m_print; }
 	const Print* 		fff_print() const { return m_fff_print; }
 	const SLAPrint* 	sla_print() const { return m_sla_print; }
+	const SLMPrint* 	slm_print() const { return m_slm_print; }
 	const FiberPrint*   fiber_print() const { return m_fiber_print; }
     // Take the project path (if provided), extract the name of the project, run it through the macro processor and save it next to the project file.
     // If the project_path is empty, just run output_filepath().
@@ -181,7 +185,7 @@ public:
     // The "finished" flag is reset by the apply() method, if it changes the state of the print.
     // This "finished" flag does not account for the final export of the output file (.gcode or zipped PNGs),
     // and it does not account for the OctoPrint scheduling.
-    bool    finished() const { return m_print->finished(); }
+    bool    finished() const { return m_print != nullptr && m_print->finished(); }
 	void finalize_gcode(const std::string &path, const bool path_on_removable_media);
     void prepare_upload(PrintHostJob &upload_job);
 
@@ -228,6 +232,7 @@ private:
 	// Non-owned pointers to Print instances.
 	Print 					   *m_fff_print 		 = nullptr;
 	SLAPrint 				   *m_sla_print			 = nullptr;
+	SLMPrint 				   *m_slm_print			 = nullptr;
 	FiberPrint				   *m_fiber_print		 = nullptr;
 	// Data structure, to which the G-code export writes its annotations.
 	GCodeProcessorResult     *m_gcode_result 		 = nullptr;
@@ -275,7 +280,7 @@ private:
 	bool                invalidate_step(BackgroundSlicingProcessStep step);
     bool                invalidate_all_steps();
     // If the background processing stop was requested, throw CanceledException.
-    void                throw_if_canceled() const { if (m_print->canceled()) throw CanceledException(); }
+    void                throw_if_canceled() const { if (m_print != nullptr && m_print->canceled()) throw CanceledException(); }
     // To be executed at the background thread.
 	ThumbnailsList		render_thumbnails(const ThumbnailsParams &params);
 	// Execute task from background thread on the UI thread synchronously. Returns true if processed, false if cancelled before executing the task.
