@@ -472,6 +472,8 @@ public:
         return ret;
     }
 
+    // Warning mitigation: Indicate that virtual serialize() is not forgotten
+    using ConfigOption::serialize;
 private:
 	friend class cereal::access;
 	template<class Archive> void serialize(Archive & ar) { ar(this->value); }
@@ -693,6 +695,8 @@ public:
         return modified;
     }
 
+    // Warning mitigation: Indicate that virtual serialize() is not forgotten
+    using ConfigOptionVectorBase::serialize;
 private:
 	friend class cereal::access;
 	template<class Archive> void serialize(Archive & ar) { ar(this->values); }
@@ -711,7 +715,10 @@ public:
     ConfigOption*           clone()     const override { return new ConfigOptionFloatTempl(*this); }
     bool                    operator==(const ConfigOptionFloatTempl &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionFloatTempl &rhs) const throw() { return this->value <  rhs.value; }
-    
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionSingle<double, NULLABLE>::operator ==;
+
     std::string serialize() const override
     {
         std::ostringstream ss;
@@ -791,6 +798,9 @@ public:
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (! std::isnan(v)) return false; return true; }
     bool 					is_nil(size_t idx) const override { return std::isnan(this->values[idx < values.size() ? idx : 0]); }
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionVector<double>::operator ==;
 
     std::string serialize() const override
     {
@@ -905,7 +915,10 @@ public:
     void                    setInt(int val) override { this->value = val; }
     ConfigOption*           clone()  const override { return new ConfigOptionIntTempl(*this); }
     bool                    operator==(const ConfigOptionIntTempl &rhs) const throw() { return this->value == rhs.value; }
-    
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten.
+    using ConfigOptionSingle<int, NULLABLE>::operator ==;
+
     std::string serialize() const override 
     {
         std::ostringstream ss;
@@ -975,6 +988,9 @@ public:
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
     bool 					is_nil(size_t idx) const override { return values[idx < this->values.size() ? idx : 0] == nil_value(); }
     std::vector<int>        getInts() const override { return this->values; }
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionVector<int>::operator ==;
 
     std::string serialize() const override
     {
@@ -1054,6 +1070,9 @@ public:
     bool                    operator< (const ConfigOptionString &rhs) const throw() { return this->value <  rhs.value; }
     bool 					empty() const { return this->value.empty(); }
 
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionSingle<std::string>::operator ==;
+
     std::string serialize() const override
     { 
         return escape_string_cstyle(this->value); 
@@ -1088,6 +1107,9 @@ public:
     bool                    operator< (const ConfigOptionStrings &rhs) const throw() { return this->values <  rhs.values; }
     bool					is_nil(size_t) const override { return false; }
 
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionVector<std::string>::operator ==;
+
     std::string serialize() const override
     {
         return escape_strings_cstyle(this->values);
@@ -1104,7 +1126,6 @@ public:
             this->values.clear();
         return unescape_strings_cstyle(str, this->values);
     }
-
 private:
 	friend class cereal::access;
 	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionVector<std::string>>(this)); }
@@ -1123,8 +1144,11 @@ public:
     bool                    operator==(const ConfigOptionPercent &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionPercent &rhs) const throw() { return this->value <  rhs.value; }
 
-    double                  get_abs_value(double ratio_over) const { return ratio_over * this->value / 100; }
-    
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionFloat::operator ==;
+
+    double get_abs_value(double ratio_over) const { return ratio_over * this->value / 100; }
+
     std::string serialize() const override 
     {
         std::ostringstream ss;
@@ -1164,6 +1188,9 @@ public:
     ConfigOptionPercentsTempl& operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionPercentsTempl &rhs) const throw() { return ConfigOptionFloatsTempl<NULLABLE>::vectors_equal(this->values, rhs.values); }
     bool                    operator< (const ConfigOptionPercentsTempl &rhs) const throw() { return ConfigOptionFloatsTempl<NULLABLE>::vectors_lower(this->values, rhs.values); }
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionFloatsTempl<NULLABLE>::operator ==;
 
     std::string serialize() const override
     {
@@ -1239,6 +1266,9 @@ public:
         *this = *static_cast<const ConfigOptionFloatOrPercent*>(rhs);
     }
 
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionPercent::operator ==;
+
     std::string serialize() const override
     {
         std::ostringstream ss;
@@ -1282,6 +1312,9 @@ public:
         assert(dynamic_cast<const ConfigOptionVector<FloatOrPercent>*>(&rhs));
         return vectors_equal(this->values, static_cast<const ConfigOptionVector<FloatOrPercent>*>(&rhs)->values);
     }
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionVector<FloatOrPercent>::operator ==;
+
     bool                    operator< (const ConfigOptionFloatsOrPercentsTempl &rhs) const throw() { return vectors_lower(this->values, rhs.values); }
 
     // Could a special "nil" value be stored inside the vector, indicating undefined value?
@@ -1405,6 +1438,9 @@ public:
     bool                    operator==(const ConfigOptionPoint &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionPoint &rhs) const throw() { return this->value <  rhs.value; }
 
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionSingle<Vec2d>::operator ==;
+
     std::string serialize() const override
     {
         std::ostringstream ss;
@@ -1443,6 +1479,9 @@ public:
     bool                    operator< (const ConfigOptionPoints &rhs) const throw() 
         { return std::lexicographical_compare(this->values.begin(), this->values.end(), rhs.values.begin(), rhs.values.end(), [](const auto &l, const auto &r){ return l < r; }); }
     bool					is_nil(size_t) const override { return false; }
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionVector<Vec2d>::operator ==;
 
     std::string serialize() const override
     {
@@ -1517,6 +1556,9 @@ public:
     bool                    operator< (const ConfigOptionPoint3 &rhs) const throw() 
         { return this->value.x() < rhs.value.x() || (this->value.x() == rhs.value.x() && (this->value.y() < rhs.value.y() || (this->value.y() == rhs.value.y() && this->value.z() < rhs.value.z()))); }
 
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionSingle<Vec3d>::operator ==;
+
     std::string serialize() const override
     {
         std::ostringstream ss;
@@ -1554,6 +1596,9 @@ public:
     ConfigOptionBool&       operator=(const ConfigOption *opt) { this->set(opt); return *this; }
     bool                    operator==(const ConfigOptionBool &rhs) const throw() { return this->value == rhs.value; }
     bool                    operator< (const ConfigOptionBool &rhs) const throw() { return int(this->value) < int(rhs.value); }
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionSingle<bool>::operator ==;
 
     std::string serialize() const override
     {
@@ -1603,6 +1648,9 @@ public:
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
     bool 					is_nil(size_t idx) const override { return this->values[idx < values.size() ? idx : 0] == nil_value(); }
+
+    // Warning mitigation: Indicate that virtual operator == is not forgotten
+    using ConfigOptionVector<unsigned char>::operator ==;
 
     bool& get_at(size_t i) {
         assert(! this->values.empty());
