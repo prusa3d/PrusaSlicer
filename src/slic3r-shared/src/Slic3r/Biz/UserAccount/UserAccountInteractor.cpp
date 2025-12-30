@@ -179,8 +179,6 @@ void UserAccountInteractor::on_action_success(ActionSuccessType success_type, st
             update_menu_callback(false);
         }
         break;
-    case Slic3r::Biz::UserAccount::ActionSuccessType::ConnectStatus:
-        break;
     case Slic3r::Biz::UserAccount::ActionSuccessType::ConnectPrinterModels:
         break;
     case Slic3r::Biz::UserAccount::ActionSuccessType::Avatar:
@@ -189,6 +187,9 @@ void UserAccountInteractor::on_action_success(ActionSuccessType success_type, st
             update_menu_callback(true);
         }
         invoke_listeners<IUserAccountListener>([](auto* l) { l->on_avatar_downloaded(); });
+        break;
+    case Slic3r::Biz::UserAccount::ActionSuccessType::ConnectPrinterStates:
+        m_connect_printer_state_monitor.on_full_printer_states(body, m_communication->user_id(), m_communication->access_token());
         break;
     case Slic3r::Biz::UserAccount::ActionSuccessType::PrinterData:
         break;
@@ -246,6 +247,7 @@ void UserAccountInteractor::on_logged_out(bool notify_owner, bool was_logged_in)
     if (!was_logged_in) {
         return;
     }
+    m_connect_printer_state_monitor.on_logged_out();
     invoke_listeners<IUserAccountListener>(
         [](auto* listener) { listener->on_user_account_logged_out(); }
     );
@@ -287,6 +289,8 @@ void UserAccountInteractor::on_user_id(const std::string& body)
             received_keys += key;
             if (value.is_string()) {
                 m_account_user_data[key] = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                m_account_user_data[key] = std::to_string(value.get<int>());
             }
         }
     } catch (const nlohmann::json::exception&) {
@@ -299,7 +303,8 @@ void UserAccountInteractor::on_user_id(const std::string& body)
         return;
     }
     std::string public_username = m_account_user_data["public_username"];
-    m_communication->on_username_changed(public_username, true);
+    const std::string id = m_account_user_data["id"];
+    m_communication->on_username_changed(public_username, id, true);
 
     if (m_account_user_data.find("email") != m_account_user_data.end()) {
         m_communication->on_email(m_account_user_data["email"]);
@@ -314,8 +319,10 @@ void UserAccountInteractor::on_user_id(const std::string& body)
     } else {
         SPDLOG_ERROR("User ID message from PrusaAuth did not contain avatar info.");
     }
-    // update printers list
-    // enqueue_connect_printer_models_action();
+   
+    if (!was_logged) {
+        m_communication->enqueue_connect_printer_states_action();
+    }
 
     invoke_listeners<IUserAccountListener>(
         [was_logged, public_username](auto* listener)

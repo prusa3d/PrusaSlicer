@@ -1075,6 +1075,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Network/TCPConsole.hpp
         include/Slic3r/Biz/Network/ServiceConfig.hpp
         include/Slic3r/Biz/Network/Jwt.hpp
+        include/Slic3r/Biz/Network/MqttSubscriber.hpp
         src/Slic3r/Biz/Network/IHttp.cpp
         src/Slic3r/Biz/Network/HttpCurl.cpp
         src/Slic3r/Biz/Network/Bonjour.cpp
@@ -1082,6 +1083,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Network/ServiceConfig.cpp
         src/Slic3r/Biz/Network/Jwt.cpp
         src/Slic3r/Biz/Network/HttpCurlFactory.cpp
+        src/Slic3r/Biz/Network/MqttSubscriber.cpp
 
         include/Slic3r/Biz/SLAResultCache.hpp
         src/Slic3r/Biz/SLAResultCache.cpp
@@ -1107,6 +1109,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/UserAccount/UserAccountTokenLog.hpp
         include/Slic3r/Biz/UserAccount/UserAccountCodeChallengeGenerator.hpp
         include/Slic3r/Biz/UserAccount/ConnectUtils.hpp
+        include/Slic3r/Biz/UserAccount/ConnectPrinterStateMonitor.hpp
         src/Slic3r/Biz/UserAccount/UserAccountInteractor.cpp
         src/Slic3r/Biz/UserAccount/UserAccountCommunication.cpp
         src/Slic3r/Biz/UserAccount/UserAccountSession.cpp
@@ -1116,6 +1119,7 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/UserAccount/UserAccountTokenStore.cpp
         src/Slic3r/Biz/UserAccount/UserAccountCodeChallengeGenerator.cpp
         src/Slic3r/Biz/UserAccount/ConnectUtils.cpp
+        src/Slic3r/Biz/UserAccount/ConnectPrinterStateMonitor.cpp
 
         include/Slic3r/Biz/Connect/IConnectHandlerListener.hpp
         include/Slic3r/Biz/Connect/ConnectMessageHandler.hpp
@@ -1444,6 +1448,7 @@ find_package(yoga CONFIG REQUIRED)
 find_package(nlohmann_json 3.11 REQUIRED)
 find_package(EXPAT CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
+find_package(PahoMqttCpp REQUIRED)
 
 if (APPLE)
     set(USE_NATIVE_MENU_DEFINE "-DUSE_NATIVE_MENU")
@@ -1528,6 +1533,7 @@ target_link_libraries(slic3r-shared PUBLIC
         range-v3::range-v3
         libcereal
         libdeflate::libdeflate_static
+        PahoMqttCpp::paho-mqttpp3-static
 )
 target_compile_definitions(slic3r-shared PUBLIC ${SLIC3R_YAML_DEFINE} ${USE_NATIVE_MENU_DEFINE})
 if (SLIC3R_SENTRY_DSN)

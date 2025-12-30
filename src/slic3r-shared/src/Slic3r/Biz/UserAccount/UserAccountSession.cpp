@@ -137,7 +137,7 @@ void UserAccountSession::process_action_queue()
         if (!m_processing_enabled) {
             return;
         }
-        // SPDLOG_INFO("action queue: {} {}", m_priority_action_queue.size(), m_action_queue.size());
+        SPDLOG_DEBUG("action queue: {} {}", m_priority_action_queue.size(), m_action_queue.size());
     }
     m_global_cancel = false;
     process_action_queue_inner();

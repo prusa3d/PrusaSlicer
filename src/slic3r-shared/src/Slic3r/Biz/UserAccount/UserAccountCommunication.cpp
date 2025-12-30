@@ -31,8 +31,8 @@ std::string get_code_from_message(const std::string& url_message)
 }
 } // namespace
 
-UserAccountCommunication::UserAccountCommunication(Platform::IMainThreadDispatcher& dispatcher) :
-    UserAccountCommunicationTokenBase{dispatcher}
+UserAccountCommunication::UserAccountCommunication(Platform::IMainThreadDispatcher& dispatcher)
+    : UserAccountCommunicationTokenBase{dispatcher}
 {}
 
 void UserAccountCommunication::do_log_out(bool notify_owner)
