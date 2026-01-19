@@ -417,8 +417,19 @@ case type: \
         WX_ERROR_CASE(wxWEBVIEW_NAV_ERR_OTHER);
     }
 
-    BOOST_LOG_TRIVIAL(error) << "WebViewDialog error: " << category;
-    load_error_page();
+    BOOST_LOG_TRIVIAL(error) << "WebViewDialog error: " << category << " for URL: " << evt.GetURL();
+    
+    // Don't treat wxWEBVIEW_NAV_ERR_OTHER as fatal - it often occurs for cancelled 
+    // subresource requests while the main page continues loading successfully.
+    // Only show error page for serious errors like connection or certificate failures.
+    int err = evt.GetInt();
+    if (err == wxWEBVIEW_NAV_ERR_CONNECTION || 
+        err == wxWEBVIEW_NAV_ERR_CERTIFICATE ||
+        err == wxWEBVIEW_NAV_ERR_AUTH ||
+        err == wxWEBVIEW_NAV_ERR_SECURITY) {
+        load_error_page();
+    }
+    // For wxWEBVIEW_NAV_ERR_OTHER, wxWEBVIEW_NAV_ERR_REQUEST, etc. - just log and continue
 }
 
 void WebViewDialog::load_error_page()
