@@ -417,7 +417,7 @@ case type: \
         WX_ERROR_CASE(wxWEBVIEW_NAV_ERR_OTHER);
     }
 
-    BOOST_LOG_TRIVIAL(error) << "WebViewDialog error: " << category << " for URL: " << evt.GetURL();
+    BOOST_LOG_TRIVIAL(error) << "WebViewDialog error: " << category;
     
     // Don't treat wxWEBVIEW_NAV_ERR_OTHER as fatal - it often occurs for cancelled 
     // subresource requests while the main page continues loading successfully.
