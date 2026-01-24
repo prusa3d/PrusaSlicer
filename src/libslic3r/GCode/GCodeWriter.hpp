@@ -135,10 +135,10 @@ public:
     static bool supports_separate_travel_acceleration(GCodeFlavor flavor);
 
     // To be called by the CoolingBuffer from another thread.
-    static std::string set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed);
+    static std::string set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed, unsigned int index = 0);
     // To be called by the main thread. It always emits the G-code, it does not remember the previous state.
     // Keeping the state is left to the CoolingBuffer, which runs asynchronously on another thread.
-    std::string set_fan(unsigned int speed) const;
+    std::string set_fan(unsigned int speed, unsigned int index = 0) const;
 
 private:
 	// Extruders are sorted by their ID, so that binary search is possible.

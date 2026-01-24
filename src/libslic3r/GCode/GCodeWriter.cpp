@@ -570,18 +570,26 @@ void GCodeWriter::update_position(const Vec3d &new_pos)
     m_pos = new_pos;
 }
 
-std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed)
+std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed, unsigned int index)
 {
     std::ostringstream gcode;
     if (speed == 0) {
         switch (gcode_flavor) {
         case gcfTeacup:
-            gcode << "M106 S0"; break;
+            gcode << "M106 S0";
+            if(index > 0) {
+                gcode << " P" << index;
+            }
+            break;
         case gcfMakerWare:
         case gcfSailfish:
             gcode << "M127";    break;
         default:
-            gcode << "M107";    break;
+            gcode << "M107";
+            if(index > 0) {
+                gcode << " P" << index;
+            }
+            break;
         }
         if (gcode_comments)
             gcode << " ; disable fan";
@@ -593,9 +601,17 @@ std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comm
             gcode << "M126";    break;
         case gcfMach3:
         case gcfMachinekit:
-            gcode << "M106 P" << 255.0 * speed / 100.0; break;
+            gcode << "M106 P" << 255.0 * speed / 100.0;
+            if(index > 0) {
+                gcode << " T" << index;
+            }
+            break;
         default:
-            gcode << "M106 S" << 255.0 * speed / 100.0; break;
+            gcode << "M106 S" << 255.0 * speed / 100.0;
+            if(index > 0) {
+                gcode << " P" << index;
+            }
+            break;
         }
         if (gcode_comments) 
             gcode << " ; enable fan";
@@ -604,9 +620,9 @@ std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comm
     return gcode.str();
 }
 
-std::string GCodeWriter::set_fan(unsigned int speed) const
+std::string GCodeWriter::set_fan(unsigned int speed, unsigned int index) const
 {
-    return GCodeWriter::set_fan(this->config.gcode_flavor, this->config.gcode_comments, speed);
+    return GCodeWriter::set_fan(this->config.gcode_flavor, this->config.gcode_comments, speed, index);
 }
 
 void GCodeFormatter::emit_axis(const char axis, const double v, size_t digits) {

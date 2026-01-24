@@ -575,7 +575,7 @@ void PrintObject::calculate_overhanging_perimeters()
             pr->collect_object_printing_extruders(*this->print(), extruders);
             auto cfg = this->print()->config();
             if (std::any_of(extruders.begin(), extruders.end(),
-                            [&cfg](unsigned int extruder_id) { return cfg.enable_dynamic_fan_speeds.get_at(extruder_id); })) {
+                            [&cfg](unsigned int extruder_id) { return cfg.enable_dynamic_fan_speeds.get_at(extruder_id) || cfg.enable_dynamic_aux_fan_speeds.get_at(extruder_id); })) {
                 regions_with_dynamic_speeds.insert(pr);
             }
         }

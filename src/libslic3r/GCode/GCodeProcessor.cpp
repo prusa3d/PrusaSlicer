@@ -3511,7 +3511,16 @@ void GCodeProcessor::process_M106(const GCodeReader::GCodeLine& line)
 
 void GCodeProcessor::process_M107(const GCodeReader::GCodeLine& line)
 {
-    m_fan_speed = 0.0f;
+    int tool;
+    if (line.has_value('P', tool)) {
+        if(tool == 1)
+        {
+            m_fan_speed = 0.0f;
+        }
+    } else {
+        // The absence of P means the print cooling fan.
+        m_fan_speed = 0.0f;
+    }
 }
 
 void GCodeProcessor::process_M108(const GCodeReader::GCodeLine& line)
