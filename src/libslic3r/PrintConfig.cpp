@@ -1175,6 +1175,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(20));
 
+    def = this->add("extruder_clearance_offset", coPoints);
+    def->label = L("Offset");
+    def->tooltip = L("Only used when 'Print Settings -> Complete individual objects' is active. This defines the X/Y shift"
+                     "of the nozzle tip relative to the center of the Clearance Radius cylinder. Use this if your nozzle"
+                     "is not centered within your extruder assembly to ensure the collision-free zone is positioned correctly.\n"
+                    "The value is ignored for most Prusa printers, which include a more detailed extruder model.");
+    def->sidetext = L("mm");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionPoints { Vec2d(0,0) });
+
     def = this->add("extruder_colour", coStrings);
     def->label = L("Extruder Color");
     def->tooltip = L("This is only used in the Slic3r interface as a visual help.");
@@ -5621,6 +5631,11 @@ std::string validate(const FullPrintConfig &cfg)
         return "Invalid value for --extruder-clearance-radius";
     if (cfg.extruder_clearance_height <= 0)
         return "Invalid value for --extruder-clearance-height";
+
+    coord_t offset_x = cfg.extruder_offset.values[0].x();
+    coord_t offset_y = cfg.extruder_offset.values[0].y();
+    if ((offset_x * offset_x + offset_y * offset_y) > (cfg.extruder_clearance_radius * cfg.extruder_clearance_radius))
+        return "Invalid value for --extruder-clearance-offset (offset must be within clearance radius)";
 
     // --extrusion-multiplier
     for (double em : cfg.extrusion_multiplier.values)
