@@ -18,6 +18,8 @@ class ArrangeSettingsDialogImgui: public arr2::ArrangeSettingsView {
 
     std::function<void()> m_on_arrange_btn;
     std::function<void()> m_on_arrange_bed_btn;
+    std::function<void()> m_on_sort_print_order_btn;
+    std::function<void()> m_on_sort_bed_print_order_btn;
     std::function<void()> m_on_reset_btn;
 
     std::function<bool()> m_show_xl_combo_predicate = [] { return true; };
@@ -40,6 +42,16 @@ public:
     void on_arrange_bed_btn(std::function<void()> on_arrangefn)
     {
         m_on_arrange_bed_btn = on_arrangefn;
+    }
+
+    void on_sort_print_order_btn(std::function<void()> on_sortfn)
+    {
+        m_on_sort_print_order_btn = on_sortfn;
+    }
+
+    void on_sort_bed_print_order_btn(std::function<void()> on_sortfn)
+    {
+        m_on_sort_bed_print_order_btn = on_sortfn;
     }
 
     void on_reset_btn(std::function<void()> on_resetfn)

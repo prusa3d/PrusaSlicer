@@ -1351,6 +1351,21 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas *canvas, Bed3D &bed)
     m_arrange_settings_dialog.on_arrange_bed_btn([]{
         wxGetApp().plater()->arrange(true);
     });
+
+    // Simple back-to-front, left-to-right sorting
+    std::function<bool(const ModelObject*, const ModelObject*)> comp =
+        [](const ModelObject* a, const ModelObject* b) {
+            const auto& a_bb = a->bounding_box_exact();
+            const auto& b_bb = b->bounding_box_exact();
+            return (a_bb.max.y() != b_bb.max.y()) ? (a_bb.max.y() > b_bb.max.y())
+                                                  : (a_bb.max.x() < b_bb.max.x());
+        };
+    m_arrange_settings_dialog.on_sort_print_order_btn([comp]{
+        wxGetApp().obj_list()->sort_objects(comp, false);
+    });
+    m_arrange_settings_dialog.on_sort_bed_print_order_btn([comp]{
+        wxGetApp().obj_list()->sort_objects(comp, true);
+    });
 }
 
 GLCanvas3D::~GLCanvas3D()
