@@ -51,6 +51,7 @@
 #include <wx/statbmp.h>
 #include <wx/radiobut.h>
 #include <wx/checkbox.h>
+#include <wx/choice.h>
 #include <wx/scrolwin.h>
 #include <wx/filedlg.h>
 #include <wx/dnd.h>
@@ -233,6 +234,7 @@ struct SvgImportOptions
 {
     SvgImportMode import_mode                  = SvgImportMode::Merged;
     std::vector<bool> selected_layers;
+    std::vector<ModelVolumeType> layer_types;
 };
 
 class SvgImportOptionsDialog final : public wxDialog
@@ -245,33 +247,51 @@ public:
     {
         if (m_options.selected_layers.size() != m_layer_names.size())
             m_options.selected_layers.assign(m_layer_names.size(), true);
+        if (m_options.layer_types.size() != m_layer_names.size())
+            m_options.layer_types.assign(m_layer_names.size(), ModelVolumeType::MODEL_PART);
 
         auto *main_sizer = new wxBoxSizer(wxVERTICAL);
+
+        auto *mode_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Import mode"));
+        m_rb_mode_merged = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Merged"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
+        m_rb_mode_layers = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Layers as parts"));
+        mode_box->Add(m_rb_mode_merged, 0, wxALL, 5);
+        mode_box->Add(m_rb_mode_layers, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
+        main_sizer->Add(mode_box, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
         auto *layers_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Layers"));
         m_layers_panel = new wxScrolledWindow(layers_box->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxSize(480, 220), wxVSCROLL | wxTAB_TRAVERSAL);
         m_layers_panel->SetScrollRate(0, 10);
 
-        auto *layers_grid = new wxFlexGridSizer(2, 5, 8);
+        auto *layers_grid = new wxFlexGridSizer(3, 5, 8);
         layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Import")), 0, wxALIGN_CENTER_VERTICAL);
         layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer")), 0, wxALIGN_CENTER_VERTICAL);
+        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Type")), 0, wxALIGN_CENTER_VERTICAL);
         for (size_t i = 0; i < m_layer_names.size(); ++i) {
             wxCheckBox *checkbox = new wxCheckBox(m_layers_panel, wxID_ANY, "");
             checkbox->SetValue(m_options.selected_layers[i]);
             m_layer_checks.push_back(checkbox);
             layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL);
+
             layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i])), 0, wxALIGN_CENTER_VERTICAL);
+
+            wxArrayString type_choices;
+            type_choices.Add(_L("Part"));
+            type_choices.Add(_L("Negative volume"));
+            type_choices.Add(_L("Modifier"));
+            wxChoice *type_choice = new wxChoice(m_layers_panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, type_choices);
+            int sel = 0;
+            if (m_options.layer_types[i] == ModelVolumeType::NEGATIVE_VOLUME)
+                sel = 1;
+            else if (m_options.layer_types[i] == ModelVolumeType::PARAMETER_MODIFIER)
+                sel = 2;
+            type_choice->SetSelection(sel);
+            m_layer_type_choices.push_back(type_choice);
+            layers_grid->Add(type_choice, 0, wxALIGN_CENTER_VERTICAL);
         }
         m_layers_panel->SetSizer(layers_grid);
         layers_box->Add(m_layers_panel, 1, wxEXPAND | wxALL, 5);
         main_sizer->Add(layers_box, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
-
-        auto *mode_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Import mode"));
-        m_rb_mode_layers = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Layers as parts"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
-        m_rb_mode_merged = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Merged"));
-        mode_box->Add(m_rb_mode_layers, 0, wxALL, 5);
-        mode_box->Add(m_rb_mode_merged, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
-        main_sizer->Add(mode_box, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
         wxStdDialogButtonSizer *buttons = new wxStdDialogButtonSizer();
         buttons->AddButton(new wxButton(this, wxID_OK));
@@ -294,6 +314,13 @@ public:
 
         for (size_t i = 0; i < m_layer_checks.size(); ++i)
             m_options.selected_layers[i] = m_layer_checks[i]->GetValue();
+        for (size_t i = 0; i < m_layer_type_choices.size(); ++i) {
+            const int sel = m_layer_type_choices[i]->GetSelection();
+            m_options.layer_types[i] =
+                sel == 1 ? ModelVolumeType::NEGATIVE_VOLUME :
+                sel == 2 ? ModelVolumeType::PARAMETER_MODIFIER :
+                           ModelVolumeType::MODEL_PART;
+        }
 
         const bool has_any_selected = std::any_of(m_options.selected_layers.begin(), m_options.selected_layers.end(), [](bool v) { return v; });
         if (!has_any_selected) {
@@ -309,6 +336,7 @@ private:
 
     wxScrolledWindow *m_layers_panel{nullptr};
     std::vector<wxCheckBox*> m_layer_checks;
+    std::vector<wxChoice*> m_layer_type_choices;
     wxRadioButton *m_rb_mode_merged{nullptr};
     wxRadioButton *m_rb_mode_layers{nullptr};
 };
@@ -348,6 +376,13 @@ static ExPolygonsWithIds get_shapes_for_layer(const ExPolygonsWithIds &shape_ids
         if (static_cast<size_t>(shape.id / 2) == layer_index)
             out.push_back(shape);
     return out;
+}
+
+static ModelVolumeType get_layer_type(size_t layer_index, const SvgImportOptions &options)
+{
+    if (layer_index < options.layer_types.size())
+        return options.layer_types[layer_index];
+    return ModelVolumeType::MODEL_PART;
 }
 
 static TriangleMesh create_mesh_from_emboss_shape(EmbossShape shape)
@@ -406,10 +441,12 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
     }
 
     if (options.import_mode == SvgImportMode::Merged) {
+        const ModelVolumeType merged_type = get_layer_type(static_cast<size_t>(selected_shapes.front().id / 2), options);
         shape.shapes_with_ids = std::move(selected_shapes);
         shape.projection.depth = base_extrusion_mm;
         shape.final_shape = {};
         volume->set_mesh(create_mesh_from_emboss_shape(shape));
+        volume->set_type(merged_type);
         volume->calculate_convex_hull();
         volume->center_geometry_after_creation();
         object->invalidate_bounding_box();
@@ -425,6 +462,8 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
     }
     const size_t initial_layer = *layer_order.begin();
     ExPolygonsWithIds initial_shapes = get_shapes_for_layer(selected_shapes, initial_layer);
+    const ModelVolumeType initial_type = get_layer_type(initial_layer, options);
+    const std::string object_base_name = object->name;
 
     EmbossShape base_shape = shape;
     base_shape.shapes_with_ids = initial_shapes;
@@ -432,11 +471,14 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
     base_shape.final_shape = {};
     shape = std::move(base_shape);
     volume->set_mesh(create_mesh_from_emboss_shape(shape));
+    volume->set_type(initial_type);
     volume->calculate_convex_hull();
     volume->center_geometry_after_creation();
     // Keep the initial layer as the grounding reference for the multipart import.
     // With 10 mm depth this shifts it by -5 mm.
     volume->translate(Vec3d(0.0, 0.0, -shape.projection.depth * 0.5));
+    object->name = GUI::format(_u8L("%1% - Layer %2%"), object_base_name, initial_layer + 1);
+    volume->name = object->name;
 
     size_t next_layer_ordinal = 1;
 
@@ -454,8 +496,9 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
         layer_shape.final_shape = {};
         TriangleMesh layer_mesh = create_mesh_from_emboss_shape(layer_shape);
 
-        ModelVolume *part = object->add_volume(std::move(layer_mesh), ModelVolumeType::MODEL_PART);
-        part->name = GUI::format(_u8L("%1% - Layer %2%"), object->name, layer_idx + 1);
+        const ModelVolumeType layer_type = get_layer_type(layer_idx, options);
+        ModelVolume *part = object->add_volume(std::move(layer_mesh), layer_type);
+        part->name = GUI::format(_u8L("%1% - Layer %2%"), object_base_name, layer_idx + 1);
         part->emboss_shape = std::move(layer_shape);
     }
 
