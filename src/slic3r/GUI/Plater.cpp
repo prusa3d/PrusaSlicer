@@ -33,6 +33,7 @@
 #include <utility>
 #include <set>
 #include <unordered_map>
+#include <stack>
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/optional.hpp>
@@ -244,6 +245,125 @@ struct SvgLayerInfo
     std::vector<size_t> shape_to_layer;
 };
 
+static bool is_svg_shape_tag(const std::string &tag_name)
+{
+    return tag_name == "path" || tag_name == "rect" || tag_name == "circle" ||
+           tag_name == "ellipse" || tag_name == "polygon" || tag_name == "polyline" ||
+           tag_name == "line";
+}
+
+static std::string get_xml_attr(const std::string &tag, const char *attr_name)
+{
+    const std::string key = std::string(attr_name) + "=";
+    size_t pos = tag.find(key);
+    if (pos == std::string::npos)
+        return {};
+    pos += key.size();
+    if (pos >= tag.size())
+        return {};
+    const char quote = tag[pos];
+    if (quote != '"' && quote != '\'')
+        return {};
+    size_t end = tag.find(quote, pos + 1);
+    if (end == std::string::npos || end <= pos + 1)
+        return {};
+    return tag.substr(pos + 1, end - pos - 1);
+}
+
+static bool parse_explicit_svg_layers(const std::string &svg_text, size_t shape_count, SvgLayerInfo &out)
+{
+    constexpr size_t npos = std::numeric_limits<size_t>::max();
+    out.names.clear();
+    out.shape_to_layer.assign(shape_count, size_t(0));
+
+    std::vector<size_t> group_stack;
+    size_t current_layer = npos;
+    size_t shape_index = 0;
+    bool has_layer_groups = false;
+
+    size_t pos = 0;
+    while (true) {
+        const size_t lt = svg_text.find('<', pos);
+        if (lt == std::string::npos)
+            break;
+        const size_t gt = svg_text.find('>', lt + 1);
+        if (gt == std::string::npos)
+            break;
+
+        std::string tag = svg_text.substr(lt + 1, gt - lt - 1);
+        boost::algorithm::trim(tag);
+        if (tag.empty() || tag[0] == '?' || tag[0] == '!') {
+            pos = gt + 1;
+            continue;
+        }
+
+        const bool is_end_tag = tag[0] == '/';
+        const bool self_closing = !tag.empty() && tag.back() == '/';
+
+        if (is_end_tag) {
+            std::string end_name = tag.substr(1);
+            boost::algorithm::trim(end_name);
+            if (end_name == "g" && !group_stack.empty()) {
+                current_layer = group_stack.back();
+                group_stack.pop_back();
+            }
+            pos = gt + 1;
+            continue;
+        }
+
+        std::string tag_name = tag.substr(0, tag.find_first_of(" \t\r\n/"));
+        boost::algorithm::to_lower(tag_name);
+
+        if (tag_name == "g") {
+            group_stack.push_back(current_layer);
+            const std::string group_mode = get_xml_attr(tag, "inkscape:groupmode");
+            if (group_mode == "layer") {
+                has_layer_groups = true;
+                std::string layer_name = get_xml_attr(tag, "inkscape:label");
+                if (layer_name.empty())
+                    layer_name = get_xml_attr(tag, "id");
+                if (layer_name.empty())
+                    layer_name = format("%1% %2%", _u8L("Layer"), out.names.size() + 1);
+
+                auto it = std::find(out.names.begin(), out.names.end(), layer_name);
+                if (it == out.names.end()) {
+                    current_layer = out.names.size();
+                    out.names.push_back(layer_name);
+                } else {
+                    current_layer = static_cast<size_t>(std::distance(out.names.begin(), it));
+                }
+            }
+            if (self_closing && !group_stack.empty()) {
+                current_layer = group_stack.back();
+                group_stack.pop_back();
+            }
+            pos = gt + 1;
+            continue;
+        }
+
+        if (is_svg_shape_tag(tag_name)) {
+            if (shape_index < out.shape_to_layer.size())
+                out.shape_to_layer[shape_index] = current_layer == npos ? size_t(0) : current_layer;
+            ++shape_index;
+        }
+
+        pos = gt + 1;
+    }
+
+    if (!has_layer_groups)
+        return false;
+
+    if (out.names.empty())
+        out.names.push_back(format("%1% %2%", _u8L("Layer"), 1));
+
+    // Shapes outside explicit layers fall back to first layer.
+    for (size_t &layer_idx : out.shape_to_layer)
+        if (layer_idx == npos || layer_idx >= out.names.size())
+            layer_idx = 0;
+
+    return true;
+}
+
 class SvgImportOptionsDialog final : public wxDialog
 {
 public:
@@ -355,43 +475,20 @@ static SvgLayerInfo build_svg_layer_info(const EmbossShape::SvgFile &svg_file, c
     for (const ExPolygonsWithId &s : shapes_with_ids)
         max_shape_index = std::max(max_shape_index, static_cast<size_t>(s.id / 2));
 
-    std::vector<std::string> shape_ids(max_shape_index + 1);
-    EmbossShape::SvgFile svg_copy = svg_file;
-    const NSVGimage *image = init_image(svg_copy);
-    if (image != nullptr) {
-        size_t idx = 0;
-        for (const NSVGshape *shape = image->shapes; shape != nullptr && idx < shape_ids.size(); shape = shape->next, ++idx) {
-            std::string id = shape->id;
-            boost::algorithm::trim(id);
-            shape_ids[idx] = std::move(id);
-        }
-    }
-
-    const bool has_named_layers = std::any_of(shape_ids.begin(), shape_ids.end(), [](const std::string &id) { return !id.empty(); });
-    if (!has_named_layers) {
+    if (max_shape_index == 0 && shapes_with_ids.empty()) {
         info.names.push_back(format("%1% %2%", _u8L("Layer"), 1));
-        info.shape_to_layer.assign(shape_ids.size(), size_t(0));
+        info.shape_to_layer.assign(1, size_t(0));
         return info;
     }
 
-    std::unordered_map<std::string, size_t> name_to_index;
-    info.shape_to_layer.resize(shape_ids.size(), size_t(0));
-    size_t unnamed_counter = 0;
-    for (size_t i = 0; i < shape_ids.size(); ++i) {
-        std::string layer_name = shape_ids[i];
-        if (layer_name.empty())
-            layer_name = format("%1% %2%", _u8L("Layer"), ++unnamed_counter);
+    const size_t shape_count = max_shape_index + 1;
+    if (svg_file.file_data != nullptr && parse_explicit_svg_layers(*svg_file.file_data, shape_count, info))
+        return info;
 
-        auto it = name_to_index.find(layer_name);
-        if (it == name_to_index.end()) {
-            const size_t new_index = info.names.size();
-            name_to_index.emplace(layer_name, new_index);
-            info.names.push_back(layer_name);
-            info.shape_to_layer[i] = new_index;
-        } else {
-            info.shape_to_layer[i] = it->second;
-        }
-    }
+    // Fallback: no explicit layers in source SVG, treat as one logical layer.
+    if (info.names.empty())
+        info.names.push_back(format("%1% %2%", _u8L("Layer"), 1));
+    info.shape_to_layer.assign(shape_count, size_t(0));
     return info;
 }
 
