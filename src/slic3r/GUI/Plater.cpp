@@ -32,6 +32,7 @@
 #include <future>
 #include <utility>
 #include <set>
+#include <unordered_map>
 #include <boost/algorithm/string.hpp>
 #include <boost/nowide/cstdio.hpp>
 #include <boost/optional.hpp>
@@ -237,6 +238,12 @@ struct SvgImportOptions
     std::vector<ModelVolumeType> layer_types;
 };
 
+struct SvgLayerInfo
+{
+    std::vector<std::string> names;
+    std::vector<size_t> shape_to_layer;
+};
+
 class SvgImportOptionsDialog final : public wxDialog
 {
 public:
@@ -341,40 +348,75 @@ private:
     wxRadioButton *m_rb_mode_layers{nullptr};
 };
 
-static std::vector<std::string> build_svg_layer_names(const EmbossShape::SvgFile &svg_file)
+static SvgLayerInfo build_svg_layer_info(const EmbossShape::SvgFile &svg_file, const ExPolygonsWithIds &shapes_with_ids)
 {
-    std::vector<std::string> names;
+    SvgLayerInfo info;
+    size_t max_shape_index = 0;
+    for (const ExPolygonsWithId &s : shapes_with_ids)
+        max_shape_index = std::max(max_shape_index, static_cast<size_t>(s.id / 2));
+
+    std::vector<std::string> shape_ids(max_shape_index + 1);
     EmbossShape::SvgFile svg_copy = svg_file;
     const NSVGimage *image = init_image(svg_copy);
     if (image != nullptr) {
-        const size_t count = get_shapes_count(*image);
-        names.reserve(count);
-        for (size_t i = 0; i < count; ++i)
-            names.push_back(format("%1% %2%", _u8L("Layer"), i + 1));
-        return names;
+        size_t idx = 0;
+        for (const NSVGshape *shape = image->shapes; shape != nullptr && idx < shape_ids.size(); shape = shape->next, ++idx) {
+            std::string id = shape->id;
+            boost::algorithm::trim(id);
+            shape_ids[idx] = std::move(id);
+        }
     }
 
-    return names;
+    const bool has_named_layers = std::any_of(shape_ids.begin(), shape_ids.end(), [](const std::string &id) { return !id.empty(); });
+    if (!has_named_layers) {
+        info.names.push_back(format("%1% %2%", _u8L("Layer"), 1));
+        info.shape_to_layer.assign(shape_ids.size(), size_t(0));
+        return info;
+    }
+
+    std::unordered_map<std::string, size_t> name_to_index;
+    info.shape_to_layer.resize(shape_ids.size(), size_t(0));
+    size_t unnamed_counter = 0;
+    for (size_t i = 0; i < shape_ids.size(); ++i) {
+        std::string layer_name = shape_ids[i];
+        if (layer_name.empty())
+            layer_name = format("%1% %2%", _u8L("Layer"), ++unnamed_counter);
+
+        auto it = name_to_index.find(layer_name);
+        if (it == name_to_index.end()) {
+            const size_t new_index = info.names.size();
+            name_to_index.emplace(layer_name, new_index);
+            info.names.push_back(layer_name);
+            info.shape_to_layer[i] = new_index;
+        } else {
+            info.shape_to_layer[i] = it->second;
+        }
+    }
+    return info;
 }
 
-static ExPolygonsWithIds filter_shapes_by_selected_layers(const ExPolygonsWithIds &shape_ids, const SvgImportOptions &options)
+static ExPolygonsWithIds filter_shapes_by_selected_layers(const ExPolygonsWithIds &shape_ids, const SvgImportOptions &options, const SvgLayerInfo &layer_info)
 {
     ExPolygonsWithIds filtered;
     filtered.reserve(shape_ids.size());
     for (const ExPolygonsWithId &shape : shape_ids) {
-        const size_t layer_index = static_cast<size_t>(shape.id / 2);
+        const size_t shape_index = static_cast<size_t>(shape.id / 2);
+        const size_t layer_index = shape_index < layer_info.shape_to_layer.size() ? layer_info.shape_to_layer[shape_index] : size_t(0);
         if (layer_index < options.selected_layers.size() && options.selected_layers[layer_index])
             filtered.push_back(shape);
     }
     return filtered;
 }
 
-static ExPolygonsWithIds get_shapes_for_layer(const ExPolygonsWithIds &shape_ids, size_t layer_index)
+static ExPolygonsWithIds get_shapes_for_layer(const ExPolygonsWithIds &shape_ids, const SvgLayerInfo &layer_info, size_t layer_index)
 {
     ExPolygonsWithIds out;
-    for (const ExPolygonsWithId &shape : shape_ids)
-        if (static_cast<size_t>(shape.id / 2) == layer_index)
+    for (const ExPolygonsWithId &shape : shape_ids) {
+        const size_t shape_index = static_cast<size_t>(shape.id / 2);
+        const size_t shape_layer = shape_index < layer_info.shape_to_layer.size() ? layer_info.shape_to_layer[shape_index] : size_t(0);
+        if (shape_layer == layer_index)
             out.push_back(shape);
+    }
     return out;
 }
 
@@ -416,15 +458,10 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
         return true;
 
     SvgImportOptions options;
-    std::vector<std::string> layer_names = build_svg_layer_names(*shape.svg_file);
-    if (layer_names.empty()) {
-        size_t max_layer_index = 0;
-        for (const ExPolygonsWithId &s : shape.shapes_with_ids)
-            max_layer_index = std::max(max_layer_index, static_cast<size_t>(s.id / 2));
-        layer_names.reserve(max_layer_index + 1);
-        for (size_t i = 0; i <= max_layer_index; ++i)
-            layer_names.push_back(format("%1% %2%", _u8L("Layer"), i + 1));
-    }
+    SvgLayerInfo layer_info = build_svg_layer_info(*shape.svg_file, shape.shapes_with_ids);
+    std::vector<std::string> layer_names = layer_info.names;
+    if (layer_names.empty())
+        layer_names.push_back(format("%1% %2%", _u8L("Layer"), 1));
 
     for (;;) {
         SvgImportOptionsDialog dialog(parent, layer_names, options);
@@ -434,14 +471,16 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
             break;
     }
 
-    ExPolygonsWithIds selected_shapes = filter_shapes_by_selected_layers(shape.shapes_with_ids, options);
+    ExPolygonsWithIds selected_shapes = filter_shapes_by_selected_layers(shape.shapes_with_ids, options, layer_info);
     if (selected_shapes.empty()) {
         show_error(parent, format_wxstr(_L("SVG file does NOT contain selected layers to import (%1%)."), from_u8(path)));
         return false;
     }
 
     if (options.import_mode == SvgImportMode::Merged) {
-        const ModelVolumeType merged_type = get_layer_type(static_cast<size_t>(selected_shapes.front().id / 2), options);
+        const size_t shape_index = static_cast<size_t>(selected_shapes.front().id / 2);
+        const size_t layer_index = shape_index < layer_info.shape_to_layer.size() ? layer_info.shape_to_layer[shape_index] : size_t(0);
+        const ModelVolumeType merged_type = get_layer_type(layer_index, options);
         shape.shapes_with_ids = std::move(selected_shapes);
         shape.projection.depth = base_extrusion_mm;
         shape.final_shape = {};
@@ -454,14 +493,17 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
     }
 
     std::set<size_t> layer_order;
-    for (const ExPolygonsWithId &s : selected_shapes)
-        layer_order.insert(static_cast<size_t>(s.id / 2));
+    for (const ExPolygonsWithId &s : selected_shapes) {
+        const size_t shape_index = static_cast<size_t>(s.id / 2);
+        const size_t layer_index = shape_index < layer_info.shape_to_layer.size() ? layer_info.shape_to_layer[shape_index] : size_t(0);
+        layer_order.insert(layer_index);
+    }
     if (layer_order.empty()) {
         show_error(parent, _L("Selected SVG layers are empty."));
         return false;
     }
     const size_t initial_layer = *layer_order.begin();
-    ExPolygonsWithIds initial_shapes = get_shapes_for_layer(selected_shapes, initial_layer);
+    ExPolygonsWithIds initial_shapes = get_shapes_for_layer(selected_shapes, layer_info, initial_layer);
     const ModelVolumeType initial_type = get_layer_type(initial_layer, options);
     const std::string object_base_name = object->name;
 
@@ -486,7 +528,7 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
         if (layer_idx == initial_layer)
             continue;
 
-        ExPolygonsWithIds layer_shapes = get_shapes_for_layer(selected_shapes, layer_idx);
+        ExPolygonsWithIds layer_shapes = get_shapes_for_layer(selected_shapes, layer_info, layer_idx);
         if (layer_shapes.empty())
             continue;
 
