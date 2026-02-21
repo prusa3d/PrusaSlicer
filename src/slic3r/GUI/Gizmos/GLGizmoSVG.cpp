@@ -2364,12 +2364,10 @@ SvgLayerInfo build_svg_layer_info(const EmbossShape::SvgFile &svg_file, const NS
     if (svg_file.file_data != nullptr && parse_explicit_svg_layers(*svg_file.file_data, shape_count, info))
         return info;
 
-    size_t i = 0;
-    for (const NSVGshape *shape = image.shapes; shape != nullptr; shape = shape->next, ++i) {
-        info.names.push_back(GUI::format(_u8L("Layer %1%"), i + 1));
-        info.shape_to_layer.push_back(i);
-        info.default_selected.push_back((shape->flags & NSVG_FLAGS_VISIBLE) != 0);
-    }
+    // Fallback: no explicit layers in source SVG, treat as one logical layer.
+    info.names.push_back(GUI::format("%1% %2%", _u8L("Layer"), 1));
+    info.shape_to_layer.assign(shape_count, size_t(0));
+    info.default_selected.assign(1, true);
     return info;
 }
 
