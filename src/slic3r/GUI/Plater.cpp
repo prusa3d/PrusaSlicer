@@ -445,15 +445,20 @@ public:
         auto *main_sizer = new wxBoxSizer(wxVERTICAL);
 
         auto *mode_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Import mode"));
+        mode_box->GetStaticBox()->SetToolTip(_L("Choose how selected layers are imported."));
         m_rb_mode_merged = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Merged layers"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
         m_rb_mode_layers = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Layers as parts"));
+        m_rb_mode_merged->SetToolTip(_L("Import selected layers as a single merged volume."));
+        m_rb_mode_layers->SetToolTip(_L("Import selected layers as separate parts."));
         mode_box->Add(m_rb_mode_merged, 0, wxALL, 5);
         mode_box->Add(m_rb_mode_layers, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
         main_sizer->Add(mode_box, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
         auto *layers_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Layers"));
+        layers_box->GetStaticBox()->SetToolTip(_L("Configure per-layer import options."));
         m_layers_panel = new wxScrolledWindow(layers_box->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxSize(480, 220), wxVSCROLL | wxTAB_TRAVERSAL);
         m_layers_panel->SetScrollRate(0, 10);
+        m_layers_panel->SetToolTip(_L("List of SVG layers detected in the file."));
 
         auto *layers_grid = new wxFlexGridSizer(5, 5, 8);
         wxFont header_font = this->GetFont();
@@ -480,6 +485,13 @@ public:
         hdr_type->SetFont(header_font);
         hdr_from_main->SetFont(header_font);
         hdr_to_main->SetFont(header_font);
+        hdr_import->SetToolTip(_L("Enable or disable importing this layer."));
+        hdr_layer->SetToolTip(_L("Name of the source SVG layer."));
+        hdr_type->SetToolTip(_L("Select how each layer is added to the model."));
+        hdr_from_main->SetToolTip(_L("Start height of the extrusion range in millimeters."));
+        hdr_from_unit->SetToolTip(_L("Units are millimeters."));
+        hdr_to_main->SetToolTip(_L("End height of the extrusion range in millimeters."));
+        hdr_to_unit->SetToolTip(_L("Units are millimeters."));
         m_header_type = hdr_type;
         m_header_from_main = hdr_from_main;
         m_header_from_unit = hdr_from_unit;
@@ -495,10 +507,13 @@ public:
         for (size_t i = 0; i < m_layer_names.size(); ++i) {
             wxCheckBox *checkbox = new wxCheckBox(m_layers_panel, wxID_ANY, "");
             checkbox->SetValue(m_options.selected_layers[i]);
+            checkbox->SetToolTip(_L("Enable to import this layer."));
             m_layer_checks.push_back(checkbox);
             layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
 
-            layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i])), 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 25);
+            auto *layer_name_label = new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i]));
+            layer_name_label->SetToolTip(_L("Layer name read from the SVG file."));
+            layers_grid->Add(layer_name_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 25);
 
             wxArrayString type_choices;
             type_choices.Add(_L("Part"));
@@ -511,11 +526,14 @@ public:
             else if (m_options.layer_types[i] == ModelVolumeType::PARAMETER_MODIFIER)
                 sel = 2;
             type_choice->SetSelection(sel);
+            type_choice->SetToolTip(_L("Choose the volume type for this layer."));
             m_layer_type_choices.push_back(type_choice);
             layers_grid->Add(type_choice, 0, wxALIGN_CENTER_VERTICAL);
 
             wxTextCtrl *from_ctrl = new wxTextCtrl(m_layers_panel, wxID_ANY, double_to_string(m_options.layer_from_mm[i]));
             wxTextCtrl *to_ctrl   = new wxTextCtrl(m_layers_panel, wxID_ANY, double_to_string(m_options.layer_to_mm[i]));
+            from_ctrl->SetToolTip(_L("Extrusion start height in millimeters."));
+            to_ctrl->SetToolTip(_L("Extrusion end height in millimeters (must be greater than From)."));
             m_layer_from_inputs.push_back(from_ctrl);
             m_layer_to_inputs.push_back(to_ctrl);
             layers_grid->Add(from_ctrl, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
@@ -526,8 +544,12 @@ public:
         main_sizer->Add(layers_box, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
         wxStdDialogButtonSizer *buttons = new wxStdDialogButtonSizer();
-        buttons->AddButton(new wxButton(this, wxID_OK));
-        buttons->AddButton(new wxButton(this, wxID_CANCEL));
+        auto *ok_btn = new wxButton(this, wxID_OK);
+        auto *cancel_btn = new wxButton(this, wxID_CANCEL);
+        ok_btn->SetToolTip(_L("Apply the selected SVG import options."));
+        cancel_btn->SetToolTip(_L("Cancel SVG import."));
+        buttons->AddButton(ok_btn);
+        buttons->AddButton(cancel_btn);
         buttons->Realize();
         main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 8);
 

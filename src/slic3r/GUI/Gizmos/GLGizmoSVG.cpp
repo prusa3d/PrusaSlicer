@@ -2386,19 +2386,28 @@ public:
         auto *main_sizer = new wxBoxSizer(wxVERTICAL);
 
         auto *layers_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Layers"));
+        layers_box->GetStaticBox()->SetToolTip(_L("Select which SVG layers will be imported."));
         m_layers_panel = new wxScrolledWindow(layers_box->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxSize(480, 220), wxVSCROLL | wxTAB_TRAVERSAL);
         m_layers_panel->SetScrollRate(0, 10);
+        m_layers_panel->SetToolTip(_L("List of SVG layers detected in the file."));
 
         auto *layers_grid = new wxFlexGridSizer(2, 5, 8);
-        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Import")), 0, wxALIGN_CENTER_VERTICAL);
-        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer")),   0, wxALIGN_CENTER_VERTICAL);
+        auto *hdr_import = new wxStaticText(m_layers_panel, wxID_ANY, _L("Import"));
+        auto *hdr_layer  = new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer"));
+        hdr_import->SetToolTip(_L("Enable or disable importing this layer."));
+        hdr_layer->SetToolTip(_L("Name of the source SVG layer."));
+        layers_grid->Add(hdr_import, 0, wxALIGN_CENTER_VERTICAL);
+        layers_grid->Add(hdr_layer,  0, wxALIGN_CENTER_VERTICAL);
 
         for (size_t i = 0; i < m_layer_names.size(); ++i) {
             wxCheckBox *checkbox = new wxCheckBox(m_layers_panel, wxID_ANY, "");
             checkbox->SetValue(m_options.selected_layers[i]);
+            checkbox->SetToolTip(_L("Enable to import this layer."));
             m_layer_checks.push_back(checkbox);
             layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL);
-            layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i])), 0, wxALIGN_CENTER_VERTICAL);
+            auto *layer_name_label = new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i]));
+            layer_name_label->SetToolTip(_L("Layer name read from the SVG file."));
+            layers_grid->Add(layer_name_label, 0, wxALIGN_CENTER_VERTICAL);
         }
 
         m_layers_panel->SetSizer(layers_grid);
@@ -2406,8 +2415,12 @@ public:
         main_sizer->Add(layers_box, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
         wxStdDialogButtonSizer *buttons = new wxStdDialogButtonSizer();
-        buttons->AddButton(new wxButton(this, wxID_OK));
-        buttons->AddButton(new wxButton(this, wxID_CANCEL));
+        auto *ok_btn = new wxButton(this, wxID_OK);
+        auto *cancel_btn = new wxButton(this, wxID_CANCEL);
+        ok_btn->SetToolTip(_L("Apply the selected SVG import options."));
+        cancel_btn->SetToolTip(_L("Cancel SVG import."));
+        buttons->AddButton(ok_btn);
+        buttons->AddButton(cancel_btn);
         buttons->Realize();
         main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 8);
 
