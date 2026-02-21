@@ -504,6 +504,10 @@ public:
 
         m_rb_mode_merged->SetValue(m_options.import_mode == SvgImportMode::Merged);
         m_rb_mode_layers->SetValue(m_options.import_mode == SvgImportMode::LayersAsParts);
+        auto update_columns_state = [this](wxCommandEvent &) { this->update_layer_editable_controls_state(); };
+        m_rb_mode_merged->Bind(wxEVT_RADIOBUTTON, update_columns_state);
+        m_rb_mode_layers->Bind(wxEVT_RADIOBUTTON, update_columns_state);
+        update_layer_editable_controls_state();
 
         wxGetApp().UpdateDlgDarkUI(this);
     }
@@ -545,6 +549,20 @@ public:
     }
 
 private:
+    void update_layer_editable_controls_state()
+    {
+        const bool enable_layer_specific = m_rb_mode_layers != nullptr && m_rb_mode_layers->GetValue();
+        for (wxChoice *choice : m_layer_type_choices)
+            if (choice != nullptr)
+                choice->Enable(enable_layer_specific);
+        for (wxTextCtrl *ctrl : m_layer_from_inputs)
+            if (ctrl != nullptr)
+                ctrl->Enable(enable_layer_specific);
+        for (wxTextCtrl *ctrl : m_layer_to_inputs)
+            if (ctrl != nullptr)
+                ctrl->Enable(enable_layer_specific);
+    }
+
     std::vector<std::string> m_layer_names;
     std::vector<bool> m_layer_default_selected;
     SvgImportOptions &m_options;
