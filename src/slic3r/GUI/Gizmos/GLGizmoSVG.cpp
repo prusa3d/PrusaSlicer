@@ -2392,21 +2392,27 @@ public:
         m_layers_panel->SetToolTip(_L("List of SVG layers detected in the file."));
 
         auto *layers_grid = new wxFlexGridSizer(2, 5, 8);
+        wxFont header_font = this->GetFont();
+        header_font.MakeBold();
         auto *hdr_import = new wxStaticText(m_layers_panel, wxID_ANY, _L("Import"));
         auto *hdr_layer  = new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer"));
+        hdr_import->SetFont(header_font);
+        hdr_layer->SetFont(header_font);
         hdr_import->SetToolTip(_L("Enable or disable importing this layer."));
         hdr_layer->SetToolTip(_L("Name of the source SVG layer."));
-        layers_grid->Add(hdr_import, 0, wxALIGN_CENTER_VERTICAL);
-        layers_grid->Add(hdr_layer,  0, wxALIGN_CENTER_VERTICAL);
+        layers_grid->Add(hdr_import, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
+        layers_grid->Add(hdr_layer,  0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
 
         for (size_t i = 0; i < m_layer_names.size(); ++i) {
             wxCheckBox *checkbox = new wxCheckBox(m_layers_panel, wxID_ANY, "");
             checkbox->SetValue(m_options.selected_layers[i]);
             checkbox->SetToolTip(_L("Enable to import this layer."));
+            checkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &) { this->update_row_visual_state(); });
             m_layer_checks.push_back(checkbox);
-            layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL);
+            layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
             auto *layer_name_label = new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i]));
             layer_name_label->SetToolTip(_L("Layer name read from the SVG file."));
+            m_layer_name_labels.push_back(layer_name_label);
             layers_grid->Add(layer_name_label, 0, wxALIGN_CENTER_VERTICAL);
         }
 
@@ -2425,8 +2431,9 @@ public:
         main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 8);
 
         this->SetSizerAndFit(main_sizer);
-        this->SetMinSize(wxSize(560, 460));
+        this->SetMinSize(this->GetSize());
         wxGetApp().UpdateDlgDarkUI(this);
+        update_row_visual_state();
     }
 
     bool transfer_from_controls()
@@ -2443,12 +2450,24 @@ public:
     }
 
 private:
+    void update_row_visual_state()
+    {
+        for (size_t i = 0; i < m_layer_name_labels.size(); ++i) {
+            const bool enabled = i < m_layer_checks.size() && m_layer_checks[i] != nullptr && m_layer_checks[i]->GetValue();
+            if (m_layer_name_labels[i] != nullptr)
+                m_layer_name_labels[i]->Enable(enabled);
+        }
+        if (m_layers_panel != nullptr)
+            m_layers_panel->Refresh();
+    }
+
     std::vector<std::string> m_layer_names;
     std::vector<bool> m_layer_default_selected;
     SvgImportOptions &m_options;
 
     wxScrolledWindow *m_layers_panel{nullptr};
     std::vector<wxCheckBox*> m_layer_checks;
+    std::vector<wxStaticText*> m_layer_name_labels;
 };
 
 bool select_svg_import_options(const SvgLayerInfo &layer_info, SvgImportOptions &options)

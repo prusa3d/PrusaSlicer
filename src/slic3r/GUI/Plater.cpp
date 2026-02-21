@@ -508,6 +508,7 @@ public:
             wxCheckBox *checkbox = new wxCheckBox(m_layers_panel, wxID_ANY, "");
             checkbox->SetValue(m_options.selected_layers[i]);
             checkbox->SetToolTip(_L("Enable to import this layer."));
+            checkbox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &) { this->update_layer_editable_controls_state(); });
             m_layer_checks.push_back(checkbox);
             layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
 
@@ -554,7 +555,9 @@ public:
         main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 8);
 
         this->SetSizerAndFit(main_sizer);
-        this->SetMinSize(wxSize(760, 520));
+        wxSize min_size = this->GetSize();
+        min_size.x += 60;
+        this->SetMinSize(min_size);
 
         m_rb_mode_merged->SetValue(m_options.import_mode == SvgImportMode::Merged);
         m_rb_mode_layers->SetValue(m_options.import_mode == SvgImportMode::LayersAsParts);
@@ -605,15 +608,15 @@ private:
     void update_layer_editable_controls_state()
     {
         const bool enable_layer_specific = m_rb_mode_layers != nullptr && m_rb_mode_layers->GetValue();
-        for (wxChoice *choice : m_layer_type_choices)
-            if (choice != nullptr)
-                choice->Enable(enable_layer_specific);
-        for (wxTextCtrl *ctrl : m_layer_from_inputs)
-            if (ctrl != nullptr)
-                ctrl->Enable(enable_layer_specific);
-        for (wxTextCtrl *ctrl : m_layer_to_inputs)
-            if (ctrl != nullptr)
-                ctrl->Enable(enable_layer_specific);
+        for (size_t i = 0; i < m_layer_type_choices.size(); ++i) {
+            const bool layer_enabled = enable_layer_specific && i < m_layer_checks.size() && m_layer_checks[i] != nullptr && m_layer_checks[i]->GetValue();
+            if (m_layer_type_choices[i] != nullptr)
+                m_layer_type_choices[i]->Enable(layer_enabled);
+            if (i < m_layer_from_inputs.size() && m_layer_from_inputs[i] != nullptr)
+                m_layer_from_inputs[i]->Enable(layer_enabled);
+            if (i < m_layer_to_inputs.size() && m_layer_to_inputs[i] != nullptr)
+                m_layer_to_inputs[i]->Enable(layer_enabled);
+        }
 
         const wxColour &header_color = enable_layer_specific ? m_header_enabled_color : m_header_disabled_color;
         if (m_header_type != nullptr)
