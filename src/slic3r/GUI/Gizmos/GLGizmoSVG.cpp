@@ -1836,16 +1836,8 @@ void GLGizmoSVG::draw_size()
         wxGetApp().obj_manipul()->set_dirty();
         // should be the almost same
         calculate_scale();
-                
-        const NSVGimage *img = m_volume_shape.svg_file->image.get();
-        assert(img != NULL);
-        if (img != NULL){
-            NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
-            m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, params);
-            m_volume_shape.final_shape = {}; // reset cache for final shape
-            if (!make_snap) // Be carefull: Last change may be without change of scale
-                process(false);
-        }
+        if (!make_snap) // Be carefull: Last change may be without change of scale
+            process(false);
     }
 
     if (make_snap)
