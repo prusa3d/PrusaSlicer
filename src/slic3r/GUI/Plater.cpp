@@ -55,6 +55,7 @@
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/scrolwin.h>
+#include <wx/textctrl.h>
 #include <wx/filedlg.h>
 #include <wx/dnd.h>
 #include <wx/progdlg.h>
@@ -237,6 +238,8 @@ struct SvgImportOptions
     SvgImportMode import_mode                  = SvgImportMode::Merged;
     std::vector<bool> selected_layers;
     std::vector<ModelVolumeType> layer_types;
+    std::vector<double> layer_from_mm;
+    std::vector<double> layer_to_mm;
 };
 
 struct SvgLayerInfo
@@ -399,6 +402,30 @@ static bool parse_explicit_svg_layers(const std::string &svg_text, size_t shape_
     return true;
 }
 
+static constexpr double svg_default_extrusion_from_mm = 0.0;
+static constexpr double svg_default_extrusion_base_to_mm = 10.0;
+static constexpr double svg_default_extrusion_step_mm = 2.0;
+
+static void ensure_default_layer_ranges(SvgImportOptions &options, size_t layer_count)
+{
+    if (options.layer_from_mm.size() != layer_count)
+        options.layer_from_mm.assign(layer_count, svg_default_extrusion_from_mm);
+    if (options.layer_to_mm.size() != layer_count) {
+        options.layer_to_mm.resize(layer_count);
+        for (size_t i = 0; i < layer_count; ++i)
+            options.layer_to_mm[i] = svg_default_extrusion_base_to_mm + svg_default_extrusion_step_mm * static_cast<double>(i);
+    }
+}
+
+static std::pair<double, double> get_layer_from_to_mm(size_t layer_index, const SvgImportOptions &options)
+{
+    const double from = layer_index < options.layer_from_mm.size() ? options.layer_from_mm[layer_index] : svg_default_extrusion_from_mm;
+    double to = layer_index < options.layer_to_mm.size() ? options.layer_to_mm[layer_index] : (svg_default_extrusion_base_to_mm + svg_default_extrusion_step_mm * static_cast<double>(layer_index));
+    if (to <= from)
+        to = from + 0.01;
+    return {from, to};
+}
+
 class SvgImportOptionsDialog final : public wxDialog
 {
 public:
@@ -412,6 +439,7 @@ public:
             m_options.selected_layers = (m_layer_default_selected.size() == m_layer_names.size()) ? m_layer_default_selected : std::vector<bool>(m_layer_names.size(), true);
         if (m_options.layer_types.size() != m_layer_names.size())
             m_options.layer_types.assign(m_layer_names.size(), ModelVolumeType::MODEL_PART);
+        ensure_default_layer_ranges(m_options, m_layer_names.size());
 
         auto *main_sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -426,10 +454,12 @@ public:
         m_layers_panel = new wxScrolledWindow(layers_box->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxSize(480, 220), wxVSCROLL | wxTAB_TRAVERSAL);
         m_layers_panel->SetScrollRate(0, 10);
 
-        auto *layers_grid = new wxFlexGridSizer(3, 5, 8);
+        auto *layers_grid = new wxFlexGridSizer(5, 5, 8);
         layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Import")), 0, wxALIGN_CENTER_VERTICAL);
         layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer")), 0, wxALIGN_CENTER_VERTICAL);
         layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Type")), 0, wxALIGN_CENTER_VERTICAL);
+        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("From (mm)")), 0, wxALIGN_CENTER_VERTICAL);
+        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("To (mm)")), 0, wxALIGN_CENTER_VERTICAL);
         for (size_t i = 0; i < m_layer_names.size(); ++i) {
             wxCheckBox *checkbox = new wxCheckBox(m_layers_panel, wxID_ANY, "");
             checkbox->SetValue(m_options.selected_layers[i]);
@@ -451,6 +481,13 @@ public:
             type_choice->SetSelection(sel);
             m_layer_type_choices.push_back(type_choice);
             layers_grid->Add(type_choice, 0, wxALIGN_CENTER_VERTICAL);
+
+            wxTextCtrl *from_ctrl = new wxTextCtrl(m_layers_panel, wxID_ANY, double_to_string(m_options.layer_from_mm[i]));
+            wxTextCtrl *to_ctrl   = new wxTextCtrl(m_layers_panel, wxID_ANY, double_to_string(m_options.layer_to_mm[i]));
+            m_layer_from_inputs.push_back(from_ctrl);
+            m_layer_to_inputs.push_back(to_ctrl);
+            layers_grid->Add(from_ctrl, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+            layers_grid->Add(to_ctrl, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
         }
         m_layers_panel->SetSizer(layers_grid);
         layers_box->Add(m_layers_panel, 1, wxEXPAND | wxALL, 5);
@@ -463,7 +500,7 @@ public:
         main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 8);
 
         this->SetSizerAndFit(main_sizer);
-        this->SetMinSize(wxSize(560, 520));
+        this->SetMinSize(wxSize(760, 520));
 
         m_rb_mode_merged->SetValue(m_options.import_mode == SvgImportMode::Merged);
         m_rb_mode_layers->SetValue(m_options.import_mode == SvgImportMode::LayersAsParts);
@@ -484,6 +521,20 @@ public:
                 sel == 2 ? ModelVolumeType::PARAMETER_MODIFIER :
                            ModelVolumeType::MODEL_PART;
         }
+        for (size_t i = 0; i < m_layer_from_inputs.size(); ++i) {
+            double from = 0.0;
+            double to = 0.0;
+            if (!m_layer_from_inputs[i]->GetValue().ToDouble(&from) || !m_layer_to_inputs[i]->GetValue().ToDouble(&to)) {
+                show_error(this, _L("From/To must be valid numeric values."));
+                return false;
+            }
+            if (to <= from) {
+                show_error(this, _L("Each layer must satisfy: To > From."));
+                return false;
+            }
+            m_options.layer_from_mm[i] = from;
+            m_options.layer_to_mm[i] = to;
+        }
 
         const bool has_any_selected = std::any_of(m_options.selected_layers.begin(), m_options.selected_layers.end(), [](bool v) { return v; });
         if (!has_any_selected) {
@@ -501,6 +552,8 @@ private:
     wxScrolledWindow *m_layers_panel{nullptr};
     std::vector<wxCheckBox*> m_layer_checks;
     std::vector<wxChoice*> m_layer_type_choices;
+    std::vector<wxTextCtrl*> m_layer_from_inputs;
+    std::vector<wxTextCtrl*> m_layer_to_inputs;
     wxRadioButton *m_rb_mode_merged{nullptr};
     wxRadioButton *m_rb_mode_layers{nullptr};
 };
@@ -618,9 +671,6 @@ static TriangleMesh create_mesh_from_emboss_shape(EmbossShape shape)
 
 static bool process_svg_import_options(wxWindow *parent, const std::string &path, Model &model)
 {
-    constexpr double base_extrusion_mm = 10.0;
-    constexpr double extrusion_step_mm = 2.0;
-
     if (model.objects.size() != 1)
         return true;
     ModelObject *object = model.objects.front();
@@ -641,6 +691,7 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
         layer_names.push_back(format("%1% %2%", _u8L("Layer"), 1));
     if (options.selected_layers.size() != layer_names.size())
         options.selected_layers = (layer_info.default_selected.size() == layer_names.size()) ? layer_info.default_selected : std::vector<bool>(layer_names.size(), true);
+    ensure_default_layer_ranges(options, layer_names.size());
 
     for (;;) {
         SvgImportOptionsDialog dialog(parent, layer_names, layer_info.default_selected, options);
@@ -661,14 +712,19 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
     if (options.import_mode == SvgImportMode::Merged) {
         const size_t shape_index = static_cast<size_t>(selected_shapes.front().id / 2);
         const size_t layer_index = shape_index < layer_info.shape_to_layer.size() ? layer_info.shape_to_layer[shape_index] : size_t(0);
+        const auto [from_mm, to_mm] = get_layer_from_to_mm(layer_index, options);
+        const double depth_mm = to_mm - from_mm;
         const ModelVolumeType merged_type = get_layer_type(layer_index, options);
         shape.shapes_with_ids = std::move(selected_shapes);
-        shape.projection.depth = base_extrusion_mm;
+        shape.projection.depth = depth_mm;
         shape.final_shape = {};
         volume->set_mesh(create_mesh_from_emboss_shape(shape));
         volume->set_type(merged_type);
         volume->calculate_convex_hull();
         volume->center_geometry_after_creation();
+        Vec3d merged_offset = volume->get_offset();
+        merged_offset.z() = from_mm + depth_mm * 0.5;
+        volume->set_offset(merged_offset);
         object->invalidate_bounding_box();
         return true;
     }
@@ -690,20 +746,19 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
 
     EmbossShape base_shape = shape;
     base_shape.shapes_with_ids = initial_shapes;
-    base_shape.projection.depth = base_extrusion_mm;
+    const auto [initial_from_mm, initial_to_mm] = get_layer_from_to_mm(initial_layer, options);
+    base_shape.projection.depth = initial_to_mm - initial_from_mm;
     base_shape.final_shape = {};
     shape = std::move(base_shape);
     volume->set_mesh(create_mesh_from_emboss_shape(shape));
     volume->set_type(initial_type);
     volume->calculate_convex_hull();
     volume->center_geometry_after_creation();
-    // Keep the initial layer as the grounding reference for the multipart import.
-    // With 10 mm depth this shifts it by -5 mm.
-    volume->translate(Vec3d(0.0, 0.0, -shape.projection.depth * 0.5));
+    Vec3d initial_offset = volume->get_offset();
+    initial_offset.z() = initial_from_mm + shape.projection.depth * 0.5;
+    volume->set_offset(initial_offset);
     object->name = GUI::format(_u8L("%1% - Layer %2%"), object_base_name, initial_layer + 1);
     volume->name = object->name;
-
-    size_t next_layer_ordinal = 1;
 
     for (size_t layer_idx : layer_order) {
         if (layer_idx == initial_layer)
@@ -715,7 +770,8 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
 
         EmbossShape layer_shape = shape;
         layer_shape.shapes_with_ids = std::move(layer_shapes);
-        layer_shape.projection.depth = base_extrusion_mm + extrusion_step_mm * static_cast<double>(next_layer_ordinal++);
+        const auto [layer_from_mm, layer_to_mm] = get_layer_from_to_mm(layer_idx, options);
+        layer_shape.projection.depth = layer_to_mm - layer_from_mm;
         layer_shape.final_shape = {};
         TriangleMesh layer_mesh = create_mesh_from_emboss_shape(layer_shape);
 
@@ -723,6 +779,7 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
         ModelVolume *part = object->add_volume(std::move(layer_mesh), layer_type);
         part->name = GUI::format(_u8L("%1% - Layer %2%"), object_base_name, layer_idx + 1);
         part->emboss_shape = std::move(layer_shape);
+        part->translate(Vec3d(0.0, 0.0, layer_from_mm));
     }
 
     object->invalidate_bounding_box();
