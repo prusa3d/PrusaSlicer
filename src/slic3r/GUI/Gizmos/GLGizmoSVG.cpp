@@ -34,6 +34,7 @@
 #include <wx/statbox.h>
 #include <wx/stattext.h>
 #include <wx/button.h>
+#include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/fstream.hpp>
 
@@ -126,20 +127,21 @@ std::string get_file_name(const std::string &file_path);
 /// <returns>Name for volume</returns>
 std::string volume_name(const EmbossShape& shape);
 
-enum class SvgImportMode : int {
-    Merged = 0,
-    LayersAsParts = 1
-};
-
 struct SvgImportOptions
 {
-    SvgImportMode import_mode                  = SvgImportMode::Merged;
     std::vector<bool> selected_layers;
 };
 
-std::vector<std::string> build_svg_layer_names(const NSVGimage &image);
-bool select_svg_import_options(const NSVGimage &image, SvgImportOptions &options);
-ExPolygonsWithIds filter_shapes_by_selected_layers(const ExPolygonsWithIds &shape_ids, const SvgImportOptions &options);
+struct SvgLayerInfo
+{
+    std::vector<std::string> names;
+    std::vector<size_t> shape_to_layer;
+    std::vector<bool> default_selected;
+};
+
+SvgLayerInfo build_svg_layer_info(const EmbossShape::SvgFile &svg_file, const NSVGimage &image);
+bool select_svg_import_options(const SvgLayerInfo &layer_info, SvgImportOptions &options);
+ExPolygonsWithIds create_shapes_with_selected_layers(EmbossShape::SvgFile &svg_file, const SvgImportOptions &options, const SvgLayerInfo &layer_info);
 
 enum class IconType : unsigned {
     reset_value,
@@ -2195,25 +2197,193 @@ GuiCfg create_gui_configuration() {
     return cfg;
 }
 
-std::vector<std::string> build_svg_layer_names(const NSVGimage &image)
+static bool is_svg_shape_tag(const std::string &tag_name)
 {
-    std::vector<std::string> names;
+    return tag_name == "path" || tag_name == "rect" || tag_name == "circle" ||
+           tag_name == "ellipse" || tag_name == "polygon" || tag_name == "polyline" ||
+           tag_name == "line";
+}
+
+static std::string get_xml_attr(const std::string &tag, const char *attr_name)
+{
+    const std::string key = std::string(attr_name) + "=";
+    size_t pos = tag.find(key);
+    if (pos == std::string::npos)
+        return {};
+    pos += key.size();
+    if (pos >= tag.size())
+        return {};
+    const char quote = tag[pos];
+    if (quote != '"' && quote != '\'')
+        return {};
+    size_t end = tag.find(quote, pos + 1);
+    if (end == std::string::npos || end <= pos + 1)
+        return {};
+    return tag.substr(pos + 1, end - pos - 1);
+}
+
+static bool has_hidden_style_flag(const std::string &style_raw)
+{
+    if (style_raw.empty())
+        return false;
+    const std::string style = boost::algorithm::to_lower_copy(style_raw);
+    return style.find("display:none") != std::string::npos ||
+           style.find("visibility:hidden") != std::string::npos ||
+           style.find("visibility:collapse") != std::string::npos;
+}
+
+static bool is_hidden_tag(const std::string &tag)
+{
+    const std::string display = boost::algorithm::to_lower_copy(get_xml_attr(tag, "display"));
+    const std::string visibility = boost::algorithm::to_lower_copy(get_xml_attr(tag, "visibility"));
+    if (display == "none")
+        return true;
+    if (visibility == "hidden" || visibility == "collapse")
+        return true;
+    return has_hidden_style_flag(get_xml_attr(tag, "style"));
+}
+
+static bool parse_explicit_svg_layers(const std::string &svg_text, size_t shape_count, SvgLayerInfo &out)
+{
+    constexpr size_t npos = std::numeric_limits<size_t>::max();
+    out.names.clear();
+    out.shape_to_layer.assign(shape_count, size_t(0));
+    out.default_selected.clear();
+
+    std::vector<size_t> group_stack;
+    std::vector<bool> hidden_stack;
+    size_t current_layer = npos;
+    bool current_hidden = false;
+    size_t shape_index = 0;
+    bool has_layer_groups = false;
+
+    size_t pos = 0;
+    while (true) {
+        const size_t lt = svg_text.find('<', pos);
+        if (lt == std::string::npos)
+            break;
+        const size_t gt = svg_text.find('>', lt + 1);
+        if (gt == std::string::npos)
+            break;
+
+        std::string tag = svg_text.substr(lt + 1, gt - lt - 1);
+        boost::algorithm::trim(tag);
+        if (tag.empty() || tag[0] == '?' || tag[0] == '!') {
+            pos = gt + 1;
+            continue;
+        }
+
+        const bool is_end_tag = tag[0] == '/';
+        const bool self_closing = !tag.empty() && tag.back() == '/';
+
+        if (is_end_tag) {
+            std::string end_name = tag.substr(1);
+            boost::algorithm::trim(end_name);
+            if (end_name == "g" && !group_stack.empty() && !hidden_stack.empty()) {
+                current_layer = group_stack.back();
+                group_stack.pop_back();
+                current_hidden = hidden_stack.back();
+                hidden_stack.pop_back();
+            }
+            pos = gt + 1;
+            continue;
+        }
+
+        std::string tag_name = tag.substr(0, tag.find_first_of(" \t\r\n/"));
+        boost::algorithm::to_lower(tag_name);
+
+        if (tag_name == "g") {
+            group_stack.push_back(current_layer);
+            hidden_stack.push_back(current_hidden);
+            current_hidden = current_hidden || is_hidden_tag(tag);
+            const std::string group_mode = get_xml_attr(tag, "inkscape:groupmode");
+            if (group_mode == "layer") {
+                has_layer_groups = true;
+                std::string layer_name = get_xml_attr(tag, "inkscape:label");
+                if (layer_name.empty())
+                    layer_name = get_xml_attr(tag, "id");
+                if (layer_name.empty())
+                    layer_name = GUI::format("%1% %2%", _u8L("Layer"), out.names.size() + 1);
+
+                auto it = std::find(out.names.begin(), out.names.end(), layer_name);
+                if (it == out.names.end()) {
+                    current_layer = out.names.size();
+                    out.names.push_back(layer_name);
+                    out.default_selected.push_back(!current_hidden);
+                } else {
+                    current_layer = static_cast<size_t>(std::distance(out.names.begin(), it));
+                    out.default_selected[current_layer] = out.default_selected[current_layer] && !current_hidden;
+                }
+            }
+            if (self_closing && !group_stack.empty() && !hidden_stack.empty()) {
+                current_layer = group_stack.back();
+                group_stack.pop_back();
+                current_hidden = hidden_stack.back();
+                hidden_stack.pop_back();
+            }
+            pos = gt + 1;
+            continue;
+        }
+
+        if (is_svg_shape_tag(tag_name)) {
+            if (shape_index < out.shape_to_layer.size())
+                out.shape_to_layer[shape_index] = current_layer == npos ? size_t(0) : current_layer;
+            ++shape_index;
+        }
+
+        pos = gt + 1;
+    }
+
+    if (!has_layer_groups)
+        return false;
+
+    if (out.names.empty())
+        out.names.push_back(GUI::format("%1% %2%", _u8L("Layer"), 1));
+    if (out.default_selected.size() != out.names.size())
+        out.default_selected.assign(out.names.size(), true);
+
+    for (size_t &layer_idx : out.shape_to_layer)
+        if (layer_idx == npos || layer_idx >= out.names.size())
+            layer_idx = 0;
+
+    return true;
+}
+
+SvgLayerInfo build_svg_layer_info(const EmbossShape::SvgFile &svg_file, const NSVGimage &image)
+{
+    SvgLayerInfo info;
+    const size_t shape_count = get_shapes_count(image);
+
+    if (shape_count == 0) {
+        info.names.push_back(GUI::format("%1% %2%", _u8L("Layer"), 1));
+        info.shape_to_layer.assign(1, size_t(0));
+        info.default_selected.assign(1, true);
+        return info;
+    }
+
+    if (svg_file.file_data != nullptr && parse_explicit_svg_layers(*svg_file.file_data, shape_count, info))
+        return info;
+
     size_t i = 0;
-    for (const NSVGshape *shape = image.shapes; shape != nullptr; shape = shape->next, ++i)
-        names.push_back(GUI::format(_u8L("Layer %1%"), i + 1));
-    return names;
+    for (const NSVGshape *shape = image.shapes; shape != nullptr; shape = shape->next, ++i) {
+        info.names.push_back(GUI::format(_u8L("Layer %1%"), i + 1));
+        info.shape_to_layer.push_back(i);
+        info.default_selected.push_back((shape->flags & NSVG_FLAGS_VISIBLE) != 0);
+    }
+    return info;
 }
 
 class SvgImportOptionsDialog final : public wxDialog
 {
 public:
-    SvgImportOptionsDialog(wxWindow *parent, const std::vector<std::string> &layer_names, SvgImportOptions &options)
+    SvgImportOptionsDialog(wxWindow *parent, const std::vector<std::string> &layer_names, const std::vector<bool> &layer_default_selected, SvgImportOptions &options)
         : wxDialog(parent, wxID_ANY, _L("SVG import options"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
         , m_layer_names(layer_names)
+        , m_layer_default_selected(layer_default_selected)
         , m_options(options)
     {
         if (m_options.selected_layers.size() != m_layer_names.size())
-            m_options.selected_layers.assign(m_layer_names.size(), true);
+            m_options.selected_layers = (m_layer_default_selected.size() == m_layer_names.size()) ? m_layer_default_selected : std::vector<bool>(m_layer_names.size(), true);
 
         auto *main_sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -2237,13 +2407,6 @@ public:
         layers_box->Add(m_layers_panel, 1, wxEXPAND | wxALL, 5);
         main_sizer->Add(layers_box, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
-        auto *mode_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Import mode"));
-        m_rb_mode_layers = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Layers as parts"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
-        m_rb_mode_merged = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Merged"));
-        mode_box->Add(m_rb_mode_layers, 0, wxALL, 5);
-        mode_box->Add(m_rb_mode_merged, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
-        main_sizer->Add(mode_box, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
-
         wxStdDialogButtonSizer *buttons = new wxStdDialogButtonSizer();
         buttons->AddButton(new wxButton(this, wxID_OK));
         buttons->AddButton(new wxButton(this, wxID_CANCEL));
@@ -2251,17 +2414,12 @@ public:
         main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 8);
 
         this->SetSizerAndFit(main_sizer);
-        this->SetMinSize(wxSize(560, 520));
-
-        m_rb_mode_merged->SetValue(m_options.import_mode == SvgImportMode::Merged);
-        m_rb_mode_layers->SetValue(m_options.import_mode == SvgImportMode::LayersAsParts);
+        this->SetMinSize(wxSize(560, 460));
         wxGetApp().UpdateDlgDarkUI(this);
     }
 
     bool transfer_from_controls()
     {
-        m_options.import_mode = m_rb_mode_layers->GetValue() ? SvgImportMode::LayersAsParts : SvgImportMode::Merged;
-
         for (size_t i = 0; i < m_layer_checks.size(); ++i)
             m_options.selected_layers[i] = m_layer_checks[i]->GetValue();
 
@@ -2275,36 +2433,53 @@ public:
 
 private:
     std::vector<std::string> m_layer_names;
+    std::vector<bool> m_layer_default_selected;
     SvgImportOptions &m_options;
 
     wxScrolledWindow *m_layers_panel{nullptr};
     std::vector<wxCheckBox*> m_layer_checks;
-    wxRadioButton *m_rb_mode_merged{nullptr};
-    wxRadioButton *m_rb_mode_layers{nullptr};
 };
 
-bool select_svg_import_options(const NSVGimage &image, SvgImportOptions &options)
+bool select_svg_import_options(const SvgLayerInfo &layer_info, SvgImportOptions &options)
 {
-    const std::vector<std::string> layer_names = build_svg_layer_names(image);
-    if (layer_names.empty())
+    if (layer_info.names.empty())
         return true;
 
-    SvgImportOptionsDialog dialog(nullptr, layer_names, options);
+    SvgImportOptionsDialog dialog(nullptr, layer_info.names, layer_info.default_selected, options);
     if (dialog.ShowModal() != wxID_OK)
         return false;
     return dialog.transfer_from_controls();
 }
 
-ExPolygonsWithIds filter_shapes_by_selected_layers(const ExPolygonsWithIds &shape_ids, const SvgImportOptions &options)
+ExPolygonsWithIds create_shapes_with_selected_layers(EmbossShape::SvgFile &svg_file, const SvgImportOptions &options, const SvgLayerInfo &layer_info)
 {
-    ExPolygonsWithIds filtered;
-    filtered.reserve(shape_ids.size());
-    for (const ExPolygonsWithId &shape : shape_ids) {
-        const size_t layer_index = static_cast<size_t>(shape.id / 2);
-        if (layer_index < options.selected_layers.size() && options.selected_layers[layer_index])
-            filtered.push_back(shape);
+    NSVGimage *image = init_image(svg_file);
+    if (image == nullptr)
+        return {};
+
+    std::vector<unsigned char> original_flags;
+    const size_t shape_count = get_shapes_count(*image);
+    original_flags.reserve(shape_count);
+
+    size_t shape_index = 0;
+    for (NSVGshape *shape_ptr = image->shapes; shape_ptr != nullptr; shape_ptr = shape_ptr->next, ++shape_index) {
+        original_flags.push_back(shape_ptr->flags);
+        const size_t layer_index = shape_index < layer_info.shape_to_layer.size() ? layer_info.shape_to_layer[shape_index] : size_t(0);
+        const bool should_select = layer_index < options.selected_layers.size() ? options.selected_layers[layer_index] : true;
+        if (should_select)
+            shape_ptr->flags = static_cast<unsigned char>(shape_ptr->flags | NSVG_FLAGS_VISIBLE);
+        else
+            shape_ptr->flags = static_cast<unsigned char>(shape_ptr->flags & ~NSVG_FLAGS_VISIBLE);
     }
-    return filtered;
+
+    NSVGLineParams params{get_tesselation_tolerance(1.)};
+    ExPolygonsWithIds shape_ids = create_shape_with_ids(*image, params);
+
+    shape_index = 0;
+    for (NSVGshape *shape_ptr = image->shapes; shape_ptr != nullptr && shape_index < original_flags.size(); shape_ptr = shape_ptr->next, ++shape_index)
+        shape_ptr->flags = original_flags[shape_index];
+
+    return shape_ids;
 }
 
 std::string choose_svg_file()
@@ -2378,15 +2553,12 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
         return {};
     }
 
-    // Set default and unchanging scale
-    NSVGLineParams params{tesselation_tolerance};
-    shape.shapes_with_ids = create_shape_with_ids(*svg.image, params);
-
     SvgImportOptions import_options;
-    if (!select_svg_import_options(*svg.image, import_options))
+    const SvgLayerInfo layer_info = build_svg_layer_info(svg, *svg.image);
+    if (!select_svg_import_options(layer_info, import_options))
         return {};
 
-    shape.shapes_with_ids = filter_shapes_by_selected_layers(shape.shapes_with_ids, import_options);
+    shape.shapes_with_ids = create_shapes_with_selected_layers(svg, import_options, layer_info);
 
     // Must contain some shapes !!!
     if (shape.shapes_with_ids.empty()) {
