@@ -56,6 +56,7 @@
 #include <wx/choice.h>
 #include <wx/scrolwin.h>
 #include <wx/textctrl.h>
+#include <wx/settings.h>
 #include <wx/filedlg.h>
 #include <wx/dnd.h>
 #include <wx/progdlg.h>
@@ -444,7 +445,7 @@ public:
         auto *main_sizer = new wxBoxSizer(wxVERTICAL);
 
         auto *mode_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Import mode"));
-        m_rb_mode_merged = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Merged"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
+        m_rb_mode_merged = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Merged layers"), wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
         m_rb_mode_layers = new wxRadioButton(mode_box->GetStaticBox(), wxID_ANY, _L("Layers as parts"));
         mode_box->Add(m_rb_mode_merged, 0, wxALL, 5);
         mode_box->Add(m_rb_mode_layers, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
@@ -455,18 +456,49 @@ public:
         m_layers_panel->SetScrollRate(0, 10);
 
         auto *layers_grid = new wxFlexGridSizer(5, 5, 8);
-        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Import")), 0, wxALIGN_CENTER_VERTICAL);
-        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer")), 0, wxALIGN_CENTER_VERTICAL);
-        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("Type")), 0, wxALIGN_CENTER_VERTICAL);
-        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("From (mm)")), 0, wxALIGN_CENTER_VERTICAL);
-        layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, _L("To (mm)")), 0, wxALIGN_CENTER_VERTICAL);
+        wxFont header_font = this->GetFont();
+        header_font.MakeBold();
+        auto *hdr_import = new wxStaticText(m_layers_panel, wxID_ANY, _L("Import"));
+        auto *hdr_layer  = new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer"));
+        auto *hdr_type   = new wxStaticText(m_layers_panel, wxID_ANY, _L("Type"));
+        auto *hdr_from_panel = new wxPanel(m_layers_panel, wxID_ANY);
+        auto *hdr_from_sizer = new wxBoxSizer(wxHORIZONTAL);
+        auto *hdr_from_main = new wxStaticText(hdr_from_panel, wxID_ANY, _L("From"));
+        auto *hdr_from_unit = new wxStaticText(hdr_from_panel, wxID_ANY, _L(" (mm)"));
+        hdr_from_sizer->Add(hdr_from_main, 0, wxALIGN_CENTER_VERTICAL);
+        hdr_from_sizer->Add(hdr_from_unit, 0, wxALIGN_CENTER_VERTICAL);
+        hdr_from_panel->SetSizerAndFit(hdr_from_sizer);
+        auto *hdr_to_panel = new wxPanel(m_layers_panel, wxID_ANY);
+        auto *hdr_to_sizer = new wxBoxSizer(wxHORIZONTAL);
+        auto *hdr_to_main = new wxStaticText(hdr_to_panel, wxID_ANY, _L("To"));
+        auto *hdr_to_unit = new wxStaticText(hdr_to_panel, wxID_ANY, _L(" (mm)"));
+        hdr_to_sizer->Add(hdr_to_main, 0, wxALIGN_CENTER_VERTICAL);
+        hdr_to_sizer->Add(hdr_to_unit, 0, wxALIGN_CENTER_VERTICAL);
+        hdr_to_panel->SetSizerAndFit(hdr_to_sizer);
+        hdr_import->SetFont(header_font);
+        hdr_layer->SetFont(header_font);
+        hdr_type->SetFont(header_font);
+        hdr_from_main->SetFont(header_font);
+        hdr_to_main->SetFont(header_font);
+        m_header_type = hdr_type;
+        m_header_from_main = hdr_from_main;
+        m_header_from_unit = hdr_from_unit;
+        m_header_to_main = hdr_to_main;
+        m_header_to_unit = hdr_to_unit;
+        m_header_enabled_color = hdr_type->GetForegroundColour();
+        m_header_disabled_color = wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT);
+        layers_grid->Add(hdr_import, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
+        layers_grid->Add(hdr_layer,  0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL | wxLEFT | wxRIGHT, 25);
+        layers_grid->Add(hdr_type,   0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
+        layers_grid->Add(hdr_from_panel, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
+        layers_grid->Add(hdr_to_panel,   0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
         for (size_t i = 0; i < m_layer_names.size(); ++i) {
             wxCheckBox *checkbox = new wxCheckBox(m_layers_panel, wxID_ANY, "");
             checkbox->SetValue(m_options.selected_layers[i]);
             m_layer_checks.push_back(checkbox);
-            layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL);
+            layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
 
-            layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i])), 0, wxALIGN_CENTER_VERTICAL);
+            layers_grid->Add(new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i])), 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 25);
 
             wxArrayString type_choices;
             type_choices.Add(_L("Part"));
@@ -507,9 +539,8 @@ public:
         auto update_columns_state = [this](wxCommandEvent &) { this->update_layer_editable_controls_state(); };
         m_rb_mode_merged->Bind(wxEVT_RADIOBUTTON, update_columns_state);
         m_rb_mode_layers->Bind(wxEVT_RADIOBUTTON, update_columns_state);
-        update_layer_editable_controls_state();
-
         wxGetApp().UpdateDlgDarkUI(this);
+        update_layer_editable_controls_state();
     }
 
     bool transfer_from_controls()
@@ -561,6 +592,20 @@ private:
         for (wxTextCtrl *ctrl : m_layer_to_inputs)
             if (ctrl != nullptr)
                 ctrl->Enable(enable_layer_specific);
+
+        const wxColour &header_color = enable_layer_specific ? m_header_enabled_color : m_header_disabled_color;
+        if (m_header_type != nullptr)
+            m_header_type->SetForegroundColour(header_color);
+        if (m_header_from_main != nullptr)
+            m_header_from_main->SetForegroundColour(header_color);
+        if (m_header_from_unit != nullptr)
+            m_header_from_unit->SetForegroundColour(header_color);
+        if (m_header_to_main != nullptr)
+            m_header_to_main->SetForegroundColour(header_color);
+        if (m_header_to_unit != nullptr)
+            m_header_to_unit->SetForegroundColour(header_color);
+        if (m_layers_panel != nullptr)
+            m_layers_panel->Refresh();
     }
 
     std::vector<std::string> m_layer_names;
@@ -572,6 +617,13 @@ private:
     std::vector<wxChoice*> m_layer_type_choices;
     std::vector<wxTextCtrl*> m_layer_from_inputs;
     std::vector<wxTextCtrl*> m_layer_to_inputs;
+    wxStaticText *m_header_type{nullptr};
+    wxStaticText *m_header_from_main{nullptr};
+    wxStaticText *m_header_from_unit{nullptr};
+    wxStaticText *m_header_to_main{nullptr};
+    wxStaticText *m_header_to_unit{nullptr};
+    wxColour m_header_enabled_color;
+    wxColour m_header_disabled_color;
     wxRadioButton *m_rb_mode_merged{nullptr};
     wxRadioButton *m_rb_mode_layers{nullptr};
 };
