@@ -2516,7 +2516,7 @@ public:
         wxFont header_font = this->GetFont();
         header_font.MakeBold();
         auto *hdr_import = new wxStaticText(m_layers_panel, wxID_ANY, _L("Import"));
-        auto *hdr_layer  = new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer"));
+        auto *hdr_layer  = new wxStaticText(m_layers_panel, wxID_ANY, _L("Layer name"));
         hdr_import->SetFont(header_font);
         hdr_layer->SetFont(header_font);
         hdr_import->SetToolTip(_L("Enable or disable importing this layer."));
