@@ -400,6 +400,16 @@ static bool parse_explicit_svg_layers(const std::string &svg_text, size_t shape_
         if (layer_idx == npos || layer_idx >= out.names.size())
             layer_idx = 0;
 
+    // Inkscape renders the layer stack top-to-bottom opposite to SVG declaration order.
+    // Reverse the UI/order mapping so the dialog matches Inkscape's visual layer list.
+    if (out.names.size() > 1) {
+        const size_t last_idx = out.names.size() - 1;
+        std::reverse(out.names.begin(), out.names.end());
+        std::reverse(out.default_selected.begin(), out.default_selected.end());
+        for (size_t &layer_idx : out.shape_to_layer)
+            layer_idx = last_idx - layer_idx;
+    }
+
     return true;
 }
 
@@ -413,8 +423,10 @@ static void ensure_default_layer_ranges(SvgImportOptions &options, size_t layer_
         options.layer_from_mm.assign(layer_count, svg_default_extrusion_from_mm);
     if (options.layer_to_mm.size() != layer_count) {
         options.layer_to_mm.resize(layer_count);
-        for (size_t i = 0; i < layer_count; ++i)
-            options.layer_to_mm[i] = svg_default_extrusion_base_to_mm + svg_default_extrusion_step_mm * static_cast<double>(i);
+        for (size_t i = 0; i < layer_count; ++i) {
+            const size_t reversed_index = layer_count - 1 - i;
+            options.layer_to_mm[i] = svg_default_extrusion_base_to_mm + svg_default_extrusion_step_mm * static_cast<double>(reversed_index);
+        }
     }
 }
 
@@ -461,6 +473,9 @@ public:
         m_layers_panel->SetToolTip(_L("List of SVG layers detected in the file."));
 
         auto *layers_grid = new wxFlexGridSizer(5, 5, 8);
+        layers_grid->AddGrowableCol(1, 1);
+        constexpr int type_col_width_px = 170;
+        constexpr int from_to_col_width_px = 90;
         wxFont header_font = this->GetFont();
         header_font.MakeBold();
         auto *hdr_import = new wxStaticText(m_layers_panel, wxID_ANY, _L("Import"));
@@ -499,8 +514,15 @@ public:
         m_header_to_unit = hdr_to_unit;
         m_header_enabled_color = hdr_type->GetForegroundColour();
         m_header_disabled_color = wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT);
+        hdr_type->SetMinSize(wxSize(type_col_width_px, -1));
+        hdr_type->SetMaxSize(wxSize(type_col_width_px, -1));
+        hdr_from_panel->SetMinSize(wxSize(from_to_col_width_px, -1));
+        hdr_from_panel->SetMaxSize(wxSize(from_to_col_width_px, -1));
+        hdr_to_panel->SetMinSize(wxSize(from_to_col_width_px, -1));
+        hdr_to_panel->SetMaxSize(wxSize(from_to_col_width_px, -1));
+        hdr_layer->SetMinSize(wxSize(1, -1));
         layers_grid->Add(hdr_import, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
-        layers_grid->Add(hdr_layer,  0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL | wxLEFT | wxRIGHT, 25);
+        layers_grid->Add(hdr_layer,  0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL | wxLEFT | wxRIGHT | wxEXPAND, 25);
         layers_grid->Add(hdr_type,   0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
         layers_grid->Add(hdr_from_panel, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
         layers_grid->Add(hdr_to_panel,   0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
@@ -512,15 +534,18 @@ public:
             m_layer_checks.push_back(checkbox);
             layers_grid->Add(checkbox, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_CENTER_HORIZONTAL);
 
-            auto *layer_name_label = new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i]));
+            auto *layer_name_label = new wxStaticText(m_layers_panel, wxID_ANY, from_u8(m_layer_names[i]), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+            layer_name_label->SetMinSize(wxSize(1, -1));
             layer_name_label->SetToolTip(_L("Layer name read from the SVG file."));
-            layers_grid->Add(layer_name_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 25);
+            layers_grid->Add(layer_name_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT | wxEXPAND, 25);
 
             wxArrayString type_choices;
             type_choices.Add(_L("Part"));
             type_choices.Add(_L("Negative volume"));
             type_choices.Add(_L("Modifier"));
             wxChoice *type_choice = new wxChoice(m_layers_panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, type_choices);
+            type_choice->SetMinSize(wxSize(type_col_width_px, -1));
+            type_choice->SetMaxSize(wxSize(type_col_width_px, -1));
             int sel = 0;
             if (m_options.layer_types[i] == ModelVolumeType::NEGATIVE_VOLUME)
                 sel = 1;
@@ -533,12 +558,16 @@ public:
 
             wxTextCtrl *from_ctrl = new wxTextCtrl(m_layers_panel, wxID_ANY, double_to_string(m_options.layer_from_mm[i]));
             wxTextCtrl *to_ctrl   = new wxTextCtrl(m_layers_panel, wxID_ANY, double_to_string(m_options.layer_to_mm[i]));
+            from_ctrl->SetMinSize(wxSize(from_to_col_width_px, -1));
+            from_ctrl->SetMaxSize(wxSize(from_to_col_width_px, -1));
+            to_ctrl->SetMinSize(wxSize(from_to_col_width_px, -1));
+            to_ctrl->SetMaxSize(wxSize(from_to_col_width_px, -1));
             from_ctrl->SetToolTip(_L("Extrusion start height in millimeters."));
             to_ctrl->SetToolTip(_L("Extrusion end height in millimeters (must be greater than From)."));
             m_layer_from_inputs.push_back(from_ctrl);
             m_layer_to_inputs.push_back(to_ctrl);
-            layers_grid->Add(from_ctrl, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
-            layers_grid->Add(to_ctrl, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+            layers_grid->Add(from_ctrl, 0, wxALIGN_CENTER_VERTICAL);
+            layers_grid->Add(to_ctrl, 0, wxALIGN_CENTER_VERTICAL);
         }
         m_layers_panel->SetSizer(layers_grid);
         layers_box->Add(m_layers_panel, 1, wxEXPAND | wxALL, 5);
@@ -555,9 +584,10 @@ public:
         main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 8);
 
         this->SetSizerAndFit(main_sizer);
-        wxSize min_size = this->GetSize();
-        min_size.x += 60;
-        this->SetMinSize(min_size);
+        wxSize initial_size = this->GetSize();
+        initial_size.x += 120;
+        this->SetSize(initial_size);
+        this->SetMinSize(initial_size);
 
         m_rb_mode_merged->SetValue(m_options.import_mode == SvgImportMode::Merged);
         m_rb_mode_layers->SetValue(m_options.import_mode == SvgImportMode::LayersAsParts);
@@ -752,6 +782,13 @@ static ModelVolumeType get_layer_type(size_t layer_index, const SvgImportOptions
     return ModelVolumeType::MODEL_PART;
 }
 
+static std::string get_layer_name(const SvgLayerInfo &layer_info, size_t layer_index)
+{
+    if (layer_index < layer_info.names.size() && !layer_info.names[layer_index].empty())
+        return layer_info.names[layer_index];
+    return format("%1% %2%", _u8L("Layer"), layer_index + 1);
+}
+
 static TriangleMesh create_mesh_from_emboss_shape(EmbossShape shape)
 {
     ExPolygons union_shape = union_with_delta(shape, Slic3r::Emboss::UNION_DELTA, Slic3r::Emboss::UNION_MAX_ITERATIN);
@@ -837,7 +874,6 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
     const size_t initial_layer = *layer_order.begin();
     ExPolygonsWithIds initial_shapes = get_shapes_for_layer(selected_shapes, layer_info, initial_layer);
     const ModelVolumeType initial_type = get_layer_type(initial_layer, options);
-    const std::string object_base_name = object->name;
 
     EmbossShape base_shape = shape;
     base_shape.shapes_with_ids = initial_shapes;
@@ -852,8 +888,8 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
     Vec3d initial_offset = volume->get_offset();
     initial_offset.z() = initial_from_mm + shape.projection.depth * 0.5;
     volume->set_offset(initial_offset);
-    object->name = GUI::format(_u8L("%1% - Layer %2%"), object_base_name, initial_layer + 1);
-    volume->name = object->name;
+    object->name = fs::path(path).stem().string();
+    volume->name = get_layer_name(layer_info, initial_layer);
 
     for (size_t layer_idx : layer_order) {
         if (layer_idx == initial_layer)
@@ -872,7 +908,7 @@ static bool process_svg_import_options(wxWindow *parent, const std::string &path
 
         const ModelVolumeType layer_type = get_layer_type(layer_idx, options);
         ModelVolume *part = object->add_volume(std::move(layer_mesh), layer_type);
-        part->name = GUI::format(_u8L("%1% - Layer %2%"), object_base_name, layer_idx + 1);
+        part->name = get_layer_name(layer_info, layer_idx);
         part->emboss_shape = std::move(layer_shape);
         part->translate(Vec3d(0.0, 0.0, layer_from_mm));
     }

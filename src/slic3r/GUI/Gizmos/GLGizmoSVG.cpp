@@ -2437,6 +2437,16 @@ static bool parse_explicit_svg_layers(const std::string &svg_text, size_t shape_
         if (layer_idx == npos || layer_idx >= out.names.size())
             layer_idx = 0;
 
+    // Inkscape renders the layer stack top-to-bottom opposite to SVG declaration order.
+    // Reverse the UI/order mapping so the dialog matches Inkscape's visual layer list.
+    if (out.names.size() > 1) {
+        const size_t last_idx = out.names.size() - 1;
+        std::reverse(out.names.begin(), out.names.end());
+        std::reverse(out.default_selected.begin(), out.default_selected.end());
+        for (size_t &layer_idx : out.shape_to_layer)
+            layer_idx = last_idx - layer_idx;
+    }
+
     return true;
 }
 
