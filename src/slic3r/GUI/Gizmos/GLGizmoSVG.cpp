@@ -1449,6 +1449,8 @@ bool GLGizmoSVG::process(bool make_snapshot) {
     auto base = std::make_unique<DataBase>(m_volume->name, m_job_cancel, std::move(shape));
     base->is_outside = m_volume->type() == ModelVolumeType::MODEL_PART;
     DataUpdate data{std::move(base), m_volume_id, make_snapshot};
+    if (!m_volume_shape.projection.use_surface)
+        data.trmat = m_volume->get_matrix();
     return start_update_volume(std::move(data), *m_volume, m_parent.get_selection(), m_raycast_manager);    
 }
 
@@ -1924,6 +1926,7 @@ void GLGizmoSVG::draw_size()
     if (new_relative_scale.has_value()){
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
+        const double preserved_z = (m_volume != nullptr) ? m_volume->get_offset().z() : 0.0;
 
         auto selection_scale_fnc = [&selection, rel_scale = *new_relative_scale]() {
             selection.scale(rel_scale, get_drag_transformation_type(selection));
@@ -1933,6 +1936,17 @@ void GLGizmoSVG::draw_size()
         std::string snap_name; // Empty mean do not store on undo/redo stack
         m_parent.do_scale(snap_name);
         wxGetApp().obj_manipul()->set_dirty();
+
+        // Keep the current Z placement while scaling XY from the SVG panel.
+        if (m_volume != nullptr && !is_approx(m_volume->get_offset().z(), preserved_z)) {
+            m_volume->set_offset(Axis::Z, preserved_z);
+            if (!selection.get_volume_idxs().empty()) {
+                if (GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin()); gl_volume != nullptr)
+                    gl_volume->set_volume_offset(Axis::Z, preserved_z);
+            }
+            selection.setup_cache();
+        }
+
         // should be the almost same
         calculate_scale();
         if (!make_snap) // Be carefull: Last change may be without change of scale

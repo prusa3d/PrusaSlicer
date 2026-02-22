@@ -466,7 +466,7 @@ public:
         mode_box->Add(m_rb_mode_layers, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
         main_sizer->Add(mode_box, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
-        auto *layers_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Layers"));
+        auto *layers_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("SVG layers"));
         layers_box->GetStaticBox()->SetToolTip(_L("Configure per-layer import options."));
         m_layers_panel = new wxScrolledWindow(layers_box->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxSize(480, 220), wxVSCROLL | wxTAB_TRAVERSAL);
         m_layers_panel->SetScrollRate(0, 10);
