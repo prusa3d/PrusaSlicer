@@ -140,7 +140,7 @@ struct SvgLayerInfo
 };
 
 SvgLayerInfo build_svg_layer_info(const EmbossShape::SvgFile &svg_file, const NSVGimage &image);
-bool select_svg_import_options(const SvgLayerInfo &layer_info, SvgImportOptions &options);
+bool select_svg_import_options(const SvgLayerInfo &layer_info, SvgImportOptions &options, bool show_relink_notice = false);
 ExPolygonsWithIds create_shapes_with_selected_layers(EmbossShape::SvgFile &svg_file, const SvgImportOptions &options, const SvgLayerInfo &layer_info);
 
 enum class IconType : unsigned {
@@ -584,8 +584,20 @@ void GLGizmoSVG::on_set_state()
 }
 
 void GLGizmoSVG::data_changed(bool is_serializing) { 
+    if (m_relink_prompt_active)
+        return;
+
+    if (m_empty_shape_prompt_canceled_volume_id.valid()) {
+        const Selection &selection = m_parent.get_selection();
+        const Model *model = selection.get_model();
+        const GLVolume *gl_volume = model != nullptr ? get_selected_gl_volume(selection) : nullptr;
+        const ModelVolume *selected_volume = (gl_volume != nullptr && model != nullptr) ? get_model_volume(*gl_volume, model->objects) : nullptr;
+        if (selected_volume == nullptr || selected_volume->id() != m_empty_shape_prompt_canceled_volume_id)
+            m_empty_shape_prompt_canceled_volume_id = ObjectID{};
+    }
+
     set_volume_by_selection();
-    if (!is_serializing && m_volume == nullptr)
+    if (!is_serializing && m_volume == nullptr && !m_empty_shape_prompt_canceled_volume_id.valid())
         close();
 }
 
@@ -1204,15 +1216,25 @@ std::vector<std::string> create_shape_warnings(const EmbossShape &shape, float s
 
 void GLGizmoSVG::set_volume_by_selection()
 {
+    if (m_relink_prompt_active)
+        return;
+
     const Selection &selection = m_parent.get_selection();
+    const Model *model = selection.get_model();
+    if (model == nullptr)
+        return reset_volume();
+
     const GLVolume *gl_volume = get_selected_gl_volume(selection);
     if (gl_volume == nullptr)
         return reset_volume();
 
-    const ModelObjectPtrs &objects = selection.get_model()->objects;
+    const ModelObjectPtrs &objects = model->objects;
     ModelVolume *volume =get_model_volume(*gl_volume, objects);
     if (volume == nullptr)
         return reset_volume();
+
+    if (volume->id() == m_empty_shape_prompt_canceled_volume_id)
+        return;
 
     // is same volume as actual selected?
     if (volume->id() == m_volume_id)
@@ -1247,9 +1269,25 @@ void GLGizmoSVG::set_volume_by_selection()
     assert(svg_file.image.get() != nullptr);
     const NSVGimage &image = *svg_file.image;
     ExPolygonsWithIds &shape_ids = es.shapes_with_ids;
-    if (shape_ids.empty()) {        
-        NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
-        shape_ids = create_shape_with_ids(image, params);                
+    bool needs_relink_prompt = false;
+    if (shape_ids.empty()) {
+        const SvgLayerInfo layer_info = build_svg_layer_info(svg_file, image);
+        SvgImportOptions import_options;
+        import_options.selected_layers = layer_info.default_selected;
+        if (import_options.selected_layers.empty())
+            import_options.selected_layers.assign(layer_info.names.size(), true);
+        shape_ids = create_shapes_with_selected_layers(svg_file, import_options, layer_info);
+        if (shape_ids.empty()) {
+            import_options.selected_layers.assign(layer_info.names.size(), true);
+            shape_ids = create_shapes_with_selected_layers(svg_file, import_options, layer_info);
+            if (shape_ids.empty()) {
+                show_error(nullptr, _L("Selected SVG layers are empty."));
+                m_empty_shape_prompt_canceled_volume_id = volume->id();
+                return reset_volume();
+            }
+        }
+        m_empty_shape_prompt_canceled_volume_id = ObjectID{};
+        needs_relink_prompt = true;
     }
 
     reset_volume(); // clear cached data
@@ -1264,6 +1302,64 @@ void GLGizmoSVG::set_volume_by_selection()
     m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
     
     m_shape_bb = get_extents(m_volume_shape.shapes_with_ids);
+
+    if (needs_relink_prompt && !m_relink_prompt_scheduled) {
+        m_relink_prompt_scheduled = true;
+        m_relink_prompt_volume_id = m_volume_id;
+        wxGetApp().plater()->CallAfter([this]() {
+            m_relink_prompt_scheduled = false;
+            if (m_relink_prompt_active || this->get_state() != GLGizmoBase::On || m_relink_prompt_volume_id.invalid())
+                return;
+
+            const Selection &selection = m_parent.get_selection();
+            const Model *model = selection.get_model();
+            if (model == nullptr)
+                return;
+
+            ModelVolume *volume = get_model_volume(m_relink_prompt_volume_id, model->objects);
+            if (volume == nullptr || !volume->emboss_shape.has_value() || !volume->emboss_shape->svg_file.has_value())
+                return;
+
+            EmbossShape &es = *volume->emboss_shape;
+            EmbossShape::SvgFile &svg_file = *es.svg_file;
+            if (svg_file.image == nullptr && init_image(svg_file) == nullptr)
+                return;
+
+            const SvgLayerInfo layer_info = build_svg_layer_info(svg_file, *svg_file.image);
+            SvgImportOptions import_options;
+            import_options.selected_layers = layer_info.default_selected;
+
+            m_relink_prompt_active = true;
+            const bool accepted = select_svg_import_options(layer_info, import_options, true);
+            m_relink_prompt_active = false;
+
+            if (!accepted) {
+                m_empty_shape_prompt_canceled_volume_id = volume->id();
+                if (m_volume != nullptr && m_volume_id == volume->id())
+                    reset_volume();
+                return;
+            }
+
+            ExPolygonsWithIds selected_shapes = create_shapes_with_selected_layers(svg_file, import_options, layer_info);
+            if (selected_shapes.empty()) {
+                show_error(nullptr, _L("Selected SVG layers are empty."));
+                m_empty_shape_prompt_canceled_volume_id = volume->id();
+                if (m_volume != nullptr && m_volume_id == volume->id())
+                    reset_volume();
+                return;
+            }
+
+            es.shapes_with_ids = selected_shapes;
+            m_empty_shape_prompt_canceled_volume_id = ObjectID{};
+
+            if (m_volume != nullptr && m_volume_id == volume->id()) {
+                m_volume_shape.shapes_with_ids = selected_shapes;
+                m_shape_warnings = create_shape_warnings(m_volume_shape, get_scale_for_tolerance());
+                m_shape_bb = get_extents(m_volume_shape.shapes_with_ids);
+                process(false);
+            }
+        });
+    }
 }
 namespace {
 void delete_texture(Texture& texture){
@@ -1275,6 +1371,9 @@ void delete_texture(Texture& texture){
 }
 void GLGizmoSVG::reset_volume()
 {
+    m_relink_prompt_scheduled = false;
+    m_relink_prompt_volume_id = ObjectID{};
+
     if (m_volume == nullptr)
         return; // already reseted
 
@@ -2366,7 +2465,7 @@ SvgLayerInfo build_svg_layer_info(const EmbossShape::SvgFile &svg_file, const NS
 class SvgImportOptionsDialog final : public wxDialog
 {
 public:
-    SvgImportOptionsDialog(wxWindow *parent, const std::vector<std::string> &layer_names, const std::vector<bool> &layer_default_selected, SvgImportOptions &options)
+    SvgImportOptionsDialog(wxWindow *parent, const std::vector<std::string> &layer_names, const std::vector<bool> &layer_default_selected, SvgImportOptions &options, bool show_relink_notice)
         : wxDialog(parent, wxID_ANY, _L("SVG import options"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
         , m_layer_names(layer_names)
         , m_layer_default_selected(layer_default_selected)
@@ -2376,6 +2475,12 @@ public:
             m_options.selected_layers = (m_layer_default_selected.size() == m_layer_names.size()) ? m_layer_default_selected : std::vector<bool>(m_layer_names.size(), true);
 
         auto *main_sizer = new wxBoxSizer(wxVERTICAL);
+
+        if (show_relink_notice) {
+            auto *notice = new wxStaticText(this, wxID_ANY, _L("Please relink the SVG layer(s) you want to edit."));
+            notice->Wrap(520);
+            main_sizer->Add(notice, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 8);
+        }
 
         auto *layers_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("Layers"));
         layers_box->GetStaticBox()->SetToolTip(_L("Select which SVG layers will be imported."));
@@ -2462,12 +2567,12 @@ private:
     std::vector<wxStaticText*> m_layer_name_labels;
 };
 
-bool select_svg_import_options(const SvgLayerInfo &layer_info, SvgImportOptions &options)
+bool select_svg_import_options(const SvgLayerInfo &layer_info, SvgImportOptions &options, bool show_relink_notice)
 {
     if (layer_info.names.empty())
         return true;
 
-    SvgImportOptionsDialog dialog(nullptr, layer_info.names, layer_info.default_selected, options);
+    SvgImportOptionsDialog dialog(nullptr, layer_info.names, layer_info.default_selected, options, show_relink_notice);
     if (dialog.ShowModal() != wxID_OK)
         return false;
     return dialog.transfer_from_controls();
