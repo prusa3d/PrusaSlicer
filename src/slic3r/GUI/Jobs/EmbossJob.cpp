@@ -428,6 +428,10 @@ void UpdateJob::update_volume(ModelVolume *volume, TriangleMesh &&mesh, const Da
     if (!is_valid_input)
         return;
 
+    const bool is_svg_update = base.shape.svg_file.has_value();
+    const bool normalize_svg_origin = is_svg_update && !base.shape.projection.use_surface;
+    const Vec3d prev_offset = normalize_svg_origin ? volume->get_offset() : Vec3d::Zero();
+
     // update volume
     volume->set_mesh(std::move(mesh));
     volume->set_new_unique_id();
@@ -435,6 +439,11 @@ void UpdateJob::update_volume(ModelVolume *volume, TriangleMesh &&mesh, const Da
 
     // write data from base into volume
     base.write(*volume);
+    if (normalize_svg_origin) {
+        // Normalize updated SVG mesh origin to its geometric center, but keep part placement unchanged.
+        volume->center_geometry_after_creation(false);
+        volume->set_offset(prev_offset);
+    }
 
     GUI_App &app = wxGetApp(); // may be move to input
     if (volume->name != base.volume_name) {

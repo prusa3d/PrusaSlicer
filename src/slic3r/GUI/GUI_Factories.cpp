@@ -27,6 +27,7 @@
 #include "wx/dcclient.h"
 #include "slic3r/Utils/MacDarkMode.hpp"
 #endif
+#include <wx/filedlg.h>
 
 // ----------------------------------------------------------------------------
 // MenuWithSeparators
@@ -618,6 +619,44 @@ void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, 
 }
 
 void MenuFactory::append_menu_item_add_svg(wxMenu *menu, ModelVolumeType type, bool is_submenu_item /* = true*/){
+    if (type == ModelVolumeType::INVALID) {
+        auto add_svg_shape = [](const wxCommandEvent &) {
+            wxFileDialog dialog(wxGetApp().GetTopWindow(),
+                                _L("Choose one or more SVG files:"),
+                                from_u8(wxGetApp().app_config->get_last_dir()), "",
+                                file_wildcards(FT_SVG), wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
+            if (dialog.ShowModal() != wxID_OK)
+                return;
+
+            wxArrayString input_files;
+            dialog.GetPaths(input_files);
+            if (input_files.IsEmpty())
+                return;
+
+            std::vector<std::string> paths;
+            paths.reserve(input_files.size());
+            for (const auto &input_file : input_files)
+                paths.emplace_back(input_file.ToUTF8().data());
+
+            wxString snapshot_label = (paths.size() == 1) ? _L("Import Object") : _L("Import Objects");
+            snapshot_label += ": ";
+            snapshot_label += wxString::FromUTF8(boost::filesystem::path(paths.front()).filename().string().c_str());
+            for (size_t i = 1; i < paths.size(); ++i) {
+                snapshot_label += ", ";
+                snapshot_label += wxString::FromUTF8(boost::filesystem::path(paths[i]).filename().string().c_str());
+            }
+
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), snapshot_label);
+            wxGetApp().plater()->load_files(paths, true, false);
+        };
+
+        wxString item_name = _L("SVG");
+        menu->AppendSeparator();
+        const std::string icon_name = "";
+        append_menu_item(menu, wxID_ANY, item_name, "", add_svg_shape, icon_name, menu);
+        return;
+    }
+
     append_menu_itemm_add_(_L("SVG"), GLGizmosManager::Svg, menu, type, is_submenu_item);
 }
 

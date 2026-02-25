@@ -154,6 +154,11 @@ private:
     // When work with undo redo stack there could be situation that 
     // m_volume point to unexisting volume so One need also objectID
     ObjectID m_volume_id;
+    // Prevent reopening the layer selection dialog every frame after user cancels it.
+    ObjectID m_empty_shape_prompt_canceled_volume_id;
+    bool m_relink_prompt_active{false};
+    bool m_relink_prompt_scheduled{false};
+    ObjectID m_relink_prompt_volume_id;
 
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_job_cancel = nullptr;
