@@ -482,7 +482,7 @@ if (SLIC3R_PCH AND NOT SLIC3R_SYNTAXONLY)
 endif ()
 
 if (HAVE_SPNAV)
-    target_link_libraries(libslic3r_gui spnav)
+    target_link_libraries(libslic3r_gui PUBLIC spnav)
 endif()
 
 # We need to implement some hacks for wxWidgets and touch the underlying GTK
