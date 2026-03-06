@@ -1097,7 +1097,7 @@ namespace Slic3r {
 
     bool _3MF_Importer::_extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
-        if (stat.m_uncomp_size == 0) {
+        if (stat.m_uncomp_size == 0 || stat.m_uncomp_size > 500000000) {
             add_error("Found invalid size");
             return false;
         }
@@ -1161,7 +1161,7 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_cut_information_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, ConfigSubstitutionContext& config_substitutions)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1223,7 +1223,7 @@ namespace Slic3r {
         DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, 
         const std::string& archive_filename)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1243,7 +1243,7 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_layer_heights_profile_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1305,7 +1305,7 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_layer_config_ranges_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, ConfigSubstitutionContext& config_substitutions)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1362,7 +1362,7 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_sla_support_points_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1454,7 +1454,7 @@ namespace Slic3r {
     
     void _3MF_Importer::_extract_sla_drain_holes_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer(size_t(stat.m_uncomp_size), 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1565,7 +1565,7 @@ namespace Slic3r {
 
     bool _3MF_Importer::_extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model)
     {
-        if (stat.m_uncomp_size == 0) {
+        if (stat.m_uncomp_size == 0 || stat.m_uncomp_size > 10000000) {
             add_error("Found invalid size");
             return false;
         }
@@ -1605,7 +1605,7 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_custom_gcode_per_print_z_from_archive(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1679,7 +1679,7 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_wipe_tower_information_from_archive(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, Model& model)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
@@ -1721,7 +1721,7 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_wipe_tower_information_from_archive_legacy(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, Model& model)
     {
-        if (stat.m_uncomp_size > 0) {
+        if (stat.m_uncomp_size > 0 && stat.m_uncomp_size <= 10000000) {
             std::string buffer((size_t)stat.m_uncomp_size, 0);
             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
             if (res == 0) {
