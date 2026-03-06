@@ -789,7 +789,7 @@ void AMFParserContext::endElement(const char * /* name */)
                 char* p = m_value[1].data();
                 char* end = strchr(p, ';');
                 if (end == nullptr) {
-                    add_error("Invalid layer_height_range: missing ';' separator");
+                    stop("Invalid layer_height_range: missing ';' separator");
                     return;
                 }
                 *end = 0;
