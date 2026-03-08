@@ -120,6 +120,9 @@ struct CoolingLine
         TYPE_RESET_FAN_SPEED    = 1 << 18,
         TYPE_INTERNAL_PERIMETER = 1 << 19,
         TYPE_FIRST_INTERNAL_PERIMETER = 1 << 20,
+        // Top layer fan disable
+        TYPE_TOP_LAYER_FAN_START = 1 << 21,
+        TYPE_TOP_LAYER_FAN_END   = 1 << 22,
     };
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
@@ -837,6 +840,10 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_BRIDGE_FAN_START;
         } else if (boost::starts_with(sline, ";_BRIDGE_FAN_END")) {
             line.type = CoolingLine::TYPE_BRIDGE_FAN_END;
+        } else if (boost::starts_with(sline, ";_TOP_LAYER_FAN_START")) {
+            line.type = CoolingLine::TYPE_TOP_LAYER_FAN_START;
+        } else if (boost::starts_with(sline, ";_TOP_LAYER_FAN_END")) {
+            line.type = CoolingLine::TYPE_TOP_LAYER_FAN_END;
         } else if (boost::starts_with(sline, "G4 ")) {
             // Parse the wait time.
             line.type = CoolingLine::TYPE_G4;
@@ -1125,7 +1132,8 @@ std::string CoolingBuffer::apply_layer_cooldown(
     new_gcode.reserve(gcode.size() * 2);
     bool bridge_fan_control = false;
     int  bridge_fan_speed   = 0;
-    auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed](const int requested_fan_speed = -1) {
+    bool top_layer_fan_disable = false;
+    auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed, &top_layer_fan_disable](const int requested_fan_speed = -1) {
 #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
         const int min_fan_speed            = EXTRUDER_CONFIG(min_fan_speed);
         // Is the fan speed ramp enabled?
@@ -1178,6 +1186,14 @@ std::string CoolingBuffer::apply_layer_cooldown(
 #undef EXTRUDER_CONFIG
             bridge_fan_control = bridge_fan_speed > fan_speed_new;
         } else { // fan disabled
+            bridge_fan_control                   = false;
+            bridge_fan_speed                     = 0;
+            fan_speed_new                        = 0;
+            requested_fan_speed_limits.max_speed = 0;
+        }
+
+        // Disable fan for top layers
+        if (top_layer_fan_disable) {
             bridge_fan_control                   = false;
             bridge_fan_speed                     = 0;
             fan_speed_new                        = 0;
@@ -1274,11 +1290,22 @@ std::string CoolingBuffer::apply_layer_cooldown(
             change_extruder_set_fan(line->fan_speed);
         } else if (line->type & CoolingLine::TYPE_RESET_FAN_SPEED){
             change_extruder_set_fan();
+        } else if (line->type & CoolingLine::TYPE_TOP_LAYER_FAN_START) {
+            top_layer_fan_disable = true;
+            // Disable the fan immediately
+            if (m_fan_speed != 0) {
+                m_fan_speed = 0;
+                new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, 0);
+            }
+        } else if (line->type & CoolingLine::TYPE_TOP_LAYER_FAN_END) {
+            top_layer_fan_disable = false;
+            // Restore fan to calculated speed
+            change_extruder_set_fan();
         } else if (line->type & CoolingLine::TYPE_BRIDGE_FAN_START) {
-            if (bridge_fan_control)
+            if (bridge_fan_control && !top_layer_fan_disable)
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, bridge_fan_speed);
         } else if (line->type & CoolingLine::TYPE_BRIDGE_FAN_END) {
-            if (bridge_fan_control)
+            if (bridge_fan_control && !top_layer_fan_disable)
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed);
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             // Just remove this comment.
