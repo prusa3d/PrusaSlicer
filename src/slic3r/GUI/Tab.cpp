@@ -2270,6 +2270,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("bridge_fan_speed", category_path + "fan-settings");
         optgroup->append_single_option_line("disable_fan_first_layers", category_path + "fan-settings");
         optgroup->append_single_option_line("full_fan_speed_layer", category_path + "fan-settings");
+        //optgroup->append_single_option_line("top_fan_speed", category_path + "fan-settings");
 
         optgroup = page->new_optgroup(L("Dynamic fan speeds"), 25);
         optgroup->append_single_option_line("enable_dynamic_fan_speeds", category_path + "dynamic-fan-speeds");

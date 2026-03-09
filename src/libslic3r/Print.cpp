@@ -178,6 +178,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "custom_parameters_printer",
         "toolchange_gcode",
         "top_solid_infill_acceleration",
+        "top_fan_speed",
         "travel_acceleration",
         "travel_short_distance_acceleration",
         "thumbnails",

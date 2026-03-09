@@ -930,6 +930,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInts,               bed_temperature))
     ((ConfigOptionFloat,              bridge_acceleration))
     ((ConfigOptionInts,               bridge_fan_speed))
+    ((ConfigOptionInts,               top_fan_speed))
     ((ConfigOptionBools,              enable_dynamic_fan_speeds))
     ((ConfigOptionInts,               overhang_fan_speed_0))
     ((ConfigOptionInts,               overhang_fan_speed_1))

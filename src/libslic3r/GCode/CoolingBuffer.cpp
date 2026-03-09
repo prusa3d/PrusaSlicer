@@ -1132,14 +1132,15 @@ std::string CoolingBuffer::apply_layer_cooldown(
     new_gcode.reserve(gcode.size() * 2);
     bool bridge_fan_control = false;
     int  bridge_fan_speed   = 0;
-    bool top_layer_fan_disable = false; // using boolean value here, but will get from GUI later on
-    auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed, &top_layer_fan_disable](const int requested_fan_speed = -1) {
+    int top_fan_speed = 0;  // fan speed now a % based, similar to super slicer
+    auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed, &top_fan_speed](const int requested_fan_speed = -1) {
 #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
         const int min_fan_speed            = EXTRUDER_CONFIG(min_fan_speed);
         // Is the fan speed ramp enabled?
         const int full_fan_speed_layer     = EXTRUDER_CONFIG(full_fan_speed_layer);
         int       disable_fan_first_layers = EXTRUDER_CONFIG(disable_fan_first_layers);
         int       fan_speed_new            = EXTRUDER_CONFIG(fan_always_on) ? min_fan_speed : 0;
+        int top_fan_speed = EXTRUDER_CONFIG(top_fan_speed) ? : 100; // the else should not be needed...but incase.
 
         struct FanSpeedRange
         {
@@ -1190,14 +1191,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             bridge_fan_speed                     = 0;
             fan_speed_new                        = 0;
             requested_fan_speed_limits.max_speed = 0;
-        }
-
-        // Disable fan for top layers
-        if (top_layer_fan_disable) {
-            bridge_fan_control                   = false;
-            bridge_fan_speed                     = 0;
-            fan_speed_new                        = 0;
-            requested_fan_speed_limits.max_speed = 0;
+            top_fan_speed                        = 0;
         }
 
         requested_fan_speed_limits.min_speed = std::min(requested_fan_speed_limits.min_speed, requested_fan_speed_limits.max_speed);
@@ -1291,21 +1285,19 @@ std::string CoolingBuffer::apply_layer_cooldown(
         } else if (line->type & CoolingLine::TYPE_RESET_FAN_SPEED){
             change_extruder_set_fan();
         } else if (line->type & CoolingLine::TYPE_TOP_LAYER_FAN_START) {
-            top_layer_fan_disable = true;
-            // Disable the fan immediately
+           //set fan speed to top_fan_speed
             if (m_fan_speed != 0) {
-                m_fan_speed = 0;
+                m_fan_speed = top_fan_speed;
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, 0);
             }
         } else if (line->type & CoolingLine::TYPE_TOP_LAYER_FAN_END) {
-            top_layer_fan_disable = false;
             // Restore fan to calculated speed
             change_extruder_set_fan();
         } else if (line->type & CoolingLine::TYPE_BRIDGE_FAN_START) {
-            if (bridge_fan_control && !top_layer_fan_disable)
+            if (bridge_fan_control)
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, bridge_fan_speed);
         } else if (line->type & CoolingLine::TYPE_BRIDGE_FAN_END) {
-            if (bridge_fan_control && !top_layer_fan_disable)
+            if (bridge_fan_control)
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed);
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             // Just remove this comment.
