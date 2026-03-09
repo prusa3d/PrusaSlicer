@@ -1129,19 +1129,19 @@ std::string CoolingBuffer::apply_layer_cooldown(
     }
     // Second generate the adjusted G-code.
     std::string new_gcode;
+    #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
     new_gcode.reserve(gcode.size() * 2);
     bool bridge_fan_control = false;
     bool top_fan_control = false;
     int  bridge_fan_speed   = 0;
-    int top_fan_speed = 100;  // fan speed now a % based, similar to super slicer
+    int top_fan_speed = EXTRUDER_CONFIG(top_fan_speed);  // fan speed now a % based, similar to super slicer
     auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed, &top_fan_speed](const int requested_fan_speed = -1) {
-#define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
         const int min_fan_speed            = EXTRUDER_CONFIG(min_fan_speed);
         // Is the fan speed ramp enabled?
         const int full_fan_speed_layer     = EXTRUDER_CONFIG(full_fan_speed_layer);
         int       disable_fan_first_layers = EXTRUDER_CONFIG(disable_fan_first_layers);
         int       fan_speed_new            = EXTRUDER_CONFIG(fan_always_on) ? min_fan_speed : 0;
-        int top_fan_speed = EXTRUDER_CONFIG(top_fan_speed) ? : 100; // the else should not be needed...but incase.
+        int top_fan_speed                  = EXTRUDER_CONFIG(top_fan_speed) ? : 100; // the else should not be needed...but incase.
 
         struct FanSpeedRange
         {
@@ -1176,6 +1176,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             }
 
             bridge_fan_speed = EXTRUDER_CONFIG(bridge_fan_speed);
+            top_fan_speed    = EXTRUDER_CONFIG(top_fan_speed);
             if (int(layer_id) >= disable_fan_first_layers && int(layer_id) + 1 < full_fan_speed_layer) {
                 // Ramp up the fan speed from disable_fan_first_layers to full_fan_speed_layer.
                 const float factor = float(int(layer_id + 1) - disable_fan_first_layers) / float(full_fan_speed_layer - disable_fan_first_layers);
