@@ -5,6 +5,7 @@
 ///|/ Copyright (c) Prusa Research 2016 - 2017 Vojtěch Bubník @bubnikv
 ///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
 ///|/ Copyright (c) 2016 Chow Loong Jin @hyperair
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/

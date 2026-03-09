@@ -14,6 +14,7 @@
 ///|/ Copyright (c) 2016 Chow Loong Jin @hyperair
 ///|/ Copyright (c) 2012 QuantumConcepts
 ///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/

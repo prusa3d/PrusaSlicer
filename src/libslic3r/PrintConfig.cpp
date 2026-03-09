@@ -16,6 +16,7 @@
 ///|/ Copyright (c) 2016 Vanessa Ezekowitz @VanessaE
 ///|/ Copyright (c) 2015 Alexander Rössler @machinekoder
 ///|/ Copyright (c) 2014 Petr Ledvina @ledvinap
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
