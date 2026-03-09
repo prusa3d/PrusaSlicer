@@ -1720,7 +1720,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 100;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionInts { 25 });
+    def->set_default_value(new ConfigOptionInts { 100 });
 
     def = this->add("fuzzy_skin", coEnum);
     def->label = L("Fuzzy Skin");
