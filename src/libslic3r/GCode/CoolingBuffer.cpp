@@ -1133,7 +1133,6 @@ std::string CoolingBuffer::apply_layer_cooldown(
     #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
     new_gcode.reserve(gcode.size() * 2);
     bool bridge_fan_control = false;
-    bool top_fan_control = false;
     int  bridge_fan_speed   = 0;
     int top_fan_speed = EXTRUDER_CONFIG(top_fan_speed);  // fan speed now a % based, similar to super slicer
     auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed, &top_fan_speed](const int requested_fan_speed = -1) {
