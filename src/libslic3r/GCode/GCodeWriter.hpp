@@ -61,6 +61,7 @@ public:
     std::string set_chamber_temperature(unsigned int temperature, bool wait, bool accurate) const;
     std::string set_print_acceleration(unsigned int acceleration)   { return set_acceleration_internal(Acceleration::Print, acceleration); }
     std::string set_travel_acceleration(unsigned int acceleration)  { return set_acceleration_internal(Acceleration::Travel, acceleration); }
+    std::string set_junction_deviation(double junction_deviation);
     std::string reset_e(bool force = false);
     std::string update_progress(unsigned int num, unsigned int tot, bool allow_100 = false) const;
     // return false if this extruder was already selected
@@ -151,6 +152,7 @@ private:
     // If set to zero, the limit is not in action.
     unsigned int    m_max_acceleration;
     unsigned int    m_max_travel_acceleration;
+    double          m_max_junction_deviation;
 
     unsigned int    m_last_bed_temperature;
     bool            m_last_bed_temperature_reached;

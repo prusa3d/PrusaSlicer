@@ -1,9 +1,17 @@
+min_slic3r_version = 2.9.4-rc0
+2.4.0 Added profiles for CORE One L.
 min_slic3r_version = 2.9.3-alpha0
+2.3.8 MMU3 - added support for 0.6mm nozzle (MK4 family, CORE One).
+2.3.7 Added filament profile for Prusament PC Space Grade (XL and MK4).
+2.3.6 Added filament profile for Prusament PC Space Grade.
+2.3.5 Updated filament settings and specific supports settings.
+2.3.4 Updated FW version notification.
 2.3.3 Renamed cooling slowdown options.
 2.3.2 Updated BALANCED profiles for CORE One.
 2.3.1 Added BALANCED profiles for CORE One.
 2.3.0 Added values for short travel acceleration (CORE One/XL/MK4/MK3.9/MK3.5/MINI family). Enabled new cooling slowdown logic (CORE One/XL/MK4/MK3.9 family).
 min_slic3r_version = 2.9.1-alpha0
+2.2.20 Updated FW version notification.
 2.2.19 Slightly adjusted perimeter speeds in "Structural" profiles for quieter printing (CORE One). Updated PA values for Buddy3D PETG.
 2.2.18 Updated FW version notification (CORE One). Added filament profile for Sunlu PETG.
 2.2.17 Added filament profile for Prusament PP Glass Fiber.

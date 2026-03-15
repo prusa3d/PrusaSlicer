@@ -3210,6 +3210,8 @@ PageShp TabPrinter::build_kinematics_page()
             append_option_line(optgroup, "machine_max_jerk_" + axis);
         }
 
+        append_option_line(optgroup, "machine_max_junction_deviation");
+
         if (m_supports_min_feedrates) {
             optgroup = page->new_optgroup(L("Minimum feedrates"));
             append_option_line(optgroup, "machine_min_extruding_rate");
@@ -3706,9 +3708,12 @@ void TabPrinter::toggle_options()
 		bool enabled = machine_limits_usage->value != MachineLimitsUsage::Ignore;
         bool silent_mode = m_config->opt_bool("silent_mode");
         int  max_field = silent_mode ? 2 : 1;
-    	for (const std::string &opt : Preset::machine_limits_options())
-            for (int i = 0; i < max_field; ++ i)
-	            toggle_option(opt, enabled, i);
+    	for (const std::string &opt : Preset::machine_limits_options()) {
+            const bool option_enabled = (opt == "machine_max_junction_deviation") ? flavor == gcfMarlinFirmware && enabled : enabled;
+            for (int i = 0; i < max_field; ++ i) {
+                toggle_option(opt, option_enabled, i);
+            }
+        }
         update_machine_limits_description(machine_limits_usage->value);
     }
 }

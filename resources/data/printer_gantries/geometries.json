@@ -236,6 +236,61 @@
             ]
         },
         {
+            "printer_notes_regex": ".*SEQ_ARRANGE_MODEL_COREONEL.*",
+            "gantry_model_filename": "prusa3d_coreoneL_gantry.stl",
+            "slices": [
+                {
+                    "height": "0",
+                    "type": "convex",
+                    "polygons": [
+                        "-33,-44; 27,-44; 27,19; -33,19"
+                    ]
+                },
+                {
+                    "height": "2",
+                    "type": "convex",
+                    "polygons": [
+                        "-40,-73; 27,-73; 27,20; -40,20"
+                    ]
+                },
+                {
+                    "height": "23",
+                    "type": "convex",
+                    "polygons": [
+                        "-44,-52; 35,-52; 35,23; -44,23"
+                    ]
+                },
+                {
+                    "height": "23",
+                    "type": "convex",
+                    "polygons": [
+                        "-38,-96; 25,-96; 25,-47; -38,-47"
+                    ]
+                },
+                {
+                    "height": "33",
+                    "type": "box",
+                    "polygons": [
+                        "-400,-49; 400,-49; 400,-24; -400,-24"
+                    ]
+                },
+                {
+                    "height": "120",
+                    "type": "box",
+                    "polygons": [
+                        "-400,-400; 400,-400; 400,10; -400,10"
+                    ]
+                },
+                {
+                    "height": "185",
+                    "type": "box",
+                    "polygons": [
+                        "-400,-400; 400,-400; 400,400; -400,400"
+                    ]
+                }
+            ]
+        },
+        {
             "printer_notes_regex": ".*PRINTER_MODEL_COREONE.*",
             "gantry_model_filename": "prusa3d_coreone_gantry.stl",
             "slices": [
