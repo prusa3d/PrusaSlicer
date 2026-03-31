@@ -111,6 +111,8 @@ set(SLIC3R_CLI_SOURCES
     CLI/Run.cpp
     CLI/ProfilesSharingUtils.cpp
     CLI/ProfilesSharingUtils.hpp
+    CLI/CLIThumbnailRenderer.hpp
+    CLI/CLIThumbnailRenderer.cpp
 )
 if (SLIC3R_GUI)
     list(APPEND SLIC3R_CLI_SOURCES
@@ -142,6 +144,18 @@ endif ()
 
 
 target_link_libraries(PrusaSlicer PRIVATE libslic3r libcereal slic3r-arrange-wrapper libseqarrange stb_image)
+
+# Headless EGL thumbnail rendering for CLI mode (Linux only)
+if (NOT WIN32 AND NOT APPLE)
+    find_package(OpenGL COMPONENTS EGL)
+    if (OpenGL_EGL_FOUND)
+        target_compile_definitions(PrusaSlicer PRIVATE SLIC3R_CLI_THUMBNAILS)
+        target_link_libraries(PrusaSlicer PRIVATE OpenGL::EGL OpenGL::GL)
+        message(STATUS "CLI thumbnail rendering: enabled (EGL)")
+    else()
+        message(STATUS "CLI thumbnail rendering: disabled (no EGL)")
+    endif()
+endif()
 
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)

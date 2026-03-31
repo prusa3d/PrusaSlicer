@@ -38,6 +38,7 @@
 
 #include "CLI/CLI.hpp"
 #include "CLI/ProfilesSharingUtils.hpp"
+#include "CLI/CLIThumbnailRenderer.hpp"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize2.h"
@@ -387,7 +388,24 @@ bool process_actions(Data& cli, const DynamicPrintConfig& print_config, std::vec
                 if (printer_technology == ptFFF) {
                     // The outfile is processed by a PlaceholderParser.
                     const std::string input_file = fff_print.model().objects.empty() ? "" : fff_print.model().objects.front()->input_file;
-                    outfile = fff_print.export_gcode(outfile, nullptr, get_thumbnail_generator_cli(input_file));
+                    auto thumbnail_cb = get_thumbnail_generator_cli(input_file);
+                    // For non-3MF input, try headless EGL rendering.
+                    // get_thumbnail_generator_cli returns an empty generator for STL/OBJ;
+                    // replace it with one that uses ThumbnailRenderer if EGL is available.
+                    if (!boost::iends_with(input_file, ".3mf") && ThumbnailRenderer::init()) {
+                        const Model& mdl = fff_print.model();
+                        thumbnail_cb = [&mdl](const ThumbnailsParams& params) -> ThumbnailsList {
+                            ThumbnailsList out;
+                            for (const Vec2d& sz : params.sizes) {
+                                Point isz(sz);
+                                ThumbnailData td = ThumbnailRenderer::render(mdl, isz.x(), isz.y());
+                                if (td.is_valid())
+                                    out.push_back(std::move(td));
+                            }
+                            return out;
+                        };
+                    }
+                    outfile = fff_print.export_gcode(outfile, nullptr, thumbnail_cb);
                     outfile_final = fff_print.print_statistics().finalize_output_path(outfile);
                 }
                 else {
