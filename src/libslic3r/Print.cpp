@@ -38,6 +38,7 @@
 #include "BuildVolume.hpp"
 #include "format.hpp"
 #include "ArrangeHelper.hpp"
+#include "CustomParametersHandling.hpp"
 
 #include <float.h>
 
@@ -99,6 +100,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "chamber_minimal_temperature",
         "colorprint_heights",
         "cooling",
+        "cooling_slowdown_logic",
+        "cooling_perimeter_transition_distance",
         "default_acceleration",
         "deretract_speed",
         "disable_fan_first_layers",
@@ -141,6 +144,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "max_volumetric_extrusion_rate_slope_positive",
         "max_volumetric_extrusion_rate_slope_negative",
         "notes",
+        "custom_parameters_printer",
         "only_retract_when_crossing_perimeters",
         "output_filename_format",
         "perimeter_acceleration",
@@ -170,9 +174,12 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "standby_temperature_delta",
         "start_gcode",
         "start_filament_gcode",
+        "custom_parameters_filament",
+        "custom_parameters_printer",
         "toolchange_gcode",
         "top_solid_infill_acceleration",
         "travel_acceleration",
+        "travel_short_distance_acceleration",
         "thumbnails",
         "thumbnails_format",
         "use_firmware_retraction",
@@ -750,6 +757,11 @@ std::string Print::validate(std::vector<std::string>* warnings) const
             return _u8L("\"G92 E0\" was found in before_layer_gcode, which is incompatible with absolute extruder addressing.");
         else if (layer_gcode_resets_extruder)
                 return _u8L("\"G92 E0\" was found in layer_gcode, which is incompatible with absolute extruder addressing.");
+    }
+    {
+        std::string error_out;
+        if (! check_custom_parameters(m_config.custom_parameters_print, m_config.custom_parameters_printer, m_config.custom_parameters_filament.values, &error_out))
+            return std::string("Unable to parse custom parameters: " + error_out);
     }
 
     return std::string();

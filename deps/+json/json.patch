@@ -1,0 +1,33 @@
+--- a/include/nlohmann/detail/conversions/from_json.hpp
++++ b/include/nlohmann/detail/conversions/from_json.hpp
+@@ -13,9 +13,6 @@
+ #include <forward_list> // forward_list
+ #include <iterator> // inserter, front_inserter, end
+ #include <map> // map
+-#ifdef JSON_HAS_CPP_17
+-    #include <optional> // optional
+-#endif
+ #include <string> // string
+ #include <tuple> // tuple, make_tuple
+ #include <type_traits> // is_arithmetic, is_same, is_enum, underlying_type, is_convertible
+@@ -32,6 +29,11 @@
+ #include <nlohmann/detail/string_concat.hpp>
+ #include <nlohmann/detail/value_t.hpp>
+ 
++// include after macro_scope.hpp
++#ifdef JSON_HAS_CPP_17
++    #include <optional> // optional
++#endif
++
+ NLOHMANN_JSON_NAMESPACE_BEGIN
+ namespace detail
+ {
+@@ -47,7 +49,7 @@ inline void from_json(const BasicJsonType& j, typename std::nullptr_t& n)
+ }
+ 
+ #ifdef JSON_HAS_CPP_17
+-#ifndef JSON_USE_IMPLICIT_CONVERSIONS
++#if !defined(JSON_USE_IMPLICIT_CONVERSIONS) || !JSON_USE_IMPLICIT_CONVERSIONS
+ template<typename BasicJsonType, typename T>
+ void from_json(const BasicJsonType& j, std::optional<T>& opt)
+ {

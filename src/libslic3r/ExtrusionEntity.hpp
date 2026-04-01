@@ -144,6 +144,7 @@ struct ExtrusionAttributes : ExtrusionFlow
     ExtrusionAttributes(ExtrusionRole role) : role{ role } {}
     ExtrusionAttributes(ExtrusionRole role, const Flow &flow) : role{ role }, ExtrusionFlow{ flow } {}
     ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow) : role{ role }, ExtrusionFlow{ flow } {}
+    ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow, const uint16_t perimeter_index) : role{ role }, ExtrusionFlow{ flow }, perimeter_index{ perimeter_index } {}
     ExtrusionAttributes(ExtrusionRole role, const ExtrusionFlow &flow, const bool maybe_self_crossing)
         : role{role}, ExtrusionFlow{flow}, maybe_self_crossing(maybe_self_crossing) {}
 
@@ -153,6 +154,8 @@ struct ExtrusionAttributes : ExtrusionFlow
     // OVerhangAttributes are currently computed for perimeters if dynamic overhangs are enabled. 
     // They are used to control fan and print speed in export.
     std::optional<OverhangAttributes> overhang_attributes;
+    // Set only for external and internal perimeters. The external perimeter has value 0, the first internal perimeter has 1, and so on.
+    std::optional<uint16_t> perimeter_index;
 };
 
 inline bool operator==(const ExtrusionAttributes &lhs, const ExtrusionAttributes &rhs)

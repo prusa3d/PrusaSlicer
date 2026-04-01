@@ -3416,9 +3416,9 @@ void GUI_App::show_downloader_registration_dialog()
     InfoDialog msg(nullptr
         , format_wxstr(_L("Welcome to %1% version %2%."), SLIC3R_APP_NAME, SLIC3R_VERSION)
         , format_wxstr(_L(
-            "Do you wish to register downloads from <b>Printables.com</b>"
+            "Do you wish to register downloads from supported websites"
             "\nfor this <b>%1% %2%</b> executable?"
-            "\n\nDownloads can be registered for only 1 executable at time."
+            "\n\nDownloads can be registered for only 1 executable at a time."
             ), SLIC3R_APP_NAME, SLIC3R_VERSION)
         , true, wxYES_NO);
     if (msg.ShowModal() == wxID_YES) {

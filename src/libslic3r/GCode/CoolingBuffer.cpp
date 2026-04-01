@@ -42,6 +42,8 @@
 
 namespace Slic3r {
 
+const constexpr float SEGMENT_SPLIT_EPSILON = 10. * GCodeFormatter::XYZ_EPSILON;
+
 CoolingBuffer::CoolingBuffer(GCodeGenerator &gcodegen) : m_config(gcodegen.config()), m_toolchange_prefix(gcodegen.writer().toolchange_prefix()), m_current_extruder(0)
 {
     this->reset(gcodegen.writer().get_position());
@@ -64,6 +66,26 @@ void CoolingBuffer::reset(const Vec3d &position)
     m_current_pos[AxisIdx::F] = float(m_config.travel_speed.value);
     m_fan_speed = -1;
 }
+
+enum class AdjustableFeatureType : uint32_t {
+    None                    = 0,
+    ExternalPerimeters      = 1 << 0,
+    FirstInternalPerimeters = 1 << 1,
+};
+
+inline AdjustableFeatureType operator|(AdjustableFeatureType a, AdjustableFeatureType b) {
+    return static_cast<AdjustableFeatureType>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+inline AdjustableFeatureType operator&(AdjustableFeatureType a, AdjustableFeatureType b) {
+    return static_cast<AdjustableFeatureType>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+}
+
+inline bool operator!(AdjustableFeatureType a) {
+    return static_cast<uint32_t>(a) == 0;
+}
+
+struct GCodeMoveSegment;
 
 struct CoolingLine
 {
@@ -96,20 +118,34 @@ struct CoolingLine
         TYPE_SET_FAN_SPEED      = 1 << 17,
         // Reset fan speed back to speed calculate by the CoolingBuffer.
         TYPE_RESET_FAN_SPEED    = 1 << 18,
+        TYPE_INTERNAL_PERIMETER = 1 << 19,
+        TYPE_FIRST_INTERNAL_PERIMETER = 1 << 20,
     };
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
         type(type), line_start(line_start), line_end(line_end),
-        length(0.f), feedrate(0.f), time(0.f), time_max(0.f), slowdown(false) {}
+        adjustable_length(0.f), non_adjustable_length(0.f), feedrate(0.f),
+        feedrate_original(0.f), adjustable_time(0.f), adjustable_time_max(0.f),
+        non_adjustable_time(0.f), slowdown(false) {}
 
-    bool adjustable(bool slowdown_external_perimeters) const {
-        return (this->type & TYPE_ADJUSTABLE) && 
-               (! (this->type & TYPE_EXTERNAL_PERIMETER) || slowdown_external_perimeters) &&
-               this->time < this->time_max;
+    bool adjustable(AdjustableFeatureType additional_slowdown_features) const {
+        if (!(this->type & TYPE_ADJUSTABLE) || this->adjustable_length <= 0.f || this->adjustable_time >= this->adjustable_time_max) {
+            return false;
+        }
+
+        if (this->type & TYPE_EXTERNAL_PERIMETER) {
+            return (additional_slowdown_features & AdjustableFeatureType::ExternalPerimeters) != AdjustableFeatureType::None;
+        }
+
+        if (this->type & TYPE_FIRST_INTERNAL_PERIMETER) {
+            return (additional_slowdown_features & AdjustableFeatureType::FirstInternalPerimeters) != AdjustableFeatureType::None;
+        }
+
+        return true;
     }
 
     bool adjustable() const {
-        return (this->type & TYPE_ADJUSTABLE) && this->time < this->time_max;
+        return (this->type & TYPE_ADJUSTABLE) && this->adjustable_length > 0. && this->adjustable_time < this->adjustable_time_max;
     }
 
     size_t  type;
@@ -117,19 +153,137 @@ struct CoolingLine
     size_t  line_start;
     // End of this line at the G-code snippet.
     size_t  line_end;
-    // XY Euclidian length of this segment.
-    float   length;
+    // XY Euclidian length of the adjustable part of this segment.
+    float   adjustable_length;
+    // XY Euclidian length of the non-adjustable part of this segment (for ConsistentSurface logic).
+    float   non_adjustable_length;
     // Current feedrate, possibly adjusted.
     float   feedrate;
-    // Current duration of this segment.
-    float   time;
-    // Maximum duration of this segment.
-    float   time_max;
+    // Original unchanged feedrate.
+    float   feedrate_original;
+    // Current duration of the adjustable part of this segment.
+    float   adjustable_time;
+    // Current duration of the non-adjustable part of this segment (for ConsistentSurface logic).
+    float   non_adjustable_time;
+    // Maximum duration of the adjustable part of this segment.
+    float   adjustable_time_max;
     // Requested fan speed
     int     fan_speed;
     // If marked with the "slowdown" flag, the line has been slowed down.
     bool    slowdown;
+    // Set only for external and internal perimeters. The external perimeter has value 0, the first internal perimeter has 1, and so on.
+    std::optional<uint16_t> perimeter_index;
+
+    // Individual G-code segments within this CoolingLine block (for EXTRUDE_SET_SPEED blocks).
+    std::vector<GCodeMoveSegment> move_segments;
+
+    inline float time() const { return this->adjustable_time + this->non_adjustable_time; }
+
+    inline float length() const { return this->adjustable_length + this->non_adjustable_length; }
+
+    inline float time_max() const { return this->adjustable_time_max + this->non_adjustable_time; }
 };
+
+struct GCodeMoveSegment {
+    Vec4f position_start = Vec4f::Zero();
+    Vec4f position_end   = Vec4f::Zero();
+    float length         = 0.f;
+
+    size_t line_start = 0;        // Position in a G-code string.
+    size_t line_end   = 0;        // Position in a G-code string.
+
+    uint32_t type = 0;            // Same flags as CoolingLine::Type.
+
+    Vec2f ij_params = {0.f, 0.f}; // I, J for arcs.
+
+    GCodeMoveSegment(const Vec4f &position_start, const Vec4f &position_end, float length, size_t line_start, size_t line_end, uint32_t type)
+        : position_start(position_start), position_end(position_end), length(length), line_start(line_start), line_end(line_end), type(type) {}
+
+    GCodeMoveSegment(const Vec4f &position_start, const Vec4f &position_end, float length, size_t line_start, size_t line_end, uint32_t type, const Vec2f &ij_params)
+        : position_start(position_start), position_end(position_end), length(length), line_start(line_start), line_end(line_end), type(type), ij_params(ij_params) {}
+
+    bool is_arc() const { return (type & CoolingLine::TYPE_G2G3) != 0; }
+    bool is_ccw() const { return (type & CoolingLine::TYPE_G2G3_CCW) != 0; }
+};
+
+std::string emit_feedrate(const float feedrate)
+{
+    GCodeG1Formatter feedrate_formatter;
+    feedrate_formatter.emit_f(std::floor(60. * feedrate + 0.5));
+
+    return feedrate_formatter.string();
+}
+
+static std::string emit_extrusion(const Vec4f &position_start, const Vec4f &position_end, const bool use_relative_e_distances)
+{
+    GCodeG1Formatter extrusion_formatter;
+    for (int axis_idx = 0; axis_idx < 3; ++axis_idx) {
+        if (position_start[axis_idx] != position_end[axis_idx]) {
+            extrusion_formatter.emit_axis(char('X' + axis_idx), position_end[axis_idx], GCodeFormatter::XYZF_EXPORT_DIGITS);
+        }
+    }
+
+    if (position_start[3] != position_end[3]) {
+        extrusion_formatter.emit_axis('E', use_relative_e_distances ? (position_end[3] - position_start[3]) : position_end[3], GCodeFormatter::E_EXPORT_DIGITS);
+    }
+
+    return extrusion_formatter.string();
+}
+
+static std::string emit_arc(const Vec4f &position_start, const Vec4f &position_end, const Vec2f &ij_params, const bool is_ccw, const bool use_relative_e_distances)
+{
+    GCodeG2G3Formatter arc_formatter(is_ccw);
+    
+    for (int axis_idx = 0; axis_idx < 3; ++axis_idx) {
+        if (position_start[axis_idx] != position_end[axis_idx]) {
+            arc_formatter.emit_axis(char('X' + axis_idx), position_end[axis_idx], GCodeFormatter::XYZF_EXPORT_DIGITS);
+        }
+    }
+
+    arc_formatter.emit_axis('I', ij_params.x(), GCodeFormatter::XYZF_EXPORT_DIGITS);
+    arc_formatter.emit_axis('J', ij_params.y(), GCodeFormatter::XYZF_EXPORT_DIGITS);
+
+    if (position_start[3] != position_end[3]) {
+        arc_formatter.emit_axis('E', use_relative_e_distances ? (position_end[3] - position_start[3]) : position_end[3], GCodeFormatter::E_EXPORT_DIGITS);
+    }
+
+    return arc_formatter.string();
+}
+
+static std::pair<std::string, std::string> split_linear_segment(const GCodeMoveSegment &segment, const float split_at_length, const bool use_relative_e_distances)
+{
+    assert(segment.length > 0.f && !segment.is_arc());
+
+    const float t               = std::clamp(split_at_length / segment.length, 0.f, 1.f);
+    const Vec4f position_middle = Slic3r::lerp(segment.position_start, segment.position_end, t);
+
+    return { emit_extrusion(segment.position_start, position_middle, use_relative_e_distances), emit_extrusion(position_middle, segment.position_end, use_relative_e_distances) };
+}
+
+static std::pair<std::string, std::string> split_arc_segment(const GCodeMoveSegment &segment, const float split_at_length, const bool use_relative_e_distances)
+{
+    assert(segment.length > 0.f && segment.is_arc() && (segment.type & CoolingLine::TYPE_G2G3_IJ));
+
+    const Vec2f position_start  = segment.position_start.head<2>();
+    const Vec2f position_end    = segment.position_end.head<2>();
+    const Vec2f arc_center      = position_start + segment.ij_params;
+
+    const Vec2f position_middle = Geometry::ArcWelder::arc_point_at_distance(position_start, position_end, arc_center, segment.is_ccw(), split_at_length);
+    const float arc_length_val  = Geometry::ArcWelder::arc_length(position_start, position_end, arc_center, segment.is_ccw());
+    const float t               = std::clamp(split_at_length / arc_length_val, 0.f, 1.f);
+
+    const Vec4f position_middle_4d = Vec4f(position_middle.x(), position_middle.y(),
+        Slic3r::lerp(segment.position_start.z(), segment.position_end.z(), t),
+        Slic3r::lerp(segment.position_start.w(), segment.position_end.w(), t)
+    );
+
+    const std::string first_part_gcode = emit_arc(segment.position_start, position_middle_4d, segment.ij_params, segment.is_ccw(), use_relative_e_distances);
+
+    const Vec2f second_part_ij = arc_center - position_middle;
+    const std::string second_part_gcode = emit_arc(position_middle_4d, segment.position_end, second_part_ij, segment.is_ccw(), use_relative_e_distances);
+
+    return { first_part_gcode, second_part_gcode };
+}
 
 // Calculate the required per extruder time stretches.
 struct PerExtruderAdjustments 
@@ -137,70 +291,90 @@ struct PerExtruderAdjustments
     // Calculate the total elapsed time per this extruder, adjusted for the slowdown.
     float elapsed_time_total() const {
         float time_total = 0.f;
-        for (const CoolingLine &line : lines)
-            time_total += line.time;
+        for (const CoolingLine &line : lines) {
+            time_total += line.time();
+        }
+
         return time_total;
     }
-    // Calculate the total elapsed time when slowing down 
+
+    // Calculate the total elapsed time when slowing down
     // to the minimum extrusion feed rate defined for the current material.
-    float maximum_time_after_slowdown(bool slowdown_external_perimeters) const {
+    float maximum_time_after_slowdown(const AdjustableFeatureType additional_slowdown_features) const {
         float time_total = 0.f;
-        for (const CoolingLine &line : lines)
-            if (line.adjustable(slowdown_external_perimeters)) {
-                if (line.time_max == FLT_MAX)
+        for (const CoolingLine &line : lines) {
+            if (line.adjustable(additional_slowdown_features)) {
+                if (line.time_max() == FLT_MAX)
                     return FLT_MAX;
                 else
-                    time_total += line.time_max;
+                    time_total += line.time_max();
             } else
-                time_total += line.time;
+                time_total += line.time();
+        }
+
         return time_total;
     }
+
     // Calculate the adjustable part of the total time.
-    float adjustable_time(bool slowdown_external_perimeters) const {
+    float adjustable_time(const AdjustableFeatureType additional_slowdown_features) const {
         float time_total = 0.f;
-        for (const CoolingLine &line : lines)
-            if (line.adjustable(slowdown_external_perimeters))
-                time_total += line.time;
+        for (const CoolingLine &line : lines) {
+            if (line.adjustable(additional_slowdown_features))
+                time_total += line.adjustable_time;
+        }
+
         return time_total;
     }
+
     // Calculate the non-adjustable part of the total time.
-    float non_adjustable_time(bool slowdown_external_perimeters) const {
+    float non_adjustable_time(const AdjustableFeatureType additional_slowdown_features) const {
         float time_total = 0.f;
-        for (const CoolingLine &line : lines)
-            if (! line.adjustable(slowdown_external_perimeters))
-                time_total += line.time;
+        for (const CoolingLine &line : lines) {
+            if (line.adjustable(additional_slowdown_features)) {
+                time_total += line.non_adjustable_time;
+            } else {
+                time_total += line.time();
+            }
+        }
+
         return time_total;
     }
+
     // Slow down the adjustable extrusions to the minimum feedrate allowed for the current extruder material.
     // Used by both proportional and non-proportional slow down.
-    float slowdown_to_minimum_feedrate(bool slowdown_external_perimeters) {
+    float slowdown_to_minimum_feedrate(const AdjustableFeatureType additional_slowdown_features) {
         float time_total = 0.f;
         for (CoolingLine &line : lines) {
-            if (line.adjustable(slowdown_external_perimeters)) {
-                assert(line.time_max >= 0.f && line.time_max < FLT_MAX);
-                line.slowdown = true;
-                line.time     = line.time_max;
-                assert(line.time > 0);
-                line.feedrate = line.length / line.time;
+            if (line.adjustable(additional_slowdown_features)) {
+                assert(line.time_max() >= 0.f && line.time_max() < FLT_MAX);
+                line.slowdown        = true;
+                line.adjustable_time = line.adjustable_time_max;
+                assert(line.time() > 0);
+                line.feedrate = line.adjustable_length / line.adjustable_time;
             }
-            time_total += line.time;
+
+            time_total += line.time();
         }
+
         return time_total;
     }
+
     // Slow down each adjustable G-code line proportionally by a factor.
     // Used by the proportional slow down.
-    float slow_down_proportional(float factor, bool slowdown_external_perimeters) {
+    float slow_down_proportional(const float factor, const AdjustableFeatureType additional_slowdown_features) {
         assert(factor >= 1.f);
         float time_total = 0.f;
         for (CoolingLine &line : lines) {
-            if (line.adjustable(slowdown_external_perimeters)) {
-                line.slowdown = true;
-                line.time     = std::min(line.time_max, line.time * factor);
-                assert(line.time > 0);
-                line.feedrate = line.length / line.time;
+            if (line.adjustable(additional_slowdown_features)) {
+                line.slowdown        = true;
+                line.adjustable_time = std::min(line.adjustable_time_max, line.adjustable_time * factor);
+                assert(line.time() > 0);
+                line.feedrate = line.adjustable_length / line.adjustable_time;
             }
-            time_total += line.time;
+
+            time_total += line.time();
         }
+
         return time_total;
     }
 
@@ -215,37 +389,39 @@ struct PerExtruderAdjustments
         for (n_lines_adjustable = 0; 
             n_lines_adjustable < lines.size() && this->lines[n_lines_adjustable].adjustable();
             ++ n_lines_adjustable);
+
         time_non_adjustable = 0.f;
-        for (size_t i = n_lines_adjustable; i < lines.size(); ++ i)
-            time_non_adjustable += lines[i].time;
+        for (size_t i = n_lines_adjustable; i < lines.size(); ++i)
+            time_non_adjustable += lines[i].time();
     }
 
     // Calculate the maximum time stretch when slowing down to min_feedrate.
     // Slowdown to min_feedrate shall be allowed for this extruder's material.
     // Used by non-proportional slow down.
-    float time_stretch_when_slowing_down_to_feedrate(float min_feedrate) const {
+    float time_stretch_when_slowing_down_to_feedrate(float min_feedrate, const AdjustableFeatureType additional_slowdown_features) const {
         float time_stretch = 0.f;
         assert(this->min_print_speed < min_feedrate + EPSILON);
-        for (size_t i = 0; i < n_lines_adjustable; ++ i) {
+        for (size_t i = 0; i < n_lines_adjustable; ++i) {
             const CoolingLine &line = lines[i];
-            if (line.feedrate > min_feedrate) {
+            if (line.adjustable(additional_slowdown_features) && line.feedrate > min_feedrate) {
                 assert(min_feedrate > 0);
-                time_stretch += line.time * (line.feedrate / min_feedrate - 1.f);
+                time_stretch += line.adjustable_time * (line.feedrate / min_feedrate - 1.f);
             }
         }
+
         return time_stretch;
     }
 
     // Slow down all adjustable lines down to min_feedrate.
     // Slowdown to min_feedrate shall be allowed for this extruder's material.
     // Used by non-proportional slow down.
-    void slow_down_to_feedrate(float min_feedrate) {
+    void slow_down_to_feedrate(float min_feedrate, const AdjustableFeatureType additional_slowdown_features) {
         assert(this->min_print_speed < min_feedrate + EPSILON);
         for (size_t i = 0; i < n_lines_adjustable; ++ i) {
             CoolingLine &line = lines[i];
-            if (line.feedrate > min_feedrate) {
+            if (line.adjustable(additional_slowdown_features) && line.feedrate > min_feedrate) {
                 assert(min_feedrate > 0);
-                line.time *= std::max(1.f, line.feedrate / min_feedrate);
+                line.adjustable_time *= std::max(1.f, line.feedrate / min_feedrate);
                 line.feedrate = min_feedrate;
                 line.slowdown = true;
             }
@@ -256,6 +432,7 @@ struct PerExtruderAdjustments
     unsigned int                extruder_id         = 0;
     // Is the cooling slow down logic enabled for this extruder's material?
     bool                        cooling_slow_down_enabled = false;
+    CoolingSlowdownLogicType    cooling_slowdown_logic    = CoolingSlowdownLogicType::UniformCooling;
     // Slow down the print down to min_print_speed if the total layer time is below slowdown_below_layer_time.
     float                       slowdown_below_layer_time = 0.f;
     // Minimum print speed allowed for this extruder.
@@ -276,13 +453,51 @@ struct PerExtruderAdjustments
     // Temporaries for processing the slow down. Both thresholds go from 0 to n_lines_adjustable.
     size_t                      idx_line_begin      = 0;
     size_t                      idx_line_end        = 0;
+
+    // Create non-adjustable segments that should not be slowed down into CoolingLine (for ConsistentSurface logic).
+    void create_non_adjustable_segments(const float non_adjustable_length) {
+        if (non_adjustable_length <= 0.f) {
+            return;
+        }
+
+        // Accumulate length from the end, only for adjustable segments that are NOT external or
+        // first internal perimeters
+        float accumulated_length = 0.f;
+        for (auto it = this->lines.rbegin(); it != this->lines.rend() && accumulated_length < non_adjustable_length; ++it) {
+            CoolingLine &line = *it;
+            assert(line.feedrate == line.feedrate_original);
+
+            // Only consider adjustable lines that are not external or first internal perimeters
+            if (line.adjustable(AdjustableFeatureType::None)) {
+                const float remaining_non_adjustable_length = non_adjustable_length - accumulated_length;
+                if (line.adjustable_length <= remaining_non_adjustable_length) {
+                    accumulated_length         += line.adjustable_length;
+                    line.non_adjustable_length += line.adjustable_length;
+                    line.adjustable_length      = 0.f;
+
+                    line.adjustable_time     = 0.f;
+                    line.non_adjustable_time = line.non_adjustable_length / line.feedrate;
+                    line.adjustable_time_max = 0.f;
+                } else {
+                    accumulated_length          = non_adjustable_length;
+                    line.non_adjustable_length += remaining_non_adjustable_length;
+                    line.adjustable_length     -= remaining_non_adjustable_length;
+
+                    line.adjustable_time     = line.adjustable_length / line.feedrate;
+                    line.non_adjustable_time = line.non_adjustable_length / line.feedrate;
+                    line.adjustable_time_max = line.adjustable_time_max == FLT_MAX ? FLT_MAX : std::max(line.adjustable_time, line.adjustable_length / this->min_print_speed);
+                    break;
+                }
+            }
+        }
+    }
 };
 
 // Calculate a new feedrate when slowing down by time_stretch for segments faster than min_feedrate.
 // Used by non-proportional slow down.
 float new_feedrate_to_reach_time_stretch(
     std::vector<PerExtruderAdjustments*>::const_iterator it_begin, std::vector<PerExtruderAdjustments*>::const_iterator it_end, 
-    float min_feedrate, float time_stretch, size_t max_iter = 20)
+    float min_feedrate, float time_stretch, const AdjustableFeatureType additional_slowdown_features, size_t max_iter = 20)
 {
 	float new_feedrate = min_feedrate;
     for (size_t iter = 0; iter < max_iter; ++ iter) {
@@ -292,9 +507,9 @@ float new_feedrate_to_reach_time_stretch(
 			assert((*it)->min_print_speed < min_feedrate + EPSILON);
 			for (size_t i = 0; i < (*it)->n_lines_adjustable; ++i) {
 				const CoolingLine &line = (*it)->lines[i];
-                if (line.feedrate > min_feedrate) {
-                    nomin += line.time * line.feedrate;
-                    denom += line.time;
+                if (line.adjustable(additional_slowdown_features) && line.feedrate > min_feedrate) {
+                    nomin += line.adjustable_time * line.feedrate;
+                    denom += line.adjustable_time;
                 }
             }
         }
@@ -313,7 +528,7 @@ float new_feedrate_to_reach_time_stretch(
         for (auto it = it_begin; it != it_end; ++ it)
 			for (size_t i = 0; i < (*it)->n_lines_adjustable; ++i) {
 				const CoolingLine &line = (*it)->lines[i];
-                if (line.feedrate > min_feedrate && line.feedrate < new_feedrate)
+                if (line.adjustable(additional_slowdown_features) && line.feedrate > min_feedrate && line.feedrate < new_feedrate)
                     // Some of the line segments taken into account in the calculation of nomin / denom are now slower than new_feedrate, 
                     // which makes the new_feedrate lower than it should be.
                     // Re-run the calculation with a new min_feedrate limit, so that the segments with current feedrate lower than new_feedrate
@@ -332,7 +547,7 @@ finished:
     {
         float time_stretch_final = 0.f;
         for (auto it = it_begin; it != it_end; ++ it)
-            time_stretch_final += (*it)->time_stretch_when_slowing_down_to_feedrate(new_feedrate);
+            time_stretch_final += (*it)->time_stretch_when_slowing_down_to_feedrate(new_feedrate, additional_slowdown_features);
         assert(std::abs(time_stretch - time_stretch_final) < EPSILON);
     }
 #endif /* NDEBUG */
@@ -371,6 +586,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         unsigned int            extruder_id = m_extruder_ids[i];
         adj.extruder_id               = extruder_id;
         adj.cooling_slow_down_enabled = m_config.cooling.get_at(extruder_id);
+        adj.cooling_slowdown_logic    = m_config.cooling_slowdown_logic.get_at(extruder_id);
         adj.slowdown_below_layer_time = float(m_config.slowdown_below_layer_time.get_at(extruder_id));
         adj.min_print_speed           = float(m_config.min_print_speed.get_at(extruder_id));
         map_extruder_to_per_extruder_adjustment[extruder_id] = i;
@@ -447,10 +663,23 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 (line.type & (CoolingLine::TYPE_G2G3_IJ | CoolingLine::TYPE_G2G3_R)));
             // Arc is defined either by IJ or by R, not by both.
             assert(! ((line.type & CoolingLine::TYPE_G2G3_IJ) && (line.type & CoolingLine::TYPE_G2G3_R)));
-            bool external_perimeter = boost::contains(sline, ";_EXTERNAL_PERIMETER");
-            bool wipe               = boost::contains(sline, ";_WIPE");
-            if (external_perimeter)
-                line.type |= CoolingLine::TYPE_EXTERNAL_PERIMETER;
+            bool external_perimeter          = boost::contains(sline, ";_EXTERNAL_PERIMETER");
+            bool wipe                        = boost::contains(sline, ";_WIPE");
+            auto internal_perimeter_it_range = boost::find_last(sline, ";_INTERNAL_PERIMETER");
+            if (external_perimeter) {
+                line.type            |= CoolingLine::TYPE_EXTERNAL_PERIMETER;
+                line.perimeter_index  = 0;
+            } else if (!internal_perimeter_it_range.empty()) {
+                uint16_t    perimetr_index = 0;
+                const char* start_ptr      = sline.data() + std::distance(sline.begin(), internal_perimeter_it_range.end());
+                const char* end_ptr        = sline.data() + sline.size();
+                const auto  res            = std::from_chars(start_ptr, end_ptr,perimetr_index);
+                if (res.ec == std::errc()) {
+                    line.type            |= perimetr_index == 1 ? CoolingLine::TYPE_FIRST_INTERNAL_PERIMETER : CoolingLine::TYPE_INTERNAL_PERIMETER;
+                    line.perimeter_index  = perimetr_index;
+                }
+            }
+
             if (wipe)
                 line.type |= CoolingLine::TYPE_WIPE;
             if (boost::contains(sline, ";_EXTRUDE_SET_SPEED") && ! wipe) {
@@ -484,44 +713,88 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                         dxy2 = 0;
                 } else
                     dxy2 = sqr(dif[AxisIdx::X]) + sqr(dif[AxisIdx::Y]);
+
+                const bool is_adjustable = (line.type & CoolingLine::TYPE_ADJUSTABLE) || active_speed_modifier != size_t(-1);
                 float dxyz2 = dxy2 + sqr(dif[AxisIdx::Z]);
                 if (dxyz2 > 0.f) {
                     // Movement in xyz, calculate time from the xyz Euclidian distance.
-                    line.length = sqrt(dxyz2);
+                    if (is_adjustable) {
+                        line.adjustable_length     = sqrt(dxyz2);
+                        line.non_adjustable_length = 0.f;
+                    } else {
+                        line.adjustable_length     = 0.f;
+                        line.non_adjustable_length = sqrt(dxyz2);
+                    }
                 } else if (std::abs(dif[AxisIdx::E]) > 0.f) {
                     // Movement in the extruder axis.
-                    line.length = std::abs(dif[AxisIdx::E]);
+                    if (is_adjustable) {
+                        line.adjustable_length     = std::abs(dif[AxisIdx::E]);
+                        line.non_adjustable_length = 0.f;
+                    } else {
+                        line.adjustable_length     = 0.f;
+                        line.non_adjustable_length = std::abs(dif[AxisIdx::E]);
+                    }
                 }
-                line.feedrate = new_pos[AxisIdx::F];
+
+                line.feedrate          = new_pos[AxisIdx::F];
+                line.feedrate_original = new_pos[AxisIdx::F];
+
                 assert((line.type & CoolingLine::TYPE_ADJUSTABLE) == 0 || line.feedrate > 0.f);
-                if (line.length > 0) {
+                if (line.length() > 0) {
                     assert(line.feedrate > 0);
-                    line.time = line.length / line.feedrate;
-                    assert(line.time > 0);
+                    if (is_adjustable) {
+                        line.adjustable_time     = line.length() / line.feedrate;
+                        line.non_adjustable_time = 0.f;
+                    } else {
+                        line.adjustable_time     = 0.f;
+                        line.non_adjustable_time = line.length() / line.feedrate;
+                    }
+
+                    assert(line.time() > 0);
                 }
-                line.time_max = line.time;
-                if ((line.type & CoolingLine::TYPE_ADJUSTABLE) || active_speed_modifier != size_t(-1)) {
+
+                if (is_adjustable) {
                     assert(adjustment->min_print_speed >= 0);
-                    line.time_max = (adjustment->min_print_speed == 0.f) ? FLT_MAX : std::max(line.time, line.length / adjustment->min_print_speed);
+                    line.adjustable_time_max = (adjustment->min_print_speed == 0.f) ? FLT_MAX : std::max(line.time(), line.length() / adjustment->min_print_speed);
+                } else {
+                    line.adjustable_time_max = 0.f;
                 }
+
                 if (active_speed_modifier < adjustment->lines.size() && (line.type & (CoolingLine::TYPE_G1 | CoolingLine::TYPE_G2G3))) {
                     // Inside the ";_EXTRUDE_SET_SPEED" blocks, there must not be a G1 Fxx entry.
                     assert((line.type & CoolingLine::TYPE_HAS_F) == 0);
                     CoolingLine &sm = adjustment->lines[active_speed_modifier];
+
                     assert(sm.feedrate > 0.f);
-                    sm.length   += line.length;
-                    sm.time     += line.time;
-                    if (sm.time_max != FLT_MAX) {
-                        if (line.time_max == FLT_MAX)
-                            sm.time_max = FLT_MAX;
+                    sm.adjustable_length   += line.adjustable_length;
+                    sm.adjustable_time     += line.adjustable_time;
+                    if (sm.adjustable_time_max != FLT_MAX) {
+                        if (line.adjustable_time_max == FLT_MAX)
+                            sm.adjustable_time_max = FLT_MAX;
                         else
-                            sm.time_max += line.time_max;
+                            sm.adjustable_time_max += line.adjustable_time_max;
                     }
+
+                    const Vec4f current_pos_v = Vec4f(current_pos[AxisIdx::X], current_pos[AxisIdx::Y], current_pos[AxisIdx::Z], current_pos[AxisIdx::E]);
+                    const Vec4f new_pos_v = Vec4f(new_pos[AxisIdx::X], new_pos[AxisIdx::Y], new_pos[AxisIdx::Z], new_pos[AxisIdx::E]);
+
+                    if (line.type & CoolingLine::TYPE_G2G3_IJ) {
+                        sm.move_segments.emplace_back(current_pos_v, new_pos_v, line.length(), line.line_start, line.line_end, line.type, Vec2f(new_pos[AxisIdx::I], new_pos[AxisIdx::J]));
+                    } else {
+                        assert(line.type & CoolingLine::TYPE_G1);
+                        sm.move_segments.emplace_back(current_pos_v, new_pos_v, line.length(), line.line_start, line.line_end, line.type);
+                    }
+
                     // Don't store this line.
                     line.type = 0;
                 }
             }
+
             std::copy(std::begin(new_pos), std::begin(new_pos) + 5, std::begin(current_pos));
+            if (m_config.use_relative_e_distances.value) {
+                // Reset extruder accumulator.
+                current_pos[AxisIdx::E] = 0.f;
+            }
         } else if (boost::starts_with(sline, ";_EXTRUDE_END")) {
             // Closing a block of non-zero length extrusion moves.
             line.type = CoolingLine::TYPE_EXTRUDE_END;
@@ -530,9 +803,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 CoolingLine &sm = adjustment->lines[active_speed_modifier];
                 // There should be at least some extrusion move inside the adjustment block.
                 // However if the block has no extrusion (which is wrong), fix it for the cooling buffer to work.
-                assert(sm.length > 0);
-                assert(sm.time > 0);
-                if (sm.time <= 0) {
+                assert(sm.length() > 0);
+                assert(sm.time() > 0);
+                if (sm.time() <= 0) {
                     // Likely a zero length extrusion, it should not be emitted, however the zero extrusions should not confuse firmware either.
                     // Prohibit time adjustment of a block of zero length extrusions by the cooling buffer.
                     sm.type &= ~CoolingLine::TYPE_ADJUSTABLE;
@@ -573,14 +846,15 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             bool   has_P = pos_P > 0;
             if (has_S || has_P) {
                 //auto [pend, ec] = 
-                    fast_float::from_chars(sline.data() + (has_S ? pos_S : pos_P) + 1, sline.data() + sline.size(), line.time);
+                    fast_float::from_chars(sline.data() + (has_S ? pos_S : pos_P) + 1, sline.data() + sline.size(), line.non_adjustable_time);
                 if (has_P)
-                    line.time *= 0.001f;
+                    line.non_adjustable_time *= 0.001f;
             } else {
-                line.time = 0;
+                line.non_adjustable_time = 0.f;
             }
 
-            line.time_max = line.time;
+            line.adjustable_time = 0.f;
+            line.adjustable_time_max = 0.f;
         } else if (boost::contains(sline, ";_SET_FAN_SPEED")) {
             auto speed_start = sline.find_last_of('D');
             int  speed       = 0;
@@ -618,13 +892,13 @@ static inline float extruder_range_slow_down_proportional(
     // Now decide, whether the external perimeters shall be slowed down as well.
     float max_time_nep = elapsed_time_total0;
     for (auto it = it_begin; it != it_end; ++ it)
-        max_time_nep += (*it)->maximum_time_after_slowdown(false);
+        max_time_nep += (*it)->maximum_time_after_slowdown(AdjustableFeatureType::None);
     if (max_time_nep > slowdown_below_layer_time) {
         // It is sufficient to slow down the non-external perimeter moves to reach the target layer time.
         // Slow down the non-external perimeters proportionally.
         float non_adjustable_time = elapsed_time_total0;
         for (auto it = it_begin; it != it_end; ++ it)
-            non_adjustable_time += (*it)->non_adjustable_time(false);
+            non_adjustable_time += (*it)->non_adjustable_time(AdjustableFeatureType::None);
         // The following step is a linear programming task due to the minimum movement speeds of the print moves.
         // Run maximum 5 iterations until a good enough approximation is reached.
         for (size_t iter = 0; iter < 5; ++ iter) {
@@ -632,24 +906,24 @@ static inline float extruder_range_slow_down_proportional(
             assert(factor > 1.f);
             total_after_slowdown = elapsed_time_total0;
             for (auto it = it_begin; it != it_end; ++ it)
-                total_after_slowdown += (*it)->slow_down_proportional(factor, false);
+                total_after_slowdown += (*it)->slow_down_proportional(factor, AdjustableFeatureType::None);
             if (total_after_slowdown > 0.95f * slowdown_below_layer_time)
                 break;
         }
     } else {
         // Slow down everything. First slow down the non-external perimeters to maximum.
         for (auto it = it_begin; it != it_end; ++ it)
-            (*it)->slowdown_to_minimum_feedrate(false);
+            (*it)->slowdown_to_minimum_feedrate(AdjustableFeatureType::None);
         // Slow down the external perimeters proportionally.
         float non_adjustable_time = elapsed_time_total0;
         for (auto it = it_begin; it != it_end; ++ it)
-            non_adjustable_time += (*it)->non_adjustable_time(true);
+            non_adjustable_time += (*it)->non_adjustable_time(AdjustableFeatureType::ExternalPerimeters | AdjustableFeatureType::FirstInternalPerimeters);
         for (size_t iter = 0; iter < 5; ++ iter) {
             float factor = (slowdown_below_layer_time - non_adjustable_time) / (total_after_slowdown - non_adjustable_time);
             assert(factor > 1.f);
             total_after_slowdown = elapsed_time_total0;
             for (auto it = it_begin; it != it_end; ++ it)
-                total_after_slowdown += (*it)->slow_down_proportional(factor, true);
+                total_after_slowdown += (*it)->slow_down_proportional(factor, AdjustableFeatureType::ExternalPerimeters | AdjustableFeatureType::FirstInternalPerimeters);
             if (total_after_slowdown > 0.95f * slowdown_below_layer_time)
                 break;
         }
@@ -659,10 +933,11 @@ static inline float extruder_range_slow_down_proportional(
 
 // Slow down an extruder range to slowdown_below_layer_time.
 // Return the total time for the complete layer.
-static inline void extruder_range_slow_down_non_proportional(
+static inline float extruder_range_slow_down_non_proportional(
     std::vector<PerExtruderAdjustments*>::iterator it_begin,
     std::vector<PerExtruderAdjustments*>::iterator it_end,
-    float time_stretch)
+    float                                          time_stretch,
+    const AdjustableFeatureType                    additional_slowdown_features)
 {
     // Slow down. Try to equalize the feedrates.
     std::vector<PerExtruderAdjustments*> by_min_print_speed(it_begin, it_end);
@@ -700,27 +975,35 @@ static inline void extruder_range_slow_down_non_proportional(
                 // and the minimum speed is set to zero.
                 float time_adjustable = 0.f;
                 for (auto it = adj; it != by_min_print_speed.end(); ++ it)
-                    time_adjustable += (*it)->adjustable_time(true);
+                    time_adjustable += (*it)->adjustable_time(additional_slowdown_features);
                 assert(time_adjustable > 0);
                 float rate = (time_adjustable + time_stretch) / time_adjustable;
-                for (auto it = adj; it != by_min_print_speed.end(); ++ it)
-                    (*it)->slow_down_proportional(rate, true);
-                return;
+                for (auto it = adj; it != by_min_print_speed.end(); ++ it) {
+                    (*it)->slow_down_proportional(rate, additional_slowdown_features);
+                }
+
+                return 0.f;
             } else {
                 float feedrate_limit = std::max(feedrate_next, (*adj)->min_print_speed);
                 bool  done           = false;
                 float time_stretch_max = 0.f;
-                for (auto it = adj; it != by_min_print_speed.end(); ++ it)
-                    time_stretch_max += (*it)->time_stretch_when_slowing_down_to_feedrate(feedrate_limit);
+                for (auto it = adj; it != by_min_print_speed.end(); ++ it) {
+                    time_stretch_max += (*it)->time_stretch_when_slowing_down_to_feedrate(feedrate_limit, additional_slowdown_features);
+                }
+
                 if (time_stretch_max >= time_stretch) {
-                    feedrate_limit = new_feedrate_to_reach_time_stretch(adj, by_min_print_speed.end(), feedrate_limit, time_stretch, 20);
+                    feedrate_limit = new_feedrate_to_reach_time_stretch(adj, by_min_print_speed.end(), feedrate_limit, time_stretch, additional_slowdown_features, 20);
                     done = true;
-                } else
+                } else {
                     time_stretch -= time_stretch_max;
-                for (auto it = adj; it != by_min_print_speed.end(); ++ it)
-                    (*it)->slow_down_to_feedrate(feedrate_limit);
+                }
+
+                for (auto it = adj; it != by_min_print_speed.end(); ++it) {
+                    (*it)->slow_down_to_feedrate(feedrate_limit, additional_slowdown_features);
+                }
+
                 if (done)
-                    return;
+                    return 0.;
             }
             // Skip the other extruders with nearly the same min_print_speed, as they have been processed already.
             auto next = adj;
@@ -735,6 +1018,8 @@ static inline void extruder_range_slow_down_non_proportional(
             feedrate = feedrate_next;
         }
     }
+
+    return time_stretch;
 }
 
 // Calculate slow down for all the extruders.
@@ -749,15 +1034,22 @@ float CoolingBuffer::calculate_layer_slowdown(std::vector<PerExtruderAdjustments
     // Collect total print time of non-adjustable extruders.
     float elapsed_time_total0 = 0.f;
     for (PerExtruderAdjustments &adj : per_extruder_adjustments) {
+        const double perimeter_transition_distance = m_config.cooling_perimeter_transition_distance.get_at(m_current_extruder);
+        if (adj.cooling_slowdown_logic == CoolingSlowdownLogicType::ConsistentSurface && perimeter_transition_distance >= 0.) {
+            // Create non-adjustable segments for ConsistentSurface logic before sorting.
+            adj.create_non_adjustable_segments(static_cast<float>(perimeter_transition_distance));
+        }
+
         // Curren total time for this extruder.
         adj.time_total  = adj.elapsed_time_total();
         // Maximum time for this extruder, when all extrusion moves are slowed down to min_extrusion_speed.
-        adj.time_maximum = adj.maximum_time_after_slowdown(true);
+        adj.time_maximum = adj.maximum_time_after_slowdown(AdjustableFeatureType::ExternalPerimeters | AdjustableFeatureType::FirstInternalPerimeters);
         if (adj.cooling_slow_down_enabled && adj.lines.size() > 0) {
             by_slowdown_time.emplace_back(&adj);
-            if (! m_cooling_logic_proportional)
+            if (adj.cooling_slowdown_logic != CoolingSlowdownLogicType::Proportional) {
                 // sorts the lines, also sets adj.time_non_adjustable
                 adj.sort_lines_by_decreasing_feedrate();
+            }
         } else
             elapsed_time_total0 += adj.elapsed_time_total();
     }
@@ -781,14 +1073,21 @@ float CoolingBuffer::calculate_layer_slowdown(std::vector<PerExtruderAdjustments
             for (auto it = cur_begin; it != by_slowdown_time.end(); ++ it)
                 max_time += (*it)->time_maximum;
             if (max_time > slowdown_below_layer_time) {
-                if (m_cooling_logic_proportional)
+                if (adj.cooling_slowdown_logic == CoolingSlowdownLogicType::Proportional) {
                     extruder_range_slow_down_proportional(cur_begin, by_slowdown_time.end(), elapsed_time_total0, total, slowdown_below_layer_time);
-                else
-                    extruder_range_slow_down_non_proportional(cur_begin, by_slowdown_time.end(), slowdown_below_layer_time - total);
+                } else if (adj.cooling_slowdown_logic == CoolingSlowdownLogicType::ConsistentSurface) {
+                    const float remaining_time_stretch = extruder_range_slow_down_non_proportional(cur_begin, by_slowdown_time.end(), slowdown_below_layer_time - total, AdjustableFeatureType::None);
+                    if (remaining_time_stretch > 0.f) {
+                        // We didn't achieve the requested time for the layer, so we allow a slowdown on the external and first internal perimeter.
+                        extruder_range_slow_down_non_proportional(cur_begin, by_slowdown_time.end(), remaining_time_stretch, AdjustableFeatureType::ExternalPerimeters | AdjustableFeatureType::FirstInternalPerimeters);
+                    }
+                } else {
+                    extruder_range_slow_down_non_proportional(cur_begin, by_slowdown_time.end(), slowdown_below_layer_time - total, AdjustableFeatureType::ExternalPerimeters | AdjustableFeatureType::FirstInternalPerimeters);
+                }
             } else {
                 // Slow down to maximum possible.
                 for (auto it = cur_begin; it != by_slowdown_time.end(); ++ it)
-                    (*it)->slowdown_to_minimum_feedrate(true);
+                    (*it)->slowdown_to_minimum_feedrate(AdjustableFeatureType::ExternalPerimeters | AdjustableFeatureType::FirstInternalPerimeters);
             }
         }
         elapsed_time_total0 += adj.elapsed_time_total();
@@ -900,11 +1199,69 @@ std::string CoolingBuffer::apply_layer_cooldown(
     int                 current_feedrate  = 0;
 
     change_extruder_set_fan();
+
+    const CoolingLine *line_waiting_for_split = nullptr;
     for (const CoolingLine *line : lines) {
         const char *line_start  = gcode.c_str() + line->line_start;
         const char *line_end    = gcode.c_str() + line->line_end;
-        if (line_start > pos)
-            new_gcode.append(pos, line_start - pos);
+        if (line_start > pos) {
+            if (line_waiting_for_split != nullptr &&
+                line_waiting_for_split->move_segments.front().line_start == (pos - gcode.c_str()) &&
+                line_waiting_for_split->move_segments.back().line_end == line->line_start) {
+                assert(!line_waiting_for_split->move_segments.empty());
+
+                // We need to split CoolingLine into two parts with different feedrates.
+                const float segments_total_length    = std::accumulate(line_waiting_for_split->move_segments.begin(), line_waiting_for_split->move_segments.end(), 0.f, [](float sum, const GCodeMoveSegment &segment) {
+                    return sum + segment.length;
+                });
+                const float split_segments_at_length = segments_total_length - line_waiting_for_split->non_adjustable_length;
+
+                float accumulated_length = 0.f;
+                auto  segment_it         = line_waiting_for_split->move_segments.cbegin();
+                for (; segment_it != line_waiting_for_split->move_segments.cend() && accumulated_length + segment_it->length <= split_segments_at_length; ++segment_it) {
+                    new_gcode.append(gcode.c_str() + segment_it->line_start, segment_it->line_end - segment_it->line_start);
+                    accumulated_length += segment_it->length;
+                }
+
+                if (segment_it != line_waiting_for_split->move_segments.cend()) {
+                    const GCodeMoveSegment &segment         = *segment_it;
+                    const float             split_at_length = split_segments_at_length - accumulated_length;
+
+                    if (split_at_length >= segment.length - SEGMENT_SPLIT_EPSILON) {
+                        new_gcode.append(gcode.c_str() + segment_it->line_start, segment_it->line_end - segment_it->line_start);
+                        ++segment_it;
+
+                        if (segment_it != line_waiting_for_split->move_segments.cend()) {
+                            new_gcode.append(emit_feedrate(line_waiting_for_split->feedrate_original));
+                        }
+                    } else if (split_at_length <= SEGMENT_SPLIT_EPSILON) {
+                        new_gcode.append(emit_feedrate(line_waiting_for_split->feedrate_original));
+                        new_gcode.append(gcode.c_str() + segment_it->line_start, segment_it->line_end - segment_it->line_start);
+                        ++segment_it;
+                    } else {
+                        const std::pair<std::string, std::string> segment_parts = segment.is_arc() ? split_arc_segment(segment, split_at_length, m_config.use_relative_e_distances)
+                                                                                                   : split_linear_segment(segment, split_at_length, m_config.use_relative_e_distances);
+                        new_gcode += segment_parts.first;
+
+                        // Change the feedrate for the second part.
+                        new_gcode.append(emit_feedrate(line_waiting_for_split->feedrate_original));
+
+                        new_gcode += segment_parts.second;
+
+                        ++segment_it;
+                    }
+                }
+
+                for (; segment_it != line_waiting_for_split->move_segments.end(); ++segment_it) {
+                    new_gcode.append(gcode.c_str() + segment_it->line_start, segment_it->line_end - segment_it->line_start);
+                }
+
+                line_waiting_for_split = nullptr;
+            } else {
+                new_gcode.append(pos, line_start - pos);
+            }
+        }
+
         if (line->type & CoolingLine::TYPE_SET_TOOL) {
             unsigned int new_extruder = 0;
             auto res = std::from_chars(line_start + m_toolchange_prefix.size(), line_end, new_extruder);
@@ -925,7 +1282,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
                 new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed);
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_END) {
             // Just remove this comment.
-        } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE | CoolingLine::TYPE_HAS_F)) {
+        } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_FIRST_INTERNAL_PERIMETER | CoolingLine::TYPE_WIPE | CoolingLine::TYPE_HAS_F)) {
             // Find the start of a comment, or roll to the end of line.
             const char *end = line_start;
             for (; end < line_end && *end != ';'; ++ end);
@@ -937,14 +1294,15 @@ std::string CoolingBuffer::apply_layer_cooldown(
             // Remove the F word from the current G-code line.
             bool        remove          = false;
             assert(fpos != nullptr);
-            if (line->slowdown)
+            if (line->slowdown) {
                 new_feedrate = int(floor(60. * line->feedrate + 0.5));
-            else
-                //auto res = 
-                    std::from_chars(fpos, line_end, new_feedrate);
+            } else {
+                std::from_chars(fpos, line_end, new_feedrate);
+            }
+
             if (new_feedrate == current_feedrate) {
                 // No need to change the F value.
-                if ((line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) || line->length == 0.)
+                if ((line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_FIRST_INTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) || line->length() == 0.)
                     // Feedrate does not change and this line does not move the print head. Skip the complete G-code line including the G-code comment.
                     end = line_end;
                 else
@@ -989,12 +1347,17 @@ std::string CoolingBuffer::apply_layer_cooldown(
             }
             // Process the rest of the line.
             if (end < line_end) {
-                if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) {
-                    // Process comments, remove ";_EXTRUDE_SET_SPEED", ";_EXTERNAL_PERIMETER", ";_WIPE"
+                if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_INTERNAL_PERIMETER | CoolingLine::TYPE_FIRST_INTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) {
+                    // Process comments, remove ";_EXTRUDE_SET_SPEED", ";_EXTERNAL_PERIMETER", ";_INTERNAL_PERIMETER", ";_WIPE"
                     std::string comment(end, line_end);
                     boost::replace_all(comment, ";_EXTRUDE_SET_SPEED", "");
-                    if (line->type & CoolingLine::TYPE_EXTERNAL_PERIMETER)
+                    if (line->type & CoolingLine::TYPE_EXTERNAL_PERIMETER) {
                         boost::replace_all(comment, ";_EXTERNAL_PERIMETER", "");
+                    } else if (line->type & CoolingLine::TYPE_INTERNAL_PERIMETER || line->type & CoolingLine::TYPE_FIRST_INTERNAL_PERIMETER) {
+                        assert(line->perimeter_index.has_value());
+                        boost::replace_all(comment, ";_INTERNAL_PERIMETER" + std::to_string(*line->perimeter_index), "");
+                    }
+
                     if (line->type & CoolingLine::TYPE_WIPE)
                         boost::replace_all(comment, ";_WIPE", "");
                     new_gcode += comment;
@@ -1002,6 +1365,11 @@ std::string CoolingBuffer::apply_layer_cooldown(
                     // Just attach the rest of the source line.
                     new_gcode.append(end, line_end - end);
                 }
+            }
+
+            if (line->slowdown && !line->move_segments.empty() && line->non_adjustable_length > 0.f) {
+                assert(line_waiting_for_split == nullptr);
+                line_waiting_for_split = line;
             }
         } else {
             new_gcode.append(line_start, line_end - line_start);

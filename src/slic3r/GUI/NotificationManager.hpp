@@ -962,7 +962,7 @@ private:
 		, NotificationLevel::RegularNotificationLevel
 		, 10
 		// TRN: The text is followed by a hyperlink saying "here." It is necessary to split it in two phrases, sorry.
-		, _u8L("PrusaSlicer received a download request from Printables.com, but it's not allowed. You can allow it")
+		, _u8L("PrusaSlicer received a download request from supported website, but it's not allowed. You can allow it")
 		, _u8L("here.")
 		,  [](wxEvtHandler* evnthndlr) {
 			wxGetApp().open_preferences("downloader_url_registered", "Other");

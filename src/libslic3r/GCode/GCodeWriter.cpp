@@ -50,6 +50,7 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
         print_config.machine_max_acceleration_extruding.values.front() : 0));
     m_max_travel_acceleration = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode && supports_separate_travel_acceleration(print_config.gcode_flavor.value)) ?
         print_config.machine_max_acceleration_travel.values.front() : 0));
+    m_max_junction_deviation = (use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ? print_config.machine_max_junction_deviation.values.front() : 0.;
 }
 
 void GCodeWriter::set_extruders(std::vector<unsigned int> extruder_ids)
@@ -229,6 +230,24 @@ std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned i
     if (this->config.gcode_comments) gcode << " ; adjust acceleration";
     gcode << "\n";
     
+    return gcode.str();
+}
+
+std::string GCodeWriter::set_junction_deviation(const double junction_deviation)
+{
+    std::ostringstream gcode;
+    if (FLAVOR_IS(gcfMarlinFirmware) && junction_deviation > 0. && m_max_junction_deviation > 0.) {
+        // Clamp the junction deviation to the allowed maximum.
+        gcode << "M205 J";
+        if (junction_deviation <= m_max_junction_deviation) {
+            gcode << std::fixed << std::setprecision(3) << junction_deviation;
+        } else {
+            gcode << std::fixed << std::setprecision(3) << m_max_junction_deviation;
+        }
+
+        gcode << " ; sets the junction deviation, mm\n";
+    }
+
     return gcode.str();
 }
 

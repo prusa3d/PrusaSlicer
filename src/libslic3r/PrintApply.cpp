@@ -31,6 +31,7 @@
 #include "libslic3r/Slicing.hpp"
 #include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/libslic3r.h"
+#include "libslic3r/CustomParametersHandling.hpp"
 
 namespace Slic3r {
 
@@ -1126,6 +1127,19 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 		m_placeholder_parser.apply_config(filament_overrides);
 	    // It is also safe to change m_config now after this->invalidate_state_by_config_options() call.
 	    m_config.apply_only(new_full_config, print_diff, true);
+
+        try {
+            DynamicConfig custom_pars = parse_custom_parameters_to_dynamic_config(
+                m_config.custom_parameters_print,
+                m_config.custom_parameters_printer,
+                m_config.custom_parameters_filament.values
+            );
+            m_placeholder_parser.apply_config(std::move(custom_pars));
+        } catch (const std::runtime_error& ex) {
+            // Ignore any errors. The user will be prompted when Print::validate is called.
+            BOOST_LOG_TRIVIAL(error) << "Unable to parse custom parameters: " << ex.what();
+        }
+        
 	    //FIXME use move semantics once ConfigBase supports it.
         // Some filament_overrides may contain values different from new_full_config, but equal to m_config.
         // As long as these config options don't reallocate memory when copying, we are safe overriding a value, which is in use by a worker thread.

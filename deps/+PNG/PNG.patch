@@ -1,15 +1,33 @@
-Common subdirectories: ../libpng-1.6.35-orig/arm and ./arm
-Common subdirectories: ../libpng-1.6.35-orig/contrib and ./contrib
-Common subdirectories: ../libpng-1.6.35-orig/intel and ./intel
-Common subdirectories: ../libpng-1.6.35-orig/mips and ./mips
-Only in ./: PNG.patch
-diff -u ../libpng-1.6.35-orig/pngrutil.c ./pngrutil.c
---- ../libpng-1.6.35-orig/pngrutil.c	2018-07-15 20:58:00.000000000 +0200
-+++ ./pngrutil.c	2021-03-24 15:59:38.687108444 +0100
+--- libpng-1.6.35/pngpriv.h	2018-07-16 05:58:00.000000000 +0200
++++ libpng-1.6.35-patched/pngpriv.h	2025-06-13 12:12:34.915635578 +0200
+@@ -514,18 +514,8 @@
+     */
+ #  include <float.h>
+
+-#  if (defined(__MWERKS__) && defined(macintosh)) || defined(applec) || \
+-    defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)
+-   /* We need to check that <math.h> hasn't already been included earlier
+-    * as it seems it doesn't agree with <fp.h>, yet we should really use
+-    * <fp.h> if possible.
+-    */
+-#    if !defined(__MATH_H__) && !defined(__MATH_H) && !defined(__cmath__)
+-#      include <fp.h>
+-#    endif
+-#  else
+-#    include <math.h>
+-#  endif
++#  include <math.h>
++
+ #  if defined(_AMIGA) && defined(__SASC) && defined(_M68881)
+    /* Amiga SAS/C: We must include builtin FPU functions when compiling using
+     * MATH=68881
+diff --color -urN libpng-1.6.35/pngrutil.c libpng-1.6.35-patched/pngrutil.c
+--- libpng-1.6.35/pngrutil.c	2018-07-16 05:58:00.000000000 +0200
++++ libpng-1.6.35-patched/pngrutil.c	2025-06-13 11:58:40.515140291 +0200
 @@ -422,13 +422,6 @@
              png_ptr->flags |= PNG_FLAG_ZSTREAM_INITIALIZED;
        }
- 
+
 -#if ZLIB_VERNUM >= 0x1290 && \
 -   defined(PNG_SET_OPTION_SUPPORTED) && defined(PNG_IGNORE_ADLER32)
 -      if (((png_ptr->options >> PNG_IGNORE_ADLER32) & 3) == PNG_OPTION_ON)
@@ -19,8 +37,4 @@ diff -u ../libpng-1.6.35-orig/pngrutil.c ./pngrutil.c
 -
        if (ret == Z_OK)
           png_ptr->zowner = owner;
- 
-Common subdirectories: ../libpng-1.6.35-orig/powerpc and ./powerpc
-Common subdirectories: ../libpng-1.6.35-orig/projects and ./projects
-Common subdirectories: ../libpng-1.6.35-orig/scripts and ./scripts
-Common subdirectories: ../libpng-1.6.35-orig/tests and ./tests
+

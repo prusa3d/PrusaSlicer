@@ -1,6 +1,6 @@
 add_cmake_project(z3
-  URL https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.13.0.zip
-  URL_HASH SHA256=81543736dcbbbcb037a7df55d0be596245d509f3f69f56610df32728e48ee050
+  URL https://github.com/Z3Prover/z3/archive/refs/tags/z3-4.15.1.zip
+  URL_HASH SHA256=5072309889a8fe73381303949114391ae2c976b7df64886f4cbdae349dd39cae
   CMAKE_ARGS
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     -DZ3_INCLUDE_GIT_HASH=OFF
