@@ -1904,10 +1904,10 @@ wxSizer* TabPrint::create_texture_skin_pattern_widget(wxWindow* parent)
     label->SetBackgroundColour(parent->GetBackgroundColour());
 
     auto refresh_label = [this, label]() {
-        const auto pat = static_cast<Pattern>(m_config->option<ConfigOptionEnum<TextureSkinPattern>>("texture_skin_pattern")->value);
+        const auto pat = static_cast<Pattern>(m_config->opt_enum<TextureSkinPattern>("texture_skin_pattern"));
         wxString text;
         if (pat == Pattern::Custom) {
-            const std::string& path = m_config->option<ConfigOptionString>("texture_skin_custom_image")->value;
+            const std::string& path = m_config->opt_string("texture_skin_custom_image");
             if (path.empty()) {
                 text = _L("Custom…") + " (" + _L("no file") + ")";
             } else {
@@ -1919,22 +1919,19 @@ wxSizer* TabPrint::create_texture_skin_pattern_widget(wxWindow* parent)
         if (label->GetValue() != text) label->SetValue(text);
     };
     refresh_label();
-
-    // Keep the label in sync with config (reset/undo/preset-switch don't call our button handler).
     label->Bind(wxEVT_UPDATE_UI, [refresh_label](wxUpdateUIEvent&) { refresh_label(); });
 
     btn->Bind(wxEVT_BUTTON, [this, refresh_label](wxCommandEvent&) {
-        const auto current_pat = static_cast<Pattern>(m_config->option<ConfigOptionEnum<TextureSkinPattern>>("texture_skin_pattern")->value);
-        const std::string current_custom = m_config->option<ConfigOptionString>("texture_skin_custom_image")->value;
+        const auto current_pat = static_cast<Pattern>(m_config->opt_enum<TextureSkinPattern>("texture_skin_pattern"));
+        const std::string current_custom = m_config->opt_string("texture_skin_custom_image");
 
         TextureSkinPickerDialog dlg(this, current_pat, current_custom);
         if (dlg.ShowModal() != wxID_OK) return;
 
         const Pattern picked = dlg.get_pattern();
         load_key_value("texture_skin_pattern", static_cast<int>(picked));
-        if (picked == Pattern::Custom) {
+        if (picked == Pattern::Custom)
             load_key_value("texture_skin_custom_image", dlg.get_custom_image_path());
-        }
         refresh_label();
         update_changed_ui();
     });
@@ -1944,7 +1941,6 @@ wxSizer* TabPrint::create_texture_skin_pattern_widget(wxWindow* parent)
     sizer->AddSpacer(wxGetApp().em_unit());
     sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL);
 
-    // Forward texture_skin_custom_image searches to the same category as texture_skin_pattern.
     Search::OptionsSearcher& searcher = wxGetApp().searcher();
     const Search::GroupAndCategory& gc = searcher.get_group_and_category("texture_skin_pattern");
     searcher.add_key("texture_skin_custom_image", m_type, gc.group, gc.category);

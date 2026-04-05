@@ -11,6 +11,9 @@
 #include "libslic3r/Feature/TextureSkin/MeshDisplace.hpp"
 #include "libslic3r/Feature/TextureSkin/TexturePatterns.hpp"
 
+#include "slic3r/GUI/TextureSkinPickerDialog.hpp"
+#include "slic3r/GUI/Tab.hpp"
+
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
@@ -21,6 +24,7 @@
 
 #include <GL/glew.h>
 #include <algorithm>
+#include <boost/filesystem.hpp>
 
 namespace Slic3r::GUI {
 
@@ -81,12 +85,19 @@ void GLGizmoTextureSkin::on_render_input_window(float x, float y, float bottom_l
     if (!m_c->selection_info()->model_object())
         return;
 
-    const float approx_height = m_imgui->scaled(22.f);
-
-    y = std::min(y, bottom_limit - approx_height);
+    // Compute available height and clamp the window so it never falls off the
+    // bottom of the viewport. If content exceeds the available height the
+    // window becomes scrollable via ImGuiWindowFlags_AlwaysVerticalScrollbar.
+    const float top_margin   = m_imgui->scaled(1.f);
+    const float min_height   = m_imgui->scaled(12.f);
+    // Shift the window up a bit from the gizmo toolbar anchor so it's easier to reach.
+    y = std::max(0.f, y - m_imgui->scaled(22.f));
+    const float avail_height = std::max(min_height, bottom_limit - y - top_margin);
+    if (y + avail_height > bottom_limit) y = std::max(0.f, bottom_limit - avail_height - top_margin);
     ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.f, 0.f), ImVec2(FLT_MAX, avail_height));
 
-    ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+    ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
     const float clipping_slider_left   = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x,
                                                   ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
@@ -271,7 +282,44 @@ void GLGizmoTextureSkin::on_render_input_window(float x, float y, float bottom_l
     }
     const bool running = status != BakeState::idle;
 
+    // Pattern picker: shows the current texture and opens the thumbnail dialog.
     m_imgui->disabled_begin(running);
+    {
+        namespace TS = Slic3r::Feature::TextureSkin;
+        const DynamicPrintConfig &cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        const auto cur_pattern = static_cast<TS::Pattern>(
+            static_cast<int>(cfg.opt_enum<TextureSkinPattern>("texture_skin_pattern")));
+        std::string label;
+        if (cur_pattern == TS::Pattern::Custom) {
+            const std::string &p = cfg.opt_string("texture_skin_custom_image");
+            label = p.empty() ? _u8L("Custom… (no file)")
+                              : _u8L("Custom:") + " " + boost::filesystem::path(p).filename().string();
+        } else {
+            label = TS::pattern_display_name(cur_pattern);
+        }
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(_u8L("Pattern") + ": " + label);
+        if (ImGuiPureWrap::button(_u8L("Pick texture…"))) {
+            const std::string cur_custom = cfg.opt_string("texture_skin_custom_image");
+            TextureSkinPickerDialog dlg(wxGetApp().plater(), cur_pattern, cur_custom);
+            if (dlg.ShowModal() == wxID_OK) {
+                Tab *print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
+                DynamicPrintConfig &mut_cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+                const int picked_int = static_cast<int>(dlg.get_pattern());
+                mut_cfg.set_key_value("texture_skin_pattern",
+                    new ConfigOptionEnum<TextureSkinPattern>(static_cast<TextureSkinPattern>(picked_int)));
+                if (dlg.get_pattern() == TS::Pattern::Custom)
+                    mut_cfg.set_key_value("texture_skin_custom_image",
+                        new ConfigOptionString(dlg.get_custom_image_path()));
+                if (print_tab) {
+                    print_tab->on_value_change("texture_skin_pattern", picked_int);
+                    if (dlg.get_pattern() == TS::Pattern::Custom)
+                        print_tab->on_value_change("texture_skin_custom_image", dlg.get_custom_image_path());
+                }
+            }
+        }
+    }
+    ImGui::Separator();
     ImGui::AlignTextToFramePadding();
     ImGuiPureWrap::text(_u8L("Amplitude (mm)") + ":");
     ImGui::SameLine(sliders_left_width);
