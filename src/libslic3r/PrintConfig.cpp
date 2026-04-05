@@ -1823,7 +1823,7 @@ void PrintConfigDef::init_fff_params()
         { "custom",       L("Custom") }
     });
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<TextureSkinPattern>(TextureSkinPattern::Knurling));
+    def->set_default_value(new ConfigOptionEnum<TextureSkinPattern>(TextureSkinPattern::Crystal));
 
     def = this->add("texture_skin_uv_mode", coEnum);
     def->label = L("UV projection");
