@@ -60,11 +60,12 @@ void name_tbb_thread_pool_threads_set_locale();
 template<class Fn>
 inline boost::thread create_thread(boost::thread::attributes &attrs, Fn &&fn)
 {
-    // Duplicating the stack allocation size of Thread Building Block worker
-    // threads of the thread pool: allocate 4MB on a 64bit system, allocate 2MB
-    // on a 32bit system by default.
-    
-    attrs.set_stack_size((sizeof(void*) == 4) ? (2048 * 1024) : (4096 * 1024));
+    // Use the caller's stack size if explicitly set (non-zero),
+    // otherwise default to 4MB/2MB matching TBB worker threads.
+    // CGAL's exact arithmetic (GMP) can require deep stack for
+    // complex mesh intersections (e.g. texture projection on spheres).
+    if (attrs.get_stack_size() == 0)
+        attrs.set_stack_size((sizeof(void*) == 4) ? (2048 * 1024) : (4096 * 1024));
     return boost::thread{attrs, std::forward<Fn>(fn)};
 }
 
