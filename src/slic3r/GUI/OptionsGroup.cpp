@@ -1207,6 +1207,7 @@ static const std::set<std::string> options_without_field = {
     "bed_shape",
     "filament_ramming_parameters",
     "gcode_substitutions",
+    "texture_skin_pattern",
 };
 
 bool OptionsGroup::is_option_without_field(const std::string& opt_key)

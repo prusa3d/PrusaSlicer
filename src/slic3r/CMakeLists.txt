@@ -165,6 +165,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/GUI_ObjectList.hpp
     GUI/GalleryDialog.cpp
     GUI/GalleryDialog.hpp
+    GUI/TextureSkinPickerDialog.cpp
+    GUI/TextureSkinPickerDialog.hpp
     GUI/GUI_ObjectManipulation.cpp
     GUI/GUI_ObjectManipulation.hpp
     GUI/GUI_ObjectSettings.cpp
