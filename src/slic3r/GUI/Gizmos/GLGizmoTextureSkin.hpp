@@ -3,7 +3,11 @@
 #ifndef slic3r_GLGizmoTextureSkin_hpp_
 #define slic3r_GLGizmoTextureSkin_hpp_
 
+#include <mutex>
+#include <thread>
+
 #include "GLGizmoPainterBase.hpp"
+#include "admesh/stl.h"
 
 #include "slic3r/GUI/I18N.hpp"
 
@@ -40,6 +44,30 @@ private:
     PainterGizmoType get_painter_type() const override;
 
     std::map<std::string, std::string> m_desc;
+
+    // ----- Bake displacement state ------------------------------------
+    struct BakeState {
+        enum Status { idle, running, cancelling };
+        Status                 status   = idle;
+        int                    progress = 0;
+        indexed_triangle_set   result;
+        int                    object_idx = -1;
+        ObjectID               volume_id;
+    };
+
+    float    m_bake_edge_length_mm   = 0.4f;
+    float    m_bake_amplitude_mm     = 0.5f;
+    int      m_bake_target_triangles = 100000;
+    bool     m_bake_skip_bottom      = true;
+
+    std::thread m_bake_thread;
+    std::mutex  m_bake_mutex;
+    BakeState   m_bake_state;
+
+    void start_bake();
+    void cancel_bake();
+    void apply_bake();      // UI-thread: swap mesh, trigger reslice
+    void join_bake_thread();
 };
 
 } // namespace Slic3r::GUI

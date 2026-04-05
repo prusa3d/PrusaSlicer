@@ -105,6 +105,8 @@ set(SLIC3R_SOURCES
     Feature/TextureSkin/TextureSampler.hpp
     Feature/TextureSkin/TexturePatterns.cpp
     Feature/TextureSkin/TexturePatterns.hpp
+    Feature/TextureSkin/MeshDisplace.cpp
+    Feature/TextureSkin/MeshDisplace.hpp
     Fill/Fill.cpp
     Fill/Fill3DHoneycomb.cpp
     Fill/Fill3DHoneycomb.hpp
