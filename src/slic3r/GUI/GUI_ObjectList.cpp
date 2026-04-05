@@ -1942,6 +1942,13 @@ void ObjectList::del_info_item(const int obj_idx, InfoItemType type)
             mv->fuzzy_skin_facets.reset();
         break;
 
+    case InfoItemType::TextureSkin:
+        cnv->get_gizmos_manager().reset_all_states();
+        Plater::TakeSnapshot(plater, _L("Remove paint-on texture skin"));
+        for (ModelVolume* mv : (*m_objects)[obj_idx]->volumes)
+            mv->texture_skin_facets.reset();
+        break;
+
     case InfoItemType::Sinking:
         Plater::TakeSnapshot(plater, _L("Shift objects to bed"));
         (*m_objects)[obj_idx]->ensure_on_bed();
@@ -2743,10 +2750,12 @@ void ObjectList::part_selection_changed()
                     case InfoItemType::CustomSeam:
                     case InfoItemType::MmSegmentation:
                     case InfoItemType::FuzzySkin:
+                    case InfoItemType::TextureSkin:
                     {
                         GLGizmosManager::EType gizmo_type = info_type == InfoItemType::CustomSupports   ? GLGizmosManager::EType::FdmSupports :
                                                             info_type == InfoItemType::CustomSeam       ? GLGizmosManager::EType::Seam :
                                                             info_type == InfoItemType::FuzzySkin        ? GLGizmosManager::EType::FuzzySkin :
+                                                            info_type == InfoItemType::TextureSkin      ? GLGizmosManager::EType::TextureSkin :
                                                             GLGizmosManager::EType::MmSegmentation;
                         if (gizmos_mgr.get_current_type() != gizmo_type)
                             gizmos_mgr.open_gizmo(gizmo_type);
@@ -2919,6 +2928,7 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
                               InfoItemType::CutConnectors,
                               InfoItemType::MmSegmentation,
                               InfoItemType::FuzzySkin,
+                              InfoItemType::TextureSkin,
                               InfoItemType::Sinking,
                               InfoItemType::VariableLayerHeight}) {
         wxDataViewItem item = m_objects_model->GetInfoItemByType(item_obj, type);
@@ -2930,12 +2940,14 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
         case InfoItemType::CustomSeam :
         case InfoItemType::MmSegmentation :
         case InfoItemType::FuzzySkin :
+        case InfoItemType::TextureSkin :
             should_show = printer_technology() == ptFFF
                        && std::any_of(model_object->volumes.begin(), model_object->volumes.end(),
                                       [type](const ModelVolume *mv) {
                                           return !(type == InfoItemType::CustomSupports ? mv->supported_facets.empty() :
                                                    type == InfoItemType::CustomSeam     ? mv->seam_facets.empty() :
                                                    type == InfoItemType::FuzzySkin      ? mv->fuzzy_skin_facets.empty() :
+                                                   type == InfoItemType::TextureSkin    ? mv->texture_skin_facets.empty() :
                                                                                           mv->mm_segmentation_facets.empty());
                                       });
             break;

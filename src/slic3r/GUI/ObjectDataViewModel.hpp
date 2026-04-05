@@ -58,6 +58,7 @@ enum class InfoItemType
     CutConnectors,
     MmSegmentation,
     FuzzySkin,
+    TextureSkin,
     Sinking,
     VariableLayerHeight
 };

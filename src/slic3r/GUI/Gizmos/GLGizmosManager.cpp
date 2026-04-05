@@ -22,6 +22,7 @@
 #include "slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp"
+#include "slic3r/GUI/Gizmos/GLGizmoTextureSkin.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoCut.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoHollow.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoSeam.hpp"
@@ -115,8 +116,9 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoFdmSupports(m_parent, "fdm_supports.svg", 7));
     m_gizmos.emplace_back(new GLGizmoSeam(m_parent, "seam.svg", 8));
     m_gizmos.emplace_back(new GLGizmoFuzzySkin(m_parent, "fuzzy_skin_painting.svg", 9));
-    m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 10));
-    m_gizmos.emplace_back(new GLGizmoMeasure(m_parent, "measure.svg", 11));
+    m_gizmos.emplace_back(new GLGizmoTextureSkin(m_parent, "texture_skin_painting.svg", 10));
+    m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 11));
+    m_gizmos.emplace_back(new GLGizmoMeasure(m_parent, "measure.svg", 12));
     m_gizmos.emplace_back(new GLGizmoEmboss(m_parent));
     m_gizmos.emplace_back(new GLGizmoSVG(m_parent));
     m_gizmos.emplace_back(new GLGizmoSimplify(m_parent));
@@ -304,6 +306,8 @@ bool GLGizmosManager::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_p
         return dynamic_cast<GLGizmoCut3D*>(m_gizmos[Cut].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
     else if (m_current == FuzzySkin)
         return dynamic_cast<GLGizmoFuzzySkin*>(m_gizmos[FuzzySkin].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
+    else if (m_current == TextureSkin)
+        return dynamic_cast<GLGizmoTextureSkin*>(m_gizmos[TextureSkin].get())->gizmo_event(action, mouse_position, shift_down, alt_down, control_down);
     else
         return false;
 }
@@ -371,7 +375,7 @@ bool GLGizmosManager::on_mouse_wheel(const wxMouseEvent &evt)
 {
     bool processed = false;
 
-    if (m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmSegmentation || m_current == FuzzySkin) {
+    if (m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmSegmentation || m_current == FuzzySkin || m_current == TextureSkin) {
         float rot = (float)evt.GetWheelRotation() / (float)evt.GetWheelDelta();
         if (gizmo_event((rot > 0.f ? SLAGizmoEventType::MouseWheelUp : SLAGizmoEventType::MouseWheelDown), Vec2d::Zero(), evt.ShiftDown(), evt.AltDown(), evt.ControlDown()))
             processed = true;
@@ -544,7 +548,7 @@ bool GLGizmosManager::on_char(wxKeyEvent& evt)
         case 'r' :
         case 'R' :
         {
-            if ((m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmSegmentation || m_current == FuzzySkin) && gizmo_event(SLAGizmoEventType::ResetClippingPlane))
+            if ((m_current == SlaSupports || m_current == Hollow || m_current == FdmSupports || m_current == Seam || m_current == MmSegmentation || m_current == FuzzySkin || m_current == TextureSkin) && gizmo_event(SLAGizmoEventType::ResetClippingPlane))
                 processed = true;
 
             break;

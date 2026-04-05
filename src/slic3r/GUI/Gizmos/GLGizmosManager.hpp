@@ -81,6 +81,7 @@ public:
         FdmSupports,
         Seam,
         FuzzySkin,
+        TextureSkin,
         MmSegmentation,
         Measure,
         Emboss,

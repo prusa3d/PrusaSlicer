@@ -424,6 +424,11 @@ bool Model::is_fuzzy_skin_painted() const
     return std::any_of(this->objects.cbegin(), this->objects.cend(), [](const ModelObject *mo) { return mo->is_fuzzy_skin_painted(); });
 }
 
+bool Model::is_texture_skin_painted() const
+{
+    return std::any_of(this->objects.cbegin(), this->objects.cend(), [](const ModelObject *mo) { return mo->is_texture_skin_painted(); });
+}
+
 ModelObject::~ModelObject()
 {
     this->clear_volumes();
@@ -617,6 +622,11 @@ bool ModelObject::is_mm_painted() const
 bool ModelObject::is_fuzzy_skin_painted() const
 {
     return std::any_of(this->volumes.cbegin(), this->volumes.cend(), [](const ModelVolume *mv) { return mv->is_fuzzy_skin_painted(); });
+}
+
+bool ModelObject::is_texture_skin_painted() const
+{
+    return std::any_of(this->volumes.cbegin(), this->volumes.cend(), [](const ModelVolume *mv) { return mv->is_texture_skin_painted(); });
 }
 
 bool ModelObject::is_text() const
@@ -1084,6 +1094,7 @@ void ModelVolume::reset_extra_facets()
     this->seam_facets.reset();
     this->mm_segmentation_facets.reset();
     this->fuzzy_skin_facets.reset();
+    this->texture_skin_facets.reset();
 }
 
 
@@ -1446,6 +1457,7 @@ void ModelVolume::assign_new_unique_ids_recursive()
     seam_facets.set_new_unique_id();
     mm_segmentation_facets.set_new_unique_id();
     fuzzy_skin_facets.set_new_unique_id();
+    texture_skin_facets.set_new_unique_id();
 }
 
 void ModelVolume::rotate(double angle, Axis axis)
@@ -1782,6 +1794,13 @@ bool model_fuzzy_skin_data_changed(const ModelObject &mo, const ModelObject &mo_
     return model_property_changed(mo, mo_new,
         [](const ModelVolumeType t) { return t == ModelVolumeType::MODEL_PART; },
         [](const ModelVolume &mv_old, const ModelVolume &mv_new){ return mv_old.fuzzy_skin_facets.timestamp_matches(mv_new.fuzzy_skin_facets); });
+}
+
+bool model_texture_skin_data_changed(const ModelObject &mo, const ModelObject &mo_new)
+{
+    return model_property_changed(mo, mo_new,
+        [](const ModelVolumeType t) { return t == ModelVolumeType::MODEL_PART; },
+        [](const ModelVolume &mv_old, const ModelVolume &mv_new){ return mv_old.texture_skin_facets.timestamp_matches(mv_new.texture_skin_facets); });
 }
 
 bool model_has_parameter_modifiers_in_objects(const Model &model)

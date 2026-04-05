@@ -39,6 +39,8 @@ enum class TriangleStateType : int8_t {
     BLOCKER   = 2,
     // For the fuzzy skin, we use just two values (NONE and FUZZY_SKIN).
     FUZZY_SKIN = ENFORCER,
+    // For the texture skin, likewise a binary mask aliased to ENFORCER.
+    TEXTURE_SKIN = ENFORCER,
     // Maximum is 15. The value is serialized in TriangleSelector into 6 bits using a 2 bit prefix code.
     Extruder1 = ENFORCER,
     Extruder2 = BLOCKER,
