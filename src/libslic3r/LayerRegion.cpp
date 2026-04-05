@@ -126,7 +126,15 @@ void LayerRegion::make_perimeters(
         this->layer()->object()->config(),
         print_config,
         perimeter_regions,
-        spiral_vase
+        spiral_vase,
+        this->layer()->print_z,
+        BoundingBoxf3(
+            Vec3d(-unscale<double>(this->layer()->object()->size().x()) * 0.5,
+                  -unscale<double>(this->layer()->object()->size().y()) * 0.5,
+                  0.0),
+            Vec3d(unscale<double>(this->layer()->object()->size().x()) * 0.5,
+                  unscale<double>(this->layer()->object()->size().y()) * 0.5,
+                  unscale<double>(this->layer()->object()->size().z())))
     );
 
     // Cummulative sum of polygons over all the regions.

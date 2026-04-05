@@ -1498,6 +1498,19 @@ void TabPrint::build()
         optgroup->append_single_option_line("fuzzy_skin_thickness", category_path + "fuzzy-skin-thickness");
         optgroup->append_single_option_line("fuzzy_skin_point_dist", category_path + "fuzzy-skin-point-distance");
 
+        optgroup = page->new_optgroup(L("Texture skin (experimental)"));
+        optgroup->append_single_option_line("texture_skin");
+        optgroup->append_single_option_line("texture_skin_pattern");
+        optgroup->append_single_option_line("texture_skin_uv_mode");
+        optgroup->append_single_option_line("texture_skin_amplitude");
+        optgroup->append_single_option_line("texture_skin_point_dist");
+        optgroup->append_single_option_line("texture_skin_uv_scale");
+        optgroup->append_single_option_line("texture_skin_uv_offset_u");
+        optgroup->append_single_option_line("texture_skin_uv_offset_v");
+        optgroup->append_single_option_line("texture_skin_uv_rotation");
+        optgroup->append_single_option_line("texture_skin_mapping_blend");
+        optgroup->append_single_option_line("texture_skin_custom_image");
+
         optgroup = page->new_optgroup(L("Only one perimeter"));
         category_path = "layers-and-perimeters_1748/#";
         optgroup->append_single_option_line("top_one_perimeter_type", category_path + "top-one-perimeter-type");

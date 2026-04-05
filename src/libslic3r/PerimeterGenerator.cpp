@@ -28,6 +28,7 @@
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "Feature/FuzzySkin/FuzzySkin.hpp"
+#include "Feature/TextureSkin/TextureSkin.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
@@ -225,7 +226,12 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
         }
 
         // Apply fuzzy skin if it is enabled for at least some part of the polygon.
-        const Polygon polygon = apply_fuzzy_skin(loop.polygon, params.config, params.perimeter_regions, params.layer_id, loop.depth, loop.is_contour);
+        Polygon polygon = apply_fuzzy_skin(loop.polygon, params.config, params.perimeter_regions, params.layer_id, loop.depth, loop.is_contour);
+        // Apply pattern-based Texture Skin on top.
+        polygon = Slic3r::Feature::TextureSkin::apply_texture_skin(
+            polygon, params.config, params.perimeter_regions,
+            params.layer_id, loop.depth, loop.is_contour,
+            params.object_bbox, params.layer_z);
 
         ExtrusionPaths paths;
         if (params.config.overhangs && params.layer_id > params.object_config.raft_layers &&
@@ -435,6 +441,12 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
 
         // Apply fuzzy skin if it is enabled for at least some part of the ExtrusionLine.
         extrusion = apply_fuzzy_skin(extrusion, params.config, params.perimeter_regions, params.layer_id, pg_extrusion.extrusion.inset_idx, !pg_extrusion.extrusion.is_closed || pg_extrusion.is_contour());
+        // Apply pattern-based Texture Skin on top.
+        extrusion = Slic3r::Feature::TextureSkin::apply_texture_skin(
+            extrusion, params.config, params.perimeter_regions,
+            params.layer_id, pg_extrusion.extrusion.inset_idx,
+            !pg_extrusion.extrusion.is_closed || pg_extrusion.is_contour(),
+            params.object_bbox, params.layer_z);
 
         ExtrusionPaths paths;
         // detect overhanging/bridging perimeters

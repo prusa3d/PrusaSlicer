@@ -97,6 +97,14 @@ set(SLIC3R_SOURCES
     FileParserError.hpp
     Feature/FuzzySkin/FuzzySkin.cpp
     Feature/FuzzySkin/FuzzySkin.hpp
+    Feature/TextureSkin/TextureSkin.cpp
+    Feature/TextureSkin/TextureSkin.hpp
+    Feature/TextureSkin/UVProjection.cpp
+    Feature/TextureSkin/UVProjection.hpp
+    Feature/TextureSkin/TextureSampler.cpp
+    Feature/TextureSkin/TextureSampler.hpp
+    Feature/TextureSkin/TexturePatterns.cpp
+    Feature/TextureSkin/TexturePatterns.hpp
     Fill/Fill.cpp
     Fill/Fill3DHoneycomb.cpp
     Fill/Fill3DHoneycomb.hpp
