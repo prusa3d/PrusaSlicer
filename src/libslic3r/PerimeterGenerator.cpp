@@ -1567,7 +1567,18 @@ bool PerimeterRegion::has_compatible_perimeter_regions(const PrintRegionConfig &
 {
     return config.fuzzy_skin            == other_config.fuzzy_skin &&
            config.fuzzy_skin_thickness  == other_config.fuzzy_skin_thickness &&
-           config.fuzzy_skin_point_dist == other_config.fuzzy_skin_point_dist;
+           config.fuzzy_skin_point_dist == other_config.fuzzy_skin_point_dist &&
+           config.texture_skin            == other_config.texture_skin &&
+           config.texture_skin_pattern    == other_config.texture_skin_pattern &&
+           config.texture_skin_uv_mode    == other_config.texture_skin_uv_mode &&
+           config.texture_skin_amplitude  == other_config.texture_skin_amplitude &&
+           config.texture_skin_point_dist == other_config.texture_skin_point_dist &&
+           config.texture_skin_uv_scale   == other_config.texture_skin_uv_scale &&
+           config.texture_skin_uv_offset_u == other_config.texture_skin_uv_offset_u &&
+           config.texture_skin_uv_offset_v == other_config.texture_skin_uv_offset_v &&
+           config.texture_skin_uv_rotation == other_config.texture_skin_uv_rotation &&
+           config.texture_skin_mapping_blend == other_config.texture_skin_mapping_blend &&
+           config.texture_skin_custom_image  == other_config.texture_skin_custom_image;
 }
 
 void PerimeterRegion::merge_compatible_perimeter_regions(PerimeterRegions &perimeter_regions)
