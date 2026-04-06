@@ -164,7 +164,13 @@ static double sample_displacement_for_vertex(
         wsum += s.w;
     }
     if (wsum > 0.0) grey /= wsum;
-    return (grey - 0.5) * 2.0 * double(p.amplitude_mm);
+    // zero_point controls where "no displacement" sits in the greyscale:
+    //   0.5 = symmetric (black=-amp, white=+amp)
+    //   0.0 = outward only (black=0, white=+amp)
+    //   1.0 = inward only (black=-amp, white=0)
+    const double zp = std::clamp(double(p.zero_point), 0.0, 1.0);
+    const double scale = std::max(zp, 1.0 - zp); // normalise so peak is ±amplitude
+    return (scale > 0.0) ? (grey - zp) / scale * double(p.amplitude_mm) : 0.0;
 }
 
 } // anon namespace

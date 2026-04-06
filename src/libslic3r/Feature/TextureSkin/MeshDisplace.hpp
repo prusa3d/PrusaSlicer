@@ -22,6 +22,10 @@ struct MeshDisplaceParams {
     UVMode          uv_mode = UVMode::Triplanar;
     UVSettings      uv_settings;
     float           amplitude_mm          = 0.5f;
+    float           zero_point            = 0.5f;  // grey value that maps to zero displacement
+                                                    // 0.5 = symmetric (±amplitude)
+                                                    // 0.0 = outward only (0 to +amplitude)
+                                                    // 1.0 = inward only (-amplitude to 0)
     float           edge_length_mm        = 0.4f;  // subdivide edges longer than this
     uint32_t        target_triangle_count = 100000;
     float           max_error             = 1e6f;  // QEM cap, essentially unbounded

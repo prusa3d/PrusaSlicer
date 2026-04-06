@@ -71,6 +71,7 @@ private:
 
     float    m_bake_edge_length_mm   = 0.4f;
     float    m_bake_amplitude_mm     = 0.15f;
+    int      m_bake_direction        = 0; // 0=Outward, 1=Symmetric, 2=Inward
     int      m_bake_target_triangles = 100000;
     bool     m_bake_skip_bottom      = true;
     int      m_bake_uv_mode          = 5; // default Triplanar (UVMode enum index)

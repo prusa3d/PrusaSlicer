@@ -298,6 +298,15 @@ void GLGizmoSurfaceTexture::on_render_input_window(float x, float y, float botto
         ImGui::Separator();
 
         ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(_u8L("Direction") + ":");
+        ImGui::SameLine(sliders_left_width);
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        {
+            static const char* dir_names[] = { "Outward", "Symmetric", "Inward" };
+            ImGui::Combo("##bake_dir", &m_bake_direction, dir_names, IM_ARRAYSIZE(dir_names));
+        }
+
+        ImGui::AlignTextToFramePadding();
         ImGuiPureWrap::text(_u8L("Amplitude (mm)") + ":");
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
@@ -510,6 +519,9 @@ void GLGizmoSurfaceTexture::start_bake()
     params.uv_settings.rotation_deg  = m_bake_uv_rotation;
     params.uv_settings.mapping_blend = m_bake_mapping_blend;
     params.amplitude_mm          = m_bake_amplitude_mm;
+    params.zero_point            = m_bake_direction == 0 ? 0.0f :   // Outward
+                                   m_bake_direction == 2 ? 1.0f :   // Inward
+                                                           0.5f;    // Symmetric
     params.edge_length_mm        = m_bake_edge_length_mm;
     params.target_triangle_count = static_cast<uint32_t>(m_bake_target_triangles);
     params.bounds                = BoundingBoxf3(input->vertices.begin(), input->vertices.end());
