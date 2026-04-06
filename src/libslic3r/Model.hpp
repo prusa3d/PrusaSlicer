@@ -944,8 +944,8 @@ public:
     bool is_fdm_support_painted() const { return !this->supported_facets.empty(); }
     bool is_seam_painted() const { return !this->seam_facets.empty(); }
     bool is_mm_painted() const { return !this->mm_segmentation_facets.empty(); }
-    bool is_fuzzy_skin_painted() const { return !this->fuzzy_skin_facets.empty(); }
-    bool is_texture_skin_painted() const { return !this->texture_skin_facets.empty(); }
+    bool is_fuzzy_skin_painted() const { return !this->fuzzy_skin_facets.empty() || !this->surface_texture_facets.empty(); }
+    bool is_texture_skin_painted() const { return !this->texture_skin_facets.empty() || !this->surface_texture_facets.empty(); }
     bool is_surface_texture_painted() const { return !this->surface_texture_facets.empty(); }
 
     // Returns 0-based indices of extruders painted by multi-material painting gizmo.

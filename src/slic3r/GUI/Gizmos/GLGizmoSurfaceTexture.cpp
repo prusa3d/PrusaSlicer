@@ -257,7 +257,18 @@ void GLGizmoSurfaceTexture::on_render_input_window(float x, float y, float botto
                 label = TS::pattern_display_name(cur_pattern);
             }
             ImGui::AlignTextToFramePadding();
-            ImGuiPureWrap::text(_u8L("Pattern") + ": " + label);
+            // Truncate long names with ellipsis to fit the panel width.
+            {
+                const std::string prefix = _u8L("Pattern") + ": ";
+                const float avail = window_width - ImGuiPureWrap::calc_text_size(prefix).x - m_imgui->scaled(1.f);
+                std::string display = label;
+                if (avail > 0.f && ImGuiPureWrap::calc_text_size(display).x > avail) {
+                    while (!display.empty() && ImGuiPureWrap::calc_text_size(display + "…").x > avail)
+                        display.pop_back();
+                    display += "…";
+                }
+                ImGuiPureWrap::text(prefix + display);
+            }
             if (ImGuiPureWrap::button(_u8L("Pick texture…"))) {
                 const std::string cur_custom = cfg.opt_string("texture_skin_custom_image");
                 TextureSkinPickerDialog dlg(wxGetApp().plater(), cur_pattern, cur_custom);
@@ -417,7 +428,16 @@ void GLGizmoSurfaceTexture::start_bake()
     TS::MeshDisplaceParams params;
     params.image                 = img;
     params.uv_mode               = static_cast<TS::UVMode>(static_cast<int>(uv_mode_enum));
-    params.uv_settings.scale_u   = std::max(uv_scale, 1e-4);
+    // Use the pattern's recommended default scale if the user hasn't changed
+    // the config from its default (0.5). This gives each pattern a tuned
+    // starting point (e.g. Knurling = 0.15, Dots = 0.1, Crystal = 0.5).
+    double effective_scale = uv_scale;
+    if (pattern != TS::Pattern::Custom) {
+        const double pattern_default = TS::pattern_default_scale(pattern);
+        if (pattern_default > 0.0)
+            effective_scale = pattern_default;
+    }
+    params.uv_settings.scale_u   = std::max(effective_scale, 1e-4);
     params.uv_settings.scale_v   = params.uv_settings.scale_u;
     params.uv_settings.offset_u  = uv_off_u;
     params.uv_settings.offset_v  = uv_off_v;

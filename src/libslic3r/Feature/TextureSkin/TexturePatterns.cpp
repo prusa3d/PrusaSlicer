@@ -2,10 +2,14 @@
 ///|/
 #include "TexturePatterns.hpp"
 
+#include <csetjmp>
+#include <cstdio>
 #include <fstream>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
+
+#include <jpeglib.h>
 
 #include "libslic3r/PNGReadWrite.hpp"
 
@@ -55,13 +59,18 @@ static GrayImage s_empty;
 static std::unordered_map<std::string, GrayImage> s_cache;
 static std::mutex s_cache_mutex;
 
-static GrayImage load_png_file(const std::string &path)
+// Load an image file and convert to grayscale. Supports:
+//  - 8-bit grayscale PNG (fast path via existing decoder)
+//  - Any-format PNG (RGBA path, converted to grayscale)
+//  - JPEG (via the RGBA path after re-encoding — fallback)
+// Uses libpng's simplified API which handles 1/2/4/8/16-bit, grey/RGB/RGBA,
+// paletted, interlaced PNGs transparently when requesting PNG_FORMAT_GRAY.
+static GrayImage load_image_file(const std::string &path)
 {
     GrayImage out;
     std::ifstream in(path, std::ios::binary);
     if (!in) return out;
 
-    // Read entire file into a buffer.
     in.seekg(0, std::ios::end);
     const std::streamsize sz = in.tellg();
     if (sz <= 0) return out;
@@ -69,14 +78,76 @@ static GrayImage load_png_file(const std::string &path)
     std::vector<uint8_t> buf(static_cast<size_t>(sz));
     if (!in.read(reinterpret_cast<char*>(buf.data()), sz)) return out;
 
-    Slic3r::png::ImageGreyscale img;
-    const Slic3r::png::ReadBuf readbuf{buf.data(), buf.size()};
-    if (!Slic3r::png::decode_png(readbuf, img)) return out;
+    // Fast path: try strict 8-bit grayscale decode.
+    {
+        Slic3r::png::ImageGreyscale img;
+        const Slic3r::png::ReadBuf readbuf{buf.data(), buf.size()};
+        if (Slic3r::png::decode_png(readbuf, img) && img.cols > 0 && img.rows > 0) {
+            out.width  = img.cols;
+            out.height = img.rows;
+            out.pixels = std::move(img.buf);
+            return out;
+        }
+    }
 
-    out.width  = img.cols;
-    out.height = img.rows;
-    out.pixels = std::move(img.buf);
-    return out;
+    // Fallback: decode as RGBA then convert to grayscale via luminance.
+    {
+        const std::string data(reinterpret_cast<const char*>(buf.data()), buf.size());
+        std::vector<unsigned char> rgba;
+        unsigned w = 0, h = 0;
+        if (Slic3r::png::decode_png(data, rgba, w, h) && w > 0 && h > 0) {
+            out.width  = w;
+            out.height = h;
+            out.pixels.resize(w * h);
+            for (size_t i = 0; i < w * h; ++i) {
+                const uint8_t r = rgba[i * 4 + 0];
+                const uint8_t g = rgba[i * 4 + 1];
+                const uint8_t b = rgba[i * 4 + 2];
+                // Standard luminance weights.
+                out.pixels[i] = static_cast<uint8_t>(0.299 * r + 0.587 * g + 0.114 * b);
+            }
+            return out;
+        }
+    }
+
+    // JPEG fallback: use libjpeg to decode, convert to grayscale.
+    {
+        FILE *fp = std::fopen(path.c_str(), "rb");
+        if (fp) {
+            struct jpeg_decompress_struct cinfo;
+            struct jpeg_error_mgr jerr;
+            cinfo.err = jpeg_std_error(&jerr);
+            jpeg_create_decompress(&cinfo);
+            jpeg_stdio_src(&cinfo, fp);
+            if (jpeg_read_header(&cinfo, TRUE) == JPEG_HEADER_OK) {
+                cinfo.out_color_space = JCS_RGB;
+                jpeg_start_decompress(&cinfo);
+                const unsigned w = cinfo.output_width;
+                const unsigned h = cinfo.output_height;
+                const int row_stride = w * cinfo.output_components;
+                std::vector<uint8_t> row_buf(row_stride);
+                out.width  = w;
+                out.height = h;
+                out.pixels.resize(w * h);
+                for (unsigned y = 0; y < h; ++y) {
+                    uint8_t *row_ptr = row_buf.data();
+                    jpeg_read_scanlines(&cinfo, &row_ptr, 1);
+                    for (unsigned x = 0; x < w; ++x) {
+                        const uint8_t r = row_buf[x * 3 + 0];
+                        const uint8_t g = row_buf[x * 3 + 1];
+                        const uint8_t b = row_buf[x * 3 + 2];
+                        out.pixels[y * w + x] = static_cast<uint8_t>(0.299 * r + 0.587 * g + 0.114 * b);
+                    }
+                }
+                jpeg_finish_decompress(&cinfo);
+            }
+            jpeg_destroy_decompress(&cinfo);
+            std::fclose(fp);
+            if (!out.pixels.empty()) return out;
+        }
+    }
+
+    return out; // unsupported format
 }
 
 } // anonymous namespace
@@ -107,7 +178,7 @@ const GrayImage& get_pattern_image(Pattern p, const std::string &resources_dir)
     std::lock_guard<std::mutex> lock(s_cache_mutex);
     auto it = s_cache.find(path);
     if (it != s_cache.end()) return it->second;
-    auto [ins, _] = s_cache.emplace(path, load_png_file(path));
+    auto [ins, _] = s_cache.emplace(path, load_image_file(path));
     return ins->second;
 }
 
@@ -117,7 +188,7 @@ const GrayImage& get_custom_image(const std::string &absolute_path)
     std::lock_guard<std::mutex> lock(s_cache_mutex);
     auto it = s_cache.find(absolute_path);
     if (it != s_cache.end()) return it->second;
-    auto [ins, _] = s_cache.emplace(absolute_path, load_png_file(absolute_path));
+    auto [ins, _] = s_cache.emplace(absolute_path, load_image_file(absolute_path));
     return ins->second;
 }
 

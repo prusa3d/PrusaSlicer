@@ -165,9 +165,9 @@ void TextureSkinPickerDialog::accept_selection(long list_index)
 
 std::string TextureSkinPickerDialog::prompt_custom_file()
 {
-    wxFileDialog dlg(this, _L("Choose a grayscale PNG"),
+    wxFileDialog dlg(this, _L("Choose a texture image"),
                      m_custom_path.empty() ? wxString() : wxString::FromUTF8(m_custom_path),
-                     wxString(), "PNG files (*.png)|*.png",
+                     wxString(), "Image files (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg|PNG files (*.png)|*.png|JPEG files (*.jpg;*.jpeg)|*.jpg;*.jpeg",
                      wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() != wxID_OK) return {};
     return into_u8(dlg.GetPath());
