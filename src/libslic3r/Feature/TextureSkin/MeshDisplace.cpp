@@ -17,6 +17,7 @@
 #include "libslic3r/NormalUtils.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/QuadricEdgeCollapse.hpp"
+#include "libslic3r/TriangleMesh.hpp"
 
 namespace Slic3r::Feature::TextureSkin {
 
@@ -269,6 +270,21 @@ indexed_triangle_set mesh_displace(
         tick(45 + percent * 55 / 100);
     };
     its_quadric_edge_collapse(sub.its, params.target_triangle_count, &max_err, throw_on_cancel, collapse_status);
+
+    // --- Pass 4: mesh cleanup ---------------------------------------------
+    // Displacement + decimation can produce degenerate triangles, orphan
+    // vertices, and occasionally flipped normals. Clean them up so the
+    // slicer doesn't choke on negative-spacing or extreme-coordinate errors.
+    its_remove_degenerate_faces(sub.its);
+    its_compactify_vertices(sub.its);
+    // If the mesh volume is negative after displacement (normals flipped),
+    // flip all triangles to restore correct winding.
+    {
+        TriangleMesh tmp(sub.its);
+        if (tmp.volume() < 0.f)
+            its_flip_triangles(sub.its);
+    }
+
     tick(100);
     return std::move(sub.its);
 }
