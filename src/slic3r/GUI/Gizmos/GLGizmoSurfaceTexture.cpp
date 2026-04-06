@@ -370,7 +370,28 @@ void GLGizmoSurfaceTexture::update_model_object() const
     for (ModelVolume *mv : mo->volumes) {
         if (!mv->is_model_part()) continue;
         ++idx;
+
+        // 1. Write the unified 3-state annotation (for gizmo display + 3MF).
         updated |= mv->surface_texture_facets.set(*m_triangle_selectors[idx]);
+
+        // 2. Derive legacy single-state annotations for the slicing pipeline.
+        //    Clone the selector tree, remap states, serialize — preserves full
+        //    sub-triangle precision (no whole-triangle projection).
+        {
+            // Fuzzy: keep SURFACE_FUZZY(1) as ENFORCER(1), clear SURFACE_PATTERN(2).
+            TriangleSelector fuzzy_sel(mv->mesh());
+            fuzzy_sel.deserialize(mv->surface_texture_facets.get_data(), false);
+            fuzzy_sel.remap_state(TriangleStateType::SURFACE_PATTERN, TriangleStateType::NONE);
+            mv->fuzzy_skin_facets.set(fuzzy_sel);
+        }
+        {
+            // Pattern: remap SURFACE_PATTERN(2) → ENFORCER(1), clear SURFACE_FUZZY(1).
+            TriangleSelector pattern_sel(mv->mesh());
+            pattern_sel.deserialize(mv->surface_texture_facets.get_data(), false);
+            pattern_sel.remap_state(TriangleStateType::SURFACE_FUZZY, TriangleStateType::NONE);
+            pattern_sel.remap_state(TriangleStateType::SURFACE_PATTERN, TriangleStateType::ENFORCER);
+            mv->texture_skin_facets.set(pattern_sel);
+        }
     }
     if (updated) {
         const ModelObjectPtrs &mos = wxGetApp().model().objects;

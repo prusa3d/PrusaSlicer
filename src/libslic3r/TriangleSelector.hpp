@@ -369,6 +369,11 @@ public:
     // paint info without reaching into the protected Triangle type from
     // outside callers.
     void                 visit_painted_leaves(const std::function<void(int /*source_triangle*/, TriangleStateType)> &visitor) const;
+
+    // In-place state remap: every leaf with state == from becomes to.
+    // Useful for splitting a multi-state annotation into single-state
+    // legacy annotations.
+    void                 remap_state(TriangleStateType from, TriangleStateType to);
     // Get facets that pass the filter. Don't triangulate T-joints.
     template<AdditionalMeshInfo facet_info = AdditionalMeshInfo::None>
     typename IndexedTriangleSetType<facet_info>::type get_facets(const std::function<bool(const Triangle &)> &facet_filter) const;

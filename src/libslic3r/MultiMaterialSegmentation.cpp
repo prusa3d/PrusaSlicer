@@ -2277,15 +2277,16 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
 }
 
 // Returns fuzzy skin segmentation based on painting in fuzzy skin segmentation gizmo
+// Returns fuzzy skin segmentation based on painting in the unified gizmo.
+// Legacy fuzzy_skin_facets is populated from surface_texture_facets by
+// the gizmo's update_model_object with full sub-triangle precision.
 std::vector<std::vector<ExPolygons>> fuzzy_skin_segmentation_by_painting(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback) {
-    const size_t num_facets_states = 2; // Unpainted facets and facets painted with fuzzy skin.
+    const size_t num_facets_states = 2;
 
     const auto extract_facets_info = [](const ModelVolume &mv) -> ModelVolumeFacetsInfo {
         return {mv.fuzzy_skin_facets, mv.is_fuzzy_skin_painted(), false};
     };
 
-    // Because we apply fuzzy skin just on external perimeters, we limit the depth of fuzzy skin
-    // by the maximal extrusion width of external perimeters.
     float max_external_perimeter_width = 0.;
     for (size_t region_idx = 0; region_idx < print_object.num_printing_regions(); ++region_idx) {
         const PrintRegion &region = print_object.printing_region(region_idx);
@@ -2295,15 +2296,14 @@ std::vector<std::vector<ExPolygons>> fuzzy_skin_segmentation_by_painting(const P
     return segmentation_by_painting(print_object, extract_facets_info, num_facets_states, max_external_perimeter_width, 0.f, false, IncludeTopAndBottomLayers::No, throw_on_cancel_callback);
 }
 
-// Returns texture skin segmentation based on painting in texture skin segmentation gizmo
+// Returns texture skin segmentation based on painting in the unified gizmo.
 std::vector<std::vector<ExPolygons>> texture_skin_segmentation_by_painting(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback) {
-    const size_t num_facets_states = 2; // Unpainted facets and facets painted with texture skin.
+    const size_t num_facets_states = 2;
 
     const auto extract_facets_info = [](const ModelVolume &mv) -> ModelVolumeFacetsInfo {
         return {mv.texture_skin_facets, mv.is_texture_skin_painted(), false};
     };
 
-    // Same depth constraint as fuzzy skin - texturing applied only on external perimeters.
     float max_external_perimeter_width = 0.;
     for (size_t region_idx = 0; region_idx < print_object.num_printing_regions(); ++region_idx) {
         const PrintRegion &region = print_object.printing_region(region_idx);

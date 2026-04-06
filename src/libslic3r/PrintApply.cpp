@@ -32,7 +32,6 @@
 #include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/CustomParametersHandling.hpp"
-#include "libslic3r/Feature/SurfaceTexture/LegacyMigration.hpp"
 
 namespace Slic3r {
 
@@ -113,9 +112,6 @@ static inline void model_volume_list_copy_configs(ModelObject &model_object_dst,
         mv_dst.texture_skin_facets.assign(mv_src.texture_skin_facets);
         assert(mv_dst.surface_texture_facets.id() == mv_src.surface_texture_facets.id());
         mv_dst.surface_texture_facets.assign(mv_src.surface_texture_facets);
-        // Refresh the legacy facet fields from the unified annotation so
-        // the segmentation pipelines keep working unchanged.
-        Slic3r::Feature::SurfaceTexture::derive_legacy_from_surface_texture(mv_dst);
         //FIXME what to do with the materials?
         // mv_dst.m_material_id = mv_src.m_material_id;
         ++ i_src;
