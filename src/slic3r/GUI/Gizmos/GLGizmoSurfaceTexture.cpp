@@ -416,6 +416,7 @@ void GLGizmoSurfaceTexture::update_model_object() const
         const ModelObjectPtrs &mos = wxGetApp().model().objects;
         wxGetApp().obj_list()->update_info_items(std::find(mos.begin(), mos.end(), mo) - mos.begin());
         m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+        wxGetApp().plater()->schedule_background_process();
     }
 }
 
