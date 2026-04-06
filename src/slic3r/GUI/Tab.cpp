@@ -1892,8 +1892,8 @@ wxSizer* TabPrint::create_texture_skin_pattern_widget(wxWindow* parent)
 {
     using Pattern = Slic3r::Feature::TextureSkin::Pattern;
 
-    ScalableButton* btn = new ScalableButton(parent, wxID_ANY, "texture_skin_painting", " " + _L("Pick texture") + " " + dots,
-                                             wxDefaultSize, wxDefaultPosition, wxBU_LEFT | wxBU_EXACTFIT);
+    ScalableButton* btn = new ScalableButton(parent, wxID_ANY, "", " " + _L("Pick texture") + " " + dots,
+                                             wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT);
     btn->SetFont(wxGetApp().normal_font());
     btn->SetSize(btn->GetBestSize());
 
