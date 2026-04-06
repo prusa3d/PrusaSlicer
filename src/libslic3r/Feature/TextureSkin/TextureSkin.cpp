@@ -107,6 +107,10 @@ bool params_from_config(const PrintRegionConfig &config,
     out.mode          = static_cast<UVMode>(config.texture_skin_uv_mode.value);
     out.uv.scale_u    = std::max(config.texture_skin_uv_scale.value, 1e-4);
     out.uv.scale_v    = out.uv.scale_u;
+    // Aspect correction so non-square textures tile proportionally.
+    const double tmax = std::max(double(img->width), double(img->height));
+    out.uv.texture_aspect_u = (img->width  > 0) ? tmax / double(img->width)  : 1.0;
+    out.uv.texture_aspect_v = (img->height > 0) ? tmax / double(img->height) : 1.0;
     out.uv.offset_u   = config.texture_skin_uv_offset_u.value;
     out.uv.offset_v   = config.texture_skin_uv_offset_v.value;
     out.uv.rotation_deg = config.texture_skin_uv_rotation.value;

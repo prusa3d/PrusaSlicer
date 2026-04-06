@@ -513,6 +513,10 @@ void GLGizmoSurfaceTexture::start_bake()
     // collapsible "UV mapping" section) rather than the Print Settings.
     params.uv_settings.scale_u       = std::max(double(m_bake_uv_scale), 1e-4);
     params.uv_settings.scale_v       = params.uv_settings.scale_u;
+    // Aspect correction so non-square textures tile proportionally.
+    const double tmax = std::max(double(img->width), double(img->height));
+    params.uv_settings.texture_aspect_u = (img->width  > 0) ? tmax / double(img->width)  : 1.0;
+    params.uv_settings.texture_aspect_v = (img->height > 0) ? tmax / double(img->height) : 1.0;
     params.uv_settings.offset_u      = m_bake_uv_offset_u;
     params.uv_settings.offset_v      = m_bake_uv_offset_v;
     params.uv_settings.rotation_deg  = m_bake_uv_rotation;
