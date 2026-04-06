@@ -286,6 +286,12 @@ void GLGizmoSurfaceTexture::on_render_input_window(float x, float y, float botto
                         if (dlg.get_pattern() == TS::Pattern::Custom)
                             print_tab->on_value_change("texture_skin_custom_image", dlg.get_custom_image_path());
                     }
+                    // Seed the bake UV scale from the pattern's recommended default.
+                    const auto picked_pattern = static_cast<TS::Pattern>(picked_int);
+                    if (picked_pattern != TS::Pattern::Custom) {
+                        const double ds = TS::pattern_default_scale(picked_pattern);
+                        if (ds > 0.0) m_bake_uv_scale = float(ds);
+                    }
                 }
             }
         }
@@ -296,6 +302,39 @@ void GLGizmoSurfaceTexture::on_render_input_window(float x, float y, float botto
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
         m_imgui->slider_float("##bake_amp", &m_bake_amplitude_mm, 0.05f, 5.0f, "%.2f", 1.0f, true);
+
+        if (ImGui::CollapsingHeader(_u8L("UV mapping").c_str())) {
+            ImGui::AlignTextToFramePadding();
+            ImGuiPureWrap::text(_u8L("UV scale") + ":");
+            ImGui::SameLine(sliders_left_width);
+            ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+            m_imgui->slider_float("##bake_uv_scale", &m_bake_uv_scale, 0.01f, 5.0f, "%.3f", 1.0f, true);
+
+            ImGui::AlignTextToFramePadding();
+            ImGuiPureWrap::text(_u8L("UV offset U") + ":");
+            ImGui::SameLine(sliders_left_width);
+            ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+            m_imgui->slider_float("##bake_uv_off_u", &m_bake_uv_offset_u, -1.0f, 1.0f, "%.2f", 1.0f, true);
+
+            ImGui::AlignTextToFramePadding();
+            ImGuiPureWrap::text(_u8L("UV offset V") + ":");
+            ImGui::SameLine(sliders_left_width);
+            ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+            m_imgui->slider_float("##bake_uv_off_v", &m_bake_uv_offset_v, -1.0f, 1.0f, "%.2f", 1.0f, true);
+
+            ImGui::AlignTextToFramePadding();
+            ImGuiPureWrap::text(_u8L("Rotation") + ":");
+            ImGui::SameLine(sliders_left_width);
+            ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+            m_imgui->slider_float("##bake_uv_rot", &m_bake_uv_rotation, 0.0f, 360.0f, "%.1f", 1.0f, true);
+
+            ImGui::AlignTextToFramePadding();
+            ImGuiPureWrap::text(_u8L("Blend") + ":");
+            ImGui::SameLine(sliders_left_width);
+            ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+            m_imgui->slider_float("##bake_blend", &m_bake_mapping_blend, 0.0f, 1.0f, "%.2f", 1.0f, true);
+        }
+
         ImGui::AlignTextToFramePadding();
         ImGuiPureWrap::text(_u8L("Edge length (mm)") + ":");
         ImGui::SameLine(sliders_left_width);
@@ -428,21 +467,14 @@ void GLGizmoSurfaceTexture::start_bake()
     TS::MeshDisplaceParams params;
     params.image                 = img;
     params.uv_mode               = static_cast<TS::UVMode>(static_cast<int>(uv_mode_enum));
-    // Use the pattern's recommended default scale if the user hasn't changed
-    // the config from its default (0.5). This gives each pattern a tuned
-    // starting point (e.g. Knurling = 0.15, Dots = 0.1, Crystal = 0.5).
-    double effective_scale = uv_scale;
-    if (pattern != TS::Pattern::Custom) {
-        const double pattern_default = TS::pattern_default_scale(pattern);
-        if (pattern_default > 0.0)
-            effective_scale = pattern_default;
-    }
-    params.uv_settings.scale_u   = std::max(effective_scale, 1e-4);
-    params.uv_settings.scale_v   = params.uv_settings.scale_u;
-    params.uv_settings.offset_u  = uv_off_u;
-    params.uv_settings.offset_v  = uv_off_v;
-    params.uv_settings.rotation_deg = uv_rotation;
-    params.uv_settings.mapping_blend = mapping_blend;
+    // Bake uses the gizmo-local UV params (user-adjustable in the
+    // collapsible "UV mapping" section) rather than the Print Settings.
+    params.uv_settings.scale_u       = std::max(double(m_bake_uv_scale), 1e-4);
+    params.uv_settings.scale_v       = params.uv_settings.scale_u;
+    params.uv_settings.offset_u      = m_bake_uv_offset_u;
+    params.uv_settings.offset_v      = m_bake_uv_offset_v;
+    params.uv_settings.rotation_deg  = m_bake_uv_rotation;
+    params.uv_settings.mapping_blend = m_bake_mapping_blend;
     params.amplitude_mm          = m_bake_amplitude_mm;
     params.edge_length_mm        = m_bake_edge_length_mm;
     params.target_triangle_count = static_cast<uint32_t>(m_bake_target_triangles);

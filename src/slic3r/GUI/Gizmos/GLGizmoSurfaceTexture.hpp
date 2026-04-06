@@ -73,6 +73,11 @@ private:
     float    m_bake_amplitude_mm     = 0.15f;
     int      m_bake_target_triangles = 100000;
     bool     m_bake_skip_bottom      = true;
+    float    m_bake_uv_scale         = 0.5f;
+    float    m_bake_uv_offset_u      = 0.0f;
+    float    m_bake_uv_offset_v      = 0.0f;
+    float    m_bake_uv_rotation      = 0.0f;
+    float    m_bake_mapping_blend    = 0.0f;
 
     std::thread m_bake_thread;
     std::mutex  m_bake_mutex;
