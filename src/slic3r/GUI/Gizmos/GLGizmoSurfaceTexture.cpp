@@ -9,7 +9,9 @@
 #include "libslic3r/Feature/TextureSkin/MeshDisplace.hpp"
 #include "libslic3r/Feature/TextureSkin/TexturePatterns.hpp"
 
+#include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
+#include "slic3r/GUI/GLShadersManager.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
@@ -26,9 +28,18 @@
 
 namespace Slic3r::GUI {
 
+GLGizmoSurfaceTexture::~GLGizmoSurfaceTexture()
+{
+    // Must join before std::thread's destructor runs, otherwise
+    // std::terminate() is called if the thread is still joinable.
+    join_bake_thread();
+    cleanup_preview();
+}
+
 void GLGizmoSurfaceTexture::on_shutdown()
 {
     join_bake_thread();
+    cleanup_preview();
     m_parent.use_slope(false);
     m_parent.toggle_model_objects_visibility(true);
 }
@@ -72,6 +83,11 @@ void GLGizmoSurfaceTexture::render_painter_gizmo()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glEnable(GL_DEPTH_TEST));
     render_triangles(selection);
+
+    // Overlay the actual texture pattern on PATTERN-painted faces.
+    if (m_mode == Mode::Pattern)
+        render_texture_preview(selection);
+
     m_c->object_clipper()->render_cut();
     m_c->instances_hider()->render_cut();
     render_cursor();
@@ -417,6 +433,7 @@ void GLGizmoSurfaceTexture::update_model_object() const
         wxGetApp().obj_list()->update_info_items(std::find(mos.begin(), mos.end(), mo) - mos.begin());
         m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
         wxGetApp().plater()->schedule_background_process();
+        m_preview_dirty = true;
     }
 }
 
@@ -434,6 +451,7 @@ void GLGizmoSurfaceTexture::update_from_model_object()
         m_triangle_selectors.back()->deserialize(mv->surface_texture_facets.get_data(), false);
         m_triangle_selectors.back()->request_update_render_data();
     }
+    m_preview_dirty = true;
 }
 
 PainterGizmoType GLGizmoSurfaceTexture::get_painter_type() const
@@ -446,7 +464,161 @@ wxString GLGizmoSurfaceTexture::handle_snapshot_action_name(bool shift_down, GLG
     return shift_down ? _L("Remove surface texture") : _L("Add surface texture");
 }
 
-// ----- Bake displacement implementation (unchanged from GLGizmoTextureSkin) -----
+// ----- Texture preview overlay ------------------------------------------------
+
+void GLGizmoSurfaceTexture::upload_preview_texture()
+{
+    namespace TS = Slic3r::Feature::TextureSkin;
+    const DynamicPrintConfig &cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    const int pat_int = static_cast<int>(cfg.opt_enum<TextureSkinPattern>("texture_skin_pattern"));
+
+    if (pat_int == m_preview_tex_pattern && m_preview_tex_id != 0) return; // already current
+    m_preview_tex_pattern = pat_int;
+
+    const auto pattern = static_cast<TS::Pattern>(pat_int);
+    const TS::GrayImage *img = nullptr;
+    if (pattern == TS::Pattern::Custom) {
+        const std::string &path = cfg.opt_string("texture_skin_custom_image");
+        if (!path.empty()) img = &TS::get_custom_image(path);
+    } else {
+        img = &TS::get_pattern_image(pattern, Slic3r::resources_dir());
+    }
+    if (!img || img->empty()) { m_preview_tex_id = 0; return; }
+
+    if (m_preview_tex_id == 0) glsafe(::glGenTextures(1, &m_preview_tex_id));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, m_preview_tex_id));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, int(img->width), int(img->height),
+                           0, GL_RED, GL_UNSIGNED_BYTE, img->pixels.data()));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
+    m_preview_dirty = true; // models need rebuild with new UVs
+}
+
+void GLGizmoSurfaceTexture::rebuild_preview_models()
+{
+    namespace TS = Slic3r::Feature::TextureSkin;
+    m_preview_models.clear();
+    m_preview_dirty = false;
+
+    const ModelObject *mo = m_c->selection_info()->model_object();
+    if (!mo) return;
+
+    const DynamicPrintConfig &cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    const auto uv_mode = static_cast<TS::UVMode>(m_bake_uv_mode);
+    TS::UVSettings uv_settings;
+    uv_settings.scale_u       = std::max(double(m_bake_uv_scale), 1e-4);
+    uv_settings.scale_v       = uv_settings.scale_u;
+    uv_settings.offset_u      = m_bake_uv_offset_u;
+    uv_settings.offset_v      = m_bake_uv_offset_v;
+    uv_settings.rotation_deg  = m_bake_uv_rotation;
+    uv_settings.mapping_blend = m_bake_mapping_blend;
+
+    int mesh_id = -1;
+    for (const ModelVolume *mv : mo->volumes) {
+        if (!mv->is_model_part()) continue;
+        ++mesh_id;
+        if (mesh_id >= int(m_triangle_selectors.size())) break;
+
+        // Extract PATTERN-painted sub-triangles.
+        indexed_triangle_set pattern_its = m_triangle_selectors[mesh_id]->get_facets(TriangleStateType::SURFACE_PATTERN);
+        if (pattern_its.indices.empty()) {
+            m_preview_models.emplace_back(); // empty placeholder
+            continue;
+        }
+
+        const BoundingBoxf3 bounds = mv->mesh().bounding_box();
+
+        GLModel::Geometry geom;
+        geom.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2 };
+        geom.reserve_vertices(pattern_its.indices.size() * 3);
+        geom.reserve_indices(pattern_its.indices.size() * 3);
+
+        unsigned int idx = 0;
+        for (const Vec3i &tri : pattern_its.indices) {
+            for (int k = 0; k < 3; ++k) {
+                const Vec3f &pos = pattern_its.vertices[tri[k]];
+                const Vec3d pos_d(pos.x(), pos.y(), pos.z());
+                // Approximate normal from first edge cross (for UV, not lighting).
+                const Vec3f &p0 = pattern_its.vertices[tri[0]];
+                const Vec3f &p1 = pattern_its.vertices[tri[1]];
+                const Vec3f &p2 = pattern_its.vertices[tri[2]];
+                Vec3f face_n = (p1 - p0).cross(p2 - p0);
+                const float nlen = face_n.norm();
+                if (nlen > 0.f) face_n /= nlen;
+                const Vec3d nrm(face_n.x(), face_n.y(), face_n.z());
+
+                const TS::UVResult uvr = TS::compute_uv(pos_d, nrm, uv_mode, uv_settings, bounds);
+                float u = 0.f, v = 0.f;
+                if (uvr.count > 0) {
+                    // Use the highest-weight sample.
+                    double best_w = -1.0;
+                    for (int s = 0; s < uvr.count; ++s)
+                        if (uvr.samples[s].w > best_w) { best_w = uvr.samples[s].w; u = float(uvr.samples[s].u); v = float(uvr.samples[s].v); }
+                }
+                geom.add_vertex(pos, Vec2f(u, v));
+                geom.add_index(idx++);
+            }
+        }
+
+        m_preview_models.emplace_back();
+        m_preview_models.back().init_from(std::move(geom));
+    }
+}
+
+void GLGizmoSurfaceTexture::render_texture_preview(const Selection &selection)
+{
+    upload_preview_texture();
+    if (m_preview_tex_id == 0) return;
+    if (m_preview_dirty || m_preview_models.empty())
+        rebuild_preview_models();
+
+    auto *shader = wxGetApp().get_shader("flat_texture");
+    if (!shader) return;
+
+    shader->start_using();
+    glsafe(::glBindTexture(GL_TEXTURE_2D, m_preview_tex_id));
+    // Render slightly in front to overwrite the flat-red blocker color.
+    glsafe(::glEnable(GL_POLYGON_OFFSET_FILL));
+    glsafe(::glPolygonOffset(-1.f, -1.f));
+
+    const ModelObject *mo = m_c->selection_info()->model_object();
+    int mesh_id = -1;
+    for (const ModelVolume *mv : mo->volumes) {
+        if (!mv->is_model_part()) continue;
+        ++mesh_id;
+        if (mesh_id >= int(m_preview_models.size())) break;
+        if (m_preview_models[mesh_id].vertices_count() == 0) continue;
+
+        const Transform3d trafo_matrix =
+            mo->instances[selection.get_instance_idx()]->get_transformation().get_matrix() *
+            mv->get_matrix();
+
+        const Camera &camera = wxGetApp().plater()->get_camera();
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * trafo_matrix);
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+
+        m_preview_models[mesh_id].render();
+    }
+
+    glsafe(::glDisable(GL_POLYGON_OFFSET_FILL));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
+    shader->stop_using();
+}
+
+void GLGizmoSurfaceTexture::cleanup_preview()
+{
+    if (m_preview_tex_id != 0) {
+        glsafe(::glDeleteTextures(1, &m_preview_tex_id));
+        m_preview_tex_id = 0;
+    }
+    m_preview_models.clear();
+    m_preview_tex_pattern = -1;
+}
+
+// ----- Bake displacement implementation -----------------------------------------------
 
 void GLGizmoSurfaceTexture::join_bake_thread()
 {

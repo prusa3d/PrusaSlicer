@@ -5,6 +5,7 @@
 #include <thread>
 
 #include "GLGizmoPainterBase.hpp"
+#include "slic3r/GUI/GLModel.hpp"
 #include "admesh/stl.h"
 
 #include "slic3r/GUI/I18N.hpp"
@@ -21,6 +22,7 @@ public:
 
     GLGizmoSurfaceTexture(GLCanvas3D &parent, const std::string &icon_filename, unsigned int sprite_id)
         : GLGizmoPainterBase(parent, icon_filename, sprite_id) {}
+    ~GLGizmoSurfaceTexture() override;
 
     void render_painter_gizmo() override;
 
@@ -87,6 +89,17 @@ private:
     void cancel_bake();
     void apply_bake();
     void join_bake_thread();
+
+    // ----- Texture preview overlay (pattern mode only) ----------------
+    unsigned int              m_preview_tex_id    = 0;
+    int                       m_preview_tex_pattern = -1; // cached pattern enum
+    std::vector<GLModel>      m_preview_models;           // one per volume
+    mutable bool              m_preview_dirty     = true;
+
+    void upload_preview_texture();
+    void rebuild_preview_models();
+    void render_texture_preview(const Selection &selection);
+    void cleanup_preview();
 };
 
 } // namespace Slic3r::GUI
