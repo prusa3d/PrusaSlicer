@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 // Port of stlTexturizer/js/mapping.js to C++.
 
 #include "UVProjection.hpp"

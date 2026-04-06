@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 #ifndef slic3r_TextureSkinPickerDialog_hpp_
 #define slic3r_TextureSkinPickerDialog_hpp_
 

@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 #include "GLGizmoSurfaceTexture.hpp"
 
 #include "libslic3r/Model.hpp"

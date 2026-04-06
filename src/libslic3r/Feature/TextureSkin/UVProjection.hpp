@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 #ifndef libslic3r_TextureSkin_UVProjection_hpp_
 #define libslic3r_TextureSkin_UVProjection_hpp_
 

@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 // Shared polyline-perturbation core for Fuzzy Skin and Texture Skin.
 // Walks a point sequence, inserts samples every `point_distance_scaled`
 // (with optional per-point jitter), and calls the OffsetProvider to

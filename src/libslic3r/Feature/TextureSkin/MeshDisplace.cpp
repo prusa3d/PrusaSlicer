@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 // Bake a grayscale texture into a mesh as vertex displacement, in three passes:
 //   1. Adaptive subdivision of edges longer than edge_length_mm, tracking the
 //      original triangle each sub-triangle descends from.

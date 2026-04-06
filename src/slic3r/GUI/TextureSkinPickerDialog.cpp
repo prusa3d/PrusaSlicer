@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 #include "TextureSkinPickerDialog.hpp"
 
 #include <wx/bitmap.h>

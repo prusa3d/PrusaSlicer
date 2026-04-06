@@ -1,5 +1,3 @@
-///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
 #include "LegacyMigration.hpp"
 
 #include "libslic3r/Model.hpp"
@@ -44,46 +42,6 @@ void migrate_legacy_paint_to_surface_texture(ModelVolume &volume)
                 selector.set_facet(int(i), TriangleStateType::SURFACE_PATTERN);
         volume.surface_texture_facets.set(selector);
     }
-}
-
-void derive_legacy_from_surface_texture(ModelVolume &volume)
-{
-    volume.fuzzy_skin_facets.reset();
-    volume.texture_skin_facets.reset();
-    if (volume.surface_texture_facets.empty()) return;
-
-    TriangleSelector unified(volume.mesh());
-    unified.deserialize(volume.surface_texture_facets.get_data(), false);
-
-    TriangleSelector fuzzy_sel(volume.mesh());
-    TriangleSelector pattern_sel(volume.mesh());
-
-    // Walk leaves and route source-triangle paint to the per-state legacy
-    // selectors. Sub-triangle precision is projected to whole-source-
-    // triangle granularity (the slice-time segmentation pipeline only
-    // needs per-region ExPolygons anyway).
-    unified.visit_painted_leaves([&](int source_triangle, TriangleStateType state) {
-        if (state == TriangleStateType::SURFACE_FUZZY) {
-            // Pattern takes precedence: don't overwrite if already marked PATTERN.
-            // Since pattern_sel is written in a second pass we don't need a
-            // guard here; overwrites are handled below.
-            fuzzy_sel.set_facet(source_triangle, TriangleStateType::FUZZY_SKIN);
-        } else if (state == TriangleStateType::SURFACE_PATTERN) {
-            pattern_sel.set_facet(source_triangle, TriangleStateType::TEXTURE_SKIN);
-        }
-    });
-
-    // If both fuzzy and pattern exist on the SAME source triangle, pattern
-    // wins: clear fuzzy for any source-triangle that pattern_sel marked.
-    {
-        const auto &pattern_data = pattern_sel.serialize();
-        for (const auto &m : pattern_data.triangles_to_split)
-            if (m.triangle_idx >= 0)
-                fuzzy_sel.set_facet(m.triangle_idx, TriangleStateType::NONE);
-    }
-
-    volume.fuzzy_skin_facets.set(fuzzy_sel);
-    volume.texture_skin_facets.set(pattern_sel);
 }
 
 } // namespace Slic3r::Feature::SurfaceTexture
