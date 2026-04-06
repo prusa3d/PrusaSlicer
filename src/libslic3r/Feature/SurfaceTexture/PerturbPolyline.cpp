@@ -1,5 +1,6 @@
 #include "PerturbPolyline.hpp"
 
+#include <cmath>
 #include <random>
 
 #include "libslic3r/Arachne/utils/ExtrusionJunction.hpp"
@@ -47,7 +48,8 @@ void perturb_polyline(Points &poly, const bool closed,
         Point &p1 = *it;
         const Vec2d p0p1      = (p1 - *p0).cast<double>();
         const double p0p1_len = p0p1.norm();
-        if (p0p1_len <= 0.0) { p0 = &p1; continue; }
+        // Skip degenerate / near-zero segments to avoid extreme direction vectors.
+        if (p0p1_len < 1.0) { p0 = &p1; continue; }
         const Vec2d dir      = p0p1 / p0p1_len;
         const Vec2d perp_dir = perp(dir);
 
@@ -55,6 +57,8 @@ void perturb_polyline(Points &poly, const bool closed,
         while (d < p0p1_len) {
             const Vec2d pos_f = p0->cast<double>() + dir * d;
             const double off  = offset_provider(pos_f, perp_dir);
+            // Guard against NaN / infinity from edge-case sampling.
+            if (!std::isfinite(off)) { d += next_step(spacing); continue; }
             const Vec2d delta = perp_dir * off;
             out.emplace_back(static_cast<coord_t>(pos_f.x() + delta.x()),
                              static_cast<coord_t>(pos_f.y() + delta.y()));
@@ -96,7 +100,7 @@ void perturb_extrusion_line(Arachne::ExtrusionLine &line,
         }
         const Vec2d p0p1      = (p1.p - p0->p).cast<double>();
         const double p0p1_len = p0p1.norm();
-        if (p0p1_len <= 0.0) { p0 = &p1; continue; }
+        if (p0p1_len < 1.0) { p0 = &p1; continue; }
         const Vec2d dir      = p0p1 / p0p1_len;
         const Vec2d perp_dir = perp(dir);
 
@@ -104,6 +108,7 @@ void perturb_extrusion_line(Arachne::ExtrusionLine &line,
         while (d < p0p1_len) {
             const Vec2d pos_f = p0->p.cast<double>() + dir * d;
             const double off  = offset_provider(pos_f, perp_dir);
+            if (!std::isfinite(off)) { d += next_step(spacing); continue; }
             const Vec2d delta = perp_dir * off;
             out.emplace_back(Point(static_cast<coord_t>(pos_f.x() + delta.x()),
                                    static_cast<coord_t>(pos_f.y() + delta.y())),
