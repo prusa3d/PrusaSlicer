@@ -84,9 +84,9 @@ void GLGizmoSurfaceTexture::render_painter_gizmo()
     glsafe(::glEnable(GL_DEPTH_TEST));
     render_triangles(selection);
 
-    // Overlay the actual texture pattern on PATTERN-painted faces.
-    if (m_mode == Mode::Pattern)
-        render_texture_preview(selection);
+    // TODO: texture preview disabled — UV mapping needs fixing.
+    // if (m_mode == Mode::Pattern)
+    //     render_texture_preview(selection);
 
     m_c->object_clipper()->render_cut();
     m_c->instances_hider()->render_cut();
