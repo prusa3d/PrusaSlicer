@@ -14,6 +14,7 @@
 #include "libslic3r/Time.hpp"
 
 #include "libslic3r/I18N.hpp"
+#include "libslic3r/Feature/SurfaceTexture/LegacyMigration.hpp"
 
 #include "3mf.hpp"
 
@@ -137,6 +138,7 @@ static constexpr const char* CUSTOM_SEAM_ATTR = "slic3rpe:custom_seam";
 static constexpr const char* MM_SEGMENTATION_ATTR = "slic3rpe:mmu_segmentation";
 static constexpr const char* FUZZY_SKIN_ATTR = "slic3rpe:fuzzy_skin";
 static constexpr const char* TEXTURE_SKIN_ATTR = "slic3rpe:texture_skin";
+static constexpr const char* SURFACE_TEXTURE_ATTR = "slic3rpe:surface_texture";
 
 static constexpr const char* KEY_ATTR = "key";
 static constexpr const char* VALUE_ATTR = "value";
@@ -380,6 +382,7 @@ namespace Slic3r {
             std::vector<std::string> mm_segmentation;
             std::vector<std::string> fuzzy_skin;
             std::vector<std::string> texture_skin;
+            std::vector<std::string> surface_texture;
 
             bool empty() { return vertices.empty() || triangles.empty(); }
 
@@ -391,6 +394,7 @@ namespace Slic3r {
                 mm_segmentation.clear();
                 fuzzy_skin.clear();
                 texture_skin.clear();
+                surface_texture.clear();
             }
         };
 
@@ -2122,6 +2126,7 @@ namespace Slic3r {
         m_curr_object.geometry.custom_seam.push_back(get_attribute_value_string(attributes, num_attributes, CUSTOM_SEAM_ATTR));
         m_curr_object.geometry.fuzzy_skin.push_back(get_attribute_value_string(attributes, num_attributes, FUZZY_SKIN_ATTR));
         m_curr_object.geometry.texture_skin.push_back(get_attribute_value_string(attributes, num_attributes, TEXTURE_SKIN_ATTR));
+        m_curr_object.geometry.surface_texture.push_back(get_attribute_value_string(attributes, num_attributes, SURFACE_TEXTURE_ATTR));
 
         // Now load MM segmentation data. Unfortunately, BambuStudio has changed the attribute name after they forked us,
         // leading to https://github.com/prusa3d/PrusaSlicer/issues/12502. Let's try to load both keys if the usual
@@ -2626,12 +2631,13 @@ namespace Slic3r {
             if (has_transform)
                 volume->source.transform = Slic3r::Geometry::Transformation(volume_matrix_to_object);
 
-            // recreate custom supports, seam, mm segmentation, fuzzy skin and texture skin from previously loaded attribute
+            // recreate custom supports, seam, mm segmentation, and surface texture (+ legacy fuzzy/texture) from previously loaded attributes
             volume->supported_facets.reserve(triangles_count);
             volume->seam_facets.reserve(triangles_count);
             volume->mm_segmentation_facets.reserve(triangles_count);
             volume->fuzzy_skin_facets.reserve(triangles_count);
             volume->texture_skin_facets.reserve(triangles_count);
+            volume->surface_texture_facets.reserve(triangles_count);
             for (size_t i=0; i<triangles_count; ++i) {
                 size_t index = volume_data.first_triangle_id + i;
                 assert(index < geometry.custom_supports.size());
@@ -2644,12 +2650,19 @@ namespace Slic3r {
                 volume->fuzzy_skin_facets.set_triangle_from_string(i, geometry.fuzzy_skin[index]);
                 if (index < geometry.texture_skin.size())
                     volume->texture_skin_facets.set_triangle_from_string(i, geometry.texture_skin[index]);
+                if (index < geometry.surface_texture.size())
+                    volume->surface_texture_facets.set_triangle_from_string(i, geometry.surface_texture[index]);
             }
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mm_segmentation_facets.shrink_to_fit();
             volume->fuzzy_skin_facets.shrink_to_fit();
             volume->texture_skin_facets.shrink_to_fit();
+            volume->surface_texture_facets.shrink_to_fit();
+            // Migrate legacy fuzzy_skin_facets + texture_skin_facets into the
+            // unified surface_texture_facets when loading an old 3MF that
+            // predates the merge.
+            Slic3r::Feature::SurfaceTexture::migrate_legacy_paint_to_surface_texture(*volume);
 
             if (auto &es = volume_data.shape_configuration; es.has_value())
                 volume->emboss_shape = std::move(es);            
@@ -3332,21 +3345,15 @@ namespace Slic3r {
                     output_buffer += "\"";
                 }
 
-                std::string fuzzy_skin_data_string = volume->fuzzy_skin_facets.get_triangle_as_string(i);
-                if (!fuzzy_skin_data_string.empty()) {
+                // Unified Surface Texture attribute (replaces legacy
+                // fuzzy_skin + texture_skin). Old versions of PrusaSlicer
+                // will ignore the unknown attribute.
+                std::string surface_texture_data_string = volume->surface_texture_facets.get_triangle_as_string(i);
+                if (!surface_texture_data_string.empty()) {
                     output_buffer += " ";
-                    output_buffer += FUZZY_SKIN_ATTR;
+                    output_buffer += SURFACE_TEXTURE_ATTR;
                     output_buffer += "=\"";
-                    output_buffer += fuzzy_skin_data_string;
-                    output_buffer += "\"";
-                }
-
-                std::string texture_skin_data_string = volume->texture_skin_facets.get_triangle_as_string(i);
-                if (!texture_skin_data_string.empty()) {
-                    output_buffer += " ";
-                    output_buffer += TEXTURE_SKIN_ATTR;
-                    output_buffer += "=\"";
-                    output_buffer += texture_skin_data_string;
+                    output_buffer += surface_texture_data_string;
                     output_buffer += "\"";
                 }
 

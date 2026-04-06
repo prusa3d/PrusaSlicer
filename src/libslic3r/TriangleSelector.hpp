@@ -41,6 +41,11 @@ enum class TriangleStateType : int8_t {
     FUZZY_SKIN = ENFORCER,
     // For the texture skin, likewise a binary mask aliased to ENFORCER.
     TEXTURE_SKIN = ENFORCER,
+    // Unified surface-texture annotation: fuzzy occupies ENFORCER slot,
+    // pattern occupies BLOCKER slot (same 2-state encoding used by
+    // GLGizmoFdmSupports). A single FacetsAnnotation can thus hold both.
+    SURFACE_FUZZY   = ENFORCER,
+    SURFACE_PATTERN = BLOCKER,
     // Maximum is 15. The value is serialized in TriangleSelector into 6 bits using a 2 bit prefix code.
     Extruder1 = ENFORCER,
     Extruder2 = BLOCKER,
@@ -358,6 +363,12 @@ public:
     bool                 has_facets(TriangleStateType state) const;
     static bool          has_facets(const TriangleSplittingData &data, TriangleStateType test_state);
     int                  num_facets(TriangleStateType state) const;
+
+    // Walk every painted leaf and invoke visitor(source_triangle_idx, state)
+    // for each one whose state != NONE. Used to export per-source-triangle
+    // paint info without reaching into the protected Triangle type from
+    // outside callers.
+    void                 visit_painted_leaves(const std::function<void(int /*source_triangle*/, TriangleStateType)> &visitor) const;
     // Get facets that pass the filter. Don't triangulate T-joints.
     template<AdditionalMeshInfo facet_info = AdditionalMeshInfo::None>
     typename IndexedTriangleSetType<facet_info>::type get_facets(const std::function<bool(const Triangle &)> &facet_filter) const;

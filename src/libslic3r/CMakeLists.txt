@@ -97,6 +97,10 @@ set(SLIC3R_SOURCES
     FileParserError.hpp
     Feature/FuzzySkin/FuzzySkin.cpp
     Feature/FuzzySkin/FuzzySkin.hpp
+    Feature/SurfaceTexture/PerturbPolyline.cpp
+    Feature/SurfaceTexture/PerturbPolyline.hpp
+    Feature/SurfaceTexture/LegacyMigration.cpp
+    Feature/SurfaceTexture/LegacyMigration.hpp
     Feature/TextureSkin/TextureSkin.cpp
     Feature/TextureSkin/TextureSkin.hpp
     Feature/TextureSkin/UVProjection.cpp

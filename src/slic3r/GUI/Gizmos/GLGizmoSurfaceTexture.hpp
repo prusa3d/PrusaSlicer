@@ -1,7 +1,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#ifndef slic3r_GLGizmoTextureSkin_hpp_
-#define slic3r_GLGizmoTextureSkin_hpp_
+#ifndef slic3r_GLGizmoSurfaceTexture_hpp_
+#define slic3r_GLGizmoSurfaceTexture_hpp_
 
 #include <mutex>
 #include <thread>
@@ -13,10 +13,16 @@
 
 namespace Slic3r::GUI {
 
-class GLGizmoTextureSkin : public GLGizmoPainterBase
+// Unified "Surface Texture" paint-on gizmo. Replaces the separate fuzzy
+// and texture skin gizmos: one paint mask, one toolbar entry, two modes
+// (Fuzzy / Pattern) selected by a radio at the top of the panel.
+class GLGizmoSurfaceTexture : public GLGizmoPainterBase
 {
 public:
-    GLGizmoTextureSkin(GLCanvas3D &parent, const std::string &icon_filename, unsigned int sprite_id) : GLGizmoPainterBase(parent, icon_filename, sprite_id) {}
+    enum class Mode { Fuzzy = 0, Pattern = 1 };
+
+    GLGizmoSurfaceTexture(GLCanvas3D &parent, const std::string &icon_filename, unsigned int sprite_id)
+        : GLGizmoPainterBase(parent, icon_filename, sprite_id) {}
 
     void render_painter_gizmo() override;
 
@@ -26,11 +32,16 @@ protected:
 
     wxString handle_snapshot_action_name(bool shift_down, Button button_down) const override;
 
-    std::string get_gizmo_entering_text() const override { return _u8L("Entering Paint-on texture skin"); }
-    std::string get_gizmo_leaving_text() const override { return _u8L("Leaving Paint-on texture skin"); }
-    std::string get_action_snapshot_name() const override { return _u8L("Paint-on texture skin editing"); }
+    std::string get_gizmo_entering_text() const override { return _u8L("Entering Paint-on surface texture"); }
+    std::string get_gizmo_leaving_text() const override  { return _u8L("Leaving Paint-on surface texture"); }
+    std::string get_action_snapshot_name() const override { return _u8L("Paint-on surface texture editing"); }
 
-    TriangleStateType get_left_button_state_type() const override { return TriangleStateType::TEXTURE_SKIN; }
+    // Active paint state depends on the current mode.
+    TriangleStateType get_left_button_state_type() const override
+    {
+        return m_mode == Mode::Fuzzy ? TriangleStateType::SURFACE_FUZZY
+                                     : TriangleStateType::SURFACE_PATTERN;
+    }
     TriangleStateType get_right_button_state_type() const override { return TriangleStateType::NONE; }
 
 private:
@@ -45,7 +56,10 @@ private:
 
     std::map<std::string, std::string> m_desc;
 
-    // ----- Bake displacement state ------------------------------------
+    // Active paint mode.
+    Mode m_mode = Mode::Pattern;
+
+    // ----- Bake displacement (pattern mode only) ---------------------
     struct BakeState {
         enum Status { idle, running, cancelling };
         Status                 status   = idle;
@@ -66,10 +80,10 @@ private:
 
     void start_bake();
     void cancel_bake();
-    void apply_bake();      // UI-thread: swap mesh, trigger reslice
+    void apply_bake();
     void join_bake_thread();
 };
 
 } // namespace Slic3r::GUI
 
-#endif // slic3r_GLGizmoTextureSkin_hpp_
+#endif // slic3r_GLGizmoSurfaceTexture_hpp_

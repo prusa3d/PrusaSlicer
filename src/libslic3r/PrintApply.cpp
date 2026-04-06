@@ -32,6 +32,7 @@
 #include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/CustomParametersHandling.hpp"
+#include "libslic3r/Feature/SurfaceTexture/LegacyMigration.hpp"
 
 namespace Slic3r {
 
@@ -110,6 +111,11 @@ static inline void model_volume_list_copy_configs(ModelObject &model_object_dst,
         mv_dst.fuzzy_skin_facets.assign(mv_src.fuzzy_skin_facets);
         assert(mv_dst.texture_skin_facets.id() == mv_src.texture_skin_facets.id());
         mv_dst.texture_skin_facets.assign(mv_src.texture_skin_facets);
+        assert(mv_dst.surface_texture_facets.id() == mv_src.surface_texture_facets.id());
+        mv_dst.surface_texture_facets.assign(mv_src.surface_texture_facets);
+        // Refresh the legacy facet fields from the unified annotation so
+        // the segmentation pipelines keep working unchanged.
+        Slic3r::Feature::SurfaceTexture::derive_legacy_from_surface_texture(mv_dst);
         //FIXME what to do with the materials?
         // mv_dst.m_material_id = mv_src.m_material_id;
         ++ i_src;
@@ -1338,8 +1344,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         bool solid_or_modifier_differ   = model_volume_list_changed(model_object, model_object_new, solid_or_modifier_types) ||
                                           model_mmu_segmentation_data_changed(model_object, model_object_new) ||
                                           (model_object_new.is_mm_painted() && num_extruders_changed) ||
-                                          model_fuzzy_skin_data_changed(model_object, model_object_new) ||
-                                          model_texture_skin_data_changed(model_object, model_object_new);
+                                          model_surface_texture_data_changed(model_object, model_object_new);
         bool supports_differ            = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SUPPORT_BLOCKER) ||
                                           model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SUPPORT_ENFORCER);
         bool layer_height_ranges_differ = ! layer_height_ranges_equal(model_object.layer_config_ranges, model_object_new.layer_config_ranges, model_object_new.layer_height_profile.empty());

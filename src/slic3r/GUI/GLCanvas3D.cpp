@@ -1571,8 +1571,7 @@ void GLCanvas3D::toggle_model_objects_visibility(bool visible, const ModelObject
                     if (  (gizmo_type == GLGizmosManager::FdmSupports
                         || gizmo_type == GLGizmosManager::Seam
                         || gizmo_type == GLGizmosManager::Cut
-                        || gizmo_type == GLGizmosManager::FuzzySkin
-                        || gizmo_type == GLGizmosManager::TextureSkin)
+                        || gizmo_type == GLGizmosManager::SurfaceTexture)
                         && !vol->is_modifier) {
                         vol->force_neutral_color = true;
                     }
@@ -3526,9 +3525,8 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
     if (keyCode == WXK_ALT && (gizmo_type == GLGizmosManager::FdmSupports ||
                                gizmo_type == GLGizmosManager::Seam ||
                                gizmo_type == GLGizmosManager::MmSegmentation ||
-                               gizmo_type == GLGizmosManager::FuzzySkin ||
-                               gizmo_type == GLGizmosManager::TextureSkin)) {
-        // Prevents focusing on the menu bar when ALT is pressed in painting gizmos (FdmSupports, Seam, MmSegmentation, FuzzySkin, and TextureSkin).
+                               gizmo_type == GLGizmosManager::SurfaceTexture)) {
+        // Prevents focusing on the menu bar when ALT is pressed in painting gizmos (FdmSupports, Seam, MmSegmentation, and SurfaceTexture).
         evt.Skip(false);
     } else if (keyCode != WXK_TAB
         && keyCode != WXK_LEFT
@@ -3921,8 +3919,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     m_gizmos.get_current_type() != GLGizmosManager::Cut &&
                     m_gizmos.get_current_type() != GLGizmosManager::Measure &&
                     m_gizmos.get_current_type() != GLGizmosManager::MmSegmentation &&
-                    m_gizmos.get_current_type() != GLGizmosManager::FuzzySkin &&
-                    m_gizmos.get_current_type() != GLGizmosManager::TextureSkin) {
+                    m_gizmos.get_current_type() != GLGizmosManager::SurfaceTexture) {
                     m_rectangle_selection.start_dragging(m_mouse.position, evt.ShiftDown() ? GLSelectionRectangle::EState::Select : GLSelectionRectangle::EState::Deselect);
                     m_dirty = true;
                 }
@@ -6133,8 +6130,7 @@ void GLCanvas3D::_render_bed(const Transform3d& view_matrix, const Transform3d& 
           && m_gizmos.get_current_type() != GLGizmosManager::Hollow
           && m_gizmos.get_current_type() != GLGizmosManager::Seam
           && m_gizmos.get_current_type() != GLGizmosManager::MmSegmentation
-          && m_gizmos.get_current_type() != GLGizmosManager::FuzzySkin
-          && m_gizmos.get_current_type() != GLGizmosManager::TextureSkin);
+          && m_gizmos.get_current_type() != GLGizmosManager::SurfaceTexture);
 
     m_bed.render(*this, view_matrix, projection_matrix, bottom, scale_factor, show_texture);
 }

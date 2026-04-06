@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px"
+     width="128px" height="128px" viewBox="0 0 128 128" enable-background="new 0 0 128 128" xml:space="preserve">
+  <!-- 8x scaled version of the 16px displaced-sphere icon -->
+  <circle cx="64" cy="64" r="36" fill="#808080"/>
+  <polygon points="64,4 70,32 58,32" fill="#ED6B21"/>
+  <polygon points="124,64 96,70 96,58" fill="#ED6B21"/>
+  <polygon points="64,124 58,96 70,96" fill="#ED6B21"/>
+  <polygon points="4,64 32,58 32,70" fill="#ED6B21"/>
+  <polygon points="106.4,21.6 87.2,44.8 79.2,36" fill="#ED6B21"/>
+  <polygon points="106.4,106.4 79.2,92 88.8,82.4" fill="#ED6B21"/>
+  <polygon points="21.6,106.4 44.8,87.2 36,79.2" fill="#ED6B21"/>
+  <polygon points="21.6,21.6 36,48.8 48.8,36" fill="#ED6B21"/>
+</svg>

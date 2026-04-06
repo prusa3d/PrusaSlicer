@@ -1,6 +1,6 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "GLGizmoTextureSkin.hpp"
+#include "GLGizmoSurfaceTexture.hpp"
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Print.hpp"
@@ -11,15 +11,15 @@
 #include "libslic3r/Feature/TextureSkin/MeshDisplace.hpp"
 #include "libslic3r/Feature/TextureSkin/TexturePatterns.hpp"
 
-#include "slic3r/GUI/TextureSkinPickerDialog.hpp"
-#include "slic3r/GUI/Tab.hpp"
-
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
 #include "slic3r/GUI/ImGuiWrapper.hpp"
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/Plater.hpp"
+#include "slic3r/GUI/Tab.hpp"
+#include "slic3r/GUI/TextureSkinPickerDialog.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
 #include <GL/glew.h>
@@ -28,69 +28,65 @@
 
 namespace Slic3r::GUI {
 
-void GLGizmoTextureSkin::on_shutdown()
+void GLGizmoSurfaceTexture::on_shutdown()
 {
     join_bake_thread();
     m_parent.use_slope(false);
     m_parent.toggle_model_objects_visibility(true);
 }
 
-std::string GLGizmoTextureSkin::on_get_name() const
+std::string GLGizmoSurfaceTexture::on_get_name() const
 {
-    return _u8L("Paint-on texture skin");
+    return _u8L("Paint-on surface texture");
 }
 
-bool GLGizmoTextureSkin::on_init()
+bool GLGizmoSurfaceTexture::on_init()
 {
-    m_shortcut_key = WXK_CONTROL_T;
+    m_shortcut_key = WXK_CONTROL_H;
 
-    m_desc["clipping_of_view"]             = _u8L("Clipping of view") + ": ";
-    m_desc["reset_direction"]              = _u8L("Reset direction");
-    m_desc["cursor_size"]                  = _u8L("Brush size") + ": ";
-    m_desc["cursor_type"]                  = _u8L("Brush shape") + ": ";
-    m_desc["add_texture_skin_caption"]     = _u8L("Left mouse button") + ": ";
-    m_desc["add_texture_skin"]             = _u8L("Add texture skin");
-    m_desc["remove_texture_skin_caption"]  = _u8L("Shift + Left mouse button") + ": ";
-    m_desc["remove_texture_skin"]          = _u8L("Remove texture skin");
-    m_desc["remove_all"]                   = _u8L("Remove all selection");
-    m_desc["circle"]                       = _u8L("Circle");
-    m_desc["sphere"]                       = _u8L("Sphere");
-    m_desc["pointer"]                      = _u8L("Triangles");
-    m_desc["tool_type"]                    = _u8L("Tool type") + ": ";
-    m_desc["tool_brush"]                   = _u8L("Brush");
-    m_desc["tool_smart_fill"]              = _u8L("Smart fill");
-    m_desc["smart_fill_angle"]             = _u8L("Smart fill angle");
-    m_desc["split_triangles"]              = _u8L("Split triangles");
+    m_desc["clipping_of_view"]   = _u8L("Clipping of view") + ": ";
+    m_desc["reset_direction"]    = _u8L("Reset direction");
+    m_desc["cursor_size"]        = _u8L("Brush size") + ": ";
+    m_desc["cursor_type"]        = _u8L("Brush shape") + ": ";
+    m_desc["add_caption"]        = _u8L("Left mouse button") + ": ";
+    m_desc["add"]                = _u8L("Add");
+    m_desc["remove_caption"]     = _u8L("Shift + Left mouse button") + ": ";
+    m_desc["remove"]             = _u8L("Remove");
+    m_desc["remove_all"]         = _u8L("Remove all selection");
+    m_desc["circle"]             = _u8L("Circle");
+    m_desc["sphere"]             = _u8L("Sphere");
+    m_desc["pointer"]            = _u8L("Triangles");
+    m_desc["tool_type"]          = _u8L("Tool type") + ": ";
+    m_desc["tool_brush"]         = _u8L("Brush");
+    m_desc["tool_smart_fill"]    = _u8L("Smart fill");
+    m_desc["smart_fill_angle"]   = _u8L("Smart fill angle");
+    m_desc["split_triangles"]    = _u8L("Split triangles");
+    m_desc["mode"]               = _u8L("Mode") + ": ";
+    m_desc["mode_fuzzy"]         = _u8L("Fuzzy");
+    m_desc["mode_pattern"]       = _u8L("Pattern");
 
     return true;
 }
 
-void GLGizmoTextureSkin::render_painter_gizmo()
+void GLGizmoSurfaceTexture::render_painter_gizmo()
 {
     const Selection &selection = m_parent.get_selection();
-
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glEnable(GL_DEPTH_TEST));
-
     render_triangles(selection);
     m_c->object_clipper()->render_cut();
     m_c->instances_hider()->render_cut();
     render_cursor();
-
     glsafe(::glDisable(GL_BLEND));
 }
 
-void GLGizmoTextureSkin::on_render_input_window(float x, float y, float bottom_limit)
+void GLGizmoSurfaceTexture::on_render_input_window(float x, float y, float bottom_limit)
 {
     if (!m_c->selection_info()->model_object())
         return;
 
-    // Compute available height and clamp the window so it never falls off the
-    // bottom of the viewport. If content exceeds the available height the
-    // window becomes scrollable via ImGuiWindowFlags_AlwaysVerticalScrollbar.
-    const float top_margin   = m_imgui->scaled(1.f);
-    const float min_height   = m_imgui->scaled(12.f);
-    // Shift the window up a bit from the gizmo toolbar anchor so it's easier to reach.
+    const float top_margin = m_imgui->scaled(1.f);
+    const float min_height = m_imgui->scaled(12.f);
     y = std::max(0.f, y - m_imgui->scaled(22.f));
     const float avail_height = std::max(min_height, bottom_limit - y - top_margin);
     if (y + avail_height > bottom_limit) y = std::max(0.f, bottom_limit - avail_height - top_margin);
@@ -99,32 +95,28 @@ void GLGizmoTextureSkin::on_render_input_window(float x, float y, float bottom_l
 
     ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
+    // Layout helpers.
     const float clipping_slider_left   = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x,
                                                   ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
     const float cursor_slider_left     = ImGuiPureWrap::calc_text_size(m_desc.at("cursor_size")).x + m_imgui->scaled(1.f);
     const float smart_fill_slider_left = ImGuiPureWrap::calc_text_size(m_desc.at("smart_fill_angle")).x + m_imgui->scaled(1.f);
-
     const float cursor_type_radio_circle  = ImGuiPureWrap::calc_text_size(m_desc["circle"]).x + m_imgui->scaled(2.5f);
     const float cursor_type_radio_sphere  = ImGuiPureWrap::calc_text_size(m_desc["sphere"]).x + m_imgui->scaled(2.5f);
     const float cursor_type_radio_pointer = ImGuiPureWrap::calc_text_size(m_desc["pointer"]).x + m_imgui->scaled(2.5f);
-
     const float button_width         = ImGuiPureWrap::calc_text_size(m_desc.at("remove_all")).x + m_imgui->scaled(1.f);
     const float buttons_width        = m_imgui->scaled(0.5f);
     const float minimal_slider_width = m_imgui->scaled(4.f);
-
     const float tool_type_radio_left       = ImGuiPureWrap::calc_text_size(m_desc["tool_type"]).x + m_imgui->scaled(1.f);
     const float tool_type_radio_brush      = ImGuiPureWrap::calc_text_size(m_desc["tool_brush"]).x + m_imgui->scaled(2.5f);
     const float tool_type_radio_smart_fill = ImGuiPureWrap::calc_text_size(m_desc["tool_smart_fill"]).x + m_imgui->scaled(2.5f);
-
     const float split_triangles_checkbox_width = ImGuiPureWrap::calc_text_size(m_desc["split_triangles"]).x + m_imgui->scaled(2.5f);
 
     float caption_max    = 0.f;
     float total_text_max = 0.f;
-    for (const std::string t : {"add_texture_skin", "remove_texture_skin"}) {
+    for (const std::string &t : {"add", "remove"}) {
         caption_max    = std::max(caption_max, ImGuiPureWrap::calc_text_size(m_desc[t + "_caption"]).x);
         total_text_max = std::max(total_text_max, ImGuiPureWrap::calc_text_size(m_desc[t]).x);
     }
-
     total_text_max += caption_max + m_imgui->scaled(1.f);
     caption_max    += m_imgui->scaled(1.f);
 
@@ -138,96 +130,69 @@ void GLGizmoTextureSkin::on_render_input_window(float x, float y, float bottom_l
     window_width                   = std::max(window_width, tool_type_radio_left + tool_type_radio_brush + tool_type_radio_smart_fill);
     window_width                   = std::max(window_width, 2.f * buttons_width + m_imgui->scaled(1.f));
 
+    // Mode radio at the top.
+    ImGui::AlignTextToFramePadding();
+    ImGuiPureWrap::text(m_desc["mode"]);
+    ImGui::SameLine();
+    if (ImGuiPureWrap::radio_button(m_desc["mode_fuzzy"], m_mode == Mode::Fuzzy))
+        m_mode = Mode::Fuzzy;
+    ImGui::SameLine();
+    if (ImGuiPureWrap::radio_button(m_desc["mode_pattern"], m_mode == Mode::Pattern))
+        m_mode = Mode::Pattern;
+    ImGui::Separator();
+
+    // Captions.
     auto draw_text_with_caption = [&caption_max](const std::string &caption, const std::string &text) {
         ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, caption);
         ImGui::SameLine(caption_max);
         ImGuiPureWrap::text(text);
     };
-
-    for (const std::string t : {"add_texture_skin", "remove_texture_skin"}) {
-        draw_text_with_caption(m_desc.at(t + "_caption"), m_desc.at(t));
-    }
-
+    draw_text_with_caption(m_desc.at("add_caption"), m_desc.at("add"));
+    draw_text_with_caption(m_desc.at("remove_caption"), m_desc.at("remove"));
     ImGui::Separator();
 
+    // Tool type radios.
     std::string format_str = std::string("%.f") + I18N::translate_utf8("°",
-        "Degree sign to use in the respective slider in texture skin gizmo,"
-        "placed after the number with no whitespace in between.");
-
+        "Degree sign to use in the smart-fill angle slider, placed after the number with no whitespace in between.");
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
-
     ImGui::AlignTextToFramePadding();
     ImGuiPureWrap::text(m_desc["tool_type"]);
-
     float tool_type_offset = tool_type_radio_left + (window_width - tool_type_radio_left - tool_type_radio_brush - tool_type_radio_smart_fill + m_imgui->scaled(0.5f)) / 2.f;
     ImGui::SameLine(tool_type_offset);
     ImGui::PushItemWidth(tool_type_radio_brush);
-    if (ImGuiPureWrap::radio_button(m_desc["tool_brush"], m_tool_type == ToolType::BRUSH))
-        m_tool_type = ToolType::BRUSH;
-
-    if (ImGui::IsItemHovered())
-        ImGuiPureWrap::tooltip(_u8L("Paints facets according to the chosen painting brush."), max_tooltip_width);
-
+    if (ImGuiPureWrap::radio_button(m_desc["tool_brush"], m_tool_type == ToolType::BRUSH)) m_tool_type = ToolType::BRUSH;
+    if (ImGui::IsItemHovered()) ImGuiPureWrap::tooltip(_u8L("Paints facets according to the chosen painting brush."), max_tooltip_width);
     ImGui::SameLine(tool_type_offset + tool_type_radio_brush);
     ImGui::PushItemWidth(tool_type_radio_smart_fill);
-    if (ImGuiPureWrap::radio_button(m_desc["tool_smart_fill"], m_tool_type == ToolType::SMART_FILL))
-        m_tool_type = ToolType::SMART_FILL;
-
-    if (ImGui::IsItemHovered())
-        ImGuiPureWrap::tooltip(_u8L("Paints neighboring facets whose relative angle is less or equal to set angle."), max_tooltip_width);
-
+    if (ImGuiPureWrap::radio_button(m_desc["tool_smart_fill"], m_tool_type == ToolType::SMART_FILL)) m_tool_type = ToolType::SMART_FILL;
+    if (ImGui::IsItemHovered()) ImGuiPureWrap::tooltip(_u8L("Paints neighboring facets whose relative angle is less or equal to set angle."), max_tooltip_width);
     ImGui::Separator();
 
+    // Brush controls.
     if (m_tool_type == ToolType::BRUSH) {
         ImGuiPureWrap::text(m_desc.at("cursor_type"));
         ImGui::NewLine();
-
         float cursor_type_offset = (window_width - cursor_type_radio_sphere - cursor_type_radio_circle - cursor_type_radio_pointer + m_imgui->scaled(1.5f)) / 2.f;
         ImGui::SameLine(cursor_type_offset);
         ImGui::PushItemWidth(cursor_type_radio_sphere);
-        if (ImGuiPureWrap::radio_button(m_desc["sphere"], m_cursor_type == TriangleSelector::CursorType::SPHERE))
-            m_cursor_type = TriangleSelector::CursorType::SPHERE;
-
-        if (ImGui::IsItemHovered())
-            ImGuiPureWrap::tooltip(_u8L("Paints all facets inside, regardless of their orientation."), max_tooltip_width);
-
+        if (ImGuiPureWrap::radio_button(m_desc["sphere"], m_cursor_type == TriangleSelector::CursorType::SPHERE)) m_cursor_type = TriangleSelector::CursorType::SPHERE;
         ImGui::SameLine(cursor_type_offset + cursor_type_radio_sphere);
         ImGui::PushItemWidth(cursor_type_radio_circle);
-
-        if (ImGuiPureWrap::radio_button(m_desc["circle"], m_cursor_type == TriangleSelector::CursorType::CIRCLE))
-            m_cursor_type = TriangleSelector::CursorType::CIRCLE;
-
-        if (ImGui::IsItemHovered())
-            ImGuiPureWrap::tooltip(_u8L("Ignores facets facing away from the camera."), max_tooltip_width);
-
+        if (ImGuiPureWrap::radio_button(m_desc["circle"], m_cursor_type == TriangleSelector::CursorType::CIRCLE)) m_cursor_type = TriangleSelector::CursorType::CIRCLE;
         ImGui::SameLine(cursor_type_offset + cursor_type_radio_sphere + cursor_type_radio_circle);
         ImGui::PushItemWidth(cursor_type_radio_pointer);
-
-        if (ImGuiPureWrap::radio_button(m_desc["pointer"], m_cursor_type == TriangleSelector::CursorType::POINTER))
-            m_cursor_type = TriangleSelector::CursorType::POINTER;
-
-        if (ImGui::IsItemHovered())
-            ImGuiPureWrap::tooltip(_u8L("Paints only one facet."), max_tooltip_width);
-
+        if (ImGuiPureWrap::radio_button(m_desc["pointer"], m_cursor_type == TriangleSelector::CursorType::POINTER)) m_cursor_type = TriangleSelector::CursorType::POINTER;
         m_imgui->disabled_begin(m_cursor_type != TriangleSelector::CursorType::SPHERE && m_cursor_type != TriangleSelector::CursorType::CIRCLE);
-
         ImGui::AlignTextToFramePadding();
         ImGuiPureWrap::text(m_desc.at("cursor_size"));
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
         m_imgui->slider_float("##cursor_radius", &m_cursor_radius, CursorRadiusMin, CursorRadiusMax, "%.2f", 1.0f, true, _L("Alt + Mouse wheel"));
-
         ImGuiPureWrap::checkbox(m_desc["split_triangles"], m_triangle_splitting_enabled);
-
-        if (ImGui::IsItemHovered())
-            ImGuiPureWrap::tooltip(_u8L("Splits bigger facets into smaller ones while the object is painted."), max_tooltip_width);
-
         m_imgui->disabled_end();
     } else {
-        assert(m_tool_type == ToolType::SMART_FILL);
         ImGui::AlignTextToFramePadding();
         ImGuiPureWrap::text(m_desc["smart_fill_angle"] + ":");
-
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
         if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel")))
@@ -237,225 +202,189 @@ void GLGizmoTextureSkin::on_render_input_window(float x, float y, float bottom_l
             }
     }
 
+    // Clipping.
     ImGui::Separator();
     if (m_c->object_clipper()->get_position() == 0.f) {
         ImGui::AlignTextToFramePadding();
         ImGuiPureWrap::text(m_desc.at("clipping_of_view"));
     } else {
-        if (ImGuiPureWrap::button(m_desc.at("reset_direction"))) {
+        if (ImGuiPureWrap::button(m_desc.at("reset_direction")))
             wxGetApp().CallAfter([this]() { m_c->object_clipper()->set_position_by_ratio(-1., false); });
-        }
     }
-
     auto clp_dist = float(m_c->object_clipper()->get_position());
     ImGui::SameLine(sliders_left_width);
     ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true, from_u8(GUI::shortkey_ctrl_prefix()) + _L("Mouse wheel")))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
 
+    // Remove-all.
     ImGui::Separator();
     if (ImGuiPureWrap::button(m_desc.at("remove_all"))) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Reset selection"), UndoRedo::SnapshotType::GizmoAction);
-        ModelObject         *mo  = m_c->selection_info()->model_object();
-        int                  idx = -1;
+        ModelObject *mo = m_c->selection_info()->model_object();
+        int idx = -1;
         for (ModelVolume *mv : mo->volumes)
             if (mv->is_model_part()) {
                 ++idx;
                 m_triangle_selectors[idx]->reset();
                 m_triangle_selectors[idx]->request_update_render_data();
             }
-
         update_model_object();
         m_parent.set_as_dirty();
     }
 
-    // --- Bake displacement section --------------------------------------
-    ImGui::Separator();
-    ImGuiPureWrap::text(_u8L("Bake displacement"));
+    // Pattern-mode-only: texture picker + bake.
+    if (m_mode == Mode::Pattern) {
+        ImGui::Separator();
+        ImGuiPureWrap::text(_u8L("Bake displacement"));
 
-    BakeState::Status status;
-    int progress = 0;
-    {
-        std::lock_guard<std::mutex> lk(m_bake_mutex);
-        status = m_bake_state.status;
-        progress = m_bake_state.progress;
-    }
-    const bool running = status != BakeState::idle;
+        BakeState::Status status;
+        int progress = 0;
+        { std::lock_guard<std::mutex> lk(m_bake_mutex); status = m_bake_state.status; progress = m_bake_state.progress; }
+        const bool running = status != BakeState::idle;
 
-    // Pattern picker: shows the current texture and opens the thumbnail dialog.
-    m_imgui->disabled_begin(running);
-    {
-        namespace TS = Slic3r::Feature::TextureSkin;
-        const DynamicPrintConfig &cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
-        const auto cur_pattern = static_cast<TS::Pattern>(
-            static_cast<int>(cfg.opt_enum<TextureSkinPattern>("texture_skin_pattern")));
-        std::string label;
-        if (cur_pattern == TS::Pattern::Custom) {
-            const std::string &p = cfg.opt_string("texture_skin_custom_image");
-            label = p.empty() ? _u8L("Custom… (no file)")
-                              : _u8L("Custom:") + " " + boost::filesystem::path(p).filename().string();
-        } else {
-            label = TS::pattern_display_name(cur_pattern);
-        }
-        ImGui::AlignTextToFramePadding();
-        ImGuiPureWrap::text(_u8L("Pattern") + ": " + label);
-        if (ImGuiPureWrap::button(_u8L("Pick texture…"))) {
-            const std::string cur_custom = cfg.opt_string("texture_skin_custom_image");
-            TextureSkinPickerDialog dlg(wxGetApp().plater(), cur_pattern, cur_custom);
-            if (dlg.ShowModal() == wxID_OK) {
-                Tab *print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
-                DynamicPrintConfig &mut_cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
-                const int picked_int = static_cast<int>(dlg.get_pattern());
-                mut_cfg.set_key_value("texture_skin_pattern",
-                    new ConfigOptionEnum<TextureSkinPattern>(static_cast<TextureSkinPattern>(picked_int)));
-                if (dlg.get_pattern() == TS::Pattern::Custom)
-                    mut_cfg.set_key_value("texture_skin_custom_image",
-                        new ConfigOptionString(dlg.get_custom_image_path()));
-                if (print_tab) {
-                    print_tab->on_value_change("texture_skin_pattern", picked_int);
+        m_imgui->disabled_begin(running);
+        {
+            namespace TS = Slic3r::Feature::TextureSkin;
+            const DynamicPrintConfig &cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+            const auto cur_pattern = static_cast<TS::Pattern>(static_cast<int>(cfg.opt_enum<TextureSkinPattern>("texture_skin_pattern")));
+            std::string label;
+            if (cur_pattern == TS::Pattern::Custom) {
+                const std::string &p = cfg.opt_string("texture_skin_custom_image");
+                label = p.empty() ? _u8L("Custom… (no file)")
+                                  : _u8L("Custom:") + " " + boost::filesystem::path(p).filename().string();
+            } else {
+                label = TS::pattern_display_name(cur_pattern);
+            }
+            ImGui::AlignTextToFramePadding();
+            ImGuiPureWrap::text(_u8L("Pattern") + ": " + label);
+            if (ImGuiPureWrap::button(_u8L("Pick texture…"))) {
+                const std::string cur_custom = cfg.opt_string("texture_skin_custom_image");
+                TextureSkinPickerDialog dlg(wxGetApp().plater(), cur_pattern, cur_custom);
+                if (dlg.ShowModal() == wxID_OK) {
+                    Tab *print_tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
+                    DynamicPrintConfig &mut_cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+                    const int picked_int = static_cast<int>(dlg.get_pattern());
+                    mut_cfg.set_key_value("texture_skin_pattern",
+                        new ConfigOptionEnum<TextureSkinPattern>(static_cast<TextureSkinPattern>(picked_int)));
                     if (dlg.get_pattern() == TS::Pattern::Custom)
-                        print_tab->on_value_change("texture_skin_custom_image", dlg.get_custom_image_path());
+                        mut_cfg.set_key_value("texture_skin_custom_image",
+                            new ConfigOptionString(dlg.get_custom_image_path()));
+                    if (print_tab) {
+                        print_tab->on_value_change("texture_skin_pattern", picked_int);
+                        if (dlg.get_pattern() == TS::Pattern::Custom)
+                            print_tab->on_value_change("texture_skin_custom_image", dlg.get_custom_image_path());
+                    }
                 }
             }
         }
-    }
-    ImGui::Separator();
-    ImGui::AlignTextToFramePadding();
-    ImGuiPureWrap::text(_u8L("Amplitude (mm)") + ":");
-    ImGui::SameLine(sliders_left_width);
-    ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-    m_imgui->slider_float("##bake_amp", &m_bake_amplitude_mm, 0.05f, 5.0f, "%.2f", 1.0f, true);
+        ImGui::Separator();
 
-    ImGui::AlignTextToFramePadding();
-    ImGuiPureWrap::text(_u8L("Edge length (mm)") + ":");
-    ImGui::SameLine(sliders_left_width);
-    ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-    m_imgui->slider_float("##bake_edge", &m_bake_edge_length_mm, 0.1f, 2.0f, "%.2f", 1.0f, true);
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(_u8L("Amplitude (mm)") + ":");
+        ImGui::SameLine(sliders_left_width);
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        m_imgui->slider_float("##bake_amp", &m_bake_amplitude_mm, 0.05f, 5.0f, "%.2f", 1.0f, true);
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(_u8L("Edge length (mm)") + ":");
+        ImGui::SameLine(sliders_left_width);
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        m_imgui->slider_float("##bake_edge", &m_bake_edge_length_mm, 0.1f, 2.0f, "%.2f", 1.0f, true);
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(_u8L("Target triangles") + ":");
+        ImGui::SameLine(sliders_left_width);
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        ImGui::SliderInt("##bake_tri", &m_bake_target_triangles, 1000, 2000000, "%d", ImGuiSliderFlags_Logarithmic);
+        ImGuiPureWrap::checkbox(_u8L("Skip bottom face (build-plate side)"), m_bake_skip_bottom);
+        m_imgui->disabled_end();
 
-    ImGui::AlignTextToFramePadding();
-    ImGuiPureWrap::text(_u8L("Target triangles") + ":");
-    ImGui::SameLine(sliders_left_width);
-    ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-    {
-        int min_t = 1000, max_t = 2000000;
-        ImGui::SliderInt("##bake_tri", &m_bake_target_triangles, min_t, max_t, "%d", ImGuiSliderFlags_Logarithmic);
-    }
-    ImGuiPureWrap::checkbox(_u8L("Skip bottom face (build-plate side)"), m_bake_skip_bottom);
-    m_imgui->disabled_end();
-
-    if (!running) {
-        if (ImGuiPureWrap::button(_u8L("Bake mesh"))) {
-            start_bake();
+        if (!running) {
+            if (ImGuiPureWrap::button(_u8L("Bake mesh"))) start_bake();
+        } else {
+            ImGui::ProgressBar(float(progress) / 100.0f, ImVec2(-1.0f, 0.0f));
+            if (ImGuiPureWrap::button(_u8L("Cancel"))) cancel_bake();
         }
-    } else {
-        ImGui::ProgressBar(float(progress) / 100.0f, ImVec2(-1.0f, 0.0f));
-        if (ImGuiPureWrap::button(_u8L("Cancel"))) {
-            cancel_bake();
-        }
+        ImGuiPureWrap::text_wrapped(_u8L("Baking replaces the mesh with displaced geometry and clears paint. "
+                                          "Afterwards, set Texture Skin to None in Print Settings to avoid double-texturing."),
+                                     window_width);
     }
-    ImGuiPureWrap::text_wrapped(_u8L("Baking replaces the mesh with displaced geometry and clears paint. "
-                                      "Afterwards, set Texture Skin to None in Print Settings to avoid double-texturing."),
-                                 window_width);
 
     ImGuiPureWrap::end();
 }
 
-void GLGizmoTextureSkin::update_model_object() const
+void GLGizmoSurfaceTexture::update_model_object() const
 {
     bool         updated = false;
     ModelObject *mo      = m_c->selection_info()->model_object();
     int          idx     = -1;
     for (ModelVolume *mv : mo->volumes) {
-        if (!mv->is_model_part())
-            continue;
-
+        if (!mv->is_model_part()) continue;
         ++idx;
-        updated |= mv->texture_skin_facets.set(*m_triangle_selectors[idx]);
+        updated |= mv->surface_texture_facets.set(*m_triangle_selectors[idx]);
     }
-
     if (updated) {
         const ModelObjectPtrs &mos = wxGetApp().model().objects;
         wxGetApp().obj_list()->update_info_items(std::find(mos.begin(), mos.end(), mo) - mos.begin());
-
         m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
     }
 }
 
-void GLGizmoTextureSkin::update_from_model_object()
+void GLGizmoSurfaceTexture::update_from_model_object()
 {
     wxBusyCursor wait;
-
     const ModelObject *mo = m_c->selection_info()->model_object();
     m_triangle_selectors.clear();
-
     int volume_id = -1;
     for (const ModelVolume *mv : mo->volumes) {
-        if (!mv->is_model_part())
-            continue;
-
+        if (!mv->is_model_part()) continue;
         ++volume_id;
-
         const TriangleMesh *mesh = &mv->mesh();
-
         m_triangle_selectors.emplace_back(std::make_unique<TriangleSelectorGUI>(*mesh));
-        m_triangle_selectors.back()->deserialize(mv->texture_skin_facets.get_data(), false);
+        m_triangle_selectors.back()->deserialize(mv->surface_texture_facets.get_data(), false);
         m_triangle_selectors.back()->request_update_render_data();
     }
 }
 
-PainterGizmoType GLGizmoTextureSkin::get_painter_type() const
+PainterGizmoType GLGizmoSurfaceTexture::get_painter_type() const
 {
-    return PainterGizmoType::TEXTURE_SKIN;
+    return PainterGizmoType::SURFACE_TEXTURE;
 }
 
-wxString GLGizmoTextureSkin::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const
+wxString GLGizmoSurfaceTexture::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button /*button_down*/) const
 {
-    return shift_down ? _L("Remove texture skin") : _L("Add texture skin");
+    return shift_down ? _L("Remove surface texture") : _L("Add surface texture");
 }
 
-void GLGizmoTextureSkin::join_bake_thread()
+// ----- Bake displacement implementation (unchanged from GLGizmoTextureSkin) -----
+
+void GLGizmoSurfaceTexture::join_bake_thread()
 {
     if (m_bake_thread.joinable()) {
-        {
-            std::lock_guard<std::mutex> lk(m_bake_mutex);
-            if (m_bake_state.status == BakeState::running)
-                m_bake_state.status = BakeState::cancelling;
-        }
+        { std::lock_guard<std::mutex> lk(m_bake_mutex); if (m_bake_state.status == BakeState::running) m_bake_state.status = BakeState::cancelling; }
         m_bake_thread.join();
     }
 }
 
-void GLGizmoTextureSkin::cancel_bake()
+void GLGizmoSurfaceTexture::cancel_bake()
 {
     std::lock_guard<std::mutex> lk(m_bake_mutex);
-    if (m_bake_state.status == BakeState::running)
-        m_bake_state.status = BakeState::cancelling;
+    if (m_bake_state.status == BakeState::running) m_bake_state.status = BakeState::cancelling;
 }
 
-void GLGizmoTextureSkin::start_bake()
+void GLGizmoSurfaceTexture::start_bake()
 {
     namespace TS = Slic3r::Feature::TextureSkin;
-
-    // Already running? Ignore.
-    {
-        std::lock_guard<std::mutex> lk(m_bake_mutex);
-        if (m_bake_state.status != BakeState::idle) return;
-    }
-
-    // Make sure any previous (finished) thread is joined before starting.
+    { std::lock_guard<std::mutex> lk(m_bake_mutex); if (m_bake_state.status != BakeState::idle) return; }
     if (m_bake_thread.joinable()) m_bake_thread.join();
 
     ModelObject *mo = m_c->selection_info()->model_object();
     if (!mo) return;
     ModelVolume *volume = nullptr;
-    for (ModelVolume *mv : mo->volumes)
-        if (mv->is_model_part()) { volume = mv; break; }
+    for (ModelVolume *mv : mo->volumes) if (mv->is_model_part()) { volume = mv; break; }
     if (!volume) return;
 
-    // Snapshot the mesh we'll operate on.
     auto input = std::make_shared<indexed_triangle_set>(volume->mesh().its);
 
-    // Read pattern + UV settings from the currently-edited Print preset.
     const DynamicPrintConfig &cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
     const TextureSkinPattern  pattern_enum  = cfg.opt_enum<TextureSkinPattern>("texture_skin_pattern");
     const TextureSkinUVMode   uv_mode_enum  = cfg.opt_enum<TextureSkinUVMode>("texture_skin_uv_mode");
@@ -474,19 +403,17 @@ void GLGizmoTextureSkin::start_bake()
         img = &TS::get_pattern_image(pattern, Slic3r::resources_dir());
     }
     if (!img || img->empty()) {
-        MessageDialog(wxGetApp().plater(),
-                      _L("Could not load the texture image. Pick a texture first."),
-                      _L("Texture Skin"), wxICON_WARNING | wxOK).ShowModal();
+        MessageDialog(wxGetApp().plater(), _L("Could not load the texture image. Pick a texture first."),
+                      _L("Surface Texture"), wxICON_WARNING | wxOK).ShowModal();
         return;
     }
 
-    // Fine-grained mask: painted sub-triangles in original mesh coordinates.
+    // Bake uses the PATTERN paint state from surface_texture_facets.
     auto painted_region = std::make_shared<indexed_triangle_set>();
-    if (volume->is_texture_skin_painted()) {
-        *painted_region = volume->texture_skin_facets.get_facets(*volume, TriangleStateType::TEXTURE_SKIN);
+    if (volume->is_surface_texture_painted()) {
+        *painted_region = volume->surface_texture_facets.get_facets(*volume, TriangleStateType::SURFACE_PATTERN);
     }
 
-    // Object-local bounds in mm (matches apply_texture_skin caller-side in LayerRegion.cpp).
     TS::MeshDisplaceParams params;
     params.image                 = img;
     params.uv_mode               = static_cast<TS::UVMode>(static_cast<int>(uv_mode_enum));
@@ -499,13 +426,10 @@ void GLGizmoTextureSkin::start_bake()
     params.amplitude_mm          = m_bake_amplitude_mm;
     params.edge_length_mm        = m_bake_edge_length_mm;
     params.target_triangle_count = static_cast<uint32_t>(m_bake_target_triangles);
-    params.bounds = BoundingBoxf3(input->vertices.begin(), input->vertices.end());
+    params.bounds                = BoundingBoxf3(input->vertices.begin(), input->vertices.end());
     params.painted_region_its    = painted_region->indices.empty() ? nullptr : painted_region.get();
     params.skip_bottom_face      = m_bake_skip_bottom;
 
-    // Snapshot selection info.
-    const int obj_idx = m_c->selection_info()->get_active_instance();
-    (void)obj_idx; // unused; object index derived from selection at apply-time.
     {
         std::lock_guard<std::mutex> lk(m_bake_mutex);
         m_bake_state.status = BakeState::running;
@@ -518,36 +442,22 @@ void GLGizmoTextureSkin::start_bake()
     m_bake_thread = std::thread([this, input, painted_region, params]() {
         auto throw_on_cancel = [this]() {
             std::lock_guard<std::mutex> lk(m_bake_mutex);
-            if (m_bake_state.status == BakeState::cancelling)
-                throw std::runtime_error("cancelled");
+            if (m_bake_state.status == BakeState::cancelling) throw std::runtime_error("cancelled");
         };
         auto statusfn = [this](int percent) {
-            std::lock_guard<std::mutex> lk(m_bake_mutex);
-            m_bake_state.progress = percent;
+            std::lock_guard<std::mutex> lk(m_bake_mutex); m_bake_state.progress = percent;
         };
-
         indexed_triangle_set out;
         bool cancelled = false;
-        try {
-            out = Slic3r::Feature::TextureSkin::mesh_displace(*input, params, throw_on_cancel, statusfn);
-        } catch (...) {
-            cancelled = true;
-        }
-
-        {
-            std::lock_guard<std::mutex> lk(m_bake_mutex);
-            if (!cancelled && !out.indices.empty()) m_bake_state.result = std::move(out);
-            m_bake_state.status = BakeState::idle;
-        }
-
+        try { out = Slic3r::Feature::TextureSkin::mesh_displace(*input, params, throw_on_cancel, statusfn); }
+        catch (...) { cancelled = true; }
+        { std::lock_guard<std::mutex> lk(m_bake_mutex); if (!cancelled && !out.indices.empty()) m_bake_state.result = std::move(out); m_bake_state.status = BakeState::idle; }
         wxGetApp().CallAfter([this]() { apply_bake(); });
     });
 }
 
-void GLGizmoTextureSkin::apply_bake()
+void GLGizmoSurfaceTexture::apply_bake()
 {
-    // Called on UI thread after worker finishes. Must handle both success and
-    // cancellation (empty result).
     indexed_triangle_set result;
     int obj_idx = -1;
     ObjectID volume_id;
@@ -560,19 +470,16 @@ void GLGizmoTextureSkin::apply_bake()
         m_bake_state.result = {};
     }
     if (result.indices.empty() || obj_idx < 0) return;
-
     if (m_bake_thread.joinable()) m_bake_thread.join();
 
     auto *plater = wxGetApp().plater();
     plater->take_snapshot(_u8L("Bake texture displacement"));
-    plater->clear_before_change_mesh(obj_idx, _u8L("Painted annotations (supports, seams, multimaterial, "
-                                                   "fuzzy/texture skin) were cleared by mesh displacement."));
+    plater->clear_before_change_mesh(obj_idx, _u8L("Painted annotations were cleared by mesh displacement."));
     wxGetApp().obj_list()->update_info_items(obj_idx);
 
     ModelObject *mo = wxGetApp().model().objects[obj_idx];
     ModelVolume *volume = nullptr;
-    for (ModelVolume *mv : mo->volumes)
-        if (mv->id() == volume_id) { volume = mv; break; }
+    for (ModelVolume *mv : mo->volumes) if (mv->id() == volume_id) { volume = mv; break; }
     if (!volume) return;
 
     volume->set_mesh(std::move(result));
@@ -584,8 +491,6 @@ void GLGizmoTextureSkin::apply_bake()
     plater->changed_mesh(obj_idx);
     wxGetApp().obj_list()->update_item_error_icon(obj_idx, -1);
 
-    // Refresh the gizmo's triangle selectors so the (now-cleared) paint state
-    // matches the new mesh.
     update_from_model_object();
     m_parent.set_as_dirty();
 }

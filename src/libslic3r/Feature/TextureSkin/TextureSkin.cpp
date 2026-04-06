@@ -13,6 +13,7 @@
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Feature/SurfaceTexture/PerturbPolyline.hpp"
 
 using namespace Slic3r;
 
@@ -36,53 +37,34 @@ double sample_displacement_mm(const Vec3d &pos_mm, const Vec3d &normal, const Pa
     return (grey - 0.5) * 2.0 * params.amplitude_mm;
 }
 
+namespace ST = Slic3r::Feature::SurfaceTexture;
+
+// Texture-skin offset: sample the grayscale image at the point's 3D
+// position via UV projection, centre at 0.5, scale to ±amplitude.
+static ST::OffsetProvider make_texture_provider(const Params &params)
+{
+    return [&params](const Vec2d &pos_scaled, const Vec2d &n2d) -> double {
+        const Vec3d pos_mm(unscale<double>(static_cast<coord_t>(pos_scaled.x())),
+                           unscale<double>(static_cast<coord_t>(pos_scaled.y())),
+                           params.layer_z_mm);
+        const Vec3d normal3d(n2d.x(), n2d.y(), 0.0);
+        const double disp_mm = sample_displacement_mm(pos_mm, normal3d, params);
+        return scaled<double>(disp_mm);
+    };
+}
+
+static ST::PerturbSpacing make_texture_spacing(const Params &params)
+{
+    ST::PerturbSpacing s;
+    s.point_distance_scaled = scaled<double>(std::max(params.point_dist_mm, 0.01));
+    s.jitter_fraction       = 0.0; // deterministic spacing
+    return s;
+}
+
 void texturize_polyline(Points &poly, const bool closed, const Params &params)
 {
     if (!params.image || params.image->empty() || poly.size() < 2) return;
-
-    const double point_distance = std::max(params.point_dist_mm, 0.01);
-    const double point_distance_scaled = scaled<double>(point_distance);
-    const double amplitude_scaled = scaled<double>(params.amplitude_mm);
-
-    Points out;
-    out.reserve(poly.size() * 2);
-
-    Point *p0 = closed ? &poly.back() : &poly.front();
-    for (auto it_pt1 = closed ? poly.begin() : std::next(poly.begin()); it_pt1 != poly.end(); ++it_pt1) {
-        Point &p1 = *it_pt1;
-        const Vec2d p0p1 = (p1 - *p0).cast<double>();
-        const double seg_len = p0p1.norm();
-        if (seg_len < 1.0) { p0 = &p1; continue; }
-
-        const Vec2d dir = p0p1 / seg_len;
-        // Perpendicular (same convention as fuzzy skin).
-        const Vec2d n2d = perp(dir);
-
-        // Insert points every `point_distance_scaled` along the segment.
-        for (double d = 0.0; d < seg_len; d += point_distance_scaled) {
-            const Vec2d  p_scaled = p0->cast<double>() + dir * d;
-            const Vec3d  pos_mm(unscale<double>(static_cast<coord_t>(p_scaled.x())),
-                                unscale<double>(static_cast<coord_t>(p_scaled.y())),
-                                params.layer_z_mm);
-            const Vec3d  normal3d(n2d.x(), n2d.y(), 0.0);
-            const double disp_mm = sample_displacement_mm(pos_mm, normal3d, params);
-            const double disp_scaled = disp_mm / params.amplitude_mm * amplitude_scaled; // = scaled(disp_mm)
-
-            const Vec2d offset = n2d * disp_scaled;
-            out.emplace_back(static_cast<coord_t>(p_scaled.x() + offset.x()),
-                             static_cast<coord_t>(p_scaled.y() + offset.y()));
-        }
-
-        p0 = &p1;
-    }
-
-    while (out.size() < 3) {
-        if (poly.empty()) break;
-        out.emplace_back(poly.back());
-        if (poly.size() < 2) break;
-    }
-
-    if (out.size() >= 3) poly = std::move(out);
+    ST::perturb_polyline(poly, closed, make_texture_spacing(params), make_texture_provider(params));
 }
 
 void texturize_polygon(Polygon &polygon, const Params &params)
@@ -93,53 +75,7 @@ void texturize_polygon(Polygon &polygon, const Params &params)
 void texturize_extrusion_line(Arachne::ExtrusionLine &ext_lines, const Params &params)
 {
     if (!params.image || params.image->empty() || ext_lines.junctions.size() < 2) return;
-
-    const double point_distance = std::max(params.point_dist_mm, 0.01);
-    const double point_distance_scaled = scaled<double>(point_distance);
-    const double amplitude_scaled = scaled<double>(params.amplitude_mm);
-
-    Arachne::ExtrusionJunction *p0 = &ext_lines.front();
-    Arachne::ExtrusionJunctions out;
-    out.reserve(ext_lines.junctions.size() * 2);
-
-    for (auto &p1 : ext_lines.junctions) {
-        if (p0->p == p1.p) {
-            out.emplace_back(p1.p, p1.w, p1.perimeter_index);
-            continue;
-        }
-        const Vec2d p0p1 = (p1.p - p0->p).cast<double>();
-        const double seg_len = p0p1.norm();
-        if (seg_len < 1.0) { p0 = &p1; continue; }
-        const Vec2d dir = p0p1 / seg_len;
-        const Vec2d n2d = perp(dir);
-
-        for (double d = 0.0; d < seg_len; d += point_distance_scaled) {
-            const Vec2d p_scaled = p0->p.cast<double>() + dir * d;
-            const Vec3d pos_mm(unscale<double>(static_cast<coord_t>(p_scaled.x())),
-                               unscale<double>(static_cast<coord_t>(p_scaled.y())),
-                               params.layer_z_mm);
-            const Vec3d normal3d(n2d.x(), n2d.y(), 0.0);
-            const double disp_mm = sample_displacement_mm(pos_mm, normal3d, params);
-            const double disp_scaled = params.amplitude_mm != 0.0 ? disp_mm / params.amplitude_mm * amplitude_scaled : 0.0;
-            const Vec2d offset = n2d * disp_scaled;
-            out.emplace_back(Point(static_cast<coord_t>(p_scaled.x() + offset.x()),
-                                   static_cast<coord_t>(p_scaled.y() + offset.y())),
-                             p1.w, p1.perimeter_index);
-        }
-
-        p0 = &p1;
-    }
-
-    while (out.size() < 3 && !ext_lines.junctions.empty()) {
-        out.emplace_back(ext_lines.junctions.back());
-        if (ext_lines.junctions.size() < 2) break;
-    }
-
-    if (ext_lines.junctions.back().p == ext_lines.junctions.front().p && !out.empty()) {
-        out.front().p = out.back().p;
-    }
-
-    if (out.size() >= 3) ext_lines.junctions = std::move(out);
+    ST::perturb_extrusion_line(ext_lines, make_texture_spacing(params), make_texture_provider(params));
 }
 
 bool should_texturize(const PrintRegionConfig &config, const size_t layer_idx, const size_t perimeter_idx, const bool is_contour)
