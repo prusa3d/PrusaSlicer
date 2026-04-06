@@ -305,6 +305,18 @@ void GLGizmoSurfaceTexture::on_render_input_window(float x, float y, float botto
 
         if (ImGui::CollapsingHeader(_u8L("UV mapping").c_str())) {
             ImGui::AlignTextToFramePadding();
+            ImGuiPureWrap::text(_u8L("Projection") + ":");
+            ImGui::SameLine(sliders_left_width);
+            ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+            {
+                static const char* uv_mode_names[] = {
+                    "Planar XY", "Planar XZ", "Planar YZ",
+                    "Cylindrical", "Spherical", "Triplanar", "Cubic"
+                };
+                ImGui::Combo("##bake_uv_mode", &m_bake_uv_mode, uv_mode_names, IM_ARRAYSIZE(uv_mode_names));
+            }
+
+            ImGui::AlignTextToFramePadding();
             ImGuiPureWrap::text(_u8L("UV scale") + ":");
             ImGui::SameLine(sliders_left_width);
             ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
@@ -458,7 +470,8 @@ void GLGizmoSurfaceTexture::start_bake()
 
     const DynamicPrintConfig &cfg = wxGetApp().preset_bundle->prints.get_edited_preset().config;
     const TextureSkinPattern  pattern_enum  = cfg.opt_enum<TextureSkinPattern>("texture_skin_pattern");
-    const TextureSkinUVMode   uv_mode_enum  = cfg.opt_enum<TextureSkinUVMode>("texture_skin_uv_mode");
+    // UV mode comes from the gizmo-local combo, not Print Settings.
+    (void)cfg.opt_enum<TextureSkinUVMode>("texture_skin_uv_mode"); // unused
     const double uv_scale      = cfg.opt_float("texture_skin_uv_scale");
     const double uv_off_u      = cfg.opt_float("texture_skin_uv_offset_u");
     const double uv_off_v      = cfg.opt_float("texture_skin_uv_offset_v");
@@ -487,7 +500,7 @@ void GLGizmoSurfaceTexture::start_bake()
 
     TS::MeshDisplaceParams params;
     params.image                 = img;
-    params.uv_mode               = static_cast<TS::UVMode>(static_cast<int>(uv_mode_enum));
+    params.uv_mode               = static_cast<TS::UVMode>(m_bake_uv_mode);
     // Bake uses the gizmo-local UV params (user-adjustable in the
     // collapsible "UV mapping" section) rather than the Print Settings.
     params.uv_settings.scale_u       = std::max(double(m_bake_uv_scale), 1e-4);
