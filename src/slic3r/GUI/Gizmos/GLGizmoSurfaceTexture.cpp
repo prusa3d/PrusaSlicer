@@ -493,6 +493,10 @@ void GLGizmoSurfaceTexture::upload_preview_texture()
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
     glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, int(img->width), int(img->height),
                            0, GL_RED, GL_UNSIGNED_BYTE, img->pixels.data()));
+    // Swizzle so the single RED channel maps to all RGB → grayscale output
+    // instead of dark-red. (GL_RED textures sample as (r,0,0,1) by default.)
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED));
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
     m_preview_dirty = true; // models need rebuild with new UVs
 }
@@ -579,7 +583,9 @@ void GLGizmoSurfaceTexture::render_texture_preview(const Selection &selection)
     if (!shader) return;
 
     shader->start_using();
+    glsafe(::glActiveTexture(GL_TEXTURE0));
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_preview_tex_id));
+    shader->set_uniform("uniform_texture", 0); // sampler2D → texture unit 0
     // Render slightly in front to overwrite the flat-red blocker color.
     glsafe(::glEnable(GL_POLYGON_OFFSET_FILL));
     glsafe(::glPolygonOffset(-1.f, -1.f));
