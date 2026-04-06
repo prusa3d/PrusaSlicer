@@ -542,7 +542,12 @@ void GLGizmoSurfaceTexture::start_bake()
             if (m_bake_state.status == BakeState::cancelling) throw std::runtime_error("cancelled");
         };
         auto statusfn = [this](int percent) {
-            std::lock_guard<std::mutex> lk(m_bake_mutex); m_bake_state.progress = percent;
+            {
+                std::lock_guard<std::mutex> lk(m_bake_mutex);
+                m_bake_state.progress = percent;
+            }
+            // Trigger a UI repaint so the progress bar updates.
+            wxGetApp().CallAfter([this]() { m_parent.set_as_dirty(); });
         };
         indexed_triangle_set out;
         bool cancelled = false;

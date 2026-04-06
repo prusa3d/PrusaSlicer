@@ -9,8 +9,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
+#include <unordered_map>
 #include <queue>
+
+#include <tbb/parallel_for.h>
 
 #include "libslic3r/NormalUtils.hpp"
 #include "libslic3r/Point.hpp"
@@ -28,7 +30,6 @@ std::vector<bool> extract_painted_face_mask(
     const TriangleSelector::TriangleSplittingData  &data)
 {
     std::vector<bool> painted(num_original_facets, false);
-    // Nothing painted: used_states index for TEXTURE_SKIN (== ENFORCER) is false.
     const size_t state_idx = static_cast<size_t>(TriangleStateType::TEXTURE_SKIN);
     if (state_idx >= data.used_states.size() || !data.used_states[state_idx])
         return painted;
@@ -41,34 +42,38 @@ std::vector<bool> extract_painted_face_mask(
 
 // ---------------------------------------------------------------------------
 // Subdivision with per-output-triangle origin tracking.
+// When painted_faces is provided, only painted faces are subdivided;
+// unpainted faces pass through at original resolution.
 // ---------------------------------------------------------------------------
 
 namespace {
 
 struct SubdivResult {
     indexed_triangle_set    its;
-    std::vector<uint32_t>   origin;   // origin[i] = original triangle index that output triangle i came from
+    std::vector<uint32_t>   origin;   // origin[i] = original triangle index
     bool                    truncated = false;
 };
 
-// Midpoint-subdivision with an edge-midpoint cache. For each triangle we split
-// its longest edge recursively until all edges are ≤ max_length. We only
-// track *original* triangle identity — it's fine for a deeply subdivided
-// triangle to share edges with its sibling chain.
+// Hash for unordered_map with pair<int,int> keys.
+struct PairHash {
+    size_t operator()(const std::pair<int,int> &p) const {
+        return std::hash<int64_t>()(int64_t(p.first) << 32 | uint32_t(p.second));
+    }
+};
+
 static SubdivResult subdivide_with_origins(
     const indexed_triangle_set &in,
     float                       max_length,
-    std::function<void()>       throw_on_cancel)
+    const std::vector<bool>    *painted_faces,  // null = subdivide all
+    std::function<void()>       throw_on_cancel,
+    std::function<void(int)>    statusfn = nullptr)
 {
     SubdivResult r;
-    r.its.vertices = in.vertices;           // will be appended to as we split
+    r.its.vertices = in.vertices;
     r.its.indices.reserve(in.indices.size() * 2);
     r.origin.reserve(in.indices.size() * 2);
 
-    // Edge key → new midpoint vertex index, so neighbouring triangles share
-    // the same new vertex and the mesh stays watertight. Key is the unordered
-    // pair of vertex indices of that edge.
-    std::map<std::pair<int,int>, int> edge_midpoint_cache;
+    std::unordered_map<std::pair<int,int>, int, PairHash> edge_midpoint_cache;
     auto edge_key = [](int a, int b) {
         return a < b ? std::pair<int,int>(a,b) : std::pair<int,int>(b,a);
     };
@@ -94,14 +99,32 @@ static SubdivResult subdivide_with_origins(
     std::queue<Work> q;
     size_t cancel_counter = 0;
 
-    for (uint32_t face_idx = 0; face_idx < in.indices.size(); ++face_idx) {
+    const uint32_t total_faces = uint32_t(in.indices.size());
+    int last_progress = -1;
+
+    for (uint32_t face_idx = 0; face_idx < total_faces; ++face_idx) {
+        // Report progress per-face so the UI stays responsive.
+        if (statusfn && total_faces > 0) {
+            const int pct = int(face_idx * 100 / total_faces);
+            if (pct != last_progress) { statusfn(pct); last_progress = pct; }
+        }
+
         const Vec3i &t = in.indices[face_idx];
+
+        // Skip subdivision for unpainted faces — pass through at original
+        // resolution. This is the single biggest performance win for
+        // partially-painted models.
+        if (painted_faces && face_idx < painted_faces->size() && !(*painted_faces)[face_idx]) {
+            r.its.indices.emplace_back(t[0], t[1], t[2]);
+            r.origin.push_back(face_idx);
+            continue;
+        }
+
         q.push(Work{t[0], t[1], t[2], face_idx});
         while (!q.empty()) {
             if (throw_on_cancel && (++cancel_counter & 0xFFFFu) == 0) throw_on_cancel();
             if (r.its.indices.size() + q.size() > MAX_SUBDIVIDED_TRIANGLES) {
                 r.truncated = true;
-                // Drain queue into output without further splitting — preserves validity.
                 while (!q.empty()) {
                     const Work w = q.front(); q.pop();
                     r.its.indices.emplace_back(w.v0, w.v1, w.v2);
@@ -111,7 +134,6 @@ static SubdivResult subdivide_with_origins(
             }
             Work w = q.front(); q.pop();
 
-            // Find the longest edge.
             const float l0 = sq_len(w.v0, w.v1);
             const float l1 = sq_len(w.v1, w.v2);
             const float l2 = sq_len(w.v2, w.v0);
@@ -124,7 +146,6 @@ static SubdivResult subdivide_with_origins(
                 continue;
             }
 
-            // Split the longest edge at its midpoint.
             int m;
             if (which == 0) {
                 m = get_midpoint(w.v0, w.v1);
@@ -162,12 +183,8 @@ static double sample_displacement_for_vertex(
         wsum += s.w;
     }
     if (wsum > 0.0) grey /= wsum;
-    // zero_point controls where "no displacement" sits in the greyscale:
-    //   0.5 = symmetric (black=-amp, white=+amp)
-    //   0.0 = outward only (black=0, white=+amp)
-    //   1.0 = inward only (black=-amp, white=0)
     const double zp = std::clamp(double(p.zero_point), 0.0, 1.0);
-    const double scale = std::max(zp, 1.0 - zp); // normalise so peak is ±amplitude
+    const double scale = std::max(zp, 1.0 - zp);
     return (scale > 0.0) ? (grey - zp) / scale * double(p.amplitude_mm) : 0.0;
 }
 
@@ -185,23 +202,62 @@ indexed_triangle_set mesh_displace(
     auto tick = [&](int percent) { if (statusfn) statusfn(percent); };
     auto cancel = [&]() { if (throw_on_cancel) throw_on_cancel(); };
 
-    // --- Pass 1: subdivide ------------------------------------------------
+    // --- Build per-original-face painted mask for selective subdivision ----
+    // If a painted_region_its is provided, determine which original faces
+    // contain painted sub-triangles. Only those faces get subdivided.
+    std::vector<bool> face_painted;
+    const bool has_region_mask = params.painted_region_its && !params.painted_region_its->indices.empty();
+    const bool has_face_mask   = !has_region_mask && params.painted_face_mask && !params.painted_face_mask->empty();
+
+    if (has_region_mask) {
+        // For each painted sub-tri, find which original face it belongs to
+        // via centroid-in-triangle test. Build a per-original-face flag.
+        face_painted.assign(original.indices.size(), false);
+        const indexed_triangle_set &pr = *params.painted_region_its;
+        for (size_t pi = 0; pi < pr.indices.size(); ++pi) {
+            const Vec3f centroid = (pr.vertices[pr.indices[pi][0]] +
+                                    pr.vertices[pr.indices[pi][1]] +
+                                    pr.vertices[pr.indices[pi][2]]) / 3.f;
+            // Find the original face containing this centroid.
+            for (size_t fi = 0; fi < original.indices.size(); ++fi) {
+                if (face_painted[fi]) continue; // already marked
+                const Vec3f &A = original.vertices[original.indices[fi][0]];
+                const Vec3f &B = original.vertices[original.indices[fi][1]];
+                const Vec3f &C = original.vertices[original.indices[fi][2]];
+                const Vec3f e1 = B - A, e2 = C - A, w = centroid - A;
+                const float d00 = e1.dot(e1), d01 = e1.dot(e2), d11 = e2.dot(e2);
+                const float denom = d00*d11 - d01*d01;
+                if (std::abs(denom) < 1e-12f) continue;
+                const float d20 = w.dot(e1), d21 = w.dot(e2);
+                const float v = (d11*d20 - d01*d21) / denom;
+                const float u = (d00*d21 - d01*d20) / denom;
+                if (v >= -1e-4f && u >= -1e-4f && (1.f - v - u) >= -1e-4f) {
+                    face_painted[fi] = true;
+                    break;
+                }
+            }
+        }
+    } else if (has_face_mask) {
+        face_painted = *params.painted_face_mask;
+    }
+
+    // --- Pass 1: subdivide ALL faces (no selective skip — selective
+    //     subdivision creates T-junctions at painted/unpainted boundaries) --
     tick(0);
-    SubdivResult sub = subdivide_with_origins(original, params.edge_length_mm, throw_on_cancel);
+    auto subdiv_progress = [&](int pct) { tick(pct * 40 / 100); }; // 0-40%
+    SubdivResult sub = subdivide_with_origins(original, params.edge_length_mm, nullptr, throw_on_cancel, subdiv_progress);
     cancel();
-    tick(35);
+    tick(40);
 
     // --- Build per-output-vertex painted mask -----------------------------
     std::vector<bool> vertex_painted;
-    const bool region_masking = params.painted_region_its && !params.painted_region_its->indices.empty();
-    const bool face_masking   = !region_masking && params.painted_face_mask && !params.painted_face_mask->empty();
+    const bool region_masking = has_region_mask;
+    const bool face_masking   = !region_masking && !face_painted.empty();
     const bool masking        = region_masking || face_masking;
 
     if (region_masking) {
-        // 3D barycentric + plane-distance test against each painted sub-tri.
-        // Sub-tris live on their parent original triangle's plane; an output
-        // vertex also lives on some original triangle's plane, so the test is
-        // effectively planar when the planes match.
+        // Fine-grained: test each output vertex against painted sub-triangles
+        // via 3D barycentric + plane-distance check.
         vertex_painted.assign(sub.its.vertices.size(), false);
         const indexed_triangle_set &pr = *params.painted_region_its;
         constexpr float EDGE_EPS  = 1e-4f;
@@ -211,39 +267,31 @@ indexed_triangle_set mesh_displace(
             const Vec3f &P0 = pr.vertices[pr.indices[pi][0]];
             const Vec3f &P1 = pr.vertices[pr.indices[pi][1]];
             const Vec3f &P2 = pr.vertices[pr.indices[pi][2]];
-            const Vec3f e1 = P1 - P0;
-            const Vec3f e2 = P2 - P0;
+            const Vec3f e1 = P1 - P0, e2 = P2 - P0;
             const Vec3f n  = e1.cross(e2);
             const float n_len_sq = n.squaredNorm();
             if (n_len_sq < 1e-12f) continue;
-            const float n_len = std::sqrt(n_len_sq);
-            const Vec3f nn = n / n_len;
-            const float d00 = e1.dot(e1);
-            const float d01 = e1.dot(e2);
-            const float d11 = e2.dot(e2);
-            const float denom = d00 * d11 - d01 * d01;
+            const Vec3f nn = n / std::sqrt(n_len_sq);
+            const float d00 = e1.dot(e1), d01 = e1.dot(e2), d11 = e2.dot(e2);
+            const float denom = d00*d11 - d01*d01;
             if (std::abs(denom) < 1e-12f) continue;
             const float inv_denom = 1.f / denom;
-
             for (size_t vi = 0; vi < sub.its.vertices.size(); ++vi) {
                 if (vertex_painted[vi]) continue;
                 const Vec3f w = sub.its.vertices[vi] - P0;
                 if (std::abs(w.dot(nn)) > PLANE_EPS) continue;
-                const float d20 = w.dot(e1);
-                const float d21 = w.dot(e2);
-                const float v   = (d11 * d20 - d01 * d21) * inv_denom;
-                const float u2  = (d00 * d21 - d01 * d20) * inv_denom;
-                const float u   = 1.f - v - u2;
-                if (u >= -EDGE_EPS && v >= -EDGE_EPS && u2 >= -EDGE_EPS)
+                const float d20 = w.dot(e1), d21 = w.dot(e2);
+                const float v = (d11*d20 - d01*d21) * inv_denom;
+                const float u2 = (d00*d21 - d01*d20) * inv_denom;
+                if ((1.f-v-u2) >= -EDGE_EPS && v >= -EDGE_EPS && u2 >= -EDGE_EPS)
                     vertex_painted[vi] = true;
             }
         }
     } else if (face_masking) {
         vertex_painted.assign(sub.its.vertices.size(), false);
-        const auto &pm = *params.painted_face_mask;
         for (size_t i = 0; i < sub.its.indices.size(); ++i) {
             const uint32_t orig = sub.origin[i];
-            if (orig < pm.size() && pm[orig]) {
+            if (orig < face_painted.size() && face_painted[orig]) {
                 const Vec3i &t = sub.its.indices[i];
                 vertex_painted[t[0]] = true;
                 vertex_painted[t[1]] = true;
@@ -252,37 +300,37 @@ indexed_triangle_set mesh_displace(
         }
     }
     cancel();
+    tick(50);
 
-    // --- Pass 2: displace painted vertices --------------------------------
+    // --- Pass 2: displace painted vertices (parallel) ---------------------
     const std::vector<Vec3f> normals = NormalUtils::create_normals(sub.its, NormalUtils::VertexNormalType::NelsonMaxWeighted);
     assert(normals.size() == sub.its.vertices.size());
 
-    for (size_t v = 0; v < sub.its.vertices.size(); ++v) {
-        if (masking && !vertex_painted[v]) continue;
-        if (params.skip_bottom_face && normals[v].z() < params.bottom_threshold) continue;
-        if ((v & 0xFFFFu) == 0) cancel();
-        const double disp = sample_displacement_for_vertex(sub.its.vertices[v], normals[v], params);
-        sub.its.vertices[v] += normals[v] * float(disp);
-    }
-    tick(45);
+    const size_t num_verts = sub.its.vertices.size();
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_verts, 4096),
+        [&](const tbb::blocked_range<size_t> &range) {
+            for (size_t v = range.begin(); v < range.end(); ++v) {
+                if (masking && !vertex_painted[v]) continue;
+                if (params.skip_bottom_face && normals[v].z() < params.bottom_threshold) continue;
+                const double disp = sample_displacement_for_vertex(sub.its.vertices[v], normals[v], params);
+                if (std::isfinite(disp))
+                    sub.its.vertices[v] += normals[v] * float(disp);
+            }
+            if (throw_on_cancel) throw_on_cancel();
+        });
+    tick(55);
     cancel();
 
     // --- Pass 3: decimate --------------------------------------------------
     float max_err = params.max_error;
     auto collapse_status = [&](int percent) {
-        // Map 0..100 → 45..100 so the overall progress keeps moving.
-        tick(45 + percent * 55 / 100);
+        tick(55 + percent * 40 / 100); // 55-95%
     };
     its_quadric_edge_collapse(sub.its, params.target_triangle_count, &max_err, throw_on_cancel, collapse_status);
 
     // --- Pass 4: mesh cleanup ---------------------------------------------
-    // Displacement + decimation can produce degenerate triangles, orphan
-    // vertices, and occasionally flipped normals. Clean them up so the
-    // slicer doesn't choke on negative-spacing or extreme-coordinate errors.
     its_remove_degenerate_faces(sub.its);
     its_compactify_vertices(sub.its);
-    // If the mesh volume is negative after displacement (normals flipped),
-    // flip all triangles to restore correct winding.
     {
         TriangleMesh tmp(sub.its);
         if (tmp.volume() < 0.f)
