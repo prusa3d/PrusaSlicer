@@ -1498,6 +1498,35 @@ void TabPrint::build()
         optgroup->append_single_option_line("fuzzy_skin_thickness", category_path + "fuzzy-skin-thickness");
         optgroup->append_single_option_line("fuzzy_skin_point_dist", category_path + "fuzzy-skin-point-distance");
 
+        optgroup = page->new_optgroup(L("Textured skin (experimental)"));
+        optgroup->append_single_option_line("textured_skin_enabled");
+        {
+            // SVG file path with a Browse button
+            Option svg_opt = optgroup->get_option("textured_skin_svg");
+            Line svg_line = optgroup->create_single_option_line(svg_opt);
+            svg_line.append_widget([this](wxWindow *parent) -> wxSizer * {
+                auto btn = new wxButton(parent, wxID_ANY, _L("Browse..."), wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+                btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) {
+                    wxFileDialog dlg(nullptr, _L("Choose SVG texture pattern"), "", "",
+                        "SVG files (*.svg)|*.svg", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+                    if (dlg.ShowModal() == wxID_OK) {
+                        std::string path = dlg.GetPath().ToUTF8().data();
+                        load_key_value("textured_skin_svg", boost::any(path));
+                        reload_config();
+                    }
+                });
+                auto sizer = new wxBoxSizer(wxHORIZONTAL);
+                sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL);
+                return sizer;
+            });
+            optgroup->append_line(svg_line);
+        }
+        optgroup->append_single_option_line("textured_skin_mapping");
+        optgroup->append_single_option_line("textured_skin_thickness");
+        optgroup->append_single_option_line("textured_skin_tile_size");
+        optgroup->append_single_option_line("textured_skin_tile_height");
+        optgroup->append_single_option_line("textured_skin_point_dist");
+
         optgroup = page->new_optgroup(L("Only one perimeter"));
         category_path = "layers-and-perimeters_1748/#";
         optgroup->append_single_option_line("top_one_perimeter_type", category_path + "top-one-perimeter-type");

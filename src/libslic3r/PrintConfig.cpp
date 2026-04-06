@@ -1743,6 +1743,90 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.8));
 
+    def = this->add("textured_skin_enabled", coBool);
+    def->label = L("Enable textured skin");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Enable or disable the textured skin feature.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("textured_skin_svg", coString);
+    def->label = L("SVG Texture file");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Full path to an SVG file containing the texture pattern. "
+                     "The pattern displaces the outer perimeter to create a structured surface texture. "
+                     "Leave empty to disable textured skin. "
+                     "Example: /Users/you/patterns/bricks.svg");
+    def->mode = comAdvanced;
+    def->width = 40; // wider text field for file path
+    def->set_default_value(new ConfigOptionString(""));
+
+    def = this->add("textured_skin_mapping", coInt);
+    def->label = L("Texture mapping");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("How the 2D pattern maps onto the 3D surface:\n\n"
+                     "0 = Painted on\n"
+                     "Consistent physical tile size everywhere. Best for cylinders and boxes.\n\n"
+                     "1 = Mercator (conformal)\n"
+                     "Preserves pattern shape (angles stay 90°) but tile size varies. Best for spheres.\n\n"
+                     "2 = Stretch to fit\n"
+                     "Forces whole tiles around each layer. Always seamless. Best for vases and bottles.\n\n"
+                     "3 = Stamp\n"
+                     "Projects pattern from above using XY coordinates. Best for flat top surfaces.\n\n"
+                     "Stamp modes (3-8) — project pattern from a direction:\n"
+                     "3 = Stamp Front, 4 = Stamp Back, 5 = Stamp Left,\n"
+                     "6 = Stamp Right, 7 = Stamp Top, 8 = Stamp Bottom\n\n"
+                     "9 = Adaptive\n"
+                     "Auto-blends between Painted on and Mercator based on layer circumference.");
+    def->min = 0;
+    def->max = 9;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("textured_skin_thickness", coFloat);
+    def->label = L("Texture depth");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Maximum displacement of the outer perimeter by the texture pattern.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 2;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.3));
+
+    def = this->add("textured_skin_tile_size", coFloat);
+    def->label = L("Texture tile size");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Physical size of one pattern tile in mm. "
+                     "The SVG pattern is scaled to fit this width and repeats at this interval.");
+    def->sidetext = L("mm");
+    def->min = 0.5;
+    def->max = 1000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(5.0));
+
+    def = this->add("textured_skin_tile_height", coFloat);
+    def->label = L("Texture tile height");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Height of one pattern tile in mm. If 0, height is derived from tile width "
+                     "using the SVG aspect ratio. Set explicitly for Earth-on-sphere: "
+                     "tile width = circumference, tile height = sphere height.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("textured_skin_point_dist", coFloat);
+    def->label = L("Texture point distance");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Distance between displacement sample points along the perimeter. "
+                     "Lower values produce finer texture detail but increase G-code size.");
+    def->sidetext = L("mm");
+    def->min = 0.1;
+    def->max = 5;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.3));
+
     def = this->add("gap_fill_enabled", coBool);
     def->label = L("Fill gaps");
     def->category = L("Layers and Perimeters");
