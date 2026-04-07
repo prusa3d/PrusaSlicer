@@ -127,6 +127,25 @@ static const t_config_enum_values s_keys_map_FuzzySkinType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
 
+static const t_config_enum_values s_keys_map_TexturedSkinMapping {
+    { "painted_on",   int(TexturedSkinMapping::PaintedOn) },
+    { "mercator",     int(TexturedSkinMapping::Mercator) },
+    { "stretch_fit",  int(TexturedSkinMapping::StretchFit) },
+    { "stamp_front",  int(TexturedSkinMapping::StampFront) },
+    { "stamp_back",   int(TexturedSkinMapping::StampBack) },
+    { "stamp_left",   int(TexturedSkinMapping::StampLeft) },
+    { "stamp_right",  int(TexturedSkinMapping::StampRight) },
+    { "stamp_top",    int(TexturedSkinMapping::StampTop) },
+    { "stamp_bottom", int(TexturedSkinMapping::StampBottom) },
+    { "adaptive",     int(TexturedSkinMapping::Adaptive) },
+    { "cylindrical",  int(TexturedSkinMapping::Cylindrical) },
+    { "triplanar",    int(TexturedSkinMapping::Triplanar) },
+    // Backward compat: accept old integer values from configs saved before enum
+    { "0", 0 }, { "1", 1 }, { "2", 2 }, { "3", 3 }, { "4", 4 }, { "5", 5 },
+    { "6", 6 }, { "7", 7 }, { "8", 8 }, { "9", 9 }, { "10", 10 }, { "11", 11 }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TexturedSkinMapping)
+
 static const t_config_enum_values s_keys_map_InfillPattern {
     { "rectilinear",        ipRectilinear },
     { "monotonic",          ipMonotonic },
@@ -1751,37 +1770,36 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("textured_skin_svg", coString);
-    def->label = L("SVG Texture file");
+    def->label = L("Texture file");
     def->category = L("Fuzzy Skin");
-    def->tooltip = L("Full path to an SVG file containing the texture pattern. "
-                     "The pattern displaces the outer perimeter to create a structured surface texture. "
-                     "Leave empty to disable textured skin. "
-                     "Example: /Users/you/patterns/bricks.svg");
+    def->tooltip = L("Path to an SVG or PNG file containing the texture pattern. "
+                     "SVG: filled shapes create raised areas. "
+                     "PNG: grayscale heightmap where bright pixels are raised. "
+                     "Use the Invert option to swap raised/recessed.");
     def->mode = comAdvanced;
-    def->width = 40; // wider text field for file path
+    def->width = 40;
     def->set_default_value(new ConfigOptionString(""));
 
-    def = this->add("textured_skin_mapping", coInt);
+    def = this->add("textured_skin_mapping", coEnum);
     def->label = L("Texture mapping");
     def->category = L("Fuzzy Skin");
-    def->tooltip = L("How the 2D pattern maps onto the 3D surface:\n\n"
-                     "0 = Painted on\n"
-                     "Consistent physical tile size everywhere. Best for cylinders and boxes.\n\n"
-                     "1 = Mercator (conformal)\n"
-                     "Preserves pattern shape (angles stay 90°) but tile size varies. Best for spheres.\n\n"
-                     "2 = Stretch to fit\n"
-                     "Forces whole tiles around each layer. Always seamless. Best for vases and bottles.\n\n"
-                     "3 = Stamp\n"
-                     "Projects pattern from above using XY coordinates. Best for flat top surfaces.\n\n"
-                     "Stamp modes (3-8) — project pattern from a direction:\n"
-                     "3 = Stamp Front, 4 = Stamp Back, 5 = Stamp Left,\n"
-                     "6 = Stamp Right, 7 = Stamp Top, 8 = Stamp Bottom\n\n"
-                     "9 = Adaptive\n"
-                     "Auto-blends between Painted on and Mercator based on layer circumference.");
-    def->min = 0;
-    def->max = 9;
+    def->tooltip = L("How the 2D pattern maps onto the 3D surface.");
+    def->set_enum<TexturedSkinMapping>({
+        { "painted_on",   L("Painted on") },
+        { "mercator",     L("Mercator (conformal)") },
+        { "stretch_fit",  L("Stretch to fit") },
+        { "stamp_front",  L("Stamp Front") },
+        { "stamp_back",   L("Stamp Back") },
+        { "stamp_left",   L("Stamp Left") },
+        { "stamp_right",  L("Stamp Right") },
+        { "stamp_top",    L("Stamp Top") },
+        { "stamp_bottom", L("Stamp Bottom") },
+        { "adaptive",     L("Adaptive") },
+        { "cylindrical",  L("Cylindrical") },
+        { "triplanar",    L("Triplanar") }
+    });
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionInt(0));
+    def->set_default_value(new ConfigOptionEnum<TexturedSkinMapping>(TexturedSkinMapping::PaintedOn));
 
     def = this->add("textured_skin_thickness", coFloat);
     def->label = L("Texture depth");
@@ -1794,10 +1812,11 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0.3));
 
     def = this->add("textured_skin_tile_size", coFloat);
-    def->label = L("Texture tile size");
+    def->label = L("Tile width");
     def->category = L("Fuzzy Skin");
-    def->tooltip = L("Physical size of one pattern tile in mm. "
-                     "The SVG pattern is scaled to fit this width and repeats at this interval.");
+    def->tooltip = L("Width of one pattern tile in mm. "
+                     "The pattern is scaled to this width and repeats horizontally. "
+                     "For cylindrical wrapping, set to the object circumference.");
     def->sidetext = L("mm");
     def->min = 0.5;
     def->max = 1000;
@@ -1805,11 +1824,11 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(5.0));
 
     def = this->add("textured_skin_tile_height", coFloat);
-    def->label = L("Texture tile height");
+    def->label = L("Tile height");
     def->category = L("Fuzzy Skin");
-    def->tooltip = L("Height of one pattern tile in mm. If 0, height is derived from tile width "
-                     "using the SVG aspect ratio. Set explicitly for Earth-on-sphere: "
-                     "tile width = circumference, tile height = sphere height.");
+    def->tooltip = L("Height of one pattern tile in mm. "
+                     "If 0, derived from tile width using the image aspect ratio. "
+                     "Set explicitly when the pattern shouldn't keep its original proportions.");
     def->sidetext = L("mm");
     def->min = 0;
     def->max = 1000;
@@ -1826,6 +1845,14 @@ void PrintConfigDef::init_fff_params()
     def->max = 5;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.3));
+
+    def = this->add("textured_skin_invert", coBool);
+    def->label = L("Invert pattern");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Swap raised and recessed areas of the pattern. "
+                     "Useful when the texture appears inverted (grooves instead of bumps).");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("gap_fill_enabled", coBool);
     def->label = L("Fill gaps");

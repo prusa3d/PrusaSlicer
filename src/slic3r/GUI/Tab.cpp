@@ -1507,8 +1507,9 @@ void TabPrint::build()
             svg_line.append_widget([this](wxWindow *parent) -> wxSizer * {
                 auto btn = new wxButton(parent, wxID_ANY, _L("Browse..."), wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
                 btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) {
-                    wxFileDialog dlg(nullptr, _L("Choose SVG texture pattern"), "", "",
-                        "SVG files (*.svg)|*.svg", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+                    wxFileDialog dlg(nullptr, _L("Choose texture pattern"), "", "",
+                        "Texture files (*.svg;*.png)|*.svg;*.png|SVG files (*.svg)|*.svg|PNG files (*.png)|*.png",
+                        wxFD_OPEN | wxFD_FILE_MUST_EXIST);
                     if (dlg.ShowModal() == wxID_OK) {
                         std::string path = dlg.GetPath().ToUTF8().data();
                         load_key_value("textured_skin_svg", boost::any(path));
@@ -1526,6 +1527,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("textured_skin_tile_size");
         optgroup->append_single_option_line("textured_skin_tile_height");
         optgroup->append_single_option_line("textured_skin_point_dist");
+        optgroup->append_single_option_line("textured_skin_invert");
 
         optgroup = page->new_optgroup(L("Only one perimeter"));
         category_path = "layers-and-perimeters_1748/#";

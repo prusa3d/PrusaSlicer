@@ -481,7 +481,7 @@ static std::vector<std::string> s_Preset_print_options {
     "ironing", "ironing_type", "ironing_flowrate", "ironing_speed", "ironing_spacing",
     "max_print_speed", "max_volumetric_speed", "avoid_crossing_perimeters_max_detour",
     "fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_dist",
-    "textured_skin_enabled", "textured_skin_svg", "textured_skin_mapping", "textured_skin_thickness", "textured_skin_tile_size", "textured_skin_tile_height", "textured_skin_point_dist",
+    "textured_skin_enabled", "textured_skin_svg", "textured_skin_mapping", "textured_skin_thickness", "textured_skin_tile_size", "textured_skin_tile_height", "textured_skin_point_dist", "textured_skin_invert",
     "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative",
     "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "infill_speed", "solid_infill_speed",
     "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3",

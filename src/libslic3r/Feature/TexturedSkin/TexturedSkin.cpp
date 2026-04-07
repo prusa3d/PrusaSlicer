@@ -5,12 +5,15 @@
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/NSVGUtils.hpp"
+#include "libslic3r/PNGReadWrite.hpp"
 #include "libslic3r/libslic3r.h"
 
 #include <nanosvg/nanosvg.h>
 #include <boost/log/trivial.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 #include <cmath>
 #include <algorithm>
+#include <fstream>
 
 namespace Slic3r::Feature::TexturedSkin {
 
@@ -21,6 +24,86 @@ std::shared_ptr<PatternSampler> PatternSampler::create(const std::string &svg_pa
     if (svg_path.empty() || tile_size_mm <= 0 || resolution <= 0)
         return nullptr;
 
+    // --- PNG path: load grayscale pixels directly into grid ---
+    if (boost::algorithm::iends_with(svg_path, ".png")) {
+        // Read file into memory
+        std::ifstream file(svg_path, std::ios::binary | std::ios::ate);
+        if (!file) {
+            BOOST_LOG_TRIVIAL(warning) << "TexturedSkin: Failed to open PNG file: " << svg_path;
+            return nullptr;
+        }
+        size_t file_size = file.tellg();
+        file.seekg(0);
+        std::vector<uint8_t> file_data(file_size);
+        file.read(reinterpret_cast<char*>(file_data.data()), file_size);
+
+        png::ImageGreyscale img;
+        png::ReadBuf rbuf{file_data.data(), file_data.size()};
+        if (!png::decode_png(rbuf, img) || img.cols == 0 || img.rows == 0) {
+            BOOST_LOG_TRIVIAL(warning) << "TexturedSkin: Failed to decode PNG: " << svg_path;
+            return nullptr;
+        }
+
+        auto sampler = std::shared_ptr<PatternSampler>(new PatternSampler());
+        sampler->m_tile_w = tile_size_mm;
+        double aspect = static_cast<double>(img.rows) / img.cols;
+        sampler->m_tile_h = (tile_height_mm > 0) ? tile_height_mm : tile_size_mm * aspect;
+        sampler->m_resolution = resolution;
+
+        // Downsample the PNG to match the target resolution.
+        // 512×512 PNGs at tile_size=5mm give 102 px/mm, but the perimeter
+        // is sampled at ~0.3mm intervals. Without downsampling, fine features
+        // (woodgrain lines, weave threads) fall between sample points → aliasing.
+        // Box-filter downsampling averages each block, capturing fine detail.
+        int target_w = std::max(1, static_cast<int>(std::ceil(sampler->m_tile_w * resolution)));
+        int target_h = std::max(1, static_cast<int>(std::ceil(sampler->m_tile_h * resolution)));
+        sampler->m_grid_w = target_w;
+        sampler->m_grid_h = target_h;
+        sampler->m_grid.resize(target_w * target_h, 0.0f);
+
+        // Find min/max for auto-normalization
+        uint8_t px_min = 255, px_max = 0;
+        for (uint8_t px : img.buf) {
+            px_min = std::min(px_min, px);
+            px_max = std::max(px_max, px);
+        }
+        float inv_range = (px_max > px_min) ? 1.0f / (px_max - px_min) : 1.0f;
+
+        // Box-filter downsample: each grid cell averages a block of PNG pixels.
+        for (int gy = 0; gy < target_h; ++gy) {
+            int py0 = static_cast<int>(static_cast<double>(gy) / target_h * img.rows);
+            int py1 = static_cast<int>(static_cast<double>(gy + 1) / target_h * img.rows);
+            py1 = std::min(py1, static_cast<int>(img.rows));
+            for (int gx = 0; gx < target_w; ++gx) {
+                int px0 = static_cast<int>(static_cast<double>(gx) / target_w * img.cols);
+                int px1 = static_cast<int>(static_cast<double>(gx + 1) / target_w * img.cols);
+                px1 = std::min(px1, static_cast<int>(img.cols));
+                // Average the pixel block
+                float sum = 0;
+                int count = 0;
+                for (int py = py0; py < py1; ++py)
+                    for (int px = px0; px < px1; ++px) {
+                        sum += static_cast<float>(img.buf[py * img.cols + px] - px_min) * inv_range;
+                        ++count;
+                    }
+                float avg = (count > 0) ? sum / count : 0.0f;
+                // Standard heightmap: white = raised = max displacement
+                sampler->m_grid[gy * target_w + gx] = avg;
+            }
+        }
+
+        sampler->m_resolution = resolution;
+
+        int filled = 0;
+        for (float c : sampler->m_grid) if (c > 0.01f) filled++;
+        BOOST_LOG_TRIVIAL(debug) << "TexturedSkin: loaded PNG " << svg_path
+            << " " << img.cols << "x" << img.rows << " px"
+            << " tile " << sampler->m_tile_w << "x" << sampler->m_tile_h << " mm"
+            << " filled " << filled << "/" << sampler->m_grid.size();
+        return sampler;
+    }
+
+    // --- SVG path ---
     NSVGimage_ptr image = nsvgParseFromFile(svg_path, "mm", 96.0f);
     if (!image || image->width <= 0 || image->height <= 0) {
         BOOST_LOG_TRIVIAL(warning) << "TexturedSkin: Failed to load SVG file: " << svg_path;
@@ -72,11 +155,25 @@ std::shared_ptr<PatternSampler> PatternSampler::create(const std::string &svg_pa
         }
     }
 
+    // Auto-normalize displacement range so the lightest shape = 0 and darkest = 1.
+    // Without this, an all-gray SVG (no black or white) would produce uniform
+    // displacement with barely visible variation.
+    if (!entry_displacement.empty()) {
+        float min_d = *std::min_element(entry_displacement.begin(), entry_displacement.end());
+        float max_d = *std::max_element(entry_displacement.begin(), entry_displacement.end());
+        float range = max_d - min_d;
+        if (range > 0.01f) {
+            for (float &d : entry_displacement)
+                d = (d - min_d) / range;
+        }
+        // If all shapes have the same brightness, they all become 1.0 (full displacement)
+    }
+
     // Match ExPolygonsWithIds entries to displacement values.
     struct PolyBright { const ExPolygon *poly; float displacement; };
     std::vector<PolyBright> poly_list;
     for (size_t i = 0; i < shapes.size(); ++i) {
-        float disp = (i < entry_displacement.size()) ? entry_displacement[i] : 1.0f;
+        float disp = (i < entry_displacement.size()) ? entry_displacement[i] : 0.0f;
         for (const auto &ep : shapes[i].expoly)
             poly_list.push_back({&ep, disp});
     }
@@ -148,8 +245,12 @@ double PatternSampler::sample(double u, double v) const
     if (v_mod < 0) v_mod += m_tile_h;
 
     // Bilinear interpolation for smooth transitions.
-    double fx = u_mod * m_resolution - 0.5;
-    double fy = v_mod * m_resolution - 0.5;
+    // Use separate X/Y resolutions: grid may not be square, and tile_w/tile_h
+    // may have different ratios (e.g. PNG with explicit tile_height).
+    double res_x = m_grid_w / m_tile_w;
+    double res_y = m_grid_h / m_tile_h;
+    double fx = u_mod * res_x - 0.5;
+    double fy = v_mod * res_y - 0.5;
     int x0 = static_cast<int>(std::floor(fx));
     int y0 = static_cast<int>(std::floor(fy));
     double dx = fx - x0;
@@ -232,38 +333,57 @@ double find_seam_offset(const Polygon &polygon, const Vec2d &centroid)
     return 0;
 }
 
-// (Mercator ref circumference removed — now uses tile_width directly)
+/// Convert scaled coordinate to mm.
+inline double to_mm(double scaled_val) { return unscale<double>(static_cast<coord_t>(scaled_val)); }
 
-double compute_angle(const Vec2d &pos_scaled, const PerimeterInfo &info)
+/// Angle of a point from centroid, in [0, 2π).
+double angle_from_centroid(const Vec2d &pos_scaled, const PerimeterInfo &info)
 {
-    double angle = std::atan2(pos_scaled.y() - info.centroid.y(),
-                              pos_scaled.x() - info.centroid.x());
-    if (angle < 0) angle += 2.0 * M_PI;
-    return angle;
+    double a = std::atan2(pos_scaled.y() - info.centroid.y(),
+                          pos_scaled.x() - info.centroid.x());
+    if (a < 0) a += 2.0 * M_PI;
+    return a;
 }
 
-inline double us(double v) { return unscale<double>(static_cast<coord_t>(v)); }
-
+/// Compute (u, v) pattern coordinates for a perimeter point.
+///
+/// Each mode implements a different UV projection:
+///
+/// ArcLength:   u = distance along perimeter (mm), v = layer height (mm).
+///              Pattern has consistent physical tile size everywhere.
+///              The seam_offset ensures stable alignment across layers.
+///
+/// Cylindrical: u = angle around centroid × (tile_width / 2π), v = layer height.
+///              The pattern wraps seamlessly around the circumference.
+///              tile_width should equal the object's circumference for one wrap.
+///              Angle-based u is inherently stable across layers (no seam drift).
+///
+/// Spherical:   u = longitude (angle) × (tile_width / 2π),
+///              v = latitude mapped from circumference ratio.
+///              Uses conformal v-scaling: layers with smaller circumference
+///              get proportionally stretched v to preserve local shape.
+///              tile_width should equal the equator circumference.
+///
+/// Planar:      u = X position (mm), v = Z position (mm).
+///              Projects the pattern from the front (XZ plane).
+///              Simple, predictable, works well on flat/boxy surfaces.
+///
+/// Triplanar:   Automatically selects the best planar projection per point
+///              based on the outward normal direction at that point.
+///              For points facing X: u=Y, v=Z. Facing Y: u=X, v=Z. Facing Z: u=X, v=Y.
+///              Works on ANY shape without user configuration.
+///              Inspired by triplanar mapping in game engines and PR #15335.
 std::pair<double, double> compute_uv(
-    const Vec2d &pos_scaled, MappingMode mode, double arc_length,
-    double layer_z, const PerimeterInfo &info, double tile_width)
+    const Vec2d &pos_scaled, const Vec2d &normal_dir, MappingMode mode,
+    double arc_length, double layer_z, const PerimeterInfo &info, double tile_width)
 {
     switch (mode) {
     case MappingMode::PaintedOn:
         return {arc_length, layer_z};
 
     case MappingMode::Mercator: {
-        // Conformal Mercator: u = angle × R, v scaled to preserve local aspect ratio.
-        // R = tile_width / 2π (the user sets tile_width = circumference at equator).
-        // For conformal mapping, vertical scale must match horizontal scale:
-        //   horizontal scale at this layer = circumference / (2π)
-        //   so v must accumulate at rate (tile_width / circumference) per mm of Z
-        // This is a linear approximation that's exact for cylinders and close
-        // for gentle curvature. True Mercator (ln-tan formula) requires knowing
-        // the equator position which isn't available per-layer.
         double ref_radius = tile_width / (2.0 * M_PI);
-        double u = compute_angle(pos_scaled, info) * ref_radius;
-        // Scale v so vertical density matches horizontal density at this layer
+        double u = angle_from_centroid(pos_scaled, info) * ref_radius;
         double v = layer_z * (tile_width / std::max(info.perimeter_mm, 1.0));
         return {u, v};
     }
@@ -273,21 +393,32 @@ std::pair<double, double> compute_uv(
         return {arc_length * (tile_width / (info.perimeter_mm / n)), layer_z};
     }
 
-    case MappingMode::StampFront:  return { us(pos_scaled.x()),  layer_z};
-    case MappingMode::StampBack:   return {-us(pos_scaled.x()),  layer_z};
-    case MappingMode::StampLeft:   return { us(pos_scaled.y()),  layer_z};
-    case MappingMode::StampRight:  return {-us(pos_scaled.y()),  layer_z};
-    case MappingMode::StampTop:    return { us(pos_scaled.x()),  us(pos_scaled.y())};
-    case MappingMode::StampBottom: return { us(pos_scaled.x()), -us(pos_scaled.y())};
+    case MappingMode::StampFront:  return { to_mm(pos_scaled.x()),  layer_z};
+    case MappingMode::StampBack:   return {-to_mm(pos_scaled.x()),  layer_z};
+    case MappingMode::StampLeft:   return { to_mm(pos_scaled.y()),  layer_z};
+    case MappingMode::StampRight:  return {-to_mm(pos_scaled.y()),  layer_z};
+    case MappingMode::StampTop:    return { to_mm(pos_scaled.x()),  to_mm(pos_scaled.y())};
+    case MappingMode::StampBottom: return { to_mm(pos_scaled.x()), -to_mm(pos_scaled.y())};
 
     case MappingMode::Adaptive: {
-        // Blend between PaintedOn (arc-length) and Mercator (angle-based).
-        // Large perimeters (many tiles fit) → PaintedOn is fine.
-        // Small perimeters (few tiles) → Mercator keeps vertical alignment.
         double ref_radius = tile_width / (2.0 * M_PI);
-        double u_merc = compute_angle(pos_scaled, info) * ref_radius;
+        double u_merc = angle_from_centroid(pos_scaled, info) * ref_radius;
         double blend = std::clamp((info.perimeter_mm / tile_width - 2.0) / 2.0, 0.0, 1.0);
         return {blend * arc_length + (1.0 - blend) * u_merc, layer_z};
+    }
+
+    case MappingMode::Cylindrical: {
+        double u = angle_from_centroid(pos_scaled, info) * (tile_width / (2.0 * M_PI));
+        return {u, layer_z};
+    }
+
+    case MappingMode::Triplanar: {
+        double nx = std::abs(normal_dir.x());
+        double ny = std::abs(normal_dir.y());
+        if (nx >= ny)
+            return {to_mm(pos_scaled.y()), layer_z};
+        else
+            return {to_mm(pos_scaled.x()), layer_z};
     }
     }
     return {arc_length, layer_z};
@@ -303,7 +434,8 @@ void textured_polygon(
     double                layer_z,
     double                thickness,
     double                point_distance,
-    MappingMode           mapping)
+    MappingMode           mapping,
+    bool                  invert)
 {
     if (polygon.points.size() < 3 || point_distance <= 0 || thickness <= 0)
         return;
@@ -320,12 +452,6 @@ void textured_polygon(
 
     double arc_length = -seam_offset;
     double dist_to_next = 0;
-    double prev_displacement = 0;
-    double prev_u = -1e9;
-    // Rate limiter: allow displacement to change by 3× point_distance per step.
-    // Too low = horizontal streaking (slow ramps). Too high = sharp spikes.
-    // 3× allows full 0→max transition in ~3 sample points.
-    double max_disp_change = scaled(point_distance * 3.0);
 
     Point *p0 = &polygon.points.back();
     for (Point &p1 : polygon.points) {
@@ -346,21 +472,11 @@ void textured_polygon(
             double t = walked / edge_len_mm;
             Vec2d pos = p0->cast<double>() + edge * t;
 
-            auto [u, v] = compute_uv(pos, mapping, arc_length + walked, layer_z, pinfo, sampler.tile_width());
+            auto [u, v] = compute_uv(pos, outward_normal, mapping, arc_length + walked, layer_z, pinfo, sampler.tile_width());
 
-            if (std::abs(u - prev_u) > pinfo.perimeter_mm * 0.5)
-                prev_displacement = 0;
-            prev_u = u;
-
-            // sample() now returns 0.0-1.0 grayscale, not binary.
-            // Displacement is proportional to the sampled height.
-            double pattern_val = sampler.sample(u, v);
-            double target_disp = pattern_val * scaled(thickness);
-
-            double displacement = std::clamp(target_disp,
-                prev_displacement - max_disp_change,
-                prev_displacement + max_disp_change);
-            prev_displacement = displacement;
+            double val = sampler.sample(u, v);
+            if (invert) val = 1.0 - val;
+            double displacement = val * scaled(thickness);
 
             Vec2d pt = pos + outward_normal * displacement;
             out.emplace_back(pt.cast<coord_t>());

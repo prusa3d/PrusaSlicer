@@ -246,12 +246,13 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
             }
             if (s_sampler) {
                 double layer_z = params.layer_id * params.layer_height;
-                auto mapping = static_cast<Feature::TexturedSkin::MappingMode>(params.config.textured_skin_mapping.value);
+                auto mapping = static_cast<Feature::TexturedSkin::MappingMode>(static_cast<int>(params.config.textured_skin_mapping.value));
+                bool invert = params.config.textured_skin_invert.value;
                 Feature::TexturedSkin::textured_polygon(
                     polygon, *s_sampler, layer_z,
                     params.config.textured_skin_thickness.value,
                     params.config.textured_skin_point_dist.value,
-                    mapping);
+                    mapping, invert);
             }
         }
 
@@ -486,12 +487,13 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
                     poly.points.push_back(j.p);
 
                 double layer_z = params.layer_id * params.layer_height;
-                auto mapping = static_cast<Feature::TexturedSkin::MappingMode>(params.config.textured_skin_mapping.value);
+                auto mapping = static_cast<Feature::TexturedSkin::MappingMode>(static_cast<int>(params.config.textured_skin_mapping.value));
+                bool invert = params.config.textured_skin_invert.value;
                 Feature::TexturedSkin::textured_polygon(
                     poly, *s_sampler, layer_z,
                     params.config.textured_skin_thickness.value,
                     params.config.textured_skin_point_dist.value,
-                    mapping);
+                    mapping, invert);
 
                 // Rebuild extrusion junctions from the resampled polygon.
                 // Note: all junctions get uniform width from the first original junction,
@@ -1633,7 +1635,8 @@ bool PerimeterRegion::has_compatible_perimeter_regions(const PrintRegionConfig &
            config.textured_skin_thickness == other_config.textured_skin_thickness &&
            config.textured_skin_tile_size == other_config.textured_skin_tile_size &&
            config.textured_skin_tile_height == other_config.textured_skin_tile_height &&
-           config.textured_skin_point_dist == other_config.textured_skin_point_dist;
+           config.textured_skin_point_dist == other_config.textured_skin_point_dist &&
+           config.textured_skin_invert == other_config.textured_skin_invert;
 }
 
 void PerimeterRegion::merge_compatible_perimeter_regions(PerimeterRegions &perimeter_regions)
