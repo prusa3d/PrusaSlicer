@@ -19,6 +19,7 @@
 #include "slic3r/GUI/Gizmos/GLGizmoScale.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoRotate.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFlatten.hpp"
+#include "slic3r/GUI/Gizmos/GLGizmoFaceAlign.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp"
@@ -109,14 +110,15 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoScale3D(m_parent, "scale.svg", 1));
     m_gizmos.emplace_back(new GLGizmoRotate3D(m_parent, "rotate.svg", 2));
     m_gizmos.emplace_back(new GLGizmoFlatten(m_parent, "place.svg", 3));
-    m_gizmos.emplace_back(new GLGizmoCut3D(m_parent, "cut.svg", 4));
-    m_gizmos.emplace_back(new GLGizmoHollow(m_parent, "hollow.svg", 5));
-    m_gizmos.emplace_back(new GLGizmoSlaSupports(m_parent, "sla_supports.svg", 6));
-    m_gizmos.emplace_back(new GLGizmoFdmSupports(m_parent, "fdm_supports.svg", 7));
-    m_gizmos.emplace_back(new GLGizmoSeam(m_parent, "seam.svg", 8));
-    m_gizmos.emplace_back(new GLGizmoFuzzySkin(m_parent, "fuzzy_skin_painting.svg", 9));
-    m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 10));
-    m_gizmos.emplace_back(new GLGizmoMeasure(m_parent, "measure.svg", 11));
+    m_gizmos.emplace_back(new GLGizmoFaceAlign(m_parent, "place.svg", 4));
+    m_gizmos.emplace_back(new GLGizmoCut3D(m_parent, "cut.svg", 5));
+    m_gizmos.emplace_back(new GLGizmoHollow(m_parent, "hollow.svg", 6));
+    m_gizmos.emplace_back(new GLGizmoSlaSupports(m_parent, "sla_supports.svg", 7));
+    m_gizmos.emplace_back(new GLGizmoFdmSupports(m_parent, "fdm_supports.svg", 8));
+    m_gizmos.emplace_back(new GLGizmoSeam(m_parent, "seam.svg", 9));
+    m_gizmos.emplace_back(new GLGizmoFuzzySkin(m_parent, "fuzzy_skin_painting.svg", 10));
+    m_gizmos.emplace_back(new GLGizmoMmuSegmentation(m_parent, "mmu_segmentation.svg", 11));
+    m_gizmos.emplace_back(new GLGizmoMeasure(m_parent, "measure.svg", 12));
     m_gizmos.emplace_back(new GLGizmoEmboss(m_parent));
     m_gizmos.emplace_back(new GLGizmoSVG(m_parent));
     m_gizmos.emplace_back(new GLGizmoSimplify(m_parent));

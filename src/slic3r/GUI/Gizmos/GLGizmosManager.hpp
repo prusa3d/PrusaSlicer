@@ -75,6 +75,7 @@ public:
         Scale,
         Rotate,
         Flatten,
+        FaceAlign,
         Cut,
         Hollow,
         SlaSupports,

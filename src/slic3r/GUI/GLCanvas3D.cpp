@@ -4300,6 +4300,28 @@ void GLCanvas3D::set_tooltip(const std::string& tooltip)
         m_tooltip.set_text(tooltip);
 }
 
+SceneRaycaster::HitResult GLCanvas3D::get_volume_raycaster_hit(const Vec2d& mouse_pos) const
+{
+    const ClippingPlane clipping_plane = m_gizmos.get_clipping_plane().inverted_normal();
+    return m_scene_raycaster.hit(mouse_pos, wxGetApp().plater()->get_camera(), &clipping_plane);
+}
+
+void GLCanvas3D::transform_instance_world(int object_idx, int instance_idx, const Transform3d& delta_world)
+{
+    if (m_model == nullptr)
+        return;
+    for (GLVolume* v : m_volumes.volumes) {
+        if (v->object_idx() == object_idx && v->instance_idx() == instance_idx && v->volume_idx() >= 0) {
+            const Transform3d new_inst = delta_world * v->get_instance_transformation().get_matrix();
+            v->set_instance_transformation(new_inst);
+        }
+    }
+    // Skip do_rotate's bed snap: delta already places the face on the target plane in world space; a Z-only
+    // shift would break coplanarity and leave parts separated.
+    do_rotate("", true);
+    wxGetApp().obj_manipul()->set_dirty();
+}
+
 void GLCanvas3D::do_move(const std::string& snapshot_type)
 {
     if (m_model == nullptr)
@@ -4385,7 +4407,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
     m_dirty = true;
 }
 
-void GLCanvas3D::do_rotate(const std::string& snapshot_type)
+void GLCanvas3D::do_rotate(const std::string& snapshot_type, bool skip_z_correction)
 {
     if (m_model == nullptr)
         return;
@@ -4393,20 +4415,21 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     if (!snapshot_type.empty())
         wxGetApp().plater()->take_snapshot(_(snapshot_type));
 
-    // stores current min_z of instances
+    // stores current min_z of instances (used only for sink/fly correction below)
     std::map<std::pair<int, int>, double> min_zs;
-    for (int i = 0; i < static_cast<int>(m_model->objects.size()); ++i) {
-        const ModelObject* obj = m_model->objects[i];
-        for (int j = 0; j < static_cast<int>(obj->instances.size()); ++j) {
-            if (snapshot_type == L("Gizmo-Place on Face") && m_selection.get_object_idx() == i) {
-                // This means we are flattening this object. In that case pretend
-                // that it is not sinking (even if it is), so it is placed on bed
-                // later on (whatever is sinking will be left sinking).
-                min_zs[{ i, j }] = SINKING_Z_THRESHOLD;
+    if (!skip_z_correction) {
+        for (int i = 0; i < static_cast<int>(m_model->objects.size()); ++i) {
+            const ModelObject* obj = m_model->objects[i];
+            for (int j = 0; j < static_cast<int>(obj->instances.size()); ++j) {
+                if (snapshot_type == L("Gizmo-Place on Face") && m_selection.get_object_idx() == i) {
+                    // This means we are flattening this object. In that case pretend
+                    // that it is not sinking (even if it is), so it is placed on bed
+                    // later on (whatever is sinking will be left sinking).
+                    min_zs[{ i, j }] = SINKING_Z_THRESHOLD;
+                }
+                else
+                    min_zs[{ i, j }] = obj->instance_bounding_box(j).min.z();
             }
-            else
-                min_zs[{ i, j }] = obj->instance_bounding_box(j).min.z();
-
         }
     }
 
@@ -4458,17 +4481,18 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
-        const double shift_z = m->get_instance_min_z(i.second);
-        // leave sinking instances as sinking
-        if (min_zs.find({ i.first, i.second })->second >= SINKING_Z_THRESHOLD || shift_z > SINKING_Z_THRESHOLD) {
-            const Vec3d shift(0.0, 0.0, -shift_z);
-            m_selection.translate(i.first, i.second, shift);
-            m->translate_instance(i.second, shift);
+        if (!skip_z_correction) {
+            const double shift_z = m->get_instance_min_z(i.second);
+            // leave sinking instances as sinking
+            if (min_zs.find({ i.first, i.second })->second >= SINKING_Z_THRESHOLD || shift_z > SINKING_Z_THRESHOLD) {
+                const Vec3d shift(0.0, 0.0, -shift_z);
+                m_selection.translate(i.first, i.second, shift);
+                m->translate_instance(i.second, shift);
+            }
         }
-
         obj_idx_for_update_info_items.emplace(i.first);
     }
-    //update sinking information in ObjectList
+    // update sinking information in ObjectList
     for (int id : obj_idx_for_update_info_items)
         wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 

@@ -700,6 +700,12 @@ public:
         return m_scene_raycaster.get_raycasters(type);
     }
 
+    /// Volume picking (same clipping / ordering as hover picking). Used by gizmos that need mesh hits.
+    SceneRaycaster::HitResult get_volume_raycaster_hit(const Vec2d& mouse_pos) const;
+
+    /// Apply a world-space rigid transform on the left to one object instance (all its GLVolumes), then sync the model.
+    void transform_instance_world(int object_idx, int instance_idx, const Transform3d& delta_world);
+
     void set_raycaster_gizmos_on_top(bool value) {
         m_scene_raycaster.set_gizmos_on_top(value);
     }
@@ -874,7 +880,8 @@ public:
 
     // the following methods add a snapshot to the undo/redo stack, unless the given string is empty
     void do_move(const std::string& snapshot_type);
-    void do_rotate(const std::string& snapshot_type);
+    /// @param skip_z_correction If true, do not snap instances to the bed (used when world-space alignment already fixed Z).
+    void do_rotate(const std::string& snapshot_type, bool skip_z_correction = false);
     void do_scale(const std::string& snapshot_type);
     void do_mirror(const std::string& snapshot_type);
     void do_reset_skew(const std::string& snapshot_type);
