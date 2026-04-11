@@ -121,7 +121,7 @@ bool GLGizmosManager::init()
     m_gizmos.emplace_back(new GLGizmoEmboss(m_parent));
     m_gizmos.emplace_back(new GLGizmoSVG(m_parent));
     m_gizmos.emplace_back(new GLGizmoSimplify(m_parent));
-    m_gizmos.emplace_back(new GLGizmoFaceAlign(m_parent, "place.svg", 15));
+    m_gizmos.emplace_back(new GLGizmoFaceAlign(m_parent, "face_align.svg", 15));
 
     m_common_gizmos_data.reset(new CommonGizmosDataPool(&m_parent));
 
@@ -845,13 +845,14 @@ void GLGizmosManager::do_render_overlay() const
         if (m_current == idx)
             render_background(top_x - margin_w, top_y + border_h, top_x + icons_size_x + margin_w, top_y - icons_size_y - border_h, border_w, border_h);
 
-        const unsigned int sprite_id = gizmo->get_sprite_id();
+        // Vertical UVs use gizmo index in m_gizmos (matches row order in generate_icons_texture), not get_sprite_id(),
+        // so toolbar icons stay correct even if a gizmo's sprite_id were out of sync with its vector index.
         // higlighted state needs to be decided first so its highlighting in every other state
         const int icon_idx = (m_highlight.first == idx ? (m_highlight.second ? 4 : 5) : (m_current == idx) ? /*2*/1 : ((m_hover == idx) ? 1 : (gizmo->is_activable() ? 0 : 3)));
 
         const float u_left   = u_offset + icon_idx * du;
         const float u_right  = u_left + du - u_offset;
-        const float v_top    = v_offset + sprite_id * dv;
+        const float v_top    = v_offset + float(idx) * dv;
         const float v_bottom = v_top + dv - v_offset;
 
         GLTexture::render_sub_texture(icons_texture_id, top_x, top_x + icons_size_x, top_y - icons_size_y, top_y, { { u_left, v_bottom }, { u_right, v_bottom }, { u_right, v_top }, { u_left, v_top } });
