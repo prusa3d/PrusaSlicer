@@ -70,12 +70,12 @@ public:
 
     enum EType : unsigned char
     {
-        // Order must match index in m_gizmos!
+        // Order must match index in m_gizmos! Append new types before Undefined only — the
+        // active gizmo is serialized as this value; reordering breaks 3MF/project compatibility.
         Move,
         Scale,
         Rotate,
         Flatten,
-        FaceAlign,
         Cut,
         Hollow,
         SlaSupports,
@@ -87,6 +87,7 @@ public:
         Emboss,
         Svg,
         Simplify,
+        FaceAlign,
         Undefined
     };
 
