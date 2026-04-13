@@ -494,3 +494,13 @@ endif ()
 
 # Add a definition so that we can tell we are compiling slic3r.
 target_compile_definitions(libslic3r_gui PRIVATE SLIC3R_CURRENTLY_COMPILING_GUI_MODULE)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      # Keep the vendored (2009-era) hidapi's symbols out of prusa-slicer's
+      # dynamic symbol table. Otherwise they preempt libmanette's calls to
+      # the system libhidapi-hidraw at runtime. The vendored copy uses a
+      # 3-field hid_device struct while libmanette's runtime hidapi has a
+      # 4-field one with wchar_t *last_error_str at offset 8; mixing the
+      # two causes hid_get_device_info() to free(0x1) and crash. See #15343.
+      target_link_options(libslic3r_gui PUBLIC "-Wl,--exclude-libs,libhidapi.a")
+endif()
