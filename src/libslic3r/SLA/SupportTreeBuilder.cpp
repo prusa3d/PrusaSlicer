@@ -2,6 +2,7 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include "libslic3r/SLA/SupportTreeTypes.hpp"
 #include <libslic3r/SLA/SupportTreeBuilder.hpp>
 #include <libslic3r/SLA/SupportTreeMesher.hpp>
 
@@ -11,21 +12,6 @@
 
 namespace Slic3r {
 namespace sla {
-
-Head::Head(double       r_big_mm,
-           double       r_small_mm,
-           double       length_mm,
-           double       penetration,
-           const Vec3d &direction,
-           const Vec3d &offset)
-    : dir(direction)
-    , pos(offset)
-    , r_back_mm(r_big_mm)
-    , r_pin_mm(r_small_mm)
-    , width_mm(length_mm)
-    , penetration_mm(penetration)
-{
-}
 
 SupportTreeBuilder::SupportTreeBuilder(SupportTreeBuilder &&o)
     : m_heads(std::move(o.m_heads))
@@ -117,7 +103,7 @@ const indexed_triangle_set &SupportTreeBuilder::merged_mesh(size_t steps) const
         if (ctl().stopcondition()) break;
         its_merge(merged, get_mesh(bs, steps));
     }
-    
+
     for (auto &bs : m_crossbridges) {
         if (ctl().stopcondition()) break;
         its_merge(merged, get_mesh(bs, steps));
@@ -152,20 +138,7 @@ const indexed_triangle_set &SupportTreeBuilder::merged_mesh(size_t steps) const
     return m_meshcache;
 }
 
-const indexed_triangle_set &SupportTreeBuilder::merge_and_cleanup()
-{
-    // in case the mesh is not generated, it should be...
-    auto &ret = merged_mesh(); 
-    
-    // Doing clear() does not garantee to release the memory.
-    clear_and_shrink(m_heads);
-    clear_and_shrink(m_head_indices);
-    clear_and_shrink(m_pillars);
-    clear_and_shrink(m_junctions);
-    clear_and_shrink(m_bridges);
 
-    return ret;
-}
 
 const indexed_triangle_set &SupportTreeBuilder::retrieve_mesh(MeshType meshtype) const
 {
@@ -177,6 +150,22 @@ const indexed_triangle_set &SupportTreeBuilder::retrieve_mesh(MeshType meshtype)
     }
     
     return m_meshcache;
+}
+
+
+
+SupportTreeOutput SupportTreeBuilder::retrieve_output()
+{
+    return SupportTreeOutput(
+        std::move(m_pillars),
+        std::move(m_heads),
+        std::move(m_junctions),
+        std::move(m_bridges),
+        std::move(m_crossbridges),
+        std::move(m_diffbridges),
+        std::move(m_pedestals),
+        std::move(m_anchors)
+    );
 }
 
 }} // namespace Slic3r::sla

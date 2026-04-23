@@ -1590,6 +1590,18 @@ float its_volume(const indexed_triangle_set &its)
     return volume;
 }
 
+float its_area(const indexed_triangle_set& its)
+{
+    float area = 0.f;
+    for (const auto& idxs : its.indices) {
+        const Vec3f& a = its.vertices[idxs[0]];
+        const Vec3f& b = its.vertices[idxs[1]];
+        const Vec3f& c = its.vertices[idxs[2]];
+        area += (b-a).cross(c-a).norm() / 2.;
+    }
+    return area;
+}
+
 float its_average_edge_length(const indexed_triangle_set &its)
 {
     if (its.indices.empty())

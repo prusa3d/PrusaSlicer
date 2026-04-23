@@ -468,7 +468,7 @@ void TextCtrl::BUILD() {
 	case coPercent:
 	{
 		text_value = wxString::Format(_T("%i"), int(m_opt.default_value->getFloat()));
-		text_value += "%";
+        m_last_meaningful_value = text_value;
 		break;
 	}
 	case coPercents:
@@ -865,6 +865,9 @@ void SpinCtrl::BUILD() {
 	switch (m_opt.type) {
 	case coInt:
 		default_value = m_opt.default_value->getInt();
+        if (m_opt.nullable && m_opt.default_value->is_nil()) {
+            default_value = m_opt.min;
+        }
         m_last_meaningful_value = default_value;
 		break;
 	case coInts:
@@ -881,6 +884,12 @@ void SpinCtrl::BUILD() {
 	default:
 		break;
 	}
+
+    wxString tooltip_text = m_opt.nullable && m_opt.default_value->is_nil() ?
+        _L("N/A") :
+        default_value == UNDEF_VALUE ?
+        _L("Undefined") :
+        wxString::Format(_T("%i"), default_value);
 
     if (default_value != UNDEF_VALUE)
         text_value = wxString::Format(_T("%i"), default_value);
@@ -925,7 +934,7 @@ void SpinCtrl::BUILD() {
         propagate_value();
         bEnterPressed = true;
     }), temp->GetId());
-	temp->SetToolTip(get_tooltip_text(text_value));
+	temp->SetToolTip(get_tooltip_text(tooltip_text));
 
     temp->Bind(wxEVT_TEXT, [this, temp](wxCommandEvent e) {
         long value;

@@ -502,7 +502,7 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
 
     /* FT_TEX */     { "Texture"sv,         { ".png"sv, ".svg"sv } },
 
-    /* FT_SL1 (deprecated, overriden by sla_wildcards) */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv, ".pwmx"sv } },
+    /* FT_SL1 (deprecated, overriden by sla_wildcards) */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv, ".slx"sv, ".pwmx"sv } },
 
     /* FT_ZIP */     { "Zip files"sv, { ".zip"sv } },
 };
@@ -2754,8 +2754,9 @@ wxMenu* GUI_App::get_config_menu(MainFrame* main_frame)
         case ConfigMenuWizard:
             run_wizard(ConfigWizard::RR_USER);
             break;
-        case ConfigMenuUpdateConf: 
-            check_updates(true); 
+        case ConfigMenuUpdateConf:
+            this->plater_->fetch_workflows_file_online_start();
+            check_updates(true);
             break;
         case ConfigMenuUpdateApp:
             app_version_check(true);

@@ -18,7 +18,14 @@ if (MSVC)
 
 else ()
     string(TOUPPER "${CMAKE_BUILD_TYPE}" _buildtype_upper)
-    set(_gmp_ccflags "${CMAKE_CXX_FLAGS_${_buildtype_upper}} -fPIC -DPIC -Wall -Wmissing-prototypes -Wpointer-arith -pedantic -fomit-frame-pointer -fno-common")
+
+    if (APPLE)
+        set(_stdlib "")
+    else()
+        set(_stdlib "-std=gnu11")
+    endif()
+
+    set(_gmp_ccflags "${_stdlib} ${CMAKE_CXX_FLAGS_${_buildtype_upper}} -fPIC -DPIC -Wall -Wmissing-prototypes -Wpointer-arith -pedantic -fomit-frame-pointer -fno-common")
     set(_gmp_build_tgt "${CMAKE_SYSTEM_PROCESSOR}")
 
     set(_cross_compile_arg "")

@@ -1271,6 +1271,9 @@ public:
     const CustomGCode::Info& custom_gcode_per_print_z() const;
     std::vector<CustomGCode::Info>& get_custom_gcode_per_print_z_vector() { return custom_gcode_per_print_z_vector; }
 
+    std::string sla_workflow_uuid; // This is a temporary place to put this, just for the 2.9.x series.
+    // It is probably the less invasive way to make this propagate from the frontend to the backend.
+
 private:
     // Wipe tower object.
     std::vector<ModelWipeTower> wipe_tower_vector = std::vector<ModelWipeTower>(MAX_NUMBER_OF_BEDS);

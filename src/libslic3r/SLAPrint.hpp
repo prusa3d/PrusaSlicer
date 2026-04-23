@@ -84,6 +84,10 @@ enum SliceOrigin { soSupport, soModel };
 
 namespace Slic3r {
 
+namespace sla {
+    class SupportSlicesCache;
+}
+
 // Each sla object step can hold a collection of csg operations on the
 // sla model to be sliced. Currently, Assembly step adds negative and positive
 // volumes, hollowing adds the negative interior, drilling adds the hole cylinders.
@@ -150,6 +154,8 @@ public:
     // Get a pad mesh centered around origin in XY, and with zero rotation around Z applied.
     // Support mesh is only valid if this->is_step_done(slaposPad) is true.
     const TriangleMesh&     pad_mesh() const;
+
+    double surface_area_estimate() const;
 
     // Get the mesh that is going to be printed with all the modifications
     // like hollowing and drilled holes.
@@ -220,7 +226,7 @@ public:
             m_po = &po; m_support_slices_idx = id;
         }
 
-        const ExPolygons& get_slice(SliceOrigin o) const;
+        ExPolygons        get_slice(SliceOrigin o) const;
         size_t            get_slice_idx(SliceOrigin o) const
         {
             return o == soModel ? m_model_slices_idx : m_support_slices_idx;
@@ -283,7 +289,6 @@ private:
     }
 
     const std::vector<ExPolygons>& get_model_slices() const { return m_model_slices; }
-    const std::vector<ExPolygons>& get_support_slices() const;
 
 public:
 
@@ -374,20 +379,22 @@ private:
     struct SupportData
     {
         sla::SupportableMesh    input; // the input
-        std::vector<ExPolygons> support_slices;   // sliced supports
-        TriangleMesh tree_mesh, pad_mesh, full_mesh; // cached artifacts
-        
-        inline SupportData(const TriangleMesh &t)
-            : input{t.its, {}, {}}
-        {}
 
-        inline SupportData(const indexed_triangle_set &t)
-            : input{t, {}, {}}
-        {}
+        std::unique_ptr<sla::SupportSlicesCache> support_slices_cache;
+
+
+        TriangleMesh tree_mesh, pad_mesh; // cached artifacts
+        sla::SupportTreeOutput support_tree_output;
+        
+        explicit SupportData(const TriangleMesh &t);
+
+        explicit SupportData(const indexed_triangle_set &t);
         
         void create_support_tree(const sla::JobController &ctl)
         {
-            tree_mesh = TriangleMesh{sla::create_support_tree(input, ctl)};
+            auto output = sla::create_support_tree(input, ctl);
+            tree_mesh = TriangleMesh(std::move(output.first));
+            support_tree_output = std::move(output.second);
         }
 
         void create_pad(const sla::JobController &ctl)
@@ -494,8 +501,15 @@ public:
     bool                empty() const override { return m_objects.empty(); }
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
-    ApplyStatus         apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings = nullptr) override;
-    void                set_task(const TaskParams &params) override { PrintBaseWithState<SLAPrintStep, slapsCount>::set_task_impl(params, m_objects); }
+    ApplyStatus apply(
+        const Model &model,
+        DynamicPrintConfig config,
+        std::vector<std::string> *warnings = nullptr,
+        const DynamicPrintConfig *original_config = nullptr
+    ) override;
+    void set_task(const TaskParams &params) override {
+        PrintBaseWithState<SLAPrintStep, slapsCount>::set_task_impl(params, m_objects);
+    }
     void                process() override;
     void                finalize() override { PrintBaseWithState<SLAPrintStep, slapsCount>::finalize_impl(m_objects); }
     void                cleanup() override {}
@@ -522,6 +536,7 @@ public:
     const SLAPrinterConfig&     printer_config() const { return m_printer_config; }
     const SLAMaterialConfig&    material_config() const { return m_material_config; }
     const SLAPrintObjectConfig& default_object_config() const { return m_default_object_config; }
+    const DynamicPrintConfig&   original_config() const { return m_original_config; }
 
     // Extracted value from the configuration objects
     Vec3d                       relative_correction() const;
@@ -544,17 +559,7 @@ public:
         // The collection of slice records for the current level.
         std::vector<std::reference_wrapper<const SliceRecord>> m_slices;
 
-        ExPolygons m_transformed_slices;
-
-        template<class Container> void transformed_slices(Container&& c)
-        {
-            m_transformed_slices = std::forward<Container>(c);
-        }
-        
-        friend class SLAPrint::Steps;
-
-    public:
-        
+    public:       
         explicit PrintLayer(coord_t lvl) : m_level(lvl) {}
 
         // for being sorted in their container (see m_printer_input)
@@ -567,10 +572,6 @@ public:
         coord_t level() const { return m_level; }
 
         auto slices() const -> const decltype (m_slices)& { return m_slices; }
-
-        const ExPolygons & transformed_slices() const {
-            return m_transformed_slices;
-        }
     };
 
     // The aggregated and leveled print records from various objects.
@@ -601,6 +602,9 @@ private:
     SLAPrinterConfig                m_printer_config;
     SLAMaterialConfig               m_material_config;
     SLAPrintObjectConfig            m_default_object_config;
+
+    // Contains original values [values from PresetCollection::selected_preset()], which were changed in PresetCollection::edited_preset()
+    DynamicPrintConfig              m_original_config;
 
     PrintObjects                    m_objects;
 

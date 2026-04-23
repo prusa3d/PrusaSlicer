@@ -1895,6 +1895,12 @@ void GCodeGenerator::print_machine_envelope(GCodeOutputStream &file, const Print
             print.config().machine_max_jerk_y.values.front() * factor,
             print.config().machine_max_jerk_z.values.front() * factor,
             print.config().machine_max_jerk_e.values.front() * factor);
+
+        if (flavor == gcfMarlinFirmware) {
+            // New Marlin uses M205 J[mm] for junction deviation (only apply if it is > 0)
+            file.write_format(writer().set_junction_deviation(config().machine_max_junction_deviation.values.front()).c_str());
+        }
+
         if (flavor != gcfRepRapFirmware)
             file.write_format("M205 S%d T%d ; sets the minimum extruding and travel feed rate, mm/sec\n",
                 int(print.config().machine_min_extruding_rate.values.front() + 0.5),

@@ -62,6 +62,7 @@ public:
     void enqueue_id_action();
     void enqueue_test_connection();
     void enqueue_printer_data_action(const std::string& uuid);
+    void request_printables_secret_token();
     void enqueue_refresh();
     void request_refresh();
 
@@ -92,6 +93,7 @@ public:
 
     void on_race_lost(); // T4
     void on_store_read_request();
+
 private:
     std::unique_ptr<UserAccountSession>     m_session;
     std::thread                             m_thread;

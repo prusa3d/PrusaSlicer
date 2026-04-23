@@ -608,8 +608,15 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
 
-    ApplyStatus         apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings = nullptr) override;
-    void                set_task(const TaskParams &params) override { PrintBaseWithState<PrintStep, psCount>::set_task_impl(params, m_objects); }
+    ApplyStatus apply(
+        const Model &model,
+        DynamicPrintConfig config,
+        std::vector<std::string> *warnings = nullptr,
+        const DynamicPrintConfig *original_config = nullptr
+    ) override;
+    void set_task(const TaskParams &params) override {
+        PrintBaseWithState<PrintStep, psCount>::set_task_impl(params, m_objects);
+    }
     void                process() override;
     void                finalize() override { PrintBaseWithState<PrintStep, psCount>::finalize_impl(m_objects); }
     void                cleanup() override;

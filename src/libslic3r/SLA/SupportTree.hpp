@@ -12,6 +12,7 @@
 #include <libslic3r/SLA/SupportPoint.hpp>
 #include <libslic3r/SLA/JobController.hpp>
 #include <libslic3r/SLA/SupportTreeStrategies.hpp>
+#include "libslic3r/SLA/SupportTreeTypes.hpp"
 #include <math.h>
 #include <vector>
 #include <memory>
@@ -148,7 +149,7 @@ inline double ground_level(const SupportableMesh &sm)
     return lvl;
 }
 
-indexed_triangle_set create_support_tree(const SupportableMesh &mesh,
+std::pair<indexed_triangle_set, SupportTreeOutput> create_support_tree(const SupportableMesh &mesh,
                                          const JobController   &ctl);
 
 indexed_triangle_set create_pad(const SupportableMesh      &model_mesh,

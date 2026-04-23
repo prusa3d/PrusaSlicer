@@ -49,6 +49,7 @@ public:
     void enqueue_avatar_old_action();
     void enqueue_avatar_new_action(const std::string& url);
     void enqueue_printer_data_action(const std::string& uuid);
+    void request_printables_secret_token();
     void request_refresh();
     // Clears all data and connections, called on logout or EVT_UA_RESET
     void clear();

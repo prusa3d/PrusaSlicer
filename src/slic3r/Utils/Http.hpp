@@ -171,6 +171,9 @@ public:
 
 	// converts the given string to an url_encoded_string
 	static std::string url_encode(const std::string &str);
+
+    static std::string get_apex_domain(const std::string& url);
+
 private:
 	Http(const std::string &url);
 

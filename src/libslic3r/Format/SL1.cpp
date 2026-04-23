@@ -32,6 +32,7 @@
 
 #include "libslic3r/SLA/RasterBase.hpp"
 
+#include <nlohmann/json.hpp>
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -53,107 +54,357 @@ std::string to_ini(const ConfMap &m)
     return ret;
 }
 
-static std::string get_key(const std::string& opt_key)
+// Not all keys have the same name in PS config and in SL1 / SLX config.json
+// Also, some values need to be multiplied to convert to the right unit
+// And they can be placed in different JSON hierarchy levels
+struct ConfigKeyMapping {
+    std::string target_key;   // Renamed key (e.g., "layerHeight")
+    double multiplier;         // Value multiplier (e.g., 1000.0 for s->ms)
+    std::string json_path;     // JSON location: "root", "exposure_profile", "tilt", or "" (no special placement)
+};
+
+static ConfigKeyMapping get_key_mapping(const std::string& opt_key)
 {
-    static const std::set<std::string> ms_opts = {
-      "delay_before_exposure"
-    , "delay_after_exposure"
-    , "tilt_down_offset_delay"
-    , "tilt_up_offset_delay"
-    , "tilt_down_delay"
-    , "tilt_up_delay"
+    // SINGLE SOURCE OF TRUTH for all config key transformations
+    static const std::map<std::string, ConfigKeyMapping> mappings = {
+        // Config.ini entries (appear at root level in config.json)
+        {"layer_height",             {"layerHeight",     1.0, "root"}},
+        {"exposure_time",            {"expTime",         1.0, "root"}},
+        {"min_exposure_time",        {"min_expTime",     1.0, "root"}},
+        {"max_exposure_time",        {"max_expTime",     1.0, "root"}},
+        {"initial_exposure_time",    {"expTimeFirst",    1.0, "root"}},
+        {"min_initial_exposure_time",{"min_expTimeFirst",1.0, "root"}},
+        {"max_initial_exposure_time",{"max_expTimeFirst",1.0, "root"}},
+        {"material_print_speed",     {"expUserProfile",  1.0, "root"}},
+        {"sla_material_settings_id", {"materialName",    1.0, "root"}},
+        {"printer_model",            {"printerModel",    1.0, "root"}},
+        {"printer_variant",          {"printerVariant",  1.0, "root"}},
+        {"printer_settings_id",      {"printerProfile",  1.0, "root"}},
+        {"sla_print_settings_id",    {"printProfile",    1.0, "root"}},
+        {"faded_layers",             {"numFade",         1.0, "root"}},
+
+        // Exposure profile entries
+        {"area_fill",               {"area_fill",               1.0, "exposure_profile"}},
+        {"printing_temperature",    {"printing_temperature",    1.0, "exposure_profile"}},
+
+        // Tilt options - Time values (s -> ms: 1000x multiplier + _ms suffix)
+        {"delay_before_exposure",       {"delay_before_exposure_ms",    1000.0, "tilt"}},
+        {"delay_to_reflood",            {"delay_to_reflood_ms",         1000.0, "tilt"}},
+        {"delay_after_exposure",        {"delay_after_exposure_ms",     1000.0, "tilt"}},
+        {"tilt_down_offset_delay",      {"tilt_down_offset_delay_ms",   1000.0, "tilt"}},
+        {"tilt_up_offset_delay",        {"tilt_up_offset_delay_ms",     1000.0, "tilt"}},
+        {"tilt_down_delay",             {"tilt_down_delay_ms",          1000.0, "tilt"}},
+        {"tilt_up_delay",               {"tilt_up_delay_ms",            1000.0, "tilt"}},
+        {"dynamic_delay_before_timeout",{"dynamic_delay_before_timeout_ms", 1000.0, "tilt"}},
+
+        // Tilt options - Distance values (mm -> nm: 1000000x multiplier + _nm suffix)
+        {"tower_hop_height",        {"tower_hop_height_nm", 1000000.0, "tilt"}},
+
+        // Tilt options - Speed values (_speed -> _profile replacement)
+        {"tower_speed",                 {"tower_profile",               1.0, "tilt"}},
+        {"tilt_down_initial_speed",     {"tilt_down_initial_profile",   1.0, "tilt"}},
+        {"tilt_down_finish_speed",      {"tilt_down_finish_profile",    1.0, "tilt"}},
+        {"tilt_up_initial_speed",       {"tilt_up_initial_profile",     1.0, "tilt"}},
+        {"tilt_up_finish_speed",        {"tilt_up_finish_profile",      1.0, "tilt"}},
+
+        {"tilt_down_initial_speed_slx", {"tilt_down_initial_profile",   1.0, "tilt"}},
+        {"tilt_down_finish_speed_slx",  {"tilt_down_finish_profile",    1.0, "tilt"}},
+        {"tilt_up_initial_speed_slx",   {"tilt_up_initial_profile",     1.0, "tilt"}},
+        {"tilt_up_finish_speed_slx",    {"tilt_up_finish_profile",      1.0, "tilt"}},
+
+        // Tilt options - Enum profiles
+        {"dynamic_delay_before_profile",{"dynamic_delay_before_profile",1.0, "tilt"}},
+        {"dynamic_tilt_up_profile",     {"dynamic_tilt_up_profile",     1.0, "tilt"}},
+        {"dynamic_tilt_down_profile",   {"dynamic_tilt_down_profile",   1.0, "tilt"}},
     };
-    
-    static const std::set<std::string> nm_opts = {
-       "tower_hop_height"
-    };
-    
-    static const std::set<std::string> speed_opts = {
-      "tower_speed"
-    , "tilt_down_initial_speed"
-    , "tilt_down_finish_speed"
-    , "tilt_up_initial_speed"
-    , "tilt_up_finish_speed"
-    };
 
-    if (ms_opts.find(opt_key) != ms_opts.end())
-        return opt_key + "_ms";
+    auto it = mappings.find(opt_key);
+    if (it != mappings.end()) {
+        return it->second;
+    }
 
-    if (nm_opts.find(opt_key) != nm_opts.end())
-        return opt_key + "_nm";
-
-    if (speed_opts.find(opt_key) != speed_opts.end())
-        return boost::replace_all_copy(opt_key, "_speed", "_profile");
-
-    return opt_key;
+    // Default: no transformation, no special path
+    return {opt_key, 1.0, ""};
 }
 
-namespace pt = boost::property_tree;
+using json = nlohmann::ordered_json;
 
-std::string to_json(const SLAPrint& print, const ConfMap &m)
+static float get_print_area(const SLAPrint &print) {
+    float area = 0.;
+    for (const SLAPrintObject* obj : print.objects())
+        area += obj->surface_area_estimate() * double(obj->instances().size());
+    return area;
+}
+
+// Serialize a scalar config option to a JSON node
+// Handles key mapping, multiplier, and type conversions automatically
+static void serialize_config_option(const std::string& opt_key, const ConfigOption* opt, json& node)
 {
-    auto& cfg = print.full_print_config();
+    if (!opt)
+        return;
 
-    pt::ptree below_node;
-    pt::ptree above_node;
+    auto mapping = get_key_mapping(opt_key);
+
+    if (opt->is_nil()) {
+        node[mapping.target_key] = nullptr;
+        return;
+    }
+
+    switch (opt->type()) {
+    case coFloat: {
+        auto value = static_cast<const ConfigOptionFloat*>(opt);
+        if (opt_key == "area_fill") {
+            // area_fill should be output as an int
+            node[mapping.target_key] = int(mapping.multiplier * value->value);
+        } else {
+            node[mapping.target_key] = mapping.multiplier * value->value;
+        }
+        break;
+    }
+    case coInt: {
+        auto value = static_cast<const ConfigOptionInt*>(opt);
+        if (mapping.multiplier != 1.0) {
+            BOOST_LOG_TRIVIAL(fatal) << "Multiplier for int config option " << opt_key << " is not supported.";
+            std::terminate();
+        }
+        node[mapping.target_key] = static_cast<int>(value->value);
+        break;
+    }
+    case coBool: {
+        auto value = static_cast<const ConfigOptionBool*>(opt);
+        node[mapping.target_key] = value->value;
+        break;
+    }
+    case coString: {
+        auto value = static_cast<const ConfigOptionString*>(opt);
+        node[mapping.target_key] = value->value;
+        break;
+    }
+    case coPercent: {
+        auto value = static_cast<const ConfigOptionPercent*>(opt);
+        node[mapping.target_key] = mapping.multiplier * value->value;
+        break;
+    }
+    case coFloatOrPercent: {
+        auto value = static_cast<const ConfigOptionFloatOrPercent*>(opt);
+        node[mapping.target_key] = mapping.multiplier * value->value;
+        break;
+    }
+    default:
+        // For other types (enums, complex types, etc.), use serialize()
+        node[mapping.target_key] = opt->serialize();
+        break;
+    }
+}
+
+// Serialize a vector config option to dual JSON nodes (below/above area fill)
+// Handles key mapping, multiplier, and type conversions for vector types
+static void serialize_tilt_option_to_json(std::string opt_key, const ConfigOption* opt, bool is_slx, json& below_node, json& above_node)
+{
+    assert(opt != nullptr);
 
     const t_config_enum_names& tilt_enum_names  = ConfigOptionEnum< TiltSpeeds>::get_enum_names();
+    const t_config_enum_names& tilt_enum_names_slx  = ConfigOptionEnum< TiltSpeedsSLX>::get_enum_names();
     const t_config_enum_names& tower_enum_names = ConfigOptionEnum<TowerSpeeds>::get_enum_names();
 
-    for (const std::string& opt_key : tilt_options()) {
-        const ConfigOption* opt = cfg.option(opt_key);
-        assert(opt != nullptr);
+    const std::string& key = get_key_mapping(opt_key).target_key;
+    const double mult = get_key_mapping(opt_key).multiplier;
 
-        switch (opt->type()) {
-        case coFloats: {
-            auto values = static_cast<const ConfigOptionFloats*>(opt);
-            double koef = opt_key == "tower_hop_height" ? 1000000. : 1000.; // export in nm (instead of mm), resp. in ms (instead of s)
-            below_node.put<double>(get_key(opt_key), int(koef * values->get_at(0)));
-            above_node.put<double>(get_key(opt_key), int(koef * values->get_at(1)));
+    switch (opt->type()) {
+    case coFloats: {
+        auto values = static_cast<const ConfigOptionFloats*>(opt);
+        below_node[key] = static_cast<int>(mult * values->get_at(0));
+        above_node[key] = static_cast<int>(mult * values->get_at(1));
+    }
+    break;
+    case coInts: {
+        auto values = static_cast<const ConfigOptionInts*>(opt);
+        below_node[key] = static_cast<int>(mult * values->get_at(0));
+        above_node[key] = static_cast<int>(mult * values->get_at(1));
+    }
+    break;
+    case coBools: {
+        auto values = static_cast<const ConfigOptionBools*>(opt);
+        below_node[key] = values->get_at(0);
+        above_node[key] = values->get_at(1);
+    }
+    break;
+    case coEnums: {
+        t_config_enum_names enum_names;
+        if (opt_key == "tower_speed")
+            enum_names = tower_enum_names;
+        else if (boost::starts_with(opt_key, "tilt_")) {
+            if (is_slx && boost::ends_with(opt_key, "_slx")) {
+                enum_names = tilt_enum_names_slx;
+                opt_key.resize(opt_key.size() - 4); // trim the suffix
+            }
+            else if (! is_slx && ! boost::ends_with(opt_key, "_slx"))
+                enum_names = tilt_enum_names;
+            else
+                return;
         }
+        else if (opt_key == "dynamic_delay_before_profile")
+            enum_names = ConfigOptionEnum<TiltDynamicDelayBefore>::get_enum_names();
+        else if (opt_key == "dynamic_tilt_up_profile")
+            enum_names = ConfigOptionEnum<TiltDynamicUp>::get_enum_names();
+        else if (opt_key == "dynamic_tilt_down_profile")
+            enum_names = ConfigOptionEnum<TiltDynamicDown>::get_enum_names();
+        else
+            std::terminate();
+
+        auto values = static_cast<const ConfigOptionEnums<TiltSpeeds>*>(opt);
+        below_node[key] = enum_names[values->get_at(0)];
+        above_node[key] = enum_names[values->get_at(1)];
+    }
+    break;
+    case coNone:
+    default:
         break;
-        case coInts: {
-            auto values = static_cast<const ConfigOptionInts*>(opt);
-            below_node.put<int>(get_key(opt_key), values->get_at(0));
-            above_node.put<int>(get_key(opt_key), values->get_at(1));
+    }
+}
+
+// Centralized function to serialize DynamicPrintConfig to JSON structure
+// Uses get_key_mapping() to determine key renaming, multipliers, and JSON hierarchy placement
+struct SerializedConfigNodes {
+    json root_level = json::object();           // Options that go at root/default level
+    json exposure_profile = json::object();     // Options under exposure_profile node
+    json below_area_fill = json::object();      // Tilt options for below area fill threshold
+    json above_area_fill = json::object();      // Tilt options for above area fill threshold
+};
+
+static SerializedConfigNodes serialize_dynamic_config(const DynamicPrintConfig &cfg, bool is_slx)
+{
+    SerializedConfigNodes result;
+
+    for (const std::string &opt_key : cfg.keys()) {
+        const ConfigOption* opt = cfg.option(opt_key);
+        if (!opt)
+            continue;
+
+        auto mapping = get_key_mapping(opt_key);
+
+        // Check if this is a tilt option
+        bool is_tilt = std::find(tilt_options().begin(), tilt_options().end(), opt_key) != tilt_options().end();
+
+        if (is_tilt) {
+            // Tilt options go into below_area_fill and above_area_fill
+            serialize_tilt_option_to_json(opt_key, opt, is_slx,
+                                         result.below_area_fill,
+                                         result.above_area_fill);
         }
-        break;
-        case coBools: {
-            auto values = static_cast<const ConfigOptionBools*>(opt);
-            below_node.put<bool>(get_key(opt_key), values->get_at(0));
-            above_node.put<bool>(get_key(opt_key), values->get_at(1));
+        else if (mapping.json_path == "exposure_profile") {
+            // Use centralized serialization with key mapping and multipliers
+            serialize_config_option(opt_key, opt, result.exposure_profile);
         }
-        break;
-        case coEnums: {
-            const t_config_enum_names& enum_names = opt_key == "tower_speed" ? tower_enum_names : tilt_enum_names;
-            auto values = static_cast<const ConfigOptionEnums<TiltSpeeds>*>(opt);
-            below_node.put(get_key(opt_key), enum_names[values->get_at(0)]);
-            above_node.put(get_key(opt_key), enum_names[values->get_at(1)]);
+        else if (mapping.json_path == "root") {
+            // Root level options (these typically come from ConfMap, not serialized here)
+            // But included for completeness when serializing full config
+            serialize_config_option(opt_key, opt, result.root_level);
         }
-        break;
-        case coNone:
-        default:
-            break;
+        else {
+            // Default: place at root level with transformed key
+            serialize_config_option(opt_key, opt, result.root_level);
         }
     }
 
-    pt::ptree profile_node;
-    profile_node.put("area_fill", cfg.option("area_fill")->serialize());
-    profile_node.add_child("below_area_fill", below_node);
-    profile_node.add_child("above_area_fill", above_node);
+    return result;
+}
 
-    pt::ptree root;
-    // params from config.ini
+static json get_original_values(const DynamicPrintConfig &cfg, bool is_slx)
+{
+    auto serialized = serialize_dynamic_config(cfg, is_slx);
+
+    json& node = serialized.root_level;
+    json& exp_node = serialized.exposure_profile;
+
+    if (!serialized.below_area_fill.empty())
+        exp_node["below_area_fill"] = serialized.below_area_fill;
+    if (!serialized.above_area_fill.empty())
+        exp_node["above_area_fill"] = serialized.above_area_fill;
+    if (!serialized.exposure_profile.empty())
+        node["exposure_profile"] = exp_node;
+    
+    return node;
+}
+
+// Helper to create exposure_profile node with tilt options
+static json create_exposure_profile_node(const DynamicPrintConfig &cfg, bool is_slx)
+{
+    json below_node = json::object();
+    json above_node = json::object();
+
+    // Serialize tilt options
+    for (const std::string& opt_key : tilt_options()) {
+        serialize_tilt_option_to_json(opt_key, cfg.option(opt_key), is_slx, below_node, above_node);
+    }
+
+    // Build exposure profile node
+    json profile_node = json::object();
+
+    // Add area_fill using centralized serialization
+    serialize_config_option("area_fill", cfg.option("area_fill"), profile_node);
+
+    // Add printing_temperature (nullable) - special handling required
+    serialize_config_option("printing_temperature", cfg.option("printing_temperature"), profile_node);
+
+    profile_node["below_area_fill"] = below_node;
+    profile_node["above_area_fill"] = above_node;
+
+    return profile_node;
+}
+
+std::string to_json(const SLAPrint& print, const ConfMap &m)
+{
+    const auto& cfg = print.full_print_config();
+    const bool is_slx = cfg.opt_string("printer_model") == "SLX";
+
+    // Build JSON object using nlohmann::ordered_json
+    json root = json::object();
+
+    // Convert ConfMap to boost::property_tree, serialize with type conversion,
+    // then parse back as nlohmann::json for proper types
+    namespace pt = boost::property_tree;
+    pt::ptree iniconf_tree;
     for (auto& param : m)
-        root.put(param.first, param.second );
+        iniconf_tree.put(param.first, param.second);
 
-    root.put("version", "1");
-    root.add_child("exposure_profile", profile_node);
+    // Use existing helper that converts string values to proper JSON types
+    std::string iniconf_json_str = write_json_with_post_process(iniconf_tree);
 
-    // Boost confirms its implementation has no 100% conformance to JSON standard. 
-    // In the boost libraries, boost will always serialize each value as string and parse all values to a string equivalent.
-    // so, post-prosess output
-    return write_json_with_post_process(root);
+    // Parse as nlohmann::json to get properly typed values
+    json iniconf_json;
+    try {
+        iniconf_json = json::parse(iniconf_json_str);
+    } catch (const json::parse_error& e) {
+        // If this happens, it indicates a bug in write_json_with_post_process or the way we populate iniconf_tree
+        BOOST_LOG_TRIVIAL(error) << "Failed to parse intermediate JSON: " << e.what();
+        throw;
+    }
+
+    // Merge into root
+    for (auto& [key, value] : iniconf_json.items())
+        root[key] = value;
+
+    // Add SLX-specific fields
+    if (is_slx) {
+        if (auto material_uuid = cfg.opt_string("material_uuid"); ! material_uuid.empty())
+            root["material_uuid"] = material_uuid;
+        if (! print.model().sla_workflow_uuid.empty())
+            root["workflow_uuid"] = print.model().sla_workflow_uuid;
+    }
+
+    // Add standard fields
+    root["surface_area"] = get_print_area(print);
+    root["version"] = is_slx ? 2 : 1;
+
+    // Add exposure_profile using centralized logic
+    root["exposure_profile"] = create_exposure_profile_node(cfg, is_slx);
+
+    // Add original_values
+    root["original_values"] = get_original_values(print.original_config(), is_slx);
+
+    // Serialize to JSON string with 4-space indentation
+    return root.dump(4);
 }
 
 std::string get_cfg_value(const DynamicPrintConfig &cfg, const std::string &key)
@@ -172,16 +423,16 @@ void fill_iniconf(ConfMap &m, const SLAPrint &print)
 {
     CNumericLocalesSetter locales_setter; // for to_string
     auto &cfg = print.full_print_config();
-    m["layerHeight"]    = get_cfg_value(cfg, "layer_height");
-    m["expTime"]        = get_cfg_value(cfg, "exposure_time");
-    m["expTimeFirst"]   = get_cfg_value(cfg, "initial_exposure_time");
+    m[get_key_mapping("layer_height").target_key]    = get_cfg_value(cfg, "layer_height");
+    m[get_key_mapping("exposure_time").target_key]   = get_cfg_value(cfg, "exposure_time");
+    m[get_key_mapping("initial_exposure_time").target_key] = get_cfg_value(cfg, "initial_exposure_time");
     const std::string mps = get_cfg_value(cfg, "material_print_speed");
-    m["expUserProfile"] = mps == "slow" ? "1" : mps == "fast" ? "0" : "2";
-    m["materialName"]   = get_cfg_value(cfg, "sla_material_settings_id");
-    m["printerModel"]   = get_cfg_value(cfg, "printer_model");
-    m["printerVariant"] = get_cfg_value(cfg, "printer_variant");
-    m["printerProfile"] = get_cfg_value(cfg, "printer_settings_id");
-    m["printProfile"]   = get_cfg_value(cfg, "sla_print_settings_id");
+    m[get_key_mapping("material_print_speed").target_key] = mps == "slow" ? "1" : mps == "fast" ? "0" : "2";
+    m[get_key_mapping("sla_material_settings_id").target_key]= get_cfg_value(cfg, "sla_material_settings_id");
+    m[get_key_mapping("printer_model").target_key]   = get_cfg_value(cfg, "printer_model");
+    m[get_key_mapping("printer_variant").target_key] = get_cfg_value(cfg, "printer_variant");
+    m[get_key_mapping("printer_settings_id").target_key]     = get_cfg_value(cfg, "printer_settings_id");
+    m[get_key_mapping("sla_print_settings_id").target_key]   = get_cfg_value(cfg, "sla_print_settings_id");
     m["fileCreationTimestamp"] = Utils::utc_timestamp();
     m["prusaSlicerVersion"]    = SLIC3R_BUILD_ID;
     
@@ -195,7 +446,7 @@ void fill_iniconf(ConfMap &m, const SLAPrint &print)
     num_fade = num_fade >= 0 ? num_fade : 0;
     
     m["usedMaterial"] = std::to_string(used_material);
-    m["numFade"]      = std::to_string(num_fade);
+    m[get_key_mapping("faded_layers").target_key] = get_cfg_value(cfg, "faded_layers");
     m["numSlow"]      = std::to_string(stats.slow_layers_count);
     m["numFast"]      = std::to_string(stats.fast_layers_count);
     m["printTime"]    = std::to_string(stats.estimated_print_time);

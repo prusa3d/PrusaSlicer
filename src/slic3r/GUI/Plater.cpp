@@ -80,6 +80,7 @@
 #include "libslic3r/ModelProcessing.hpp"
 #include "libslic3r/FileReader.hpp"
 #include "libslic3r/MultipleBeds.hpp"
+#include "libslic3r/SLA/Workflows.hpp"
 
 // For stl export
 #include "libslic3r/CSGMesh/ModelToCSGMesh.hpp"
@@ -179,6 +180,7 @@ wxDEFINE_EVENT(EVT_SLICING_COMPLETED,               wxCommandEvent);
 wxDEFINE_EVENT(EVT_PROCESS_COMPLETED,               SlicingProcessCompletedEvent);
 wxDEFINE_EVENT(EVT_EXPORT_BEGAN,                    wxCommandEvent);
 wxDEFINE_EVENT(EVT_REGENERATE_BED_THUMBNAILS, SimpleEvent);
+wxDEFINE_EVENT(EVT_RELOAD_SLA_WORKFLOWS, SimpleEvent);
 
 // Plater::DropTarget
 
@@ -195,6 +197,28 @@ private:
     MainFrame& m_mainframe;
     Plater& m_plater;
 };
+
+static std::optional<std::string> http_get_file_as_string(const std::string& url)
+{
+    std::optional<std::string> out;
+    bool res = false;
+	auto http = Http::get(url);
+    http
+		.timeout_max(5)
+        .on_error([&](std::string body, std::string error, unsigned http_status) {
+            BOOST_LOG_TRIVIAL(error) << "Unable to fetch file (" << url << "): "
+            << http_status << " (" << error << ")";
+        })
+		.on_complete([&](std::string body, unsigned http_status) {
+            if (http_status == 200)
+                out = body;
+		})
+        .perform_sync();
+    
+    return out;
+}
+
+
 
 namespace {
 bool emboss_svg(Plater& plater, const wxString &svg_file, const Vec2d& mouse_drop_position)
@@ -273,6 +297,7 @@ struct Plater::priv
     Slic3r::Model               model;
     PrinterTechnology           printer_technology = ptFFF;
     std::vector<Slic3r::GCodeProcessorResult> gcode_results;
+    std::unique_ptr<sla::WorkflowManager> workflow_manager;
 
     // GUI elements
     wxSizer* panel_sizer{ nullptr };
@@ -592,6 +617,8 @@ struct Plater::priv
     std::string                 last_output_dir_path;
     bool                        inside_snapshot_capture() { return m_prevent_snapshots != 0; }
 
+    void fetch_workflows_file_online_start();
+
 private:
     bool layers_height_allowed() const;
 
@@ -651,8 +678,29 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     , m_project_filename(wxEmptyString)
 {}
 
+void Plater::priv::fetch_workflows_file_online_start()
+{
+    workflow_manager->fetch_workflows_file_online_in_background(
+        http_get_file_as_string,
+        [this](Semver){
+            // This callback is run in background thread after an update fetches a new file.
+            // Just fire a wxWidgets event to invoke the callback in the UI thread.
+            wxQueueEvent(this->q, new SimpleEvent(EVT_RELOAD_SLA_WORKFLOWS));
+        }
+    );
+}
+
 void Plater::priv::init()
 {
+    workflow_manager = std::make_unique<sla::WorkflowManager>();
+    q->Bind(EVT_RELOAD_SLA_WORKFLOWS, [this](SimpleEvent&) {
+        workflow_manager = std::make_unique<sla::WorkflowManager>();
+        sidebar->update_workflow_combobox_if_needed();
+        sidebar->on_workflow_changed();
+    });
+    q->fetch_workflows_file_online_start();
+    
+
     for (int i = 0; i < s_multiple_beds.get_max_beds(); ++i) {
         gcode_results.emplace_back();
         fff_prints.emplace_back(std::make_unique<Print>());
@@ -1072,6 +1120,9 @@ void Plater::priv::init()
             fclose(file);
             this->main_frame->refresh_account_menu(true);
         }); 
+        this->q->Bind(EVT_UA_PRINTABLES_SECRET_TOKEN_SUCCESS, [this](UserAccountSuccessEvent& evt) {
+            main_frame->on_printables_secret_token(evt.data);
+        });
         this->q->Bind(EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, [this](UserAccountSuccessEvent& evt) {
             this->user_account->set_current_printer_data(evt.data);
             wxGetApp().handle_connect_request_printer_select_inner(evt.data);
@@ -2395,8 +2446,9 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             apply_statuses[s_multiple_beds.get_active_bed()] = invalidated;
         });
     } else if (printer_technology == ptSLA) {
+        DynamicPrintConfig original_config = wxGetApp().preset_bundle->original_config();
         with_single_bed_model_sla(q->model(), s_multiple_beds.get_active_bed(), [&](){
-            invalidated = background_process.apply(q->model(), full_config, &warnings);
+            invalidated = background_process.apply(q->model(), full_config, &warnings, &original_config);
             apply_statuses[0] = invalidated;
         });
     } else {
@@ -4400,6 +4452,10 @@ void Plater::render_project_state_debug_window() const { p->render_project_state
 Sidebar&        Plater::sidebar()           { return *p->sidebar; }
 const Model&    Plater::model() const       { return p->model; }
 Model&          Plater::model()             { return p->model; }
+
+void Plater::fetch_workflows_file_online_start() {
+    p->fetch_workflows_file_online_start();
+}
 
 bool Plater::is_project_temp() const
 {
@@ -7746,6 +7802,11 @@ std::vector<std::unique_ptr<Print>>& Plater::get_fff_prints()
 const std::vector<GCodeProcessorResult>& Plater::get_gcode_results() const
 {
     return p->gcode_results;
+}
+
+const sla::WorkflowManager& Plater::get_workflow_manager() const
+{
+    return *p->workflow_manager;
 }
 
 wxMenu* Plater::object_menu()           { return p->menus.object_menu();            }

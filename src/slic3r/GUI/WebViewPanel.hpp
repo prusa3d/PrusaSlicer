@@ -77,6 +77,8 @@ public:
     void on_app_quit_event(const std::string& message_data);
     void on_app_minimize_event(const std::string& message_data);
     void prohibit_after_show_func_once() {m_after_show_func_prohibited_once = true; }
+
+    virtual void on_printables_secret_token(const std::string& body) {}
 protected:
     virtual void late_create();
     virtual void define_css();
@@ -181,6 +183,7 @@ public:
     void clear() { m_api_key.clear(); m_usr.clear(); m_psk.clear(); m_api_key_sent = false; }
 
     void on_reload_event(const std::string& message_data);
+
 protected:
     void define_css() override;
 private:
@@ -204,11 +207,14 @@ public:
     void sys_color_changed() override;
 
     void logout(const std::string& override_url = std::string());
-    void login(const std::string& access_token, const std::string& override_url = std::string());
+    void login(const std::string& access_token);
     void send_refreshed_token(const std::string& access_token);
     void send_will_refresh();
     wxString get_default_url() const override;
     void set_next_show_url(const std::string& url) {m_next_show_url = Utils::ServiceConfig::instance().printables_url() + url; }
+
+    void on_printables_secret_token(const std::string& body);
+
 protected:
     void define_css() override;
 private:
@@ -223,6 +229,7 @@ private:
      void on_printables_event_open_url(const std::string& message_data);
      void on_dummy_event(const std::string& message_data) {}
      void load_default_url() override;
+     void load_url_with_auth(const std::string& url);
      std::string get_url_lang_theme(const wxString& url) const;
      void show_download_notification(const std::string& filename);
      void show_loading_overlay();
@@ -230,7 +237,8 @@ private:
 
      std::map<std::string, std::function<void(const std::string&)>> m_events;
      std::string m_next_show_url;
-
+    
+     bool m_reload_after_secret_token{false};
      bool m_refreshing_token {false};
 #ifdef _WIN32
      bool m_remove_request_auth { false };

@@ -781,6 +781,36 @@ std::string Http::url_encode(const std::string &str)
 	return encoded;
 }
 
+std::string Http::get_apex_domain(const std::string& url)
+{
+    CURLU* h = curl_url();
+    if (!h) return {};
+
+    if (curl_url_set(h, CURLUPART_URL, url.c_str(), CURLU_DEFAULT_SCHEME) != CURLUE_OK) {
+        curl_url_cleanup(h);
+        return {};
+    }
+
+    char* host = nullptr;
+    if (curl_url_get(h, CURLUPART_HOST, &host, 0) != CURLUE_OK) {
+        curl_url_cleanup(h);
+        return {};
+    }
+
+    std::string host_str(host);
+    curl_free(host);
+    curl_url_cleanup(h);
+
+    size_t last_dot = host_str.rfind('.');
+    if (last_dot != std::string::npos && last_dot > 0) {
+        size_t prev_dot = host_str.rfind('.', last_dot - 1);
+        if (prev_dot != std::string::npos) {
+            return host_str.substr(prev_dot + 1);
+        }
+    }
+    return host_str;
+}
+
 std::ostream& operator<<(std::ostream &os, const Http::Progress &progress)
 {
 	os << "Http::Progress("
