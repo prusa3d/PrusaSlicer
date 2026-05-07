@@ -19,8 +19,6 @@
 
 namespace Slic3r::GUI {
 
-
-
 void GLGizmoSeam::on_shutdown()
 {
     m_parent.toggle_model_objects_visibility(true);
@@ -45,6 +43,10 @@ bool GLGizmoSeam::on_init()
     m_desc["remove_all"]       = _u8L("Remove all selection");
     m_desc["circle"]           = _u8L("Circle");
     m_desc["sphere"]           = _u8L("Sphere");
+    m_desc["tool_type"]        = _u8L("Tool type") + ": ";
+    m_desc["tool_brush"]       = _u8L("Brush");
+    m_desc["tool_smart_fill"]  = _u8L("Smart fill");
+    m_desc["smart_fill_angle"] = _u8L("Smart fill angle");
 
     return true;
 }
@@ -79,7 +81,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     if (! m_c->selection_info()->model_object())
         return;
 
-    const float approx_height = m_imgui->scaled(13.45f);
+    const float approx_height = m_imgui->scaled(16.5f);
     y = std::min(y, bottom_limit - approx_height);
     ImGuiPureWrap::set_next_window_pos(x, y, ImGuiCond_Always);
     ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -88,11 +90,15 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     const float clipping_slider_left = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x,
                                                 ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x)
                                            + m_imgui->scaled(1.5f);
-    const float cursor_size_slider_left = ImGuiPureWrap::calc_text_size(m_desc.at("cursor_size")).x + m_imgui->scaled(1.f);
+    const float cursor_slider_left     = ImGuiPureWrap::calc_text_size(m_desc.at("cursor_size")).x + m_imgui->scaled(1.f);
+    const float smart_fill_slider_left = ImGuiPureWrap::calc_text_size(m_desc.at("smart_fill_angle")).x + m_imgui->scaled(1.f);
 
     const float cursor_type_radio_left   = ImGuiPureWrap::calc_text_size(m_desc["cursor_type"]).x + m_imgui->scaled(1.f);
     const float cursor_type_radio_sphere = ImGuiPureWrap::calc_text_size(m_desc["sphere"]).x + m_imgui->scaled(2.5f);
     const float cursor_type_radio_circle = ImGuiPureWrap::calc_text_size(m_desc["circle"]).x + m_imgui->scaled(2.5f);
+    const float tool_type_radio_left     = ImGuiPureWrap::calc_text_size(m_desc["tool_type"]).x + m_imgui->scaled(1.f);
+    const float tool_type_radio_brush    = ImGuiPureWrap::calc_text_size(m_desc["tool_brush"]).x + m_imgui->scaled(2.5f);
+    const float tool_type_radio_smart_fill = ImGuiPureWrap::calc_text_size(m_desc["tool_smart_fill"]).x + m_imgui->scaled(2.5f);
 
     const float button_width = ImGuiPureWrap::calc_text_size(m_desc.at("remove_all")).x + m_imgui->scaled(1.f);
     const float minimal_slider_width = m_imgui->scaled(4.f);
@@ -106,12 +112,13 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     total_text_max += caption_max + m_imgui->scaled(1.f);
     caption_max    += m_imgui->scaled(1.f);
 
-    const float sliders_left_width = std::max(cursor_size_slider_left, clipping_slider_left);
+    const float sliders_left_width = std::max(std::max(cursor_slider_left, smart_fill_slider_left), clipping_slider_left);
     const float slider_icon_width  = ImGuiPureWrap::get_slider_icon_size().x;
     float       window_width       = minimal_slider_width + sliders_left_width + slider_icon_width;
     window_width = std::max(window_width, total_text_max);
     window_width = std::max(window_width, button_width);
     window_width = std::max(window_width, cursor_type_radio_left + cursor_type_radio_sphere + cursor_type_radio_circle);
+    window_width = std::max(window_width, tool_type_radio_left + tool_type_radio_brush + tool_type_radio_smart_fill);
 
     auto draw_text_with_caption = [&caption_max](const std::string& caption, const std::string& text) {
         ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, caption);
@@ -125,32 +132,72 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::Separator();
 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
+    std::string format_str = std::string("%.f") + I18N::translate_utf8("\xC2\xB0",
+        "Degree sign to use in the respective slider in seam gizmo,"
+        " placed after the number with no whitespace in between.");
 
     ImGui::AlignTextToFramePadding();
-    ImGuiPureWrap::text(m_desc.at("cursor_size"));
-    ImGui::SameLine(sliders_left_width);
-    ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-    m_imgui->slider_float("##cursor_radius", &m_cursor_radius, CursorRadiusMin, CursorRadiusMax, "%.2f", 1.0f, true, _L("Alt + Mouse wheel"));
+    ImGuiPureWrap::text(m_desc["tool_type"]);
 
-    ImGui::AlignTextToFramePadding();
-    ImGuiPureWrap::text(m_desc.at("cursor_type"));
-
-    float cursor_type_offset = cursor_type_radio_left + (window_width - cursor_type_radio_left - cursor_type_radio_sphere - cursor_type_radio_circle + m_imgui->scaled(0.5f)) / 2.f;
-    ImGui::SameLine(cursor_type_offset);
-    ImGui::PushItemWidth(cursor_type_radio_sphere);
-    if (ImGuiPureWrap::radio_button(m_desc["sphere"], m_cursor_type == TriangleSelector::CursorType::SPHERE))
-        m_cursor_type = TriangleSelector::CursorType::SPHERE;
+    float tool_type_offset = tool_type_radio_left + (window_width - tool_type_radio_left - tool_type_radio_brush - tool_type_radio_smart_fill + m_imgui->scaled(0.5f)) / 2.f;
+    ImGui::SameLine(tool_type_offset);
+    ImGui::PushItemWidth(tool_type_radio_brush);
+    if (ImGuiPureWrap::radio_button(m_desc["tool_brush"], m_tool_type == ToolType::BRUSH))
+        m_tool_type = ToolType::BRUSH;
 
     if (ImGui::IsItemHovered())
-        ImGuiPureWrap::tooltip(_u8L("Paints all facets inside, regardless of their orientation."), max_tooltip_width);
+        ImGuiPureWrap::tooltip(_u8L("Paints facets according to the chosen painting brush."), max_tooltip_width);
 
-    ImGui::SameLine(cursor_type_offset + cursor_type_radio_sphere);
-    ImGui::PushItemWidth(cursor_type_radio_circle);
-    if (ImGuiPureWrap::radio_button(m_desc["circle"], m_cursor_type == TriangleSelector::CursorType::CIRCLE))
-        m_cursor_type = TriangleSelector::CursorType::CIRCLE;
+    ImGui::SameLine(tool_type_offset + tool_type_radio_brush);
+    ImGui::PushItemWidth(tool_type_radio_smart_fill);
+    if (ImGuiPureWrap::radio_button(m_desc["tool_smart_fill"], m_tool_type == ToolType::SMART_FILL))
+        m_tool_type = ToolType::SMART_FILL;
 
     if (ImGui::IsItemHovered())
-        ImGuiPureWrap::tooltip(_u8L("Ignores facets facing away from the camera."), max_tooltip_width);
+        ImGuiPureWrap::tooltip(_u8L("Paints neighboring facets whose relative angle is less or equal to set angle."), max_tooltip_width);
+
+    ImGui::Separator();
+
+    if (m_tool_type == ToolType::BRUSH) {
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(m_desc.at("cursor_size"));
+        ImGui::SameLine(sliders_left_width);
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        m_imgui->slider_float("##cursor_radius", &m_cursor_radius, CursorRadiusMin, CursorRadiusMax, "%.2f", 1.0f, true, _L("Alt + Mouse wheel"));
+
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(m_desc.at("cursor_type"));
+
+        float cursor_type_offset = cursor_type_radio_left + (window_width - cursor_type_radio_left - cursor_type_radio_sphere - cursor_type_radio_circle + m_imgui->scaled(0.5f)) / 2.f;
+        ImGui::SameLine(cursor_type_offset);
+        ImGui::PushItemWidth(cursor_type_radio_sphere);
+        if (ImGuiPureWrap::radio_button(m_desc["sphere"], m_cursor_type == TriangleSelector::CursorType::SPHERE))
+            m_cursor_type = TriangleSelector::CursorType::SPHERE;
+
+        if (ImGui::IsItemHovered())
+            ImGuiPureWrap::tooltip(_u8L("Paints all facets inside, regardless of their orientation."), max_tooltip_width);
+
+        ImGui::SameLine(cursor_type_offset + cursor_type_radio_sphere);
+        ImGui::PushItemWidth(cursor_type_radio_circle);
+        if (ImGuiPureWrap::radio_button(m_desc["circle"], m_cursor_type == TriangleSelector::CursorType::CIRCLE))
+            m_cursor_type = TriangleSelector::CursorType::CIRCLE;
+
+        if (ImGui::IsItemHovered())
+            ImGuiPureWrap::tooltip(_u8L("Ignores facets facing away from the camera."), max_tooltip_width);
+    } else {
+        assert(m_tool_type == ToolType::SMART_FILL);
+        ImGui::AlignTextToFramePadding();
+        ImGuiPureWrap::text(m_desc["smart_fill_angle"] + ":");
+
+        ImGui::SameLine(sliders_left_width);
+        ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
+        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel"))) {
+            for (auto &triangle_selector : m_triangle_selectors) {
+                triangle_selector->seed_fill_unselect_all_triangles();
+                triangle_selector->request_update_render_data();
+            }
+        }
+    }
 
     ImGui::Separator();
     if (m_c->object_clipper()->get_position() == 0.f) {
