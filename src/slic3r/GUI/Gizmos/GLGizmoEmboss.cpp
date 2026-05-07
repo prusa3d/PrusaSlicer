@@ -1387,37 +1387,40 @@ bool GLGizmoEmboss::process(bool make_snapshot, std::optional<Transform3d> volum
 
 void GLGizmoEmboss::close()
 {
-    if (m_volume != nullptr && 
-        m_volume->text_configuration.has_value() ){
-        
+    if (m_volume != nullptr &&
+        m_volume->text_configuration.has_value()) {
         // remove volume when text is empty
         if (is_text_empty(m_text)) {
             Plater &p = *wxGetApp().plater();
+            // Store state prior to call to reset_volume().
+            const bool is_text_object = m_volume->is_the_only_one_part();
+            const int object_idx = m_parent.get_selection().get_object_idx();
+            reset_volume();
             // is the text object?
-            if (m_volume->is_the_only_one_part()) {
+            if (is_text_object) {
                 // delete whole object
-                p.remove(m_parent.get_selection().get_object_idx());
+                p.remove(object_idx);
             } else {
                 // delete text volume
                 p.remove_selected();
             }
-        }
+        } else {
+            // Fix phanthom transformation
+            //   appear when right click into scene during edit Rotation in input (click "Edit" button)
+            const GLVolume *gl_volume_ptr = m_parent.get_selection().get_first_volume();
+            if (gl_volume_ptr != nullptr) {
+                const Transform3d &v_tr = m_volume->get_matrix();
+                const Transform3d &gl_v_tr = gl_volume_ptr->get_volume_transformation().get_matrix();
 
-        // Fix phanthom transformation
-        //   appear when right click into scene during edit Rotation in input (click "Edit" button)
-        const GLVolume *gl_volume_ptr = m_parent.get_selection().get_first_volume();
-        if (gl_volume_ptr != nullptr) {
-            const Transform3d &v_tr = m_volume->get_matrix();
-            const Transform3d &gl_v_tr = gl_volume_ptr->get_volume_transformation().get_matrix();
-
-            const Matrix3d &v_rot = v_tr.linear();
-            const Matrix3d &gl_v_rot = gl_v_tr.linear();
-            const Vec3d &v_move = v_tr.translation();
-            const Vec3d &gl_v_move = gl_v_tr.translation();
-            if (!is_approx(v_rot, gl_v_rot)) { 
-                m_parent.do_rotate(rotation_snapshot_name);
-            } else if (!is_approx(v_move, gl_v_move)){
-                m_parent.do_move(move_snapshot_name);
+                const Matrix3d &v_rot = v_tr.linear();
+                const Matrix3d &gl_v_rot = gl_v_tr.linear();
+                const Vec3d &v_move = v_tr.translation();
+                const Vec3d &gl_v_move = gl_v_tr.translation();
+                if (!is_approx(v_rot, gl_v_rot)) {
+                    m_parent.do_rotate(rotation_snapshot_name);
+                } else if (!is_approx(v_move, gl_v_move)){
+                    m_parent.do_move(move_snapshot_name);
+                }
             }
         }
     }
