@@ -47,6 +47,9 @@ bool GLGizmoSeam::on_init()
     m_desc["tool_brush"]       = _u8L("Brush");
     m_desc["tool_smart_fill"]  = _u8L("Smart fill");
     m_desc["smart_fill_angle"] = _u8L("Smart fill angle");
+    m_desc["smart_fill_format"] = std::string("%.f") + I18N::translate_utf8("°",
+        "Degree sign to use in the respective slider in seam gizmo,"
+        " placed after the number with no whitespace in between.");
 
     return true;
 }
@@ -132,9 +135,6 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::Separator();
 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
-    std::string format_str = std::string("%.f") + I18N::translate_utf8("\xC2\xB0",
-        "Degree sign to use in the respective slider in seam gizmo,"
-        " placed after the number with no whitespace in between.");
 
     ImGui::AlignTextToFramePadding();
     ImGuiPureWrap::text(m_desc["tool_type"]);
@@ -191,7 +191,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
 
         ImGui::SameLine(sliders_left_width);
         ImGui::PushItemWidth(window_width - sliders_left_width - slider_icon_width);
-        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, format_str.data(), 1.0f, true, _L("Alt + Mouse wheel"))) {
+        if (m_imgui->slider_float("##smart_fill_angle", &m_smart_fill_angle, SmartFillAngleMin, SmartFillAngleMax, m_desc["smart_fill_format"].data(), 1.0f, true, _L("Alt + Mouse wheel"))) {
             for (auto &triangle_selector : m_triangle_selectors) {
                 triangle_selector->seed_fill_unselect_all_triangles();
                 triangle_selector->request_update_render_data();
