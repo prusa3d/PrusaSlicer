@@ -60,18 +60,18 @@ bool STHalfEdge::isUpward() const
     std::optional<coord_t> backward_up_dist = twin->distToGoUp();
     if (forward_up_dist && backward_up_dist)
     {
-        return forward_up_dist < backward_up_dist;
-    }
-
-    if (forward_up_dist)
-    {
+        if (forward_up_dist < backward_up_dist) {
+            return true;
+        }
+        if (forward_up_dist > backward_up_dist) {
+            return false;
+        }
+    } else if (forward_up_dist) {
         return true;
-    }
-
-    if (backward_up_dist)
-    {
+    } else if (backward_up_dist) {
         return false;
     }
+
     return to->p < from->p; // Arbitrary ordering, which returns the opposite for the twin edge
 }
 
