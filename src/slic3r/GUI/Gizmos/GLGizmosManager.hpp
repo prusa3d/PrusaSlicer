@@ -80,7 +80,7 @@ public:
         SlaSupports,
         FdmSupports,
         Seam,
-        FuzzySkin,
+        SurfaceTexture,
         MmSegmentation,
         Measure,
         Emboss,

@@ -81,8 +81,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Gizmos/GLGizmoSlaSupports.hpp
     GUI/Gizmos/GLGizmoFdmSupports.cpp
     GUI/Gizmos/GLGizmoFdmSupports.hpp
-    GUI/Gizmos/GLGizmoFuzzySkin.cpp
-    GUI/Gizmos/GLGizmoFuzzySkin.hpp
+    GUI/Gizmos/GLGizmoSurfaceTexture.cpp
+    GUI/Gizmos/GLGizmoSurfaceTexture.hpp
     GUI/Gizmos/GLGizmoFlatten.cpp
     GUI/Gizmos/GLGizmoFlatten.hpp
     GUI/Gizmos/GLGizmoCut.cpp
@@ -163,6 +163,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/GUI_ObjectList.hpp
     GUI/GalleryDialog.cpp
     GUI/GalleryDialog.hpp
+    GUI/TextureSkinPickerDialog.cpp
+    GUI/TextureSkinPickerDialog.hpp
     GUI/GUI_ObjectManipulation.cpp
     GUI/GUI_ObjectManipulation.hpp
     GUI/GUI_ObjectSettings.cpp

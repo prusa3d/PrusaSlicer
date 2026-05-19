@@ -736,6 +736,109 @@ void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_can
 }
 
 template<typename ThrowOnCancel>
+void apply_texture_skin_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel)
+{
+    // Returns texture skin segmentation based on painting in the texture skin painting gizmo.
+    std::vector<std::vector<ExPolygons>> segmentation = texture_skin_segmentation_by_painting(print_object, throw_on_cancel);
+    assert(segmentation.size() == print_object.layer_count());
+
+    struct ByRegion
+    {
+        ExPolygons expolygons;
+        bool       needs_merge { false };
+        bool       modified    { false };
+    };
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, segmentation.size(), std::max(segmentation.size() / 128, size_t(1))), [&print_object, &segmentation, throw_on_cancel](const tbb::blocked_range<size_t> &range) {
+        const auto &layer_ranges   = print_object.shared_regions()->layer_ranges;
+        auto        it_layer_range = layer_range_first(layer_ranges, print_object.get_layer(int(range.begin()))->slice_z);
+
+        for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+            throw_on_cancel();
+
+            Layer &layer = *print_object.get_layer(int(layer_idx));
+            it_layer_range = layer_range_next(layer_ranges, it_layer_range, layer.slice_z);
+            const PrintObjectRegions::LayerRangeRegions &layer_range = *it_layer_range;
+
+            assert(segmentation[layer_idx].size() == 1);
+            const ExPolygons &texture_skin_segmentation      = segmentation[layer_idx][0];
+            const BoundingBox texture_skin_segmentation_bbox = get_extents(texture_skin_segmentation);
+            if (texture_skin_segmentation.empty())
+                continue;
+
+            std::vector<ByRegion> by_region(layer.region_count());
+            auto                  it_texture_skin_region_begin = layer_range.texture_skin_painted_regions.cbegin();
+            for (int parent_layer_region_idx = 0; parent_layer_region_idx < layer.region_count(); ++parent_layer_region_idx) {
+                if (it_texture_skin_region_begin == layer_range.texture_skin_painted_regions.cend())
+                    continue;
+
+                const LayerRegion &parent_layer_region = *layer.get_region(parent_layer_region_idx);
+                const PrintRegion &parent_print_region = parent_layer_region.region();
+                assert(parent_print_region.print_object_region_id() == parent_layer_region_idx);
+                if (parent_layer_region.slices().empty())
+                    continue;
+
+                auto it_texture_skin_region = std::find_if(it_texture_skin_region_begin, layer_range.texture_skin_painted_regions.cend(), [&layer_range, &parent_print_region](const auto &texture_skin_region) {
+                    return texture_skin_region.parent_print_object_region_id(layer_range) == parent_print_region.print_object_region_id();
+                });
+
+                if (it_texture_skin_region == layer_range.texture_skin_painted_regions.cend())
+                    continue;
+
+                assert(it_texture_skin_region->parent_print_object_region(layer_range) == &parent_print_region);
+                it_texture_skin_region_begin = std::next(it_texture_skin_region);
+
+                const BoundingBox parent_layer_region_bbox        = get_extents(parent_layer_region.slices().surfaces);
+                Polygons          layer_region_remaining_polygons = to_polygons(parent_layer_region.slices().surfaces);
+                if (parent_layer_region_bbox.overlap(texture_skin_segmentation_bbox) && it_texture_skin_region->region != &parent_print_region) {
+                    const int  target_region_id = it_texture_skin_region->region->print_object_region_id();
+                    ExPolygons stolen           = intersection_ex(parent_layer_region.slices().surfaces, texture_skin_segmentation);
+                    if (!stolen.empty()) {
+                        ByRegion &dst = by_region[target_region_id];
+                        if (dst.expolygons.empty()) {
+                            dst.expolygons = std::move(stolen);
+                        } else {
+                            append(dst.expolygons, std::move(stolen));
+                            dst.needs_merge = true;
+                        }
+                        dst.modified = true;
+                        by_region[parent_print_region.print_object_region_id()].modified = true;
+                    }
+
+                    layer_region_remaining_polygons = diff(layer_region_remaining_polygons, texture_skin_segmentation);
+                    if (!layer_region_remaining_polygons.empty()) {
+                        layer_region_remaining_polygons = opening(union_ex(layer_region_remaining_polygons), scaled<float>(5. * EPSILON), scaled<float>(5. * EPSILON));
+                    }
+                }
+
+                if (!layer_region_remaining_polygons.empty()) {
+                    ByRegion &dst = by_region[parent_print_region.print_object_region_id()];
+                    if (dst.expolygons.empty()) {
+                        dst.expolygons = union_ex(layer_region_remaining_polygons);
+                    } else {
+                        append(dst.expolygons, union_ex(layer_region_remaining_polygons));
+                        dst.needs_merge = true;
+                    }
+                    dst.modified = true;
+                }
+            }
+
+            // Only overwrite regions that were actually touched by this
+            // segmentation pass. Regions belonging to other features (e.g.
+            // fuzzy-skin painted regions) keep their existing slices.
+            for (int region_id = 0; region_id < layer.region_count(); ++region_id) {
+                ByRegion &src = by_region[region_id];
+                if (!src.modified) continue;
+                if (src.needs_merge) {
+                    src.expolygons = closing_ex(src.expolygons, scaled<float>(10. * EPSILON));
+                }
+                layer.get_region(region_id)->m_slices.set(std::move(src.expolygons), stInternal);
+            }
+        }
+    });
+}
+
+template<typename ThrowOnCancel>
 void apply_fuzzy_skin_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_cancel)
 {
     // Returns fuzzy skin segmentation based on painting in the fuzzy skin painting gizmo.
@@ -746,6 +849,7 @@ void apply_fuzzy_skin_segmentation(PrintObject &print_object, ThrowOnCancel thro
     {
         ExPolygons expolygons;
         bool       needs_merge { false };
+        bool       modified    { false };
     };
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, segmentation.size(), std::max(segmentation.size() / 128, size_t(1))), [&print_object, &segmentation, throw_on_cancel](const tbb::blocked_range<size_t> &range) {
@@ -807,6 +911,10 @@ void apply_fuzzy_skin_segmentation(PrintObject &print_object, ThrowOnCancel thro
                             append(dst.expolygons, std::move(stolen));
                             dst.needs_merge = true;
                         }
+                        dst.modified = true;
+                        // Parent is always modified when we steal from it
+                        // (even if remaining is empty = fully consumed).
+                        by_region[parent_print_region.print_object_region_id()].modified = true;
                     }
 
                     // Trim slices of this LayerRegion by the fuzzy skin region.
@@ -826,17 +934,19 @@ void apply_fuzzy_skin_segmentation(PrintObject &print_object, ThrowOnCancel thro
                         append(dst.expolygons, union_ex(layer_region_remaining_polygons));
                         dst.needs_merge = true;
                     }
+                    dst.modified = true;
                 }
             }
 
-            // Re-create Surfaces of LayerRegions.
+            // Only overwrite regions that were actually touched by this
+            // segmentation pass. Regions belonging to other features (e.g.
+            // texture-skin painted regions) keep their existing slices.
             for (int region_id = 0; region_id < layer.region_count(); ++region_id) {
                 ByRegion &src = by_region[region_id];
+                if (!src.modified) continue;
                 if (src.needs_merge) {
-                    // Multiple regions were merged into one.
                     src.expolygons = closing_ex(src.expolygons, scaled<float>(10. * EPSILON));
                 }
-
                 layer.get_region(region_id)->m_slices.set(std::move(src.expolygons), stInternal);
             }
         }
@@ -922,6 +1032,20 @@ void PrintObject::slice_volumes()
 
         BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - Fuzzy skin segmentation";
         apply_fuzzy_skin_segmentation(*this, [print]() { print->throw_if_canceled(); });
+    }
+
+    // Is any ModelVolume texture skin painted?
+    if (this->model_object()->is_texture_skin_painted()) {
+        if (m_config.xy_size_compensation.value != 0.f) {
+            this->active_step_add_warning(
+                PrintStateBase::WarningLevel::CRITICAL,
+                _u8L("An object has enabled XY Size compensation which will not be used because it is also texture skin painted.\nXY Size "
+                     "compensation cannot be combined with texture skin painting.") +
+                    "\n" + (_u8L("Object name")) + ": " + this->model_object()->name);
+        }
+
+        BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - Texture skin segmentation";
+        apply_texture_skin_segmentation(*this, [print]() { print->throw_if_canceled(); });
     }
 
     if (m_config.interlocking_beam) {

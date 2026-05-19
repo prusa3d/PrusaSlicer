@@ -127,6 +127,53 @@ static const t_config_enum_values s_keys_map_FuzzySkinType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
 
+static const t_config_enum_values s_keys_map_TextureSkinType {
+    { "none",           int(TextureSkinType::None) },
+    { "external",       int(TextureSkinType::External) },
+    { "all",            int(TextureSkinType::All) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TextureSkinType)
+
+static const t_config_enum_values s_keys_map_TextureSkinPattern {
+    { "basket",       int(TextureSkinPattern::Basket) },
+    { "brick",        int(TextureSkinPattern::Brick) },
+    { "bubble",       int(TextureSkinPattern::Bubble) },
+    { "carbon_fiber", int(TextureSkinPattern::CarbonFiber) },
+    { "crystal",      int(TextureSkinPattern::Crystal) },
+    { "dots",         int(TextureSkinPattern::Dots) },
+    { "grid",         int(TextureSkinPattern::Grid) },
+    { "grip_surface", int(TextureSkinPattern::GripSurface) },
+    { "hexagon",      int(TextureSkinPattern::Hexagon) },
+    { "hexagons",     int(TextureSkinPattern::Hexagons) },
+    { "isogrid",      int(TextureSkinPattern::Isogrid) },
+    { "knitting",     int(TextureSkinPattern::Knitting) },
+    { "knurling",     int(TextureSkinPattern::Knurling) },
+    { "leather2",     int(TextureSkinPattern::Leather2) },
+    { "noise",        int(TextureSkinPattern::Noise) },
+    { "stripes1",     int(TextureSkinPattern::Stripes1) },
+    { "stripes2",     int(TextureSkinPattern::Stripes2) },
+    { "voronoi",      int(TextureSkinPattern::Voronoi) },
+    { "weave1",       int(TextureSkinPattern::Weave1) },
+    { "weave2",       int(TextureSkinPattern::Weave2) },
+    { "weave3",       int(TextureSkinPattern::Weave3) },
+    { "wood1",        int(TextureSkinPattern::Wood1) },
+    { "wood2",        int(TextureSkinPattern::Wood2) },
+    { "wood3",        int(TextureSkinPattern::Wood3) },
+    { "custom",       int(TextureSkinPattern::Custom) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TextureSkinPattern)
+
+static const t_config_enum_values s_keys_map_TextureSkinUVMode {
+    { "planar_xy",   int(TextureSkinUVMode::PlanarXY) },
+    { "planar_xz",   int(TextureSkinUVMode::PlanarXZ) },
+    { "planar_yz",   int(TextureSkinUVMode::PlanarYZ) },
+    { "cylindrical", int(TextureSkinUVMode::Cylindrical) },
+    { "spherical",   int(TextureSkinUVMode::Spherical) },
+    { "triplanar",   int(TextureSkinUVMode::Triplanar) },
+    { "cubic",       int(TextureSkinUVMode::Cubic) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TextureSkinUVMode)
+
 static const t_config_enum_values s_keys_map_InfillPattern {
     { "rectilinear",        ipRectilinear },
     { "monotonic",          ipMonotonic },
@@ -1780,6 +1827,120 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.8));
+
+    def = this->add("texture_skin", coEnum);
+    def->label = L("Texture Skin");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Pattern-based perimeter modulation using a texture image (sibling of Fuzzy Skin). "
+                     "Disabled, applied only to outside walls, or to all walls.");
+    def->set_enum<TextureSkinType>({
+        { "none",     L("None") },
+        { "external", L("Outside walls") },
+        { "all",      L("All walls") }
+    });
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionEnum<TextureSkinType>(TextureSkinType::None));
+
+    def = this->add("texture_skin_pattern", coEnum);
+    def->label = L("Pattern");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Built-in texture pattern, or Custom to use a user image.");
+    def->set_enum<TextureSkinPattern>({
+        { "basket",       L("Basket") },       { "brick",        L("Brick") },
+        { "bubble",       L("Bubble") },       { "carbon_fiber", L("Carbon Fiber") },
+        { "crystal",      L("Crystal") },      { "dots",         L("Dots") },
+        { "grid",         L("Grid") },         { "grip_surface", L("Grip Surface") },
+        { "hexagon",      L("Hexagon") },      { "hexagons",     L("Hexagons") },
+        { "isogrid",      L("Isogrid") },      { "knitting",     L("Knitting") },
+        { "knurling",     L("Knurling") },     { "leather2",     L("Leather 2") },
+        { "noise",        L("Noise") },        { "stripes1",     L("Stripes 1") },
+        { "stripes2",     L("Stripes 2") },    { "voronoi",      L("Voronoi") },
+        { "weave1",       L("Weave 1") },      { "weave2",       L("Weave 2") },
+        { "weave3",       L("Weave 3") },      { "wood1",        L("Wood 1") },
+        { "wood2",        L("Wood 2") },       { "wood3",        L("Wood 3") },
+        { "custom",       L("Custom") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<TextureSkinPattern>(TextureSkinPattern::Crystal));
+
+    def = this->add("texture_skin_uv_mode", coEnum);
+    def->label = L("UV projection");
+    def->category = L("Texture Skin");
+    def->tooltip = L("How the 2D texture is projected onto the 3D object.");
+    def->set_enum<TextureSkinUVMode>({
+        { "planar_xy",   L("Planar XY") },   { "planar_xz",   L("Planar XZ") },
+        { "planar_yz",   L("Planar YZ") },   { "cylindrical", L("Cylindrical") },
+        { "spherical",   L("Spherical") },   { "triplanar",   L("Triplanar") },
+        { "cubic",       L("Cubic") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<TextureSkinUVMode>(TextureSkinUVMode::Triplanar));
+
+    def = this->add("texture_skin_amplitude", coFloat);
+    def->label = L("Amplitude");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Peak ± displacement applied to perimeters in millimetres. Grayscale 0.5 maps to no offset; "
+                     "white pushes outward, black inward.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.3));
+
+    def = this->add("texture_skin_point_dist", coFloat);
+    def->label = L("Point distance");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Distance between texture-sampling points inserted along perimeters. "
+                     "Smaller values give finer detail but more G-code.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.4));
+
+    def = this->add("texture_skin_uv_scale", coFloat);
+    def->label = L("UV scale");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Texture tile size. Lower values tile the texture more times across the object.");
+    def->min = 0.001;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.5));
+
+    def = this->add("texture_skin_uv_offset_u", coFloat);
+    def->label = L("UV offset U");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Horizontal texture offset (0-1).");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("texture_skin_uv_offset_v", coFloat);
+    def->label = L("UV offset V");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Vertical texture offset (0-1).");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("texture_skin_uv_rotation", coFloat);
+    def->label = L("UV rotation");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Rotation applied to the texture in degrees.");
+    def->sidetext = L("°");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("texture_skin_mapping_blend", coFloat);
+    def->label = L("Mapping blend");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Softness of seam transitions for triplanar / cylindrical / cubic modes (0 = hard, 1 = soft).");
+    def->min = 0;
+    def->max = 1;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("texture_skin_custom_image", coString);
+    def->label = L("Custom image path");
+    def->category = L("Texture Skin");
+    def->tooltip = L("Absolute path to an 8-bit grayscale PNG to use when pattern = Custom.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("gap_fill_enabled", coBool);
     def->label = L("Fill gaps");

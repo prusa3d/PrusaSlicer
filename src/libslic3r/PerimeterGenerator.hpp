@@ -19,6 +19,7 @@
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/ExtrusionRole.hpp"
 #include "libslic3r/Point.hpp"
+#include "libslic3r/BoundingBox.hpp"
 
 namespace Slic3r {
 class ExtrusionEntityCollection;
@@ -60,28 +61,34 @@ struct Parameters {
         const PrintObjectConfig    &object_config,
         const PrintConfig          &print_config,
         const PerimeterRegions     &perimeter_regions,
-        const bool                  spiral_vase) :   
+        const bool                  spiral_vase,
+        double                      layer_z,
+        const BoundingBoxf3        &object_bbox) :
             layer_height(layer_height),
             layer_id(layer_id),
-            perimeter_flow(perimeter_flow), 
+            perimeter_flow(perimeter_flow),
             ext_perimeter_flow(ext_perimeter_flow),
-            overhang_flow(overhang_flow), 
+            overhang_flow(overhang_flow),
             solid_infill_flow(solid_infill_flow),
-            config(config), 
-            object_config(object_config), 
+            config(config),
+            object_config(object_config),
             print_config(print_config),
             perimeter_regions(perimeter_regions),
             spiral_vase(spiral_vase),
             scaled_resolution(scaled<double>(print_config.gcode_resolution.value)),
             mm3_per_mm(perimeter_flow.mm3_per_mm()),
-            ext_mm3_per_mm(ext_perimeter_flow.mm3_per_mm()), 
-            mm3_per_mm_overhang(overhang_flow.mm3_per_mm())
+            ext_mm3_per_mm(ext_perimeter_flow.mm3_per_mm()),
+            mm3_per_mm_overhang(overhang_flow.mm3_per_mm()),
+            layer_z(layer_z),
+            object_bbox(object_bbox)
         {
         }
 
     // Input parameters
     double                       layer_height;
     int                          layer_id;
+    double                       layer_z{0.0};
+    BoundingBoxf3                object_bbox;
     Flow                         perimeter_flow;
     Flow                         ext_perimeter_flow;
     Flow                         overhang_flow;

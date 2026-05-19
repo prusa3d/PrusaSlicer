@@ -101,6 +101,23 @@ enum class FuzzySkinType {
     All,
 };
 
+enum class TextureSkinType {
+    None,
+    External,
+    All,
+};
+
+enum class TextureSkinPattern : int {
+    Basket = 0, Brick, Bubble, CarbonFiber, Crystal, Dots, Grid, GripSurface,
+    Hexagon, Hexagons, Isogrid, Knitting, Knurling, Leather2, Noise,
+    Stripes1, Stripes2, Voronoi, Weave1, Weave2, Weave3, Wood1, Wood2, Wood3,
+    Custom,
+};
+
+enum class TextureSkinUVMode : int {
+    PlanarXY = 0, PlanarXZ, PlanarYZ, Cylindrical, Spherical, Triplanar, Cubic,
+};
+
 enum InfillPattern : int {
     ipRectilinear, ipMonotonic, ipMonotonicLines, ipAlignedRectilinear, ipGrid, ipTriangles, ipStars, ipCubic, ipLine, ipConcentric, ipHoneycomb, ip3DHoneycomb,
     ipGyroid, ipHilbertCurve, ipArchimedeanChords, ipOctagramSpiral, ipAdaptiveCubic, ipSupportCubic, ipSupportBase,
@@ -290,6 +307,9 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(MachineLimitsUsage)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PrintHostType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(AuthorizationType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(FuzzySkinType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TextureSkinType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TextureSkinPattern)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TextureSkinUVMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(InfillPattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(IroningType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SlicingMode)
@@ -763,6 +783,17 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<FuzzySkinType>,  fuzzy_skin))
     ((ConfigOptionFloat,                fuzzy_skin_thickness))
     ((ConfigOptionFloat,                fuzzy_skin_point_dist))
+    ((ConfigOptionEnum<TextureSkinType>,    texture_skin))
+    ((ConfigOptionEnum<TextureSkinPattern>, texture_skin_pattern))
+    ((ConfigOptionEnum<TextureSkinUVMode>,  texture_skin_uv_mode))
+    ((ConfigOptionFloat,                    texture_skin_amplitude))
+    ((ConfigOptionFloat,                    texture_skin_point_dist))
+    ((ConfigOptionFloat,                    texture_skin_uv_scale))
+    ((ConfigOptionFloat,                    texture_skin_uv_offset_u))
+    ((ConfigOptionFloat,                    texture_skin_uv_offset_v))
+    ((ConfigOptionFloat,                    texture_skin_uv_rotation))
+    ((ConfigOptionFloat,                    texture_skin_mapping_blend))
+    ((ConfigOptionString,                   texture_skin_custom_image))
     ((ConfigOptionBool,                 gap_fill_enabled))
     ((ConfigOptionFloat,                gap_fill_speed))
     ((ConfigOptionFloatOrPercent,       infill_anchor))

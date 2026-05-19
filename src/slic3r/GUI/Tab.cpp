@@ -19,6 +19,7 @@
 ///|/
 // #include "libslic3r/GCodeSender.hpp"
 #include "slic3r/GUI/BedShapeDialog.hpp"
+#include "slic3r/GUI/TextureSkinPickerDialog.hpp"
 #include "slic3r/Utils/Serial.hpp"
 #include "Tab.hpp"
 #include "PresetHints.hpp"
@@ -1498,6 +1499,20 @@ void TabPrint::build()
         optgroup->append_single_option_line("fuzzy_skin_thickness", category_path + "fuzzy-skin-thickness");
         optgroup->append_single_option_line("fuzzy_skin_point_dist", category_path + "fuzzy-skin-point-distance");
 
+        optgroup = page->new_optgroup(L("Texture skin (experimental)"));
+        optgroup->append_single_option_line("texture_skin");
+        create_line_with_widget(optgroup.get(), "texture_skin_pattern", "", [this](wxWindow* parent) {
+            return create_texture_skin_pattern_widget(parent);
+        });
+        optgroup->append_single_option_line("texture_skin_uv_mode");
+        optgroup->append_single_option_line("texture_skin_amplitude");
+        optgroup->append_single_option_line("texture_skin_point_dist");
+        optgroup->append_single_option_line("texture_skin_uv_scale");
+        optgroup->append_single_option_line("texture_skin_uv_offset_u");
+        optgroup->append_single_option_line("texture_skin_uv_offset_v");
+        optgroup->append_single_option_line("texture_skin_uv_rotation");
+        optgroup->append_single_option_line("texture_skin_mapping_blend");
+
         optgroup = page->new_optgroup(L("Only one perimeter"));
         category_path = "layers-and-perimeters_1748/#";
         optgroup->append_single_option_line("top_one_perimeter_type", category_path + "top-one-perimeter-type");
@@ -1873,6 +1888,66 @@ void TabPrint::update()
 
         wxGetApp().mainframe->on_config_changed(m_config);
     }
+}
+
+wxSizer* TabPrint::create_texture_skin_pattern_widget(wxWindow* parent)
+{
+    using Pattern = Slic3r::Feature::TextureSkin::Pattern;
+
+    ScalableButton* btn = new ScalableButton(parent, wxID_ANY, "", " " + _L("Pick texture") + " " + dots,
+                                             wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT);
+    btn->SetFont(wxGetApp().normal_font());
+    btn->SetSize(btn->GetBestSize());
+
+    wxTextCtrl* label = new wxTextCtrl(parent, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                                       wxSize(20 * wxGetApp().em_unit(), -1),
+                                       wxTE_READONLY | wxBORDER_NONE);
+    label->SetFont(wxGetApp().normal_font());
+    label->SetBackgroundColour(parent->GetBackgroundColour());
+
+    auto refresh_label = [this, label]() {
+        const auto pat = static_cast<Pattern>(m_config->opt_enum<TextureSkinPattern>("texture_skin_pattern"));
+        wxString text;
+        if (pat == Pattern::Custom) {
+            const std::string& path = m_config->opt_string("texture_skin_custom_image");
+            if (path.empty()) {
+                text = _L("Custom…") + " (" + _L("no file") + ")";
+            } else {
+                text = _L("Custom:") + " " + from_u8(boost::filesystem::path(path).filename().string());
+            }
+        } else {
+            text = wxString::FromUTF8(Slic3r::Feature::TextureSkin::pattern_display_name(pat));
+        }
+        if (label->GetValue() != text) label->SetValue(text);
+    };
+    refresh_label();
+    label->Bind(wxEVT_UPDATE_UI, [refresh_label](wxUpdateUIEvent&) { refresh_label(); });
+
+    btn->Bind(wxEVT_BUTTON, [this, refresh_label](wxCommandEvent&) {
+        const auto current_pat = static_cast<Pattern>(m_config->opt_enum<TextureSkinPattern>("texture_skin_pattern"));
+        const std::string current_custom = m_config->opt_string("texture_skin_custom_image");
+
+        TextureSkinPickerDialog dlg(this, current_pat, current_custom);
+        if (dlg.ShowModal() != wxID_OK) return;
+
+        const Pattern picked = dlg.get_pattern();
+        load_key_value("texture_skin_pattern", static_cast<int>(picked));
+        if (picked == Pattern::Custom)
+            load_key_value("texture_skin_custom_image", dlg.get_custom_image_path());
+        refresh_label();
+        update_changed_ui();
+    });
+
+    auto* sizer = new wxBoxSizer(wxHORIZONTAL);
+    sizer->Add(label, 1, wxALIGN_CENTER_VERTICAL);
+    sizer->AddSpacer(wxGetApp().em_unit());
+    sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL);
+
+    Search::OptionsSearcher& searcher = wxGetApp().searcher();
+    const Search::GroupAndCategory& gc = searcher.get_group_and_category("texture_skin_pattern");
+    searcher.add_key("texture_skin_custom_image", m_type, gc.group, gc.category);
+
+    return sizer;
 }
 
 void TabPrint::clear_pages()

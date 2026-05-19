@@ -108,6 +108,10 @@ static inline void model_volume_list_copy_configs(ModelObject &model_object_dst,
         mv_dst.mm_segmentation_facets.assign(mv_src.mm_segmentation_facets);
         assert(mv_dst.fuzzy_skin_facets.id() == mv_src.fuzzy_skin_facets.id());
         mv_dst.fuzzy_skin_facets.assign(mv_src.fuzzy_skin_facets);
+        assert(mv_dst.texture_skin_facets.id() == mv_src.texture_skin_facets.id());
+        mv_dst.texture_skin_facets.assign(mv_src.texture_skin_facets);
+        assert(mv_dst.surface_texture_facets.id() == mv_src.surface_texture_facets.id());
+        mv_dst.surface_texture_facets.assign(mv_src.surface_texture_facets);
         //FIXME what to do with the materials?
         // mv_dst.m_material_id = mv_src.m_material_id;
         ++ i_src;
@@ -804,6 +808,25 @@ bool verify_update_print_object_regions(
         }
     }
 
+    // Verify and / or update PrintRegions produced by texture skin painting.
+    for (const PrintObjectRegions::LayerRangeRegions &layer_range : print_object_regions.layer_ranges) {
+        for (const PrintObjectRegions::TextureSkinPaintedRegion &region : layer_range.texture_skin_painted_regions) {
+            const PrintRegion &parent_print_region = *region.parent_print_object_region(layer_range);
+            PrintRegionConfig  cfg                 = parent_print_region.config();
+            cfg.texture_skin.value                 = TextureSkinType::All;
+            if (cfg != region.region->config()) {
+                if (print_region_ref_cnt(*region.region) == 0) {
+                    t_config_option_keys diff = region.region->config().diff(cfg);
+                    callback_invalidate(region.region->config(), cfg, diff);
+                    region.region->config_apply_only(cfg, diff, false);
+                } else {
+                    return false;
+                }
+            }
+            print_region_ref_inc(*region.region);
+        }
+    }
+
     // Lastly verify, whether some regions were not merged.
     {
         std::vector<const PrintRegion*> regions;
@@ -908,7 +931,8 @@ static PrintObjectRegions* generate_print_object_regions(
     size_t                                       num_extruders,
     const float                                  xy_size_compensation,
     const std::vector<unsigned int>             &painting_extruders,
-    const bool                                   has_painted_fuzzy_skin)
+    const bool                                   has_painted_fuzzy_skin,
+    const bool                                   has_painted_texture_skin)
 {
     // Reuse the old object or generate a new one.
     auto out = print_object_regions_old ? std::unique_ptr<PrintObjectRegions>(print_object_regions_old) : std::make_unique<PrintObjectRegions>();
@@ -931,6 +955,7 @@ static PrintObjectRegions* generate_print_object_regions(
             r.volume_regions.clear();
             r.painted_regions.clear();
             r.fuzzy_skin_painted_regions.clear();
+            r.texture_skin_painted_regions.clear();
         }
     } else {
         out->trafo_bboxes = trafo;
@@ -1043,6 +1068,31 @@ static PrintObjectRegions* generate_print_object_regions(
 
             // Sort the regions by parent region::print_object_region_id() to help the slicing algorithm when applying fuzzy skin segmentation.
             std::sort(layer_range.fuzzy_skin_painted_regions.begin(), layer_range.fuzzy_skin_painted_regions.end(), [&layer_range](auto &l, auto &r) {
+                return l.parent_print_object_region_id(layer_range) < r.parent_print_object_region_id(layer_range);
+            });
+        }
+    }
+
+    if (has_painted_texture_skin) {
+        using TextureSkinParentType = PrintObjectRegions::TextureSkinPaintedRegion::ParentType;
+
+        for (PrintObjectRegions::LayerRangeRegions &layer_range : layer_ranges_regions) {
+            for (int parent_volume_region_id = 0; parent_volume_region_id < int(layer_range.volume_regions.size()); ++parent_volume_region_id) {
+                if (const PrintObjectRegions::VolumeRegion &parent_volume_region = layer_range.volume_regions[parent_volume_region_id]; parent_volume_region.model_volume->is_model_part() || parent_volume_region.model_volume->is_modifier()) {
+                    PrintRegionConfig cfg = parent_volume_region.region->config();
+                    cfg.texture_skin.value = TextureSkinType::All;
+                    layer_range.texture_skin_painted_regions.push_back({TextureSkinParentType::VolumeRegion, parent_volume_region_id, get_create_region(std::move(cfg))});
+                }
+            }
+
+            for (int parent_painted_regions_id = 0; parent_painted_regions_id < int(layer_range.painted_regions.size()); ++parent_painted_regions_id) {
+                const PrintObjectRegions::PaintedRegion &parent_painted_region = layer_range.painted_regions[parent_painted_regions_id];
+                PrintRegionConfig cfg = parent_painted_region.region->config();
+                cfg.texture_skin.value = TextureSkinType::All;
+                layer_range.texture_skin_painted_regions.push_back({TextureSkinParentType::PaintedRegion, parent_painted_regions_id, get_create_region(std::move(cfg))});
+            }
+
+            std::sort(layer_range.texture_skin_painted_regions.begin(), layer_range.texture_skin_painted_regions.end(), [&layer_range](auto &l, auto &r) {
                 return l.parent_print_object_region_id(layer_range) < r.parent_print_object_region_id(layer_range);
             });
         }
@@ -1290,7 +1340,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
         bool solid_or_modifier_differ   = model_volume_list_changed(model_object, model_object_new, solid_or_modifier_types) ||
                                           model_mmu_segmentation_data_changed(model_object, model_object_new) ||
                                           (model_object_new.is_mm_painted() && num_extruders_changed) ||
-                                          model_fuzzy_skin_data_changed(model_object, model_object_new);
+                                          model_surface_texture_data_changed(model_object, model_object_new);
         bool supports_differ            = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SUPPORT_BLOCKER) ||
                                           model_volume_list_changed(model_object, model_object_new, ModelVolumeType::SUPPORT_ENFORCER);
         bool layer_height_ranges_differ = ! layer_height_ranges_equal(model_object.layer_config_ranges, model_object_new.layer_config_ranges, model_object_new.layer_height_profile.empty());
@@ -1573,7 +1623,8 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                 num_extruders,
                 print_object.is_mm_painted() ? 0.f : float(print_object.config().xy_size_compensation.value),
                 painting_extruders,
-                print_object.is_fuzzy_skin_painted());
+                print_object.is_fuzzy_skin_painted(),
+                print_object.is_texture_skin_painted());
         }
         for (auto it = it_print_object; it != it_print_object_end; ++it)
             if ((*it)->m_shared_regions) {

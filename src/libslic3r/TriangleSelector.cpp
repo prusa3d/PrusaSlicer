@@ -1533,6 +1533,22 @@ int TriangleSelector::num_facets(TriangleStateType state) const {
     return cnt;
 }
 
+void TriangleSelector::visit_painted_leaves(const std::function<void(int, TriangleStateType)> &visitor) const {
+    for (const Triangle &tr : m_triangles) {
+        if (!tr.valid() || tr.is_split()) continue;
+        const TriangleStateType state = tr.get_state();
+        if (state == TriangleStateType::NONE) continue;
+        visitor(tr.source_triangle, state);
+    }
+}
+
+void TriangleSelector::remap_state(TriangleStateType from, TriangleStateType to) {
+    for (Triangle &tr : m_triangles) {
+        if (!tr.valid() || tr.is_split()) continue;
+        if (tr.get_state() == from) tr.set_state(to);
+    }
+}
+
 template<AdditionalMeshInfo facet_info>
 typename IndexedTriangleSetType<facet_info>::type TriangleSelector::get_facets(const std::function<bool(const Triangle &)> &facet_filter) const {
     using IndexedTriangleSetType = typename IndexedTriangleSetType<facet_info>::type;
