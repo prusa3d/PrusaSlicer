@@ -101,6 +101,21 @@ enum class FuzzySkinType {
     All,
 };
 
+enum class TexturedSkinMapping {
+    PaintedOn    = 0,
+    Mercator     = 1,
+    StretchFit   = 2,
+    StampFront   = 3,
+    StampBack    = 4,
+    StampLeft    = 5,
+    StampRight   = 6,
+    StampTop     = 7,
+    StampBottom  = 8,
+    Adaptive     = 9,
+    Cylindrical  = 10,
+    Triplanar    = 11,
+};
+
 enum InfillPattern : int {
     ipRectilinear, ipMonotonic, ipMonotonicLines, ipAlignedRectilinear, ipGrid, ipTriangles, ipStars, ipCubic, ipLine, ipConcentric, ipHoneycomb, ip3DHoneycomb,
     ipGyroid, ipHilbertCurve, ipArchimedeanChords, ipOctagramSpiral, ipAdaptiveCubic, ipSupportCubic, ipSupportBase,
@@ -763,6 +778,14 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnum<FuzzySkinType>,  fuzzy_skin))
     ((ConfigOptionFloat,                fuzzy_skin_thickness))
     ((ConfigOptionFloat,                fuzzy_skin_point_dist))
+    ((ConfigOptionBool,                 textured_skin_enabled))
+    ((ConfigOptionString,               textured_skin_svg))
+    ((ConfigOptionEnum<TexturedSkinMapping>, textured_skin_mapping))
+    ((ConfigOptionFloat,                textured_skin_thickness))
+    ((ConfigOptionFloat,                textured_skin_tile_size))
+    ((ConfigOptionFloat,                textured_skin_tile_height))
+    ((ConfigOptionFloat,                textured_skin_point_dist))
+    ((ConfigOptionBool,                 textured_skin_invert))
     ((ConfigOptionBool,                 gap_fill_enabled))
     ((ConfigOptionFloat,                gap_fill_speed))
     ((ConfigOptionFloatOrPercent,       infill_anchor))

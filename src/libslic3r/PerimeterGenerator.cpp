@@ -28,6 +28,8 @@
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
 #include "Feature/FuzzySkin/FuzzySkin.hpp"
+#include "Feature/TexturedSkin/TexturedSkin.hpp"
+#include <boost/log/trivial.hpp>
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
@@ -225,7 +227,34 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
         }
 
         // Apply fuzzy skin if it is enabled for at least some part of the polygon.
-        const Polygon polygon = apply_fuzzy_skin(loop.polygon, params.config, params.perimeter_regions, params.layer_id, loop.depth, loop.is_contour);
+        Polygon polygon = apply_fuzzy_skin(loop.polygon, params.config, params.perimeter_regions, params.layer_id, loop.depth, loop.is_contour);
+
+        // Apply textured skin: structured SVG pattern displacement on outer perimeter.
+        // Only applies to outermost contour (perimeter_idx == 0, is_contour).
+        if (loop.depth == 0 && loop.is_contour && params.config.textured_skin_enabled.value && !params.config.textured_skin_svg.value.empty()) {
+            static thread_local std::shared_ptr<Feature::TexturedSkin::PatternSampler> s_sampler;
+            static thread_local std::string s_sampler_path;
+            static thread_local double s_sampler_tile;
+            const std::string &svg_path = params.config.textured_skin_svg.value;
+            double tile_size = params.config.textured_skin_tile_size.value;
+            double tile_height = params.config.textured_skin_tile_height.value;
+            // Lazy-load / cache the pattern sampler per thread
+            if (!s_sampler || s_sampler_path != svg_path || s_sampler_tile != tile_size) {
+                s_sampler = Feature::TexturedSkin::PatternSampler::create(svg_path, tile_size, tile_height);
+                s_sampler_path = svg_path;
+                s_sampler_tile = tile_size;
+            }
+            if (s_sampler) {
+                double layer_z = params.layer_id * params.layer_height;
+                auto mapping = static_cast<Feature::TexturedSkin::MappingMode>(static_cast<int>(params.config.textured_skin_mapping.value));
+                bool invert = params.config.textured_skin_invert.value;
+                Feature::TexturedSkin::textured_polygon(
+                    polygon, *s_sampler, layer_z,
+                    params.config.textured_skin_thickness.value,
+                    params.config.textured_skin_point_dist.value,
+                    mapping, invert);
+            }
+        }
 
         ExtrusionPaths paths;
         if (params.config.overhangs && params.layer_id > params.object_config.raft_layers &&
@@ -435,6 +464,50 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
 
         // Apply fuzzy skin if it is enabled for at least some part of the ExtrusionLine.
         extrusion = apply_fuzzy_skin(extrusion, params.config, params.perimeter_regions, params.layer_id, pg_extrusion.extrusion.inset_idx, !pg_extrusion.extrusion.is_closed || pg_extrusion.is_contour());
+
+        // Apply textured skin on outermost contour (Arachne path).
+        // In Arachne, inset_idx 0 = outermost external perimeter (is_external).
+        if (is_external && params.config.textured_skin_enabled.value && !params.config.textured_skin_svg.value.empty()) {
+            static thread_local std::shared_ptr<Feature::TexturedSkin::PatternSampler> s_sampler;
+            static thread_local std::string s_sampler_path;
+            static thread_local double s_sampler_tile;
+            const std::string &svg_path = params.config.textured_skin_svg.value;
+            double tile_size = params.config.textured_skin_tile_size.value;
+            double tile_height = params.config.textured_skin_tile_height.value;
+            if (!s_sampler || s_sampler_path != svg_path || s_sampler_tile != tile_size) {
+                s_sampler = Feature::TexturedSkin::PatternSampler::create(svg_path, tile_size, tile_height);
+                s_sampler_path = svg_path;
+                s_sampler_tile = tile_size;
+            }
+            if (s_sampler) {
+                // Convert ExtrusionLine junctions to a Polygon, apply texture, write back
+                Polygon poly;
+                poly.points.reserve(extrusion.size());
+                for (const auto &j : extrusion.junctions)
+                    poly.points.push_back(j.p);
+
+                double layer_z = params.layer_id * params.layer_height;
+                auto mapping = static_cast<Feature::TexturedSkin::MappingMode>(static_cast<int>(params.config.textured_skin_mapping.value));
+                bool invert = params.config.textured_skin_invert.value;
+                Feature::TexturedSkin::textured_polygon(
+                    poly, *s_sampler, layer_z,
+                    params.config.textured_skin_thickness.value,
+                    params.config.textured_skin_point_dist.value,
+                    mapping, invert);
+
+                // Rebuild extrusion junctions from the resampled polygon.
+                // Note: all junctions get uniform width from the first original junction,
+                // losing any per-junction width variation from Arachne. This is acceptable
+                // for external perimeters which are typically uniform width.
+                if (poly.points.size() >= 3) {
+                    Arachne::ExtrusionLine new_ext(extrusion.inset_idx, extrusion.is_odd, extrusion.is_closed);
+                    coord_t w = extrusion.junctions.empty() ? 0 : extrusion.junctions.front().w;
+                    for (const Point &p : poly.points)
+                        new_ext.junctions.emplace_back(p, w, extrusion.inset_idx);
+                    extrusion = std::move(new_ext);
+                }
+            }
+        }
 
         ExtrusionPaths paths;
         // detect overhanging/bridging perimeters
@@ -1555,7 +1628,15 @@ bool PerimeterRegion::has_compatible_perimeter_regions(const PrintRegionConfig &
 {
     return config.fuzzy_skin            == other_config.fuzzy_skin &&
            config.fuzzy_skin_thickness  == other_config.fuzzy_skin_thickness &&
-           config.fuzzy_skin_point_dist == other_config.fuzzy_skin_point_dist;
+           config.fuzzy_skin_point_dist == other_config.fuzzy_skin_point_dist &&
+           config.textured_skin_enabled == other_config.textured_skin_enabled &&
+           config.textured_skin_svg     == other_config.textured_skin_svg &&
+           config.textured_skin_mapping == other_config.textured_skin_mapping &&
+           config.textured_skin_thickness == other_config.textured_skin_thickness &&
+           config.textured_skin_tile_size == other_config.textured_skin_tile_size &&
+           config.textured_skin_tile_height == other_config.textured_skin_tile_height &&
+           config.textured_skin_point_dist == other_config.textured_skin_point_dist &&
+           config.textured_skin_invert == other_config.textured_skin_invert;
 }
 
 void PerimeterRegion::merge_compatible_perimeter_regions(PerimeterRegions &perimeter_regions)
