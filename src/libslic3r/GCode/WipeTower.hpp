@@ -250,6 +250,7 @@ public:
         int                 cooling_moves = 0;
         float               cooling_initial_speed = 0.f;
         float               cooling_final_speed = 0.f;
+        bool                cooling_wait_for_temp = false;
         float               ramming_line_width_multiplicator = 1.f;
         float               ramming_step_multiplicator = 1.f;
         float               max_e_speed = std::numeric_limits<float>::max();
