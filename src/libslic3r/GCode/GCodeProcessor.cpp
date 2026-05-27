@@ -356,6 +356,7 @@ void GCodeProcessor::TimeMachine::calculate_time(GCodeProcessorResult& result, P
                         const float height = interpolate ? lerp(prev_move.height, curr_move.height, t) : curr_move.height;
                         const float mm3_per_mm = interpolate ? lerp(prev_move.mm3_per_mm, curr_move.mm3_per_mm, t) : curr_move.mm3_per_mm;
                         const float fan_speed = interpolate ? lerp(prev_move.fan_speed, curr_move.fan_speed, t) : curr_move.fan_speed;
+                        const float aux_fan_speed = interpolate ? lerp(prev_move.aux_fan_speed, curr_move.aux_fan_speed, t) : curr_move.aux_fan_speed;
                         const float temperature = interpolate ? lerp(prev_move.temperature, curr_move.temperature, t) : curr_move.temperature;
                         actual_speed_moves.push_back({
                             block.move_id,
@@ -367,6 +368,7 @@ void GCodeProcessor::TimeMachine::calculate_time(GCodeProcessorResult& result, P
                             height,
                             mm3_per_mm,
                             fan_speed,
+                            aux_fan_speed,
                             temperature
                         });
                     }
@@ -384,6 +386,7 @@ void GCodeProcessor::TimeMachine::calculate_time(GCodeProcessorResult& result, P
                         const float height = interpolate ? lerp(prev_move.height, curr_move.height, t) : curr_move.height;
                         const float mm3_per_mm = interpolate ? lerp(prev_move.mm3_per_mm, curr_move.mm3_per_mm, t) : curr_move.mm3_per_mm;
                         const float fan_speed = interpolate ? lerp(prev_move.fan_speed, curr_move.fan_speed, t) : curr_move.fan_speed;
+                        const float aux_fan_speed = interpolate ? lerp(prev_move.aux_fan_speed, curr_move.aux_fan_speed, t) : curr_move.aux_fan_speed;
                         const float temperature = interpolate ? lerp(prev_move.temperature, curr_move.temperature, t) : curr_move.temperature;
                         actual_speed_moves.push_back({
                             block.move_id,
@@ -395,6 +398,7 @@ void GCodeProcessor::TimeMachine::calculate_time(GCodeProcessorResult& result, P
                             height,
                             mm3_per_mm,
                             fan_speed,
+                            aux_fan_speed,
                             temperature
                         });
                     }
@@ -1056,6 +1060,7 @@ void GCodeProcessor::reset()
     m_forced_height = 0.0f;
     m_mm3_per_mm = 0.0f;
     m_fan_speed = 0.0f;
+    m_aux_fan_speed = 0.0f;
     m_z_offset = 0.0f;
 
     m_extrusion_role = GCodeExtrusionRole::None;
@@ -3428,19 +3433,39 @@ void GCodeProcessor::process_M104(const GCodeReader::GCodeLine& line)
 
 void GCodeProcessor::process_M106(const GCodeReader::GCodeLine& line)
 {
-    if (!line.has('P')) {
+    int tool = 0;
+    if (!line.has_value('P', tool) || tool == 1) {
         // The absence of P means the print cooling fan, so ignore anything else.
         float new_fan_speed;
         if (line.has_value('S', new_fan_speed))
             m_fan_speed = (100.0f / 255.0f) * new_fan_speed;
         else
             m_fan_speed = 100.0f;
+    } else if(tool == 2) {
+        float new_aux_fan_speed;
+        if (line.has_value('S', new_aux_fan_speed))
+            m_aux_fan_speed = (100.0f / 255.0f) * new_aux_fan_speed;
+        else
+            m_aux_fan_speed = 100.0f;
     }
 }
 
 void GCodeProcessor::process_M107(const GCodeReader::GCodeLine& line)
 {
-    m_fan_speed = 0.0f;
+    int tool;
+    if (line.has_value('P', tool)) {
+        if(tool == 1)
+        {
+            m_fan_speed = 0.0f;
+        }
+        else if(tool == 2)
+        {
+            m_aux_fan_speed = 0.0f;
+        }
+    } else {
+        // The absence of P means the print cooling fan.
+        m_fan_speed = 0.0f;
+    }
 }
 
 void GCodeProcessor::process_M108(const GCodeReader::GCodeLine& line)
@@ -4549,6 +4574,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type, bool internal_only)
         m_height,
         m_mm3_per_mm,
         m_fan_speed,
+        m_aux_fan_speed,
         m_extruder_temps[m_extruder_id],
         { 0.0f, 0.0f }, // time
         std::max<unsigned int>(1, m_layer_id) - 1,
@@ -4760,6 +4786,7 @@ void GCodeProcessor::calculate_time(GCodeProcessorResult& result, size_t keep_la
             new_move.height = *it->height;
             new_move.mm3_per_mm = *it->mm3_per_mm;
             new_move.fan_speed = *it->fan_speed;
+            new_move.aux_fan_speed = *it->aux_fan_speed;
             new_move.temperature = *it->temperature;
             new_move.internal_only = true;
             moves_to_insert.back().second.emplace_back(new_move);

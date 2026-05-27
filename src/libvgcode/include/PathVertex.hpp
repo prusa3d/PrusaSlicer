@@ -45,6 +45,10 @@ struct PathVertex
     //
     float fan_speed{ 0.0f };
     //
+    // Segment aux fan speed
+    //
+    float aux_fan_speed{ 0.0f };
+    //
     // Segment temperature
     //
     float temperature{ 0.0f };

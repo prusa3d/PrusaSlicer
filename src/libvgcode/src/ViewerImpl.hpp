@@ -284,6 +284,7 @@ private:
     ColorRange m_speed_range;
     ColorRange m_actual_speed_range;
     ColorRange m_fan_speed_range;
+    ColorRange m_aux_fan_speed_range;
     ColorRange m_temperature_range;
     ColorRange m_volumetric_rate_range;
     ColorRange m_actual_volumetric_rate_range;

@@ -524,6 +524,8 @@ static std::vector<std::string> s_Preset_filament_options {
     "temperature", "idle_temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", "fan_always_on", "cooling", "cooling_slowdown_logic",
     "cooling_perimeter_transition_distance", "min_fan_speed",
     "max_fan_speed", "bridge_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed",
+    "enable_aux_fan", "min_aux_fan_speed", "max_aux_fan_speed", "bridge_aux_fan_speed", "disable_aux_fan_first_layers", "full_aux_fan_speed_layer", "aux_fan_below_layer_time",
+    "enable_dynamic_aux_fan_speeds", "overhang_aux_fan_speed_0", "overhang_aux_fan_speed_1", "overhang_aux_fan_speed_2", "overhang_aux_fan_speed_3",
     "custom_parameters_filament", "start_filament_gcode", "end_filament_gcode", "enable_dynamic_fan_speeds", "chamber_temperature", "chamber_minimal_temperature",
     "overhang_fan_speed_0", "overhang_fan_speed_1", "overhang_fan_speed_2", "overhang_fan_speed_3",
     // Retract overrides

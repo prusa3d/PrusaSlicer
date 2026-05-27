@@ -1472,6 +1472,10 @@ Color ViewerImpl::get_vertex_color(const PathVertex& v) const
     {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_fan_speed_range.get_color_at(v.fan_speed);
     }
+    case EViewType::AuxFanSpeed:
+    {
+        return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_aux_fan_speed_range.get_color_at(v.aux_fan_speed);
+    }
     case EViewType::Temperature:
     {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_temperature_range.get_color_at(v.temperature);
@@ -1563,6 +1567,7 @@ const ColorRange& ViewerImpl::get_color_range(EViewType type) const
     case EViewType::Speed:                    { return m_speed_range; }
     case EViewType::ActualSpeed:              { return m_actual_speed_range; }
     case EViewType::FanSpeed:                 { return m_fan_speed_range; }
+    case EViewType::AuxFanSpeed:              { return m_aux_fan_speed_range; }
     case EViewType::Temperature:              { return m_temperature_range; }
     case EViewType::VolumetricFlowRate:       { return m_volumetric_rate_range; }
     case EViewType::ActualVolumetricFlowRate: { return m_actual_volumetric_rate_range; }
@@ -1581,6 +1586,7 @@ void ViewerImpl::set_color_range_palette(EViewType type, const Palette& palette)
     case EViewType::Speed:                    { m_speed_range.set_palette(palette);           break; }
     case EViewType::ActualSpeed:              { m_actual_speed_range.set_palette(palette);    break; }
     case EViewType::FanSpeed:                 { m_fan_speed_range.set_palette(palette);       break; }
+    case EViewType::AuxFanSpeed:              { m_aux_fan_speed_range.set_palette(palette);   break; }
     case EViewType::Temperature:              { m_temperature_range.set_palette(palette);     break; }
     case EViewType::VolumetricFlowRate:       { m_volumetric_rate_range.set_palette(palette); break; }
     case EViewType::ActualVolumetricFlowRate: { m_actual_volumetric_rate_range.set_palette(palette); break; }
@@ -1618,6 +1624,7 @@ size_t ViewerImpl::get_used_cpu_memory() const
     ret += m_speed_range.size_in_bytes_cpu();
     ret += m_actual_speed_range.size_in_bytes_cpu();
     ret += m_fan_speed_range.size_in_bytes_cpu();
+    ret += m_aux_fan_speed_range.size_in_bytes_cpu();
     ret += m_temperature_range.size_in_bytes_cpu();
     ret += m_volumetric_rate_range.size_in_bytes_cpu();
     ret += m_actual_volumetric_rate_range.size_in_bytes_cpu();
@@ -1768,6 +1775,7 @@ void ViewerImpl::update_color_ranges()
     m_speed_range.reset();
     m_actual_speed_range.reset();
     m_fan_speed_range.reset();
+    m_aux_fan_speed_range.reset();
     m_temperature_range.reset();
     m_volumetric_rate_range.reset();
     m_actual_volumetric_rate_range.reset();
@@ -1784,6 +1792,7 @@ void ViewerImpl::update_color_ranges()
                 m_actual_volumetric_rate_range.update(round_to_bin(v.actual_volumetric_rate()));
             }
             m_fan_speed_range.update(round_to_bin(v.fan_speed));
+            m_aux_fan_speed_range.update(round_to_bin(v.aux_fan_speed));
             m_temperature_range.update(round_to_bin(v.temperature));
         }
         if ((v.is_travel() && m_settings.options_visibility[size_t(EOptionType::Travels)]) ||

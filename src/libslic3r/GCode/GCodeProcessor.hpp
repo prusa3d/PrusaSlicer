@@ -130,6 +130,7 @@ namespace Slic3r {
             float height{ 0.0f }; // mm
             float mm3_per_mm{ 0.0f };
             float fan_speed{ 0.0f }; // percentage
+            float aux_fan_speed{ 0.0f }; // percentage
             float temperature{ 0.0f }; // Celsius degrees
             std::array<float, static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count)> time{ 0.0f, 0.0f }; // s
             unsigned int layer_id{ 0 };
@@ -328,6 +329,7 @@ namespace Slic3r {
                 std::optional<float> height;
                 std::optional<float> mm3_per_mm;
                 std::optional<float> fan_speed;
+                std::optional<float> aux_fan_speed;
                 std::optional<float> temperature;
             };
 
@@ -520,6 +522,7 @@ namespace Slic3r {
         float m_forced_height; // mm
         float m_mm3_per_mm;
         float m_fan_speed; // percentage
+        float m_aux_fan_speed; // percentage
         float m_z_offset; // mm
         GCodeExtrusionRole m_extrusion_role;
         unsigned char m_extruder_id;

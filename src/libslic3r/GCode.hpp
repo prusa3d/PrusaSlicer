@@ -456,6 +456,7 @@ private:
 
     // Current fan speed set by dynamic fan speed control.
     std::optional<float>                m_current_dynamic_fan_speed;
+    std::optional<float>                m_current_dynamic_aux_fan_speed;
 
     // Heights (print_z) at which the skirt has already been extruded.
     std::vector<coordf_t>               m_skirt_done;

@@ -2280,10 +2280,31 @@ void TabFilament::build()
         optgroup->append_single_option_line("overhang_fan_speed_2", category_path + "dynamic-fan-speeds");
         optgroup->append_single_option_line("overhang_fan_speed_3", category_path + "dynamic-fan-speeds");
 
+
+        optgroup = page->new_optgroup(L("Auxiliary fan settings"));
+        optgroup->append_single_option_line("enable_aux_fan", category_path + "fan-settings");
+        line = { L("Auxiliary Fan speed"), "" };
+        line.label_path = category_path + "fan-settings";
+        line.append_option(optgroup->get_option("min_aux_fan_speed"));
+        line.append_option(optgroup->get_option("max_aux_fan_speed"));
+        optgroup->append_line(line);
+        optgroup->append_single_option_line("bridge_aux_fan_speed", category_path + "fan-settings");
+        optgroup->append_single_option_line("disable_aux_fan_first_layers", category_path + "fan-settings");
+        optgroup->append_single_option_line("full_aux_fan_speed_layer", category_path + "fan-settings");
+
+        optgroup = page->new_optgroup(L("Dynamic auxiliary fan speeds"), 25);
+        optgroup->append_single_option_line("enable_dynamic_aux_fan_speeds", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_aux_fan_speed_0", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_aux_fan_speed_1", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_aux_fan_speed_2", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_aux_fan_speed_3", category_path + "dynamic-fan-speeds");
+
         optgroup = page->new_optgroup(L("Cooling thresholds"), 25);
         optgroup->append_single_option_line("fan_below_layer_time", category_path + "cooling-thresholds");
+        optgroup->append_single_option_line("aux_fan_below_layer_time", category_path + "cooling-thresholds");
         optgroup->append_single_option_line("slowdown_below_layer_time", category_path + "cooling-thresholds");
         optgroup->append_single_option_line("min_print_speed", category_path + "cooling-thresholds");
+
 
     page = add_options_page(L("Advanced"), "wrench");
         optgroup = page->new_optgroup(L("Filament properties"));
@@ -2455,6 +2476,7 @@ void TabFilament::toggle_options()
     {
         bool cooling = m_config->opt_bool("cooling", 0);
         bool fan_always_on = cooling || m_config->opt_bool("fan_always_on", 0);
+        bool aux_fan = cooling && m_config->opt_bool("enable_aux_fan", 0);
 
         for (auto el : { "max_fan_speed", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed", "cooling_slowdown_logic" })
             toggle_option(el, cooling);
@@ -2462,9 +2484,17 @@ void TabFilament::toggle_options()
         for (auto el : { "min_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer" })
             toggle_option(el, fan_always_on);
 
+        for (auto el : { "max_aux_fan_speed", "min_aux_fan_speed", "bridge_aux_fan_speed", "enable_dynamic_aux_fan_speeds", "disable_aux_fan_first_layers", "full_aux_fan_speed_layer", "aux_fan_below_layer_time"})
+            toggle_option(el, aux_fan);
+
         bool dynamic_fan_speeds = m_config->opt_bool("enable_dynamic_fan_speeds", 0);
         for (int i = 0; i < 4; i++) {
             toggle_option("overhang_fan_speed_"+std::to_string(i),dynamic_fan_speeds);
+        }
+
+        bool dynamic_aux_fan_speeds = aux_fan && m_config->opt_bool("enable_dynamic_aux_fan_speeds", 0);
+        for (int i = 0; i < 4; i++) {
+            toggle_option("overhang_aux_fan_speed_"+std::to_string(i),dynamic_aux_fan_speeds);
         }
 
         bool cooling_preserve_perimeters = cooling && static_cast<CoolingSlowdownLogicType>(m_config->option("cooling_slowdown_logic")->getInts().at(0)) == CoolingSlowdownLogicType::ConsistentSurface;

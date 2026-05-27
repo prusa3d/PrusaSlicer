@@ -85,6 +85,7 @@ enum class EViewType : uint8_t
     Speed,
     ActualSpeed,
     FanSpeed,
+    AuxFanSpeed,
     Temperature,
     VolumetricFlowRate,
     ActualVolumetricFlowRate,

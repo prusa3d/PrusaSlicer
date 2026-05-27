@@ -1403,6 +1403,13 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     // Write end commands to file.
     file.write(this->retract_and_wipe());
     file.write(m_writer.set_fan(0));
+    bool aux_fan_enabled = false;
+    for(auto extruder_id : tool_ordering.all_extruders()) {
+        aux_fan_enabled = aux_fan_enabled || m_config.enable_aux_fan.get_at(extruder_id);
+    }
+    if(aux_fan_enabled) {
+        file.write(m_writer.set_fan(0, 2));
+    }
 
     // adds tag for processor
     file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), gcode_extrusion_role_to_string(GCodeExtrusionRole::Custom).c_str());
@@ -3474,7 +3481,7 @@ std::string GCodeGenerator::_extrude(
     else if (this->object_layer_over_raft())
         speed = m_config.get_abs_value("first_layer_speed_over_raft", speed);
 
-    ExtrusionProcessor::OverhangSpeeds dynamic_print_and_fan_speeds = {-1.f, -1.f};
+    ExtrusionProcessor::OverhangSpeeds dynamic_print_and_fan_speeds = {-1.f, -1.f, -1.f};
     if (path_attr.overhang_attributes.has_value()) {
         double external_perimeter_reference_speed = m_config.get_abs_value("external_perimeter_speed");
         if (external_perimeter_reference_speed == 0) {
@@ -3484,7 +3491,7 @@ std::string GCodeGenerator::_extrude(
         external_perimeter_reference_speed = cap_speed(external_perimeter_reference_speed, m_config, m_writer.extruder()->id(), path_attr);
         dynamic_print_and_fan_speeds       = ExtrusionProcessor::calculate_overhang_speed(path_attr, this->m_config, m_writer.extruder()->id(),
                                                                                     float(external_perimeter_reference_speed), float(speed),
-                                                                                    m_current_dynamic_fan_speed);
+                                                                                    m_current_dynamic_fan_speed, m_current_dynamic_aux_fan_speed);
     }
 
     if (dynamic_print_and_fan_speeds.print_speed > -1) {
@@ -3569,6 +3576,17 @@ std::string GCodeGenerator::_extrude(
         gcode += ";_RESET_FAN_SPEED\n";
     }
 
+    if (dynamic_print_and_fan_speeds.aux_fan_speed >= 0) {
+        const int aux_fan_speed = int(dynamic_print_and_fan_speeds.aux_fan_speed);
+        if (!m_current_dynamic_aux_fan_speed.has_value() || (m_current_dynamic_aux_fan_speed.has_value() && m_current_dynamic_aux_fan_speed != aux_fan_speed)) {
+            m_current_dynamic_aux_fan_speed = aux_fan_speed;
+            gcode += ";_SET_AUX_FAN_SPEED" + std::to_string(aux_fan_speed) + "\n";
+        }
+    } else if (m_current_dynamic_aux_fan_speed.has_value() && dynamic_print_and_fan_speeds.aux_fan_speed < 0) {
+        m_current_dynamic_aux_fan_speed.reset();
+        gcode += ";_RESET_AUX_FAN_SPEED\n";
+    }
+
     std::string comment;
     if (m_config.gcode_comments) {
         comment = description;
@@ -3635,6 +3653,11 @@ std::string GCodeGenerator::_extrude(
     if (m_current_dynamic_fan_speed.has_value() && emit_modifiers.emit_fan_speed_reset) {
         m_current_dynamic_fan_speed.reset();
         gcode += ";_RESET_FAN_SPEED\n";
+    }
+
+    if (m_current_dynamic_aux_fan_speed.has_value() && emit_modifiers.emit_fan_speed_reset) {
+        m_current_dynamic_aux_fan_speed.reset();
+        gcode += ";_RESET_AUX_FAN_SPEED\n";
     }
 
     this->last_position = path.back().point;

@@ -542,6 +542,16 @@ void GCodeViewer::SequentialView::Marker::render_position_window(const libvgcode
                         text = _u8L("N/A");
                     ImGuiPureWrap::text(text);
                 });
+                append_table_row(_u8L("Auxiliary fan speed") + " (" + _u8L("%") + ")", [&vertex, &buff]() {
+                    std::string text;
+                    if (vertex.is_extrusion()) {
+                        sprintf(buff, "%.0f", vertex.aux_fan_speed);
+                        text = std::string(buff);
+                    }
+                    else
+                        text = _u8L("N/A");
+                    ImGuiPureWrap::text(text);
+                });
                 append_table_row(_u8L("Temperature") + " (" + _u8L("°C") + ")", [&vertex, &buff]() {
                     sprintf(buff, "%.0f", vertex.temperature);
                     ImGuiPureWrap::text(std::string(buff));
@@ -1941,6 +1951,7 @@ void GCodeViewer::render_toolpaths()
             add_range_property_row("width range", m_viewer.get_color_range(libvgcode::EViewType::Width).get_range());
             add_range_property_row("speed range", m_viewer.get_color_range(libvgcode::EViewType::Speed).get_range());
             add_range_property_row("fan speed range", m_viewer.get_color_range(libvgcode::EViewType::FanSpeed).get_range());
+            add_range_property_row("aux fan speed range", m_viewer.get_color_range(libvgcode::EViewType::AuxFanSpeed).get_range());
             add_range_property_row("temperature range", m_viewer.get_color_range(libvgcode::EViewType::Temperature).get_range());
             add_range_property_row("volumetric rate range", m_viewer.get_color_range(libvgcode::EViewType::VolumetricFlowRate).get_range());
             add_range_property_row("layer time linear range", m_viewer.get_color_range(libvgcode::EViewType::LayerTimeLinear).get_range());
@@ -2446,7 +2457,7 @@ void GCodeViewer::render_legend(float& legend_height)
     const std::vector<float> layers_times = get_layers_times();
     if (!layers_times.empty() && layers_times.size() == m_viewer.get_layers_count()) {
         view_options = { _u8L("Feature type"), _u8L("Height (mm)"), _u8L("Width (mm)"), _u8L("Speed (mm/s)"), _u8L("Actual speed (mm/s)"),
-                         _u8L("Fan speed (%)"), _u8L("Temperature (°C)"), _u8L("Volumetric flow rate (mm³/s)"), _u8L("Actual volumetric flow rate (mm³/s)"),
+                         _u8L("Fan speed (%)"), _u8L("Auxiliary fan speed (%)"), _u8L("Temperature (°C)"), _u8L("Volumetric flow rate (mm³/s)"), _u8L("Actual volumetric flow rate (mm³/s)"),
                          _u8L("Layer time (linear)"), _u8L("Layer time (logarithmic)"), _u8L("Tool"), _u8L("Color Print") };
         view_options_id = { static_cast<int>(libvgcode::EViewType::FeatureType),
                             static_cast<int>(libvgcode::EViewType::Height),
@@ -2454,6 +2465,7 @@ void GCodeViewer::render_legend(float& legend_height)
                             static_cast<int>(libvgcode::EViewType::Speed),
                             static_cast<int>(libvgcode::EViewType::ActualSpeed),
                             static_cast<int>(libvgcode::EViewType::FanSpeed),
+                            static_cast<int>(libvgcode::EViewType::AuxFanSpeed),
                             static_cast<int>(libvgcode::EViewType::Temperature),
                             static_cast<int>(libvgcode::EViewType::VolumetricFlowRate),
                             static_cast<int>(libvgcode::EViewType::ActualVolumetricFlowRate),
@@ -2464,7 +2476,7 @@ void GCodeViewer::render_legend(float& legend_height)
     }
     else {
         view_options = { _u8L("Feature type"), _u8L("Height (mm)"), _u8L("Width (mm)"), _u8L("Speed (mm/s)"), _u8L("Actual speed (mm/s)"),
-                         _u8L("Fan speed (%)"), _u8L("Temperature (°C)"), _u8L("Volumetric flow rate (mm³/s)"), _u8L("Actual volumetric flow rate (mm³/s)"),
+                         _u8L("Fan speed (%)"),_u8L("Auxiliary fan speed (%)"),  _u8L("Temperature (°C)"), _u8L("Volumetric flow rate (mm³/s)"), _u8L("Actual volumetric flow rate (mm³/s)"),
                          _u8L("Tool"), _u8L("Color Print") };
         view_options_id = { static_cast<int>(libvgcode::EViewType::FeatureType),
                             static_cast<int>(libvgcode::EViewType::Height),
@@ -2472,6 +2484,7 @@ void GCodeViewer::render_legend(float& legend_height)
                             static_cast<int>(libvgcode::EViewType::Speed),
                             static_cast<int>(libvgcode::EViewType::ActualSpeed),
                             static_cast<int>(libvgcode::EViewType::FanSpeed),
+                            static_cast<int>(libvgcode::EViewType::AuxFanSpeed),
                             static_cast<int>(libvgcode::EViewType::Temperature),
                             static_cast<int>(libvgcode::EViewType::VolumetricFlowRate),
                             static_cast<int>(libvgcode::EViewType::ActualVolumetricFlowRate),
@@ -2540,6 +2553,7 @@ void GCodeViewer::render_legend(float& legend_height)
         case libvgcode::EViewType::Speed:                    { append_range(m_viewer.get_color_range(libvgcode::EViewType::Speed), 1); break; }
         case libvgcode::EViewType::ActualSpeed:              { append_range(m_viewer.get_color_range(libvgcode::EViewType::ActualSpeed), 1); break; }
         case libvgcode::EViewType::FanSpeed:                 { append_range(m_viewer.get_color_range(libvgcode::EViewType::FanSpeed), 0); break; }
+        case libvgcode::EViewType::AuxFanSpeed:              { append_range(m_viewer.get_color_range(libvgcode::EViewType::AuxFanSpeed), 0); break; }
         case libvgcode::EViewType::Temperature:              { append_range(m_viewer.get_color_range(libvgcode::EViewType::Temperature), 0); break; }
         case libvgcode::EViewType::VolumetricFlowRate:       { append_range(m_viewer.get_color_range(libvgcode::EViewType::VolumetricFlowRate), 3); break; }
         case libvgcode::EViewType::ActualVolumetricFlowRate: { append_range(m_viewer.get_color_range(libvgcode::EViewType::ActualVolumetricFlowRate), 3); break; }

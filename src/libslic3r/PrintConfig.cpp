@@ -732,6 +732,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.));
 
+    def = this->add("bridge_aux_fan_speed", coInts);
+    def->label = L("Bridge aux fan speed");
+    def->tooltip = L("This setting represents the speed of the auxiliary fan when bridging.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 100 });
+
     def = this->add("bridge_fan_speed", coInts);
     def->label = L("Bridges fan speed");
     def->tooltip = L("This fan speed is enforced during all bridges and overhangs.");
@@ -882,6 +891,48 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_3", coInts);
+    def->label    = L("speed for 75% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def          = this->add("enable_dynamic_aux_fan_speeds", coBools);
+    def->label   = L("Enable dynamic auxiliary fan speeds");
+    def->tooltip = L("This setting enables dynamic auxiliary fan speed control on overhangs.");
+    def->mode    = comExpert;
+    def->set_default_value(new ConfigOptionBools{false});
+
+    def           = this->add("overhang_aux_fan_speed_0", coInts);
+    def->label    = L("speed for 0% overlap (bridge)");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def           = this->add("overhang_aux_fan_speed_1", coInts);
+    def->label    = L("speed for 25% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def           = this->add("overhang_aux_fan_speed_2", coInts);
+    def->label    = L("speed for 50% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def           = this->add("overhang_aux_fan_speed_3", coInts);
     def->label    = L("speed for 75% overlap");
     def->tooltip  = fan_speed_setting_description;
     def->sidetext = L("%");
@@ -1042,6 +1093,16 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionString());
     def->cli = ConfigOptionDef::nocli;
 
+    def = this->add("disable_aux_fan_first_layers", coInts);
+    def->label = L("Disable auxiliary fan for the first");
+    def->tooltip = L("You can set this to a positive value to disable auxiliary fan at all "
+                   "during the first layers, so that it does not make adhesion worse.");
+    def->sidetext = L("layers");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 3 });
+
     def = this->add("disable_fan_first_layers", coInts);
     def->label = L("Disable fan for the first");
     def->tooltip = L("You can set this to a positive value to disable fan at all "
@@ -1067,6 +1128,13 @@ void PrintConfigDef::init_fff_params()
     def->aliases = { "multiply_distance" };
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(6));
+
+    def = this->add("enable_aux_fan", coBools);
+    def->label = L("Enable auxiliary fan");
+    def->tooltip = L("If your printer have an auxiliary fan and supports M106 P2 and M107 P2 for setting its speed, you can enable this fan here.\n"
+        "if you are using klipper, you can create macros to handle these gcodes.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBools{false});
 
     def = this->add("end_gcode", coString);
     def->label = L("End G-code");
@@ -1265,6 +1333,16 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("If this is enabled, fan will never be disabled and will be kept running at least "
                    "at its minimum speed. Useful for PLA, harmful for ABS.");
     def->set_default_value(new ConfigOptionBools { false });
+
+    def = this->add("aux_fan_below_layer_time", coInts);
+    def->label = L("Enable auxiliary fan if layer print time is below");
+    def->tooltip = L("If layer print time is estimated below this number of seconds, auxiliary fan will be enabled "
+                   "and its speed will be calculated by interpolating the minimum and maximum speeds.");
+    def->sidetext = L("approximate seconds");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 60 });
 
     def = this->add("fan_below_layer_time", coInts);
     def->label = L("Enable fan if layer print time is below");
@@ -1737,6 +1815,17 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = max_temp;
     def->set_default_value(new ConfigOptionInts { 200 });
+
+    def = this->add("full_aux_fan_speed_layer", coInts);
+    def->label = L("Full auxiliary fan speed at layer");
+    def->tooltip = L("Auxiliary fan speed will be ramped up linearly from zero at layer \"disable_aux_fan_first_layers\" "
+                   "to maximum at layer \"full_aux_fan_speed_layer\". "
+                   "\"full_aux_fan_speed_layer\" will be ignored if lower than \"disable_aux_fan_first_layers\", in which case "
+                   "the auxiliary fan will be running at maximum allowed speed at layer \"disable_aux_fan_first_layers\" + 1.");
+    def->min = 0;
+    def->max = 1000;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 0 });
 
     def = this->add("full_fan_speed_layer", coInts);
     def->label = L("Full fan speed at layer");
@@ -2345,6 +2434,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats{ 1500., 1250. });
 
+    def = this->add("max_aux_fan_speed", coInts);
+    def->label = L("Max");
+    def->tooltip = L("This setting represents the maximum speed of your auxiliary fan.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 100 });
+
     def = this->add("max_fan_speed", coInts);
     def->label = L("Max");
     def->tooltip = L("This setting represents the maximum speed of your fan.");
@@ -2407,6 +2505,15 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("min_aux_fan_speed", coInts);
+    def->label = L("Min");
+    def->tooltip = L("This setting represents the minimum speed of your auxiliary fan.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 35 });
 
     def = this->add("min_fan_speed", coInts);
     def->label = L("Min");

@@ -60,6 +60,7 @@ struct OverhangSpeeds
 {
     float print_speed;
     float fan_speed;
+    float aux_fan_speed;
 };
 
 struct PropertiesEstimationConfig {
@@ -285,7 +286,8 @@ OverhangSpeeds calculate_overhang_speed(const ExtrusionAttributes  &attributes,
                                         size_t                      extruder_id,
                                         float                       external_perimeter_reference_speed,
                                         float                       default_speed,
-                                        const std::optional<float> &current_fan_speed);
+                                        const std::optional<float> &current_fan_speed,
+                                        const std::optional<float> &current_aux_fan_speed);
 
 } // namespace Slic3r::ExtrusionProcessor
 
