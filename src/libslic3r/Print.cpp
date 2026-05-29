@@ -751,8 +751,22 @@ std::string Print::validate(std::vector<std::string>* warnings) const
         }
     }
     {
+        // Case‑sensitive match for exactly "G92 E0" (uppercase G and E only)
+        static const boost::regex regex_g92e0_correct {
+            "^[ \\t]*G92[ \\t]*E(0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$"
+        };
+
         bool before_layer_gcode_resets_extruder = boost::regex_search(m_config.before_layer_gcode.value, regex_g92e0);
         bool layer_gcode_resets_extruder        = boost::regex_search(m_config.layer_gcode.value, regex_g92e0);
+
+        // If a G92 E0 is found but with wrong case, tell the user to fix it.
+        if (before_layer_gcode_resets_extruder && !boost::regex_search(m_config.before_layer_gcode.value, regex_g92e0_correct))
+            return _u8L("\"G92 E0\" was found in before_layer_gcode, but the G or E are not uppercase. "
+                        "Please change them to the exact uppercase \"G92 E0\".");
+        if (layer_gcode_resets_extruder && !boost::regex_search(m_config.layer_gcode.value, regex_g92e0_correct))
+            return _u8L("\"G92 E0\" was found in layer_gcode, but the G or E are not uppercase. "
+                        "Please change them to the exact uppercase \"G92 E0\".");
+
         if (m_config.use_relative_e_distances) {
             // See GH issues #6336 #5073
             if ((m_config.gcode_flavor == gcfMarlinLegacy || m_config.gcode_flavor == gcfMarlinFirmware) &&
