@@ -8,6 +8,8 @@
 #include "BitmapCache.hpp"
 #include "GUI_App.hpp"
 #include "GUI_Factories.hpp"
+#include "Plater.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 #include "I18N.hpp"
 
 #include "libslic3r/Model.hpp"
@@ -23,6 +25,16 @@ namespace GUI {
 wxDEFINE_EVENT(wxCUSTOMEVT_LAST_VOLUME_IS_DELETED, wxCommandEvent);
 
 BitmapCache* m_bitmap_cache = nullptr;
+
+int parse_extruder_id(const wxString& text)
+{
+    wxString numeric = text;
+    if (numeric.StartsWith("[V] ")) {
+        numeric = numeric.Mid(4);
+    }
+
+    return atoi(numeric.utf8_str());
+}
 
 wxBitmapBundle* find_bndl(const std::string& bmp_name)
 {
@@ -283,6 +295,32 @@ void ObjectDataViewModelNode::SetIdx(const int& idx)
         m_name = wxString::Format(_(L("Instance %d")), m_idx + 1);
 }
 
+// Map a 1-based extruder ID to the dense color-icon array index.
+// Physical IDs map to 0..N-1. Virtual IDs map to N + vector_position.
+static size_t extruder_id_to_color_idx(int extruder_id_1based)
+{
+    if (extruder_id_1based <= 0) {
+        return 0;
+    }
+
+    const int physical = GUI::wxGetApp().extruders_edited_cnt();
+    if (extruder_id_1based <= physical) {
+        return size_t(extruder_id_1based - 1);
+    }
+
+    if (GUI::wxGetApp().plater()) {
+        const FullSpectrum::VirtualExtruders& virtual_extruders =
+            GUI::wxGetApp().plater()->model().virtual_extruders;
+        for (size_t i = 0; i < virtual_extruders.size(); ++i) {
+            if (int(virtual_extruders[i].id) == extruder_id_1based) {
+                return size_t(physical) + i;
+            }
+        }
+    }
+
+    return 0;
+}
+
 void ObjectDataViewModelNode::UpdateExtruderAndColorIcon(wxString extruder /*= ""*/)
 {
     if (m_type == itVolume && m_volume_type != ModelVolumeType::MODEL_PART && m_volume_type != ModelVolumeType::PARAMETER_MODIFIER)
@@ -293,11 +331,11 @@ void ObjectDataViewModelNode::UpdateExtruderAndColorIcon(wxString extruder /*= "
         m_extruder = extruder; // update extruder
 
     // update color icon
-    size_t extruder_idx = atoi(extruder.c_str());
-    if (extruder_idx == 0) { 
+    int extruder_id = std::max(0, parse_extruder_id(extruder));
+    if (extruder_id == 0) {
         if (m_type & itObject);
         else if (m_type & itVolume && m_volume_type == ModelVolumeType::MODEL_PART) {
-            extruder_idx = atoi(m_parent->GetExtruder().c_str());
+            extruder_id = std::max(0, parse_extruder_id(m_parent->GetExtruder()));
         }
         else {
             m_extruder_bmp = wxNullBitmap;
@@ -305,7 +343,7 @@ void ObjectDataViewModelNode::UpdateExtruderAndColorIcon(wxString extruder /*= "
         }
     }
 
-    if (extruder_idx > 0) --extruder_idx;
+    const size_t extruder_idx = extruder_id_to_color_idx(extruder_id);
     // Create the bitmap with color bars.
     std::vector<wxBitmapBundle*> bmps = get_extruder_color_icons();// use wide icons
     if (bmps.empty()) {
@@ -1154,6 +1192,7 @@ void ObjectDataViewModel::UpdateExtruderBitmap(wxDataViewItem item)
         return;
     ObjectDataViewModelNode* node = static_cast<ObjectDataViewModelNode*>(item.GetID());
     node->UpdateExtruderAndColorIcon();
+    ItemChanged(item);
 }
 
 void ObjectDataViewModel::UpdateVolumesExtruderBitmap(wxDataViewItem obj_item)
@@ -1162,8 +1201,10 @@ void ObjectDataViewModel::UpdateVolumesExtruderBitmap(wxDataViewItem obj_item)
         return;
     ObjectDataViewModelNode* obj_node = static_cast<ObjectDataViewModelNode*>(obj_item.GetID());
     for (auto child : obj_node->GetChildren())
-        if (child->GetVolumeType() == ModelVolumeType::MODEL_PART)
+        if (child->GetVolumeType() == ModelVolumeType::MODEL_PART) {
             child->UpdateExtruderAndColorIcon();
+            ItemChanged(wxDataViewItem(static_cast<void*>(child)));
+        }
 }
 
 int ObjectDataViewModel::GetDefaultExtruderIdx(wxDataViewItem item)
@@ -1293,7 +1334,7 @@ int ObjectDataViewModel::GetExtruderNumber(const wxDataViewItem& item) const
 	if (!node)      // happens if item.IsOk()==false
 		return 0;
 
-	return atoi(node->m_extruder.c_str());
+	return parse_extruder_id(node->m_extruder);
 }
 
 wxString ObjectDataViewModel::GetColumnType(unsigned int col) const
@@ -1353,6 +1394,8 @@ void ObjectDataViewModel::SetExtruder(const wxString& extruder, wxDataViewItem i
     node->UpdateExtruderAndColorIcon(extruder);
     if (node->GetType() == itObject)
         UpdateVolumesExtruderBitmap(item);
+
+    ItemChanged(item);
 }
 
 bool ObjectDataViewModel::SetName(const wxString& new_name, wxDataViewItem item)

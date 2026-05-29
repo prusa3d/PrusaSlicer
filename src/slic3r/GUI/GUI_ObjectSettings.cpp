@@ -149,7 +149,7 @@ bool ObjectSettings::update_settings_list()
                 if (!option.opt.full_label.empty())
                     option.opt.label = option.opt.full_label;
                 if (is_extruders_cat)
-                    option.opt.max = wxGetApp().extruders_edited_cnt();
+                    option.opt.max = wxGetApp().extruders_edited_cnt() + wxGetApp().virtual_extruders_cnt();
                 optgroup->append_single_option_line(option);
             }
             optgroup->activate();

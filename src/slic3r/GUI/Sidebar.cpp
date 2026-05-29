@@ -43,6 +43,8 @@
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Print.hpp"
+#include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/ModelProcessing.hpp"
@@ -62,12 +64,91 @@
 #include "NotificationManager.hpp"
 #include "PresetComboBoxes.hpp"
 #include "MsgDialog.hpp"
+#include "FullSpectrumDialog.hpp"
+#include "MainFrame.hpp"
 
 using Slic3r::Preset;
 using Slic3r::GUI::format_wxstr;
 
 namespace Slic3r {
 namespace GUI {
+
+static bool
+renumber_virtual_extruders(Plater& plater, unsigned int num_physical, bool take_snapshot = false)
+{
+    Model& model = plater.model();
+    if (model.virtual_extruders.empty()) {
+        return false;
+    }
+
+    std::map<unsigned int, unsigned int> remap;
+    unsigned int next_id = num_physical + 1;
+    for (FullSpectrum::VirtualExtruder& ve : model.virtual_extruders) {
+        if (ve.id != next_id) {
+            remap[ve.id] = next_id;
+            ve.id        = next_id;
+        }
+
+        ++next_id;
+    }
+
+    if (remap.empty()) {
+        return false;
+    }
+
+    if (take_snapshot) {
+        plater.take_snapshot(_L("Renumber virtual extruders"));
+    }
+
+    for (ModelObject* object : model.objects) {
+        if (!object) {
+            continue;
+        }
+
+        if (object->config.has("extruder")) {
+            auto it = remap.find(static_cast<unsigned int>(object->config.extruder()));
+            if (it != remap.end()) {
+                object->config.set_key_value("extruder", new ConfigOptionInt(int(it->second)));
+            }
+        }
+        for (ModelVolume* volume : object->volumes) {
+            if (!volume) {
+                continue;
+            }
+            if (volume->config.has("extruder")) {
+                auto it = remap.find(static_cast<unsigned int>(volume->config.extruder()));
+                if (it != remap.end()) {
+                    volume->config.set_key_value("extruder", new ConfigOptionInt(int(it->second)));
+                }
+            }
+
+            if (volume->is_mm_painted()) {
+                bool needs = false;
+                const std::vector<bool>& used =
+                    volume->mm_segmentation_facets.get_data().used_states;
+                for (const auto& [old_id, new_id] : remap) {
+                    if (old_id < used.size() && used[old_id]) {
+                        needs = true;
+                        break;
+                    }
+                }
+
+                if (needs) {
+                    TriangleSelector selector(volume->mesh());
+                    selector.deserialize(volume->mm_segmentation_facets.get_data(), false);
+                    std::map<TriangleStateType, TriangleStateType> state_remap;
+                    for (const auto& [old_id, new_id] : remap) {
+                        state_remap[TriangleStateType(old_id)] = TriangleStateType(new_id);
+                    }
+
+                    selector.remap_states(state_remap);
+                    volume->mm_segmentation_facets.set(selector);
+                }
+            }
+        }
+    }
+    return true;
+}
 
 class ObjectInfo : public wxStaticBoxSizer
 {
@@ -234,14 +315,19 @@ void Sidebar::show_preset_comboboxes()
     for (size_t i = 0; i < 4; ++i)
         m_presets_sizer->Show(i, !showSLA);
 
-    for (size_t i = 4; i < 8; ++i)
+    if (m_btn_full_spectrum) {
+        const bool show_btn = !showSLA && int(m_combos_filament.size()) >= 2;
+        m_presets_sizer->Show(size_t(4), show_btn);
+    }
+
+    for (size_t i = 5; i < 9; ++i)
         m_presets_sizer->Show(i, showSLA);
 
     m_frequently_changed_parameters->Show(!showSLA);
 
     const Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
     bool is_prusa_slx = showSLA && tab->is_prusa_printer() && tab->printer_model() == "SLX";
-    for (size_t i = 11; i < 13; ++i)
+    for (size_t i = 12; i < 14; ++i)
         m_presets_sizer->Show(i, is_prusa_slx);
 
     m_scrolled_panel->GetParent()->Layout();
@@ -408,6 +494,71 @@ Sidebar::Sidebar(Plater *parent)
     m_combos_filament.push_back(nullptr);
     init_combo(&m_combo_print,         _L("Print settings"),     Preset::TYPE_PRINT,         false);
     init_combo(&m_combos_filament[0],  _L("Filament"),           Preset::TYPE_FILAMENT,      true);
+
+    m_btn_full_spectrum = new wxButton(m_presets_panel, wxID_ANY,
+                                       _L("Virtual Extruders - Color Mixing"),
+                                       wxDefaultPosition, wxDefaultSize,
+                                       wxBU_EXACTFIT);
+    m_btn_full_spectrum->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) {
+        if (GLCanvas3D *canvas = m_plater->canvas3D(); canvas != nullptr)
+            canvas->reset_all_gizmos();
+        FullSpectrumDialog dialog(static_cast<wxWindow*>(wxGetApp().mainframe), m_plater->model(),
+                                  wxGetApp().preset_bundle->full_config());
+        if (dialog.ShowModal() != wxID_OK) {
+            return;
+        }
+
+        m_plater->take_snapshot(_L("Update virtual extruders"));
+        Model &model = m_plater->model();
+        for (unsigned int removed_id : dialog.removed_ids()) {
+            for (ModelObject *object : model.objects) {
+                if (object == nullptr) continue;
+                if (object->config.has("extruder") && object->config.extruder() == int(removed_id))
+                    object->config.erase("extruder");
+                for (ModelVolume *volume : object->volumes) {
+                    if (volume == nullptr) continue;
+                    if (volume->config.has("extruder") && volume->config.extruder() == int(removed_id))
+                        volume->config.erase("extruder");
+                    if (volume->is_mm_painted()) {
+                        const auto& used = volume->mm_segmentation_facets.get_data().used_states;
+                        if (removed_id < used.size() && used[removed_id]) {
+                            TriangleSelector selector(volume->mesh());
+                            selector.deserialize(volume->mm_segmentation_facets.get_data(), false);
+                            selector.remap_states({{TriangleStateType(removed_id), TriangleStateType::NONE}});
+                            volume->mm_segmentation_facets.set(selector);
+                        }
+                    }
+                }
+            }
+        }
+        model.virtual_extruders = FullSpectrum::normalize_virtual_extruders(
+            dialog.result_virtual_extruders());
+
+        renumber_virtual_extruders(*m_plater, static_cast<unsigned int>(m_combos_filament.size()));
+
+        for (size_t obj_idx = 0; obj_idx < model.objects.size(); ++obj_idx)
+            m_object_list->update_info_items(obj_idx);
+
+        m_plater->schedule_background_process();
+        update_objects_list_extruder_column(m_combos_filament.size());
+        m_object_list->Refresh();
+        if (GLCanvas3D *canvas = m_plater->canvas3D(); canvas != nullptr) {
+            canvas->reload_scene(true);
+        }
+    });
+    m_btn_full_spectrum->Show(false);
+#ifdef _WIN32
+    wxGetApp().UpdateDarkUI(m_btn_full_spectrum, true);
+#endif
+    {
+        auto *btn_row_sizer = new wxBoxSizer(wxHORIZONTAL);
+        btn_row_sizer->Add(m_btn_full_spectrum, 1, wxEXPAND);
+        const int gear_col_width = m_combos_filament[0]->edit_btn->GetBestSize().GetWidth()
+                                 + 2 * int(0.3 * wxGetApp().em_unit());
+        btn_row_sizer->AddSpacer(gear_col_width);
+        m_presets_sizer->Add(btn_row_sizer, 0, wxEXPAND | wxBOTTOM, 2);
+    }
+
     init_combo(&m_combo_sla_print,     _L("SLA print settings"), Preset::TYPE_SLA_PRINT,     false);
     init_combo(&m_combo_sla_material,  _L("SLA material"),       Preset::TYPE_SLA_MATERIAL,  false);
     init_combo(&m_combo_printer,       _L("Printer"),            Preset::TYPE_PRINTER,       false);
@@ -423,6 +574,8 @@ Sidebar::Sidebar(Plater *parent)
         | wxRIGHT
 #endif // __WXGTK3__
         , wxOSX ? 1 : margin_5);
+    if (m_btn_full_spectrum)
+        m_presets_sizer->Show(size_t(4), int(m_combos_filament.size()) >= 2);
 
     // Object List
     m_object_list = new ObjectList(m_scrolled_panel);
@@ -927,6 +1080,9 @@ void Sidebar::sys_color_changed()
         wxGetApp().UpdateAllStaticTextDarkUI(win);
     for (wxWindow* btn : std::vector<wxWindow*>{ m_btn_reslice, m_btn_export_gcode, m_btn_connect_gcode })
         wxGetApp().UpdateDarkUI(btn, true);
+    if (m_btn_full_spectrum) {
+        wxGetApp().UpdateDarkUI(m_btn_full_spectrum, true);
+    }
 
     m_frequently_changed_parameters->sys_color_changed();
     m_object_settings              ->sys_color_changed();
@@ -1373,6 +1529,8 @@ void Sidebar::set_extruders_count(size_t extruders_count)
     if (extruders_count == m_combos_filament.size())
         return;
 
+    renumber_virtual_extruders(*m_plater, static_cast<unsigned int>(extruders_count), true);
+
     dynamic_cast<TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT))->update_extruder_combobox();
 
     wxWindowUpdateLocker noUpdates_scrolled_panel(this);
@@ -1391,7 +1549,12 @@ void Sidebar::set_extruders_count(size_t extruders_count)
 
     // remove unused choices if any
     remove_unused_filament_combos(extruders_count);
-    
+
+    if (m_btn_full_spectrum && m_presets_sizer) {
+        m_presets_sizer->Show(size_t(4), int(extruders_count) >= 2);
+        m_presets_sizer->Layout();
+    }
+
     Layout();
     m_scrolled_panel->Refresh();
 }

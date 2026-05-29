@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.0" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+	 x="0px" y="0px" viewBox="0 0 16 16" enable-background="new 0 0 16 16" xml:space="preserve">
+<g id="recipe_add">
+	<rect x="1" y="1" width="14" height="14" rx="3" ry="3" fill="#ED6B21"/>
+	<line fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" x1="8" y1="5" x2="8" y2="11"/>
+	<line fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" x1="5" y1="8" x2="11" y2="8"/>
+</g>
+</svg>

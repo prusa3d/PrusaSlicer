@@ -88,7 +88,8 @@ static Model read_all_from_file(const std::string& input_file,
                                 DynamicPrintConfig* config,
                                 ConfigSubstitutionContext* config_substitutions,
                                 boost::optional<Semver> &prusaslicer_generator_version,
-                                LoadAttributes options)
+                                LoadAttributes options,
+                                FullSpectrum::FullSpectrumConfig* out_fs_config = nullptr)
 {
     assert(is_project_file(input_file));
     assert(config != nullptr);
@@ -98,7 +99,7 @@ static Model read_all_from_file(const std::string& input_file,
 
     bool result = false;
     if (is_project_file(input_file))
-        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion, prusaslicer_generator_version);
+        result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion, prusaslicer_generator_version, out_fs_config);
     else
         throw Slic3r::RuntimeError(L("Unknown file format. Input file must have .3mf extension."));
 
@@ -239,14 +240,15 @@ Model load_model(const std::string& input_file,
     return model;
 }
 
-Model load_model_with_config(const std::string& input_file, 
-                             DynamicPrintConfig* config, 
+Model load_model_with_config(const std::string& input_file,
+                             DynamicPrintConfig* config,
                              ConfigSubstitutionContext* config_substitutions,
                              boost::optional<Semver>& prusaslicer_generator_version,
-                             LoadAttributes options, 
-                             LoadStats* stats)
+                             LoadAttributes options,
+                             LoadStats* stats,
+                             FullSpectrum::FullSpectrumConfig* out_fs_config)
 {
-    Model model = read_all_from_file(input_file, config, config_substitutions, prusaslicer_generator_version, options);
+    Model model = read_all_from_file(input_file, config, config_substitutions, prusaslicer_generator_version, options, out_fs_config);
 
     if (stats && !model.mesh().empty()) {
         stats->deleted_objects_cnt          = removed_objects_with_zero_volume(model);

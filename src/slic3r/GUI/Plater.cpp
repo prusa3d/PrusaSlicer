@@ -69,6 +69,7 @@
 #include "libslic3r/Format/OBJ.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 #include "libslic3r/SLA/SupportPoint.hpp"
 #include "libslic3r/SLA/ReprojectPointsOnMesh.hpp"
 #include "libslic3r/Print.hpp"
@@ -241,7 +242,35 @@ bool emboss_svg(Plater& plater, const wxString &svg_file, const Vec2d& mouse_dro
 
     return svg->create_volume(svg_file_str, mouse_drop_position, ModelVolumeType::MODEL_PART);
 }
+
+void apply_full_spectrum_physical_colors(
+    const std::vector<std::string>& physical_colors,
+    Plater* plater,
+    Sidebar* sidebar
+)
+{
+    Tab* printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
+    ConfigOptionStrings* colors =
+        printer_tab->get_config()->option<ConfigOptionStrings>("extruder_colour");
+    if (colors == nullptr || colors->values.empty()) {
+        return;
+    }
+
+    const size_t n = std::min(physical_colors.size(), colors->values.size());
+    for (size_t i = 0; i < n; ++i) {
+        if (!physical_colors[i].empty()) {
+            colors->values[i] = physical_colors[i];
+        }
+    }
+
+    DynamicPrintConfig new_cfg = *printer_tab->get_config();
+    printer_tab->load_config(new_cfg);
+    plater->on_config_change(new_cfg);
+    plater->force_filament_colors_update();
+    sidebar->update_presets(Preset::TYPE_FILAMENT);
 }
+
+} // namespace
 
 bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames)
 {
@@ -1423,9 +1452,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
         FileReader::LoadStats load_stats;
 
+        FullSpectrum::FullSpectrumConfig fs_config;
         try {
             if (load_config) {
-                model = FileReader::load_model_with_config(path.string(), &config_loaded, &config_substitutions, prusaslicer_generator_version, FileReader::LoadAttribute::CheckVersion, &load_stats);
+                model = FileReader::load_model_with_config(path.string(), &config_loaded, &config_substitutions, prusaslicer_generator_version, FileReader::LoadAttribute::CheckVersion, &load_stats, &fs_config);
             }
             else if (load_model) {
                 if (type_step) {
@@ -1510,7 +1540,19 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
 
             this->model.get_custom_gcode_per_print_z_vector() = model.get_custom_gcode_per_print_z_vector();
-            this->model.get_wipe_tower_vector() = model.get_wipe_tower_vector();
+            this->model.get_wipe_tower_vector()               = model.get_wipe_tower_vector();
+            this->model.get_virtual_extruders()               = model.get_virtual_extruders();
+
+            FullSpectrum::remap_full_spectrum_on_import(
+                model,
+                this->model.get_virtual_extruders(),
+                static_cast<unsigned int>(nozzle_dmrs->values.size()),
+                fs_config
+            );
+
+            if (!fs_config.physical_colors.empty() && !this->model.virtual_extruders.empty()) {
+                apply_full_spectrum_physical_colors(fs_config.physical_colors, q, this->sidebar);
+            }
 
             if (!in_temp)
                 wxGetApp().app_config->update_config_dir(path.parent_path().string());
@@ -7127,6 +7169,15 @@ std::vector<std::string> Plater::get_extruder_color_strings_from_plater_config(c
         for (size_t i = 0; i < extruder_colors.size(); ++i)
             if (extruder_colors[i] == "" && i < filament_colours.size())
                 extruder_colors[i] = filament_colours[i];
+
+        // Append virtual extruder colors in vector order (dense array).
+        // The painting gizmo and 3D preview use get_extruder_color_idx()
+        // to map actual VE IDs to dense array positions.
+        const std::vector<std::string> phys_colors(extruder_colors);
+        for (const auto& ve : p->model.virtual_extruders) {
+            const std::string eff = ve.effective_color(phys_colors);
+            extruder_colors.push_back(eff.empty() ? "#808080" : eff);
+        }
 
         return extruder_colors;
     }

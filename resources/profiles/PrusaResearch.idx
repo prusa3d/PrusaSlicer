@@ -1,4 +1,5 @@
 min_slic3r_version = 2.9.4-rc0
+2.4.14 Updated FW version notification (6.4.1 for XL). Updated filament profiles for Prusament TPU 95A, Filament PM PETG, Prusa PETG.
 2.4.13 Updated FW version notification (6.5.3).
 2.4.12 Updated default printer configuration for Prusa Signature Oak.
 2.4.11 Added profiles for Prusa Signature Oak. Added profiles for CORE One L MMU3. Updated MMU parameters.

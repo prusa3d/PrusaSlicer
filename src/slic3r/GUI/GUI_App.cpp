@@ -3314,6 +3314,11 @@ int GUI_App::extruders_edited_cnt() const
            preset.config.option<ConfigOptionFloats>("nozzle_diameter")->values.size();
 }
 
+int GUI_App::virtual_extruders_cnt() const
+{
+    return static_cast<int>(plater_->model().virtual_extruders.size());
+}
+
 wxString GUI_App::current_language_code_safe() const
 {
 	// Translate the language code to a code, for which Prusa Research maintains translations.

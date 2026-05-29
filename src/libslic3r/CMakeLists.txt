@@ -97,6 +97,8 @@ set(SLIC3R_SOURCES
     FileParserError.hpp
     Feature/FuzzySkin/FuzzySkin.cpp
     Feature/FuzzySkin/FuzzySkin.hpp
+    Feature/FullSpectrum/VirtualExtruder.cpp
+    Feature/FullSpectrum/VirtualExtruder.hpp
     Fill/Fill.cpp
     Fill/Fill3DHoneycomb.cpp
     Fill/Fill3DHoneycomb.hpp
@@ -655,6 +657,7 @@ target_link_libraries(libslic3r PUBLIC
     ankerl
     boost_headeronly
     libseqarrange
+    prusa_fdm_mixer
 )
 
 if (APPLE)

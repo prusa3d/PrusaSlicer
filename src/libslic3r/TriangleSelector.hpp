@@ -14,6 +14,7 @@
 #include <cfloat>
 #include <algorithm>
 #include <array>
+#include <map>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -32,14 +33,14 @@ class access;
 namespace Slic3r {
 class TriangleMesh;
 
-enum class TriangleStateType : int8_t {
+enum class TriangleStateType : uint8_t {
     // Maximum is 3. The value is serialized in TriangleSelector into 2 bits.
     NONE      = 0,
     ENFORCER  = 1,
     BLOCKER   = 2,
     // For the fuzzy skin, we use just two values (NONE and FUZZY_SKIN).
     FUZZY_SKIN = ENFORCER,
-    // Maximum is 15. The value is serialized in TriangleSelector into 6 bits using a 2 bit prefix code.
+    // Maximum is 254. The value is serialized in TriangleSelector into 2, 6, or 14 bits using prefix codes.
     Extruder1 = ENFORCER,
     Extruder2 = BLOCKER,
     Extruder3,
@@ -55,8 +56,10 @@ enum class TriangleStateType : int8_t {
     Extruder13,
     Extruder14,
     Extruder15,
-    Count
+    Extruder16
 };
+
+inline constexpr size_t TRIANGLE_STATE_TYPE_COUNT = 256;
 
 // Following class holds information about selected triangles. It also has power
 // to recursively subdivide the triangles and make the selection finer.
@@ -287,7 +290,7 @@ public:
         // Bit stream containing splitting information.
         std::vector<bool>                     bitstream;
         // Array indicating which triangle state types are used (encoded inside bitstream).
-        std::vector<bool>                     used_states { std::vector<bool>(static_cast<size_t>(TriangleStateType::Count), false) };
+        std::vector<bool>                     used_states { std::vector<bool>(TRIANGLE_STATE_TYPE_COUNT, false) };
 
         TriangleSplittingData() = default;
 
@@ -301,12 +304,17 @@ public:
 
         // Reset all used states before they are recomputed based on the bitstream.
         void reset_used_states() {
-            used_states.resize(static_cast<size_t>(TriangleStateType::Count), false);
+            used_states.resize(TRIANGLE_STATE_TYPE_COUNT, false);
             std::fill(used_states.begin(), used_states.end(), false);
         }
 
         // Update used states based on the bitstream. It just iterated over the bitstream from the bitstream_start_idx till the end.
         void update_used_states(size_t bitstream_start_idx);
+
+        // Returns the minimum painting version required to represent this data.
+        // Version 1: Only states 0-16 are used (compatible with PrusaSlicer 2.9.4 and older).
+        // Version 2: States 17-255 are used (requires the extended serialization format).
+        size_t minimum_required_painting_version() const;
 
     private:
         friend class cereal::access;
@@ -381,6 +389,10 @@ public:
 
     // Set facet of the mesh to a given state. Only works for original triangles.
     void set_facet(int facet_idx, TriangleStateType state);
+
+    // Remap triangle states according to the given mapping. Merges split
+    // triangles whose children end up with identical states after remapping.
+    void remap_states(const std::map<TriangleStateType, TriangleStateType>& remap);
 
     // Clear everything and make the tree empty.
     void reset();

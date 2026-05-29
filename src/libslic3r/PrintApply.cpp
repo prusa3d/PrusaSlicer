@@ -32,6 +32,12 @@
 #include "libslic3r/TriangleSelector.hpp"
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/CustomParametersHandling.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
+
+using Slic3r::FullSpectrum::VirtualExtruder;
+using Slic3r::FullSpectrum::VirtualExtruders;
+using Slic3r::FullSpectrum::VirtualExtruderComponent;
+using Slic3r::FullSpectrum::VirtualExtruderGradientStop;
 
 namespace Slic3r {
 
@@ -671,7 +677,12 @@ PrintObjectRegions::BoundingBox find_modifier_volume_extents(const PrintObjectRe
     return out;
 }
 
-PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &default_or_parent_region_config, const DynamicPrintConfig *layer_range_config, const ModelVolume &volume, size_t num_extruders);
+PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig  &default_or_parent_region_config,
+                                                  const DynamicPrintConfig *layer_range_config,
+                                                  const ModelVolume        &volume,
+                                                  size_t                    num_physical_extruders,
+                                                  const VirtualExtruders      &virtual_extruders,
+                                                  std::optional<unsigned int> *out_source_virtual_extruder_id = nullptr);
 
 void print_region_ref_inc(PrintRegion &r) { ++ r.m_ref_cnt; }
 void print_region_ref_reset(PrintRegion &r) { r.m_ref_cnt = 0; }
@@ -683,7 +694,8 @@ int  print_region_ref_cnt(const PrintRegion &r) { return r.m_ref_cnt; }
 bool verify_update_print_object_regions(
     ModelVolumePtrs                     model_volumes,
     const PrintRegionConfig            &default_region_config,
-    size_t                              num_extruders,
+    unsigned int                        num_physical_extruders,
+    const VirtualExtruders             &virtual_extruders,
     PrintObjectRegions                 &print_object_regions,
     const std::function<void(const PrintRegionConfig&, const PrintRegionConfig&, const t_config_option_keys&)> &callback_invalidate)
 {
@@ -730,16 +742,21 @@ bool verify_update_print_object_regions(
                             } else if (PrintObjectRegions::BoundingBox parent_bbox = find_modifier_volume_extents(layer_range, parent_region_id); parent_bbox.intersects(*bbox))
                                 // Such parent region does not exist. If it is needed, then we need to reslice.
                                 // Only create new region for a modifier, which actually modifies config of it's parent.
-                                if (PrintRegionConfig config = region_config_from_model_volume(parent_region.region->config(), nullptr, **it_model_volume, num_extruders);
+                                if (PrintRegionConfig config = region_config_from_model_volume(parent_region.region->config(), nullptr, **it_model_volume, num_physical_extruders, virtual_extruders);
                                     config != parent_region.region->config())
                                     // This modifier newly overrides a region, which it did not before. We need to reslice.
                                     return false;
                         }
                     }
                 }
+                std::optional<unsigned int> new_source_virtual;
                 PrintRegionConfig cfg = region.parent == -1 ?
-                    region_config_from_model_volume(default_region_config, layer_range.config, **it_model_volume, num_extruders) :
-                    region_config_from_model_volume(layer_range.volume_regions[region.parent].region->config(), nullptr, **it_model_volume, num_extruders);
+                    region_config_from_model_volume(default_region_config, layer_range.config, **it_model_volume, num_physical_extruders, virtual_extruders, &new_source_virtual) :
+                    region_config_from_model_volume(layer_range.volume_regions[region.parent].region->config(), nullptr, **it_model_volume, num_physical_extruders, virtual_extruders, &new_source_virtual);
+                if (new_source_virtual != region.region->source_virtual_extruder_id()) {
+                    return false;
+                }
+
                 if (cfg != region.region->config()) {
                     // Region configuration changed.
                     if (print_region_ref_cnt(*region.region) == 0) {
@@ -817,7 +834,8 @@ bool verify_update_print_object_regions(
             size_t hash = regions[i]->config_hash();
             size_t j = i;
             for (++ j; j < regions.size() && regions[j]->config_hash() == hash; ++ j)
-                if (regions[i]->config() == regions[j]->config()) {
+                if (regions[i]->config() == regions[j]->config()
+                    && regions[i]->source_virtual_extruder_id() == regions[j]->source_virtual_extruder_id()) {
                     // Regions were merged. We need to reslice.
                     return false;
                 }
@@ -905,7 +923,8 @@ static PrintObjectRegions* generate_print_object_regions(
     const LayerRanges                           &model_layer_ranges,
     const PrintRegionConfig                     &default_region_config,
     const Transform3d                           &trafo,
-    size_t                                       num_extruders,
+    unsigned int                                 num_physical_extruders,
+    const VirtualExtruders                      &virtual_extruders,
     const float                                  xy_size_compensation,
     const std::vector<unsigned int>             &painting_extruders,
     const bool                                   has_painted_fuzzy_skin)
@@ -939,19 +958,30 @@ static PrintObjectRegions* generate_print_object_regions(
             layer_ranges_regions.push_back({ range.layer_height_range, range.config });
     }
 
-    const bool is_mm_painted = num_extruders > 1 && std::any_of(model_volumes.cbegin(), model_volumes.cend(), [](const ModelVolume *mv) { return mv->is_mm_painted(); });
+    const bool is_mm_painted = num_physical_extruders > 1 && std::any_of(model_volumes.cbegin(), model_volumes.cend(), [](const ModelVolume *mv) { return mv->is_mm_painted(); });
     update_volume_bboxes(layer_ranges_regions, out->cached_volume_ids, model_volumes, out->trafo_bboxes, is_mm_painted ? 0.f : std::max(0.f, xy_size_compensation));
 
     std::vector<PrintRegion*> region_set;
-    auto get_create_region = [&region_set, &all_regions](PrintRegionConfig &&config) -> PrintRegion* {
-        size_t hash = config.hash();
-        auto it = Slic3r::lower_bound_by_predicate(region_set.begin(), region_set.end(), [&config, hash](const PrintRegion* l) {
-            return l->config_hash() < hash || (l->config_hash() == hash && l->config() < config); });
-        if (it != region_set.end() && (*it)->config_hash() == hash && (*it)->config() == config)
+    auto get_create_region = [&region_set, &all_regions](
+        PrintRegionConfig &&config,
+        std::optional<unsigned int> source_virtual = std::nullopt) -> PrintRegion*
+    {
+        const size_t hash = config.hash();
+        auto it = Slic3r::lower_bound_by_predicate(region_set.begin(), region_set.end(),
+            [&config, hash, source_virtual](const PrintRegion *l) {
+                if (l->config_hash() != hash)    return l->config_hash() < hash;
+                if (l->config() != config)       return l->config() < config;
+                return l->source_virtual_extruder_id() < source_virtual;
+            });
+        if (it != region_set.end()
+            && (*it)->config_hash() == hash
+            && (*it)->config() == config
+            && (*it)->source_virtual_extruder_id() == source_virtual)
             return *it;
         // Insert into a sorted array, it has O(n) complexity, but the calling algorithm has an O(n^2*log(n)) complexity anyways.
         all_regions.emplace_back(std::make_unique<PrintRegion>(std::move(config), hash, int(all_regions.size())));
         PrintRegion *region = all_regions.back().get();
+        region->set_source_virtual_extruder_id(source_virtual);
         region_set.emplace(it, region);
         return region;
     };
@@ -964,11 +994,12 @@ static PrintObjectRegions* generate_print_object_regions(
                 if (const PrintObjectRegions::BoundingBox *bbox = find_volume_extents(layer_range, volume); bbox) {
                     if (volume.is_model_part()) {
                         // Add a model volume, assign an existing region or generate a new one.
-                        layer_range.volume_regions.push_back({
-                            &volume, -1,
-                            get_create_region(region_config_from_model_volume(default_region_config, layer_range.config, volume, num_extruders)),
-                            bbox
-                        });
+                        std::optional<unsigned int> source_virtual;
+                        PrintRegionConfig region_config = region_config_from_model_volume(
+                            default_region_config, layer_range.config, volume,
+                            num_physical_extruders, virtual_extruders, &source_virtual);
+                        PrintRegion *region = get_create_region(std::move(region_config), source_virtual);
+                        layer_range.volume_regions.push_back({ &volume, -1, region, bbox, nullptr });
                     } else if (volume.is_negative_volume()) {
                         // Add a negative (subtractor) volume. Such volume has neither region nor parent volume assigned.
                         layer_range.volume_regions.push_back({ &volume, -1, nullptr, bbox });
@@ -983,21 +1014,86 @@ static PrintObjectRegions* generate_print_object_regions(
                             if (parent_volume.is_model_part() || parent_volume.is_modifier())
                                 if (PrintObjectRegions::BoundingBox parent_bbox = find_modifier_volume_extents(layer_range, parent_region_id); parent_bbox.intersects(*bbox)) {
                                     // Only create new region for a modifier, which actually modifies config of it's parent.
-                                    if (PrintRegionConfig config = region_config_from_model_volume(parent_region.region->config(), nullptr, volume, num_extruders); 
+                                    std::optional<unsigned int> source_virtual;
+                                    if (PrintRegionConfig config = region_config_from_model_volume(
+                                            parent_region.region->config(), nullptr, volume,
+                                            num_physical_extruders, virtual_extruders, &source_virtual);
                                         config != parent_region.region->config()) {
                                         added = true;
-                                        layer_range.volume_regions.push_back({ &volume, parent_region_id, get_create_region(std::move(config)), bbox });
+                                        PrintRegion *region = get_create_region(std::move(config), source_virtual);
+                                        layer_range.volume_regions.push_back({ &volume, parent_region_id, region, bbox, nullptr });
                                     } else if (parent_model_part_id == -1 && parent_volume.is_model_part())
                                         parent_model_part_id = parent_region_id;
                                 }
                         }
-                        if (! added && parent_model_part_id >= 0)
+                        if (! added && parent_model_part_id >= 0) {
                             // This modifier does not override any printable volume's configuration, however it may in the future.
                             // Store it so that verify_update_print_object_regions() will handle this modifier correctly if its configuration changes.
-                            layer_range.volume_regions.push_back({ &volume, parent_model_part_id, layer_range.volume_regions[parent_model_part_id].region, bbox });
+                            // The virtual-source marker is carried by the shared PrintRegion itself, so
+                            // remap reads it via volume_region.region->source_virtual_extruder_id().
+                            const PrintObjectRegions::VolumeRegion &parent_region = layer_range.volume_regions[parent_model_part_id];
+                            layer_range.volume_regions.push_back({ &volume, parent_model_part_id, parent_region.region, bbox, nullptr });
+                        }
                     }
                 }
             }
+    }
+
+    // Create PaintedRegions for each physical extruder a virtual extruder can
+    // resolve to. Both MM segmentation and remap_virtual_region_slices_to_physical
+    // need these target regions to exist.
+    for (PrintObjectRegions::LayerRangeRegions& layer_range : layer_ranges_regions) {
+        const int num_volume_regions = int(layer_range.volume_regions.size());
+        for (int volume_region_id = 0; volume_region_id < num_volume_regions; ++volume_region_id) {
+            const PrintObjectRegions::VolumeRegion& volume_region =
+                layer_range.volume_regions[volume_region_id];
+            if (!volume_region.model_volume->is_model_part()
+                && !volume_region.model_volume->is_modifier())
+            {
+                continue;
+            }
+
+            const std::optional<unsigned int> source_virtual =
+                volume_region.region->source_virtual_extruder_id();
+            if (!source_virtual.has_value()) {
+                continue;
+            }
+
+            const unsigned int virtual_extruder_id = *source_virtual;
+            // Find the matching virtual extruder definition.
+            for (const VirtualExtruder& virtual_extruder : virtual_extruders) {
+                if (virtual_extruder.id != virtual_extruder_id) {
+                    continue;
+                }
+
+                std::set<unsigned int> distinct_physical_ids;
+                if (virtual_extruder.gradient.has_value()) {
+                    for (const VirtualExtruderGradientStop& stop : virtual_extruder.gradient->stops)
+                    {
+                        distinct_physical_ids.insert(stop.extruder_id);
+                    }
+                } else {
+                    for (const VirtualExtruderComponent& component : virtual_extruder.components) {
+                        distinct_physical_ids.insert(component.extruder_id);
+                    }
+                }
+
+                for (unsigned int physical_id : distinct_physical_ids) {
+                    assert(physical_id >= 1 && physical_id <= num_physical_extruders);
+                    PrintRegionConfig painted_region_config        = volume_region.region->config();
+                    painted_region_config.perimeter_extruder.value = physical_id;
+                    painted_region_config.solid_infill_extruder.value = physical_id;
+                    painted_region_config.infill_extruder.value       = physical_id;
+                    layer_range.painted_regions.push_back(
+                        {physical_id,
+                         volume_region_id,
+                         get_create_region(std::move(painted_region_config))}
+                    );
+                }
+
+                break;
+            }
+        }
     }
 
     // Finally add painting regions.
@@ -1080,6 +1176,11 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     new_full_config.option("physical_printer_settings_id", true);
     new_full_config.normalize_fdm();
 
+    const unsigned int     num_physical_extruders = static_cast<unsigned int>(
+        new_full_config.option<ConfigOptionFloats>("nozzle_diameter")->values.size());
+    const VirtualExtruders virtual_extruders      = filter_virtual_extruders_for_physical_count(
+        num_physical_extruders, model.virtual_extruders);
+
     // Find modified keys of the various configs. Resolve overrides extruder retract values by filament profiles.
     DynamicPrintConfig   filament_overrides;
     t_config_option_keys print_diff       = print_config_diffs(m_config, new_full_config, filament_overrides);
@@ -1112,7 +1213,16 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 
     // Apply variables to placeholder parser. The placeholder parser is used by G-code export,
     // which should be stopped if print_diff is not empty.
-    size_t num_extruders = m_config.nozzle_diameter.size();
+    const bool virtual_extruders_differ = (virtual_extruders != m_virtual_extruders);
+
+    const size_t prev_num_extruders = m_config.nozzle_diameter.size();
+    m_virtual_extruders             = virtual_extruders;
+
+    if (virtual_extruders_differ) {
+        update_apply_status(this->invalidate_step(psWipeTower));
+        update_apply_status(this->invalidate_step(psGCodeExport));
+    }
+
     bool   num_extruders_changed = false;
     if (! full_config_diff.empty()) {
         update_apply_status(this->invalidate_step(psGCodeExport));
@@ -1149,8 +1259,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 	    // Handle changes to regions config defaults
 	    m_default_region_config.apply_only(new_full_config, region_diff, true);
         m_full_print_config = std::move(new_full_config);
-        if (num_extruders != m_config.nozzle_diameter.size()) {
-            num_extruders = m_config.nozzle_diameter.size();
+        if (prev_num_extruders != m_config.nozzle_diameter.size()) {
             num_extruders_changed = true;
         }
     }
@@ -1192,10 +1301,10 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             // Tool change G-codes are applied as color changes for a single extruder printer, no need to invalidate tool ordering.
             // FIXME The tool ordering may be invalidated unnecessarily if the custom_gcode_per_print_z.mode is not applicable
             // to the active print / model state, and then it is reset, so it is being applicable, but empty, thus the effect is the same.
-            const bool tool_change_differ    = num_extruders > 1 && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z().gcodes, model.custom_gcode_per_print_z().gcodes, CustomGCode::ToolChange);
+            const bool tool_change_differ    = num_physical_extruders > 1 && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z().gcodes, model.custom_gcode_per_print_z().gcodes, CustomGCode::ToolChange);
             // For multi-extruder printers, we perform a tool change before a color change.
             // So, in that case, we must invalidate tool ordering and wipe tower even if custom color change g-codes differ.
-            const bool color_change_differ   = num_extruders > 1 && (next_mode == CustomGCode::MultiExtruder) && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z().gcodes, model.custom_gcode_per_print_z().gcodes, CustomGCode::ColorChange);
+            const bool color_change_differ   = num_physical_extruders > 1 && (next_mode == CustomGCode::MultiExtruder) && custom_per_printz_gcodes_tool_changes_differ(m_model.custom_gcode_per_print_z().gcodes, model.custom_gcode_per_print_z().gcodes, CustomGCode::ColorChange);
 
             update_apply_status(
                 (num_extruders_changed || tool_change_differ || multi_extruder_differ || color_change_differ) ?
@@ -1303,7 +1412,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             model_object_status.print_object_regions = print_objects_range.begin()->print_object->m_shared_regions;
             model_object_status.print_object_regions->ref_cnt_inc();
         }
-        if (solid_or_modifier_differ || model_origin_translation_differ || layer_height_ranges_differ ||
+        if (solid_or_modifier_differ || model_origin_translation_differ || layer_height_ranges_differ || virtual_extruders_differ ||
             ! model_object.layer_height_profile.timestamp_matches(model_object_new.layer_height_profile)) {
             // The very first step (the slicing step) is invalidated. One may freely remove all associated PrintObjects.
             model_object_status.print_object_regions_status = 
@@ -1349,7 +1458,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 			if (object_config_changed)
 				model_object.config.assign_config(model_object_new.config);
             if (! object_diff.empty() || object_config_changed || num_extruders_changed) {
-                PrintObjectConfig new_config = PrintObject::object_config_from_model_object(m_default_object_config, model_object, num_extruders);
+                PrintObjectConfig new_config = PrintObject::object_config_from_model_object(m_default_object_config, model_object, num_physical_extruders);
                 for (const PrintObjectStatus &print_object_status : print_object_status_db.get_range(model_object)) {
                     t_config_option_keys diff = print_object_status.print_object->config().diff(new_config);
                     if (! diff.empty()) {
@@ -1417,10 +1526,10 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             // Generate a list of trafos and XY offsets for instances of a ModelObject
             // Producing the config for PrintObject on demand, caching it at print_object_last.
             const PrintObject *print_object_last = nullptr;
-            auto print_object_apply_config = [this, &print_object_last, model_object, num_extruders](PrintObject *print_object) {
+            auto print_object_apply_config = [this, &print_object_last, model_object, num_physical_extruders](PrintObject *print_object) {
                 print_object->config_apply(print_object_last ?
                     print_object_last->config() :
-                    PrintObject::object_config_from_model_object(m_default_object_config, *model_object, num_extruders));
+                    PrintObject::object_config_from_model_object(m_default_object_config, *model_object, num_physical_extruders));
                 print_object_last = print_object;
             };
             if (old.empty()) {
@@ -1499,13 +1608,13 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
             print_object_regions->ref_cnt_inc();
         }
         std::vector<unsigned int> painting_extruders;
-        if (const auto &volumes = print_object.model_object()->volumes; num_extruders > 1 && print_object.model_object()->is_mm_painted()) {
-            std::array<bool, static_cast<size_t>(TriangleStateType::Count)> used_facet_states{};
+        if (const auto &volumes = print_object.model_object()->volumes; num_physical_extruders > 1 && print_object.model_object()->is_mm_painted()) {
+            std::array<bool, TRIANGLE_STATE_TYPE_COUNT> used_facet_states{};
             for (const ModelVolume *volume : volumes) {
                 if (volume->is_mm_painted()) {
                     const std::vector<bool> &volume_used_facet_states = volume->mm_segmentation_facets.get_data().used_states;
 
-                    assert(volume_used_facet_states.size() == used_facet_states.size());
+                    assert(volume_used_facet_states.size() <= used_facet_states.size());
                     for (size_t state_idx = 1; state_idx < std::min(volume_used_facet_states.size(), used_facet_states.size()); ++state_idx) {
                         used_facet_states[state_idx] |= volume_used_facet_states[state_idx];
                     }
@@ -1528,6 +1637,10 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                     painting_extruders.emplace_back(state_idx);
                 }
             }
+
+            // Expand virtual extruder IDs to their physical components.
+            // PaintedRegions will be created only for physical extruder IDs.
+            painting_extruders = expand_virtual_extruders_1based(painting_extruders, virtual_extruders);
         }
         if (model_object_status.print_object_regions_status == ModelObjectStatus::PrintObjectRegionsStatus::Valid) {
             // Verify that the trafo for regions & volume bounding boxes thus for regions is still applicable.
@@ -1545,7 +1658,8 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                 verify_update_print_object_regions(
                     print_object.model_object()->volumes,
                     m_default_region_config,
-                    num_extruders,
+                    num_physical_extruders,
+                    virtual_extruders,
                     *print_object_regions,
                     [it_print_object, it_print_object_end, &update_apply_status](const PrintRegionConfig &old_config, const PrintRegionConfig &new_config, const t_config_option_keys &diff_keys) {
                         for (auto it = it_print_object; it != it_print_object_end; ++it)
@@ -1570,7 +1684,8 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                 LayerRanges(print_object.model_object()->layer_config_ranges),
                 m_default_region_config,
                 model_object_status.print_instances.front().trafo,
-                num_extruders,
+                num_physical_extruders,
+                virtual_extruders,
                 print_object.is_mm_painted() ? 0.f : float(print_object.config().xy_size_compensation.value),
                 painting_extruders,
                 print_object.is_fuzzy_skin_painted());
@@ -1587,7 +1702,15 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 
     if (print_regions_reshuffled) {
         // Update Print::m_print_regions from objects.
-        struct cmp { bool operator() (const PrintRegion *l, const PrintRegion *r) const { return l->config_hash() == r->config_hash() && l->config() == r->config(); } };
+        struct cmp
+        {
+            bool operator()(const PrintRegion* l, const PrintRegion* r) const
+            {
+                return l->config_hash() == r->config_hash()
+                    && l->config() == r->config()
+                    && l->source_virtual_extruder_id() == r->source_virtual_extruder_id();
+            }
+        };
         std::set<const PrintRegion*, cmp> region_set;
         m_print_regions.clear();
         PrintObjectRegions *print_object_regions = nullptr;

@@ -830,7 +830,7 @@ void ConnectWebViewPanel::on_user_logged_out(UserAccountSuccessEvent& e)
     if (!m_browser)
         return;
     // clear token from session storage
-    m_browser->RunScriptAsync(get_logout_script());
+    m_browser->RunScript(get_logout_script());
 }
 
 void ConnectWebViewPanel::on_script_message(wxWebViewEvent& evt)

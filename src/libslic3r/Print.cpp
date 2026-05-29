@@ -39,6 +39,7 @@
 #include "format.hpp"
 #include "ArrangeHelper.hpp"
 #include "CustomParametersHandling.hpp"
+#include "Feature/FullSpectrum/VirtualExtruder.hpp"
 
 #include <float.h>
 
@@ -293,6 +294,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             osteps.emplace_back(posEstimateCurledExtrusions);
         } else if (opt_key == "automatic_extrusion_widths") {
             osteps.emplace_back(posPerimeters);
+        } else if (opt_key == "toolchange_ordering") {
+            steps.emplace_back(psWipeTower);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps
             //FIXME invalidate all steps of all objects as well?
@@ -342,7 +345,9 @@ std::vector<unsigned int> Print::object_extruders() const
 		for (const PrintRegion &region : object->all_regions())
         	region.collect_object_printing_extruders(*this, extruders);
     sort_remove_duplicates(extruders);
-    return extruders;
+
+    // Expand virtual extruder IDs to their physical components.
+    return FullSpectrum::expand_virtual_extruders_0based(extruders, m_virtual_extruders);
 }
 
 // returns 0-based indices of used extruders

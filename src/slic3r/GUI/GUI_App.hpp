@@ -364,6 +364,7 @@ public:
     wxBookCtrlBase* tab_panel() const ;
     int             extruders_cnt() const;
     int             extruders_edited_cnt() const;
+    int             virtual_extruders_cnt() const;
 
     std::vector<Tab *>      tabs_list;
 

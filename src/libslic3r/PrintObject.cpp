@@ -65,6 +65,9 @@
 #include "tcbspan/span.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/InfillAboveBridges.hpp"
+#include "Feature/FullSpectrum/VirtualExtruder.hpp"
+
+using Slic3r::FullSpectrum::VirtualExtruders;
 
 using namespace std::literals;
 
@@ -2613,11 +2616,22 @@ void PrintObject::bridge_over_infill()
 
 } // void PrintObject::bridge_over_infill()
 
-static void clamp_exturder_to_default(ConfigOptionInt &opt, size_t num_extruders)
+static void clamp_exturder_to_default(
+    ConfigOptionInt& opt,
+    const size_t num_physical_extruders,
+    const VirtualExtruders& virtual_extruders = {}
+)
 {
-    if (opt.value > (int)num_extruders)
-        // assign the default extruder
-        opt.value = 1;
+    if (opt.value <= static_cast<int>(num_physical_extruders)) {
+        return;
+    }
+
+    if (FullSpectrum::is_virtual_extruder(static_cast<unsigned int>(opt.value), virtual_extruders)) {
+        return;
+    }
+
+    // Assign the default extruder.
+    opt.value = 1;
 }
 
 PrintObjectConfig PrintObject::object_config_from_model_object(const PrintObjectConfig &default_object_config, const ModelObject &object, size_t num_extruders)
@@ -2662,7 +2676,12 @@ static void apply_to_print_region_config(PrintRegionConfig &out, const DynamicPr
             }
 }
 
-PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &default_or_parent_region_config, const DynamicPrintConfig *layer_range_config, const ModelVolume &volume, size_t num_extruders)
+PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig       &default_or_parent_region_config,
+                                                  const DynamicPrintConfig      *layer_range_config,
+                                                  const ModelVolume             &volume,
+                                                  const size_t                   num_physical_extruders,
+                                                  const VirtualExtruders        &virtual_extruders = {},
+                                                  std::optional<unsigned int>   *out_source_virtual_extruder_id = nullptr)
 {
     PrintRegionConfig config = default_or_parent_region_config;
     if (volume.is_model_part()) {
@@ -2680,10 +2699,15 @@ PrintRegionConfig region_config_from_model_volume(const PrintRegionConfig &defau
     apply_to_print_region_config(config, volume.config.get());
     if (! volume.material_id().empty())
         apply_to_print_region_config(config, volume.material()->config.get());
+    const std::optional<unsigned int> source_virtual = FullSpectrum::source_virtual_extruder_in_region_config(config, virtual_extruders);
+    if (out_source_virtual_extruder_id != nullptr) {
+        *out_source_virtual_extruder_id = source_virtual;
+    }
+
     // Clamp invalid extruders to the default extruder (with index 1).
-    clamp_exturder_to_default(config.infill_extruder,       num_extruders);
-    clamp_exturder_to_default(config.perimeter_extruder,    num_extruders);
-    clamp_exturder_to_default(config.solid_infill_extruder, num_extruders);
+    clamp_exturder_to_default(config.infill_extruder,       num_physical_extruders, virtual_extruders);
+    clamp_exturder_to_default(config.perimeter_extruder,    num_physical_extruders, virtual_extruders);
+    clamp_exturder_to_default(config.solid_infill_extruder, num_physical_extruders, virtual_extruders);
     if (config.fill_density.value < 0.00011f)
         // Switch of infill for very low infill rates, also avoid division by zero in infill generator for these very low rates.
         // See GH issue #5910.

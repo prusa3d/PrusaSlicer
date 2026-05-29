@@ -63,6 +63,7 @@ Model& Model::assign_copy(const Model &rhs)
     this->custom_gcode_per_print_z_vector = rhs.custom_gcode_per_print_z_vector;
     this->wipe_tower_vector = rhs.wipe_tower_vector;
     this->sla_workflow_uuid = rhs.sla_workflow_uuid;
+    this->virtual_extruders = rhs.virtual_extruders;
 
     return *this;
 }
@@ -87,6 +88,7 @@ Model& Model::assign_copy(Model &&rhs)
     this->custom_gcode_per_print_z_vector = std::move(rhs.custom_gcode_per_print_z_vector);
     this->wipe_tower_vector = rhs.wipe_tower_vector;
     this->sla_workflow_uuid = rhs.sla_workflow_uuid;
+    this->virtual_extruders = std::move(rhs.virtual_extruders);
 
     return *this;
 }
@@ -424,6 +426,18 @@ bool Model::is_mm_painted() const
 bool Model::is_fuzzy_skin_painted() const
 {
     return std::any_of(this->objects.cbegin(), this->objects.cend(), [](const ModelObject *mo) { return mo->is_fuzzy_skin_painted(); });
+}
+
+size_t Model::minimum_required_painting_version(FacetsAnnotation ModelVolume::*facets_annotation_member) const
+{
+    size_t version = 1;
+    for (const ModelObject *object : this->objects) {
+        for (const ModelVolume *volume : object->volumes) {
+            version = std::max(version, (volume->*facets_annotation_member).get_data().minimum_required_painting_version());
+        }
+    }
+
+    return version;
 }
 
 ModelObject::~ModelObject()

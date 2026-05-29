@@ -98,11 +98,11 @@ public:
 
     void render_triangles(const Selection& selection) const override;
 
-    // TriangleSelector::serialization/deserialization has a limit to store 19 different states.
+    // TriangleSelector::serialization/deserialization has a limit to store 255 different states.
     // EXTRUDER_LIMIT + 1 states are used to storing the painting because also uncolored triangles are stored.
     // When increasing EXTRUDER_LIMIT, it needs to ensure that TriangleSelector::serialization/deserialization
     // will be also extended to support additional states, requiring at least one state to remain free out of 19 states.
-    static const constexpr size_t EXTRUDERS_LIMIT = 16;
+    static const constexpr size_t EXTRUDERS_LIMIT = TRIANGLE_STATE_TYPE_COUNT - 1;
 
     float get_cursor_radius_min() const override { return CursorRadiusMin; }
 

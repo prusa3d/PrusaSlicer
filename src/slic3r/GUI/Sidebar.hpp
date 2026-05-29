@@ -94,6 +94,7 @@ class Sidebar : public wxPanel
     wxButton* m_btn_connect_gcode_all               { nullptr };
 	ScalableButton* m_btn_export_all_gcode_removable{ nullptr };
 
+    wxButton*                           m_btn_full_spectrum { nullptr };
     std::unique_ptr<FreqChangedParams>  m_frequently_changed_parameters;
     std::unique_ptr<ObjectManipulation> m_object_manipulation;
     std::unique_ptr<ObjectSettings>     m_object_settings;

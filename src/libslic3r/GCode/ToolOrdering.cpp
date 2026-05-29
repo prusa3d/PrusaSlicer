@@ -372,22 +372,34 @@ void ToolOrdering::reorder_extruders(unsigned int last_extruder_id)
         ++ last_extruder_id;
 
     for (LayerTools &lt : m_layer_tools) {
+        // Extruders in lt.extruders are already sorted.
+
         if (lt.extruders.empty())
             continue;
         if (lt.extruders.size() == 1 && lt.extruders.front() == 0)
             lt.extruders.front() = last_extruder_id;
         else {
-            if (lt.extruders.front() == 0)
+            if (lt.extruders.front() == 0) {
                 // Pop the "don't care" extruder, the "don't care" region will be merged with the next one.
                 lt.extruders.erase(lt.extruders.begin());
-            // Reorder the extruders to start with the last one.
-            for (size_t i = 1; i < lt.extruders.size(); ++ i)
-                if (lt.extruders[i] == last_extruder_id) {
-                    // Move the last extruder to the front.
-                    memmove(lt.extruders.data() + 1, lt.extruders.data(), i * sizeof(unsigned int));
-                    lt.extruders.front() = last_extruder_id;
-                    break;
+            }
+
+            if (m_print_config_ptr == nullptr
+                || m_print_config_ptr->toolchange_ordering == ToolChangeOrderingType::Optimized)
+            {
+                // Reorder the extruders to start with the last one.
+                for (size_t i = 1; i < lt.extruders.size(); ++i) {
+                    if (lt.extruders[i] == last_extruder_id) {
+                        // Move the last extruder to the front.
+                        std::rotate(
+                            lt.extruders.begin(),
+                            lt.extruders.begin() + i,
+                            lt.extruders.begin() + i + 1
+                        );
+                        break;
+                    }
                 }
+            }
 
             // On first layer with wipe tower, prefer a soluble extruder
             // at the beginning, so it is not wiped on the first layer.

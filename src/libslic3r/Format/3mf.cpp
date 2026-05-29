@@ -12,6 +12,7 @@
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Semver.hpp"
 #include "libslic3r/Time.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 
 #include "libslic3r/I18N.hpp"
 
@@ -71,12 +72,15 @@ const char* SLIC3RPE_3MF_VERSION = "slic3rpe:Version3mf"; // definition of the m
 // Painting gizmos data version numbers
 // 0 : 3MF files saved by older PrusaSlicer or the painting gizmo wasn't used. No version definition in them.
 // 1 : Introduction of painting gizmos data versioning. No other changes in painting gizmos data.
-const unsigned int FDM_SUPPORTS_PAINTING_VERSION = 1;
-const unsigned int SEAM_PAINTING_VERSION         = 1;
-const unsigned int MM_PAINTING_VERSION           = 1;
+// 2 : Extended support up to 255 triangle states.
+const unsigned int FDM_SUPPORTS_PAINTING_VERSION = 2;
+const unsigned int SEAM_PAINTING_VERSION         = 2;
+const unsigned int FUZZY_SKIN_PAINTING_VERSION   = 2;
+const unsigned int MM_PAINTING_VERSION           = 2;
 
 const std::string SLIC3RPE_FDM_SUPPORTS_PAINTING_VERSION = "slic3rpe:FdmSupportsPaintingVersion";
 const std::string SLIC3RPE_SEAM_PAINTING_VERSION         = "slic3rpe:SeamPaintingVersion";
+const std::string SLIC3RPE_FUZZY_SKIN_PAINTING_VERSION   = "slic3rpe:FuzzySkinPaintingVersion";
 const std::string SLIC3RPE_MM_PAINTING_VERSION           = "slic3rpe:MmPaintingVersion";
 
 const std::string MODEL_FOLDER = "3D/";
@@ -87,6 +91,7 @@ const std::string RELATIONSHIPS_FILE = "_rels/.rels";
 const std::string THUMBNAIL_FILE = "Metadata/thumbnail.png";
 const std::string PRINT_CONFIG_FILE = "Metadata/Slic3r_PE.config";
 const std::string MODEL_CONFIG_FILE = "Metadata/Slic3r_PE_model.config";
+const std::string FULL_SPECTRUM_CONFIG_FILE = "Metadata/Prusa_Slicer_full_spectrum.json";
 const std::string LAYER_HEIGHTS_PROFILE_FILE = "Metadata/Slic3r_PE_layer_heights_profile.txt";
 const std::string LAYER_CONFIG_RANGES_FILE = "Metadata/Prusa_Slicer_layer_config_ranges.xml";
 const std::string SLA_SUPPORT_POINTS_FILE = "Metadata/Slic3r_PE_sla_support_points.txt";
@@ -500,7 +505,10 @@ namespace Slic3r {
         boost::optional<Semver> m_prusaslicer_generator_version;
         unsigned int m_fdm_supports_painting_version = 0;
         unsigned int m_seam_painting_version         = 0;
+        unsigned int m_fuzzy_skin_painting_version   = 0;
         unsigned int m_mm_painting_version           = 0;
+
+        FullSpectrum::FullSpectrumConfig m_full_spectrum_config;
 
         XML_Parser m_xml_parser;
         // Error code returned by the application side of the parser. In that case the expat may not reliably deliver the error state
@@ -535,6 +543,7 @@ namespace Slic3r {
         bool load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, bool check_version);
         unsigned int version() const { return m_version; }
         boost::optional<Semver> prusaslicer_generator_version() const { return m_prusaslicer_generator_version; }
+        const FullSpectrum::FullSpectrumConfig& full_spectrum_config() const { return m_full_spectrum_config; }
 
     private:
         void _destroy_xml_parser();
@@ -566,6 +575,7 @@ namespace Slic3r {
         void _extract_print_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig& config, ConfigSubstitutionContext& subs_context, const std::string& archive_filename);
         bool _extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model);
         void _extract_embossed_svg_shape_file(const std::string &filename, mz_zip_archive &archive, const mz_zip_archive_file_stat &stat);
+        void _extract_full_spectrum_from_archive(mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, Model &model);
 
         // handlers to parse the .rels file
         void _handle_start_relationships_element(const char* name, const char** attributes);
@@ -677,6 +687,7 @@ namespace Slic3r {
         m_version = 0;
         m_fdm_supports_painting_version = 0;
         m_seam_painting_version = 0;
+        m_fuzzy_skin_painting_version = 0;
         m_mm_painting_version = 0;
         m_check_version = check_version;
         m_model = &model;
@@ -847,6 +858,9 @@ namespace Slic3r {
                 } 
                 else if (_is_svg_shape_file(name)) {
                     _extract_embossed_svg_shape_file(name, archive, stat);
+                }
+                else if (boost::algorithm::iequals(name, FULL_SPECTRUM_CONFIG_FILE)) {
+                    _extract_full_spectrum_from_archive(archive, stat, model);
                 }
             }
         }
@@ -1563,6 +1577,23 @@ namespace Slic3r {
         }
     }
 
+    void _3MF_Importer::_extract_full_spectrum_from_archive(mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, Model &model)
+    {
+        if (stat.m_uncomp_size == 0) {
+            return;
+        }
+
+        std::string buffer(static_cast<size_t>(stat.m_uncomp_size), '\0');
+        if (!mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, buffer.data(), buffer.size(), 0)) {
+            add_error("Error reading " + FULL_SPECTRUM_CONFIG_FILE + " from archive");
+            return;
+        }
+
+        m_full_spectrum_config = FullSpectrum::deserialize_virtual_extruders_from_json(buffer);
+        model.virtual_extruders = FullSpectrum::normalize_virtual_extruders(
+            m_full_spectrum_config.virtual_extruders);
+    }
+
     bool _3MF_Importer::_extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model)
     {
         if (stat.m_uncomp_size == 0) {
@@ -2254,6 +2285,10 @@ namespace Slic3r {
             m_seam_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
             check_painting_version(m_seam_painting_version, SEAM_PAINTING_VERSION,
                 _u8L("The selected 3MF contains seam painted object using a newer version of PrusaSlicer and is not compatible."));
+        } else if (m_curr_metadata_name == SLIC3RPE_FUZZY_SKIN_PAINTING_VERSION) {
+            m_fuzzy_skin_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
+            check_painting_version(m_fuzzy_skin_painting_version, FUZZY_SKIN_PAINTING_VERSION,
+                _u8L("The selected 3MF contains fuzzy skin painted object using a newer version of PrusaSlicer and is not compatible."));
         } else if (m_curr_metadata_name == SLIC3RPE_MM_PAINTING_VERSION) {
             m_mm_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
             check_painting_version(m_mm_painting_version, MM_PAINTING_VERSION,
@@ -2796,6 +2831,7 @@ namespace Slic3r {
         bool _add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, const IdToObjectDataMap &objects_data);
         bool _add_custom_gcode_per_print_z_file_to_archive(mz_zip_archive& archive, Model& model, const DynamicPrintConfig* config);
         bool _add_wipe_tower_information_file_to_archive( mz_zip_archive& archive, Model& model);
+        bool _add_full_spectrum_file_to_archive(mz_zip_archive& archive, const Model& model, const DynamicPrintConfig* config);
     };
 
     bool _3MF_Exporter::save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
@@ -2931,6 +2967,12 @@ namespace Slic3r {
             return false;
         }
 
+        if (!_add_full_spectrum_file_to_archive(archive, model, config)) {
+            close_zip_writer(&archive);
+            boost::filesystem::remove(filename);
+            return false;
+        }
+
         if (!mz_zip_writer_finalize_archive(&archive)) {
             close_zip_writer(&archive);
             boost::filesystem::remove(filename);
@@ -3033,14 +3075,25 @@ namespace Slic3r {
             stream << "<" << MODEL_TAG << " unit=\"millimeter\" xml:lang=\"en-US\" xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\" xmlns:slic3rpe=\"http://schemas.slic3r.org/3mf/2017/06\">\n";
             stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_3MF_VERSION << "\">" << VERSION_3MF << "</" << METADATA_TAG << ">\n";
 
-            if (model.is_fdm_support_painted())
-                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_FDM_SUPPORTS_PAINTING_VERSION << "\">" << FDM_SUPPORTS_PAINTING_VERSION << "</" << METADATA_TAG << ">\n";
+            if (model.is_fdm_support_painted()) {
+                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_FDM_SUPPORTS_PAINTING_VERSION << "\">"
+                       << model.minimum_required_painting_version(&ModelVolume::supported_facets) << "</" << METADATA_TAG << ">\n";
+            }
 
-            if (model.is_seam_painted())
-                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_SEAM_PAINTING_VERSION << "\">" << SEAM_PAINTING_VERSION << "</" << METADATA_TAG << ">\n";
+            if (model.is_seam_painted()) {
+                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_SEAM_PAINTING_VERSION << "\">"
+                       << model.minimum_required_painting_version(&ModelVolume::seam_facets) << "</" << METADATA_TAG << ">\n";
+            }
 
-            if (model.is_mm_painted())
-                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_MM_PAINTING_VERSION << "\">" << MM_PAINTING_VERSION << "</" << METADATA_TAG << ">\n";
+            if (model.is_fuzzy_skin_painted()) {
+                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_FUZZY_SKIN_PAINTING_VERSION << "\">"
+                       << model.minimum_required_painting_version(&ModelVolume::fuzzy_skin_facets) << "</" << METADATA_TAG << ">\n";
+            }
+
+            if (model.is_mm_painted()) {
+                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_MM_PAINTING_VERSION << "\">"
+                       << model.minimum_required_painting_version(&ModelVolume::mm_segmentation_facets) << "</" << METADATA_TAG << ">\n";
+            }
 
             std::string name = xml_escape(boost::filesystem::path(filename).stem().string());
             stream << " <" << METADATA_TAG << " name=\"Title\">" << name << "</" << METADATA_TAG << ">\n";
@@ -3909,6 +3962,67 @@ bool _3MF_Exporter::_add_wipe_tower_information_file_to_archive( mz_zip_archive&
     return true;
 }
 
+bool _3MF_Exporter::_add_full_spectrum_file_to_archive(
+    mz_zip_archive& archive,
+    const Model& model,
+    const DynamicPrintConfig* config
+)
+{
+    if (model.virtual_extruders.empty() || config == nullptr) {
+        return true;
+    }
+
+    const ConfigOptionFloats* nozzle_diameter_opt =
+        config->option<ConfigOptionFloats>("nozzle_diameter");
+    const ConfigOptionStrings* extruder_colour_opt =
+        config->option<ConfigOptionStrings>("extruder_colour");
+    const ConfigOptionStrings* filament_colour_opt =
+        config->option<ConfigOptionStrings>("filament_colour");
+
+    if (nozzle_diameter_opt == nullptr) {
+        return true;
+    }
+
+    const size_t physical_extruders_cnt = nozzle_diameter_opt->values.size();
+    const size_t extruder_colour_cnt = extruder_colour_opt ? extruder_colour_opt->values.size() : 0;
+    const size_t filament_colour_cnt = filament_colour_opt ? filament_colour_opt->values.size() : 0;
+
+    std::vector<std::string> colors;
+    colors.reserve(physical_extruders_cnt);
+    for (size_t extruder_idx = 0; extruder_idx < physical_extruders_cnt; ++extruder_idx) {
+        std::string color;
+        if (extruder_idx < extruder_colour_cnt) {
+            color = extruder_colour_opt->values[extruder_idx];
+        }
+
+        if (color.empty() && extruder_idx < filament_colour_cnt) {
+            color = filament_colour_opt->values[extruder_idx];
+        }
+
+        if (color.empty()) {
+            color = "#808080";
+        }
+
+        colors.push_back(std::move(color));
+    }
+
+    const std::string json =
+        FullSpectrum::serialize_virtual_extruders_to_json(colors, model.virtual_extruders);
+    if (!mz_zip_writer_add_mem(
+            &archive,
+            FULL_SPECTRUM_CONFIG_FILE.c_str(),
+            json.data(),
+            json.size(),
+            MZ_DEFAULT_COMPRESSION
+        ))
+    {
+        add_error("Unable to add " + FULL_SPECTRUM_CONFIG_FILE + " to archive");
+        return false;
+    }
+
+    return true;
+}
+
 // Perform conversions based on the config values available.
 static void handle_legacy_project_loaded(
     DynamicPrintConfig& config,
@@ -3994,7 +4108,8 @@ bool load_3mf(
     ConfigSubstitutionContext& config_substitutions,
     Model* model,
     bool check_version,
-    boost::optional<Semver> &prusaslicer_generator_version
+    boost::optional<Semver> &prusaslicer_generator_version,
+    FullSpectrum::FullSpectrumConfig* out_fs_config
 )
 {
     if (path == nullptr || model == nullptr)
@@ -4007,6 +4122,10 @@ bool load_3mf(
     importer.log_errors();
     handle_legacy_project_loaded(config, importer.prusaslicer_generator_version());
     prusaslicer_generator_version = importer.prusaslicer_generator_version();
+
+    if (out_fs_config) {
+        *out_fs_config = importer.full_spectrum_config();
+    }
 
     return res;
 }

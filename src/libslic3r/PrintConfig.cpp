@@ -360,6 +360,12 @@ static const t_config_enum_values s_keys_map_CoolingSlowdownLogicType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CoolingSlowdownLogicType)
 
+static t_config_enum_values s_keys_map_ToolChangeOrderingType {
+        { "optimized", int(ToolChangeOrderingType::Optimized) },
+        { "cyclic",    int(ToolChangeOrderingType::Cyclic) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ToolChangeOrderingType)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -3684,6 +3690,21 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionString(""));
 
+    def = this->add("toolchange_ordering", coEnum);
+    def->label = L("Toolchange ordering");
+    def->category = L("Advanced");
+    def->tooltip = L(
+        "Determines the order of tool changes on each layer.\n"
+        "Optimized - Starts with the last used extruder to minimize tool changes.\n"
+        "Cyclic - Uses extruders in a fixed sequential order (1, 2, 3, ...) on every layer."
+    );
+    def->mode = comAdvanced;
+    def->set_enum<ToolChangeOrderingType>({
+        { "optimized", L("Optimized") },
+        { "cyclic",    L("Cyclic") },
+    });
+    def->set_default_value(new ConfigOptionEnum<ToolChangeOrderingType>(ToolChangeOrderingType::Optimized));
+
     def = this->add("top_infill_extrusion_width", coFloatOrPercent);
     def->label = L("Top solid infill");
     def->category = L("Extrusion Width");
@@ -4304,12 +4325,14 @@ void PrintConfigDef::init_sla_params()
     def = this->add("display_width", coFloat);
     def->label = L("Display width");
     def->tooltip = L("Width of the display");
+    def->mode = comExpert;
     def->min = 1;
     def->set_default_value(new ConfigOptionFloat(120.));
 
     def = this->add("display_height", coFloat);
     def->label = L("Display height");
     def->tooltip = L("Height of the display");
+    def->mode = comExpert;
     def->min = 1;
     def->set_default_value(new ConfigOptionFloat(68.));
 
@@ -4317,12 +4340,14 @@ void PrintConfigDef::init_sla_params()
     def->full_label = L("Number of pixels in");
     def->label = ("X");
     def->tooltip = L("Number of pixels in X");
+    def->mode = comExpert;
     def->min = 100;
     def->set_default_value(new ConfigOptionInt(2560));
 
     def = this->add("display_pixels_y", coInt);
     def->label = ("Y");
     def->tooltip = L("Number of pixels in Y");
+    def->mode = comExpert;
     def->min = 100;
     def->set_default_value(new ConfigOptionInt(1440));
 
