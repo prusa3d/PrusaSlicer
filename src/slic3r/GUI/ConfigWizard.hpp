@@ -48,7 +48,7 @@ namespace DownloaderUtils {
         void set_path_name(const std::string& name);
 
         bool on_finish();
-        static bool perform_download_register(const std::string& path);
+        bool validate_and_save_download_path(const std::string& path);
         static bool perform_url_register();
 #ifdef __linux__
         static bool perform_registration_linux;

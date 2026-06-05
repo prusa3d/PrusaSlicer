@@ -3429,7 +3429,10 @@ void GUI_App::show_downloader_registration_dialog()
         , true, wxYES_NO);
     if (msg.ShowModal() == wxID_YES) {
         auto downloader_worker = new DownloaderUtils::Worker(nullptr);
-        downloader_worker->perform_download_register(app_config->get("url_downloader_dest"));
+        if (downloader_worker->validate_and_save_download_path(app_config->get("url_downloader_dest"))) {
+            downloader_worker->perform_url_register();
+            app_config->set("downloader_url_registered", "1");
+        }
 #if defined(__linux__) && defined(SLIC3R_DESKTOP_INTEGRATION) 
         if (DownloaderUtils::Worker::perform_registration_linux)
             DesktopIntegrationDialog::perform_downloader_desktop_integration();
