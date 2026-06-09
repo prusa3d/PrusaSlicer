@@ -315,23 +315,6 @@ void PreferencesDialog::build()
 				"Examples of such issues are floating object parts, unsupported extrusions and low bed adhesion."),
 			app_config->get_bool("alert_when_supports_needed"));
 
-#ifdef SLIC3R_LOCAL_IMPORT_SERVER
-		append_bool_option(m_optgroup_general, "enable_local_import_server",
-			L("Enable local import server"),
-			L("If enabled, PrusaSlicer listens on a loopback HTTP port (127.0.0.1:8126) so external "
-			  "tools - such as a browser CAD app - can send model files directly into the open window. "
-			  "Bound to localhost only and off by default. Advanced options (port, allowed origin) "
-			  "are stored in PrusaSlicer.ini."),
-			app_config->get_bool("enable_local_import_server"));
-
-		append_bool_option(m_optgroup_general, "local_import_require_key",
-			L("Require an access key for the local import server"),
-			L("If enabled, the local import server only accepts requests that present a matching "
-			  "access key. A random key is generated the first time you enable this; copy it from "
-			  "local_import_token in PrusaSlicer.ini into the tool that sends files."),
-			app_config->get_bool("local_import_require_key"));
-#endif // SLIC3R_LOCAL_IMPORT_SERVER
-
 
 		m_optgroup_general->append_separator();
 
@@ -660,6 +643,23 @@ void PreferencesDialog::build()
 			L("Allow downloads from supported websites (e.g. Printables.com)"),
 			L("If enabled, PrusaSlicer can download and open files from supported websites"),
 			app_config->get_bool("downloader_url_registered"));
+
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+		append_bool_option(m_optgroup_other, "enable_local_import_server",
+			L("Enable local import server"),
+			L("If enabled, PrusaSlicer listens on a loopback HTTP port (127.0.0.1:8126) so external "
+			  "tools - such as a browser CAD app - can send model files directly into the open window. "
+			  "Bound to localhost only and off by default. Advanced options (port, allowed origin) "
+			  "are stored in PrusaSlicer.ini."),
+			app_config->get_bool("enable_local_import_server"));
+
+		append_bool_option(m_optgroup_other, "local_import_require_key",
+			L("Require an access key for the local import server"),
+			L("If enabled, the local import server only accepts requests that present a matching "
+			  "access key. A random key is generated the first time you enable this; copy it from "
+			  "local_import_token in PrusaSlicer.ini into the tool that sends files."),
+			app_config->get_bool("local_import_require_key"));
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
 
 		activate_options_tab(m_optgroup_other);
 
