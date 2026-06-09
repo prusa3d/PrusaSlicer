@@ -315,6 +315,23 @@ void PreferencesDialog::build()
 				"Examples of such issues are floating object parts, unsupported extrusions and low bed adhesion."),
 			app_config->get_bool("alert_when_supports_needed"));
 
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+		append_bool_option(m_optgroup_general, "enable_local_import_server",
+			L("Enable local import server"),
+			L("If enabled, PrusaSlicer listens on a loopback HTTP port (127.0.0.1) so external "
+			  "tools - such as a browser CAD app - can send model files directly into the open window. "
+			  "Bound to localhost only and off by default. Advanced options (port, allowed origin) "
+			  "are stored in PrusaSlicer.ini."),
+			app_config->get_bool("enable_local_import_server"));
+
+		append_bool_option(m_optgroup_general, "local_import_require_key",
+			L("Require an access key for the local import server"),
+			L("If enabled, the local import server only accepts requests that present a matching "
+			  "access key. A random key is generated the first time you enable this; copy it from "
+			  "local_import_token in PrusaSlicer.ini into the tool that sends files."),
+			app_config->get_bool("local_import_require_key"));
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
+
 
 		m_optgroup_general->append_separator();
 
@@ -808,6 +825,13 @@ void PreferencesDialog::accept(wxEvent&)
 
 	for (std::map<std::string, std::string>::iterator it = m_values.begin(); it != m_values.end(); ++it)
 		app_config->set(it->first, it->second);
+
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+	if (m_values.count("enable_local_import_server") || m_values.count("local_import_require_key")
+	    || m_values.count("local_import_server_port") || m_values.count("local_import_allowed_origin")
+	    || m_values.count("local_import_token"))
+		wxGetApp().start_local_import_server_if_enabled();
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
 
 	if (wxGetApp().is_editor()) {
 		wxGetApp().set_label_clr_sys(m_sys_colour->GetColour());

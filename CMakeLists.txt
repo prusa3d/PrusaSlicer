@@ -41,6 +41,7 @@ option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
 option(SLIC3R_ASAN              "Enable ASan on Clang and GCC" 0)
 option(SLIC3R_UBSAN             "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" ON)
+option(SLIC3R_LOCAL_IMPORT_SERVER "Enable an optional, off-by-default loopback HTTP endpoint to receive model files from external tools" ON)
 option(SLIC3R_LOG_TO_FILE       "Enable logging into file")
 option(SLIC3R_REPO_URL          "Preset repo URL")
 
@@ -111,6 +112,10 @@ endif ()
 
 if (SLIC3R_OPENGL_ES)
     add_definitions(-DSLIC3R_OPENGL_ES)
+endif()
+
+if (SLIC3R_LOCAL_IMPORT_SERVER)
+    add_definitions(-DSLIC3R_LOCAL_IMPORT_SERVER)
 endif()
 
 if(SLIC3R_DESKTOP_INTEGRATION)

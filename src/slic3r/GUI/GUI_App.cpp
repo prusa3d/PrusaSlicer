@@ -29,6 +29,7 @@
 #include <iterator>
 #include <exception>
 #include <cstdlib>
+#include <random>
 #include <regex>
 #include <string_view>
 #include <boost/nowide/fstream.hpp>
@@ -92,6 +93,9 @@
 #include "Mouse3DController.hpp"
 #include "RemovableDriveManager.hpp"
 #include "InstanceCheck.hpp" // IWYU pragma: keep
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+#include "Utils/LocalImportServer.hpp"
+#endif
 #include "NotificationManager.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
@@ -869,7 +873,68 @@ void GUI_App::post_init()
     // Sets window property to mainframe so other instances can indentify it.
     OtherInstanceMessageHandler::init_windows_properties(mainframe, m_instance_hash_int);
 #endif //WIN32
+
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+    // Optional loopback endpoint that receives model files from external tools.
+    if (is_editor())
+        start_local_import_server_if_enabled();
+#endif
 }
+
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+void GUI_App::start_local_import_server_if_enabled()
+{
+    // Stop any existing instance first so this can also act as "apply changes".
+    m_local_import_server.reset();
+
+    if (app_config == nullptr || ! app_config->get_bool("enable_local_import_server"))
+        return;
+
+    LocalImportServer::Config cfg;
+    if (const std::string addr = app_config->get("local_import_bind_address"); ! addr.empty())
+        cfg.bind_address = addr;
+    const int port = atoi(app_config->get("local_import_server_port").c_str());
+    if (port > 0 && port < 65536)
+        cfg.port = static_cast<uint16_t>(port);
+    cfg.allowed_origin = app_config->get("local_import_allowed_origin");
+
+    // Optional access-key gate. When the user asks to require a key, generate and
+    // persist a random one on first enable so it is secure without manual setup.
+    if (app_config->get_bool("local_import_require_key")) {
+        std::string token = app_config->get("local_import_token");
+        if (token.empty()) {
+            std::random_device rd;
+            static const char hexd[] = "0123456789abcdef";
+            token.reserve(32);
+            for (int i = 0; i < 32; ++i)
+                token.push_back(hexd[rd() & 0xF]);
+            app_config->set("local_import_token", token);
+            BOOST_LOG_TRIVIAL(info)
+                << "Local import server: generated an access key (see local_import_token in PrusaSlicer.ini).";
+        }
+        cfg.token = token;
+    }
+
+    m_local_import_server = std::make_unique<LocalImportServer>(std::move(cfg),
+        [](boost::filesystem::path path) {
+            // Invoked on the server thread; marshal onto the GUI thread and reuse
+            // the existing "open these files" path.
+            wxGetApp().CallAfter([path]() {
+                GUI_App& app = wxGetApp();
+                if (Plater* pl = app.plater()) {
+                    if (app.mainframe)
+                        app.mainframe->Raise();
+                    pl->load_files(std::vector<boost::filesystem::path>{ path }, true, false, false);
+                }
+            });
+        });
+
+    if (! m_local_import_server->start()) {
+        BOOST_LOG_TRIVIAL(error) << "Could not start the local import server (port in use?).";
+        m_local_import_server.reset();
+    }
+}
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
 
 IMPLEMENT_APP(GUI_App)
 

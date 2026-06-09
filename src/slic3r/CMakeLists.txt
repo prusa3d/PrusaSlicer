@@ -354,6 +354,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/AppUpdater.hpp
     Utils/Http.cpp
     Utils/Http.hpp
+    Utils/LocalImportServer.cpp
+    Utils/LocalImportServer.hpp
     Utils/FixModelByWin10.cpp
     Utils/FixModelByWin10.hpp
     Utils/Jwt.cpp
