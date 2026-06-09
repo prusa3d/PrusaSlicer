@@ -23,6 +23,8 @@ class wxColourPickerCtrl;
 class wxBookCtrlBase;
 class wxSlider;
 class wxRadioButton;
+class wxStaticText;
+class wxHyperlinkCtrl;
 
 namespace Slic3r {
 
@@ -69,6 +71,12 @@ class PreferencesDialog : public DPIDialog
 
 	DownloaderUtils::Worker*			downloader { nullptr };
 
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+	wxSizer*							m_local_import_token_sizer  { nullptr };
+	wxHyperlinkCtrl*					m_local_import_token_link   { nullptr };
+	wxStaticText*						m_local_import_token_status { nullptr };
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
+
 	wxBookCtrlBase*						tabs {nullptr};
 
     bool                                isOSX {false};
@@ -106,6 +114,10 @@ protected:
     void create_settings_mode_color_widget();
     void create_settings_font_widget();
     void create_downloader_path_sizer();
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+	void create_local_import_token_widget();
+	void update_local_import_token_widget(bool require_key);
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
 	void init_highlighter(const t_config_option_key& opt_key);
 	std::vector<ConfigOptionsGroup*> optgroups();
 

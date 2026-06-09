@@ -903,11 +903,7 @@ void GUI_App::start_local_import_server_if_enabled()
     if (app_config->get_bool("local_import_require_key")) {
         std::string token = app_config->get("local_import_token");
         if (token.empty()) {
-            std::random_device rd;
-            static const char hexd[] = "0123456789abcdef";
-            token.reserve(32);
-            for (int i = 0; i < 32; ++i)
-                token.push_back(hexd[rd() & 0xF]);
+            token = LocalImportServer::generate_token();
             app_config->set("local_import_token", token);
             BOOST_LOG_TRIVIAL(info)
                 << "Local import server: generated an access key (see local_import_token in PrusaSlicer.ini).";

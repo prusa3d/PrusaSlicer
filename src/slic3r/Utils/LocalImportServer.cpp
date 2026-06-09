@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <random>
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
@@ -179,6 +180,17 @@ struct LocalImportServer::Impl
     asio::io_context        ioc;
     std::unique_ptr<tcp::acceptor> acceptor;
 };
+
+std::string LocalImportServer::generate_token()
+{
+    std::random_device rd;
+    static const char hexd[] = "0123456789abcdef";
+    std::string token;
+    token.reserve(32);
+    for (int i = 0; i < 32; ++i)
+        token.push_back(hexd[rd() & 0xF]);
+    return token;
+}
 
 LocalImportServer::LocalImportServer(Config cfg, FileCallback on_file)
     : m_cfg(std::move(cfg))

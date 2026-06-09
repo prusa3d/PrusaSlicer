@@ -59,6 +59,9 @@ public:
     bool running() const { return m_running.load(); }
     uint16_t port() const { return m_cfg.port; }
 
+    // Generates a random hex access key (used for the X-Prusa-Token gate).
+    static std::string generate_token();
+
 private:
     void run();
 

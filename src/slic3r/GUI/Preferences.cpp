@@ -21,6 +21,12 @@
 #include "GLCanvas3D.hpp"
 #include "ConfigWizard.hpp"
 #include "Search.hpp"
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+#include "../Utils/LocalImportServer.hpp"
+#include <wx/hyperlink.h>
+// wxTheClipboard / wxTextDataObject / wxButton / wxStaticText come from the
+// precompiled header (<wx/wx.h>), as in AboutDialog.cpp.
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
 
 #include "Widgets/SpinInput.hpp"
 
@@ -605,6 +611,11 @@ void PreferencesDialog::build()
 		m_optgroup_other = create_options_tab(_L("Other"), tabs);
 		m_optgroup_other->on_change = [this](t_config_option_key opt_key, boost::any value) {
 
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+			if (opt_key == "local_import_require_key")
+				update_local_import_token_widget(boost::any_cast<bool>(value));
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
+
 			if (auto it = m_values.find(opt_key); it != m_values.end() && opt_key != "url_downloader_dest") {
 				m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
 				return;
@@ -663,6 +674,11 @@ void PreferencesDialog::build()
 
 		activate_options_tab(m_optgroup_other);
 
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+		// Added before the download-path sizer so the access-key row sits directly
+		// below the "Require an access key" checkbox (the last option line).
+		create_local_import_token_widget();
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
 		create_downloader_path_sizer();
 		create_settings_font_widget();
 
@@ -1202,6 +1218,91 @@ void PreferencesDialog::create_downloader_path_sizer()
 
 	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
 }
+
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+void PreferencesDialog::create_local_import_token_widget()
+{
+	wxWindow* parent = m_optgroup_other->parent();
+	auto app_config = get_app_config();
+
+	const std::string token = app_config->get("local_import_token");
+
+	auto* sizer = new wxBoxSizer(wxHORIZONTAL);
+
+	auto* label = new wxStaticText(parent, wxID_ANY, _L("Access key") + ":");
+	m_local_import_token_link = new wxHyperlinkCtrl(parent, wxID_ANY, wxString::FromUTF8(token.c_str()), wxEmptyString);
+	m_local_import_token_link->SetToolTip(_L("Click to copy the access key to the clipboard"));
+	// Keep the key readable after it has been clicked (don't turn "visited" purple).
+	m_local_import_token_link->SetVisitedColour(m_local_import_token_link->GetNormalColour());
+	m_local_import_token_link->SetHoverColour(m_local_import_token_link->GetNormalColour());
+	auto* regen_btn = new wxButton(parent, wxID_ANY, _L("Regenerate"));
+	regen_btn->SetToolTip(_L("Generate a new random access key"));
+	m_local_import_token_status = new wxStaticText(parent, wxID_ANY, wxEmptyString);
+
+	// Indent to line up with the download-path row, which is offset by its blinker icon.
+	sizer->AddSpacer(int(1.6 * em_unit()) + 2);
+	sizer->Add(label,                     0, wxALIGN_CENTER_VERTICAL | wxRIGHT, em_unit());
+	sizer->Add(m_local_import_token_link, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 2 * em_unit());
+	sizer->Add(regen_btn,                 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, em_unit());
+	sizer->Add(m_local_import_token_status, 0, wxALIGN_CENTER_VERTICAL);
+
+	m_local_import_token_sizer = sizer;
+	m_optgroup_other->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+
+	auto copy_token = [this]() {
+		const wxString tok = m_local_import_token_link->GetLabel();
+		if (!tok.IsEmpty() && wxTheClipboard->Open()) {
+			wxTheClipboard->SetData(new wxTextDataObject(tok));
+			wxTheClipboard->Close();
+			if (m_local_import_token_status) {
+				m_local_import_token_status->SetLabel(_L("Copied to clipboard"));
+				m_local_import_token_sizer->Layout();
+			}
+		}
+	};
+
+	// Click the key text -> copy to clipboard (the hyperlink supplies the hover cursor).
+	m_local_import_token_link->Bind(wxEVT_HYPERLINK, [copy_token](wxHyperlinkEvent&) { copy_token(); });
+
+	regen_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+		const std::string t = LocalImportServer::generate_token();
+		m_values["local_import_token"] = t;
+		m_local_import_token_link->SetLabel(wxString::FromUTF8(t.c_str()));
+		if (m_local_import_token_status) {
+			m_local_import_token_status->SetLabel(_L("Token regenerated"));
+			m_local_import_token_sizer->Layout();
+		}
+	});
+
+	update_local_import_token_widget(app_config->get_bool("local_import_require_key"));
+}
+
+void PreferencesDialog::update_local_import_token_widget(bool require_key)
+{
+	if (!m_local_import_token_sizer)
+		return;
+
+	if (require_key) {
+		// Make sure a key exists so it can be displayed/copied.
+		std::string token;
+		if (auto it = m_values.find("local_import_token"); it != m_values.end())
+			token = it->second;
+		else
+			token = get_app_config()->get("local_import_token");
+		if (token.empty()) {
+			token = LocalImportServer::generate_token();
+			m_values["local_import_token"] = token;
+		}
+		if (m_local_import_token_link)
+			m_local_import_token_link->SetLabel(wxString::FromUTF8(token.c_str()));
+	}
+	if (m_local_import_token_status)
+		m_local_import_token_status->SetLabel(wxEmptyString);
+
+	m_optgroup_other->sizer->Show(m_local_import_token_sizer, require_key, true);
+	m_optgroup_other->parent()->Layout();
+}
+#endif // SLIC3R_LOCAL_IMPORT_SERVER
 
 void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)
 {
