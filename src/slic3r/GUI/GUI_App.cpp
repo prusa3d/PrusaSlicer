@@ -94,7 +94,7 @@
 #include "RemovableDriveManager.hpp"
 #include "InstanceCheck.hpp" // IWYU pragma: keep
 #ifdef SLIC3R_LOCAL_IMPORT_SERVER
-#include "Utils/LocalImportServer.hpp"
+#include "../Utils/LocalImportServer.hpp"
 #endif
 #include "NotificationManager.hpp"
 #include "UnsavedChangesDialog.hpp"
