@@ -318,7 +318,7 @@ void PreferencesDialog::build()
 #ifdef SLIC3R_LOCAL_IMPORT_SERVER
 		append_bool_option(m_optgroup_general, "enable_local_import_server",
 			L("Enable local import server"),
-			L("If enabled, PrusaSlicer listens on a loopback HTTP port (127.0.0.1) so external "
+			L("If enabled, PrusaSlicer listens on a loopback HTTP port (127.0.0.1:8126) so external "
 			  "tools - such as a browser CAD app - can send model files directly into the open window. "
 			  "Bound to localhost only and off by default. Advanced options (port, allowed origin) "
 			  "are stored in PrusaSlicer.ini."),
