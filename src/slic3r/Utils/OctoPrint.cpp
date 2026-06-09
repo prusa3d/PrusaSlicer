@@ -12,6 +12,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -164,7 +165,7 @@ std::string escape_path_by_element(const boost::filesystem::path& path)
 
 OctoPrint::OctoPrint(DynamicPrintConfig *config) :
     m_host(config->opt_string("print_host")),
-    m_apikey(config->opt_string("printhost_apikey")),
+    m_apikey(boost::trim_copy(config->opt_string("printhost_apikey"))),
     m_cafile(config->opt_string("printhost_cafile")),
     m_ssl_revoke_best_effort(config->opt_bool("printhost_ssl_ignore_revoke"))
 {}
