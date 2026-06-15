@@ -1,5 +1,6 @@
 ///|/ Copyright (c) Prusa Research 2017 - 2023 Oleksandra Iushchenko @YuSanka, Pavel Mikuš @Godrak, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
 ///|/ Copyright (c) 2021 Ilya @xorza
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -124,6 +125,8 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
     const auto &support_material_extrusion_width    = *print_config.option<ConfigOptionFloatOrPercent>("support_material_extrusion_width");
     const auto &top_infill_extrusion_width          = *print_config.option<ConfigOptionFloatOrPercent>("top_infill_extrusion_width");
     const auto &first_layer_speed                   = *print_config.option<ConfigOptionFloatOrPercent>("first_layer_speed");
+    // TOP Fan speed is not yet supported.
+    //const auto &top_infill_fan_speed                = *print_config.option<ConfigOptionFloatOrPercent>("top_infill_fan_speed");
 
     // Index of an extruder assigned to a feature. If set to 0, an active extruder will be used for a multi-material print.
     // If different from idx_extruder, it will not be taken into account for this hint.

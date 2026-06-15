@@ -17,6 +17,7 @@
 ///|/ Copyright (c) 2013 Robert Giseburt
 ///|/ Copyright (c) 2012 Mark Hindess
 ///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -3145,8 +3146,31 @@ std::string GCodeGenerator::extrude_infill_ranges(
     for (const InfillRange &infill_range : infill_ranges) {
         if (!infill_range.items.empty()) {
             this->m_config.apply(infill_range.region->config());
+
+            // Check if this infill range contains top solid infill, we should be able to piggy back of that to find
+            // "top" infill. This is how i saw fan speeds set above...so it should work fine.
+            //  is this a bit of a hack? maybe. does it work? sorta. but top solid infill is only the top most
+            // layer of the infill range. Need to check with Super slicer if this is how they do theirs.
+            bool has_top_layer = false;
+            for (const GCode::SmoothPath &path : infill_range.items) {
+                if (!path.empty() && path.front().path_attributes.role == ExtrusionRole::TopSolidInfill) {
+                    has_top_layer = true;
+                    break;
+                }
+            }
+
+            // Add top layer fan disable marker if this is a top layer
+            if (has_top_layer) {
+                gcode += ";_TOP_LAYER_FAN_START\n";
+            }
+
             for (const GCode::SmoothPath &path : infill_range.items) {
                 gcode += this->extrude_smooth_path(path, false, comment, -1.0);
+            }
+
+            // Add top layer fan restore marker
+            if (has_top_layer) {
+                gcode += ";_TOP_LAYER_FAN_END\n";
             }
         }
     }

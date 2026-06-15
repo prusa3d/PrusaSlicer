@@ -5,6 +5,7 @@
 ///|/ Copyright (c) Prusa Research 2016 - 2017 Vojtěch Bubník @bubnikv
 ///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
 ///|/ Copyright (c) 2016 Chow Loong Jin @hyperair
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -120,6 +121,9 @@ struct CoolingLine
         TYPE_RESET_FAN_SPEED    = 1 << 18,
         TYPE_INTERNAL_PERIMETER = 1 << 19,
         TYPE_FIRST_INTERNAL_PERIMETER = 1 << 20,
+        // Top layer fan disable
+        TYPE_TOP_LAYER_FAN_START = 1 << 21,
+        TYPE_TOP_LAYER_FAN_END   = 1 << 22,
     };
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
@@ -837,6 +841,10 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_BRIDGE_FAN_START;
         } else if (boost::starts_with(sline, ";_BRIDGE_FAN_END")) {
             line.type = CoolingLine::TYPE_BRIDGE_FAN_END;
+        } else if (boost::starts_with(sline, ";_TOP_LAYER_FAN_START")) {
+            line.type = CoolingLine::TYPE_TOP_LAYER_FAN_START;
+        } else if (boost::starts_with(sline, ";_TOP_LAYER_FAN_END")) {
+            line.type = CoolingLine::TYPE_TOP_LAYER_FAN_END;
         } else if (boost::starts_with(sline, "G4 ")) {
             // Parse the wait time.
             line.type = CoolingLine::TYPE_G4;
@@ -1122,16 +1130,18 @@ std::string CoolingBuffer::apply_layer_cooldown(
     }
     // Second generate the adjusted G-code.
     std::string new_gcode;
+    #define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
     new_gcode.reserve(gcode.size() * 2);
     bool bridge_fan_control = false;
     int  bridge_fan_speed   = 0;
-    auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed](const int requested_fan_speed = -1) {
-#define EXTRUDER_CONFIG(OPT) m_config.OPT.get_at(m_current_extruder)
+    int top_fan_speed = EXTRUDER_CONFIG(top_fan_speed);  // fan speed now a % based, similar to super slicer
+    auto change_extruder_set_fan = [this, layer_id, layer_time, &new_gcode, &bridge_fan_control, &bridge_fan_speed, &top_fan_speed](const int requested_fan_speed = -1) {
         const int min_fan_speed            = EXTRUDER_CONFIG(min_fan_speed);
         // Is the fan speed ramp enabled?
         const int full_fan_speed_layer     = EXTRUDER_CONFIG(full_fan_speed_layer);
         int       disable_fan_first_layers = EXTRUDER_CONFIG(disable_fan_first_layers);
         int       fan_speed_new            = EXTRUDER_CONFIG(fan_always_on) ? min_fan_speed : 0;
+        int top_fan_speed                  = EXTRUDER_CONFIG(top_fan_speed) ? : 100; // the else should not be needed...but incase.
 
         struct FanSpeedRange
         {
@@ -1166,6 +1176,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             }
 
             bridge_fan_speed = EXTRUDER_CONFIG(bridge_fan_speed);
+            top_fan_speed    = EXTRUDER_CONFIG(top_fan_speed);
             if (int(layer_id) >= disable_fan_first_layers && int(layer_id) + 1 < full_fan_speed_layer) {
                 // Ramp up the fan speed from disable_fan_first_layers to full_fan_speed_layer.
                 const float factor = float(int(layer_id + 1) - disable_fan_first_layers) / float(full_fan_speed_layer - disable_fan_first_layers);
@@ -1182,6 +1193,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             bridge_fan_speed                     = 0;
             fan_speed_new                        = 0;
             requested_fan_speed_limits.max_speed = 0;
+            top_fan_speed                        = 0;
         }
 
         requested_fan_speed_limits.min_speed = std::min(requested_fan_speed_limits.min_speed, requested_fan_speed_limits.max_speed);
@@ -1273,6 +1285,15 @@ std::string CoolingBuffer::apply_layer_cooldown(
         } else if (line->type & CoolingLine::TYPE_SET_FAN_SPEED) {
             change_extruder_set_fan(line->fan_speed);
         } else if (line->type & CoolingLine::TYPE_RESET_FAN_SPEED){
+            change_extruder_set_fan();
+        } else if (line->type & CoolingLine::TYPE_TOP_LAYER_FAN_START) {
+           //set fan speed to top_fan_speed
+            if (m_fan_speed != 0) {
+                m_fan_speed = top_fan_speed;
+                new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed);
+            }
+        } else if (line->type & CoolingLine::TYPE_TOP_LAYER_FAN_END) {
+            // Restore fan to calculated speed
             change_extruder_set_fan();
         } else if (line->type & CoolingLine::TYPE_BRIDGE_FAN_START) {
             if (bridge_fan_control)

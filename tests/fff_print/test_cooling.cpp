@@ -272,4 +272,107 @@ SCENARIO("Cooling integration tests", "[Cooling]") {
             // ok $external, '';
         }
     }
+
+    WHEN("top_fan_speed is applied") {
+        THEN("fan speed is reduced when entering top layer") {
+            config.set_deserialize_strict({
+                { "cooling",                   "1" },
+                { "fan_below_layer_time",      "60" },
+                { "slowdown_below_layer_time", "5" },
+                { "max_fan_speed",             "100" },
+                { "min_fan_speed",             "50" },
+                { "top_fan_speed",             "25" },
+                { "disable_fan_first_layers",  "0" }
+            });
+
+            GCodeGenerator gcodegen;
+            auto buffer = make_cooling_buffer(gcodegen, config);
+
+            std::string gcode_with_top_fan =
+                "G1 F3000;_EXTRUDE_SET_SPEED\n"
+                "G1 X50 E1\n"
+                ";_TOP_LAYER_FAN_START\n"
+                "G1 X100 E1\n"
+                ";_TOP_LAYER_FAN_END\n"
+                "G1 X150 E1\n";
+
+            std::string processed = buffer->process_layer(gcode_with_top_fan, 1, true);
+
+            // Should contain M106 commands for fan speed changes
+            bool has_fan_changes = processed.find("M106") != processed.npos;
+            REQUIRE(has_fan_changes);
+        }
+    }
+
+    WHEN("top_fan_speed respects fan disabled state") {
+        THEN("fan stays off when disabled in first layers") {
+            config.set_deserialize_strict({
+                { "cooling",                   "1" },
+                { "fan_below_layer_time",      "60" },
+                { "slowdown_below_layer_time", "5" },
+                { "max_fan_speed",             "100" },
+                { "top_fan_speed",             "25" },
+                { "disable_fan_first_layers",  "3" }
+            });
+
+            GCodeGenerator gcodegen;
+            auto buffer = make_cooling_buffer(gcodegen, config);
+
+            std::string gcode_with_top_fan =
+                "G1 F3000;_EXTRUDE_SET_SPEED\n"
+                ";_TOP_LAYER_FAN_START\n"
+                "G1 X50 E1\n"
+                ";_TOP_LAYER_FAN_END\n";
+
+            // Layer 0 should have fan disabled
+            std::string processed = buffer->process_layer(gcode_with_top_fan, 0, true);
+
+            // Should not contain M106 (fan on) when fan is disabled
+            bool fan_off = processed.find("M106") == processed.npos;
+            REQUIRE(fan_off);
+        }
+    }
+
+    // important, as we do not want to disable for 1 object, and then have a taller object also have disabled "top fan" at that layer
+    WHEN("top_fan_speed with multiple top fan sections") {
+        THEN("fan speed is toggled correctly for multiple sections") {
+            config.set_deserialize_strict({
+                { "cooling",                   "1" },
+                { "fan_below_layer_time",      "60" },
+                { "slowdown_below_layer_time", "5" },
+                { "max_fan_speed",             "100" },
+                { "min_fan_speed",             "50" },
+                { "top_fan_speed",             "30" },
+                { "disable_fan_first_layers",  "0" }
+            });
+
+            GCodeGenerator gcodegen;
+            auto buffer = make_cooling_buffer(gcodegen, config);
+
+            std::string gcode_with_multiple_sections =
+                "G1 F3000;_EXTRUDE_SET_SPEED\n"
+                "G1 X10 E1\n"
+                ";_TOP_LAYER_FAN_START\n"
+                "G1 X20 E1\n"
+                ";_TOP_LAYER_FAN_END\n"
+                "G1 X30 E1\n"
+                ";_TOP_LAYER_FAN_START\n"
+                "G1 X40 E1\n"
+                ";_TOP_LAYER_FAN_END\n"
+                "G1 X50 E1\n";
+
+            std::string processed = buffer->process_layer(gcode_with_multiple_sections, 1, true);
+
+            // Count M106 occurrences (should have multiple fan changes)
+            size_t m106_count = 0;
+            size_t pos = 0;
+            while ((pos = processed.find("M106", pos)) != std::string::npos) {
+                m106_count++;
+                pos += 4;
+            }
+
+            // Should have at least 2 fan changes (entering and exiting top sections)
+            REQUIRE(m106_count >= 2);
+        }
+    }
 }

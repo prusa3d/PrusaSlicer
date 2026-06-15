@@ -16,6 +16,7 @@
 ///|/ Copyright (c) 2016 Vanessa Ezekowitz @VanessaE
 ///|/ Copyright (c) 2015 Alexander Rössler @machinekoder
 ///|/ Copyright (c) 2014 Petr Ledvina @ledvinap
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -1748,6 +1749,16 @@ void PrintConfigDef::init_fff_params()
     def->max = 1000;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionInts { 0 });
+
+    // Pretty much from super slicer
+    def = this->add("top_fan_speed", coInts);
+    def->label = L("Top fan speed");
+    def->tooltip = L("This fan speed is enforced during top infill layers. Set to 0 to disable.");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInts { 100 });
 
     def = this->add("fuzzy_skin", coEnum);
     def->label = L("Fuzzy Skin");

@@ -17,6 +17,7 @@
 ///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
 ///|/ Copyright (c) 2012 Michael Moon
 ///|/ Copyright (c) 2011 Richard Goodwin
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -179,6 +180,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "custom_parameters_printer",
         "toolchange_gcode",
         "top_solid_infill_acceleration",
+        "top_fan_speed",
         "travel_acceleration",
         "travel_short_distance_acceleration",
         "thumbnails",

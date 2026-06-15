@@ -14,6 +14,7 @@
 ///|/ Copyright (c) 2016 Chow Loong Jin @hyperair
 ///|/ Copyright (c) 2012 QuantumConcepts
 ///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2026 Nate Fonseka @nfons
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -2272,6 +2273,7 @@ void TabFilament::build()
         optgroup->append_single_option_line("bridge_fan_speed", category_path + "fan-settings");
         optgroup->append_single_option_line("disable_fan_first_layers", category_path + "fan-settings");
         optgroup->append_single_option_line("full_fan_speed_layer", category_path + "fan-settings");
+        optgroup->append_single_option_line("top_fan_speed", category_path + "fan-settings");
 
         optgroup = page->new_optgroup(L("Dynamic fan speeds"), 25);
         optgroup->append_single_option_line("enable_dynamic_fan_speeds", category_path + "dynamic-fan-speeds");
