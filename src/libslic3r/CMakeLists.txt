@@ -622,6 +622,7 @@ target_include_directories(libslic3r PUBLIC ${EXPAT_INCLUDE_DIRS})
 
 find_package(JPEG REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(libnoise REQUIRED)
 
 target_link_libraries(libslic3r PRIVATE
     sla_time_estimate
@@ -643,6 +644,7 @@ target_link_libraries(libslic3r PRIVATE
     fastfloat
     int128
     nlohmann_json::nlohmann_json
+    libnoise::libnoise
 )
 target_link_libraries(libslic3r PUBLIC
     Eigen3::Eigen

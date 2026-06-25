@@ -123,9 +123,26 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(AuthorizationType)
 static const t_config_enum_values s_keys_map_FuzzySkinType {
     { "none",           int(FuzzySkinType::None) },
     { "external",       int(FuzzySkinType::External) },
-    { "all",            int(FuzzySkinType::All) }
+    { "all",            int(FuzzySkinType::All) },
+    { "allwalls",       int(FuzzySkinType::AllWalls) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinType)
+
+static const t_config_enum_values s_keys_map_FuzzySkinMode {
+    { "displacement",   int(FuzzySkinMode::Displacement) },
+    { "extrusion",      int(FuzzySkinMode::Extrusion) },
+    { "combined",       int(FuzzySkinMode::Combined) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FuzzySkinMode)
+
+static const t_config_enum_values s_keys_map_NoiseType {
+    { "classic",        int(NoiseType::Classic) },
+    { "perlin",         int(NoiseType::Perlin) },
+    { "billow",         int(NoiseType::Billow) },
+    { "ridgedmulti",    int(NoiseType::RidgedMulti) },
+    { "voronoi",        int(NoiseType::Voronoi) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(NoiseType)
 
 static const t_config_enum_values s_keys_map_InfillPattern {
     { "rectilinear",        ipRectilinear },
@@ -1778,7 +1795,8 @@ void PrintConfigDef::init_fff_params()
     def->set_enum<FuzzySkinType>({
         { "none",       L("None") },
         { "external",   L("Outside walls") },
-        { "all",        L("All walls") }
+        { "all",        L("Outside walls and holes") },
+        { "allwalls",   L("All walls (including internal)") }
     });
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum<FuzzySkinType>(FuzzySkinType::None));
@@ -1802,6 +1820,75 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.8));
+
+    def = this->add("fuzzy_skin_first_layer", coBool);
+    def->label = L("Apply fuzzy skin to first layer");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Apply fuzzy skin effect to the first layer. By default, the first layer is not fuzzified "
+                     "to improve bed adhesion.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("fuzzy_skin_mode", coEnum);
+    def->label = L("Fuzzy skin mode");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Displacement mode offsets points perpendicular to the wall (classic behavior). "
+                     "Extrusion mode varies the extrusion width (requires Arachne). "
+                     "Combined mode applies both displacement and extrusion variation.");
+    def->set_enum<FuzzySkinMode>({
+        { "displacement",   L("Displacement") },
+        { "extrusion",      L("Extrusion width") },
+        { "combined",       L("Combined") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<FuzzySkinMode>(FuzzySkinMode::Displacement));
+
+    def = this->add("fuzzy_skin_noise_type", coEnum);
+    def->label = L("Noise type");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Type of noise pattern to use. Classic uses random noise (original behavior). "
+                     "Perlin creates smooth, natural-looking patterns. Billow creates cloud-like billowy patterns. "
+                     "RidgedMulti creates sharp ridge patterns. Voronoi creates cell-like patterns.");
+    def->set_enum<NoiseType>({
+        { "classic",        L("Classic (random)") },
+        { "perlin",         L("Perlin") },
+        { "billow",         L("Billow") },
+        { "ridgedmulti",    L("Ridged multifractal") },
+        { "voronoi",        L("Voronoi") }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<NoiseType>(NoiseType::Classic));
+
+    def = this->add("fuzzy_skin_scale", coFloat);
+    def->label = L("Noise scale");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Scale of the noise pattern. Larger values create larger features. "
+                     "Only applies to non-classic noise types.");
+    def->sidetext = L("mm");
+    def->min = 0.1;
+    def->max = 500;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1.0));
+
+    def = this->add("fuzzy_skin_octaves", coInt);
+    def->label = L("Noise octaves");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Number of octaves of noise to combine. More octaves add finer detail. "
+                     "Only applies to Perlin, Billow, and RidgedMulti noise types.");
+    def->min = 1;
+    def->max = 10;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(4));
+
+    def = this->add("fuzzy_skin_persistence", coFloat);
+    def->label = L("Noise persistence");
+    def->category = L("Fuzzy Skin");
+    def->tooltip = L("Controls how quickly the amplitude of each octave decreases. "
+                     "Higher values create rougher patterns. Only applies to Perlin and Billow noise types.");
+    def->min = 0.01;
+    def->max = 1.0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.5));
 
     def = this->add("gap_fill_enabled", coBool);
     def->label = L("Fill gaps");

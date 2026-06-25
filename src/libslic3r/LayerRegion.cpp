@@ -118,6 +118,7 @@ void LayerRegion::make_perimeters(
     PerimeterGenerator::Parameters params(
         this->layer()->height,
         int(this->layer()->id()),
+        this->layer()->slice_z,
         this->flow(frPerimeter),
         this->flow(frExternalPerimeter),
         this->bridging_flow(frPerimeter),

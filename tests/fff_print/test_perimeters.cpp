@@ -50,6 +50,7 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         PerimeterGenerator::Parameters perimeter_generator_params(
             1., // layer height
             -1, // layer ID
+            0., // slice_z
             flow, flow, flow, flow,
             static_cast<const PrintRegionConfig&>(config),
             static_cast<const PrintObjectConfig&>(config),

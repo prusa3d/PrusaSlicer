@@ -225,7 +225,7 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
         }
 
         // Apply fuzzy skin if it is enabled for at least some part of the polygon.
-        const Polygon polygon = apply_fuzzy_skin(loop.polygon, params.config, params.perimeter_regions, params.layer_id, loop.depth, loop.is_contour);
+        const Polygon polygon = apply_fuzzy_skin(loop.polygon, params.config, params.perimeter_regions, params.layer_id, params.slice_z, loop.depth, loop.is_contour);
 
         ExtrusionPaths paths;
         if (params.config.overhangs && params.layer_id > params.object_config.raft_layers &&
@@ -434,7 +434,7 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
         ExtrusionRole role_overhang = role_normal | ExtrusionRoleModifier::Bridge;
 
         // Apply fuzzy skin if it is enabled for at least some part of the ExtrusionLine.
-        extrusion = apply_fuzzy_skin(extrusion, params.config, params.perimeter_regions, params.layer_id, pg_extrusion.extrusion.inset_idx, !pg_extrusion.extrusion.is_closed || pg_extrusion.is_contour());
+        extrusion = apply_fuzzy_skin(extrusion, params.config, params.perimeter_regions, params.layer_id, params.slice_z, pg_extrusion.extrusion.inset_idx, !pg_extrusion.extrusion.is_closed || pg_extrusion.is_contour());
 
         ExtrusionPaths paths;
         // detect overhanging/bridging perimeters
@@ -1553,9 +1553,15 @@ PerimeterRegion::PerimeterRegion(const LayerRegion &layer_region) : region(&laye
 
 bool PerimeterRegion::has_compatible_perimeter_regions(const PrintRegionConfig &config, const PrintRegionConfig &other_config)
 {
-    return config.fuzzy_skin            == other_config.fuzzy_skin &&
-           config.fuzzy_skin_thickness  == other_config.fuzzy_skin_thickness &&
-           config.fuzzy_skin_point_dist == other_config.fuzzy_skin_point_dist;
+    return config.fuzzy_skin              == other_config.fuzzy_skin &&
+           config.fuzzy_skin_thickness    == other_config.fuzzy_skin_thickness &&
+           config.fuzzy_skin_point_dist   == other_config.fuzzy_skin_point_dist &&
+           config.fuzzy_skin_first_layer  == other_config.fuzzy_skin_first_layer &&
+           config.fuzzy_skin_mode         == other_config.fuzzy_skin_mode &&
+           config.fuzzy_skin_noise_type   == other_config.fuzzy_skin_noise_type &&
+           config.fuzzy_skin_scale        == other_config.fuzzy_skin_scale &&
+           config.fuzzy_skin_octaves      == other_config.fuzzy_skin_octaves &&
+           config.fuzzy_skin_persistence  == other_config.fuzzy_skin_persistence;
 }
 
 void PerimeterRegion::merge_compatible_perimeter_regions(PerimeterRegions &perimeter_regions)

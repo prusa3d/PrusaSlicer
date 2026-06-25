@@ -9,6 +9,7 @@
 #include "format.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/PrintConfig.hpp"
 #include "MsgDialog.hpp"
 
 #include <string>
@@ -278,6 +279,31 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             apply(config, &(*new_config));
         }
     }
+
+    // Check fuzzy skin mode compatibility with perimeter generator
+    // Extrusion and Combined modes require Arachne perimeter generator
+    FuzzySkinMode fuzzy_skin_mode = config->opt_enum<FuzzySkinMode>("fuzzy_skin_mode");
+    FuzzySkinType fuzzy_skin_type = config->opt_enum<FuzzySkinType>("fuzzy_skin");
+    bool have_arachne = config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
+
+    if (fuzzy_skin_type != FuzzySkinType::None &&
+        fuzzy_skin_mode != FuzzySkinMode::Displacement &&
+        !have_arachne) {
+        wxString msg_text = _(L("Fuzzy skin modes 'Extrusion width' and 'Combined' require the Arachne perimeter generator "
+                                "to vary extrusion widths. The Classic perimeter generator does not support variable width extrusions."));
+        if (is_global_config)
+            msg_text += "\n\n" + _(L("Shall I enable Arachne perimeter generator?"));
+        MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Fuzzy Skin")),
+                               wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
+        DynamicPrintConfig new_conf = *config;
+        auto answer = dialog.ShowModal();
+        if (!is_global_config || answer == wxID_YES) {
+            new_conf.set_key_value("perimeter_generator", new ConfigOptionEnum<PerimeterGeneratorType>(PerimeterGeneratorType::Arachne));
+        } else {
+            new_conf.set_key_value("fuzzy_skin_mode", new ConfigOptionEnum<FuzzySkinMode>(FuzzySkinMode::Displacement));
+        }
+        apply(config, &new_conf);
+    }
 }
 
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
@@ -431,6 +457,27 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool have_non_zero_mmu_segmented_region_max_width = !use_beam_interlocking && config->opt_float("mmu_segmented_region_max_width") > 0.;
     toggle_field("mmu_segmented_region_interlocking_depth", have_non_zero_mmu_segmented_region_max_width);
+
+    // Fuzzy skin visibility toggles
+    bool has_fuzzy_skin = config->opt_enum<FuzzySkinType>("fuzzy_skin") != FuzzySkinType::None;
+    toggle_field("fuzzy_skin_thickness", has_fuzzy_skin);
+    toggle_field("fuzzy_skin_point_dist", has_fuzzy_skin);
+    toggle_field("fuzzy_skin_first_layer", has_fuzzy_skin);
+    toggle_field("fuzzy_skin_mode", has_fuzzy_skin);
+    toggle_field("fuzzy_skin_noise_type", has_fuzzy_skin);
+
+    // Noise-specific parameters
+    NoiseType noise_type = config->opt_enum<NoiseType>("fuzzy_skin_noise_type");
+    bool is_non_classic_noise = has_fuzzy_skin && noise_type != NoiseType::Classic;
+    toggle_field("fuzzy_skin_scale", is_non_classic_noise);
+
+    // Octaves: Perlin, Billow, RidgedMulti (not Voronoi or Classic)
+    bool has_octaves = is_non_classic_noise && noise_type != NoiseType::Voronoi;
+    toggle_field("fuzzy_skin_octaves", has_octaves);
+
+    // Persistence: only Perlin and Billow
+    bool has_persistence = is_non_classic_noise && (noise_type == NoiseType::Perlin || noise_type == NoiseType::Billow);
+    toggle_field("fuzzy_skin_persistence", has_persistence);
 }
 
 void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
