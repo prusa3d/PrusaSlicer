@@ -45,6 +45,12 @@ class ISelectedConfigContainerChangedListener;
 class IProjectsChangedListener;
 class IMessageDialogProvider;
 
+enum class EmptyProjectAction
+{
+    Keep,
+    Replace
+};
+
 class NoopUndoProvider : public IUndoProvider
 {
     void take_snapshot(UndoSnapshotType type) {}
@@ -175,8 +181,13 @@ public:
      */
     /**
      * @brief Load project from the file
+     * @param empty_project_action Replace takes over the selected project instead of adding a new
+     * one, when that project is still empty once the file is loaded.
      */
-    void load_project(const boost::filesystem::path& file_path);
+    void load_project(
+        const boost::filesystem::path& file_path,
+        EmptyProjectAction empty_project_action = EmptyProjectAction::Keep
+    );
     /**
      * @brief Load projects from files
      * @param restored project - if set to true, will remove files after sucessfull loading,
@@ -269,6 +280,8 @@ public:
     {
         return m_selection.config_container_id();
     }
+
+    bool selected_project_is_empty() const;
 
     /** @} */
     /**
@@ -510,31 +523,16 @@ public:
     /**
      * @brief Callback from AppInstanceMessageHandler.
      */
-    void on_download_models(std::vector<std::string> message) override
-    {
-        if (m_raise_app_fn) {
-            m_raise_app_fn();
-        }
-        m_file_downloader_interactor.download_files_prusaslicer_url(message);
-    }
+    void on_download_models(std::vector<std::string> message) override;
 
-    void download_model_from_printables_tab(FileDownloader::FileDownloaderMultiTicket data)
-    {
-        m_file_downloader_interactor.init_multi_job(std::move(data));
-    }
+    void download_model_from_printables_tab(FileDownloader::FileDownloaderMultiTicket data);
 
     /**
      * @brief Callback from FileDownloader.
      */
     void on_model_downloaded(const std::vector<boost::filesystem::path>& paths, bool in_new_project) override;
 
-    void open_downloaded_file(const boost::filesystem::path& path, bool in_new_project)
-    {
-        if (in_new_project) {
-            new_project();
-        }
-        load_models_to_project({path});
-    }
+    void open_downloaded_file(const boost::filesystem::path& path, bool in_new_project);
 
     /**
      * @brief Callback from AppInstanceMessageHandler.

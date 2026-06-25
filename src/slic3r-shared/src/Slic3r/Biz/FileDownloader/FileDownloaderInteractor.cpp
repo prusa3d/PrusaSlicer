@@ -38,12 +38,47 @@ std::string filename_from_url(const std::string& url)
     return std::string(url_plain.begin() + slash + 1, url_plain.end());
 }
 
+bool validate_and_complete_input(FileDownloaderJobInput& input)
+{
+    const std::string& escaped_url = input.file_url;
+
+    constexpr std::string_view prefix = "https://";
+    if (!escaped_url.starts_with(prefix)) {
+        std::string msg = fmt::format(
+            "Download won't start. Download URL isn't secure (https) : {}",
+            escaped_url
+        );
+        SPDLOG_ERROR("{}", msg);
+        return false;
+    }
+
+    if (!is_any_subdomain(escaped_url, {"printables.com", "testprusaverse.com", "thingiverse.com", "cults3d.com"})) {
+        std::string msg = fmt::format(
+            "Download won't start. Download URL doesn't point to allowed subdomains : {}",
+            escaped_url
+        );
+        SPDLOG_ERROR("{}", msg);
+        // TODO: dispatch msg to notification
+        return false;
+    }
+
+    if (input.file_name.empty()) {
+        input.file_name = filename_from_url(escaped_url);
+    }
+
+    return true;
+}
+
 } // namespace
 
 void FileDownloaderInteractor::download_files_prusaslicer_url(
-    const std::vector<std::string>& files_url
+    const std::vector<std::string>& files_url,
+    bool open_in_new_project
 )
 {
+    FileDownloaderMultiTicket ticket;
+    ticket.new_project = open_in_new_project;
+
     for (const std::string& full_url : files_url) {
         std::string escaped_url            = Network::IHttp::unescape_string(full_url);
         constexpr std::string_view prefix1 = "prusaslicer://open?file=";
@@ -59,41 +94,26 @@ void FileDownloaderInteractor::download_files_prusaslicer_url(
         }
         FileDownloaderJobInput input;
         input.file_url = escaped_url;
-        input.load_count = 0;
-        init_download_job(std::move(input));
+        input.load_count = open_in_new_project ? 1 : 0;
+
+        if (open_in_new_project) {
+            ticket.jobs.emplace_back(std::move(input));
+        } else {
+            init_download_job(std::move(input));
+        }
+    }
+
+    if (!ticket.jobs.empty()) {
+        init_multi_job(std::move(ticket));
     }
 }
 
 void FileDownloaderInteractor::init_download_job(FileDownloaderJobInput input_data)
 {
-    
-    std::string escaped_url = input_data.file_url;
-    // https check
-    constexpr std::string_view prefix = "https://";
-    if (!escaped_url.starts_with(prefix)) {
-        std::string msg = fmt::format(
-            "Download won't start. Download URL isn't secure (https) : {}",
-            escaped_url
-        );
-        SPDLOG_ERROR("{}", msg);
+    if (!validate_and_complete_input(input_data)) {
         return;
     }
 
-    // subdomain check
-    if (!is_any_subdomain(escaped_url, {"printables.com", "testprusaverse.com", "thingiverse.com", "cults3d.com"})) {
-        std::string msg = fmt::format(
-            "Download won't start. Download URL doesn't point to allowed subdomains : {}",
-            escaped_url
-        );
-        SPDLOG_ERROR("{}", msg);
-        // TODO: dispatch msg to notification
-        return;
-    }
-    
-    if (input_data.file_name.empty()) {
-        input_data.file_name = filename_from_url(escaped_url);
-    }
-    
     boost::filesystem::path dest_directory = Platform::PlatformServices::instance().app_config_provider().download_dir();
     FileDownloaderJobData data{
         std::move(input_data),
@@ -156,32 +176,8 @@ void FileDownloaderInteractor::init_multi_job(FileDownloaderMultiTicket ticket)
         for (size_t i = 0; i < ticket.jobs.size(); i++)
         {
             FileDownloaderJobInput input_data{ ticket.jobs[i]};
-            std::string escaped_url = input_data.file_url;
-
-            // https check
-            constexpr std::string_view prefix = "https://";
-            if (!escaped_url.starts_with(prefix)) {
-                std::string msg = fmt::format(
-                    "Download won't start. Download URL isn't secure (https) : {}",
-                    escaped_url
-                );
-                SPDLOG_ERROR("{}", msg);
+            if (!validate_and_complete_input(input_data)) {
                 return {};
-            }
-
-            // subdomain check
-            if (!is_any_subdomain(escaped_url, {"printables.com", "testprusaverse.com", "thingiverse.com", "cults3d.com"})) {
-                std::string msg = fmt::format(
-                    "Download won't start. Download URL doesn't point to allowed subdomains : {}",
-                    escaped_url
-                );
-                SPDLOG_ERROR("{}", msg);
-                // TODO: dispatch msg to notification
-                return {};
-            }
-
-            if (input_data.file_name.empty()) {
-                input_data.file_name = filename_from_url(escaped_url);
             }
 
             boost::filesystem::path dest_directory = Platform::PlatformServices::instance().app_config_provider().download_dir();
