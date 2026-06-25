@@ -169,7 +169,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
         assert(object_config.support_material_style == smsTree || object_config.support_material_style == smsOrganic);
 
         bool found_existing_group = false;
-        TreeSupportSettings next_settings{ TreeSupportMeshGroupSettings{ print_object }, print_object.slicing_parameters() };
+        TreeSupportSettings next_settings{ TreeSupportMeshGroupSettings{ print_object }, print_object.slicing_parameters(), &print_object };
         //FIXME for now only a single object per group is enabled.
 #if 0
         for (size_t idx = 0; idx < grouped_meshes.size(); ++ idx)
@@ -188,15 +188,6 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
             largest_printed_mesh_idx = object_id;
     }
 
-#if 0
-    {
-        std::vector<coord_t> known_z(storage.meshes[largest_printed_mesh_idx].layers.size());
-        for (size_t z = 0; z < storage.meshes[largest_printed_mesh_idx].layers.size(); z++)
-            known_z[z] = storage.meshes[largest_printed_mesh_idx].layers[z].printZ;
-        for (size_t idx = 0; idx < grouped_meshes.size(); ++ idx)
-            grouped_meshes[idx].first.setActualZ(known_z);
-    }
-#endif
 
     return grouped_meshes;
 }
@@ -3221,7 +3212,7 @@ static void finalize_interface_and_support_areas(
                 }
                 if (! floor_layer.empty()) {
                     if (support_bottom == nullptr)
-                        support_bottom = &layer_allocate(layer_storage, SupporLayerType::BottomContact, print_object.slicing_parameters(), config, layer_idx);
+                        support_bottom = &layer_allocate(layer_storage, SupporLayerType::BottomContact, config, layer_idx);
                     support_bottom->polygons = union_(floor_layer, support_bottom->polygons);
                     base_layer_polygons = diff_clipped(base_layer_polygons, offset(support_bottom->polygons, scaled<float>(0.01), jtMiter, 1.2)); // Subtract the support floor from the normal support.
                 }
@@ -3229,11 +3220,11 @@ static void finalize_interface_and_support_areas(
 
             if (! support_roof_polygons.empty()) {
                 if (support_roof == nullptr)
-                    support_roof = top_contacts[layer_idx] = &layer_allocate(layer_storage, SupporLayerType::TopContact, print_object.slicing_parameters(), config, layer_idx);
+                    support_roof = top_contacts[layer_idx] = &layer_allocate(layer_storage, SupporLayerType::TopContact, config, layer_idx);
                 support_roof->polygons = union_(support_roof_polygons);
             }
             if (! base_layer_polygons.empty()) {
-                SupportGeneratorLayer *base_layer = intermediate_layers[layer_idx] = &layer_allocate(layer_storage, SupporLayerType::Base, print_object.slicing_parameters(), config, layer_idx);
+                SupportGeneratorLayer *base_layer = intermediate_layers[layer_idx] = &layer_allocate(layer_storage, SupporLayerType::Base, config, layer_idx);
                 base_layer->polygons = union_(base_layer_polygons);
             }
 
@@ -3515,7 +3506,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         };
 
         InterfacePlacer              interface_placer{
-            print_object.slicing_parameters(), support_params, config,
+            support_params, config,
             // Outputs
             layer_storage, top_contacts, interface_layers, base_interface_layers };
 

@@ -660,39 +660,6 @@ std::vector<coordf_t> generate_object_layers(
     return out;
 }
 
-// Check whether the layer height profile describes a fixed layer height profile.
-bool check_object_layers_fixed(
-    const SlicingParameters     &slicing_params,
-    const std::vector<coordf_t> &layer_height_profile)
-{
-    assert(layer_height_profile.size() >= 4);
-    assert(layer_height_profile.size() % 2 == 0);
-    assert(layer_height_profile[0] == 0);
-
-    if (layer_height_profile.size() != 4 && layer_height_profile.size() != 8)
-        return false;
-
-    bool fixed_step1 = is_approx(layer_height_profile[1], layer_height_profile[3]);
-    bool fixed_step2 = layer_height_profile.size() == 4 || 
-            (layer_height_profile[2] == layer_height_profile[4] && is_approx(layer_height_profile[5], layer_height_profile[7]));
-
-    if (! fixed_step1 || ! fixed_step2)
-        return false;
-
-    if (layer_height_profile[2] < 0.5 * slicing_params.first_object_layer_height + EPSILON ||
-        ! is_approx(layer_height_profile[3], slicing_params.first_object_layer_height))
-        return false;
-
-    double z_max = layer_height_profile[layer_height_profile.size() - 2];
-    double z_2nd = slicing_params.first_object_layer_height + 0.5 * slicing_params.layer_height;
-    if (z_2nd > z_max)
-        return true;
-    if (z_2nd < *(layer_height_profile.end() - 4) + EPSILON ||
-        ! is_approx(layer_height_profile.back(), slicing_params.layer_height))
-        return false;
-
-    return true;
-}
 
 int generate_layer_height_texture(
 	const SlicingParameters 	&slicing_params,

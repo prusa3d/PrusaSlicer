@@ -16,6 +16,7 @@
 #include <cstdio>
 
 #include "libslic3r/Flow.hpp"
+#include "libslic3r/Layer.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Utils.hpp"
 
@@ -88,7 +89,7 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
     this->support_tree_tip_diameter = std::clamp(scaled<coord_t>(config.support_tree_tip_diameter.value), 0, this->support_tree_branch_diameter);
 }
 
-TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mesh_group_settings, const SlicingParameters &slicing_params)
+TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mesh_group_settings, const SlicingParameters &slicing_params, const PrintObject *print_object)
     : support_line_width(mesh_group_settings.support_line_width),
       layer_height(mesh_group_settings.layer_height),
       branch_radius(mesh_group_settings.support_tree_branch_diameter / 2),
@@ -122,7 +123,9 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mes
       resolution(mesh_group_settings.resolution),
       support_roof_line_distance(mesh_group_settings.support_roof_line_distance), // in the end the actual infill has to be calculated to subtract interface from support areas according to interface_preference.
       settings(mesh_group_settings),
-      min_feature_size(mesh_group_settings.min_feature_size)
+      min_feature_size(mesh_group_settings.min_feature_size),
+      object_print_z_min(slicing_params.object_print_z_min),
+      first_object_layer_height(slicing_params.first_object_layer_height)
 {
     // At least one tip layer must be defined.
     assert(tip_layers > 0);
@@ -173,6 +176,16 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mes
                 this->raft_layers.emplace_back(z);
             }
         }
+    }
+
+    // Populate actual per-layer z data from the already-sliced PrintObject layers.
+    // This enables variable layer height support: when populated, layer_z() etc.
+    // use the actual z-coordinates instead of the uniform arithmetic progression.
+    if (print_object) {
+        for (coordf_t z : this->raft_layers)
+            this->layer_print_z.emplace_back(z);
+        for (const Layer *layer : print_object->layers())
+            this->layer_print_z.emplace_back(layer->print_z);
     }
 }
 

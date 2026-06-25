@@ -150,10 +150,10 @@ struct Tree
 using Forest = std::vector<Tree>;
 using Trees  = std::vector<Tree>;
 
-Element to_tree_element(const TreeSupportSettings &config, const SlicingParameters &slicing_params, SupportElement &element, bool is_root)
+Element to_tree_element(const TreeSupportSettings &config, SupportElement &element, bool is_root)
 {
     Element out;
-    out.position        = to_3d(unscaled<float>(element.state.result_on_layer), float(layer_z(slicing_params, config, element.state.layer_idx)));
+    out.position        = to_3d(unscaled<float>(element.state.result_on_layer), float(config.layer_z(element.state.layer_idx)));
     out.radius          = support_element_radius(config, element);
     out.layer_idx       = element.state.layer_idx;
     out.influence_area  = std::move(element.influence_area);
@@ -163,7 +163,7 @@ Element to_tree_element(const TreeSupportSettings &config, const SlicingParamete
 
 // Convert move bounds into a forest of trees, each tree made of a graph of branches and bifurcation points.
 // Destroys move_bounds.
-Forest make_forest(const TreeSupportSettings &config, const SlicingParameters &slicing_params, std::vector<SupportElements> &&move_bounds)
+Forest make_forest(const TreeSupportSettings &config, std::vector<SupportElements> &&move_bounds)
 {
     struct TreeVisitor {
         void visit_recursive(std::vector<SupportElements> &move_bounds, SupportElement &start_element, Branch *parent_branch, Tree &out) const {
@@ -179,12 +179,12 @@ Forest make_forest(const TreeSupportSettings &config, const SlicingParameters &s
                     // Duplicate the last element of the trunk below.
                     // If this branch has a smaller diameter than the trunk below, its centerline will not be aligned with the centerline of the trunk.
                     branch.path.emplace_back(parent_branch->path.back());
-                branch.path.emplace_back(to_tree_element(config, slicing_params, start_element, parent_branch == nullptr));
+                branch.path.emplace_back(to_tree_element(config, start_element, parent_branch == nullptr));
                 // Traverse each branch until it branches again.
                 SupportElement &first_parent = layer_above[start_element.parents[parent_idx]];
                 assert(! first_parent.state.marked);
                 assert(branch.path.back().layer_idx + 1 == first_parent.state.layer_idx);
-                branch.path.emplace_back(to_tree_element(config, slicing_params, first_parent, false));
+                branch.path.emplace_back(to_tree_element(config, first_parent, false));
                 if (first_parent.parents.size() < 2)
                     first_parent.state.marked = true;
                 SupportElement *next_branch = nullptr;
@@ -194,7 +194,7 @@ Forest make_forest(const TreeSupportSettings &config, const SlicingParameters &s
                         SupportElement &next_parent = move_bounds[parent->state.layer_idx + 1][parent->parents.front()];
                         assert(! next_parent.state.marked);
                         assert(branch.path.back().layer_idx + 1 == next_parent.state.layer_idx);
-                        branch.path.emplace_back(to_tree_element(config, slicing_params, next_parent, false));
+                        branch.path.emplace_back(to_tree_element(config, next_parent, false));
                         if (next_parent.parents.size() > 1) {
                             // Branching point was reached.
                             next_branch = &next_parent;
@@ -251,10 +251,9 @@ Forest make_forest(const TreeSupportSettings &config, const SlicingParameters &s
         }
 
         const TreeSupportSettings &config;
-        const SlicingParameters   &slicing_params;
     };
 
-    TreeVisitor visitor{ config, slicing_params };
+    TreeVisitor visitor{ config };
 
     for (SupportElements &elements : move_bounds)
         for (SupportElement &el : elements)
@@ -612,7 +611,6 @@ static std::pair<int, int> discretize_circle(const Vec3f &center, const Vec3f &n
 static std::pair<float, float> extrude_branch(
     const std::vector<const SupportElement*>    &path,
     const TreeSupportSettings                   &config,
-    const SlicingParameters                     &slicing_params,
     const std::vector<SupportElements>          &move_bounds,
     indexed_triangle_set                        &result)
 {
@@ -634,8 +632,8 @@ static std::pair<float, float> extrude_branch(
         const SupportElement &prev    = *path[ipath - 1];
         const SupportElement &current = *path[ipath];
         assert(prev.state.layer_idx + 1 == current.state.layer_idx);
-        p1 = to_3d(unscaled<double>(prev   .state.result_on_layer), layer_z(slicing_params, config, prev   .state.layer_idx));
-        p2 = to_3d(unscaled<double>(current.state.result_on_layer), layer_z(slicing_params, config, current.state.layer_idx));
+        p1 = to_3d(unscaled<double>(prev   .state.result_on_layer), config.layer_z(prev   .state.layer_idx));
+        p2 = to_3d(unscaled<double>(current.state.result_on_layer), config.layer_z(current.state.layer_idx));
         v1 = (p2 - p1).normalized();
         if (ipath == 1) {
             nprev = v1;
@@ -684,7 +682,7 @@ static std::pair<float, float> extrude_branch(
         } else {
             const SupportElement &next = *path[ipath + 1];
             assert(current.state.layer_idx + 1 == next.state.layer_idx);
-            p3 = to_3d(unscaled<double>(next.state.result_on_layer), layer_z(slicing_params, config, next.state.layer_idx));
+            p3 = to_3d(unscaled<double>(next.state.result_on_layer), config.layer_z(next.state.layer_idx));
             v2 = (p3 - p2).normalized();
             ncurrent = (v1 + v2).normalized();
             float radius = unscaled<float>(support_element_radius(config, current));
@@ -731,7 +729,6 @@ static void organic_smooth_branches_avoid_collisions(
     };
     std::vector<LayerCollisionCache> layer_collision_cache;
     layer_collision_cache.reserve(1024);
-    const SlicingParameters &slicing_params = print_object.slicing_parameters();
     for (const std::pair<SupportElement*, int>& element : elements_with_link_down) {
         LayerIndex layer_idx = element.first->state.layer_idx;
         if (size_t num_layers = layer_idx + 1; num_layers > layer_collision_cache.size()) {
@@ -796,7 +793,7 @@ static void organic_smooth_branches_avoid_collisions(
             element.parents.empty() || (link_down == -1 && element.state.layer_idx > 0),
             unscaled<float>(support_element_radius(config, element)),
             // 3D position
-            to_3d(unscaled<float>(element.state.result_on_layer), float(layer_z(slicing_params, config, element.state.layer_idx)))
+            to_3d(unscaled<float>(element.state.result_on_layer), float(config.layer_z(element.state.layer_idx)))
         });
         // Update min_z coordinate to min_z of the tree below.
         CollisionSphere &collision_sphere = collision_spheres.back();
@@ -827,9 +824,9 @@ static void organic_smooth_branches_avoid_collisions(
         //FIXME limit the collision span by the tree slope.
         collision_sphere.min_z = std::max(collision_sphere.min_z, collision_sphere.position.z() - collision_sphere.radius);
         collision_sphere.max_z = std::min(collision_sphere.max_z, collision_sphere.position.z() + collision_sphere.radius);
-        collision_sphere.layer_begin = std::min(collision_sphere.element.state.layer_idx, layer_idx_ceil(slicing_params, config, collision_sphere.min_z));
+        collision_sphere.layer_begin = std::min(collision_sphere.element.state.layer_idx, config.layer_idx_ceil(collision_sphere.min_z));
         assert(collision_sphere.layer_begin < layer_collision_cache.size());
-        collision_sphere.layer_end   = std::min(LayerIndex(layer_collision_cache.size()), std::max(collision_sphere.element.state.layer_idx, layer_idx_floor(slicing_params, config, collision_sphere.max_z)) + 1);
+        collision_sphere.layer_end   = std::min(LayerIndex(layer_collision_cache.size()), std::max(collision_sphere.element.state.layer_idx, config.layer_idx_floor(collision_sphere.max_z)) + 1);
     }
 
     throw_on_cancel();
@@ -844,13 +841,13 @@ static void organic_smooth_branches_avoid_collisions(
             collision_sphere.prev_position = collision_sphere.position;
         std::atomic<size_t> num_moved{ 0 };
         tbb::parallel_for(tbb::blocked_range<size_t>(0, collision_spheres.size()),
-            [&collision_spheres, &layer_collision_cache, &slicing_params, &config, &linear_data_layers, &num_moved, &throw_on_cancel](const tbb::blocked_range<size_t> range) {
+            [&collision_spheres, &layer_collision_cache, &config, &linear_data_layers, &num_moved, &throw_on_cancel](const tbb::blocked_range<size_t> range) {
             for (size_t collision_sphere_id = range.begin(); collision_sphere_id < range.end(); ++ collision_sphere_id)
                 if (CollisionSphere &collision_sphere = collision_spheres[collision_sphere_id]; ! collision_sphere.locked) {
                     // Calculate collision of multiple 2D layers against a collision sphere.
                     collision_sphere.last_collision_depth = - std::numeric_limits<double>::max();
                     for (uint32_t layer_id = collision_sphere.layer_begin; layer_id != collision_sphere.layer_end; ++ layer_id) {
-                        double dz = (layer_id - collision_sphere.element.state.layer_idx) * slicing_params.layer_height;
+                        double dz = config.layer_z(layer_id) - config.layer_z(collision_sphere.element.state.layer_idx);
                         if (double r2 = sqr(collision_sphere.radius) - sqr(dz); r2 > 0) {
                             if (const LayerCollisionCache &layer_collision_cache_item = layer_collision_cache[layer_id]; ! layer_collision_cache_item.empty()) {
                                 size_t hit_idx_out;
@@ -861,7 +858,7 @@ static void organic_smooth_branches_avoid_collisions(
                                     double collision_depth = sqrt(r2) - dist;
                                     if (collision_depth > collision_sphere.last_collision_depth) {
                                         collision_sphere.last_collision_depth = collision_depth;
-                                        collision_sphere.last_collision = to_3d(hit_point_out.cast<float>(), float(layer_z(slicing_params, config, layer_id)));
+                                        collision_sphere.last_collision = to_3d(hit_point_out.cast<float>(), float(config.layer_z(layer_id)));
                                     }
                                 }
                             }
@@ -941,7 +938,7 @@ static void organic_smooth_branches_avoid_collisions(
     std::vector<openvdb::Vec3R> pts, prev, projections;
     std::vector<float> distances;
     for (const std::pair<SupportElement*, int>& element : elements_with_link_down) {
-        Vec3d pt = to_3d(unscaled<double>(element.first->state.result_on_layer), layer_z(print_object.slicing_parameters(), config, element.first->state.layer_idx)) * scale;
+        Vec3d pt = to_3d(unscaled<double>(element.first->state.result_on_layer), config.layer_z(element.first->state.layer_idx)) * scale;
         pts.push_back({ pt.x(), pt.y(), pt.z() });
     }
 
@@ -1207,12 +1204,11 @@ void organic_draw_branches(
         }
     }
 
-    const SlicingParameters &slicing_params = print_object.slicing_parameters();
     MeshSlicingParams mesh_slicing_params;
     mesh_slicing_params.mode = MeshSlicingParams::SlicingMode::Positive;
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size(), 1),
-        [&trees, &volumes, &config, &slicing_params, &move_bounds, &mesh_slicing_params, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
+        [&trees, &volumes, &config, &move_bounds, &mesh_slicing_params, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
             indexed_triangle_set    partial_mesh;
             std::vector<float>      slice_z;
             std::vector<Polygons>   bottom_contacts;
@@ -1221,17 +1217,17 @@ void organic_draw_branches(
                 for (const Branch &branch : tree.branches) {
                     // Triangulate the tube.
                     partial_mesh.clear();
-                    std::pair<float, float> zspan = extrude_branch(branch.path, config, slicing_params, move_bounds, partial_mesh);
+                    std::pair<float, float> zspan = extrude_branch(branch.path, config, move_bounds, partial_mesh);
                     LayerIndex layer_begin = branch.has_root ?
                         branch.path.front()->state.layer_idx : 
-                        std::min(branch.path.front()->state.layer_idx, layer_idx_ceil(slicing_params, config, zspan.first));
+                        std::min(branch.path.front()->state.layer_idx, config.layer_idx_ceil(zspan.first));
                     LayerIndex layer_end   = (branch.has_tip ?
                         branch.path.back()->state.layer_idx :
-                        std::max(branch.path.back()->state.layer_idx, layer_idx_floor(slicing_params, config, zspan.second))) + 1;
+                        std::max(branch.path.back()->state.layer_idx, config.layer_idx_floor(zspan.second))) + 1;
                     slice_z.clear();
                     for (LayerIndex layer_idx = layer_begin; layer_idx < layer_end; ++ layer_idx) {
-                        const double print_z  = layer_z(slicing_params, config, layer_idx);
-                        const double bottom_z = layer_idx > 0 ? layer_z(slicing_params, config, layer_idx - 1) : 0.;
+                        const double print_z  = config.layer_z(layer_idx);
+                        const double bottom_z = layer_idx > 0 ? config.layer_z(layer_idx - 1) : 0.;
                         slice_z.emplace_back(float(0.5 * (bottom_z + print_z)));
                     }
                     std::vector<Polygons> slices = slice_mesh(partial_mesh, slice_z, mesh_slicing_params, throw_on_cancel);
@@ -1426,12 +1422,12 @@ void organic_draw_branches(
             if (! bottom_contact_polygons.empty()) {
                 base_layer_polygons = diff(base_layer_polygons, bottom_contact_polygons);
                 SupportGeneratorLayer *bottom_contact_layer = bottom_contacts[layer_idx] = &layer_allocate(
-                    layer_storage, SupporLayerType::BottomContact, print_object.slicing_parameters(), config, layer_idx);
+                    layer_storage, SupporLayerType::BottomContact, config, layer_idx);
                 bottom_contact_layer->polygons = std::move(bottom_contact_polygons);
             }
             if (! base_layer_polygons.empty()) {
                 SupportGeneratorLayer *base_layer = intermediate_layers[layer_idx] = &layer_allocate(
-                    layer_storage, SupporLayerType::Base, print_object.slicing_parameters(), config, layer_idx);
+                    layer_storage, SupporLayerType::Base, config, layer_idx);
                 base_layer->polygons = union_(base_layer_polygons);
             }
 

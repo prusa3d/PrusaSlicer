@@ -495,3 +495,109 @@ Old Perl tests, which were disabled by Vojtech at the time of first Support Gene
 }
 
 */
+
+TEST_CASE("Organic supports with variable layer height", "[SupportMaterial]")
+{
+    // Use raft layers to ensure support layers are generated, combined with
+    // variable layer height to test the z-alignment fix.
+    Slic3r::Print print;
+    Slic3r::Model model;
+    Slic3r::Test::init_print({ TestMesh::cube_20x20x20 }, print, model, {
+        { "support_material",       1 },
+        { "support_material_style", "organic" },
+        { "raft_layers",            3 },
+        { "layer_height",           0.2 },
+        { "first_layer_height",     0.2 },
+    });
+    // Set a variable layer height profile on the 20mm tall object.
+    model.objects.front()->layer_height_profile.set({
+        0.0, 0.2,  5.0, 0.2,  10.0, 0.15,  15.0, 0.15,  20.0, 0.2
+    });
+    print.apply(model, print.full_print_config());
+    print.process();
+
+    REQUIRE(! print.objects().empty());
+    REQUIRE(! print.objects().front()->support_layers().empty());
+}
+
+TEST_CASE("Organic support layers align with variable object layers", "[SupportMaterial]")
+{
+    Slic3r::Print print;
+    Slic3r::Model model;
+    Slic3r::Test::init_print({ TestMesh::cube_20x20x20 }, print, model, {
+        { "support_material",       1 },
+        { "support_material_style", "organic" },
+        { "raft_layers",            3 },
+        { "layer_height",           0.2 },
+        { "first_layer_height",     0.2 },
+    });
+    model.objects.front()->layer_height_profile.set({
+        0.0, 0.2,  5.0, 0.2,  10.0, 0.15,  15.0, 0.15,  20.0, 0.2
+    });
+    print.apply(model, print.full_print_config());
+    print.process();
+
+    const PrintObject *obj = print.objects().front();
+    REQUIRE(! obj->support_layers().empty());
+
+    // Each support layer's print_z that is above the raft should match
+    // some object layer's print_z (within EPSILON). This verifies that
+    // the layer_z() method correctly uses actual per-layer z-coordinates.
+    double raft_top_z = 0;
+    for (const SupportLayer *sl : obj->support_layers())
+        raft_top_z = std::max(raft_top_z, sl->print_z);
+    // Find the raft height (first few support layers are raft)
+    // and only check alignment for layers above the raft.
+    double raft_height = 0;
+    for (const SupportLayer *sl : obj->support_layers()) {
+        if (sl->print_z < 1.0)  // raft layers are typically below 1mm
+            raft_height = sl->print_z;
+    }
+    for (const SupportLayer *sl : obj->support_layers()) {
+        if (sl->print_z <= raft_height)
+            continue;  // skip raft layers
+        bool found = false;
+        for (const Layer *ol : obj->layers())
+            if (std::abs(sl->print_z - ol->print_z) < EPSILON) {
+                found = true;
+                break;
+            }
+        CHECK(found);
+    }
+}
+
+TEST_CASE("Tree supports with variable layer height", "[SupportMaterial]")
+{
+    Slic3r::Print print;
+    Slic3r::Model model;
+    Slic3r::Test::init_print({ TestMesh::cube_20x20x20 }, print, model, {
+        { "support_material",       1 },
+        { "support_material_style", "tree" },
+        { "raft_layers",            3 },
+        { "layer_height",           0.2 },
+        { "first_layer_height",     0.2 },
+    });
+    model.objects.front()->layer_height_profile.set({
+        0.0, 0.2,  5.0, 0.2,  10.0, 0.15,  15.0, 0.15,  20.0, 0.2
+    });
+    print.apply(model, print.full_print_config());
+    print.process();
+
+    REQUIRE(! print.objects().empty());
+    REQUIRE(! print.objects().front()->support_layers().empty());
+}
+
+TEST_CASE("Organic supports with uniform layer height still work", "[SupportMaterial]")
+{
+    Slic3r::Print print;
+    Slic3r::Test::init_and_process_print({ TestMesh::cube_20x20x20 }, print, {
+        { "support_material",       1 },
+        { "support_material_style", "organic" },
+        { "raft_layers",            3 },
+        { "layer_height",           0.2 },
+        { "first_layer_height",     0.2 },
+    });
+
+    REQUIRE(! print.objects().empty());
+    REQUIRE(! print.objects().front()->support_layers().empty());
+}

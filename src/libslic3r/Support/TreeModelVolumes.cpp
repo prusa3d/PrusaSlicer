@@ -105,7 +105,7 @@ TreeModelVolumes::TreeModelVolumes(
     {
         m_anti_overhang = print_object.slice_support_blockers();
         TreeSupportMeshGroupSettings mesh_settings(print_object);
-        const TreeSupportSettings config{ mesh_settings, print_object.slicing_parameters() };
+        const TreeSupportSettings config{ mesh_settings, print_object.slicing_parameters(), &print_object };
         m_current_min_xy_dist = config.xy_min_distance;
         m_current_min_xy_dist_delta = config.xy_distance - m_current_min_xy_dist;
         assert(m_current_min_xy_dist_delta >= 0);

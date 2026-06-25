@@ -233,7 +233,7 @@ struct TreeSupportSettings
 {
 public:
     TreeSupportSettings() = default; // required for the definition of the config variable in the TreeSupportGenerator class.
-    explicit TreeSupportSettings(const TreeSupportMeshGroupSettings &mesh_group_settings, const SlicingParameters &slicing_params);
+    explicit TreeSupportSettings(const TreeSupportMeshGroupSettings &mesh_group_settings, const SlicingParameters &slicing_params, const PrintObject *print_object = nullptr);
 
     // some static variables dependent on other meshes that are not currently processed.
     // Has to be static because TreeSupportConfig will be used in TreeModelVolumes as this reduces redundancy.
@@ -381,6 +381,51 @@ public:
     // Extra raft layers below the object.
     std::vector<coordf_t> raft_layers;
 
+    // Actual print_z of each support layer (raft layers + object layers).
+    // Populated from PrintObject::layers() when variable heights are in use.
+    // Empty when layer heights are uniform — fallback to arithmetic progression.
+    std::vector<coordf_t> layer_print_z;
+    // Cached slicing params fields for the fallback arithmetic progression.
+    coordf_t object_print_z_min { 0 };
+    coordf_t first_object_layer_height { 0 };
+
+    bool has_variable_layer_z() const { return !layer_print_z.empty(); }
+
+    /*!
+     * \brief Return the print_z of the given support layer.
+     * \param layer_idx[in] The layer index (0-based, including raft layers).
+     * \return The print_z of the layer.
+     */
+    [[nodiscard]] inline double layer_z(size_t layer_idx) const {
+        if (layer_idx < raft_layers.size())
+            return raft_layers[layer_idx];
+        if (!layer_print_z.empty() && layer_idx < layer_print_z.size())
+            return layer_print_z[layer_idx];
+        // Fallback: uniform arithmetic progression
+        return object_print_z_min + first_object_layer_height
+             + (double(layer_idx) - double(raft_layers.size())) * double(layer_height);
+    }
+
+    /*!
+     * \brief Lowest layer index whose print_z >= z.
+     */
+    [[nodiscard]] inline LayerIndex layer_idx_ceil(double z) const {
+        if (!layer_print_z.empty())
+            return LayerIndex(std::lower_bound(layer_print_z.begin(), layer_print_z.end(), z) - layer_print_z.begin());
+        return LayerIndex(raft_layers.size()) +
+            std::max<LayerIndex>(0, LayerIndex(std::ceil((z - object_print_z_min - first_object_layer_height) / double(layer_height))));
+    }
+
+    /*!
+     * \brief Highest layer index whose print_z <= z.
+     */
+    [[nodiscard]] inline LayerIndex layer_idx_floor(double z) const {
+        if (!layer_print_z.empty())
+            return LayerIndex(std::upper_bound(layer_print_z.begin(), layer_print_z.end(), z) - layer_print_z.begin()) - 1;
+        return LayerIndex(raft_layers.size()) +
+            std::max<LayerIndex>(0, LayerIndex(std::floor((z - object_print_z_min - first_object_layer_height) / double(layer_height))));
+    }
+
 public:
     bool operator==(const TreeSupportSettings& other) const
     {
@@ -415,6 +460,7 @@ public:
                     )
 #endif
                && raft_layers == other.raft_layers
+               && layer_print_z == other.layer_print_z
             ;
     }
 
@@ -444,30 +490,6 @@ public:
         return num_layers_widened > 0 ? branch_radius + num_layers_widened * bp_radius_increase_per_layer : 0;
     }
 
-#if 0
-    /*!
-     * \brief Return on which z in microns the layer will be printed. Used only for support infill line generation.
-     * \param layer_idx[in] The layer.
-     * \return The radius every element should aim to achieve.
-     */
-    [[nodiscard]] inline coord_t getActualZ(LayerIndex layer_idx)
-    {
-        return layer_idx < coord_t(known_z.size()) ? known_z[layer_idx] : (layer_idx - known_z.size()) * layer_height + known_z.size() ? known_z.back() : 0;
-    }
-
-    /*!
-     * \brief Set the z every Layer is printed at. Required for getActualZ to work
-     * \param z[in] The z every LayerIndex is printed. Vector is used as a map<LayerIndex,coord_t> with the index of each element being the corresponding LayerIndex
-     * \return The radius every element should aim to achieve.
-     */
-    void setActualZ(std::vector<coord_t>& z)
-    {
-        known_z = z;
-    }
-#endif
-
-private:
-//    std::vector<coord_t> known_z;
 };
 
 static constexpr const bool polygons_strictly_simple = false;
@@ -476,35 +498,14 @@ static constexpr const auto tiny_area_threshold = sqr(scaled<double>(0.001));
 
 void tree_supports_show_error(std::string_view message, bool critical);
 
-inline double layer_z(const SlicingParameters &slicing_params, const TreeSupportSettings &config, const size_t layer_idx)
-{
-    return layer_idx >= config.raft_layers.size() ? 
-        slicing_params.object_print_z_min + slicing_params.first_object_layer_height + (layer_idx - config.raft_layers.size()) * slicing_params.layer_height :
-        config.raft_layers[layer_idx];
-}
-// Lowest collision layer
-inline LayerIndex layer_idx_ceil(const SlicingParameters &slicing_params, const TreeSupportSettings &config, const double z)
-{
-    return 
-        LayerIndex(config.raft_layers.size()) +
-        std::max<LayerIndex>(0, ceil((z - slicing_params.object_print_z_min - slicing_params.first_object_layer_height) / slicing_params.layer_height));
-}
-// Highest collision layer
-inline LayerIndex layer_idx_floor(const SlicingParameters &slicing_params, const TreeSupportSettings &config, const double z)
-{
-    return 
-        LayerIndex(config.raft_layers.size()) + 
-        std::max<LayerIndex>(0, floor((z - slicing_params.object_print_z_min - slicing_params.first_object_layer_height) / slicing_params.layer_height));
-}
 
 inline SupportGeneratorLayer& layer_initialize(
     SupportGeneratorLayer     &layer_new,
-    const SlicingParameters   &slicing_params,
     const TreeSupportSettings &config, 
     const size_t               layer_idx)
 {
-    layer_new.print_z  = layer_z(slicing_params, config, layer_idx);
-    layer_new.bottom_z = layer_idx > 0 ? layer_z(slicing_params, config, layer_idx - 1) : 0;
+    layer_new.print_z  = config.layer_z(layer_idx);
+    layer_new.bottom_z = layer_idx > 0 ? config.layer_z(layer_idx - 1) : 0;
     layer_new.height   = layer_new.print_z - layer_new.bottom_z;
     return layer_new;
 }
@@ -513,30 +514,27 @@ inline SupportGeneratorLayer& layer_initialize(
 inline SupportGeneratorLayer& layer_allocate_unguarded(
     SupportGeneratorLayerStorage      &layer_storage,
     SupporLayerType                    layer_type,
-    const SlicingParameters           &slicing_params,
     const TreeSupportSettings         &config, 
     size_t                             layer_idx)
 {
     SupportGeneratorLayer &layer = layer_storage.allocate_unguarded(layer_type);
-    return layer_initialize(layer, slicing_params, config, layer_idx);
+    return layer_initialize(layer, config, layer_idx);
 }
 
 inline SupportGeneratorLayer& layer_allocate(
     SupportGeneratorLayerStorage      &layer_storage,
     SupporLayerType                    layer_type,
-    const SlicingParameters           &slicing_params,
     const TreeSupportSettings         &config, 
     size_t                             layer_idx)
 {
     SupportGeneratorLayer &layer = layer_storage.allocate(layer_type);
-    return layer_initialize(layer, slicing_params, config, layer_idx);
+    return layer_initialize(layer, config, layer_idx);
 }
 
 // Used by generate_initial_areas() in parallel by multiple layers.
 class InterfacePlacer {
 public:
     InterfacePlacer(
-        const SlicingParameters         &slicing_parameters, 
         const SupportParameters         &support_parameters,
         const TreeSupportSettings       &config, 
         SupportGeneratorLayerStorage    &layer_storage, 
@@ -544,17 +542,17 @@ public:
         SupportGeneratorLayersPtr       &top_interfaces,
         SupportGeneratorLayersPtr       &top_base_interfaces) 
     :
-        slicing_parameters(slicing_parameters), support_parameters(support_parameters), config(config),
+        support_parameters(support_parameters), config(config),
         layer_storage(layer_storage), top_contacts(top_contacts), top_interfaces(top_interfaces), top_base_interfaces(top_base_interfaces)  
     {}
     InterfacePlacer(const InterfacePlacer& rhs) :
-        slicing_parameters(rhs.slicing_parameters), support_parameters(rhs.support_parameters), config(rhs.config),
+        support_parameters(rhs.support_parameters), config(rhs.config),
         layer_storage(rhs.layer_storage), top_contacts(rhs.top_contacts), top_interfaces(rhs.top_interfaces), top_base_interfaces(rhs.top_base_interfaces) 
     {}
 
-    const SlicingParameters    &slicing_parameters;
     const SupportParameters    &support_parameters;
     const TreeSupportSettings  &config;
+
     SupportGeneratorLayersPtr&  top_contacts_mutable() { return this->top_contacts; }
 
 public:
@@ -592,7 +590,7 @@ public:
         SupportGeneratorLayer*& l = layers[insert_layer_idx];
         if (l == nullptr)
             l = &layer_allocate_unguarded(layer_storage, dtt_roof == 0 ? SupporLayerType::TopContact : SupporLayerType::TopInterface, 
-                    slicing_parameters, config, insert_layer_idx);
+                    config, insert_layer_idx);
         // will be unioned in finalize_interface_and_support_areas()
         append(l->polygons, std::move(new_roofs));
     }
