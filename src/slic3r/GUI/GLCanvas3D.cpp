@@ -5000,6 +5000,13 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
 
+        std::vector<CustomGCode::Item> color_changes;
+        for (const auto& item : thumbnail_params.color_changes.gcodes) {
+            if (item.type == CustomGCode::ColorChange || item.type == CustomGCode::ToolChange)
+                color_changes.push_back(item);
+        }
+        std::sort(color_changes.begin(), color_changes.end());
+
         if (is_left_handed)
             glsafe(::glFrontFace(GL_CW));
 
@@ -5015,6 +5022,44 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
             ts.request_update_render_data();
 
             ts.render(nullptr, model_matrix);
+        }
+        else if (!color_changes.empty()) {
+            GLShaderProgram* mm_shader = wxGetApp().get_shader("mm_gouraud");
+            if (mm_shader) {
+                mm_shader->start_using();
+                mm_shader->set_uniform("volume_world_matrix", vol->world_matrix());
+                mm_shader->set_uniform("volume_mirrored", is_left_handed);
+                mm_shader->set_uniform("clipping_plane", ColorRGBA(0.0f, 0.0f, 0.0f, 0.0f));
+                mm_shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
+                mm_shader->set_uniform("projection_matrix", projection_matrix);
+                mm_shader->set_uniform("view_normal_matrix", view_normal_matrix);
+
+                double last_z = -FLT_MAX;
+                ColorRGBA current_color = vol->color;
+
+                auto render_range = [&](double z_min, double z_max, const ColorRGBA& color) {
+                    mm_shader->set_uniform("z_range", std::array<float, 2>{(float)z_min, (float)z_max});
+                    mm_shader->set_uniform("uniform_color", color);
+                    vol->render();
+                };
+
+                glsafe(::glDepthFunc(GL_LEQUAL));
+                glsafe(::glEnable(GL_CLIP_PLANE0));
+                for (const auto& item : color_changes) {
+                    render_range(last_z, item.print_z, current_color);
+                    last_z = item.print_z;
+                    decode_color(item.color, current_color);
+                }
+                render_range(last_z, FLT_MAX, current_color);
+                glsafe(::glDisable(GL_CLIP_PLANE0));
+                glsafe(::glDepthFunc(GL_LESS));
+
+                mm_shader->stop_using();
+                shader->start_using(); // restore original shader for stop_using call below
+            }
+            else {
+                vol->render();
+            }
         }
         else
             vol->render();

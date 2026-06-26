@@ -9,6 +9,7 @@
 #include <functional>
 
 #include "libslic3r/Point.hpp"
+#include "libslic3r/CustomGCode.hpp"
 
 namespace Slic3r {
 
@@ -34,6 +35,7 @@ struct ThumbnailsParams
 	bool 			parts_only;
 	bool 			show_bed;
 	bool 			transparent_background;
+	CustomGCode::Info color_changes;
 };
 
 typedef std::function<ThumbnailsList(const ThumbnailsParams&)> ThumbnailsGeneratorCallback;

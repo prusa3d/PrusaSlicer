@@ -807,7 +807,8 @@ void GLModel::render(const std::pair<size_t, size_t>& range)
         }
     }
 
-    shader->set_uniform("uniform_color", data.color);
+    if (shader->get_name() != "mm_gouraud")
+        shader->set_uniform("uniform_color", data.color);
 
     glsafe(::glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_render_data.ibo_id));
     glsafe(::glDrawElements(mode, range.second - range.first, index_type, (const void*)(range.first * Geometry::index_stride_bytes(data))));

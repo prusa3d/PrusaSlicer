@@ -796,8 +796,11 @@ void BackgroundSlicingProcess::prepare_upload(PrintHostJob &upload_job)
 ThumbnailsList BackgroundSlicingProcess::render_thumbnails(const ThumbnailsParams &params)
 {
 	ThumbnailsList thumbnails;
-	if (m_thumbnail_cb)
-		this->execute_ui_task([this, &params, &thumbnails](){ thumbnails = m_thumbnail_cb(params); });
+	if (m_thumbnail_cb) {
+        ThumbnailsParams p = params;
+        p.color_changes = m_print->model().custom_gcode_per_print_z();
+		this->execute_ui_task([this, &p, &thumbnails](){ thumbnails = m_thumbnail_cb(p); });
+    }
 	return thumbnails;
 }
 

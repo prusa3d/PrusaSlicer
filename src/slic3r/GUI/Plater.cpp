@@ -3727,10 +3727,12 @@ ThumbnailsList Plater::priv::generate_thumbnails(const ThumbnailsParams& params,
     s_multiple_beds.set_thumbnail_bed_idx(s_multiple_beds.get_active_bed());
     ScopeGuard guard([]() { s_multiple_beds.set_thumbnail_bed_idx(-1); });
     ThumbnailsList thumbnails;
-    for (const Vec2d& size : params.sizes) {
+    ThumbnailsParams p = params;
+    p.color_changes = q->model().custom_gcode_per_print_z();
+    for (const Vec2d& size : p.sizes) {
         thumbnails.push_back(ThumbnailData());
         Point isize(size); // round to ints
-        generate_thumbnail(thumbnails.back(), isize.x(), isize.y(), params, camera_type);
+        generate_thumbnail(thumbnails.back(), isize.x(), isize.y(), p, camera_type);
         if (!thumbnails.back().is_valid())
             thumbnails.pop_back();
     }
