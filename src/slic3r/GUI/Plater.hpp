@@ -279,6 +279,7 @@ public:
     void leave_gizmos_stack();
 
     bool update_filament_colors_in_full_config();
+    void swap_filaments(unsigned int idx_a, unsigned int idx_b);
     void on_config_change(const DynamicPrintConfig &config);
     void force_filament_colors_update();
     void force_filament_cb_update();

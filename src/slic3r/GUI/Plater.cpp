@@ -7090,6 +7090,56 @@ void Plater::set_default_bed_shape() const
     set_bed_shape({ { 0.0, 0.0 }, { 200.0, 0.0 }, { 200.0, 200.0 }, { 0.0, 200.0 } }, 0.0, {}, {}, true);
 }
 
+void Plater::swap_filaments(unsigned int idx_a, unsigned int idx_b)
+{
+    if (idx_a == idx_b)
+        return;
+    PresetBundle* preset_bundle = wxGetApp().preset_bundle;
+    const size_t num_extruders = preset_bundle->extruders_filaments.size();
+    if (idx_a >= num_extruders || idx_b >= num_extruders)
+        return;
+
+    // Swap filament preset selections
+    std::string name_a = preset_bundle->extruders_filaments[idx_a].get_selected_preset_name();
+    std::string name_b = preset_bundle->extruders_filaments[idx_b].get_selected_preset_name();
+    preset_bundle->set_filament_preset(idx_a, name_b);
+    preset_bundle->set_filament_preset(idx_b, name_a);
+
+    // Swap extruder colors
+    DynamicPrintConfig& printer_config = preset_bundle->printers.get_edited_preset().config;
+    auto* extruder_colours = printer_config.option<ConfigOptionStrings>("extruder_colour");
+    if (extruder_colours && idx_a < extruder_colours->values.size() && idx_b < extruder_colours->values.size())
+        std::swap(extruder_colours->values[idx_a], extruder_colours->values[idx_b]);
+
+    // Swap wipe tower purging matrix rows and columns
+    auto* wipe_volumes = preset_bundle->project_config.option<ConfigOptionFloats>("wiping_volumes_matrix");
+    if (wipe_volumes && num_extruders * num_extruders == wipe_volumes->values.size()) {
+        std::vector<double>& matrix = wipe_volumes->values;
+        for (size_t col = 0; col < num_extruders; ++col)
+            std::swap(matrix[idx_a * num_extruders + col], matrix[idx_b * num_extruders + col]);
+        for (size_t row = 0; row < num_extruders; ++row)
+            std::swap(matrix[row * num_extruders + idx_a], matrix[row * num_extruders + idx_b]);
+    }
+
+    // Swap custom G-code extruder references (1-based)
+    const int ext_a = (int)idx_a + 1;
+    const int ext_b = (int)idx_b + 1;
+    for (auto& info : p->model.get_custom_gcode_per_print_z_vector()) {
+        for (auto& item : info.gcodes) {
+            if (item.extruder == ext_a)
+                item.extruder = ext_b;
+            else if (item.extruder == ext_b)
+                item.extruder = ext_a;
+        }
+    }
+
+    // Refresh UI
+    p->sidebar->update_presets(Preset::TYPE_FILAMENT);
+    on_config_change(preset_bundle->full_config());
+    preset_bundle->export_selections(*wxGetApp().app_config);
+    schedule_background_process();
+}
+
 void Plater::force_filament_colors_update()
 {
     bool update_scheduled = false;

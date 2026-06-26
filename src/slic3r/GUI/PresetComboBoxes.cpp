@@ -898,6 +898,60 @@ void PlaterPresetComboBox::show_edit_menu()
         append_menu_item(menu, wxID_ANY, _L("Show/Hide template presets"), "",
             [](wxCommandEvent&) { wxGetApp().open_preferences("no_templates", "General"); }, "spool", menu, []() { return true; }, wxGetApp().plater());
 
+        // "Swap with..." submenu
+        const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
+        if (extruders_filaments.size() > 1) {
+            wxMenu* swap_menu = new wxMenu();
+
+            const auto& printer_config = wxGetApp().preset_bundle->printers.get_edited_preset().config;
+            std::vector<std::string> extruder_colors;
+            if (printer_config.has("extruder_colour"))
+                extruder_colors = printer_config.option<ConfigOptionStrings>("extruder_colour")->values;
+
+            for (size_t i = 0; i < extruders_filaments.size(); ++i) {
+                if ((int)i == m_extruder_idx)
+                    continue;
+
+                const Preset* preset = extruders_filaments[i].get_selected_preset();
+
+                // Build label: preset name with extruder number, or fallback
+                wxString label;
+                if (preset) {
+                    const std::string& display_name = preset->alias.empty() ? preset->name : preset->alias;
+                    label = from_u8(display_name) + wxString::Format(" (%d)", (int)(i + 1));
+                } else {
+                    label = wxString::Format(_L("Filament %d"), (int)(i + 1));
+                }
+
+                // Build dual-color icon (filament color + extruder color bar)
+                std::string filament_rgb = preset ? preset->config.opt_string("filament_colour", 0) : "";
+                std::string extruder_rgb = (i < extruder_colors.size() && !extruder_colors[i].empty())
+                    ? extruder_colors[i] : filament_rgb;
+
+                wxBitmapBundle* icon = nullptr;
+                if (!filament_rgb.empty()) {
+                    bool single_bar = (filament_rgb == extruder_rgb);
+                    std::string cache_key = "swap_menu_" + std::to_string(i) + "_" + filament_rgb + "_" + extruder_rgb;
+                    icon = bitmap_cache().find_bndl(cache_key);
+                    if (!icon) {
+                        std::vector<wxBitmapBundle*> bmps;
+                        bmps.emplace_back(get_solid_bmp_bundle(single_bar ? 24 : 16, 16, filament_rgb));
+                        if (!single_bar)
+                            bmps.emplace_back(get_solid_bmp_bundle(8, 16, extruder_rgb));
+                        icon = bitmap_cache().insert_bndl(cache_key, bmps);
+                    }
+                }
+
+                const int this_idx = m_extruder_idx;
+                append_menu_item(swap_menu, wxID_ANY, label, "",
+                    [this_idx, other_idx = (int)i](wxCommandEvent&) {
+                        wxGetApp().plater()->swap_filaments(this_idx, other_idx);
+                    }, icon, swap_menu, []() { return true; }, wxGetApp().plater());
+            }
+            append_submenu(menu, swap_menu, wxID_ANY, _L("Swap with"), "",
+                "switch_presets", []() { return true; }, wxGetApp().plater());
+        }
+
         wxGetApp().plater()->PopupMenu(menu);
         return;
     }
