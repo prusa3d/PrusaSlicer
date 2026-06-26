@@ -52,10 +52,15 @@ void convert_to_multipart_object(Model& model, unsigned int max_extruders)
             // Revert the centering operation.
             trafo_volume.set_offset(trafo_volume.get_offset() - o->origin_translation);
             int counter = 1;
-            auto copy_volume = [o, max_extruders, &counter, &extruder_counter](ModelVolume* new_v) {
+            auto copy_volume = [o, v, max_extruders, &counter, &extruder_counter](ModelVolume* new_v) {
                 assert(new_v != nullptr);
                 new_v->name = (counter > 1) ? o->name + "_" + std::to_string(counter++) : o->name;
-                new_v->config.set("extruder", auto_extruder_id(max_extruders, extruder_counter));
+                // respect existing extruder assignment, if it exists. otherwise, autoassign.
+                if ((v == nullptr) || (v->extruder_id() <= 0) || (static_cast<unsigned int>(v->extruder_id()) > max_extruders)) {
+                    new_v->config.set("extruder", auto_extruder_id(max_extruders, extruder_counter));
+                } else {
+                    new_v->config.set("extruder", v->extruder_id());
+                }
                 return new_v;
                 };
             if (o->instances.empty()) {
