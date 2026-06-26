@@ -12,10 +12,13 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/format.hpp>
-#include <boost/filesystem.hpp>
+#include <boost/process/v1/search_path.hpp>
+#include <boost/process/v1/filesystem.hpp>
 #include <boost/nowide/cstdlib.hpp>
 #include <boost/nowide/convert.hpp>
 #include <boost/nowide/fstream.hpp>
+#include <boost/process/v1/io.hpp>
+#include <boost/process/v1/child.hpp>
 
 #ifdef WIN32
 
@@ -152,9 +155,14 @@ static int run_script(const std::string &script, const std::string &gcode, std::
 
 #include <cstdlib>   // getenv()
 #include <sstream>
-#include <boost/process.hpp>
+#include <boost/process/v1/error.hpp>
+#include <boost/process/v1/io.hpp>
+#include <boost/process/v1/args.hpp>
+#include <boost/process/v1/spawn.hpp>
+#include <boost/process/v1/async_pipe.hpp>
+#include <boost/process/v1/async.hpp>
 
-namespace process = boost::process;
+namespace process = boost::process::v1;
 
 static int run_script(const std::string &script, const std::string &gcode, std::string &std_err)
 {
