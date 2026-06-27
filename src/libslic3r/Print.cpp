@@ -113,6 +113,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "extrusion_axis",
         "extruder_clearance_height",
         "extruder_clearance_radius",
+        "extruder_clearance_offset",
         "extruder_colour",
         "extruder_offset",
         "extrusion_multiplier",

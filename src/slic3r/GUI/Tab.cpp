@@ -2883,6 +2883,8 @@ void TabPrinter::build_fff()
         optgroup = page->new_optgroup(L("Sequential printing limits"));
         optgroup->append_single_option_line("extruder_clearance_radius");
         optgroup->append_single_option_line("extruder_clearance_height");
+        optgroup->append_single_option_line("extruder_clearance_offset");
+
 
     const int gcode_field_height = 15; // 150
     const int notes_field_height = 25; // 250

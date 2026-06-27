@@ -170,17 +170,20 @@ std::pair<std::optional<std::unique_ptr<GLModel>>, bool> GLCanvas3D::get_current
     static std::string last_printer_notes;
     static double old_r = 0.;
     static double old_h = 0.;
+    static Vec2d old_offset;
     static bool old_seq = false;
 
     std::string printer_notes = m_config->opt_string("printer_notes");
     double r = m_config->opt_float("extruder_clearance_radius");
     double h = m_config->opt_float("extruder_clearance_height");
+    const Vec2d offset = m_config->option<ConfigOptionPoints>("extruder_clearance_offset")->values[0];
     bool seq = m_config->opt_bool("complete_objects");
 
-    if (last_printer_notes != printer_notes ||  r != old_r || h != old_h || seq != old_seq) {
+    if (last_printer_notes != printer_notes ||  r != old_r || h != old_h || seq != old_seq || offset != old_offset) {
         last_printer_notes = printer_notes;
         old_r = r;
         old_h = h;
+        old_offset = offset;
         old_seq = seq;
 
         out.second = (printer_notes.find("PRINTER_MODEL_HT90") != std::string::npos);
@@ -211,13 +214,19 @@ std::pair<std::optional<std::unique_ptr<GLModel>>, bool> GLCanvas3D::get_current
         if (*(out.first) == nullptr && seq) {
             // Generic sequential extruder model.
             double gantry_height = 10;
-            auto mesh = its_make_cylinder(r, h + gantry_height - 0.001);
+            double nozzle_height = 3;
+            double nozzle_radius = std::min(2.0, r / 2);
             double d = 3 * wxGetApp().plater()->build_volume().bounding_volume2d().size().x();
-            auto mesh2 = its_make_cube(d,2*r, gantry_height);
-            its_translate(mesh2, Vec3f(-d/2, -r, h));
-            its_merge(mesh, mesh2);
+            auto gantry_mesh = its_make_cube(d,2*r, gantry_height);
+            auto toolhead_mesh = its_make_cylinder(r, h + gantry_height - 0.001);
+            its_translate(gantry_mesh, Vec3f(-d/2, -r, h));
+            its_merge(gantry_mesh, toolhead_mesh);
+
+            auto nozzle_mesh = its_make_cylinder(nozzle_radius, nozzle_height - 0.001);
+            its_translate(gantry_mesh, Vec3f(offset.x(),offset.y(), 0));
+            its_merge(nozzle_mesh, gantry_mesh);
             std::unique_ptr<GLModel> m = std::make_unique<GLModel>();
-            m->init_from(mesh);
+            m->init_from(nozzle_mesh);
             out.first = std::make_optional(std::move(m));
         }
     }

@@ -115,10 +115,13 @@ static Sequential::PrinterGeometry get_printer_geometry(const ConfigBase& config
 			// Fallback to primitive model using radius and height.
 			coord_t r = scaled(std::max(0.1, config.opt_float("extruder_clearance_radius")));
 			coord_t h = scaled(std::max(0.1, config.opt_float("extruder_clearance_height")));
+			const ConfigOptionPoints* extruder_offset = config.option<ConfigOptionPoints>("extruder_clearance_offset");
+			coord_t offset_x = scaled(extruder_offset->values[0].x());
+			coord_t offset_y = scaled(extruder_offset->values[0].y());
 			double bed_x = bv.bounding_volume2d().size().x();
 			double bed_y = bv.bounding_volume2d().size().y();
 			slices.push_back(ExtruderSlice{ 0, CONVEX, { { {  -5000000,   -5000000 }, {   5000000,   -5000000 }, {   5000000,   5000000 }, {  -5000000,   5000000 } } } });
-			slices.push_back(ExtruderSlice{ 1000000, BOX, { { {  -r, -r }, { r, -r }, {   r,   r }, {  -r,  r } } } });
+			slices.push_back(ExtruderSlice{ 1000000, BOX, { { {  -r + offset_x, -r + offset_y }, { r + offset_x, -r + offset_y }, { r + offset_x, r + offset_y }, { -r + offset_x, r + offset_y } } } });
 			slices.push_back(ExtruderSlice{ h, BOX, { { { -scaled(bed_x),  -r }, { scaled(bed_x),  -r }, { scaled(bed_x), r }, { -scaled(bed_x), r}}} });
 		}
 	}
