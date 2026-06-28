@@ -40,6 +40,13 @@ void ProjectDirtyStateManager::update_from_presets()
         auto type = preset_collection->type();
         m_presets_dirty |= (has_project && !m_initial_presets[type].empty() && m_initial_presets[type] != preset_collection->get_selected_preset_name()) || preset_collection->saved_is_dirty();
     }
+
+    // check for per-extruder filament selection changes
+    m_filament_presets_dirty = false;
+    const auto& efs = app.preset_bundle->extruders_filaments;
+    for (size_t i = 0; i < std::min(efs.size(), m_initial_filament_presets.size()); ++i)
+        m_filament_presets_dirty |= efs[i].get_selected_preset_name() != m_initial_filament_presets[i];
+
     m_project_config_dirty = m_initial_project_config != app.preset_bundle->project_config;
     app.mainframe->update_title();
 }
@@ -61,6 +68,7 @@ void ProjectDirtyStateManager::reset_after_save()
     this->reset_initial_presets();
     m_plater_dirty  = false;
     m_presets_dirty = false;
+    m_filament_presets_dirty = false;
     m_project_config_dirty = false;
     m_custom_gcode_per_print_z_dirty = false;
     wxGetApp().mainframe->update_title();
@@ -72,6 +80,10 @@ void ProjectDirtyStateManager::reset_initial_presets()
     GUI_App &app = wxGetApp();
     for (const PresetCollection *preset_collection : app.get_active_preset_collections())
         m_initial_presets[preset_collection->type()] = preset_collection->get_selected_preset_name();
+    m_initial_filament_presets.clear();
+    for (const auto& ef : app.preset_bundle->extruders_filaments)
+        m_initial_filament_presets.push_back(ef.get_selected_preset_name());
+
     m_initial_project_config = app.preset_bundle->project_config;
     m_initial_custom_gcode_per_print_z = app.model().custom_gcode_per_print_z();
 }

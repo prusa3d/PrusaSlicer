@@ -942,9 +942,11 @@ void Sidebar::on_select_preset(wxCommandEvent& evt)
             const std::string& old_name = wxGetApp().preset_bundle->filaments.get_edited_preset().name;
                                           wxGetApp().preset_bundle->set_filament_preset(idx, old_name);
         }
-        else
+        else {
             // Synchronize config.ini with the current selections.
             wxGetApp().preset_bundle->export_selections(*wxGetApp().app_config);
+            m_plater->update_project_dirty_from_presets();
+        }
         combo->update();
     }
     else if (select_preset) {

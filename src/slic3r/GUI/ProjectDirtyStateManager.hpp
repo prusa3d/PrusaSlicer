@@ -20,7 +20,7 @@ public:
     void reset_after_save();
     void reset_initial_presets();
 
-    bool is_dirty() const { return m_plater_dirty || m_project_config_dirty || m_presets_dirty || m_custom_gcode_per_print_z_dirty; }
+    bool is_dirty() const { return m_plater_dirty || m_project_config_dirty || m_presets_dirty || m_filament_presets_dirty || m_custom_gcode_per_print_z_dirty; }
     bool is_presets_dirty() const { return m_presets_dirty; }
 
 #if ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
@@ -34,10 +34,14 @@ private:
     bool                                        m_presets_dirty { false };
     // Is the project config dirty?
     bool                                        m_project_config_dirty { false };
+    // Have per-extruder filament selections changed?
+    bool                                        m_filament_presets_dirty { false };
     // Is the custom_gcode_per_print_z dirty?
     bool                                        m_custom_gcode_per_print_z_dirty { false };
     // Keeps track of preset names selected at the time of last project save.
     std::array<std::string, Preset::TYPE_COUNT> m_initial_presets;
+    // Keeps track of per-extruder filament preset names at the time of last project save.
+    std::vector<std::string>                    m_initial_filament_presets;
     DynamicPrintConfig                          m_initial_project_config;
     CustomGCode::Info                           m_initial_custom_gcode_per_print_z;
 };
