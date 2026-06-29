@@ -39,6 +39,7 @@
 #include "../Utils/FixModelByWin10.hpp"
 #include "../Utils/UndoRedo.hpp"
 #include "../Utils/ServiceConfig.hpp"
+#include "../Utils/3DPrinterOS.hpp"
 #include "RemovableDriveManager.hpp"
 #include "BitmapCache.hpp"
 #include "BonjourDialog.hpp"
@@ -432,6 +433,34 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
         return sizer;
     };
 
+    auto print_host_logout = [&](wxWindow *parent) {
+        auto sizer = create_sizer_with_btn(parent, &m_printhost_logout_btn, "", _L("Log Out"));
+
+        m_printhost_logout_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent &e) {
+            std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
+            if (!host) {
+                const wxString text = _L("Could not get a valid Printer Host reference");
+                show_error(this, text);
+                return;
+            }
+
+            wxString msg_text = _L("Are you sure to log out?");
+            MessageDialog dialog(this, msg_text, "", wxICON_QUESTION | wxYES_NO);
+
+            if (dialog.ShowModal() == wxID_YES) {
+                host->log_out();
+                // update();
+                update_printhost_buttons();
+                this->Fit();
+                this->Layout();
+#ifdef __WXMSW__
+                this->Refresh();
+#endif
+            }
+        });
+        return sizer;
+    };
+
     auto print_host_printers = [this, create_sizer_with_btn](wxWindow* parent) {
         //add_scaled_button(parent, &m_printhost_port_browse_btn, "browse", _(L("Refresh Printers")), wxBU_LEFT | wxBU_EXACTFIT);
         auto sizer = create_sizer_with_btn(parent, &m_printhost_port_browse_btn, "browse", _(L("Refresh Printers")));
@@ -461,6 +490,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     Line host_line = m_optgroup->create_single_option_line(option);
     host_line.append_widget(printhost_browse);
     host_line.append_widget(print_host_test);
+    host_line.append_widget(print_host_logout);
     m_optgroup->append_line(host_line);
 
     m_optgroup->append_single_option_line("printhost_authorization_type");
@@ -621,6 +651,11 @@ void PhysicalPrinterDialog::update_printhost_buttons()
     std::unique_ptr<PrintHost> host(PrintHost::get_print_host(m_config));
     m_printhost_test_btn->Enable(!m_config->opt_string("print_host").empty() && host->can_test());
     m_printhost_browse_btn->Enable(host->has_auto_discovery());
+    if (host) {
+        m_printhost_browse_btn->Show(host->has_auto_discovery());
+        m_printhost_logout_btn->Show(host->is_logged_in());
+        m_printhost_test_btn->SetLabel(host->is_cloud() ? _L("Login/Test") : _L("Test"));
+    }
 }
 
 void PhysicalPrinterDialog::update(bool printer_change)
@@ -658,12 +693,23 @@ void PhysicalPrinterDialog::update(bool printer_change)
                 m_stored_host = printhost_win->GetValue();
                 printhost_win->SetValue(from_u8(Utils::ServiceConfig::instance().connect_url()));
             }
+        } else if (opt->value == ht3DPrinterOS) {
+            // hide show hostname and 3DPrinterOS address
+            Field *printhost_field = m_optgroup->get_field("print_host");
+            m_optgroup->show_field("printhost_apikey", false);
+            text_ctrl *printhost_win = printhost_field ?
+                dynamic_cast<text_ctrl *>(printhost_field->getWindow()) :
+                nullptr;
+            if (!m_opened_as_connect && printhost_win && m_last_host_type != ht3DPrinterOS) {
+                m_stored_host = printhost_win->GetValue();
+                printhost_win->SetValue(from_u8(C3DPrinterOS::default_host()));
+            }
         } else {
             m_printhost_browse_btn->Show();
             // hide PrusaConnect address and show hostname
             Field* printhost_field = m_optgroup->get_field("print_host");
             text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
-            if (!m_opened_as_connect && printhost_win && m_last_host_type == htPrusaConnect) {
+            if (!m_opened_as_connect && printhost_win && (m_last_host_type == htPrusaConnect || m_last_host_type == ht3DPrinterOS)) {
                 wxString temp_host = printhost_win->GetValue();
                 printhost_win->SetValue(m_stored_host);
                 m_stored_host = temp_host;
