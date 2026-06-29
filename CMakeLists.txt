@@ -224,6 +224,13 @@ if(WIN32)
     endif()
 endif()
 
+# meshseal — option declaration only here; the FetchContent call moves
+# below add_subdirectory(bundled_deps) so PrusaSlicer's own `miniz`
+# target exists before meshseal runs. meshseal v0.1.2+ guards its
+# bundled-dep fetches with `if(NOT TARGET <name>)` and links against
+# the host's miniz instead.
+option(SLIC3R_MESHSEAL "Build with meshseal mesh-repair backend" ON)
+
 if (APPLE)
     message("OS X SDK Path: ${CMAKE_OSX_SYSROOT}")
     if (CMAKE_OSX_DEPLOYMENT_TARGET)
@@ -611,6 +618,33 @@ endfunction()
 
 add_subdirectory(build-utils)
 add_subdirectory(bundled_deps)
+
+# meshseal cross-platform mesh-repair backend.
+# Placed AFTER bundled_deps so PrusaSlicer's bundled `miniz` target
+# already exists; meshseal's `if(NOT TARGET miniz)` guard (v0.1.2+) then
+# skips its own miniz fetch and links against the host one.
+if (SLIC3R_MESHSEAL)
+    include(FetchContent)
+    FetchContent_Declare(meshseal
+        URL      https://github.com/jkavalik/meshseal/archive/refs/tags/v0.1.3.tar.gz
+        URL_HASH SHA256=5bca8b9051a21c6895284cba2cce130127a6bebfa5945af3c35c714efa0e6b4c
+    )
+    # Build meshseal as STATIC so it links into libslic3r_gui directly.
+    # SHARED was tried first but PrusaSlicer's bundled_deps/miniz is built
+    # without -fPIC (its CMake doesn't set POSITION_INDEPENDENT_CODE), so
+    # the static miniz archive can't be linked into a shared library on
+    # Linux. STATIC sidesteps the issue: meshseal becomes a static archive,
+    # libslic3r_gui pulls it in, the host's miniz is shared across both.
+    set(MESHSEAL_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(MESHSEAL_BUILD_CLI    OFF CACHE BOOL "" FORCE)
+    set(MESHSEAL_BUILD_TESTS  OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(meshseal)
+    add_definitions(-DHAS_MESHSEAL)
+    message("Building with meshseal cross-platform mesh-repair backend")
+else()
+    message("Building without meshseal mesh-repair backend (SLIC3R_MESHSEAL=OFF)")
+endif()
+
 # libslic3r, PrusaSlicer GUI and the PrusaSlicer executable.
 add_subdirectory(src)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT PrusaSlicer_app_console)

@@ -44,6 +44,7 @@
 #include <wx/bookctrl.h> // IWYU pragma: keep
 
 #include "slic3r/Utils/FixModelByWin10.hpp"
+#include "slic3r/Utils/FixModelByMeshseal.hpp"
 
 #ifdef __WXMSW__
 #include "wx/uiaction.h"
@@ -4746,6 +4747,61 @@ void ObjectList::fix_through_winsdk()
     // Show info notification
     wxString msg = MenuFactory::get_repaire_result_message(succes_models, failed_models);
     plater->get_notification_manager()->push_notification(NotificationType::RepairFinished, NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel, into_u8(msg));
+}
+
+void ObjectList::fix_through_meshseal()
+{
+    if (!wxGetApp().plater()->canvas3D()->get_gizmos_manager().check_gizmos_closed_except(GLGizmosManager::Undefined))
+        return;
+
+    std::vector<int> obj_idxs, vol_idxs;
+    get_selection_indexes(obj_idxs, vol_idxs);
+    if (obj_idxs.empty()) return;
+
+    auto plater = wxGetApp().plater();
+    Plater::TakeSnapshot snapshot(plater, _L("Fix by meshseal"));
+
+    wxProgressDialog progress_dlg(_L("Repairing by meshseal"), "", 100,
+        find_toplevel_parent(plater),
+        wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT);
+
+    std::vector<std::string> succes_models;
+    std::vector<std::pair<std::string, std::string>> failed_models;
+
+    auto do_fix = [&](int obj_idx, int vol_idx) {
+        const std::string name = vol_idx < 0
+            ? object(obj_idx)->name
+            : object(obj_idx)->volumes[vol_idx]->name;
+        plater->clear_before_change_mesh(obj_idx,
+            _u8L("Custom supports, seams, fuzzy skin and multimaterial painting "
+                 "were removed after repairing the mesh."));
+        std::string res;
+        wxString msg = _L("Repairing model") + ": " + from_u8(name) + "\n";
+        if (!fix_model_by_meshseal_gui(*object(obj_idx), vol_idx, progress_dlg, msg, res))
+            return false;
+        plater->changed_mesh(obj_idx);
+        if (res.empty()) succes_models.push_back(name);
+        else             failed_models.push_back({ name, res });
+        update_item_error_icon(obj_idx, vol_idx);
+        update_info_items(obj_idx);
+        return true;
+    };
+
+    if (vol_idxs.empty()) {
+        for (int obj_idx : obj_idxs)
+            if (!do_fix(obj_idx, -1)) break;
+    } else {
+        int obj_idx = obj_idxs.front();
+        for (int vol_idx : vol_idxs)
+            if (!do_fix(obj_idx, vol_idx)) break;
+    }
+    progress_dlg.Update(100, "");
+
+    wxString msg = MenuFactory::get_repaire_result_message(succes_models, failed_models);
+    plater->get_notification_manager()->push_notification(
+        NotificationType::RepairFinished,
+        NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel,
+        into_u8(msg));
 }
 
 void ObjectList::simplify()

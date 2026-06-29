@@ -24,6 +24,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include "slic3r/Utils/FixModelByWin10.hpp"
+#include "slic3r/Utils/FixModelByMeshseal.hpp"
 #ifdef __APPLE__
 #include "wx/dcclient.h"
 #include "slic3r/Utils/MacDarkMode.hpp"
@@ -876,9 +877,22 @@ wxMenuItem* MenuFactory::append_menu_item_fix_through_winsdk(wxMenu* menu)
         return nullptr;
     wxMenuItem* menu_item = append_menu_item(menu, wxID_ANY, _L("Fix by Windows repair algorithm"), "",
         [](wxCommandEvent&) { obj_list()->fix_through_winsdk(); }, "", menu,
-        []() {return plater()->can_fix_through_winsdk(); }, m_parent);
+        []() { return plater()->can_fix_through_winsdk(); }, m_parent);
 
     return menu_item;
+}
+
+wxMenuItem* MenuFactory::append_menu_item_fix_through_meshseal(wxMenu* menu)
+{
+#ifdef HAS_MESHSEAL
+    wxMenuItem* menu_item = append_menu_item(menu, wxID_ANY, _L("Fix by meshseal"), "",
+        [](wxCommandEvent&) { obj_list()->fix_through_meshseal(); }, "", menu,
+        []() { return plater()->can_fix_through_meshseal(); }, m_parent);
+    return menu_item;
+#else
+    (void)menu;
+    return nullptr;
+#endif
 }
 
 wxMenuItem* MenuFactory::append_menu_item_simplify(wxMenu* menu)
@@ -1199,6 +1213,7 @@ void MenuFactory::create_common_object_menu(wxMenu* menu)
     append_menu_item_scale_selection_to_fit_print_volume(menu);
 
     append_menu_item_fix_through_winsdk(menu);
+    append_menu_item_fix_through_meshseal(menu);
     append_menu_item_simplify(menu);
     append_menu_items_mirror(menu);
 
@@ -1248,6 +1263,7 @@ void MenuFactory::create_part_menu()
     append_menu_item_replace_with_stl(menu);
     append_menu_item_export_stl(menu);
     append_menu_item_fix_through_winsdk(menu);
+    append_menu_item_fix_through_meshseal(menu);
     append_menu_item_simplify(menu);
 
     append_menu_item(menu, wxID_ANY, _L("Split"), _L("Split the selected object into individual parts"),
@@ -1264,6 +1280,7 @@ void MenuFactory::create_text_part_menu()
     append_menu_item_edit_text(menu);
     append_menu_item_delete(menu);
     append_menu_item_fix_through_winsdk(menu);
+    append_menu_item_fix_through_meshseal(menu);
     append_menu_item_simplify(menu);
 
     append_immutable_part_menu_items(menu);
@@ -1276,6 +1293,7 @@ void MenuFactory::create_svg_part_menu()
     append_menu_item_edit_svg(menu);
     append_menu_item_delete(menu);
     append_menu_item_fix_through_winsdk(menu);
+    append_menu_item_fix_through_meshseal(menu);
     append_menu_item_simplify(menu);
 
     append_immutable_part_menu_items(menu);
@@ -1389,6 +1407,7 @@ wxMenu* MenuFactory::multi_selection_menu()
     wxMenu* menu = new MenuWithSeparators();
 
     append_menu_item_fix_through_winsdk(menu);
+    append_menu_item_fix_through_meshseal(menu);
     append_menu_item_reload_from_disk(menu);
     append_menu_items_convert_unit(menu);
     if (obj_list()->can_merge_to_multipart_object())

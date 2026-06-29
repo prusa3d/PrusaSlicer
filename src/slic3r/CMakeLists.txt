@@ -356,6 +356,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/Http.hpp
     Utils/FixModelByWin10.cpp
     Utils/FixModelByWin10.hpp
+    Utils/FixModelByMeshseal.cpp
+    Utils/FixModelByMeshseal.hpp
     Utils/Jwt.cpp
     Utils/Jwt.hpp
     Utils/Moonraker.cpp
@@ -470,6 +472,14 @@ target_link_libraries(
     fastfloat
     boost_headeronly
 )
+
+if (SLIC3R_MESHSEAL)
+    # meshseal is a shared library (MESHSEAL_BUILD_SHARED=ON) fetched via
+    # FetchContent at top level (CMakeLists.txt). Link conditionally so a
+    # build with -DSLIC3R_MESHSEAL=OFF still compiles (FixModelByMeshseal
+    # then becomes a no-op stub via the HAS_MESHSEAL gate in its header).
+    target_link_libraries(libslic3r_gui PUBLIC meshseal)
+endif ()
 
 if (MSVC)
     target_link_libraries(libslic3r_gui PUBLIC Setupapi.lib)

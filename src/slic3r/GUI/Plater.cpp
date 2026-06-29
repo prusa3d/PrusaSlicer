@@ -617,6 +617,7 @@ struct Plater::priv
     bool can_arrange() const;
     bool can_layers_editing() const;
     bool can_fix_through_winsdk() const;
+    bool can_fix_through_meshseal() const;
     bool can_simplify() const;
     bool can_set_instance_to_object() const;
     bool can_mirror() const;
@@ -4054,6 +4055,15 @@ bool Plater::priv::can_fix_through_winsdk() const
             return true;
     return false;
 #endif // FIX_THROUGH_WINSDK_ALWAYS
+}
+
+bool Plater::priv::can_fix_through_meshseal() const
+{
+    // Same selection / error-count gate as the WinSDK path. meshseal is
+    // available on all platforms, so no platform check needed; the
+    // HAS_MESHSEAL guard in the called code path handles the
+    // build-time opt-out.
+    return can_fix_through_winsdk();
 }
 
 bool Plater::priv::can_simplify() const
@@ -7749,6 +7759,7 @@ bool Plater::can_increase_instances() const { return p->can_increase_instances()
 bool Plater::can_decrease_instances(int obj_idx/* = -1*/) const { return p->can_decrease_instances(obj_idx); }
 bool Plater::can_set_instance_to_object() const { return p->can_set_instance_to_object(); }
 bool Plater::can_fix_through_winsdk() const { return p->can_fix_through_winsdk(); }
+bool Plater::can_fix_through_meshseal() const { return p->can_fix_through_meshseal(); }
 bool Plater::can_simplify() const { return p->can_simplify(); }
 bool Plater::can_split_to_objects() const { return p->can_split_to_objects(); }
 bool Plater::can_split_to_volumes() const { return p->can_split_to_volumes(); }
