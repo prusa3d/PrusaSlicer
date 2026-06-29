@@ -286,7 +286,6 @@ void TopBarItemsCtrl::CreateSearch()
     ctrl->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event)
     {
         TriggerSearch();
-        event.Skip();
     });
 
     ctrl->Bind(wxEVT_LEFT_UP, [this](wxMouseEvent& event)
