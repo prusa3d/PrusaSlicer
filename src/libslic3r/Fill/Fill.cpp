@@ -95,6 +95,8 @@ struct SurfaceFillParams
 	// Index of this entry in a linear vector.
     size_t 			idx = 0;
 
+    // For Gyroid: when true, use the parameterized "optimized" variant.
+    bool gyroid_optimized = false;
 
 	bool operator<(const SurfaceFillParams &rhs) const {
 #define RETURN_COMPARE_NON_EQUAL(KEY) if (this->KEY < rhs.KEY) return true; if (this->KEY > rhs.KEY) return false;
@@ -117,6 +119,7 @@ struct SurfaceFillParams
 		RETURN_COMPARE_NON_EQUAL(flow.height());
 		RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter());
 		RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, bridge);
+		RETURN_COMPARE_NON_EQUAL(gyroid_optimized);
 		return this->extrusion_role.lower(rhs.extrusion_role);
 	}
 
@@ -133,7 +136,8 @@ struct SurfaceFillParams
 				this->anchor_length  	== rhs.anchor_length    &&
 				this->anchor_length_max == rhs.anchor_length_max &&
 				this->flow 				== rhs.flow 			&&
-				this->extrusion_role	== rhs.extrusion_role;
+				this->extrusion_role	== rhs.extrusion_role   &&
+				this->gyroid_optimized  == rhs.gyroid_optimized;
 	}
 };
 
@@ -173,6 +177,9 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        params.extruder 	 = layerm.region().extruder(extrusion_role);
 		        params.pattern 		 = region_config.fill_pattern.value;
 		        params.density       = float(region_config.fill_density);
+		        // Pass gyroid_optimized through only when the effective pattern is Gyroid,
+		        // so non-Gyroid fills are not differentiated by an irrelevant flag.
+		        params.gyroid_optimized = (params.pattern == ipGyroid) && region_config.gyroid_optimized;
 
 		        if (surface.is_solid()) {
 		            params.density = 100.f;
@@ -547,6 +554,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         params.use_arachne                = (perimeter_generator == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) || surface_fill.params.pattern == ipEnsuring;
         params.layer_height               = layerm.layer()->height;
         params.prefer_clockwise_movements = this->object()->print()->config().prefer_clockwise_movements;
+        params.gyroid_optimized           = surface_fill.params.gyroid_optimized;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
 			// Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.
@@ -735,6 +743,7 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         params.resolution        = resolution;
         params.use_arachne       = false;
         params.layer_height      = layerm.layer()->height;
+        params.gyroid_optimized  = surface_fill.params.gyroid_optimized;
 
         for (ExPolygon &expoly : surface_fill.expolygons) {
             // Spacing is modified by the filler to indicate adjustments. Reset it for each expolygon.

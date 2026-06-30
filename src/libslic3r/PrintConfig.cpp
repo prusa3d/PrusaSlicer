@@ -1665,6 +1665,20 @@ void PrintConfigDef::init_fff_params()
     });
     def->set_default_value(new ConfigOptionEnum<InfillPattern>(ipStars));
 
+    // Z-buckling bias optimization (experimental). Tightens the gyroid wave along the Z
+    // (vertical) axis at low infill density to shorten the effective column length under
+    // Z-axis compression. Filament use at the same `fill_density` setting is preserved.
+    // No effect above ~30% density (formula clamps to no-op).
+    def = this->add("gyroid_optimized", coBool);
+    def->label    = L("Z-buckling bias optimization (experimental)");
+    def->category = L("Infill");
+    def->tooltip  = L("Tightens the gyroid wave along the Z (vertical) axis at low infill density "
+                      "to shorten the effective vertical column length and improve Z-axis compression "
+                      "buckling resistance. Filament use is preserved. No effect at ~30% fill density "
+                      "and above. Only applies when Fill pattern is set to Gyroid.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("first_layer_acceleration", coFloat);
     def->label = L("First layer");
     def->tooltip = L("This is the acceleration your printer will use for first layer. Set zero "

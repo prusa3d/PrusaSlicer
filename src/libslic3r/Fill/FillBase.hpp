@@ -88,6 +88,9 @@ struct FillParams
 
     // For infills that produce closed loops to force printing those loops clockwise.
     bool        prefer_clockwise_movements { false };
+
+    // For Gyroid: when true, use the parameterized "optimized" variant.
+    bool        gyroid_optimized { false };
 };
 static_assert(IsTriviallyCopyable<FillParams>::value, "FillParams class is not POD (and it should be - see constructor).");
 
