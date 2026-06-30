@@ -7,7 +7,11 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/scalable_allocator.h>
+#endif
 #include <boost/container/vector.hpp>
 #include <memory>
 #include <algorithm>

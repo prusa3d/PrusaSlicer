@@ -13,10 +13,17 @@
 #include "TreeModelVolumes.hpp"
 
 #include <boost/log/trivial.hpp>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
 #include <oneapi/tbb/task_arena.h>
 #include <oneapi/tbb/task_group.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/task_arena.h>
+#include <tbb/task_group.h>
+#endif
 #include <algorithm>
 #include <chrono>
 #include <limits>

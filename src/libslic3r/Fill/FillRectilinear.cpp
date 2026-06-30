@@ -9,7 +9,11 @@
 ///|/
 #include <boost/container/small_vector.hpp>
 #include <boost/log/trivial.hpp>
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/scalable_allocator.h>
+#endif
 #include <boost/container/vector.hpp>
 #include <algorithm>
 #include <cmath>

@@ -39,7 +39,11 @@
 
 #include <Eigen/Geometry> 
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/scalable_allocator.h>
+#else
+#include <tbb/scalable_allocator.h>
+#endif
 
 #define CLIPPER_VERSION "6.2.6"
 

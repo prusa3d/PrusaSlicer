@@ -1,8 +1,13 @@
 #ifndef libslic3r_SeamGeometry_hpp_
 #define libslic3r_SeamGeometry_hpp_
 
+#if TBB_VERSION_MAJOR >= 2021
 #include <oneapi/tbb/blocked_range.h>
 #include <oneapi/tbb/parallel_for.h>
+#else
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#endif
 #include <vector>
 #include <algorithm>
 #include <cstddef>
