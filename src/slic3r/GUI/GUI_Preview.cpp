@@ -806,7 +806,7 @@ void Preview::update_sliders_from_canvas(wxKeyEvent& event)
         m_layers_slider->add_current_tick();
     else if (can_edit && (key == WXK_NUMPAD_SUBTRACT || key == WXK_DELETE || key == WXK_BACK || key == '-'))
         m_layers_slider->delete_current_tick();
-    else if (key == 'G' || key == 'g')
+    else if ((key == 'G' || key == 'g') && !event.HasModifiers())
         m_layers_slider->jump_to_value();
     else if (key == WXK_LEFT || key == WXK_RIGHT || key == WXK_UP || key == WXK_DOWN) {
         int delta = 1;
