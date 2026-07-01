@@ -5,6 +5,7 @@
 #include <wx/panel.h>
 
 #include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/Accessibility.hpp"
 
 BEGIN_EVENT_TABLE(TextInput, wxPanel)
 
@@ -55,6 +56,11 @@ void TextInput::Create(wxWindow *     parent,
 
     state_handler.attach({&label_color, &text_color});
     state_handler.update_binds();
+
+    if(Slic3r::GUI::Accessibility::IsLabelAvailable())
+        wxStaticText *virtualLabel = new wxStaticText(
+            this, wxID_ANY, Slic3r::GUI::Accessibility::GetLastLabelString(), wxDefaultPosition, wxSize(0, 0), wxST_NO_AUTORESIZE
+        );
 
     text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {4, 4}, size, style | wxBORDER_NONE);
 #ifdef __WXOSX__

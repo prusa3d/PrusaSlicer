@@ -4,6 +4,7 @@
 #include "UIColors.hpp"
 
 #include "../GUI_App.hpp"
+#include "../Accessibility.hpp"
 
 #include <wx/dcgraph.h>
 #include <wx/panel.h>
@@ -286,6 +287,10 @@ void SpinInput::Create(wxWindow *parent,
     state_handler.attach({&label_color, &text_color});
     state_handler.update_binds();
 
+    if(Slic3r::GUI::Accessibility::IsLabelAvailable())
+        wxStaticText *virtualLabel = new wxStaticText(
+            this, wxID_ANY, Slic3r::GUI::Accessibility::GetLastLabelString(), wxDefaultPosition, wxSize(0, 0), wxST_NO_AUTORESIZE
+        );
     text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {20, 4}, wxDefaultSize, style | wxBORDER_NONE | wxTE_PROCESS_ENTER, wxTextValidator(wxFILTER_NUMERIC));
 #ifdef __WXOSX__
     text_ctrl->OSXDisableAllSmartSubstitutions();
