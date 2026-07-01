@@ -8,6 +8,7 @@
 #include "SL1.hpp"
 #include "SL1_SVG.hpp"
 #include "AnycubicSLA.hpp"
+#include "JXS.hpp"
 #include "libslic3r/I18N.hpp"
 #include "SLAArchiveFormatRegistry.hpp"
 #include "libslic3r/Format/SLAArchiveReader.hpp"
@@ -45,6 +46,16 @@ class Registry {
                 [] (const auto &cfg) { return std::make_unique<SL1_SVGArchive>(cfg); },
                 [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) {
                     return std::make_unique<SL1_SVGReader>(fname, quality, progr);
+                }
+            },
+            {
+                "JXS",
+                L("JXS archive (JuXin Slicer)"),
+                "jxs",
+                {},
+                [] (const auto &cfg) { return std::make_unique<JXSArchive>(cfg); },
+                [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) {
+                    return std::make_unique<JXSReader>(fname, quality, progr);
                 }
             },
             anycubic_sla_format("pwmo", "Photon Mono"),
