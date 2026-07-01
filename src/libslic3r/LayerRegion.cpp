@@ -983,5 +983,23 @@ void LayerRegion::export_region_fill_surfaces_to_svg_debug(const char *name) con
     this->export_region_fill_surfaces_to_svg(debug_out_path("LayerRegion-fill_surfaces-%s-%d.svg", name, idx ++).c_str());
 }
 
+
+bool LayerRegion::needs_bridge_over_infill() const
+{
+    // Minimum width of voids in sparse infill for the layer above to be treated as a bridge.
+    // Scaled based on layer height, with a 3mm void at 0.2mm layer height as the baseline.
+    const float min_void_width = bridging_flow(frSolidInfill, true).scaled_width() * 3.f * m_layer->height / 0.2;
+
+    const float fill_density = region().config().fill_density.value / 100.0;
+    if (fill_density > 0.0) {
+        // Estimate the infill void width from infill density and extrusion width.
+        const float infill_extrusion_width = flow(frInfill).scaled_width();
+        if (min_void_width > (infill_extrusion_width / fill_density - infill_extrusion_width))
+            return false;
+    }
+
+    return true;
+}
+
 }
  
