@@ -568,8 +568,7 @@ static int buspirate_start_mode_bin(struct programmer_t *pgm)
 	memset(buf, 0, sizeof(buf));
 	buspirate_recv_bin(pgm, buf, 4);
 	if (sscanf((const char*)buf, submode->entered_format, &PDATA(pgm)->submode_version) != 1) {
-		avrdude_message(MSG_INFO, "%s mode not confirmed: '%s'\n",
-		                submode->name, buf);
+		avrdude_message(MSG_INFO, "BusPirate submode not confirmed: '%s'\n", buf);
 		buspirate_reset_from_binmode(pgm);
 		return -1;
 	}

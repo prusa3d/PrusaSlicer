@@ -428,7 +428,7 @@ void ReversePolyPtLinks(OutPt *pp)
 
 inline void InitEdge(TEdge* e, TEdge* eNext, TEdge* ePrev, const IntPoint& Pt)
 {
-  std::memset(e, 0, sizeof(TEdge));
+  *e = TEdge();
   e->Next = eNext;
   e->Prev = ePrev;
   e->Curr = Pt;
@@ -786,7 +786,7 @@ bool ClipperBase::AddPathInternal(const Path &pg, int highI, PolyType PolyTyp, b
     throw clipperException("AddPath: Open paths have been disabled.");
 #endif
 
-  assert(highI >= 0 && highI < pg.size());
+  assert(highI >= 0 && static_cast<decltype(pg.size())>(highI) < pg.size());
 
   //1. Basic (first) edge initialization ...
   try
