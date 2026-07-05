@@ -109,7 +109,7 @@ static FILE* stl_open_count_facets(stl_file *stl, const char *file)
 		// do another null check to be safe
     	if (fp == nullptr) {
 			BOOST_LOG_TRIVIAL(error) << "stl_open_count_facets: Couldn't open " << file << " for reading";
-      		fclose(fp);
+      		//fclose(fp);
       		return nullptr;
     	}
     
