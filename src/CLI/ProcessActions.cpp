@@ -35,9 +35,12 @@
 #include "libslic3r/PNGReadWrite.hpp"
 #include "libslic3r/MultipleBeds.hpp"
 #include "libslic3r/BuildVolume.hpp"
+#include "libslic3r/Utils.hpp"
 
 #include "CLI/CLI.hpp"
 #include "CLI/ProfilesSharingUtils.hpp"
+
+#include "CLIThumbnailRenderer.hpp"
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize2.h"
@@ -199,7 +202,10 @@ static ThumbnailData resize_and_crop(const std::vector<unsigned char>& data, int
 }
 
 
-static std::function<ThumbnailsList(const ThumbnailsParams&)> get_thumbnail_generator_cli(const std::string& filename)
+static std::function<ThumbnailsList(const ThumbnailsParams&)> get_thumbnail_generator_cli(
+    const std::string& filename,
+    const Model& model,
+    const DynamicPrintConfig& print_config)
 {
     if (boost::iends_with(filename, ".3mf")) {
         return [filename](const ThumbnailsParams& params) {
@@ -249,7 +255,29 @@ static std::function<ThumbnailsList(const ThumbnailsParams&)> get_thumbnail_gene
         };
     }
 
-    return [](const ThumbnailsParams&) ->ThumbnailsList { return {}; };
+    // Non-3MF input: render thumbnails into an offscreen OpenGL context.
+    // On any failure (no GPU/driver, missing resources, bad shader), the
+    // renderer returns an empty list and the CLI proceeds unchanged from
+    // the pre-#7878 behaviour.
+    //
+    // Capture-by-reference is deliberate: `model` and `print_config` are the
+    // lambda caller's parameters, which alias `fff_print.model()` and the
+    // `print_config` local in process_actions(). Both outlive the callback.
+    // This lambda must only be invoked synchronously from within the same
+    // `export_gcode()` call that receives it; the 3MF branch above does not
+    // have this constraint because it captures by value.
+    return [&model, &print_config](const ThumbnailsParams& params) -> ThumbnailsList {
+        try {
+            return Slic3r::CLIThumbnails::render_thumbnails(
+                model, print_config, params, Slic3r::resources_dir());
+        } catch (const std::exception& ex) {
+            boost::nowide::cerr << "CLI thumbnail render failed: " << ex.what() << std::endl;
+            return {};
+        } catch (...) {
+            boost::nowide::cerr << "CLI thumbnail render failed: unknown exception" << std::endl;
+            return {};
+        }
+    };
 }
 
 static void update_instances_outside_state(Model& model, const DynamicPrintConfig& config)
@@ -387,7 +415,8 @@ bool process_actions(Data& cli, const DynamicPrintConfig& print_config, std::vec
                 if (printer_technology == ptFFF) {
                     // The outfile is processed by a PlaceholderParser.
                     const std::string input_file = fff_print.model().objects.empty() ? "" : fff_print.model().objects.front()->input_file;
-                    outfile = fff_print.export_gcode(outfile, nullptr, get_thumbnail_generator_cli(input_file));
+                    outfile = fff_print.export_gcode(outfile, nullptr,
+                        get_thumbnail_generator_cli(input_file, fff_print.model(), print_config));
                     outfile_final = fff_print.print_statistics().finalize_output_path(outfile);
                 }
                 else {

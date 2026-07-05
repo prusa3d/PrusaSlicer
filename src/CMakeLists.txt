@@ -22,6 +22,7 @@ endif ()
 add_subdirectory(slic3r-arrange)
 add_subdirectory(slic3r-arrange-wrapper)
 add_subdirectory(libseqarrange)
+add_subdirectory(libslic3r_cli_thumbnails)
 
 
 if (SLIC3R_GUI)
@@ -142,7 +143,7 @@ if (NOT WIN32 AND NOT APPLE)
 endif ()
 
 
-target_link_libraries(PrusaSlicer PRIVATE libslic3r libcereal slic3r-arrange-wrapper libseqarrange stb_image)
+target_link_libraries(PrusaSlicer PRIVATE libslic3r libcereal slic3r-arrange-wrapper libseqarrange libslic3r_cli_thumbnails stb_image)
 
 if (APPLE)
 #    add_compile_options(-stdlib=libc++)
