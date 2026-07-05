@@ -1157,20 +1157,40 @@ void PerimeterGenerator::process_arachne(
 
     if (lower_slices != nullptr && params.config.overhangs && params.config.extra_perimeters_on_overhangs &&
         params.config.perimeters > 0 && params.layer_id > params.object_config.raft_layers) {
-        // Generate extra perimeters on overhang areas, and cut them to these parts only, to save print time and material
-        auto [extra_perimeters, filled_area] = generate_extra_perimeters_over_overhangs(infill_areas,
-                                                                                        lower_slices_polygons_cache,
-                                                                                        loop_number + 1,
-                                                                                        params.overhang_flow, params.scaled_resolution,
-                                                                                        params.object_config, params.print_config);
-        if (!extra_perimeters.empty()) {
-            ExtrusionEntityCollection &this_islands_perimeters = static_cast<ExtrusionEntityCollection&>(*out_loops.entities.back());
-            ExtrusionEntitiesPtr       old_entities;
-            old_entities.swap(this_islands_perimeters.entities);
-            for (ExtrusionPaths &paths : extra_perimeters) 
-                this_islands_perimeters.append(std::move(paths));
-            append(this_islands_perimeters.entities, old_entities);
-            infill_areas = diff_ex(infill_areas, filled_area);
+        // Do not generate extra perimeters when the overhang is an horizontal
+        // bridge surface (i.e. almost the entire infill area is unsupported).
+        // In that case the surface should be handled as a bridge, not as a slanted
+        // wall overhang. We detect this by comparing the unsupported area to the
+        // total infill area: if the ratio is too high, skip.
+        const Polygons infill_polygons = to_polygons(infill_areas);
+        const Polygons overhang_polygons = diff(infill_polygons, lower_slices_polygons_cache);
+        const double infill_area_total = area(infill_polygons);
+        const double overhang_area_total = area(overhang_polygons);
+
+        // A slanted wall overhang has only a thin unsupported strip (typically <20% of
+        // infill area), while a near-horizontal bridge surface is almost entirely
+        // unsupported (typically >95%). A threshold of 80% reliably separates the two
+        // cases while staying robust to geometry noise from the nozzle-diameter expansion
+        // of lower_slices_polygons_cache.
+        static constexpr double HORIZONTAL_BRIDGE_AREA_THRESHOLD = 0.8;
+        const bool is_horizontal_bridge = infill_area_total > 0.0 &&
+            (overhang_area_total / infill_area_total) > HORIZONTAL_BRIDGE_AREA_THRESHOLD;
+
+        if (!is_horizontal_bridge) {
+            auto [extra_perimeters, filled_area] = generate_extra_perimeters_over_overhangs(
+                infill_areas, lower_slices_polygons_cache, loop_number + 1, params.overhang_flow,
+                params.scaled_resolution, params.object_config, params.print_config
+            );
+            if (!extra_perimeters.empty()) {
+                ExtrusionEntityCollection &this_islands_perimeters =
+                    static_cast<ExtrusionEntityCollection &>(*out_loops.entities.back());
+                ExtrusionEntitiesPtr old_entities;
+                old_entities.swap(this_islands_perimeters.entities);
+                for (ExtrusionPaths &paths : extra_perimeters)
+                    this_islands_perimeters.append(std::move(paths));
+                append(this_islands_perimeters.entities, old_entities);
+                infill_areas = diff_ex(infill_areas, filled_area);
+            }
         }
     }
     
@@ -1525,20 +1545,40 @@ void PerimeterGenerator::process_classic(
 
     if (lower_slices != nullptr && params.config.overhangs && params.config.extra_perimeters_on_overhangs &&
         params.config.perimeters > 0 && params.layer_id > params.object_config.raft_layers) {
-        // Generate extra perimeters on overhang areas, and cut them to these parts only, to save print time and material
-        auto [extra_perimeters, filled_area] = generate_extra_perimeters_over_overhangs(infill_areas,
-                                                                                        lower_slices_polygons_cache,
-                                                                                        loop_number + 1,
-                                                                                        params.overhang_flow, params.scaled_resolution,
-                                                                                        params.object_config, params.print_config);
-        if (!extra_perimeters.empty()) {
-            ExtrusionEntityCollection &this_islands_perimeters = static_cast<ExtrusionEntityCollection&>(*out_loops.entities.back());
-            ExtrusionEntitiesPtr       old_entities;
-            old_entities.swap(this_islands_perimeters.entities);
-            for (ExtrusionPaths &paths : extra_perimeters) 
-                this_islands_perimeters.append(std::move(paths));
-            append(this_islands_perimeters.entities, old_entities);
-            infill_areas = diff_ex(infill_areas, filled_area);
+        // Do not generate extra perimeters when the overhang is an horizontal
+        // bridge surface (i.e. almost the entire infill area is unsupported).
+        // In that case the surface should be handled as a bridge, not as a slanted
+        // wall overhang. We detect this by comparing the unsupported area to the
+        // total infill area: if the ratio is too high, skip.
+        const Polygons infill_polygons = to_polygons(infill_areas);
+        const Polygons overhang_polygons = diff(infill_polygons, lower_slices_polygons_cache);
+        const double infill_area_total = area(infill_polygons);
+        const double overhang_area_total = area(overhang_polygons);
+
+        // A slanted wall overhang has only a thin unsupported strip (typically <20% of
+        // infill area), while a near-horizontal bridge surface is almost entirely
+        // unsupported (typically >95%). A threshold of 80% reliably separates the two
+        // cases while staying robust to geometry noise from the nozzle-diameter expansion
+        // of lower_slices_polygons_cache.
+        static constexpr double HORIZONTAL_BRIDGE_AREA_THRESHOLD = 0.8;
+        const bool is_horizontal_bridge = infill_area_total > 0.0 &&
+            (overhang_area_total / infill_area_total) > HORIZONTAL_BRIDGE_AREA_THRESHOLD;
+
+        if (!is_horizontal_bridge) {
+            auto [extra_perimeters, filled_area] = generate_extra_perimeters_over_overhangs(
+                infill_areas, lower_slices_polygons_cache, loop_number + 1, params.overhang_flow,
+                params.scaled_resolution, params.object_config, params.print_config
+            );
+            if (!extra_perimeters.empty()) {
+                ExtrusionEntityCollection &this_islands_perimeters =
+                    static_cast<ExtrusionEntityCollection &>(*out_loops.entities.back());
+                ExtrusionEntitiesPtr old_entities;
+                old_entities.swap(this_islands_perimeters.entities);
+                for (ExtrusionPaths &paths : extra_perimeters)
+                    this_islands_perimeters.append(std::move(paths));
+                append(this_islands_perimeters.entities, old_entities);
+                infill_areas = diff_ex(infill_areas, filled_area);
+            }
         }
     }
     
