@@ -92,6 +92,27 @@ void AppConfig::set_defaults()
         if (get("export_sources_full_pathnames").empty())
             set("export_sources_full_pathnames", "0");
 
+        // Optional loopback HTTP endpoint for receiving model files from external
+        // tools (e.g. a browser CAD app). Off by default; loopback only.
+        if (get("enable_local_import_server").empty())
+            set("enable_local_import_server", "0");
+        // When enabled, callers must present a matching "X-Prusa-Token" header. A
+        // random key is generated into local_import_token on first enable.
+        if (get("local_import_require_key").empty())
+            set("local_import_require_key", "0");
+        // Loopback bind address. Defaults to 127.0.0.1. A dedicated address from
+        // the 127.0.0.0/8 block (e.g. to avoid colliding with other tools on a
+        // shared port) is allowed, but on macOS/Windows it must first be assigned
+        // to the loopback interface (PrusaSlicer never does this itself).
+        if (get("local_import_bind_address").empty())
+            set("local_import_bind_address", "127.0.0.1");
+        if (get("local_import_server_port").empty())
+            set("local_import_server_port", "8126");
+        if (get("local_import_allowed_origin").empty())
+            set("local_import_allowed_origin", "");
+        if (get("local_import_token").empty())
+            set("local_import_token", "");
+
 #ifdef _WIN32
         if (get("associate_3mf").empty())
             set("associate_3mf", "0");

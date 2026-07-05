@@ -48,6 +48,9 @@ namespace GUI{
 
 class RemovableDriveManager;
 class OtherInstanceMessageHandler;
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+class LocalImportServer;
+#endif
 class MainFrame;
 class Sidebar;
 class ObjectManipulation;
@@ -190,7 +193,10 @@ private:
     std::unique_ptr<AppUpdater>                     m_app_updater;
     std::unique_ptr<wxSingleInstanceChecker>        m_single_instance_checker;
     std::unique_ptr<Downloader>                     m_downloader;
-    
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+    std::unique_ptr<LocalImportServer>              m_local_import_server;
+#endif
+
     std::string m_instance_hash_string;
 	size_t m_instance_hash_int;
 
@@ -372,6 +378,11 @@ public:
 	OtherInstanceMessageHandler* other_instance_message_handler() { return m_other_instance_message_handler.get(); }
     wxSingleInstanceChecker* single_instance_checker() {return m_single_instance_checker.get();}
 
+#ifdef SLIC3R_LOCAL_IMPORT_SERVER
+	// (Re)start or stop the optional loopback model-import server to match the
+	// current AppConfig settings. Safe to call repeatedly.
+	void        start_local_import_server_if_enabled();
+#endif
 	void        init_single_instance_checker(const std::string &name, const std::string &path);
 	void        set_instance_hash (const size_t hash) { m_instance_hash_int = hash; m_instance_hash_string = std::to_string(hash); }
     std::string get_instance_hash_string ()           { return m_instance_hash_string; }
