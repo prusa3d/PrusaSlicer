@@ -623,6 +623,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         if (*line_end == '\n')
             ++ line_end;
         CoolingLine line(0, line_start - gcode.c_str(), line_end - gcode.c_str());
+        if (line.length() == 0)
+            continue; // Empty line.
         if (boost::starts_with(sline, "G0 "))
             line.type = CoolingLine::TYPE_G0;
         else if (boost::starts_with(sline, "G1 "))

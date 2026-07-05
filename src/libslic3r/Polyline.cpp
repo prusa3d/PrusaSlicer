@@ -401,9 +401,18 @@ void ThickPolyline::clip_end(double distance)
 
 void ThickPolyline::start_at_index(int index)
 {
-    assert(index >= 0 && index < this->points.size());
-    assert(this->points.front() == this->points.back() && this->width.front() == this->width.back());
-    if (index != 0 && index + 1 != int(this->points.size()) && this->points.front() == this->points.back() && this->width.front() == this->width.back()) {
+    assert(index >= 0 && index < (int)this->points.size());
+
+    // Operate only on properly closed ThickPolylines
+    if (this->points.empty())
+        return;
+    if (!(this->points.front() == this->points.back() &&
+          !this->width.empty() && this->width.front() == this->width.back())) {
+        // Not a properly closed ThickPolyline — nothing to rotate.
+        return;
+    }
+
+    if (index != 0 && index + 1 != int(this->points.size())) {
         this->points.pop_back();
         assert(this->points.size() * 2 == this->width.size());
         std::rotate(this->points.begin(), this->points.begin() + index, this->points.end());

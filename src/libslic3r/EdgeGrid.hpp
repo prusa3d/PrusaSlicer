@@ -209,7 +209,7 @@ public:
 		assert(ixb >= 0 && size_t(ixb) < m_cols);
 		assert(iyb >= 0 && size_t(iyb) < m_rows);
 		// Account for the end points.
-		if (! visitor(iy, ix) || (ix == ixb && iy == iyb))
+		if ((ix == ixb && iy == iyb) || ! visitor(iy, ix))
 			// Both ends fall into the same cell.
 			return;
 		// Raster the centeral part of the line.

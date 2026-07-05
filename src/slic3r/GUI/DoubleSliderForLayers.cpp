@@ -1045,10 +1045,14 @@ bool DSForLayers::is_wipe_tower_layer(int tick) const
         return false;
     if (tick == 0 || (tick == (int)m_values.size() - 1 && m_values[tick] > m_values[tick - 1]))
         return false;
-    if ((m_values[tick - 1] == m_values[tick + 1] && m_values[tick] < m_values[tick + 1]) ||
-        (tick > 0 && m_values[tick] < m_values[tick - 1]) ) // if there is just one wiping on the layer 
-        return true;
-
+    // Make sure we don't access past the end of m_values (tick+1 must be valid).
+    if (tick > 0) {
+        if (tick + 1 < (int)m_values.size() &&
+            m_values[tick - 1] == m_values[tick + 1] && m_values[tick] < m_values[tick + 1])
+            return true;
+        if (m_values[tick] < m_values[tick - 1]) // if there is just one wiping on the layer
+            return true;
+    }
     return false;
 }
 
