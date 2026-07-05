@@ -314,24 +314,26 @@ std::string GCodeWriter::set_speed(double F, const std::string_view comment, con
     return w.string();
 }
 
-std::string GCodeWriter::travel_to_xy_force(const Vec2d &point, const std::string_view comment)
+std::string GCodeWriter::travel_to_xy_force(const Vec2d &point, const std::string_view comment, bool on_first_layer)
 {
     GCodeG1Formatter w;
+
+    const double speed = on_first_layer && this->config.first_layer_travel_speed > 0.0 ? this->config.first_layer_travel_speed : this->config.travel_speed.value;
     w.emit_xy(point);
-    w.emit_f(this->config.travel_speed.value * 60.0);
+    w.emit_f(speed * 60.0);
     w.emit_comment(this->config.gcode_comments, comment);
     m_pos.head<2>() = point.head<2>();
     return w.string();
 }
 
-std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string_view comment)
+std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string_view comment, bool on_first_layer)
 {
     if (std::abs(point.x() - m_pos.x()) < GCodeFormatter::XYZ_EPSILON
         && std::abs(point.y() - m_pos.y()) < GCodeFormatter::XYZ_EPSILON)
     {
         return "";
     } else {
-        return this->travel_to_xy_force(point, comment);
+        return this->travel_to_xy_force(point, comment, on_first_layer);
     }
 }
 
@@ -352,7 +354,7 @@ std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij
     return w.string();
 }
 
-std::string GCodeWriter::travel_to_xyz(const Vec3d &to, const std::string_view comment)
+std::string GCodeWriter::travel_to_xyz(const Vec3d &to, const std::string_view comment, bool on_first_layer)
 {
     if (std::abs(to.x() - m_pos.x()) < GCodeFormatter::XYZ_EPSILON
         && std::abs(to.y() - m_pos.y()) < GCodeFormatter::XYZ_EPSILON
@@ -367,17 +369,17 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &to, const std::string_view c
     } else if (
         std::abs(to.z() - m_pos.z()) < GCodeFormatter::XYZ_EPSILON)
     {
-        return this->travel_to_xy_force(to.head<2>(), comment);
+        return this->travel_to_xy_force(to.head<2>(), comment, on_first_layer);
     } else {
-        return this->travel_to_xyz_force(to, comment);
+        return this->travel_to_xyz_force(to, comment, on_first_layer);
     }
 }
 
-std::string GCodeWriter::travel_to_xyz_force(const Vec3d &to, const std::string_view comment) {
+std::string GCodeWriter::travel_to_xyz_force(const Vec3d &to, const std::string_view comment, bool on_first_layer) {
     GCodeG1Formatter w;
     w.emit_xyz(to);
 
-    double speed = this->config.travel_speed.value;
+    double speed = this->config.first_layer_travel_speed > 0.0 && on_first_layer ? this->config.first_layer_travel_speed : this->config.travel_speed.value;
     const double speed_z = this->config.travel_speed_z.value;
 
     if (speed_z) {

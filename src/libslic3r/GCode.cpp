@@ -2340,7 +2340,7 @@ std::string GCodeGenerator::generate_ramping_layer_change_gcode(
     for (const Vec3crd &point : travel) {
         const Vec3d gcode_point{this->point_to_gcode(point)};
         travel_gcode += this->m_writer
-                            .travel_to_xyz_force(gcode_point, "layer change");
+                            .travel_to_xyz_force(gcode_point, "layer change", this->on_first_layer());
     }
     return travel_gcode;
 }
@@ -3215,7 +3215,7 @@ std::string GCodeGenerator::extrude_perimeters(
             // Make a little move inwards before leaving loop.
             if (std::optional<Point> pt = wipe_hide_seam(perimeter.smooth_path, perimeter.reversed, scale_(EXTRUDER_CONFIG(nozzle_diameter))); pt) {
                 // Generate the seam hiding travel move.
-                gcode += m_writer.travel_to_xy(this->point_to_gcode(*pt), "move inwards before travel");
+                gcode += m_writer.travel_to_xy(this->point_to_gcode(*pt), "move inwards before travel", this->on_first_layer());
                 this->last_position = *pt;
             }
         }
@@ -3339,7 +3339,7 @@ std::string GCodeGenerator::travel_to_first_position(const Vec3crd& point, const
         const std::string comment{"move to first layer point"};
 
         gcode += insert_gcode();
-        gcode += this->writer().travel_to_xy_force(gcode_point.head<2>(), comment);
+        gcode += this->writer().travel_to_xy_force(gcode_point.head<2>(), comment, this->on_first_layer());
         gcode += this->writer().travel_to_z_force(gcode_point.z(), comment);
 
         this->m_avoid_crossing_perimeters.reset_once_modifiers();
@@ -3395,7 +3395,7 @@ std::string GCodeGenerator::_extrude(
         const std::string comment{"move to print after unknown position"};
         gcode += this->retract_and_wipe();
         gcode += m_writer.multiple_extruders ? "" : m_label_objects.maybe_change_instance(m_writer);
-        gcode += this->m_writer.travel_to_xy(this->point_to_gcode(path.front().point), comment);
+        gcode += this->m_writer.travel_to_xy(this->point_to_gcode(path.front().point), comment, this->on_first_layer());
         gcode += this->m_writer.travel_to_z_force(z, comment);
     } else if ( this->last_position != path.front().point) {
         std::string comment = "move to first ";
@@ -3677,12 +3677,13 @@ std::string GCodeGenerator::generate_travel_gcode(
     }
 
     const unsigned travel_acceleration                = static_cast<unsigned>(m_config.travel_acceleration.value + 0.5);
+    const unsigned first_layer_travel_acceleration    = static_cast<unsigned>(m_config.first_layer_travel_acceleration.value + 0.5);
     const unsigned travel_short_distance_acceleration = static_cast<unsigned>(m_config.travel_short_distance_acceleration.value + 0.5);
 
     std::string gcode;
     // Generate G-code for the travel move.
     // Use G1 because we rely on paths being straight (G0 may make round paths).
-    gcode += this->m_writer.set_travel_acceleration(use_short_distance_acceleration() ? travel_short_distance_acceleration : travel_acceleration);
+    gcode += this->m_writer.set_travel_acceleration((this->on_first_layer() && first_layer_travel_acceleration > 0.0) ? first_layer_travel_acceleration : (use_short_distance_acceleration() ? travel_short_distance_acceleration : travel_acceleration));
 
     bool already_inserted{false};
     for (std::size_t i{0}; i < travel.size(); ++i) {
@@ -3701,10 +3702,10 @@ std::string GCodeGenerator::generate_travel_gcode(
             ) {
                 gcode += this->m_writer.travel_to_z_force(gcode_point.z(), comment);
             } else {
-                gcode += this->m_writer.travel_to_xyz_force(gcode_point, comment);
+                gcode += this->m_writer.travel_to_xyz_force(gcode_point, comment, this->on_first_layer());
             }
         } else {
-            gcode += this->m_writer.travel_to_xyz(gcode_point, comment);
+            gcode += this->m_writer.travel_to_xyz(gcode_point, comment, this->on_first_layer());
         }
 
         this->last_position = point.head<2>();

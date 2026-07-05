@@ -1618,6 +1618,7 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Speed for non-print moves"));
         optgroup->append_single_option_line("travel_speed");
         optgroup->append_single_option_line("travel_speed_z");
+        optgroup->append_single_option_line("first_layer_travel_speed");
 
         optgroup = page->new_optgroup(L("Modifiers"));
         optgroup->append_single_option_line("first_layer_speed");
@@ -1636,6 +1637,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("wipe_tower_acceleration");
         optgroup->append_single_option_line("travel_acceleration");
         optgroup->append_single_option_line("travel_short_distance_acceleration");
+        optgroup->append_single_option_line("first_layer_travel_acceleration");
         optgroup->append_single_option_line("default_acceleration");
 
         optgroup = page->new_optgroup(L("Autospeed (advanced)"));
