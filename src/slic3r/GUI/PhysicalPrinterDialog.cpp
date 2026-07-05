@@ -303,6 +303,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
     update_full_printer_names();
 
     m_config = &m_printer.config;
+    boost::trim(m_config->opt_string("printhost_apikey"));
 
     m_optgroup = new ConfigOptionsGroup(this, _L("Print Host upload"), m_config);
     build_printhost_settings(m_optgroup);
@@ -599,6 +600,29 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
                     temp->SetValue(trimed_str);
 
                 TextCtrl* field = dynamic_cast<TextCtrl*>(printhost_field);
+                if (field)
+                    field->propagate_value();
+            }), temp->GetId());
+        }
+    }
+
+    Field* apikey_field = m_optgroup->get_field("printhost_apikey");
+    if (apikey_field)
+    {
+        text_ctrl* temp = dynamic_cast<text_ctrl*>(apikey_field->getWindow());
+        if (temp) {
+            temp->Bind(wxEVT_TEXT, ([apikey_field, temp](wxEvent& e)
+            {
+#ifndef __WXGTK__
+                e.Skip();
+                temp->GetToolTip()->Enable(true);
+#endif // __WXGTK__
+                std::string trimed_str, str = trimed_str = temp->GetValue().ToStdString();
+                boost::trim(trimed_str);
+                if (trimed_str != str)
+                    temp->SetValue(trimed_str);
+
+                TextCtrl* field = dynamic_cast<TextCtrl*>(apikey_field);
                 if (field)
                     field->propagate_value();
             }), temp->GetId());
@@ -965,6 +989,8 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
 
     //update printer name, if it was changed
     m_printer.set_name(into_u8(printer_name));
+
+    boost::trim(m_printer.config.opt_string("printhost_apikey"));
 
     // save access data secretly
     if (!m_printer.config.opt_string("printhost_password").empty()) {
