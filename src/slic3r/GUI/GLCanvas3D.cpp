@@ -2125,7 +2125,7 @@ void GLCanvas3D::render()
     const int curr_active_bed_id = s_multiple_beds.get_active_bed();
     if (m_last_active_bed_id != curr_active_bed_id) {
         const Vec3d bed_offset = s_multiple_beds.get_bed_translation(s_multiple_beds.get_active_bed());
-        const Vec2d bed_center = m_bed.build_volume().bed_center() + Vec2d(bed_offset.x(), bed_offset.y());
+        //const Vec2d bed_center = m_bed.build_volume().bed_center() + Vec2d(bed_offset.x(), bed_offset.y());
         m_last_active_bed_id = curr_active_bed_id;
     }
 

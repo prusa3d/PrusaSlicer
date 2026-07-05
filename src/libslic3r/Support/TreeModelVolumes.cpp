@@ -878,7 +878,7 @@ std::vector<std::pair<TreeModelVolumes::RadiusLayerPair, std::reference_wrapper<
         for (auto &radius_polygons : layer)
             out.emplace_back(std::make_pair(radius_polygons.first, layer_idx), radius_polygons.second);
     }
-    assert(std::is_sorted(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second) && l.first.first < r.first.first; }));
+    assert(std::is_sorted(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || ((l.first.second == r.first.second) && (l.first.first < r.first.first)); }));
     return out;
 }
 

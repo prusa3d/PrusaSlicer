@@ -241,7 +241,7 @@ void SeqArrange::process_seq_arrange(std::function<void(int)> progress_fn)
 			});
 			assert(it != m_plates.end());
 			size_t plate_id = it - m_plates.begin();
-			if (expected_plate != -1 && expected_plate != plate_id)
+			if (expected_plate != -1 && static_cast<size_t>(expected_plate) != plate_id)
 				throw ExceptionCannotApplySeqArrange();
 			expected_plate = otp.glued_to_next ? plate_id : -1;
 		}
