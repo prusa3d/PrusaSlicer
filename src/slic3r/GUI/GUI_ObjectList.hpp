@@ -273,6 +273,7 @@ public:
     void                del_info_item(const int obj_idx, InfoItemType type);
     void                split();
     void                merge(bool to_multipart_object);
+    void                sort_objects(std::function<bool(const ModelObject*, const ModelObject*)> sort_func, bool current_bed_only = false);
     void                layers_editing();
 
     wxDataViewItem      add_layer_root_item(const wxDataViewItem obj_item);

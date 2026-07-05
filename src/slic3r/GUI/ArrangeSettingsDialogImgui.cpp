@@ -143,12 +143,22 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y, bool current_b
         ImGui::Separator();
     }
 
-
-    if (!current_bed && ImGuiPureWrap::button(_u8L("Arrange")) && m_on_arrange_btn) {
-        m_on_arrange_btn();
-    }
-    if (current_bed && ImGuiPureWrap::button(_u8L("Arrange bed")) && m_on_arrange_bed_btn) {
-        m_on_arrange_bed_btn();
+    if (!current_bed) {
+        if( ImGuiPureWrap::button(_u8L("Arrange")) && m_on_arrange_btn) {
+            m_on_arrange_btn();
+        }
+        ImGui::SameLine();
+        if( ImGuiPureWrap::button(_u8L("Sort Print Order"), _u8L("Sorts the print order based on how objects are arranged on the plate")) && m_on_sort_print_order_btn) {
+            m_on_sort_print_order_btn();
+        }
+    } else {
+        if (ImGuiPureWrap::button(_u8L("Arrange bed")) && m_on_arrange_bed_btn) {
+            m_on_arrange_bed_btn();
+        }
+        ImGui::SameLine();
+        if( ImGuiPureWrap::button(_u8L("Sort Bed Print Order"), _u8L("Sorts the bed print order based on how objects are arranged on the plate")) && m_on_sort_bed_print_order_btn) {
+            m_on_sort_bed_print_order_btn();
+        }
     }
 
     ImGuiPureWrap::end();

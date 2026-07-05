@@ -2364,6 +2364,88 @@ void ObjectList::merge(bool to_multipart_object)
     }
 }
 
+void ObjectList::sort_objects(
+    std::function<bool(const ModelObject*, const ModelObject*)> cmp,
+    bool current_bed_only
+) {
+    if (!m_objects || m_objects->empty())
+        return;
+
+    const int selected_bed = current_bed_only ? s_multiple_beds.get_active_bed() : -1;
+
+    // Filter objects to sort by bed, deriving bed IDs from instances
+    std::vector<size_t> indices;
+    std::vector<int> bed_ids(m_objects->size(), -1);
+    const auto& inst_map = s_multiple_beds.get_inst_map();
+
+    for (size_t i = 0; i < m_objects->size(); ++i) {
+        const ModelObject* mo = (*m_objects)[i];
+        int object_bed = -1;
+        bool mixed_beds = false;
+
+        for (const ModelInstance* mi : mo->instances) {
+            int inst_bed = -1;
+            if (auto it = inst_map.find(mi->id()); it != inst_map.end())
+                inst_bed = it->second;
+
+            if (object_bed == -1) {
+                object_bed = inst_bed;
+            } else if (object_bed != inst_bed) {
+                mixed_beds = true;
+                break;
+            }
+        }
+
+        if (mixed_beds)
+            object_bed = -1;
+
+        bed_ids[i] = object_bed;
+
+        // If sorting only the active bed, skip objects not fully on it
+        if (selected_bed != -1 && object_bed != selected_bed)
+            continue;
+
+        indices.push_back(i);
+    }
+
+
+    if (indices.size() < 2)
+        return;
+
+    // Sort indices by bed ID first, then comp function
+    std::vector<size_t> sorted_indices = indices;
+    std::sort(sorted_indices.begin(), sorted_indices.end(),
+            [&cmp, &bed_ids, this](size_t a, size_t b) {
+                if (bed_ids[a] != bed_ids[b])
+                    return bed_ids[a] < bed_ids[b];
+                return cmp((*m_objects)[a], (*m_objects)[b]);
+            });
+
+    bool changed = false;
+    for (size_t i = 0; i < indices.size(); ++i) {
+        if ((*m_objects)[indices[i]] != (*m_objects)[sorted_indices[i]]) {
+            changed = true;
+            break;
+        }
+    }
+    if (!changed)
+        return;
+
+    take_snapshot(L("Sort objects"));
+
+    UnselectAll();
+
+    // Apply sorted order
+    std::vector<ModelObject*> temp;
+    for (size_t idx : sorted_indices)
+        temp.push_back((*m_objects)[idx]);
+    for (size_t i = 0; i < indices.size(); ++i)
+        (*m_objects)[indices[i]] = temp[i];
+
+    // Refresh the whole object list
+    update_after_undo_redo();
+}
+
 void ObjectList::layers_editing()
 {
     const Selection& selection = scene_selection();
