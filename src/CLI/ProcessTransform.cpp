@@ -48,7 +48,7 @@ bool process_transform(Data& cli, const DynamicPrintConfig& print_config, std::v
             for (ModelObject* o : model.objects)
                 m.add_object(*o);
         // Rearrange instances unless --dont-arrange is supplied
-        if (!transform.has("dont_arrange") && !transform.opt_bool("dont_arrange")) {
+        if (!transform.has("dont_arrange") || !transform.opt_bool("dont_arrange")) {
             m.add_default_instances();
             if (actions.has("slice"))
                 arrange_objects(m, bed, arrange_cfg);
