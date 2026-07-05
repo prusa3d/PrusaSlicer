@@ -12314,8 +12314,8 @@ msgstr ""
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:3407
 #, boost-format
 msgid ""
-"Can't load exactly same font(\"%1%\"). Aplication selected a similar "
-"one(\"%2%\"). You have to specify font for enable edit text."
+"Can't load exactly same font(\"%1%\"). Application selected a similar "
+"one(\"%2%\"). You have to select a font to enable editing text."
 msgstr ""
 "Impossible de charger exactement la même police (\"%1%\"). L'application en "
 "a sélectionné une similaire (\"%2%\"). Vous devez spécifier la police pour "

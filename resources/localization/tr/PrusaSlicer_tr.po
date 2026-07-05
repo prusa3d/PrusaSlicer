@@ -11558,8 +11558,8 @@ msgstr "Metni kameraya bakacak şekilde ayarla"
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:3407
 #, boost-format
 msgid ""
-"Can't load exactly same font(\"%1%\"). Aplication selected a similar "
-"one(\"%2%\"). You have to specify font for enable edit text."
+"Can't load exactly same font(\"%1%\"). Application selected a similar "
+"one(\"%2%\"). You have to select a font to enable editing text."
 msgstr ""
 "Tam olarak aynı fontu yüklenemiyor (\"%1%\"), uygulama benzer bir yazı tipi "
 "seçti (\"%2%\"). Metni düzenlemeyi etkinleştirmek için yazı tipi belirtmeniz "

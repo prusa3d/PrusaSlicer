@@ -11085,8 +11085,8 @@ msgstr "沿对象曲面移动文本时，锁定文本的旋转。"
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:3407
 #, boost-format
 msgid ""
-"Can't load exactly same font(\"%1%\"). Aplication selected a similar "
-"one(\"%2%\"). You have to specify font for enable edit text."
+"Can't load exactly same font(\"%1%\"). Application selected a similar "
+"one(\"%2%\"). You have to select a font to enable editing text."
 msgstr ""
 "不能加载完全相同的字体(\"%1%\")。应用程序选择了一种类似的字体（\"%2%\"）。你"
 "必须为启用编辑文本指定字体。"

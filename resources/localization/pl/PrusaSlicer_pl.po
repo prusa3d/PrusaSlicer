@@ -12112,8 +12112,8 @@ msgstr "Zablokuj obrót tekstu podczas przesuwania go po powierzchni obiektu."
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:3407
 #, boost-format
 msgid ""
-"Can't load exactly same font(\"%1%\"). Aplication selected a similar "
-"one(\"%2%\"). You have to specify font for enable edit text."
+"Can't load exactly same font(\"%1%\"). Application selected a similar "
+"one(\"%2%\"). You have to select a font to enable editing text."
 msgstr ""
 "Nie można załadować dokładnie tej samej czcionki (\"%1%\"). Aplikacja "
 "wybrała podobną (\"%2%\"). Musisz określić czcionkę dla umożliwienia edycji "

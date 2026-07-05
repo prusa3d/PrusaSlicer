@@ -3405,8 +3405,8 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     const std::string &face_name = face_name_opt.value_or(face_name_by_wx.value_or(es.path));
     std::string text =
         GUI::format(_L("Can't load exactly same font(\"%1%\"). "
-                       "Aplication selected a similar one(\"%2%\"). "
-                       "You have to specify font for enable edit text."),
+                       "Application selected a similar one(\"%2%\"). "
+                       "You have to specify font to enable editing text."),
                     face_name_3mf, face_name);
     create_notification_not_valid_font(text);
 }

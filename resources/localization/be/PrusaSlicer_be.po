@@ -11869,8 +11869,8 @@ msgstr "Заблакаваць вярчэнне тэксту пры руху т�
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:3407
 #, boost-format
 msgid ""
-"Can't load exactly same font(\"%1%\"). Aplication selected a similar "
-"one(\"%2%\"). You have to specify font for enable edit text."
+"Can't load exactly same font(\"%1%\"). Application selected a similar "
+"one(\"%2%\"). You have to select a font to enable editing text."
 msgstr ""
 "Не атрымалася загрузіць сапраўды такі ж шрыфт (\"%1%\").\n"
 "Выбраны падобны (\"%2%\").\n"
