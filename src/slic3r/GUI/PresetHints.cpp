@@ -25,11 +25,11 @@ std::string PresetHints::cooling_description(const Preset &preset)
 	std::string out;
 
     bool cooling              = preset.config.opt_bool("cooling", 0);
-    int  fan_below_layer_time = preset.config.opt_int("fan_below_layer_time", 0);
+    double fan_below_layer_time = preset.config.opt_float("fan_below_layer_time", 0);
     int  full_fan_speed_layer = preset.config.opt_int("full_fan_speed_layer", 0);
 
     if (cooling) {
-		int 	slowdown_below_layer_time 	= preset.config.opt_int("slowdown_below_layer_time", 0);
+		double 	slowdown_below_layer_time 	= preset.config.opt_float("slowdown_below_layer_time", 0);
 		int 	min_fan_speed 				= preset.config.opt_int("min_fan_speed", 0);
 		int 	max_fan_speed 				= preset.config.opt_int("max_fan_speed", 0);
 		int 	min_print_speed				= int(preset.config.opt_float("min_print_speed", 0) + 0.5);
