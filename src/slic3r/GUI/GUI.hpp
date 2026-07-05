@@ -36,6 +36,10 @@ void enable_screensaver();
 bool debugged();
 void break_to_debugger();
 
+// Platform specific Ctrl/Alt (Windows, Linux) vs. ⌘/⌥ (OSX) keys
+extern const std::string& shortkey_ctrl();
+extern const std::string& shortkey_alt();
+
 // Platform specific Ctrl+/Alt+ (Windows, Linux) vs. ⌘/⌥ (OSX) prefixes 
 extern const std::string& shortkey_ctrl_prefix();
 extern const std::string& shortkey_alt_prefix();
