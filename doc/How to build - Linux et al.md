@@ -28,7 +28,9 @@ libglu1-mesa-dev \
 libgtk-3-dev \
 libdbus-1-dev \
 libwebkit2gtk-4.1-dev \
-texinfo
+texinfo \
+libtool \
+librust-hidapi-sys-dev
 ```
 The names of the packages may be different on different distros.
 
