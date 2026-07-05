@@ -1698,7 +1698,7 @@ bool PageDownloader::on_finish_downloader() const
 bool DownloaderUtils::Worker::perform_registration_linux = false;
 #endif // __linux__
 
-bool DownloaderUtils::Worker::perform_download_register(const std::string& path)
+bool DownloaderUtils::Worker::validate_and_save_download_path(const std::string& path)
 {
     boost::filesystem::path aux_dest (path);
     boost::system::error_code ec;
@@ -1709,12 +1709,18 @@ bool DownloaderUtils::Worker::perform_download_register(const std::string& path)
     if (chosen_dest.empty() || !boost::filesystem::is_directory(chosen_dest, ec) || ec) {
         std::string err_msg = GUI::format("%1%\n\n%2%",_L("Chosen directory for downloads does not exist.") ,chosen_dest.string());
         BOOST_LOG_TRIVIAL(error) << err_msg;
-        show_error(/*m_parent*/ nullptr, err_msg);
+        if (downloader_checked) {
+            // Error if checked
+            show_error(/*m_parent*/ nullptr, err_msg);
+        } else {
+            // Warn if unchecked
+            show_info(/*m_parent*/ nullptr, err_msg);
+        }
         return false;
     }
     BOOST_LOG_TRIVIAL(info) << "Downloader registration: Directory for downloads: " << chosen_dest.string();
     wxGetApp().app_config->set("url_downloader_dest", chosen_dest.string());
-    return perform_url_register();
+    return true;
 }
 bool DownloaderUtils::Worker::perform_url_register()
 {
@@ -1775,24 +1781,20 @@ bool DownloaderUtils::Worker::on_finish() {
     AppConfig* app_config = wxGetApp().app_config;
     bool ac_value = app_config->get_bool("downloader_url_registered");
     BOOST_LOG_TRIVIAL(debug) << "PageDownloader::on_finish_downloader ac_value " << ac_value << " downloader_checked " << downloader_checked;
-    if (ac_value && downloader_checked) {
-        // already registered but we need to do it again
-        if (!perform_download_register(GUI::into_u8(path_name())))
-            return false;
-        app_config->set("downloader_url_registered", "1");
-    } else if (!ac_value && downloader_checked) {
-        // register
-        if (!perform_download_register(GUI::into_u8(path_name())))
-            return false;
-        app_config->set("downloader_url_registered", "1");
-    } else if (ac_value && !downloader_checked) {
-        // deregister, downloads are banned now  
+    // Always validate and save path
+    bool valid_path = validate_and_save_download_path(GUI::into_u8(path_name()));
+
+    if (downloader_checked) {
+        if (valid_path && perform_url_register()) {
+            app_config->set("downloader_url_registered", "1");
+            return true;
+        }
+        return false;
+    } else if (ac_value) {
+        // deregister, downloads are banned now
         deregister();
         app_config->set("downloader_url_registered", "0");
-    } /*else if (!ac_value && !downloader_checked) {
-        // not registered and we dont want to do it
-        // do not deregister as other instance might be registered
-    } */
+    }
     return true;
 }
 
