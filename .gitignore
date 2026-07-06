@@ -1,6 +1,12 @@
 Build
 Build.bat
 /build/
+/build-default/
+
+# Nix / direnv dev environment
+/.direnv/
+/result
+/result-*
 MYMETA.json
 MYMETA.yml
 _build
