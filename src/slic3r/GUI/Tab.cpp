@@ -1711,6 +1711,8 @@ void TabPrint::build()
         optgroup->append_single_option_line("arc_fitting");
         optgroup->append_single_option_line("xy_size_compensation");
         optgroup->append_single_option_line("elefant_foot_compensation", "elephant-foot-compensation_114487");
+        optgroup->append_single_option_line("overhang_reshape");
+        optgroup->append_single_option_line("overhang_reshape_angle");
 
         optgroup = page->new_optgroup(L("Arachne perimeter generator"));
         optgroup->append_single_option_line("wall_transition_angle");

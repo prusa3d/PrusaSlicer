@@ -673,6 +673,9 @@ PRINT_CONFIG_CLASS_DEFINE(
 //  ((ConfigOptionFloat,               seam_preferred_direction_jitter))
     ((ConfigOptionFloat,               slice_closing_radius))
     ((ConfigOptionEnum<SlicingMode>,   slicing_mode))
+    // Reshape (bake conical support into) downward overhangs steeper than overhang_reshape_angle, at slice time.
+    ((ConfigOptionBool,                overhang_reshape))
+    ((ConfigOptionFloat,               overhang_reshape_angle))
     ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
     ((ConfigOptionFloatOrPercent,      wall_transition_length))
     ((ConfigOptionFloatOrPercent,      wall_transition_filter_deviation))

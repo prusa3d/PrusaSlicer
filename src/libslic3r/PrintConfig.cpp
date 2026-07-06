@@ -3947,6 +3947,27 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionInt(0));
 
+    def = this->add("overhang_reshape", coBool);
+    def->label = L("Make overhangs printable");
+    def->category = L("Advanced");
+    def->tooltip = L("Reshape the model at slice time so that downward overhangs steeper than "
+                   "the configured angle are pushed outward into a printable cone, baking "
+                   "conical support into the geometry. Material is only added, never removed.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("overhang_reshape_angle", coFloat);
+    def->label = L("Maximum overhang angle");
+    def->category = L("Advanced");
+    def->tooltip = L("Maximum overhang angle, measured from the vertical, that is left untouched. "
+                   "Surfaces steeper than this (i.e. more horizontal) are reshaped to this angle. "
+                   "Only used when \"Make overhangs printable\" is enabled.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 89;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(45));
+
     def = this->add("xy_size_compensation", coFloat);
     def->label = L("XY Size Compensation");
     def->category = L("Advanced");
