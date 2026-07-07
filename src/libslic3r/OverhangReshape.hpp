@@ -17,8 +17,13 @@ class Layer;
 //
 // The added material is inserted into the layer's first region as internal
 // surfaces, and the merged layer outline (lslices) is updated to match.
+//
+// Holes (internal cavities) whose per-layer area is <= max_hole_area_mm2 are
+// filled in to support their ceiling; larger holes are kept open. Pass 0 to
+// keep every hole open.
 void make_overhangs_printable(const std::vector<Layer*> &layers,
-                              double                     max_overhang_angle_deg);
+                              double                     max_overhang_angle_deg,
+                              double                     max_hole_area_mm2);
 
 } // namespace Slic3r
 

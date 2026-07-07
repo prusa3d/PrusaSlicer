@@ -10,7 +10,8 @@
 namespace Slic3r {
 
 void make_overhangs_printable(const std::vector<Layer*> &layers,
-                              double                     max_overhang_angle_deg)
+                              double                     max_overhang_angle_deg,
+                              double                     max_hole_area_mm2)
 {
     if (layers.size() < 2)
         return;
@@ -54,6 +55,20 @@ void make_overhangs_printable(const std::vector<Layer*> &layers,
                 if (std::abs(ex.area()) > min_area)
                     append(cleaned, ex.simplify(scale_(0.02)));
             grown = std::move(cleaned);
+        }
+
+        // Keep large internal cavities open: the top-down union fills any hole
+        // whose ceiling is solid above, which would solidify designed cavities.
+        // Subtract the model's holes that exceed the threshold back out of the
+        // grown outline so only small holes (< threshold) get filled/supported.
+        {
+            Polygons keep_open;
+            for (const ExPolygon &ex : layer->lslices)
+                for (const Polygon &hole : ex.holes)
+                    if (std::abs(hole.area()) * SCALING_FACTOR * SCALING_FACTOR > max_hole_area_mm2)
+                        keep_open.emplace_back(hole);
+            if (! keep_open.empty())
+                grown = diff_ex(grown, keep_open);
         }
 
         // Merge the cone into the layer outline. For a single region we replace

@@ -541,7 +541,7 @@ void PrintObject::slice()
     m_print->throw_if_canceled();
     // Make overhangs printable: grow a printable cone under overhangs in slice space.
     if (m_config.overhang_reshape.value)
-        make_overhangs_printable(m_layers, m_config.overhang_reshape_angle.value);
+        make_overhangs_printable(m_layers, m_config.overhang_reshape_angle.value, m_config.overhang_reshape_hole_area.value);
     m_print->throw_if_canceled();
 #if 0
     // Layer::slicing_errors is no more set since 1.41.1 or possibly earlier, thus this code

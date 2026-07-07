@@ -3968,6 +3968,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(45));
 
+    def = this->add("overhang_reshape_hole_area", coFloat);
+    def->label = L("Maximum hole area to fill");
+    def->category = L("Advanced");
+    def->tooltip = L("When making overhangs printable, holes (internal cavities) smaller than this "
+                   "area are filled in to support their ceiling, while larger holes are left open. "
+                   "Set to zero to keep all holes open. Only used when \"Make overhangs printable\" "
+                   "is enabled.");
+    def->sidetext = L("mm²");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(5));
+
     def = this->add("xy_size_compensation", coFloat);
     def->label = L("XY Size Compensation");
     def->category = L("Advanced");
