@@ -125,6 +125,7 @@ EMoveType convert(Slic3r::EMoveType type)
     case Slic3r::EMoveType::Travel:       { return EMoveType::Travel; }
     case Slic3r::EMoveType::Wipe:         { return EMoveType::Wipe; }
     case Slic3r::EMoveType::Extrude:      { return EMoveType::Extrude; }
+    case Slic3r::EMoveType::Flush:        { return EMoveType::Flush; }
     default:                              { return EMoveType::COUNT; }
     }
 }
@@ -198,6 +199,12 @@ GCodeInputData convert(const Slic3r::GCodeProcessorResult& result, const std::ve
         const Slic3r::GCodeProcessorResult::MoveVertex& prev = moves[i - 1];
         const EMoveType curr_type = convert(curr.type);
         const EOptionType option_type = move_type_to_option(curr_type);
+
+        // Flush extrusions (between FLUSH_START/FLUSH_END tags) are not shown in the preview.
+        if (curr_type == EMoveType::Flush) {
+            continue;
+        }
+
         if (option_type == EOptionType::COUNT || option_type == EOptionType::Travels || option_type == EOptionType::Wipes) {
             if (ret.vertices.empty() || prev.type != curr.type || prev.extrusion_role != curr.extrusion_role) {
                 // to allow libvgcode to properly detect the start/end of a path we need to add a 'phantom' vertex

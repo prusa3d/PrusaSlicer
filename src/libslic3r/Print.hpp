@@ -553,11 +553,16 @@ struct PrintStatistics
     double                          total_wipe_tower_cost;
     double                          total_wipe_tower_filament;
     double                          total_wipe_tower_filament_weight;
+    double                          total_flush_cost;
+    double                          total_flush_filament;
+    double                          total_flush_filament_weight;
     std::vector<unsigned int>       printing_extruders;
     unsigned int                    initial_extruder_id;
     std::string                     initial_filament_type;
     std::string                     printing_filament_types;
     std::map<size_t, double>        filament_stats;
+    std::map<size_t, double>        wipe_tower_stats;
+    std::map<size_t, double>        flush_stats;
 
     // Config with the filled in print statistics.
     DynamicConfig           config() const;
@@ -566,19 +571,25 @@ struct PrintStatistics
     // Replace the print statistics placeholders in the path.
     std::string             finalize_output_path(const std::string &path_in) const;
 
-    void clear() {
-        total_used_filament    = 0.;
-        total_extruded_volume  = 0.;
-        total_cost             = 0.;
-        total_toolchanges      = 0;
-        total_weight           = 0.;
-        total_wipe_tower_cost  = 0.;
-        total_wipe_tower_filament = 0.;
+    void clear()
+    {
+        total_used_filament              = 0.;
+        total_extruded_volume            = 0.;
+        total_cost                       = 0.;
+        total_toolchanges                = 0;
+        total_weight                     = 0.;
+        total_wipe_tower_cost            = 0.;
+        total_wipe_tower_filament        = 0.;
         total_wipe_tower_filament_weight = 0.;
-        initial_extruder_id    = 0;
+        total_flush_cost                 = 0.;
+        total_flush_filament             = 0.;
+        total_flush_filament_weight      = 0.;
+        initial_extruder_id              = 0;
         initial_filament_type.clear();
         printing_filament_types.clear();
         filament_stats.clear();
+        wipe_tower_stats.clear();
+        flush_stats.clear();
         printing_extruders.clear();
     }
 
@@ -598,6 +609,7 @@ struct PrintStatistics
     static const std::string TotalFilamentCostValueMask;
     static const std::string TotalFilamentUsedWipeTower;
     static const std::string TotalFilamentUsedWipeTowerValueMask;
+    static const std::string TotalToolchanges;
 };
 
 using PrintObjectPtrs          = std::vector<PrintObject*>;

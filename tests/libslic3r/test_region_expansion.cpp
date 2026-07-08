@@ -312,3 +312,86 @@ TEST_CASE("WaveSeed - ZFillFunction - SPE-2698", "[WaveSeedZFillFunctionSPE2698]
     }
 }
 
+// Sources touching the boundary only at existing vertices create no intersection point,
+// but wave_seeds() must still keep a seed for each such source.
+// The same data is also tested rotated because the clipped end points may then lie slightly
+// outside the boundary and the anchor must not be lost even in that case.
+TEST_CASE(
+    "WaveSeed - bridge anchor when a segment ends only on existing vertices",
+    "[WaveSeedBridgeAnchorExistingVertices]"
+)
+{
+    const ExPolygons src = {
+        ExPolygon{
+            Point(-4933736, 2795288),
+            Point(-6146421, 2095141),
+            Point(-6275792, 2020450),
+            Point(-6275792, -5485090),
+            Point(-4933736, -6259925)
+        },
+        ExPolygon{
+            Point(6594818, -5559781),
+            Point(6724189, -5485090),
+            Point(6724189, 2020450),
+            Point(5382135, 2795287),
+            Point(5382135, -6259924)
+        },
+    };
+
+    const ExPolygons boundary = {
+        ExPolygon{
+            {Point(12727296, 12359747),
+             Point(-12727290, 12359744),
+             Point(-12727290, -12359746),
+             Point(12727296, -12359746)},
+            {Point(-451931, -9895903),
+             Point(-4933736, -7308332),
+             Point(-4933736, -6259925),
+             Point(-6275792, -5485090),
+             Point(-6275792, 2020450),
+             Point(-6146421, 2095141),
+             Point(-4933736, 2795288),
+             Point(-4933736, 3843698),
+             Point(224197, 6821629),
+             Point(5382135, 3843696),
+             Point(5382135, 2795287),
+             Point(6724189, 2020450),
+             Point(6724189, -5485090),
+             Point(6594818, -5559781),
+             Point(5382135, -6259924),
+             Point(5382135, -7308331),
+             Point(224199, -10286265)},
+        },
+    };
+
+    const float tiny_expansion       = 50000.f;
+    const size_t expected_seed_count = 2;
+
+    // The angles include values where a badly chosen source vertex would lose a bridge anchor.
+    for (const double angle_deg : {0., 3.7, 7., 33.3, 61.7, 118.4, 174.9}) {
+        SECTION(std::string("rotated by ") + std::to_string(angle_deg) + " deg")
+        {
+            const double angle_rad      = angle_deg * M_PI / 180.;
+            ExPolygons src_rotated      = src;
+            ExPolygons boundary_rotated = boundary;
+
+            expolygons_rotate(src_rotated, angle_rad);
+            expolygons_rotate(boundary_rotated, angle_rad);
+
+            std::vector<Algorithm::WaveSeed> seeds =
+                Algorithm::wave_seeds(src_rotated, boundary_rotated, tiny_expansion, true);
+
+            // All returned indices must stay in range.
+            std::set<uint32_t> anchored_srcs;
+            for (const Algorithm::WaveSeed& seed : seeds) {
+                REQUIRE(seed.src < src_rotated.size());
+                REQUIRE(seed.boundary < boundary_rotated.size());
+                anchored_srcs.insert(seed.src);
+            }
+
+            // Both anchors must be kept.
+            REQUIRE(seeds.size() == expected_seed_count);
+            REQUIRE(anchored_srcs == std::set<uint32_t>{0u, 1u});
+        }
+    }
+}

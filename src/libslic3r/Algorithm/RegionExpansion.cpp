@@ -263,7 +263,8 @@ std::vector<WaveSeed> wave_seeds(
 
     // AABBTree over bounding boxes of boundaries.
     // Only built if necessary, that is if any of the seed contours is closed, thus there is no intersection point
-    // with the boundary and all Z coordinates of the closed contour point to the source contour.
+    // with the boundary and all Z coordinates of the closed contour point to the source contour,
+    // or when the clipping ended only on existing vertices (#12469, SPE-2698).
     AABBTreeBBoxes aabb_tree;
 
     // Sort paths into their respective islands.
@@ -271,74 +272,75 @@ std::vector<WaveSeed> wave_seeds(
     // Multiple pieces of a single src may intersect the same boundary.
     WaveSeeds out;
     out.reserve(segments.size());
-    int iseed = 0;
-    for (const ClipperLib_Z::Path &path : segments) {
+    for (const ClipperLib_Z::Path& path : segments) {
         assert(path.size() >= 2);
-        ClipperLib_Z::IntPoint front = path.front();
-        ClipperLib_Z::IntPoint back  = path.back();
-        // Both ends of a seed segment are supposed to be inside a single boundary expolygon.
-        // Thus as long as the seed contour is not closed, it should be open at a boundary point.
-        assert((front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end) || 
-            //(front.z() < 0 && back.z() < 0));
-            // Hope that at least one end of an open polyline is clipped by the boundary, thus an intersection point is created.
-            (front.z() < 0 || back.z() < 0));
+        const ClipperLib_Z::IntPoint& front = path.front();
+        const ClipperLib_Z::IntPoint& back  = path.back();
+        const Intersection* intersection    = nullptr;
 
-        if (front != back && front.z() >= 0 && back.z() >= 0) {
-            // Very rare case when both endpoints intersect boundary ExPolygons in existing points.
-            // So the ZFillFunction callback hasn't been called.
-            continue;
-        } else
-        if (front == back && (front.z() < idx_boundary_end)) {
-            // This should be a very rare exception.
-            // See https://github.com/prusa3d/PrusaSlicer/issues/12469.
-            // Segement is open, yet its first point seems to be part of boundary polygon.
-            // Take the first point with src polygon index.
-            for (const ClipperLib_Z::IntPoint &point : path) {
-                if (point.z() >= idx_boundary_end) {
-                    front = point;
-                    back = point;
+        auto intersection_point_valid = [idx_boundary_end, idx_src_end](const Intersection& is)
+        {
+            return is.first >= 1
+                && is.first < idx_boundary_end
+                && is.second >= idx_boundary_end
+                && is.second < idx_src_end;
+        };
+
+        // A negative end point Z is a -1 based index into "intersections" and identifies both the
+        // source and the boundary expolygon. It is not always present because ClipperLib reuses an existing
+        // vertex together with its Z when the rounded intersection point falls onto it.
+        if (front.z() < 0 && intersection_point_valid(intersections[-front.z() - 1])) {
+            intersection = &intersections[-front.z() - 1];
+        } else if (back.z() < 0 && intersection_point_valid(intersections[-back.z() - 1])) {
+            intersection = &intersections[-back.z() - 1];
+        }
+
+        if (intersection != nullptr) {
+            // The path intersects the boundary contour at least at one side.
+            out.push_back(
+                {uint32_t(intersection->second - idx_boundary_end),
+                 uint32_t(intersection->first - 1),
+                 ClipperZUtils::from_zpath(path)}
+            );
+        } else {
+            // The path has no usable intersection record (#12469, SPE-2698), so recover the seed from
+            // its vertices. Any source vertex gives the source index. The boundary index is found by
+            // sampling because the integer rounding may put an end point slightly outside the boundary.
+            if (aabb_tree.empty()) {
+                aabb_tree = build_aabb_tree_over_expolygons(boundary);
+            }
+
+            coord_t source_z = -1;
+            int boundary_id  = -1;
+            for (const ClipperLib_Z::IntPoint& point : path) {
+                if (point.z() >= idx_boundary_end && point.z() < idx_src_end) {
+                    source_z = point.z();
+                    boundary_id =
+                        sample_in_expolygons(aabb_tree, boundary, Point(point.x(), point.y()));
+
+                    if (boundary_id >= 0) {
+                        break;
+                    }
                 }
             }
-        }
 
-        const Intersection *intersection = nullptr;
-        auto intersection_point_valid = [idx_boundary_end, idx_src_end](const Intersection &is) {
-            return is.first >= 1 && is.first < idx_boundary_end &&
-                   is.second >= idx_boundary_end && is.second < idx_src_end;
-        };
-        if (front.z() < 0) {
-            const Intersection &is = intersections[- front.z() - 1];
-            assert(intersection_point_valid(is));
-            if (intersection_point_valid(is))
-                intersection = &is;
+            if (source_z >= 0 && boundary_id >= 0) {
+                out.push_back(
+                    {uint32_t(source_z - idx_boundary_end),
+                     uint32_t(boundary_id),
+                     ClipperZUtils::from_zpath(path)}
+                );
+            }
+
+            // Otherwise no source vertex lies inside any boundary ExPolygon and there is nothing to anchor.
         }
-        if (! intersection && back.z() < 0) {
-            const Intersection &is = intersections[- back.z() - 1];
-            assert(intersection_point_valid(is));
-            if (intersection_point_valid(is))
-                intersection = &is;
-        }
-        if (intersection) {
-            // The path intersects the boundary contour at least at one side. 
-            out.push_back({ uint32_t(intersection->second - idx_boundary_end), uint32_t(intersection->first - 1), ClipperZUtils::from_zpath(path) });
-        } else {
-            // This should be a closed contour.
-            assert(front == back && front.z() >= idx_boundary_end && front.z() < idx_src_end);
-            // Find a source boundary expolygon of one sample of this closed path.
-            if (aabb_tree.empty())
-                aabb_tree = build_aabb_tree_over_expolygons(boundary);
-            int boundary_id = sample_in_expolygons(aabb_tree, boundary, Point(front.x(), front.y()));
-            // Boundary that contains the sample point was found.
-            assert(boundary_id >= 0);
-            if (boundary_id >= 0)
-                out.push_back({ uint32_t(front.z() - idx_boundary_end), uint32_t(boundary_id), ClipperZUtils::from_zpath(path) });
-        }
-        ++ iseed;
     }
 
-    if (sorted)
+    if (sorted) {
         // Sort the seeds by their intersection boundary and source contour.
         std::sort(out.begin(), out.end(), lower_by_boundary_and_src);
+    }
+
     return out;
 }
 

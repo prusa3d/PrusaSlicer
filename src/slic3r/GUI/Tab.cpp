@@ -2354,6 +2354,9 @@ void TabFilament::build()
         optgroup->append_single_option_line("filament_multitool_ramming_volume");
         optgroup->append_single_option_line("filament_multitool_ramming_flow");
 
+        optgroup = page->new_optgroup(L("Flush parameters (experimental)"));
+        optgroup->append_single_option_line("filament_flush_volume");
+        optgroup->append_single_option_line("filament_flush_speed");
 
 
     add_filament_overrides_page();

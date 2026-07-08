@@ -1266,21 +1266,48 @@ void Sidebar::update_sliced_info_sizer()
         else
         {
             const PrintStatistics& ps = m_plater->active_fff_print().print_statistics();
-            const bool is_wipe_tower = ps.total_wipe_tower_filament > 0;
+            const bool is_wipe_tower  = ps.total_wipe_tower_filament > 0;
+            const bool is_flush       = ps.total_flush_filament > 0;
 
             bool imperial_units = wxGetApp().app_config->get_bool("use_inches");
             double koef = imperial_units ? ObjectManipulation::in_to_mm : 1000.0;
 
-            wxString new_label = imperial_units ? _L("Used Filament (in)") : _L("Used Filament (m)");
-            if (is_wipe_tower)
-                new_label += format_wxstr(":\n    - %1%\n    - %2%", _L("objects"), _L("wipe tower"));
+            wxString new_label =
+                imperial_units ? _L("Used Filament (in)") : _L("Used Filament (m)");
+            if (is_wipe_tower || is_flush) {
+                new_label += format_wxstr(":\n    - %1%", _L("objects"));
 
-            wxString info_text = is_wipe_tower ?
-                                wxString::Format("%.2f \n%.2f \n%.2f", ps.total_used_filament / koef,
-                                                (ps.total_used_filament - ps.total_wipe_tower_filament) / koef,
-                                                ps.total_wipe_tower_filament / koef) :
-                                wxString::Format("%.2f", ps.total_used_filament / koef);
-            m_sliced_info->SetTextAndShow(siFilament_m,    info_text,      new_label);
+                if (is_wipe_tower) {
+                    new_label += format_wxstr("\n    - %1%", _L("wipe tower"));
+                }
+
+                if (is_flush) {
+                    new_label += format_wxstr("\n    - %1%", _L("flush"));
+                }
+            }
+
+            wxString info_text;
+            if (is_wipe_tower || is_flush) {
+                const double total_objects_used_filament =
+                    ps.total_used_filament - ps.total_wipe_tower_filament - ps.total_flush_filament;
+                info_text = wxString::Format(
+                    "%.2f \n%.2f",
+                    ps.total_used_filament / koef,
+                    total_objects_used_filament / koef
+                );
+
+                if (is_wipe_tower) {
+                    info_text += wxString::Format(" \n%.2f", ps.total_wipe_tower_filament / koef);
+                }
+
+                if (is_flush) {
+                    info_text += wxString::Format(" \n%.2f", ps.total_flush_filament / koef);
+                }
+            } else {
+                info_text = wxString::Format("%.2f", ps.total_used_filament / koef);
+            }
+
+            m_sliced_info->SetTextAndShow(siFilament_m, info_text, new_label);
 
             koef = imperial_units ? pow(ObjectManipulation::mm_to_in, 3) : 1.0f;
             new_label = imperial_units ? _L("Used Filament (in³)") : _L("Used Filament (mm³)");
@@ -1300,11 +1327,13 @@ void Sidebar::update_sliced_info_sizer()
                 for (const auto& [filament_id, filament_vol] : ps.filament_stats) {
                     assert(filament_id < extruders_filaments.size());
                     if (const Preset* preset = extruders_filaments[filament_id].get_selected_preset()) {
+                        const double filament_density =
+                            preset->config.opt_float("filament_density", 0);
+
                         double filament_weight;
-                        if (ps.filament_stats.size() == 1)
+                        if (ps.filament_stats.size() == 1) {
                             filament_weight = ps.total_weight;
-                        else {
-                            double filament_density = preset->config.opt_float("filament_density", 0);
+                        } else {
                             filament_weight = filament_vol * filament_density/* *2.4052f*/ * 0.001; // assumes 1.75mm filament diameter;
 
                             new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament_id + 1);
@@ -1316,6 +1345,39 @@ void Sidebar::update_sliced_info_sizer()
                             new_label += "\n      " + _L("(including spool)");
                             info_text += wxString::Format(" (%.2f)\n", filament_weight + spool_weight);
                         }
+
+                        if (is_wipe_tower || is_flush) {
+                            double flush_vol = 0.;
+                            if (auto it = ps.flush_stats.find(filament_id);
+                                it != ps.flush_stats.end()) {
+                                flush_vol = it->second;
+                            }
+
+                            double wipe_tower_vol = 0.;
+                            if (auto it = ps.wipe_tower_stats.find(filament_id);
+                                it != ps.wipe_tower_stats.end()) {
+                                wipe_tower_vol = it->second;
+                            }
+
+                            const double objects_weight = (filament_vol - flush_vol - wipe_tower_vol) *
+                                filament_density * 0.001;
+
+                            new_label += "\n        - " + _L("objects");
+                            info_text += wxString::Format("\n%.2f", objects_weight);
+
+                            if (is_wipe_tower) {
+                                new_label += "\n        - " + _L("wipe tower");
+                                info_text += wxString::Format(
+                                    "\n%.2f", wipe_tower_vol * filament_density * 0.001
+                                );
+                            }
+
+                            if (is_flush) {
+                                new_label += "\n        - " + _L("flush");
+                                info_text +=
+                                    wxString::Format("\n%.2f", flush_vol * filament_density * 0.001);
+                            }
+                        }
                     }
                 }
 
@@ -1323,15 +1385,36 @@ void Sidebar::update_sliced_info_sizer()
             }
 
             new_label = _L("Cost");
-            if (is_wipe_tower)
-                new_label += format_wxstr(":\n    - %1%\n    - %2%", _L("objects"), _L("wipe tower"));
+            if (is_wipe_tower || is_flush) {
+                new_label += format_wxstr(":\n    - %1%", _L("objects"));
 
-            info_text = ps.total_cost == 0.0 ? "N/A" :
-                        is_wipe_tower ?
-                        wxString::Format("%.2f \n%.2f \n%.2f", ps.total_cost,
-                                            (ps.total_cost - ps.total_wipe_tower_cost),
-                                            ps.total_wipe_tower_cost) :
-                        wxString::Format("%.2f", ps.total_cost);
+                if (is_wipe_tower) {
+                    new_label += format_wxstr("\n    - %1%", _L("wipe tower"));
+                }
+
+                if (is_flush) {
+                    new_label += format_wxstr("\n    - %1%", _L("flush"));
+                }
+            }
+
+            if (ps.total_cost == 0.) {
+                info_text = "N/A";
+            } else if (is_wipe_tower || is_flush) {
+                const double total_objects_cost =
+                    ps.total_cost - ps.total_wipe_tower_cost - ps.total_flush_cost;
+                info_text = wxString::Format("%.2f \n%.2f", ps.total_cost, total_objects_cost);
+
+                if (is_wipe_tower) {
+                    info_text += wxString::Format(" \n%.2f", ps.total_wipe_tower_cost);
+                }
+
+                if (is_flush) {
+                    info_text += wxString::Format(" \n%.2f", ps.total_flush_cost);
+                }
+            } else {
+                info_text = wxString::Format("%.2f", ps.total_cost);
+            }
+
             m_sliced_info->SetTextAndShow(siCost, info_text,      new_label);
 
             if (ps.estimated_normal_print_time == "N/A" && ps.estimated_silent_print_time == "N/A")

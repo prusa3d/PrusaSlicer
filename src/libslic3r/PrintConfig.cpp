@@ -1579,6 +1579,28 @@ void PrintConfigDef::init_fff_params()
     def->max = 10.;
     def->set_default_value(new ConfigOptionPercents { 0. });
 
+    def = this->add("filament_flush_volume", coFloats);
+    def->label = L("Flush volume");
+    def->tooltip = L(
+        "Volume of filament to flush during a tool change. "
+        "Used in custom toolchange G-code."
+    );
+    def->sidetext = L("mm³");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats{0.});
+
+    def = this->add("filament_flush_speed", coFloats);
+    def->label = L("Flush speed");
+    def->tooltip = L(
+        "Extrusion speed used for flushing during a tool change. "
+        "Used in custom toolchange G-code."
+    );
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats{0.});
+
     def = this->add("fill_angle", coFloat);
     def->label = L("Fill angle");
     def->category = L("Infill");

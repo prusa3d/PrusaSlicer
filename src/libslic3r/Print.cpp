@@ -127,6 +127,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "filament_cost",
         "filament_seam_gap_distance",
         "filament_spool_weight",
+        "filament_flush_volume",
+        "filament_flush_speed",
         "first_layer_acceleration",
         "first_layer_acceleration_over_raft",
         "first_layer_bed_temperature",
@@ -1646,6 +1648,8 @@ const std::string PrintStatistics::TotalFilamentCostValueMask = "; total filamen
 
 const std::string PrintStatistics::TotalFilamentUsedWipeTower     = "total filament used for wipe tower [g]";
 const std::string PrintStatistics::TotalFilamentUsedWipeTowerValueMask = "; total filament used for wipe tower [g] = %.2lf\n";
+
+const std::string PrintStatistics::TotalToolchanges = "total toolchanges";
 
 
 

@@ -777,24 +777,48 @@ static std::vector<ExPolygons> extract_colored_segments(const std::vector<Colore
     return segmented_expolygons_per_extruder;
 }
 
-static void cut_segmented_layers(const std::vector<ExPolygons>        &input_expolygons,
-                                 std::vector<std::vector<ExPolygons>> &segmented_regions,
-                                 const float                           cut_width,
-                                 const float                           interlocking_depth,
-                                 const std::function<void()>          &throw_on_cancel_callback)
+static void cut_segmented_layers(
+    const std::vector<ExPolygons>& input_expolygons,
+    std::vector<std::vector<ExPolygons>>& segmented_regions,
+    const std::vector<std::vector<size_t>>& dominant_color_per_expolygon,
+    const float cut_width,
+    const float interlocking_depth,
+    const std::function<void()>& throw_on_cancel_callback
+)
 {
     BOOST_LOG_TRIVIAL(debug) << "Print object segmentation - Cutting segmented layers in parallel - Begin";
     const float interlocking_cut_width = interlocking_depth > 0.f ? std::max(cut_width - interlocking_depth, 0.f) : 0.f;
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, segmented_regions.size()),[&segmented_regions, &input_expolygons, &cut_width, &interlocking_cut_width, &throw_on_cancel_callback](const tbb::blocked_range<size_t>& range) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, segmented_regions.size()),[&segmented_regions, &input_expolygons, &dominant_color_per_expolygon, &cut_width, &interlocking_cut_width, &throw_on_cancel_callback](const tbb::blocked_range<size_t>& range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
             throw_on_cancel_callback();
             const float  region_cut_width       = (layer_idx % 2 == 0 && interlocking_cut_width > 0.f) ? interlocking_cut_width : cut_width;
             const size_t num_extruders_plus_one = segmented_regions[layer_idx].size();
             if (region_cut_width > 0.f) {
+                const ExPolygons cut_region =
+                    offset_ex(input_expolygons[layer_idx], -region_cut_width);
+
                 std::vector<ExPolygons> segmented_regions_cuts(num_extruders_plus_one); // Indexed by extruder_id
                 for (size_t extruder_idx = 0; extruder_idx < num_extruders_plus_one; ++extruder_idx)
                     if (const ExPolygons &ex_polygons = segmented_regions[layer_idx][extruder_idx]; !ex_polygons.empty())
-                        segmented_regions_cuts[extruder_idx] = diff_ex(ex_polygons, offset_ex(input_expolygons[layer_idx], -region_cut_width));
+                        segmented_regions_cuts[extruder_idx] = diff_ex(ex_polygons, cut_region);
+
+                // Give each expolygon's clipped-away part to its dominant extruder, then merge the result into one area.
+                for (const ExPolygon& input_expolygon : input_expolygons[layer_idx]) {
+                    const size_t expolygon_idx =
+                        &input_expolygon - input_expolygons[layer_idx].data();
+                    const size_t expolygon_dominant_color =
+                        dominant_color_per_expolygon[layer_idx][expolygon_idx];
+
+                    if (expolygon_dominant_color > 0) {
+                        Slic3r::append(
+                            segmented_regions_cuts[expolygon_dominant_color],
+                            intersection_ex(cut_region, input_expolygons[layer_idx][expolygon_idx])
+                        );
+                        segmented_regions_cuts[expolygon_dominant_color] =
+                            union_ex(segmented_regions_cuts[expolygon_dominant_color]);
+                    }
+                }
+
                 segmented_regions[layer_idx] = std::move(segmented_regions_cuts);
             }
         }
@@ -2072,6 +2096,34 @@ static void project_color_lines_on_color_projection_lines(std::vector<ColorLines
     }
 }
 
+static size_t dominant_state_by_area(const std::vector<ExPolygons>& segments_by_state)
+{
+    if (segments_by_state.empty()) {
+        return 0;
+    }
+
+    const auto ex_polygons_area = [](const ExPolygons& ex_polygons)
+    {
+        return std::accumulate(
+            ex_polygons.begin(),
+            ex_polygons.end(),
+            0.,
+            [](const double acc, const ExPolygon& ex_polygon) { return acc + ex_polygon.area(); }
+        );
+    };
+
+    size_t dominant_state = 0;
+    double dominant_area  = 0.;
+    for (size_t state = 0; state < segments_by_state.size(); ++state) {
+        if (const double area = ex_polygons_area(segments_by_state[state]); area > dominant_area) {
+            dominant_area  = area;
+            dominant_state = state;
+        }
+    }
+
+    return dominant_state;
+}
+
 std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject                                               &print_object,
                                                               const std::function<ModelVolumeFacetsInfo(const ModelVolume &)> &extract_facets_info,
                                                               const size_t                                                     num_facets_states,
@@ -2185,12 +2237,29 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
     std::vector<std::vector<ExPolygons>>  segmented_regions(num_layers);
     segmented_regions.assign(num_layers, std::vector<ExPolygons>(num_facets_states));
 
+    // Whether cut_segmented_layers() will run.
+    const bool should_cut_segmented_layers =
+        (segmentation_max_width > 0.f || segmentation_interlocking_depth > 0.f)
+        && !segmentation_interlocking_beam;
+
+    // For each expolygon, the extruder (color > 0) which covers most of it, or 0 to leave the default.
+    std::vector<std::vector<size_t>> dominant_color_per_expolygon;
+    if (should_cut_segmented_layers) {
+        dominant_color_per_expolygon.resize(num_layers);
+    }
+
     // Be aware that after the projection of the ColorPolygons and its postprocessing isn't
     // ensured that consistency of the color_prev. So, only color_next can be used.
     BOOST_LOG_TRIVIAL(debug) << "Print object segmentation - Layers segmentation in parallel - Begin";
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&input_expolygons_projection_lines_layers, &segmented_regions, &input_expolygons, &num_facets_states, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, num_layers), [&input_expolygons_projection_lines_layers, &segmented_regions, &input_expolygons, &num_facets_states, &dominant_color_per_expolygon, should_cut_segmented_layers, &throw_on_cancel_callback](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
             throw_on_cancel_callback();
+            if (should_cut_segmented_layers) {
+                dominant_color_per_expolygon[layer_idx].assign(
+                    input_expolygons[layer_idx].size(),
+                    0
+                );
+            }
 
             ColorProjectionExPolygons &input_expolygons_projection_lines = input_expolygons_projection_lines_layers[layer_idx];
             for (ColorProjectionExPolygon &input_expolygon_projection_lines : input_expolygons_projection_lines) {
@@ -2218,14 +2287,31 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
                 if (has_polygons_only_one_color(colored_polygons)) {
                     // When the whole ExPolygon is painted using the same color, it is not needed to construct a Voronoi diagram for the segmentation of this ExPolygon.
                     assert(!colored_polygons.front().empty());
-                    segmented_regions[layer_idx][size_t(colored_polygons.front().front().color)].emplace_back(input_expolygons[layer_idx][expolygon_idx]);
+                    const ExPolygon& expolygon = input_expolygons[layer_idx][expolygon_idx];
+                    const size_t expolygon_color =
+                        static_cast<size_t>(colored_polygons.front().front().color);
+
+                    segmented_regions[layer_idx][expolygon_color].emplace_back(expolygon);
+
+                    // Color 0 is the default extruder, dropped after merging, so only real extruders are stored.
+                    if (should_cut_segmented_layers && expolygon_color > 0) {
+                        dominant_color_per_expolygon[layer_idx][expolygon_idx] = expolygon_color;
+                    }
                 } else {
-                    std::vector<ExPolygons> colored_segments_by_states = extract_colored_segments(colored_polygons, num_facets_states, layer_idx);
+                    std::vector<ExPolygons> colored_segments_by_states =
+                        extract_colored_segments(colored_polygons, num_facets_states, layer_idx);
+                    const size_t dominant_color =
+                        dominant_state_by_area(colored_segments_by_states);
+
                     for (size_t state_idx = 0; state_idx < num_facets_states; ++state_idx) {
                         if (colored_segments_by_states[state_idx].empty())
                             continue;
 
                         Slic3r::append(segmented_regions[layer_idx][state_idx], std::move(colored_segments_by_states[state_idx]));
+                    }
+
+                    if (should_cut_segmented_layers && dominant_color > 0) {
+                        dominant_color_per_expolygon[layer_idx][expolygon_idx] = dominant_color;
                     }
                 }
             }
@@ -2245,8 +2331,16 @@ std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject 
         throw_on_cancel_callback();
     }
 
-    if ((segmentation_max_width > 0.f || segmentation_interlocking_depth > 0.f) && !segmentation_interlocking_beam) {
-        cut_segmented_layers(input_expolygons, segmented_regions, scaled<float>(segmentation_max_width), scaled<float>(segmentation_interlocking_depth), throw_on_cancel_callback);
+    if (should_cut_segmented_layers) {
+        cut_segmented_layers(
+            input_expolygons,
+            segmented_regions,
+            dominant_color_per_expolygon,
+            scaled<float>(segmentation_max_width),
+            scaled<float>(segmentation_interlocking_depth),
+            throw_on_cancel_callback
+        );
+
         throw_on_cancel_callback();
     }
 

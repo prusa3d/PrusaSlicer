@@ -3,6 +3,7 @@
 #include <vector>
 
 #include <wx/colour.h>
+#include <wx/string.h>
 
 #include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 
@@ -93,6 +94,8 @@ private:
     wxPanel* m_editor_box{nullptr};
     wxStaticText* m_editor_title{nullptr};
     wxStaticText* m_editor_description{nullptr};
+    wxString m_editor_description_text;
+    bool m_editor_desc_wrap_guard{false};
     wxPanel* m_color_swatch{nullptr};
 
     wxBoxSizer* m_rows_sizer{nullptr};
@@ -128,6 +131,7 @@ private:
     std::vector<wxWindow*> m_preset_filter_buttons;
 
     void build_layout();
+    void set_editor_description(const wxString& text);
     void refresh_virtual_extruder_list(int select_index = -1);
     void populate_editor_from_selection();
     void update_preview_and_validation();

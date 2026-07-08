@@ -21,6 +21,7 @@
 #include <boost/nowide/cstdio.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
 #include <float.h>
 #include <assert.h>
@@ -64,6 +65,13 @@ const std::vector<std::string> GCodeProcessor::Reserved_Tags = {
     "_GP_FIRST_LINE_M73_PLACEHOLDER",
     "_GP_LAST_LINE_M73_PLACEHOLDER",
     "_GP_ESTIMATED_PRINTING_TIME_PLACEHOLDER"
+};
+
+const std::vector<std::string> GCodeProcessor::Custom_Tags = {
+    "FLUSH_START",
+    "FLUSH_END",
+    "EXCLUDE_E_START",
+    "EXCLUDE_E_END",
 };
 
 const float GCodeProcessor::Wipe_Width = 0.05f;
@@ -320,8 +328,9 @@ void GCodeProcessor::TimeMachine::calculate_time(GCodeProcessorResult& result, P
     for (size_t i = 0; i < n_blocks_process; ++i) {
         const TimeBlock& block = blocks[i];
         float block_time = block.time();
-        if (i == 0)
+        if (i + 1 == n_blocks_process) {
             block_time += additional_time;
+        }
 
         time += double(block_time);
         result.moves[block.move_id].time[static_cast<size_t>(mode)] = block_time;
@@ -465,6 +474,9 @@ void GCodeProcessor::UsedFilaments::reset()
     filaments_per_role.clear();
 
     extruder_retracted_volume.clear();
+
+    wipe_tower_per_extruder.clear();
+    flush_per_extruder.clear();
 }
 
 void GCodeProcessor::UsedFilaments::increase_caches(double extruded_volume, unsigned char extruder_id, double parking_volume, double extra_loading_volume)
@@ -486,6 +498,17 @@ void GCodeProcessor::UsedFilaments::increase_caches(double extruded_volume, unsi
         color_change_cache += extruded_volume;
         tool_change_cache += extruded_volume;
         role_cache += extruded_volume;
+    }
+}
+
+void GCodeProcessor::UsedFilaments::update_flush_per_extruder(
+    const double flushed_volume,
+    const unsigned char extruder_id
+)
+{
+    if (flushed_volume > 0.) {
+        flush_per_extruder[extruder_id] += flushed_volume;
+        volumes_per_extruder[extruder_id] += flushed_volume;
     }
 }
 
@@ -515,13 +538,18 @@ void GCodeProcessor::UsedFilaments::process_role_cache(const GCodeProcessor* pro
         filament.first = role_cache / s * 0.001;
         filament.second = role_cache * processor->m_result.filament_densities[processor->m_extruder_id] * 0.001;
 
-        GCodeExtrusionRole active_role = processor->m_extrusion_role;
+        const GCodeExtrusionRole active_role = processor->m_extrusion_role;
         if (filaments_per_role.find(active_role) != filaments_per_role.end()) {
             filaments_per_role[active_role].first += filament.first;
             filaments_per_role[active_role].second += filament.second;
-        }
-        else
+        } else {
             filaments_per_role[active_role] = filament;
+        }
+
+        if (active_role == GCodeExtrusionRole::WipeTower) {
+            wipe_tower_per_extruder[processor->m_extruder_id] += role_cache;
+        }
+
         role_cache = 0.0;
     }
 }
@@ -1059,7 +1087,9 @@ void GCodeProcessor::reset()
     m_z_offset = 0.0f;
 
     m_extrusion_role = GCodeExtrusionRole::None;
-    m_extruder_id = 0;
+    m_flushing       = false;
+    m_exclude_e      = false;
+    m_extruder_id    = 0;
     m_extruder_colors.resize(MIN_EXTRUDERS_COUNT);
     for (size_t i = 0; i < MIN_EXTRUDERS_COUNT; ++i) {
         m_extruder_colors[i] = static_cast<unsigned char>(i);
@@ -1834,13 +1864,14 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
         default:
             break;
         }
-    }
-    else {
-        const std::string &comment = line.raw();
-        if (comment.length() > 2 && comment.front() == ';')
+    } else {
+        // Leading whitespace is trimmed so that tags inside indented blocks (e.g. {if}) are recognized.
+        const std::string comment = boost::algorithm::trim_left_copy(line.raw());
+        if (comment.length() > 2 && comment.front() == ';') {
             // Process tags embedded into comments. Tag comments always start at the start of a line
             // with a comment and continue with a tag without any whitespace separator.
             process_tags(comment.substr(1), producers_enabled);
+        }
     }
 }
 
@@ -1912,6 +1943,30 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
     // wipe end tag
     if (boost::starts_with(comment, reserved_tag(ETags::Wipe_End))) {
         m_wiping = false;
+        return;
+    }
+
+    // flush start tag
+    if (boost::starts_with(comment, custom_tag(CustomETags::Flush_Start))) {
+        m_flushing = true;
+        return;
+    }
+
+    // flush end tag
+    if (boost::starts_with(comment, custom_tag(CustomETags::Flush_End))) {
+        m_flushing = false;
+        return;
+    }
+
+    // exclude E start tag
+    if (boost::starts_with(comment, custom_tag(CustomETags::Exclude_E_Start))) {
+        m_exclude_e = true;
+        return;
+    }
+
+    // exclude E end tag
+    if (boost::starts_with(comment, custom_tag(CustomETags::Exclude_E_End))) {
+        m_exclude_e = false;
         return;
     }
 
@@ -2636,9 +2691,18 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 
     const float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
 
-    if (volume_extruded_filament != 0.)
-        m_used_filaments.increase_caches(volume_extruded_filament, m_extruder_id, area_filament_cross_section * m_parking_position,
-                                         area_filament_cross_section * m_extra_loading_move);
+    if (volume_extruded_filament != 0. && !m_exclude_e) {
+        if (m_flushing) {
+            m_used_filaments.update_flush_per_extruder(volume_extruded_filament, m_extruder_id);
+        } else {
+            m_used_filaments.increase_caches(
+                volume_extruded_filament,
+                m_extruder_id,
+                area_filament_cross_section * m_parking_position,
+                area_filament_cross_section * m_extra_loading_move
+            );
+        }
+    }
 
     const EMoveType type = move_type(delta_pos);
     if (type == EMoveType::Extrude) {
@@ -3817,6 +3881,8 @@ void GCodeProcessor::post_process()
             return ret;
         };
 
+        const int total_toolchanges = m_print->print_statistics().total_toolchanges;
+
         // update binary data
         bgcode::binarize::BinaryData& binary_data = m_binarizer.get_binary_data();
         binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedMm, stringify(filament_mm));
@@ -3826,12 +3892,18 @@ void GCodeProcessor::post_process()
         binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentUsedG, stringify({ filament_total_g }));
         binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentCost, stringify({ filament_total_cost }));
         binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentUsedWipeTower, stringify({ total_g_wipe_tower }));
+        if (total_toolchanges > 0) {
+            binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalToolchanges, std::to_string(total_toolchanges));
+        }
 
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedMm, stringify(filament_mm)); // duplicated into print metadata
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedG, stringify(filament_g));   // duplicated into print metadata
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentCost, stringify(filament_cost));   // duplicated into print metadata
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedCm3, stringify(filament_cm3)); // duplicated into print metadata
         binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentUsedWipeTower, stringify({ total_g_wipe_tower })); // duplicated into print metadata
+        if (total_toolchanges > 0) {
+            binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::TotalToolchanges, std::to_string(total_toolchanges)); // duplicated into print metadata
+        }
 
         for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
             const TimeMachine& machine = m_time_processor.machines[i];
@@ -4535,9 +4607,13 @@ void GCodeProcessor::store_move_vertex(EMoveType type, bool internal_only)
         m_line_id + 1 :
         ((type == EMoveType::Seam) ? m_last_line_id : m_line_id);
 
+    // Extrusions between FLUSH_START/FLUSH_END are stored with a dedicated move type, so they can be
+    // hidden from the G-code preview.
+    const EMoveType stored_type = m_flushing ? EMoveType::Flush : type;
+
     m_result.moves.push_back({
         m_last_line_id,
-        type,
+        stored_type,
         m_extrusion_role,
         m_extruder_id,
         m_cp_color.current,
@@ -4722,8 +4798,10 @@ void GCodeProcessor::process_filaments(CustomGCode::Type code)
     if (code == CustomGCode::ColorChange)
         m_used_filaments.process_color_change_cache();
 
-    if (code == CustomGCode::ToolChange)
+    if (code == CustomGCode::ToolChange) {
+        m_used_filaments.process_role_cache(this);
         m_used_filaments.process_extruder_cache(m_extruder_id);
+    }
 }
 
 void GCodeProcessor::calculate_time(GCodeProcessorResult& result, size_t keep_last_n_blocks, float additional_time)
@@ -4888,6 +4966,8 @@ void GCodeProcessor::update_estimated_statistics()
     m_result.print_statistics.volumes_per_color_change  = m_used_filaments.volumes_per_color_change;
     m_result.print_statistics.volumes_per_extruder      = m_used_filaments.volumes_per_extruder;
     m_result.print_statistics.used_filaments_per_role   = m_used_filaments.filaments_per_role;
+    m_result.print_statistics.wipe_tower_per_extruder   = m_used_filaments.wipe_tower_per_extruder;
+    m_result.print_statistics.flush_per_extruder        = m_used_filaments.flush_per_extruder;
 
     // THE FOLLOWING LOGGING IS USED BY EasyPrint !!!
     log_feature_statistics(m_result);

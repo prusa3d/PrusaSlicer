@@ -492,12 +492,38 @@ namespace DoExport {
             total_cost          += weight * extruder->filament_cost() * 0.001;
         }
 
-        print_statistics.total_extruded_volume = total_extruded_volume;
-        print_statistics.total_used_filament   = total_used_filament;
-        print_statistics.total_weight          = total_weight;
-        print_statistics.total_cost            = total_cost;
+        double total_flush_cost            = 0.;
+        double total_flush_filament        = 0.;
+        double total_flush_filament_weight = 0.;
+        for (const auto& [extruder_id, volume] : result.print_statistics.flush_per_extruder) {
+            auto extruder_it = std::find_if(
+                extruders.begin(),
+                extruders.end(),
+                [extruder_id](const Extruder& extr) { return extr.id() == extruder_id; }
+            );
 
-        print_statistics.filament_stats        = result.print_statistics.volumes_per_extruder;
+            if (extruder_it == extruders.end()) {
+                continue;
+            }
+
+            const double s      = PI * sqr(0.5 * extruder_it->filament_diameter());
+            const double weight = volume * extruder_it->filament_density() * 0.001;
+            total_flush_cost            += weight * extruder_it->filament_cost() * 0.001;
+            total_flush_filament        += volume / s;
+            total_flush_filament_weight += weight;
+        }
+
+        print_statistics.total_extruded_volume       = total_extruded_volume;
+        print_statistics.total_used_filament         = total_used_filament;
+        print_statistics.total_weight                = total_weight;
+        print_statistics.total_cost                  = total_cost;
+        print_statistics.total_flush_cost            = total_flush_cost;
+        print_statistics.total_flush_filament        = total_flush_filament;
+        print_statistics.total_flush_filament_weight = total_flush_filament_weight;
+
+        print_statistics.filament_stats              = result.print_statistics.volumes_per_extruder;
+        print_statistics.flush_stats                 = result.print_statistics.flush_per_extruder;
+        print_statistics.wipe_tower_stats            = result.print_statistics.wipe_tower_per_extruder;
     }
 
     // if any reserved keyword is found, returns a std::vector containing the first MAX_COUNT keywords found
@@ -1461,8 +1487,6 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
 
     if (export_to_binary_gcode) {
         bgcode::binarize::BinaryData& binary_data = m_processor.get_binary_data();
-        if (print.m_print_statistics.total_toolchanges > 0)
-            binary_data.print_metadata.raw_data.emplace_back("total toolchanges", std::to_string(print.m_print_statistics.total_toolchanges));
         char buf[1024];
         sprintf(buf, "%.2lf", m_max_layer_z);
         binary_data.printer_metadata.raw_data.emplace_back("max_layer_z", buf);
@@ -3950,10 +3974,13 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
     const std::string& toolchange_gcode = m_config.toolchange_gcode.value;
     std::string toolchange_gcode_parsed;
 
+    const int prev_extruder_id =
+        static_cast<int>(m_writer.extruder() != nullptr ? m_writer.extruder()->id() : -1);
+
     // Process the custom toolchange_gcode. If it is empty, insert just a Tn command.
     if (!toolchange_gcode.empty()) {
         DynamicConfig config;
-        config.set_key_value("previous_extruder", new ConfigOptionInt((int)(m_writer.extruder() != nullptr ? m_writer.extruder()->id() : -1 )));
+        config.set_key_value("previous_extruder", new ConfigOptionInt(prev_extruder_id));
         config.set_key_value("next_extruder",     new ConfigOptionInt((int)extruder_id));
         config.set_key_value("layer_num",         new ConfigOptionInt(m_layer_index));
         config.set_key_value("layer_z",           new ConfigOptionFloat(print_z));
@@ -3971,6 +3998,23 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
     else {
         // user provided his own toolchange gcode, no need to do anything
     }
+
+    // Emit toolchange time annotation for CoolingBuffer except for the XL printers.
+    if (!is_XL_printer(m_config)) {
+        const float toolchange_time =
+            static_cast<float>(m_config.filament_unload_time.get_at(prev_extruder_id)) +
+            static_cast<float>(m_config.filament_load_time.get_at(extruder_id));
+
+        if (toolchange_time > 0.f) {
+            gcode += ";_TOOLCHANGE_TIME" + std::to_string(toolchange_time) + "\n";
+        }
+    }
+
+    // Custom toolchange gcode may have changed fan speed via M106/M107 that CoolingBuffer
+    // doesn't track. Reset dynamic fan speed and emit ;_TOOLCHANGE_END to force CoolingBuffer
+    // to restore the correct fan speed.
+    m_current_dynamic_fan_speed.reset();
+    gcode += ";_TOOLCHANGE_END\n";
 
     // Set the temperature if the wipe tower didn't (not needed for non-single extruder MM)
     if (m_config.single_extruder_multi_material && !m_config.wipe_tower) {

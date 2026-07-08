@@ -1,6 +1,61 @@
 {
     "printers": [
         {
+            "printer_notes_regex": ".*SEQ_ARRANGE_MODEL_COREONE_INDX.*",
+            "gantry_model_filename": "prusa3d_coreone_indx_gantry.stl",
+            "slices": [
+                {
+                    "height": "0",
+                    "type": "convex",
+                    "polygons": [
+                        "-5,-5; 5,-5; 5,5; -5,5"
+                    ]
+                },
+                {
+                    "height": "2",
+                    "type": "convex",
+                    "polygons": [
+                        "-25,-75; 27,-75; 27,18; -25,18"
+                    ]
+                },
+                {
+                    "height": "23",
+                    "type": "convex",
+                    "polygons": [
+                        "-27,-52; 25,-52; 25,21; -27,21"
+                    ]
+                },
+                {
+                    "height": "23",
+                    "type": "convex",
+                    "polygons": [
+                        "-27,-90; 28,-90; 28,-47; -27,-47"
+                    ]
+                },
+                {
+                    "height": "29",
+                    "type": "box",
+                    "polygons": [
+                        "-300,-58; 300,-58; 300,-36; -300,-36"
+                    ]
+                },
+                {
+                    "height": "120",
+                    "type": "box",
+                    "polygons": [
+                        "-300,-300; 300,-300; 300,10; -300,10"
+                    ]
+                },
+                {
+                    "height": "170",
+                    "type": "box",
+                    "polygons": [
+                        "-300,-300; 300,-300; 300,300; -300,300"
+                    ]
+                }
+            ]
+        },
+        {
             "printer_notes_regex": ".*PRINTER_MODEL_MK4(?!S).*",
             "gantry_model_filename": "prusa3d_mk4_gantry.stl",
             "slices": [

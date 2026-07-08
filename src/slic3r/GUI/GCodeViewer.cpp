@@ -397,6 +397,7 @@ static std::string to_string(libvgcode::EMoveType type)
     case libvgcode::EMoveType::Travel:      { return _u8L("Travel"); }
     case libvgcode::EMoveType::Wipe:        { return _u8L("Wipe"); }
     case libvgcode::EMoveType::Extrude:     { return _u8L("Extrude"); }
+    case libvgcode::EMoveType::Flush:       { return _u8L("Flush"); }
     default:                                { return _u8L("Unknown"); }
     }
 }
