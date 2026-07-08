@@ -77,20 +77,18 @@ struct CurlGlobalInit
                 }
             }
 
-            if (!bundle)
+            if (!bundle) {
                 message = _u8L("Could not detect system SSL certificate store. "
                                "PrusaSlicer will be unable to establish secure "
                                "network connections.");
-            else
-                message = Slic3r::GUI::format(
-					_L("PrusaSlicer detected system SSL certificate store in: %1%"),
-                    bundle);
-
-            message += "\n" + Slic3r::GUI::format(
-				_L("To specify the system certificate store manually, please "
-                   "set the %1% environment variable to the correct CA bundle "
-                   "and restart the application."),
-                SSL_CA_FILE);
+                message += "\n" + Slic3r::GUI::format(
+                    _L("To specify the system certificate store manually, please "
+                       "set the %1% environment variable to the correct CA bundle "
+                       "and restart the application."),
+                    SSL_CA_FILE);
+            } else {
+                BOOST_LOG_TRIVIAL(info) << "PrusaSlicer detected system SSL certificate store in: " << bundle;
+            }
         }
 
 #endif // OPENSSL_CERT_OVERRIDE

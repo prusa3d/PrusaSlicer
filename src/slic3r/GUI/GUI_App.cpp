@@ -1438,6 +1438,7 @@ bool GUI_App::on_init_inner()
                 dlg(nullptr,
                     wxString::Format(_L("%s\nDo you want to continue?"), msg),
                     "PrusaSlicer", wxICON_QUESTION | wxYES_NO);
+            dlg.SetYesNoLabels(_L("Continue"), _L("Abort"));
             dlg.ShowCheckBox(_L("Remember my choice"));
             if (dlg.ShowModal() != wxID_YES) return false;
 
