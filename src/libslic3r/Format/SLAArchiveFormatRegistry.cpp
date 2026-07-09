@@ -8,6 +8,7 @@
 #include "SL1.hpp"
 #include "SL1_SVG.hpp"
 #include "AnycubicSLA.hpp"
+#include "MiiCraft3DP.hpp"
 #include "libslic3r/I18N.hpp"
 #include "SLAArchiveFormatRegistry.hpp"
 #include "libslic3r/Format/SLAArchiveReader.hpp"
@@ -50,6 +51,7 @@ class Registry {
             anycubic_sla_format("pwmo", "Photon Mono"),
             anycubic_sla_format("pwmx", "Photon Mono X"),
             anycubic_sla_format("pwms", "Photon Mono SE"),
+            miicraft_3dp_format("3dp", "MiiCraft Series")
 
             /**
                 // Supports only ANYCUBIC_SLA_VERSION_1
