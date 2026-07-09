@@ -2487,7 +2487,16 @@ bool GUI_App::select_language()
     	// This is the language to highlight in the choice dialog initially.
     	init_selection_default = init_selection;
 
-    const long index = GetSingleChoiceIndex(_L("Select the language"), _L("Language"), names, init_selection_default);
+    wxString message = _L("Select the language");
+    
+#ifdef __linux__
+    // Detect Flatpak
+    if (getenv("container")) {
+        message += "\n\n" + _L("Linux Flatpak version by default does not include all available languages.\nSee https://help.prusa3d.com/neco for more info.");
+    }
+#endif
+
+    const long index = GetSingleChoiceIndex(message, _L("Language"), names, init_selection_default);
 	// Try to load a new language.
     if (index != -1 && (init_selection == -1 || init_selection != index)) {
     	const wxLanguageInfo *new_language_info = language_infos[index];
