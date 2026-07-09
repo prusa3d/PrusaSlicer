@@ -1475,18 +1475,17 @@ void TabPrint::build()
         optgroup->append_single_option_line("overhangs", category_path + "detect-bridging-perimeters");
 
         optgroup = page->new_optgroup(L("Advanced"));
-        optgroup->append_single_option_line("seam_position", category_path + "seam-position");
-        optgroup->append_single_option_line("seam_gap_distance", category_path + "seam-gap-distance");
-        optgroup->append_single_option_line("staggered_inner_seams", category_path + "staggered-inner-seams");
-
-        const std::string scarf_seam_path{"seam-position_151069#"};
-        optgroup->append_single_option_line("scarf_seam_placement", scarf_seam_path + "scarf-joint-placement");
-        optgroup->append_single_option_line("scarf_seam_only_on_smooth", scarf_seam_path + "scarf-joint-only-on-smooth-perimeters");
-        optgroup->append_single_option_line("scarf_seam_start_height", scarf_seam_path + "scarf-start-height");
-        optgroup->append_single_option_line("scarf_seam_entire_loop", scarf_seam_path + "scarf-joint-around-entire-perimeter");
-        optgroup->append_single_option_line("scarf_seam_length", scarf_seam_path + "scarf-joint-length");
-        optgroup->append_single_option_line("scarf_seam_max_segment_length", scarf_seam_path + "max-scarf-joint-segment-length");
-        optgroup->append_single_option_line("scarf_seam_on_inner_perimeters", scarf_seam_path + "scarf-joint-on-inner-perimeters");
+        const std::string seam_path{"seam-position_151069#"};
+        optgroup->append_single_option_line("seam_position", seam_path + "seam-position");
+        optgroup->append_single_option_line("seam_gap_distance", seam_path + "seam-gap-distance");
+        optgroup->append_single_option_line("staggered_inner_seams", seam_path + "staggered-inner-seams");
+        optgroup->append_single_option_line("scarf_seam_placement", seam_path + "scarf-joint-placement");
+        optgroup->append_single_option_line("scarf_seam_only_on_smooth", seam_path + "scarf-joint-only-on-smooth-perimeters");
+        optgroup->append_single_option_line("scarf_seam_start_height", seam_path + "scarf-start-height");
+        optgroup->append_single_option_line("scarf_seam_entire_loop", seam_path + "scarf-joint-around-entire-perimeter");
+        optgroup->append_single_option_line("scarf_seam_length", seam_path + "scarf-joint-length");
+        optgroup->append_single_option_line("scarf_seam_max_segment_length", seam_path + "max-scarf-joint-segment-length");
+        optgroup->append_single_option_line("scarf_seam_on_inner_perimeters", seam_path + "scarf-joint-on-inner-perimeters");
 
         optgroup->append_single_option_line("external_perimeters_first", category_path + "external-perimeters-first");
         optgroup->append_single_option_line("gap_fill_enabled", category_path + "fill-gaps");
