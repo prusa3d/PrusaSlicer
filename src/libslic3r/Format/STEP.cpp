@@ -42,8 +42,8 @@ LoadStepFn get_load_step_fn()
 #endif
 
     if (!load_step_fn) {
-        auto libpath = boost::dll::program_location().parent_path();
 #ifdef _WIN32
+        auto libpath = boost::dll::program_location().parent_path();
         libpath /= "OCCTWrapper.dll";
         HMODULE module = LoadLibraryW(libpath.wstring().c_str());
         if (module == NULL)
@@ -64,8 +64,8 @@ LoadStepFn get_load_step_fn()
 #elif __APPLE__
         load_step_fn = &load_step_internal;
 #else
-        libpath /= "OCCTWrapper.so";
-        void *plugin_ptr = dlopen(libpath.c_str(), RTLD_NOW | RTLD_GLOBAL);
+        // This is installed into /usr/lib(64)/ and dlopen will search there.
+        void *plugin_ptr = dlopen("OCCTWrapper.so", RTLD_NOW | RTLD_GLOBAL);
 
         if (plugin_ptr) {
             load_step_fn = reinterpret_cast<LoadStepFn>(dlsym(plugin_ptr, fn_name));
