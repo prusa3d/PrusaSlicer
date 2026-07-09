@@ -483,7 +483,13 @@ void PreferencesDialog::build()
 		L("If enabled, reverses the direction of zoom with mouse wheel"),
 		app_config->get_bool("reverse_mouse_wheel_zoom"));
 
-	activate_options_tab(m_optgroup_camera);
+	append_bool_option(m_optgroup_camera, "reverse_mouse_buttons",
+        L("Reverse left and right mouse button functions"),
+        L("If enabled, the right mouse button will rotate"),
+        app_config->get_bool("reverse_mouse_buttons")
+    );
+
+    activate_options_tab(m_optgroup_camera);
 
 	// Add "GUI" tab
 	m_optgroup_gui = create_options_tab(L("GUI"), tabs);
