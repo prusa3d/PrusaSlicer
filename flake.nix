@@ -38,6 +38,7 @@
             echo "PrusaSlicer dev shell — deps from nixpkgs#prusa-slicer"
             echo "Configure: cmake -G Ninja -B build -DSLIC3R_FHS=0 -DSLIC3R_STATIC=0 -DSLIC3R_GTK=3 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=mold"
             echo "Build:     cmake --build build --target PrusaSlicer -j\$(nproc)"
+            echo "Run:       ./build/src/prusa-slicer"
           '';
         };
       });

@@ -212,10 +212,11 @@ static bool setup_common()
     save_main_thread_id();
 
 #ifdef __WXGTK__
-    // On Linux, wxGTK has no support for Wayland, and the app crashes on
-    // startup if gtk3 is used. This env var has to be set explicitly to
-    // instruct the window manager to fall back to X server mode.
-    ::setenv("GDK_BACKEND", "x11", /* replace */ true);
+    // Historically wxGTK/GTK3 had no usable Wayland support, so the backend was
+    // force-pinned to X11 here. That forces the 3D wxGLCanvas onto XWayland/GLX,
+    // which renders black on modern Wayland compositors (e.g. the nixpkgs dev
+    // build on NixOS). Let GTK pick the native backend instead — matching the
+    // nixpkgs "allow_wayland" patch.
 
     // https://github.com/prusa3d/PrusaSlicer/issues/12969
     ::setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", /* replace */ false);
