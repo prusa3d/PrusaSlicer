@@ -39,7 +39,8 @@
                 "SLIC3R_GTK": "3",
                 "SLIC3R_ENC_CHECK": false,
                 "SLIC3R_PCH": true,
-                "PrusaSlicer_BUILD_DEPS": false
+                "PrusaSlicer_BUILD_DEPS": false,
+                "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
             }
         }
     ]

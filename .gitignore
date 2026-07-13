@@ -2,6 +2,8 @@ Build
 Build.bat
 /build/
 /build-default/
+/build-no-occt/
+/shareddeps/
 
 # Nix / direnv dev environment
 /.direnv/
