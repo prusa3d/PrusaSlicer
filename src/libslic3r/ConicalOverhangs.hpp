@@ -1,5 +1,5 @@
-#ifndef slic3r_OverhangReshape_hpp_
-#define slic3r_OverhangReshape_hpp_
+#ifndef slic3r_ConicalOverhangs_hpp_
+#define slic3r_ConicalOverhangs_hpp_
 
 #include <vector>
 
@@ -7,7 +7,7 @@ namespace Slic3r {
 
 class Layer;
 
-// "Make overhangs printable" (Cura-style conical overhang), in slice space.
+// Conical overhangs (Cura-style), in slice space.
 //
 // Operates on the already-sliced object layers (bottom..top). Going top-down,
 // every layer's outline is unioned with the outline of the layer above dilated
@@ -21,10 +21,10 @@ class Layer;
 // Holes (internal cavities) whose per-layer area is <= max_hole_area_mm2 are
 // filled in to support their ceiling; larger holes are kept open. Pass 0 to
 // keep every hole open.
-void make_overhangs_printable(const std::vector<Layer*> &layers,
-                              double                     max_overhang_angle_deg,
-                              double                     max_hole_area_mm2);
+void apply_conical_overhangs(const std::vector<Layer*> &layers,
+                             double                     max_overhang_angle_deg,
+                             double                     max_hole_area_mm2);
 
 } // namespace Slic3r
 
-#endif // slic3r_OverhangReshape_hpp_
+#endif // slic3r_ConicalOverhangs_hpp_

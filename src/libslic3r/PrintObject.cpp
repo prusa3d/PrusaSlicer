@@ -774,9 +774,9 @@ bool PrintObject::invalidate_state_by_config_options(
 		} else if (
                opt_key == "elefant_foot_compensation"
             || opt_key == "support_material_contact_distance"
-            || opt_key == "overhang_reshape"
-            || opt_key == "overhang_reshape_angle"
-            || opt_key == "overhang_reshape_hole_area"
+            || opt_key == "conical_overhangs"
+            || opt_key == "conical_overhangs_angle"
+            || opt_key == "conical_overhangs_hole_area"
             || opt_key == "xy_size_compensation") {
             steps.emplace_back(posSlice);
         } else if (opt_key == "support_material") {

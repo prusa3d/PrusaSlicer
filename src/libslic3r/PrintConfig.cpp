@@ -3947,8 +3947,8 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionInt(0));
 
-    def = this->add("overhang_reshape", coBool);
-    def->label = L("Make overhangs printable");
+    def = this->add("conical_overhangs", coBool);
+    def->label = L("Conical overhangs");
     def->category = L("Advanced");
     def->tooltip = L("Reshape the model at slice time so that downward overhangs steeper than "
                    "the configured angle are pushed outward into a printable cone, baking "
@@ -3956,24 +3956,24 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def = this->add("overhang_reshape_angle", coFloat);
+    def = this->add("conical_overhangs_angle", coFloat);
     def->label = L("Maximum overhang angle");
     def->category = L("Advanced");
     def->tooltip = L("Maximum overhang angle, measured from the vertical, that is left untouched. "
                    "Surfaces steeper than this (i.e. more horizontal) are reshaped to this angle. "
-                   "Only used when \"Make overhangs printable\" is enabled.");
+                   "Only used when \"Conical overhangs\" is enabled.");
     def->sidetext = L("°");
     def->min = 0;
     def->max = 89;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(45));
 
-    def = this->add("overhang_reshape_hole_area", coFloat);
+    def = this->add("conical_overhangs_hole_area", coFloat);
     def->label = L("Maximum hole area to fill");
     def->category = L("Advanced");
-    def->tooltip = L("When making overhangs printable, holes (internal cavities) smaller than this "
+    def->tooltip = L("With conical overhangs, holes (internal cavities) smaller than this "
                    "area are filled in to support their ceiling, while larger holes are left open. "
-                   "Set to zero to keep all holes open. Only used when \"Make overhangs printable\" "
+                   "Set to zero to keep all holes open. Only used when \"Conical overhangs\" "
                    "is enabled.");
     def->sidetext = L("mm²");
     def->min = 0;

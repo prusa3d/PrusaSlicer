@@ -1,4 +1,4 @@
-#include "OverhangReshape.hpp"
+#include "ConicalOverhangs.hpp"
 
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
@@ -9,9 +9,9 @@
 
 namespace Slic3r {
 
-void make_overhangs_printable(const std::vector<Layer*> &layers,
-                              double                     max_overhang_angle_deg,
-                              double                     max_hole_area_mm2)
+void apply_conical_overhangs(const std::vector<Layer*> &layers,
+                             double                     max_overhang_angle_deg,
+                             double                     max_hole_area_mm2)
 {
     if (layers.size() < 2)
         return;

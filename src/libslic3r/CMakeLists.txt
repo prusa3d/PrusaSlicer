@@ -382,8 +382,8 @@ set(SLIC3R_SOURCES
     Tesselate.cpp
     Tesselate.hpp
     TextConfiguration.hpp
-    OverhangReshape.cpp
-    OverhangReshape.hpp
+    ConicalOverhangs.cpp
+    ConicalOverhangs.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp

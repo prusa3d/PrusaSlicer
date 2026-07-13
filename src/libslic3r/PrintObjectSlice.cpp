@@ -39,7 +39,7 @@
 #include "libslic3r/Surface.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
-#include "libslic3r/OverhangReshape.hpp"
+#include "libslic3r/ConicalOverhangs.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/libslic3r.h"
 
@@ -539,9 +539,9 @@ void PrintObject::slice()
     m_layers = new_layers(this, generate_object_layers(m_slicing_params, layer_height_profile));
     this->slice_volumes();
     m_print->throw_if_canceled();
-    // Make overhangs printable: grow a printable cone under overhangs in slice space.
-    if (m_config.overhang_reshape.value)
-        make_overhangs_printable(m_layers, m_config.overhang_reshape_angle.value, m_config.overhang_reshape_hole_area.value);
+    // Conical overhangs: grow a printable cone under overhangs in slice space.
+    if (m_config.conical_overhangs.value)
+        apply_conical_overhangs(m_layers, m_config.conical_overhangs_angle.value, m_config.conical_overhangs_hole_area.value);
     m_print->throw_if_canceled();
 #if 0
     // Layer::slicing_errors is no more set since 1.41.1 or possibly earlier, thus this code
