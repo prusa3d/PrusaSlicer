@@ -212,11 +212,14 @@ static bool setup_common()
     save_main_thread_id();
 
 #ifdef __WXGTK__
-    // Historically wxGTK/GTK3 had no usable Wayland support, so the backend was
-    // force-pinned to X11 here. That forces the 3D wxGLCanvas onto XWayland/GLX,
-    // which renders black on modern Wayland compositors (e.g. the nixpkgs dev
-    // build on NixOS). Let GTK pick the native backend instead — matching the
-    // nixpkgs "allow_wayland" patch.
+    // Default to the X11 backend: legacy wxGTK/GTK3 had unreliable Wayland
+    // support and could crash on startup, so X11 (via XWayland on Wayland
+    // sessions) stays the safe default. Use replace=false so it only fills in a
+    // default and honours an explicit GDK_BACKEND from the environment. Wayland
+    // users can `export GDK_BACKEND=wayland` to get native EGL — required on
+    // compositors where XWayland/GLX renders the 3D wxGLCanvas black (e.g.
+    // NVIDIA), which the packaged nixpkgs "allow_wayland" build relies on.
+    ::setenv("GDK_BACKEND", "x11", /* replace */ false);
 
     // https://github.com/prusa3d/PrusaSlicer/issues/12969
     ::setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", /* replace */ false);
