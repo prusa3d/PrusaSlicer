@@ -3980,6 +3980,36 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(5));
 
+    def = this->add("conical_overhangs_melt_angle", coFloat);
+    def->label = L("Extra melt angle");
+    def->category = L("Advanced");
+    def->tooltip = L("Melt the sharp ridges the cone forms where its support surfaces meet, so they "
+                   "smoothly round away as they descend instead of curling up when hot. Uses "
+                   "curve-shortening (a square cross-section slowly becomes a circle). This is the "
+                   "extra overhang angle allowed at ridges in exchange for melting them: no melted "
+                   "wall will be steeper than the overhang angle plus this value. Larger values melt "
+                   "ridges faster and more completely (0 = sharp ridges, disabled). Only affects "
+                   "ridges created by conical overhangs, never the model's own edges. Only used when "
+                   "\"Conical overhangs\" is enabled.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 45;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("conical_overhangs_subdivision", coFloat);
+    def->label = L("Ridge subdivision length");
+    def->category = L("Advanced");
+    def->tooltip = L("Before melting, the cone outline is subdivided so no edge is longer than this "
+                   "length. Subdivision gives each corner's turn somewhere to spread, so sharp ridges "
+                   "round into smooth arcs (a bare polygon can only shrink, not round). Smaller "
+                   "values give finer, rounder ridges at some slicing cost. Only used when \"Extra "
+                   "melt angle\" is greater than zero.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.5));
+
     def = this->add("xy_size_compensation", coFloat);
     def->label = L("XY Size Compensation");
     def->category = L("Advanced");

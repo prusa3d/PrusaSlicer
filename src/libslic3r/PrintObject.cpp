@@ -777,6 +777,8 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "conical_overhangs"
             || opt_key == "conical_overhangs_angle"
             || opt_key == "conical_overhangs_hole_area"
+            || opt_key == "conical_overhangs_melt_angle"
+            || opt_key == "conical_overhangs_subdivision"
             || opt_key == "xy_size_compensation") {
             steps.emplace_back(posSlice);
         } else if (opt_key == "support_material") {

@@ -541,7 +541,8 @@ void PrintObject::slice()
     m_print->throw_if_canceled();
     // Conical overhangs: grow a printable cone under overhangs in slice space.
     if (m_config.conical_overhangs.value)
-        apply_conical_overhangs(m_layers, m_config.conical_overhangs_angle.value, m_config.conical_overhangs_hole_area.value);
+        apply_conical_overhangs(m_layers, m_config.conical_overhangs_angle.value, m_config.conical_overhangs_hole_area.value,
+                                m_config.conical_overhangs_melt_angle.value, m_config.conical_overhangs_subdivision.value);
     m_print->throw_if_canceled();
 #if 0
     // Layer::slicing_errors is no more set since 1.41.1 or possibly earlier, thus this code

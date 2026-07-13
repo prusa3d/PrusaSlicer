@@ -677,6 +677,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                conical_overhangs))
     ((ConfigOptionFloat,               conical_overhangs_angle))
     ((ConfigOptionFloat,               conical_overhangs_hole_area))
+    ((ConfigOptionFloat,               conical_overhangs_melt_angle))
+    ((ConfigOptionFloat,               conical_overhangs_subdivision))
     ((ConfigOptionEnum<PerimeterGeneratorType>, perimeter_generator))
     ((ConfigOptionFloatOrPercent,      wall_transition_length))
     ((ConfigOptionFloatOrPercent,      wall_transition_filter_deviation))

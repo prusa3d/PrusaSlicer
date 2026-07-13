@@ -13,6 +13,7 @@ add_executable(${_TEST_NAME}_tests
 	test_clipper_utils.cpp
 	test_color.cpp
 	test_config.cpp
+	test_conical_overhangs.cpp
 	test_curve_fitting.cpp
 	test_cut_surface.cpp
 	test_elephant_foot_compensation.cpp

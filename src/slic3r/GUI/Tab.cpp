@@ -1711,9 +1711,13 @@ void TabPrint::build()
         optgroup->append_single_option_line("arc_fitting");
         optgroup->append_single_option_line("xy_size_compensation");
         optgroup->append_single_option_line("elefant_foot_compensation", "elephant-foot-compensation_114487");
+
+        optgroup = page->new_optgroup(L("Conical overhangs"));
         optgroup->append_single_option_line("conical_overhangs");
         optgroup->append_single_option_line("conical_overhangs_angle");
         optgroup->append_single_option_line("conical_overhangs_hole_area");
+        optgroup->append_single_option_line("conical_overhangs_melt_angle");
+        optgroup->append_single_option_line("conical_overhangs_subdivision");
 
         optgroup = page->new_optgroup(L("Arachne perimeter generator"));
         optgroup->append_single_option_line("wall_transition_angle");
