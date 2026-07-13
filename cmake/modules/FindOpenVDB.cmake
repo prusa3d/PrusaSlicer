@@ -347,25 +347,24 @@ macro(just_fail msg)
   return()
 endmacro()
 
+# OpenVDB < 8 links Half from IlmBase; OpenVDB 8+/Imath (e.g. nixpkgs' OpenVDB 12)
+# dropped IlmBase entirely. Reconstruct the IlmBase::Half imported target only when
+# an IlmBase that actually provides Half is present, so both the bundled
+# (IlmBase-era OpenEXR 2.5) and modern-Imath toolchains configure without failing.
 find_package(IlmBase QUIET)
 if(NOT IlmBase_FOUND)
   pkg_check_modules(IlmBase QUIET IlmBase)
 endif()
-if (IlmBase_FOUND AND NOT TARGET IlmBase::Half)
-  message(STATUS "Falling back to IlmBase found by pkg-config...")
-
+if(IlmBase_FOUND AND NOT TARGET IlmBase::Half)
   find_library(IlmHalf_LIBRARY NAMES Half)
-  if(IlmHalf_LIBRARY-NOTFOUND OR NOT IlmBase_INCLUDE_DIRS)
-    just_fail("IlmBase::Half can not be found!")
+  if(IlmHalf_LIBRARY AND IlmBase_INCLUDE_DIRS)
+    add_library(IlmBase::Half UNKNOWN IMPORTED)
+    set_target_properties(IlmBase::Half PROPERTIES
+      IMPORTED_LOCATION "${IlmHalf_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}")
   endif()
-  
-  add_library(IlmBase::Half UNKNOWN IMPORTED)
-  set_target_properties(IlmBase::Half PROPERTIES
-    IMPORTED_LOCATION "${IlmHalf_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}")
-elseif(NOT IlmBase_FOUND)
-  just_fail("IlmBase::Half can not be found!")
 endif()
+
 find_package(TBB ${_quiet} ${_required} COMPONENTS tbb)
 find_package(ZLIB ${_quiet} ${_required})
 find_package(Boost ${_quiet} ${_required} COMPONENTS iostreams system )
@@ -471,8 +470,12 @@ endif()
 set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
+
+# Only propagate Half if it was found/reconstructed above (absent on Imath builds).
+if(TARGET IlmBase::Half)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES IlmBase::Half)
+endif()
 
 set(_OPENVDB_DEFINITIONS)
 if(OpenVDB_ABI)

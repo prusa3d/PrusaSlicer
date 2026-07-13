@@ -1,6 +1,14 @@
 Build
 Build.bat
 /build/
+/build-default/
+/build-no-occt/
+/shareddeps/
+
+# Nix / direnv dev environment
+/.direnv/
+/result
+/result-*
 MYMETA.json
 MYMETA.yml
 _build
