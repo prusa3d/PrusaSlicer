@@ -98,7 +98,6 @@ bool load_step(const char *path, Model *model /*BBS:, ImportStepProgressFn proFn
     
     assert(boost::algorithm::iends_with(occt_object.object_name, ".stp")
         || boost::algorithm::iends_with(occt_object.object_name, ".step"));
-    occt_object.object_name.erase(occt_object.object_name.find("."));
     assert(! occt_object.object_name.empty());
 
 
