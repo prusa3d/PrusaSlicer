@@ -964,7 +964,16 @@ namespace Slic3rLegacy {
         m_start_part_path = MODEL_FILE; // set default value for invalid .rel file
         clear_errors();
 
-        return _load_model_from_file(filename, model, config, preset_metadata, config_substitutions, wipe_towers, custom_gcodes, out_virtual_extruders_config);
+        return _load_model_from_file(
+            filename,
+            model,
+            config,
+            preset_metadata,
+            config_substitutions,
+            wipe_towers,
+            custom_gcodes,
+            out_virtual_extruders_config
+        );
     }
 
     void _3MF_Importer::_destroy_xml_parser()

@@ -11,6 +11,7 @@
 #include "Slic3r/Log.hpp"
 
 #include <algorithm>
+#include <fmt/ranges.h>
 #include <limits>
 #include <map>
 #include <set>
@@ -201,15 +202,7 @@ tl::expected<void, std::string> VirtualExtruderInteractor::set_virtual_extruders
     }
 
     if (!violation_messages.empty()) {
-        std::string joined_message;
-        for (const std::string& violation_message : violation_messages) {
-            if (!joined_message.empty()) {
-                joined_message += '\n';
-            }
-            joined_message += violation_message;
-        }
-
-        return tl::make_unexpected(std::move(joined_message));
+        return tl::make_unexpected(fmt::to_string(fmt::join(violation_messages, "\n")));
     }
 
     write_virtual_extruders(*config_container, std::move(normalized_virtual_extruders));

@@ -78,7 +78,7 @@ std::unique_ptr<App::Render::Geometry> create_painted_mesh_geometry(
     for (const TriangleSelector::Triangle& tr : triangles) {
         if (tr.valid() && !tr.is_split()) {
             const size_t triangle_state = static_cast<size_t>(tr.get_state());
-            //assert(triangle_state < state_colors.size());
+            assert(triangle_state < color_per_state.size());
 
             const size_t color = color_per_state[triangle_state].has_value() ? triangle_state : 0;
             std::vector<uint32_t>& indices_per_color = indices_per_colors
