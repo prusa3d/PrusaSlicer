@@ -3152,19 +3152,18 @@ void PrintConfigDef::init_fff_params()
                    "It won't work when printing more than one single object.");
     def->set_default_value(new ConfigOptionBool(false));
 
-    def = this->add("spiral_vase_wall_count", coInt);
-    def->label = L("Spiral vase wall count");
-    def->tooltip = L("Number of concentric walls printed as one continuous spiral per layer when "
-                   "Spiral vase is enabled. 1 = classic single-wall spiral vase. Higher values print "
-                   "a thick, solid wall: each layer is filled with concentric rings joined into one "
-                   "continuous extrusion (flat rings with a short smooth transition between them), "
-                   "and the layer change is a short spiral ramp instead of a Z hop. "
-                   "0 = automatic: fill the sliced wall of the model completely, deriving the wall "
-                   "count per layer from the model geometry (works for tapered shapes such as cones).");
-    def->min = 0;
-    def->max = 100;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionInt(1));
+    def = this->add("constant_wall_spiral", coBool);
+    def->label = L("Continuous constant-wall spiral");
+    def->tooltip = L("One-click continuous printing for round, constant-wall shapes. Every layer whose "
+                   "cross-section is a circular wall of constant thickness (fully axisymmetric) is "
+                   "printed as one continuous spiral of concentric rings with exact volumetric flow: "
+                   "the wall fills completely, the climb to the next layer is a short ramp buried "
+                   "inside the wall, and the whole section prints without a single retraction or "
+                   "restart. Layers that are not a constant circular wall (holes, ports, non-round "
+                   "sections, solid tops and bottoms) automatically print with the regular settings. "
+                   "No other settings are modified by this mode.");
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("standby_temperature_delta", coInt);
     def->label = L("Temperature variation");
@@ -5545,20 +5544,9 @@ void DynamicPrintConfig::normalize_fdm()
             opt_n->values.assign(opt_n->values.size(), false);  // Set all values to false.
         }
         {
-            // Multi-wall (thick) spiral vase: spiral_vase_wall_count drives the perimeter count.
-            // 1 = classic single-wall spiral vase. N>1 = N concentric walls morphed into one
-            // continuous spiral per layer. 0 = automatic: as many walls as fit the sliced wall
-            // of the model (works for tapered shapes; effectively "fill the wall completely").
-            int spiral_walls = this->has("spiral_vase_wall_count") ?
-                this->opt<ConfigOptionInt>("spiral_vase_wall_count", true)->value : 1;
-            this->opt<ConfigOptionInt>("perimeters", true)->value       = (spiral_walls <= 0) ? 1000 : spiral_walls;
+            this->opt<ConfigOptionInt>("perimeters", true)->value       = 1;
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
-            if (spiral_walls != 1) {
-                // The multi-wall spiral starts at the build plate: no solid bottom.
-                this->opt<ConfigOptionInt>("bottom_solid_layers", true)->value = 0;
-                this->opt<ConfigOptionFloat>("bottom_solid_min_thickness", true)->value = 0.;
-            }
         }
     }
 
@@ -5893,9 +5881,7 @@ std::string validate(const FullPrintConfig &cfg)
     if (cfg.spiral_vase) {
         // Note that we might want to have more than one perimeter on the bottom
         // solid layers.
-        // Multi-wall spiral vase (spiral_vase_wall_count != 1) morphs any number of concentric
-        // perimeters into one continuous spiral per layer, so more than one perimeter is valid.
-        if (cfg.perimeters > 1 && cfg.spiral_vase_wall_count == 1)
+        if (cfg.perimeters > 1)
             return "Can't make more than one perimeter when spiral vase mode is enabled";
         else if (cfg.perimeters < 1)
             return "Can't make less than one perimeter when spiral vase mode is enabled";

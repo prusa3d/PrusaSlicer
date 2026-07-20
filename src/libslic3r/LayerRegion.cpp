@@ -139,7 +139,10 @@ void LayerRegion::make_perimeters(
         auto perimeters_begin      = uint32_t(m_perimeters.size());
         auto gap_fills_begin       = uint32_t(m_thin_fills.size());
         auto fill_expolygons_begin = uint32_t(fill_expolygons.size());
-        if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne && !spiral_vase)
+        // The continuous constant-wall spiral is implemented in the classic generator; force it
+        // for the whole print when the mode is on so qualifying layers can take the spiral path.
+        if (this->layer()->object()->config().perimeter_generator.value == PerimeterGeneratorType::Arachne && !spiral_vase &&
+            !print_config.constant_wall_spiral.value)
             PerimeterGenerator::process_arachne(
                 // input:
                 params,

@@ -44,9 +44,10 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
         return gcode;
     }
 
-    // Multi-wall (thick) spiral vase: the layer is one morphed multi-ring spiral path; keep it
-    // FLAT at its nominal height and only ramp the final short arc up to the next layer.
-    if (m_config.spiral_vase_wall_count.value != 1)
+    // Continuous constant-wall spiral: the layer is one morphed multi-ring spiral path; keep it
+    // FLAT at its nominal height and only ramp the final short arc (the in-wall elevator) up to
+    // the next layer.
+    if (m_config.constant_wall_spiral.value)
         return this->process_layer_multiwall(gcode, last_layer);
 
     // Get total XY length for this layer by summing all extrusion moves.

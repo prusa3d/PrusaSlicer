@@ -1177,6 +1177,33 @@ void PerimeterGenerator::process_arachne(
     append(out_fill_expolygons, std::move(infill_areas));
 }
 
+// Continuous constant-wall spiral: does this surface qualify for the per-layer spiral treatment?
+// It must be a fully axisymmetric wall: exactly one hole, both boundaries circular (isoperimetric
+// quotient 4*pi*A/P^2 ~ 1), and concentric within a fraction of the wall thickness (which makes
+// the wall thickness constant). Anything else - side holes/ports (they break the annulus),
+// non-round sections, solid regions - prints with the regular settings untouched.
+static bool surface_is_constant_circular_wall(const ExPolygon &exp)
+{
+    if (exp.holes.size() != 1)
+        return false;
+    const Polygon &c = exp.contour;
+    const Polygon &h = exp.holes.front();
+    const double ac = std::abs(c.area()), ah = std::abs(h.area());
+    if (ac <= 0. || ah <= 0. || ah >= ac)
+        return false;
+    auto circularity = [](const Polygon &p, double a) {
+        const double len = p.length();
+        return (len > 0.) ? 4. * PI * a / (len * len) : 0.;
+    };
+    if (circularity(c, ac) < 0.9 || circularity(h, ah) < 0.9)
+        return false;
+    const double rc = std::sqrt(ac / PI), rh = std::sqrt(ah / PI);
+    const double wall = rc - rh;
+    if (wall <= 0.)
+        return false;
+    return (c.centroid() - h.centroid()).cast<double>().norm() <= 0.25 * wall;
+}
+
 // Multi-wall (thick) spiral vase: morph the concentric perimeter loops of one layer into a
 // single continuous extrusion path. Each ring is held FLAT (constant radius) for most of its
 // revolution and steps inward/outward to the next ring only over a short smoothstep arc at the
@@ -1749,11 +1776,14 @@ void PerimeterGenerator::process_classic(
     // internal flow which is unrelated.
     coord_t min_spacing         = coord_t(perimeter_spacing      * (1 - INSET_OVERLAP_TOLERANCE));
     coord_t ext_min_spacing     = coord_t(ext_perimeter_spacing  * (1 - INSET_OVERLAP_TOLERANCE));
-    // Multi-wall spiral vase: the morph re-spaces the whole wall solidly (make_multiwall_spiral
-    // step 5c), so the perimeter generator must NOT also emit gap fill - it would print as a
-    // separate, unbonded feature (a visible seam ring) that the morph does not absorb.
-    const bool multiwall_spiral = params.spiral_vase && params.print_config.spiral_vase_wall_count.value != 1;
-    bool    has_gap_fill 		= params.config.gap_fill_enabled.value && params.config.gap_fill_speed.value > 0 && !multiwall_spiral;
+    // Continuous constant-wall spiral: one-click per-layer feature. When enabled and THIS
+    // surface is a fully axisymmetric constant wall, the whole wall is printed as one continuous
+    // spiral of concentric rings (make_multiwall_spiral): as many perimeters as fit, no gap fill
+    // (the morph re-spaces the wall solidly), no infill. Non-qualifying surfaces print with the
+    // regular settings untouched.
+    const bool constant_wall = params.print_config.constant_wall_spiral.value &&
+                               surface_is_constant_circular_wall(surface.expolygon);
+    bool    has_gap_fill 		= params.config.gap_fill_enabled.value && params.config.gap_fill_speed.value > 0 && !constant_wall;
 
     // prepare grown lower layer slices for overhang detection
     if (params.config.overhangs && lower_slices != nullptr && lower_slices_polygons_cache.empty()) {
@@ -1768,6 +1798,10 @@ void PerimeterGenerator::process_classic(
     // extra perimeters for each one
     // detect how many perimeters must be generated for this island
     int        loop_number = params.config.perimeters + surface.extra_perimeters - 1;  // 0-indexed loops
+    if (constant_wall)
+        // Fill the whole wall with rings: the offsetting loop stops on its own when the wall is
+        // consumed, so this is simply "as many as fit" (the configured count is for regular layers).
+        loop_number = 999;
 
     // Set the topmost layer to be one perimeter.
     if (loop_number > 0 && ((params.config.top_one_perimeter_type != TopOnePerimeterType::None && upper_slices == nullptr) || (params.config.only_one_perimeter_first_layer && params.layer_id == 0)))
@@ -1987,10 +2021,9 @@ void PerimeterGenerator::process_classic(
         }
         // at this point, all loops should be in contours[0]
         ExtrusionEntityCollection entities = traverse_loops_classic(params, lower_slices_polygons_cache, contours.front(), thin_walls);
-        if (multiwall_spiral && entities.entities.size() > 1) {
-            // Multi-wall (thick) spiral vase: morph the concentric loops into one continuous
-            // spiral path per layer (flat rings + short smoothstep seam transitions). The sliced
-            // wall area drives the exact per-layer extrusion volume (area * layer height).
+        if (constant_wall && entities.entities.size() > 1) {
+            // Morph the concentric loops into one continuous spiral path for this layer. The
+            // sliced wall area drives the exact per-layer extrusion volume (area * layer height).
             make_multiwall_spiral(entities, (size_t) params.layer_id, std::abs(surface.expolygon.area()));
         }
         // if brim will be printed, reverse the order of perimeters so that
@@ -2086,7 +2119,9 @@ void PerimeterGenerator::process_classic(
         }
     }
     
-    append(out_fill_expolygons, std::move(infill_areas));
+    // A constant-wall spiral layer is completely filled by its rings: no infill.
+    if (! constant_wall)
+        append(out_fill_expolygons, std::move(infill_areas));
 }
 
 PerimeterRegion::PerimeterRegion(const LayerRegion &layer_region) : region(&layer_region.region())

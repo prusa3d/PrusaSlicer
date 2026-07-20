@@ -1052,7 +1052,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     m_volumetric_speed = DoExport::autospeed_volumetric_limit(print);
     print.throw_if_canceled();
 
-    if (print.config().spiral_vase.value)
+    if (print.config().spiral_vase.value || print.config().constant_wall_spiral.value)
         m_spiral_vase = make_unique<SpiralVase>(print.config());
 
     if (print.config().max_volumetric_extrusion_rate_slope_positive.value > 0 ||

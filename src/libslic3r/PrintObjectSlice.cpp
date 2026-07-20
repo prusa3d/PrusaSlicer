@@ -195,13 +195,7 @@ static std::vector<VolumeSlices> slice_volumes_inner(
                     if (model_volume->is_model_part() && print_config.spiral_vase) {
                         auto it = std::find_if(layer_range.volume_regions.begin(), layer_range.volume_regions.end(),
                             [model_volume](const auto &slice){ return model_volume == slice.model_volume; });
-                        // Multi-wall spiral vase (wall count != 1) must slice Regular: a tube's
-                        // inner hole bounds the wall, and the morph fills the wall between the
-                        // outer contour and the hole. PositiveLargestContour would fill the hole
-                        // solid, extending perimeters all the way to the center.
-                        params.mode = (print_config.spiral_vase_wall_count.value == 1)
-                            ? MeshSlicingParams::SlicingMode::PositiveLargestContour
-                            : MeshSlicingParams::SlicingMode::Regular;
+                        params.mode = MeshSlicingParams::SlicingMode::PositiveLargestContour;
                         // Slice the bottom layers with SlicingMode::Regular.
                         // This needs to be in sync with LayerRegion::make_perimeters() spiral_vase!
                         const PrintRegionConfig &region_config = it->region->config();
