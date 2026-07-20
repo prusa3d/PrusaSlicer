@@ -1509,69 +1509,165 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
     };
 
     const double cos_theta = L_TRANS_RADIAL / std::hypot(L_TRANS_RADIAL, pitch_scaled);
-    for (size_t r = 0; r + 1 < K_aug; ++r) {
-        const std::vector<Point> &a = resampled[r];
-        const std::vector<Point> &b = resampled[r + 1];
+    const double MIN_COVER = 0.05; // mm; keeps a segment extruding (continuity) with ~no deposit
+    const size_t N_CHUNK   = 4;   // sub-segments used to approximate a linearly varying flow
+
+    // Per-ring seam-arc length in samples (all rings share M samples; use ring 0's circumference).
+    auto trans_of = [&](const std::vector<Point> &ring) -> size_t {
         double circ = 0.;
         for (size_t j = 0; j < M; ++j)
-            circ += (a[(j + 1) % M] - a[j]).cast<double>().norm();
-        size_t trans = (circ > 0.) ? (size_t)(L_TRANS_RADIAL * (double) M / circ + 0.5) : M;
-        if (trans < 1) trans = 1;
-        if (trans > M) trans = M;
-        const size_t flat = M - trans;        // points held flat at ring r before the step
+            circ += (ring[(j + 1) % M] - ring[j]).cast<double>().norm();
+        size_t tr = (circ > 0.) ? (size_t)(L_TRANS_RADIAL * (double) M / circ + 0.5) : M;
+        if (tr < 1) tr = 1;
+        if (tr > M) tr = M;
+        return tr;
+    };
+
+    // ---- FIRST ring: one full clean revolution. This ring is a SURFACE (exterior on even
+    //      layers, interior on odd), so it must be a complete undistorted circle. It starts at
+    //      index `flat0` (where the previous layer's elevator ended, on the midline half a pitch
+    //      away) and runs the full circle back to that angle.
+    const size_t trans0 = trans_of(resampled[0]);
+    const size_t flat0  = M - trans0;
+    {
+        const std::vector<Point> &r0 = resampled[0];
+        Points pts;
+        pts.reserve(M + 2);
+        // Continuity: the previous layer's elevator ended on the midline between this layer's
+        // first two rings at this exact angle - start there so the whole part is ONE
+        // uninterrupted extrusion (no travel, no retract, no restart).
+        if (layer_id > 0 && K_aug >= 2)
+            pts.push_back(lerp(resampled[0][flat0], resampled[1][flat0], 0.5));
+        for (size_t j = 0; j < M; ++j)
+            pts.push_back(r0[(flat0 + j) % M]);
+        pts.push_back(r0[flat0]); // close the circle
+        emit_segment(std::move(pts), pitch_mm);
+    }
+    // ---- DEPARTURE diagonal from ring 0 over the seam arc [flat0..M): ring 0's line there is
+    //      already fully printed (full circle above), so the diagonal only needs to cover the
+    //      WIDENING strip it leaves as it pulls away: coverage grows linearly 0 -> pitch.
+    //      Exception: if the previous layer's elevator climbed through this interstice, it
+    //      already deposited here - traverse with (almost) no extrusion instead.
+    {
+        const std::vector<Point> &a = resampled[0];
+        const std::vector<Point> &b = resampled[1 < K_aug ? 1 : 0];
+        const bool elevator_below = layer_id > 0;
+        for (size_t c = 0; c < N_CHUNK; ++c) {
+            const size_t j0 = flat0 + (trans0 * c) / N_CHUNK;
+            const size_t j1 = flat0 + (trans0 * (c + 1)) / N_CHUNK;
+            if (j0 >= j1)
+                continue;
+            Points chunk;
+            chunk.reserve(j1 - j0 + 1);
+            {   // share the boundary point with the previous emitted geometry
+                const size_t jp = (j0 == flat0) ? flat0 : j0 - 1;
+                const double tp = (j0 == flat0) ? 0.0 : double(jp - flat0 + 1) / double(trans0);
+                chunk.push_back(lerp(a[jp], b[jp], tp));
+            }
+            for (size_t j = j0; j < j1; ++j) {
+                double t = double(j - flat0 + 1) / double(trans0);
+                if (t > 1.0) t = 1.0;
+                chunk.push_back(lerp(a[j], b[j], t));
+            }
+            const double t_mid = (double(j0 + j1) * 0.5 - double(flat0) + 1.0) / double(trans0);
+            emit_segment(std::move(chunk),
+                elevator_below ? MIN_COVER : pitch_mm * std::max(MIN_COVER, std::min(1.0, t_mid)));
+        }
+    }
+    // ---- INTERIOR rings 1..K-2: flat arc then a straight LINEAR diagonal to the next ring.
+    //      Straight parallel diagonals are spaced exactly pitch * cos(theta) apart perpendicular
+    //      to their direction, so the correspondingly narrowed bead fills the step band EXACTLY
+    //      (the previous smoothstep S-curve diverged at its flat ends and left diamond voids).
+    for (size_t r = 1; r + 1 < K_aug; ++r) {
+        const std::vector<Point> &a = resampled[r];
+        const std::vector<Point> &b = resampled[r + 1];
+        const size_t trans = trans_of(a);
+        const size_t flat  = M - trans;
         Points flat_pts, diag_pts;
-        flat_pts.reserve(flat + 1);
+        flat_pts.reserve(flat + 2);
         diag_pts.reserve(trans + 1);
+        // The incoming diagonal landed on this ring at index M-1; start there so the short
+        // closing chord M-1 -> 0 is extruded, not hopped (keeps the extrusion gapless).
+        flat_pts.push_back(a[M - 1]);
         for (size_t j = 0; j < M; ++j) {
             double t;
             if (j < flat) {
-                t = 0.0;                       // flat circle at ring r's radius
+                t = 0.0;
             } else {
-                double u = double(j - flat + 1) / double(trans); // 0..1 across the seam step
-                if (u > 1.0) u = 1.0;
-                t = u * u * (3.0 - 2.0 * u);   // smoothstep ease - no kink at either end
+                t = double(j - flat + 1) / double(trans);
+                if (t > 1.0) t = 1.0;
             }
             const Point p = lerp(a[j], b[j], t);
             if (j < flat) {
                 flat_pts.push_back(p);
             } else {
                 if (diag_pts.empty() && ! flat_pts.empty())
-                    diag_pts.push_back(flat_pts.back()); // share the boundary point
+                    diag_pts.push_back(flat_pts.back());
                 diag_pts.push_back(p);
             }
         }
         emit_segment(std::move(flat_pts), pitch_mm);
         emit_segment(std::move(diag_pts), pitch_mm * cos_theta);
     }
-    // The final ring: full flat revolution, but its seam arc re-traces the arc the incoming
-    // diagonal converged onto - taper the coverage to match the narrowing leftover strip.
+    // ---- FINAL ring: one full clean revolution (the other SURFACE - interior on even layers,
+    //      exterior on odd). Its seam arc re-traces the arc the incoming diagonal converged
+    //      onto, so the leftover strip narrows linearly: taper the coverage (1-t)*pitch.
+    size_t fin_flat = 0, fin_trans = 0;
     {
         const std::vector<Point> &fin = resampled[K_aug - 1];
-        double circ = 0.;
-        for (size_t j = 0; j < M; ++j)
-            circ += (fin[(j + 1) % M] - fin[j]).cast<double>().norm();
-        size_t trans = (circ > 0.) ? (size_t)(L_TRANS_RADIAL * (double) M / circ + 0.5) : M;
-        if (trans < 1) trans = 1;
-        if (trans > M) trans = M;
-        const size_t flat = M - trans;
-        Points flat_pts(fin.begin(), fin.begin() + flat);
+        fin_trans = trans_of(fin);
+        fin_flat  = M - fin_trans;
+        Points flat_pts;
+        flat_pts.reserve(fin_flat + 1);
+        flat_pts.push_back(fin[M - 1]); // incoming diagonal landed here: extrude the closing chord
+        flat_pts.insert(flat_pts.end(), fin.begin(), fin.begin() + fin_flat);
         emit_segment(std::move(flat_pts), pitch_mm);
-        // Chunk the tapered arc: coverage tracks the strip left by the diagonal, (1 - t) * pitch.
-        const size_t N_CHUNK = 4;
         for (size_t c = 0; c < N_CHUNK; ++c) {
-            const size_t j0 = flat + (trans * c) / N_CHUNK;
-            const size_t j1 = flat + (trans * (c + 1)) / N_CHUNK;
+            const size_t j0 = fin_flat + (fin_trans * c) / N_CHUNK;
+            const size_t j1 = fin_flat + (fin_trans * (c + 1)) / N_CHUNK;
             if (j0 >= j1)
                 continue;
             Points chunk;
             chunk.reserve(j1 - j0 + 1);
             if (j0 > 0)
-                chunk.push_back(fin[j0 - 1]); // share the boundary point
+                chunk.push_back(fin[j0 - 1]);
             for (size_t j = j0; j < j1; ++j)
                 chunk.push_back(fin[j]);
-            const double u_mid = (double(j0 + j1) * 0.5 - double(flat) + 1.0) / double(trans);
-            const double t_mid = std::min(1.0, u_mid * u_mid * (3.0 - 2.0 * u_mid));
-            emit_segment(std::move(chunk), pitch_mm * std::max(0.05, 1.0 - t_mid));
+            const double u_mid = (double(j0 + j1) * 0.5 - double(fin_flat) + 1.0) / double(fin_trans);
+            emit_segment(std::move(chunk), pitch_mm * std::max(MIN_COVER, 1.0 - std::min(1.0, u_mid)));
+        }
+    }
+    // ---- THE ELEVATOR: the Z climb to the next layer, on the MIDLINE between the last two
+    //      rings - half a pitch inside the wall, so the climbing bead never sits on (and never
+    //      squishes out of) the interior or exterior surface. It runs BACKWARD along the seam
+    //      arc, which cancels the path's angular advance: the climb ends at the midline point of
+    //      the seam-arc start, exactly where the NEXT layer's first ring begins. The SpiralVase
+    //      post-processor ramps Z over the last L_TRANS of the layer = precisely this arc.
+    //      Flow tapers 0 -> pitch along the climb: at the start the bead overlaps this layer's
+    //      already-full interstice (deposit nothing), at the top it lays a full bead into the
+    //      next layer's empty seam interstice (whose own departure diagonal then deposits
+    //      nothing - see elevator_below above). Every point in the wall gets exactly one bead.
+    if (K_aug >= 2) {
+        const std::vector<Point> &fin  = resampled[K_aug - 1];
+        const std::vector<Point> &prev = resampled[K_aug - 2];
+        for (size_t c = 0; c < N_CHUNK; ++c) {
+            // Backward: from index M-1 down to fin_flat, in N_CHUNK pieces.
+            const size_t i0 = (fin_trans * c) / N_CHUNK;          // steps taken backward so far
+            const size_t i1 = (fin_trans * (c + 1)) / N_CHUNK;
+            if (i0 >= i1)
+                continue;
+            Points chunk;
+            chunk.reserve(i1 - i0 + 2);
+            if (i0 == 0)
+                chunk.push_back(fin[M - 1]); // continue from the final ring's end
+            else
+                chunk.push_back(lerp(fin[M - i0], prev[M - i0], 0.5));
+            for (size_t i = i0 + 1; i <= i1; ++i) {
+                const size_t j = M - i; // walks M-1, M-2, ... down to fin_flat
+                chunk.push_back(lerp(fin[j], prev[j], 0.5));
+            }
+            const double climb_mid = (double(i0 + i1) * 0.5) / double(fin_trans); // 0 -> 1
+            emit_segment(std::move(chunk), pitch_mm * std::max(MIN_COVER, climb_mid));
         }
     }
     if (multi.paths.empty())
@@ -1595,6 +1691,18 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
                 attr.mm3_per_mm *= f;
                 p = ExtrusionPath(std::move(p.polyline), attr);
             }
+        }
+    }
+
+    if (const char *dbg = std::getenv("MULTIWALL_DEBUG"); dbg != nullptr && atoi(dbg) == (int) layer_id) {
+        fprintf(stderr, "[multiwall] layer %zu: %zu sub-paths (K_aug=%zu, M=%zu, fin_flat=%zu, fin_trans=%zu)\n",
+            layer_id, multi.paths.size(), K_aug, M, fin_flat, fin_trans);
+        for (size_t i = 0; i < multi.paths.size(); ++i) {
+            const Polyline &pl = multi.paths[i].polyline;
+            fprintf(stderr, "[multiwall]   seg %2zu: %4zu pts  w=%.3f  first=(%.3f,%.3f) last=(%.3f,%.3f)\n",
+                i, pl.points.size(), multi.paths[i].width(),
+                unscale<double>(pl.points.front().x()), unscale<double>(pl.points.front().y()),
+                unscale<double>(pl.points.back().x()),  unscale<double>(pl.points.back().y()));
         }
     }
 
