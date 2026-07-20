@@ -133,20 +133,35 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
 
     double fill_density = config->option<ConfigOptionPercent>("fill_density")->value;
 
+    // Multi-wall spiral vase: spiral_vase_wall_count drives the required perimeter count
+    // (1 = classic single-wall spiral, N = N walls, 0 = auto/fill the wall -> 1000).
+    const int spiral_walls        = config->has("spiral_vase_wall_count") ? config->opt_int("spiral_vase_wall_count") : 1;
+    const int required_perimeters = (spiral_walls <= 0) ? 1000 : spiral_walls;
+    const bool multiwall_bottom_ok = spiral_walls == 1 || config->opt_int("bottom_solid_layers") == 0;
+
     if (config->opt_bool("spiral_vase") &&
-        ! (config->opt_int("perimeters") == 1 &&
+        ! (config->opt_int("perimeters") == required_perimeters &&
            config->opt_int("top_solid_layers") == 0 &&
+           multiwall_bottom_ok &&
            fill_density == 0 &&
            ! config->opt_bool("support_material") &&
            config->opt_int("support_material_enforce_layers") == 0 &&
            ! config->opt_bool("thin_walls")))
     {
-        wxString msg_text = _(L("The Spiral Vase mode requires:\n"
-                                "- one perimeter\n"
-                                "- no top solid layers\n"
-                                "- 0% fill density\n"
-                                "- no support material\n"
-               					"- Detect thin walls disabled"));
+        wxString msg_text = spiral_walls == 1 ?
+            _(L("The Spiral Vase mode requires:\n"
+                "- one perimeter\n"
+                "- no top solid layers\n"
+                "- 0% fill density\n"
+                "- no support material\n"
+                "- Detect thin walls disabled")) :
+            _(L("The multi-wall Spiral Vase mode requires:\n"
+                "- perimeters matching the spiral wall count\n"
+                "- no top solid layers\n"
+                "- no bottom solid layers\n"
+                "- 0% fill density\n"
+                "- no support material\n"
+                "- Detect thin walls disabled"));
         if (is_global_config)
             msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable Spiral Vase?"));
         MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Spiral Vase")),
@@ -155,8 +170,12 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         auto answer = dialog.ShowModal();
         bool support = true;
         if (!is_global_config || answer == wxID_YES) {
-            new_conf.set_key_value("perimeters", new ConfigOptionInt(1));
+            new_conf.set_key_value("perimeters", new ConfigOptionInt(required_perimeters));
             new_conf.set_key_value("top_solid_layers", new ConfigOptionInt(0));
+            if (spiral_walls != 1) {
+                new_conf.set_key_value("bottom_solid_layers", new ConfigOptionInt(0));
+                new_conf.set_key_value("bottom_solid_min_thickness", new ConfigOptionFloat(0.));
+            }
             new_conf.set_key_value("fill_density", new ConfigOptionPercent(0));
             new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
@@ -308,6 +327,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("infill_anchor", has_infill_anchors);
 
     bool has_spiral_vase         = config->opt_bool("spiral_vase");
+    toggle_field("spiral_vase_wall_count", has_spiral_vase);
     bool has_top_solid_infill 	 = config->opt_int("top_solid_layers") > 0;
     bool has_bottom_solid_infill = config->opt_int("bottom_solid_layers") > 0;
     bool has_solid_infill 		 = has_top_solid_infill || has_bottom_solid_infill;

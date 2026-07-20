@@ -44,6 +44,11 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
         return gcode;
     }
 
+    // Multi-wall (thick) spiral vase: the layer is one morphed multi-ring spiral path; keep it
+    // FLAT at its nominal height and only ramp the final short arc up to the next layer.
+    if (m_config.spiral_vase_wall_count.value != 1)
+        return this->process_layer_multiwall(gcode, last_layer);
+
     // Get total XY length for this layer by summing all extrusion moves.
     float total_layer_length = 0.f;
     float layer_height       = 0.f;
@@ -162,6 +167,69 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
 
     m_previous_layer = std::move(current_layer);
     return new_gcode + transition_gcode;
+}
+
+// Multi-wall (thick) spiral vase - flat layers with a short spiral transition.
+// The layer's perimeter G-code is one continuous morphed spiral covering every concentric wall.
+// The whole layer is printed FLAT at its nominal Z, so every wall is present at every height ->
+// a genuinely solid thick wall. Only the final L_TRANS of the layer (the tail of the last ring,
+// which the perimeter morph alternates between the innermost and outermost wall per layer) ramps
+// Z up by one layer height, turning the layer-change Z seam into a short fixed-length spiral.
+// L_TRANS is a constant arc length (0.05 inch) regardless of part size.
+std::string SpiralVase::process_layer_multiwall(const std::string &gcode, bool /*last_layer*/)
+{
+    const float L_TRANS = 1.27f; // 0.05 inch, fixed regardless of geometry
+
+    // --- First pass: total XY extrusion length, layer height, and the layer's nominal Z. ---
+    float total_len = 0.f, layer_height = 0.f, z_nominal = 0.f;
+    bool  set_z = false;
+    {
+        GCodeReader r = m_reader; // clone
+        r.parse_buffer(gcode, [&total_len, &layer_height, &z_nominal, &set_z]
+            (GCodeReader &reader, const GCodeReader::GCodeLine &line) {
+            if (line.cmd_is("G1")) {
+                if (line.extruding(reader))
+                    total_len += line.dist_XY(reader);
+                else if (line.has(Z)) {
+                    layer_height += line.dist_Z(reader);
+                    if (! set_z) { z_nominal = line.new_Z(reader); set_z = true; }
+                }
+            }
+        });
+    }
+    if (total_len <= 0.f) { m_reader.parse_buffer(gcode); return gcode; }
+
+    // The final L_TRANS of the layer ramps from the flat height up to the next layer.
+    const float ramp_start = std::max(0.f, total_len - L_TRANS);
+    const float ramp_span  = total_len - ramp_start; // == min(L_TRANS, total_len)
+
+    std::string new_gcode;
+    float       len = 0.f;
+    m_reader.parse_buffer(gcode, [&]
+        (GCodeReader &reader, GCodeReader::GCodeLine line) {
+        if (! line.cmd_is("G1")) { new_gcode += line.raw() + '\n'; return; }
+        // Flatten any Z-only move (layer change / travel hop) to the layer's nominal height;
+        // the spiral transition at the end of the previous layer already climbed us here.
+        if (line.has_z() && ! (line.has_x() || line.has_y())) {
+            line.set(reader, Z, z_nominal);
+            new_gcode += line.raw() + '\n';
+            return;
+        }
+        const bool extruding = line.extruding(reader) && line.dist_XY(reader) > 0;
+        if (! extruding) { new_gcode += line.raw() + '\n'; return; } // travel / retract: unchanged
+
+        len += line.dist_XY(reader);
+        float zz = z_nominal; // flat across the body of the layer
+        if (ramp_span > 0.f && len > ramp_start) {
+            float f = (len - ramp_start) / ramp_span;
+            if (f > 1.f) f = 1.f;
+            zz = z_nominal + f * layer_height; // short spiral up to the next layer
+        }
+        line.set(reader, Z, zz);
+        new_gcode += line.raw() + '\n';
+    });
+
+    return new_gcode;
 }
 
 }

@@ -1177,6 +1177,326 @@ void PerimeterGenerator::process_arachne(
     append(out_fill_expolygons, std::move(infill_areas));
 }
 
+// Multi-wall (thick) spiral vase: morph the concentric perimeter loops of one layer into a
+// single continuous extrusion path. Each ring is held FLAT (constant radius) for most of its
+// revolution and steps inward/outward to the next ring only over a short smoothstep arc at the
+// seam, so the wall prints as bonded concentric rings with one aligned seam line. The whole wall
+// is re-spaced at a constant pitch outer->inner so the fill is solid for any geometry (straight
+// tube or tapered cone) with no leftover strip for gap fill. Direction alternates per layer
+// (outer->inner on even layers, inner->outer on odd) so the layer-change spiral ramp connects
+// end-to-start. Z stays 0 here; the SpiralVase post-processor flattens each layer at its nominal
+// height and turns the final ~1.27mm of the layer into a short spiral ramp to the next layer.
+static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t layer_id)
+{
+    // 1. Collect the ExtrusionLoop entities.
+    std::vector<const ExtrusionLoop *> loops;
+    loops.reserve(entities.entities.size());
+    for (const ExtrusionEntity *ee : entities.entities)
+        if (const ExtrusionLoop *loop = dynamic_cast<const ExtrusionLoop *>(ee))
+            loops.push_back(loop);
+    if (loops.size() < 2)
+        return; // nothing to morph, leave unchanged
+
+    // 2. Capture the closed contour of each loop as a Polygon, and a reference ExtrusionPath
+    //    (role/flow) taken from the outermost loop (largest area).
+    struct LoopPoly {
+        Polygon              polygon;
+        const ExtrusionPath *ref;
+    };
+    std::vector<LoopPoly> loop_polys;
+    loop_polys.reserve(loops.size());
+    for (const ExtrusionLoop *loop : loops) {
+        if (loop->paths.empty())
+            continue;
+        loop_polys.push_back({ loop->polygon(), &loop->paths.front() });
+    }
+    if (loop_polys.size() < 2)
+        return;
+
+    // 3. Sort by abs(area) descending (outermost first).
+    std::stable_sort(loop_polys.begin(), loop_polys.end(),
+        [](const LoopPoly &a, const LoopPoly &b) {
+            return std::abs(a.polygon.area()) > std::abs(b.polygon.area());
+        });
+    const ExtrusionPath &ref = *loop_polys.front().ref; // outermost loop's reference path
+
+    // 3b. Filter the sorted loops down to a clean, NESTED, concentric sequence before morphing.
+    //     Filling a solid all the way to its center spawns tiny and/or off-center fragment loops
+    //     near the middle; the plain area-sort interleaves them, so blending dives radially
+    //     (r8 -> r1 -> r8) and produces big radial jumps/crossings. We keep only loops that are
+    //     both concentric with the outermost loop and strictly nested (monotonically shrinking),
+    //     and we stop once a loop is so small that its center is effectively degenerate.
+    {
+        const double area0_abs = std::abs(loop_polys.front().polygon.area());          // scaled^2
+        const Point  C0        = loop_polys.front().polygon.centroid();                 // outer centroid
+        const double R0        = std::sqrt(area0_abs / PI);                             // outer "radius" (scaled)
+        const double conc_tol  = 0.5 * R0;                                              // max centroid drift (scaled)
+        // Center cap thresholds: stop once the remaining hole is tiny. Both are in SCALED units.
+        const double r_min     = scale_(1.0);                                           // 1 mm radius (scaled)
+        // ~ (2 * line spacing)^2. ExtrusionPath width is in mm, so scale it before squaring.
+        const double spacing_s = scale_(2.0 * double(ref.width()));                     // 2*line-width (scaled)
+        const double area_min  = spacing_s * spacing_s;                                 // scaled^2
+
+        std::vector<LoopPoly> kept;
+        kept.reserve(loop_polys.size());
+        kept.push_back(loop_polys.front());                                             // always keep outermost
+        double last_area_abs = area0_abs;
+        for (size_t i = 1; i < loop_polys.size(); ++i) {
+            const double a_abs = std::abs(loop_polys[i].polygon.area());
+            // Center cap: stop adding rings once the loop is degenerate-small.
+            const double r_eq = std::sqrt(a_abs / PI);
+            if (r_eq < r_min || a_abs < area_min)
+                break;
+            // Nested: must be strictly smaller in area than the last kept loop.
+            if (a_abs >= last_area_abs)
+                continue;
+            // Concentric: centroid must sit within 0.5*R0 of the outer centroid.
+            const double drift = (loop_polys[i].polygon.centroid() - C0).cast<double>().norm();
+            if (drift > conc_tol)
+                continue;
+            kept.push_back(loop_polys[i]);
+            last_area_abs = a_abs;
+        }
+        loop_polys.swap(kept);
+    }
+    // After filtering, fewer than 2 nested rings means there is nothing to morph: leave unchanged.
+    if (loop_polys.size() < 2)
+        return;
+
+    // 4. M = sample points per revolution, derived from the outermost loop's perimeter length.
+    const Polygon &outer_polygon = loop_polys.front().polygon;
+    size_t M = std::max<size_t>(64, (size_t)(outer_polygon.length() / scale_(0.4)));
+    M = std::min<size_t>(M, 2048);
+
+    // 5. Resample EACH loop's polygon to exactly M points, evenly spaced by arc length and
+    //    angularly aligned across loops (index j ~ same angular position on every ring), with
+    //    a consistent winding direction so j advances the same way for all loops.
+    const size_t K = loop_polys.size();
+    std::vector<std::vector<Point>> resampled(K);
+    // Thread each kept ring's equivalent radius R = sqrt(|area|/PI) through alongside the
+    // resampled points, in the SAME outer->inner order, so the uniform re-spacing below can
+    // place rings evenly by radius. (loop_polys is sorted outer->inner, same as resampled.)
+    std::vector<double> radii(K);
+    for (size_t r = 0; r < K; ++r)
+        radii[r] = std::sqrt(std::abs(loop_polys[r].polygon.area()) / PI); // scaled units
+    for (size_t r = 0; r < K; ++r) {
+        Polygon poly = loop_polys[r].polygon;
+        // Consistent winding: make every loop counter-clockwise.
+        if (! poly.is_counter_clockwise())
+            poly.reverse();
+        if (poly.points.size() < 3) {
+            // Degenerate: can't morph reliably, bail out and leave entities untouched.
+            return;
+        }
+        // Reference direction = +X from the centroid; start at the loop point whose direction
+        // from the centroid is closest to +X so index j is angularly consistent across loops.
+        const Point centroid = poly.centroid();
+        size_t start_idx = 0;
+        double best_dot = -std::numeric_limits<double>::infinity();
+        for (size_t i = 0; i < poly.points.size(); ++i) {
+            const Vec2d d = (poly.points[i] - centroid).cast<double>();
+            const double len = d.norm();
+            const double cos_to_x = (len > 0.) ? (d.x() / len) : -1.; // dot with +X unit vector
+            if (cos_to_x > best_dot) {
+                best_dot  = cos_to_x;
+                start_idx = i;
+            }
+        }
+        // Build the closed point ring rotated to start at start_idx.
+        const size_t n = poly.points.size();
+        std::vector<Point> ring;
+        ring.reserve(n + 1);
+        for (size_t i = 0; i < n; ++i)
+            ring.push_back(poly.points[(start_idx + i) % n]);
+        ring.push_back(ring.front()); // close it
+
+        // Arc-length cumulative table.
+        std::vector<double> cum(ring.size(), 0.);
+        for (size_t i = 1; i < ring.size(); ++i)
+            cum[i] = cum[i - 1] + (ring[i] - ring[i - 1]).cast<double>().norm();
+        const double total_len = cum.back();
+
+        // Emit M points equally spaced by arc length: target arc length = total_len * j / M.
+        std::vector<Point> &out = resampled[r];
+        out.reserve(M);
+        if (total_len <= 0.) {
+            for (size_t j = 0; j < M; ++j)
+                out.push_back(ring.front());
+        } else {
+            size_t seg = 0;
+            for (size_t j = 0; j < M; ++j) {
+                const double target = total_len * (double) j / (double) M;
+                while (seg + 1 < cum.size() && cum[seg + 1] < target)
+                    ++seg;
+                const double seg_len = cum[seg + 1] - cum[seg];
+                const double t = (seg_len > 0.) ? (target - cum[seg]) / seg_len : 0.;
+                out.push_back(lerp(ring[seg], ring[seg + 1], t));
+            }
+        }
+    }
+
+    // 5b. ALIGN CONSECUTIVE RINGS TO EACH OTHER (not just independently to +X).
+    //     Resampling each ring to +X independently leaves point[j] of ring r and ring r+1 at
+    //     slightly different angles; that offset grows toward the center, so the per-revolution
+    //     lerp(a[j], b[j]) connects angularly-mismatched points and produces jumps near the
+    //     middle. Fix: keep ring[0]'s +X resampling as the reference, then for every subsequent
+    //     ring rotate its M-point sequence (preserving winding) so index 0 lands on the point
+    //     closest to the PREVIOUS ring's start point. This makes index j correspond angularly
+    //     across all rings, killing the angular-misalignment jumps.
+    for (size_t r = 1; r < K; ++r) {
+        const Point &prev_start = resampled[r - 1].front();
+        std::vector<Point> &cur = resampled[r];
+        size_t best_j   = 0;
+        double best_d2  = std::numeric_limits<double>::infinity();
+        for (size_t j = 0; j < M; ++j) {
+            const double d2 = (cur[j] - prev_start).cast<double>().squaredNorm();
+            if (d2 < best_d2) {
+                best_d2 = d2;
+                best_j  = j;
+            }
+        }
+        if (best_j != 0) {
+            // Rotate in place so index best_j becomes index 0 (winding/order unchanged).
+            std::rotate(cur.begin(), cur.begin() + best_j, cur.end());
+        }
+    }
+
+    // 5c. UNIFORMLY RE-SPACE the wall. Discard the perimeter generator's uneven ring radii and lay
+    //     down a fresh set of rings at a CONSTANT pitch from the outermost radius to the innermost,
+    //     interpolating each new ring's SHAPE from the two collected rings that bracket its radius
+    //     (rings are aligned in step 5b, so a per-point lerp is a clean concentric blend). This
+    //     guarantees a fully solid wall with no leftover strip for ANY geometry - straight tube OR
+    //     tapered cone. Otherwise the perimeter generator hands the fractional leftover (where the
+    //     outer-going and inner-going offset fronts meet) to gap fill, which prints as a separate,
+    //     unbonded feature with its own travels. We suppress that gap fill in spiral mode (see
+    //     has_gap_fill in process_classic) and cover the whole wall here instead.
+    {
+        const double ref_spac = scale_(std::max(0.1f, ref.width())); // nozzle line spacing (scaled)
+        // Natural pitch = median collected spacing; fall back to the nozzle width when the layer
+        // has too few rings to trust its own median (e.g. a degenerate top/bottom slice that the
+        // perimeter generator reduced to just the outer + inner contour).
+        double pitch = ref_spac;
+        if (K >= 4) {
+            std::vector<double> spac;
+            spac.reserve(K - 1);
+            for (size_t r = 0; r + 1 < K; ++r)
+                spac.push_back(std::abs(radii[r] - radii[r + 1]));
+            std::sort(spac.begin(), spac.end());
+            const double med = spac[spac.size() / 2];
+            if (med > 0. && med <= 1.8 * ref_spac)
+                pitch = med;
+        }
+        const double r_outer = radii.front();          // K rings are sorted outer -> inner
+        const double r_inner = radii.back();
+        const double span    = r_outer - r_inner;
+        if (pitch > 0. && span > 0.) {
+            size_t N = (size_t) std::lround(span / pitch) + 1; // keep neighbours within `pitch`
+            if (N < 2) N = 2;
+            if (N < K) N = K;                           // never drop below what we already had
+            std::vector<std::vector<Point>> uni_rings;
+            std::vector<double>             uni_radii;
+            uni_rings.reserve(N);
+            uni_radii.reserve(N);
+            size_t a = 0;                               // bracket index into the collected rings
+            for (size_t t = 0; t < N; ++t) {
+                const double rt = r_outer - span * (double) t / (double) (N - 1);
+                // Advance `a` so that radii[a] >= rt >= radii[a+1] (radii are decreasing).
+                while (a + 2 < K && radii[a + 1] >= rt)
+                    ++a;
+                const double ra = radii[a], rb = radii[a + 1];
+                const double denom = ra - rb;
+                double f = (denom != 0.) ? (ra - rt) / denom : 0.;
+                if (f < 0.) f = 0.; else if (f > 1.) f = 1.;
+                std::vector<Point> ring(M);
+                for (size_t j = 0; j < M; ++j)
+                    ring[j] = lerp(resampled[a][j], resampled[a + 1][j], f);
+                uni_rings.push_back(std::move(ring));
+                uni_radii.push_back(rt);
+            }
+            resampled.swap(uni_rings);
+            radii.swap(uni_radii);
+        }
+    }
+    const size_t K_aug = resampled.size();
+
+    // 6. Order outer->inner (already sorted that way); reverse to inner->outer on odd layers.
+    if (layer_id % 2 == 1) {
+        std::reverse(resampled.begin(), resampled.end());
+        std::reverse(radii.begin(), radii.end());
+    }
+
+    // 7. Build the path: hold each ring FLAT at its own radius, and step inward to the next
+    //    ring only over a short eased transition (~L_TRANS_RADIAL arc, smoothstep so there is no
+    //    sharp jerk) at the ring seam - instead of spiralling the radius over the whole
+    //    revolution. Seams are aligned across rings (step 5b), so they stack into one line.
+    const double L_TRANS_RADIAL = scale_(1.27); // 0.05 inch of arc for the wall-to-wall step
+    std::vector<Point> spiral;
+    spiral.reserve((size_t) K_aug * M);
+    for (size_t r = 0; r + 1 < K_aug; ++r) {
+        const std::vector<Point> &a = resampled[r];
+        const std::vector<Point> &b = resampled[r + 1];
+        double circ = 0.;
+        for (size_t j = 0; j < M; ++j)
+            circ += (a[(j + 1) % M] - a[j]).cast<double>().norm();
+        size_t trans = (circ > 0.) ? (size_t)(L_TRANS_RADIAL * (double) M / circ + 0.5) : M;
+        if (trans < 1) trans = 1;
+        if (trans > M) trans = M;
+        const size_t flat = M - trans;        // points held flat at ring r before the step
+        for (size_t j = 0; j < M; ++j) {
+            double t;
+            if (j < flat) {
+                t = 0.0;                       // flat circle at ring r's radius
+            } else {
+                double u = double(j - flat + 1) / double(trans); // 0..1 across the seam step
+                if (u > 1.0) u = 1.0;
+                t = u * u * (3.0 - 2.0 * u);   // smoothstep ease - no kink at either end
+            }
+            spiral.push_back(lerp(a[j], b[j], t));
+        }
+    }
+    // Append the final ring fully to finish the innermost (or outermost) ring.
+    for (size_t j = 0; j < M; ++j)
+        spiral.push_back(resampled[K_aug - 1][j]);
+
+    // 8. Build a single ExtrusionPath from the spiral points.
+    //    Deposit each bead slightly WIDER than the ring pitch so adjacent rings overlap and fuse
+    //    into a solid wall. Width == pitch (0% overlap) leaves the beads merely touching, which
+    //    reads visibly gappy at typical perimeter pitches. A ~15% overlap closes the seam at
+    //    every pitch without meaningful over-extrusion (matches the overlap solid infill uses).
+    //    Rectangular flow (w*h) keeps the deposited width == w.
+    double out_mm3_per_mm = ref.mm3_per_mm();
+    float  out_width      = ref.width();
+    {
+        std::vector<double> fspac;            // consecutive |spacings| of the final ring set (scaled)
+        fspac.reserve(radii.size());
+        for (size_t r = 0; r + 1 < radii.size(); ++r)
+            fspac.push_back(std::abs(radii[r] - radii[r + 1]));
+        if (! fspac.empty()) {
+            std::sort(fspac.begin(), fspac.end());
+            const size_t fm  = fspac.size();
+            const double med_scaled = (fm % 2 == 1) ? fspac[fm / 2]
+                                                    : 0.5 * (fspac[fm / 2 - 1] + fspac[fm / 2]);
+            if (med_scaled > 0.) {
+                const double OVERLAP = 1.15;
+                const double w_mm = unscale<double>(coord_t(med_scaled)) * OVERLAP; // bead width (mm)
+                const double h    = (double) ref.height();                          // layer height (mm)
+                out_width      = (float) w_mm;
+                out_mm3_per_mm = w_mm * h;
+            }
+        }
+    }
+    Polyline pl;
+    pl.points.reserve(spiral.size());
+    for (const Point &p : spiral)
+        pl.points.push_back(p);
+    ExtrusionPath path(std::move(pl),
+        ExtrusionAttributes(ref.role(), ExtrusionFlow(out_mm3_per_mm, out_width, ref.height())));
+
+    // 9. Replace the loop collection with the single spiral path.
+    entities.clear();
+    entities.append(std::move(path));
+}
+
 void PerimeterGenerator::process_classic(
     // Inputs:
     const Parameters           &params,
@@ -1215,7 +1535,11 @@ void PerimeterGenerator::process_classic(
     // internal flow which is unrelated.
     coord_t min_spacing         = coord_t(perimeter_spacing      * (1 - INSET_OVERLAP_TOLERANCE));
     coord_t ext_min_spacing     = coord_t(ext_perimeter_spacing  * (1 - INSET_OVERLAP_TOLERANCE));
-    bool    has_gap_fill 		= params.config.gap_fill_enabled.value && params.config.gap_fill_speed.value > 0;
+    // Multi-wall spiral vase: the morph re-spaces the whole wall solidly (make_multiwall_spiral
+    // step 5c), so the perimeter generator must NOT also emit gap fill - it would print as a
+    // separate, unbonded feature (a visible seam ring) that the morph does not absorb.
+    const bool multiwall_spiral = params.spiral_vase && params.print_config.spiral_vase_wall_count.value != 1;
+    bool    has_gap_fill 		= params.config.gap_fill_enabled.value && params.config.gap_fill_speed.value > 0 && !multiwall_spiral;
 
     // prepare grown lower layer slices for overhang detection
     if (params.config.overhangs && lower_slices != nullptr && lower_slices_polygons_cache.empty()) {
@@ -1449,6 +1773,11 @@ void PerimeterGenerator::process_classic(
         }
         // at this point, all loops should be in contours[0]
         ExtrusionEntityCollection entities = traverse_loops_classic(params, lower_slices_polygons_cache, contours.front(), thin_walls);
+        if (multiwall_spiral && entities.entities.size() > 1) {
+            // Multi-wall (thick) spiral vase: morph the concentric loops into one continuous
+            // spiral path per layer (flat rings + short smoothstep seam transitions).
+            make_multiwall_spiral(entities, (size_t) params.layer_id);
+        }
         // if brim will be printed, reverse the order of perimeters so that
         // we continue inwards after having finished the brim
         // TODO: add test for perimeter order
