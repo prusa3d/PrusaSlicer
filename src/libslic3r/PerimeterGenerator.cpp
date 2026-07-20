@@ -1495,10 +1495,70 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
     }
     const size_t K_aug = resampled.size();
 
-    // 6. Order outer->inner (already sorted that way); reverse to inner->outer on odd layers.
+    // Uniform pitch of the final ring set (scaled units).
+    double pitch_scaled = 0.;
+    {
+        std::vector<double> fspac;
+        fspac.reserve(radii.size());
+        for (size_t r = 0; r + 1 < radii.size(); ++r)
+            fspac.push_back(std::abs(radii[r] - radii[r + 1]));
+        if (! fspac.empty()) {
+            std::sort(fspac.begin(), fspac.end());
+            const size_t fm = fspac.size();
+            pitch_scaled = (fm % 2 == 1) ? fspac[fm / 2]
+                                         : 0.5 * (fspac[fm / 2 - 1] + fspac[fm / 2]);
+        }
+    }
+    if (pitch_scaled <= 0.)
+        pitch_scaled = scale_(std::max(0.1f, ref.width()));
+    const double pitch_mm = unscale<double>(coord_t(pitch_scaled));
+    // Wall-to-wall step-over: a SHORT tangent S-arc with one-wall-width corner radius (total
+    // arc ~2 pitches long) instead of a long straight ramp.
+    const double L_STEP    = 2.0 * pitch_scaled;
+    const double cos_theta = L_STEP / std::hypot(L_STEP, 0.5 * PI * pitch_scaled); // avg slope of the cosine S
+
+    // Per-ring seam-arc length in samples.
+    auto trans_of = [&](const std::vector<Point> &ring) -> size_t {
+        double circ = 0.;
+        for (size_t j = 0; j < M; ++j)
+            circ += (ring[(j + 1) % M] - ring[j]).cast<double>().norm();
+        size_t tr = (circ > 0.) ? (size_t)(L_STEP * (double) M / circ + 0.5) : M;
+        if (tr < 3) tr = 3;
+        if (tr > M) tr = M;
+        return tr;
+    };
+
+    // 6. Order outer->inner (already sorted that way). Odd layers run inner->outer AND in the
+    //    OPPOSITE rotation around the part (boustrophedon): the layer starts exactly where the
+    //    previous layer's vertical elevator ended, prints its whole spiral in one direction, and
+    //    climbs - the next layer then continues in the other direction from that very spot.
+    //    No backward positioning move, no connector, no travel: even layers run B -> A and climb
+    //    at A; odd layers run A -> B and climb at B (A and B are two fixed spots one step-arc
+    //    apart on the wall).
     if (layer_id % 2 == 1) {
         std::reverse(resampled.begin(), resampled.end());
         std::reverse(radii.begin(), radii.end());
+        const Point C = loop_polys.front().polygon.centroid();
+        for (std::vector<Point> &ring : resampled) {
+            // Flip the winding (CCW -> CW)...
+            std::reverse(ring.begin(), ring.end());
+            // ...re-anchor index 0 to +X in the flipped ring...
+            size_t best_j  = 0;
+            double best_d  = -std::numeric_limits<double>::infinity();
+            for (size_t j = 0; j < M; ++j) {
+                const Vec2d d  = (ring[j] - C).cast<double>();
+                const double n = d.norm();
+                const double c = (n > 0.) ? d.x() / n : -1.;
+                if (c > best_d) { best_d = c; best_j = j; }
+            }
+            if (best_j != 0)
+                std::rotate(ring.begin(), ring.begin() + best_j, ring.end());
+            // ...then shift by one step-arc so this layer's entry point (index flat) coincides
+            // with the even layers' exit point (the anchor).
+            const size_t tr = trans_of(ring) % M;
+            if (tr != 0)
+                std::rotate(ring.begin(), ring.begin() + tr, ring.end());
+        }
     }
 
     // 7.+8. Build the spiral as ONE ExtrusionMultiPath (a single entity, so the per-layer spiral
@@ -1524,24 +1584,6 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
     //    triangular step voids), distributing them uniformly (~1-2%), so total volume is exact.
     const double h = (double) ref.height();     // layer height (mm)
 
-    // Uniform pitch of the final ring set (scaled units).
-    double pitch_scaled = 0.;
-    {
-        std::vector<double> fspac;
-        fspac.reserve(radii.size());
-        for (size_t r = 0; r + 1 < radii.size(); ++r)
-            fspac.push_back(std::abs(radii[r] - radii[r + 1]));
-        if (! fspac.empty()) {
-            std::sort(fspac.begin(), fspac.end());
-            const size_t fm = fspac.size();
-            pitch_scaled = (fm % 2 == 1) ? fspac[fm / 2]
-                                         : 0.5 * (fspac[fm / 2 - 1] + fspac[fm / 2]);
-        }
-    }
-    if (pitch_scaled <= 0.)
-        pitch_scaled = scale_(std::max(0.1f, ref.width()));
-    const double pitch_mm = unscale<double>(coord_t(pitch_scaled));
-
     ExtrusionMultiPath multi;
     // Segment accumulator: emit consecutive points sharing one coverage width as one sub-path.
     // Consecutive sub-paths share their boundary point so the chain is continuous.
@@ -1555,24 +1597,8 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
             ExtrusionAttributes(ref.role(), ExtrusionFlow(w * h, (float) w, (float) h)));
     };
 
-    // Wall-to-wall step-over: a SHORT tangent S-arc with one-wall-width corner radius (total
-    // arc ~2 pitches long), curving around the elevator column instead of a long straight ramp.
-    const double L_STEP     = 2.0 * pitch_scaled;
-    const double cos_theta  = L_STEP / std::hypot(L_STEP, 0.5 * PI * pitch_scaled); // avg slope of the cosine S
     const double MIN_COVER = 0.05; // mm; keeps a segment extruding (continuity) with ~no deposit
     const size_t N_CHUNK   = 4;   // sub-segments used to approximate a linearly varying flow
-
-    // Per-ring seam-arc length in samples (all rings share M samples; use ring 0's circumference).
-    auto trans_of = [&](const std::vector<Point> &ring) -> size_t {
-        double circ = 0.;
-        for (size_t j = 0; j < M; ++j)
-            circ += (ring[(j + 1) % M] - ring[j]).cast<double>().norm();
-        size_t tr = (circ > 0.) ? (size_t)(L_STEP * (double) M / circ + 0.5) : M;
-        if (tr < 3) tr = 3;
-        if (tr < 1) tr = 1;
-        if (tr > M) tr = M;
-        return tr;
-    };
 
     // ---- FIRST ring: one full clean revolution. This ring is a SURFACE (exterior on even
     //      layers, interior on odd), so it must be a complete undistorted circle. It starts at
@@ -1582,18 +1608,10 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
     const size_t flat0  = M - trans0;
     {
         const std::vector<Point> &r0 = resampled[0];
-        // Continuity: the previous layer's vertical elevator ended at the seam anchor (index 0)
-        // on the midline between this layer's first two rings. A short MIN-flow connector rides
-        // from there back to the circle's start at flat0, through the still-empty seam window at
-        // this layer's height - and the avoidance projection below arcs it around the elevator
-        // column. The whole part stays ONE uninterrupted extrusion.
-        if (elevator_below && K_aug >= 2) {
-            Points conn;
-            conn.push_back(lerp(resampled[0][0], resampled[1][0], 0.5)); // elevator top
-            conn.push_back(lerp(resampled[0][flat0], resampled[1][flat0], 0.5));
-            conn.push_back(r0[flat0]);                                   // onto the ring start
-            emit_segment(std::move(conn), MIN_COVER);
-        }
+        // Continuity: the previous layer's vertical elevator climbed ON THE WALL LINE exactly
+        // here - this layer's circle starts at that spot and runs the OPPOSITE rotation
+        // (boustrophedon), so there is no backward positioning move and no travel at all.
+        (void) elevator_below;
         Points pts;
         pts.reserve(M + 1);
         for (size_t j = 0; j < M; ++j)
@@ -1693,42 +1711,16 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
             emit_segment(std::move(chunk), pitch_mm * std::max(MIN_COVER, 1.0 - std::min(1.0, u_mid)));
         }
     }
-    // ---- THE ELEVATOR PAD: the climb to the next layer is a single STRAIGHT VERTICAL extruding
-    //      move (appended by the SpiralVase post-processor at the end of the layer). Here the
-    //      path only steps onto the pad: the midline of the interstice between the last two
-    //      rings at the seam - half a pitch inside the wall, touching neither surface. The
-    //      vertical column bead grows layer by layer at this spot; the next layer starts right
-    //      here and its nearby paths arc around the column (see the avoidance projection below).
-    if (elevator_above && K_aug >= 2) {
-        // Pad at index 0 (the +X anchor) - the same formula the next layer uses for its entry
-        // connector, so the column top and the next layer's start coincide.
-        const Point S_out = lerp(resampled[K_aug - 1][0], resampled[K_aug - 2][0], 0.5);
-        Points pad;
-        pad.push_back(resampled[K_aug - 1][M - 1]); // from the final ring's end
-        pad.push_back(S_out);                       // onto the pad (a ~half-pitch step)
-        emit_segment(std::move(pad), MIN_COVER);
-    }
+    // ---- THE ELEVATOR: the climb to the next layer is a single STRAIGHT VERTICAL extruding
+    //      move appended by the SpiralVase post-processor after the layer's last extrusion -
+    //      which is the closing taper's end, ON THE WALL LINE at the seam anchor. The vertical
+    //      column bead is part of the wall itself: a clean stacked seam on the outer wall on odd
+    //      layers and the inner wall on even layers (the print direction alternates). The next
+    //      layer's first ring simply prints through that point. (elevator_above needs no
+    //      geometry here; the top layer's climb is suppressed by the post-processor.)
+    (void) elevator_above;
     if (multi.paths.empty())
         return;
-
-    // ---- AVOIDANCE ARCS: the previous layer left a vertical elevator column at this layer's
-    //      seam interstice. Any path point within one bead width of the column is projected onto
-    //      a bead-width-radius circle around it, so the neighbouring rings arc smoothly in and
-    //      out around the elevator instead of ramming or squishing it.
-    if (elevator_below && K_aug >= 2) {
-        const Point   S_in    = lerp(resampled[0][0], resampled[1][0], 0.5);
-        const double  r_avoid = pitch_scaled; // one wall (bead) width
-        const double  r2      = r_avoid * r_avoid;
-        for (ExtrusionPath &p : multi.paths)
-            for (Point &q : p.polyline.points) {
-                const Vec2d d  = (q - S_in).cast<double>();
-                const double dd = d.squaredNorm();
-                if (dd < r2 && dd > 1e-6) {
-                    const double f = r_avoid / std::sqrt(dd);
-                    q = S_in + Point(coord_t(d.x() * f), coord_t(d.y() * f));
-                }
-            }
-    }
 
     // Global volumetric normalization: scale every segment's flow so the layer's total extruded
     // volume equals EXACTLY the sliced wall area times the layer height.
