@@ -2603,10 +2603,18 @@ LayerResult GCodeGenerator::process_layer(
     // Just a reminder: A spiral vase mode is allowed for a single object, single material print only.
     m_enable_loop_clipping = true;
     if (m_spiral_vase && layers.size() == 1 && support_layer == nullptr) {
-        bool enable = (layer.id() > 0 || !print.has_brim()) && (layer.id() >= (size_t)print.config().skirt_height.value && ! print.has_infinite_skirt());
+        // The continuous constant-wall spiral is flat-per-layer with only a short in-wall ramp
+        // at the very end of the layer, so it coexists with skirt/brim on the first layer
+        // (unlike the classic whole-layer Z ramp, which must not start below them).
+        bool enable = print.config().constant_wall_spiral.value ||
+            ((layer.id() > 0 || !print.has_brim()) && (layer.id() >= (size_t)print.config().skirt_height.value && ! print.has_infinite_skirt()));
         if (enable) {
+            // In constant-wall mode a qualifying layer is already a solid wall - bottom solid
+            // layers add nothing there, and non-qualifying layers are caught by the perimeter
+            // and fill counts below (a spiral layer is exactly one perimeter entity, no fills).
+            const bool check_bottom = ! print.config().constant_wall_spiral.value;
             for (const LayerRegion *layer_region : layer.regions())
-                if (size_t(layer_region->region().config().bottom_solid_layers.value) > layer.id() ||
+                if ((check_bottom && size_t(layer_region->region().config().bottom_solid_layers.value) > layer.id()) ||
                     layer_region->perimeters().items_count() > 1u ||
                     layer_region->fills().items_count() > 0) {
                     enable = false;
