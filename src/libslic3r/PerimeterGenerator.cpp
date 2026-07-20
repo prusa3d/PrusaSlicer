@@ -1220,6 +1220,19 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
         });
     const ExtrusionPath &ref = *loop_polys.front().ref; // outermost loop's reference path
 
+    // Temporary diagnostics: MULTIWALL_DEBUG=<layer_id> dumps the collected loop radii.
+    if (const char *dbg = std::getenv("MULTIWALL_DEBUG"); dbg != nullptr && atoi(dbg) == (int) layer_id) {
+        fprintf(stderr, "[multiwall] layer %zu: %zu loops collected\n", layer_id, loop_polys.size());
+        for (size_t i = 0; i < loop_polys.size(); ++i) {
+            const double a_abs = std::abs(loop_polys[i].polygon.area());
+            const Point  c     = loop_polys[i].polygon.centroid();
+            fprintf(stderr, "[multiwall]   loop %2zu: r_eq=%7.3f mm  centroid=(%.2f,%.2f) ccw=%d pts=%zu\n",
+                i, unscale<double>(coord_t(std::sqrt(a_abs / PI))),
+                unscale<double>(c.x()), unscale<double>(c.y()),
+                int(loop_polys[i].polygon.is_counter_clockwise()), loop_polys[i].polygon.points.size());
+        }
+    }
+
     // 3b. Filter the sorted loops down to a clean, NESTED, concentric sequence before morphing.
     //     Filling a solid all the way to its center spawns tiny and/or off-center fragment loops
     //     near the middle; the plain area-sort interleaves them, so blending dives radially
@@ -1231,6 +1244,16 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
         const Point  C0        = loop_polys.front().polygon.centroid();                 // outer centroid
         const double R0        = std::sqrt(area0_abs / PI);                             // outer "radius" (scaled)
         const double conc_tol  = 0.5 * R0;                                              // max centroid drift (scaled)
+        // Shape gate: isoperimetric quotient A/P^2 is scale-invariant and characterizes SHAPE
+        // (circle 1/4pi; any similar shape keeps the same value at every offset depth). Where the
+        // outer-going and hole-going offset fronts meet, the leftover strip can survive as a
+        // degenerate self-crossing "bowtie" loop: huge perimeter, tiny net area -> quotient
+        // collapses to a few % of the outer's. Morphing against such a loop lerps angularly
+        // mismatched points straight through the center (criss-cross disc). Reject any loop whose
+        // quotient falls below 35% of the outer contour's - inner rings of legitimate shapes only
+        // get ROUNDER (higher quotient) as they shrink, so real rings always pass.
+        const double P0 = loop_polys.front().polygon.length();
+        const double q0 = (P0 > 0.) ? area0_abs / (P0 * P0) : 0.;
         // Center cap thresholds: stop once the remaining hole is tiny. Both are in SCALED units.
         const double r_min     = scale_(1.0);                                           // 1 mm radius (scaled)
         // ~ (2 * line spacing)^2. ExtrusionPath width is in mm, so scale it before squaring.
@@ -1253,6 +1276,11 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
             // Concentric: centroid must sit within 0.5*R0 of the outer centroid.
             const double drift = (loop_polys[i].polygon.centroid() - C0).cast<double>().norm();
             if (drift > conc_tol)
+                continue;
+            // Shape-similar: reject degenerate bowtie/sliver leftovers (see q0 above).
+            const double Pi_len = loop_polys[i].polygon.length();
+            const double qi     = (Pi_len > 0.) ? a_abs / (Pi_len * Pi_len) : 0.;
+            if (qi < 0.35 * q0)
                 continue;
             kept.push_back(loop_polys[i]);
             last_area_abs = a_abs;
