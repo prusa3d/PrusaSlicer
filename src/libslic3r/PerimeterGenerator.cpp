@@ -1186,7 +1186,7 @@ void PerimeterGenerator::process_arachne(
 // (outer->inner on even layers, inner->outer on odd) so the layer-change spiral ramp connects
 // end-to-start. Z stays 0 here; the SpiralVase post-processor flattens each layer at its nominal
 // height and turns the final ~1.27mm of the layer into a short spiral ramp to the next layer.
-static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t layer_id)
+static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t layer_id, double wall_area_scaled2)
 {
     // 1. Collect the ExtrusionLoop entities.
     std::vector<const ExtrusionLoop *> loops;
@@ -1453,13 +1453,62 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
         std::reverse(radii.begin(), radii.end());
     }
 
-    // 7. Build the path: hold each ring FLAT at its own radius, and step inward to the next
-    //    ring only over a short eased transition (~L_TRANS_RADIAL arc, smoothstep so there is no
-    //    sharp jerk) at the ring seam - instead of spiralling the radius over the whole
-    //    revolution. Seams are aligned across rings (step 5b), so they stack into one line.
+    // 7.+8. Build the spiral as ONE ExtrusionMultiPath (a single entity, so the per-layer spiral
+    //    vase check still sees one perimeter) whose segments carry LOCALLY-correct volumetric
+    //    flow, then normalize globally so the layer extrudes EXACTLY wall_area * layer_height -
+    //    100% of the sliced wall volume, neither over- nor under-deposited.
+    //
+    //    Geometry (unchanged): hold each ring FLAT at its own radius, step to the next ring only
+    //    over a short smoothstep transition (~L_TRANS_RADIAL of arc) at the ring seam. Seams are
+    //    aligned across rings (step 5b), so they stack into one line.
+    //
+    //    Local coverage model (bead cross-section = coverage_width * layer_height):
+    //      - flat ring arcs: each bead covers one ring pitch.
+    //      - step diagonals: adjacent diagonals are parallel, radially one pitch apart, so their
+    //        perpendicular spacing is pitch * cos(theta), theta = atan(pitch / L_TRANS). Constant
+    //        nominal flow would over-deposit by 1/cos(theta) right at the seam.
+    //      - the final ring's seam arc: the incoming diagonal converged onto this ring across the
+    //        same arc, so the leftover strip between them narrows from one pitch to zero. Constant
+    //        flow would re-deposit a full bead on top of the diagonal's tail - THE seam blob.
+    //        Taper the coverage with the same smoothstep the diagonal used (chunked, since one
+    //        path has one flow value).
+    //    The global normalization then absorbs the small remaining geometric slivers (the
+    //    triangular step voids), distributing them uniformly (~1-2%), so total volume is exact.
     const double L_TRANS_RADIAL = scale_(1.27); // 0.05 inch of arc for the wall-to-wall step
-    std::vector<Point> spiral;
-    spiral.reserve((size_t) K_aug * M);
+    const double h = (double) ref.height();     // layer height (mm)
+
+    // Uniform pitch of the final ring set (scaled units).
+    double pitch_scaled = 0.;
+    {
+        std::vector<double> fspac;
+        fspac.reserve(radii.size());
+        for (size_t r = 0; r + 1 < radii.size(); ++r)
+            fspac.push_back(std::abs(radii[r] - radii[r + 1]));
+        if (! fspac.empty()) {
+            std::sort(fspac.begin(), fspac.end());
+            const size_t fm = fspac.size();
+            pitch_scaled = (fm % 2 == 1) ? fspac[fm / 2]
+                                         : 0.5 * (fspac[fm / 2 - 1] + fspac[fm / 2]);
+        }
+    }
+    if (pitch_scaled <= 0.)
+        pitch_scaled = scale_(std::max(0.1f, ref.width()));
+    const double pitch_mm = unscale<double>(coord_t(pitch_scaled));
+
+    ExtrusionMultiPath multi;
+    // Segment accumulator: emit consecutive points sharing one coverage width as one sub-path.
+    // Consecutive sub-paths share their boundary point so the chain is continuous.
+    auto emit_segment = [&multi, &ref, h](Points &&pts, double coverage_mm) {
+        if (pts.size() < 2)
+            return;
+        const double w = std::max(coverage_mm, 0.05); // keep E > 0 so the move stays an extrusion
+        Polyline pl;
+        pl.points = std::move(pts);
+        multi.paths.emplace_back(std::move(pl),
+            ExtrusionAttributes(ref.role(), ExtrusionFlow(w * h, (float) w, (float) h)));
+    };
+
+    const double cos_theta = L_TRANS_RADIAL / std::hypot(L_TRANS_RADIAL, pitch_scaled);
     for (size_t r = 0; r + 1 < K_aug; ++r) {
         const std::vector<Point> &a = resampled[r];
         const std::vector<Point> &b = resampled[r + 1];
@@ -1470,6 +1519,9 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
         if (trans < 1) trans = 1;
         if (trans > M) trans = M;
         const size_t flat = M - trans;        // points held flat at ring r before the step
+        Points flat_pts, diag_pts;
+        flat_pts.reserve(flat + 1);
+        diag_pts.reserve(trans + 1);
         for (size_t j = 0; j < M; ++j) {
             double t;
             if (j < flat) {
@@ -1479,50 +1531,76 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
                 if (u > 1.0) u = 1.0;
                 t = u * u * (3.0 - 2.0 * u);   // smoothstep ease - no kink at either end
             }
-            spiral.push_back(lerp(a[j], b[j], t));
+            const Point p = lerp(a[j], b[j], t);
+            if (j < flat) {
+                flat_pts.push_back(p);
+            } else {
+                if (diag_pts.empty() && ! flat_pts.empty())
+                    diag_pts.push_back(flat_pts.back()); // share the boundary point
+                diag_pts.push_back(p);
+            }
+        }
+        emit_segment(std::move(flat_pts), pitch_mm);
+        emit_segment(std::move(diag_pts), pitch_mm * cos_theta);
+    }
+    // The final ring: full flat revolution, but its seam arc re-traces the arc the incoming
+    // diagonal converged onto - taper the coverage to match the narrowing leftover strip.
+    {
+        const std::vector<Point> &fin = resampled[K_aug - 1];
+        double circ = 0.;
+        for (size_t j = 0; j < M; ++j)
+            circ += (fin[(j + 1) % M] - fin[j]).cast<double>().norm();
+        size_t trans = (circ > 0.) ? (size_t)(L_TRANS_RADIAL * (double) M / circ + 0.5) : M;
+        if (trans < 1) trans = 1;
+        if (trans > M) trans = M;
+        const size_t flat = M - trans;
+        Points flat_pts(fin.begin(), fin.begin() + flat);
+        emit_segment(std::move(flat_pts), pitch_mm);
+        // Chunk the tapered arc: coverage tracks the strip left by the diagonal, (1 - t) * pitch.
+        const size_t N_CHUNK = 4;
+        for (size_t c = 0; c < N_CHUNK; ++c) {
+            const size_t j0 = flat + (trans * c) / N_CHUNK;
+            const size_t j1 = flat + (trans * (c + 1)) / N_CHUNK;
+            if (j0 >= j1)
+                continue;
+            Points chunk;
+            chunk.reserve(j1 - j0 + 1);
+            if (j0 > 0)
+                chunk.push_back(fin[j0 - 1]); // share the boundary point
+            for (size_t j = j0; j < j1; ++j)
+                chunk.push_back(fin[j]);
+            const double u_mid = (double(j0 + j1) * 0.5 - double(flat) + 1.0) / double(trans);
+            const double t_mid = std::min(1.0, u_mid * u_mid * (3.0 - 2.0 * u_mid));
+            emit_segment(std::move(chunk), pitch_mm * std::max(0.05, 1.0 - t_mid));
         }
     }
-    // Append the final ring fully to finish the innermost (or outermost) ring.
-    for (size_t j = 0; j < M; ++j)
-        spiral.push_back(resampled[K_aug - 1][j]);
+    if (multi.paths.empty())
+        return;
 
-    // 8. Build a single ExtrusionPath from the spiral points.
-    //    Deposit each bead slightly WIDER than the ring pitch so adjacent rings overlap and fuse
-    //    into a solid wall. Width == pitch (0% overlap) leaves the beads merely touching, which
-    //    reads visibly gappy at typical perimeter pitches. A ~15% overlap closes the seam at
-    //    every pitch without meaningful over-extrusion (matches the overlap solid infill uses).
-    //    Rectangular flow (w*h) keeps the deposited width == w.
-    double out_mm3_per_mm = ref.mm3_per_mm();
-    float  out_width      = ref.width();
+    // Global volumetric normalization: scale every segment's flow so the layer's total extruded
+    // volume equals EXACTLY the sliced wall area times the layer height.
     {
-        std::vector<double> fspac;            // consecutive |spacings| of the final ring set (scaled)
-        fspac.reserve(radii.size());
-        for (size_t r = 0; r + 1 < radii.size(); ++r)
-            fspac.push_back(std::abs(radii[r] - radii[r + 1]));
-        if (! fspac.empty()) {
-            std::sort(fspac.begin(), fspac.end());
-            const size_t fm  = fspac.size();
-            const double med_scaled = (fm % 2 == 1) ? fspac[fm / 2]
-                                                    : 0.5 * (fspac[fm / 2 - 1] + fspac[fm / 2]);
-            if (med_scaled > 0.) {
-                const double OVERLAP = 1.15;
-                const double w_mm = unscale<double>(coord_t(med_scaled)) * OVERLAP; // bead width (mm)
-                const double h    = (double) ref.height();                          // layer height (mm)
-                out_width      = (float) w_mm;
-                out_mm3_per_mm = w_mm * h;
+        double v_planned = 0.;
+        for (const ExtrusionPath &p : multi.paths)
+            v_planned += p.mm3_per_mm() * unscale<double>(p.polyline.length());
+        const double wall_area_mm2 = wall_area_scaled2 * SCALING_FACTOR * SCALING_FACTOR;
+        const double v_exact       = wall_area_mm2 * h;
+        if (const char *dbg = std::getenv("MULTIWALL_DEBUG"); dbg != nullptr && (atoi(dbg) == (int) layer_id || atoi(dbg) == -1))
+            fprintf(stderr, "[multiwall] layer %zu: v_planned=%.2f v_exact=%.2f (A=%.2f mm2, h=%.3f) f=%.4f segs=%zu\n",
+                layer_id, v_planned, v_exact, wall_area_mm2, h, v_exact / std::max(1e-9, v_planned), multi.paths.size());
+        if (v_planned > 0. && v_exact > 0.) {
+            const double f = v_exact / v_planned;
+            for (ExtrusionPath &p : multi.paths) {
+                ExtrusionAttributes attr = p.attributes();
+                attr.mm3_per_mm *= f;
+                p = ExtrusionPath(std::move(p.polyline), attr);
             }
         }
     }
-    Polyline pl;
-    pl.points.reserve(spiral.size());
-    for (const Point &p : spiral)
-        pl.points.push_back(p);
-    ExtrusionPath path(std::move(pl),
-        ExtrusionAttributes(ref.role(), ExtrusionFlow(out_mm3_per_mm, out_width, ref.height())));
 
-    // 9. Replace the loop collection with the single spiral path.
+    // 9. Replace the loop collection with the single continuous multi-segment spiral.
     entities.clear();
-    entities.append(std::move(path));
+    entities.append(std::move(multi));
 }
 
 void PerimeterGenerator::process_classic(
@@ -1803,8 +1881,9 @@ void PerimeterGenerator::process_classic(
         ExtrusionEntityCollection entities = traverse_loops_classic(params, lower_slices_polygons_cache, contours.front(), thin_walls);
         if (multiwall_spiral && entities.entities.size() > 1) {
             // Multi-wall (thick) spiral vase: morph the concentric loops into one continuous
-            // spiral path per layer (flat rings + short smoothstep seam transitions).
-            make_multiwall_spiral(entities, (size_t) params.layer_id);
+            // spiral path per layer (flat rings + short smoothstep seam transitions). The sliced
+            // wall area drives the exact per-layer extrusion volume (area * layer height).
+            make_multiwall_spiral(entities, (size_t) params.layer_id, std::abs(surface.expolygon.area()));
         }
         // if brim will be printed, reverse the order of perimeters so that
         // we continue inwards after having finished the brim
