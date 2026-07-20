@@ -237,11 +237,18 @@ std::string SpiralVase::process_layer_multiwall(const std::string &gcode, bool l
         const double col_volume    = PI * 0.25 * max_nozzle * max_nozzle * (double) layer_height;
         const double de            = col_volume / filament_area;
         char buf[96];
-        if (relative_e)
+        if (relative_e) {
             snprintf(buf, sizeof(buf), "G1 Z%.3f E%.5f F600", z_nominal + layer_height, de);
-        else
+            out_lines.insert(out_lines.begin() + last_extruding + 1, buf);
+        } else {
+            // Absolute E: the injected climb extrudes material the generator never counted, so
+            // restore the counter afterwards - otherwise every next layer's first E value sits
+            // below the counter and reads as a (physically meaningless) micro-retract.
             snprintf(buf, sizeof(buf), "G1 Z%.3f E%.5f F600", z_nominal + layer_height, last_abs_e + de);
-        out_lines.insert(out_lines.begin() + last_extruding + 1, buf);
+            out_lines.insert(out_lines.begin() + last_extruding + 1, buf);
+            snprintf(buf, sizeof(buf), "G92 E%.5f", last_abs_e);
+            out_lines.insert(out_lines.begin() + last_extruding + 2, buf);
+        }
     }
     std::string new_gcode;
     new_gcode.reserve(gcode.size() + 32);

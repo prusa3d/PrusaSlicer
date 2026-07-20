@@ -1473,6 +1473,26 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
             radii.swap(uni_radii);
         }
     }
+    // 5d. RE-ANCHOR every ring's index 0 to the +X direction from the shared centroid. The
+    //     chained alignment (5b) anchors only the outermost ring; layers alternate which ring
+    //     comes first, so the seam angle wandered layer to layer and the elevator columns did
+    //     not stack. With a common absolute anchor the seam - and the vertical elevator pads -
+    //     sit at the same angle on every layer.
+    {
+        const Point C = loop_polys.front().polygon.centroid();
+        for (std::vector<Point> &ring : resampled) {
+            size_t best_j  = 0;
+            double best_d  = -std::numeric_limits<double>::infinity();
+            for (size_t j = 0; j < M; ++j) {
+                const Vec2d d  = (ring[j] - C).cast<double>();
+                const double n = d.norm();
+                const double c = (n > 0.) ? d.x() / n : -1.;
+                if (c > best_d) { best_d = c; best_j = j; }
+            }
+            if (best_j != 0)
+                std::rotate(ring.begin(), ring.begin() + best_j, ring.end());
+        }
+    }
     const size_t K_aug = resampled.size();
 
     // 6. Order outer->inner (already sorted that way); reverse to inner->outer on odd layers.
@@ -1502,7 +1522,6 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
     //        path has one flow value).
     //    The global normalization then absorbs the small remaining geometric slivers (the
     //    triangular step voids), distributing them uniformly (~1-2%), so total volume is exact.
-    const double L_TRANS_RADIAL = scale_(1.27); // 0.05 inch of arc for the wall-to-wall step
     const double h = (double) ref.height();     // layer height (mm)
 
     // Uniform pitch of the final ring set (scaled units).
@@ -1536,7 +1555,10 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
             ExtrusionAttributes(ref.role(), ExtrusionFlow(w * h, (float) w, (float) h)));
     };
 
-    const double cos_theta = L_TRANS_RADIAL / std::hypot(L_TRANS_RADIAL, pitch_scaled);
+    // Wall-to-wall step-over: a SHORT tangent S-arc with one-wall-width corner radius (total
+    // arc ~2 pitches long), curving around the elevator column instead of a long straight ramp.
+    const double L_STEP     = 2.0 * pitch_scaled;
+    const double cos_theta  = L_STEP / std::hypot(L_STEP, 0.5 * PI * pitch_scaled); // avg slope of the cosine S
     const double MIN_COVER = 0.05; // mm; keeps a segment extruding (continuity) with ~no deposit
     const size_t N_CHUNK   = 4;   // sub-segments used to approximate a linearly varying flow
 
@@ -1545,7 +1567,8 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
         double circ = 0.;
         for (size_t j = 0; j < M; ++j)
             circ += (ring[(j + 1) % M] - ring[j]).cast<double>().norm();
-        size_t tr = (circ > 0.) ? (size_t)(L_TRANS_RADIAL * (double) M / circ + 0.5) : M;
+        size_t tr = (circ > 0.) ? (size_t)(L_STEP * (double) M / circ + 0.5) : M;
+        if (tr < 3) tr = 3;
         if (tr < 1) tr = 1;
         if (tr > M) tr = M;
         return tr;
@@ -1559,23 +1582,29 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
     const size_t flat0  = M - trans0;
     {
         const std::vector<Point> &r0 = resampled[0];
+        // Continuity: the previous layer's vertical elevator ended at the seam anchor (index 0)
+        // on the midline between this layer's first two rings. A short MIN-flow connector rides
+        // from there back to the circle's start at flat0, through the still-empty seam window at
+        // this layer's height - and the avoidance projection below arcs it around the elevator
+        // column. The whole part stays ONE uninterrupted extrusion.
+        if (elevator_below && K_aug >= 2) {
+            Points conn;
+            conn.push_back(lerp(resampled[0][0], resampled[1][0], 0.5)); // elevator top
+            conn.push_back(lerp(resampled[0][flat0], resampled[1][flat0], 0.5));
+            conn.push_back(r0[flat0]);                                   // onto the ring start
+            emit_segment(std::move(conn), MIN_COVER);
+        }
         Points pts;
-        pts.reserve(M + 2);
-        // Continuity: the previous layer's micro-helix elevator ended at the seam on the midline
-        // between this layer's first two rings - start there so the whole part is ONE
-        // uninterrupted extrusion (no travel, no retract, no restart).
-        if (elevator_below && K_aug >= 2)
-            pts.push_back(lerp(resampled[0][0], resampled[1][0], 0.5));
+        pts.reserve(M + 1);
         for (size_t j = 0; j < M; ++j)
-            pts.push_back(r0[j]);
-        pts.push_back(r0[0]); // close the circle
+            pts.push_back(r0[(flat0 + j) % M]);
+        pts.push_back(r0[flat0]); // close the circle
         emit_segment(std::move(pts), pitch_mm);
     }
-    // ---- DEPARTURE diagonal from ring 0 over the seam arc [flat0..M): ring 0's line there is
-    //      already fully printed (full circle above), so the diagonal only needs to cover the
-    //      WIDENING strip it leaves as it pulls away: coverage grows linearly 0 -> pitch.
-    //      Exception: if the previous layer's elevator climbed through this interstice, it
-    //      already deposited here - traverse with (almost) no extrusion instead.
+    // ---- DEPARTURE arc from ring 0 over the seam window [flat0..M): ring 0's line there is
+    //      already fully printed (full circle above), so the arc only needs to cover the
+    //      WIDENING strip it leaves as it pulls away: coverage grows 0 -> pitch. (The elevator
+    //      is a point column at the anchor, not a strip - the departure always deposits.)
     {
         const std::vector<Point> &a = resampled[0];
         const std::vector<Point> &b = resampled[1 < K_aug ? 1 : 0];
@@ -1588,17 +1617,16 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
             chunk.reserve(j1 - j0 + 1);
             {   // share the boundary point with the previous emitted geometry
                 const size_t jp = (j0 == flat0) ? flat0 : j0 - 1;
-                const double tp = (j0 == flat0) ? 0.0 : double(jp - flat0 + 1) / double(trans0);
-                chunk.push_back(lerp(a[jp], b[jp], tp));
+                const double up = (j0 == flat0) ? 0.0 : double(jp - flat0 + 1) / double(trans0);
+                chunk.push_back(lerp(a[jp], b[jp], 0.5 - 0.5 * std::cos(PI * std::min(1.0, up))));
             }
             for (size_t j = j0; j < j1; ++j) {
-                double t = double(j - flat0 + 1) / double(trans0);
-                if (t > 1.0) t = 1.0;
-                chunk.push_back(lerp(a[j], b[j], t));
+                double u = double(j - flat0 + 1) / double(trans0);
+                if (u > 1.0) u = 1.0;
+                chunk.push_back(lerp(a[j], b[j], 0.5 - 0.5 * std::cos(PI * u)));
             }
             const double t_mid = (double(j0 + j1) * 0.5 - double(flat0) + 1.0) / double(trans0);
-            emit_segment(std::move(chunk),
-                elevator_below ? MIN_COVER : pitch_mm * std::max(MIN_COVER, std::min(1.0, t_mid)));
+            emit_segment(std::move(chunk), pitch_mm * std::max(MIN_COVER, std::min(1.0, t_mid)));
         }
     }
     // ---- INTERIOR rings 1..K-2: flat arc then a straight LINEAR diagonal to the next ring.
@@ -1621,8 +1649,9 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
             if (j < flat) {
                 t = 0.0;
             } else {
-                t = double(j - flat + 1) / double(trans);
-                if (t > 1.0) t = 1.0;
+                double u = double(j - flat + 1) / double(trans);
+                if (u > 1.0) u = 1.0;
+                t = 0.5 - 0.5 * std::cos(PI * u); // tangent S-arc: one-wall-radius corners
             }
             const Point p = lerp(a[j], b[j], t);
             if (j < flat) {
@@ -1671,7 +1700,9 @@ static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t la
     //      vertical column bead grows layer by layer at this spot; the next layer starts right
     //      here and its nearby paths arc around the column (see the avoidance projection below).
     if (elevator_above && K_aug >= 2) {
-        const Point S_out = lerp(resampled[K_aug - 1][M - 1], resampled[K_aug - 2][M - 1], 0.5);
+        // Pad at index 0 (the +X anchor) - the same formula the next layer uses for its entry
+        // connector, so the column top and the next layer's start coincide.
+        const Point S_out = lerp(resampled[K_aug - 1][0], resampled[K_aug - 2][0], 0.5);
         Points pad;
         pad.push_back(resampled[K_aug - 1][M - 1]); // from the final ring's end
         pad.push_back(S_out);                       // onto the pad (a ~half-pitch step)
