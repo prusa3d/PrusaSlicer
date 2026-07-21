@@ -3152,6 +3152,19 @@ void PrintConfigDef::init_fff_params()
                    "It won't work when printing more than one single object.");
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("constant_wall_spiral", coBool);
+    def->label = L("Continuous constant-wall spiral");
+    def->tooltip = L("One-click continuous printing for round, constant-wall shapes. Every layer whose "
+                   "cross-section is a circular wall of constant thickness (fully axisymmetric) is "
+                   "printed as one continuous spiral of concentric rings with exact volumetric flow: "
+                   "the wall fills completely, the climb to the next layer is a short ramp buried "
+                   "inside the wall, and the whole section prints without a single retraction or "
+                   "restart. Layers that are not a constant circular wall (holes, ports, non-round "
+                   "sections, solid tops and bottoms) automatically print with the regular settings. "
+                   "No other settings are modified by this mode.");
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("standby_temperature_delta", coInt);
     def->label = L("Temperature variation");
     // TRN PrintSettings : "Ooze prevention" > "Temperature variation"

@@ -193,7 +193,7 @@ static std::vector<VolumeSlices> slice_volumes_inner(
             if (layer_ranges.size() == 1) {
                 if (const PrintObjectRegions::LayerRangeRegions &layer_range = layer_ranges.front(); layer_range.has_volume(model_volume->id())) {
                     if (model_volume->is_model_part() && print_config.spiral_vase) {
-                        auto it = std::find_if(layer_range.volume_regions.begin(), layer_range.volume_regions.end(), 
+                        auto it = std::find_if(layer_range.volume_regions.begin(), layer_range.volume_regions.end(),
                             [model_volume](const auto &slice){ return model_volume == slice.model_volume; });
                         params.mode = MeshSlicingParams::SlicingMode::PositiveLargestContour;
                         // Slice the bottom layers with SlicingMode::Regular.

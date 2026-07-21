@@ -44,6 +44,12 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
         return gcode;
     }
 
+    // Continuous constant-wall spiral: the layer is one morphed multi-ring spiral path; keep it
+    // FLAT at its nominal height and only ramp the final short arc (the in-wall elevator) up to
+    // the next layer.
+    if (m_config.constant_wall_spiral.value)
+        return this->process_layer_multiwall(gcode, last_layer);
+
     // Get total XY length for this layer by summing all extrusion moves.
     float total_layer_length = 0.f;
     float layer_height       = 0.f;
@@ -162,6 +168,95 @@ std::string SpiralVase::process_layer(const std::string &gcode, bool last_layer)
 
     m_previous_layer = std::move(current_layer);
     return new_gcode + transition_gcode;
+}
+
+// Multi-wall (thick) spiral vase - flat layers with a short spiral transition.
+// The layer's perimeter G-code is one continuous morphed spiral covering every concentric wall.
+// The whole layer is printed FLAT at its nominal Z, so every wall is present at every height ->
+// a genuinely solid thick wall. Only the final L_TRANS of the layer (the tail of the last ring,
+// which the perimeter morph alternates between the innermost and outermost wall per layer) ramps
+// Z up by one layer height, turning the layer-change Z seam into a short fixed-length spiral.
+// L_TRANS is a constant arc length (0.05 inch) regardless of part size.
+std::string SpiralVase::process_layer_multiwall(const std::string &gcode, bool last_layer)
+{
+    // --- First pass: total XY extrusion length, layer height, and the layer's nominal Z. ---
+    float total_len = 0.f, layer_height = 0.f, z_nominal = 0.f;
+    bool  set_z = false;
+    {
+        GCodeReader r = m_reader; // clone
+        r.parse_buffer(gcode, [&total_len, &layer_height, &z_nominal, &set_z]
+            (GCodeReader &reader, const GCodeReader::GCodeLine &line) {
+            if (line.cmd_is("G1")) {
+                if (line.extruding(reader))
+                    total_len += line.dist_XY(reader);
+                else if (line.has(Z)) {
+                    layer_height += line.dist_Z(reader);
+                    if (! set_z) { z_nominal = line.new_Z(reader); set_z = true; }
+                }
+            }
+        });
+    }
+    if (total_len <= 0.f) { m_reader.parse_buffer(gcode); return gcode; }
+
+    // The whole layer prints FLAT at its nominal Z. The climb to the next layer is a single
+    // STRAIGHT VERTICAL extruding move (the elevator column) appended after the layer's last
+    // extrusion - the layer ends on the seam interstice pad the generator placed there, and the
+    // next layer's paths arc around the column. The print's last layer gets no climb.
+    std::vector<std::string> out_lines;
+    size_t      last_extruding = std::string::npos;
+    float       last_abs_e = 0.f;
+    const bool  relative_e = m_config.use_relative_e_distances.value;
+    m_reader.parse_buffer(gcode, [&]
+        (GCodeReader &reader, GCodeReader::GCodeLine line) {
+        if (! line.cmd_is("G1")) { out_lines.emplace_back(line.raw()); return; }
+        // Flatten any Z move to the layer's nominal height; the vertical elevator at the end of
+        // the previous layer already climbed us here.
+        if (line.has_z() && ! (line.has_x() || line.has_y())) {
+            line.set(reader, Z, z_nominal);
+            out_lines.emplace_back(line.raw());
+            return;
+        }
+        if (line.has(E) && ! relative_e)
+            last_abs_e = line.e();
+        if (line.extruding(reader) && line.dist_XY(reader) > 0) {
+            line.set(reader, Z, z_nominal);
+            out_lines.emplace_back(line.raw());
+            last_extruding = out_lines.size() - 1;
+        } else
+            out_lines.emplace_back(line.raw());
+    });
+
+    if (! last_layer && layer_height > 0.f && last_extruding != std::string::npos) {
+        // The vertical elevator: climb one layer height IN PLACE, right at the elevator pad (the
+        // layer's last extrusion), extruding enough to leave a nozzle-diameter column bead
+        // (pressure stays up, no retract, no restart). Inserted before any trailing travel so
+        // the column lands exactly where the next layer's avoidance arcs expect it.
+        const double max_nozzle    = *std::max_element(m_config.nozzle_diameter.values.begin(), m_config.nozzle_diameter.values.end());
+        const double fil_d         = m_config.filament_diameter.get_at(0);
+        const double filament_area = PI * 0.25 * fil_d * fil_d;
+        const double col_volume    = PI * 0.25 * max_nozzle * max_nozzle * (double) layer_height;
+        const double de            = col_volume / filament_area;
+        char buf[96];
+        if (relative_e) {
+            snprintf(buf, sizeof(buf), "G1 Z%.3f E%.5f F600", z_nominal + layer_height, de);
+            out_lines.insert(out_lines.begin() + last_extruding + 1, buf);
+        } else {
+            // Absolute E: the injected climb extrudes material the generator never counted, so
+            // restore the counter afterwards - otherwise every next layer's first E value sits
+            // below the counter and reads as a (physically meaningless) micro-retract.
+            snprintf(buf, sizeof(buf), "G1 Z%.3f E%.5f F600", z_nominal + layer_height, last_abs_e + de);
+            out_lines.insert(out_lines.begin() + last_extruding + 1, buf);
+            snprintf(buf, sizeof(buf), "G92 E%.5f", last_abs_e);
+            out_lines.insert(out_lines.begin() + last_extruding + 2, buf);
+        }
+    }
+    std::string new_gcode;
+    new_gcode.reserve(gcode.size() + 32);
+    for (const std::string &l : out_lines) {
+        new_gcode += l;
+        new_gcode += '\n';
+    }
+    return new_gcode;
 }
 
 }

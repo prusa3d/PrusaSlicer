@@ -1177,6 +1177,589 @@ void PerimeterGenerator::process_arachne(
     append(out_fill_expolygons, std::move(infill_areas));
 }
 
+// Continuous constant-wall spiral: does this surface qualify for the per-layer spiral treatment?
+// It must be a fully axisymmetric wall: exactly one hole, both boundaries circular (isoperimetric
+// quotient 4*pi*A/P^2 ~ 1), and concentric within a fraction of the wall thickness (which makes
+// the wall thickness constant). Anything else - side holes/ports (they break the annulus),
+// non-round sections, solid regions - prints with the regular settings untouched.
+static bool surface_is_constant_circular_wall(const ExPolygon &exp)
+{
+    if (exp.holes.size() != 1)
+        return false;
+    const Polygon &c = exp.contour;
+    const Polygon &h = exp.holes.front();
+    const double ac = std::abs(c.area()), ah = std::abs(h.area());
+    if (ac <= 0. || ah <= 0. || ah >= ac)
+        return false;
+    auto circularity = [](const Polygon &p, double a) {
+        const double len = p.length();
+        return (len > 0.) ? 4. * PI * a / (len * len) : 0.;
+    };
+    if (circularity(c, ac) < 0.9 || circularity(h, ah) < 0.9)
+        return false;
+    const double rc = std::sqrt(ac / PI), rh = std::sqrt(ah / PI);
+    const double wall = rc - rh;
+    if (wall <= 0.)
+        return false;
+    return (c.centroid() - h.centroid()).cast<double>().norm() <= 0.25 * wall;
+}
+
+// Multi-wall (thick) spiral vase: morph the concentric perimeter loops of one layer into a
+// single continuous extrusion path. Each ring is held FLAT (constant radius) for most of its
+// revolution and steps inward/outward to the next ring only over a short smoothstep arc at the
+// seam, so the wall prints as bonded concentric rings with one aligned seam line. The whole wall
+// is re-spaced at a constant pitch outer->inner so the fill is solid for any geometry (straight
+// tube or tapered cone) with no leftover strip for gap fill. Direction alternates per layer
+// (outer->inner on even layers, inner->outer on odd) so the layer-change spiral ramp connects
+// end-to-start. Z stays 0 here; the SpiralVase post-processor flattens each layer at its nominal
+// height and turns the final ~1.27mm of the layer into a short spiral ramp to the next layer.
+static void make_multiwall_spiral(ExtrusionEntityCollection &entities, size_t layer_id, double wall_area_scaled2,
+                                  bool elevator_below, bool elevator_above)
+{
+    // 1. Collect the ExtrusionLoop entities.
+    std::vector<const ExtrusionLoop *> loops;
+    loops.reserve(entities.entities.size());
+    for (const ExtrusionEntity *ee : entities.entities)
+        if (const ExtrusionLoop *loop = dynamic_cast<const ExtrusionLoop *>(ee))
+            loops.push_back(loop);
+    if (loops.size() < 2)
+        return; // nothing to morph, leave unchanged
+
+    // 2. Capture the closed contour of each loop as a Polygon, and a reference ExtrusionPath
+    //    (role/flow) taken from the outermost loop (largest area).
+    struct LoopPoly {
+        Polygon              polygon;
+        const ExtrusionPath *ref;
+    };
+    std::vector<LoopPoly> loop_polys;
+    loop_polys.reserve(loops.size());
+    for (const ExtrusionLoop *loop : loops) {
+        if (loop->paths.empty())
+            continue;
+        loop_polys.push_back({ loop->polygon(), &loop->paths.front() });
+    }
+    if (loop_polys.size() < 2)
+        return;
+
+    // 3. Sort by abs(area) descending (outermost first).
+    std::stable_sort(loop_polys.begin(), loop_polys.end(),
+        [](const LoopPoly &a, const LoopPoly &b) {
+            return std::abs(a.polygon.area()) > std::abs(b.polygon.area());
+        });
+    const ExtrusionPath &ref = *loop_polys.front().ref; // outermost loop's reference path
+
+    // Temporary diagnostics: MULTIWALL_DEBUG=<layer_id> dumps the collected loop radii.
+    if (const char *dbg = std::getenv("MULTIWALL_DEBUG"); dbg != nullptr && atoi(dbg) == (int) layer_id) {
+        fprintf(stderr, "[multiwall] layer %zu: %zu loops collected\n", layer_id, loop_polys.size());
+        for (size_t i = 0; i < loop_polys.size(); ++i) {
+            const double a_abs = std::abs(loop_polys[i].polygon.area());
+            const Point  c     = loop_polys[i].polygon.centroid();
+            fprintf(stderr, "[multiwall]   loop %2zu: r_eq=%7.3f mm  centroid=(%.2f,%.2f) ccw=%d pts=%zu\n",
+                i, unscale<double>(coord_t(std::sqrt(a_abs / PI))),
+                unscale<double>(c.x()), unscale<double>(c.y()),
+                int(loop_polys[i].polygon.is_counter_clockwise()), loop_polys[i].polygon.points.size());
+        }
+    }
+
+    // 3b. Filter the sorted loops down to a clean, NESTED, concentric sequence before morphing.
+    //     Filling a solid all the way to its center spawns tiny and/or off-center fragment loops
+    //     near the middle; the plain area-sort interleaves them, so blending dives radially
+    //     (r8 -> r1 -> r8) and produces big radial jumps/crossings. We keep only loops that are
+    //     both concentric with the outermost loop and strictly nested (monotonically shrinking),
+    //     and we stop once a loop is so small that its center is effectively degenerate.
+    {
+        const double area0_abs = std::abs(loop_polys.front().polygon.area());          // scaled^2
+        const Point  C0        = loop_polys.front().polygon.centroid();                 // outer centroid
+        const double R0        = std::sqrt(area0_abs / PI);                             // outer "radius" (scaled)
+        const double conc_tol  = 0.5 * R0;                                              // max centroid drift (scaled)
+        // Shape gate: isoperimetric quotient A/P^2 is scale-invariant and characterizes SHAPE
+        // (circle 1/4pi; any similar shape keeps the same value at every offset depth). Where the
+        // outer-going and hole-going offset fronts meet, the leftover strip can survive as a
+        // degenerate self-crossing "bowtie" loop: huge perimeter, tiny net area -> quotient
+        // collapses to a few % of the outer's. Morphing against such a loop lerps angularly
+        // mismatched points straight through the center (criss-cross disc). Reject any loop whose
+        // quotient falls below 35% of the outer contour's - inner rings of legitimate shapes only
+        // get ROUNDER (higher quotient) as they shrink, so real rings always pass.
+        const double P0 = loop_polys.front().polygon.length();
+        const double q0 = (P0 > 0.) ? area0_abs / (P0 * P0) : 0.;
+        // Center cap thresholds: stop once the remaining hole is tiny. Both are in SCALED units.
+        const double r_min     = scale_(1.0);                                           // 1 mm radius (scaled)
+        // ~ (2 * line spacing)^2. ExtrusionPath width is in mm, so scale it before squaring.
+        const double spacing_s = scale_(2.0 * double(ref.width()));                     // 2*line-width (scaled)
+        const double area_min  = spacing_s * spacing_s;                                 // scaled^2
+
+        std::vector<LoopPoly> kept;
+        kept.reserve(loop_polys.size());
+        kept.push_back(loop_polys.front());                                             // always keep outermost
+        double last_area_abs = area0_abs;
+        for (size_t i = 1; i < loop_polys.size(); ++i) {
+            const double a_abs = std::abs(loop_polys[i].polygon.area());
+            // Center cap: stop adding rings once the loop is degenerate-small.
+            const double r_eq = std::sqrt(a_abs / PI);
+            if (r_eq < r_min || a_abs < area_min)
+                break;
+            // Nested: must be strictly smaller in area than the last kept loop.
+            if (a_abs >= last_area_abs)
+                continue;
+            // Concentric: centroid must sit within 0.5*R0 of the outer centroid.
+            const double drift = (loop_polys[i].polygon.centroid() - C0).cast<double>().norm();
+            if (drift > conc_tol)
+                continue;
+            // Shape-similar: reject degenerate bowtie/sliver leftovers (see q0 above).
+            const double Pi_len = loop_polys[i].polygon.length();
+            const double qi     = (Pi_len > 0.) ? a_abs / (Pi_len * Pi_len) : 0.;
+            if (qi < 0.35 * q0)
+                continue;
+            kept.push_back(loop_polys[i]);
+            last_area_abs = a_abs;
+        }
+        loop_polys.swap(kept);
+    }
+    // After filtering, fewer than 2 nested rings means there is nothing to morph: leave unchanged.
+    if (loop_polys.size() < 2)
+        return;
+
+    // 4. M = sample points per revolution, derived from the outermost loop's perimeter length.
+    const Polygon &outer_polygon = loop_polys.front().polygon;
+    size_t M = std::max<size_t>(64, (size_t)(outer_polygon.length() / scale_(0.4)));
+    M = std::min<size_t>(M, 2048);
+
+    // 5. Resample EACH loop's polygon to exactly M points, evenly spaced by arc length and
+    //    angularly aligned across loops (index j ~ same angular position on every ring), with
+    //    a consistent winding direction so j advances the same way for all loops.
+    const size_t K = loop_polys.size();
+    std::vector<std::vector<Point>> resampled(K);
+    // Thread each kept ring's equivalent radius R = sqrt(|area|/PI) through alongside the
+    // resampled points, in the SAME outer->inner order, so the uniform re-spacing below can
+    // place rings evenly by radius. (loop_polys is sorted outer->inner, same as resampled.)
+    std::vector<double> radii(K);
+    for (size_t r = 0; r < K; ++r)
+        radii[r] = std::sqrt(std::abs(loop_polys[r].polygon.area()) / PI); // scaled units
+    for (size_t r = 0; r < K; ++r) {
+        Polygon poly = loop_polys[r].polygon;
+        // Consistent winding: make every loop counter-clockwise.
+        if (! poly.is_counter_clockwise())
+            poly.reverse();
+        if (poly.points.size() < 3) {
+            // Degenerate: can't morph reliably, bail out and leave entities untouched.
+            return;
+        }
+        // Reference direction = +X from the centroid; start at the loop point whose direction
+        // from the centroid is closest to +X so index j is angularly consistent across loops.
+        const Point centroid = poly.centroid();
+        size_t start_idx = 0;
+        double best_dot = -std::numeric_limits<double>::infinity();
+        for (size_t i = 0; i < poly.points.size(); ++i) {
+            const Vec2d d = (poly.points[i] - centroid).cast<double>();
+            const double len = d.norm();
+            const double cos_to_x = (len > 0.) ? (d.x() / len) : -1.; // dot with +X unit vector
+            if (cos_to_x > best_dot) {
+                best_dot  = cos_to_x;
+                start_idx = i;
+            }
+        }
+        // Build the closed point ring rotated to start at start_idx.
+        const size_t n = poly.points.size();
+        std::vector<Point> ring;
+        ring.reserve(n + 1);
+        for (size_t i = 0; i < n; ++i)
+            ring.push_back(poly.points[(start_idx + i) % n]);
+        ring.push_back(ring.front()); // close it
+
+        // Arc-length cumulative table.
+        std::vector<double> cum(ring.size(), 0.);
+        for (size_t i = 1; i < ring.size(); ++i)
+            cum[i] = cum[i - 1] + (ring[i] - ring[i - 1]).cast<double>().norm();
+        const double total_len = cum.back();
+
+        // Emit M points equally spaced by arc length: target arc length = total_len * j / M.
+        std::vector<Point> &out = resampled[r];
+        out.reserve(M);
+        if (total_len <= 0.) {
+            for (size_t j = 0; j < M; ++j)
+                out.push_back(ring.front());
+        } else {
+            size_t seg = 0;
+            for (size_t j = 0; j < M; ++j) {
+                const double target = total_len * (double) j / (double) M;
+                while (seg + 1 < cum.size() && cum[seg + 1] < target)
+                    ++seg;
+                const double seg_len = cum[seg + 1] - cum[seg];
+                const double t = (seg_len > 0.) ? (target - cum[seg]) / seg_len : 0.;
+                out.push_back(lerp(ring[seg], ring[seg + 1], t));
+            }
+        }
+    }
+
+    // 5b. ALIGN CONSECUTIVE RINGS TO EACH OTHER (not just independently to +X).
+    //     Resampling each ring to +X independently leaves point[j] of ring r and ring r+1 at
+    //     slightly different angles; that offset grows toward the center, so the per-revolution
+    //     lerp(a[j], b[j]) connects angularly-mismatched points and produces jumps near the
+    //     middle. Fix: keep ring[0]'s +X resampling as the reference, then for every subsequent
+    //     ring rotate its M-point sequence (preserving winding) so index 0 lands on the point
+    //     closest to the PREVIOUS ring's start point. This makes index j correspond angularly
+    //     across all rings, killing the angular-misalignment jumps.
+    for (size_t r = 1; r < K; ++r) {
+        const Point &prev_start = resampled[r - 1].front();
+        std::vector<Point> &cur = resampled[r];
+        size_t best_j   = 0;
+        double best_d2  = std::numeric_limits<double>::infinity();
+        for (size_t j = 0; j < M; ++j) {
+            const double d2 = (cur[j] - prev_start).cast<double>().squaredNorm();
+            if (d2 < best_d2) {
+                best_d2 = d2;
+                best_j  = j;
+            }
+        }
+        if (best_j != 0) {
+            // Rotate in place so index best_j becomes index 0 (winding/order unchanged).
+            std::rotate(cur.begin(), cur.begin() + best_j, cur.end());
+        }
+    }
+
+    // 5c. UNIFORMLY RE-SPACE the wall. Discard the perimeter generator's uneven ring radii and lay
+    //     down a fresh set of rings at a CONSTANT pitch from the outermost radius to the innermost,
+    //     interpolating each new ring's SHAPE from the two collected rings that bracket its radius
+    //     (rings are aligned in step 5b, so a per-point lerp is a clean concentric blend). This
+    //     guarantees a fully solid wall with no leftover strip for ANY geometry - straight tube OR
+    //     tapered cone. Otherwise the perimeter generator hands the fractional leftover (where the
+    //     outer-going and inner-going offset fronts meet) to gap fill, which prints as a separate,
+    //     unbonded feature with its own travels. We suppress that gap fill in spiral mode (see
+    //     has_gap_fill in process_classic) and cover the whole wall here instead.
+    {
+        const double ref_spac = scale_(std::max(0.1f, ref.width())); // nozzle line spacing (scaled)
+        // Natural pitch = median collected spacing; fall back to the nozzle width when the layer
+        // has too few rings to trust its own median (e.g. a degenerate top/bottom slice that the
+        // perimeter generator reduced to just the outer + inner contour).
+        double pitch = ref_spac;
+        if (K >= 4) {
+            std::vector<double> spac;
+            spac.reserve(K - 1);
+            for (size_t r = 0; r + 1 < K; ++r)
+                spac.push_back(std::abs(radii[r] - radii[r + 1]));
+            std::sort(spac.begin(), spac.end());
+            const double med = spac[spac.size() / 2];
+            if (med > 0. && med <= 1.8 * ref_spac)
+                pitch = med;
+        }
+        const double r_outer = radii.front();          // K rings are sorted outer -> inner
+        const double r_inner = radii.back();
+        const double span    = r_outer - r_inner;
+        if (pitch > 0. && span > 0.) {
+            size_t N = (size_t) std::lround(span / pitch) + 1; // keep neighbours within `pitch`
+            if (N < 2) N = 2;
+            if (N < K) N = K;                           // never drop below what we already had
+            std::vector<std::vector<Point>> uni_rings;
+            std::vector<double>             uni_radii;
+            uni_rings.reserve(N);
+            uni_radii.reserve(N);
+            size_t a = 0;                               // bracket index into the collected rings
+            for (size_t t = 0; t < N; ++t) {
+                const double rt = r_outer - span * (double) t / (double) (N - 1);
+                // Advance `a` so that radii[a] >= rt >= radii[a+1] (radii are decreasing).
+                while (a + 2 < K && radii[a + 1] >= rt)
+                    ++a;
+                const double ra = radii[a], rb = radii[a + 1];
+                const double denom = ra - rb;
+                double f = (denom != 0.) ? (ra - rt) / denom : 0.;
+                if (f < 0.) f = 0.; else if (f > 1.) f = 1.;
+                std::vector<Point> ring(M);
+                for (size_t j = 0; j < M; ++j)
+                    ring[j] = lerp(resampled[a][j], resampled[a + 1][j], f);
+                uni_rings.push_back(std::move(ring));
+                uni_radii.push_back(rt);
+            }
+            resampled.swap(uni_rings);
+            radii.swap(uni_radii);
+        }
+    }
+    // 5d. RE-ANCHOR every ring's index 0 to the +X direction from the shared centroid. The
+    //     chained alignment (5b) anchors only the outermost ring; layers alternate which ring
+    //     comes first, so the seam angle wandered layer to layer and the elevator columns did
+    //     not stack. With a common absolute anchor the seam - and the vertical elevator pads -
+    //     sit at the same angle on every layer.
+    {
+        const Point C = loop_polys.front().polygon.centroid();
+        for (std::vector<Point> &ring : resampled) {
+            size_t best_j  = 0;
+            double best_d  = -std::numeric_limits<double>::infinity();
+            for (size_t j = 0; j < M; ++j) {
+                const Vec2d d  = (ring[j] - C).cast<double>();
+                const double n = d.norm();
+                const double c = (n > 0.) ? d.x() / n : -1.;
+                if (c > best_d) { best_d = c; best_j = j; }
+            }
+            if (best_j != 0)
+                std::rotate(ring.begin(), ring.begin() + best_j, ring.end());
+        }
+    }
+    const size_t K_aug = resampled.size();
+
+    // Uniform pitch of the final ring set (scaled units).
+    double pitch_scaled = 0.;
+    {
+        std::vector<double> fspac;
+        fspac.reserve(radii.size());
+        for (size_t r = 0; r + 1 < radii.size(); ++r)
+            fspac.push_back(std::abs(radii[r] - radii[r + 1]));
+        if (! fspac.empty()) {
+            std::sort(fspac.begin(), fspac.end());
+            const size_t fm = fspac.size();
+            pitch_scaled = (fm % 2 == 1) ? fspac[fm / 2]
+                                         : 0.5 * (fspac[fm / 2 - 1] + fspac[fm / 2]);
+        }
+    }
+    if (pitch_scaled <= 0.)
+        pitch_scaled = scale_(std::max(0.1f, ref.width()));
+    const double pitch_mm = unscale<double>(coord_t(pitch_scaled));
+    // Wall-to-wall step-over: a SHORT tangent S-arc with one-wall-width corner radius (total
+    // arc ~2 pitches long) instead of a long straight ramp.
+    const double L_STEP    = 2.0 * pitch_scaled;
+    const double cos_theta = L_STEP / std::hypot(L_STEP, 0.5 * PI * pitch_scaled); // avg slope of the cosine S
+
+    // Per-ring seam-arc length in samples.
+    auto trans_of = [&](const std::vector<Point> &ring) -> size_t {
+        double circ = 0.;
+        for (size_t j = 0; j < M; ++j)
+            circ += (ring[(j + 1) % M] - ring[j]).cast<double>().norm();
+        size_t tr = (circ > 0.) ? (size_t)(L_STEP * (double) M / circ + 0.5) : M;
+        if (tr < 3) tr = 3;
+        if (tr > M) tr = M;
+        return tr;
+    };
+
+    // 6. Order outer->inner (already sorted that way). Odd layers run inner->outer AND in the
+    //    OPPOSITE rotation around the part (boustrophedon): the layer starts exactly where the
+    //    previous layer's vertical elevator ended, prints its whole spiral in one direction, and
+    //    climbs - the next layer then continues in the other direction from that very spot.
+    //    No backward positioning move, no connector, no travel: even layers run B -> A and climb
+    //    at A; odd layers run A -> B and climb at B (A and B are two fixed spots one step-arc
+    //    apart on the wall).
+    if (layer_id % 2 == 1) {
+        std::reverse(resampled.begin(), resampled.end());
+        std::reverse(radii.begin(), radii.end());
+        const Point C = loop_polys.front().polygon.centroid();
+        for (std::vector<Point> &ring : resampled) {
+            // Flip the winding (CCW -> CW)...
+            std::reverse(ring.begin(), ring.end());
+            // ...re-anchor index 0 to +X in the flipped ring...
+            size_t best_j  = 0;
+            double best_d  = -std::numeric_limits<double>::infinity();
+            for (size_t j = 0; j < M; ++j) {
+                const Vec2d d  = (ring[j] - C).cast<double>();
+                const double n = d.norm();
+                const double c = (n > 0.) ? d.x() / n : -1.;
+                if (c > best_d) { best_d = c; best_j = j; }
+            }
+            if (best_j != 0)
+                std::rotate(ring.begin(), ring.begin() + best_j, ring.end());
+            // ...then shift by one step-arc so this layer's entry point (index flat) coincides
+            // with the even layers' exit point (the anchor).
+            const size_t tr = trans_of(ring) % M;
+            if (tr != 0)
+                std::rotate(ring.begin(), ring.begin() + tr, ring.end());
+        }
+    }
+
+    // 7.+8. Build the spiral as ONE ExtrusionMultiPath (a single entity, so the per-layer spiral
+    //    vase check still sees one perimeter) whose segments carry LOCALLY-correct volumetric
+    //    flow, then normalize globally so the layer extrudes EXACTLY wall_area * layer_height -
+    //    100% of the sliced wall volume, neither over- nor under-deposited.
+    //
+    //    Geometry (unchanged): hold each ring FLAT at its own radius, step to the next ring only
+    //    over a short smoothstep transition (~L_TRANS_RADIAL of arc) at the ring seam. Seams are
+    //    aligned across rings (step 5b), so they stack into one line.
+    //
+    //    Local coverage model (bead cross-section = coverage_width * layer_height):
+    //      - flat ring arcs: each bead covers one ring pitch.
+    //      - step diagonals: adjacent diagonals are parallel, radially one pitch apart, so their
+    //        perpendicular spacing is pitch * cos(theta), theta = atan(pitch / L_TRANS). Constant
+    //        nominal flow would over-deposit by 1/cos(theta) right at the seam.
+    //      - the final ring's seam arc: the incoming diagonal converged onto this ring across the
+    //        same arc, so the leftover strip between them narrows from one pitch to zero. Constant
+    //        flow would re-deposit a full bead on top of the diagonal's tail - THE seam blob.
+    //        Taper the coverage with the same smoothstep the diagonal used (chunked, since one
+    //        path has one flow value).
+    //    The global normalization then absorbs the small remaining geometric slivers (the
+    //    triangular step voids), distributing them uniformly (~1-2%), so total volume is exact.
+    const double h = (double) ref.height();     // layer height (mm)
+
+    ExtrusionMultiPath multi;
+    // Segment accumulator: emit consecutive points sharing one coverage width as one sub-path.
+    // Consecutive sub-paths share their boundary point so the chain is continuous.
+    auto emit_segment = [&multi, &ref, h](Points &&pts, double coverage_mm) {
+        if (pts.size() < 2)
+            return;
+        const double w = std::max(coverage_mm, 0.05); // keep E > 0 so the move stays an extrusion
+        Polyline pl;
+        pl.points = std::move(pts);
+        multi.paths.emplace_back(std::move(pl),
+            ExtrusionAttributes(ref.role(), ExtrusionFlow(w * h, (float) w, (float) h)));
+    };
+
+    const double MIN_COVER = 0.05; // mm; keeps a segment extruding (continuity) with ~no deposit
+    const size_t N_CHUNK   = 4;   // sub-segments used to approximate a linearly varying flow
+
+    // ---- FIRST ring: one full clean revolution. This ring is a SURFACE (exterior on even
+    //      layers, interior on odd), so it must be a complete undistorted circle. It starts at
+    //      the seam (where the previous layer's micro-helix elevator ended, on the midline half
+    //      a pitch away) and runs the full circle back to that angle.
+    const size_t trans0 = trans_of(resampled[0]);
+    const size_t flat0  = M - trans0;
+    {
+        const std::vector<Point> &r0 = resampled[0];
+        // Continuity: the previous layer's vertical elevator climbed ON THE WALL LINE exactly
+        // here - this layer's circle starts at that spot and runs the OPPOSITE rotation
+        // (boustrophedon), so there is no backward positioning move and no travel at all.
+        (void) elevator_below;
+        Points pts;
+        pts.reserve(M + 1);
+        for (size_t j = 0; j < M; ++j)
+            pts.push_back(r0[(flat0 + j) % M]);
+        pts.push_back(r0[flat0]); // close the circle
+        emit_segment(std::move(pts), pitch_mm);
+    }
+    // ---- DEPARTURE arc from ring 0 over the seam window [flat0..M): ring 0's line there is
+    //      already fully printed (full circle above), so the arc only needs to cover the
+    //      WIDENING strip it leaves as it pulls away: coverage grows 0 -> pitch. (The elevator
+    //      is a point column at the anchor, not a strip - the departure always deposits.)
+    {
+        const std::vector<Point> &a = resampled[0];
+        const std::vector<Point> &b = resampled[1 < K_aug ? 1 : 0];
+        for (size_t c = 0; c < N_CHUNK; ++c) {
+            const size_t j0 = flat0 + (trans0 * c) / N_CHUNK;
+            const size_t j1 = flat0 + (trans0 * (c + 1)) / N_CHUNK;
+            if (j0 >= j1)
+                continue;
+            Points chunk;
+            chunk.reserve(j1 - j0 + 1);
+            {   // share the boundary point with the previous emitted geometry
+                const size_t jp = (j0 == flat0) ? flat0 : j0 - 1;
+                const double up = (j0 == flat0) ? 0.0 : double(jp - flat0 + 1) / double(trans0);
+                chunk.push_back(lerp(a[jp], b[jp], 0.5 - 0.5 * std::cos(PI * std::min(1.0, up))));
+            }
+            for (size_t j = j0; j < j1; ++j) {
+                double u = double(j - flat0 + 1) / double(trans0);
+                if (u > 1.0) u = 1.0;
+                chunk.push_back(lerp(a[j], b[j], 0.5 - 0.5 * std::cos(PI * u)));
+            }
+            const double t_mid = (double(j0 + j1) * 0.5 - double(flat0) + 1.0) / double(trans0);
+            emit_segment(std::move(chunk), pitch_mm * std::max(MIN_COVER, std::min(1.0, t_mid)));
+        }
+    }
+    // ---- INTERIOR rings 1..K-2: flat arc then a straight LINEAR diagonal to the next ring.
+    //      Straight parallel diagonals are spaced exactly pitch * cos(theta) apart perpendicular
+    //      to their direction, so the correspondingly narrowed bead fills the step band EXACTLY
+    //      (the previous smoothstep S-curve diverged at its flat ends and left diamond voids).
+    for (size_t r = 1; r + 1 < K_aug; ++r) {
+        const std::vector<Point> &a = resampled[r];
+        const std::vector<Point> &b = resampled[r + 1];
+        const size_t trans = trans_of(a);
+        const size_t flat  = M - trans;
+        Points flat_pts, diag_pts;
+        flat_pts.reserve(flat + 2);
+        diag_pts.reserve(trans + 1);
+        // The incoming diagonal landed on this ring at index M-1; start there so the short
+        // closing chord M-1 -> 0 is extruded, not hopped (keeps the extrusion gapless).
+        flat_pts.push_back(a[M - 1]);
+        for (size_t j = 0; j < M; ++j) {
+            double t;
+            if (j < flat) {
+                t = 0.0;
+            } else {
+                double u = double(j - flat + 1) / double(trans);
+                if (u > 1.0) u = 1.0;
+                t = 0.5 - 0.5 * std::cos(PI * u); // tangent S-arc: one-wall-radius corners
+            }
+            const Point p = lerp(a[j], b[j], t);
+            if (j < flat) {
+                flat_pts.push_back(p);
+            } else {
+                if (diag_pts.empty() && ! flat_pts.empty())
+                    diag_pts.push_back(flat_pts.back());
+                diag_pts.push_back(p);
+            }
+        }
+        emit_segment(std::move(flat_pts), pitch_mm);
+        emit_segment(std::move(diag_pts), pitch_mm * cos_theta);
+    }
+    // ---- FINAL ring: one full clean revolution (the other SURFACE - interior on even layers,
+    //      exterior on odd). Its seam arc re-traces the arc the incoming diagonal converged
+    //      onto, so the leftover strip narrows linearly: taper the coverage (1-t)*pitch.
+    size_t fin_flat = 0, fin_trans = 0;
+    {
+        const std::vector<Point> &fin = resampled[K_aug - 1];
+        fin_trans = trans_of(fin);
+        fin_flat  = M - fin_trans;
+        Points flat_pts;
+        flat_pts.reserve(fin_flat + 1);
+        flat_pts.push_back(fin[M - 1]); // incoming diagonal landed here: extrude the closing chord
+        flat_pts.insert(flat_pts.end(), fin.begin(), fin.begin() + fin_flat);
+        emit_segment(std::move(flat_pts), pitch_mm);
+        for (size_t c = 0; c < N_CHUNK; ++c) {
+            const size_t j0 = fin_flat + (fin_trans * c) / N_CHUNK;
+            const size_t j1 = fin_flat + (fin_trans * (c + 1)) / N_CHUNK;
+            if (j0 >= j1)
+                continue;
+            Points chunk;
+            chunk.reserve(j1 - j0 + 1);
+            if (j0 > 0)
+                chunk.push_back(fin[j0 - 1]);
+            for (size_t j = j0; j < j1; ++j)
+                chunk.push_back(fin[j]);
+            const double u_mid = (double(j0 + j1) * 0.5 - double(fin_flat) + 1.0) / double(fin_trans);
+            emit_segment(std::move(chunk), pitch_mm * std::max(MIN_COVER, 1.0 - std::min(1.0, u_mid)));
+        }
+    }
+    // ---- THE ELEVATOR: the climb to the next layer is a single STRAIGHT VERTICAL extruding
+    //      move appended by the SpiralVase post-processor after the layer's last extrusion -
+    //      which is the closing taper's end, ON THE WALL LINE at the seam anchor. The vertical
+    //      column bead is part of the wall itself: a clean stacked seam on the outer wall on odd
+    //      layers and the inner wall on even layers (the print direction alternates). The next
+    //      layer's first ring simply prints through that point. (elevator_above needs no
+    //      geometry here; the top layer's climb is suppressed by the post-processor.)
+    (void) elevator_above;
+    if (multi.paths.empty())
+        return;
+
+    // Global volumetric normalization: scale every segment's flow so the layer's total extruded
+    // volume equals EXACTLY the sliced wall area times the layer height.
+    {
+        double v_planned = 0.;
+        for (const ExtrusionPath &p : multi.paths)
+            v_planned += p.mm3_per_mm() * unscale<double>(p.polyline.length());
+        const double wall_area_mm2 = wall_area_scaled2 * SCALING_FACTOR * SCALING_FACTOR;
+        const double v_exact       = wall_area_mm2 * h;
+        if (const char *dbg = std::getenv("MULTIWALL_DEBUG"); dbg != nullptr && (atoi(dbg) == (int) layer_id || atoi(dbg) == -1))
+            fprintf(stderr, "[multiwall] layer %zu: v_planned=%.2f v_exact=%.2f (A=%.2f mm2, h=%.3f) f=%.4f segs=%zu\n",
+                layer_id, v_planned, v_exact, wall_area_mm2, h, v_exact / std::max(1e-9, v_planned), multi.paths.size());
+        if (v_planned > 0. && v_exact > 0.) {
+            const double f = v_exact / v_planned;
+            for (ExtrusionPath &p : multi.paths) {
+                ExtrusionAttributes attr = p.attributes();
+                attr.mm3_per_mm *= f;
+                p = ExtrusionPath(std::move(p.polyline), attr);
+            }
+        }
+    }
+
+    if (const char *dbg = std::getenv("MULTIWALL_DEBUG"); dbg != nullptr && atoi(dbg) == (int) layer_id) {
+        fprintf(stderr, "[multiwall] layer %zu: %zu sub-paths (K_aug=%zu, M=%zu, fin_flat=%zu, fin_trans=%zu)\n",
+            layer_id, multi.paths.size(), K_aug, M, fin_flat, fin_trans);
+        for (size_t i = 0; i < multi.paths.size(); ++i) {
+            const Polyline &pl = multi.paths[i].polyline;
+            fprintf(stderr, "[multiwall]   seg %2zu: %4zu pts  w=%.3f  first=(%.3f,%.3f) last=(%.3f,%.3f)\n",
+                i, pl.points.size(), multi.paths[i].width(),
+                unscale<double>(pl.points.front().x()), unscale<double>(pl.points.front().y()),
+                unscale<double>(pl.points.back().x()),  unscale<double>(pl.points.back().y()));
+        }
+    }
+
+    // 9. Replace the loop collection with the single continuous multi-segment spiral.
+    entities.clear();
+    entities.append(std::move(multi));
+}
+
 void PerimeterGenerator::process_classic(
     // Inputs:
     const Parameters           &params,
@@ -1215,7 +1798,14 @@ void PerimeterGenerator::process_classic(
     // internal flow which is unrelated.
     coord_t min_spacing         = coord_t(perimeter_spacing      * (1 - INSET_OVERLAP_TOLERANCE));
     coord_t ext_min_spacing     = coord_t(ext_perimeter_spacing  * (1 - INSET_OVERLAP_TOLERANCE));
-    bool    has_gap_fill 		= params.config.gap_fill_enabled.value && params.config.gap_fill_speed.value > 0;
+    // Continuous constant-wall spiral: one-click per-layer feature. When enabled and THIS
+    // surface is a fully axisymmetric constant wall, the whole wall is printed as one continuous
+    // spiral of concentric rings (make_multiwall_spiral): as many perimeters as fit, no gap fill
+    // (the morph re-spaces the wall solidly), no infill. Non-qualifying surfaces print with the
+    // regular settings untouched.
+    const bool constant_wall = params.print_config.constant_wall_spiral.value &&
+                               surface_is_constant_circular_wall(surface.expolygon);
+    bool    has_gap_fill 		= params.config.gap_fill_enabled.value && params.config.gap_fill_speed.value > 0 && !constant_wall;
 
     // prepare grown lower layer slices for overhang detection
     if (params.config.overhangs && lower_slices != nullptr && lower_slices_polygons_cache.empty()) {
@@ -1230,6 +1820,10 @@ void PerimeterGenerator::process_classic(
     // extra perimeters for each one
     // detect how many perimeters must be generated for this island
     int        loop_number = params.config.perimeters + surface.extra_perimeters - 1;  // 0-indexed loops
+    if (constant_wall)
+        // Fill the whole wall with rings: the offsetting loop stops on its own when the wall is
+        // consumed, so this is simply "as many as fit" (the configured count is for regular layers).
+        loop_number = 999;
 
     // Set the topmost layer to be one perimeter.
     if (loop_number > 0 && ((params.config.top_one_perimeter_type != TopOnePerimeterType::None && upper_slices == nullptr) || (params.config.only_one_perimeter_first_layer && params.layer_id == 0)))
@@ -1449,6 +2043,19 @@ void PerimeterGenerator::process_classic(
         }
         // at this point, all loops should be in contours[0]
         ExtrusionEntityCollection entities = traverse_loops_classic(params, lower_slices_polygons_cache, contours.front(), thin_walls);
+        if (constant_wall && entities.entities.size() > 1) {
+            // The elevator handshake is geometry-aware: climb into the next layer only if it will
+            // also print as a spiral (otherwise end flat), and discount this layer's departure
+            // diagonal only if the layer below actually climbed here (otherwise deposit fully).
+            const bool elevator_below = lower_slices != nullptr && lower_slices->size() == 1 &&
+                                        surface_is_constant_circular_wall(lower_slices->front());
+            const bool elevator_above = upper_slices != nullptr && upper_slices->size() == 1 &&
+                                        surface_is_constant_circular_wall(upper_slices->front());
+            // Morph the concentric loops into one continuous spiral path for this layer. The
+            // sliced wall area drives the exact per-layer extrusion volume (area * layer height).
+            make_multiwall_spiral(entities, (size_t) params.layer_id, std::abs(surface.expolygon.area()),
+                                  elevator_below, elevator_above);
+        }
         // if brim will be printed, reverse the order of perimeters so that
         // we continue inwards after having finished the brim
         // TODO: add test for perimeter order
@@ -1542,7 +2149,9 @@ void PerimeterGenerator::process_classic(
         }
     }
     
-    append(out_fill_expolygons, std::move(infill_areas));
+    // A constant-wall spiral layer is completely filled by its rings: no infill.
+    if (! constant_wall)
+        append(out_fill_expolygons, std::move(infill_areas));
 }
 
 PerimeterRegion::PerimeterRegion(const LayerRegion &layer_region) : region(&layer_region.region())

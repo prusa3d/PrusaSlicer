@@ -43,6 +43,9 @@ public:
     std::string process_layer(const std::string &gcode, bool last_layer);
 
 private:
+    // Multi-wall (thick) spiral vase: flat layers with a short spiral ramp at the layer change.
+    std::string process_layer_multiwall(const std::string &gcode, bool last_layer);
+
     const PrintConfig  &m_config;
     GCodeReader 		m_reader;
     float               m_max_xy_smoothing = 0.f;
