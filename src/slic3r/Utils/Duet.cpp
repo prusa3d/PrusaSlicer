@@ -116,7 +116,7 @@ bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn e
 	auto http = (dsf ? Http::put(std::move(upload_cmd)) : Http::post(std::move(upload_cmd)));
 	if (dsf) {
 		http.set_put_body(upload_data.source_path);
-		if (connect_msg.empty())
+		if (! connect_msg.empty())
             http.header("X-Session-Key", GUI::into_u8(connect_msg));
 	} else {
 		http.set_post_body(upload_data.source_path);
