@@ -23,6 +23,7 @@
 #include <wx/textctrl.h>
 #include <wx/checkbox.h>
 
+#include "libslic3r/Checksum.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/I18N.hpp"
@@ -90,7 +91,22 @@ bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn e
 	bool res = true;
 	bool dsf = (connectionType == ConnectionType::dsf);
 
-	auto upload_cmd = get_upload_url(upload_data.upload_path.string(), connectionType);
+	// RepRapFirmware compares this against the CRC32 of the data it actually received and fails the
+	// upload on a mismatch, which is the only way to catch a transfer that got corrupted past the
+	// TCP checksum. The DSF endpoint has no equivalent parameter.
+	std::optional<uint32_t> crc32;
+	if (! dsf) {
+		crc32 = checksum::crc32_file(upload_data.source_path);
+		if (! crc32) {
+			// The upload would send an empty body, so fail here rather than truncating the file on the printer.
+			BOOST_LOG_TRIVIAL(error) << boost::format("Duet: Could not read %1% to compute its checksum") % upload_data.source_path;
+			error_fn(format_error(std::string(), L("Could not read the file to be uploaded."), 0));
+			disconnect(connectionType);
+			return false;
+		}
+	}
+
+	auto upload_cmd = get_upload_url(upload_data.upload_path.string(), connectionType, crc32);
 	BOOST_LOG_TRIVIAL(info) << boost::format("Duet: Uploading file %1%, filepath: %2%, post_action: %3%, command: %4%")
 		% upload_data.source_path
 		% upload_data.upload_path
@@ -111,7 +127,13 @@ bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn e
 			int err_code = dsf ? (status == 201 ? 0 : 1) : get_err_code_from_body(body);
 			if (err_code != 0) {
 				BOOST_LOG_TRIVIAL(error) << boost::format("Duet: Request completed but error code was received: %1%") % err_code;
-				error_fn(format_error(body, L("Unknown error occured"), 0));
+				// If we sent a checksum, the firmware rejecting the upload most likely means the data did not
+				// arrive intact. RepRapFirmware removes the incomplete file by itself in that case.
+				error_fn(format_error(body, (crc32 && err_code > 0)
+					? L("The printer rejected the uploaded file, most likely because it was corrupted during "
+					    "the transfer (checksum or size mismatch). The incomplete file was removed from the "
+					    "printer. Please try the upload again.")
+					: L("Unknown error occured"), 0));
 				res = false;
 			} else if (upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
 				wxString errormsg;
@@ -220,7 +242,7 @@ void Duet::disconnect(ConnectionType connectionType) const
 	.perform_sync();
 }
 
-std::string Duet::get_upload_url(const std::string &filename, ConnectionType connectionType) const
+std::string Duet::get_upload_url(const std::string &filename, ConnectionType connectionType, const std::optional<uint32_t> &crc32) const
 {
     assert(connectionType != ConnectionType::error);
 
@@ -229,10 +251,13 @@ std::string Duet::get_upload_url(const std::string &filename, ConnectionType con
 				% get_base_url()
 				% Http::url_encode(filename)).str();
 	} else {
-		return (boost::format("%1%rr_upload?name=0:/gcodes/%2%&%3%")
+		// The crc32 parameter is supported since RepRapFirmware 2.04RC3 and expects a lower case hex
+		// string without the "0x" prefix. Older firmware simply ignores it.
+		return (boost::format("%1%rr_upload?name=0:/gcodes/%2%&%3%%4%")
 				% get_base_url()
 				% Http::url_encode(filename)
-				% timestamp_str()).str();
+				% timestamp_str()
+				% (crc32 ? "&crc32=" + checksum::to_hex(*crc32) : std::string())).str();
 	}
 }
 

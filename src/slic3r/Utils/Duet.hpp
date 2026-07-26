@@ -7,6 +7,8 @@
 #ifndef slic3r_Duet_hpp_
 #define slic3r_Duet_hpp_
 
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <wx/string.h>
 
@@ -39,7 +41,10 @@ private:
 	std::string host;
 	std::string password;
 
-	std::string get_upload_url(const std::string &filename, ConnectionType connectionType) const;
+	// crc32 is appended to the RepRapFirmware rr_upload URL when set, so that the firmware can
+	// verify the data it received. It is ignored for the DuetSoftwareFramework endpoint, which
+	// has no equivalent parameter.
+	std::string get_upload_url(const std::string &filename, ConnectionType connectionType, const std::optional<uint32_t> &crc32) const;
 	std::string get_connect_url(const bool dsfUrl) const;
 	std::string get_base_url() const;
 	std::string timestamp_str() const;
