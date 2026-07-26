@@ -313,7 +313,10 @@ void Http::priv::form_add_file(const char *name, const fs::path &path, const cha
 //FIXME may throw! Is the caller aware of it?
 void Http::priv::set_post_body(const fs::path &path)
 {
-	boost::nowide::ifstream file(path.string());
+	// Binary mode is mandatory: in text mode a Windows build would collapse CRLF to LF, so the bytes
+	// sent would differ from the bytes on disk. That corrupts binary G-code and breaks any checksum
+	// the caller computed over the file.
+	boost::nowide::ifstream file(path.string(), std::ios::in | std::ios::binary);
 	std::string file_content { std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>() };
 	postfields = std::move(file_content);
 }
