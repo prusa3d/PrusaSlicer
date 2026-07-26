@@ -341,11 +341,18 @@ bool Duet::start_print(wxString &msg, const std::string &filename, ConnectionTyp
 
 int Duet::get_err_code_from_body(const std::string &body) const
 {
-	pt::ptree root;
-	std::istringstream iss (body); // wrap returned json to istringstream
-	pt::read_json(iss, root);
+	try {
+		pt::ptree root;
+		std::istringstream iss (body); // wrap returned json to istringstream
+		pt::read_json(iss, root);
 
-	return root.get<int>("err", 0);
+		return root.get<int>("err", 0);
+	} catch (const std::exception &ex) {
+		// Do not let the exception escape into the print host queue thread, which would tear the whole
+		// queue down for the rest of the session. Report it as an error instead.
+		BOOST_LOG_TRIVIAL(error) << boost::format("Duet: Could not parse the reply as JSON: %1%, body: `%2%`") % ex.what() % body;
+		return -1;
+	}
 }
 
 }
