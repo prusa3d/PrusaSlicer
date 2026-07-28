@@ -788,6 +788,10 @@ void AMFParserContext::endElement(const char * /* name */)
                 // Parse object's layer_height_range, a semicolon separated doubles.
                 char* p = m_value[1].data();
                 char* end = strchr(p, ';');
+                if (end == nullptr) {
+                    stop("Invalid layer_height_range: missing ';' separator");
+                    return;
+                }
                 *end = 0;
 
                 const t_layer_height_range range = {double(atof(p)), double(atof(end + 1))};
