@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" xml:space="preserve">
+  <!-- Handle (tab on lid) -->
+  <rect fill="#808080" x="5.5" y="0.5" width="5" height="2" rx="0.75"/>
+  <!-- Lid -->
+  <rect fill="#808080" x="1.5" y="3" width="13" height="1.75" rx="0.5"/>
+  <!-- Body outline -->
+  <rect fill="none" stroke="#808080" stroke-width="1.2" x="2.5" y="5.25" width="11" height="9.25" rx="1"/>
+  <!-- Slats -->
+  <line x1="6.5" y1="6.75" x2="6.5" y2="13.5" stroke="#808080" stroke-width="0.9" stroke-linecap="round"/>
+  <line x1="9.5" y1="6.75" x2="9.5" y2="13.5" stroke="#808080" stroke-width="0.9" stroke-linecap="round"/>
+</svg>

@@ -1,6 +1,21 @@
 min_slic3r_version = 2.9.4-rc0
+2.4.14 Updated FW version notification (6.4.1 for XL). Updated filament profiles for Prusament TPU 95A, Filament PM PETG, Prusa PETG.
+2.4.13 Updated FW version notification (6.5.3).
+2.4.12 Updated default printer configuration for Prusa Signature Oak.
+2.4.11 Added profiles for Prusa Signature Oak. Added profiles for CORE One L MMU3. Updated MMU parameters.
+2.4.10 Updated/fixed filament profiles.
+2.4.9 Updated 3D-Fuel filament profiles.
+2.4.8 Added filament profile for Prusament PETG Ultraglow.
+2.4.7 Updated colorFabb filaments.
+2.4.6 Updated FW version notification (XL). Updated filament profiles.
+2.4.5 Updated spool weight for Prusament filaments. Updated filament profiles. Updated support material settings.
+2.4.4 Updated filament profile for Numakers PLA+. Updated "soluble" profiles (default mode set to "supports everywhere").
+2.4.3 Updated FW version notification. Updated start g-code (XL). Increased raft first layer density. 
+2.4.2 Added BALANCED profiles for non-HF 0.4mm nozzle (C1/C1L). Updated FW version notification (C1L). Updated support settings. 
+2.4.1 Updated filament profile for Prusament TPU 95A.
 2.4.0 Added profiles for CORE One L.
 min_slic3r_version = 2.9.3-alpha0
+2.3.9 Updated filament profile for Prusament TPU 95A.
 2.3.8 MMU3 - added support for 0.6mm nozzle (MK4 family, CORE One).
 2.3.7 Added filament profile for Prusament PC Space Grade (XL and MK4).
 2.3.6 Added filament profile for Prusament PC Space Grade.

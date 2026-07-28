@@ -20,6 +20,7 @@
 #include <wx/bookctrl.h> // IWYU pragma: keep
 #include <wx/numformatter.h>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include "slic3r/GUI/Search.hpp" // IWYU pragma: keep
 #include "slic3r/GUI/Field.hpp"
@@ -276,9 +277,14 @@ Option::Option(const ConfigOptionDef& _opt, t_config_option_key id) : opt(_opt),
         if (opt.opt_key.rfind("branching", 0) == 0)
             tooltip = _L("Unavailable for this method.") + "\n";
         tooltip += _(opt.tooltip);
-        if (opt.opt_key.rfind("custom_parameters_", 0) == 0) {
+        if (boost::starts_with(opt.opt_key, "custom_parameters_")) {
             //"custom_parameters_*" contains just a template tooltip which has to be formated after localization
-            tooltip = format_wxstr(tooltip, opt.opt_key);
+            // Note that the tooltip should use singular form (parameters -> parameter), because that is how the parameters
+            // are addressed (https://github.com/prusa3d/PrusaSlicer/issues/15033). This is fragile, but it might do.
+            if (tooltip.find("%1%") == wxString::npos)
+                std::terminate(); // this is a programmer error, the tooltip should contain "%1%" placeholder for parameter name
+            const std::string param_prefix = boost::replace_first_copy(opt.opt_key, "custom_parameters_", "custom_parameter_");
+            tooltip = format_wxstr(tooltip, param_prefix);
         }
 
         // edit tooltip : change Slic3r to SLIC3R_APP_KEY
@@ -287,6 +293,16 @@ Option::Option(const ConfigOptionDef& _opt, t_config_option_key id) : opt(_opt),
 
         opt.tooltip = into_u8(tooltip);
     }
+}
+
+bool Line::has_option(const std::string& opt_key) const
+{
+    for (const auto& opt : m_options) {
+        if (opt.opt_id == opt_key) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Line::clear()
@@ -364,6 +380,13 @@ void OptionsGroup::show_field(const t_config_option_key& opt_key, bool show/* = 
                 return;
         }
         row_shift += cols;
+    }
+}
+
+void OptionsGroup::show_line(const t_config_option_key& opt_key, bool show)
+{
+    if (custom_ctrl) {
+        custom_ctrl->show_line(opt_key, show);
     }
 }
 
@@ -1006,12 +1029,16 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
     {
         switch (opt->type)
         {
+        case coPercent:
         case coFloat:
             if (config.option(opt_key)->is_nil())
                 ret = _L("N/A");
-            else
-                ret = double_to_string(config.option<ConfigOptionFloatNullable>(opt_key)->value);
-
+            else {
+                double val = opt->type == coFloat ?
+                            config.option<ConfigOptionFloatNullable>(opt_key)->value :
+                            config.option<ConfigOptionPercentNullable>(opt_key)->value;
+                ret = double_to_string(val);
+            }
             break;
         case coInt:
             ret = config.option<ConfigOptionIntNullable>(opt_key)->value;

@@ -55,10 +55,13 @@ namespace UndoRedo {
     struct Snapshot;
 }
 
+namespace sla { class WorkflowManager; }
+
 namespace GUI {
 
 wxDECLARE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
 wxDECLARE_EVENT(EVT_REGENERATE_BED_THUMBNAILS, SimpleEvent);
+wxDECLARE_EVENT(EVT_RELOAD_SLA_WORKFLOWS, SimpleEvent);
 
 class MainFrame;
 class GLCanvas3D;
@@ -194,6 +197,8 @@ public:
 
     bool is_view3D_layers_editing_enabled() const;
 
+    void fetch_workflows_file_online_start();
+
     // Called after the Preferences dialog is closed and the program settings are saved.
     // Update the UI based on the current preferences.
     void update_ui_from_settings();
@@ -302,6 +307,8 @@ public:
     GLCanvas3D* canvas3D();
     const GLCanvas3D * canvas3D() const;
     GLCanvas3D* get_current_canvas3D();
+
+    const sla::WorkflowManager& get_workflow_manager() const;
 
     void render_sliders(GLCanvas3D& canvas);
 

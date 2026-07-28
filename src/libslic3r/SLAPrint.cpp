@@ -9,6 +9,8 @@
 #include "CSGMesh/PerformCSGMeshBooleans.hpp"
 #include "format.hpp"
 #include "StaticMap.hpp"
+#include "libslic3r/ClipperUtils.hpp"
+#include "libslic3r/SLA/SupportSlicesCache.hpp"
 
 #include "Format/SLAArchiveFormatRegistry.hpp"
 
@@ -220,9 +222,21 @@ static t_config_option_keys print_config_diffs(const StaticPrintConfig     &curr
         "branchingsupport_head_penetration"sv,
         "branchingsupport_head_width"sv,
         "branchingsupport_pillar_diameter"sv,
+        "support_critical_angle"sv,
+        "branchingsupport_critical_angle"sv,
+        "support_max_bridge_length"sv,
+        "branchingsupport_max_bridge_length"sv,
+        "support_max_pillar_link_distance"sv,
+        "branchingsupport_max_pillar_link_distance"sv,
+        "support_small_pillar_diameter_percent"sv,
+        "branchingsupport_small_pillar_diameter_percent"sv,
+        "support_max_bridges_on_pillar"sv,
+        "branchingsupport_max_bridges_on_pillar"sv,
         "support_points_density_relative"sv,
+        "faded_layers"sv,
         "elefant_foot_compensation"sv,
         "absolute_correction"sv,
+        "pad_wall_slope"sv,
     };
 
     static constexpr auto material_ow_prefix = "material_ow_";
@@ -259,12 +273,19 @@ static t_config_option_keys print_config_diffs(const StaticPrintConfig     &curr
     return print_diff;
 }
 
-
-SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings)
-{
+SLAPrint::ApplyStatus SLAPrint::apply(
+    const Model &model,
+    DynamicPrintConfig config,
+    std::vector<std::string> *warnings,
+    const DynamicPrintConfig *original_config
+) {
 #ifdef _DEBUG
     check_model_ids_validity(model);
 #endif /* _DEBUG */
+
+    if (original_config) {
+        m_original_config = *original_config;
+    }
 
     // Normalize the config.
     config.option("sla_print_settings_id",        true);
@@ -299,6 +320,11 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
         update_apply_status(this->invalidate_state_by_config_options(printer_diff, invalidate_all_model_objects));
     if (! material_diff.empty())
         update_apply_status(this->invalidate_state_by_config_options(material_diff, invalidate_all_model_objects));
+
+    if (model.sla_workflow_uuid != m_model.sla_workflow_uuid) {
+        update_apply_status(this->invalidate_step(slapsMergeSlicesAndEval));
+        m_model.sla_workflow_uuid = model.sla_workflow_uuid;
+    }
 
     // Multiple beds hack: We currently use one SLAPrint for all beds. It must be invalidated
     // when beds are switched. If not done explicitly, supports from previously sliced object
@@ -655,7 +681,20 @@ std::string SLAPrint::validate(std::vector<std::string>*) const
                 "distance' has to be greater than the 'Pad object gap' "
                 "parameter to avoid this.");
         }
-        
+
+        {
+            double object_top_z = po->model_object()->bounding_box_exact().max.z();
+            double elevation = po->get_elevation();
+            double tower_hop = std::max(m_material_config.tower_hop_height.get_at(0), m_material_config.tower_hop_height.get_at(1));
+            double max_z = m_printer_config.max_print_height - EPSILON;
+            if (object_top_z > max_z)
+                return _u8L("Print exceeds maximum print height.");
+            else if (object_top_z + elevation > max_z)
+                return  _u8L("Print would exceed maximum print height after it is lifted for supports / pad.");
+            else if (object_top_z + elevation + tower_hop > max_z)
+                return  _u8L("The print is too tall - there is no space for tower hop at the top.");
+        }
+
         std::string pval = padcfg.validate();
         if (!pval.empty()) return pval;
     }
@@ -889,6 +928,7 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         // tilt params
         "delay_before_exposure"sv,
         "delay_after_exposure"sv,
+        "delay_to_reflood"sv,
         "tower_hop_height"sv,
         "tower_speed"sv,
         "use_tilt"sv,
@@ -904,7 +944,16 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "tilt_up_finish_speed"sv,
         "tilt_up_cycles"sv,
         "tilt_up_delay"sv,
+        "dynamic_delay_before_profile"sv,
+        "dynamic_delay_before_timeout"sv,
+        "dynamic_tilt_down_profile"sv,
+        "dynamic_tilt_up_profile"sv,
         "area_fill"sv,
+        "printing_temperature"sv,
+        "tilt_down_initial_speed_slx"sv,
+        "tilt_down_finish_speed_slx"sv,
+        "tilt_up_initial_speed_slx"sv,
+        "tilt_up_finish_speed_slx"sv
     };
 
     static StaticSet steps_ignore = {
@@ -916,6 +965,7 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "slow_tilt_time"sv,
         "high_viscosity_tilt_time"sv,
         "bottle_cost"sv,
+        "material_uuid"sv,
         "bottle_volume"sv,
         "bottle_weight"sv,
         "material_density"sv,
@@ -927,9 +977,21 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "material_ow_branchingsupport_head_front_diameter"sv,
         "material_ow_branchingsupport_head_penetration"sv,
         "material_ow_branchingsupport_head_width"sv,
-        "material_ow_elefant_foot_compensation"sv,
+        "material_ow_support_critical_angle"sv,
+        "material_ow_branchingsupport_critical_angle"sv,
+        "material_ow_support_max_bridge_length"sv,
+        "material_ow_branchingsupport_max_bridge_length"sv,
+        "material_ow_support_max_pillar_link_distance"sv,
+        "material_ow_branchingsupport_max_pillar_link_distance"sv,
+        "material_ow_support_small_pillar_diameter_percent"sv,
+        "material_ow_branchingsupport_small_pillar_diameter_percent"sv,
+        "material_ow_support_max_bridges_on_pillar"sv,
+        "material_ow_branchingsupport_max_bridges_on_pillar"sv,
         "material_ow_support_points_density_relative"sv,
+        "material_ow_faded_layers"sv,
+        "material_ow_elefant_foot_compensation"sv,
         "material_ow_absolute_correction"sv,
+        "material_ow_pad_wall_slope"sv,
         "printer_model"sv,
     };
 
@@ -975,6 +1037,14 @@ bool SLAPrint::is_step_done(SLAPrintObjectStep step) const
             return false;
     return true;
 }
+
+SLAPrintObject::SupportData::SupportData(const TriangleMesh &t)
+    : input{t.its, {}, {}}
+{}
+
+SLAPrintObject::SupportData::SupportData(const indexed_triangle_set &t)
+    : input{t, {}, {}}
+{}
 
 SLAPrintObject::SLAPrintObject(SLAPrint *print, ModelObject *model_object)
     : Inherited(print, model_object)
@@ -1179,23 +1249,20 @@ const std::vector<sla::SupportPoint>& SLAPrintObject::get_support_points() const
     return m_supportdata? m_supportdata->input.pts : EMPTY_SUPPORT_POINTS;
 }
 
-const std::vector<ExPolygons> &SLAPrintObject::get_support_slices() const
-{
-    // assert(is_step_done(slaposSliceSupports));
-    if (!m_supportdata) return EMPTY_SLICES;
-    return m_supportdata->support_slices;
-}
-
-const ExPolygons &SliceRecord::get_slice(SliceOrigin o) const
+ExPolygons SliceRecord::get_slice(SliceOrigin o) const
 {
     size_t idx = o == soModel ? m_model_slices_idx : m_support_slices_idx;
 
     if(m_po == nullptr) return EMPTY_SLICE;
 
-    const std::vector<ExPolygons>& v = o == soModel? m_po->get_model_slices() :
-                                                     m_po->get_support_slices();
-
-    return idx >= v.size() ? EMPTY_SLICE : v[idx];
+    if (o == SliceOrigin::soModel) {
+        const std::vector<ExPolygons>& v = m_po->get_model_slices();
+        return idx >= v.size() ? EMPTY_SLICE : v[idx];
+    } else {
+        if (! m_po->m_supportdata || ! m_po->m_supportdata->support_slices_cache)
+            return EMPTY_SLICE;
+        return m_po->m_supportdata->support_slices_cache->calculate_support_slice(idx);
+    }
 }
 
 const TriangleMesh& SLAPrintObject::support_mesh() const
@@ -1214,6 +1281,19 @@ const TriangleMesh& SLAPrintObject::pad_mesh() const
         return m_supportdata->pad_mesh;
 
     return EMPTY_MESH;
+}
+
+double SLAPrintObject::surface_area_estimate() const
+{
+    const std::shared_ptr<const indexed_triangle_set>& its = this->get_mesh_to_print();
+    double area = its_area(*its);
+    if (m_supportdata) {
+        if (m_supportdata->support_slices_cache) {
+            area += m_supportdata->support_slices_cache->area();
+            area += its_area(m_supportdata->pad_mesh.its);
+        }
+    }
+    return area;
 }
 
 const std::shared_ptr<const indexed_triangle_set> &

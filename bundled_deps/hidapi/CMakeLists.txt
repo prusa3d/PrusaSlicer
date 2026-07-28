@@ -1,19 +1,27 @@
-
 if (WIN32)
     set(HIDAPI_IMPL win/hid.c)
+
+    add_library(hidapi STATIC ${HIDAPI_IMPL})
+    target_include_directories(hidapi PUBLIC include)
+
 elseif (APPLE)
     set(HIDAPI_IMPL mac/hid.c)
+
+    add_library(hidapi STATIC ${HIDAPI_IMPL})
+    target_include_directories(hidapi PUBLIC include)
+
 else ()
-    # Assume Linux or Unix other than Mac OS
-    set(HIDAPI_IMPL linux/hid.c)
-endif()
+    find_package(PkgConfig REQUIRED)
 
+    pkg_check_modules(HIDAPI IMPORTED_TARGET hidapi-hidraw)
+    if (NOT HIDAPI_FOUND)
+        pkg_check_modules(HIDAPI REQUIRED IMPORTED_TARGET hidapi-libusb)
+    endif()
 
-add_library(hidapi STATIC ${HIDAPI_IMPL})
-target_include_directories(hidapi PUBLIC include)
+    if (NOT TARGET PkgConfig::HIDAPI)
+        message(FATAL_ERROR "hidapi not found (tried hidraw and libusb)")
+    endif()
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	# Don't link the udev library, as there are two versions out there (libudev.so.0, libudev.so.1), so they are linked explicitely.
-#	target_link_libraries(hidapi udev)
-target_link_libraries(hidapi PRIVATE dl)
+    add_library(hidapi INTERFACE)
+    target_link_libraries(hidapi INTERFACE PkgConfig::HIDAPI)
 endif()

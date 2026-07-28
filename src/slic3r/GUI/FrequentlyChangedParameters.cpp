@@ -34,6 +34,8 @@
 #include "Tab.hpp"
 #include "I18N.hpp"
 
+#include "FullSpectrumDialog.hpp"
+#include "GLCanvas3D.hpp"
 #include "WipeTowerDialog.hpp"
 
 using Slic3r::Preset;
@@ -315,17 +317,36 @@ void FreqChangedParams::sys_color_changed()
         btn->sys_color_changed();
 
     wxGetApp().UpdateDarkUI(m_wiping_dialog_button, true);
+    if (m_full_spectrum_button) {
+        wxGetApp().UpdateDarkUI(m_full_spectrum_button, true);
+    }
 }
 
 void FreqChangedParams::Show(bool is_fff) const
 {
     const bool is_wdb_shown = m_wiping_dialog_button->IsShown();
+    const bool is_fsb_shown = m_full_spectrum_button == nullptr || m_full_spectrum_button->IsShown();
     m_og_fff->Show(is_fff);
     m_og_sla->Show(!is_fff);
 
     // correct showing of the FreqChangedParams sizer when m_wiping_dialog_button is hidden
     if (is_fff && !is_wdb_shown)
         m_wiping_dialog_button->Hide();
+    if (is_fff && !is_fsb_shown && m_full_spectrum_button != nullptr) {
+        m_full_spectrum_button->Hide();
+    }
+}
+
+void FreqChangedParams::update_full_spectrum_visibility(int physical_extruder_count)
+{
+    if (m_full_spectrum_button == nullptr) {
+        return;
+    }
+
+    m_full_spectrum_button->Show(physical_extruder_count >= 2);
+    if (m_sizer != nullptr) {
+        m_sizer->Layout();
+    }
 }
 
 ConfigOptionsGroup* FreqChangedParams::get_og(bool is_fff)

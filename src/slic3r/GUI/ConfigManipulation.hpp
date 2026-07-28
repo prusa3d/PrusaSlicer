@@ -62,7 +62,7 @@ public:
     void    update_print_fff_config(DynamicPrintConfig* config, const bool is_global_config = false);
     void    toggle_print_fff_options(DynamicPrintConfig* config);
 
-    // SLA print
+    // SLA
     void    toggle_print_sla_options(DynamicPrintConfig* config);
 
     bool    is_initialized_support_material_overhangs_queried() { return m_is_initialized_support_material_overhangs_queried; }

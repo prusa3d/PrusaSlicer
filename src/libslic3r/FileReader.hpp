@@ -13,6 +13,7 @@
 #pragma once
 
 #include "PrintConfig.hpp"
+#include "Feature/FullSpectrum/VirtualExtruder.hpp"
 #include "enum_bitmask.hpp"
 #include <utility>
 #include <optional>
@@ -58,7 +59,8 @@ namespace FileReader
                                            ConfigSubstitutionContext* config_substitutions,
                                            boost::optional<Semver> &prusaslicer_generator_version,
                                            LoadAttributes options,
-                                           LoadStats* statistics = nullptr);
+                                           LoadStats* statistics = nullptr,
+                                           FullSpectrum::FullSpectrumConfig* out_fs_config = nullptr);
 }
     
 ENABLE_ENUM_BITMASK_OPERATORS(FileReader::LoadAttribute)

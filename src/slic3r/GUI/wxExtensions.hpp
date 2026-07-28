@@ -68,10 +68,42 @@ wxBitmapBundle* get_solid_bmp_bundle(int width, int height, const std::string& c
 std::vector<wxBitmapBundle*> get_extruder_color_icons(bool thin_icon = false);
 
 namespace Slic3r {
+class Model;
+class ModelVolume;
+namespace FullSpectrum { struct VirtualExtruder; }
 namespace GUI {
 class BitmapComboBox;
-}
-}
+
+struct ExtruderDropdownEntry
+{
+    wxString label;
+    int extruder_id;
+};
+
+wxString format_extruder_label(
+    int extruder_id_1based_or_0,
+    const Model& model,
+    bool use_full_item_name = false
+);
+
+std::vector<ExtruderDropdownEntry> build_extruder_dropdown(
+    const Model& model,
+    bool include_default    = true,
+    bool use_full_item_name = false
+);
+
+size_t
+find_extruder_dropdown_position(int extruder_id, const std::vector<ExtruderDropdownEntry>& entries);
+
+size_t get_extruder_color_idx(
+    const ModelVolume& model_volume,
+    int num_physical,
+    const std::vector<FullSpectrum::VirtualExtruder>& virtual_extruders
+);
+
+} // namespace GUI
+} // namespace Slic3r
+
 void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
                              wxWindow* parent,
                              const std::string& first_item = "",

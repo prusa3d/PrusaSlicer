@@ -328,19 +328,46 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
 #else
     auto c_editor = new wxBitmapComboBox(parent, wxID_ANY, wxEmptyString,
 #endif
-        labelRect.GetTopLeft(), wxSize(labelRect.GetWidth(), -1), 
+        labelRect.GetTopLeft(), wxSize(labelRect.GetWidth(), -1),
         0, nullptr , wxCB_READONLY);
 
 #ifdef _WIN32
     Slic3r::GUI::wxGetApp().UpdateDarkUI(c_editor);
 #endif
 
-    int def_id = get_default_extruder_idx ? get_default_extruder_idx() : 0;
-    c_editor->Append(_L("default"), def_id < 0 ? wxNullBitmap : *icons[def_id]);
-    for (size_t i = 0; i < icons.size(); i++)
-        c_editor->Append(wxString::Format("%d", i+1), *icons[i]);
+    Slic3r::GUI::Plater* plater = Slic3r::GUI::wxGetApp().plater();
+    if (plater == nullptr) {
+        c_editor->Append(_L("default"), wxNullBitmap);
+        c_editor->SetSelection(0);
+        return c_editor;
+    }
 
-    c_editor->SetSelection(atoi(data.GetText().c_str()));
+    const std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
+        Slic3r::GUI::build_extruder_dropdown(plater->model(), true, false);
+
+    const int def_id = get_default_extruder_idx ? get_default_extruder_idx() : 0;
+    for (size_t i = 0; i < entries.size(); ++i) {
+        wxBitmapBundle* bmp = nullptr;
+        if (i == 0) {
+            bmp = (def_id < 0 || size_t(def_id) >= icons.size()) ? nullptr : icons[def_id];
+        } else {
+            const size_t icon_idx = i - 1;
+            bmp                   = (icon_idx < icons.size()) ? icons[icon_idx] : nullptr;
+        }
+
+        c_editor->Append(entries[i].label, bmp ? *bmp : wxNullBitmap);
+    }
+
+    {
+        wxString cell_text = data.GetText();
+        if (cell_text.StartsWith("[V] ")) {
+            cell_text = cell_text.Mid(4);
+        }
+
+        const int target_id = atoi(cell_text.utf8_str());
+        const size_t pos    = Slic3r::GUI::find_extruder_dropdown_position(target_id, entries);
+        c_editor->SetSelection(int(pos));
+    }
 
     
 #ifdef __linux__

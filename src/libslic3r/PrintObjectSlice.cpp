@@ -23,6 +23,7 @@
 #include "ShortestPath.hpp"
 #include "admesh/stl.h"
 #include "libslic3r/Feature/Interlocking/InterlockingGenerator.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/ExPolygon.hpp"
 #include "libslic3r/Exception.hpp"
@@ -583,6 +584,21 @@ void apply_mm_segmentation(PrintObject &print_object, ThrowOnCancel throw_on_can
     // Returns MM segmentation based on painting in MM segmentation gizmo
     std::vector<std::vector<ExPolygons>> segmentation = multi_material_segmentation_by_painting(print_object, throw_on_cancel);
     assert(segmentation.size() == print_object.layer_count());
+
+    if (!print_object.print()->virtual_extruders().empty()) {
+        std::vector<double> print_z_per_layer(segmentation.size());
+        for (size_t layer_id = 0; layer_id < segmentation.size(); ++layer_id) {
+            print_z_per_layer[layer_id] = print_object.get_layer(int(layer_id))->print_z;
+        }
+
+        FullSpectrum::remap_virtual_extruders_to_physical(
+            segmentation,
+            print_z_per_layer,
+            print_object.print()->num_physical_extruders(),
+            print_object.print()->virtual_extruders()
+        );
+    }
+
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, segmentation.size(), std::max(segmentation.size() / 128, size_t(1))),
         [&print_object, &segmentation, throw_on_cancel](const tbb::blocked_range<size_t> &range) {
@@ -922,6 +938,14 @@ void PrintObject::slice_volumes()
 
         BOOST_LOG_TRIVIAL(debug) << "Slicing volumes - Fuzzy skin segmentation";
         apply_fuzzy_skin_segmentation(*this, [print]() { print->throw_if_canceled(); });
+    }
+
+    if (!m_print->virtual_extruders().empty()) {
+        FullSpectrum::remap_virtual_region_slices_to_physical(
+            *this,
+            m_print->num_physical_extruders(),
+            m_print->virtual_extruders()
+        );
     }
 
     if (m_config.interlocking_beam) {

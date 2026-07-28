@@ -5,7 +5,7 @@ on:
 
 jobs:
   build_nogui:
-    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_nogui.yml@master
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_nogui.yml@legacy
     secrets: inherit
     with:
-      actions_branch: master
+      actions_branch: legacy

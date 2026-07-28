@@ -376,6 +376,31 @@ bool OG_CustomCtrl::update_visibility(ConfigOptionMode mode)
     return invisible_lines != ctrl_lines.size();
 }
 
+void OG_CustomCtrl::show_line(const t_config_option_key& opt_key, bool show)
+{
+    wxCoord    v_pos = 0;
+
+    // We have to correct the item positions only if the visibility state of any line has changed.
+    bool force_correct_items_positions{ false };
+
+    for (CtrlLine& line : ctrl_lines) {
+        if (force_correct_items_positions) {
+            line.correct_items_positions();
+        }
+        else if (line.og_line.has_option(opt_key)) {
+            force_correct_items_positions = line.is_visible != show;
+            line.show(show);
+        }
+        if (line.is_visible) {
+            v_pos += (wxCoord)line.height;
+        }
+    }
+
+    if (force_correct_items_positions) {
+        this->SetMinSize(wxSize(wxDefaultCoord, v_pos));
+    }
+}
+
 void OG_CustomCtrl::correct_window_position(wxWindow* win, const Line& line, Field* field/* = nullptr*/)
 {
     wxPoint pos = get_pos(line, field);
@@ -534,6 +559,11 @@ void OG_CustomCtrl::CtrlLine::update_visibility(ConfigOptionMode mode)
     const ConfigOptionMode& line_mode = option_set.front().opt.mode;
     is_visible = line_mode <= mode;
 
+    update_visibility();
+}
+
+void OG_CustomCtrl::CtrlLine::update_visibility()
+{
     if (draw_just_act_buttons)
         return;
 
@@ -544,6 +574,7 @@ void OG_CustomCtrl::CtrlLine::update_visibility(ConfigOptionMode mode)
     if (og_line.extra_widget_sizer)
         og_line.extra_widget_sizer->ShowItems(is_visible);
 
+    const std::vector<Option>& option_set = og_line.get_options();
     for (auto opt : option_set) {
         Field* field = ctrl->opt_group->get_field(opt.opt_id);
         if (!field)
@@ -560,6 +591,14 @@ void OG_CustomCtrl::CtrlLine::update_visibility(ConfigOptionMode mode)
     }
 
     correct_items_positions();
+}
+
+void OG_CustomCtrl::CtrlLine::show(bool show)
+{
+    if (is_visible != show) {
+        is_visible = show;
+        update_visibility();
+    }
 }
 
 void OG_CustomCtrl::CtrlLine::render_separator(wxDC& dc, wxCoord v_pos)

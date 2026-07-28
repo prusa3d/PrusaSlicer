@@ -893,6 +893,14 @@ void MainFrame::show_printables_tab(const std::string& url)
     m_printables_webview->set_next_show_url(url);
     m_tabpanel->SetSelection(m_tabpanel->FindPage(m_printables_webview));
 }
+
+void MainFrame::on_printables_secret_token(const std::string& data)
+{
+    if (!m_printables_webview_added) {
+        return;
+    }
+    m_printables_webview->on_printables_secret_token(data);
+}
 void MainFrame::add_printables_webview_tab()
 {
     if (m_printables_webview_added) {

@@ -28,8 +28,8 @@
 
 namespace Slic3r { namespace sla {
 
-indexed_triangle_set create_support_tree(const SupportableMesh &sm,
-                                         const JobController   &ctl)
+std::pair<indexed_triangle_set, SupportTreeOutput> create_support_tree(
+    const SupportableMesh &sm, const JobController   &ctl)
 {
     auto builder = make_unique<SupportTreeBuilder>(ctl);
 
@@ -59,13 +59,13 @@ indexed_triangle_set create_support_tree(const SupportableMesh &sm,
         BOOST_LOG_TRIVIAL(info) << "Support tree creation took: "
                                 << duration<double>{stop - start}.count()
                                 << " seconds";
-
-        builder->merge_and_cleanup();   // clean metadata, leave only the meshes.
     }
+    std::pair<indexed_triangle_set, sla::SupportTreeOutput> its_and_output;
+    // Mesh must be retrieved before output!
+    its_and_output.first = builder->retrieve_mesh(MeshType::Support);
+    its_and_output.second = builder->retrieve_output(); 
 
-    indexed_triangle_set out = builder->retrieve_mesh(MeshType::Support);
-
-    return out;
+    return its_and_output;
 }
 
 indexed_triangle_set create_pad(const SupportableMesh      &sm,

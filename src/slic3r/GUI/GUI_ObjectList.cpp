@@ -10,6 +10,7 @@
 #include "libslic3r/BuildVolume.hpp" // IWYU pragma: keep
 #include "libslic3r/ModelProcessing.hpp"
 #include "libslic3r/FileReader.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_Factories.hpp"
 #include "GUI_ObjectManipulation.hpp"
@@ -73,7 +74,7 @@ static DynamicPrintConfig& printer_config()
 
 static int extruders_count()
 {
-    return wxGetApp().extruders_edited_cnt();
+    return wxGetApp().extruders_edited_cnt() + wxGetApp().virtual_extruders_cnt();
 }
 
 static void take_snapshot(const wxString& snapshot_name) 
@@ -589,34 +590,44 @@ ModelConfig& ObjectList::get_item_config(const wxDataViewItem& item) const
                             (*m_objects)[obj_idx]->config;
 }
 
+static wxString extruder2str(int extruder);
+static int effective_extruder_for_object_row(const ModelObject& object);
+
 void ObjectList::update_extruder_values_for_items(const size_t max_extruder)
 {
+    const FullSpectrum::VirtualExtruders& virtual_extruders =
+        wxGetApp().plater()->model().virtual_extruders;
+    auto extruder_id_in_range = [&](int extruder_id_1based)
+    {
+        if (extruder_id_1based <= 0) {
+            return false;
+        }
+
+        if (size_t(extruder_id_1based) <= max_extruder) {
+            return true;
+        }
+
+        return FullSpectrum::is_virtual_extruder(unsigned(extruder_id_1based), virtual_extruders);
+    };
+
     for (size_t i = 0; i < m_objects->size(); ++i)
     {
         wxDataViewItem item = m_objects_model->GetItemById(i);
         if (!item) continue;
-            
-        auto object = (*m_objects)[i];
-        wxString extruder;
-        if (!object->config.has("extruder") ||
-            size_t(object->config.extruder()) > max_extruder)
-            extruder = _(L("default"));
-        else
-            extruder = wxString::Format("%d", object->config.extruder());
 
-        m_objects_model->SetExtruder(extruder, item);
+        auto object = (*m_objects)[i];
+        const int raw_object_ext = effective_extruder_for_object_row(*object);
+        const int object_ext     = extruder_id_in_range(raw_object_ext) ? raw_object_ext : 0;
+        m_objects_model->SetExtruder(extruder2str(object_ext), item);
 
         if (object->volumes.size() > 1) {
             for (size_t id = 0; id < object->volumes.size(); id++) {
                 item = m_objects_model->GetItemByVolumeId(i, id);
                 if (!item) continue;
-                if (!object->volumes[id]->config.has("extruder") ||
-                    size_t(object->volumes[id]->config.extruder()) > max_extruder)
-                    extruder = _(L("default"));
-                else
-                    extruder = wxString::Format("%d", object->volumes[id]->config.extruder()); 
-
-                m_objects_model->SetExtruder(extruder, item);
+                const int volume_ext = (object->volumes[id]->config.has("extruder")
+                                     && extruder_id_in_range(object->volumes[id]->config.extruder()))
+                    ? object->volumes[id]->config.extruder() : 0;
+                m_objects_model->SetExtruder(extruder2str(volume_ext), item);
             }
         }
     }
@@ -2095,7 +2106,7 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
 
                 // update extruder color in ObjectList
                 if (obj_item) {
-                    wxString extruder = object->config.has("extruder") ? wxString::Format("%d", object->config.extruder()) : _L("default");
+                    const wxString extruder = extruder2str(object->config.has("extruder") ? object->config.extruder() : 0);
                     m_objects_model->SetExtruder(extruder, obj_item);
                 }
                 // add settings to the object, if it has them
@@ -2982,7 +2993,28 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
 
 static wxString extruder2str(int extruder)
 {
-    return extruder == 0 ? _L("default") : wxString::Format("%d", extruder);
+    Plater* plater = wxGetApp().plater();
+    if (plater == nullptr) {
+        return extruder == 0 ? _L("default") : wxString::Format("%d", extruder);
+    }
+
+    return format_extruder_label(extruder, plater->model(), false);
+}
+
+static int effective_extruder_for_object_row(const ModelObject& object)
+{
+    if (object.config.has("extruder")) {
+        return object.config.extruder();
+    }
+
+    if (object.volumes.size() == 1
+        && object.volumes[0] != nullptr
+        && object.volumes[0]->config.has("extruder"))
+    {
+        return object.volumes[0]->config.extruder();
+    }
+
+    return 0;
 }
 
 static bool can_add_volumes_to_object(const ModelObject* object)
@@ -3052,8 +3084,9 @@ void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
 {
     auto model_object = (*m_objects)[obj_idx];
     const wxString& item_name = get_item_name(model_object->name, model_object->is_text());
+    const int effective_extruder = effective_extruder_for_object_row(*model_object);
     const auto item = m_objects_model->AddObject(item_name,
-                      extruder2str(model_object->config.has("extruder") ? model_object->config.extruder() : 0),
+                      extruder2str(effective_extruder),
                       get_warning_icon_name(model_object->mesh().stats()),
                       model_object->is_cut());
 
@@ -4843,8 +4876,7 @@ void ObjectList::set_extruder_for_selected_items(const int extruder) const
         else if (extruder > 0)
             config.set_key_value("extruder", new ConfigOptionInt(extruder));
 
-        const wxString extruder_str = extruder == 0 ? wxString (_(L("default"))) : 
-                                      wxString::Format("%d", config.extruder());
+        const wxString extruder_str = extruder2str(extruder == 0 ? 0 : config.extruder());
 
         auto const type = m_objects_model->GetItemType(item);
 

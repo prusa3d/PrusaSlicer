@@ -343,6 +343,7 @@ inline stl_normal its_unnormalized_normal(const indexed_triangle_set &its,
     return (tri[1] - tri[0]).cross(tri[2] - tri[0]);
 }
 
+float its_area(const indexed_triangle_set& its);
 float its_volume(const indexed_triangle_set &its);
 float its_average_edge_length(const indexed_triangle_set &its);
 

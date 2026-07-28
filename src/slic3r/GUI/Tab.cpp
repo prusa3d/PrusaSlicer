@@ -1672,6 +1672,8 @@ void TabPrint::build()
         optgroup->append_single_option_line("single_extruder_multi_material_priming");
 
         optgroup = page->new_optgroup(L("Advanced"));
+        optgroup->append_single_option_line("toolchange_ordering");
+
         optgroup->append_single_option_line("interface_shells");
         optgroup->append_single_option_line("mmu_segmented_region_max_width");
         optgroup->append_single_option_line("mmu_segmented_region_interlocking_depth");
@@ -2352,6 +2354,9 @@ void TabFilament::build()
         optgroup->append_single_option_line("filament_multitool_ramming_volume");
         optgroup->append_single_option_line("filament_multitool_ramming_flow");
 
+        optgroup = page->new_optgroup(L("Flush parameters (experimental)"));
+        optgroup->append_single_option_line("filament_flush_volume");
+        optgroup->append_single_option_line("filament_flush_speed");
 
 
     add_filament_overrides_page();
@@ -3037,7 +3042,6 @@ void TabPrinter::build_sla()
     line.append_option(optgroup->get_option("slow_tilt_time"));
     line.append_option(optgroup->get_option("high_viscosity_tilt_time"));
     optgroup->append_line(line);
-//    optgroup->append_single_option_line("area_fill");
 
     optgroup = page->new_optgroup(L("Corrections"));
     line = Line{ m_config->def()->get("relative_correction")->full_label, "" };
@@ -5530,20 +5534,14 @@ void TabSLAMaterial::build()
 
     page = add_options_page(L("Material printing profile"), "note");
 
-#if 1
     optgroup = page->new_optgroup(L("Material printing profile"));
     optgroup->append_single_option_line("material_print_speed");
 
     optgroup = page->new_optgroup(L("Tilt"));
     optgroup->append_single_option_line("area_fill");
 
-#else
-    optgroup = page->new_optgroup(L("Material printing profile"));
-    option = optgroup->get_option("material_print_speed");
-    optgroup->append_single_option_line(option);
-
-    optgroup->append_single_option_line("area_fill");
-#endif
+    optgroup = page->new_optgroup(L("Temperature"));
+    create_line_with_near_label_widget(optgroup, "printing_temperature");
 
     build_tilt_group(page);
 }
@@ -5599,8 +5597,11 @@ void TabSLAMaterial::build_tilt_group(Slic3r::GUI::PageShp page)
     auto optgroup = page->new_optgroup(L("Profile settings"));
     optgroup->on_change = [this](const t_config_option_key& key, boost::any value)
     {
-        if (key.find("use_tilt") == 0)
-            toggle_tilt_options(key == "use_tilt#0");
+        for (const auto& s : { "use_tilt"}) {
+            if (key.find(s) == 0)
+                toggle_tilt_options(key == std::string(s) + "#0");
+        }
+        
 
         update_dirty();
         update();
@@ -5652,17 +5653,25 @@ void TabSLAMaterial::create_line_with_tilt_defaults(ConfigOptionsGroupShp optgro
 
 std::vector<std::string> disable_tilt_options = {
          "tilt_down_initial_speed"
+        ,"tilt_down_initial_speed_slx"
         ,"tilt_down_offset_steps"
         ,"tilt_down_offset_delay"
         ,"tilt_down_finish_speed"
         ,"tilt_down_cycles"
         ,"tilt_down_delay"
+        ,"tilt_down_finish_speed_slx"
         ,"tilt_up_initial_speed"
+        ,"tilt_up_initial_speed_slx"
         ,"tilt_up_offset_steps"
         ,"tilt_up_offset_delay"
         ,"tilt_up_finish_speed"
         ,"tilt_up_cycles"
         ,"tilt_up_delay"
+        ,"tilt_up_finish_speed_slx"
+        ,"dynamic_delay_before_profile"
+        ,"dynamic_delay_before_timeout"
+        ,"dynamic_tilt_down_profile"
+        ,"dynamic_tilt_up_profile"
 };
 
 void TabSLAMaterial::toggle_tilt_options(bool is_above)
@@ -5672,11 +5681,20 @@ void TabSLAMaterial::toggle_tilt_options(bool is_above)
         int column_id = is_above ? 0 : 1;
         auto optgroup = m_active_page->get_optgroup("Profile settings");
         bool use_tilt = boost::any_cast<bool>(optgroup->get_config_value(*m_config, "use_tilt", column_id));
+        bool delay_before_enabled = boost::any_cast<int>(optgroup->get_config_value(*m_config, "dynamic_delay_before_profile", column_id)) != tddbDisabled;
 
         for (const std::string& opt_key : disable_tilt_options) {
+            bool state = use_tilt;
+            if (opt_key == "dynamic_delay_before_timeout")
+                state &= delay_before_enabled;
+
             auto field = optgroup->get_fieldc(opt_key, column_id);
             if (field != nullptr)
-                field->toggle(use_tilt);
+                field->toggle(state);
+            if (opt_key == "dynamic_delay_before_timeout") {
+                auto field = optgroup->get_fieldc("delay_before_exposure", column_id);
+                field->toggle(! state);
+            }
         }
     }
 }
@@ -5685,6 +5703,14 @@ void TabSLAMaterial::toggle_options()
 {
     if (m_active_page->title() == "Material Overrides")
         update_material_overrides_page();
+    if (m_active_page->title() == "Material printing profile") {
+        std::optional<ConfigOptionsGroupShp> optgroup{ get_option_group(m_active_page, "Temperature")};
+        if (optgroup) {
+            update_line_with_near_label_widget(*optgroup, "printing_temperature");
+        }
+    }
+    toggle_tilt_options(true);
+    toggle_tilt_options(false);
 }
 
 void TabSLAMaterial::update()
@@ -5728,6 +5754,32 @@ bool Tab::is_prusa_printer() const
     return SLAPrint::is_prusa_print(printer_model());
 }
 
+static std::vector<std::string> show_for_slx = {
+    "tilt_down_initial_speed_slx",
+    "tilt_down_finish_speed_slx",
+    "tilt_up_initial_speed_slx",
+    "tilt_up_finish_speed_slx",
+    "delay_to_reflood",
+    "dynamic_delay_before_profile",
+    "dynamic_delay_before_timeout",
+    "dynamic_tilt_down_profile",
+    "dynamic_tilt_up_profile"
+};
+
+static std::vector<std::string> hide_for_slx = {
+    "tilt_down_initial_speed",
+    "tilt_down_finish_speed",
+    "tilt_up_initial_speed",
+    "tilt_up_finish_speed",
+    "delay_after_exposure",
+    "tilt_down_cycles",
+    "tilt_down_delay",
+    "tilt_down_offset_delay",
+    "tilt_up_cycles",
+    "tilt_up_delay",
+    "tilt_up_offset_delay"
+};
+
 void TabSLAMaterial::update_sla_prusa_specific_visibility()
 {
     if (m_active_page && m_active_page->title() == "Material printing profile") {
@@ -5738,6 +5790,14 @@ void TabSLAMaterial::update_sla_prusa_specific_visibility()
                 og_it->get()->Show(m_mode >= comAdvanced && is_prusa_printer());
                 const std::string pr_model = printer_model();
                 m_tilt_defaults_sizer->Show(pr_model == "SL1S" || pr_model == "M1");
+
+                if (og_it->get()->title == "Profile settings") {
+                    bool is_slx = pr_model == "SLX";
+                    for (const auto& opt : show_for_slx)
+                        og_it->get()->show_line(opt + "#0", is_slx);
+                    for (const auto& opt : hide_for_slx)
+                        og_it->get()->show_line(opt + "#0", ! is_slx);
+                }
             }
         }
 
@@ -5842,22 +5902,27 @@ static std::vector<std::string> get_override_opt_kyes_for_line(const std::string
     std::vector<std::string> opt_keys;
     opt_keys.reserve(3);
 
-    if (title == "Support head" || title == "Support pillar") {
+    if (title == "Support head" || title == "Support pillar" ||
+        title == "Connection of the support sticks and junctions") {
         for (auto& prefix : { "", "branching" })
             opt_keys.push_back(preprefix + prefix + key);
     }
     else
         opt_keys.push_back(preprefix + key);
 
+    if (key == "printing_temperature")
+        opt_keys = { "printing_temperature" };
+
     return opt_keys;
 }
 
 void TabSLAMaterial::create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& key)
 {
-    if (optgroup->title == "Support head" || optgroup->title == "Support pillar")
+    if (optgroup->title == "Support head" || optgroup->title == "Support pillar" ||
+        optgroup->title == "Connection of the support sticks and junctions")
         add_options_into_line(optgroup, { {"", L("Default")}, {"branching", L("Branching")} }, key, "material_ow_");
     else {
-        const std::string opt_key = std::string("material_ow_") + key;
+        const std::string opt_key = (key == "printing_temperature") ? key : std::string("material_ow_") + key;
         optgroup->append_single_option_line(opt_key);
     }
 
@@ -5899,13 +5964,26 @@ std::vector<std::pair<std::string, std::vector<std::string>>> material_overrides
     }},
     {"Support pillar", {
         "support_pillar_diameter",
+        "support_small_pillar_diameter_percent",
+        "support_max_bridges_on_pillar",
+    }},
+    {"Connection of the support sticks and junctions", {
+        "support_critical_angle",
+        "support_max_bridge_length",
+        "support_max_pillar_link_distance",
     }},
     {"Automatic generation", {
         "support_points_density_relative"
     }},
+    {"Layers", {
+        "faded_layers"
+    }},
     {"Corrections", {
         "absolute_correction",
         "elefant_foot_compensation"
+    }},
+    {"Pad", {
+        "pad_wall_slope"
     }}
 };
 
@@ -5932,7 +6010,8 @@ void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp op
     std::vector<std::string> opt_keys;
     opt_keys.reserve(3);
 
-    if (optgroup->title == "Support head" || optgroup->title == "Support pillar") {
+    if (optgroup->title == "Support head" || optgroup->title == "Support pillar" ||
+        optgroup->title == "Connection of the support sticks and junctions") {
         for (auto& prefix : { "", "branching" }) {
             std::string opt_key = preprefix + prefix + key;
             is_checked = !m_config->option(opt_key)->is_nil();
@@ -5947,7 +6026,7 @@ void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp op
         }
     }
     else {
-        std::string opt_key = preprefix + key;
+        std::string opt_key = (key == "printing_temperature") ? key : preprefix + key;
         is_checked = !m_config->option(opt_key)->is_nil();
         opt_keys.push_back(opt_key);
     }

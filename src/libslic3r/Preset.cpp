@@ -512,7 +512,7 @@ static std::vector<std::string> s_Preset_print_options {
     "top_one_perimeter_type", "only_one_perimeter_first_layer",
     "automatic_extrusion_widths", "automatic_infill_combination", "automatic_infill_combination_max_layer_height",
     "bed_temperature_extruder", "interlocking_beam", "interlocking_orientation", "interlocking_beam_layer_count", "interlocking_depth", "interlocking_boundary_avoidance", "interlocking_beam_width",
-    "travel_short_distance_acceleration",
+    "travel_short_distance_acceleration", "toolchange_ordering"
 };
 
 static std::vector<std::string> s_Preset_filament_options {
@@ -520,7 +520,7 @@ static std::vector<std::string> s_Preset_filament_options {
     "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
     "filament_unloading_speed", "filament_unloading_speed_start", "filament_unload_time", "filament_toolchange_delay", "filament_cooling_moves", "filament_stamping_loading_speed", "filament_stamping_distance",
     "filament_cooling_initial_speed", "filament_purge_multiplier", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
-    "filament_multitool_ramming", "filament_multitool_ramming_volume", "filament_multitool_ramming_flow", 
+    "filament_multitool_ramming", "filament_multitool_ramming_volume", "filament_multitool_ramming_flow", "filament_flush_volume", "filament_flush_speed",
     "temperature", "idle_temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", "fan_always_on", "cooling", "cooling_slowdown_logic",
     "cooling_perimeter_transition_distance", "min_fan_speed",
     "max_fan_speed", "bridge_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed",
@@ -633,11 +633,12 @@ static std::vector<std::string> s_Preset_sla_print_options {
     "inherits"
 };
 
-static std::vector<std::string> s_Preset_sla_material_options {
+static std::vector<std::string> s_Preset_sla_material_options{
     "material_colour",
     "material_type",
     "initial_layer_height",
     "bottle_cost",
+    "material_uuid",
     "bottle_volume",
     "bottle_weight",
     "material_density",
@@ -651,10 +652,14 @@ static std::vector<std::string> s_Preset_sla_material_options {
     "material_vendor",
     "material_print_speed",
     "area_fill",
+    "printing_temperature",
     "default_sla_material_profile",
     "zcorrection_layers",
-    "compatible_prints", "compatible_prints_condition",
-    "compatible_printers", "compatible_printers_condition", "inherits",
+    "compatible_prints",
+    "compatible_prints_condition",
+    "compatible_printers",
+    "compatible_printers_condition",
+    "inherits",
 
     // overriden options
     "material_ow_support_head_front_diameter",
@@ -667,29 +672,51 @@ static std::vector<std::string> s_Preset_sla_material_options {
     "material_ow_branchingsupport_head_width",
     "material_ow_branchingsupport_pillar_diameter",
 
+    "material_ow_support_critical_angle",
+    "material_ow_branchingsupport_critical_angle",
+    "material_ow_support_max_bridge_length",
+    "material_ow_branchingsupport_max_bridge_length",
+    "material_ow_support_max_pillar_link_distance",
+    "material_ow_branchingsupport_max_pillar_link_distance",
+    "material_ow_support_small_pillar_diameter_percent",
+    "material_ow_branchingsupport_small_pillar_diameter_percent",
+    "material_ow_support_max_bridges_on_pillar",
+    "material_ow_branchingsupport_max_bridges_on_pillar",
+
     "material_ow_support_points_density_relative",
+    "material_ow_faded_layers",
     "material_ow_absolute_correction",
-    "material_ow_elefant_foot_compensation"
+    "material_ow_elefant_foot_compensation",
+    "material_ow_pad_wall_slope"
 };
 
 static std::vector<std::string> s_Preset_sla_tilt_options{
      "delay_before_exposure"
     ,"delay_after_exposure"
+    ,"delay_to_reflood"
     ,"tower_hop_height"
     ,"tower_speed"
     ,"use_tilt"
     ,"tilt_down_initial_speed"
+    ,"tilt_down_initial_speed_slx"
     ,"tilt_down_offset_steps"
     ,"tilt_down_offset_delay"
     ,"tilt_down_finish_speed"
+    ,"tilt_down_finish_speed_slx"
     ,"tilt_down_cycles"
     ,"tilt_down_delay"
     ,"tilt_up_initial_speed"
+    ,"tilt_up_initial_speed_slx"
     ,"tilt_up_offset_steps"
     ,"tilt_up_offset_delay"
     ,"tilt_up_finish_speed"
+    ,"tilt_up_finish_speed_slx"
     ,"tilt_up_cycles"
     ,"tilt_up_delay"
+    ,"dynamic_delay_before_profile"
+    ,"dynamic_delay_before_timeout"
+    ,"dynamic_tilt_down_profile"
+    ,"dynamic_tilt_up_profile"
 };
 const std::vector<std::string>& tilt_options() { return s_Preset_sla_tilt_options; }
 
@@ -701,7 +728,7 @@ static std::vector<std::string> s_Preset_sla_printer_options {
     "display_width", "display_height", "display_pixels_x", "display_pixels_y",
     "display_mirror_x", "display_mirror_y",
     "display_orientation",
-    "fast_tilt_time", "slow_tilt_time", "high_viscosity_tilt_time", //"area_fill",
+    "fast_tilt_time", "slow_tilt_time", "high_viscosity_tilt_time",
     "relative_correction",
     "relative_correction_x",
     "relative_correction_y",

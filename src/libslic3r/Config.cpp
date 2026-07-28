@@ -266,6 +266,7 @@ ConfigOption* ConfigOptionDef::create_empty_option() const
 	    switch (this->type) {
         case coFloat:           return new ConfigOptionFloatNullable();
         case coInt:             return new ConfigOptionIntNullable();
+        case coPercent:         return new ConfigOptionPercentNullable();
 	    case coFloats:          return new ConfigOptionFloatsNullable();
 	    case coInts:            return new ConfigOptionIntsNullable();
 	    case coPercents:        return new ConfigOptionPercentsNullable();

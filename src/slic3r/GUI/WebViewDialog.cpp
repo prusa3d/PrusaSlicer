@@ -437,7 +437,7 @@ void WebViewDialog::run_script(const wxString& javascript)
     // Remember the script we run in any case, so the next time the user opens
     // the "Run Script" dialog box, it is shown there for convenient updating.
     m_javascript = javascript;
-    BOOST_LOG_TRIVIAL(debug) << "RunScript " << javascript << "\n";
+    //BOOST_LOG_TRIVIAL(debug) << "RunScript " << javascript << "\n";
     m_browser->RunScriptAsync(javascript);
 }
 

@@ -314,6 +314,38 @@ static const t_config_enum_values s_keys_map_TiltSpeeds{
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TiltSpeeds)
 
+static const t_config_enum_values s_keys_map_TiltSpeedsSLX{
+    { "layer160",    tssLayer160     },
+    { "layer1600",   tssLayer1600   },
+    { "layer3040",   tssLayer3040    },
+    { "layer4480",   tssLayer4480   },
+    { "layer5920",   tssLayer5920   },
+    { "layer7360",   tssLayer7360   },
+    { "layer8800",   tssLayer8800   },
+    { "layer10240",  tssLayer10240  },
+    { "layer11680",  tssLayer11680  },
+    { "layer13120",  tssLayer13120  },
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TiltSpeedsSLX)
+
+static const t_config_enum_values s_keys_map_TiltDynamicDelayBefore{
+    {"disabled", tddbDisabled},
+    {"neg0_2", tddbNeg02}
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TiltDynamicDelayBefore)
+
+static const t_config_enum_values s_keys_map_TiltDynamicUp{
+    {"disabled", tduDisabled},
+    {"threshold_slowdown", tduThresholdSlowdown}
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TiltDynamicUp)
+
+static const t_config_enum_values s_keys_map_TiltDynamicDown{
+    {"disabled", tddDisabled},
+    {"first_peak", tddFirstPeak}
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TiltDynamicDown)
+
 static const t_config_enum_values s_keys_map_EnsureVerticalShellThickness {
     { "disabled", int(EnsureVerticalShellThickness::Disabled) },
     { "partial",  int(EnsureVerticalShellThickness::Partial)  },
@@ -327,6 +359,12 @@ static const t_config_enum_values s_keys_map_CoolingSlowdownLogicType {
     { "proportional",       int(CoolingSlowdownLogicType::Proportional)      },
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(CoolingSlowdownLogicType)
+
+static t_config_enum_values s_keys_map_ToolChangeOrderingType {
+        { "optimized", int(ToolChangeOrderingType::Optimized) },
+        { "cyclic",    int(ToolChangeOrderingType::Cyclic) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ToolChangeOrderingType)
 
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
@@ -390,7 +428,7 @@ void PrintConfigDef::init_common_params()
 
     def = this->add("thumbnails", coString);
     def->label = L("G-code thumbnails");
-    def->tooltip = L("Picture sizes to be stored into a .gcode / .bgcode and .sl1 / .sl1s files, in the following format: \"XxY/EXT, XxY/EXT, ...\"\n"
+    def->tooltip = L("Picture sizes to be stored into a .gcode / .bgcode and .sl1 / .sl1s / .slx files, in the following format: \"XxY/EXT, XxY/EXT, ...\"\n"
                      "Currently supported extensions are PNG, QOI and JPG.");
     def->mode = comExpert;
     def->gui_type = ConfigOptionDef::GUIType::one_string;
@@ -1540,6 +1578,28 @@ void PrintConfigDef::init_fff_params()
     def->min = -10.;
     def->max = 10.;
     def->set_default_value(new ConfigOptionPercents { 0. });
+
+    def = this->add("filament_flush_volume", coFloats);
+    def->label = L("Flush volume");
+    def->tooltip = L(
+        "Volume of filament to flush during a tool change. "
+        "Used in custom toolchange G-code."
+    );
+    def->sidetext = L("mm³");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats{0.});
+
+    def = this->add("filament_flush_speed", coFloats);
+    def->label = L("Flush speed");
+    def->tooltip = L(
+        "Extrusion speed used for flushing during a tool change. "
+        "Used in custom toolchange G-code."
+    );
+    def->sidetext = L("mm/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats{0.});
 
     def = this->add("fill_angle", coFloat);
     def->label = L("Fill angle");
@@ -3652,6 +3712,21 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionString(""));
 
+    def = this->add("toolchange_ordering", coEnum);
+    def->label = L("Toolchange ordering");
+    def->category = L("Advanced");
+    def->tooltip = L(
+        "Determines the order of tool changes on each layer.\n"
+        "Optimized - Starts with the last used extruder to minimize tool changes.\n"
+        "Cyclic - Uses extruders in a fixed sequential order (1, 2, 3, ...) on every layer."
+    );
+    def->mode = comAdvanced;
+    def->set_enum<ToolChangeOrderingType>({
+        { "optimized", L("Optimized") },
+        { "cyclic",    L("Cyclic") },
+    });
+    def->set_default_value(new ConfigOptionEnum<ToolChangeOrderingType>(ToolChangeOrderingType::Optimized));
+
     def = this->add("top_infill_extrusion_width", coFloatOrPercent);
     def->label = L("Top solid infill");
     def->category = L("Extrusion Width");
@@ -4272,12 +4347,14 @@ void PrintConfigDef::init_sla_params()
     def = this->add("display_width", coFloat);
     def->label = L("Display width");
     def->tooltip = L("Width of the display");
+    def->mode = comExpert;
     def->min = 1;
     def->set_default_value(new ConfigOptionFloat(120.));
 
     def = this->add("display_height", coFloat);
     def->label = L("Display height");
     def->tooltip = L("Height of the display");
+    def->mode = comExpert;
     def->min = 1;
     def->set_default_value(new ConfigOptionFloat(68.));
 
@@ -4285,12 +4362,14 @@ void PrintConfigDef::init_sla_params()
     def->full_label = L("Number of pixels in");
     def->label = ("X");
     def->tooltip = L("Number of pixels in X");
+    def->mode = comExpert;
     def->min = 100;
     def->set_default_value(new ConfigOptionInt(2560));
 
     def = this->add("display_pixels_y", coInt);
     def->label = ("Y");
     def->tooltip = L("Number of pixels in Y");
+    def->mode = comExpert;
     def->min = 100;
     def->set_default_value(new ConfigOptionInt(1440));
 
@@ -4356,6 +4435,17 @@ void PrintConfigDef::init_sla_params()
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(35.));
+
+    def = this->add_nullable("printing_temperature", coInt);
+    def->label = L("Printing temperature");
+    def->tooltip = L("This value sets the target printing temperature. The printer will wait for the resin to reach "
+        "this stable temperature before starting and will maintain it throughout the print. When disabled, the printer "
+        "ignores the resin's current temperature and begins printing immediately.");
+    def->sidetext = L("°C");
+    def->min = 18;
+    def->max = 60;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionIntNullable(ConfigOptionIntNullable::nil_value()));
 
     def = this->add("relative_correction", coFloats);
     def->label = L("Printer scaling correction");
@@ -4487,6 +4577,10 @@ void PrintConfigDef::init_sla_params()
     def->sidetext = L("money/bottle");
     def->min = 0;
     def->set_default_value(new ConfigOptionFloat(0.0));
+
+    def = this->add("material_uuid", coString);
+    def->label = "Material UUID (FOR DEBUGGING ONLY)";
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("faded_layers", coInt);
     def->label = L("Faded layers");
@@ -4842,13 +4936,21 @@ void PrintConfigDef::init_sla_params()
     // Declare retract values for material profile, overriding the print and printer profiles.
     for (const char* opt_key : {
         // float
-        "support_head_front_diameter", "branchingsupport_head_front_diameter", 
-        "support_head_penetration", "branchingsupport_head_penetration", 
+        "support_head_front_diameter", "branchingsupport_head_front_diameter",
+        "support_head_penetration", "branchingsupport_head_penetration",
         "support_head_width", "branchingsupport_head_width",
         "support_pillar_diameter", "branchingsupport_pillar_diameter",
+        "support_critical_angle", "branchingsupport_critical_angle",
+        "support_max_bridge_length", "branchingsupport_max_bridge_length",
+        "support_max_pillar_link_distance", "branchingsupport_max_pillar_link_distance",
         "elefant_foot_compensation", "absolute_correction",
+        "pad_wall_slope",
         // int
-        "support_points_density_relative"
+        "faded_layers",
+        "support_points_density_relative",
+        "support_max_bridges_on_pillar", "branchingsupport_max_bridges_on_pillar",
+        // percent
+        "support_small_pillar_diameter_percent", "branchingsupport_small_pillar_diameter_percent"
         }) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
@@ -4861,8 +4963,9 @@ void PrintConfigDef::init_sla_params()
         def->max  = it_opt->second.max;
         def->mode = it_opt->second.mode;
         switch (def->type) {
-        case coFloat: def->set_default_value(new ConfigOptionFloatNullable{ it_opt->second.default_value->getFloat() }); break;
-        case coInt:   def->set_default_value(new ConfigOptionIntNullable{ it_opt->second.default_value->getInt() }); break;
+        case coFloat:   def->set_default_value(new ConfigOptionFloatNullable{ it_opt->second.default_value->getFloat() }); break;
+        case coPercent: def->set_default_value(new ConfigOptionPercentNullable{ it_opt->second.default_value->getFloat() }); break;
+        case coInt:     def->set_default_value(new ConfigOptionIntNullable{ it_opt->second.default_value->getInt() }); break;
         default: assert(false);
         }
     }
@@ -4875,10 +4978,11 @@ void PrintConfigDef::init_sla_tilt_params()
 
     def = this->add("delay_before_exposure", coFloats);
     def->full_label = L("Delay before exposure");
-    def->tooltip = L("Delay before exposure after previous layer separation.");
+    def->tooltip = L("Sets a fixed pause before an exposure of the new layer starts. "
+        "This setting is ignored if 'Dynamic delay before exposure' is enabled.");
     def->sidetext = L("s");
     def->min = 0;
-    def->max = 30;
+    def->max = 300;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats({ 3., 3.}));
 
@@ -4891,9 +4995,21 @@ void PrintConfigDef::init_sla_tilt_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats({ 0., 0.}));
 
+    def = this->add("delay_to_reflood", coFloats);
+    def->full_label = L("Delay to reflood");
+    def->tooltip = L("Defines the pause between the separation movement (tilt down, Z-hop) and the return "
+        "movement (tilt up). Increasing this time allows the resin more time to fully reflood the peeled-off layer.");
+    def->sidetext = L("s");
+    def->min = 0;
+    def->max = 300;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats({ 0., 0.}));
+
     def = this->add("tower_hop_height", coFloats);
     def->full_label = L("Tower hop height");
-    def->tooltip = L("The height of the tower raise.");
+    def->tooltip = L("An alternative separation move to tilting. After layer exposure, the platform"
+        " lifts by this distance. A minimum of 5mm is recommended if tilting is disabled. "
+        "If you use tilting, we suggest 0mm, although a combination of both is possible.");
     def->sidetext = L("mm");
     def->min = 0;
     def->max = 100;
@@ -4937,9 +5053,39 @@ void PrintConfigDef::init_sla_tilt_params()
         { "move8000",   "8000"  },
     };
 
+    const std::initializer_list<std::pair<std::string_view, std::string_view>> tilt_speeds_slx_il = {
+        { "layer160",   "160"   },
+        { "layer1600",  "1600"  },
+        { "layer3040",  "3040"  },
+        { "layer4480",  "4480"  },
+        { "layer5920",  "5920"  },
+        { "layer7360",  "7360"  },
+        { "layer8800",  "8800"  },
+        { "layer10240", "10240" },
+        { "layer11680", "11680" },
+        { "layer13120", "13120" }
+    };
+
+    const std::initializer_list<std::pair<std::string_view, std::string_view>> tilt_dynamic_delay_before_il = {
+        { "disabled",   "disabled" },
+        { "neg0_2",   "neg0_2" }
+    };
+
+    const std::initializer_list<std::pair<std::string_view, std::string_view>> tilt_dynamic_up_il = {
+        { "disabled",   "disabled" },
+        {"threshold_slowdown", "threshold_slowdown"}
+    };
+
+    const std::initializer_list<std::pair<std::string_view, std::string_view>> tilt_dynamic_down_il = {
+        { "disabled",   "disabled" },
+        {"first_peak", "first_peak"}
+    };
+
     def = this->add("tilt_down_initial_speed", coEnums); 
     def->full_label = L("Tilt down initial speed");
-    def->tooltip = L("Tilt speed used for an initial portion of tilt down move.");
+    def->tooltip = L("Sets the initial speed for the tilt-down separation move. A high speed may negatively "
+        "affect print quality or success, especially with certain resins or delicate geometries, "
+        "but it speeds up the overall print time.");
     def->mode = comExpert;
     def->sidetext = L("μ-steps/s");
     def->set_enum<TiltSpeeds>(tilt_speeds_il);
@@ -4947,7 +5093,8 @@ void PrintConfigDef::init_sla_tilt_params()
 
     def = this->add("tilt_down_finish_speed", coEnums); 
     def->full_label = L("Tilt down finish speed");
-    def->tooltip = L("Tilt speed used for the rest of the tilt down move.");
+    def->tooltip = L("Sets the final speed for the tilt-down separation move. Too high a speed, "
+        "especially with less viscous resins, can cause resin to splash out of the tank.");
     def->mode = comExpert;
     def->sidetext = L("μ-steps/s");
     def->set_enum<TiltSpeeds>(tilt_speeds_il);
@@ -4955,7 +5102,7 @@ void PrintConfigDef::init_sla_tilt_params()
 
     def = this->add("tilt_up_initial_speed", coEnums); 
     def->full_label = L("Tilt up initial speed");
-    def->tooltip = L("Tilt speed used for an initial portion of tilt up move.");
+    def->tooltip = L("Sets the initial speed for the tilt-up return movement.");
     def->mode = comExpert;
     def->sidetext = L("μ-steps/s");
     def->set_enum<TiltSpeeds>(tilt_speeds_il);
@@ -4963,21 +5110,87 @@ void PrintConfigDef::init_sla_tilt_params()
 
     def = this->add("tilt_up_finish_speed", coEnums); 
     def->full_label = L("Tilt up finish speed");
-    def->tooltip = L("Tilt speed used for the rest of the tilt-up.");
+    def->tooltip = L("Sets the final speed for the tilt-up return movement. Excessive speed, especially "
+        "with highly viscous resins, can lead to a loss of print quality, or in extreme cases, "
+        "tilt motor skipping or damage to the print display.");
     def->mode = comExpert;
     def->sidetext = L("μ-steps/s");
     def->set_enum<TiltSpeeds>(tilt_speeds_il);
     def->set_default_value(new ConfigOptionEnums<TiltSpeeds>({ tsLayer1750, tsLayer1750 }));
 
+    def = this->add("tilt_down_initial_speed_slx", coEnums); 
+    def->full_label = L("Tilt down initial speed");
+    def->tooltip = L("Tilt speed used for an initial portion of tilt down move.");
+    def->mode = comExpert;
+    def->sidetext = L("μ-steps/s");
+    def->set_enum<TiltSpeedsSLX>(tilt_speeds_slx_il);
+    def->set_default_value(new ConfigOptionEnums<TiltSpeedsSLX>({ tssLayer160, tssLayer160 }));
+
+    def = this->add("tilt_down_finish_speed_slx", coEnums); 
+    def->full_label = L("Tilt down finish speed");
+    def->tooltip = L("Tilt speed used for the rest of the tilt down move.");
+    def->mode = comExpert;
+    def->sidetext = L("μ-steps/s");
+    def->set_enum<TiltSpeedsSLX>(tilt_speeds_slx_il);
+    def->set_default_value(new ConfigOptionEnums<TiltSpeedsSLX>({ tssLayer160, tssLayer160 }));
+
+    def = this->add("tilt_up_initial_speed_slx", coEnums); 
+    def->full_label = L("Tilt up initial speed");
+    def->tooltip = L("Tilt speed used for an initial portion of tilt up move.");
+    def->mode = comExpert;
+    def->sidetext = L("μ-steps/s");
+    def->set_enum<TiltSpeedsSLX>(tilt_speeds_slx_il);
+    def->set_default_value(new ConfigOptionEnums<TiltSpeedsSLX>({ tssLayer160, tssLayer160 }));
+
+    def = this->add("tilt_up_finish_speed_slx", coEnums); 
+    def->full_label = L("Tilt up finish speed");
+    def->tooltip = L("Tilt speed used for the rest of the tilt-up.");
+    def->mode = comExpert;
+    def->sidetext = L("μ-steps/s");
+    def->set_enum<TiltSpeedsSLX>(tilt_speeds_slx_il);
+    def->set_default_value(new ConfigOptionEnums<TiltSpeedsSLX>({ tssLayer160, tssLayer160 }));
+
+    def = this->add("dynamic_delay_before_profile", coEnums); 
+    def->full_label = L("Dynamic delay before profile");
+    def->tooltip = L("Switches between predefined algorithms that influence how the dynamic delay before exposure function behaves.");
+    def->mode = comExpert;
+    def->set_enum<TiltDynamicDelayBefore>(tilt_dynamic_delay_before_il);
+    def->set_default_value(new ConfigOptionEnums<TiltDynamicDelayBefore>({ tddbDisabled, tddbDisabled }));
+
+    def = this->add("dynamic_delay_before_timeout", coFloats); 
+    def->full_label = L("Dynamic delay before exposure timeout");
+    def->tooltip = L("Sets the maximum allowed time for waiting for the pressure sensors to stabilize during dynamic delay before exposure. "
+        "Once this timeout expires, the printer starts exposing the next layer regardless of resin pressure stabilization.");
+    def->min = 0;
+    def->max = 120;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats{ 50., 50.});
+
+    def = this->add("dynamic_tilt_up_profile", coEnums); 
+    def->full_label = L("Dynamic tilt up profile");
+    def->tooltip = L("Switches between predefined algorithms that influence how the dynamic tilt up function behaves.");
+    def->mode = comExpert;
+    def->set_enum<TiltDynamicUp>(tilt_dynamic_up_il);
+    def->set_default_value(new ConfigOptionEnums<TiltDynamicUp>({ tduDisabled, tduDisabled }));
+
+    def = this->add("dynamic_tilt_down_profile", coEnums); 
+    def->full_label = L("Dynamic tilt down profile");
+    def->tooltip = L("Switches between predefined algorithms that influence how the dynamic tilt down function behaves.");
+    def->mode = comExpert;
+    def->set_enum<TiltDynamicDown>(tilt_dynamic_down_il);
+    def->set_default_value(new ConfigOptionEnums<TiltDynamicDown>({ tddDisabled, tddDisabled } ));
+
     def = this->add("use_tilt", coBools);
     def->full_label = L("Use tilt");
-    def->tooltip = L("If enabled, tilt is used for layer separation. Otherwise, all the parameters below are ignored.");
+    def->tooltip = L("Enables or disables the tilting function. If disabled, the layer separation is performed using the 'Tower hop height' parameter.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBools({ true, true }));
 
     def = this->add("tilt_down_offset_steps", coInts);
     def->full_label = L("Tilt down offset steps");
-    def->tooltip = L("Number of steps to move down from the calibrated (horizontal) position with 'tilt_down_initial_speed'.");
+    def->tooltip = L("Defines the distance (steps) over which the 'Tilt down initial speed' is applied. "
+        "Once this distance is covered, the tilt moves at the 'Tilt down finish speed'. Setting to 0 "
+        "immediately applies the finish speed. Maximum distance varies by printer, typically around 12,000 steps.");
     def->sidetext = L("μ-steps");
     def->min = 0;
     def->max = 10000;
@@ -5012,7 +5225,8 @@ void PrintConfigDef::init_sla_tilt_params()
 
     def = this->add("tilt_up_offset_steps", coInts);
     def->full_label = L("Tilt up offset steps");
-    def->tooltip = L("Move tilt up to calibrated (horizontal) position minus this offset.");
+    def->tooltip = L("Defines the distance over which the 'Tilt up initial speed' is applied. After this distance, "
+        "the tilt moves at the 'Tilt up finish speed'. Setting to 0 immediately applies the finish speed.");
     def->sidetext = L("μ-steps");
     def->min = 0;
     def->max = 10000;
@@ -5344,6 +5558,7 @@ const std::map<std::string, ConfigOptionFloats> tilt_options_floats_defs =
     {"tilt_down_delay",          ConfigOptionFloats({ 0., 0., 0., 0., 0., 0., 0., 0. }) } ,
     {"tilt_up_offset_delay",     ConfigOptionFloats({ 0., 0., 0., 0., 0., 0., 0., 0. }) } ,
     {"tilt_up_delay",            ConfigOptionFloats({ 0., 0., 0., 0., 0., 0., 0., 0. }) } ,
+    {"delay_to_reflood",         ConfigOptionFloats({ 0., 0., 0., 0., 0., 0., 0., 0. }) } ,
     {"tower_hop_height",         ConfigOptionFloats({ 0., 0., 0., 0., 5., 5., 0., 0. }) } ,
 };
 
@@ -5369,8 +5584,8 @@ const std::map<std::string, ConfigOptionEnums<TiltSpeeds>> tilt_options_enums_de
 {
     {"tilt_down_initial_speed",   ConfigOptionEnums<TiltSpeeds>({ tsLayer1750, tsLayer1750, tsLayer1750, tsLayer1750, tsLayer800, tsLayer800, tsMove120, tsMove120 }) } ,
     {"tilt_down_finish_speed",    ConfigOptionEnums<TiltSpeeds>({ tsLayer1750, tsLayer1750, tsMove8000, tsLayer1750, tsLayer1750, tsLayer1750, tsMove120, tsMove120 }) } ,
-    {"tilt_up_initial_speed",     ConfigOptionEnums<TiltSpeeds>({ tsMove8000, tsMove8000, tsMove8000, tsMove8000, tsLayer1750, tsLayer1750, tsMove120, tsMove120 }) } ,
-    {"tilt_up_finish_speed",      ConfigOptionEnums<TiltSpeeds>({ tsLayer1750, tsLayer1750, tsLayer1750, tsLayer1750, tsLayer800, tsLayer800, tsMove120, tsMove120 }) } ,
+    {"tilt_up_initial_speed",     ConfigOptionEnums<TiltSpeeds>({ tsMove8000, tsMove8000, tsMove8000, tsMove8000, tsLayer1750, tsLayer1750, tsMove120, tsMove120 }) },
+    {"tilt_up_finish_speed",      ConfigOptionEnums<TiltSpeeds>({ tsLayer1750, tsLayer1750, tsLayer1750, tsLayer1750, tsLayer800, tsLayer800, tsMove120, tsMove120 }) }
 };
 
 // Default values containe option pair of values (Below and Above) for each titl modes 
@@ -5384,6 +5599,7 @@ const std::map<std::string, ConfigOptionFloats> tilt_options_floats_sl1_defs =
     {"tilt_down_delay",          ConfigOptionFloats({ 0., 0., 0., 0., 0., 0., 0., 0. }) } ,
     {"tilt_up_offset_delay",     ConfigOptionFloats({ 0., 0., 0., 0., 1., 1., 0., 0. }) } ,
     {"tilt_up_delay",            ConfigOptionFloats({ 0., 0., 0., 0., 0., 0., 0., 0. }) } ,
+    {"delay_to_reflood",         ConfigOptionFloats({ 0., 0., 0., 0., 0., 0., 0., 0. }) } ,
     {"tower_hop_height",         ConfigOptionFloats({ 0., 0., 0., 0., 5., 5., 0., 0. }) } ,
 };
 
@@ -5455,6 +5671,11 @@ void update_tilts_by_mode(DynamicPrintConfig& config, int tilt_mode, bool is_sl1
     const std::map<std::string, ConfigOptionEnums<TiltSpeeds>>    tilt_enums_defs  = is_sl1_model ? tilt_options_enums_sl1_defs : tilt_options_enums_defs;
 
     for (const std::string& opt_key : tilt_options()) {
+        if (boost::ends_with(opt_key, "_slx") || opt_key == "dynamic_delay_before_timeout") {
+            // These options are for SLX only, and SLX does not have the legacy
+            // Fast/Slow/HighViscosity buttons. Do not touch them.
+            continue;
+        }
         switch (config.def()->get(opt_key)->type) {
         case coFloats: {
             ConfigOptionFloats values = floats_defs.at(opt_key);
@@ -5484,10 +5705,15 @@ void update_tilts_by_mode(DynamicPrintConfig& config, int tilt_mode, bool is_sl1
                 val1 = values.get_at(2 * tilt_mode);
                 val2 = values.get_at(2 * tilt_mode + 1);
             }
-            else {
+            else if (boost::starts_with(opt_key, "tilt_")) {
                 auto values = tilt_enums_defs.at(opt_key);
                 val1 = values.get_at(2 * tilt_mode);
                 val2 = values.get_at(2 * tilt_mode + 1);
+            } else if (boost::starts_with(opt_key, "dynamic_")) {
+                val1 = 0;
+                val2 = 0;
+            } else {
+                assert(false);
             }
             config.set_key_value(opt_key, new ConfigOptionEnumsGeneric({ val1, val2 }));
         }

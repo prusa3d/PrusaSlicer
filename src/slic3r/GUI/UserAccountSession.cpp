@@ -27,6 +27,7 @@ wxDEFINE_EVENT(EVT_UA_PRUSACONNECT_STATUS_SUCCESS, UserAccountSuccessEvent);
 wxDEFINE_EVENT(EVT_UA_PRUSACONNECT_PRINTER_MODELS_SUCCESS, UserAccountSuccessEvent);
 wxDEFINE_EVENT(EVT_UA_AVATAR_SUCCESS, UserAccountSuccessEvent); 
 wxDEFINE_EVENT(EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, UserAccountSuccessEvent);
+wxDEFINE_EVENT(EVT_UA_PRINTABLES_SECRET_TOKEN_SUCCESS, UserAccountSuccessEvent);
 wxDEFINE_EVENT(EVT_UA_FAIL, UserAccountFailEvent);
 wxDEFINE_EVENT(EVT_UA_RESET, UserAccountFailEvent);
 wxDEFINE_EVENT(EVT_UA_RACE_LOST, UserAccountFailEvent);
@@ -36,14 +37,29 @@ wxDEFINE_EVENT(EVT_UA_ENQUEUED_REFRESH, SimpleEvent);
 wxDEFINE_EVENT(EVT_UA_RETRY_NOTIFY, UserAccountFailEvent);
 wxDEFINE_EVENT(EVT_UA_CLOSE_RETRY_NOTIFICATION, SimpleEvent);
 
-void UserActionPost::perform(/*UNUSED*/ wxEvtHandler* evt_handler, /*UNUSED*/ const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const
+void UserActionPost::perform(
+    /*UNUSED*/ wxEvtHandler *evt_handler,
+    /*UNUSED*/ const std::string &access_token,
+    UserActionSuccessFn success_callback,
+    UserActionFailFn fail_callback,
+    const std::string &input,
+    const std::vector<std::pair<std::string, std::string>> &additional_headers
+) const 
 {
     std::string url = m_url;
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << " " << url; 
     auto http = Http::post(std::move(url));
     if (!input.empty())
         http.set_post_body(input);
-    http.header("Content-type", "application/x-www-form-urlencoded");
+   
+    if (additional_headers.empty()) {
+        http.header("Content-type", "application/x-www-form-urlencoded");
+    } else {
+        for (const std::pair<std::string, std::string>& p : additional_headers) {
+            http.header(p.first, p.second);
+        }
+    }
+
     http.on_error([fail_callback](std::string body, std::string error, unsigned status) {
         BOOST_LOG_TRIVIAL(trace) << "UserActionPost::perform on_error";
         if (fail_callback)
@@ -64,7 +80,14 @@ void UserActionPost::perform(/*UNUSED*/ wxEvtHandler* evt_handler, /*UNUSED*/ co
     http.perform_sync(HttpRetryOpt::default_retry());
 }
 
-void UserActionGetWithEvent::perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const
+void UserActionGetWithEvent::perform(
+    wxEvtHandler *evt_handler,
+    const std::string &access_token,
+    UserActionSuccessFn success_callback,
+    UserActionFailFn fail_callback,
+    const std::string &input,
+    const std::vector<std::pair<std::string, std::string>> &additional_headers
+) const 
 {
     std::string url = m_url + input;
     BOOST_LOG_TRIVIAL(trace) << __FUNCTION__ << " " << url; 
@@ -125,7 +148,7 @@ void UserAccountSession::process_action_queue()
         BOOST_LOG_TRIVIAL(trace) << "action queue: " << m_priority_action_queue.size() << " " << m_action_queue.size();
         if (m_priority_action_queue.empty() && m_action_queue.empty()) {
             // update printers periodically
-            enqueue_action_inner(m_polling_action, nullptr, nullptr, {});
+            enqueue_action_inner(m_polling_action, nullptr, nullptr, {}, {});
         }
     }
     process_action_queue_inner();
@@ -154,24 +177,24 @@ void UserAccountSession::process_action_queue_inner()
     }
     if (call_priority || call_standard) {
         bool use_token = m_actions[selected_data.action_id]->get_requires_auth_token();
-        m_actions[selected_data.action_id]->perform(p_evt_handler, use_token ? get_access_token() : std::string(), selected_data.success_callback, selected_data.fail_callback, selected_data.input);
+        m_actions[selected_data.action_id]->perform(p_evt_handler, use_token ? get_access_token() : std::string(), selected_data.success_callback, selected_data.fail_callback, selected_data.input, selected_data.additional_headers);
         process_action_queue_inner();
     }        
 }
 
-void UserAccountSession::enqueue_action(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input)
+void UserAccountSession::enqueue_action(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, std::vector<std::pair<std::string, std::string>> additional_headers)
 {
     {
         std::lock_guard<std::mutex> lock(m_session_mutex);
-        enqueue_action_inner(id, success_callback, fail_callback, input);
+        enqueue_action_inner(id, success_callback, fail_callback, input, std::move(additional_headers));
     }
 }
 
 // called from m_session_mutex protected code only!
-void UserAccountSession::enqueue_action_inner(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input)
+void UserAccountSession::enqueue_action_inner(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, std::vector<std::pair<std::string, std::string>> additional_headers)
 {
         m_proccessing_enabled = true;
-        m_action_queue.push({ id, success_callback, fail_callback, input });
+        m_action_queue.push({ id, success_callback, fail_callback, input, std::move(additional_headers)});
 }
 
 void UserAccountSession::init_with_code(const std::string& code, const std::string& code_verifier)
@@ -280,7 +303,7 @@ void UserAccountSession::token_success_callback(const std::string& body)
         m_shared_session_key = shared_session_key;
         m_next_token_timeout = std::time(nullptr) + expires_in;
     }
-    enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_USER_ID_AFTER_TOKEN_SUCCESS, nullptr, nullptr, {});
+    enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_USER_ID_AFTER_TOKEN_SUCCESS, nullptr, nullptr, {}, {});
     wxQueueEvent(p_evt_handler, new UserAccountTimeEvent(EVT_UA_REFRESH_TIME, expires_in));
 }
 

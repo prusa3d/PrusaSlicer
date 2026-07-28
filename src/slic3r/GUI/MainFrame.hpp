@@ -229,6 +229,7 @@ public:
     void    on_account_logout();
     void    show_connect_tab(const wxString& url);
     void    show_printables_tab(const std::string& url);
+    void    on_printables_secret_token(const std::string& data);
 
     void    add_printables_webview_tab();
     void    remove_printables_webview_tab();

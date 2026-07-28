@@ -13,6 +13,7 @@
 #include "I18N.hpp"
 #include "Plater.hpp"
 #include "ObjectDataViewModel.hpp"
+#include "wxExtensions.hpp"
 
 #include "OptionsGroup.hpp"
 #include "GLCanvas3D.hpp"
@@ -67,7 +68,7 @@ static PrinterTechnology printer_technology()
 
 static int extruders_count()
 {
-    return wxGetApp().extruders_edited_cnt();
+    return wxGetApp().extruders_edited_cnt() + wxGetApp().virtual_extruders_cnt();
 }
 
 static bool is_improper_category(const std::string& category, const int extruders_cnt, const bool is_object_settings = true)
@@ -950,18 +951,36 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
         initial_extruder = config.has("extruder") ? config.extruder() : 0;
     }
 
-    for (int i = 0; i <= extruders_cnt; i++)
-    {
-        bool is_active_extruder = i == initial_extruder;
-        int icon_idx = i == 0 ? 0 : i - 1;
+    Plater* p = plater();
+    if (p == nullptr) {
+        return;
+    }
 
-        const wxString& item_name = (i == 0 ? _L("Default") : wxString::Format(_L("Extruder %d"), i)) +
-            (is_active_extruder ? " (" + _L("active") + ")" : "");
+    const std::vector<ExtruderDropdownEntry> entries =
+        build_extruder_dropdown(p->model(), true, true);
 
-        append_menu_item(extruder_selection_menu, wxID_ANY, item_name, "",
-            [i](wxCommandEvent&) { obj_list()->set_extruder_for_selected_items(i); }, icons[icon_idx], menu,
-            [is_active_extruder]() { return !is_active_extruder; }, m_parent);
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const ExtruderDropdownEntry& entry = entries[i];
+        const bool is_active_extruder      = entry.extruder_id == initial_extruder;
 
+        const wxString item_name =
+            entry.label + (is_active_extruder ? " (" + _L("active") + ")" : "");
+
+        const size_t icon_idx = i == 0 ? 0 : std::min<size_t>(i - 1, icons.size() - 1);
+
+        const int captured_id = entry.extruder_id;
+        append_menu_item(
+            extruder_selection_menu,
+            wxID_ANY,
+            item_name,
+            "",
+            [captured_id](wxCommandEvent&)
+            { obj_list()->set_extruder_for_selected_items(captured_id); },
+            icons[icon_idx],
+            menu,
+            [is_active_extruder]() { return !is_active_extruder; },
+            m_parent
+        );
     }
 
     append_submenu(menu, extruder_selection_menu, wxID_ANY, name, _L("Use another extruder"),

@@ -28,6 +28,7 @@
 #include "format.hpp"
 
 #include "libslic3r/Color.hpp"
+#include "libslic3r/Model.hpp"
 
 #ifndef __linux__
 // msw_menuitem_bitmaps is used for MSW and OSX
@@ -377,20 +378,24 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
     // For ObjectList we use short extruder name (just a number)
     const bool use_full_item_name = dynamic_cast<Slic3r::GUI::ObjectList*>(parent) == nullptr;
 
-    int i = 0;
-    wxString str = _(L("Extruder"));
-    for (wxBitmapBundle* bmp : icons) {
-        if (i == 0) {
-            if (!first_item.empty())
-                (*ctrl)->Append(_(first_item), *bmp);
-            ++i;
-        }
-
-        (*ctrl)->Append(use_full_item_name
-                        ? Slic3r::GUI::from_u8((boost::format("%1% %2%") % str % i).str())
-                        : wxString::Format("%d", i), *bmp);
-        ++i;
+    Slic3r::GUI::Plater* plater = Slic3r::GUI::wxGetApp().plater();
+    if (plater == nullptr) {
+        (*ctrl)->Append(_(first_item.empty() ? "default" : first_item), wxNullBitmap);
+        return;
     }
+    const std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
+        Slic3r::GUI::build_extruder_dropdown(plater->model(), false, use_full_item_name);
+
+    if (!first_item.empty()) {
+        const int def_id = (!icons.empty()) ? 0 : -1;
+        (*ctrl)->Append(_(first_item), def_id >= 0 ? *icons[def_id] : wxNullBitmap);
+    }
+
+    for (size_t entry_idx = 0; entry_idx < entries.size() && entry_idx < icons.size(); ++entry_idx)
+    {
+        (*ctrl)->Append(entries[entry_idx].label, *icons[entry_idx]);
+    }
+
     (*ctrl)->SetSelection(0);
 }
 
@@ -808,6 +813,111 @@ void HighlighterForWx::blink()
     }
 
     Highlighter::blink();
+}
+
+namespace {
+
+std::vector<unsigned int> collect_virtual_ids(const Model& model)
+{
+    std::vector<unsigned int> ids;
+    ids.reserve(model.virtual_extruders.size());
+    for (const FullSpectrum::VirtualExtruder& ve : model.virtual_extruders) {
+        ids.push_back(ve.id);
+    }
+
+    return ids;
+}
+
+wxString make_physical_label(unsigned int physical_id, bool use_full_item_name)
+{
+    if (use_full_item_name) {
+        return from_u8((boost::format("%1% %2%") % _u8L("Extruder") % physical_id).str());
+    }
+
+    return wxString::Format("%u", physical_id);
+}
+
+wxString make_virtual_label(unsigned int virtual_id, bool use_full_item_name)
+{
+    return "[V] " + make_physical_label(virtual_id, use_full_item_name);
+}
+
+} // namespace
+
+wxString
+format_extruder_label(int extruder_id_1based_or_0, const Model& model, bool use_full_item_name)
+{
+    if (extruder_id_1based_or_0 == 0) {
+        return _L("default");
+    }
+
+    const unsigned int extruder_id = static_cast<unsigned int>(extruder_id_1based_or_0);
+    if (FullSpectrum::is_virtual_extruder(extruder_id, model.virtual_extruders)) {
+        return make_virtual_label(extruder_id, use_full_item_name);
+    }
+
+    return make_physical_label(extruder_id, use_full_item_name);
+}
+
+std::vector<ExtruderDropdownEntry>
+build_extruder_dropdown(const Model& model, bool include_default, bool use_full_item_name)
+{
+    std::vector<ExtruderDropdownEntry> entries;
+
+    const unsigned int num_physical = static_cast<unsigned int>(wxGetApp().extruders_edited_cnt());
+    const std::vector<unsigned int> virtual_ids = collect_virtual_ids(model);
+
+    entries.reserve(size_t(include_default ? 1 : 0) + size_t(num_physical) + virtual_ids.size());
+
+    if (include_default) {
+        entries.push_back({_L("default"), 0});
+    }
+
+    for (unsigned int i = 1; i <= num_physical; ++i) {
+        entries.push_back({make_physical_label(i, use_full_item_name), int(i)});
+    }
+
+    for (unsigned int virtual_id : virtual_ids) {
+        entries.push_back({make_virtual_label(virtual_id, use_full_item_name), int(virtual_id)});
+    }
+
+    return entries;
+}
+
+size_t
+find_extruder_dropdown_position(int extruder_id, const std::vector<ExtruderDropdownEntry>& entries)
+{
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (entries[i].extruder_id == extruder_id) {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
+size_t get_extruder_color_idx(
+    const ModelVolume& model_volume,
+    int num_physical,
+    const FullSpectrum::VirtualExtruders& virtual_extruders
+)
+{
+    const int id = model_volume.extruder_id();
+    if (id <= 0) {
+        return 0;
+    }
+
+    if (id <= num_physical) {
+        return size_t(id - 1);
+    }
+
+    for (size_t i = 0; i < virtual_extruders.size(); ++i) {
+        if (int(virtual_extruders[i].id) == id) {
+            return size_t(num_physical) + i;
+        }
+    }
+
+    return 0;
 }
 
 }// GUI

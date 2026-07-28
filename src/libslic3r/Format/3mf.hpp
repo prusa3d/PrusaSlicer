@@ -6,6 +6,7 @@
 #define slic3r_Format_3mf_hpp_
 
 #include "libslic3r/Semver.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 #include <boost/optional/optional.hpp>
 namespace Slic3r {
 
@@ -56,7 +57,8 @@ namespace Slic3r {
         ConfigSubstitutionContext& config_substitutions,
         Model* model,
         bool check_version,
-        boost::optional<Semver> &prusaslicer_generator_version
+        boost::optional<Semver> &prusaslicer_generator_version,
+        FullSpectrum::FullSpectrumConfig* out_fs_config = nullptr
     );
 
     // Save the given model and the config data contained in the given Print into a 3mf file.

@@ -12,6 +12,7 @@ else()
     target_link_libraries(qhull INTERFACE Qhull::qhullcpp Qhull::qhull_r)
 endif()
 
+add_subdirectory(sla-time-estimates)
 add_subdirectory(libslic3r)
 
 if (SLIC3R_ENABLE_FORMAT_STEP)

@@ -8,8 +8,8 @@ on:
 
 jobs:
   build_osx_asan:
-    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_osx.yml@master
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_osx.yml@legacy
     secrets: inherit
     with:
       with_asan: true
-      actions_branch: master
+      actions_branch: legacy

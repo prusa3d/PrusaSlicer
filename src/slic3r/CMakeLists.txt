@@ -149,10 +149,14 @@ set(SLIC3R_GUI_SOURCES
     GUI/PresetComboBoxes.cpp
     GUI/BitmapComboBox.hpp
     GUI/BitmapComboBox.cpp
+    GUI/ColorUtils.hpp
+    GUI/ColorUtils.cpp
     GUI/EditGCodeDialog.hpp
     GUI/EditGCodeDialog.cpp
     GUI/SavePresetDialog.hpp
     GUI/SavePresetDialog.cpp
+    GUI/FullSpectrumDialog.hpp
+    GUI/FullSpectrumDialog.cpp
     GUI/BulkExportDialog.hpp
     GUI/BulkExportDialog.cpp
     GUI/PhysicalPrinterDialog.hpp
@@ -305,6 +309,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/DesktopIntegrationDialog.hpp
     GUI/HintNotification.cpp
     GUI/HintNotification.hpp
+    GUI/Widgets/BarycentricRatioPicker.cpp
+    GUI/Widgets/BarycentricRatioPicker.hpp
     GUI/Widgets/BitmapToggleButton.cpp
     GUI/Widgets/BitmapToggleButton.hpp
     GUI/Widgets/Button.cpp
@@ -315,6 +321,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/Widgets/ComboBox.hpp
     GUI/Widgets/DropDown.cpp
     GUI/Widgets/DropDown.hpp
+    GUI/Widgets/GradientRatioBar.cpp
+    GUI/Widgets/GradientRatioBar.hpp
+    GUI/Widgets/LayerSequenceBar.cpp
+    GUI/Widgets/LayerSequenceBar.hpp
     GUI/Widgets/StateColor.cpp
     GUI/Widgets/StateColor.hpp
     GUI/Widgets/StateHandler.cpp
@@ -328,6 +338,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Widgets/TextInput.cpp
     GUI/Widgets/TextInput.hpp
     GUI/Widgets/UIColors.hpp
+    GUI/Widgets/VirtualExtruderListBox.cpp
+    GUI/Widgets/VirtualExtruderListBox.hpp
     GUI/FileArchiveDialog.cpp
     GUI/FileArchiveDialog.hpp
     GUI/Downloader.cpp

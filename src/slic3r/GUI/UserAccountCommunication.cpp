@@ -472,7 +472,7 @@ void UserAccountCommunication::enqueue_connect_printer_models_action()
         BOOST_LOG_TRIVIAL(error) << "Connect Printer Models connection failed - Not Logged in.";
         return;
     }
-    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS, nullptr, nullptr, {});
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_PRINTER_MODELS, nullptr, nullptr, {}, {});
     wakeup_session_thread();
 }
 
@@ -482,7 +482,7 @@ void UserAccountCommunication::enqueue_connect_status_action()
         BOOST_LOG_TRIVIAL(error) << "Connect Status endpoint connection failed - Not Logged in.";
         return;
     }
-    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS, nullptr, nullptr, {});
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_STATUS, nullptr, nullptr, {}, {});
     wakeup_session_thread();
 }
 void UserAccountCommunication::enqueue_test_connection()
@@ -501,7 +501,7 @@ void UserAccountCommunication::enqueue_avatar_old_action(const std::string& url)
         BOOST_LOG_TRIVIAL(error) << "Connect avatar endpoint connection failed - Not Logged in.";
         return;
     }
-    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_OLD, nullptr, nullptr, url);
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_OLD, nullptr, nullptr, url, {});
     wakeup_session_thread();
 }
 
@@ -511,7 +511,7 @@ void UserAccountCommunication::enqueue_avatar_new_action(const std::string& url)
         BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
         return;
     }
-    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_NEW, nullptr, nullptr, url);
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_NEW, nullptr, nullptr, url, {});
     wakeup_session_thread();
 }
 
@@ -521,7 +521,7 @@ void UserAccountCommunication::enqueue_id_action()
         BOOST_LOG_TRIVIAL(error) << "Connect id endpoint connection failed - Not Logged in.";
         return;
     }
-    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_USER_ID, nullptr, nullptr, {});
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_USER_ID, nullptr, nullptr, {}, {});
     wakeup_session_thread();
 }
 
@@ -531,7 +531,30 @@ void UserAccountCommunication::enqueue_printer_data_action(const std::string& uu
         BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
         return;
     }
-    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID, nullptr, nullptr, uuid);   
+    m_session->enqueue_action(UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID, nullptr, nullptr, uuid, {});   
+    wakeup_session_thread();
+}
+
+void UserAccountCommunication::request_printables_secret_token()
+{
+    if (!m_session->is_initialized()) {
+        BOOST_LOG_TRIVIAL(error) << "Connect Printers endpoint connection failed - Not Logged in.";
+        return;
+    }
+
+    UserActionSuccessFn success_callback = [evt_handler = &m_evt_handler](const std::string &body) {
+        wxQueueEvent(*evt_handler, new UserAccountSuccessEvent(EVT_UA_PRINTABLES_SECRET_TOKEN_SUCCESS, body));
+    };
+    UserActionFailFn fail_callback = [](const std::string &body) {
+        BOOST_LOG_TRIVIAL(error) << "USER_ACCOUNT_ACTION_PRINTABLES_SECRET_TOKEN fail: " << body;
+    };
+
+    m_session->enqueue_action(
+        UserAccountActionID::USER_ACCOUNT_ACTION_PRINTABLES_SECRET_TOKEN, success_callback, fail_callback,
+        "{\"accessToken\": \"" + get_access_token() + "\"}",
+        {{"Content-type", "application/json"},
+         {"Origin", Utils::ServiceConfig::instance().printables_url()}}
+    );
     wakeup_session_thread();
 }
    

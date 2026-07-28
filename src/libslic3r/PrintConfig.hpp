@@ -232,6 +232,34 @@ enum TiltSpeeds : int {
     tsMove8000,
 };
 
+enum TiltSpeedsSLX : int {
+    tssLayer160,
+    tssLayer1600,
+    tssLayer3040,
+    tssLayer4480,
+    tssLayer5920,
+    tssLayer7360,
+    tssLayer8800,
+    tssLayer10240,
+    tssLayer11680,
+    tssLayer13120,
+};
+
+enum TiltDynamicDelayBefore : int {
+    tddbDisabled,
+    tddbNeg02
+};
+
+enum TiltDynamicUp : int {
+    tduDisabled,
+    tduThresholdSlowdown
+};
+
+enum TiltDynamicDown : int {
+    tddDisabled,
+    tddFirstPeak
+};
+
 enum class EnsureVerticalShellThickness {
     Disabled,
     Partial,
@@ -243,6 +271,12 @@ enum class CoolingSlowdownLogicType
     UniformCooling,
     ConsistentSurface,
     Proportional,
+};
+
+enum class ToolChangeOrderingType
+{
+    Optimized,
+    Cyclic,
 };
 
 #define CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(NAME) \
@@ -276,6 +310,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TopOnePerimeterType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(EnsureVerticalShellThickness)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(CoolingSlowdownLogicType)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ToolChangeOrderingType)
 
 #undef CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS
 
@@ -855,6 +890,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatsOrPercentsNullable, filament_seam_gap_distance))
     ((ConfigOptionPercents,            filament_shrinkage_compensation_xy))
     ((ConfigOptionPercents,            filament_shrinkage_compensation_z))
+    ((ConfigOptionFloats,              filament_flush_volume))
+    ((ConfigOptionFloats,              filament_flush_speed))
     ((ConfigOptionBool,                gcode_comments))
     ((ConfigOptionEnum<GCodeFlavor>,   gcode_flavor))
     ((ConfigOptionEnum<LabelObjectsStyle>,  gcode_label_objects))
@@ -1000,6 +1037,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionString,             thumbnails))
     ((ConfigOptionEnum<GCodeThumbnailsFormat>,  thumbnails_format))
     ((ConfigOptionFloat,              top_solid_infill_acceleration))
+    ((ConfigOptionEnum<ToolChangeOrderingType>, toolchange_ordering))
     ((ConfigOptionFloat,              travel_acceleration))
     ((ConfigOptionFloat,              travel_short_distance_acceleration))
     ((ConfigOptionBools,              wipe))
@@ -1241,6 +1279,7 @@ PRINT_CONFIG_CLASS_DEFINE(
 
     ((ConfigOptionFloat,                       initial_layer_height))
     ((ConfigOptionFloat,                       bottle_cost))
+    ((ConfigOptionString,                      material_uuid))
     ((ConfigOptionFloat,                       bottle_volume))
     ((ConfigOptionFloat,                       bottle_weight))
     ((ConfigOptionFloat,                       material_density))
@@ -1261,17 +1300,33 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_penetration))
     ((ConfigOptionFloatNullable,               material_ow_support_head_width))
     ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_width))
+    ((ConfigOptionFloatNullable,               material_ow_support_critical_angle))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_critical_angle))
+    ((ConfigOptionFloatNullable,               material_ow_support_max_bridge_length))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_max_bridge_length))
+    ((ConfigOptionFloatNullable,               material_ow_support_max_pillar_link_distance))
+    ((ConfigOptionFloatNullable,               material_ow_branchingsupport_max_pillar_link_distance))
+    ((ConfigOptionPercentNullable,               material_ow_support_small_pillar_diameter_percent))
+    ((ConfigOptionPercentNullable,               material_ow_branchingsupport_small_pillar_diameter_percent))
+    ((ConfigOptionIntNullable,                 material_ow_support_max_bridges_on_pillar))
+    ((ConfigOptionIntNullable,                 material_ow_branchingsupport_max_bridges_on_pillar))
     ((ConfigOptionIntNullable,                 material_ow_support_points_density_relative))
+    ((ConfigOptionIntNullable,                 material_ow_faded_layers))
     ((ConfigOptionFloatNullable,               material_ow_elefant_foot_compensation))
     ((ConfigOptionFloatNullable,               material_ow_absolute_correction))
+    ((ConfigOptionFloatNullable,               material_ow_pad_wall_slope))
     ((ConfigOptionFloat,                       area_fill))
+    ((ConfigOptionIntNullable,                 printing_temperature))
+    
 
     //tilt params
     ((ConfigOptionFloats,                      delay_before_exposure))
     ((ConfigOptionFloats,                      delay_after_exposure))
+    ((ConfigOptionFloats,                      delay_to_reflood))
     ((ConfigOptionFloats,                      tower_hop_height))
     ((ConfigOptionEnums<TowerSpeeds>,          tower_speed))
     ((ConfigOptionBools,                       use_tilt))
+    
     ((ConfigOptionEnums<TiltSpeeds>,           tilt_down_initial_speed))
     ((ConfigOptionInts,                        tilt_down_offset_steps))
     ((ConfigOptionFloats,                      tilt_down_offset_delay))
@@ -1284,6 +1339,14 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionEnums<TiltSpeeds>,           tilt_up_finish_speed))
     ((ConfigOptionInts,                        tilt_up_cycles))
     ((ConfigOptionFloats,                      tilt_up_delay))
+    ((ConfigOptionEnums<TiltSpeedsSLX>,        tilt_down_finish_speed_slx))
+    ((ConfigOptionEnums<TiltSpeedsSLX>,        tilt_up_initial_speed_slx))
+    ((ConfigOptionEnums<TiltSpeedsSLX>,        tilt_down_initial_speed_slx))
+    ((ConfigOptionEnums<TiltSpeedsSLX>,        tilt_up_finish_speed_slx))
+    ((ConfigOptionEnums<TiltDynamicDelayBefore>, dynamic_delay_before_profile))
+    ((ConfigOptionFloats,                      dynamic_delay_before_timeout))
+    ((ConfigOptionEnums<TiltDynamicDown>,      dynamic_tilt_down_profile))
+    ((ConfigOptionEnums<TiltDynamicUp>,        dynamic_tilt_up_profile))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -1310,7 +1373,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                      fast_tilt_time))
     ((ConfigOptionFloat,                      slow_tilt_time))
     ((ConfigOptionFloat,                      high_viscosity_tilt_time))
-//    ((ConfigOptionFloat,                      area_fill))
     ((ConfigOptionFloat,                      min_exposure_time))
     ((ConfigOptionFloat,                      max_exposure_time))
     ((ConfigOptionFloat,                      min_initial_exposure_time))

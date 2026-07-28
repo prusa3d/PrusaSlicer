@@ -1148,6 +1148,54 @@ private:
 	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionFloat>(this)); }
 };
 
+class ConfigOptionPercentNullable : public ConfigOptionFloatNullable
+{
+public:
+    ConfigOptionPercentNullable() : ConfigOptionFloatNullable(0) {}
+    explicit ConfigOptionPercentNullable(double _value) : ConfigOptionFloatNullable(_value) {}
+
+    static ConfigOptionType         static_type() { return coPercent; }
+    ConfigOptionType                type()  const override { return static_type(); }
+    ConfigOption*                   clone() const override { return new ConfigOptionPercentNullable(*this); }
+    ConfigOptionPercentNullable&    operator= (const ConfigOption *opt) { this->set(opt); return *this; }
+    bool                            operator==(const ConfigOptionPercentNullable &rhs) const throw() { return this->value == rhs.value; }
+    bool                            operator< (const ConfigOptionPercentNullable &rhs) const throw() { return this->value <  rhs.value; }
+
+    double                          get_abs_value(double ratio_over) const { return ratio_over * this->value / 100; }
+
+    std::string serialize() const override
+    {
+        std::ostringstream ss;
+        double v = this->value;
+        if (std::isfinite(v)) {
+            ss << v;
+            ss << "%";
+        } else if (std::isnan(v)) {
+            ss << "nil";
+        } else
+            throw ConfigurationError("Serializing invalid number");
+        return ss.str();
+    }
+
+    bool deserialize(const std::string &str, bool append = false) override
+    {
+        UNUSED(append);
+        if (str == "nil") {
+            this->value = this->nil_value();
+        } else {
+            // don't try to parse the trailing % since it's optional
+            std::istringstream iss(str);
+            iss >> this->value;
+            return !iss.fail();
+        }
+        return true;
+    }
+
+private:
+	friend class cereal::access;
+	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionFloatNullable>(this)); }
+};
+
 template<bool NULLABLE>
 class ConfigOptionPercentsTempl : public ConfigOptionFloatsTempl<NULLABLE>
 {
@@ -2272,6 +2320,7 @@ public:
             switch (this->type) {
             case coFloat:            { auto opt = new ConfigOptionFloatNullable();            archive(*opt); return opt; }
             case coInt:              { auto opt = new ConfigOptionIntNullable();              archive(*opt); return opt; }
+            case coPercent:          { auto opt = new ConfigOptionPercentNullable();          archive(*opt); return opt; }
             case coFloats:           { auto opt = new ConfigOptionFloatsNullable();           archive(*opt); return opt; }
             case coInts:             { auto opt = new ConfigOptionIntsNullable();             archive(*opt); return opt; }
             case coPercents:         { auto opt = new ConfigOptionPercentsNullable();         archive(*opt); return opt; }
@@ -2308,6 +2357,7 @@ public:
             switch (this->type) {
             case coFloat:            archive(*static_cast<const ConfigOptionFloatNullable*>(opt));            break;
             case coInt:              archive(*static_cast<const ConfigOptionIntNullable*>(opt));              break;
+            case coPercent:          archive(*static_cast<const ConfigOptionPercentNullable*>(opt));          break;
             case coFloats:           archive(*static_cast<const ConfigOptionFloatsNullable*>(opt));           break;
             case coInts:             archive(*static_cast<const ConfigOptionIntsNullable*>(opt));             break;
             case coPercents:         archive(*static_cast<const ConfigOptionPercentsNullable*>(opt));         break;

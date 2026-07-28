@@ -703,7 +703,7 @@ bool DefaultSupportTree::connect_to_model_body(Head &head)
     long pillar_id = m_builder.add_pillar(head.id, hjp.z() - endp.z());
     Pillar &pill = m_builder.pillar(pillar_id);
 
-    Vec3d taildir = endp - hitp;
+    Vec3d taildir = (endp - hitp).normalized();
     double dist = (hitp - endp).norm() + m_sm.cfg.head_penetration_mm;
     double w = dist - 2 * head.r_pin_mm - head.r_back_mm;
 
