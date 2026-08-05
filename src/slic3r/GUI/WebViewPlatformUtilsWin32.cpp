@@ -3,7 +3,6 @@
 #ifdef __WIN32__
 #include "WebView2.h"
 #include <wrl.h>
-#include <atlbase.h>
 #include <unordered_map>
 
 #include "wx/msw/private/comptr.h"
