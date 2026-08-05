@@ -2668,7 +2668,8 @@ LayerResult GCodeGenerator::process_layer(
     }
 
     // Initialize avoid crossing perimeters before a layer change.
-    if (!instances_to_print.empty() && print.config().avoid_crossing_perimeters) {
+    if (!instances_to_print.empty() &&
+        (print.config().avoid_crossing_perimeters || print.config().avoid_crossing_printed_areas)) {
         const InstanceToPrint instance_to_print{instances_to_print.front()};
         this->m_avoid_crossing_perimeters.init_layer(
             *layers[instance_to_print.object_layer_to_print_id].layer());
@@ -2776,7 +2777,8 @@ LayerResult GCodeGenerator::process_layer(
             gcode += ProcessLayer::emit_custom_gcode_per_print_z(*this, *layer_tools.custom_gcode, m_writer.extruder()->id(), first_extruder_id, print.config());
         }
 
-        if (!extruder_extrusions.skirt.empty() || !extruder_extrusions.brim.empty()) {
+        if ((!extruder_extrusions.skirt_last && !extruder_extrusions.skirt.empty()) ||
+            !extruder_extrusions.brim.empty()) {
             gcode += m_label_objects.maybe_stop_instance();
             this->m_label_objects.update(nullptr);
         }
@@ -2805,7 +2807,10 @@ LayerResult GCodeGenerator::process_layer(
             this->set_origin({0, 0});
         }
 
-        if (!extruder_extrusions.skirt.empty()) {
+        const auto extrude_layer_skirt = [&]() {
+            if (extruder_extrusions.skirt.empty())
+                return;
+
             this->m_label_objects.update(nullptr);
 
             m_avoid_crossing_perimeters.use_external_mp();
@@ -2821,9 +2826,13 @@ LayerResult GCodeGenerator::process_layer(
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
-            if (first_layer && extruder_extrusions.skirt.front().first == 0)
+            if (first_layer && extruder_extrusions.skirt.front().first == 0 &&
+                !m_config.avoid_crossing_printed_areas)
                 m_avoid_crossing_perimeters.disable_once();
-        }
+        };
+
+        if (!extruder_extrusions.skirt_last)
+            extrude_layer_skirt();
 
         if (!extruder_extrusions.brim.empty()) {
             m_avoid_crossing_perimeters.use_external_mp();
@@ -2833,7 +2842,8 @@ LayerResult GCodeGenerator::process_layer(
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point.
-            m_avoid_crossing_perimeters.disable_once();
+            if (!m_config.avoid_crossing_printed_areas)
+                m_avoid_crossing_perimeters.disable_once();
         }
 
         m_label_objects.update(first_instance);
@@ -2882,9 +2892,20 @@ LayerResult GCodeGenerator::process_layer(
                 instance, layer_to_print, slices_extrusions
             );
         }
+
+        if (extruder_extrusions.skirt_last && !extruder_extrusions.skirt.empty()) {
+            this->set_origin(0.0, 0.0);
+            gcode += m_label_objects.maybe_stop_instance();
+            this->m_label_objects.update(nullptr);
+            extrude_layer_skirt();
+        }
         this->set_origin(0.0, 0.0);
     }
 
+    const bool fresh_travel_cooldown =
+        m_avoid_crossing_perimeters.consume_fresh_travel_cooldown();
+    if (!last_layer && print.config().avoid_crossing_printed_areas && fresh_travel_cooldown)
+        gcode += ";_FRESH_TRAVEL_COOLDOWN\n";
 
     BOOST_LOG_TRIVIAL(trace) << "Exported layer " << layer.id() << " print_z " << print_z <<
     log_memory_info();
@@ -2909,7 +2930,8 @@ void GCodeGenerator::initialize_instance(
     const Point &offset = print_object.instances()[print_instance.instance_id].shift;
     GCode::PrintObjectInstance next_instance = {&print_object, int(print_instance.instance_id)};
 
-    if (print.config().avoid_crossing_perimeters && !is_first) {
+    if ((print.config().avoid_crossing_perimeters || print.config().avoid_crossing_printed_areas) &&
+        !is_first) {
         m_avoid_crossing_perimeters.init_layer(*m_layer);
 
         // When starting a new object, use the external motion planner for the first travel move.
@@ -3140,6 +3162,24 @@ std::string GCodeGenerator::extrude_smooth_path(
         GCode::SmoothPath reversed_smooth_path{smooth_path};
         GCode::reverse(reversed_smooth_path);
         m_wipe.set_path(std::move(reversed_smooth_path));
+    }
+
+    if (m_config.avoid_crossing_printed_areas) {
+        Polyline recent_path;
+        for (const GCode::SmoothPathElement &element : smooth_path) {
+            for (const Geometry::ArcWelder::Segment &segment : element.path) {
+                if (recent_path.empty() || recent_path.back() != segment.point)
+                    recent_path.append(segment.point);
+            }
+        }
+        if (recent_path.size() >= 2) {
+            std::optional<bool> clockwise;
+            if (is_loop && recent_path.size() >= 3)
+                clockwise = Polygon(recent_path.points).is_clockwise();
+            recent_path.translate(Point::new_scale(m_origin.x(), m_origin.y()));
+            m_avoid_crossing_perimeters.register_recent_extrusion(
+                std::move(recent_path), clockwise);
+        }
     }
 
     return gcode;
@@ -3773,16 +3813,15 @@ Polyline GCodeGenerator::generate_travel_xy_path(
 ) {
 
     const Point scaled_origin{scaled(this->origin())};
-    const bool avoid_crossing_perimeters = (
-        this->m_config.avoid_crossing_perimeters
-        && !this->m_avoid_crossing_perimeters.disabled_once()
-    );
+    const bool perimeter_aware_travel =
+        (this->m_config.avoid_crossing_perimeters || this->m_config.avoid_crossing_printed_areas) &&
+        !this->m_avoid_crossing_perimeters.disabled_once();
 
     Polyline xy_path{start_point, end_point};
     if (m_config.avoid_crossing_curled_overhangs) {
-        if (avoid_crossing_perimeters) {
+        if (perimeter_aware_travel) {
             BOOST_LOG_TRIVIAL(warning)
-                << "Option >avoid crossing curled overhangs< is not compatible with avoid crossing perimeters and it will be ignored!";
+                << "Option >avoid crossing curled overhangs< is not compatible with perimeter-aware travel planning and it will be ignored!";
         } else {
             xy_path = this->m_avoid_crossing_curled_overhangs.find_path(
                 start_point + scaled_origin,
@@ -3792,13 +3831,9 @@ Polyline GCodeGenerator::generate_travel_xy_path(
         }
     }
 
-
-    // if a retraction would be needed, try to use avoid_crossing_perimeters to plan a
-    // multi-hop travel path inside the configuration space
-    if (
-        needs_retraction
-        && avoid_crossing_perimeters
-    ) {
+    // Avoid crossing perimeters is only needed for retracting travels. Minimize travel over
+    // printed areas applies to every travel because even a non-retracting move may cross a surface.
+    if (perimeter_aware_travel && (needs_retraction || this->m_config.avoid_crossing_printed_areas)) {
         xy_path = this->m_avoid_crossing_perimeters.travel_to(*this, end_point, &could_be_wipe_disabled);
     }
 

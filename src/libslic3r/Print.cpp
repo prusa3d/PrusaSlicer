@@ -84,6 +84,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
     static std::unordered_set<std::string> steps_gcode = {
         "autoemit_temperature_commands",
         "avoid_crossing_perimeters",
+        "avoid_crossing_printed_areas",
         "avoid_crossing_perimeters_max_detour",
         "bed_shape",
         "bed_temperature",
@@ -481,9 +482,11 @@ std::string Print::validate(std::vector<std::string>* warnings) const
     if (extruders.empty())
         return _u8L("The supplied settings will cause an empty print.");
 
-    if (m_config.avoid_crossing_perimeters && m_config.avoid_crossing_curled_overhangs) {
+    if (m_config.avoid_crossing_perimeters && m_config.avoid_crossing_curled_overhangs)
         return _u8L("Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be both enabled together.");
-    }    
+
+    if (m_config.avoid_crossing_printed_areas && m_config.avoid_crossing_curled_overhangs)
+        return _u8L("Minimize travel over printed areas and avoid crossing curled overhangs cannot be both enabled together.");
 
     if (m_config.spiral_vase) {
         size_t total_copies_count = 0;

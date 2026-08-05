@@ -284,7 +284,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 {
     bool have_perimeters = config->opt_int("perimeters") > 0;
     for (auto el : { "extra_perimeters","extra_perimeters_on_overhangs", "thin_walls", "overhangs",
-                    "seam_position","staggered_inner_seams", "external_perimeters_first", "external_perimeter_extrusion_width",
+                    "seam_position","staggered_inner_seams", "external_perimeters_first", "alternate_perimeter_order", "external_perimeter_extrusion_width",
                     "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "enable_dynamic_overhang_speeds"})
         toggle_field(el, have_perimeters);
 
@@ -396,11 +396,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
                      "wipe_tower_extra_spacing", "wipe_tower_extra_flow", "wipe_tower_bridging", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming" })
         toggle_field(el, have_wipe_tower);
 
-    toggle_field("avoid_crossing_curled_overhangs", !config->opt_bool("avoid_crossing_perimeters"));
+    const bool have_perimeter_aware_travel = config->opt_bool("avoid_crossing_perimeters") ||
+        config->opt_bool("avoid_crossing_printed_areas");
+    toggle_field("avoid_crossing_curled_overhangs", !have_perimeter_aware_travel);
     toggle_field("avoid_crossing_perimeters", !config->opt_bool("avoid_crossing_curled_overhangs"));
+    toggle_field("avoid_crossing_printed_areas", !config->opt_bool("avoid_crossing_curled_overhangs"));
 
-    bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
-    toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
+    toggle_field("avoid_crossing_perimeters_max_detour", have_perimeter_aware_travel);
 
     bool have_arachne = config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Arachne;
     toggle_field("wall_transition_length", have_arachne);

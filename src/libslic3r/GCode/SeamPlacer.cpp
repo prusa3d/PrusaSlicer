@@ -397,7 +397,12 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
                 *outter_scarf_start_point
             };
 
-            if (region->config().external_perimeters_first.value) {
+            const bool external_perimeters_first =
+                region->config().alternate_perimeter_order.value ?
+                    region->config().external_perimeters_first.value ==
+                        ((perimeter.layer_index & 1) != 0) :
+                    region->config().external_perimeters_first.value;
+            if (external_perimeters_first) {
                 const auto external_first_offset_direction{
                     offset_direction == Geometry::Direction1D::forward ?
                     Geometry::Direction1D::backward :
@@ -485,6 +490,22 @@ struct NearestCorner {
     }
 };
 
+SeamChoice choose_seam_near(
+    const Perimeters::Perimeter &perimeter,
+    const Point                 &position,
+    const double                 max_detour
+) {
+    const NearestCorner nearest_corner{unscaled(position)};
+    const std::optional<SeamChoice> corner_choice{
+        Seams::maybe_choose_seam_point(perimeter, nearest_corner)};
+
+    if (corner_choice)
+        return *corner_choice;
+
+    const Seams::Aligned::Impl::Nearest nearest{unscaled(position), max_detour};
+    return Seams::choose_seam_point(perimeter, nearest);
+}
+
 std::pair<SeamChoice, std::size_t> place_seam_near(
     const std::vector<Perimeters::BoundedPerimeter> &layer_perimeters,
     const ExtrusionLoop &loop,
@@ -502,19 +523,10 @@ std::pair<SeamChoice, std::size_t> place_seam_near(
     const std::size_t choice_index{
         Geometry::pick_closest_bounding_box(loop_polygon.bounding_box(), choose_from).first};
 
-    const NearestCorner nearest_corner{unscaled(position)};
-    const std::optional<SeamChoice> corner_choice{
-        Seams::maybe_choose_seam_point(layer_perimeters[choice_index].perimeter, nearest_corner)};
-
-    if (corner_choice) {
-        return {*corner_choice, choice_index};
-    }
-
-    const Seams::Aligned::Impl::Nearest nearest{unscaled(position), max_detour};
-    const SeamChoice nearest_choice{
-        Seams::choose_seam_point(layer_perimeters[choice_index].perimeter, nearest)};
-
-    return {nearest_choice, choice_index};
+    return {
+        choose_seam_near(layer_perimeters[choice_index].perimeter, position, max_detour),
+        choice_index
+    };
 }
 
 int get_perimeter_count(const Layer *layer){
@@ -576,6 +588,19 @@ boost::variant<Point, Scarf::Scarf> Placer::place_seam(
 
         const SeamPerimeterChoice &seam_perimeter_choice{
             choose_closest_seam(seams_on_perimeters, Geometry::to_polygon(loop))};
+        if (po->config().seam_position.value == spAligned &&
+            region->config().alternate_perimeter_order.value &&
+            po->print()->config().avoid_crossing_printed_areas.value) {
+            // Alternating concentric islands often move the aligned seam to another side as
+            // their shape grows or shrinks. Keep the requested inside-out / outside-in order,
+            // but start the next loop at its closest suitable corner to avoid a long traverse.
+            const SeamChoice nearest_choice = choose_seam_near(
+                seam_perimeter_choice.perimeter, last_pos, this->params.max_nearest_detour);
+            return finalize_seam_position(
+                loop, region, nearest_choice, seam_perimeter_choice.perimeter,
+                this->params.staggered_inner_seams, flipped, thick_bridges
+            );
+        }
         return finalize_seam_position(
             loop, region, seam_perimeter_choice.choice, seam_perimeter_choice.perimeter,
             this->params.staggered_inner_seams, flipped, thick_bridges

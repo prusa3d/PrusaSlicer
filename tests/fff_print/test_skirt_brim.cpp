@@ -63,6 +63,49 @@ TEST_CASE("Skirt height is honored", "[Skirt]") {
     REQUIRE(layers_with_skirt.size() == (size_t)config.opt_int("skirt_height"));
 }
 
+TEST_CASE("Skirt alternates between the start and end of each layer", "[Skirt]") {
+    const DynamicPrintConfig config = DynamicPrintConfig::full_print_config_with({
+        {"skirts", 1},
+        {"skirt_height", 4},
+        {"brim_width", 0},
+        {"perimeters", 1},
+        {"fill_density", 0},
+        {"top_solid_layers", 0},
+        {"bottom_solid_layers", 0},
+        {"layer_height", 0.4},
+        {"first_layer_height", 0.4},
+        {"alternate_perimeter_order", true},
+        {"support_material_speed", 99},
+        {"perimeter_speed", 40},
+        {"external_perimeter_speed", 40},
+        {"cooling", false},
+        {"first_layer_speed", "100%"},
+        {"gcode_comments", true}
+    });
+    const std::string gcode = Test::slice({TestMesh::cube_20x20x20}, config);
+
+    const double skirt_speed = 99. * MM_PER_MIN;
+    std::map<int, std::vector<bool>> skirt_extrusions_by_z;
+    GCodeReader parser;
+    parser.parse_buffer(gcode, [&](GCodeReader &reader, const GCodeReader::GCodeLine &line) {
+        if (line.extruding(reader) && line.dist_XY(reader) > 0.) {
+            skirt_extrusions_by_z[int(std::lround(reader.z() * 1000.))].push_back(
+                reader.f() == Approx(skirt_speed)
+            );
+        }
+    });
+
+    REQUIRE(skirt_extrusions_by_z.size() >= 4);
+    auto layer = skirt_extrusions_by_z.begin();
+    for (size_t layer_id = 0; layer_id < 4; ++layer_id) {
+        CAPTURE(layer_id, layer->first);
+        REQUIRE_FALSE(layer->second.empty());
+        CHECK(layer->second.front() == ((layer_id & 1) == 0));
+        CHECK(layer->second.back() == ((layer_id & 1) != 0));
+        ++layer;
+    }
+}
+
 SCENARIO("Original Slic3r Skirt/Brim tests", "[SkirtBrim]") {
     GIVEN("A default configuration") {
 	    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();

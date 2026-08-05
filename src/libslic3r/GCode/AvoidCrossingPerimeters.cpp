@@ -5,6 +5,7 @@
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/container_hash/hash.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
+#include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
 #include <iterator>
@@ -190,16 +191,76 @@ static std::vector<ClosestLine> get_closest_lines_in_radius(const EdgeGrid::Grid
     return visitor.closest_lines;
 }
 
+static ClosestLine get_closest_line(
+    const AvoidCrossingPerimeters::Boundary &boundary, const Point &center, size_t border_idx
+) {
+    ClosestLine closest{border_idx, size_t(-1), {}};
+    double min_distance_squared = std::numeric_limits<double>::max();
+    const Polygon &polygon = boundary.boundaries[border_idx];
+    for (size_t line_idx = 0; line_idx < polygon.size(); ++line_idx) {
+        Point projected;
+        const double distance_squared = line_alg::distance_to_squared(
+            Line{polygon[line_idx], polygon[next_idx_modulo(line_idx, polygon.size())]}, center,
+            &projected
+        );
+        if (distance_squared < min_distance_squared) {
+            min_distance_squared = distance_squared;
+            closest.line_idx = line_idx;
+            closest.point = projected;
+        }
+    }
+    return closest;
+}
+
+static std::pair<std::vector<ClosestLine>, std::vector<ClosestLine>> get_complete_boundary_candidates(
+    const AvoidCrossingPerimeters::Boundary &boundary, const Point &start, const Point &end
+) {
+    auto nearest_boundary = [&boundary](const Point &point) {
+        size_t nearest_idx = size_t(-1);
+        double min_distance_squared = std::numeric_limits<double>::max();
+        for (size_t border_idx = 0; border_idx < boundary.boundaries.size(); ++border_idx) {
+            const ClosestLine candidate = get_closest_line(boundary, point, border_idx);
+            const double distance_squared = (candidate.point - point).cast<double>().squaredNorm();
+            if (distance_squared < min_distance_squared) {
+                min_distance_squared = distance_squared;
+                nearest_idx = border_idx;
+            }
+        }
+        return nearest_idx;
+    };
+
+    const size_t start_boundary = nearest_boundary(start);
+    const size_t end_boundary = nearest_boundary(end);
+    std::vector<size_t> candidate_boundaries{start_boundary};
+    if (end_boundary != start_boundary)
+        candidate_boundaries.emplace_back(end_boundary);
+
+    std::vector<ClosestLine> start_lines;
+    std::vector<ClosestLine> end_lines;
+    start_lines.reserve(candidate_boundaries.size());
+    end_lines.reserve(candidate_boundaries.size());
+    for (size_t border_idx : candidate_boundaries) {
+        start_lines.emplace_back(get_closest_line(boundary, start, border_idx));
+        end_lines.emplace_back(get_closest_line(boundary, end, border_idx));
+    }
+    return {std::move(start_lines), std::move(end_lines)};
+}
+
 // When the offset is too big, then original travel doesn't have to cross created boundaries.
 // For these cases, this function adds another intersection with lines around the start and the end point of the original travel.
 static std::vector<Intersection> extend_for_closest_lines(const std::vector<Intersection>         &intersections,
                                                           const AvoidCrossingPerimeters::Boundary &boundary,
                                                           const Point                             &start,
                                                           const Point                             &end,
-                                                          const float                              search_radius)
+                                                          const float                              search_radius,
+                                                          const bool                               search_complete_boundary)
 {
-    const std::vector<ClosestLine> start_lines = get_closest_lines_in_radius(boundary.grid, start, search_radius);
-    const std::vector<ClosestLine> end_lines   = get_closest_lines_in_radius(boundary.grid, end, search_radius);
+    auto [start_lines, end_lines] = search_complete_boundary ?
+        get_complete_boundary_candidates(boundary, start, end) :
+        std::make_pair(
+            get_closest_lines_in_radius(boundary.grid, start, search_radius),
+            get_closest_lines_in_radius(boundary.grid, end, search_radius)
+        );
 
     // Compute distance to the closest point in the ClosestLine from begin of contour.
     auto compute_distance = [&boundary](const ClosestLine &closest_line) -> float {
@@ -207,24 +268,43 @@ static std::vector<Intersection> extend_for_closest_lines(const std::vector<Inte
         return boundary.boundaries_params[closest_line.border_idx][closest_line.line_idx] + dist_from_line_begin;
     };
 
-    // It tries to find closest lines for both start point and end point of the travel which has the same border_idx
-    auto endpoints_close_to_same_boundary = [&start_lines, &end_lines]() -> std::pair<size_t, size_t> {
-        std::unordered_set<size_t> boundaries_from_start;
-        for (const ClosestLine &cl_start : start_lines)
-            boundaries_from_start.insert(cl_start.border_idx);
-        for (const ClosestLine &cl_end : end_lines)
-            if (boundaries_from_start.find(cl_end.border_idx) != boundaries_from_start.end())
-                for (const ClosestLine &cl_start : start_lines)
-                    if (cl_start.border_idx == cl_end.border_idx) {
-                        size_t cl_start_idx = &cl_start - &start_lines.front();
-                        size_t cl_end_idx   = &cl_end - &end_lines.front();
-                        return std::make_pair(cl_start_idx, cl_end_idx);
-                    }
-        return std::make_pair(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
+    // Find the common boundary that produces the shortest complete detour. Only the closest
+    // projection of each endpoint onto each boundary needs to be considered.
+    auto endpoints_close_to_same_boundary = [&]() -> std::pair<size_t, size_t> {
+        std::unordered_map<size_t, size_t> closest_start_by_boundary;
+        for (size_t start_idx = 0; start_idx < start_lines.size(); ++start_idx)
+            closest_start_by_boundary.try_emplace(start_lines[start_idx].border_idx, start_idx);
+
+        std::unordered_set<size_t> visited_end_boundaries;
+        double best_length = std::numeric_limits<double>::max();
+        std::pair<size_t, size_t>
+            best_indices{std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max()};
+        for (size_t end_idx = 0; end_idx < end_lines.size(); ++end_idx) {
+            const ClosestLine &cl_end = end_lines[end_idx];
+            if (!visited_end_boundaries.insert(cl_end.border_idx).second)
+                continue;
+            auto start_it = closest_start_by_boundary.find(cl_end.border_idx);
+            if (start_it == closest_start_by_boundary.end())
+                continue;
+
+            const ClosestLine &cl_start = start_lines[start_it->second];
+            const float start_param = compute_distance(cl_start);
+            const float end_param = compute_distance(cl_end);
+            const float contour_length = boundary.boundaries_params[cl_start.border_idx].back();
+            const float param_delta = std::abs(start_param - end_param);
+            const double candidate_length = (start - cl_start.point).cast<double>().norm() +
+                std::min(param_delta, contour_length - param_delta) +
+                (end - cl_end.point).cast<double>().norm();
+            if (candidate_length < best_length) {
+                best_length = candidate_length;
+                best_indices = {start_it->second, end_idx};
+            }
+        }
+        return best_indices;
     };
 
-    // If the existing two lines within the search radius start and end point belong to the same boundary,
-    // discard all intersection points because the whole detour could be on one boundary.
+    // If the existing two lines within the search radius start and end point belong to the same
+    // boundary, discard all intersection points because the whole detour could be on one boundary.
     if (!start_lines.empty() && !end_lines.empty()) {
         std::pair<size_t, size_t> cl_indices = endpoints_close_to_same_boundary();
         if (cl_indices.first != std::numeric_limits<size_t>::max()) {
@@ -411,7 +491,9 @@ enum class Direction { Forward, Backward };
 static Direction get_shortest_direction(const AvoidCrossingPerimeters::Boundary &boundary,
                                         const Intersection                      &intersection_first,
                                         const Intersection                      &intersection_second,
-                                        float                                    contour_length)
+                                        float                                    contour_length,
+                                        const std::optional<bool>                preferred_clockwise,
+                                        bool                                    *preferred_direction_applied)
 {
     assert(intersection_first.border_idx == intersection_second.border_idx);
     const Polygon &poly        = boundary.boundaries[intersection_first.border_idx];
@@ -436,8 +518,26 @@ static Direction get_shortest_direction(const AvoidCrossingPerimeters::Boundary 
     total_length_forward  -= (poly[(intersection_second.line_idx + 1) % poly.size()] - intersection_second.point).cast<float>().norm();
     total_length_backward -= (intersection_second.point - poly[intersection_second.line_idx]).cast<float>().norm();
 
-    if (total_length_forward < total_length_backward) return Direction::Forward;
-    return Direction::Backward;
+    const Direction shortest_direction = total_length_forward < total_length_backward ?
+        Direction::Forward : Direction::Backward;
+    if (!preferred_clockwise.has_value())
+        return shortest_direction;
+
+    const bool forward_is_clockwise = poly.is_clockwise();
+    const Direction preferred_direction = (*preferred_clockwise == forward_is_clockwise) ?
+        Direction::Forward : Direction::Backward;
+    const float shortest_length = std::min(total_length_forward, total_length_backward);
+    const float preferred_length = preferred_direction == Direction::Forward ?
+        total_length_forward : total_length_backward;
+
+    // Opposite winding is useful only when it is a modest detour. Never turn a short move
+    // into a near-complete lap merely because the global max-detour option is unlimited.
+    const float maximum_cooling_extra = std::min(float(scale_(5.)), 0.25f * shortest_length);
+    if (preferred_length <= shortest_length + maximum_cooling_extra) {
+        *preferred_direction_applied = true;
+        return preferred_direction;
+    }
+    return shortest_direction;
 }
 
 // Straighten the travel path as long as it does not collide with the contours stored in edge_grid.
@@ -564,6 +664,9 @@ static size_t avoid_perimeters_inner(const AvoidCrossingPerimeters::Boundary &bo
                                      const Point                             &start,
                                      const Point                             &end,
                                      const Layer                             &layer,
+                                     const bool                               minimize_contained_travel,
+                                     const std::optional<bool>                preferred_clockwise,
+                                     bool                                    *preferred_direction_applied,
                                      std::vector<TravelPoint>                &result_out)
 {
     const Polygons           &boundaries = boundary.boundaries;
@@ -581,11 +684,12 @@ static size_t avoid_perimeters_inner(const AvoidCrossingPerimeters::Boundary &bo
         }
         std::sort(intersections.begin(), intersections.end(), [dir](const auto &l, const auto &r) { return (r.point - l.point).template cast<double>().dot(dir) > 0.; });
 
-        // Search radius should always be at least equals to the value of offset used for computing boundaries.
+        // Search radius should always be at least equal to the value of the offset used for computing boundaries.
         const float search_radius = 2.f * get_perimeter_spacing(layer);
         // When the offset is too big, then original travel doesn't have to cross created boundaries.
         // These cases are fixed by calling extend_for_closest_lines.
-        intersections             = extend_for_closest_lines(intersections, boundary, start, end, search_radius);
+        const bool search_complete_boundary = intersections.empty() && minimize_contained_travel;
+        intersections = extend_for_closest_lines(intersections, boundary, start, end, search_radius, search_complete_boundary);
     }
 
     std::vector<TravelPoint> result;
@@ -626,8 +730,10 @@ static size_t avoid_perimeters_inner(const AvoidCrossingPerimeters::Boundary &bo
             auto it_second = it_second_r.base() - 1;
             // The exit point from the boundary polygon
             const Intersection &intersection_second = *it_second;
-            Direction           shortest_direction  = get_shortest_direction(boundary, intersection_first, intersection_second,
-                                                                             boundary.boundaries_params[intersection_first.border_idx].back());
+            Direction shortest_direction = get_shortest_direction(
+                boundary, intersection_first, intersection_second,
+                boundary.boundaries_params[intersection_first.border_idx].back(),
+                preferred_clockwise, preferred_direction_applied);
             // Append the path around the border into the path
             if (shortest_direction == Direction::Forward)
                 for (int line_idx = int(intersection_first.line_idx); line_idx != int(intersection_second.line_idx);
@@ -677,11 +783,16 @@ static size_t avoid_perimeters(const AvoidCrossingPerimeters::Boundary &boundary
                                const Point                             &start,
                                const Point                             &end,
                                const Layer                             &layer,
+                               const bool                               minimize_contained_travel,
+                               const std::optional<bool>                preferred_clockwise,
+                               bool                                    *preferred_direction_applied,
                                Polyline                                &result_out)
 {
     // Travel line is completely or partially inside the bounding box.
     std::vector<TravelPoint> path;
-    size_t num_intersections = avoid_perimeters_inner(boundary, start, end, layer, path);
+    size_t num_intersections = avoid_perimeters_inner(
+        boundary, start, end, layer, minimize_contained_travel, preferred_clockwise,
+        preferred_direction_applied, path);
     result_out = to_polyline(path);
 
 #ifdef AVOID_CROSSING_PERIMETERS_DEBUG_OUTPUT
@@ -1107,11 +1218,31 @@ static ExPolygons get_boundary(const Layer &layer)
 }
 
 // called by AvoidCrossingPerimeters::travel_to()
-static Polygons get_boundary_external(const Layer &layer)
+static Polygons get_boundary_external(const Layer &layer, const bool include_printed_areas)
 {
     const float perimeter_spacing = get_perimeter_spacing_external(layer);
     const float perimeter_offset  = perimeter_spacing / 2.f;
     auto const *support_layer     = dynamic_cast<const SupportLayer *>(&layer);
+
+    // Skirts and brims are generated in print coordinates and normally only need the
+    // holes of all objects as travel obstacles. When printed-area minimization is
+    // requested, include the outer contours too so moves between brim paths cannot
+    // take a shortcut across an object's footprint.
+    if (include_printed_areas) {
+        ExPolygons printed_areas;
+        for (const PrintObject *object : layer.object()->print()->objects()) {
+            if (const Layer *object_layer = object->get_layer_at_printz(layer.print_z, EPSILON); object_layer) {
+                for (const PrintInstance &instance : object->instances()) {
+                    ExPolygons instance_areas = object_layer->lslices;
+                    for (ExPolygon &area : instance_areas)
+                        area.translate(instance.shift);
+                    append(printed_areas, std::move(instance_areas));
+                }
+            }
+        }
+        return to_polygons(union_ex(inner_offset(printed_areas, 1.5 * perimeter_spacing)));
+    }
+
     Polygons    boundary;
 #ifdef INCLUDE_SUPPORTS_IN_BOUNDARY
     ExPolygons  supports_boundary;
@@ -1196,31 +1327,79 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCodeGenerator &gcodegen, cons
     const Point end           = point + scaled_origin;
     const Line  travel(start, end);
 
+    const Point world_origin = Point::new_scale(gcodegen.origin()(0), gcodegen.origin()(1));
+    const Polyline world_direct{
+        *gcodegen.last_position + world_origin,
+        point + world_origin
+    };
+    const auto freshest_crossed_extrusion = [this](const Polyline &candidate)
+        -> const RecentExtrusion * {
+        if (candidate.size() < 2)
+            return nullptr;
+
+        const double endpoint_exclusion_squared = sqr(scale_(1.));
+        for (auto recent = m_recent_extrusions.rbegin(); recent != m_recent_extrusions.rend(); ++recent) {
+            if (recent->path.size() < 2)
+                continue;
+            for (size_t candidate_idx = 1; candidate_idx < candidate.size(); ++candidate_idx) {
+                const Line candidate_line(candidate[candidate_idx - 1], candidate[candidate_idx]);
+                for (size_t recent_idx = 1; recent_idx < recent->path.size(); ++recent_idx) {
+                    Point intersection;
+                    if (candidate_line.intersection(
+                            Line(recent->path[recent_idx - 1], recent->path[recent_idx]),
+                            &intersection) &&
+                        (intersection - candidate.front()).cast<double>().squaredNorm() > endpoint_exclusion_squared &&
+                        (intersection - candidate.back()).cast<double>().squaredNorm() > endpoint_exclusion_squared)
+                        return std::addressof(*recent);
+                }
+            }
+        }
+        return nullptr;
+    };
+
     Polyline result_pl;
     size_t   travel_intersection_count = 0;
+    bool     preferred_direction_applied = false;
     Vec2d startf = start.cast<double>();
     Vec2d endf   = end  .cast<double>();
 
     bool is_support_layer = dynamic_cast<const SupportLayer *>(gcodegen.layer()) != nullptr;
-    if (!use_external && (is_support_layer || (!m_lslices_offset.empty() && !any_expolygon_contains(m_lslices_offset, m_lslices_offset_bboxes, m_grid_lslices_offset, travel)))) {
+    const bool minimize_travel_over_printed_areas = gcodegen.config().avoid_crossing_printed_areas;
+    const RecentExtrusion *crossed_recent = minimize_travel_over_printed_areas ?
+        freshest_crossed_extrusion(world_direct) : nullptr;
+    const std::optional<bool> preferred_clockwise =
+        crossed_recent != nullptr && crossed_recent->clockwise.has_value() ?
+            std::optional<bool>{!*crossed_recent->clockwise} : std::nullopt;
+    const bool travel_inside_printed_area = !m_lslices_offset.empty() && any_expolygon_contains(
+        m_lslices_offset, m_lslices_offset_bboxes, m_grid_lslices_offset, travel);
+    if (!use_external &&
+        (is_support_layer || minimize_travel_over_printed_areas ||
+         (!m_lslices_offset.empty() && !travel_inside_printed_area))) {
         // Initialize m_internal only when it is necessary.
         if (m_internal.boundaries.empty())
             init_boundary(&m_internal, to_polygons(get_boundary(*gcodegen.layer())));
 
         // Trim the travel line by the bounding box.
         if (!m_internal.boundaries.empty() && Geometry::liang_barsky_line_clipping(startf, endf, m_internal.bbox)) {
-            travel_intersection_count = avoid_perimeters(m_internal, startf.cast<coord_t>(), endf.cast<coord_t>(), *gcodegen.layer(), result_pl);
+            travel_intersection_count = avoid_perimeters(
+                m_internal, startf.cast<coord_t>(), endf.cast<coord_t>(), *gcodegen.layer(),
+                minimize_travel_over_printed_areas && travel_inside_printed_area,
+                preferred_clockwise, &preferred_direction_applied, result_pl);
             result_pl.points.front()  = start;
             result_pl.points.back()   = end;
         }
     } else if(use_external) {
         // Initialize m_external only when exist any external travel for the current layer.
         if (m_external.boundaries.empty())
-            init_boundary(&m_external, get_boundary_external(*gcodegen.layer()));
+            init_boundary(&m_external, get_boundary_external(
+                *gcodegen.layer(), minimize_travel_over_printed_areas));
 
         // Trim the travel line by the bounding box.
         if (!m_external.boundaries.empty() && Geometry::liang_barsky_line_clipping(startf, endf, m_external.bbox)) {
-            travel_intersection_count = avoid_perimeters(m_external, startf.cast<coord_t>(), endf.cast<coord_t>(), *gcodegen.layer(), result_pl);
+            travel_intersection_count = avoid_perimeters(
+                m_external, startf.cast<coord_t>(), endf.cast<coord_t>(), *gcodegen.layer(),
+                minimize_travel_over_printed_areas, preferred_clockwise,
+                &preferred_direction_applied, result_pl);
             result_pl.points.front()  = start;
             result_pl.points.back()   = end;
         }
@@ -1246,6 +1425,18 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCodeGenerator &gcodegen, cons
         }
     }
 
+    if (crossed_recent != nullptr) {
+        Polyline world_result = result_pl;
+        if (!use_external)
+            world_result.translate(world_origin);
+        const bool avoids_recent_extrusions = freshest_crossed_extrusion(world_result) == nullptr;
+        const bool opposite_direction_used = preferred_clockwise.has_value() &&
+            preferred_direction_applied &&
+            travel_intersection_count > 0 && result_pl.size() > 2 && !max_detour_length_exceeded;
+        if (!avoids_recent_extrusions && !opposite_direction_used)
+            m_fresh_travel_cooldown = true;
+    }
+
     if (use_external) {
         result_pl.translate(-scaled_origin);
         *could_be_wipe_disabled = false;
@@ -1255,6 +1446,18 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCodeGenerator &gcodegen, cons
         *could_be_wipe_disabled = !need_wipe(gcodegen, m_lslices_offset, m_lslices_offset_bboxes, m_grid_lslices_offset, travel, result_pl, travel_intersection_count);
 
     return result_pl;
+}
+
+void AvoidCrossingPerimeters::register_recent_extrusion(
+    Polyline path, const std::optional<bool> clockwise)
+{
+    if (path.size() < 2)
+        return;
+
+    constexpr size_t max_recent_extrusions = 16;
+    if (m_recent_extrusions.size() == max_recent_extrusions)
+        m_recent_extrusions.erase(m_recent_extrusions.begin());
+    m_recent_extrusions.push_back({std::move(path), clockwise});
 }
 
 // ************************************* AvoidCrossingPerimeters::init_layer() *****************************************
