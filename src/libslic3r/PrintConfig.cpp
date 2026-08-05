@@ -616,11 +616,23 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("avoid_crossing_printed_areas", coBool);
+    def->label = L("Minimize travel over printed areas");
+    def->tooltip = L("Prefer travel paths around the current layer instead of across it. "
+                     "For a travel move contained within a printed area, each end is connected to a nearby boundary and the shortest route around that boundary is used. "
+                     "Travel across the printed area is kept only where it is needed to reach or leave the boundary. Freshly printed paths are avoided when possible; "
+                      "when a loop direction is known, the opposite boundary direction is preferred. If no cooler route is available, the fan runs at maximum for two "
+                      "seconds before the next layer. With alternating perimeter order and Aligned seams, the next loop starts at the closest suitable corner so the "
+                      "inside-out or outside-in sequence does not create a long cross-print move. "
+                      "This feature may increase travel distance and G-code generation time.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("avoid_crossing_perimeters_max_detour", coFloatOrPercent);
-    def->label = L("Avoid crossing perimeters - Max detour length");
+    def->label = L("Perimeter-aware travel - Max detour length");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("The maximum detour length for avoid crossing perimeters. "
-                     "If the detour is longer than this value, avoid crossing perimeters is not applied for this travel path. "
+    def->tooltip = L("The maximum detour length for perimeter-aware travel. "
+                     "If the detour is longer than this value, a direct travel path is used instead. "
                      "Detour length could be specified either as an absolute value or as percentage (for example 50%) of a direct travel path.");
     def->sidetext = L("mm or % (zero to disable)");
     def->min = 0;
@@ -1162,6 +1174,17 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Layers and Perimeters");
     def->tooltip = L("Print contour perimeters from the outermost one to the innermost one "
                    "instead of the default inverse order.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("alternate_perimeter_order", coBool);
+    def->label = L("Alternate perimeter, island and skirt order");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Reverse the order of perimeter walls and concentric perimeter islands on every other layer. "
+                     "With External perimeters first disabled, odd layers print from the outside in and even layers print from the inside out. "
+                     "This pairs a leading brim or skirt with the outermost object path and a trailing skirt with the preceding outermost path. "
+                     "Enable External perimeters first to start with the opposite order. When a skirt spans multiple layers, odd layers print "
+                     "the skirt first and even layers print it last.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 

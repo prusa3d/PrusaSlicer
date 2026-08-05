@@ -130,6 +130,7 @@ struct CoolingLine
         TYPE_FIRST_INTERNAL_PERIMETER = 1 << 20,
         TYPE_TOOLCHANGE_TIME          = 1 << 21,
         TYPE_TOOLCHANGE_END           = 1 << 22,
+        TYPE_FRESH_TRAVEL_COOLDOWN     = 1 << 23,
     };
 
     CoolingLine(unsigned int type, size_t  line_start, size_t  line_end) :
@@ -848,6 +849,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             line.type = CoolingLine::TYPE_BRIDGE_FAN_START;
         } else if (boost::starts_with(sline, ";_BRIDGE_FAN_END")) {
             line.type = CoolingLine::TYPE_BRIDGE_FAN_END;
+        } else if (boost::starts_with(sline, ";_FRESH_TRAVEL_COOLDOWN")) {
+            line.type = CoolingLine::TYPE_FRESH_TRAVEL_COOLDOWN;
         } else if (boost::starts_with(sline, TOOLCHANGE_TIME_TAG)) {
             line.type = CoolingLine::TYPE_TOOLCHANGE_TIME;
             fast_float::from_chars(
@@ -1305,6 +1308,16 @@ std::string CoolingBuffer::apply_layer_cooldown(
             // doesn't track. Force re-emission to restore the correct fan speed.
             m_fan_speed = -1;
             change_extruder_set_fan();
+        } else if (line->type & CoolingLine::TYPE_FRESH_TRAVEL_COOLDOWN) {
+            const int fan_speed_to_restore = m_fan_speed;
+            new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, 100);
+            new_gcode += "G4 S2 ; cool freshly printed travel route\n";
+            if (fan_speed_to_restore >= 0)
+                new_gcode += GCodeWriter::set_fan(
+                    m_config.gcode_flavor, m_config.gcode_comments,
+                    static_cast<unsigned int>(fan_speed_to_restore));
+            else
+                change_extruder_set_fan();
         } else if (line->type & (CoolingLine::TYPE_EXTRUDE_END | CoolingLine::TYPE_TOOLCHANGE_TIME)) {
             // Just remove this comment.
         } else if (line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_FIRST_INTERNAL_PERIMETER | CoolingLine::TYPE_WIPE | CoolingLine::TYPE_HAS_F)) {

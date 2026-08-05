@@ -6,6 +6,7 @@
 #define slic3r_AvoidCrossingPerimeters_hpp_
 
 #include <vector>
+#include <optional>
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/ExPolygon.hpp"
@@ -34,6 +35,16 @@ public:
     void        reset_once_modifiers()  { use_external_mp_once = false; m_disabled_once = false; }
 
     void        init_layer(const Layer &layer);
+
+    // Keep a short history in world coordinates so travel planning can avoid the
+    // hottest extrusion paths and, for loops, prefer the opposite winding direction.
+    void        register_recent_extrusion(Polyline path, std::optional<bool> clockwise);
+    bool        consume_fresh_travel_cooldown()
+    {
+        const bool result = m_fresh_travel_cooldown;
+        m_fresh_travel_cooldown = false;
+        return result;
+    }
 
     Polyline    travel_to(const GCodeGenerator &gcodegen, const Point& point)
     {
@@ -77,6 +88,13 @@ private:
     Boundary m_internal;
     // Store all needed data for travels outside object
     Boundary m_external;
+
+    struct RecentExtrusion {
+        Polyline            path;
+        std::optional<bool> clockwise;
+    };
+    std::vector<RecentExtrusion> m_recent_extrusions;
+    bool                          m_fresh_travel_cooldown{false};
 };
 
 } // namespace Slic3r

@@ -98,6 +98,16 @@ struct Parameters {
     double                       mm3_per_mm;
     double                       mm3_per_mm_overhang;
 
+    bool external_perimeters_first() const
+    {
+        if (!config.alternate_perimeter_order.value)
+            return config.external_perimeters_first.value;
+
+        // Start at the outside on the first layer so a leading brim / skirt hands off
+        // locally, then end at the outside on the second layer for a trailing skirt.
+        return config.external_perimeters_first.value == ((layer_id & 1) != 0);
+    }
+
 private:
     Parameters() = delete;
 };

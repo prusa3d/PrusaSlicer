@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cinttypes>
+#include <numeric>
 
 #include "libslic3r/GCode/SmoothPath.hpp"
 #include "libslic3r/ShortestPath.hpp"
@@ -312,7 +313,47 @@ std::vector<SliceExtrusions> get_slices_extrusions(
 
     std::vector<SliceExtrusions> result;
 
-    for (size_t idx : layer.lslice_indices_sorted_by_print_order) {
+    // Layer::lslices_ex follows the topological outside-to-inside order of Layer::lslices.
+    // Normally the precomputed nearest-neighbor chain is preferable. When perimeter order is
+    // alternating, preserve that topology (or reverse it) so concentric, disconnected perimeter
+    // islands progress outside-in on one layer and inside-out on the next.
+    std::optional<bool> outside_in;
+    bool order_is_consistent = true;
+    for (const LayerSlice &lslice : layer.lslices_ex) {
+        for (const LayerIsland &island : lslice.islands) {
+            if (island.perimeters.empty())
+                continue;
+
+            const PrintRegionConfig &config =
+                layer.get_region(island.perimeters.region())->region().config();
+            if (!config.alternate_perimeter_order.value) {
+                order_is_consistent = false;
+                break;
+            }
+
+            const bool region_outside_in = config.external_perimeters_first.value ==
+                ((layer.id() & 1) != 0);
+            if (outside_in.has_value() && *outside_in != region_outside_in) {
+                order_is_consistent = false;
+                break;
+            }
+            outside_in = region_outside_in;
+        }
+        if (!order_is_consistent)
+            break;
+    }
+
+    std::vector<size_t> slice_order;
+    if (order_is_consistent && outside_in.has_value()) {
+        slice_order.resize(layer.lslices_ex.size());
+        std::iota(slice_order.begin(), slice_order.end(), size_t{0});
+        if (!*outside_in)
+            std::reverse(slice_order.begin(), slice_order.end());
+    } else {
+        slice_order = layer.lslice_indices_sorted_by_print_order;
+    }
+
+    for (size_t idx : slice_order) {
         const LayerSlice &lslice = layer.lslices_ex[idx];
         std::vector<IslandExtrusions> island_extrusions{extract_island_extrusions(
             lslice, print, layer, should_pick_extrusion, smooth_path, offset, extruder_id, previous_position
@@ -547,10 +588,43 @@ std::vector<ExtruderExtrusions> get_extrusions(
 ) {
     unsigned toolchange_number{0};
 
+    // A multi-layer skirt normally forces an out-and-back trip at the start of every
+    // layer. When perimeter order alternates, put the skirt after the object on even
+    // numbered print layers (layer id 1, 3, ...). The next layer starts with the skirt,
+    // so the layer transition stays at the outside edge and only one cross-print trip
+    // is needed per layer.
+    bool skirt_last = !is_first_layer;
+    std::optional<bool> layer_is_odd;
+    bool has_object_layer = false;
+    for (const GCode::ObjectLayerToPrint &layer_to_print : layers) {
+        const Layer *object_layer = layer_to_print.object_layer;
+        if (object_layer == nullptr)
+            continue;
+
+        has_object_layer = true;
+        const bool object_layer_is_odd = (object_layer->id() & 1) != 0;
+        if (layer_is_odd.has_value() && *layer_is_odd != object_layer_is_odd) {
+            skirt_last = false;
+            break;
+        }
+        layer_is_odd = object_layer_is_odd;
+
+        for (const LayerRegion *layer_region : object_layer->regions()) {
+            if (!layer_region->region().config().alternate_perimeter_order.value) {
+                skirt_last = false;
+                break;
+            }
+        }
+        if (!skirt_last)
+            break;
+    }
+    skirt_last = skirt_last && has_object_layer && layer_is_odd.value_or(false);
+
     std::vector<ExtruderExtrusions> extrusions;
     for (const unsigned int extruder_id : layer_tools.extruders)
     {
         ExtruderExtrusions extruder_extrusions{extruder_id};
+        extruder_extrusions.skirt_last = skirt_last;
 
         if (layer_tools.has_wipe_tower && wipe_tower != nullptr) {
             const bool finish_wipe_tower{extruder_id == layer_tools.extruders.back()};
@@ -566,21 +640,26 @@ std::vector<ExtruderExtrusions> get_extrusions(
         }
 
 
-        if (auto loops_it = skirt_loops_per_extruder.find(extruder_id); loops_it != skirt_loops_per_extruder.end()) {
-            const std::pair<size_t, size_t> loops = loops_it->second;
-            for (std::size_t i = loops.first; i < loops.second; ++i) {
-                bool reverse{false};
-                if (auto loop = dynamic_cast<const ExtrusionLoop *>(print.skirt().entities[i])) {
-                    const bool is_hole = loop->is_clockwise();
-                    reverse = print.config().prefer_clockwise_movements ? !is_hole : is_hole;
+        const auto append_skirt = [&]() {
+            if (auto loops_it = skirt_loops_per_extruder.find(extruder_id); loops_it != skirt_loops_per_extruder.end()) {
+                const std::pair<size_t, size_t> loops = loops_it->second;
+                for (std::size_t i = loops.first; i < loops.second; ++i) {
+                    bool reverse{false};
+                    if (auto loop = dynamic_cast<const ExtrusionLoop *>(print.skirt().entities[i])) {
+                        const bool is_hole = loop->is_clockwise();
+                        reverse = print.config().prefer_clockwise_movements ? !is_hole : is_hole;
+                    }
+                    const ExtrusionEntityReference entity{*print.skirt().entities[i], reverse};
+                    std::optional<InstancePoint> last_position{get_instance_point(previous_position, {0, 0})};
+                    auto [path, _]{smooth_path(nullptr, nullptr, entity, extruder_id, last_position)};
+                    previous_position = get_gcode_point(last_position, {0, 0});
+                    extruder_extrusions.skirt.emplace_back(i, std::move(path));
                 }
-                const ExtrusionEntityReference entity{*print.skirt().entities[i], reverse};
-                std::optional<InstancePoint> last_position{get_instance_point(previous_position, {0, 0})};
-                auto [path, _]{smooth_path(nullptr, nullptr, entity, extruder_id, last_position)};
-                previous_position = get_gcode_point(last_position, {0, 0});
-                extruder_extrusions.skirt.emplace_back(i, std::move(path));
             }
-        }
+        };
+
+        if (!skirt_last)
+            append_skirt();
 
         // Extrude brim with the extruder of the 1st region.
         if (get_brim) {
@@ -616,6 +695,9 @@ std::vector<ExtruderExtrusions> get_extrusions(
             print, layers, layer_tools, instances_to_print, extruder_id, smooth_path,
             previous_position
         );
+
+        if (skirt_last)
+            append_skirt();
 
         extrusions.push_back(std::move(extruder_extrusions));
     }
@@ -689,11 +771,17 @@ std::optional<Geometry::ArcWelder::Segment> get_first_point(const std::vector<Sl
 }
 
 std::optional<Geometry::ArcWelder::Segment> get_first_point(const ExtruderExtrusions &extrusions) {
-    for (const auto&[_, path] : extrusions.skirt) {
-        if (auto result = get_first_point(path)) {
+    const auto get_first_skirt_point = [&]() -> std::optional<Geometry::ArcWelder::Segment> {
+        for (const auto&[_, path] : extrusions.skirt) {
+            if (auto result = get_first_point(path))
+                return result;
+        }
+        return std::nullopt;
+    };
+
+    if (!extrusions.skirt_last)
+        if (auto result = get_first_skirt_point())
             return result;
-        };
-    }
     for (const BrimPath &brim_path : extrusions.brim) {
         if (auto result = get_first_point(brim_path.path)) {
             return result;
@@ -718,6 +806,10 @@ std::optional<Geometry::ArcWelder::Segment> get_first_point(const ExtruderExtrus
             return result;
         }
     }
+
+    if (extrusions.skirt_last)
+        if (auto result = get_first_skirt_point())
+            return result;
 
     return std::nullopt;
 }
