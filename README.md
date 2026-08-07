@@ -6,7 +6,7 @@
 You may want to check the [PrusaSlicer project page](https://www.prusa3d.com/prusaslicer/).
 Prebuilt Windows, OSX and Linux binaries are available through the [git releases page](https://github.com/prusa3d/PrusaSlicer/releases) or from the [Prusa3D downloads page](https://www.prusa3d.com/drivers/). There are also [3rd party Linux builds available](https://github.com/prusa3d/PrusaSlicer/wiki/PrusaSlicer-on-Linux---binary-distributions).
 
-PrusaSlicer takes 3D models (STL, OBJ, AMF) and converts them into G-code
+PrusaSlicer takes 3D models (STL, STP, OBJ, AMF) and converts them into G-code
 instructions for FFF printers or PNG layers for mSLA 3D printers. It's
 compatible with any modern printer based on the RepRap toolchain, including all
 those based on the Marlin, Prusa, Sprinter and Repetier firmware. It also works
