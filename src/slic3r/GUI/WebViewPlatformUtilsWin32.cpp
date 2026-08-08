@@ -10,7 +10,7 @@
 
 #include "GUI_App.hpp"
 #include "format.hpp"
-#include "Mainframe.hpp"
+#include "MainFrame.hpp"
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
