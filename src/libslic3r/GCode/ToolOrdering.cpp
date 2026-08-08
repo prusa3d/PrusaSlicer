@@ -119,6 +119,17 @@ ToolOrdering::ToolOrdering(const PrintObject &object, unsigned int first_extrude
     // Collect extruders required to print the layers.
     this->collect_extruders(object, std::vector<std::pair<double, unsigned int>>(), std::vector<std::pair<double, unsigned int>>());
 
+    // In sequential printing, each object's ToolOrdering is seeded with the previously printed
+    // object's last tool. For a rafted object, the lowest layers are raft/support layers whose
+    // extruder is the "current tool" placeholder (when support_material_extruder = 0); reorder_extruders
+    // would then resolve them to that seed, i.e. the previous object's tool, so the raft would not use
+    // this object's own first-layer tool.
+    // Seed with -1 instead: reorder_extruders then self-seeds from this object's own first printing
+    // extruder (the same path already used for the very first printed object), so the raft and
+    // first_extruder() both follow the object rather than whatever printed before it.
+    if (! m_layer_tools.empty() && ! m_layer_tools.front().has_object)
+        first_extruder = (unsigned int)-1;
+
     // Reorder the extruders to minimize tool switches.
     this->reorder_extruders(first_extruder);
 
