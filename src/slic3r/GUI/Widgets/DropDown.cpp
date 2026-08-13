@@ -85,7 +85,8 @@ static gint gtk_popup_key_press (GtkWidget *widget, GdkEvent *gdk_event, wxPopup
     }
 
     gchar* keyval = gdk_keyval_name(((GdkEventKey*)gdk_event)->keyval);
-    const long keyCode = strcmp(keyval, "Up") == 0     ? WXK_UP     :
+    const long keyCode = keyval == nullptr             ? WXK_NONE   :
+                         strcmp(keyval, "Up") == 0     ? WXK_UP     :
                          strcmp(keyval, "Down") == 0   ? WXK_DOWN   :
                          strcmp(keyval, "Left") == 0   ? WXK_LEFT   :
                          strcmp(keyval, "Right") == 0  ? WXK_RIGHT  :
