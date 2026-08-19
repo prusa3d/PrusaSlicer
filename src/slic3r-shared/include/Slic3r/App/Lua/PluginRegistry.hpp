@@ -5,9 +5,16 @@
 
 #include "Slic3r/App/Lua/Plugin.hpp"
 #include "Slic3r/App/Lua/PluginBundle.hpp"
-#include "Slic3r/App/Lua/AuthorRegistry.hpp"
+#include "Slic3r/App/Lua/PublicKeyRegistry.hpp"
 
 namespace Slic3r::App::Lua {
+
+enum class PublicKeyLookupStrategy
+{
+    Author,
+    VersionedBundle
+};
+
 
 class PluginRegistry
 {
@@ -20,17 +27,17 @@ public:
     void clear();
     void scan(const std::string& path);
 
-    PluginInstallResult install(PluginBundle& bundle);
+    PluginInstallResult install(PluginBundle& bundle, PublicKeyLookupStrategy lookup_strategy);
 
     const Plugins& plugins() const { return m_plugins; }
     const PluginBundles& plugin_bundles() const { return m_bundles; }
-    AuthorRegistry& author_registry() { return m_author_registry; }
-    const AuthorRegistry& author_registry() const { return m_author_registry; }
+    PublicKeyRegistry& public_key_registry() { return m_key_registry; }
+    const PublicKeyRegistry& public_key_registry() const { return m_key_registry; }
 
 private:
     Plugins m_plugins;
     PluginBundles m_bundles;
-    AuthorRegistry m_author_registry;
+    PublicKeyRegistry m_key_registry;
 };
 
 }

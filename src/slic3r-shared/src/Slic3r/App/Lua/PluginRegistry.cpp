@@ -1,6 +1,7 @@
 #include "Slic3r/App/Lua/PluginRegistry.hpp"
 
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Assert.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Log.hpp"
 
@@ -17,7 +18,7 @@ namespace Slic3r::App::Lua {
 namespace fs = boost::filesystem;
 
 PluginRegistry::PluginRegistry() :
-    m_author_registry(fs::path{data_dir()} / "authorized_authors")
+    m_key_registry(fs::path{data_dir()} / "authorized_authors")
 {}
 
 void PluginRegistry::clear()
@@ -124,10 +125,23 @@ void PluginRegistry::scan(const std::string& path)
     }
 }
 
-PluginInstallResult PluginRegistry::install(PluginBundle& bundle)
+PluginInstallResult PluginRegistry::install(PluginBundle& bundle, PublicKeyLookupStrategy lookup_strategy)
 {
+    std::string key_name;
     try {
-        auto author_key = m_author_registry.load_author_key(bundle.meta().author);
+        switch (lookup_strategy) {
+        case PublicKeyLookupStrategy::Author:
+            key_name = bundle.meta().author;
+            break;
+
+        case PublicKeyLookupStrategy::VersionedBundle:
+            key_name = fmt::format("{}@{}", bundle.meta().id, bundle.meta().version.to_string());
+            break;
+        }
+
+        ASSERT(!key_name.empty());
+
+        auto author_key = m_key_registry.load_key(key_name);
         if (!bundle.verify(author_key)) {
             return tl::unexpected(
                 Biz::_u8L("Plugin installation failed: Integrity verification failed for bundle ")
@@ -138,10 +152,11 @@ PluginInstallResult PluginRegistry::install(PluginBundle& bundle)
         return tl::unexpected(
             fmt::format(
                 fmt::runtime(
-                    // TRN {} is an author username
-                    Biz::_u8L("Plugin installation failed: Cannot load public key for author {}")
+                    // TRN First {} is a generic key name (followed by .pem in text as the file extension, second {} is a plugin bundle identifier
+                    Biz::_u8L("Plugin installation failed: Cannot load public key {}.pem bundle {}")
                 ),
-                bundle.meta().author
+                key_name,
+                bundle.meta().id
             )
         );
     }

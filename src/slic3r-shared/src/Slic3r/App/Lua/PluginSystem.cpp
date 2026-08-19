@@ -94,9 +94,12 @@ PluginSystem::PluginSystem(
     m_plugin_paths(plugin_paths),
     m_project_interactor(project_interactor),
     m_font_manager(font_manager)
-{}
+{
+    m_marketplace_client.add_listener<IMarketplaceClientListener>(this);
+}
 
-void PluginSystem::install(const std::string& zip_file_path)
+void PluginSystem::
+    install_file(const std::string& zip_file_path, PublicKeyLookupStrategy key_lookup_strategy)
 {
     auto zip_source = Biz::Crypto::create_zip_source(zip_file_path);
     if (zip_source == nullptr) {
@@ -123,7 +126,9 @@ void PluginSystem::install(const std::string& zip_file_path)
         return;
     }
 
-    if (auto install_result = m_registry.install(plugin_bundle); !install_result.has_value()) {
+    if (auto install_result = m_registry.install(plugin_bundle, key_lookup_strategy);
+        !install_result.has_value())
+    {
         invoke_listeners<IPluginInstallationListener>(
             [&install_result](auto* listener)
             { listener->on_plugin_installation_error(install_result.error()); }
@@ -140,6 +145,11 @@ void PluginSystem::install(const std::string& zip_file_path)
 
 }
 
+void PluginSystem::install_marketplace_bundle(const BundleRequestConfig& config)
+{
+    m_marketplace_client.download_bundle(config);
+}
+
 Yoga::Passthrough<PluginDialog>& PluginSystem::init_dialog()
 {
     m_dialog = std::make_unique<PluginDialog>([this](const auto& meta, const auto& params)
@@ -148,6 +158,26 @@ Yoga::Passthrough<PluginDialog>& PluginSystem::init_dialog()
         finalize_run();
     });
     return m_dialog;
+}
+
+void PluginSystem::on_download_error(const std::string& plugin_id, const std::string& message)
+{
+
+}
+
+void PluginSystem::on_bundle_verified(const VerifiedBundleData& data)
+{
+    auto key_id = fmt::format("{}@{}", data.plugin_id, data.version);
+    m_registry.public_key_registry().store_key(key_id, data.public_key);
+}
+
+void PluginSystem::on_bundle_downloaded(
+    const std::string& plugin_id,
+    const std::string& version,
+    const std::string& zip_path
+)
+{
+    install_file(zip_path, PublicKeyLookupStrategy::VersionedBundle);
 }
 
 void PluginSystem::execute_plugin(const std::string& id)

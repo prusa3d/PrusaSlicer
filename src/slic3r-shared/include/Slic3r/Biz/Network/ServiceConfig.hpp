@@ -114,6 +114,11 @@ public:
         return m_printables_url;
     }
 
+    const std::string& plugin_marketplace_url() const
+    {
+        return m_plugin_marketplace_url;
+    }
+
     static ServiceConfig& instance();
 
 private:
@@ -124,6 +129,7 @@ private:
     std::string m_media_url;
     std::string m_preset_repo_url;
     std::string m_printables_url;
+    std::string m_plugin_marketplace_url;
     bool m_webdev_enabled{false};
 };
 

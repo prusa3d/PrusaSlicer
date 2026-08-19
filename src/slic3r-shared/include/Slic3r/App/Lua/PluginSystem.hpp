@@ -6,6 +6,7 @@
 #include "Slic3r/App/Lua/PluginRegistry.hpp"
 #include "Slic3r/App/Lua/IPluginRescanListener.hpp"
 #include "Slic3r/App/Lua/IPluginInstallationListener.hpp"
+#include "Slic3r/App/Lua/MarketplaceClient.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Emboss/IFontManager.hpp"
 #include "Slic3r/Biz/Platform//WithListeners.hpp"
@@ -15,7 +16,7 @@ namespace Slic3r::App::Lua {
 
 class PluginDialog;
 
-class PluginSystem : public WithListeners<IPluginRescanListener, IPluginInstallationListener>
+class PluginSystem : public WithListeners<IPluginRescanListener, IPluginInstallationListener>, IMarketplaceClientListener
 {
 public:
     explicit PluginSystem(
@@ -27,9 +28,21 @@ public:
     void rescan();
     const auto& plugins() const { return m_registry.plugins(); }
 
-    void install(const std::string& zip_file_path);
+    void install_file(
+        const std::string& zip_file_path,
+        PublicKeyLookupStrategy key_lookup_strategy = PublicKeyLookupStrategy::Author
+    );
+    void install_marketplace_bundle(const BundleRequestConfig& config);
 
     Yoga::Passthrough<PluginDialog>& init_dialog();
+
+    void on_download_error(const std::string& plugin_id, const std::string& message) override;
+    void on_bundle_verified(const VerifiedBundleData& data) override;
+    void on_bundle_downloaded(
+        const std::string& plugin_id,
+        const std::string& version,
+        const std::string& zip_path
+    ) override;
 private:
     void clear();
     void scan(const std::string& path);
@@ -47,6 +60,7 @@ private:
     Biz::Emboss::IFontManager& m_font_manager;
     std::optional<PluginData> m_current_plugin_data, m_last_plugin_data;
     Yoga::Passthrough<PluginDialog> m_dialog;
+    MarketplaceClient m_marketplace_client;
 };
 
 } // namespace Slic3r::App::Lua

@@ -22,6 +22,7 @@
 #include "Slic3r/App/Lua/ProjectApi.hpp"
 #include "Slic3r/App/Platform/IFileExplorerHandler.hpp"
 #include "Slic3r/App/ProjectSaver.hpp"
+#include "Slic3r/App/Browser/BrowserLogicPluginMarketplace.hpp"
 
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
@@ -1172,7 +1173,7 @@ void MenuCommandRegistrar::install_plugin(Lua::PluginSystem& plugin_system)
             Biz::Platform::PlatformServices::instance()
                 .main_thread_dispatcher()
                 .dispatch_on_main_thread([&plugin_system, file_path = file_paths.front().string()]
-                                         { plugin_system.install(file_path); });
+                                         { plugin_system.install_file(file_path); });
         }
     };
 
@@ -2367,6 +2368,19 @@ void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem&
                 Biz::Platform::PlatformServices::instance()
                     .main_thread_dispatcher()
                     .dispatch_on_main_thread([&plugin_system] { plugin_system.rescan(); });
+            }
+        )
+    );
+    m_menu_manager.register_menu_item(
+        {MenuItemName::Plugins, MenuItemName::PluginMarketplace},
+        std::make_unique<UIItemCommand>(
+            CommandName::PluginMarketplace,
+            [&]
+            {
+                AppServices::instance().dialog_manager().show_webview_dialog(
+                    std::make_unique<Browser::BrowserLogicPluginMarketplace>(m_project_interactor, plugin_system),
+                    &m_project_interactor
+                );
             }
         )
     );
