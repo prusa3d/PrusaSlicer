@@ -43,6 +43,12 @@ private:
      */
     std::string init_script(const std::string& access_token) const;
 
+    /**
+     * `_pluginMarketplace_v1.setInstalledPlugins(...)` carrying the full current
+     * inventory, so the catalogue can show Installed / Update instead of Install.
+     */
+    std::string installed_plugins_script(const std::vector<Lua::InstalledBundle>& bundles) const;
+
     Biz::ProjectInteractor& m_project_interactor;
     Lua::PluginSystem& m_plugin_system;
 };

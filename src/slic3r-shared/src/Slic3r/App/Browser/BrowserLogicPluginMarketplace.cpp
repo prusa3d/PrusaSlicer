@@ -40,6 +40,20 @@ std::string BrowserLogicPluginMarketplace::init_script(const std::string& access
     return "window._pluginMarketplace_v1 && window._pluginMarketplace_v1.init(" + options.dump() + ")";
 }
 
+std::string BrowserLogicPluginMarketplace::installed_plugins_script(
+    const std::vector<Lua::InstalledBundle>& bundles
+) const
+{
+    nlohmann::json plugins = nlohmann::json::array();
+    for (const auto& bundle : bundles) {
+        plugins.push_back({{"id", bundle.id}, {"version", bundle.version}});
+    }
+    nlohmann::json payload;
+    payload["plugins"] = std::move(plugins);
+    return "window._pluginMarketplace_v1 && window._pluginMarketplace_v1.setInstalledPlugins("
+        + payload.dump() + ")";
+}
+
 std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::send_config(const std::string& reason)
 {
     auto& account = m_project_interactor.user_account_interactor();
@@ -78,6 +92,7 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
     // { action: 'WEBAPP_READY', componentName: 'plugin-marketplace' }
     // { action: 'REQUEST_CONFIG' }
     // { action: 'REQUEST_ACCESS_TOKEN' }                        // session exchange failed
+    // { action: 'REQUEST_INSTALLED_PLUGINS' }                    // which plugins are installed
     // { action: 'INSTALL_PLUGIN', pluginId, version, downloadUrl, verifyUrl, apiOrigin }
 
     nlohmann::json msg;
@@ -105,6 +120,12 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
     if (action == "REQUEST_CONFIG" || action == "REQUEST_ACCESS_TOKEN") {
         SPDLOG_INFO("Plugin Marketplace: {}", action);
         return send_config(action);
+    }
+
+    if (action == "REQUEST_INSTALLED_PLUGINS") {
+        const auto bundles = m_plugin_system.installed_bundles();
+        SPDLOG_INFO("Plugin Marketplace: reporting {} installed bundle(s)", bundles.size());
+        return {{BrowserLogicCommandType::RunScript, installed_plugins_script(bundles)}};
     }
 
     if (action == "INSTALL_PLUGIN") {

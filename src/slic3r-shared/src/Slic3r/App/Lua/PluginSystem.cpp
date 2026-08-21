@@ -145,6 +145,21 @@ void PluginSystem::
 
 }
 
+std::vector<InstalledBundle> PluginSystem::installed_bundles() const
+{
+    const auto& bundles = m_registry.plugin_bundles();
+    std::vector<InstalledBundle> result;
+    result.reserve(bundles.size());
+    for (const auto& bundle : bundles) {
+        const auto& meta = bundle.meta();
+        if (meta.id.empty()) {
+            continue;
+        }
+        result.push_back({meta.id, meta.version.to_string()});
+    }
+    return result;
+}
+
 void PluginSystem::install_marketplace_bundle(const BundleRequestConfig& config)
 {
     m_marketplace_client.download_bundle(config);

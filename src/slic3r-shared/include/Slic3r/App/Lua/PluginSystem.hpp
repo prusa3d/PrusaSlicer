@@ -16,6 +16,17 @@ namespace Slic3r::App::Lua {
 
 class PluginDialog;
 
+/**
+ * One installed plugin bundle, as the marketplace webview needs to see it.
+ * `id` is the bundle id from manifest.json, i.e. the marketplace asset id - not
+ * the per-.lua plugin id the registry derives from it.
+ */
+struct InstalledBundle
+{
+    std::string id;
+    std::string version;
+};
+
 class PluginSystem : public WithListeners<IPluginRescanListener, IPluginInstallationListener>, IMarketplaceClientListener
 {
 public:
@@ -27,6 +38,13 @@ public:
     void execute_plugin(const std::string& id);
     void rescan();
     const auto& plugins() const { return m_registry.plugins(); }
+
+    /**
+     * Every installed bundle with its version, including the ones shipped in
+     * resources. The same id can appear twice (shipped plus user-installed);
+     * consumers are expected to keep the highest version.
+     */
+    std::vector<InstalledBundle> installed_bundles() const;
 
     void install_file(
         const std::string& zip_file_path,
