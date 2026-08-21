@@ -17,7 +17,7 @@ namespace Slic3r::App::Lua {
 
 constexpr auto HASH_TYPE = Biz::Crypto::HashType::SHA_256;
 constexpr auto CHECKSUM_FILENAME = "manifest.txt";
-constexpr auto SIGN_FILENAME = "manifest.sign";
+constexpr auto SIGN_FILENAME = "manifest.sig";
 constexpr auto META_FILENAME = "manifest.json";
 
 enum class PluginApiType
