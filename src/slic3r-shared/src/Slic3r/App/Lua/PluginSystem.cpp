@@ -162,13 +162,32 @@ Yoga::Passthrough<PluginDialog>& PluginSystem::init_dialog()
 
 void PluginSystem::on_download_error(const std::string& plugin_id, const std::string& message)
 {
-
+    SPDLOG_ERROR("Marketplace bundle download failed for {}: {}", plugin_id, message);
+    std::string error_message = fmt::format(
+        fmt::runtime(
+            // TRN {0} is a plugin id, {1} describes what went wrong
+            Biz::_u8L("Cannot download plugin {0}: {1}")
+        ),
+        plugin_id,
+        message
+    );
+    invoke_listeners<IPluginInstallationListener>(
+        [&error_message](auto* listener)
+        { listener->on_plugin_installation_error(error_message); }
+    );
 }
 
 void PluginSystem::on_bundle_verified(const VerifiedBundleData& data)
 {
     auto key_id = fmt::format("{}@{}", data.plugin_id, data.version);
-    m_registry.public_key_registry().store_key(key_id, data.public_key);
+    try {
+        m_registry.public_key_registry().store_key(key_id, data.public_key);
+    } catch (std::exception& e) {
+        // Runs on the main thread from the marketplace job callback - letting this
+        // escape would take the app down instead of failing the install.
+        SPDLOG_ERROR("Cannot store author public key {}: {}", key_id, e.what());
+        on_download_error(data.plugin_id, e.what());
+    }
 }
 
 void PluginSystem::on_bundle_downloaded(

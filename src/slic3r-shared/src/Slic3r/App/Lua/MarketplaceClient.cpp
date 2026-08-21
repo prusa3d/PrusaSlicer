@@ -1,6 +1,7 @@
 #include "Slic3r/App/Lua/MarketplaceClient.hpp"
 
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Log.hpp"
 #include "Slic3r/Biz/CerealUtils.hpp"
 #include "Slic3r/Biz/Network/IHttp.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
@@ -46,6 +47,27 @@ auto make_retry_fn(Biz::JThread::StopToken& stop_token)
     };
 }
 
+/**
+ * HttpCurl reports HTTP >= 400 with an empty `error` and the payload in `body`, and
+ * transport failures the other way round. Without this, a 404 arrives as an empty
+ * message. Note curl follows redirects, so the status can come from the storage
+ * backend the download URL redirects to, not from the marketplace API.
+ */
+std::string http_error_message(const std::string& body, const std::string& error, unsigned status)
+{
+    constexpr std::size_t max_body = 300;
+    const std::string detail = body.size() > max_body ? body.substr(0, max_body) + "..." : body;
+
+    if (!error.empty()) {
+        return status != 0 ? fmt::format("{} (HTTP {})", error, status) : error;
+    }
+    if (status != 0) {
+        return detail.empty() ? fmt::format("HTTP {}", status)
+                              : fmt::format("HTTP {}: {}", status, detail);
+    }
+    return detail.empty() ? std::string{"request failed for an unknown reason"} : detail;
+}
+
 tl::expected<void, std::string> save_file(const fs::path& dest, std::string_view data)
 {
     try {
@@ -75,55 +97,65 @@ tl::expected<void, std::string> save_file(const fs::path& dest, std::string_view
 
 void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
 {
+    using VerifyResult = tl::expected<VerifiedBundleData, std::string>;
 
-    auto job = [config = config, this](Biz::JThread::StopToken stop_token)
+    auto job = [config](Biz::JThread::StopToken stop_token) -> VerifyResult
     {
         auto retry_fn = make_retry_fn(stop_token);
         auto http_ptr = Biz::Network::IHttp::
             create(Biz::Network::IHttp::RequestMethod::Get, config.verify_url, retry_fn);
         auto& http = *http_ptr;
-        std::optional<VerifiedBundleData> data;
+
+        VerifyResult result = tl::unexpected{std::string{"verify request did not complete"}};
+
         http.on_complete([&](const std::string& body, unsigned status)
         {
             try {
                 nlohmann::json j = nlohmann::json::parse(body);
-                bool ok;
-                std::string asset_id;
-                std::string version;
-                std::string public_key;
-                std::string author_id;
-                j.at("ok").get_to(ok);
-                j.at("assetId").get_to(asset_id);
-                j.at("version").get_to(version);
-                j.at("publicKey").get_to(public_key);
-                j.at("authorId").get_to(author_id);
+                if (!j.value("ok", false)) {
+                    result = tl::unexpected{fmt::format(
+                        "bundle signature was refused: {}",
+                        j.value("reason", std::string{"no reason given"})
+                    )};
+                    return;
+                }
 
-                data = {.plugin_id = asset_id, .version = version, .public_key = public_key};
+                VerifiedBundleData data;
+                j.at("assetId").get_to(data.plugin_id);
+                j.at("version").get_to(data.version);
+                j.at("publicKey").get_to(data.public_key);
+                result = std::move(data);
             } catch (std::exception& e) {
-                report_error(config.plugin_id, e.what());
+                result = tl::unexpected{fmt::format("cannot parse verify response: {}", e.what())};
             }
+        })
+        .on_error([&](const std::string& body, const std::string& error, unsigned status)
+        {
+            result = tl::unexpected{http_error_message(body, error, status)};
         });
 
-        http_ptr->perform_sync();
+        http.perform_sync();
 
-        return data;
+        return result;
     };
 
     auto& job_manager = Biz::Platform::PlatformServices::instance().job_manager();
     job_manager.create_job("plugin-verify", std::move(job))
         .on_result(
-            [config = config, this](auto data)
+            [config, this](VerifyResult result)
             {
-                if (data.has_value()) {
-                    invoke_listeners<IMarketplaceClientListener>(
-                        [&](IMarketplaceClientListener* l) { l->on_bundle_verified(data.value()); }
-                    );
-                    perform_download_step(config);
+                if (!result.has_value()) {
+                    report_error(config.plugin_id, result.error());
+                    return;
                 }
+                invoke_listeners<IMarketplaceClientListener>(
+                    [&](IMarketplaceClientListener* l) { l->on_bundle_verified(result.value()); }
+                );
+                perform_download_step(config);
             }
         )
         .on_exception(
-            [this, &config](const std::exception_ptr& eptr)
+            [config, this](const std::exception_ptr& eptr)
             {
                 try {
                     std::rethrow_exception(eptr);
@@ -137,63 +169,62 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
 
 void MarketplaceClient::perform_download_step(const BundleRequestConfig& config)
 {
-    auto job = [config = config, this](Biz::JThread::StopToken stop_token)
+    using DownloadResult = tl::expected<std::string, std::string>;
+
+    auto job = [config, this](Biz::JThread::StopToken stop_token) -> DownloadResult
     {
-        std::optional<std::string> download_path;
         auto retry_fn = make_retry_fn(stop_token);
         auto http_ptr = Biz::Network::IHttp::
             create(Biz::Network::IHttp::RequestMethod::Get, config.download_url, retry_fn);
         auto& http = *http_ptr;
-        http // setup handlers
-            .on_complete(
-                [this, &config, &download_path](const std::string& body, unsigned status)
-                {
-                    auto dest_path =
-                        download_dir() / fmt::format("{}@{}.zip", config.plugin_id, config.version);
-                    if (auto result = save_file(dest_path, body); !result.has_value()) {
-                        report_error(config.plugin_id, result.error());
-                        return;
-                    }
 
-                    download_path = dest_path.string();
-                }
-            )
-            .on_error(
-                [this, &config](const std::string& body, const std::string& error, unsigned status)
-                {
-                    Biz::Platform::PlatformServices::instance()
-                        .main_thread_dispatcher()
-                        .dispatch_on_main_thread(
-                            [=, this] { report_error(config.plugin_id, error); }
-                        );
-                }
-            );
+        DownloadResult result = tl::unexpected{std::string{"download request did not complete"}};
+
+        http.on_complete([&](const std::string& body, unsigned status)
+        {
+            if (body.empty()) {
+                result = tl::unexpected{fmt::format("downloaded bundle is empty (HTTP {})", status)};
+                return;
+            }
+
+            auto dest_path =
+                download_dir() / fmt::format("{}@{}.zip", config.plugin_id, config.version);
+            if (auto saved = save_file(dest_path, body); !saved.has_value()) {
+                result = tl::unexpected{saved.error()};
+                return;
+            }
+
+            result = dest_path.string();
+        })
+        .on_error([&](const std::string& body, const std::string& error, unsigned status)
+        {
+            result = tl::unexpected{http_error_message(body, error, status)};
+        });
 
         http.perform_sync();
 
-        return download_path;
+        return result;
     };
 
     auto& job_manager = Biz::Platform::PlatformServices::instance().job_manager();
     job_manager.create_job("plugin-download", std::move(job))
-        .on_result([config = config, this](const auto& download_path)
-        {
-            if (download_path.has_value()) {
+        .on_result(
+            [config, this](DownloadResult result)
+            {
+                if (!result.has_value()) {
+                    report_error(config.plugin_id, result.error());
+                    return;
+                }
                 invoke_listeners<IMarketplaceClientListener>(
-                    [&download_path, &config](IMarketplaceClientListener* l)
+                    [&](IMarketplaceClientListener* l)
                     {
-                        l->on_bundle_downloaded(
-                            config.plugin_id,
-                            config.version,
-                            download_path.value()
-                        );
+                        l->on_bundle_downloaded(config.plugin_id, config.version, result.value());
                     }
                 );
-                perform_download_step(config);
             }
-        })
+        )
         .on_exception(
-            [this, &config](const std::exception_ptr& eptr)
+            [config, this](const std::exception_ptr& eptr)
             {
                 try {
                     std::rethrow_exception(eptr);
@@ -203,11 +234,12 @@ void MarketplaceClient::perform_download_step(const BundleRequestConfig& config)
             }
         )
         .start();
-
 }
 
 void MarketplaceClient::report_error(const std::string& plugin_id, const std::string& message)
 {
+    // Only ever called from job on_result / on_exception, i.e. on the main thread.
+    SPDLOG_ERROR("Plugin Marketplace: {} failed: {}", plugin_id, message);
     invoke_listeners<IMarketplaceClientListener>(
         [&](IMarketplaceClientListener* l) { l->on_download_error(plugin_id, message); }
     );

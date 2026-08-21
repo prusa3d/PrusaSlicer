@@ -1616,6 +1616,10 @@ if (SLIC3R_REPO_URL)
     target_compile_definitions(slic3r-shared PRIVATE SLIC3R_REPO_URL="${SLIC3R_REPO_URL}")
 endif()
 
+if (SLIC3R_ALLOW_LOCALHOST_SERVICES)
+    target_compile_definitions(slic3r-shared PRIVATE SLIC3R_ALLOW_LOCALHOST_SERVICES)
+endif()
+
 if (SLIC3R_ENABLE_WEBKIT)
     target_compile_definitions(slic3r-shared PRIVATE SLIC3R_HAS_WEBKIT)
 endif()
@@ -1666,6 +1670,9 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/App/DialogNavigationTests.cpp
             test/Slic3r/App/OpenFiles/OpenFilesDialogModelTests.cpp
+
+            test/Slic3r/App/Lua/PluginBundleTests.cpp
+            test/Slic3r/App/Lua/MarketplaceClientTests.cpp
 
             test/Slic3r/App/Config/CategoryUtilsTests.cpp
 

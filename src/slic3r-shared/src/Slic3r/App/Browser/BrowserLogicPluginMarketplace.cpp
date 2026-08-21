@@ -3,8 +3,16 @@
 #include <nlohmann/json.hpp>
 
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
+#include "Slic3r/Log.hpp"
 
 namespace Slic3r::App::Browser {
+
+namespace {
+// Plugin API this Slicer build speaks (semver). The marketplace filters the
+// catalogue by it - see docs/slicer-webview.md in the marketplace repo.
+// Bump together with the Lua plugin API.
+constexpr const char* PLUGIN_API_VERSION = "1.0.0";
+} // namespace
 
 BrowserLogicPluginMarketplace::BrowserLogicPluginMarketplace(Biz::ProjectInteractor& project_interactor, Lua::PluginSystem& plugin_system) :
     AbstractBrowserLogic(
@@ -18,58 +26,123 @@ BrowserLogicPluginMarketplace::BrowserLogicPluginMarketplace(Biz::ProjectInterac
     m_plugin_system(plugin_system)
 {}
 
+std::string BrowserLogicPluginMarketplace::init_script(const std::string& access_token) const
+{
+    // Build the options through nlohmann so the token is JSON-escaped instead of
+    // being pasted straight into a JS string literal.
+    nlohmann::json options;
+    options["pluginApiVersion"] = PLUGIN_API_VERSION;
+    if (!access_token.empty()) {
+        options["accessToken"] = access_token;
+    }
+    // The web app registers _pluginMarketplace_v1 on load; guard so an unsolicited
+    // push (token refresh) before that cannot throw inside the webview.
+    return "window._pluginMarketplace_v1 && window._pluginMarketplace_v1.init(" + options.dump() + ")";
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::send_config(const std::string& reason)
+{
+    auto& account = m_project_interactor.user_account_interactor();
+
+    if (!account.is_logged_in()) {
+        // Hand over the plugin API version anyway so the catalogue can filter;
+        // without a token the web app stays on its anonymous path instead of
+        // retrying the session exchange.
+        SPDLOG_INFO("Plugin Marketplace: {} with no signed-in account, sending config without a token", reason);
+        return {{BrowserLogicCommandType::RunScript, init_script({})}};
+    }
+
+    if (account.validate_and_refresh()) {
+        // Token is expired and a refresh was just queued. Answering with the stale
+        // token is what made the web app and the host ping-pong REQUEST_ACCESS_TOKEN
+        // forever; on_user_account_id_success() pushes the fresh one once it lands.
+        SPDLOG_INFO("Plugin Marketplace: {} while the access token is refreshing, deferring", reason);
+        return {};
+    }
+
+    const std::string access_token = account.access_token();
+    if (access_token.empty()) {
+        SPDLOG_WARN("Plugin Marketplace: {} but the access token is empty, sending config without a token", reason);
+        return {{BrowserLogicCommandType::RunScript, init_script({})}};
+    }
+
+    return {{BrowserLogicCommandType::RunScript, init_script(access_token)}};
+}
+
 std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_message_webview_event(
     const std::string& message
 )
 {
-    std::string action;
-    nlohmann::json msg = nlohmann::json::parse(message);
-    if (auto it = msg.find("action"); it != msg.end()) {
-        it->get_to(action);
-    }
-
-    // FE → Slicer (_prusaSlicer.postMessage)
+    // FE -> Slicer (_prusaSlicer.postMessage)
     //
-    // Host bridge detected
     // { action: 'WEBAPP_READY', componentName: 'plugin-marketplace' }
-    //
-    // Host bridge detected
     // { action: 'REQUEST_CONFIG' }
-    //
-    // /auth/slicer-session fails
-    // { action: 'REQUEST_ACCESS_TOKEN' }
-    //
-    // User taps Install
+    // { action: 'REQUEST_ACCESS_TOKEN' }                        // session exchange failed
     // { action: 'INSTALL_PLUGIN', pluginId, version, downloadUrl, verifyUrl, apiOrigin }
 
-    if (action == "WEBAPP_READY") {
-        SPDLOG_INFO("Plugin marketplace loaded");
-    } else if (action == "REQUEST_CONFIG") {
-        SPDLOG_INFO("Plugin market place request config");
-        auto access_token = m_project_interactor.user_account_interactor().access_token();
-        return {BrowserLogicCommand{
-            BrowserLogicCommandType::RunScript,
-            std::string("_pluginMarketplace_v1.init({ accessToken: '") + access_token + "', pluginApiVersion: '1.0.0' })"
-        }};
-    } else if (action == "REQUEST_ACCESS_TOKEN") {
-        SPDLOG_INFO("Plugin market place request token");
-        auto access_token = m_project_interactor.user_account_interactor().access_token();
-        return {BrowserLogicCommand{
-            BrowserLogicCommandType::RunScript,
-            std::string("window._pluginMarketplace_v1.init({ accessToken: '") + access_token + "', pluginApiVersion: '1.0.0' }); console.log('token passed');"
-        }};
-    } else if (action == "INSTALL_PLUGIN") {
-        auto result = Lua::BundleRequestConfig::load_from_json(msg);
-        if (!result.has_value()) {
-            SPDLOG_ERROR("Cannot parse message passed: {}", message);
+    nlohmann::json msg;
+    std::string action;
+    try {
+        msg = nlohmann::json::parse(message);
+        if (auto it = msg.find("action"); it != msg.end() && it->is_string()) {
+            it->get_to(action);
         }
-        SPDLOG_INFO("Plugin Marketplace Install plugin: {}", result->plugin_id);
-        m_plugin_system.install_marketplace_bundle(result.value());
-    } else {
-        SPDLOG_INFO("Plugin Marketplace: Unknown action {}", action);
+    } catch (const nlohmann::json::exception& e) {
+        SPDLOG_ERROR("Plugin Marketplace: cannot parse webview message ({}): {}", e.what(), message);
+        return {};
     }
 
+    if (action.empty()) {
+        SPDLOG_ERROR("Plugin Marketplace: webview message without an action: {}", message);
+        return {};
+    }
+
+    if (action == "WEBAPP_READY") {
+        SPDLOG_INFO("Plugin Marketplace: web app ready");
+        return {};
+    }
+
+    if (action == "REQUEST_CONFIG" || action == "REQUEST_ACCESS_TOKEN") {
+        SPDLOG_INFO("Plugin Marketplace: {}", action);
+        return send_config(action);
+    }
+
+    if (action == "INSTALL_PLUGIN") {
+        auto result = Lua::BundleRequestConfig::load_from_json(msg);
+        if (!result.has_value()) {
+            SPDLOG_ERROR("Plugin Marketplace: cannot parse INSTALL_PLUGIN ({}): {}", result.error(), message);
+            return {};
+        }
+        SPDLOG_INFO("Plugin Marketplace: install {}@{}", result->plugin_id, result->version);
+        m_plugin_system.install_marketplace_bundle(result.value());
+        return {};
+    }
+
+    SPDLOG_INFO("Plugin Marketplace: unknown action {}", action);
     return {};
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_user_account_id_success(
+    bool is_refresh,
+    const std::string& current_url
+)
+{
+    const std::string access_token = m_project_interactor.user_account_interactor().access_token();
+    if (access_token.empty()) {
+        return {};
+    }
+    SPDLOG_INFO("Plugin Marketplace: pushing {} access token", is_refresh ? "refreshed" : "new");
+    return {{BrowserLogicCommandType::RunScript, init_script(access_token)}};
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_user_account_logged_out(
+    const std::string& current_url
+)
+{
+    return {
+        {BrowserLogicCommandType::RunScript,
+         "window._pluginMarketplace_v1 && window._pluginMarketplace_v1.logout()"}
+    };
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::

@@ -4,6 +4,7 @@
 #include <Slic3r/Log.hpp>
 
 #include <ranges>
+#include <string_view>
 
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -86,8 +87,25 @@ Result<PluginBundleMeta> load_meta_from_text(std::string_view json_str)
         {
             PluginBundleMeta::ApiVersionMap ret;
             std::map<std::string, std::string> raw_data;
-            if (auto err = get("required_apis", raw_data, true); err.has_value()) {
+            if (auto err = get("required_apis", raw_data, false); err.has_value()) {
                 return tl::unexpected(err.value());
+            }
+            if (raw_data.empty()) {
+                // Marketplace manifests declare a single plugin API semver
+                // (plugin_api_version) instead of a per-API map. Treat it as the
+                // requirement for the only API type we have.
+                std::string plugin_api_version;
+                if (auto err = get("plugin_api_version", plugin_api_version, false);
+                    err.has_value()) {
+                    return tl::unexpected(err.value());
+                }
+                if (plugin_api_version.empty()) {
+                    return tl::unexpected(
+                        std::string{"Missing required field 'required_apis' "
+                                    "(or 'plugin_api_version')"}
+                    );
+                }
+                raw_data.emplace(to_string(PluginApiType::Project), plugin_api_version);
             }
             for (const auto& [raw_api, raw_ver] : raw_data) {
                 auto api = parse_plugin_api_type(raw_api);

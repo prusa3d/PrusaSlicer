@@ -39,7 +39,13 @@ void update_url_from_env(std::string& dest, const char* env_name, const std::vec
     if (is_whitelisted_url(candidate, allowed_domains)) {
         dest = std::move(candidate);
     } else {
-        SPDLOG_WARN("Url was not set from env variable: {}. New adress is not whitelisted.", candidate);
+        SPDLOG_WARN(
+            "Ignoring {}={}: apex domain '{}' is not whitelisted, keeping {}.",
+            env_name,
+            candidate,
+            IHttp::get_apex_domain(candidate),
+            dest
+        );
     }
 }
 }
@@ -66,7 +72,9 @@ ServiceConfig::ServiceConfig() :
         "prusa3d.dev",
         "printables.com",
         "testprusaverse.com",
-#ifndef NDEBUG
+#if !defined(NDEBUG) || defined(SLIC3R_ALLOW_LOCALHOST_SERVICES)
+        // Local development. get_apex_domain() keeps only the last two labels,
+        // so "localhost" passes but "127.0.0.1" does not - use localhost.
         "localhost",
 #endif
     };

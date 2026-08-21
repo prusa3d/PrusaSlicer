@@ -19,7 +19,30 @@ public:
         const std::string& current_url
     ) override;
 
+    /**
+     * @brief A (possibly refreshed) access token is available - push it to the web app.
+     */
+    std::vector<BrowserLogicCommand> on_user_account_id_success(bool is_refresh, const std::string& current_url) override;
+
+    /**
+     * @brief Account signed out - let the web app drop its marketplace session.
+     */
+    std::vector<BrowserLogicCommand> on_user_account_logged_out(const std::string& current_url) override;
+
 private:
+    /**
+     * @brief Answer REQUEST_CONFIG / REQUEST_ACCESS_TOKEN. Stays silent while a token
+     * refresh is in flight; on_user_account_id_success() delivers the fresh token.
+     * @param reason Action name, for logging only.
+     */
+    std::vector<BrowserLogicCommand> send_config(const std::string& reason);
+
+    /**
+     * @brief `_pluginMarketplace_v1.init(...)` call. Pass an empty token to hand over
+     * only the plugin API version (anonymous browsing).
+     */
+    std::string init_script(const std::string& access_token) const;
+
     Biz::ProjectInteractor& m_project_interactor;
     Lua::PluginSystem& m_plugin_system;
 };
