@@ -29,6 +29,40 @@
             }
         },
         {
+            "name": "mac_universal_arm",
+            "displayName": "macOS universal (arm64)",
+            "description": "Build arm64 slice for macOS universal binary",
+            "inherits": "default",
+            "binaryDir": "${sourceDir}/build-arm64",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "PrusaSlicer_DEPS_PRESET": "mac_universal_arm",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/build-arm64/dist"
+            }
+        },
+        {
+            "name": "mac_universal_x86",
+            "displayName": "macOS universal (x86_64)",
+            "description": "Build x86_64 slice for macOS universal binary",
+            "inherits": "default",
+            "binaryDir": "${sourceDir}/build-x86_64",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "x86_64",
+                "PrusaSlicer_DEPS_PRESET": "mac_universal_x86",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/build-x86_64/dist"
+            }
+        },
+        {
             "name": "shareddeps",
             "displayName": "Shared dependencies",
             "description": "Building with dynamically linked dependencies from the system",

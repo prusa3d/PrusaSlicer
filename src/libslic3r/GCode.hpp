@@ -131,8 +131,12 @@ public:
         );
 
         if constexpr (Derived::SizeAtCompileTime == 2) {
-            return Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
+            Vec2d p = Vec2d(unscaled<double>(point.x()), unscaled<double>(point.y())) + m_origin
                 - m_config.extruder_offset.get_at(m_writer.extruder()->id());
+            // Apply XY skew correction: x' = x + (y - y_ref) * tan(skew_angle)
+            if (m_skew_xy_k != 0.0)
+                p.x() += (p.y() - m_skew_y_ref) * m_skew_xy_k;
+            return p;
         } else {
             const Vec2d gcode_point_xy{this->point_to_gcode(point.template head<2>())};
             return to_3d(gcode_point_xy, unscaled(point.z()));
@@ -375,6 +379,9 @@ private:
     FullPrintConfig                     m_config;
     // scaled G-code resolution
     double                              m_scaled_resolution;
+    // XY skew correction: tan(skew_angle) and Y reference for shearing
+    double                              m_skew_xy_k{0.0};
+    double                              m_skew_y_ref{0.0};
     GCodeWriter                         m_writer;
 
     struct PlaceholderParserIntegration {

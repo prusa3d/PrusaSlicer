@@ -731,6 +731,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInt,                 interlocking_beam_layer_count))
     ((ConfigOptionInt,                 interlocking_depth))
     ((ConfigOptionInt,                 interlocking_boundary_avoidance))
+    // Flow rate calibration: special infill ordering for Archimedean Chords
+    ((ConfigOptionBool,                calib_flowrate_topinfill_special_order))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
@@ -1054,6 +1056,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloats,             wiping_volumes_matrix))
     ((ConfigOptionBool,               wiping_volumes_use_custom_matrix))
     ((ConfigOptionFloat,              z_offset))
+    ((ConfigOptionFloat,              skew_xy_correction))
 )
 
 PRINT_CONFIG_CLASS_DERIVED_DEFINE0(

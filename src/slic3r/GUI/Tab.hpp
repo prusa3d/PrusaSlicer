@@ -189,6 +189,7 @@ protected:
 	ScalableButton*		m_btn_rename_preset;
 	ScalableButton*		m_btn_delete_preset;
 	ScalableButton*		m_btn_edit_ph_printer {nullptr};
+	ScalableButton*		m_btn_sync_filamentdb {nullptr};
 	ScalableButton*		m_btn_hide_incompatible_presets;
 	wxBoxSizer*			m_top_hsizer;
 	wxBoxSizer*			m_hsizer;
@@ -345,7 +346,7 @@ public:
 	void		compare_preset();
 	void		transfer_options(const std::string&name_from, const std::string&name_to, std::vector<std::string> options);
 	void		save_preset(std::string name = std::string(), bool detach = false);
-	void		rename_preset();
+	void		rename_preset(const std::string& new_name = {});
 	void		delete_preset();
 	void		toggle_show_hide_incompatible();
 	void		update_compatibility_ui();
@@ -500,6 +501,12 @@ public:
 
 	const std::string&	get_custom_gcode(const t_config_option_key& opt_key) override;
 	void				set_custom_gcode(const t_config_option_key& opt_key, const std::string& value) override;
+
+    // Push the currently-selected filament preset to the configured FilamentDB
+    // server. When manual_trigger=true the caller is the user (button/menu),
+    // so we surface a "URL not configured" notice. When false the caller is
+    // save_current_preset, which is silent if the URL is empty.
+    void        sync_to_filamentdb(bool manual_trigger);
 
 protected:
     bool        select_preset_by_name(const std::string& name_w_suffix, bool force) override;

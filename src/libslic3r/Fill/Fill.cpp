@@ -151,6 +151,37 @@ static inline bool fill_type_monotonic(InfillPattern pattern)
 	return pattern == ipMonotonic || pattern == ipMonotonicLines;
 }
 
+static Polyline make_flowrate_top_overlay_spiral(const Point &center, const double radial_step, const double max_radius, const double resolution)
+{
+    Polyline polyline;
+    if (radial_step <= 0.0 || max_radius <= 0.0)
+        return polyline;
+
+    (void)resolution;
+    const double b = radial_step / (2.0 * M_PI);
+    const double theta_max = max_radius / b;
+    const double dtheta    = M_PI / 120.0; // 1.5 degrees per step for a smooth true spiral.
+
+    polyline.points.reserve(size_t(std::ceil(theta_max / dtheta)) + 2);
+    for (double theta = 0.0; theta <= theta_max; theta += dtheta) {
+        const double radius = b * theta;
+        polyline.points.emplace_back(
+            coord_t(std::lround(radius * std::cos(theta))),
+            coord_t(std::lround(radius * std::sin(theta))));
+    }
+    if (polyline.points.empty() || polyline.points.back() != Point(
+            coord_t(std::lround(max_radius * std::cos(theta_max))),
+            coord_t(std::lround(max_radius * std::sin(theta_max))))) {
+        polyline.points.emplace_back(
+            coord_t(std::lround(max_radius * std::cos(theta_max))),
+            coord_t(std::lround(max_radius * std::sin(theta_max))));
+    }
+
+    remove_same_neighbor(polyline);
+    polyline.translate(center);
+    return polyline;
+}
+
 std::vector<SurfaceFill> group_fills(const Layer &layer)
 {
 	std::vector<SurfaceFill> surface_fills;
@@ -174,14 +205,14 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        params.pattern 		 = region_config.fill_pattern.value;
 		        params.density       = float(region_config.fill_density);
 
-		        if (surface.is_solid()) {
-		            params.density = 100.f;
-					//FIXME for non-thick bridges, shall we allow a bottom surface pattern?
-		            params.pattern = (surface.is_external() && ! is_bridge) ? 
-						(surface.is_top() ? region_config.top_fill_pattern.value : region_config.bottom_fill_pattern.value) :
-		                fill_type_monotonic(region_config.top_fill_pattern) ? ipMonotonic : ipRectilinear;
-		        } else if (params.density <= 0)
-		            continue;
+			        if (surface.is_solid()) {
+			            params.density = 100.f;
+						//FIXME for non-thick bridges, shall we allow a bottom surface pattern?
+			            params.pattern = (surface.is_external() && ! is_bridge) ?
+							(surface.is_top() ? region_config.top_fill_pattern.value : region_config.bottom_fill_pattern.value) :
+			                fill_type_monotonic(region_config.top_fill_pattern) ? ipMonotonic : ipRectilinear;
+			        } else if (params.density <= 0)
+			            continue;
 
 		        if (is_bridge) {
 		            params.extrusion_role = ExtrusionRole::BridgeInfill;
@@ -327,13 +358,13 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 	        		internal_solid_fill = &surface_fill;
 	        		break;
 	        	}
-	        if (internal_solid_fill == nullptr) {
-	        	// Produce another solid fill.
-		        params.extruder 	 = layerm.region().extruder(frSolidInfill);
-	            params.pattern 		 = fill_type_monotonic(layerm.region().config().top_fill_pattern) ? ipMonotonic : ipRectilinear;
-	            params.density 		 = 100.f;
-		        params.extrusion_role = ExtrusionRole::InternalInfill;
-		        params.angle 		= float(Geometry::deg2rad(layerm.region().config().fill_angle.value));
+		        if (internal_solid_fill == nullptr) {
+		        	// Produce another solid fill.
+			        params.extruder 	 = layerm.region().extruder(frSolidInfill);
+		            params.pattern 		 = fill_type_monotonic(layerm.region().config().top_fill_pattern) ? ipMonotonic : ipRectilinear;
+		            params.density 		 = 100.f;
+			        params.extrusion_role = ExtrusionRole::InternalInfill;
+			        params.angle 		= float(Geometry::deg2rad(layerm.region().config().fill_angle.value));
 		        // calculate the actual flow we'll be using for this infill
 				params.flow = layerm.flow(frSolidInfill);
 		        params.spacing = params.flow.spacing();	        
@@ -580,6 +611,15 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                 auto                       fill_begin = uint32_t(layerm.fills().size());
                 // Only concentric fills are not sorted.
                 eec->no_sort = f->no_sort();
+                const bool is_flow_calib_object =
+                    f->print_object_config &&
+                    f->print_object_config->calib_flowrate_topinfill_special_order.value;
+                const bool is_flow_calib_top_overlay =
+                    is_flow_calib_object &&
+                    surface_fill.surface.is_top() &&
+                    surface_fill.params.extrusion_role == ExtrusionRole::TopSolidInfill;
+                if (is_flow_calib_top_overlay)
+                    eec->no_sort = true;
                 if (params.use_arachne) {
                     for (const ThickPolyline &thick_polyline : thick_polylines) {
                         Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
@@ -600,15 +640,50 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                         delete eec;
 
                     thick_polylines.clear();
-                } else {
-                    // When prefer_clockwise_movements is true, we have to ensure that extrusion paths will not be reversed during path planning.
-                    extrusion_entities_append_paths(
-                        eec->entities, std::move(polylines),
-						ExtrusionAttributes{
-                            surface_fill.params.extrusion_role,
-							ExtrusionFlow{ flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height() },
-                            f->is_self_crossing()
-						}, !params.prefer_clockwise_movements);
+	                } else {
+	                    BoundingBox overlay_bbox;
+	                    double      overlay_radius = 0.0;
+	                    if (is_flow_calib_top_overlay) {
+	                        overlay_bbox   = get_extents(surface_fill.surface.expolygon);
+	                        overlay_radius = std::max(
+	                            0.0,
+	                            0.5 * std::min(double(overlay_bbox.size().x()), double(overlay_bbox.size().y()))
+	                                - 2.0 * scaled<double>(f->spacing));
+	                        if (overlay_radius > 0.0) {
+	                            Polygon overlay_window = make_circle(
+	                                overlay_radius + 0.5 * scaled<double>(f->spacing),
+	                                std::max(1.0, scaled<double>(params.resolution)));
+	                            overlay_window.translate(overlay_bbox.center());
+	                            polylines = diff_pl(polylines, ExPolygon{std::move(overlay_window)});
+	                        }
+	                    }
+
+	                    // When prefer_clockwise_movements is true or flow calib is active,
+	                    // ensure that extrusion paths will not be reversed during path planning.
+	                    bool can_reverse = !params.prefer_clockwise_movements && !is_flow_calib_top_overlay;
+	                    extrusion_entities_append_paths(
+	                        eec->entities, std::move(polylines),
+							ExtrusionAttributes{
+	                            surface_fill.params.extrusion_role,
+								ExtrusionFlow{ flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height() },
+	                            f->is_self_crossing()
+							}, can_reverse);
+
+	                    if (is_flow_calib_top_overlay && overlay_radius > 0.0) {
+	                        Polyline spiral = make_flowrate_top_overlay_spiral(
+	                            overlay_bbox.center(),
+	                            scaled<double>(f->spacing),
+                            overlay_radius,
+                            std::max(1.0, scaled<double>(params.resolution)));
+                        if (spiral.is_valid())
+                            eec->entities.emplace_back(new ExtrusionPathOriented(
+                                std::move(spiral),
+                                ExtrusionAttributes{
+                                    ExtrusionRole::TopSolidInfill,
+                                    ExtrusionFlow{ flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height() },
+                                    false
+                                }));
+                    }
                     layerm.m_fills.entities.push_back(eec);
                 }
                 insert_fills_into_islands(*this, uint32_t(surface_fill.region_id), fill_begin, uint32_t(layerm.fills().size()));

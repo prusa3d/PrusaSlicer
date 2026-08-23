@@ -1,0 +1,222 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [master]
+  release:
+    types: [created]
+  workflow_dispatch:
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    env:
+      SCCACHE_VERSION: v0.14.0
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 2G
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        shell: pwsh
+        run: |
+          $versionLine = Select-String -Path version.inc -Pattern 'set\(SLIC3R_VERSION\s+"([^"]+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $buildIdLine = Select-String -Path version.inc -Pattern 'set\(SLIC3R_BUILD_ID\s+"([^"]+)"' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+          $buildId = $buildIdLine -replace '\$\{SLIC3R_VERSION\}', $versionLine
+          echo "version=$versionLine" >> $env:GITHUB_OUTPUT
+          echo "build_id=$buildId" >> $env:GITHUB_OUTPUT
+          Write-Host "Build ID: $buildId"
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Cache dependencies
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/build-default/destdir
+            deps/build-default/dep_*-prefix/src/*-stamp
+          key: deps-windows-x64-v3-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+          restore-keys: |
+            deps-windows-x64-v3-
+            deps-windows-x64-
+
+      - name: Cache package downloads
+        uses: actions/cache@v4
+        with:
+          path: deps/.pkg_cache
+          key: pkgcache-windows-v1-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+          restore-keys: pkgcache-windows-v1-
+
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: .sccache
+          key: sccache-windows-x64-v1-${{ github.run_id }}
+          restore-keys: sccache-windows-x64-v1-
+
+      - name: Install sccache
+        shell: pwsh
+        run: |
+          $base = "sccache-$env:SCCACHE_VERSION-x86_64-pc-windows-msvc"
+          $zip = "$base.zip"
+          Invoke-WebRequest -Uri "https://github.com/mozilla/sccache/releases/download/$env:SCCACHE_VERSION/$zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath .
+          "$PWD\\$base" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Pre-download GMP (gmplib.org is unreliable)
+        shell: bash
+        run: |
+          mkdir -p deps/.pkg_cache/GMP
+          if [ ! -f deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 ]; then
+            curl -L -o deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 \
+              https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2 || \
+            curl -L -o deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 \
+              https://mirror.ibcp.fr/pub/gnu/gmp/gmp-6.2.1.tar.bz2
+          fi
+
+      - name: Zero sccache stats
+        shell: pwsh
+        run: sccache --zero-stats
+
+      - name: Check if deps are cached
+        id: deps-exist
+        shell: bash
+        run: |
+          if [ -d "deps/build-default/destdir/usr/local/lib" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "Deps destdir found, skipping deps build"
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "Deps destdir not found, will build deps"
+          fi
+
+      - name: Build deps (skipped if cached)
+        if: steps.deps-exist.outputs.found != 'true'
+        run: |
+          cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" "-DCMAKE_CONFIGURATION_TYPES=Release" "-DDEP_DEBUG=OFF" "-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+
+      - name: Configure PrusaSlicer
+        if: steps.deps-exist.outputs.found == 'true'
+        run: |
+          cmake --preset default "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" "-DCMAKE_CONFIGURATION_TYPES=Release" "-DDEP_DEBUG=OFF" "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/deps/build-default/destdir/usr/local" "-DCMAKE_C_COMPILER_LAUNCHER=sccache" "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+
+      - name: Build
+        run: cmake --build build-default --config Release -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Install
+        run: cmake --install build-default --config Release
+
+      - name: Bundle runtime DLLs
+        shell: pwsh
+        run: |
+          $dist = "build-default/dist"
+          $depsLib = "deps/build-default/destdir/usr/local"
+
+          # Move OCCTWrapper.dll from bin/ to root if it exists
+          if (Test-Path "$dist/bin/OCCTWrapper.dll") {
+            Move-Item "$dist/bin/OCCTWrapper.dll" "$dist/" -Force
+          }
+          # Move any other DLLs from bin/ to root
+          if (Test-Path "$dist/bin") {
+            Get-ChildItem "$dist/bin/*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+              Move-Item $_.FullName "$dist/" -Force
+            }
+            Remove-Item "$dist/bin" -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+          # Copy VC++ runtime DLLs
+          $vcToolsDir = $env:VCToolsRedistDir
+          if ($vcToolsDir) {
+            $runtimeDir = Join-Path $vcToolsDir "x64\Microsoft.VC143.CRT"
+            if (Test-Path $runtimeDir) {
+              Copy-Item "$runtimeDir\msvcp140.dll" "$dist/" -Force -ErrorAction SilentlyContinue
+              Copy-Item "$runtimeDir\msvcp140_codecvt_ids.dll" "$dist/" -Force -ErrorAction SilentlyContinue
+              Copy-Item "$runtimeDir\vcruntime140.dll" "$dist/" -Force -ErrorAction SilentlyContinue
+              Copy-Item "$runtimeDir\vcruntime140_1.dll" "$dist/" -Force -ErrorAction SilentlyContinue
+              Copy-Item "$runtimeDir\concrt140.dll" "$dist/" -Force -ErrorAction SilentlyContinue
+              Write-Host "Copied VC++ runtime DLLs from $runtimeDir"
+            }
+          }
+
+          # Copy UCRT api-ms-win-crt DLLs if not statically linked
+          $ucrtDir = "C:\Program Files (x86)\Windows Kits\10\Redist\10.0.26100.0\ucrt\DLLs\x64"
+          if (Test-Path $ucrtDir) {
+            Copy-Item "$ucrtDir\api-ms-win-crt-runtime-l1-1-0.dll" "$dist/" -Force -ErrorAction SilentlyContinue
+            Write-Host "Copied UCRT DLLs from $ucrtDir"
+          }
+
+          # Copy GMP and MPFR shared libraries from deps
+          foreach ($pattern in @("libgmp*.dll", "libmpfr*.dll")) {
+            Get-ChildItem "$depsLib" -Recurse -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+              Copy-Item $_.FullName "$dist/" -Force
+              Write-Host "Copied $($_.Name)"
+            }
+          }
+
+          # Copy WebView2Loader.dll if it exists in deps
+          Get-ChildItem "$depsLib" -Recurse -Filter "WebView2Loader.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName "$dist/" -Force
+            Write-Host "Copied $($_.Name)"
+          }
+
+          # Create mesa/ directory with software OpenGL fallback if available
+          $mesaSrc = Get-ChildItem "$depsLib" -Recurse -Filter "opengl32sw.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $mesaSrc) {
+            $mesaSrc = Get-ChildItem "$depsLib" -Recurse -Filter "opengl32.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if ($mesaSrc) {
+            New-Item -ItemType Directory -Force -Path "$dist/mesa" | Out-Null
+            Copy-Item $mesaSrc.FullName "$dist/mesa/opengl32.dll" -Force
+            Write-Host "Copied mesa OpenGL from $($mesaSrc.FullName)"
+          }
+
+          # List final dist contents
+          Write-Host "`n=== Final distribution contents (exe/dll) ==="
+          Get-ChildItem "$dist" -Recurse | Where-Object { $_.Extension -match '\.(exe|dll)$' } | ForEach-Object {
+            $rel = $_.FullName.Substring((Resolve-Path $dist).Path.Length + 1)
+            Write-Host "  $rel ($([math]::Round($_.Length/1MB, 1)) MB)"
+          }
+
+      - name: Copy G-code Viewer to dist
+        shell: pwsh
+        run: |
+          Copy-Item "build-default/src/Release/prusa-gcodeviewer.exe" "build-default/dist/" -Force
+          Write-Host "Copied prusa-gcodeviewer.exe to dist"
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $buildId = "${{ steps.version.outputs.build_id }}"
+          # Install Inno Setup
+          choco install innosetup -y --no-progress
+          # Compile the installer
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="$buildId" installer.iss
+          Write-Host "Created installer: Output\$buildId-win64-setup.exe"
+
+      - name: Show sccache stats
+        if: always()
+        shell: pwsh
+        run: sccache --show-stats
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: Output/${{ steps.version.outputs.build_id }}-win64-setup.exe
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Output/${{ steps.version.outputs.build_id }}-win64-setup.exe

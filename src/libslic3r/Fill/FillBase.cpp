@@ -178,8 +178,13 @@ std::pair<float, Point> Fill::_infill_direction(const Surface *surface) const
 #endif /* SLIC3R_DEBUG */
         out_angle = float(surface->bridge_angle);
     } else if (this->layer_id != size_t(-1)) {
+        const bool keep_flow_calib_spiral_orientation =
+            this->print_object_config != nullptr &&
+            this->print_object_config->calib_flowrate_topinfill_special_order.value &&
+            dynamic_cast<const FillArchimedeanChords*>(this) != nullptr;
         // alternate fill direction
-        out_angle += this->_layer_angle(this->layer_id / surface->thickness_layers);
+        if (!keep_flow_calib_spiral_orientation)
+            out_angle += this->_layer_angle(this->layer_id / surface->thickness_layers);
     } else {
 //    	printf("Layer_ID undefined!\n");
     }

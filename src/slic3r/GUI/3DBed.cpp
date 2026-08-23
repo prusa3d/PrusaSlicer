@@ -26,6 +26,8 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/trivial.hpp>
 
+#include <imgui/imgui.h>
+
 #include <numeric>
 
 static const float GROUND_Z = -0.02f;
@@ -213,6 +215,10 @@ void Bed3D::render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matri
 void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
     bool show_texture, bool picking, bool active)
 {
+    if (m_show_mesh_overlay) {
+        static int ri_count = 0;
+        if (ri_count < 5) { fprintf(stderr, "render_internal called with overlay ON, valid=%d picking=%d\n", (int)m_mesh_data.is_valid(), (int)picking); fflush(stderr); ri_count++; }
+    }
     m_scale_factor = scale_factor;
 
     glsafe(::glEnable(GL_DEPTH_TEST));
@@ -230,6 +236,9 @@ void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, 
     default:
     case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom, show_texture, picking, active); break; }
     }
+
+    if (m_show_mesh_overlay && m_mesh_data.is_valid() && !picking)
+        render_mesh_overlay(view_matrix, projection_matrix);
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 }
@@ -683,6 +692,425 @@ void Bed3D::register_raycasters_for_picking(const GLModel::Geometry& geometry, c
 
     m_model.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
     wxGetApp().plater()->canvas3D()->add_raycaster_for_picking(SceneRaycaster::EType::Bed, 0, *m_model.mesh_raycaster, trafo);
+}
+
+void Bed3D::set_mesh_data(const BedMeshData& data)
+{
+    m_mesh_data = data;
+    // Loading a new primary mesh invalidates any previous compare baseline —
+    // the delta would no longer correspond to the user's visible view — and
+    // any stale per-tool vector from an earlier multi-tool probe.
+    m_mesh_per_tool.clear();
+    m_mesh_tool_index = 0;
+    clear_mesh_compare();
+    invalidate_mesh_overlay();
+}
+
+void Bed3D::set_mesh_compare(BedMeshData baseline, std::string baseline_name, BedMeshData delta)
+{
+    m_mesh_baseline      = std::move(baseline);
+    m_mesh_delta         = std::move(delta);
+    m_mesh_compare_name  = std::move(baseline_name);
+    m_mesh_compare_active = true;
+    // Delta view is clearest with Zero reference (white = no change).
+    m_mesh_reference = BedMeshData::Reference::Zero;
+    invalidate_mesh_overlay();
+}
+
+void Bed3D::clear_mesh_compare()
+{
+    if (!m_mesh_compare_active) return;
+    m_mesh_compare_active = false;
+    m_mesh_baseline      = {};
+    m_mesh_delta         = {};
+    m_mesh_compare_name.clear();
+    invalidate_mesh_overlay();
+}
+
+void Bed3D::set_mesh_data_per_tool(std::vector<BedMeshData> meshes)
+{
+    if (meshes.empty()) {
+        m_mesh_per_tool.clear();
+        m_mesh_tool_index = 0;
+        return;
+    }
+    m_mesh_per_tool = std::move(meshes);
+    m_mesh_tool_index = 0;
+    // Mirror T0 into m_mesh_data so the existing render path just works.
+    m_mesh_data = m_mesh_per_tool.front();
+    clear_mesh_compare();
+    invalidate_mesh_overlay();
+}
+
+void Bed3D::set_active_mesh_tool(int tool_index)
+{
+    if (m_mesh_per_tool.empty()) return;
+    if (tool_index < 0) tool_index = 0;
+    if (tool_index >= int(m_mesh_per_tool.size()))
+        tool_index = int(m_mesh_per_tool.size()) - 1;
+    if (tool_index == m_mesh_tool_index) return;
+    m_mesh_tool_index = tool_index;
+    m_mesh_data = m_mesh_per_tool[tool_index];
+    // Switching the primary mesh invalidates any comparison that was built
+    // against a different tool's data.
+    clear_mesh_compare();
+    invalidate_mesh_overlay();
+}
+
+void Bed3D::init_mesh_overlay()
+{
+    if (m_mesh_overlay.is_initialized())
+        return;
+
+    // Pick the mesh to render: the precomputed delta when compare mode is on,
+    // otherwise the current mesh. Both must be valid for rendering.
+    const BedMeshData& src = m_mesh_compare_active ? m_mesh_delta : m_mesh_data;
+    if (!src.is_valid())
+        return;
+
+    const size_t rows = src.rows;
+    const size_t cols = src.cols;
+
+    // Subdivide each data quad into `sub × sub` sub-quads with bilinearly
+    // interpolated Z values. The original probe points are preserved exactly
+    // (they sit on fine-grid vertices whose s,t are integers), but iso-lines
+    // no longer show the triangulation kinks that a coarse 1-triangle-per-
+    // side tessellation produces. Heavier tessellation also makes the
+    // diffuse+specular shading smoother. 4 is a good sweet spot visually —
+    // even a 21×21 firmware grid only becomes 81×81 = ~13k triangles, which
+    // is nothing for the GPU.
+    const int sub = m_mesh_subdivision;
+    const size_t fine_rows = (rows - 1) * size_t(sub) + 1;
+    const size_t fine_cols = (cols - 1) * size_t(sub) + 1;
+    const size_t num_quads     = (fine_rows - 1) * (fine_cols - 1);
+    const size_t num_triangles = num_quads * 2;
+    const size_t num_vertices  = fine_rows * fine_cols;
+
+    GLModel::Geometry init_data;
+    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3E3 };
+    init_data.reserve_vertices(num_vertices);
+    init_data.reserve_indices(num_triangles * 3);
+
+    const float z_mean = (src.z_min + src.z_max) * 0.5f;
+    const float z_ref = (m_mesh_reference == BedMeshData::Reference::Mean)
+        ? src.mean() : 0.f;
+
+    // Bilinear sample of the source grid at fractional coordinates (s,t),
+    // where s ∈ [0, cols-1] and t ∈ [0, rows-1]. Clamps to the grid edges.
+    // Delegated to BedMeshData::sample_bilinear so tests can exercise the
+    // sampling logic without an OpenGL context.
+    auto sample_z = [&](double s, double t) -> float {
+        return src.sample_bilinear(s, t);
+    };
+
+    const double sub_d   = double(sub);
+    const float  dx_mm_h = float(src.spacing.x() / sub_d); // width of one fine cell
+    const float  dy_mm_h = float(src.spacing.y() / sub_d);
+
+    for (size_t fr = 0; fr < fine_rows; ++fr) {
+        const double t = double(fr) / sub_d;
+        for (size_t fc = 0; fc < fine_cols; ++fc) {
+            const double s = double(fc) / sub_d;
+
+            const float z_raw = sample_z(s, t);
+            const float x = float(src.origin.x() + s * src.spacing.x());
+            const float y = float(src.origin.y() + t * src.spacing.y());
+            const float z = 20.0f + (z_raw - z_mean) * m_mesh_z_scale;
+
+            // Normal from centered differences on the fine grid.
+            float dzdx, dzdy;
+            if (fc == 0)
+                dzdx = (sample_z(s + 1.0 / sub_d, t) - z_raw) * m_mesh_z_scale / dx_mm_h;
+            else if (fc == fine_cols - 1)
+                dzdx = (z_raw - sample_z(s - 1.0 / sub_d, t)) * m_mesh_z_scale / dx_mm_h;
+            else
+                dzdx = (sample_z(s + 1.0 / sub_d, t) - sample_z(s - 1.0 / sub_d, t))
+                       * m_mesh_z_scale / (2.0f * dx_mm_h);
+            if (fr == 0)
+                dzdy = (sample_z(s, t + 1.0 / sub_d) - z_raw) * m_mesh_z_scale / dy_mm_h;
+            else if (fr == fine_rows - 1)
+                dzdy = (z_raw - sample_z(s, t - 1.0 / sub_d)) * m_mesh_z_scale / dy_mm_h;
+            else
+                dzdy = (sample_z(s, t + 1.0 / sub_d) - sample_z(s, t - 1.0 / sub_d))
+                       * m_mesh_z_scale / (2.0f * dy_mm_h);
+
+            const Vec3f normal = Vec3f(-dzdx, -dzdy, 1.0f).normalized();
+            const ColorRGBA color = z_deviation_to_color(z_raw, src.z_min, src.z_max, z_ref);
+            init_data.add_vertex(Vec3f(x, y, z), normal,
+                                 Vec3f(color.r(), color.g(), color.b()));
+        }
+    }
+
+    // Triangles on the fine grid — two per sub-quad.
+    for (size_t fr = 0; fr < fine_rows - 1; ++fr) {
+        for (size_t fc = 0; fc < fine_cols - 1; ++fc) {
+            const unsigned int tl = static_cast<unsigned int>(fr * fine_cols + fc);
+            const unsigned int tr = tl + 1;
+            const unsigned int bl = static_cast<unsigned int>((fr + 1) * fine_cols + fc);
+            const unsigned int br = bl + 1;
+            init_data.add_triangle(tl, bl, tr);
+            init_data.add_triangle(tr, bl, br);
+        }
+    }
+
+    m_mesh_overlay.init_from(std::move(init_data));
+}
+
+void Bed3D::render_mesh_overlay(const Transform3d& view_matrix, const Transform3d& projection_matrix)
+{
+    init_mesh_overlay();
+
+    if (!m_mesh_overlay.is_initialized())
+        return;
+
+    GLShaderProgram* shader = wxGetApp().get_shader("bed_mesh_overlay");
+    if (shader == nullptr) {
+        shader = wxGetApp().get_shader("gouraud_light");
+        if (shader == nullptr)
+            return;
+    }
+
+    shader->start_using();
+    shader->set_uniform("view_model_matrix", view_matrix);
+    shader->set_uniform("projection_matrix", projection_matrix);
+    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+    shader->set_uniform("view_normal_matrix", view_normal_matrix);
+    shader->set_uniform("overlay_alpha", 0.85f);
+
+    // Pass the parameters needed by the FS to reconstruct raw mm-space Z
+    // values at each fragment for contour drawing. Must match the encoding
+    // in init_mesh_overlay (z = 20 + (raw - mean) * scale).
+    const BedMeshData& src = m_mesh_compare_active ? m_mesh_delta : m_mesh_data;
+    const float z_mean = (src.z_min + src.z_max) * 0.5f;
+    shader->set_uniform("u_z_mean",  z_mean);
+    shader->set_uniform("u_z_scale", m_mesh_z_scale);
+    shader->set_uniform("u_z_base",  20.0f);
+    shader->set_uniform("u_contour_interval",
+        m_mesh_show_contours ? m_mesh_contour_interval : 0.f);
+    shader->set_uniform("u_contour_darkness", 0.55f);
+
+    glsafe(::glDisable(GL_CULL_FACE));
+    glsafe(::glDisable(GL_DEPTH_TEST));
+    glsafe(::glEnable(GL_BLEND));
+    glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
+    m_mesh_overlay.render();
+
+    glsafe(::glDisable(GL_BLEND));
+    glsafe(::glEnable(GL_DEPTH_TEST));
+    glsafe(::glEnable(GL_CULL_FACE));
+
+    shader->stop_using();
+}
+
+void Bed3D::render_mesh_legend()
+{
+    if (!m_show_mesh_overlay || !m_mesh_data.is_valid())
+        return;
+
+    const BedMeshData& displayed = m_mesh_compare_active ? m_mesh_delta : m_mesh_data;
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize |
+                             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                             ImGuiWindowFlags_NoFocusOnAppearing;
+
+    ImGui::SetNextWindowPos(ImVec2(10.f, 10.f), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.8f);
+
+    if (!ImGui::Begin("Bed Mesh", nullptr, flags)) {
+        ImGui::End();
+        return;
+    }
+
+    if (m_mesh_compare_active) {
+        ImGui::Text(u8"Δ from %s", m_mesh_compare_name.c_str());
+        ImGui::Text("Grid: %zux%zu", displayed.cols, displayed.rows);
+        if (ImGui::SmallButton("Clear comparison"))
+            clear_mesh_compare();
+    } else {
+        ImGui::Text("Bed Mesh (%zux%zu)", displayed.cols, displayed.rows);
+    }
+
+    // Per-tool picker (XL).
+    if (!m_mesh_per_tool.empty() && !m_mesh_compare_active) {
+        ImGui::Text("Tool:");
+        ImGui::SameLine();
+        for (int t = 0; t < int(m_mesh_per_tool.size()); ++t) {
+            if (t > 0) ImGui::SameLine();
+            char label[8];
+            std::snprintf(label, sizeof(label), "T%d", t);
+            const bool active = (t == m_mesh_tool_index);
+            if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.55f, 0.85f, 1.f));
+            if (ImGui::SmallButton(label))
+                set_active_mesh_tool(t);
+            if (active) ImGui::PopStyleColor();
+        }
+    }
+
+    ImGui::Separator();
+
+    // Stats
+    ImGui::Text("Min:  %.4f mm", displayed.z_min);
+    ImGui::Text("Max:  %.4f mm", displayed.z_max);
+    ImGui::Text("Range: %.4f mm", displayed.z_max - displayed.z_min);
+    ImGui::Text("Mean: %.4f mm", displayed.mean());
+    ImGui::Text("StdDev: %.4f mm", displayed.std_dev());
+
+    ImGui::Separator();
+
+    // Warp report — plane fit + quality grade. Collapsible so it doesn't
+    // dominate the legend for users who just want the heatmap.
+    if (ImGui::CollapsingHeader("Warp report", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const auto pf = displayed.fit_plane();
+        ImGui::Text("Tilt X: %+.1f arcmin", pf.tilt_x_arcmin);
+        ImGui::Text("Tilt Y: %+.1f arcmin", pf.tilt_y_arcmin);
+        ImGui::Text("Warp (RMS after plane): %.4f mm", pf.rms_after);
+        const float max_dev = displayed.max_deviation_from_plane();
+        ImGui::Text("Worst point: %.4f mm", max_dev);
+
+        ImGui::Spacing();
+        ImGui::Text("Threshold:");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80.f);
+        if (ImGui::InputFloat("mm##qth", &m_mesh_quality_threshold, 0.f, 0.f, "%.2f")) {
+            if (m_mesh_quality_threshold < 0.01f) m_mesh_quality_threshold = 0.01f;
+            if (m_mesh_quality_threshold > 2.0f)  m_mesh_quality_threshold = 2.0f;
+        }
+        const auto grade = displayed.quality_grade(m_mesh_quality_threshold);
+        const char*  grade_str;
+        ImVec4       grade_col;
+        switch (grade) {
+            case BedMeshData::Quality::Excellent: grade_str = "Excellent"; grade_col = ImVec4(0.2f, 0.9f, 0.3f, 1.f); break;
+            case BedMeshData::Quality::Good:      grade_str = "Good";      grade_col = ImVec4(0.3f, 0.8f, 0.4f, 1.f); break;
+            case BedMeshData::Quality::Marginal:  grade_str = "Marginal";  grade_col = ImVec4(0.95f, 0.75f, 0.2f, 1.f); break;
+            default:                              grade_str = "Bad";       grade_col = ImVec4(0.95f, 0.3f, 0.3f, 1.f); break;
+        }
+        ImGui::TextColored(grade_col, "Quality: %s", grade_str);
+    }
+
+    ImGui::Separator();
+
+    // Reference point selector
+    ImGui::Text("Reference:");
+    ImGui::SameLine();
+    int ref_idx = (m_mesh_reference == BedMeshData::Reference::Mean) ? 1 : 0;
+    const char* ref_items[] = { "Zero", "Mean" };
+    ImGui::SetNextItemWidth(80.f);
+    if (ImGui::Combo("##ref", &ref_idx, ref_items, IM_ARRAYSIZE(ref_items))) {
+        m_mesh_reference = (ref_idx == 1) ? BedMeshData::Reference::Mean
+                                          : BedMeshData::Reference::Zero;
+        invalidate_mesh_overlay(); // per-vertex colors need to be recomputed
+    }
+
+    ImGui::Separator();
+
+    // Color scale bar
+    ImGui::Text("Z Scale (mm):");
+    const float bar_width = 20.f;
+    const float bar_height = 120.f;
+    const int   num_steps  = 32;
+    const float z_ref = (m_mesh_reference == BedMeshData::Reference::Mean)
+        ? displayed.mean() : 0.f;
+    const float max_abs = std::max(std::abs(displayed.z_min - z_ref),
+                                   std::abs(displayed.z_max - z_ref));
+
+    ImVec2 cursor = ImGui::GetCursorScreenPos();
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    for (int i = 0; i < num_steps; ++i) {
+        float t = 1.0f - float(i) / float(num_steps);            // 1 at top, 0 at bottom
+        float z = z_ref + max_abs * (2.0f * t - 1.0f);           // +max above ref at top
+        ColorRGBA c = z_deviation_to_color(z, displayed.z_min, displayed.z_max, z_ref);
+        ImU32 col = IM_COL32(int(c.r() * 255), int(c.g() * 255), int(c.b() * 255), 255);
+        float y0 = cursor.y + bar_height * float(i) / float(num_steps);
+        float y1 = cursor.y + bar_height * float(i + 1) / float(num_steps);
+        draw_list->AddRectFilled(ImVec2(cursor.x, y0), ImVec2(cursor.x + bar_width, y1), col);
+    }
+
+    // Labels next to the bar — absolute Z so the numbers match the stats above
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%+.3f", z_ref + max_abs);
+    draw_list->AddText(ImVec2(cursor.x + bar_width + 4.f, cursor.y - 2.f), IM_COL32(255, 255, 255, 255), buf);
+    snprintf(buf, sizeof(buf), "%+.3f", z_ref);
+    draw_list->AddText(ImVec2(cursor.x + bar_width + 4.f, cursor.y + bar_height * 0.5f - 6.f), IM_COL32(255, 255, 255, 255), buf);
+    snprintf(buf, sizeof(buf), "%+.3f", z_ref - max_abs);
+    draw_list->AddText(ImVec2(cursor.x + bar_width + 4.f, cursor.y + bar_height - 14.f), IM_COL32(255, 255, 255, 255), buf);
+
+    // Advance cursor past the bar
+    ImGui::Dummy(ImVec2(bar_width + 80.f, bar_height));
+
+    ImGui::Separator();
+
+    // Z exaggeration slider
+    ImGui::Text("Z Exaggeration:");
+    if (ImGui::SliderFloat("##z_scale", &m_mesh_z_scale, 10.f, 1000.f, "%.0fx")) {
+        invalidate_mesh_overlay(); // rebuild mesh with new scale
+    }
+
+    ImGui::Separator();
+
+    // Display options — iso-Z contour lines (via shader) and per-cell text
+    // labels (via ImGui background drawlist).
+    ImGui::Checkbox("Contours", &m_mesh_show_contours);
+    if (m_mesh_show_contours) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(80.f);
+        if (ImGui::InputFloat("mm##ci", &m_mesh_contour_interval, 0.f, 0.f, "%.2f")) {
+            if (m_mesh_contour_interval < 0.01f) m_mesh_contour_interval = 0.01f;
+            if (m_mesh_contour_interval > 1.0f)  m_mesh_contour_interval = 1.0f;
+        }
+    }
+    ImGui::Checkbox("Cell values", &m_mesh_show_cell_values);
+
+    ImGui::End();
+
+    // Cell-value labels — drawn on top of the 3D view via ImGui's background
+    // drawlist, projected from each grid point's world-space XY.
+    if (m_mesh_show_cell_values)
+        render_mesh_cell_labels(displayed);
+}
+
+void Bed3D::render_mesh_cell_labels(const BedMeshData& src)
+{
+    if (!src.is_valid()) return;
+
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const Matrix4d pv = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
+    const std::array<int, 4>& viewport = camera.get_viewport();
+    const double half_w = 0.5 * double(viewport[2]);
+    const double h      = double(viewport[3]);
+    const double half_h = 0.5 * h;
+
+    // Text is drawn at the Z-scaled overlay height so it sits on top of
+    // the heatmap; mirror the encoding from init_mesh_overlay.
+    const float z_mean = (src.z_min + src.z_max) * 0.5f;
+
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const ImU32 text_col = IM_COL32(0, 0, 0, 230);
+    const ImU32 bg_col   = IM_COL32(255, 255, 255, 180);
+
+    char buf[16];
+    for (std::size_t r = 0; r < src.rows; ++r) {
+        for (std::size_t c = 0; c < src.cols; ++c) {
+            const double x = src.origin.x() + double(c) * src.spacing.x();
+            const double y = src.origin.y() + double(r) * src.spacing.y();
+            const double z = 20.0 + (src.get(r, c) - z_mean) * m_mesh_z_scale;
+            const Vec4d clip = pv * Vec4d(x, y, z, 1.0);
+            if (clip.w() <= 0.0) continue;
+            const Vec3d ndc = Vec3d(clip.x(), clip.y(), clip.z()) / clip.w();
+            if (ndc.x() < -1.0 || ndc.x() > 1.0 || ndc.y() < -1.0 || ndc.y() > 1.0)
+                continue;
+            const float sx = float(half_w * ndc.x() + double(viewport[0]) + half_w);
+            const float sy = float(h - (half_h * ndc.y() + double(viewport[1]) + half_h));
+            std::snprintf(buf, sizeof(buf), "%+.3f", src.get(r, c));
+            const ImVec2 tsz = ImGui::CalcTextSize(buf);
+            dl->AddRectFilled(ImVec2(sx - tsz.x * 0.5f - 2.f, sy - tsz.y * 0.5f - 1.f),
+                              ImVec2(sx + tsz.x * 0.5f + 2.f, sy + tsz.y * 0.5f + 1.f),
+                              bg_col, 2.f);
+            dl->AddText(ImVec2(sx - tsz.x * 0.5f, sy - tsz.y * 0.5f),
+                        text_col, buf);
+        }
+    }
 }
 
 } // GUI

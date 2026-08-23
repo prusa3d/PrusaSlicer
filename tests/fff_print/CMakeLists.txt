@@ -39,6 +39,7 @@ add_executable(${_TEST_NAME}_tests
 	test_support_material.cpp
 	test_thin_walls.cpp
 	test_trianglemesh.cpp
+	test_skew_correction.cpp
 	)
 target_link_libraries(${_TEST_NAME}_tests test_common slic3r-arrange-wrapper)
 set_property(TARGET ${_TEST_NAME}_tests PROPERTY FOLDER "tests")

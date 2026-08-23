@@ -4,6 +4,9 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "PostProcessor.hpp"
+#include "CalibrationRetractionPostProcessor.hpp"
+#include "CalibrationFlowPostProcessor.hpp"
+#include "CalibrationPALinePostProcessor.hpp"
 
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/format.hpp"
@@ -276,6 +279,53 @@ bool run_post_process_scripts(std::string &src_path, bool make_copy, const std::
                 boost::trim(script);
                 if (script.empty())
                     continue;
+                // In-process built-ins (no external interpreter needed).
+                // Triggered by the Filament-Edition Retraction Calibration dialog.
+                if (is_calibration_retraction_url(script)) {
+                    BOOST_LOG_TRIVIAL(info) << "Running built-in post-processor: " << script;
+                    try {
+                        run_calibration_retraction_post_processor(script, gcode_file.string());
+                    } catch (const std::exception &err) {
+                        delete_copy();
+                        throw Slic3r::RuntimeError(
+                            (boost::format("Built-in post-processor %1% on file %2% failed:\n%3%")
+                                 % script % path % err.what()).str());
+                    }
+                    continue;
+                }
+                if (is_calibration_flow_url(script)) {
+                    BOOST_LOG_TRIVIAL(info) << "Running built-in post-processor: " << script;
+                    try {
+                        run_calibration_flow_post_processor(script, gcode_file.string());
+                    } catch (const std::exception &err) {
+                        delete_copy();
+                        throw Slic3r::RuntimeError(
+                            (boost::format("Built-in post-processor %1% on file %2% failed:\n%3%")
+                                 % script % path % err.what()).str());
+                    }
+                    continue;
+                }
+                if (is_pa_line_url(script)) {
+                    BOOST_LOG_TRIVIAL(info) << "Running built-in post-processor: " << script;
+                    try {
+                        run_pa_line_post_processor(script, gcode_file.string());
+                    } catch (const std::exception &err) {
+                        delete_copy();
+                        throw Slic3r::RuntimeError(
+                            (boost::format("Built-in post-processor %1% on file %2% failed:\n%3%")
+                                 % script % path % err.what()).str());
+                    }
+                    continue;
+                }
+                // Legacy compatibility: the PA Pattern test was removed in 1.9.2, but a
+                // stale `::builtin::pa_calibration?...` entry may still sit in an older
+                // print preset's post_process list. Skip it — otherwise it falls through
+                // to the external-script path below and every normal export fails trying
+                // to run it as a shell command.
+                if (script.rfind("::builtin::pa_calibration", 0) == 0) {
+                    BOOST_LOG_TRIVIAL(info) << "Skipping removed built-in post-processor: " << script;
+                    continue;
+                }
                 BOOST_LOG_TRIVIAL(info) << "Executing script " << script << " on file " << path;
                 std::string std_err;
                 const int result = run_script(script, gcode_file.string(), std_err);

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" id="filament_db_sync" xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 16 16" enable-background="new 0 0 16 16">
+  <g>
+    <!-- arrowhead: solid upward triangle -->
+    <polygon fill="#808080" points="2.5,7 8,1.5 13.5,7 11,7 11,11 5,11 5,7 "/>
+    <!-- ground bar (orange accent: distinguishes "upload to server") -->
+    <rect fill="#ED6B21" x="2" y="13" width="12" height="2" rx="0.6"/>
+  </g>
+</svg>

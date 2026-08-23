@@ -11,52 +11,28 @@ brew upgrade
 
 to install them.
 
-It may help to skim over this document's [Troubleshooting](#troubleshooting)](#troubleshooting) first, as you may find helpful workarounds documented there.
+It may help to skim over this document's [Troubleshooting](#troubleshooting) first, as you may find helpful workarounds documented there.
 
-### Dependencies
+### Building Dependencies and PrusaSlicer
 
-PrusaSlicer comes with a set of CMake scripts to build its dependencies, it lives in the `deps` directory.
-Open a terminal window and navigate to the PrusaSlicer sources directory.
-Use the following commands to build the dependencies:
+PrusaSlicer uses CMake presets to automatically build all dependencies and then configure PrusaSlicer.
 
-    cd deps
-    mkdir build
-    cd build
-    cmake ..
-    make
+Open a terminal window, navigate to the PrusaSlicer sources directory, and run:
 
-This will create a dependencies bundle inside the `build/destdir` directory.
-You can also customize the bundle output path using the `-DDESTDIR=<some path>` option passed to `cmake`.
+    cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON
+    cmake --build build-default -j$(sysctl -n hw.ncpu)
 
-**Warning**: Once the dependency bundle is installed in a destdir, the destdir cannot be moved elsewhere.
+This will first build all dependencies, then configure and build PrusaSlicer itself.
+The build output will be in the `build-default` directory.
+
+**Warning**: Once the dependency bundle is installed, it cannot be moved elsewhere.
 (This is because wxWidgets hardcodes the installation path.)
 
+Alternatively, if you would like to use Xcode GUI, add the `-GXcode` option:
 
+    cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON -GXcode
 
-### Building PrusaSlicer
-
-If dependencies are built without errors, you can proceed to build PrusaSlicer itself.
-Go back to top level PrusaSlicer sources directory and use these commands:
-
-    mkdir build
-    cd build
-    cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local"
-
-The `CMAKE_PREFIX_PATH` is the path to the dependencies bundle but with `/usr/local` appended - if you set a custom path
-using the `DESTDIR` option, you will need to change this accordingly. **Warning:** the `CMAKE_PREFIX_PATH` needs to be an absolute path.
-
-The CMake command above prepares PrusaSlicer for building from the command line.
-To start the build, use
-
-    make -jN
-
-where `N` is the number of CPU cores, so, for example `make -j4` for a 4-core machine.
-
-Alternatively, if you would like to use Xcode GUI, modify the `cmake` command to include the `-GXcode` option:
-
-    cmake .. -GXcode -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local"
-
-and then open the `PrusaSlicer.xcodeproj` file.
+and then open the `build-default/PrusaSlicer.xcodeproj` file.
 This should open up Xcode where you can perform build using the GUI or perform other tasks.
 
 ### Running Unit Tests
@@ -66,12 +42,12 @@ Without the Debug build, internal assert statements are not tested.
 
 To run all the unit tests:
 
-    cd build
+    cd build-default
     make test
 
 To run a specific unit test:
 
-    cd build/tests/
+    cd build-default/tests/
 
 The unit tests can be found by
 
@@ -94,7 +70,7 @@ is currently unsupported because some of the dependencies don't support this, mo
 Please note that the `CMAKE_OSX_DEPLOYMENT_TARGET` and `CMAKE_OSX_SYSROOT` options need to be set the same
 on both the dependencies bundle as well as PrusaSlicer itself.
 
-Official macOS PrusaSlicer builds are currently (as of PrusaSlicer 2.5) built against SDK 10.12 to ensure compatibility with older systems.
+Official upstream PrusaSlicer builds historically targeted SDK 10.12. This fork targets SDK 14.0+ (macOS Sonoma and later).
 
 _Warning:_ Xcode may be set such that it rejects SDKs bellow some version (silently, more or less).
 This is set in the property list file
@@ -105,16 +81,18 @@ To remove the limitation, simply delete the key `MinimumSDKVersion` from that fi
 
 ## Troubleshooting
 
-### `CMath::CMath` target not found
+### Homebrew package conflicts
 
-At the moment (20.2.2024) PrusaSlicer cannot be built with CMake 3.28+. Use [CMake 3.27](https://github.com/Kitware/CMake/releases/tag/v3.27.9) instead. 
-If you install the CMake application from [universal DMG](https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-macos-universal.dmg), you can invoke the CMake like this:
+Homebrew versions of `boost`, `eigen`, or `glew` can conflict with the dependencies built by PrusaSlicer.
+If you encounter cmake errors related to these packages, uninstall them:
 
 ```
-/Applications/CMake.app/Contents/bin/cmake
+brew uninstall boost eigen glew
 ```
 
-### Running `cmake -GXcode` fails with `No CMAKE_CXX_COMPILER could be found.` 
+The deps build will compile the correct versions from source.
+
+### Running `cmake -GXcode` fails with `No CMAKE_CXX_COMPILER could be found.`
 
 - If Xcode command line tools wasn't already installed, run:
     ```
@@ -129,7 +107,7 @@ If you install the CMake application from [universal DMG](https://github.com/Kit
 
 Ensure the homebrew installed `m4` is in front of any other installed `m4` on your system.
 
-_e.g._ `echo 'export PATH="/opt/homebrew/opt/m4/bin:$PATH"' >> ~/.bash_profile`
+_e.g._ `echo 'export PATH="/opt/homebrew/opt/m4/bin:$PATH"' >> ~/.zprofile` (or `~/.bash_profile` if using bash)
 
 ### `cmake` complains that it can't determine the build deployment target
 
@@ -141,23 +119,16 @@ Works on a fresh installation of macOS Sequoia 15.5
 
 - Install [brew](https://brew.sh/):
 - Open Terminal
-    
+
 - Enter:
 
 ```
 brew update
 brew install automake cmake git gettext libtool texinfo m4 zlib
 brew upgrade
-git clone https://github.com/prusa3d/PrusaSlicer/
-cd PrusaSlicer/deps
-mkdir build
-cd build
-cmake ..
-make
-cd ../..
-mkdir build
-cd build
-cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local"
-make
-src/prusa-slicer
+git clone https://github.com/hyiger/PrusaSlicer.git
+cd PrusaSlicer
+cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON
+cmake --build build-default -j$(sysctl -n hw.ncpu)
+build-default/src/prusa-slicer
 ```

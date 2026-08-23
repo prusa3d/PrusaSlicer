@@ -75,6 +75,8 @@ std::pair<bool, std::string> GLShadersManager::init()
     valid &= append_shader("gouraud_light_clip", { prefix + "gouraud_light_clip.vs", prefix + "gouraud_light_clip.fs" });
     // used to render printbed
     valid &= append_shader("printbed", { prefix + "printbed.vs", prefix + "printbed.fs" });
+    // used to render bed mesh overlay with per-vertex color
+    valid &= append_shader("bed_mesh_overlay", { prefix + "bed_mesh_overlay.vs", prefix + "bed_mesh_overlay.fs" });
     // used to render options in gcode preview
     if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
         valid &= append_shader("gouraud_light_instanced", { prefix + "gouraud_light_instanced.vs", prefix + "gouraud_light_instanced.fs" });

@@ -186,6 +186,10 @@ public:
     bool is_preview_loaded() const;
     bool is_view3D_shown() const;
 
+    // Arm a one-shot reminder popup shown on the next successful slice (used by the
+    // PA "Line" calibration, whose preview is a placeholder — see Plater.cpp).
+    void set_pa_line_export_reminder(bool on);
+
     bool are_view3D_labels_shown() const;
     void show_view3D_labels(bool show);
 
@@ -253,6 +257,18 @@ public:
     void send_gcode();
     void send_gcode_inner(DynamicPrintConfig* physical_printer_config);
 	void eject_drive();
+
+    // Bed mesh overlay
+    void fetch_bed_mesh();
+    void probe_bed_mesh();
+    // Maintenance procedures over USB serial
+    void cold_pull_maintenance();
+    void save_bed_mesh_csv();
+    void load_bed_mesh_csv();
+    void compare_bed_mesh_csv();
+    void toggle_bed_mesh_overlay();
+    void set_bed_mesh_overlay_shown(bool show);
+    bool is_bed_mesh_overlay_shown() const;
 
     std::optional<PrintHostJob> get_connect_print_host_job(bool multiple_beds);
     void connect_gcode();

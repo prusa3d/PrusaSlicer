@@ -1,0 +1,366 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [master]
+  release:
+    types: [created]
+  workflow_dispatch:
+
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 240
+    env:
+      SCCACHE_VERSION: v0.14.0
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 2G
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep 'set(SLIC3R_VERSION' version.inc | sed 's/.*"\(.*\)".*/\1/')
+          BUILD_ID=$(grep 'set(SLIC3R_BUILD_ID' version.inc | sed 's/.*"\(.*\)".*/\1/' | sed "s/\${SLIC3R_VERSION}/$VERSION/")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "Build ID: $BUILD_ID"
+
+      - name: Install system dependencies
+        run: brew install automake cmake git gettext libtool texinfo m4 zlib
+
+      - name: Get SDK version for cache key
+        id: sdk
+        run: echo "version=$(xcrun --show-sdk-version)" >> $GITHUB_OUTPUT
+
+      # --- Cache arm64 deps ---
+      - name: Cache arm64 dependencies
+        id: cache-deps-arm64
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/build-arm64/destdir
+            deps/build-arm64/dep_*-prefix/src/*-stamp
+          key: deps-macos-arm64-universal-sdk${{ steps.sdk.outputs.version }}-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+
+      # --- Cache x86_64 deps ---
+      - name: Cache x86_64 dependencies
+        id: cache-deps-x86
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/build-x86_64/destdir
+            deps/build-x86_64/dep_*-prefix/src/*-stamp
+          key: deps-macos-x86_64-universal-sdk${{ steps.sdk.outputs.version }}-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+
+      - name: Cache package downloads
+        uses: actions/cache@v4
+        with:
+          path: deps/.pkg_cache
+          key: pkgcache-macos-universal-v1-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+          restore-keys: pkgcache-macos-universal-v1-
+
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: .sccache
+          key: sccache-macos-universal-v1-${{ github.run_id }}
+          restore-keys: sccache-macos-universal-v1-
+
+      - name: Install sccache
+        run: |
+          SCCACHE_ARCHIVE="sccache-${SCCACHE_VERSION}-aarch64-apple-darwin.tar.gz"
+          curl -L -o "$SCCACHE_ARCHIVE" \
+            "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${SCCACHE_ARCHIVE}"
+          tar -xzf "$SCCACHE_ARCHIVE"
+          echo "$PWD/${SCCACHE_ARCHIVE%.tar.gz}" >> "$GITHUB_PATH"
+
+      - name: Pre-download GMP (gmplib.org is unreliable)
+        run: |
+          mkdir -p deps/.pkg_cache/GMP
+          if [ ! -f deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 ]; then
+            curl -L -o deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 \
+              https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2 || \
+            curl -L -o deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 \
+              https://mirror.ibcp.fr/pub/gnu/gmp/gmp-6.2.1.tar.bz2
+          fi
+
+      - name: Zero sccache stats
+        run: sccache --zero-stats
+
+      # ========== ARM64 BUILD ==========
+      - name: Check arm64 deps cached
+        id: arm64-deps-exist
+        run: |
+          if [ -d "deps/build-arm64/destdir/usr/local/lib" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build arm64 deps
+        if: steps.arm64-deps-exist.outputs.found != 'true'
+        env:
+          LC_ALL: en_US.UTF-8
+        run: |
+          cmake --preset mac_universal_arm \
+            -DPrusaSlicer_BUILD_DEPS=ON \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Configure arm64 PrusaSlicer
+        if: steps.arm64-deps-exist.outputs.found == 'true'
+        run: |
+          cmake --preset mac_universal_arm \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/deps/build-arm64/destdir/usr/local" \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build arm64
+        run: cmake --build build-arm64 -j$(sysctl -n hw.ncpu)
+
+      - name: Save arm64 binary
+        run: |
+          cp build-arm64/src/prusa-slicer /tmp/prusa-slicer-arm64
+          # Save resources from the arm64 build (same for both archs)
+          if [ -d build-arm64/resources ]; then
+            cp -RL build-arm64/resources /tmp/build-resources 2>/dev/null || true
+          fi
+          # Save Info.plist if generated
+          if [ -f build-arm64/src/platform/osx/Info.plist ]; then
+            cp build-arm64/src/platform/osx/Info.plist /tmp/Info.plist
+          fi
+
+      - name: Clean arm64 build intermediates
+        run: |
+          rm -rf build-arm64/src build-arm64/tests build-arm64/CMakeFiles
+          df -h .
+
+      # ========== X86_64 BUILD ==========
+      - name: Check x86_64 deps cached
+        id: x86-deps-exist
+        run: |
+          if [ -d "deps/build-x86_64/destdir/usr/local/lib" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build x86_64 deps
+        if: steps.x86-deps-exist.outputs.found != 'true'
+        env:
+          LC_ALL: en_US.UTF-8
+        run: |
+          cmake --preset mac_universal_x86 \
+            -DPrusaSlicer_BUILD_DEPS=ON \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Configure x86_64 PrusaSlicer
+        if: steps.x86-deps-exist.outputs.found == 'true'
+        run: |
+          cmake --preset mac_universal_x86 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/deps/build-x86_64/destdir/usr/local" \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build x86_64
+        run: cmake --build build-x86_64 -j$(sysctl -n hw.ncpu)
+
+      - name: Save x86_64 binary
+        run: cp build-x86_64/src/prusa-slicer /tmp/prusa-slicer-x86_64
+
+      - name: Clean x86_64 build intermediates
+        run: |
+          rm -rf build-x86_64/src build-x86_64/tests build-x86_64/CMakeFiles
+          rm -rf build-arm64 build-x86_64
+          df -h .
+
+      # ========== CREATE UNIVERSAL BINARY ==========
+      - name: Create universal binary
+        run: |
+          lipo -create /tmp/prusa-slicer-arm64 /tmp/prusa-slicer-x86_64 \
+            -output /tmp/prusa-slicer-universal
+          file /tmp/prusa-slicer-universal
+          strip -x /tmp/prusa-slicer-universal
+
+      - name: Create .app bundle
+        run: |
+          APP="PrusaSlicer.app"
+          mkdir -p "$APP/Contents/MacOS"
+          mkdir -p "$APP/Contents/Resources"
+
+          # Universal binary
+          cp /tmp/prusa-slicer-universal "$APP/Contents/MacOS/PrusaSlicer"
+          chmod +x "$APP/Contents/MacOS/PrusaSlicer"
+          ln -sf PrusaSlicer "$APP/Contents/MacOS/prusa-gcodeviewer"
+
+          # Info.plist
+          if [ -f /tmp/Info.plist ]; then
+            cp /tmp/Info.plist "$APP/Contents/"
+          else
+            sed -e "s/@SLIC3R_APP_KEY@/PrusaSlicer/g" \
+                -e "s/@SLIC3R_APP_NAME@/PrusaSlicer/g" \
+                -e "s/@SLIC3R_BUILD_ID@/${{ steps.version.outputs.build_id }}/g" \
+                -e "s/@SLIC3R_VERSION@/${{ steps.version.outputs.version }}/g" \
+                src/platform/osx/Info.plist.in > "$APP/Contents/Info.plist"
+          fi
+
+          # Resources from saved build tree
+          if [ -d /tmp/build-resources ]; then
+            cp -RL /tmp/build-resources/* "$APP/Contents/Resources/" 2>/dev/null || true
+          fi
+          cp -Rn resources/* "$APP/Contents/Resources/" 2>/dev/null || true
+
+          # Icons
+          for icns in resources/icons/*.icns; do
+            [ -f "$icns" ] && cp "$icns" "$APP/Contents/Resources/"
+          done
+
+          echo "Created $APP"
+          file "$APP/Contents/MacOS/PrusaSlicer"
+          du -sh "$APP"
+
+      - name: Check signing secrets
+        id: signing
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+        run: |
+          if [ -n "$MACOS_CERTIFICATE" ]; then
+            echo "enabled=true" >> $GITHUB_OUTPUT
+            echo "Developer ID signing + notarization enabled."
+          else
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "::warning::MACOS_CERTIFICATE secret not set — falling back to ad-hoc signing (not notarized; Gatekeeper will warn)."
+          fi
+
+      - name: Import signing certificate
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/developer_id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          printf %s "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PWD" \
+            -t cert -f pkcs12 -k "$KEYCHAIN_PATH" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
+          # Prepend our keychain to the search list, keeping the defaults.
+          security list-keychains -d user -s "$KEYCHAIN_PATH" \
+            $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$CERT_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Sign app (Developer ID + hardened runtime)
+        if: steps.signing.outputs.enabled == 'true'
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep 'Developer ID Application' | head -1 | awk '{print $2}')
+          echo "Signing with identity: $IDENTITY"
+          # Sign inside-out: nested executable first, then the bundle.
+          codesign --force --options runtime --timestamp \
+            --entitlements src/platform/osx/entitlements.plist \
+            --sign "$IDENTITY" \
+            PrusaSlicer.app/Contents/MacOS/PrusaSlicer
+          codesign --force --options runtime --timestamp \
+            --entitlements src/platform/osx/entitlements.plist \
+            --sign "$IDENTITY" \
+            PrusaSlicer.app
+          codesign --verify --deep --strict --verbose=2 PrusaSlicer.app
+          codesign --display --entitlements - PrusaSlicer.app
+
+      - name: Notarize and staple app
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent PrusaSlicer.app "$RUNNER_TEMP/PrusaSlicer-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/PrusaSlicer-notarize.zip" \
+            --apple-id "$NOTARY_APPLE_ID" \
+            --password "$NOTARY_PASSWORD" \
+            --team-id "$NOTARY_TEAM_ID" \
+            --wait
+          xcrun stapler staple PrusaSlicer.app
+          xcrun stapler validate PrusaSlicer.app
+
+      - name: Ad-hoc sign (fallback — no signing secrets)
+        if: steps.signing.outputs.enabled != 'true'
+        run: codesign --force --deep --sign - PrusaSlicer.app
+
+      - name: Create DMG
+        run: |
+          DMG_NAME="${{ steps.version.outputs.build_id }}-macOS-universal.dmg"
+          STAGE_DIR="$(mktemp -d)"
+          ditto PrusaSlicer.app "$STAGE_DIR/PrusaSlicer.app"
+          for attempt in 1 2 3; do
+            if hdiutil create -volname "PrusaSlicer" -srcfolder "$STAGE_DIR/PrusaSlicer.app" \
+              -ov -format UDZO "$DMG_NAME"; then
+              break
+            fi
+            rm -f "$DMG_NAME"
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 5
+          done
+          rm -rf "$STAGE_DIR"
+          echo "dmg_name=$DMG_NAME" >> $GITHUB_ENV
+
+      - name: Sign, notarize and staple DMG
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep 'Developer ID Application' | head -1 | awk '{print $2}')
+          codesign --force --timestamp --sign "$IDENTITY" "$dmg_name"
+          xcrun notarytool submit "$dmg_name" \
+            --apple-id "$NOTARY_APPLE_ID" \
+            --password "$NOTARY_PASSWORD" \
+            --team-id "$NOTARY_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$dmg_name"
+          xcrun stapler validate "$dmg_name"
+
+      - name: Show sccache stats
+        if: always()
+        run: sccache --show-stats
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: ${{ steps.version.outputs.build_id }}-macOS-universal.dmg
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.version.outputs.build_id }}-macOS-universal.dmg

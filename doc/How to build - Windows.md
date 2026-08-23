@@ -17,7 +17,7 @@ Clone the respository. Use a directory relatively close to the drive root, so th
 ```
 c:> mkdir src
 c:> cd src
-c:\src> git clone https://github.com/prusa3d/PrusaSlicer.git
+c:\src> git clone https://github.com/hyiger/PrusaSlicer.git
 ```
 
 
@@ -66,8 +66,7 @@ Without the Debug build, internal assert statements are not tested.
 To run the unit tests:
 
     cd build
-    make test
-
+    ctest -C Release
 
 To run a specific unit test:
 
@@ -75,11 +74,11 @@ To run a specific unit test:
 
 The unit tests can be found by
 
-    `dir *\*_tests`
+    dir *\*_tests.exe
 
 Any of these unit tests can be run directly e.g.
 
-    `.\fff_print\fff_print_tests`
+    .\fff_print\Release\fff_print_tests.exe
 
 ## 2.B Run the automatic build script
 

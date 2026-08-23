@@ -29,6 +29,8 @@
 * igl
 * nanosvg
 * agg
-* catch2: Only Arch has packages for catch2, other distros at most catch (v1.x). Being strictly header only, we bundle this in the source tree. Used for the unit-test suites.
+
+## Built from source via deps
+* catch2 (v3.8+): Compiled library (not header-only since v3). Built from source via `deps/+Catch2/`. Used for unit tests.
 
 

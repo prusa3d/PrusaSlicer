@@ -26,7 +26,7 @@
 
 namespace Slic3r {
 
-#if __APPLE__
+#if __APPLE__ && defined(SLIC3R_STEP_ENABLED)
 extern "C" bool load_step_internal(const char *path, OCCTResult* res, std::optional<std::pair<double, double>> deflections /*= std::nullopt*/);
 #endif
 
@@ -61,8 +61,10 @@ LoadStepFn get_load_step_fn()
             FreeLibrary(module);
             throw;
         }
-#elif __APPLE__
+#elif __APPLE__ && defined(SLIC3R_STEP_ENABLED)
         load_step_fn = &load_step_internal;
+#elif __APPLE__
+        throw Slic3r::RuntimeError("STEP file support is not enabled in this build.");
 #else
         libpath /= "OCCTWrapper.so";
         void *plugin_ptr = dlopen(libpath.c_str(), RTLD_NOW | RTLD_GLOBAL);

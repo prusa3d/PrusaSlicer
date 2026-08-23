@@ -372,6 +372,13 @@ public:
     // return true, if new preset is stored
     bool            save_current_preset(const std::string &new_name, bool detach = false);
 
+    // #36: bind the selected filament preset to a FilamentDB record id — persists to
+    // the preset .ini and mirrors onto the edited + project-saved snapshots so this
+    // hidden metadata-only stamp doesn't make the preset OR the project look unsaved.
+    // No-op if id is empty, nothing is selected, the selected preset isn't
+    // user-modifiable, or it already carries the id. Returns true if it wrote.
+    bool            stamp_filamentdb_id(const std::string &id);
+
     // Find the preset with a new_name or create a new one,
     // initialize it with the initial_preset config.
     Preset&         get_preset_with_name(const std::string& new_name, const Preset* initial_preset);

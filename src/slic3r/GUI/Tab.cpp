@@ -32,6 +32,8 @@
 #include "libslic3r/CustomParametersHandling.hpp"
 
 #include "slic3r/Utils/Http.hpp"
+#include "slic3r/Utils/FilamentDB.hpp"
+#include "NotificationManager.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
 #include "BonjourDialog.hpp"
 #include "WipeTowerDialog.hpp"
@@ -188,6 +190,8 @@ void Tab::create_preset_tab()
     add_scaled_button(panel, &m_btn_delete_preset, "cross");
     if (m_type == Preset::Type::TYPE_PRINTER)
         add_scaled_button(panel, &m_btn_edit_ph_printer, "cog");
+    if (m_type == Preset::Type::TYPE_FILAMENT)
+        add_scaled_button(panel, &m_btn_sync_filamentdb, "filament_db_sync");
 
     m_show_incompatible_presets = false;
 
@@ -252,6 +256,11 @@ void Tab::create_preset_tab()
     if (m_btn_edit_ph_printer) {
         m_h_buttons_sizer->AddSpacer(int(4 * scale_factor));
         m_h_buttons_sizer->Add(m_btn_edit_ph_printer, 0, wxALIGN_CENTER_VERTICAL);
+    }
+    if (m_btn_sync_filamentdb) {
+        m_h_buttons_sizer->AddSpacer(int(4 * scale_factor));
+        m_h_buttons_sizer->Add(m_btn_sync_filamentdb, 0, wxALIGN_CENTER_VERTICAL);
+        m_btn_sync_filamentdb->SetToolTip(_L("Sync this filament preset to the FilamentDB server (creates a new entry if it doesn't exist)"));
     }
     m_h_buttons_sizer->AddSpacer(int(/*16*/8 * scale_factor));
     m_h_buttons_sizer->Add(m_btn_hide_incompatible_presets, 0, wxALIGN_CENTER_VERTICAL);
@@ -345,6 +354,12 @@ void Tab::create_preset_tab()
                 m_presets_choice->edit_physical_printer();
             else
                 m_presets_choice->add_physical_printer();
+        });
+
+    if (m_btn_sync_filamentdb)
+        m_btn_sync_filamentdb->Bind(wxEVT_BUTTON, [this](wxCommandEvent) {
+            if (auto *fil = dynamic_cast<TabFilament *>(this))
+                fil->sync_to_filamentdb(/*manual_trigger=*/true);
         });
 
     // Initialize the DynamicPrintConfig by default keys/values.
@@ -1867,7 +1882,7 @@ void TabPrint::update()
         toggle_options();
 
         // update() could be called during undo/redo execution
-        // Update of objectList can cause a crash in this case (because m_objects doesn't match ObjectList) 
+        // Update of objectList can cause a crash in this case (because m_objects doesn't match ObjectList)
         if (!wxGetApp().plater()->inside_snapshot_capture())
             wxGetApp().obj_list()->update_and_show_object_settings_item();
 
@@ -2599,9 +2614,255 @@ bool TabFilament::save_current_preset(const std::string &new_name, bool detach)
     if (is_saved)
         m_preset_bundle->reset_extruder_filaments();
 
-    // Saved preset have to be selected for active extruder in any case 
+    // Saved preset have to be selected for active extruder in any case
     m_preset_bundle->extruders_filaments[m_active_extruder].select_filament(m_presets->get_idx_selected());
+
+    // Sync the saved preset back to FilamentDB. Errors no longer disappear into
+    // the log — they surface as user-visible notifications so the user knows
+    // when a preset they thought they shared didn't actually make it server-side.
+    sync_to_filamentdb(/*manual_trigger=*/false);
+
     return is_saved;
+}
+
+void TabFilament::sync_to_filamentdb(bool manual_trigger)
+{
+    auto *notif = wxGetApp().notification_manager();
+
+    // Notifications render on the GL canvas (Plater/Preview), not on Settings
+    // tabs. When the user clicks the toolbar button, they're necessarily on the
+    // Filaments tab — so a notification is invisible to them. For manual
+    // triggers we ALSO surface a brief modal so the result is unmissable; the
+    // notification still fires for users who are on the Plater after the auto-
+    // sync that happens on Save Preset.
+    auto report = [&](NotificationManager::NotificationLevel level,
+                      const std::string &short_text,
+                      const std::string &full_text,
+                      bool is_error) {
+        if (notif)
+            notif->push_notification(NotificationType::CustomNotification, level, short_text);
+        if (manual_trigger) {
+            wxMessageBox(wxString::FromUTF8(full_text),
+                         _L("FilamentDB"),
+                         (is_error ? wxICON_WARNING : wxICON_INFORMATION) | wxOK,
+                         this);
+        }
+    };
+
+    try {
+        const std::string filamentdb_url = wxGetApp().app_config->get("filamentdb_url");
+        if (filamentdb_url.empty()) {
+            if (manual_trigger)
+                report(NotificationManager::NotificationLevel::WarningNotificationLevel,
+                       _u8L("FilamentDB URL is not configured."),
+                       _u8L("FilamentDB URL is not configured. Set it in Preferences → filamentdb_url."),
+                       /*is_error=*/true);
+            return;
+        }
+
+        const Preset &saved = m_presets->get_selected_preset();
+        double nozzle_dia = 0;
+        bool   high_flow  = false;
+        const auto &printer_cfg = m_preset_bundle->printers.get_edited_preset().config;
+        const size_t ext_idx = static_cast<size_t>(m_active_extruder);
+        if (auto *opt = dynamic_cast<const ConfigOptionFloats *>(printer_cfg.option("nozzle_diameter")))
+            if (ext_idx < opt->values.size())
+                nozzle_dia = opt->values[ext_idx];
+        if (auto *opt = dynamic_cast<const ConfigOptionBools *>(printer_cfg.option("nozzle_high_flow")))
+            if (ext_idx < opt->values.size())
+                high_flow = opt->values[ext_idx] != 0;
+
+        // Auto-sync (Save Preset) keeps its silent upsert — a brand-new preset just
+        // creates its record. A MANUAL toolbar sync suppresses the auto-create so a
+        // no-match becomes a deliberate Create-new / Link-to-existing prompt below
+        // (would_create); this is where the user is present to answer.
+        FilamentDBSyncResult r = sync_filament_to_filamentdb_detailed(
+            filamentdb_url, saved.name, saved.config, nozzle_dia, high_flow,
+            /*allow_create=*/!manual_trigger);
+
+        // #36 Phase 2: the server refused to mutate (HTTP 409) because this preset's
+        // filamentdb_id resolves to a DIFFERENTLY-named filament — either the preset
+        // was renamed (the id is right) or its id was copied from another preset (a
+        // Save-as that kept the source's id). The two are indistinguishable
+        // server-side, so ask the user how to reconcile rather than guess. The
+        // by-id re-sync renames the record to the preset name, so the two rename
+        // directions are explicit choices here.
+        if (r.http_status == 409 && r.name_id_mismatch) {
+            // Auto-save (Save Preset) stays silent — don't pop a blocking modal on a
+            // background save. Surface the mismatch as a notification; the user
+            // reconciles it deliberately via the toolbar sync (manual_trigger).
+            if (!manual_trigger) {
+                const std::string m = _u8L("FilamentDB: name/id mismatch — not synced. "
+                                           "Use the sync button to reconcile.");
+                report(NotificationManager::NotificationLevel::WarningNotificationLevel,
+                       m, m, /*is_error=*/true);
+                return;
+            }
+            // Prefer the server-echoed name, but fall back to the actual saved name
+            // if the server omitted sentName so the dialog never shows empty quotes.
+            const std::string shown_name = r.sent_name.empty() ? saved.name : r.sent_name;
+            const wxString msg = format_wxstr(
+                _L("This preset is linked to a Filament DB record currently named '%1%', "
+                   "but the preset is named '%2%'.\n\nHow should they be reconciled?"),
+                wxString::FromUTF8(r.matched_name), wxString::FromUTF8(shown_name));
+            wxArrayString choices;
+            choices.Add(format_wxstr(_L("Update the DB record to match this preset "
+                                        "(push settings and rename it '%1%')"),
+                                     wxString::FromUTF8(shown_name)));
+            choices.Add(format_wxstr(_L("Rename only the DB record to '%1%' "
+                                        "(keep its saved calibration)"),
+                                     wxString::FromUTF8(shown_name)));
+            choices.Add(format_wxstr(_L("Rename this preset to '%1%' (adopt the DB name)"),
+                                     wxString::FromUTF8(r.matched_name)));
+            // GetSingleChoiceIndex returns -1 on Cancel (no separate Cancel item
+            // needed) and is dark-UI aware + cross-platform.
+            const int choice = wxGetApp().GetSingleChoiceIndex(
+                msg, _L("FilamentDB — name mismatch"), choices, 0);
+            if (choice == 0) {
+                // Authoritative re-sync by the resolved ObjectId: push this preset's
+                // settings AND rename the record. Falls through to reporting below.
+                r = resync_filament_to_filamentdb_by_id(
+                    filamentdb_url, r.matched_id, saved.name, saved.config,
+                    nozzle_dia, high_flow, /*rename_only=*/false);
+            } else if (choice == 1) {
+                // Rename the record to the preset name but keep its saved calibration
+                // (no settings pushed). Resolves the mismatch without clobbering data.
+                r = resync_filament_to_filamentdb_by_id(
+                    filamentdb_url, r.matched_id, saved.name, saved.config,
+                    nozzle_dia, high_flow, /*rename_only=*/true);
+            } else if (choice == 2) {
+                // Rename the local preset directly to the DB name so a later sync
+                // matches cleanly by name+id; the preset's filamentdb_id is unchanged.
+                rename_preset(r.matched_name);
+                return;
+            } else {
+                return; // Cancel — leave both the preset and the DB record untouched.
+            }
+        }
+
+        // #36 Phase 2: nothing on the server matched this preset (manual sync with
+        // create suppressed). Offer Create-new or Link-to-existing rather than
+        // silently spawning a record — the case that used to orphan calibration
+        // when a preset's name didn't exactly match an existing filament.
+        if (r.would_create) {
+            // Shared: run the create-then-populate upsert we suppressed above.
+            auto do_create = [&] {
+                r = sync_filament_to_filamentdb_detailed(
+                    filamentdb_url, saved.name, saved.config, nozzle_dia, high_flow,
+                    /*allow_create=*/true);
+            };
+            wxArrayString actions;
+            actions.Add(_L("Create a new filament record"));
+            actions.Add(_L("Link this preset to an existing filament…"));
+            const int action = wxGetApp().GetSingleChoiceIndex(
+                format_wxstr(_L("No Filament DB record matches the preset '%1%'."),
+                             wxString::FromUTF8(saved.name)),
+                _L("FilamentDB — no match"), actions, 0);
+            if (action == 0) {
+                do_create();
+            } else if (action == 1) {
+                // Pull ALL candidates (unfiltered) so a record whose vendor/type
+                // spelling differs from this preset is still linkable — filtering
+                // server-side could hide the intended record even when other rows
+                // match. The preset's own vendor+type are sorted to the top so the
+                // likely target is prominent. Link = pick one, then an authoritative
+                // by-id re-sync (renames the record to the preset name); the trailing
+                // stamp binds it.
+                std::vector<FilamentDBCandidate> cands;
+                std::string list_err;
+                if (!list_filamentdb_candidates(filamentdb_url, "", "", cands, list_err)) {
+                    const std::string emsg =
+                        _u8L("Could not list FilamentDB filaments") + ":\n" + list_err;
+                    report(NotificationManager::NotificationLevel::WarningNotificationLevel,
+                           emsg, emsg, /*is_error=*/true);
+                    return;
+                }
+                if (cands.empty()) {
+                    // Nothing to link to — offer to create instead of dead-ending.
+                    if (wxMessageBox(_L("No existing Filament DB filament to link to.\n\n"
+                                        "Create a new record instead?"),
+                                     _L("FilamentDB — no match"),
+                                     wxICON_QUESTION | wxYES_NO, this) != wxYES)
+                        return;
+                    do_create();
+                } else {
+                    const std::string vendor =
+                        filamentdb_detail::config_first_string(saved.config, "filament_vendor");
+                    const std::string type =
+                        filamentdb_detail::config_first_string(saved.config, "filament_type");
+                    std::stable_sort(cands.begin(), cands.end(),
+                        [&](const FilamentDBCandidate &a, const FilamentDBCandidate &b) {
+                            auto rank = [&](const FilamentDBCandidate &c) {
+                                if (c.vendor == vendor && c.type == type) return 0;
+                                if (c.type == type)                       return 1;
+                                return 2;
+                            };
+                            return rank(a) < rank(b);
+                        });
+                    wxArrayString labels;
+                    for (const FilamentDBCandidate &c : cands) {
+                        std::string label = c.name;
+                        if (!c.vendor.empty()) label += "  —  " + c.vendor;
+                        if (!c.type.empty())   label += " (" + c.type + ")";
+                        labels.Add(wxString::FromUTF8(label));
+                    }
+                    const int pick = wxGetApp().GetSingleChoiceIndex(
+                        format_wxstr(_L("Link preset '%1%' to which existing filament?"),
+                                     wxString::FromUTF8(saved.name)),
+                        _L("FilamentDB — link to existing"), labels, 0);
+                    if (pick < 0)
+                        return; // cancelled the picker
+                    r = resync_filament_to_filamentdb_by_id(
+                        filamentdb_url, cands[pick].id, saved.name, saved.config,
+                        nozzle_dia, high_flow, /*rename_only=*/false);
+                }
+            } else {
+                return; // Cancel
+            }
+        }
+
+        // #36: persist the resolved id so a preset that synced BY NAME (empty id)
+        // becomes bound to its stable FilamentDB record — otherwise it re-syncs by
+        // name forever and a later rename could spawn a DUPLICATE. The collection
+        // method keeps the selected/edited/project-saved snapshots in lockstep (so
+        // this hidden stamp doesn't make the preset OR the project look unsaved) and
+        // writes just the .ini — no re-sync, no recursion. No-op when there's no id,
+        // the preset already carries it, or it isn't user-modifiable.
+        if (r.success)
+            m_presets->stamp_filamentdb_id(r.matched_id);
+
+        std::string nozzle_suffix;
+        if (nozzle_dia > 0) {
+            char buf[64];
+            std::snprintf(buf, sizeof(buf), " (%.2fmm%s)",
+                          nozzle_dia, high_flow ? " HF" : "");
+            nozzle_suffix = buf;
+        }
+
+        if (r.success && r.error_message.empty()) {
+            const std::string head = r.created_new
+                ? _u8L("Created new filament in FilamentDB")
+                : _u8L("Updated filament in FilamentDB");
+            const std::string short_msg = head + ": " + saved.name + nozzle_suffix;
+            const std::string full_msg  = head + ":\n" + saved.name + nozzle_suffix;
+            report(NotificationManager::NotificationLevel::RegularNotificationLevel,
+                   short_msg, full_msg, /*is_error=*/false);
+        } else if (r.success) {
+            const std::string msg = _u8L("FilamentDB partial sync") + ":\n" + r.error_message;
+            report(NotificationManager::NotificationLevel::WarningNotificationLevel,
+                   msg, msg, /*is_error=*/true);
+        } else {
+            const std::string msg = _u8L("FilamentDB sync failed") + ":\n" + r.error_message;
+            report(NotificationManager::NotificationLevel::WarningNotificationLevel,
+                   msg, msg, /*is_error=*/true);
+            BOOST_LOG_TRIVIAL(warning) << "FilamentDB sync-back failed: " << r.error_message;
+        }
+    } catch (const std::exception &ex) {
+        const std::string msg = std::string(_u8L("FilamentDB sync exception")) + ":\n" + ex.what();
+        report(NotificationManager::NotificationLevel::ErrorNotificationLevel,
+               msg, msg, /*is_error=*/true);
+        BOOST_LOG_TRIVIAL(error) << "FilamentDB sync-back exception: " << ex.what();
+    }
 }
 
 bool TabFilament::delete_current_preset()
@@ -2700,6 +2961,9 @@ void TabPrinter::build_fff()
 
         optgroup->append_single_option_line("max_print_height");
         optgroup->append_single_option_line("z_offset");
+
+        optgroup = page->new_optgroup(L("Skew Correction"));
+        optgroup->append_single_option_line("skew_xy_correction");
 
         optgroup = page->new_optgroup(L("Capabilities"));
         ConfigOptionDef def;
@@ -3536,6 +3800,75 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 }
 
 // this gets executed after preset is loaded and before GUI fields are updated
+// Apply FilamentDB calibration data for the given nozzle diameter to the
+// currently selected filament preset. Updates BOTH the saved preset and
+// the edited copy so PrusaSlicer doesn't flag the values as modified.
+static void apply_filamentdb_calibration(double nozzle_diameter)
+{
+    try {
+        std::string filamentdb_url = wxGetApp().app_config->get("filamentdb_url");
+        if (filamentdb_url.empty() || nozzle_diameter <= 0)
+            return;
+
+        PresetBundle *bundle = wxGetApp().preset_bundle;
+        if (!bundle)
+            return;
+
+        const std::string &filament_name = bundle->filaments.get_edited_preset().name;
+        auto cal = fetch_filament_calibration(filamentdb_url, filament_name, nozzle_diameter);
+        if (!cal.found)
+            return;
+
+        // Helper: apply a calibration value to a DynamicPrintConfig
+        auto apply_cal = [&](DynamicPrintConfig &cfg) {
+            if (cal.max_volumetric_speed >= 0)
+                cfg.set_key_value("filament_max_volumetric_speed",
+                    new ConfigOptionFloats({cal.max_volumetric_speed}));
+            if (cal.extrusion_multiplier >= 0)
+                cfg.set_key_value("extrusion_multiplier",
+                    new ConfigOptionFloats({cal.extrusion_multiplier}));
+            if (cal.retract_length >= 0)
+                cfg.set_key_value("filament_retract_length",
+                    new ConfigOptionFloatsNullable({cal.retract_length}));
+            if (cal.retract_speed >= 0)
+                cfg.set_key_value("filament_retract_speed",
+                    new ConfigOptionFloatsNullable({cal.retract_speed}));
+            if (cal.retract_lift >= 0)
+                cfg.set_key_value("filament_retract_lift",
+                    new ConfigOptionFloatsNullable({cal.retract_lift}));
+            if (cal.pressure_advance >= 0) {
+                auto *gcode_opt = cfg.option<ConfigOptionStrings>("start_filament_gcode");
+                if (gcode_opt && !gcode_opt->values.empty()) {
+                    std::string &gcode = gcode_opt->values[0];
+                    std::string pa_cmd = "M572 S" + std::to_string(cal.pressure_advance);
+                    auto pos = gcode.find("M572 S");
+                    if (pos != std::string::npos) {
+                        auto end = gcode.find_first_of("\n\\", pos);
+                        gcode.replace(pos, (end == std::string::npos ? gcode.size() : end) - pos, pa_cmd);
+                    } else if (!gcode.empty()) {
+                        gcode += "\\n" + pa_cmd;
+                    } else {
+                        gcode = pa_cmd;
+                    }
+                }
+            }
+        };
+
+        // Apply to the saved preset AND the edited copy so no dirty flag
+        apply_cal(bundle->filaments.get_selected_preset().config);
+        apply_cal(bundle->filaments.get_edited_preset().config);
+
+        // Reload filament tab to reflect changes
+        if (auto *tab = wxGetApp().get_tab(Preset::TYPE_FILAMENT))
+            tab->reload_config();
+
+        BOOST_LOG_TRIVIAL(info) << "FilamentDB: Applied calibration for '"
+                                << filament_name << "' @ " << nozzle_diameter << "mm nozzle";
+    } catch (const std::exception &ex) {
+        BOOST_LOG_TRIVIAL(warning) << "FilamentDB auto-adjust failed: " << ex.what();
+    }
+}
+
 void TabPrinter::on_preset_loaded()
 {
     // update the extruders count field
@@ -3543,6 +3876,9 @@ void TabPrinter::on_preset_loaded()
     size_t extruders_count = nozzle_diameter->values.size();
     // update the GUI field according to the number of nozzle diameters supplied
     extruders_count_changed(extruders_count);
+
+    // Auto-adjust filament settings from FilamentDB calibration data
+    apply_filamentdb_calibration(nozzle_diameter->values[0]);
 }
 
 void TabPrinter::update_pages()
@@ -4378,6 +4714,12 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         edited_preset.config.opt_string("compatible_printers_condition") = cond;
     }
 
+    // #36 Phase 2: the filamentdb_id clear/adopt rule on save/clone now lives in the
+    // libslic3r save primitives (PresetCollection::save_current_preset +
+    // get_preset_with_name → reconcile_filamentdb_id_on_save), so EVERY path is
+    // covered — this toolbar save AND the compare/diff dialog's transfer_and_save,
+    // which bypasses Tab::save_preset entirely (Codex P2).
+
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     save_current_preset(name, detach);
 
@@ -4443,7 +4785,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         update_description_lines();
 }
 
-void Tab::rename_preset()
+void Tab::rename_preset(const std::string& new_name_in)
 {
     if (m_presets_choice->is_selected_physical_printer())
         return;
@@ -4465,12 +4807,48 @@ void Tab::rename_preset()
     }
 
     // get new name
-
-    SavePresetDialog dlg(m_parent, m_type, msg);
-    if (dlg.ShowModal() != wxID_OK)
-        return;
-
-    const std::string new_name = dlg.get_name();
+    // #36: the 409 reconcile "Rename this preset to '<DB name>'" choice passes the
+    // target name directly. Rename straight to it — skipping the name dialog the
+    // user would otherwise have to retype the DB name into — but ONLY when the name
+    // passes the SAME checks SavePresetDialog::Item::update() applies AND doesn't
+    // already exist. Anything the dialog would reject (illegal chars, leading/
+    // trailing space, reserved / "(modified)" name, a preset alias, or a path over
+    // the length limit) or a collision falls back to the interactive dialog — which
+    // validates and resolves collisions safely. Otherwise an invalid name could
+    // build a bad filename and half-rename the preset (mutating the in-memory names
+    // before filesystem::rename fails). 255 is the conservative non-Windows limit;
+    // anything longer just routes through the dialog, so nothing is lost.
+    auto is_dialog_valid_name = [this](const std::string& n) {
+        if (n.empty()) return false;
+        if (n.front() == ' ' || n.back() == ' ') return false;
+        if (n == "- default -") return false;
+        if (n.find_first_of("<>[]:/\\|?*\"") != std::string::npos) return false;
+        if (n.find(PresetCollection::get_suffix_modified()) != std::string::npos) return false;
+        if (m_presets->get_preset_name_by_alias(n) != n) return false;
+        return m_presets->path_from_name(n).length() < 255;
+    };
+    // Collision check is CASE-INSENSITIVE, like SavePresetDialog: a DB name that
+    // differs only in case from an existing preset would collide with / overwrite
+    // that preset's file on a case-insensitive filesystem (Windows/macOS). Any such
+    // match — like an invalid name — routes through the dialog instead.
+    auto preset_name_taken_casei = [this](const std::string& n) {
+        for (const Preset& p : *m_presets)
+            if (boost::iequals(p.name, n))
+                return true;
+        return false;
+    };
+    std::string new_name;
+    if (!new_name_in.empty()
+        && new_name_in != m_presets->get_selected_preset().name
+        && is_dialog_valid_name(new_name_in)
+        && !preset_name_taken_casei(new_name_in)) {
+        new_name = new_name_in;
+    } else {
+        SavePresetDialog dlg(m_parent, m_type, msg);
+        if (dlg.ShowModal() != wxID_OK)
+            return;
+        new_name = dlg.get_name();
+    }
     if (new_name.empty() || new_name == m_presets->get_selected_preset().name)
         return;
 

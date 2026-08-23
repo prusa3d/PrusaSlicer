@@ -78,34 +78,76 @@ void InfillPolylineClipper::add_point(const Vec2d &fpt)
 }
 
 void FillPlanePath::_fill_surface_single(
-    const FillParams                &params, 
+    const FillParams                &params,
     unsigned int                     thickness_layers,
-    const std::pair<float, Point>   &direction, 
+    const std::pair<float, Point>   &direction,
     ExPolygon                        expolygon,
     Polylines                       &polylines_out)
 {
     expolygon.rotate(-direction.first);
 
-    //FIXME Vojtech: We are not sure whether the user expects the fill patterns on visible surfaces to be aligned across all the islands of a single layer.
-    // One may align for this->centered() to align the patterns for Archimedean Chords and Octagram Spiral patterns.
     const bool align = params.density < 0.995;
+    const bool is_flow_calib = this->print_object_config &&
+                               this->print_object_config->calib_flowrate_topinfill_special_order.value &&
+                               dynamic_cast<FillArchimedeanChords*>(this);
 
     BoundingBox snug_bounding_box = get_extents(expolygon).inflated(SCALED_EPSILON);
 
+    // Extend the bounding box by line spacing so the spiral extends beyond
+    // the expolygon boundary (ported from OrcaSlicer).
+    snug_bounding_box.offset(scaled<double>(this->spacing));
+
     // Rotated bounding box of the area to fill in with the pattern.
     BoundingBox bounding_box = align ?
-        // Sparse infill needs to be aligned across layers. Align infill across layers using the object's bounding box.
         this->bounding_box.rotated(-direction.first) :
-        // Solid infill does not need to be aligned across layers, generate the infill pattern
-        // around the clipping expolygon only.
         snug_bounding_box;
 
-    Point shift = this->centered() ? 
+    Point shift = this->centered() ?
         bounding_box.center() :
         bounding_box.min;
     expolygon.translate(-shift.x(), -shift.y());
     bounding_box.translate(-shift.x(), -shift.y());
 
+    // --- Flow calibration: generate a clean Archimedean spiral directly ---
+    // x(t) = a·t·cos(t),  y(t) = a·t·sin(t)
+    // Spacing between arms = 2π·a = extrusion width, so a = spacing / (2π)
+    // Origin at pad center, extend until past the pad boundary, clip at edges.
+    if (dynamic_cast<FillArchimedeanChords*>(this)) {
+        double line_spacing = scaled<double>(this->spacing) / params.density;
+        double a = line_spacing / (2.0 * M_PI);
+        // max radius = diagonal of bounding box
+        double max_r = std::sqrt(double(bounding_box.size().x()) * double(bounding_box.size().x()) +
+                                 double(bounding_box.size().y()) * double(bounding_box.size().y())) / 2.0 + line_spacing;
+
+        // Generate spiral points with fine angular resolution
+        Polyline spiral;
+        spiral.points.emplace_back(0, 0);  // center
+        double t = 0.01;  // avoid division issues at t=0
+        while (true) {
+            double r = a * t;
+            if (r > max_r) break;
+            coord_t x = coord_t(std::round(r * std::cos(t)));
+            coord_t y = coord_t(std::round(r * std::sin(t)));
+            spiral.points.emplace_back(x, y);
+            // Adaptive step: at least 128 points per revolution for smooth curves,
+            // finer at large radii to maintain constant chord length.
+            double step = std::min(2.0 * M_PI / 128.0, line_spacing / (2.0 * std::max(r, 1.0)));
+            t += step;
+        }
+
+        // Clip spiral to the pad boundary
+        Polylines polylines = intersection_pl(spiral, expolygon);
+
+        // Translate and rotate back
+        for (Polyline &pl : polylines) {
+            pl.translate(shift.x(), shift.y());
+            pl.rotate(direction.first);
+        }
+        append(polylines_out, std::move(polylines));
+        return;
+    }
+
+    // --- Normal (non-calibration) fill path ---
     Polyline polyline;
     {
         auto distance_between_lines = scaled<double>(this->spacing) / params.density;
@@ -115,13 +157,11 @@ void FillPlanePath::_fill_surface_single(
         auto max_y = coord_t(ceil(coordf_t(bounding_box.max.y()) / distance_between_lines));
         auto resolution = scaled<double>(params.resolution) / distance_between_lines;
         if (align) {
-            // Filling in a bounding box over the whole object, clip generated polyline against the snug bounding box.
             snug_bounding_box.translate(-shift.x(), -shift.y());
             InfillPolylineClipper output(snug_bounding_box, distance_between_lines);
             this->generate(min_x, min_y, max_x, max_y, resolution, output);
             polyline.points = std::move(output.result());
         } else {
-            // Filling in a snug bounding box, no need to clip.
             InfillPolylineOutput output(distance_between_lines);
             this->generate(min_x, min_y, max_x, max_y, resolution, output);
             polyline.points = std::move(output.result());
@@ -130,10 +170,28 @@ void FillPlanePath::_fill_surface_single(
 
     if (polyline.size() >= 2) {
         Polylines polylines = intersection_pl(polyline, expolygon);
+
         Polylines chained;
-        if (params.dont_connect() || params.density > 0.5 || polylines.size() <= 1)
-            chained = chain_polylines(std::move(polylines));
-        else
+        if (params.dont_connect() || params.density > 0.5 || polylines.size() <= 1) {
+            if (is_flow_calib && polylines.size() > 1) {
+                // Find the longest polyline (the main spiral from center)
+                auto it = std::max_element(polylines.begin(), polylines.end(),
+                    [](const Polyline& a, const Polyline& b) {
+                        return a.length() < b.length();
+                    });
+                Polyline center_spiral = std::move(*it);
+                // Ensure spiral goes from center outward
+                if (center_spiral.first_point().cast<double>().squaredNorm() >
+                    center_spiral.last_point().cast<double>().squaredNorm())
+                    center_spiral.reverse();
+                polylines.erase(it);
+                chained = chain_polylines(std::move(polylines));
+                // Append center spiral LAST so it prints last
+                chained.push_back(std::move(center_spiral));
+            } else {
+                chained = chain_polylines(std::move(polylines));
+            }
+        } else
             connect_infill(std::move(polylines), expolygon, chained, this->spacing, params);
         // paths must be repositioned and rotated back
         for (Polyline &pl : chained) {
@@ -175,7 +233,7 @@ void FillArchimedeanChords::generate(coord_t min_x, coord_t min_y, coord_t max_x
         generate_archimedean_chords(min_x, min_y, max_x, max_y, resolution, output);
 }
 
-// Adapted from 
+// Adapted from
 // http://cpansearch.perl.org/src/KRYDE/Math-PlanePath-122/lib/Math/PlanePath/HilbertCurve.pm
 //
 // state=0    3--2   plain

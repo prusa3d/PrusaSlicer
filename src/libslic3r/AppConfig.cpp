@@ -164,6 +164,18 @@ void AppConfig::set_defaults()
 
         if (get("clear_undo_redo_stack_on_new_project").empty())
             set("clear_undo_redo_stack_on_new_project", "1");
+
+        // FilamentDB REST API integration
+        if (get("filamentdb_url").empty())
+            set("filamentdb_url", "http://localhost:3456");
+
+        // Default calibration menu order
+        if (!has_section("calibration_menu_order"))
+            set_section("calibration_menu_order", {
+                {"1","temperature"}, {"2","flow_rate"}, {"3","pressure_advance"},
+                {"4","retraction"}, {"5","max_flowrate"}, {"6","extrusion_multiplier"},
+                {"7","fan_speed"}, {"8","dimensional_accuracy"}
+            });
     }
     else {
 #ifdef _WIN32

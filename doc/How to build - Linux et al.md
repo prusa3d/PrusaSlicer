@@ -37,16 +37,28 @@ The names of the packages may be different on different distros.
 
 Cloning the repository is simple thanks to git and Github. Simply `cd` into wherever you want to clone PrusaSlicer code base and run
 ```
-git clone https://www.github.com/prusa3d/PrusaSlicer
+git clone https://github.com/hyiger/PrusaSlicer.git
 cd PrusaSlicer
 ```
 This will download the source code into a new directory and `cd` into it. You can now optionally select a tag/branch/commit to build using `git checkout`. Otherwise, `master` branch will be built.
 The path to the build directory must not contain spaces - this scenario is not supported by the build scripts.
 
 
-#### 2. Building dependencies
+#### 2. Building with CMake presets (recommended)
 
-PrusaSlicer uses CMake and the build is quite simple, the only tricky part is resolution of dependencies. The supported and recommended way is to build the dependencies first and link to them statically. PrusaSlicer source base contains a CMake script that automatically downloads and builds the required dependencies. All that is needed is to run the following (from the top of the cloned repository):
+The simplest way to build PrusaSlicer with all dependencies is to use CMake presets. From the top of the cloned repository:
+
+    cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON
+    cmake --build build-default -j$(nproc)
+
+This will download, build, and install all dependencies, then configure and build PrusaSlicer. The binary will be at `build-default/src/prusa-slicer`.
+
+**Warning**: Once the dependency bundle is installed in a destdir, the destdir cannot be moved elsewhere. This is because wxWidgets hardcodes the installation path.
+
+
+#### 2B. Building dependencies manually (alternative)
+
+If you prefer to build dependencies separately:
 
     cd deps
     mkdir build
@@ -56,19 +68,16 @@ PrusaSlicer uses CMake and the build is quite simple, the only tricky part is re
     cd ../..
 
 
-**Warning**: Once the dependency bundle is installed in a destdir, the destdir cannot be moved elsewhere. This is because wxWidgets hardcode the installation path.
+#### 3. Building PrusaSlicer (manual deps path)
 
-
-#### 3. Building PrusaSlicer
-
-Now when the dependencies are compiled, all that is needed is to tell CMake that we are interested in static build and point it to the dependencies. From the top of the repository, run
+If you used step 2B, tell CMake where to find the dependencies:
 
     mkdir build
     cd build
     cmake .. -DSLIC3R_STATIC=1 -DSLIC3R_GTK=3 -DSLIC3R_PCH=OFF -DCMAKE_PREFIX_PATH=$(pwd)/../deps/build/destdir/usr/local
-    make -j4
+    make -j$(nproc)
 
-And that's it. It is now possible to run the freshly built PrusaSlicer binary:
+It is now possible to run the freshly built PrusaSlicer binary:
 
     cd src
     ./prusa-slicer

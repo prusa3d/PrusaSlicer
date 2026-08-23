@@ -51,6 +51,8 @@ set(SLIC3R_SOURCES
     BuildVolume.cpp
     BuildVolume.hpp
     BoostAdapter.hpp
+    CalibrationModels.cpp
+    CalibrationModels.hpp
     clipper.cpp
     clipper.hpp
     ClipperUtils.cpp
@@ -83,6 +85,8 @@ set(SLIC3R_SOURCES
     Extruder.cpp
     Extruder.hpp
     ExtrusionEntity.cpp
+    FilamentColorBlend.hpp
+    FilamentColorBlend.cpp
     ExtrusionEntity.hpp
     ExtrusionEntityCollection.cpp
     ExtrusionEntityCollection.hpp
@@ -169,6 +173,14 @@ set(SLIC3R_SOURCES
     GCode/Thumbnails.hpp
     GCode/ConflictChecker.cpp
     GCode/ConflictChecker.hpp
+    GCode/CalibrationRetractionPostProcessor.cpp
+    GCode/CalibrationRetractionPostProcessor.hpp
+    GCode/CalibrationFlowPostProcessor.cpp
+    GCode/CalibrationFlowPostProcessor.hpp
+    GCode/CalibrationPAPostProcessor.cpp
+    GCode/CalibrationPAPostProcessor.hpp
+    GCode/CalibrationPALinePostProcessor.cpp
+    GCode/CalibrationPALinePostProcessor.hpp
     GCode/CoolingBuffer.cpp
     GCode/CoolingBuffer.hpp
     GCode/ExtrusionProcessor.cpp
@@ -660,9 +672,10 @@ target_link_libraries(libslic3r PUBLIC
     prusa_fdm_mixer
 )
 
-if (APPLE)
+if (APPLE AND SLIC3R_ENABLE_FORMAT_STEP)
     # TODO: we need to fix notarization with the separate shared library
     target_link_libraries(libslic3r PUBLIC OCCTWrapper)
+    target_compile_definitions(libslic3r PUBLIC SLIC3R_STEP_ENABLED)
 endif ()
 
 if (TARGET OpenVDB::openvdb)

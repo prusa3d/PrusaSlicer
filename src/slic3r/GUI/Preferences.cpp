@@ -15,6 +15,7 @@
 #include "format.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include <wx/notebook.h>
+#include <wx/rearrangectrl.h>
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
@@ -604,16 +605,24 @@ void PreferencesDialog::build()
 
 		m_optgroup_other = create_options_tab(_L("Other"), tabs);
 		m_optgroup_other->on_change = [this](t_config_option_key opt_key, boost::any value) {
+			try {
+				if (value.empty())
+					return;
 
-			if (auto it = m_values.find(opt_key); it != m_values.end() && opt_key != "url_downloader_dest") {
-				m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
-				return;
+				if (auto it = m_values.find(opt_key); it != m_values.end() && opt_key != "url_downloader_dest" && opt_key != "filamentdb_url") {
+					m_values.erase(it);
+					return;
+				}
+
+				if (opt_key == "filamentdb_url")
+					m_values[opt_key] = boost::any_cast<std::string>(value);
+				else if (opt_key == "suppress_hyperlinks")
+					m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
+				else
+					m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+			} catch (...) {
+				// Silently ignore type mismatches (e.g. Cancel resetting coString fields)
 			}
-
-			if (opt_key == "suppress_hyperlinks")
-				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
-			else
-				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 		};
 
 
@@ -643,6 +652,22 @@ void PreferencesDialog::build()
 			L("Allow downloads from supported websites (e.g. Printables.com)"),
 			L("If enabled, PrusaSlicer can download and open files from supported websites"),
 			app_config->get_bool("downloader_url_registered"));
+
+		m_optgroup_other->append_separator();
+
+		// FilamentDB integration
+		{
+			ConfigOptionDef def = {"filamentdb_url", coString};
+			def.label = L("Filament DB URL");
+			def.tooltip = L("REST API URL for Filament DB integration. When set, filament presets "
+				"are synced from the remote database on startup. "
+				"Example: http://localhost:3000");
+			def.mode = comSimple;
+			def.set_default_value(new ConfigOptionString{app_config->get("filamentdb_url")});
+			def.width = 30;
+			Option option(def, "filamentdb_url");
+			m_optgroup_other->append_single_option_line(option);
+		}
 
 		activate_options_tab(m_optgroup_other);
 
@@ -851,6 +876,10 @@ void PreferencesDialog::revert(wxEvent&)
 
 	for (auto value : m_values) {
 		const std::string& key = value.first;
+
+		// Skip string-type options — get_bool() would fail on them
+		if (key == "filamentdb_url")
+			continue;
 
 		if (key == "default_action_on_dirty_project") {
 			m_optgroup_general->set_value(key, app_config->get(key).empty());

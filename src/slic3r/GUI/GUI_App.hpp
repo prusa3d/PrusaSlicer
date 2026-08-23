@@ -57,6 +57,7 @@ class ObjectLayers;
 class Plater;
 class NotificationManager;
 class Downloader;
+class FilamentScanClient;
 struct GUI_InitParams;
 class GalleryDialog;
 class PresetArchiveDatabase;
@@ -190,6 +191,11 @@ private:
     std::unique_ptr<AppUpdater>                     m_app_updater;
     std::unique_ptr<wxSingleInstanceChecker>        m_single_instance_checker;
     std::unique_ptr<Downloader>                     m_downloader;
+    // Subscribes to a Filament DB instance's /api/scan/stream — switches
+    // the active filament preset to match each scanned NFC tag. Started
+    // in post_init() once preset_bundle is populated; destructor joins
+    // the worker thread, so unique_ptr cleanup is sufficient on shutdown.
+    std::unique_ptr<FilamentScanClient>             m_filament_scan_client;
     
     std::string m_instance_hash_string;
 	size_t m_instance_hash_int;

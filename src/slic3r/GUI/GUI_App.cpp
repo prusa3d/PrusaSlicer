@@ -7,7 +7,9 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "libslic3r/Technologies.hpp"
+#include "slic3r/Utils/FilamentDB.hpp"
 #include "GUI_App.hpp"
+#include "FilamentScanClient.hpp"
 #include "GUI_Init.hpp" // IWYU pragma: keep
 #include "GUI_ObjectList.hpp"
 #include "GUI_ObjectManipulation.hpp"
@@ -134,6 +136,10 @@
 using namespace std::literals;
 
 namespace Slic3r {
+
+// Defined in PresetBundle.cpp, registered here so libslic3r can call FilamentDB in the GUI layer.
+extern std::function<int(PresetBundle&, const std::string&, std::string&)> g_load_filaments_from_filamentdb;
+
 namespace GUI {
 
 class MainFrame;
@@ -841,6 +847,21 @@ void GUI_App::post_init()
     if (app_config->get_bool("show_hints") && ! is_gcode_viewer())
         plater_->get_notification_manager()->push_hint_notification(true);
 
+    // Subscribe to the Filament DB scan stream (NFC tag reads → preset
+    // auto-select). Skipped in the gcode-viewer mode, which has no
+    // editable preset surface to switch. The base URL is shared with
+    // the rest of the FilamentDB integration (preset sync, spool
+    // check) via the `filamentdb_url` AppConfig key; clearing it
+    // disables all three features in lockstep, which matches what
+    // the rest of the FilamentDB module already does.
+    if (! is_gcode_viewer()) {
+        const std::string scan_base_url = app_config->get("filamentdb_url");
+        if (! scan_base_url.empty()) {
+            m_filament_scan_client = std::make_unique<FilamentScanClient>(scan_base_url);
+            m_filament_scan_client->start();
+        }
+    }
+
     // The extra CallAfter() is needed because of Mac, where this is the only way
     // to popup a modal dialog on start without screwing combo boxes.
     // This is ugly but I honestly found no better way to do it.
@@ -890,6 +911,15 @@ GUI_App::GUI_App(EAppMode mode)
 
 GUI_App::~GUI_App()
 {
+    // Stop the scan client BEFORE the manual deletes below. The
+    // unique_ptr member destructors otherwise run *after* this body,
+    // which would let the worker thread still be alive while
+    // preset_bundle is being deleted — its CallAfter lambdas
+    // dereference `wxGetApp().preset_bundle` (codex P1 on PR #13).
+    // Explicit reset → ~FilamentScanClient → stop() joins the worker,
+    // so by the time we touch preset_bundle no more callbacks can
+    // fire.
+    if (m_filament_scan_client) m_filament_scan_client.reset();
     delete app_config;
     delete preset_bundle;
 }
@@ -1336,6 +1366,9 @@ void GUI_App::remove_desktop_files_dialog()
 
 bool GUI_App::on_init_inner()
 {
+    // Register FilamentDB callback so libslic3r can call into the GUI layer.
+    Slic3r::g_load_filaments_from_filamentdb = &load_filaments_from_filamentdb;
+
     // TODO: remove this when all asserts are gone.
     wxDisableAsserts();
 

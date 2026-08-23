@@ -906,6 +906,9 @@ static inline bool arc_welder_enabled(const PrintConfig& print_config)
         print_config.arc_fitting != ArcFittingType::Disabled &&
         // Not a spiral vase print
         !print_config.spiral_vase &&
+        // Skew correction active — arcs would be emitted as single chords
+        // (losing all intermediate curve points), causing visible faceting.
+        print_config.skew_xy_correction.value == 0.0 &&
         // Presure equalizer not used
         print_config.max_volumetric_extrusion_rate_slope_negative == 0. &&
         print_config.max_volumetric_extrusion_rate_slope_positive == 0.;
@@ -2959,6 +2962,23 @@ void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
     m_writer.apply_print_config(print_config);
     m_config.apply(print_config);
     m_scaled_resolution = scaled<double>(print_config.gcode_resolution.value);
+
+    // Initialize XY skew correction
+    {
+        double skew_deg = m_config.skew_xy_correction.value;
+        if (skew_deg != 0.0 && !m_config.bed_shape.values.empty()) {
+            m_skew_xy_k = std::tan(skew_deg * M_PI / 180.0);
+            // Reference Y = center of bed
+            BoundingBoxf bed_bb(m_config.bed_shape.values);
+            m_skew_y_ref = (bed_bb.min.y() + bed_bb.max.y()) / 2.0;
+            BOOST_LOG_TRIVIAL(info) << "XY skew correction: angle=" << skew_deg
+                                    << "° k=" << m_skew_xy_k
+                                    << " y_ref=" << m_skew_y_ref;
+        } else {
+            m_skew_xy_k = 0.0;
+            m_skew_y_ref = 0.0;
+        }
+    }
 }
 
 void GCodeGenerator::append_full_config(const Print& print, std::string &str)
@@ -3610,8 +3630,9 @@ std::string GCodeGenerator::_extrude(
             // Center of the radius to be emitted into the G-code: Either by radius or by center offset.
             double radius = 0;
             Vec2d  ij;
-            if (it->radius != 0) {
-                // Extrude an arc.
+            if (it->radius != 0 && m_skew_xy_k == 0.0) {
+                // Extrude an arc. Disabled when skew correction is active
+                // because shear transforms circles into ellipses.
                 assert(m_config.arc_fitting == ArcFittingType::EmitCenter);
                 radius = unscaled<double>(it->radius);
                 {
@@ -4052,6 +4073,11 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
 Point GCodeGenerator::gcode_to_point(const Vec2d &point) const
 {
     Vec2d pt = point - m_origin;
+    // Reverse XY skew correction (inverse of point_to_gcode shear).
+    // The forward transform only modifies X: x' = x + (y - y_ref) * k,
+    // so Y is unchanged and the inverse is: x = x' - (y - y_ref) * k.
+    if (m_skew_xy_k != 0.0)
+        pt.x() -= (pt.y() - m_skew_y_ref) * m_skew_xy_k;
     if (const Extruder *extruder = m_writer.extruder(); extruder)
         // This function may be called at the very start from toolchange G-code when the extruder is not assigned yet.
         pt += m_config.extruder_offset.get_at(extruder->id());

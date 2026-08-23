@@ -6398,6 +6398,9 @@ void GLCanvas3D::_render_overlays()
             }
     }
     m_labels.render(sorted_instances);
+
+    // Bed mesh heatmap legend
+    m_bed.render_mesh_legend();
 }
 
 #define use_scrolling 1

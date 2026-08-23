@@ -9,6 +9,7 @@
 #include "3DScene.hpp"
 #include "CoordAxes.hpp"
 #include "MeshUtils.hpp"
+#include "BedMeshData.hpp"
 
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/ExPolygon.hpp"
@@ -57,6 +58,46 @@ private:
     std::vector<std::unique_ptr<GLModel>> m_digits_models;
     std::unique_ptr<GLTexture> m_digits_texture;
 
+    // Bed mesh overlay
+    GLModel m_mesh_overlay;
+    bool m_show_mesh_overlay{ false };
+    BedMeshData m_mesh_data;
+    float m_mesh_z_scale{ 200.f }; // exaggeration factor for visibility
+    // Color map reference: Mean centers white on the average bed height
+    // (highlights warp/tilt); Zero centers white on the nominal plane
+    // (shows absolute leveling compensation magnitude).
+    BedMeshData::Reference m_mesh_reference{ BedMeshData::Reference::Mean };
+
+    // Compare mode. When m_mesh_compare_active is true, the overlay renders
+    // m_mesh_data_delta (current - baseline) instead of m_mesh_data. The
+    // baseline itself is retained so the user can switch reference views
+    // without re-loading the file. m_mesh_compare_name is the CSV filename,
+    // shown in the legend title.
+    bool        m_mesh_compare_active{ false };
+    BedMeshData m_mesh_baseline;
+    BedMeshData m_mesh_delta;
+    std::string m_mesh_compare_name;
+
+    // Per-tool meshes (XL). Populated by set_mesh_data_per_tool; empty for
+    // single-tool printers. m_mesh_tool_index selects which tool's mesh is
+    // mirrored into m_mesh_data for rendering.
+    std::vector<BedMeshData> m_mesh_per_tool;
+    int                      m_mesh_tool_index{ 0 };
+
+    // Contour lines and per-cell Z-value labels (Phase 6).
+    bool  m_mesh_show_contours{ true };
+    bool  m_mesh_show_cell_values{ false };
+    float m_mesh_contour_interval{ 0.05f }; // mm between iso-lines
+
+    // Rendering tessellation factor: each source quad is split into this
+    // many sub-quads along each axis (via bilinear Z interpolation) before
+    // triangulation. Higher = smoother contours & shading at the cost of
+    // more triangles. 4 is a good default for 7×7..21×21 data grids.
+    int m_mesh_subdivision{ 4 };
+
+    // Quality threshold for the legend warp-grade badge (mm).
+    float m_mesh_quality_threshold{ 0.15f };
+
 public:
     Bed3D() = default;
     ~Bed3D() = default;
@@ -82,6 +123,28 @@ public:
     void render_axes();
     void render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor);
 
+    // Bed mesh overlay
+    void set_mesh_data(const BedMeshData& data);
+    void set_show_mesh_overlay(bool show) { m_show_mesh_overlay = show; }
+    bool is_mesh_overlay_shown() const { return m_show_mesh_overlay; }
+    const BedMeshData& get_mesh_data() const { return m_mesh_data; }
+    void set_mesh_z_scale(float scale) { m_mesh_z_scale = scale; invalidate_mesh_overlay(); }
+    float get_mesh_z_scale() const { return m_mesh_z_scale; }
+
+    // Compare mode: store a baseline + precomputed delta = current - baseline
+    // and switch the overlay to render the delta. baseline_name is the source
+    // filename shown in the legend.
+    void set_mesh_compare(BedMeshData baseline, std::string baseline_name, BedMeshData delta);
+    void clear_mesh_compare();
+    bool is_mesh_compare_active() const { return m_mesh_compare_active; }
+
+    // Per-tool meshes for the XL. The legend gains a T0/T1/... picker.
+    // Passing an empty vector clears per-tool data.
+    void set_mesh_data_per_tool(std::vector<BedMeshData> meshes);
+    void set_active_mesh_tool(int tool_index);
+    int  active_mesh_tool() const { return m_mesh_tool_index; }
+    const std::vector<BedMeshData>& per_tool_meshes() const { return m_mesh_per_tool; }
+
 private:
     // Calculate an extended bounding box from axes and current model for visualization purposes.
     BoundingBoxf3 calc_extended_bounding_box() const;
@@ -100,6 +163,23 @@ private:
     void render_contour(const Transform3d& view_matrix, const Transform3d& projection_matrix);
 
     void register_raycasters_for_picking(const GLModel::Geometry& geometry, const Transform3d& trafo);
+
+    // Bed mesh overlay
+    void init_mesh_overlay();
+    void invalidate_mesh_overlay() { m_mesh_overlay.reset(); }
+    void render_mesh_overlay(const Transform3d& view_matrix, const Transform3d& projection_matrix);
+
+public:
+    // ImGui legend for the bed mesh heatmap
+    void render_mesh_legend();
+
+private:
+    // Draw per-grid-cell Z value labels on top of the 3D view. Projects each
+    // grid point to screen space via the active camera and uses ImGui's
+    // background drawlist to paint the values (with a small white backdrop
+    // for legibility). `src` is the mesh currently rendered in the overlay
+    // (m_mesh_data or m_mesh_delta).
+    void render_mesh_cell_labels(const BedMeshData& src);
 };
 
 } // GUI

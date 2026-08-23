@@ -10,6 +10,14 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "MainFrame.hpp"
+#include "CalibrationTempDialog.hpp"
+#include "CalibrationExtrusionDialog.hpp"
+#include "CalibrationPADialog.hpp"
+#include "CalibrationRetractionDialog.hpp"
+#include "CalibrationShrinkageDialog.hpp"
+#include "CalibrationFlowDialog.hpp"
+#include "CalibrationFlowRateDialog.hpp"
+#include "CalibrationFanDialog.hpp"
 
 #include <wx/panel.h>
 #include <wx/notebook.h>
@@ -1743,6 +1751,180 @@ void MainFrame::init_menubar_as_editor()
 #endif // __APPLE__
     }
 
+    // Helper: clear the plate before running a calibration dialog.
+    // Returns true if the plate is clear (or was cleared), false if the user cancelled.
+    auto clear_plate_for_calibration = [this]() -> bool {
+        if (m_plater && !wxGetApp().model().objects.empty()) {
+            auto res = wxMessageBox(
+                _L("The current plate is not empty. All objects will be removed.\n\n"
+                   "Do you want to continue?"),
+                _L("Calibration"), wxYES_NO | wxICON_WARNING, this);
+            if (res != wxYES)
+                return false;
+            m_plater->reset();
+        }
+        return true;
+    };
+
+    // Calibration menu
+    auto calibrationMenu = new wxMenu();
+    {
+        // Calibration menu items — order is user-configurable via Preferences → Other.
+        struct CalibMenuItem {
+            wxString label, tooltip;
+            std::function<void()> action;
+        };
+        std::map<std::string, CalibMenuItem> calib_items = {
+            {"temperature",          {_L("&Temperature"),          _L("Temperature calibration"),
+                [this, clear_plate_for_calibration]() { if (!clear_plate_for_calibration()) return; CalibrationTempDialog dlg(this); dlg.ShowModal(); }}},
+            {"pressure_advance",     {_L("&Pressure Advance"),     _L("Pressure advance calibration"),
+                [this, clear_plate_for_calibration]() { if (!clear_plate_for_calibration()) return; CalibrationPADialog dlg(this); dlg.ShowModal(); }}},
+            {"retraction",           {_L("&Retraction"),           _L("Retraction calibration"),
+                [this, clear_plate_for_calibration]() { if (!clear_plate_for_calibration()) return; CalibrationRetractionDialog dlg(this); dlg.ShowModal(); }}},
+            {"max_flowrate",         {_L("Max &FlowRate"),         _L("Maximum flow rate calibration"),
+                [this, clear_plate_for_calibration]() { if (!clear_plate_for_calibration()) return; CalibrationFlowDialog dlg(this); dlg.ShowModal(); }}},
+            {"fan_speed",            {_L("F&an Speed"),            _L("Fan speed calibration tower"),
+                [this, clear_plate_for_calibration]() { if (!clear_plate_for_calibration()) return; CalibrationFanDialog dlg(this); dlg.ShowModal(); }}},
+        };
+
+        // Read order from AppConfig (safely — section may not exist on first run)
+        std::vector<std::string> ordered_ids;
+        if (wxGetApp().app_config->has_section("calibration_menu_order")) {
+            auto section = wxGetApp().app_config->get_section("calibration_menu_order");
+            for (int i = 1; i <= (int)calib_items.size(); ++i) {
+                auto it = section.find(std::to_string(i));
+                if (it != section.end() && calib_items.count(it->second))
+                    ordered_ids.push_back(it->second);
+            }
+        }
+        // Fall back to default if config is incomplete
+        if (ordered_ids.size() != calib_items.size()) {
+            ordered_ids = {"temperature", "pressure_advance", "retraction",
+                           "max_flowrate", "fan_speed"};
+        }
+
+        // "Flow Ratio" groups the two tests that tune the same parameter (flow ratio
+        // = extrusion multiplier): the YOLO flat-pad test (guide step 2) and the
+        // vase-mode cube (guide step 6). The submenu is placed right after Temperature
+        // so the menu follows the recommended calibration order.
+        wxMenu* flowRatioMenu = new wxMenu();
+        append_menu_item(flowRatioMenu, wxID_ANY, _L("&YOLO (flat pads)"),
+            _L("Flow ratio calibration with YOLO-style flat pads"),
+            [this, clear_plate_for_calibration](wxCommandEvent&) {
+                if (!clear_plate_for_calibration()) return; CalibrationFlowRateDialog dlg(this); dlg.ShowModal(); },
+            "", nullptr, []() { return true; }, this);
+        append_menu_item(flowRatioMenu, wxID_ANY, _L("&Extrusion Multiplier (vase cube)"),
+            _L("Flow ratio calibration with a vase-mode extrusion-multiplier cube"),
+            [this, clear_plate_for_calibration](wxCommandEvent&) {
+                if (!clear_plate_for_calibration()) return; CalibrationExtrusionDialog dlg(this); dlg.ShowModal(); },
+            "", nullptr, []() { return true; }, this);
+
+        for (const auto &id : ordered_ids) {
+            auto &item = calib_items.at(id);
+            append_menu_item(calibrationMenu, wxID_ANY, item.label, item.tooltip,
+                [action = item.action](wxCommandEvent&) { action(); },
+                "", nullptr, []() { return true; }, this);
+            if (id == "temperature")
+                append_submenu(calibrationMenu, flowRatioMenu, wxID_ANY, _L("Flow &Ratio"),
+                    _L("Flow ratio (extrusion multiplier) calibration"));
+        }
+
+        // "Dimensional Accuracy" groups the built-in XYZ shrinkage gauge with the
+        // third-party Califlower model. Califlower is licensed and cannot be bundled,
+        // so it is loaded from a user-specified STL (remembered in AppConfig).
+        wxMenu* dimAccMenu = new wxMenu();
+        append_menu_item(dimAccMenu, wxID_ANY, _L("&XYZ Shrinkage Gauge"),
+            _L("Shrinkage / dimensional accuracy calibration (XYZ cross gauge)"),
+            [this, clear_plate_for_calibration](wxCommandEvent&) {
+                if (!clear_plate_for_calibration()) return; CalibrationShrinkageDialog dlg(this); dlg.ShowModal(); },
+            "", nullptr, []() { return true; }, this);
+        // Load the remembered Califlower STL. Prompt for it only when forced
+        // ("Set Califlower STL…"), when none is set yet, or when the saved file is
+        // gone (moved/deleted) — so normally it loads in one click.
+        auto load_califlower = [this, clear_plate_for_calibration](bool force_pick) {
+            AppConfig* ac = wxGetApp().app_config;
+            std::string last = ac ? ac->get("califlower_stl_path") : std::string();
+            boost::filesystem::path p(last);
+            if (force_pick || last.empty() || !boost::filesystem::exists(p)) {
+                wxFileDialog fdlg(this, _L("Select the Califlower STL file"),
+                    last.empty() ? from_u8(wxGetApp().app_config->get_last_dir()) : from_path(p.parent_path()),
+                    last.empty() ? wxString() : from_path(p.filename()),
+                    _L("Model files") + " (*.stl;*.obj;*.3mf;*.step;*.stp)|*.stl;*.obj;*.3mf;*.step;*.stp|"
+                        + _L("All files") + " (*.*)|*.*",
+                    wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+                if (fdlg.ShowModal() != wxID_OK) return;
+                p = into_path(fdlg.GetPath());
+                if (ac) ac->set("califlower_stl_path", p.string());
+            }
+            if (!clear_plate_for_calibration()) return;
+            if (m_plater)
+                m_plater->load_files(std::vector<boost::filesystem::path>{ p }, true, false);
+        };
+        append_menu_item(dimAccMenu, wxID_ANY, _L("&Califlower"),
+            _L("Load the Califlower calibration model (asks for the STL the first time, then remembers it)"),
+            [load_califlower](wxCommandEvent&) { load_califlower(false); },
+            "", nullptr, []() { return true; }, this);
+        append_menu_item(dimAccMenu, wxID_ANY, _L("Set Califlower &STL…"),
+            _L("Choose or change the Califlower STL file on disk (e.g. if it was moved or deleted)"),
+            [load_califlower](wxCommandEvent&) { load_califlower(true); },
+            "", nullptr, []() { return true; }, this);
+        append_submenu(calibrationMenu, dimAccMenu, wxID_ANY, _L("Dimensional &Accuracy"),
+            _L("Dimensional accuracy / shrinkage calibration"));
+
+        calibrationMenu->AppendSeparator();
+        append_menu_item(calibrationMenu, wxID_ANY, _L("Calibration &Guide"), _L("Open the calibration tutorial"),
+            [](wxCommandEvent&) {
+                wxLaunchDefaultBrowser("https://github.com/hyiger/PrusaSlicer/blob/master/doc/Calibration_Guide.md");
+            }, "", nullptr, []() { return true; }, this);
+
+        // Bed mesh tools live in their own submenu — keeps the parent
+        // Calibration menu compact and groups the related Fetch / Probe /
+        // Show / Save / Load / Compare items together.
+        calibrationMenu->AppendSeparator();
+        wxMenu* bedMeshMenu = new wxMenu();
+        append_menu_item(bedMeshMenu, wxID_ANY, _L("&Fetch from Printer"),
+            _L("Fetch the stored bed mesh from a connected Prusa printer via USB"),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->fetch_bed_mesh(); },
+            "", nullptr, []() { return true; }, this);
+        append_menu_item(bedMeshMenu, wxID_ANY, _L("&Probe Bed…"),
+            _L("Run a full bed probing cycle (G29) on the connected printer, then fetch the mesh"),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->probe_bed_mesh(); },
+            "", nullptr, []() { return true; }, this);
+        bedMeshMenu->AppendSeparator();
+        append_menu_check_item(bedMeshMenu, wxID_ANY, _L("Show &Overlay"),
+            _L("Toggle bed mesh visualization on the build plate"),
+            [this](wxCommandEvent& e) { if (m_plater) m_plater->set_bed_mesh_overlay_shown(e.IsChecked()); },
+            this,
+            []() { return true; },
+            [this]() { return m_plater && m_plater->is_bed_mesh_overlay_shown(); });
+        bedMeshMenu->AppendSeparator();
+        append_menu_item(bedMeshMenu, wxID_ANY, _L("&Save As CSV…"),
+            _L("Save the currently displayed bed mesh to a CSV file"),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->save_bed_mesh_csv(); },
+            "", nullptr, []() { return true; }, this);
+        append_menu_item(bedMeshMenu, wxID_ANY, _L("&Load From CSV…"),
+            _L("Load a previously saved bed mesh CSV file"),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->load_bed_mesh_csv(); },
+            "", nullptr, []() { return true; }, this);
+        append_menu_item(bedMeshMenu, wxID_ANY, _L("&Compare With CSV…"),
+            _L("Load a baseline mesh and show the delta from the current one"),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->compare_bed_mesh_csv(); },
+            "", nullptr, []() { return true; }, this);
+        append_submenu(calibrationMenu, bedMeshMenu, wxID_ANY, _L("&Bed Mesh"),
+            _L("Fetch, probe, display, and compare bed mesh data"));
+    }
+
+    // Maintenance menu — printer service procedures run over USB serial,
+    // following the same worker/progress pattern as the bed mesh tools.
+    auto maintenanceMenu = new wxMenu();
+    {
+        append_menu_item(maintenanceMenu, wxID_ANY, _L("&Cold Pull (INDX)…"),
+            _L("Run a guided cold pull on a connected INDX to clear a clogged nozzle. "
+               "Prompts appear on the printer's screen"),
+            [this](wxCommandEvent&) { if (m_plater) m_plater->cold_pull_maintenance(); },
+            "", nullptr, []() { return true; }, this);
+    }
+
     // Help menu
     auto helpMenu = generate_help_menu();
 
@@ -1756,9 +1938,13 @@ void MainFrame::init_menubar_as_editor()
     m_bar_menus.AppendMenuSeparaorItem();
 
     m_bar_menus.AppendMenuItem(windowMenu, _L("&Window"));
-    if (viewMenu) 
+    if (viewMenu)
         m_bar_menus.AppendMenuItem(viewMenu, _L("&View"));
-    
+
+    m_bar_menus.AppendMenuItem(calibrationMenu, _L("Ca&libration"));
+
+    m_bar_menus.AppendMenuItem(maintenanceMenu, _L("Main&tenance"));
+
     m_bar_menus.AppendMenuItem(wxGetApp().get_config_menu(this), _L("&Configuration"));
 
     m_bar_menus.AppendMenuSeparaorItem();
@@ -1776,6 +1962,8 @@ void MainFrame::init_menubar_as_editor()
     if (editMenu) m_menubar->Append(editMenu, _L("&Edit"));
     m_menubar->Append(windowMenu, _L("&Window"));
     if (viewMenu) m_menubar->Append(viewMenu, _L("&View"));
+    m_menubar->Append(calibrationMenu, _L("Ca&libration"));
+    m_menubar->Append(maintenanceMenu, _L("Main&tenance"));
     // Add additional menus from C++
     m_menubar->Append(wxGetApp().get_config_menu(this), _L("&Configuration"));
     m_menubar->Append(helpMenu, _L("&Help"));

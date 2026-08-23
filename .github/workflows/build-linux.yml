@@ -1,0 +1,288 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [master]
+  release:
+    types: [created]
+  workflow_dispatch:
+
+concurrency:
+  group: build-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-22.04
+            linuxdeploy_arch: x86_64
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            linuxdeploy_arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    env:
+      SCCACHE_VERSION: v0.14.0
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+      SCCACHE_CACHE_SIZE: 2G
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep 'set(SLIC3R_VERSION' version.inc | sed 's/.*"\(.*\)".*/\1/')
+          BUILD_ID=$(grep 'set(SLIC3R_BUILD_ID' version.inc | sed 's/.*"\(.*\)".*/\1/' | sed "s/\${SLIC3R_VERSION}/$VERSION/")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+          echo "Build ID: $BUILD_ID"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git build-essential autoconf cmake \
+            libglu1-mesa-dev libgtk-3-dev libdbus-1-dev \
+            libwebkit2gtk-4.1-dev texinfo \
+            libhidapi-dev \
+            fuse libfuse2
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: deps/build-default/destdir
+          key: deps-linux-${{ matrix.arch }}-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+          restore-keys: deps-linux-${{ matrix.arch }}-
+
+      - name: Cache package downloads
+        uses: actions/cache@v4
+        with:
+          path: deps/.pkg_cache
+          key: pkgcache-linux-${{ matrix.arch }}-v1-${{ hashFiles('deps/+*/**', 'deps/CMakeLists.txt', 'deps/CMakePresets.json') }}
+          restore-keys: pkgcache-linux-${{ matrix.arch }}-v1-
+
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: .sccache
+          key: sccache-linux-${{ matrix.arch }}-v1-${{ github.run_id }}
+          restore-keys: sccache-linux-${{ matrix.arch }}-v1-
+
+      - name: Install sccache
+        run: |
+          SCCACHE_ARCHIVE="sccache-${SCCACHE_VERSION}-${{ matrix.linuxdeploy_arch }}-unknown-linux-musl.tar.gz"
+          curl -L -o "$SCCACHE_ARCHIVE" \
+            "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${SCCACHE_ARCHIVE}"
+          tar -xzf "$SCCACHE_ARCHIVE"
+          echo "$PWD/${SCCACHE_ARCHIVE%.tar.gz}" >> "$GITHUB_PATH"
+
+      - name: Pre-download GMP (gmplib.org is unreliable)
+        run: |
+          mkdir -p deps/.pkg_cache/GMP
+          if [ ! -f deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 ]; then
+            curl -L -o deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 \
+              https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.bz2 || \
+            curl -L -o deps/.pkg_cache/GMP/gmp-6.2.1.tar.bz2 \
+              https://mirror.ibcp.fr/pub/gnu/gmp/gmp-6.2.1.tar.bz2
+          fi
+
+      - name: Zero sccache stats
+        run: sccache --zero-stats
+
+      - name: Configure (builds deps if not cached)
+        run: cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build
+        run: cmake --build build-default -j$(nproc)
+
+      - name: Install
+        run: cmake --install build-default
+
+      - name: Package AppImage
+        run: |
+          # Download linuxdeploy for the correct architecture
+          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.linuxdeploy_arch }}.AppImage"
+          chmod +x linuxdeploy-${{ matrix.linuxdeploy_arch }}.AppImage
+
+          # Create AppDir structure.
+          # Non-FHS builds resolve resources at <canonical binary dir>/../resources
+          # (src/CLI/Setup.cpp), i.e. usr/bin/../resources => usr/resources. They must
+          # live there, NOT usr/share/PrusaSlicer, or OnInit aborts with no window.
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/resources
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/128x128/apps
+
+          # Copy the WHOLE install bindir, don't cherry-pick. It holds exactly three
+          # entries: prusa-slicer, the prusa-gcodeviewer symlink, and OCCTWrapper.so
+          # (src/occt_wrapper/CMakeLists.txt: install(TARGETS OCCTWrapper DESTINATION
+          # ${CMAKE_INSTALL_BINDIR})). The wrapper is dlopen()ed from the binary's own
+          # directory — src/libslic3r/Format/STEP.cpp computes
+          # program_location().parent_path() / "OCCTWrapper.so" — so it must sit next
+          # to prusa-slicer or every STEP import fails at runtime (#48).
+          # cp -a preserves the relative gcodeviewer symlink.
+          cp -a build-default/dist/bin/. AppDir/usr/bin/
+          test -f AppDir/usr/bin/OCCTWrapper.so || {
+            echo "::error::OCCTWrapper.so missing from the install tree — STEP import would be broken"
+            exit 1
+          }
+          cp -r build-default/dist/resources/* AppDir/usr/resources/ 2>/dev/null || \
+            cp -r resources/* AppDir/usr/resources/
+
+          # Desktop file and icon
+          cp src/platform/unix/PrusaSlicer.desktop AppDir/usr/share/applications/
+          if [ -f resources/icons/PrusaSlicer_128px.png ]; then
+            cp resources/icons/PrusaSlicer_128px.png AppDir/usr/share/icons/hicolor/128x128/apps/PrusaSlicer.png
+          fi
+
+          # Build AppImage
+          APPIMAGE_NAME="${{ steps.version.outputs.build_id }}-linux-${{ matrix.arch }}.AppImage"
+          # No "|| echo ..." here: swallowing a linuxdeploy failure is what let a
+          # broken package ship silently once already, and there is no tarball step
+          # in this workflow for the old message to fall back to.
+          OUTPUT="$APPIMAGE_NAME" ./linuxdeploy-${{ matrix.linuxdeploy_arch }}.AppImage \
+            --appdir AppDir \
+            --desktop-file src/platform/unix/PrusaSlicer.desktop \
+            --output appimage
+
+          # Rename if output name differs
+          if [ -f PrusaSlicer*.AppImage ] && [ ! -f "$APPIMAGE_NAME" ]; then
+            mv PrusaSlicer*.AppImage "$APPIMAGE_NAME"
+          fi
+
+          # Assert the wrapper survived packaging. linuxdeploy rewrites RPATHs of ELF
+          # files it finds in the AppDir; this turns "it should still be there" into a
+          # build failure rather than a runtime one for users.
+          # --appimage-extract needs no FUSE.
+          rm -rf squashfs-root
+          ./"$APPIMAGE_NAME" --appimage-extract usr/bin/OCCTWrapper.so >/dev/null
+          test -f squashfs-root/usr/bin/OCCTWrapper.so || {
+            echo "::error::OCCTWrapper.so did not survive AppImage packaging"
+            exit 1
+          }
+          rm -rf squashfs-root
+
+      - name: Package deb
+        run: |
+          DEB_NAME="${{ steps.version.outputs.build_id }}-linux-${{ matrix.arch }}.deb"
+          VERSION="${{ steps.version.outputs.version }}"
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            DEB_ARCH="amd64"
+          else
+            DEB_ARCH="arm64"
+          fi
+
+          # Create directory structure.
+          # Resources must sit at usr/resources (usr/bin/../resources), see Setup.cpp.
+          mkdir -p deb/DEBIAN
+          mkdir -p deb/usr/bin
+          mkdir -p deb/usr/resources
+          mkdir -p deb/usr/share/applications
+          mkdir -p deb/usr/share/icons/hicolor/128x128/apps
+
+          # Control file
+          cat > deb/DEBIAN/control << CTRL
+          Package: prusaslicer
+          Version: ${VERSION}
+          Architecture: ${DEB_ARCH}
+          Maintainer: hyiger
+          Description: PrusaSlicer - G-code generator for 3D printers (Filament Edition)
+           Converts 3D models (STL, OBJ, AMF, 3MF, STEP) into G-code
+           for FFF and SLA 3D printers. This fork adds built-in
+           calibration tools for temperature, flow rate, pressure
+           advance, retraction, and more.
+          Section: graphics
+          Priority: optional
+          Depends: libgtk-3-0 | libgtk-3-0t64, libwebkit2gtk-4.1-0, libglu1-mesa, libdbus-1-3, libhidapi-hidraw0
+          CTRL
+          # Strip leading whitespace from control file (heredoc was indented)
+          sed -i 's/^          //' deb/DEBIAN/control
+
+          # Copy the WHOLE install bindir — see the AppImage step for why cherry-picking
+          # dropped OCCTWrapper.so and broke STEP import (#48).
+          cp -a build-default/dist/bin/. deb/usr/bin/
+          test -f deb/usr/bin/OCCTWrapper.so || {
+            echo "::error::OCCTWrapper.so missing from the install tree — STEP import would be broken"
+            exit 1
+          }
+          cp -r build-default/dist/resources/* deb/usr/resources/ 2>/dev/null || \
+            cp -r resources/* deb/usr/resources/
+
+          # Desktop file and icon
+          cp src/platform/unix/PrusaSlicer.desktop deb/usr/share/applications/
+          cp resources/icons/PrusaSlicer_128px.png deb/usr/share/icons/hicolor/128x128/apps/PrusaSlicer.png
+
+          # Build deb
+          dpkg-deb --build deb "$DEB_NAME"
+          echo "Created $DEB_NAME"
+
+      # Nothing in this workflow ever executed the produced binary, which is how a
+      # missing runtime dependency (#44: libhidapi-hidraw0) and a missing module
+      # (#48: OCCTWrapper.so) both shipped without CI noticing. Installing the .deb
+      # into a clean container resolves ONLY the declared Depends:, so an omission
+      # fails right here. The `ldd | ! grep 'not found'` check is the precise
+      # invariant that was violated in #44.
+      #
+      # Do not gate on prusa-slicer's exit code: with no $DISPLAY,
+      # src/CLI/GuiParams.cpp returns 1 by design.
+      - name: Smoke test deb in a clean container
+        run: |
+          DEB_NAME="${{ steps.version.outputs.build_id }}-linux-${{ matrix.arch }}.deb"
+          docker run --rm -v "$PWD:/w" -w /w ubuntu:24.04 bash -eux -c "
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y ./'$DEB_NAME'
+
+            # NOTE: these must be explicit 'if ...; then exit 1; fi' blocks, NOT
+            # '! grep -q ...'. bash exempts a command whose status is inverted with
+            # '!' from 'set -e', so the bare-negation form would let a missing
+            # library sail straight past and the container would still exit 0 —
+            # i.e. the guard would not catch the very class of bug it exists for.
+
+            # Every declared dependency must actually resolve.
+            ldd /usr/bin/prusa-slicer > /tmp/ldd-slicer
+            if grep -q 'not found' /tmp/ldd-slicer; then
+              echo '::error::prusa-slicer has unresolved shared libraries (undeclared Depends):'
+              grep 'not found' /tmp/ldd-slicer
+              exit 1
+            fi
+
+            # The STEP wrapper must be installed next to the binary and loadable.
+            test -f /usr/bin/OCCTWrapper.so
+            ldd /usr/bin/OCCTWrapper.so > /tmp/ldd-occt
+            if grep -q 'not found' /tmp/ldd-occt; then
+              echo '::error::OCCTWrapper.so has unresolved shared libraries:'
+              grep 'not found' /tmp/ldd-occt
+              exit 1
+            fi
+          "
+
+      - name: Show sccache stats
+        if: always()
+        run: sccache --show-stats
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-${{ matrix.arch }}-appimage
+          path: ${{ steps.version.outputs.build_id }}-linux-${{ matrix.arch }}.AppImage
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}-deb
+          path: ${{ steps.version.outputs.build_id }}-linux-${{ matrix.arch }}.deb
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.version.outputs.build_id }}-linux-${{ matrix.arch }}.AppImage
+            ${{ steps.version.outputs.build_id }}-linux-${{ matrix.arch }}.deb

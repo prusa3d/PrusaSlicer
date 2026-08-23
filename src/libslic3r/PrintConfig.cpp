@@ -1557,6 +1557,16 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionString(L("(Unknown)")));
     def->cli = ConfigOptionDef::nocli;
 
+    // FilamentDB linkage (hyiger fork): the stable Filament DB _id this preset is
+    // bound to. Hidden (no label/mode → no UI widget), round-trips in the preset
+    // .ini, and is sent on sync so the server can match by stable id rather than
+    // the mutable preset name (see Utils/FilamentDB.cpp). Mirrors filament_vendor:
+    // a registered coString metadata option so it survives load (unregistered keys
+    // are dropped — Preset::remove_invalid_keys).
+    def = this->add("filamentdb_id", coString);
+    def->set_default_value(new ConfigOptionString(""));
+    def->cli = ConfigOptionDef::nocli;
+
     def = this->add("filament_shrinkage_compensation_xy", coPercents);
     def->label = L("Shrinkage compensation XY");
     def->tooltip = L("Enter your filament shrinkage percentages for the X and Y axes here to apply scaling of the object to "
@@ -2186,6 +2196,11 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(15));
+
+    // Internal flag for flow rate calibration: special Archimedean Chords ordering
+    def = this->add("calib_flowrate_topinfill_special_order", coBool);
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("layer_gcode", coString);
     def->label = L("After layer change G-code");
@@ -3965,6 +3980,21 @@ void PrintConfigDef::init_fff_params()
                    "from the print bed, set this to -0.3 (or fix your endstop).");
     def->sidetext = L("mm");
     def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("skew_xy_correction", coFloat);
+    def->label = L("XY Skew Correction");
+    def->category = L("Advanced");
+    def->tooltip = L("Corrects XY axis non-orthogonality (skew) by applying a shear "
+                   "transform to all G-code coordinates. Enter the measured skew angle "
+                   "in degrees. Positive values shear X in the +X direction as Y increases. "
+                   "Use the Dimensional Accuracy calibration tool to measure skew, then "
+                   "compute the angle from the diagonal measurements of a printed square. "
+                   "Arc fitting (G2/G3) is automatically disabled when skew correction is active.");
+    def->sidetext = L("°");
+    def->min = -5;
+    def->max = 5;
+    def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("perimeter_generator", coEnum);
