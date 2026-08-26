@@ -1,12 +1,10 @@
 #pragma once
 
 #include "Slic3r/App/Yoga/PrinterSettingsButton.hpp"
+
+#include "Slic3r/Biz/Platform/ListenerScope.hpp"
 #include "Slic3r/Biz/DataObserver.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
-
-namespace Slic3r::Biz::Preset {
-class PresetInteractor;
-} // namespace Slic3r::Biz::Preset
 
 namespace Slic3r::App::Yoga {
 class LayoutButton;
@@ -16,7 +14,8 @@ namespace Slic3r::App {
 
 class LogicalPrinterSettingsButton :
     public Yoga::PrinterSettingsButton,
-    public Biz::DataObserver<Biz::Preset::PresetItem>
+    public Biz::DataObserver<Biz::Preset::PresetItem>,
+    public Biz::IListSelectionChangedListener
 {
 public:
     using FnIndexClicked = std::function<void(size_t)>;
@@ -27,10 +26,12 @@ public:
         FnIndexClicked on_clicked,
         FnIndexClicked on_cog_clicked,
         FnIndexClicked on_favorite_clicked,
-        const Biz::Preset::PresetInteractor& preset_interactor
+        Biz::Preset::PresetInteractor& preset_interactor
     );
 
     const Biz::Preset::PresetItem& preset_item() const;
+
+    void on_list_selection_changed(Domain::SelectionId new_selection) override;
 
 protected:
     void on_data_update() override;
@@ -41,11 +42,19 @@ protected:
 
     bool is_favorited() const;
 
+    void update_selected();
+
 private:
+    Biz::ListenerScope<
+        Biz::IListSelectionChangedListener,
+        Biz::Preset::PresetItemObservableList,
+        LogicalPrinterSettingsButton>
+        m_list_selection_changed_listener_scope;
+
     FnIndexClicked m_on_clicked;
     FnIndexClicked m_on_cog_clicked;
     FnIndexClicked m_on_favorite_clicked;
-    const Biz::Preset::PresetInteractor& m_preset_interactor;
+    Biz::Preset::PresetInteractor& m_preset_interactor;
 
     Yoga::LayoutButton* m_favorite_button{nullptr};
 };

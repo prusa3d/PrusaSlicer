@@ -151,16 +151,6 @@ void LogicalPrinterSettingsDialog::on_list_selection_changed(Domain::SelectionId
         return;
     }
 
-    for (size_t button_index = 0; button_index < m_printer_list_view->object_count();
-         ++button_index)
-    {
-        LogicalPrinterSettingsButton* button = dynamic_cast<LogicalPrinterSettingsButton*>(
-            m_printer_list_view->get_item(button_index)
-        );
-        ASSERT(button);
-        button->set_checked(new_selection == button_index);
-    }
-
     update_settings_data();
 }
 

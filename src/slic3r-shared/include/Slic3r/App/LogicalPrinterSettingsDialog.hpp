@@ -97,7 +97,7 @@ private:
         LogicalPrinterSettingsButton::FnIndexClicked,
         LogicalPrinterSettingsButton::FnIndexClicked,
         LogicalPrinterSettingsButton::FnIndexClicked,
-        const Biz::Preset::PresetInteractor&>;
+        Biz::Preset::PresetInteractor&>;
     using PrinterListView = Yoga::ListView<
         LogicalPrinterSettingsButton,
         Biz::Preset::PresetItem,
