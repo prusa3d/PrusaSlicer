@@ -4,7 +4,7 @@
 ## 0. Prerequisities
 
 The following tools need to be installed on your computer:
-- Microsoft Visual Studio version 16 2019 or 17 2022
+- Microsoft Visual Studio version 16 2019 or 17 2022, including the "C++ ATL" component for the used toolset (not part of the default Build Tools installation)
 - CMake
 - git
 
