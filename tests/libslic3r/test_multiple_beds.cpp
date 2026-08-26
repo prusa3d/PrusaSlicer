@@ -11,7 +11,7 @@ TEST_CASE("Conversion between grid coords and index", "[MultipleBeds]")
 
     // Add indexes covering the whole int positive range.
     const int n{100};
-    std::generate_n(std::back_inserter(original_indices), n, [i = 1]() mutable {
+    std::generate_n(std::back_inserter(original_indices), n, [i = 1, n]() mutable {
         return std::numeric_limits<int>::max() / n * i++;
     });
 
