@@ -17,6 +17,7 @@
 #include "Slic3r/App/Platform/CommandName.hpp"
 #include "Slic3r/App/Lua/PluginSystem.hpp"
 #include "Slic3r/App/ProjectButton.hpp"
+#include "Slic3r/App/Navigator.hpp"
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
@@ -351,16 +352,14 @@ void TopBar::add_show_ui_btn(Item* parent)
     m_show_ui_btn =
         parent->emplace_back<LayoutButton>("", Render::Icon::TobBarShowUI, _u8L("Hide sidebars"));
     m_show_ui_btn->set_checkable(true);
+    m_show_ui_btn->set_checked(AppServices::instance().app_config().get<bool>("hide_sidebars"));
 
     m_show_ui_btn->callbacks().action = [this]()
     {
         m_show_ui_btn->set_tooltip(
             m_show_ui_btn->checked() ? _u8L("Show sidebars") : _u8L("Hide sidebars")
         );
-        // Propagate sidebars visibility into active RenderModule
-        m_render_module->set_sidebars_visible(!m_show_ui_btn->checked());
-
-        // ysTODO: save hide value into app_config
+        m_navigator.set_hide_sidebars(m_show_ui_btn->checked());
     };
 }
 

@@ -23,6 +23,29 @@ void Navigator::set_canvas(Platform::AbstractRenderCanvas& canvas)
     m_canvas = &canvas;
 }
 
+void Navigator::set_hide_sidebars(bool hide)
+{
+    // When sidebars are hidden normal dialogs are not available only model ones.
+    // This settings persists between RenderModules/Projects and is stored in AppConfig
+
+    AppServices::instance().app_config_interactor().set_item_value(
+        "hide_sidebars",
+        Domain::ConfigValue{hide}
+    );
+
+    for (ProjectContext& context : m_project_contexts->projects()) {
+        context.opened_dialog = nullptr;
+    }
+
+    m_plater_module->set_sidebars_visible(!hide);
+    m_preview_module->set_sidebars_visible(!hide);
+
+    if (hide) {
+        m_plater_module->set_opened_dialog(nullptr);
+        m_preview_module->set_opened_dialog(nullptr);
+    }
+}
+
 void Navigator::on_init(
     Plater::PlaterRenderModule& plater_module,
     Preview::PreviewRenderModule& preview_module,

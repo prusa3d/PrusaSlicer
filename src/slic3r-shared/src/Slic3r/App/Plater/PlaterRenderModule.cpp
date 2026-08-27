@@ -1199,7 +1199,10 @@ void PlaterRenderModule::set_sidebars_visible(bool visible)
 {
     m_layout->set_sidebars_visible(visible);
 
-    // request redraw
+    if (!visible) {
+        m_render_module_navigator->set_opened_dialog(nullptr);
+    }
+
     request_render();
 }
 

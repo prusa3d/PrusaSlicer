@@ -379,10 +379,12 @@ void PreviewRenderModule::on_bed_instance_updated(Domain::SelectionId project_id
     update_viewer();
 }
 
-void PreviewRenderModule::set_sidebars_visible(bool hide)
+void PreviewRenderModule::set_sidebars_visible(bool visible)
 {
-    m_layout->set_sidebars_visible(hide);
-    // request redraw
+    if (m_layout) {
+        m_layout->set_sidebars_visible(visible);
+    }
+
     request_render();
 }
 
