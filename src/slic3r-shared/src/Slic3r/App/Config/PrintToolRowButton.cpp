@@ -48,7 +48,7 @@ PrintToolRowButton::PrintToolRowButton(Biz::IConfigBoxSetter& cb_setter) : m_cb_
         std::size_t tool_count = m_last_print_tool_item->tool_overrides.size();
         while (tool_count > 0) {
             tool_count--;
-            m_cb_setter.set_from_original_value(
+            m_cb_setter.discard_item_changes(
                 *m_last_print_tool_item->tool_overrides.at(tool_count),
                 tool_count
             );
@@ -85,7 +85,9 @@ void PrintToolRowButton::update_data(const Biz::PrintToolItem* print_tool_item)
     bool show_preview      = false;
     std::optional<Domain::ConfigValue> value;
 
-    if (print_tool_item->print_item->def().compatibility_rule != Domain::CompatibilityRule::Undefined) {
+    if (print_tool_item->print_item->def().compatibility_rule
+        != Domain::CompatibilityRule::Undefined)
+    {
         show_preview = true;
     } else if (print_tool_item->shared_context.extruder_candidates.empty()) {
         // Extruder candidates are empty, just compare all extruder values

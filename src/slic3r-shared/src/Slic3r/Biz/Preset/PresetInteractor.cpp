@@ -1189,6 +1189,17 @@ void PresetInteractor::discard_selected_printer_preset_changes()
         if (m_printer_cbi.config_box_list().lock()->is_dirty(item.name()))
             set_from_original_value(item);
     }
+
+    invoke_listeners<IPresetChangedListener>(
+        [&](auto* l)
+        {
+            l->on_preset_discarded_changes(
+                m_selected_project_id,
+                selected_config_container_context().config_container_id,
+                PresetItemType::PrinterPreset
+            );
+        }
+    );
 }
 
 void PresetInteractor::discard_selected_print_preset_changes()
@@ -1201,6 +1212,17 @@ void PresetInteractor::discard_selected_print_preset_changes()
         if (m_print_tool_cbi.observable_list().lock()->is_dirty_print(item.name()))
             set_from_original_value(item);
     }
+
+    invoke_listeners<IPresetChangedListener>(
+        [&](auto* l)
+        {
+            l->on_preset_discarded_changes(
+                m_selected_project_id,
+                selected_config_container_context().config_container_id,
+                PresetItemType::PrintPreset
+            );
+        }
+    );
 }
 
 void PresetInteractor::discard_selected_tool_print_preset_changes(size_t tool_index)
@@ -1213,6 +1235,17 @@ void PresetInteractor::discard_selected_tool_print_preset_changes(size_t tool_in
         if (m_print_tool_cbi.observable_list().lock()->is_dirty_tool(item.name(), tool_index))
             set_from_original_value(item, tool_index);
     }
+
+    invoke_listeners<IPresetChangedListener>(
+        [&](auto* l)
+        {
+            l->on_preset_discarded_changes(
+                m_selected_project_id,
+                selected_config_container_context().config_container_id,
+                PresetItemType::ToolPrintPreset
+            );
+        }
+    );
 }
 
 void PresetInteractor::discard_selected_tool_material_preset_changes(size_t slot_index)
@@ -2608,6 +2641,22 @@ void PresetInteractor::set_from_original_value(const Domain::ConfigItem& item, s
     m_backup_store.invalidate_backup(m_selected_project_id);
     invoke_on_preset_value_changed(item);
     invoke_slicing_input_changed();
+}
+
+void PresetInteractor::discard_item_changes(const Domain::ConfigItem& item, size_t index)
+{
+    set_from_original_value(item, index);
+
+    invoke_listeners<IPresetChangedListener>(
+        [&](auto* l)
+        {
+            l->on_preset_item_discarded_changes(
+                m_selected_project_id,
+                selected_config_container_context().config_container_id,
+                item
+            );
+        }
+    );
 }
 
 void PresetInteractor::set_item_value(

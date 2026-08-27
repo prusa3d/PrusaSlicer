@@ -53,7 +53,7 @@ ConfigRowItem::ConfigRowItem(
     m_revert_button->set_height(20);
     m_revert_button->set_flex_shrink(0.f);
     m_revert_button->callbacks().action = [this]()
-    { m_cb_setter.set_from_original_value(*m_state, m_cbi_index); };
+    { m_cb_setter.discard_item_changes(*m_state, m_cbi_index); };
 
     m_label->set_width(m_force_label.has_value() ? 90 : 175);
     m_left_side->set_max_width(175);

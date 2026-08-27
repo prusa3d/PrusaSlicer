@@ -288,7 +288,7 @@ public:
 
     const Domain::ConfigValue* get_override_original_value(const Domain::ConfigItem& item, size_t index = 0) const override;
 
-    void set_from_original_value(const Domain::ConfigItem& item, size_t index = 0) override;
+    void discard_item_changes(const Domain::ConfigItem& item, size_t index = 0) override;
 
     void set_item_value(
         const Domain::ConfigItem& item,
@@ -985,6 +985,8 @@ private:
     );
 
     void delete_preset(Domain::Preset::PresetKind kind, const std::string& preset_ids);
+
+    void set_from_original_value(const Domain::ConfigItem& item, size_t index = 0);
 
     bool change_hw_config_and_validate(Domain::SelectionId project_id, const std::function<void(Domain::Preset::HwPrinterConfig&)>& modifier);
 
