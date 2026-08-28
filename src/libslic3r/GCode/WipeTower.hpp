@@ -308,6 +308,8 @@ private:
     bool            m_adhesion                  = true;
     GCodeFlavor     m_gcode_flavor;
 
+	bool			m_disable_linear_advance    = true;
+
     // Bed properties
     enum {
         RectangularBed,
