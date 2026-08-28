@@ -809,6 +809,8 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,                    scarf_seam_length))
     ((ConfigOptionFloat,                    scarf_seam_max_segment_length))
     ((ConfigOptionBool,                     scarf_seam_on_inner_perimeters))
+    // SuperSlicer
+    ((ConfigOptionEnum<InfillPattern>,  solid_fill_pattern))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(
