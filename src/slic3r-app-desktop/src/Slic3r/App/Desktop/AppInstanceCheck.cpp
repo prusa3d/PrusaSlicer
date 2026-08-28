@@ -11,6 +11,11 @@
 #include <string>
 #include <boost/filesystem.hpp>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <boost/nowide/convert.hpp>
+#endif
+
 namespace Slic3r::App::Desktop::AppInstance {
 
 namespace {
@@ -26,14 +31,45 @@ std::string get_init_params_in_string(int argc, char** argv)
     }
     return result;
 }
+
+#ifdef _WIN32
+// Normalizes case/short-path variance that argv[0] canonicalization misses. "" on failure.
+std::string get_canonical_executable_path_win32()
+{
+    wchar_t module_path[MAX_PATH];
+    DWORD len = GetModuleFileNameW(nullptr, module_path, MAX_PATH);
+    if (len == 0 || len == MAX_PATH)
+        return {};
+
+    HANDLE file = CreateFileW(
+        module_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr
+    );
+    if (file == INVALID_HANDLE_VALUE)
+        return {};
+
+    wchar_t final_path[32768];
+    DWORD count = GetFinalPathNameByHandleW(file, final_path, 32768, FILE_NAME_NORMALIZED);
+    CloseHandle(file);
+    if (count == 0 || count >= 32768)
+        return {};
+    return boost::nowide::narrow(final_path, count);
+}
+#endif // _WIN32
 } // namespace
 
 bool instance_check(const Slic3r::App::InitParams& init_params, bool app_config_single_instance)
 {
-    std::string program_path = boost::filesystem::absolute(
-                                   boost::filesystem::weakly_canonical(init_params.argv[0])
-    )
-                                   .string();
+    std::string program_path;
+#ifdef _WIN32
+    program_path = get_canonical_executable_path_win32();
+#endif
+    if (program_path.empty()) {
+        program_path = boost::filesystem::absolute(
+                           boost::filesystem::weakly_canonical(init_params.argv[0])
+        )
+                           .string();
+    }
     size_t hashed_path    = std::hash<std::string>{}(program_path);
     std::string lock_name = std::to_string(hashed_path);
     Biz::Platform::PlatformServices::instance().set_app_hash(hashed_path);
