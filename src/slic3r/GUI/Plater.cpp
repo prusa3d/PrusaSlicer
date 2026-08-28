@@ -694,7 +694,9 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
         "layer_height", "first_layer_height", "min_layer_height", "max_layer_height",
         "brim_width", "perimeters", "perimeter_extruder", "fill_density", "infill_extruder", "top_solid_layers",
         "support_material", "support_material_extruder", "support_material_interface_extruder",
-        "support_material_contact_distance", "support_material_bottom_contact_distance", "raft_layers"
+        "support_material_contact_distance", "support_material_bottom_contact_distance", "raft_layers",
+        // SuperSlicer
+        "init_z_rotate",
         }))
     , sidebar(new Sidebar(q))
     , notification_manager(std::make_unique<NotificationManager>(q))
@@ -1461,11 +1463,15 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 if (type_step) {
                     double linear_precision = string_to_double_decimal_point(wxGetApp().app_config->get("linear_precision"));
                     double angle_precision = string_to_double_decimal_point(wxGetApp().app_config->get("angle_precision"));
-                    model = FileReader::load_model(path.string(), FileReader::LoadAttributes{}, &load_stats, 
+                    model = FileReader::load_model(path.string(), FileReader::LoadAttributes{}, &load_stats,
                                                    std::make_pair(linear_precision, angle_precision));
                 }
                 else
                     model = FileReader::load_model(path.string(), FileReader::LoadAttributes{}, &load_stats);
+
+                // SuperSlicer
+                for (auto obj : model.objects)
+                    obj->rotate(Geometry::deg2rad(this->config->opt_float("init_z_rotate")), Axis::Z);
             }
         } catch (const ConfigurationError &e) {
             std::string message = GUI::format(_L("Failed loading file \"%1%\" due to an invalid configuration."), filename.string()) + "\n\n" + e.what();
