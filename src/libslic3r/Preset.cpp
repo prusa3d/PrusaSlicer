@@ -535,7 +535,9 @@ static std::vector<std::string> s_Preset_filament_options {
     // Shrinkage compensation
     "filament_shrinkage_compensation_xy", "filament_shrinkage_compensation_z",
     // Seams overrides
-    "filament_seam_gap_distance"
+    "filament_seam_gap_distance",
+    // BOSS
+    "filament_max_speed",
 };
 
 static std::vector<std::string> s_Preset_machine_limits_options {
