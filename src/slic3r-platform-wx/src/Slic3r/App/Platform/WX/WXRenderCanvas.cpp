@@ -6,6 +6,7 @@
 #include <wx/frame.h>
 #include <wx/dcclient.h>
 #include <wx/clipbrd.h>
+#include <wx/toplevel.h>
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
 
@@ -909,8 +910,17 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
         return;
     }
 
-    // Dirty hack, which will shift focus onto ImGui and let it pass keyboard events
-    SetFocus();
+    // Dirty hack, which will shift focus onto ImGui and let it pass keyboard events.
+    // Only do this while our own application is already the active one and the canvas
+    // doesn't already have the focus - calling SetFocus() unconditionally on every
+    // mouse-move (including plain hover) can implicitly activate/raise our top-level
+    // window on Windows, which must never happen while another application is in the
+    // foreground (e.g. right after FreeConsole() briefly leaves no foreground window).
+    wxTopLevelWindow* top = wxDynamicCast(wxGetTopLevelParent(this), wxTopLevelWindow);
+    if (top != nullptr && top->IsActive())
+    {
+        SetFocus();
+    }
 
     const int mouse_x = ToDIP(evt.GetX());
     const int mouse_y = ToDIP(evt.GetY());
