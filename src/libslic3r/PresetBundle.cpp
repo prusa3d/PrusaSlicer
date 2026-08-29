@@ -1872,8 +1872,11 @@ void PresetBundle::update_multi_material_filament_presets()
 
     for (size_t i = 0; i < extruders_filaments.size(); ++i)
         m_cached_extruder_filament_names[i] = extruders_filaments[i].get_selected_preset_name();
-    if (!physical_printer_name.empty())
-        m_physical_printer_filament_names[physical_printer_name] = m_cached_extruder_filament_names;
+    if (!physical_printer_name.empty()) {
+        std::vector<std::string>& saved_names_for_printer = m_physical_printer_filament_names[physical_printer_name];
+        saved_names_for_printer.assign(m_cached_extruder_filament_names.begin(),
+            m_cached_extruder_filament_names.begin() + extruders_filaments.size());
+    }
 
     // Now verify if wiping_volumes_matrix has proper size (it is used to deduce number of extruders in wipe tower generator):
     std::vector<double> old_matrix = this->project_config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values;
