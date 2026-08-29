@@ -644,6 +644,8 @@ bool PresetComboBox::selection_is_changed_according_to_physical_printers()
     }
     else
         old_printer_preset = m_collection->get_edited_preset().name;
+    if (!old_printer_full_name.empty())
+        m_preset_bundle->cache_extruder_filaments_names(old_printer_full_name);
     // Select related printer preset on the Printer Settings Tab 
     physical_printers.select_printer(selected_string);
     std::string preset_name = physical_printers.get_selected_printer_preset_name();
