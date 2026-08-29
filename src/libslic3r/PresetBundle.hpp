@@ -61,7 +61,16 @@ public:
     // extruders_filaments.size() should be the same as printers.get_edited_preset().config.nozzle_diameter.size()
     std::vector<ExtruderFilaments> extruders_filaments;
     void cache_extruder_filaments_names();
+    void cache_extruder_filaments_names(const std::string& physical_printer_name);
     void reset_extruder_filaments();
+
+private:
+    // Keep selections for extruders temporarily hidden by a single-extruder printer.
+    std::vector<std::string> m_cached_extruder_filament_names;
+    // Keep the complete extruder selection set for each physical printer.
+    std::unordered_map<std::string, std::vector<std::string>> m_physical_printer_filament_names;
+
+public:
 
     // Another hideous function related to current ExtruderFilaments hack. Returns a vector of values
     // of a given config option for all currently used filaments. Modified value is returned for modified preset.

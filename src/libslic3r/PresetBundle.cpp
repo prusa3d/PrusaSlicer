@@ -141,6 +141,8 @@ PresetBundle& PresetBundle::operator=(const PresetBundle &rhs)
 
     // Copy extruders filaments
     {
+        m_cached_extruder_filament_names = rhs.m_cached_extruder_filament_names;
+        m_physical_printer_filament_names = rhs.m_physical_printer_filament_names;
         if (!extruders_filaments.empty())
             extruders_filaments.clear();
         size_t i = 0;
@@ -167,6 +169,8 @@ void PresetBundle::reset(bool delete_files)
     this->sla_materials.reset(delete_files);
     this->printers     .reset(delete_files);
     this->extruders_filaments.clear();
+    this->m_cached_extruder_filament_names.clear();
+    this->m_physical_printer_filament_names.clear();
     this->obsolete_presets.prints.clear();
     this->obsolete_presets.sla_prints.clear();
     this->obsolete_presets.filaments.clear();
@@ -461,8 +465,24 @@ void PresetBundle::load_installed_printers(const AppConfig &config)
 
 void PresetBundle::cache_extruder_filaments_names()
 {
-    for (ExtruderFilaments& extr_filaments : extruders_filaments)
-        extr_filaments.cache_selected_name();
+    if (m_cached_extruder_filament_names.size() < extruders_filaments.size())
+        m_cached_extruder_filament_names.resize(extruders_filaments.size());
+    for (size_t i = 0; i < extruders_filaments.size(); ++i) {
+        extruders_filaments[i].cache_selected_name();
+        m_cached_extruder_filament_names[i] = extruders_filaments[i].get_cached_selected_name();
+    }
+}
+
+void PresetBundle::cache_extruder_filaments_names(const std::string& physical_printer_name)
+{
+    if (physical_printer_name.empty())
+        return;
+
+    std::vector<std::string>& names = m_physical_printer_filament_names[physical_printer_name];
+    names.clear();
+    names.reserve(extruders_filaments.size());
+    for (const ExtruderFilaments& extr_filaments : extruders_filaments)
+        names.push_back(extr_filaments.get_selected_preset_name());
 }
 
 void PresetBundle::reset_extruder_filaments()
@@ -683,6 +703,8 @@ void PresetBundle::load_selections(AppConfig &config, const PresetPreferences& p
     // The possibly excessive filament names will be later removed with this->update_multi_material_filament_presets()
     // once the FFF technology gets selected.
     this->extruders_filaments.clear();
+    this->m_cached_extruder_filament_names.clear();
+    this->m_physical_printer_filament_names.clear();
     this->extruders_filaments.emplace_back(ExtruderFilaments(&filaments));
     for (unsigned int i = 1; i < 1000; ++ i) {
         char name[64];
@@ -1121,6 +1143,7 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
     	old_filament_profile_names->values.resize(num_extruders, std::string());
 
         this->extruders_filaments.clear();
+        this->m_cached_extruder_filament_names.clear();
         if (num_extruders <= 1) {
             // Split the "compatible_printers_condition" and "inherits" from the cummulative vectors to separate filament presets.
             inherits                      = inherits_values[1];
@@ -1289,6 +1312,7 @@ ConfigSubstitutions PresetBundle::load_config_file_config_bundle(
     load_one(this->printers,      tmp_bundle.printers,      tmp_bundle.printers     .get_selected_preset_name(), true);
 
     this->extruders_filaments.clear();
+    this->m_cached_extruder_filament_names.clear();
     this->extruders_filaments.emplace_back(ExtruderFilaments(&filaments));
 
     this->update_multi_material_filament_presets();
@@ -1788,6 +1812,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
 
         // Extruder_filaments have to be recreated with new loaded filaments
         this->extruders_filaments.clear();
+        this->m_cached_extruder_filament_names.clear();
         this->extruders_filaments.emplace_back(ExtruderFilaments(&filaments));
 
         this->update_multi_material_filament_presets();
@@ -1811,16 +1836,44 @@ void PresetBundle::update_multi_material_filament_presets()
     // Verify and select the filament presets.
     auto   *nozzle_diameter = static_cast<const ConfigOptionFloats*>(printers.get_edited_preset().config.option("nozzle_diameter"));
     size_t  num_extruders   = nozzle_diameter->values.size();
+
+    // Retain selections for extruders temporarily hidden by a single-extruder printer.
+    // The vector may grow below to match num_extruders, so size the cache for
+    // the final expected count before appending any ExtruderFilaments.
+    const size_t cache_size = std::max(num_extruders, extruders_filaments.size());
+    if (m_cached_extruder_filament_names.size() < cache_size)
+        m_cached_extruder_filament_names.resize(cache_size);
+    const std::string physical_printer_name = physical_printers.get_selected_full_printer_name();
+    const auto physical_printer_it = m_physical_printer_filament_names.find(physical_printer_name);
+    const std::vector<std::string>* saved_names = physical_printer_it == m_physical_printer_filament_names.end() ?
+        nullptr : &physical_printer_it->second;
+    for (size_t i = 0; i < extruders_filaments.size(); ++i)
+        if (saved_names != nullptr && i < saved_names->size() && !(*saved_names)[i].empty())
+            extruders_filaments[i].select_filament((*saved_names)[i]);
+    for (size_t i = 0; i < extruders_filaments.size(); ++i)
+        m_cached_extruder_filament_names[i] = extruders_filaments[i].get_selected_preset_name();
+
     // Verify validity of the current filament presets.
     for (size_t i = 0; i < std::min(this->extruders_filaments.size(), num_extruders); ++i)
         this->extruders_filaments[i].select_filament(this->filaments.find_preset(this->extruders_filaments[i].get_selected_preset_name(), true)->name);
+
+    for (size_t i = 0; i < std::min(this->extruders_filaments.size(), num_extruders); ++i)
+        m_cached_extruder_filament_names[i] = this->extruders_filaments[i].get_selected_preset_name();
 
     if (this->extruders_filaments.size() > num_extruders)
         this->extruders_filaments.resize(num_extruders);
     else 
         // Append the rest of filament presets.
         for (size_t id = extruders_filaments.size(); id < num_extruders; id++)
-            extruders_filaments.emplace_back(ExtruderFilaments(&filaments, id, id == 0 ? filaments.first_visible().name : extruders_filaments[id - 1].get_selected_preset_name()));
+            extruders_filaments.emplace_back(ExtruderFilaments(&filaments, id,
+                id < m_cached_extruder_filament_names.size() && !m_cached_extruder_filament_names[id].empty() ?
+                    m_cached_extruder_filament_names[id] :
+                    (id == 0 ? filaments.first_visible().name : extruders_filaments[id - 1].get_selected_preset_name())));
+
+    for (size_t i = 0; i < extruders_filaments.size(); ++i)
+        m_cached_extruder_filament_names[i] = extruders_filaments[i].get_selected_preset_name();
+    if (!physical_printer_name.empty())
+        m_physical_printer_filament_names[physical_printer_name] = m_cached_extruder_filament_names;
 
     // Now verify if wiping_volumes_matrix has proper size (it is used to deduce number of extruders in wipe tower generator):
     std::vector<double> old_matrix = this->project_config.option<ConfigOptionFloats>("wiping_volumes_matrix")->values;
@@ -1933,6 +1986,11 @@ void PresetBundle::update_filaments_compatible(PresetSelectCompatibleType select
     }
     else
         update_filament_compatible(extruder_idx);
+
+    if (m_cached_extruder_filament_names.size() < extruders_filaments.size())
+        m_cached_extruder_filament_names.resize(extruders_filaments.size());
+    for (size_t i = 0; i < extruders_filaments.size(); ++i)
+        m_cached_extruder_filament_names[i] = extruders_filaments[i].get_selected_preset_name();
 
     // validate selection in filaments
     bool invalid_selection = this->filaments.get_idx_selected() == size_t(-1);
