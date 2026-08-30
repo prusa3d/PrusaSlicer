@@ -263,11 +263,27 @@ static PerimeterExtrusions extract_ordered_perimeter_extrusions(
             }
         }
 
-        if (!params.config.external_perimeters_first &&
-            !(params.layer_id == 0 && params.object_config.brim_width.value > 0))
+        // Make the order inner->outer by default.
+        // This causes a potential double reverse, but this way the conditions are consistent with
+        // the classic perimeter generator
+        std::reverse(
+            grouped_extrusions.back().extrusions.begin(), grouped_extrusions.back().extrusions.end()
+        );
+        // if brim will be printed, reverse the order of perimeters so that
+        // we continue inwards after having finished the brim
+        const bool first_layer_with_brim = params.layer_id == 0 &&
+            params.object_config.brim_width.value > 0 &&
+            params.object_config.brim_separation == 0 && params.object_config.brim_type != btNoBrim;
+        if (params.config.perimeters_order == PerimetersOrder::OuterInner || first_layer_with_brim)
             std::reverse(
                 grouped_extrusions.back().extrusions.begin(),
                 grouped_extrusions.back().extrusions.end()
+            );
+        if (params.config.perimeters_order == PerimetersOrder::InnerOuterInner &&
+            !first_layer_with_brim && grouped_extrusions.back().extrusions.size() > 1)
+            std::swap(
+                *std::prev(grouped_extrusions.back().extrusions.end(), 1),
+                *std::prev(grouped_extrusions.back().extrusions.end(), 2)
             );
     }
 

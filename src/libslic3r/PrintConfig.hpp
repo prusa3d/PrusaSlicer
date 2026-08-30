@@ -180,6 +180,13 @@ enum class LabelObjectsStyle {
     Disabled, Octoprint, Firmware
 };
 
+enum class PerimetersOrder
+{
+    InnerOuter,
+    OuterInner,
+    InnerOuterInner
+};
+
 enum class PerimeterGeneratorType
 {
     // Classic perimeter generator using Clipper offsets with constant extrusion width.
@@ -754,7 +761,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatOrPercent,       overhang_speed_1))
     ((ConfigOptionFloatOrPercent,       overhang_speed_2))
     ((ConfigOptionFloatOrPercent,       overhang_speed_3))
-    ((ConfigOptionBool,                 external_perimeters_first))
+    ((ConfigOptionEnum<PerimetersOrder>, perimeters_order))
     ((ConfigOptionBool,                 extra_perimeters))
     ((ConfigOptionBool,                 extra_perimeters_on_overhangs))
     ((ConfigOptionFloat,                fill_angle))
