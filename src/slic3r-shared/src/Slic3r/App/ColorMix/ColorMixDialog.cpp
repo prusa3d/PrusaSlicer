@@ -855,10 +855,6 @@ void ColorMixDialog::rebuild_component_rows()
 
         m_inline_ratio_bar = m_editor_rows->emplace_back<BlendRatioBar>();
         m_inline_ratio_bar->set_width_percent(100);
-        m_inline_ratio_bar->set_tooltip(_u8L(
-            "Drag the handle to adjust the mix ratio. "
-            "More % = more layers of that filament per cycle."
-        ));
         m_inline_ratio_bar->callbacks().ratio_changed = [this](int)
         { this->on_composition_changed(); };
         m_inline_ratio_bar->set_ratio(
@@ -898,10 +894,6 @@ void ColorMixDialog::rebuild_component_rows()
         m_inline_triangle = mixer_column->emplace_back<BarycentricRatioPicker>();
         m_inline_triangle->set_width(256_fpx);
         m_inline_triangle->set_height(200_fpx);
-        m_inline_triangle->set_tooltip(_u8L(
-            "Drag the handle to set the share of each filament. "
-            "Closer to a corner = more of that filament."
-        ));
         m_inline_triangle->callbacks().weights_changed = [this]()
         { this->on_composition_changed(); };
         m_inline_triangle->set_weights(
@@ -951,7 +943,8 @@ void ColorMixDialog::rebuild_component_rows()
         );
         m_add_component_button->set_enabled(m_physical_extruder_count >= 3);
         m_editor_description->set_text(_u8L(
-            "Drag the slider to set how many layers each filament gets in the repeating pattern."
+            "Drag the slider to set the share of each filament. "
+            "The larger the share, the more layers that filament gets in the repeating pattern."
         ));
     } else if (is_three_component) {
         m_add_component_button->set_label(_u8L("Remove third extruder"));
@@ -960,9 +953,11 @@ void ColorMixDialog::rebuild_component_rows()
             _u8L("Remove the third filament and go back to the two-way slider mixer.")
         );
         m_add_component_button->set_enabled(true);
-        m_editor_description->set_text(
-            _u8L("Drag the handle inside the triangle to set the share of each filament.")
-        );
+        m_editor_description->set_text(_u8L(
+            "Drag the handle inside the triangle to set the share of each filament. "
+            "The closer the handle is to a corner, the more layers that filament gets in the "
+            "repeating pattern."
+        ));
     }
 }
 
