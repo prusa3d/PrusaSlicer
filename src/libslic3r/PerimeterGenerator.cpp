@@ -1121,7 +1121,8 @@ void PerimeterGenerator::process_arachne(
         return true;
     }());
 
-    Arachne::PerimeterOrder::PerimeterExtrusions ordered_extrusions = Arachne::PerimeterOrder::ordered_perimeter_extrusions(perimeters, params.config.external_perimeters_first);
+    Arachne::PerimeterOrder::PerimeterExtrusions ordered_extrusions =
+        Arachne::PerimeterOrder::ordered_perimeter_extrusions(perimeters, params);
 
     if (ExtrusionEntityCollection extrusion_coll = traverse_extrusions(params, lower_slices_polygons_cache, ordered_extrusions); !extrusion_coll.empty())
         out_loops.append(extrusion_coll);

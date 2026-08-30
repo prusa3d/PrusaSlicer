@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstddef>
 
+#include "libslic3r/PerimeterGenerator.hpp"
 #include "libslic3r/Arachne/utils/ExtrusionLine.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Polygon.hpp"
@@ -44,7 +45,9 @@ struct PerimeterExtrusion
 
 using PerimeterExtrusions = std::vector<PerimeterExtrusion>;
 
-PerimeterExtrusions ordered_perimeter_extrusions(const Perimeters &perimeters, bool external_perimeters_first);
+PerimeterExtrusions ordered_perimeter_extrusions(
+    const Perimeters &perimeters, const PerimeterGenerator::Parameters &params
+);
 
 } // namespace Slic3r::Arachne::PerimeterOrder
 
