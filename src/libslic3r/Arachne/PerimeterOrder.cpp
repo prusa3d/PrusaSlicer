@@ -215,7 +215,10 @@ static std::vector<size_t> order_of_grouped_perimeter_extrusions_to_minimize_dis
     return grouped_extrusions_order;
 }
 
-static PerimeterExtrusions extract_ordered_perimeter_extrusions(const PerimeterExtrusions &sorted_perimeter_extrusions, const bool external_perimeters_first) {
+static PerimeterExtrusions extract_ordered_perimeter_extrusions(
+    const PerimeterExtrusions &sorted_perimeter_extrusions,
+    const PerimeterGenerator::Parameters &params
+) {
     // Extrusions are ordered inside each group.
     std::vector<GroupedPerimeterExtrusions> grouped_extrusions;
 
@@ -260,8 +263,28 @@ static PerimeterExtrusions extract_ordered_perimeter_extrusions(const PerimeterE
             }
         }
 
-        if (!external_perimeters_first)
-            std::reverse(grouped_extrusions.back().extrusions.begin(), grouped_extrusions.back().extrusions.end());
+        // Make the order inner->outer by default.
+        // This causes a potential double reverse, but this way the conditions are consistent with
+        // the classic perimeter generator
+        std::reverse(
+            grouped_extrusions.back().extrusions.begin(), grouped_extrusions.back().extrusions.end()
+        );
+        // if brim will be printed, reverse the order of perimeters so that
+        // we continue inwards after having finished the brim
+        const bool first_layer_with_brim = params.layer_id == 0 &&
+            params.object_config.brim_width.value > 0 &&
+            params.object_config.brim_separation == 0 && params.object_config.brim_type != btNoBrim;
+        if (params.config.perimeters_order == PerimetersOrder::OuterInner || first_layer_with_brim)
+            std::reverse(
+                grouped_extrusions.back().extrusions.begin(),
+                grouped_extrusions.back().extrusions.end()
+            );
+        if (params.config.perimeters_order == PerimetersOrder::InnerOuterInner &&
+            !first_layer_with_brim && grouped_extrusions.back().extrusions.size() > 1)
+            std::swap(
+                *std::prev(grouped_extrusions.back().extrusions.end(), 1),
+                *std::prev(grouped_extrusions.back().extrusions.end(), 2)
+            );
     }
 
     const std::vector<size_t> grouped_extrusion_order = order_of_grouped_perimeter_extrusions_to_minimize_distances(grouped_extrusions, Point::Zero());
@@ -277,11 +300,13 @@ static PerimeterExtrusions extract_ordered_perimeter_extrusions(const PerimeterE
 
 // FIXME: From the point of better patch planning, it should be better to do ordering when we have generated all extrusions (for now, when G-Code is exported).
 // FIXME: It would be better to extract the adjacency graph of extrusions from the SkeletalTrapezoidation graph.
-PerimeterExtrusions ordered_perimeter_extrusions(const Perimeters &perimeters, const bool external_perimeters_first) {
+PerimeterExtrusions ordered_perimeter_extrusions(
+    const Perimeters &perimeters, const PerimeterGenerator::Parameters &params
+) {
     PerimeterExtrusions sorted_perimeter_extrusions = get_sorted_perimeter_extrusions_by_area(perimeters);
     construct_perimeter_extrusions_adjacency_graph(sorted_perimeter_extrusions);
     assign_nearest_external_perimeter(sorted_perimeter_extrusions);
-    return extract_ordered_perimeter_extrusions(sorted_perimeter_extrusions, external_perimeters_first);
+    return extract_ordered_perimeter_extrusions(sorted_perimeter_extrusions, params);
 }
 
 } // namespace Slic3r::Arachne::PerimeterOrder

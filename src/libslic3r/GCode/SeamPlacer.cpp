@@ -397,7 +397,7 @@ boost::variant<Point, Scarf::Scarf> finalize_seam_position(
                 *outter_scarf_start_point
             };
 
-            if (region->config().external_perimeters_first.value) {
+            if (region->config().perimeters_order.value != PerimetersOrder::InnerOuter) {
                 const auto external_first_offset_direction{
                     offset_direction == Geometry::Direction1D::forward ?
                     Geometry::Direction1D::backward :

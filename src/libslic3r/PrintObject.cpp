@@ -720,6 +720,8 @@ bool PrintObject::invalidate_state_by_config_options(
         if (   opt_key == "brim_width"
             || opt_key == "brim_separation"
             || opt_key == "brim_type") {
+            // Brim can affect the first layer perimeters order so they have to be invalidated
+            steps.emplace_back(posPerimeters);
             steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
             steps.emplace_back(posSupportMaterial);
@@ -730,7 +732,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "first_layer_extrusion_width"
             || opt_key == "perimeter_extrusion_width"
             || opt_key == "infill_overlap"
-            || opt_key == "external_perimeters_first"
+            || opt_key == "perimeters_order"
             || opt_key == "arc_fitting"
             || opt_key == "top_one_perimeter_type"
             || opt_key == "only_one_perimeter_first_layer") {

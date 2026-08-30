@@ -267,6 +267,13 @@ static const t_config_enum_values s_keys_map_ForwardCompatibilitySubstitutionRul
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 
+static t_config_enum_values s_keys_map_PerimetersOrder {
+    {"inner_outer", int(PerimetersOrder::InnerOuter)},
+    {"outer_inner", int(PerimetersOrder::OuterInner)},
+    {"inner_outer_inner", int(PerimetersOrder::InnerOuterInner)}
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimetersOrder)
+
 static t_config_enum_values s_keys_map_PerimeterGeneratorType {
     { "classic", int(PerimeterGeneratorType::Classic) },
     { "arachne", int(PerimeterGeneratorType::Arachne) }
@@ -1157,13 +1164,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloatOrPercent(50, true));
 
-    def = this->add("external_perimeters_first", coBool);
-    def->label = L("External perimeters first");
+    def = this->add("perimeters_order", coEnum);
+    def->label = L("Perimeters order");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Print contour perimeters from the outermost one to the innermost one "
-                   "instead of the default inverse order.");
+    def->tooltip = L(
+        "Determines printing order of the contour perimeters. If the number of perimeters is less "
+        "than three, the Inner>Outer>Inner option behaves like Outer>Inner"
+    );
+    def->set_enum<PerimetersOrder>(
+        {{"inner_outer", L("Inner>Outer")},
+         {"outer_inner", L("Outer>Inner")},
+         {"inner_outer_inner", L("Inner>Outer>Inner")}}
+    );
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionBool(false));
+    def->set_default_value(new ConfigOptionEnum<PerimetersOrder>(PerimetersOrder::InnerOuter));
 
     def = this->add("extra_perimeters", coBool);
     def->label = L("Extra perimeters if needed");
@@ -5362,6 +5376,13 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
             assert(value == "0" || value == "1");
             // Values other than 0/1 are replaced with "partial" for handling values from different slicers.
             value = "partial";
+        }
+    } else if (opt_key == "external_perimeters_first") {
+        opt_key = "perimeters_order";
+        if (value == "0") {
+            value = "inner_outer";
+        } else {
+            value = "outer_inner";
         }
     }
 
