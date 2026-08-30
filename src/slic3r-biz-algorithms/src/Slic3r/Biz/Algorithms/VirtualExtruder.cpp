@@ -182,6 +182,18 @@ VirtualExtruders normalize_virtual_extruders(const VirtualExtruders& raw_virtual
             }
         }
 
+        VirtualExtruderComponents& components = normalized_virtual_extruder.components;
+        int remaining_percent                 = 100;
+        for (VirtualExtruderComponent& component :
+             components | std::views::take(components.size() - 1))
+        {
+            const int percent = static_cast<int>(std::round(component.ratio * 100.));
+            component.ratio   = percent / 100.;
+            remaining_percent -= percent;
+        }
+
+        components.back().ratio = remaining_percent / 100.;
+
         normalized_virtual_extruders.push_back(std::move(normalized_virtual_extruder));
     }
 
