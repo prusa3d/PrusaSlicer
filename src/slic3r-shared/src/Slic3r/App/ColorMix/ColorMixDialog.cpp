@@ -406,15 +406,18 @@ void ColorMixDialog::create_presets_pane(Item* pane)
     ));
     intro_text->set_wrap_mode(Text::WrapMode::Wrap);
     intro_text->set_text_color(muted_text_color);
+    intro_text->set_flex_shrink(0);
 
     Text* filter_label =
         pane->emplace_back<Text>(_u8L("Toggle extruders to filter the blends shown below"));
     filter_label->set_text_color(muted_text_color);
+    filter_label->set_flex_shrink(0);
 
     m_filter_button_row = pane->emplace_back<Item>();
     m_filter_button_row->set_orientation(Orientation::Horizontal);
     m_filter_button_row->set_flex_wrap(YGWrapWrap);
     m_filter_button_row->set_gap(4_fpx);
+    m_filter_button_row->set_flex_shrink(0);
 
     ScrollArea* presets_scroll = pane->emplace_back<ScrollArea>();
     presets_scroll->set_flex_grow(1.f);
