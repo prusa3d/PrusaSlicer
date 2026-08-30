@@ -720,6 +720,8 @@ bool PrintObject::invalidate_state_by_config_options(
         if (   opt_key == "brim_width"
             || opt_key == "brim_separation"
             || opt_key == "brim_type") {
+            // Brim can affect the first layer perimeters order so they have to be invalidated
+            steps.emplace_back(posPerimeters);
             steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
             steps.emplace_back(posSupportMaterial);
