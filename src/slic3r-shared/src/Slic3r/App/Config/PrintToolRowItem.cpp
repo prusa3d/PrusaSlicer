@@ -307,8 +307,23 @@ void PrintToolRowItem::on_data_update()
 
         update_explanation();
 
+        // Check if any of the Groups has not all the same values
+        const bool need_presort = std::ranges::any_of(
+            m_tool_overrides,
+            [](const ToolRowOverrideGroup& group)
+            {
+                return std::ranges::adjacent_find(
+                           group.first,
+                           std::not_equal_to{},
+                           [](const ToolRowOverride* override) -> const Domain::ConfigValue&
+                           { return override->override_item->value(); }
+                       )
+                    != group.first.end();
+            }
+        );
+
         // we have not yet presorted overrides
-        if (m_tool_overrides.empty() && !m_overrides.empty()) {
+        if ((need_presort || m_tool_overrides.empty()) && !m_overrides.empty()) {
             presort_overrides();
         }
     }
