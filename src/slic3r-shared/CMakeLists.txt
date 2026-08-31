@@ -256,6 +256,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/ColorMix/ExtruderFilterButton.cpp
         include/Slic3r/App/ColorMix/BlendRecipeTile.hpp
         src/Slic3r/App/ColorMix/BlendRecipeTile.cpp
+        include/Slic3r/App/ColorMix/BlendPresetSortFilter.hpp
+        src/Slic3r/App/ColorMix/BlendPresetSortFilter.cpp
         include/Slic3r/App/ColorMix/ColorMixDialog.hpp
         src/Slic3r/App/ColorMix/ColorMixDialog.cpp
         include/Slic3r/App/SidebarToolHeadRow.hpp

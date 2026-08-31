@@ -1,6 +1,5 @@
 #include "Slic3r/App/ColorMix/ColorMixUtils.hpp"
 
-#include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/Biz/Algorithms/Color.hpp"
 #include "Slic3r/Biz/Algorithms/VirtualExtruder.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
@@ -49,14 +48,6 @@ std::string effective_color_hex(
 std::string recipe_title(const VirtualExtruder& virtual_extruder)
 {
     return fmt::format(fmt::runtime(_u8L("Virtual extruder #{}")), virtual_extruder.id);
-}
-
-void clear_children_later(Yoga::Item* container)
-{
-    for (Yoga::Item* child : container->items()) {
-        child->set_visible(false);
-        container->remove_later(child);
-    }
 }
 
 } // namespace Slic3r::App::ColorMix

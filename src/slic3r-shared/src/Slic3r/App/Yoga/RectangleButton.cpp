@@ -191,6 +191,11 @@ void RectangleButton::set_background_border_width(float width)
     m_background->set_border_width(width);
 }
 
+void RectangleButton::set_background_border_dash(float dash_length, float gap_length)
+{
+    m_background->set_border_dash(dash_length, gap_length);
+}
+
 void RectangleButton::set_content_justify_content(YGJustify justify)
 {
     m_background->set_justify_content(justify);

@@ -16,6 +16,8 @@ public:
     const ImColor& border_color() const;
     const ImColor& border_color_disabled() const;
     float border_width() const;
+    float border_dash_length() const;
+    float border_gap_length() const;
     float rounding() const;
     ImDrawFlags flags() const;
 
@@ -24,6 +26,7 @@ public:
     void set_border_color(const ImColor& border_color);
     void set_border_color_disabled(const ImColor& border_color_disabled);
     void set_border_width(float border_width);
+    void set_border_dash(float dash_length, float gap_length);
     void set_rounding(float rounding);
     void set_flags(ImDrawFlags flags);
 
@@ -37,6 +40,8 @@ private:
     ImColor m_border_color_disabled =
         m_theme->color_imgui(Platform::Color::Button, Platform::ColorGroup::Disabled);
     float m_border_width = 0;
+    float m_border_dash_length = 0.f;
+    float m_border_gap_length  = 0.f;
     float m_rounding = 5.f;
     ImDrawFlags m_flags = ImDrawFlags_RoundCornersAll;
 };

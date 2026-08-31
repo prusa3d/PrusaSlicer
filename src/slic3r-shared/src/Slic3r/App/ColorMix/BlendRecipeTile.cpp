@@ -1,117 +1,81 @@
 #include "Slic3r/App/ColorMix/BlendRecipeTile.hpp"
 
 #include "Slic3r/App/Imgui/ImguiExtension.hpp"
-#include "Slic3r/App/Render/ImguiRender.hpp"
 #include "Slic3r/App/Render/ImguiTypes.hpp"
+#include "Slic3r/App/Yoga/Rectangle.hpp"
+#include "Slic3r/App/Yoga/Text.hpp"
 
-#include <cmath>
-#include <limits>
+using Slic3r::App::Platform::Color;
+using Slic3r::App::Platform::ColorGroup;
+using Slic3r::App::Render::ImguiFontType;
 
 using namespace Slic3r::App::Yoga;
+using namespace Slic3r::Biz;
 
 namespace Slic3r::App::ColorMix {
 
+constexpr Unit TILE_PADDING          = 3_fpx;
+constexpr Unit LABEL_PADDING         = 5_fpx;
+const constexpr float TILE_ROUNDING  = 6.f;
+const constexpr float RING_ROUNDING  = 4.f;
+const constexpr float RING_THICKNESS = 2.f;
+const constexpr float BORDER_WIDTH   = 1.f;
+const constexpr float DASH_LENGTH    = 6.f;
+const constexpr float DASH_GAP       = 4.f;
+
 BlendRecipeTile::
-    BlendRecipeTile(const ImColor& blend_color, const std::string& label, bool already_used) :
-    AbstractButton({}, "BlendRecipeTile"),
-    m_blend_color(blend_color),
-    m_label(label),
-    m_already_used(already_used),
-    m_tile_inset{3_fpx},
-    m_tile_rounding{6_fpx},
-    m_ring_rounding{4_fpx},
-    m_ring_thickness{2_fpx},
-    m_border_thickness{1_fpx},
-    m_dash_length{6_fpx},
-    m_dash_gap{4_fpx},
-    m_text_pad{5_fpx}
+    BlendRecipeTile(const size_t index, const BlendTileData& data, FnIndexClicked on_clicked) :
+    RectangleButton(),
+    DataObserver<BlendTileData>(index, data),
+    m_on_clicked{std::move(on_clicked)}
 {
+    this->set_object_name("BlendRecipeTile");
     this->set_width(54_fpx);
     this->set_height(54_fpx);
     this->set_flex_shrink(0);
     this->set_cursor(ImGuiMouseCursor_Hand);
+
+    const ImColor transparent_color = m_theme->color_imgui(Color::Transparent);
+    this->set_background_color(transparent_color, transparent_color);
+    this->set_background_color_checked(transparent_color, transparent_color);
+    this->set_background_border_width(RING_THICKNESS);
+    this->set_rounding(RING_ROUNDING);
+    this->set_content_padding({TILE_PADDING});
+
+    m_tile = this->emplace_back<Rectangle>();
+    m_tile->set_flex_grow(1.f);
+    m_tile->set_rounding(TILE_ROUNDING);
+    m_tile->set_border_width(BORDER_WIDTH);
+    m_tile->set_border_color(m_theme->color_imgui(Color::Text, ColorGroup::Disabled));
+    m_tile->set_padding({LABEL_PADDING});
+
+    m_label = m_tile->emplace_back<Text>(std::string{}, ImguiFontType::Bold);
+    m_label->set_font_size(0.8_rem);
+    m_label->set_flex_grow(1.f);
+    m_label->set_align({AlignH::Right, AlignV::Bottom});
+
+    this->callbacks().action = [this]() -> void { m_on_clicked(m_index); };
+
+    this->BlendRecipeTile::on_data_update();
 }
 
-void BlendRecipeTile::size_info_changed(const Yoga::SizeInfo& info_size)
+void BlendRecipeTile::on_data_update()
 {
-    m_tile_inset.evaluate(info_size);
-    m_tile_rounding.evaluate(info_size);
-    m_ring_rounding.evaluate(info_size);
-    m_ring_thickness.evaluate(info_size);
-    m_border_thickness.evaluate(info_size);
-    m_dash_length.evaluate(info_size);
-    m_dash_gap.evaluate(info_size);
-    m_text_pad.evaluate(info_size);
-}
-
-bool BlendRecipeTile::already_used() const
-{
-    return m_already_used;
-}
-
-void BlendRecipeTile::render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size)
-{
-    Yoga::AbstractButton::render(pos, size);
-
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    ASSERT(draw_list);
-
-    const ImVec2 rect_min{std::round(pos.x()), std::round(pos.y())};
-    const ImVec2 rect_max{std::round(pos.x() + size.x()), std::round(pos.y() + size.y())};
-
-    // The tile is inset so that the accent ring of the used state has room around it.
-    const float tile_inset = m_tile_inset.result;
-    const ImVec2 tile_min{rect_min.x + tile_inset, rect_min.y + tile_inset};
-    const ImVec2 tile_max{rect_max.x - tile_inset, rect_max.y - tile_inset};
-
-    draw_list->AddRectFilled(tile_min, tile_max, m_blend_color, m_tile_rounding.result);
-
-    ImFont* bold_font      = m_imgui_render->font(Render::ImguiFontType::Bold);
-    const float font_size  = ImGui::GetFontSize() * 0.8f;
-    const float text_pad   = m_text_pad.result;
-    const float max_width  = std::numeric_limits<float>::max();
-    const ImVec2 text_size = bold_font->CalcTextSizeA(font_size, max_width, 0.f, m_label.c_str());
-    draw_list->AddText(
-        bold_font,
-        font_size,
-        ImVec2(tile_max.x - text_size.x - text_pad, tile_max.y - text_size.y - text_pad),
-        Imgui::contrast_color(m_blend_color),
-        m_label.c_str()
-    );
-
-    const ImColor border_color =
-        m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled);
-    draw_list->AddRect(
-        tile_min,
-        tile_max,
-        border_color,
-        m_tile_rounding.result,
-        0,
-        m_border_thickness.result
-    );
-
-    const ImColor accent_color = m_theme->color_imgui(Platform::Color::AccentPrimary);
-    if (m_already_used) {
-        Imgui::draw_dashed_rounded_rect(
-            draw_list,
-            rect_min,
-            rect_max,
-            accent_color,
-            m_ring_thickness.result,
-            m_ring_rounding.result,
-            m_dash_length.result,
-            m_dash_gap.result
-        );
-    } else if (this->hovered() && this->enabled()) {
-        draw_list->AddRect(
-            rect_min,
-            rect_max,
-            accent_color,
-            m_ring_rounding.result,
-            0,
-            m_ring_thickness.result
-        );
+    const ImColor accent_color      = m_theme->color_imgui(Color::AccentPrimary);
+    const ImColor transparent_color = m_theme->color_imgui(Color::Transparent);
+    if (m_state->already_used) {
+        this->set_background_color_border(accent_color, accent_color);
+        this->set_background_border_dash(DASH_LENGTH, DASH_GAP);
+    } else {
+        this->set_background_color_border(transparent_color, accent_color);
+        this->set_background_border_dash(0.f, 0.f);
     }
+
+    this->set_tooltip(m_state->tooltip);
+
+    m_tile->set_fill(m_state->color);
+    m_label->set_text(m_state->label);
+    m_label->set_text_color(Imgui::contrast_color(m_state->color));
 }
 
 } // namespace Slic3r::App::ColorMix

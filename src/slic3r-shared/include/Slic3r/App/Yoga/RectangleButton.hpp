@@ -44,6 +44,7 @@ public:
 
     float background_border_width() const;
     void set_background_border_width(float width);
+    void set_background_border_dash(float dash_length, float gap_length);
 
     const EvaluatedPaddings& content_padding();
     void set_content_padding(const Paddings& padding);

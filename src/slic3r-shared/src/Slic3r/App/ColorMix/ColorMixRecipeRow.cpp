@@ -8,6 +8,7 @@
 #include "Slic3r/App/Yoga/RectangleButton.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Domain/VirtualExtruder.hpp"
 
 #include <fmt/format.h>
 
@@ -24,12 +25,74 @@ using namespace Slic3r::Biz;
 
 namespace Slic3r::App::ColorMix {
 
-ColorMixRecipeRow::RowData ColorMixRecipeRow::make_row_data(
+namespace {
+
+bool badges_differ(
+    const UnsharedPointer<ObservableList<RecipeBadgeData>>& badges,
+    const std::vector<RecipeBadgeData>& new_badges
+)
+{
+    if (badges->size() != new_badges.size()) {
+        return true;
+    }
+
+    for (size_t idx = 0; idx < new_badges.size(); ++idx) {
+        if (badges->at(idx) != new_badges.at(idx)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace
+
+BadgeView::BadgeView(size_t index, const RecipeBadgeData& data) :
+    DataObserver<RecipeBadgeData>(index, data)
+{
+    this->set_orientation(Orientation::Horizontal);
+    this->set_align_items(YGAlignCenter);
+    this->set_gap(6_fpx);
+
+    m_badge_rect = this->emplace_back<Rectangle>();
+    m_badge_rect->set_rounding(2.f);
+    m_badge_rect->set_border_width(1.f);
+    m_badge_rect->set_width(18_fpx);
+    m_badge_rect->set_height(18_fpx);
+    m_badge_rect->set_flex_shrink(0);
+    m_badge_rect->set_justify_content(YGJustifyCenter);
+    m_badge_rect->set_align_items(YGAlignCenter);
+
+    m_badge_text = m_badge_rect->emplace_back<Text>(std::string{}, ImguiFontType::Bold);
+    m_badge_text->set_font_size(0.85_rem);
+
+    m_percent_text = this->emplace_back<Text>(std::string{});
+}
+
+void BadgeView::on_data_update()
+{
+    const ImColor subtitle_color = m_theme->color_imgui(Color::Text, ColorGroup::Disabled);
+
+    m_badge_rect->set_fill(m_state->color);
+    m_badge_rect->set_border_color(subtitle_color);
+
+    m_badge_text->set_text(std::to_string(m_state->extruder_id));
+    m_badge_text->set_text_color(Imgui::contrast_color(m_state->color));
+
+    m_percent_text->set_text_color(subtitle_color);
+    m_percent_text->set_visible(m_state->percent >= 0);
+
+    if (m_state->percent >= 0) {
+        m_percent_text->set_text(fmt::format("{}%", m_state->percent));
+    }
+}
+
+RecipeRowData ColorMixRecipeRow::make_row_data(
     const VirtualExtruder& virtual_extruder,
     const std::vector<std::string>& physical_colors
 )
 {
-    RowData row_data;
+    RecipeRowData row_data;
     row_data.title        = recipe_title(virtual_extruder);
     row_data.swatch_color = parse_hex_color(effective_color_hex(virtual_extruder, physical_colors));
 
@@ -59,7 +122,16 @@ ColorMixRecipeRow::RowData ColorMixRecipeRow::make_row_data(
     return row_data;
 }
 
-ColorMixRecipeRow::ColorMixRecipeRow(const RowData& row_data)
+ColorMixRecipeRow::ColorMixRecipeRow(
+    const size_t index,
+    const RecipeRowData& data,
+    FnIndexClicked on_selected,
+    FnIndexClicked on_remove_clicked
+) :
+    DataObserver<RecipeRowData>(index, data),
+    m_badges(std::make_shared<ObservableList<RecipeBadgeData>>()),
+    m_on_selected{std::move(on_selected)},
+    m_on_remove_clicked{std::move(on_remove_clicked)}
 {
     constexpr const Unit RowHeight{52_fpx};
     constexpr const Unit SwatchSize{30_fpx};
@@ -79,12 +151,7 @@ ColorMixRecipeRow::ColorMixRecipeRow(const RowData& row_data)
     m_main_button->set_content_orientation(Orientation::Horizontal);
     m_main_button->set_content_align_items(YGAlignCenter);
     m_main_button->set_content_padding({8_fpx, 4_fpx});
-    m_main_button->callbacks().action = [this]()
-    {
-        if (m_callbacks.selected) {
-            m_callbacks.selected();
-        }
-    };
+    m_main_button->callbacks().action = [this]() -> void { m_on_selected(m_index); };
 
     m_swatch_rect = m_main_button->emplace_back<Rectangle>();
     m_swatch_rect->set_width(SwatchSize);
@@ -107,6 +174,14 @@ ColorMixRecipeRow::ColorMixRecipeRow(const RowData& row_data)
     m_subtitle_row->set_align_items(YGAlignCenter);
     m_subtitle_row->set_gap(6_fpx);
 
+    m_subtitle_text = m_subtitle_row->emplace_back<Text>(std::string{});
+
+    m_badge_list_view = m_subtitle_row->emplace_back<BadgeListView>();
+    m_badge_list_view->set_orientation(Orientation::Horizontal);
+    m_badge_list_view->set_align_items(YGAlignCenter);
+    m_badge_list_view->set_gap(6_fpx);
+    m_badge_list_view->set_source_list(m_badges.get());
+
     m_remove_button = m_main_button->emplace_back<LayoutButton>(
         std::string{},
         Render::Icon::DeleteBtnIcon,
@@ -118,14 +193,9 @@ ColorMixRecipeRow::ColorMixRecipeRow(const RowData& row_data)
     m_remove_button->set_flex_shrink(0);
     m_remove_button->set_margin({4_fpx, 0, 0, 0});
     m_remove_button->set_background_color(Color::ButtonTransparent);
-    m_remove_button->callbacks().action = [this]()
-    {
-        if (m_callbacks.remove_clicked) {
-            m_callbacks.remove_clicked();
-        }
-    };
+    m_remove_button->callbacks().action = [this]() -> void { m_on_remove_clicked(m_index); };
 
-    this->update(row_data);
+    this->ColorMixRecipeRow::on_data_update();
 }
 
 void ColorMixRecipeRow::set_selected(bool selected)
@@ -133,57 +203,23 @@ void ColorMixRecipeRow::set_selected(bool selected)
     m_main_button->set_checked(selected);
 }
 
-void ColorMixRecipeRow::update(const RowData& row_data)
+void ColorMixRecipeRow::on_data_update()
 {
-    m_title_text->set_text(row_data.title);
-    m_swatch_rect->set_fill(row_data.swatch_color);
-    this->rebuild_subtitle(row_data);
-}
+    m_title_text->set_text(m_state->title);
+    m_swatch_rect->set_fill(m_state->swatch_color);
 
-void ColorMixRecipeRow::rebuild_subtitle(const RowData& row_data)
-{
-    clear_children_later(m_subtitle_row);
+    const std::string subtitle_text = m_state->badges.empty() || m_state->subtitle_prefix.empty() ?
+        std::string{} :
+        m_state->subtitle_prefix + " -";
 
-    const ImColor subtitle_color = m_theme->color_imgui(Color::Text, ColorGroup::Disabled);
+    m_subtitle_text->set_text(subtitle_text);
+    m_subtitle_text->set_text_color(m_theme->color_imgui(Color::Text, ColorGroup::Disabled));
+    m_subtitle_text->set_visible(!subtitle_text.empty());
 
-    const auto add_subtitle_text = [&](const std::string& text)
-    {
-        Text* subtitle_text = m_subtitle_row->emplace_back<Text>(text);
-        subtitle_text->set_text_color(subtitle_color);
-    };
+    m_badge_list_view->set_visible(!m_state->badges.empty());
 
-    if (row_data.badges.empty()) {
-        if (!row_data.plain_subtitle.empty()) {
-            add_subtitle_text(row_data.plain_subtitle);
-        }
-
-        return;
-    }
-
-    if (!row_data.subtitle_prefix.empty()) {
-        add_subtitle_text(row_data.subtitle_prefix + " -");
-    }
-
-    for (const BadgeData& badge : row_data.badges) {
-        Rectangle* badge_rect = m_subtitle_row->emplace_back<Rectangle>();
-        badge_rect->set_fill(badge.color);
-        badge_rect->set_rounding(2.f);
-        badge_rect->set_border_width(1.f);
-        badge_rect->set_border_color(subtitle_color);
-        badge_rect->set_width(18_fpx);
-        badge_rect->set_height(18_fpx);
-        badge_rect->set_flex_shrink(0);
-        badge_rect->set_justify_content(YGJustifyCenter);
-        badge_rect->set_align_items(YGAlignCenter);
-
-        Text* badge_text =
-            badge_rect->emplace_back<Text>(std::to_string(badge.extruder_id), ImguiFontType::Bold);
-        badge_text->set_font_size(0.85_rem);
-        badge_text->set_text_color(Imgui::contrast_color(badge.color));
-
-        if (badge.percent >= 0) {
-            add_subtitle_text(fmt::format("{}%", badge.percent));
-        }
+    if (badges_differ(m_badges, m_state->badges)) {
+        m_badges->reset(m_state->badges);
     }
 }
 
