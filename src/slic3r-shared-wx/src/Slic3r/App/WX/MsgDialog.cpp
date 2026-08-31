@@ -187,6 +187,7 @@ static void add_msg_content(MsgDialog* parent, wxBoxSizer* content_sizer, const 
     }
     else {
         wxClientDC dc(parent);
+        dc.SetFont(parent->GetFont());
         wxSize msg_sz = dc.GetMultiLineTextExtent(content.msg);
         page_size = wxSize(std::min(msg_sz.GetX() + 2 * em, 68 * em),
                            std::min(msg_sz.GetY() + 2 * em, 68 * em));
@@ -322,11 +323,13 @@ RichMessageDialogBase::RichMessageDialogBase(wxWindow* parent, const HtmlContent
 
 int RichMessageDialogBase::ShowModal()
 {
-    if (m_checkBoxText.IsEmpty())
+    if (m_checkBoxText.IsEmpty()) {
         m_checkBox->Hide();
-    else {
+    } else {
         m_checkBox->SetLabelText(m_checkBoxText);
         m_checkBox->Update();
+        Fit();
+        CenterOnParent();
     }
     Layout();
 

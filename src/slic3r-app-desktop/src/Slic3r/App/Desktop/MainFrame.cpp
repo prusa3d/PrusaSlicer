@@ -404,6 +404,14 @@ void MainFrame::on_app_config_changed(const std::string& key)
 {
     AppConfig& app_config = AppServices::instance().app_config();
 
+#ifdef USE_NATIVE_MENU
+    // The only app-config key affecting menu enabled states; all other state changes
+    // reach MacOSNativeMenuBar through its own listener interfaces.
+    if (m_native_menu_bar && key == "open_hyperlink_policy") {
+        m_native_menu_bar->update_menu_states();
+    }
+#endif
+
     if (key == "enable_printables") {
         if (bool printables_enabled = AppServices::instance().app_config().is_printables_enabled();
             m_printables_page_added != printables_enabled)

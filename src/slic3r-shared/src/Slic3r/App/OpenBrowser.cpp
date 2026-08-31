@@ -8,7 +8,11 @@
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
+#include <fmt/format.h>
+
 #include <map>
+#include <memory>
+#include <optional>
 
 namespace Slic3r::App {
 
@@ -67,72 +71,89 @@ static std::string current_language_code_safe()
     return language_code;
 }
 
+static void append_query_param(std::string& url, const std::string& key_value)
+{
+    size_t insert_pos = url.find('#');
+    if (insert_pos == std::string::npos) {
+        insert_pos = url.size();
+    }
+    const bool has_query = url.find('?') < insert_pos;
+    url.insert(insert_pos, (has_query ? "&" : "?") + key_value);
+}
+
 void open_browser(OpenBrowserParams params)
 {
     if (params.is_localized_url) {
-        params.url += "&lng=" + current_language_code_safe();
+        append_query_param(params.url, "lng=" + current_language_code_safe());
     }
-
-    enum class SuppressHyperLinksOption
-    {
-        ShowWarning,
-        AlwaysSuppress,
-        AlwaysAllow
-    };
 
     AppConfig& app_config          = AppServices::instance().app_config();
     IDialogManager& dialog_manager = AppServices::instance().dialog_manager();
-    bool show_warning              = app_config.get<bool>("show_open_browser_warning_dialog");
-    bool checked                   = app_config.get<bool>("suppress_hyperlinks");
-    SuppressHyperLinksOption opt_val =
-        (show_warning ? SuppressHyperLinksOption::ShowWarning :
-                        (checked ? SuppressHyperLinksOption::AlwaysSuppress :
-                                   SuppressHyperLinksOption::AlwaysAllow));
-    bool launch = true;
-    if (opt_val == SuppressHyperLinksOption::ShowWarning) {
-        // no previous action from user
-        // open dialog with remember checkbox
+    HyperlinkPolicy policy         = params.skip_confirmation ?
+        HyperlinkPolicy::AlwaysOpen :
+        app_config.get<HyperlinkPolicy>("open_hyperlink_policy");
+
+    if (policy == HyperlinkPolicy::NeverOpen) {
+        return;
+    }
+
+    if (policy == HyperlinkPolicy::Ask) {
+        struct AskState
+        {
+            std::optional<bool> answer;
+            bool remember = false;
+        };
+        auto state = std::make_shared<AskState>();
+        auto persist_policy = [](bool launch)
+        {
+            AppConfig& app_config     = AppServices::instance().app_config();
+            Domain::EnumWrapper value = app_config.get<Domain::EnumWrapper>("open_hyperlink_policy");
+            value.set(launch ? HyperlinkPolicy::AlwaysOpen : HyperlinkPolicy::NeverOpen);
+            AppServices::instance().app_config_interactor().set_item_value(
+                "open_hyperlink_policy",
+                Domain::ConfigValue(value)
+            );
+        };
         dialog_manager.show_rich_yesno_dialog(
-            Biz::_u8L("PrusaSlicer: Open hyperlink"),
-            Biz::_u8L("Open hyperlink in default browser?"),
+            // TRN Title of the dialog asking whether a clicked hyperlink should be opened.
+            Biz::_u8L("Open hyperlink"),
+            fmt::format(
+                // TRN Followed by the URL about to be opened.
+                "{}\n\n{}", Biz::_u8L("Do you want to open this link in your web browser?"), params.url
+            ),
+            // TRN Checkbox of the open hyperlink dialog; stores the answer into the "Open hyperlinks in web browser" preference.
             Biz::_u8L("Remember my choice"),
-            [&launch](bool answer) { launch = answer; },
-            [&launch](bool checked)
+            [state, persist_policy, url = params.url](bool answer)
             {
-                if (checked) {
-                    // ysFIXME: use AppConfigInteractor , when it will be merged
-                    AppServices::instance().app_config_interactor().set_item_value(
-                        "show_open_browser_warning_dialog",
-                        Domain::ConfigValue(false)
-                    );
-                    AppServices::instance().app_config_interactor().set_item_value(
-                        "suppress_hyperlinks",
-                        Domain::ConfigValue(!launch)
-                    );
+                state->answer = answer;
+                if (state->remember) {
+                    persist_policy(answer);
+                }
+                if (answer) {
+                    AppServices::instance().dialog_manager().open_in_browser(url, 0);
+                }
+            },
+            [state, persist_policy](bool checked)
+            {
+                if (!checked) {
+                    return;
+                }
+                state->remember = true;
+                if (state->answer.has_value()) {
+                    persist_policy(*state->answer);
                 }
             }
         );
-    } else if (opt_val == SuppressHyperLinksOption::AlwaysAllow) {
-        // user already set checkbox to always open
-        launch = true;
-    } else if (opt_val == SuppressHyperLinksOption::AlwaysSuppress && params.force_remember_choice)
-    {
-        // user already set checkbox or preferences to always supress
-        launch = false;
-    } else if (opt_val == SuppressHyperLinksOption::AlwaysSuppress && !params.force_remember_choice)
-    {
-        // user already set checkbox or preferences to always supress but it is overriden
-        // no checkbox in dialog
-        dialog_manager.show_yesno_dialog(
-            Biz::_u8L("PrusaSlicer: Open hyperlink"),
-            Biz::_u8L("Open hyperlink in default browser?"),
-            [&](bool answer) { launch = answer; }
-        );
+        return;
     }
 
-    if (launch) {
-        dialog_manager.open_in_browser(params.url, 0);
-    }
+    dialog_manager.open_in_browser(params.url, 0);
+}
+
+bool hyperlinks_allowed()
+{
+    return AppServices::instance().app_config().get<HyperlinkPolicy>("open_hyperlink_policy") !=
+        HyperlinkPolicy::NeverOpen;
 }
 
 } // namespace Slic3r::App

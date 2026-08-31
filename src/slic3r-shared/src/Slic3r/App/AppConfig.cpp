@@ -277,23 +277,27 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn = []() { return Domain::ConfigValue(1.); };
 
-    // Settings for open link in browser
-
-    def = defs.add("show_open_browser_warning_dialog", typeid(bool));
-    def->location = Domain::AppConfigLocation{};
-    def->category = Domain::ConfigItemDef::Category::AppConfig_Services;
+    def               = defs.add("open_hyperlink_policy", typeid(Domain::EnumWrapper));
+    def->location     = Domain::AppConfigLocation{};
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_General;
-    def->gui_type = GUIType::checkbox;
-    def->label = L("Show warning dialog before opening a link in default browser");
-    def->init_fn = []() { return Domain::ConfigValue(true); };
-
-    def = defs.add("suppress_hyperlinks", typeid(bool));
-    def->location = Domain::AppConfigLocation{};
-    def->category = Domain::ConfigItemDef::Category::AppConfig_Services;
-    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_General;
-    def->gui_type = GUIType::checkbox;
-    def->label = L("Suppress opening hyperlinks in browser");
-    def->init_fn = []() { return Domain::ConfigValue(false); };
+    def->gui_type     = GUIType::combobox;
+    // TRN Label of a Preferences combobox choosing what happens when a hyperlink is clicked.
+    def->label        = L("Open hyperlinks in web browser");
+    // TRN Tooltip of the "Open hyperlinks in web browser" Preferences combobox.
+    def->tooltip      = L("Choose what happens when you click a link in PrusaSlicer: "
+                          "ask for confirmation, open it in your default web browser right away, or do nothing.");
+    def->init_fn      = Domain::init_with(
+        HyperlinkPolicy::Ask,
+        {
+            // TRN Value of the "Open hyperlinks in web browser" Preferences combobox.
+            {int(HyperlinkPolicy::Ask), "ask", L("Ask before opening")},
+            // TRN Value of the "Open hyperlinks in web browser" Preferences combobox.
+            {int(HyperlinkPolicy::AlwaysOpen), "always", L("Always open")},
+            // TRN Value of the "Open hyperlinks in web browser" Preferences combobox.
+            {int(HyperlinkPolicy::NeverOpen), "never", L("Never open")},
+        }
+    );
 
     def           = defs.add("favorite_params", typeid(std::vector<std::string>));
     def->location = Domain::AppConfigLocation{};

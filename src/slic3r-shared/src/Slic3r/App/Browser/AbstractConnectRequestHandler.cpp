@@ -129,7 +129,7 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_actio
     try {
         nlohmann::json j = nlohmann::json::parse(message_data);
         if (j.contains("url") && j["url"].is_string()) {
-            // TODO: open browser with url
+            return {{BrowserLogicCommandType::OpenExternalBrowser, j["url"].get<std::string>()}};
         }
     } catch (const nlohmann::json::exception& e) {
         SPDLOG_ERROR("Could not parse _prusaConnect message. {}", e.what());

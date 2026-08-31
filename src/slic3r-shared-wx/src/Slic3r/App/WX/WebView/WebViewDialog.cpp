@@ -564,12 +564,6 @@ bool WebViewDialog::handle_logic_command_LoadResourcesPage(const std::string& da
     return true;
 }
 
-bool WebViewDialog::handle_logic_command_OpenExternalBrowser(const std::string& data)
-{
-    wxLaunchDefaultBrowser(from_u8(data), 0);
-    return true;
-}
-
 bool WebViewDialog::handle_logic_command_RegisterPrusaSlicerURL(const std::string& data)
 {
     register_prusaslicer_url();

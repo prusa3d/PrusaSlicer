@@ -88,6 +88,7 @@ PresetUpdaterDialog::PresetUpdaterDialog(
     Dialog({Biz::_u8L("Preset sources & updates")}, "PresetUpdaterDialog"),
     m_controller(controller),
     m_navigator(navigator),
+    m_app_config_changed_listener_scope(AppServices::instance().app_config_interactor(), *this),
     m_online_filter(std::make_shared<SourceSortFilter>()),
     m_local_filter(std::make_shared<SourceSortFilter>())
 {
@@ -328,6 +329,18 @@ void PresetUpdaterDialog::pick_zip_archive()
     );
 }
 
+void PresetUpdaterDialog::on_app_config_changed(const std::string& key)
+{
+    if (key == "open_hyperlink_policy") {
+        update_repo_link_enabled();
+    }
+}
+
+void PresetUpdaterDialog::update_repo_link_enabled()
+{
+    m_repo_link_button->set_enabled(!m_forced_mode && hyperlinks_allowed());
+}
+
 void PresetUpdaterDialog::on_preset_updater_changed()
 {
     m_offline_note->set_visible(!m_controller.online_allowed());
@@ -341,7 +354,7 @@ void PresetUpdaterDialog::on_preset_updater_changed()
     }
 
     m_add_zip_button->set_enabled(!forced);
-    m_repo_link_button->set_enabled(!forced);
+    update_repo_link_enabled();
 
     // In forced mode the button installs the required vendors only, so anything else being
     // actionable must not make it look like there is something left to press.

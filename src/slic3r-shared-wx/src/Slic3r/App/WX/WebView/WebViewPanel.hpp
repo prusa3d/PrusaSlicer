@@ -125,7 +125,6 @@ protected:
     bool handle_logic_command_DoReload(const std::string& data) override;
     bool handle_logic_command_AddUserScript(const std::string& data) override;
     bool handle_logic_command_LoadResourcesPage(const std::string& data) override;
-    bool handle_logic_command_OpenExternalBrowser(const std::string& data) override;
     bool handle_logic_command_RegisterPrusaSlicerURL(const std::string& data) override;
     bool handle_logic_command_SetLoadDefaultURLOnErrorTrue(const std::string& data) override;
     bool handle_logic_command_SetLoadDefaultURLOnErrorFalse(const std::string& data) override;
