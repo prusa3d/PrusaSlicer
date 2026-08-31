@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <optional>
 #include <variant>
-#include "Slic3r/Biz/Algorithms/MiniZWrapper.hpp" // mini zip archivator
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Slic3r/Domain/TriangleMesh.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "admesh/stl.h" // indexed_triangle_set
@@ -22,6 +22,8 @@ using Slic3r::Domain::Transform3d;
 // Unprefixed: Element names
 // CT_ .. prefix of Complex types defined in 3MF specification
 // ST_ .. prefix of Simple types defined in 3MF specification
+
+namespace Slic3r { using Biz::Algorithms::ZipArchive; }
 
 namespace Slic3r::format_3MF{
 enum class ST_Unit { millimeter, inch, micron, centimeter, foot, meter };
@@ -460,7 +462,7 @@ struct LoadedModel {
 /// <param name="archive">Zip archive containing model on specified index</param>
 /// <param name="root_file_path">File path in 3mf archive to root .model file</param>
 /// <returns>Loaded data with list of founded issues</returns>
-LoadedModel read_model3mf(mz_zip_archive &archive, const char *root_file_path, Read3mfIssues& collected_issues);
+LoadedModel read_model3mf(ZipArchive &archive, const char *root_file_path, Read3mfIssues& collected_issues);
 
 struct ObjectIdWithPath{
     // objectid is index inside of .model file and start from 1 and increase for stream reading
@@ -497,7 +499,7 @@ struct StoredStructure {
 /// <param name="filepath">Path in 3mf where to store</param>
 /// <param name="param">Specify way to store(limit export by filters)</param>
 /// <returns>Structure of stored objects to by able pointed on them in 3mf</returns>
-StoredStructure store_model3mf(mz_zip_archive &archive, const Domain::Model &model, 
+StoredStructure store_model3mf(ZipArchive &archive, const Domain::Model &model,
     const char* filepath, const Store3mfParam &param);
 
 } // namespace Slic3r

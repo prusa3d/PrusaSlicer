@@ -2,7 +2,7 @@
 
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
-#include "Slic3r/Biz/Algorithms/MiniZWrapper.hpp"
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Slic3r/Biz/Crypto/ContentProvider.hpp"
 #include "Slic3r/Biz/Crypto/Sign.hpp"
 #include "Slic3r/App/Console/ConsoleInput.hpp"
@@ -536,13 +536,16 @@ void plugin_sign(const PluginSignActionParams& params)
         console_output(fmt::format("Files checksum signature written to {}", sign_path));
 
         // write zip
-        Biz::Algorithms::MZ_Archive zip;
         auto zip_file_name = fmt::format("{}.zip", bundle_id);
         auto zip_file_path = fs::path{zip_file_name};
         if (fs::exists(zip_file_path)) {
             fs::remove(zip_file_path);
         }
-        if (!Biz::Algorithms::open_zip_writer(&zip.arch, zip_file_name)) {
+        Biz::Algorithms::ZipArchive zip = Biz::Algorithms::ZipArchive::open(
+            zip_file_name,
+            Biz::Algorithms::ZipArchive::Mode::Write
+        );
+        if (!zip.is_open()) {
             fail_error(fmt::format("Cannot open file {} for writing", zip_file_name));
         }
 
@@ -558,22 +561,11 @@ void plugin_sign(const PluginSignActionParams& params)
                 );
             }
             auto src_path = (bundle_dir / file_path).string();
-            if (!mz_zip_writer_add_file(
-                    &zip.arch,
-                    file_path.c_str(),
-                    src_path.c_str(),
-                    nullptr,
-                    0,
-                    MZ_BEST_COMPRESSION
-                ))
-            {
+            if (!zip.add_entry_file(file_path, src_path, 12 /* libdeflate best compression */)) {
                 fail_error(fmt::format("Cannot write into zip file {}", zip_file_name));
             }
         }
-        if (!mz_zip_writer_finalize_archive(&zip.arch)) {
-            fail_error(fmt::format("Cannot write into zip file {}", zip_file_name));
-        }
-        if (!Biz::Algorithms::close_zip_writer(&zip.arch)) {
+        if (!zip.close()) {
             fail_error(fmt::format("Cannot write into zip file {}", zip_file_name));
         }
 

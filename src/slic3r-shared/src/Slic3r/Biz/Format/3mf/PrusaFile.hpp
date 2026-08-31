@@ -1,12 +1,13 @@
 #ifndef slic3r_Format_3mf_prusafile_hpp_
 #define slic3r_Format_3mf_prusafile_hpp_
 
-#include "Slic3r/Biz/Algorithms/MiniZWrapper.hpp" // mz_zip_archive + mz_zip_archive_file_stat
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Slic3r/Biz/Format/ResultLoad3mf.hpp" // Error handling
 #include "ModelMap.hpp"
 #include "Slic3r/Domain/Project.hpp"
 
 namespace Slic3r {
+using Biz::Algorithms::ZipArchive;
 struct ConfigSubstitutionContext;
 
 /// <summary>
@@ -18,7 +19,7 @@ struct ConfigSubstitutionContext;
 /// <param name="config">Configuration for whole model</param>
 /// <param name="stored_structure">Hierarchy of store model into .model file of 3mf</param>
 void store_prusa_files(
-    mz_zip_archive &archive,
+    ZipArchive &archive,
     const Domain::Model &model,
     const Domain::ProjectMetadata& project_metadata,
     const Domain::Project::ConfigContainerList& config_containers,
@@ -41,7 +42,7 @@ struct PrusaFilesResult {
 /// <param name="config_substitutions">Help backward compatibility of configuration(not 100% sure)</param>
 /// <returns>Indices of used files </returns>
 PrusaFilesResult load_prusa_files(
-    mz_zip_archive &archive,
+    ZipArchive &archive,
     const ModelMap& model_map,
     Read3mfIssues& collected_issues
 );
@@ -55,7 +56,7 @@ PrusaFilesResult load_prusa_files(
 /// <param name="result">List of issues, add issue when svg can't be open</param>
 /// <returns>True when svg is used for emboss shape otherwise false</returns>
 bool process_embossed_svg(
-    /*const*/ mz_zip_archive &archive,
+    /*const*/ ZipArchive &archive,
     const mz_zip_archive_file_stat &stat,
     Domain::Model &model,
     Read3mfIssues& collected_issues

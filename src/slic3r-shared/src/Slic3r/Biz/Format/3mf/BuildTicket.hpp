@@ -1,11 +1,12 @@
 #ifndef slic3r_Format_3mf_buildticket_hpp_
 #define slic3r_Format_3mf_buildticket_hpp_
 
-#include "Slic3r/Biz/Algorithms/MiniZWrapper.hpp" // mz_zip_archive + mz_zip_archive_file_stat
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Model3mf.hpp" // CT_Items
 #include "ModelMap.hpp" // InstanceMap
 
 namespace Slic3r {
+using Biz::Algorithms::ZipArchive;
 class DynamicPrintConfig;
 struct ConfigSubstitutionContext;
 
@@ -22,7 +23,7 @@ struct ConfigSubstitutionContext;
 /// <param name="config">Loaded configuration will be overriden</param>
 /// <param name="config_substitutions">used to set specific configuration for object</param>
 void process_build_ticket(
-    mz_zip_archive& archive,
+    ZipArchive& archive,
     const mz_zip_archive_file_stat& stat,
     const format_3MF::CT_Items& items,
     const InstanceMap& instance_map,

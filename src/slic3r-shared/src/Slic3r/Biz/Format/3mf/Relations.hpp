@@ -2,12 +2,14 @@
 
 #include <string>
 #include <optional>
-#include <miniz.h> // mz_zip_archive
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Slic3r/Biz/Format/ResultLoad3mf.hpp"
 
 #include "tl/expected.hpp"
 
 namespace Slic3r {
+
+using Biz::Algorithms::ZipArchive;
 
 struct Relationship{
     std::string target; // path to target file in archive
@@ -35,9 +37,9 @@ struct LoadedRelations {
 };
 
 // 3MF Import / Export functions
-void store(mz_zip_archive &archive, const Relationships &relationships, const char *filepath);
+void store(ZipArchive &archive, const Relationships &relationships, const char *filepath);
 
 // Read relations XML from "_rels/.rels" get index of root model
-tl::expected<LoadedRelations, Read3mfIssue> load_relations(mz_zip_archive &archive, const char *filepath, Read3mfIssues& collected_issues);
+tl::expected<LoadedRelations, Read3mfIssue> load_relations(ZipArchive &archive, const char *filepath, Read3mfIssues& collected_issues);
 
 } // namespace Slic3r

@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/Crypto/ContentProvider.hpp"
-#include "Slic3r/Biz/Algorithms/MiniZWrapper.hpp"
+
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 
 #include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -52,51 +53,50 @@ class ZipContentSource : public IContentProvider
 {
 public:
     ZipContentSource(
-        std::unique_ptr<Biz::Algorithms::MZ_Archive>&& zip_archive,
-        std::string  zip_path
+        std::unique_ptr<Biz::Algorithms::ZipArchive>&& zip_archive
     ) :
-        m_zip_archive(std::move(zip_archive)),
-        m_zip_path(std::move(zip_path))
+        m_zip_archive(std::move(zip_archive))
     {}
-
-    ~ZipContentSource() override
-    {
-        Algorithms::close_zip_reader(&m_zip_archive->arch);
-    }
 
     static std::unique_ptr<ZipContentSource> create(const std::string& zip_path)
     {
-        // we need to capture the MZ_Archive to unique_ptr so its address is fixed
+        // we need to capture the ZipArchive to unique_ptr so its address is fixed
         // this is required as the open_zip_reader's internals uses this address to set up
         // the structure
-        auto zip_archive = std::make_unique<Algorithms::MZ_Archive>();
-        const bool success = Algorithms::open_zip_reader(&zip_archive->arch, zip_path);
+        std::unique_ptr<Algorithms::ZipArchive> zip_archive =
+            std::make_unique<Algorithms::ZipArchive>(
+                Algorithms::ZipArchive::open(zip_path, Algorithms::ZipArchive::Mode::Read)
+            );
+        const bool success = zip_archive->is_open();
         if (!success) {
             return nullptr;
         }
-        return std::make_unique<ZipContentSource>(std::move(zip_archive), zip_path);
+        return std::make_unique<ZipContentSource>(std::move(zip_archive));
     }
 
     FileList list_files() override
     {
         FileList file_list;
-        const auto n = mz_zip_reader_get_num_files(&m_zip_archive->arch);
+        const auto n = m_zip_archive->get_num_files();
         file_list.reserve(n);
         for (std::decay_t<decltype(n)> i = 0; i < n; i++) {
-            constexpr size_t BUF_SIZE = 256;
-            char file_name_buf[BUF_SIZE];
-            if (mz_zip_reader_get_filename(&m_zip_archive->arch, i, file_name_buf, BUF_SIZE) > 0) {
-                file_list.emplace_back(file_name_buf);
+            std::string filename;
+            if (m_zip_archive->get_filename(i, filename)) {
+                file_list.emplace_back(std::move(filename));
             }
         }
         return file_list;
     }
 
-    bool file_stream(const std::string& file_path, const StreamKernel& kernel, size_t buffer_size) override
+    bool file_stream(
+        const std::string& file_path,
+        const StreamKernel& kernel,
+        size_t buffer_size
+    ) override
     {
         StreamKernel fwd = [&kernel](BytesView b) { kernel(b); };
         return mz_zip_reader_extract_file_to_callback(
-            &m_zip_archive->arch,
+            m_zip_archive->raw_archive(),
             file_path.c_str(),
             &ZipContentSource::pump_callback,
             &fwd,
@@ -106,7 +106,7 @@ public:
 
     const std::string& path() const override
     {
-        return m_zip_path;
+        return m_zip_archive->path();
     }
 
 
@@ -119,8 +119,7 @@ private:
     }
 
 private:
-    std::unique_ptr<Algorithms::MZ_Archive> m_zip_archive;
-    std::string m_zip_path;
+    std::unique_ptr<Algorithms::ZipArchive> m_zip_archive;
 };
 
 IContentProviderPtr create_zip_source(const std::string& zip_path)

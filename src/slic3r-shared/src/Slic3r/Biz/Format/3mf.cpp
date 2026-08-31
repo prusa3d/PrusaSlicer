@@ -5,7 +5,7 @@
 
 #include <boost/algorithm/string/predicate.hpp> // iends_with
 #include <boost/filesystem.hpp> // storing exception
-#include "Slic3r/Biz/Algorithms/MiniZWrapper.hpp" // mini zip archivator
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "3mf/Relations.hpp"
 #include "3mf/Model3mf.hpp"
 // #include "3mf/BuildTicket.hpp"
@@ -38,10 +38,7 @@ using Slic3r::Domain::SquareMatrix3d;
 
 using Slic3r::Biz::_u8L;
 using Slic3r::Domain::is_approx;
-using Slic3r::Biz::Algorithms::open_zip_reader;
-using Slic3r::Biz::Algorithms::close_zip_reader;
-using Slic3r::Biz::Algorithms::open_zip_writer;
-using Slic3r::Biz::Algorithms::close_zip_writer;
+using Slic3r::Biz::Algorithms::ZipArchive;
 
 using ModelObject       = Slic3r::Domain::ModelObject;
 using ModelVolume       = Slic3r::Domain::ModelVolume;
@@ -75,7 +72,7 @@ struct ContentTypes
     bool contain_svg = false;
 };
 
-void store_content_type(mz_zip_archive& archive, const ContentTypes& ct)
+void store_content_type(ZipArchive& archive, const ContentTypes& ct)
 {
     std::stringstream stream;
     stream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -93,37 +90,8 @@ void store_content_type(mz_zip_archive& archive, const ContentTypes& ct)
     stream << "</Types>";
     std::string out = stream.str();
 
-    if (!mz_zip_writer_add_mem(
-            &archive,
-            CONTENT_TYPES_FILE,
-            (const void*) out.data(),
-            out.length(),
-            MZ_DEFAULT_COMPRESSION
-        ))
+    if (!archive.add_entry(CONTENT_TYPES_FILE, out.data(), out.length()))
         throw boost::filesystem::filesystem_error("Unable to add content types to archive.", {});
-}
-
-void store_thumbnail(mz_zip_archive& archive, const Domain::Image& thumbnail, const char* filepath)
-{
-    size_t png_size = 0;
-    void* png_data  = tdefl_write_image_to_png_file_in_memory_ex(
-        thumbnail.pixels.data(),
-        thumbnail.width(),
-        thumbnail.height(),
-        4,
-        &png_size,
-        MZ_DEFAULT_LEVEL,
-        0
-    );
-    if (png_data == nullptr)
-        throw boost::filesystem::filesystem_error(
-            "Can't create PNG data for store thumbnail to archive.",
-            {}
-        );
-    ScopeGuard sg_png_data([png_data]() { mz_free(png_data); });
-
-    if (!mz_zip_writer_add_mem(&archive, filepath, (const void*) png_data, png_size, MZ_DEFAULT_COMPRESSION))
-        throw boost::filesystem::filesystem_error("Can't add PNG data to archive.", {});
 }
 
 ///////////////////////////////////////////////
@@ -645,17 +613,14 @@ Loaded3MF load_3mf(const std::string& filepath_3mf)
 {
     Read3mfIssues collected_issues;
 
-    mz_zip_archive archive;
-    mz_zip_zero_struct(&archive);
     std::string filepath_str{filepath_3mf};
     // TODO: change interface to acceppt string_view
-    if (!open_zip_reader(&archive, filepath_str))
+    ZipArchive archive = ZipArchive::open(filepath_str, ZipArchive::Mode::Read);
+    if (!archive.is_open())
         throw Loaded3MFException(Read3mfIssue(
             Read3mfIssueType::zip_error,
-            _u8L("Unable to open archive: ") + Biz::translate_miniz_error(archive.m_last_error)
+            _u8L("Unable to open archive: ") + Biz::translate_miniz_error(archive.last_error())
         ));
-
-    ScopeGuard sg_archive([&archive]() { close_zip_reader(&archive); });
 
     tl::expected<LoadedRelations, Read3mfIssue> relations = load_relations(
         archive,
@@ -700,7 +665,7 @@ Loaded3MF load_3mf(const std::string& filepath_3mf)
     PrusaFilesResult prusa_files_result = load_prusa_files(archive, model_map, collected_issues);
 
     std::vector<bool>& used_files = prusa_files_result.used_file_indices;
-    assert(used_files.size() == mz_zip_reader_get_num_files(&archive));
+    assert(used_files.size() == archive.get_num_files());
     assert(used_files.size() == loaded_model.used_files.size());
     for (size_t i = 0; i < loaded_model.used_files.size(); ++i)
         if (loaded_model.used_files[i]) {
@@ -718,7 +683,7 @@ Loaded3MF load_3mf(const std::string& filepath_3mf)
         if (used_files[i])
             continue; // already processed
 
-        if (!mz_zip_reader_file_stat(&archive, i, &stat)) {
+        if (!archive.stat_file(i, stat)) {
             collected_issues.add_issue(Read3mfIssue(Read3mfIssueType::cant_read_file_stats, std::to_string(i)));
             continue; // can't read filename
         }
@@ -791,15 +756,9 @@ void store_3mf(const std::string& filepath, const Domain::Project& project, cons
     CNumericLocalesSetter locales_setter;
 
     // open zip archive
-    mz_zip_archive archive;
-    mz_zip_archive* archive_ptr = &archive;
-    mz_zip_zero_struct(archive_ptr);
-    if (!open_zip_writer(archive_ptr, filepath))
+    ZipArchive archive = ZipArchive::open(filepath, ZipArchive::Mode::Write);
+    if (!archive.is_open())
         throw boost::filesystem::filesystem_error("Unable to open Zip writer to the file.", {});
-    ScopeGuard sg_archive([&archive_ptr]() {
-        if (archive_ptr)
-            close_zip_writer(archive_ptr);
-    });
 
     // First of all should be in archive stored relations,
     // when you read it you need to know where is root model
@@ -819,10 +778,14 @@ void store_3mf(const std::string& filepath, const Domain::Project& project, cons
     store_content_type(archive, content_types);
 
     // Write thumbnail into 3mf file
-    if (!relations.thumbnail_path.empty() && param.thumbnail != nullptr && ImageUtils::is_valid(*param.thumbnail))
+    if (!relations.thumbnail_path.empty()
+        && param.thumbnail != nullptr
+        && ImageUtils::is_valid(*param.thumbnail))
     {
         // Adds the file Metadata/thumbnail.png.
-        store_thumbnail(archive, *param.thumbnail, relations.thumbnail_path.c_str());
+        if (!archive.add_entry_image(relations.thumbnail_path, *param.thumbnail)) {
+            SPDLOG_WARN("Could not add Metadata/thumbnail.png into archive");
+        }
     }
 
     // Adds model file ("3D/3dmodel.model").
@@ -837,13 +800,9 @@ void store_3mf(const std::string& filepath, const Domain::Project& project, cons
         stored_structure
     );
 
-    if (!mz_zip_writer_finalize_archive(archive_ptr))
-        throw boost::filesystem::filesystem_error("Unable to finalize the archive.", {});
-
-    // Set off ScopeGuard sg_archive
-    archive_ptr = nullptr;
-    if (!close_zip_writer(&archive))
+    if (!archive.close()) {
         throw boost::filesystem::filesystem_error("Unable to close zip writer.", {});
+    }
 }
 
 static Domain::Image resize_and_crop(
@@ -891,30 +850,21 @@ static Domain::Image resize_and_crop(
 
 std::vector<Domain::Image> get_thumbnail_images_from_3mf(const std::string& input_file, const std::vector<Domain::Size>& sizes)
 {
-    mz_zip_archive archive;
-    mz_zip_zero_struct(&archive);
-
-    if (!open_zip_reader(&archive, input_file))
+    ZipArchive archive = ZipArchive::open(input_file, ZipArchive::Mode::Read);
+    if (!archive.is_open())
         return {};
 
-    int index = mz_zip_reader_locate_file(&archive, "Metadata/thumbnail.png", nullptr, 0);
-    if (index < 0) {
-        close_zip_reader(&archive);
+    int index = archive.locate_file("Metadata/thumbnail.png");
+    if (index < 0)
         return {};
-    }
 
     mz_zip_archive_file_stat stat;
-    if (!mz_zip_reader_file_stat(&archive, index, &stat)) {
-        close_zip_reader(&archive);
+    if (!archive.stat_file(index, stat))
         return {};
-    }
 
     std::string buffer;
     buffer.resize(int(stat.m_uncomp_size));
-    mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, buffer.data(), (size_t)stat.m_uncomp_size, 0);
-    close_zip_reader(&archive);
-
-    if (res == 0)
+    if (!archive.extract_entry_to(index, buffer.data(), (size_t)stat.m_uncomp_size))
         return {};
 
     std::vector<unsigned char> data;

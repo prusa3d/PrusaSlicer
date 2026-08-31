@@ -13,7 +13,7 @@
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Directories.hpp"
 
-#include "Slic3r/Biz/Algorithms/MiniZWrapper.hpp"
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 
 #include <fmt/format.h>
 #include <boost/filesystem/path.hpp>
@@ -27,9 +27,6 @@
 namespace fs = boost::filesystem;
 
 namespace Slic3r::Biz::PresetUpdater {
-
-using Algorithms::open_zip_reader;
-using Algorithms::close_zip_reader;
 
 constexpr size_t BATCH_DOWNLOAD_TRESHOLD = 20;
 
@@ -198,35 +195,6 @@ bool check_resouces_vendor_sanity(
     return true;
 }
 
-class ScopedZipReader {
-public:
-    ScopedZipReader() {
-        mz_zip_zero_struct(&archive_);
-    }
-
-    ~ScopedZipReader() {
-        if (opened_) {
-            close_zip_reader(&archive_);
-        }
-    }
-
-    bool open(const std::string& path) {
-        opened_ = open_zip_reader(&archive_, path);
-        return opened_;
-    }
-
-    mz_zip_archive* get() { return &archive_; }
-
-    ScopedZipReader(const ScopedZipReader&) = delete;
-    ScopedZipReader& operator=(const ScopedZipReader&) = delete;
-    ScopedZipReader(ScopedZipReader&&) = delete;
-    ScopedZipReader& operator=(ScopedZipReader&&) = delete;
-
-private:
-    mz_zip_archive archive_;
-    bool opened_{false};
-};
-
 bool unzip_files_from_bundle_zip(
     const boost::filesystem::path& zip_file,
     const boost::filesystem::path& dest_dir,
@@ -235,16 +203,19 @@ bool unzip_files_from_bundle_zip(
     const PresetUpdaterIndex& source_index
 )
 {
-    ScopedZipReader archive;
+    Biz::Algorithms::ZipArchive archive = Biz::Algorithms::ZipArchive::open(
+        zip_file.string(),
+        Biz::Algorithms::ZipArchive::Mode::Read
+    );
 
-    if (!archive.open(zip_file.string())) {
+    if (!archive.is_open()) {
         std::string msg = fmt::format("Couldn't open zipped bundle: {}", zip_file.string());
         SPDLOG_ERROR(msg);
         if (process_status) process_status->set_warning(msg, PresetUpdaterReason::DataCorrupted);
         return false;
     }
 
-    mz_uint num_entries = mz_zip_reader_get_num_files(archive.get());
+    mz_uint num_entries = archive.get_num_files();
     mz_zip_archive_file_stat stat;
     bool success = true;
 
@@ -254,11 +225,11 @@ bool unzip_files_from_bundle_zip(
             break;
         }
 
-        if (!mz_zip_reader_file_stat(archive.get(), i, &stat)) {
+        if (!archive.stat_file(i, stat)) {
             continue;
         }
 
-        if (mz_zip_reader_is_file_a_directory(archive.get(), i)) {
+        if (archive.is_file_directory(i)) {
             continue;
         }
 
@@ -274,29 +245,11 @@ bool unzip_files_from_bundle_zip(
         }
 
         if (stat.m_uncomp_size > 0) {
-            auto buffer = std::make_unique_for_overwrite<char[]>((size_t)stat.m_uncomp_size);
-            if (!mz_zip_reader_extract_to_mem(archive.get(), stat.m_file_index, buffer.get(), (size_t)stat.m_uncomp_size, 0)) {
-                std::string msg = fmt::format("Failed to unzip {}", stat.m_filename);
+            if (!archive.extract_to_file(stat.m_file_index, target_path.string())) {
+                std::string msg = fmt::format("Failed to extract {}", stat.m_filename);
                 SPDLOG_ERROR(msg);
-                if (process_status) process_status->set_warning(msg, PresetUpdaterReason::DataCorrupted);
-                success = false;
-                continue;
-            }
-
-            boost::nowide::fstream file(target_path, std::ios::out | std::ios::binary | std::ios::trunc);
-            if (!file) {
-                std::string msg = fmt::format("Failed to open file for writing: {}", target_path.string());
-                SPDLOG_ERROR(msg);
-                if (process_status) process_status->set_warning(msg, PresetUpdaterReason::LocalStorageFailed);
-                success = false;
-                continue;
-            }
-
-            file.write(buffer.get(), (std::streamsize)stat.m_uncomp_size);
-            if (!file) {
-                std::string msg = fmt::format("Failed to write data to: {}", target_path.string());
-                SPDLOG_ERROR(msg);
-                if (process_status) process_status->set_warning(msg, PresetUpdaterReason::LocalStorageFailed);
+                if (process_status)
+                    process_status->set_warning(msg, PresetUpdaterReason::DataCorrupted);
                 success = false;
                 continue;
             }
@@ -979,8 +932,9 @@ void PresetUpdaterRepositorySync::sync_repository(
     //
 
     // Unzip archive to temp_dir
-    ScopedZipReader archive;
-    if (!archive.open(archive_path.string())) {
+    Algorithms::ZipArchive archive =
+        Algorithms::ZipArchive::open(archive_path.string(), Algorithms::ZipArchive::Mode::Read);
+    if (!archive.is_open()) {
         std::string msg = fmt::format(
             "Failed to check updates for source {}. Couldn't open zipped bundle.",
             repo->descriptor().id
@@ -989,34 +943,19 @@ void PresetUpdaterRepositorySync::sync_repository(
         warn_about_repo(process_status, repo->descriptor().id, msg);
         return;
     } else {
-        mz_uint num_entries = mz_zip_reader_get_num_files(archive.get());
+        mz_uint num_entries = archive.get_num_files();
         mz_zip_archive_file_stat stat;
         for (mz_uint i = 0; i < num_entries; ++i) {
-            if (mz_zip_reader_file_stat(archive.get(), i, &stat)) {
+            if (archive.stat_file(i, stat)) {
                 std::string name(stat.m_filename);
 
-                if (mz_zip_reader_is_file_a_directory(archive.get(), i)) {
+                if (archive.is_file_directory(i)) {
                     std::string msg = fmt::format("Skipping directory entry: {}", name);
                     SPDLOG_INFO(msg);
                     continue;
                 }
 
                 if (stat.m_uncomp_size > 0) {
-                    auto buffer = std::make_unique_for_overwrite<char[]>((size_t) stat.m_uncomp_size);
-                    mz_bool res = mz_zip_reader_extract_to_mem(
-                        archive.get(),
-                        stat.m_file_index,
-                        buffer.get(),
-                        (size_t) stat.m_uncomp_size,
-                        0
-                    );
-                    if (res == 0) {
-                        std::string msg = fmt::format("Failed to unzip {}", stat.m_filename);
-                        SPDLOG_ERROR(msg);
-                        process_status->set_warning(msg, PresetUpdaterReason::DataCorrupted);
-                        continue;
-                    }
-    
                     fs::path tmp_path(temp_dir / (name + ".tmp"));
                     if (!fs::exists(tmp_path.parent_path(), ec) || ec) {
                         std::string msg = fmt::format(
@@ -1027,29 +966,15 @@ void PresetUpdaterRepositorySync::sync_repository(
                         process_status->set_warning(msg, PresetUpdaterReason::DataCorrupted);
                         continue;
                     }
-    
+
                     fs::path target_path(temp_dir / name);
-                    boost::nowide::fstream file(
-                        tmp_path,
-                        std::ios::out | std::ios::binary | std::ios::trunc
-                    );
-
-                    if (!file) {
-                        std::string msg = fmt::format("Failed to open temp file for writing: {}", tmp_path.string());
+                    if (!archive.extract_to_file(i, tmp_path.string())) {
+                        std::string msg = fmt::format("Failed to unzip {}", stat.m_filename);
                         SPDLOG_ERROR(msg);
-                        process_status->set_warning(msg, PresetUpdaterReason::LocalStorageFailed);
+                        process_status->set_warning(msg, PresetUpdaterReason::DataCorrupted);
                         continue;
                     }
 
-                    file.write(buffer.get(), (std::streamsize) stat.m_uncomp_size);
-                    if (!file) {
-                        std::string msg = fmt::format("Failed to write to temp file: {}", tmp_path.string());
-                        SPDLOG_ERROR(msg);
-                        process_status->set_warning(msg, PresetUpdaterReason::LocalStorageFailed);
-                        continue;
-                    }
-                    file.close();
-    
                     bool exists = fs::exists(tmp_path, ec);
                     if (!exists || ec) {
                         std::string msg = fmt::format(

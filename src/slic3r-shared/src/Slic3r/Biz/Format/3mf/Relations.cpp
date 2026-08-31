@@ -148,7 +148,7 @@ Relationships get_relationships(const std::vector<std::string> &model_paths) {
     return r;
 }
 
-void store(mz_zip_archive &archive, const Relationships &relationships, const char *filepath) {
+void store(ZipArchive &archive, const Relationships &relationships, const char *filepath) {
     assert(!relationships.empty());
     // write xml with Relations
     std::stringstream stream;
@@ -159,17 +159,17 @@ void store(mz_zip_archive &archive, const Relationships &relationships, const ch
         store_relationship(stream, r.target, r.type, "rel-"+std::to_string(++counter));
     stream << "</" << RELATIONSHIPS << ">";
     std::string out = stream.str();
-    if (!mz_zip_writer_add_mem(&archive, filepath, (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION))
+    if (!archive.add_entry(filepath, out.data(), out.length()))
         throw boost::filesystem::filesystem_error("Unable to add relationships file to archive.", {});
 }
 
-tl::expected<LoadedRelations, Read3mfIssue> load_relations(mz_zip_archive &archive, const char * filepath, Read3mfIssues& collected_issues) {
-    int index = mz_zip_reader_locate_file(&archive, filepath, nullptr, 0);
+tl::expected<LoadedRelations, Read3mfIssue> load_relations(ZipArchive &archive, const char * filepath, Read3mfIssues& collected_issues) {
+    const int index = archive.locate_file(filepath);
     if (index < 0)
         return tl::make_unexpected(Read3mfIssue(Read3mfIssueType::relations_missing));
 
     mz_zip_archive_file_stat stat;
-    if (!mz_zip_reader_file_stat(&archive, index, &stat))
+    if (!archive.stat_file(index, stat))
         return tl::make_unexpected(Read3mfIssue(Read3mfIssueType::relations_unreadable));
 
     if (stat.m_uncomp_size == 0)
@@ -181,7 +181,7 @@ tl::expected<LoadedRelations, Read3mfIssue> load_relations(mz_zip_archive &archi
         return tl::make_unexpected(Read3mfIssue(Read3mfIssueType::relations_no_memmory));
     ScopeGuard sc_buffer([buffer]() { pugi::get_memory_deallocation_function()(buffer); });
 
-    if (mz_zip_reader_extract_to_mem(&archive, index, buffer, uncomp_size, 0) != MZ_TRUE)
+    if (!archive.extract_entry_to(index, buffer, uncomp_size))
         return tl::make_unexpected(Read3mfIssue(Read3mfIssueType::relations_cant_extract));
 
     pugi::xml_document doc;

@@ -349,7 +349,7 @@ void apply(const BuildTicket         &build_ticket,
 
 namespace Slic3r {
 void process_build_ticket(
-    mz_zip_archive &archive,
+    ZipArchive &archive,
     const mz_zip_archive_file_stat &stat,
     const format_3MF::CT_Items &items,
     const InstanceMap &instance_map,
@@ -362,7 +362,7 @@ void process_build_ticket(
         return;
     }
 
-    if (mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, file_data.get(), stat.m_uncomp_size, 0) != MZ_TRUE) {
+    if (!archive.extract_entry_to(stat.m_file_index, file_data.get(), stat.m_uncomp_size)) {
         SPDLOG_ERROR("Can't extract build ticket file to memory");
         return;
     }

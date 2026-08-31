@@ -55,21 +55,19 @@ namespace{
 using NamesType = const std::vector<std::string_view>;
 using RT = Read3mfIssueType; // shorting name
 
-void write_file(mz_zip_archive &archive, const json &data, const char *filepath) {
+void write_file(ZipArchive &archive, const json &data, const char *filepath) {
     if (data.empty())
         return; // Do not store empty files
 
     int indentation = 2; // two spaces indentation
     std::string data_str = Biz::beautify_json(data, indentation);
-    if (!mz_zip_writer_add_mem(&archive, filepath, 
-        (const void *) data_str.data(), data_str.length(), MZ_DEFAULT_COMPRESSION))
+    if (!archive.add_entry(filepath, data_str.data(), data_str.length()))
         throw boost::filesystem::filesystem_error( std::string() +
             "Unable to add \"" + filepath + "\" file into archive.", {});
 }
 
-void write_svg_file(mz_zip_archive &archive, const std::string &filepath, const std::string &file_data_str) {
-    if(!mz_zip_writer_add_mem(&archive, filepath.c_str(), 
-        (const void *) file_data_str.c_str(), file_data_str.size(), MZ_DEFAULT_COMPRESSION))
+void write_svg_file(ZipArchive &archive, const std::string &filepath, const std::string &file_data_str) {
+    if(!archive.add_entry(filepath, file_data_str.c_str(), file_data_str.size()))
         throw boost::filesystem::filesystem_error("Unable to add svg file to archive.", {});
 }
 
@@ -474,7 +472,7 @@ constexpr std::string_view USE_SURFACE = "use_surface";
 
 const NamesType NAMES = {{SHAPE_SCALE, UNHEALED, SVG_FILE_PATH, SVG_FILE_PATH_IN_3MF, DEPTH, USE_SURFACE}};
 
-void write_svg_files(mz_zip_archive &archive, const Domain::Model &model) {
+void write_svg_files(ZipArchive &archive, const Domain::Model &model) {
     // write only first appear of svg
     std::set<std::string> paths;
     for (const ModelObject *mo_ptr : model.objects) {
@@ -680,7 +678,7 @@ constexpr unsigned int FUZZY_SKIN_FACETS_VERSION      = 2;
 constexpr std::string_view TRIANGLE = "triangle"; // index into mesh(specifiead by ID) triangles
 constexpr std::string_view DIVIDING = "dividing";
 NamesType FACET_NAMES{{TRIANGLE, DIVIDING}};
-void write(mz_zip_archive &archive, const Domain::Model &model, const VolumeToObjectid &v2id) {
+void write(ZipArchive &archive, const Domain::Model &model, const VolumeToObjectid &v2id) {
     auto facets_to_json = [](const Domain::FacetsAnnotation &facets, int triangle_count) {
         if (facets.empty())
             return json{};
@@ -1557,8 +1555,8 @@ struct ResultLoadJson {
     json parsed_json;
 };
 
-tl::expected<ResultLoadJson, Read3mfIssue> load_json(mz_zip_archive &archive, const char *filename, RT issue_type) {
-    int facets_file_index = mz_zip_reader_locate_file(&archive, filename, nullptr, 0);
+tl::expected<ResultLoadJson, Read3mfIssue> load_json(ZipArchive &archive, const char *filename, RT issue_type) {
+    int facets_file_index = archive.locate_file(filename);
     if (facets_file_index < 0)
         return {}; // No facets stored in 3mf
 
@@ -1567,7 +1565,7 @@ tl::expected<ResultLoadJson, Read3mfIssue> load_json(mz_zip_archive &archive, co
     };
 
     mz_zip_archive_file_stat stat;
-    if (!mz_zip_reader_file_stat(&archive, facets_file_index, &stat))
+    if (!archive.stat_file(facets_file_index, stat))
         return tl::make_unexpected(create_issue("mz_zip_reader_file_stat"));
 
     if (stat.m_uncomp_size == 0)
@@ -1575,8 +1573,7 @@ tl::expected<ResultLoadJson, Read3mfIssue> load_json(mz_zip_archive &archive, co
 
     size_t uncomp_size = static_cast<size_t>(stat.m_uncomp_size);
     std::unique_ptr<char[]> buffer(new char[uncomp_size+1]);
-    if (mz_zip_reader_extract_to_mem(&archive, facets_file_index, buffer.get(), uncomp_size, 0) !=
-        MZ_TRUE)
+    if (!archive.extract_entry_to(facets_file_index, buffer.get(), uncomp_size))
         return tl::make_unexpected(create_issue("mz_zip_reader_extract_to_mem"));
 
     // json must be null terminated
@@ -1603,7 +1600,7 @@ using namespace Slic3r::Biz::Format::ProjectFileConstants;
 NamesType PROJECT_NAMES{{PROJECT_METADATA, CONFIGURATION, PRESET_METADATA, OBJECTS}};
 
 void write(
-    mz_zip_archive &archive,
+    ZipArchive &archive,
     const Model &model,
     const Domain::ProjectMetadata& project_metadata,
     const Domain::Project::ConfigContainerList& config_containers,
@@ -1796,7 +1793,7 @@ void load(
 } // namespace
 
 void Slic3r::store_prusa_files(
-    mz_zip_archive &archive,
+    ZipArchive &archive,
     const Model &model,
     const Domain::ProjectMetadata& project_metadata,
     const Domain::Project::ConfigContainerList& config_containers,
@@ -1808,12 +1805,12 @@ void Slic3r::store_prusa_files(
 }
 
 PrusaFilesResult Slic3r::load_prusa_files(
-    mz_zip_archive &archive,
+    ZipArchive &archive,
     const ModelMap &model_map,
     Read3mfIssues& collected_issues
 ) {
     PrusaFilesResult result;
-    result.used_file_indices = std::vector<bool>(mz_zip_reader_get_num_files(&archive), {false});
+    result.used_file_indices = std::vector<bool>(archive.get_num_files(), {false});
 
     auto get_json = [&archive, &collected_issues, &result](const char *filename, RT err_type)->std::optional<json> {
         tl::expected<ResultLoadJson, Read3mfIssue> result_json = load_json(archive, filename, err_type);
@@ -1851,8 +1848,8 @@ PrusaFilesResult Slic3r::load_prusa_files(
 }
 
 bool Slic3r::process_embossed_svg(
-    mz_zip_archive &archive, const mz_zip_archive_file_stat &stat, 
-    Slic3r::Domain::Model &model, Read3mfIssues& collected_issues) 
+    ZipArchive &archive, const mz_zip_archive_file_stat &stat,
+    Slic3r::Domain::Model &model, Read3mfIssues& collected_issues)
 {
     std::shared_ptr<std::string> data = nullptr;
     std::string filename(stat.m_filename);
@@ -1871,8 +1868,8 @@ bool Slic3r::process_embossed_svg(
 
         if (data == nullptr) { // first useage --> load data
             auto file = std::make_unique<std::string>(stat.m_uncomp_size, '\0');
-            mz_bool res  = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void *) file->data(), stat.m_uncomp_size, 0);
-            if (res == 0) {
+            bool res = archive.extract_entry_to(stat.m_file_index, (void *) file->data(), stat.m_uncomp_size);
+            if (!res) {
                 collected_issues.add_issue(Read3mfIssue(RT::cant_load_zip_file, filename));
                 // it is used svg file but can't be readed from archive.
                 return true; 
