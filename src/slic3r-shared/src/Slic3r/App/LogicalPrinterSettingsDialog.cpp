@@ -135,6 +135,11 @@ void LogicalPrinterSettingsDialog::
     this->update_color_mix_visibility();
 }
 
+void LogicalPrinterSettingsDialog::on_preset_bundles_loaded()
+{
+    update_warning();
+}
+
 void LogicalPrinterSettingsDialog::update_warning()
 {
     m_warning->set_visible(m_project_interactor.preset_interactor().has_invalid_hw_config());

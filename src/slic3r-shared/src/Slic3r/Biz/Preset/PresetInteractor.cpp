@@ -215,8 +215,9 @@ void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bu
             upgrade_hw_config_features(hw_config);
         }
 
-        if (p.invalid_hw_config.has_value()) {
-            upgrade_hw_config_features(p.invalid_hw_config.value());
+        if (p.invalid_hw_config.has_value() && p.invalid_hw_config->vendor_id == vendor_id) {
+            p.invalid_hw_config = std::nullopt;
+            change_hw_config_and_validate(p.project_id, [](auto&){});
         }
     }
 
@@ -2216,29 +2217,21 @@ void PresetInteractor::duplicate_hw_config_if_needed_and_update(
 
 bool PresetInteractor::select_printer_tool_item(size_t tool_index, const std::string& id, bool user)
 {
-    auto& selected_preset = mutable_selected_printer_preset();
-    auto& p = get_or_fail_project_context(m_selected_project_id);
+    auto modifier = [&](Domain::Preset::HwPrinterConfig& hw_config)
+    {
+        const auto& vendor_data =
+            m_workbench.preset_bundle().vendor_bundles.at(hw_config.vendor_id).vendor_data;
+        const auto* tool_def = vendor_data.find_tool_config_def_by_id(id);
+        ASSERT(tool_def != nullptr, id);
+        hw_config.tools.at(tool_index) = from_def(vendor_data, *tool_def);
+        hw_config.name       = Domain::Preset::suggest_name(hw_config, vendor_data, false);
+        hw_config.short_name = Domain::Preset::suggest_name(hw_config, vendor_data, true);
+    };
 
-    // we continue with p.invalid_hw_config if it is set (e.g. from previous call)
-    // and it matches the id of selected config container (i.e. no printer was changed)
-    const bool use_invalid_hw_config =
-        p.invalid_hw_config.has_value() && selected_preset.hw_config.id == p.invalid_hw_config->id;
-    auto hw_config =
-        use_invalid_hw_config ? p.invalid_hw_config.value() : selected_preset.hw_config;
-    const auto& vendor_data =
-        m_workbench.preset_bundle().vendor_bundles.at(hw_config.vendor_id).vendor_data;
-    const auto* tool_def = vendor_data.find_tool_config_def_by_id(id);
-    ASSERT(tool_def != nullptr, id);
-    hw_config.tools.at(tool_index) = from_def(vendor_data, *tool_def);
-    hw_config.name                 = Domain::Preset::suggest_name(hw_config, vendor_data, false);
-    hw_config.short_name           = Domain::Preset::suggest_name(hw_config, vendor_data, true);
+    const bool successfully_changed =
+        change_hw_config_and_validate(m_selected_project_id, modifier);
 
-    const bool successfully_changed = update_changed_selected_preset_hw_config(hw_config);
-    if (!successfully_changed) {
-        p.invalid_hw_config = hw_config;
-    } else {
-        selected_preset.hw_config = hw_config;
-        p.invalid_hw_config = std::nullopt;
+    if (successfully_changed) {
 
         const auto& ccc = selected_config_container_context();
         const Domain::SelectionId config_container_id{ccc.config_container_id};
@@ -2265,30 +2258,19 @@ bool PresetInteractor::select_printer_tool_item(size_t tool_index, const std::st
 
 bool PresetInteractor::select_printer_sheet(const std::string& id, bool user)
 {
-    auto& p = get_or_fail_project_context(m_selected_project_id);
-    auto& selected_preset = mutable_selected_printer_preset();
+    auto modifier = [&](Domain::Preset::HwPrinterConfig& hw_config)
+    {
+        const auto& vendor_data =
+            m_workbench.preset_bundle().vendor_bundles.at(hw_config.vendor_id).vendor_data;
+        const auto* sheet_def = vendor_data.find_sheet_config_def_by_id(id);
+        ASSERT(sheet_def != nullptr, id);
 
-    const auto& vendor_data = m_workbench.preset_bundle()
-                                  .vendor_bundles.at(selected_preset.hw_config.vendor_id)
-                                  .vendor_data;
-    const auto* sheet_def = vendor_data.find_sheet_config_def_by_id(id);
-    ASSERT(sheet_def != nullptr, id);
+        hw_config.sheet = from_def(vendor_data, *sheet_def);
+    };
 
-    // we continue with p.invalid_hw_config if it is set (e.g. from previous call)
-    // and it matches the id of selected config container (i.e. no printer was changed)
-    const bool use_invalid_hw_config =
-        p.invalid_hw_config.has_value() && selected_preset.hw_config.id == p.invalid_hw_config->id;
-    auto hw_config =
-        use_invalid_hw_config ? p.invalid_hw_config.value() : selected_preset.hw_config;
-
-    hw_config.sheet = from_def(vendor_data, *sheet_def);
-    const bool successfully_changed = update_changed_selected_preset_hw_config(hw_config);
-    if (!successfully_changed) {
-        p.invalid_hw_config = hw_config;
-    } else {
-        selected_preset.hw_config = hw_config;
-        p.invalid_hw_config = std::nullopt;
-
+    const bool successfully_changed =
+        change_hw_config_and_validate(m_selected_project_id, modifier);
+    if (successfully_changed) {
         const auto& ccc = selected_config_container_context();
         const Domain::SelectionId config_container_id{ccc.config_container_id};
         invoke_listeners<IPresetChangedListener>(
@@ -2308,6 +2290,39 @@ bool PresetInteractor::select_printer_sheet(const std::string& id, bool user)
     }
 
     return successfully_changed;
+}
+
+bool PresetInteractor::change_hw_config_and_validate(
+    Domain::SelectionId project_id,
+    const std::function<void(Domain::Preset::HwPrinterConfig&)>& modifier
+)
+{
+    auto& p = get_or_fail_project_context(project_id);
+    auto* cc =
+        m_workbench.project(project_id).find_config_container(p.selected_config_container_id);
+
+    ASSERT(cc != nullptr);
+    auto& selected_preset = cc->mutable_selected_preset();
+
+    // we continue with p.invalid_hw_config if it is set (e.g. from previous call)
+    // and it matches the id of selected config container (i.e. no printer was changed)
+    const bool use_invalid_hw_config =
+        p.invalid_hw_config.has_value() && selected_preset.hw_config.id == p.invalid_hw_config->id;
+    auto hw_config =
+        use_invalid_hw_config ? p.invalid_hw_config.value() : selected_preset.hw_config;
+
+    modifier(hw_config);
+
+    const bool successfully_changed = update_changed_selected_preset_hw_config(hw_config);
+    if (!successfully_changed) {
+        p.invalid_hw_config = hw_config;
+    } else {
+        selected_preset.hw_config = hw_config;
+        p.invalid_hw_config = std::nullopt;
+    }
+
+    return successfully_changed;
+
 }
 
 Domain::Preset::PresetNames PresetInteractor::get_all_vendor_preset_names(

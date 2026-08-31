@@ -986,6 +986,8 @@ private:
 
     void delete_preset(Domain::Preset::PresetKind kind, const std::string& preset_ids);
 
+    bool change_hw_config_and_validate(Domain::SelectionId project_id, const std::function<void(Domain::Preset::HwPrinterConfig&)>& modifier);
+
 private:
     using SetAccessorMap = std::map<const OverridableConfigBoxInteractor*, OverridableConfigBoxInteractor::SetAccessor>;
 

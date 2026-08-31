@@ -84,7 +84,7 @@ private:
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id
     ) override;
-
+    void on_preset_bundles_loaded() override;
 protected:
     void close_action() override;
 
