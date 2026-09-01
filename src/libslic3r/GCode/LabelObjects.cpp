@@ -192,7 +192,7 @@ std::string LabelObjects::all_objects_header() const
     out += "\n";
     for (const LabelData& label : m_label_data) {
         if (m_label_objects_style == LabelObjectsStyle::Firmware && m_flavor == gcfKlipper)
-            out += "EXCLUDE_OBJECT_DEFINE NAME='" + label.name + "' CENTER=" + label.center + " POLYGON=" + label.polygon + "\n";
+            out += "EXCLUDE_OBJECT_DEFINE NAME='" + label.name + "-" + std::to_string(label.unique_id) + "' CENTER=" + label.center + " POLYGON=" + label.polygon + "\n";
         else {
             out += start_object(*label.pi, IncludeName::Yes);
             out += stop_object(*label.pi);
@@ -238,7 +238,7 @@ std::string LabelObjects::start_object(const PrintInstance& print_instance, Incl
             }
             out += "\n";
         } else if (m_flavor == gcfKlipper)
-            out += "EXCLUDE_OBJECT_START NAME='" + label.name + "'\n";
+            out += "EXCLUDE_OBJECT_START NAME='" +  label.name + "-" + std::to_string(label.unique_id) + "'\n";
         else {
             // Not supported by / implemented for the other firmware flavors.
         }
@@ -262,7 +262,7 @@ std::string LabelObjects::stop_object(const PrintInstance& print_instance) const
         if (m_flavor == GCodeFlavor::gcfMarlinFirmware || m_flavor == GCodeFlavor::gcfMarlinLegacy || m_flavor == GCodeFlavor::gcfRepRapFirmware)
             out += std::string("M486 S-1\n");
         else if (m_flavor ==gcfKlipper)
-            out += "EXCLUDE_OBJECT_END NAME='" + label.name + "'\n";
+            out += "EXCLUDE_OBJECT_END NAME='" +  label.name + "-" + std::to_string(label.unique_id) + "'\n";
         else {
             // Not supported by / implemented for the other firmware flavors.
         }
