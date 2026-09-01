@@ -17,6 +17,7 @@
 #include "Plater.hpp"
 #include "BitmapCache.hpp"
 #include "Camera.hpp"
+#include "wxExtensions.hpp"
 
 #include "Gizmos/GLGizmoMmuSegmentation.hpp"
 
@@ -845,8 +846,11 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
                 glsafe(::glFrontFace(GL_CW));
 
             const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
-            const size_t extruder_idx = ModelVolume::get_extruder_color_idx(model_volume, GUI::wxGetApp().extruders_edited_cnt());
-
+            const int physical_cnt          = GUI::wxGetApp().extruders_edited_cnt();
+            const FullSpectrum::VirtualExtruders& virtual_extruders =
+                model_objects[obj_idx]->get_model()->virtual_extruders;
+            const size_t extruder_idx =
+                GUI::get_extruder_color_idx(model_volume, physical_cnt, virtual_extruders);
 
             // This block retrieves the painted geometry from the cache or adds it to it.
             ObjectID vol_id = model_volume.id();
@@ -1014,17 +1018,47 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
         }
     }
 
+    const size_t physical_cnt = colors.size();
+    const FullSpectrum::VirtualExtruders& virtual_extruders =
+        GUI::wxGetApp().plater()->model().virtual_extruders;
+    if (!virtual_extruders.empty()) {
+        std::vector<std::string> phys_color_strs;
+        phys_color_strs.reserve(physical_cnt);
+        for (const ColorItem& c : colors) {
+            phys_color_strs.push_back(c.first);
+        }
+
+        for (const FullSpectrum::VirtualExtruder& ve : virtual_extruders) {
+            const std::string eff = ve.effective_color(phys_color_strs);
+            ColorRGB rgb;
+            if (!eff.empty() && decode_color(eff, rgb)) {
+                colors.push_back({eff, rgb});
+            } else {
+                colors.push_back({"#808080", {0.5f, 0.5f, 0.5f}});
+            }
+        }
+    }
+
     for (GLVolume* volume : volumes) {
         if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower() || volume->is_sla_pad() || volume->is_sla_support())
             continue;
 
-        int extruder_id = volume->extruder_id - 1;
-        if (extruder_id < 0 || (int)colors.size() <= extruder_id)
-            extruder_id = 0;
+        const int ext_id = volume->extruder_id;
+        size_t color_idx = 0;
+        if (ext_id > 0 && size_t(ext_id) <= physical_cnt) {
+            color_idx = size_t(ext_id - 1);
+        } else if (ext_id > 0) {
+            for (size_t i = 0; i < virtual_extruders.size(); ++i) {
+                if (int(virtual_extruders[i].id) == ext_id) {
+                    color_idx = physical_cnt + i;
+                    break;
+                }
+            }
+        }
 
-        const ColorItem& color = colors[extruder_id];
-        if (!color.first.empty())
-            volume->color = to_rgba(color.second, volume->color.a());
+        if (color_idx < colors.size() && !colors[color_idx].first.empty()) {
+            volume->color = to_rgba(colors[color_idx].second, volume->color.a());
+        }
     }
 }
 

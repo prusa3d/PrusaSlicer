@@ -14,8 +14,8 @@ on:
 
 jobs:
   bundle_flatpak:
-    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/get_release_flatpak_manifest.yml@master
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/get_release_flatpak_manifest.yml@legacy
     secrets: inherit
     with:
-      actions_branch: master
+      actions_branch: legacy
       tag: ${{ inputs.tag || github.ref_name }}

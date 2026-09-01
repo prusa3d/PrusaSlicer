@@ -39,6 +39,7 @@ namespace Slic3r {
         Travel,
         Wipe,
         Extrude,
+        Flush,
         Count
     };
 
@@ -67,6 +68,8 @@ namespace Slic3r {
         std::map<size_t, double>                                volumes_per_extruder;
         std::map<GCodeExtrusionRole, std::pair<double, double>> used_filaments_per_role;
         std::map<size_t, double>                                cost_per_extruder;
+        std::map<size_t, double>                                wipe_tower_per_extruder;
+        std::map<size_t, double>                                flush_per_extruder;
 
         std::array<Mode, static_cast<size_t>(ETimeMode::Count)> modes;
 
@@ -81,6 +84,8 @@ namespace Slic3r {
             volumes_per_extruder.clear();
             used_filaments_per_role.clear();
             cost_per_extruder.clear();
+            wipe_tower_per_extruder.clear();
+            flush_per_extruder.clear();
         }
     };
 
@@ -172,6 +177,7 @@ namespace Slic3r {
     class GCodeProcessor
     {
         static const std::vector<std::string> Reserved_Tags;
+        static const std::vector<std::string> Custom_Tags;
 
     public:
         enum class ETags : unsigned char
@@ -190,7 +196,24 @@ namespace Slic3r {
             Estimated_Printing_Time_Placeholder
         };
 
-        static const std::string& reserved_tag(ETags tag) { return Reserved_Tags[static_cast<unsigned char>(tag)]; }
+        enum class CustomETags : unsigned char
+        {
+            Flush_Start,
+            Flush_End,
+            Exclude_E_Start,
+            Exclude_E_End,
+        };
+
+        static const std::string& reserved_tag(ETags tag)
+        {
+            return Reserved_Tags[static_cast<unsigned char>(tag)];
+        }
+
+        static const std::string& custom_tag(CustomETags tag)
+        {
+            return Custom_Tags[static_cast<unsigned char>(tag)];
+        }
+
         // checks the given gcode for reserved tags and returns true when finding the 1st (which is returned into found_tag) 
         static bool contains_reserved_tag(const std::string& gcode, std::string& found_tag);
         // checks the given gcode for reserved tags and returns true when finding any
@@ -296,6 +319,7 @@ namespace Slic3r {
                 float safe_feedrate; // mm/s
                 AxisCoords axis_feedrate; // mm/s
                 AxisCoords abs_axis_feedrate; // mm/s
+                Vec4f jd_unit_vec;
 
                 void reset();
             };
@@ -403,6 +427,8 @@ namespace Slic3r {
 
             double tool_change_cache;
             std::map<size_t, double> volumes_per_extruder;
+            std::map<size_t, double> wipe_tower_per_extruder;
+            std::map<size_t, double> flush_per_extruder;
 
             double role_cache;
             std::map<GCodeExtrusionRole, std::pair<double, double>> filaments_per_role; // ExtrusionRole -> (m, g)
@@ -410,6 +436,8 @@ namespace Slic3r {
             void reset();
 
             void increase_caches(double extruded_volume, unsigned char extruder_id, double parking_volume, double extra_loading_volume);
+
+            void update_flush_per_extruder(double flushed_volume, unsigned char extruder_id);
 
             void process_color_change_cache();
             void process_extruder_cache(unsigned char extruder_id);
@@ -527,6 +555,8 @@ namespace Slic3r {
         ExtruderTemps m_extruder_temps_config;
         ExtruderTemps m_extruder_temps_first_layer_config;
         bool  m_is_XL_printer = false;
+        bool  m_flushing      = false;
+        bool  m_exclude_e     = false;
         float m_parking_position;
         float m_extra_loading_move;
         float m_extruded_last_z;
@@ -759,6 +789,7 @@ namespace Slic3r {
         float get_axis_max_feedrate(PrintEstimatedStatistics::ETimeMode mode, Axis axis) const;
         float get_axis_max_acceleration(PrintEstimatedStatistics::ETimeMode mode, Axis axis) const;
         float get_axis_max_jerk(PrintEstimatedStatistics::ETimeMode mode, Axis axis) const;
+        float get_junction_deviation(PrintEstimatedStatistics::ETimeMode mode) const;
         float get_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;
         void  set_retract_acceleration(PrintEstimatedStatistics::ETimeMode mode, float value);
         float get_acceleration(PrintEstimatedStatistics::ETimeMode mode) const;
@@ -780,6 +811,7 @@ namespace Slic3r {
 
         double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
 
+        float calc_junction_acceleration(const TimeBlock &block, const Vec4f &junction_vector, PrintEstimatedStatistics::ETimeMode mode) const;
    };
 
 } /* namespace Slic3r */

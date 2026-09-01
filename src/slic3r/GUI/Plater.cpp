@@ -69,6 +69,7 @@
 #include "libslic3r/Format/OBJ.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Feature/FullSpectrum/VirtualExtruder.hpp"
 #include "libslic3r/SLA/SupportPoint.hpp"
 #include "libslic3r/SLA/ReprojectPointsOnMesh.hpp"
 #include "libslic3r/Print.hpp"
@@ -80,6 +81,7 @@
 #include "libslic3r/ModelProcessing.hpp"
 #include "libslic3r/FileReader.hpp"
 #include "libslic3r/MultipleBeds.hpp"
+#include "libslic3r/SLA/Workflows.hpp"
 
 // For stl export
 #include "libslic3r/CSGMesh/ModelToCSGMesh.hpp"
@@ -179,6 +181,7 @@ wxDEFINE_EVENT(EVT_SLICING_COMPLETED,               wxCommandEvent);
 wxDEFINE_EVENT(EVT_PROCESS_COMPLETED,               SlicingProcessCompletedEvent);
 wxDEFINE_EVENT(EVT_EXPORT_BEGAN,                    wxCommandEvent);
 wxDEFINE_EVENT(EVT_REGENERATE_BED_THUMBNAILS, SimpleEvent);
+wxDEFINE_EVENT(EVT_RELOAD_SLA_WORKFLOWS, SimpleEvent);
 
 // Plater::DropTarget
 
@@ -195,6 +198,28 @@ private:
     MainFrame& m_mainframe;
     Plater& m_plater;
 };
+
+static std::optional<std::string> http_get_file_as_string(const std::string& url)
+{
+    std::optional<std::string> out;
+    bool res = false;
+	auto http = Http::get(url);
+    http
+		.timeout_max(5)
+        .on_error([&](std::string body, std::string error, unsigned http_status) {
+            BOOST_LOG_TRIVIAL(error) << "Unable to fetch file (" << url << "): "
+            << http_status << " (" << error << ")";
+        })
+		.on_complete([&](std::string body, unsigned http_status) {
+            if (http_status == 200)
+                out = body;
+		})
+        .perform_sync();
+    
+    return out;
+}
+
+
 
 namespace {
 bool emboss_svg(Plater& plater, const wxString &svg_file, const Vec2d& mouse_drop_position)
@@ -217,7 +242,35 @@ bool emboss_svg(Plater& plater, const wxString &svg_file, const Vec2d& mouse_dro
 
     return svg->create_volume(svg_file_str, mouse_drop_position, ModelVolumeType::MODEL_PART);
 }
+
+void apply_full_spectrum_physical_colors(
+    const std::vector<std::string>& physical_colors,
+    Plater* plater,
+    Sidebar* sidebar
+)
+{
+    Tab* printer_tab = wxGetApp().get_tab(Preset::TYPE_PRINTER);
+    ConfigOptionStrings* colors =
+        printer_tab->get_config()->option<ConfigOptionStrings>("extruder_colour");
+    if (colors == nullptr || colors->values.empty()) {
+        return;
+    }
+
+    const size_t n = std::min(physical_colors.size(), colors->values.size());
+    for (size_t i = 0; i < n; ++i) {
+        if (!physical_colors[i].empty()) {
+            colors->values[i] = physical_colors[i];
+        }
+    }
+
+    DynamicPrintConfig new_cfg = *printer_tab->get_config();
+    printer_tab->load_config(new_cfg);
+    plater->on_config_change(new_cfg);
+    plater->force_filament_colors_update();
+    sidebar->update_presets(Preset::TYPE_FILAMENT);
 }
+
+} // namespace
 
 bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &filenames)
 {
@@ -273,6 +326,7 @@ struct Plater::priv
     Slic3r::Model               model;
     PrinterTechnology           printer_technology = ptFFF;
     std::vector<Slic3r::GCodeProcessorResult> gcode_results;
+    std::unique_ptr<sla::WorkflowManager> workflow_manager;
 
     // GUI elements
     wxSizer* panel_sizer{ nullptr };
@@ -592,6 +646,8 @@ struct Plater::priv
     std::string                 last_output_dir_path;
     bool                        inside_snapshot_capture() { return m_prevent_snapshots != 0; }
 
+    void fetch_workflows_file_online_start();
+
 private:
     bool layers_height_allowed() const;
 
@@ -651,8 +707,29 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     , m_project_filename(wxEmptyString)
 {}
 
+void Plater::priv::fetch_workflows_file_online_start()
+{
+    workflow_manager->fetch_workflows_file_online_in_background(
+        http_get_file_as_string,
+        [this](Semver){
+            // This callback is run in background thread after an update fetches a new file.
+            // Just fire a wxWidgets event to invoke the callback in the UI thread.
+            wxQueueEvent(this->q, new SimpleEvent(EVT_RELOAD_SLA_WORKFLOWS));
+        }
+    );
+}
+
 void Plater::priv::init()
 {
+    workflow_manager = std::make_unique<sla::WorkflowManager>();
+    q->Bind(EVT_RELOAD_SLA_WORKFLOWS, [this](SimpleEvent&) {
+        workflow_manager = std::make_unique<sla::WorkflowManager>();
+        sidebar->update_workflow_combobox_if_needed();
+        sidebar->on_workflow_changed();
+    });
+    q->fetch_workflows_file_online_start();
+    
+
     for (int i = 0; i < s_multiple_beds.get_max_beds(); ++i) {
         gcode_results.emplace_back();
         fff_prints.emplace_back(std::make_unique<Print>());
@@ -1072,6 +1149,9 @@ void Plater::priv::init()
             fclose(file);
             this->main_frame->refresh_account_menu(true);
         }); 
+        this->q->Bind(EVT_UA_PRINTABLES_SECRET_TOKEN_SUCCESS, [this](UserAccountSuccessEvent& evt) {
+            main_frame->on_printables_secret_token(evt.data);
+        });
         this->q->Bind(EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, [this](UserAccountSuccessEvent& evt) {
             this->user_account->set_current_printer_data(evt.data);
             wxGetApp().handle_connect_request_printer_select_inner(evt.data);
@@ -1372,9 +1452,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
         FileReader::LoadStats load_stats;
 
+        FullSpectrum::FullSpectrumConfig fs_config;
         try {
             if (load_config) {
-                model = FileReader::load_model_with_config(path.string(), &config_loaded, &config_substitutions, prusaslicer_generator_version, FileReader::LoadAttribute::CheckVersion, &load_stats);
+                model = FileReader::load_model_with_config(path.string(), &config_loaded, &config_substitutions, prusaslicer_generator_version, FileReader::LoadAttribute::CheckVersion, &load_stats, &fs_config);
             }
             else if (load_model) {
                 if (type_step) {
@@ -1459,7 +1540,19 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
 
             this->model.get_custom_gcode_per_print_z_vector() = model.get_custom_gcode_per_print_z_vector();
-            this->model.get_wipe_tower_vector() = model.get_wipe_tower_vector();
+            this->model.get_wipe_tower_vector()               = model.get_wipe_tower_vector();
+            this->model.get_virtual_extruders()               = model.get_virtual_extruders();
+
+            FullSpectrum::remap_full_spectrum_on_import(
+                model,
+                this->model.get_virtual_extruders(),
+                static_cast<unsigned int>(nozzle_dmrs->values.size()),
+                fs_config
+            );
+
+            if (!fs_config.physical_colors.empty() && !this->model.virtual_extruders.empty()) {
+                apply_full_spectrum_physical_colors(fs_config.physical_colors, q, this->sidebar);
+            }
 
             if (!in_temp)
                 wxGetApp().app_config->update_config_dir(path.parent_path().string());
@@ -2395,8 +2488,9 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             apply_statuses[s_multiple_beds.get_active_bed()] = invalidated;
         });
     } else if (printer_technology == ptSLA) {
+        DynamicPrintConfig original_config = wxGetApp().preset_bundle->original_config();
         with_single_bed_model_sla(q->model(), s_multiple_beds.get_active_bed(), [&](){
-            invalidated = background_process.apply(q->model(), full_config, &warnings);
+            invalidated = background_process.apply(q->model(), full_config, &warnings, &original_config);
             apply_statuses[0] = invalidated;
         });
     } else {
@@ -4400,6 +4494,10 @@ void Plater::render_project_state_debug_window() const { p->render_project_state
 Sidebar&        Plater::sidebar()           { return *p->sidebar; }
 const Model&    Plater::model() const       { return p->model; }
 Model&          Plater::model()             { return p->model; }
+
+void Plater::fetch_workflows_file_online_start() {
+    p->fetch_workflows_file_online_start();
+}
 
 bool Plater::is_project_temp() const
 {
@@ -7072,6 +7170,15 @@ std::vector<std::string> Plater::get_extruder_color_strings_from_plater_config(c
             if (extruder_colors[i] == "" && i < filament_colours.size())
                 extruder_colors[i] = filament_colours[i];
 
+        // Append virtual extruder colors in vector order (dense array).
+        // The painting gizmo and 3D preview use get_extruder_color_idx()
+        // to map actual VE IDs to dense array positions.
+        const std::vector<std::string> phys_colors(extruder_colors);
+        for (const auto& ve : p->model.virtual_extruders) {
+            const std::string eff = ve.effective_color(phys_colors);
+            extruder_colors.push_back(eff.empty() ? "#808080" : eff);
+        }
+
         return extruder_colors;
     }
 }
@@ -7746,6 +7853,11 @@ std::vector<std::unique_ptr<Print>>& Plater::get_fff_prints()
 const std::vector<GCodeProcessorResult>& Plater::get_gcode_results() const
 {
     return p->gcode_results;
+}
+
+const sla::WorkflowManager& Plater::get_workflow_manager() const
+{
+    return *p->workflow_manager;
 }
 
 wxMenu* Plater::object_menu()           { return p->menus.object_menu();            }

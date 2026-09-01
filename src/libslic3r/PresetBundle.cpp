@@ -768,6 +768,42 @@ DynamicPrintConfig PresetBundle::full_config_secure() const
     return config;
 }
 
+DynamicPrintConfig PresetBundle::original_config() const
+{
+    DynamicPrintConfig out;
+
+    if (this->printers.get_edited_preset().printer_technology() == ptFFF) {
+        // nothing to do here, we don't use it for FFF
+    } else {
+        for (const PresetCollection *pc : std::initializer_list<const PresetCollection *>{
+                 &this->sla_prints, &this->sla_materials, &this->printers
+             }) {
+
+            const Preset *original_preset = pc->get_selected_preset_parent();
+            if (!original_preset)
+                continue;
+
+            const bool is_dirty = pc->is_dirty(&pc->get_edited_preset(), original_preset);
+            if (is_dirty) {
+                auto dirty_options = pc->current_different_from_parent_options();
+                assert(dirty_options.size() > 0);
+
+                const DynamicPrintConfig &original_cfg = original_preset->config;
+
+                for (const std::string &opt_key : dirty_options) {
+                    const ConfigOption *option = original_cfg.optptr(opt_key);
+                    if (option) {
+                        out.set_key_value(opt_key, option->clone());
+                    }
+                    assert(out.optptr(opt_key)->nullable() == option->nullable());
+                }
+            }
+        }
+    }
+
+    return out;
+}
+
 DynamicPrintConfig PresetBundle::full_fff_config() const
 {    
     DynamicPrintConfig out;

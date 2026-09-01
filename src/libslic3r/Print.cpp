@@ -39,6 +39,7 @@
 #include "format.hpp"
 #include "ArrangeHelper.hpp"
 #include "CustomParametersHandling.hpp"
+#include "Feature/FullSpectrum/VirtualExtruder.hpp"
 
 #include <float.h>
 
@@ -126,6 +127,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "filament_cost",
         "filament_seam_gap_distance",
         "filament_spool_weight",
+        "filament_flush_volume",
+        "filament_flush_speed",
         "first_layer_acceleration",
         "first_layer_acceleration_over_raft",
         "first_layer_bed_temperature",
@@ -293,6 +296,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             osteps.emplace_back(posEstimateCurledExtrusions);
         } else if (opt_key == "automatic_extrusion_widths") {
             osteps.emplace_back(posPerimeters);
+        } else if (opt_key == "toolchange_ordering") {
+            steps.emplace_back(psWipeTower);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps
             //FIXME invalidate all steps of all objects as well?
@@ -342,7 +347,9 @@ std::vector<unsigned int> Print::object_extruders() const
 		for (const PrintRegion &region : object->all_regions())
         	region.collect_object_printing_extruders(*this, extruders);
     sort_remove_duplicates(extruders);
-    return extruders;
+
+    // Expand virtual extruder IDs to their physical components.
+    return FullSpectrum::expand_virtual_extruders_0based(extruders, m_virtual_extruders);
 }
 
 // returns 0-based indices of used extruders
@@ -1641,6 +1648,8 @@ const std::string PrintStatistics::TotalFilamentCostValueMask = "; total filamen
 
 const std::string PrintStatistics::TotalFilamentUsedWipeTower     = "total filament used for wipe tower [g]";
 const std::string PrintStatistics::TotalFilamentUsedWipeTowerValueMask = "; total filament used for wipe tower [g] = %.2lf\n";
+
+const std::string PrintStatistics::TotalToolchanges = "total toolchanges";
 
 
 

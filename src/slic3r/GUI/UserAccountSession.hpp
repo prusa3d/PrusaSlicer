@@ -27,6 +27,7 @@ wxDECLARE_EVENT(EVT_UA_PRUSACONNECT_STATUS_SUCCESS, UserAccountSuccessEvent);
 wxDECLARE_EVENT(EVT_UA_PRUSACONNECT_PRINTER_MODELS_SUCCESS, UserAccountSuccessEvent);
 wxDECLARE_EVENT(EVT_UA_AVATAR_SUCCESS, UserAccountSuccessEvent);
 wxDECLARE_EVENT(EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, UserAccountSuccessEvent);
+wxDECLARE_EVENT(EVT_UA_PRINTABLES_SECRET_TOKEN_SUCCESS, UserAccountSuccessEvent);
 wxDECLARE_EVENT(EVT_UA_FAIL, UserAccountFailEvent); // Soft fail - clears only after some number of fails
 wxDECLARE_EVENT(EVT_UA_RESET, UserAccountFailEvent); // Hard fail - clears all
 wxDECLARE_EVENT(EVT_UA_RACE_LOST, UserAccountFailEvent); // Hard fail - clears all
@@ -54,13 +55,14 @@ enum class UserAccountActionID {
     USER_ACCOUNT_ACTION_AVATAR_OLD,
     USER_ACCOUNT_ACTION_AVATAR_NEW,
     USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID,
+    USER_ACCOUNT_ACTION_PRINTABLES_SECRET_TOKEN,
 };
 class UserAction
 {
 public:
     UserAction(const std::string name, const std::string url, bool requires_auth_token) : m_action_name(name), m_url(url), m_requires_auth_token(requires_auth_token){}
     virtual ~UserAction() = default;
-    virtual void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const = 0;
+    virtual void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, const std::vector<std::pair<std::string, std::string>>& additional_headers) const = 0;
     bool get_requires_auth_token() { return m_requires_auth_token; }
 protected:
     std::string m_action_name;
@@ -77,7 +79,7 @@ public:
         , UserAction(name, url, requires_auth_token)
     {}
     ~UserActionGetWithEvent() {}
-    void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const override;
+    void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, const std::vector<std::pair<std::string, std::string>>& additional_headers) const override;
 private:
     wxEventType   m_succ_evt_type;
     wxEventType   m_fail_evt_type;
@@ -88,7 +90,7 @@ class UserActionPost : public UserAction
 public:
     UserActionPost(const std::string name, const std::string url, bool requires_auth_token = true) : UserAction(name, url, requires_auth_token) {}
     ~UserActionPost() {}
-    void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const override;
+    void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, const std::vector<std::pair<std::string, std::string>>& additional_headers) const override;
 };
 
 class DummyUserAction : public UserAction
@@ -96,7 +98,7 @@ class DummyUserAction : public UserAction
 public:
     DummyUserAction() : UserAction("Dummy", {}, false) {}
     ~DummyUserAction() {}
-    void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input) const override { }
+    void perform(wxEvtHandler* evt_handler, const std::string& access_token, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, const std::vector<std::pair<std::string, std::string>>& additional_headers) const override { }
 };
 
 struct ActionQueueData
@@ -105,6 +107,7 @@ struct ActionQueueData
     UserActionSuccessFn     success_callback;
     UserActionFailFn        fail_callback;
     std::string             input;
+    std::vector<std::pair<std::string, std::string>> additional_headers;
 };
 
 class UserAccountSession
@@ -134,6 +137,7 @@ public:
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_OLD] = std::make_unique<UserActionGetWithEvent>("AVATAR", sc.media_url(), EVT_UA_AVATAR_SUCCESS, EVT_UA_FAIL, false);
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_AVATAR_NEW] = std::make_unique<UserActionGetWithEvent>("AVATAR", std::string(), EVT_UA_AVATAR_SUCCESS, EVT_UA_FAIL, false);
         m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID] = std::make_unique<UserActionGetWithEvent>("USER_ACCOUNT_ACTION_CONNECT_DATA_FROM_UUID", sc.connect_printers_url(), EVT_UA_PRUSACONNECT_PRINTER_DATA_SUCCESS, EVT_UA_PRUSACONNECT_PRINTER_DATA_FAIL);
+        m_actions[UserAccountActionID::USER_ACCOUNT_ACTION_PRINTABLES_SECRET_TOKEN] = std::make_unique<UserActionPost>("PRINTABLES_SECRET_TOKEN", sc.printables_get_secret_token_url());
     }
     ~UserAccountSession()
     {
@@ -163,7 +167,7 @@ public:
 
     // Functions that automatically enable action queu processing
     void init_with_code(const std::string& code, const std::string& code_verifier);
-    void enqueue_action(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input);
+    void enqueue_action(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, std::vector<std::pair<std::string, std::string>> additional_headers);
     // Special enques, that sets callbacks.
     void enqueue_test_with_refresh();
     void enqueue_refresh(const std::string& body);
@@ -210,7 +214,7 @@ private:
     void remove_from_queue(UserAccountActionID action_id);
 
     // called from m_session_mutex protected code only
-    void enqueue_action_inner(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input);
+    void enqueue_action_inner(UserAccountActionID id, UserActionSuccessFn success_callback, UserActionFailFn fail_callback, const std::string& input, std::vector<std::pair<std::string, std::string>> additional_headers);
 
    
 

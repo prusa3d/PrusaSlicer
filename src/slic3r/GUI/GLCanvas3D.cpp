@@ -5005,7 +5005,11 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
         if (render_as_painted) {
             const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
-            const size_t extruder_idx = ModelVolume::get_extruder_color_idx(model_volume, extruders_count);
+            const int physical_cnt          = GUI::wxGetApp().extruders_edited_cnt();
+            const FullSpectrum::VirtualExtruders& virtual_extruders =
+                model_objects[obj_idx]->get_model()->virtual_extruders;
+            const size_t extruder_idx =
+                GUI::get_extruder_color_idx(model_volume, physical_cnt, virtual_extruders);
             TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
             ts.deserialize(model_volume.mm_segmentation_facets.get_data(), true);
             ts.request_update_render_data();

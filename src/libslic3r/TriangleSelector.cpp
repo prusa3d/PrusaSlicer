@@ -7,6 +7,7 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 #include <cmath>
+#include <functional>
 #include <queue>
 #include <cstring>
 
@@ -1121,6 +1122,26 @@ void TriangleSelector::set_facet(int facet_idx, TriangleStateType state) {
     m_triangles[facet_idx].set_state(state);
 }
 
+void TriangleSelector::remap_states(const std::map<TriangleStateType, TriangleStateType>& remap)
+{
+    for (Triangle& tr : m_triangles) {
+        if (!tr.valid() || tr.is_split()) {
+            continue;
+        }
+
+        if (const auto it = remap.find(tr.get_state()); it != remap.end()) {
+            tr.set_state(it->second);
+        }
+    }
+
+    for (Triangle& tr : m_triangles) {
+        if (tr.is_split() && tr.valid()) {
+            const size_t facet_idx = &tr - &m_triangles.front();
+            this->remove_useless_children(int(facet_idx));
+        }
+    }
+}
+
 // called by select_patch()->select_triangle()...select_triangle()
 // to decide which sides of the triangle to split and to actually split it calling set_division() and perform_split().
 void TriangleSelector::split_triangle(int facet_idx, const Vec3i &neighbors)
@@ -1786,12 +1807,31 @@ void TriangleSelector::get_seed_fill_contour_recursive(const int facet_idx, cons
     }
 }
 
+// Decode leaf triangle state from the first nibble's code using prefix codes:
+//   xx != 0b11:                 state = xx (states 0-2)
+//   xx == 0b11, zzzz != 0b1110: state = zzzz + 3 (states 3-16)
+//   xx == 0b11, zzzz == 0b1110: state = next 8 bits + 17 (states 17-255)
+static TriangleStateType decode_leaf_state(const int code, const std::function<int()> &next_nibble) {
+    if ((code & 0b1100) != 0b1100) {
+        return TriangleStateType(code >> 2);
+    }
+
+    if (const int second_nibble = next_nibble(); second_nibble != 0b1110) {
+        return TriangleStateType(second_nibble + 3);
+    }
+
+    const int lo_nibble = next_nibble();
+    const int hi_nibble = next_nibble();
+    return TriangleStateType((lo_nibble | (hi_nibble << 4)) + 17);
+}
+
 TriangleSelector::TriangleSplittingData TriangleSelector::serialize() const {
     // Each original triangle of the mesh is assigned a number encoding its state
-    // or how it is split. Each triangle is encoded by 4 bits (xxyy) or 8 bits (zzzzxxyy):
-    // leaf triangle: xx = TriangleStateType (Only values 0, 1, and 2. Value 3 is used as an indicator for additional 4 bits.), yy = 0
-    // leaf triangle: xx = 0b11, yy = 0b00, zzzz = TriangleStateType (subtracted by 3)
-    // non-leaf:      xx = special side, yy = number of split sides
+    // or how it is split. Each triangle is encoded by 4, 8, or 16 bits:
+    // leaf triangle (states 0-2):    xxyy             where xx = TriangleStateType, yy = 0b00
+    // leaf triangle (states 3-16):   zzzzxxyy         where xx = 0b11 (indicator for additional 4 bits), yy = 0b00, zzzz = (TriangleStateType - 3)
+    // leaf triangle (states 17-255): vvvvvvvvzzzzxxyy where xx = 0b11, yy = 0b00, zzzz = 0b1110 (indicator for additional 8 bits), vvvvvvvv = (TriangleStateType - 17)
+    // non-leaf:                      xxyy             where xx = special side, yy = number of split sides
     // These are bitwise appended and formed into one 64-bit integer.
 
     // The function returns a map from original triangle indices to
@@ -1808,7 +1848,7 @@ TriangleSelector::TriangleSplittingData TriangleSelector::serialize() const {
             const Triangle& tr = triangle_selector->m_triangles[facet_idx];
 
             // Always save number of split sides. It is zero for unsplit triangles.
-            int split_sides = tr.number_of_split_sides();
+            const int split_sides = tr.number_of_split_sides();
             assert(split_sides >= 0 && split_sides <= 3);
 
             data.bitstream.push_back(split_sides & 0b01);
@@ -1828,18 +1868,31 @@ TriangleSelector::TriangleSplittingData TriangleSelector::serialize() const {
                     this->serialize(tr.children[child_idx]);
             } else {
                 // In case this is leaf, we better save information about its state.
-                int n = int(tr.get_state());
-                if (n < static_cast<int>(TriangleStateType::Count))
+                const int n = static_cast<int>(tr.get_state());
+                if (n < static_cast<int>(TRIANGLE_STATE_TYPE_COUNT)) {
                     data.used_states[n] = true;
+                }
 
                 if (n >= 3) {
-                    assert(n <= 16);
+                    assert(n < static_cast<int>(TRIANGLE_STATE_TYPE_COUNT)),
+
+                    // Store "11" plus 4 bits of (n-3) or 8 bits (n-17).
+                    // All extended states start with the xx=11 indicator nibble.
+                    data.bitstream.insert(data.bitstream.end(), { true, true });
+
                     if (n <= 16) {
-                        // Store "11" plus 4 bits of (n-3).
-                        data.bitstream.insert(data.bitstream.end(), { true, true });
-                        n -= 3;
-                        for (size_t bit_idx = 0; bit_idx < 4; ++bit_idx)
-                            data.bitstream.push_back(n & (uint64_t(0b0001) << bit_idx));
+                        const uint8_t encoded = n - 3;
+                        for (size_t bit_idx = 0; bit_idx < 4; ++bit_idx) {
+                            data.bitstream.push_back(encoded & (1 << bit_idx));
+                        }
+                    } else if (n <= 255) {
+                        // Store "0111" plus 8 bits of (n-17).
+                        const uint8_t encoded = n - 17;
+                        data.bitstream.insert(data.bitstream.end(), { false, true, true, true });
+
+                        for (size_t bit_idx = 0; bit_idx < 8; ++bit_idx) {
+                            data.bitstream.push_back(encoded & (1 << bit_idx));
+                        }
                     }
                 } else {
                     // Simple case, compatible with PrusaSlicer 2.3.1 and older for storing paint on supports and seams.
@@ -1894,7 +1947,7 @@ void TriangleSelector::deserialize(const TriangleSplittingData &data, bool needs
     for (auto [triangle_id, ibit] : data.triangles_to_split) {
         assert(triangle_id < int(m_triangles.size()));
         assert(ibit < int(data.bitstream.size()));
-        auto next_nibble = [&data, &ibit = ibit]() {
+        const auto next_nibble = [&data, &ibit = ibit]() {
             int n = 0;
             for (int i = 0; i < 4; ++ i)
                 n |= data.bitstream[ibit ++] << i;
@@ -1904,14 +1957,15 @@ void TriangleSelector::deserialize(const TriangleSplittingData &data, bool needs
         parents.clear();
         while (true) {
             // Read next triangle info.
-            int code = next_nibble();
-            int num_of_split_sides = code & 0b11;
-            int num_of_children = num_of_split_sides == 0 ? 0 : num_of_split_sides + 1;
-            bool is_split = num_of_children != 0;
-            // Only valid if not is_split. Value of the second nibble was subtracted by 3, so it is added back.
-            auto state = is_split ? TriangleStateType::NONE : TriangleStateType((code & 0b1100) == 0b1100 ? next_nibble() + 3 : code >> 2);
+            const int code = next_nibble();
+            const int num_of_split_sides = code & 0b11;
+            const int num_of_children = num_of_split_sides == 0 ? 0 : num_of_split_sides + 1;
+            const bool is_split = num_of_children != 0;
+
+            // Only valid if not is_split.
+            const TriangleStateType state = is_split ? TriangleStateType::NONE : decode_leaf_state(code, next_nibble);
             // Only valid if is_split.
-            int special_side = code >> 2;
+            const int special_side = code >> 2;
 
             // Take care of the first iteration separately, so handling of the others is simpler.
             if (parents.empty()) {
@@ -1990,16 +2044,24 @@ void TriangleSelector::TriangleSplittingData::update_used_states(const size_t bi
     while (nibble_idx < this->bitstream.size()) {
         const uint8_t code = read_next_nibble();
 
-        if (const bool is_split = (code & 0b11) != 0; is_split)
+        if (const bool is_split = (code & 0b11) != 0; is_split) {
             continue;
+        }
 
-        const uint8_t facet_state = (code & 0b1100) == 0b1100 ? read_next_nibble() + 3 : code >> 2;
+        const uint8_t facet_state = static_cast<uint8_t>(decode_leaf_state(code, read_next_nibble));
         assert(facet_state < this->used_states.size());
-        if (facet_state >= this->used_states.size())
+        if (facet_state >= this->used_states.size()) {
             continue;
+        }
 
         this->used_states[facet_state] = true;
     }
+}
+
+size_t TriangleSelector::TriangleSplittingData::minimum_required_painting_version() const {
+    // States 0-16 fit into version 1 encoding (2 or 6 bits).
+    // States 17-255 require version 2 (14 bits).
+    return std::find(used_states.begin() + 17, used_states.end(), true) != used_states.end() ? 2 : 1;
 }
 
 // Lightweight variant of deserialization, which only tests whether a face of test_state exists.
@@ -2020,12 +2082,12 @@ bool TriangleSelector::has_facets(const TriangleSplittingData &data, const Trian
         };
         // < 0 -> negative of a number of children
         // >= 0 -> state
-        auto num_children_or_state = [&next_nibble]() -> int {
-            int code               = next_nibble();
-            int num_of_split_sides = code & 0b11;
+        const auto num_children_or_state = [&next_nibble]() -> int {
+            const int code               = next_nibble();
+            const int num_of_split_sides = code & 0b11;
             return num_of_split_sides == 0 ?
-                ((code & 0b1100) == 0b1100 ? next_nibble() + 3 : code >> 2) :
-                - num_of_split_sides - 1;
+                static_cast<int>(decode_leaf_state(code, next_nibble)) :
+                -num_of_split_sides - 1;
         };
 
         int state = num_children_or_state();

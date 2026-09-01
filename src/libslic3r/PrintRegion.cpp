@@ -76,12 +76,26 @@ coordf_t PrintRegion::bridging_height_avg(const PrintConfig &print_config) const
     return this->nozzle_dmr_avg(print_config) * sqrt(m_config.bridge_flow_ratio.value);
 }
 
-void PrintRegion::collect_object_printing_extruders(const PrintConfig &print_config, const PrintRegionConfig &region_config, const bool has_brim, std::vector<unsigned int> &object_extruders)
+void PrintRegion::collect_object_printing_extruders(
+    const PrintConfig& print_config,
+    const PrintRegionConfig& region_config,
+    const bool has_brim,
+    std::vector<unsigned int>& object_extruders,
+    const FullSpectrum::VirtualExtruders& virtual_extruders
+)
 {
     // These checks reflect the same logic used in the GUI for enabling/disabling extruder selection fields.
     auto num_extruders = (int)print_config.nozzle_diameter.size();
-    auto emplace_extruder = [num_extruders, &object_extruders](int extruder_id) {
-    	int i = std::max(0, extruder_id - 1);
+    auto emplace_extruder = [num_extruders, &object_extruders, &virtual_extruders](int extruder_id) {
+        if (extruder_id > num_extruders && FullSpectrum::is_virtual_extruder(static_cast<unsigned int>(extruder_id), virtual_extruders)) {
+            for (unsigned int physical_1based : FullSpectrum::expand_virtual_extruders_1based({ static_cast<unsigned int>(extruder_id) }, virtual_extruders)) {
+                object_extruders.emplace_back(physical_1based - 1);
+            }
+
+            return;
+        }
+
+        int i = std::max(0, extruder_id - 1);
         object_extruders.emplace_back((i >= num_extruders) ? 0 : i);
     };
     if (region_config.perimeters.value > 0 || has_brim)
@@ -98,11 +112,15 @@ void PrintRegion::collect_object_printing_extruders(const Print &print, std::vec
     // If not, then there must be something wrong with the Print::apply() function.
 #ifndef NDEBUG
     auto num_extruders = int(print.config().nozzle_diameter.size());
-    assert(this->config().perimeter_extruder    <= num_extruders);
-    assert(this->config().infill_extruder       <= num_extruders);
-    assert(this->config().solid_infill_extruder <= num_extruders);
+    auto valid_extruder = [&](int id) {
+        return id <= num_extruders ||
+               FullSpectrum::is_virtual_extruder(static_cast<unsigned int>(id), print.virtual_extruders());
+    };
+    assert(valid_extruder(this->config().perimeter_extruder));
+    assert(valid_extruder(this->config().infill_extruder));
+    assert(valid_extruder(this->config().solid_infill_extruder));
 #endif
-    collect_object_printing_extruders(print.config(), this->config(), print.has_brim(), object_extruders);
+    collect_object_printing_extruders(print.config(), this->config(), print.has_brim(), object_extruders, print.virtual_extruders());
 }
 
 }

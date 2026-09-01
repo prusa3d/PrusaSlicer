@@ -37,6 +37,7 @@
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "MultiMaterialSegmentation.hpp"
+#include "Feature/FullSpectrum/VirtualExtruder.hpp"
 
 #include "libslic3r.h"
 
@@ -109,6 +110,7 @@ public:
     // Identifier of this PrintRegion in the list of Print::m_print_regions.
     int                         print_region_id() const throw() { return m_print_region_id; }
     int                         print_object_region_id() const throw() { return m_print_object_region_id; }
+    std::optional<unsigned int> source_virtual_extruder_id() const throw() { return m_source_virtual_extruder_id; }
 	// 1-based extruder identifier for this region and role.
 	unsigned int 				extruder(FlowRole role) const;
     Flow                        flow(const PrintObject &object, FlowRole role, double layer_height, bool first_layer = false) const;
@@ -119,7 +121,11 @@ public:
 
     // Collect 0-based extruder indices used to print this region's object.
 	void                        collect_object_printing_extruders(const Print &print, std::vector<unsigned int> &object_extruders) const;
-	static void                 collect_object_printing_extruders(const PrintConfig &print_config, const PrintRegionConfig &region_config, const bool has_brim, std::vector<unsigned int> &object_extruders);
+	static void                 collect_object_printing_extruders(const PrintConfig                             &print_config,
+	                                                              const PrintRegionConfig                       &region_config,
+	                                                              const bool                                     has_brim,
+	                                                              std::vector<unsigned int>                      &object_extruders,
+	                                                              const FullSpectrum::VirtualExtruders          &virtual_extruders = {});
 
 // Methods modifying the PrintRegion's state:
 public:
@@ -127,6 +133,7 @@ public:
     void                        set_config(PrintRegionConfig &&config) { m_config = std::move(config); m_config_hash = m_config.hash(); }
     void                        config_apply_only(const ConfigBase &other, const t_config_option_keys &keys, bool ignore_nonexistent = false) 
                                         { m_config.apply_only(other, keys, ignore_nonexistent); m_config_hash = m_config.hash(); }
+    void                        set_source_virtual_extruder_id(std::optional<unsigned int> v) throw() { m_source_virtual_extruder_id = v; }
 private:
     friend Print;
     friend void print_region_ref_inc(PrintRegion&);
@@ -138,10 +145,20 @@ private:
     int                m_print_region_id { -1 };
     int                m_print_object_region_id { -1 };
     int                m_ref_cnt { 0 };
+    std::optional<unsigned int> m_source_virtual_extruder_id;
 };
 
-inline bool operator==(const PrintRegion &lhs, const PrintRegion &rhs) { return lhs.config_hash() == rhs.config_hash() && lhs.config() == rhs.config(); }
-inline bool operator!=(const PrintRegion &lhs, const PrintRegion &rhs) { return ! (lhs == rhs); }
+inline bool operator==(const PrintRegion& lhs, const PrintRegion& rhs)
+{
+    return lhs.config_hash() == rhs.config_hash()
+        && lhs.config() == rhs.config()
+        && lhs.source_virtual_extruder_id() == rhs.source_virtual_extruder_id();
+}
+
+inline bool operator!=(const PrintRegion& lhs, const PrintRegion& rhs)
+{
+    return !(lhs == rhs);
+}
 
 // For const correctness: Wrapping a vector of non-const pointers as a span of const pointers.
 template<class T>
@@ -402,7 +419,11 @@ private:
     // Called on main thread with stopped or paused background processing to let PrintObject release data for its milestones that were invalidated or canceled.
     void                    cleanup();
 
-    static PrintObjectConfig object_config_from_model_object(const PrintObjectConfig &default_object_config, const ModelObject &object, size_t num_extruders);
+    static PrintObjectConfig object_config_from_model_object(
+        const PrintObjectConfig& default_object_config,
+        const ModelObject& object,
+        size_t num_physical_extruders
+    );
 
 private:
     void make_perimeters();
@@ -532,11 +553,16 @@ struct PrintStatistics
     double                          total_wipe_tower_cost;
     double                          total_wipe_tower_filament;
     double                          total_wipe_tower_filament_weight;
+    double                          total_flush_cost;
+    double                          total_flush_filament;
+    double                          total_flush_filament_weight;
     std::vector<unsigned int>       printing_extruders;
     unsigned int                    initial_extruder_id;
     std::string                     initial_filament_type;
     std::string                     printing_filament_types;
     std::map<size_t, double>        filament_stats;
+    std::map<size_t, double>        wipe_tower_stats;
+    std::map<size_t, double>        flush_stats;
 
     // Config with the filled in print statistics.
     DynamicConfig           config() const;
@@ -545,19 +571,25 @@ struct PrintStatistics
     // Replace the print statistics placeholders in the path.
     std::string             finalize_output_path(const std::string &path_in) const;
 
-    void clear() {
-        total_used_filament    = 0.;
-        total_extruded_volume  = 0.;
-        total_cost             = 0.;
-        total_toolchanges      = 0;
-        total_weight           = 0.;
-        total_wipe_tower_cost  = 0.;
-        total_wipe_tower_filament = 0.;
+    void clear()
+    {
+        total_used_filament              = 0.;
+        total_extruded_volume            = 0.;
+        total_cost                       = 0.;
+        total_toolchanges                = 0;
+        total_weight                     = 0.;
+        total_wipe_tower_cost            = 0.;
+        total_wipe_tower_filament        = 0.;
         total_wipe_tower_filament_weight = 0.;
-        initial_extruder_id    = 0;
+        total_flush_cost                 = 0.;
+        total_flush_filament             = 0.;
+        total_flush_filament_weight      = 0.;
+        initial_extruder_id              = 0;
         initial_filament_type.clear();
         printing_filament_types.clear();
         filament_stats.clear();
+        wipe_tower_stats.clear();
+        flush_stats.clear();
         printing_extruders.clear();
     }
 
@@ -577,6 +609,7 @@ struct PrintStatistics
     static const std::string TotalFilamentCostValueMask;
     static const std::string TotalFilamentUsedWipeTower;
     static const std::string TotalFilamentUsedWipeTowerValueMask;
+    static const std::string TotalToolchanges;
 };
 
 using PrintObjectPtrs          = std::vector<PrintObject*>;
@@ -608,8 +641,15 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<ObjectID> print_object_ids() const override;
 
-    ApplyStatus         apply(const Model &model, DynamicPrintConfig config, std::vector<std::string> *warnings = nullptr) override;
-    void                set_task(const TaskParams &params) override { PrintBaseWithState<PrintStep, psCount>::set_task_impl(params, m_objects); }
+    ApplyStatus apply(
+        const Model &model,
+        DynamicPrintConfig config,
+        std::vector<std::string> *warnings = nullptr,
+        const DynamicPrintConfig *original_config = nullptr
+    ) override;
+    void set_task(const TaskParams &params) override {
+        PrintBaseWithState<PrintStep, psCount>::set_task_impl(params, m_objects);
+    }
     void                process() override;
     void                finalize() override { PrintBaseWithState<PrintStep, psCount>::finalize_impl(m_objects); }
     void                cleanup() override;
@@ -634,7 +674,17 @@ public:
     double              skirt_first_layer_height() const;
     Flow                brim_flow() const;
     Flow                skirt_flow() const;
-    
+
+    unsigned int num_physical_extruders() const
+    {
+        return static_cast<unsigned int>(m_config.nozzle_diameter.size());
+    }
+
+    const FullSpectrum::VirtualExtruders& virtual_extruders() const
+    {
+        return m_virtual_extruders;
+    }
+
     std::vector<unsigned int> object_extruders() const;
     std::vector<unsigned int> support_material_extruders() const;
     std::vector<unsigned int> extruders() const;
@@ -722,6 +772,7 @@ private:
     PrintRegionConfig                       m_default_region_config;
     PrintObjectPtrs                         m_objects;
     PrintRegionPtrs                         m_print_regions;
+    FullSpectrum::VirtualExtruders          m_virtual_extruders;
 
     // Ordered collections of extrusion paths to build skirt loops and brim.
     ExtrusionEntityCollection               m_skirt;

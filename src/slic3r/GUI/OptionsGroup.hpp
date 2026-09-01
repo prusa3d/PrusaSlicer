@@ -96,6 +96,7 @@ public:
 
 	bool is_separator() const { return m_is_separator; }
 	bool has_only_option(const std::string& opt_key) const { return m_options.size() == 1 && m_options[0].opt_id == opt_key; }
+    bool has_option(const std::string& opt_key) const;
 	void clear();
 
     const std::vector<widget_t>&	get_extra_widgets() const {return m_extra_widgets;}
@@ -189,6 +190,9 @@ public:
 
 	void			show_field(const t_config_option_key& opt_key, bool show = true);
 	void			hide_field(const t_config_option_key& opt_key) {  show_field(opt_key, false);  }
+
+    // Show/hide a whole line in custom_control, if this line contains opt_key
+    void            show_line(const t_config_option_key& opt_key, bool show);
 
 	void			set_name(const wxString& new_name) { stb->SetLabel(new_name); }
 	wxString		get_name() const { return stb->GetLabel(); }

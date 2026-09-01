@@ -107,11 +107,14 @@ std::string json_var_to_opt_string(const std::string& json_var)
     return json_var;
 }
 
-void fill_config_options_from_json_inner(const boost::property_tree::ptree& ptree, std::map<std::string, std::vector<std::string>>& result,  const std::map<std::string, std::string>& parameters) 
-{
-    pt::ptree slots = parse_tree_for_subtree(ptree, "tools"); 
+void fill_config_options_from_json_inner(
+    const boost::property_tree::ptree &ptree,
+    std::map<std::string, std::vector<std::string>> &result,
+    const std::map<std::string, std::string> &parameters
+) {
+    pt::ptree slots = parse_tree_for_subtree(ptree, "tools");
     for (const auto &subtree : slots) {
-       size_t slot_id;
+        size_t slot_id;
         try {
             // id could "1" for extruder
             // or "1.1" for MMU (than we need number after dot as id)
@@ -121,31 +124,35 @@ void fill_config_options_from_json_inner(const boost::property_tree::ptree& ptre
             } else {
                 slot_id = boost::lexical_cast<std::size_t>(subtree.first);
             }
-        } catch (const boost::bad_lexical_cast&) {
+        } catch (const boost::bad_lexical_cast &) { continue; }
+
+        if (slot_id == 0) {
+            BOOST_LOG_TRIVIAL(error) << __FUNCTION__ <<" ignoring tool with index 0";
             continue;
         }
-       for (const auto &item : subtree.second) {
-           if (parameters.find(item.first) == parameters.end()) {
-               continue;
-           }
-           std::string config_name = parameters.at(item.first);
-           // resolve value
-           std::string val;
-           if (item.second.size() > 0) {
-               for (const auto &subitem : item.second) {
-                   if (!val.empty()) {
-                       val += ",";
-                   }
-                   val += json_var_to_opt_string(subitem.second.data());
-               }
-           } else {
-               val = json_var_to_opt_string(item.second.data());
-           }
-           // insert value
-           while (result[config_name].size() < slot_id)
-               result[config_name].emplace_back();
-           result[config_name][slot_id - 1] = val;
-       }
+
+        for (const auto &item : subtree.second) {
+            if (parameters.find(item.first) == parameters.end()) {
+                continue;
+            }
+            std::string config_name = parameters.at(item.first);
+            // resolve value
+            std::string val;
+            if (item.second.size() > 0) {
+                for (const auto &subitem : item.second) {
+                    if (!val.empty()) {
+                        val += ",";
+                    }
+                    val += json_var_to_opt_string(subitem.second.data());
+                }
+            } else {
+                val = json_var_to_opt_string(item.second.data());
+            }
+            // insert value
+            while (result[config_name].size() < slot_id)
+                result[config_name].emplace_back();
+            result[config_name][slot_id - 1] = val;
+        }
     }
 }
 }

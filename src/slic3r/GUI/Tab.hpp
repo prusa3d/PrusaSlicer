@@ -408,6 +408,7 @@ public:
 	bool        validate_custom_gcodes();
     bool        validate_custom_gcodes_was_shown{ false };
     bool        is_prusa_printer() const;
+    std::string printer_model() const;
 
     void						edit_custom_gcode(const t_config_option_key& opt_key);
     virtual const std::string&	get_custom_gcode(const t_config_option_key& opt_key);
@@ -426,7 +427,6 @@ protected:
 	void			update_frequently_changed_parameters();
 	void			fill_icon_descriptions();
 	void			set_tooltips_text();
-    std::string     printer_model() const;
 
     virtual bool    select_preset_by_name(const std::string& name_w_suffix, bool force);
     virtual bool    save_current_preset(const std::string& new_name, bool detach);

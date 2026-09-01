@@ -297,7 +297,7 @@ void add_request_authorization(wxWebView* webview, const wxString& address, cons
                     std::string val = "External " + token;
                     // Add or modify the Authorization header
                     hr = headers->SetHeader(L"Authorization", GUI::from_u8(val).c_str());
-                    BOOST_LOG_TRIVIAL(debug) << "add_WebResourceRequested " << ws;
+                    //BOOST_LOG_TRIVIAL(debug) << "add_WebResourceRequested " << ws;
 
                     // This function is only needed for debug purpose
                     RequestHeadersToLog(headers.Get());    

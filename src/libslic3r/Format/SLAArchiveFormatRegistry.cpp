@@ -27,7 +27,7 @@ class Registry {
                 "SL1",                      // id
                 L("SL1 archive"),    // description
                 "sl1",                      // main extension
-                {"sl1s", "zip"},            // extension aliases
+                {"sl1s", "slx", "zip"},            // extension aliases
 
                 // Writer factory
                 [] (const auto &cfg) { return std::make_unique<SL1Archive>(cfg); },

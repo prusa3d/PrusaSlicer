@@ -35,7 +35,8 @@ class ConfigOptionsGroup;
 class FreqChangedParams
 {
     double		    m_brim_width = 0.0;
-    wxButton*       m_wiping_dialog_button{ nullptr };
+    wxButton*       m_wiping_dialog_button { nullptr };
+    wxButton*       m_full_spectrum_button { nullptr };
     wxSizer*        m_sizer {nullptr};
 
     std::shared_ptr<ConfigOptionsGroup> m_og_fff;
@@ -49,8 +50,10 @@ public:
     ~FreqChangedParams() = default;
 
     wxButton*       get_wiping_dialog_button() noexcept { return m_wiping_dialog_button; }
+    wxButton*       get_full_spectrum_button() noexcept { return m_full_spectrum_button; }
     wxSizer*        get_sizer() noexcept                { return m_sizer; }
     void            Show(bool is_fff) const;
+    void            update_full_spectrum_visibility(int physical_extruder_count);
 
     ConfigOptionsGroup* get_og(bool is_fff);
 

@@ -78,7 +78,11 @@ PresetUpdaterWrapper::~PresetUpdaterWrapper()
 
 bool PresetUpdaterWrapper::wizard_sync(const PresetBundle* preset_bundle, const Semver& old_slic3r_version, wxWindow* parent, bool full_sync, const wxString& headline)
 {
-    assert(!m_modal_thread.joinable());
+    if (m_modal_thread.joinable()) {
+        // instead of canceling, we do not proceed with wizard sync
+        return false;
+    }
+
     // Cancel sync before starting wizard to prevent two downloads at same time.
     cancel_worker_thread();
 

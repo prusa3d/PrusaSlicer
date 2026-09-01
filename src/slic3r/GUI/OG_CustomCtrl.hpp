@@ -59,6 +59,8 @@ class OG_CustomCtrl :public wxPanel
         void    correct_items_positions();
         void    msw_rescale();
         void    update_visibility(ConfigOptionMode mode);
+        void    update_visibility();
+        void    show(bool show);
 
         void render_separator(wxDC& dc, wxCoord v_pos);
 
@@ -95,6 +97,7 @@ public:
 
     void    init_ctrl_lines();
     bool    update_visibility(ConfigOptionMode mode);
+    void    show_line(const t_config_option_key& opt_key, bool show);
     void    correct_window_position(wxWindow* win, const Line& line, Field* field = nullptr);
     void    correct_widgets_position(wxSizer* widget, const Line& line, Field* field = nullptr);
     void    init_max_win_width();

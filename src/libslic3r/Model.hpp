@@ -25,6 +25,7 @@
 #include "TextConfiguration.hpp"
 #include "EmbossShape.hpp"
 #include "TriangleSelector.hpp"
+#include "Feature/FullSpectrum/VirtualExtruder.hpp"
 
 #include <map>
 #include <memory>
@@ -1259,6 +1260,8 @@ public:
     ModelMaterialMap    materials;
     // Objects are owned by a model. Each model may have multiple instances, each instance having its own transformation (shift, scale, rotation).
     ModelObjectPtrs     objects;
+    // Virtual extruder definitions. Empty when no virtual extruders are defined.
+    FullSpectrum::VirtualExtruders virtual_extruders;
 
     ModelWipeTower& wipe_tower();
     const ModelWipeTower& wipe_tower() const;
@@ -1267,9 +1270,14 @@ public:
     std::vector<ModelWipeTower>& get_wipe_tower_vector() { return wipe_tower_vector; }
     const std::vector<ModelWipeTower>& get_wipe_tower_vector() const { return wipe_tower_vector; }
 
+    FullSpectrum::VirtualExtruders &get_virtual_extruders() { return virtual_extruders; }
+
     CustomGCode::Info& custom_gcode_per_print_z();
     const CustomGCode::Info& custom_gcode_per_print_z() const;
     std::vector<CustomGCode::Info>& get_custom_gcode_per_print_z_vector() { return custom_gcode_per_print_z_vector; }
+
+    std::string sla_workflow_uuid; // This is a temporary place to put this, just for the 2.9.x series.
+    // It is probably the less invasive way to make this propagate from the frontend to the backend.
 
 private:
     // Wipe tower object.
@@ -1347,6 +1355,8 @@ public:
     bool          is_mm_painted() const;
     // Checks if any of objects is painted using the fuzzy skin painting gizmo.
     bool          is_fuzzy_skin_painted() const;
+
+    size_t        minimum_required_painting_version(FacetsAnnotation ModelVolume::*facets_annotation_member) const;
 
 private:
     explicit Model(int) : ObjectBase(-1) { assert(this->id().invalid()); }
