@@ -76,7 +76,7 @@ Context::Context()
     m_gl_vendor_string = getGlString(GL_VENDOR);
     m_gl_version_string = getGlString(GL_VERSION, VERSION_NA);
     m_opengl_version = parse_version(m_gl_version_string);
-    m_core_profile = !GLEW_ARB_compatibility;
+    m_core_profile = !GLAD_GL_ARB_compatibility;
     m_gl_core_profile_string = m_core_profile ? "Yes" : "No";
     m_glsl_version_string = getGlString(GL_SHADING_LANGUAGE_VERSION, VERSION_NA);
     m_glsl_version = parse_version(m_glsl_version_string);
@@ -92,11 +92,7 @@ Context::Context()
     glCheck();
     m_max_texture_size = max_texture_size;
 
-#ifdef EMSCRIPTEN
-    m_vao_available = GLEW_OES_vertex_array_object;
-#else
     m_vao_available = true;
-#endif // EMSCRIPTEN
     m_device.reset(new Device(*this));
     m_shader_manager.reset(new ShaderManager(*this));
     m_texture_manager.reset(new TextureManager(*m_device));

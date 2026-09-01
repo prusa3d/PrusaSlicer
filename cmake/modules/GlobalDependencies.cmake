@@ -47,9 +47,9 @@ if(SLIC3R_GUI)
     if (EMSCRIPTEN)
         # OpenGL::GL and GLEW::GLEW are part of OPENGL_LIBRARIES
         target_include_directories(PlatformGL INTERFACE ${OPENGL_INCLUDE_DIR})
-        target_link_libraries(PlatformGL INTERFACE ${OPENGL_LIBRARIES})
+        target_link_libraries(PlatformGL INTERFACE ${OPENGL_LIBRARIES} GLAD::GLES)
     else()
-        target_link_libraries(PlatformGL INTERFACE OpenGL::GL GLEW::GLEW)
+        target_link_libraries(PlatformGL INTERFACE OpenGL::GL GLAD::GL)
     endif()
 endif()
 
