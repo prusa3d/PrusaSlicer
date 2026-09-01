@@ -165,6 +165,14 @@ void InputText::render(const Vec2f& pos, const Vec2f& size)
                 m_callbacks.hovered_changed(m_hovered);
             }
         }
+        if (enabled() && hovered && m_callbacks.mouse_wheel) {
+            ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+        }
+        if (enabled() && hovered && GImGui->IO.MouseWheel != 0.f && m_callbacks.mouse_wheel) {
+            const float wheel_delta = GImGui->IO.MouseWheel;
+            GImGui->IO.MouseWheel   = 0.f;
+            m_callbacks.mouse_wheel(wheel_delta);
+        }
 
         ImGui::PopFont();
 
