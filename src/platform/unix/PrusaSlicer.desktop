@@ -1,6 +1,7 @@
 [Desktop Entry]
 Name=PrusaSlicer
 GenericName=3D Printing Software
+Comment=Slice 3D models and prepare them for 3D printing
 Icon=PrusaSlicer
 Exec=prusa-slicer %F
 Terminal=false
