@@ -145,6 +145,7 @@ bool ComboBox::YGBeginCombo(
             ImGuiInputTextFlags_AutoSelectAll,
             nullptr
         );
+        hovered |= ImGui::IsItemHovered();
         if (ImGui::IsItemActivated() && m_validator) {
             std::string without_unit = m_validator->string_without_unit();
             strncpy(
@@ -349,7 +350,7 @@ void ComboBox::render(const Vec2f& pos, const Vec2f& size)
 
         const std::string id = "###" + object_name();
         bool new_hovered     = false;
-        if (YGBeginCombo(
+        const bool popup_open = YGBeginCombo(
                 id.c_str(),
                 m_override_label.empty() ? m_current_label.c_str() : m_override_label.c_str(),
                 to_im(size),
@@ -364,8 +365,11 @@ void ComboBox::render(const Vec2f& pos, const Vec2f& size)
                 new_hovered,
                 m_imgui_render ? m_imgui_render->font(m_label_font_type) : nullptr,
                 m_label_color
-            ))
-        {
+            );
+        if (enabled() && !popup_open && new_hovered && !m_items.empty()) {
+            ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+        }
+        if (popup_open) {
             const ImVec2 im_size = to_im(size);
             for (int index = 0; index < static_cast<int>(m_items.size()); ++index) {
                 ImGui::PushID(index);
@@ -387,6 +391,29 @@ void ComboBox::render(const Vec2f& pos, const Vec2f& size)
             }
 
             ImGui::EndCombo();
+        }
+
+        ImGuiIO& io = ImGui::GetIO();
+        if (enabled()
+            && !popup_open
+            && new_hovered
+            && !m_items.empty()
+            && io.MouseWheel != 0.f)
+        {
+            const int offset    = io.MouseWheel > 0.f ? -1 : 1;
+            const int new_index = std::clamp(
+                m_current_index + offset,
+                0,
+                static_cast<int>(m_items.size()) - 1
+            );
+            io.MouseWheel = 0.f;
+
+            if (new_index != m_current_index) {
+                set_current_index(new_index);
+                if (m_callbacks.selection_changed) {
+                    m_callbacks.selection_changed(new_index);
+                }
+            }
         }
 
         ImGui::PopStyleVar(1);
