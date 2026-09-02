@@ -11,7 +11,7 @@
 cmake_minimum_required(VERSION 3.13)
 project(PrusaSlicer)
 
-option(SLIC3R_STATIC "Compile PrusaSlicer with static libraries (Boost, TBB, glew)" ON)
+option(SLIC3R_STATIC "Compile PrusaSlicer with static libraries (Boost, TBB)" ON)
 option(SLIC3R_FHS "Assume PrusaSlicer is to be installed in a FHS directory structure" OFF)
 
 if (DEFINED SLIC3R_PCH AND SLIC3R_PCH AND MSVC)
@@ -46,6 +46,10 @@ if (NOT EMSCRIPTEN)
     option(SLIC3R_BUILD_TESTS "Build unit tests" ON)
     option(SLIC3R_GUI "Compile PrusaSlicer with GUI components (OpenGL, wxWidgets)" ON)
     option(SLIC3R_OPENGL_ES "Use OpenGL ES" OFF)
+    # A lot of Linux distribution don't build wxWidgets with EGL support yet. This
+    # is why by default this option is set to OFF. If a Linux distribution has
+    # built wxWidgets with EGL support, you should turn that on!
+    option(SLIC3R_EGL "Compile PrusaSlicer with Wayland (EGL) support" OFF)
     if (SLIC3R_GUI)
         option(SLIC3R_ENABLE_WEBKIT "Enables linking against WebKitGTK on Linux, Webkit on MacOs or WebView2 on Windows" ON)
     else()

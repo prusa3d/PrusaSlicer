@@ -6,4 +6,4 @@ add_cmake_project(OpenCSG
     PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt.in ./CMakeLists.txt
 )
 
-set(DEP_OpenCSG_DEPENDS GLEW ZLIB)
+set(DEP_OpenCSG_DEPENDS ZLIB)

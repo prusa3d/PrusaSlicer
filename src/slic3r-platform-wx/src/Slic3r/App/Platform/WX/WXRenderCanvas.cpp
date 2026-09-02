@@ -423,9 +423,8 @@ WXRenderCanvas::~WXRenderCanvas()
 
 void WXRenderCanvas::init()
 {
-    const auto err = glewInit();
-    if (err != GLEW_NO_ERROR) {
-        throw PlatformError(std::string("GLEW init failed with code ") + std::to_string(err));
+    if (gladLoaderLoadGL() == 0) {
+        throw PlatformError("Failed to initialize OpenGL loader");
     }
 
     glGetError();

@@ -32,7 +32,7 @@ slic3r_remap_configs(wx::wxhtml wx::wxadv wx::wxgl wx::wxcore wx::wxbase RelWith
 target_link_libraries(slic3r-platform-wx PUBLIC
     wxWidgets::wxWidgets
     OpenGL::GL
-    GLEW::GLEW
+    GLAD::GL
     imgui_backend_ogl3
     slic3r-shared
 )
