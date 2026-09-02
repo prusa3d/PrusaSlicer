@@ -43,6 +43,9 @@ public:
     void on_deactivated();
     PlaceOnBedButton& place_on_bed_button();
 
+    void set_bend_values(double horizontal_bend_deg, double vertical_curl_deg);
+    void apply_bend_change(double horizontal_bend_rad, double vertical_curl_rad);
+
 private:
     std::optional<Domain::Vec3d> get_obb_rotation() const;
     void reload(std::optional<Domain::SelectionId> project_id = std::nullopt);
@@ -51,6 +54,8 @@ private:
     TripleInput* m_relative_input;
     PlaceOnBedButton* m_place_on_bed_button{nullptr};
     ReferenceFramePicker* m_reference_frame_picker;
+    Yoga::Item* m_bend_section{nullptr};
+    TripleInput* m_bend_input{nullptr};
 
     struct ProjectContext {
         bool activated{false};

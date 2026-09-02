@@ -1,4 +1,4 @@
-﻿#include "PrusaFile.hpp"
+#include "PrusaFile.hpp"
 #include <string_view>
 #include <set>
 #include <type_traits> // enable_if
@@ -359,10 +359,12 @@ constexpr std::string_view FONT_FAMILY = "family";
 constexpr std::string_view FONT_FACE_NAME = "face_name";
 constexpr std::string_view FONT_STYLE = "style";
 constexpr std::string_view FONT_WEIGHT = "weight";
+constexpr std::string_view BEND_HORIZONTAL = "bend_horizontal";
+constexpr std::string_view BEND_VERTICAL   = "bend_vertical";
 
 const NamesType NAMES = {{TEXT, STYLE_NAME, FONT_DESCRIPTOR, FONT_DESCRIPTOR_TYPE, 
 CHAR_GAP, LINE_GAP, LINE_HEIGHT, BOLDNESS, SKEW, PER_GLYPH, HORIZONTAL_ALIGN, VERTICAL_ALIGN, COLLECTION_NUMBER,
-FONT_FAMILY, FONT_FACE_NAME, FONT_STYLE, FONT_WEIGHT}};
+FONT_FAMILY, FONT_FACE_NAME, FONT_STYLE, FONT_WEIGHT, BEND_HORIZONTAL, BEND_VERTICAL}};
 
 using TypeToName = boost::bimap<FontDescriptor::Type, std::string_view>;
 const TypeToName type_to_name = 
@@ -403,6 +405,8 @@ json to_json(const TextConfiguration &tc) {
     result[LINE_HEIGHT] = fp.size_in_mm;
     if (fp.boldness.has_value()) result[BOLDNESS] = *fp.boldness;
     if (fp.skew.has_value())     result[SKEW] = *fp.skew;
+    if (fp.bend_horizontal.has_value()) result[BEND_HORIZONTAL] = *fp.bend_horizontal;
+    if (fp.bend_vertical.has_value())   result[BEND_VERTICAL]   = *fp.bend_vertical;
     if (fp.per_glyph)            result[PER_GLYPH] = true;
     result[HORIZONTAL_ALIGN] = ::to_json(fp.align.horizontal, horizontal_align_to_name);
     result[VERTICAL_ALIGN] = ::to_json(fp.align.vertical, vertical_align_to_name);
@@ -429,6 +433,8 @@ void load(const json &tc_json, TextConfiguration &tc, Read3mfIssues& collected_i
     from_json(tc_json, LINE_HEIGHT, fp.size_in_mm, collected_issues, RT::project_text_configuration_line_height_issue, true);
     from_json(tc_json, BOLDNESS,    fp.boldness  , collected_issues, RT::project_text_configuration_boldness_issue);
     from_json(tc_json, SKEW,        fp.skew      , collected_issues, RT::project_text_configuration_skew_issue);
+    from_json(tc_json, BEND_HORIZONTAL, fp.bend_horizontal, collected_issues, RT::project_text_configuration_skew_issue);
+    from_json(tc_json, BEND_VERTICAL,   fp.bend_vertical,   collected_issues, RT::project_text_configuration_skew_issue);
     from_json(tc_json, PER_GLYPH,   fp.per_glyph , collected_issues, RT::project_text_configuration_per_glyph_issue);
     from_json(tc_json, HORIZONTAL_ALIGN , fp.align.horizontal , horizontal_align_to_name, collected_issues, RT::project_text_configuration_horizontal_align_issue, true);
     from_json(tc_json, VERTICAL_ALIGN   , fp.align.vertical, vertical_align_to_name  , collected_issues, RT::project_text_configuration_vertical_align_issue, true);

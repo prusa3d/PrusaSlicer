@@ -33,6 +33,14 @@ struct FontProp
     // When not set value is zero and is not stored
     std::optional<float> skew; // [ration x:y]
 
+    // Horizontal bend angle across text length (in/out) [-pi, pi]
+    // When not set, text is flat along X and is not stored
+    std::optional<float> bend_horizontal;
+
+    // Vertical curl angle across text height (curl up/down) [-pi, pi]
+    // When not set, text is flat along Y and is not stored
+    std::optional<float> bend_vertical;
+
     // Parameter for True Type Font collections
     // Select index of font in collection
     std::optional<unsigned int> collection_number;

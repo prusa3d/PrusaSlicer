@@ -4,6 +4,8 @@
 #include "Slic3r/App/Plater/TripleInput.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/App/Plater/PlaterGizmosHelper.hpp"
+#include "Slic3r/Biz/Emboss/TextLines.hpp"
+#include "Slic3r/Biz/Emboss/TextBender.hpp"
 #include "Slic3r/Math.hpp"
 
 using namespace Slic3r::App::Yoga;
@@ -80,6 +82,23 @@ RotationDialog::RotationDialog(
         m_project_interactor,
         Biz::Scene::SelectionReferenceFrame::Volume
     );
+
+    add_separator(content());
+
+    m_bend_section = content()->emplace_back<Yoga::Item>();
+    m_bend_section->set_orientation(Orientation::Vertical);
+    m_bend_section->set_gap(10_fpx);
+
+    auto bend_title{m_bend_section->emplace_back<Text>("Text Bend & Curl")};
+    bend_title->set_font_type(Render::ImguiFontType::Bold);
+
+    m_bend_input = m_bend_section->emplace_back<TripleInput>(_u8L("°"));
+    m_bend_input->set_visible({true, true, false});
+    m_bend_input->on_change = [this](const Domain::Vec3d& value, int index)
+    {
+        apply_bend_change(deg2rad(value(1)), deg2rad(value(0)));
+    };
+    m_bend_section->set_visible(false);
 }
 
 RotationDialog::~RotationDialog()
@@ -147,6 +166,49 @@ void RotationDialog::reload(std::optional<Domain::SelectionId> project_id) {
     } else {
         m_relative_input->set_visible({true, true, true});
     }
+
+    auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
+    const bool is_text = selected_text.volume != nullptr && selected_text.volume->text_configuration.has_value();
+    if (m_bend_section != nullptr) {
+        m_bend_section->set_visible(is_text);
+        if (is_text) {
+            const auto& prop = selected_text.volume->text_configuration->style.prop;
+            double h_deg = rad2deg(static_cast<double>(prop.bend_horizontal.value_or(0.0f)));
+            double v_deg = rad2deg(static_cast<double>(prop.bend_vertical.value_or(0.0f)));
+            m_bend_input->set_value({v_deg, h_deg, 0.0});
+        }
+    }
+}
+
+void RotationDialog::set_bend_values(double horizontal_bend_deg, double vertical_curl_deg)
+{
+    if (m_bend_input != nullptr) {
+        m_bend_input->set_value({vertical_curl_deg, horizontal_bend_deg, 0.0});
+    }
+}
+
+void RotationDialog::apply_bend_change(double horizontal_bend_rad, double vertical_curl_rad)
+{
+    auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
+    if (!selected_text.volume || !selected_text.volume->text_configuration)
+        return;
+
+    auto& mutable_volume = const_cast<Domain::ModelVolume&>(*selected_text.volume);
+    mutable_volume.text_configuration->style.prop.bend_horizontal = static_cast<float>(horizontal_bend_rad);
+    mutable_volume.text_configuration->style.prop.bend_vertical = static_cast<float>(vertical_curl_rad);
+
+    indexed_triangle_set bent_its = mutable_volume.mesh().its;
+    Biz::Emboss::BendParams params{
+        .horizontal_bend = static_cast<float>(horizontal_bend_rad),
+        .vertical_curl = static_cast<float>(vertical_curl_rad)
+    };
+    Biz::Emboss::TextBender::bend_mesh(bent_its, params, mutable_volume.mesh().bounding_box());
+    Domain::TriangleMesh bent_mesh(std::move(bent_its));
+    const auto& selection = m_project_interactor.scene_interactor().object_selection();
+    if (!selection.elements.empty()) {
+        m_project_interactor.scene_interactor().change_volume_meshes({ {selection.elements.front(), std::move(bent_mesh)} });
+    }
+    m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::Rotate);
 }
 
 void RotationDialog::add_rotation(Domain::Vec3d rotate_by_rads)
