@@ -12,7 +12,6 @@
 
 
 #include <boost/nowide/fstream.hpp>
-#include <GL/glew.h>
 
 
 using Slic3r::Domain::ColorRGB;
