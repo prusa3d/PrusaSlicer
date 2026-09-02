@@ -39,8 +39,8 @@ Domain::Project load_file_as_project(
 struct ImportToSceneResult {
     // Instance-level element refs of all newly added objects.
     Domain::ElementRefs instances;
-    // True if a 3MF carrying PrusaSlicer settings was loaded as geometry only (its settings ignored).
-    bool settings_ignored = false;
+    // True if at least one 3MF was loaded as geometry only.
+    bool geometry_only_3mf = false;
 };
 
 /**

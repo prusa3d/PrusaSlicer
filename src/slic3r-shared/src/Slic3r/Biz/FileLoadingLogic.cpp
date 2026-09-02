@@ -48,9 +48,7 @@ struct ReturnData
     boost::filesystem::path file_path;
     std::optional<Domain::TriangleMesh> mesh;
     std::optional<Domain::Model> model;
-    // True when the source carried PrusaSlicer settings that were discarded by loading geometry only
-    // (a 3MF imported into a project keeps its model but drops its config containers).
-    bool settings_ignored = false;
+    bool geometry_only_3mf = false;
 };
 
 struct FileLoadError
@@ -748,10 +746,8 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
                 );
             }
 
-            ret.model = loaded_3mf.model;
-            // Loading a 3MF into a project keeps only its geometry. If the file carried PrusaSlicer
-            // configuration (empty means none, e.g. Bambu/Orca exports), those settings are ignored.
-            ret.settings_ignored = !loaded_3mf.config_containers_data.empty();
+            ret.model             = loaded_3mf.model;
+            ret.geometry_only_3mf = true;
             return ret;
         } catch (const Loaded3MFException& e) {
             return tl::make_unexpected(FileLoadError::error(
@@ -1112,7 +1108,7 @@ ImportToSceneResult import_files_and_add_to_scene(
     ImportToSceneResult result;
     ElementRefs& added_instances = result.instances;
     for (Biz::FileLoadingLogic::ReturnData& file_data : data) {
-        result.settings_ignored |= file_data.settings_ignored;
+        result.geometry_only_3mf |= file_data.geometry_only_3mf;
 
         Domain::BoundingBox3d bbox;
         ElementRefs new_instances;

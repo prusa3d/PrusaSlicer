@@ -1175,9 +1175,7 @@ void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::pa
         UndoSnapshotType::AddObject
     );
 
-    // A 3MF added to a project keeps only its geometry; the print, filament and printer settings it
-    // carried are discarded. Tell the user when that actually happened.
-    if (import_result.settings_ignored) {
+    if (import_result.geometry_only_3mf) {
         invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
             l->on_geometry_only_imported();
         });
