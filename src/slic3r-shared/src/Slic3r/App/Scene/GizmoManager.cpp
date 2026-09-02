@@ -184,9 +184,11 @@ void GizmoManager::on_scene_mouse_event(const Platform::MouseEvent& e, const Sli
     {
         ZoneScopedN("on_mouse");
 
-        auto it = p.in_cycle_gizmos.begin();
-        while (it != p.in_cycle_gizmos.end()) {
-            auto g = *it;
+        // Deactivating a tool erases it from in_cycle_gizmos, so iterate over a copy and skip erased gizmos.
+        for (IGizmo* g : std::vector<IGizmo*>(p.in_cycle_gizmos)) {
+            if (std::ranges::find(p.in_cycle_gizmos, g) == p.in_cycle_gizmos.end()) {
+                continue;
+            }
 
             auto ret = g->on_mouse(ctx, single_active);
 #if DEBUG_GIZMO_MANAGER
@@ -194,8 +196,7 @@ void GizmoManager::on_scene_mouse_event(const Platform::MouseEvent& e, const Sli
 #endif
 
             if (ret == GizmoActivationState::Inactive) {
-                it = p.in_cycle_gizmos.erase(it);
-                continue;
+                std::erase(p.in_cycle_gizmos, g);
             } else if (ret == GizmoActivationState::Done) {
                 p.in_cycle_gizmos.clear();
                 break;
@@ -206,7 +207,6 @@ void GizmoManager::on_scene_mouse_event(const Platform::MouseEvent& e, const Sli
                     m_mouse_drag_detector->cancel_drag_event();
                 break;
             }
-            ++it;
         }
     }
 
@@ -310,7 +310,15 @@ void GizmoManager::deactivate_current_tool()
     auto& p = current_context();
     if (p.active_tool == nullptr)
         return;
-    p.active_tool->on_deactivated();
+
+    IToolGizmo* deactivated_tool = p.active_tool;
+    std::erase(p.in_cycle_gizmos, deactivated_tool);
+
+    if (p.in_cycle_gizmos.empty()) {
+        p.in_cycle = false;
+    }
+
+    deactivated_tool->on_deactivated();
     p.active_tool = nullptr;
     invoke_listeners<IGizmoActiveToolListener>([p](auto* l) { l->active_tool_changed(p.active_tool); });
     p.object_selection_disabled = false;
