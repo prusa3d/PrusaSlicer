@@ -75,6 +75,11 @@ public:
 
     IAppConfigProvider& app_config_provider();
 
+    bool has_app_config_provider() const
+    {
+        return m_app_config_provider != nullptr;
+    }
+
 private:
     IRenderRequestHandler* m_render_request_handler{nullptr};
     std::unique_ptr<IMainThreadDispatcher> m_main_thread_dispatcher{};

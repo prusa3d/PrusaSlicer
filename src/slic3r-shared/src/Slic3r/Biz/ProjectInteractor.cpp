@@ -921,6 +921,11 @@ void ProjectInteractor::do_result_export(const Domain::SlicingId id, const boost
 {
     set_output_dir(id.project_id, dest_path);
     set_output_extension(id.project_id, dest_path.extension().string());
+    m_physical_printer_interactor.remember_used_destination(std::string(
+        m_removable_drive_service.is_path_on_removable_drive(dest_path) ?
+            PhysicalPrinter::REMOVABLE_DRIVE_UUID :
+            PhysicalPrinter::LOCAL_DRIVE_UUID
+    ));
     PhysicalPrinter::PhysicalPrinterConfig config;
     config.payload = PhysicalPrinter::FileSystemExport{};
     PrintHost::PrintHostJobData data{
@@ -939,6 +944,7 @@ void ProjectInteractor::do_result_upload(
 )
 {
     set_output_extension(id.project_id, boost::filesystem::path(filename).extension().string());
+    m_physical_printer_interactor.remember_used_destination(print_host_config.uuid);
     PhysicalPrinter::PhysicalPrinterConfig config {print_host_config};
     boost::filesystem::path dest_path(filename);
     PrintHost::PrintHostJobData data{
@@ -973,6 +979,7 @@ void ProjectInteractor::do_result_upload_connect(
         filename = filename_override;
     }
 
+    m_physical_printer_interactor.remember_used_destination(std::string(PhysicalPrinter::PRUSA_CONNECT_UUID));
     set_output_extension(id.project_id, boost::filesystem::path(filename).extension().string());
     PrintHost::PrintHostJobData data{
         std::monostate{},

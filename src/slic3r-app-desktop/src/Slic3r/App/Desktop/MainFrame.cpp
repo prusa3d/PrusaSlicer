@@ -618,6 +618,9 @@ void MainFrame::init_left_bar(Biz::ProjectInteractor& project_interactor)
     init_slicing_page();
     init_printers_page(project_interactor);
     init_printables_page(project_interactor);
+    if (project_interactor.physical_printer_interactor().is_printer_upload_selected()) {
+        init_physical_printer_page(project_interactor);
+    }
     init_preferences_button();
 
     //! experiments just for UI testing

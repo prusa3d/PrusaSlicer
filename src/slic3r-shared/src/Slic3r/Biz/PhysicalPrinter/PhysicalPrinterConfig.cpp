@@ -2,10 +2,6 @@
 
 #include "Slic3r/Domain/ConfigPhysical.hpp"
 
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
 namespace Slic3r::Biz::PhysicalPrinter {
 
 std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data)
@@ -32,8 +28,7 @@ PhysicalPrinterConfig filesystem_export_local()
         FileSystemExport{false},
         {},
         _u8L("Local Drive"),
-        boost::uuids::to_string(boost::uuids::random_generator()()),
-
+        std::string(LOCAL_DRIVE_UUID),
     };
 }
 
@@ -43,7 +38,7 @@ PhysicalPrinterConfig filesystem_export_removable()
         FileSystemExport{true},
         {},
         _u8L("Removable Drive"),
-        boost::uuids::to_string(boost::uuids::random_generator()()),
+        std::string(REMOVABLE_DRIVE_UUID),
     };
 }
 
@@ -53,8 +48,13 @@ PhysicalPrinterConfig connect_upload_generic()
         ConnectUpload{},
         {},
         _u8L("Prusa Connect"),
-        boost::uuids::to_string(boost::uuids::random_generator()()),
+        std::string(PRUSA_CONNECT_UUID),
     };
+}
+
+bool is_reserved_uuid(const std::string& uuid)
+{
+    return uuid == LOCAL_DRIVE_UUID || uuid == REMOVABLE_DRIVE_UUID || uuid == PRUSA_CONNECT_UUID;
 }
 
 bool is_physical_printer_compatible(

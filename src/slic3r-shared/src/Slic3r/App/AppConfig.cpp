@@ -222,6 +222,11 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn = []() { return Domain::ConfigValue(std::string()); };
 
+    def = defs.add("last_used_physical_printer", typeid(std::string));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(std::string()); };
+
     // TODO: This option needs check after changed field in Preferences.
     def = defs.add("downloads_directory", typeid(std::string));
     def->location = Domain::AppConfigLocation{};

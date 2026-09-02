@@ -98,7 +98,7 @@ public:
         m_preset_updater_interactor(dispatcher, m_user_account_interactor),
         m_removable_drive_service(dispatcher),
         m_file_downloader_interactor(dispatcher),
-        m_physical_printer_interactor(dispatcher, m_preset_interactor, m_user_account_interactor),
+        m_physical_printer_interactor(dispatcher, m_preset_interactor, m_user_account_interactor, m_removable_drive_service),
         m_connect_message_handler(dispatcher, m_preset_interactor, m_user_account_interactor, m_physical_printer_interactor),
         m_project_list(*this),
         m_undo_provider(std::make_unique<NoopUndoProvider>())
@@ -136,6 +136,7 @@ public:
             &m_preset_interactor.object_settings_interactor()
         );
         add_listener<ISelectedConfigContainerChangedListener>(&m_physical_printer_interactor);
+        m_removable_drive_service.add_status_listener(&m_physical_printer_interactor);
     }
 
     const Domain::Workbench& workbench() const
@@ -477,7 +478,7 @@ public:
 
         if (!is_refresh)
         {
-            m_physical_printer_interactor.select_connect_upload(true);
+            m_physical_printer_interactor.select_connect_upload_if_default();
         }
     }
 
