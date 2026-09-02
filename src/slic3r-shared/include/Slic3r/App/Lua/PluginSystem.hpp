@@ -55,7 +55,7 @@ public:
     Yoga::Passthrough<PluginDialog>& init_dialog();
 
     void on_download_error(const std::string& plugin_id, const std::string& message) override;
-    void on_bundle_verified(const VerifiedBundleData& data) override;
+    bool on_bundle_verified(const VerifiedBundleData& data) override;
     void on_bundle_downloaded(
         const std::string& plugin_id,
         const std::string& version,

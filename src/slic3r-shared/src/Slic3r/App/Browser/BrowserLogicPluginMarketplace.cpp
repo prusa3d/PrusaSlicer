@@ -62,7 +62,7 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::send_config(cons
         // Hand over the plugin API version anyway so the catalogue can filter;
         // without a token the web app stays on its anonymous path instead of
         // retrying the session exchange.
-        SPDLOG_INFO("Plugin Marketplace: {} with no signed-in account, sending config without a token", reason);
+        SPDLOG_DEBUG("Plugin Marketplace: {} with no signed-in account, sending config without a token", reason);
         return {{BrowserLogicCommandType::RunScript, init_script({})}};
     }
 
@@ -113,18 +113,18 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
     }
 
     if (action == "WEBAPP_READY") {
-        SPDLOG_INFO("Plugin Marketplace: web app ready");
+        SPDLOG_DEBUG("Plugin Marketplace: web app ready");
         return {};
     }
 
     if (action == "REQUEST_CONFIG" || action == "REQUEST_ACCESS_TOKEN") {
-        SPDLOG_INFO("Plugin Marketplace: {}", action);
+        SPDLOG_DEBUG("Plugin Marketplace: {}", action);
         return send_config(action);
     }
 
     if (action == "REQUEST_INSTALLED_PLUGINS") {
         const auto bundles = m_plugin_system.installed_bundles();
-        SPDLOG_INFO("Plugin Marketplace: reporting {} installed bundle(s)", bundles.size());
+        SPDLOG_DEBUG("Plugin Marketplace: reporting {} installed bundle(s)", bundles.size());
         return {{BrowserLogicCommandType::RunScript, installed_plugins_script(bundles)}};
     }
 
@@ -152,7 +152,7 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_user_account_
     if (access_token.empty()) {
         return {};
     }
-    SPDLOG_INFO("Plugin Marketplace: pushing {} access token", is_refresh ? "refreshed" : "new");
+    SPDLOG_DEBUG("Plugin Marketplace: pushing {} access token", is_refresh ? "refreshed" : "new");
     return {{BrowserLogicCommandType::RunScript, init_script(access_token)}};
 }
 

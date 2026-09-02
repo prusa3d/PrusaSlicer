@@ -2377,10 +2377,20 @@ void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem&
             CommandName::PluginMarketplace,
             [&]
             {
-                AppServices::instance().dialog_manager().show_webview_dialog(
-                    std::make_unique<Browser::BrowserLogicPluginMarketplace>(m_project_interactor, plugin_system),
-                    &m_project_interactor
-                );
+                Biz::Platform::PlatformServices::instance()
+                    .main_thread_dispatcher()
+                    .dispatch_on_main_thread(
+                        [&]
+                        {
+                            AppServices::instance().dialog_manager().show_webview_dialog(
+                                std::make_unique<Browser::BrowserLogicPluginMarketplace>(
+                                    m_project_interactor,
+                                    plugin_system
+                                ),
+                                &m_project_interactor
+                            );
+                        }
+                    );
             }
         )
     );

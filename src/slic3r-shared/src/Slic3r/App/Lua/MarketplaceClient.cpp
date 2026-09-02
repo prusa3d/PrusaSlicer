@@ -15,6 +15,8 @@ namespace Slic3r::App::Lua {
 
 namespace fs = boost::filesystem;
 
+constexpr int BUNDLE_SIZE_LIMIT      = 100 * 1'024 * 1'024;
+
 BundleRequestConfig::LoadResult BundleRequestConfig::load_from_json(const nlohmann::json& j)
 {
     BundleRequestConfig ret;
@@ -108,7 +110,7 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
 
         VerifyResult result = tl::unexpected{std::string{"verify request did not complete"}};
 
-        http.on_complete([&](const std::string& body, unsigned status)
+        http.on_complete([&result](const std::string& body, unsigned status)
         {
             try {
                 nlohmann::json j = nlohmann::json::parse(body);
@@ -129,7 +131,7 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
                 result = tl::unexpected{fmt::format("cannot parse verify response: {}", e.what())};
             }
         })
-        .on_error([&](const std::string& body, const std::string& error, unsigned status)
+        .on_error([&result](const std::string& body, const std::string& error, unsigned status)
         {
             result = tl::unexpected{http_error_message(body, error, status)};
         });
@@ -140,7 +142,8 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
     };
 
     auto& job_manager = Biz::Platform::PlatformServices::instance().job_manager();
-    job_manager.create_job("plugin-verify", std::move(job))
+    std::string job_id = fmt::format("plugin-verify: {}@{}", config.plugin_id, config.version);
+    job_manager.create_job(job_id, std::move(job))
         .on_result(
             [config, this](VerifyResult result)
             {
@@ -148,10 +151,14 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
                     report_error(config.plugin_id, result.error());
                     return;
                 }
+                bool all_fine = true;
                 invoke_listeners<IMarketplaceClientListener>(
-                    [&](IMarketplaceClientListener* l) { l->on_bundle_verified(result.value()); }
+                    [&](IMarketplaceClientListener* l)
+                    { all_fine = all_fine && l->on_bundle_verified(result.value()); }
                 );
-                perform_download_step(config);
+                if (all_fine) {
+                    perform_download_step(config);
+                }
             }
         )
         .on_exception(
@@ -180,26 +187,29 @@ void MarketplaceClient::perform_download_step(const BundleRequestConfig& config)
 
         DownloadResult result = tl::unexpected{std::string{"download request did not complete"}};
 
-        http.on_complete([&](const std::string& body, unsigned status)
-        {
-            if (body.empty()) {
-                result = tl::unexpected{fmt::format("downloaded bundle is empty (HTTP {})", status)};
-                return;
-            }
+        http.size_limit(BUNDLE_SIZE_LIMIT)
+            .on_complete(
+                [&](const std::string& body, unsigned status)
+                {
+                    if (body.empty()) {
+                        result = tl::unexpected{
+                            fmt::format("downloaded bundle is empty (HTTP {})", status)
+                        };
+                        return;
+                    }
 
-            auto dest_path =
-                download_dir() / fmt::format("{}@{}.zip", config.plugin_id, config.version);
-            if (auto saved = save_file(dest_path, body); !saved.has_value()) {
-                result = tl::unexpected{saved.error()};
-                return;
-            }
+                    auto dest_path =
+                        download_dir() / fmt::format("{}@{}.zip", config.plugin_id, config.version);
+                    if (auto saved = save_file(dest_path, body); !saved.has_value()) {
+                        result = tl::unexpected{saved.error()};
+                        return;
+                    }
 
-            result = dest_path.string();
-        })
-        .on_error([&](const std::string& body, const std::string& error, unsigned status)
-        {
-            result = tl::unexpected{http_error_message(body, error, status)};
-        });
+                    result = dest_path.string();
+                }
+            )
+            .on_error([&](const std::string& body, const std::string& error, unsigned status)
+                      { result = tl::unexpected{http_error_message(body, error, status)}; });
 
         http.perform_sync();
 
@@ -207,7 +217,8 @@ void MarketplaceClient::perform_download_step(const BundleRequestConfig& config)
     };
 
     auto& job_manager = Biz::Platform::PlatformServices::instance().job_manager();
-    job_manager.create_job("plugin-download", std::move(job))
+    std::string job_id = fmt::format("plugin-download: {}@{}", config.plugin_id, config.version);
+    job_manager.create_job(job_id, std::move(job))
         .on_result(
             [config, this](DownloadResult result)
             {

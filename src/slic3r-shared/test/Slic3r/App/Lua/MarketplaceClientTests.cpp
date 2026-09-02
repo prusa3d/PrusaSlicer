@@ -65,9 +65,11 @@ struct RecordingListener : IMarketplaceClientListener
     {
         errors.push_back(message);
     }
-    void on_bundle_verified(const VerifiedBundleData& data) override
+
+    bool on_bundle_verified(const VerifiedBundleData& data) override
     {
         verified.push_back(data.plugin_id + "@" + data.version);
+        return true;
     }
     void on_bundle_downloaded(const std::string&, const std::string&, const std::string& zip_path)
         override

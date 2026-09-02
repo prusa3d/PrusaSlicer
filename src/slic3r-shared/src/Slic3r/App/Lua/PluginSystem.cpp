@@ -192,17 +192,21 @@ void PluginSystem::on_download_error(const std::string& plugin_id, const std::st
     );
 }
 
-void PluginSystem::on_bundle_verified(const VerifiedBundleData& data)
+bool PluginSystem::on_bundle_verified(const VerifiedBundleData& data)
 {
-    auto key_id = fmt::format("{}@{}", data.plugin_id, data.version);
+    std::string key_id = data.plugin_id;
     try {
+        auto version = Semver(data.version);
+        key_id = fmt::format("{}@{}", data.plugin_id, version.to_string());
         m_registry.public_key_registry().store_key(key_id, data.public_key);
     } catch (std::exception& e) {
         // Runs on the main thread from the marketplace job callback - letting this
-        // escape would take the app down instead of failing the install.
+        // escape would take the app down instead of failing the installation.
         SPDLOG_ERROR("Cannot store author public key {}: {}", key_id, e.what());
         on_download_error(data.plugin_id, e.what());
+        return false;
     }
+    return true;
 }
 
 void PluginSystem::on_bundle_downloaded(
