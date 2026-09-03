@@ -61,9 +61,9 @@ void TextBender::bend_mesh(
         return; // flat / unbent
     }
 
-    for (Vec3f& v : its.vertices) {
-        Domain::Vec3d bent = bend_point(v.cast<double>(), params, base_bbox);
-        v = bent.cast<float>();
+    for (auto& v : its.vertices) {
+        Domain::Vec3d bent = bend_point(v.template cast<double>(), params, base_bbox);
+        v = bent.template cast<float>();
     }
 }
 
