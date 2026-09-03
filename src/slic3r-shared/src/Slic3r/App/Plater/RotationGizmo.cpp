@@ -644,17 +644,17 @@ void RotationGizmo::on_activated()
 
     project_context.bend_slider_x = nullptr;
     project_context.bend_slider_y = nullptr;
-    project_context.main_node->query(
-        [&project_context](const Scene::Node* n) -> bool
+    visit(
+        *project_context.main_node,
+        [&project_context](Scene::Node& n)
         {
-            const RotationGizmoNodeTag* tag = n->tag_of_type<RotationGizmoNodeTag>();
+            const RotationGizmoNodeTag* tag = n.tag_of_type<RotationGizmoNodeTag>();
             if (tag != nullptr && tag->is_bend_slider) {
                 if (tag->primary_axis == AxisType::XAxis)
-                    project_context.bend_slider_x = const_cast<Scene::Node*>(n);
+                    project_context.bend_slider_x = &n;
                 else if (tag->primary_axis == AxisType::YAxis)
-                    project_context.bend_slider_y = const_cast<Scene::Node*>(n);
+                    project_context.bend_slider_y = &n;
             }
-            return false;
         },
         true
     );
@@ -820,7 +820,9 @@ void RotationGizmo::apply_bend_slider_drag(double local_x)
         };
         Biz::Emboss::TextBender::bend_mesh(bent_its, params, project_context.base_mesh_bbox);
         Domain::TriangleMesh bent_mesh(std::move(bent_its));
-        m_scene_interactor.change_volume_meshes({ {project_context.bend_target_element, std::move(bent_mesh)} });
+        Biz::Scene::SceneInteractor::RefMeshes ref_meshes;
+        ref_meshes.emplace_back(project_context.bend_target_element, std::move(bent_mesh));
+        m_scene_interactor.change_volume_meshes(std::move(ref_meshes));
     }
 
     if (m_window != nullptr) {

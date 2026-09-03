@@ -206,7 +206,9 @@ void RotationDialog::apply_bend_change(double horizontal_bend_rad, double vertic
     Domain::TriangleMesh bent_mesh(std::move(bent_its));
     const auto& selection = m_project_interactor.scene_interactor().object_selection();
     if (!selection.elements.empty()) {
-        m_project_interactor.scene_interactor().change_volume_meshes({ {selection.elements.front(), std::move(bent_mesh)} });
+        Biz::Scene::SceneInteractor::RefMeshes ref_meshes;
+        ref_meshes.emplace_back(selection.elements.front(), std::move(bent_mesh));
+        m_project_interactor.scene_interactor().change_volume_meshes(std::move(ref_meshes));
     }
     m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::Rotate);
 }

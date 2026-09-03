@@ -67,4 +67,14 @@ void TextBender::bend_mesh(
     }
 }
 
+void TextBender::bend_mesh(
+    indexed_triangle_set& its,
+    const BendParams& params,
+    const Domain::BoundingBox3d& base_bbox
+)
+{
+    Domain::BoundingBox3f bbox_f(base_bbox.min.cast<float>(), base_bbox.max.cast<float>());
+    bend_mesh(its, params, bbox_f);
+}
+
 } // namespace Slic3r::Biz::Emboss

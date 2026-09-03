@@ -22,6 +22,12 @@ public:
         const Domain::BoundingBox3f& base_bbox
     );
 
+    static void bend_mesh(
+        indexed_triangle_set& its,
+        const BendParams& params,
+        const Domain::BoundingBox3d& base_bbox
+    );
+
     static Domain::Vec3d bend_point(
         const Domain::Vec3d& pt,
         const BendParams& params,
