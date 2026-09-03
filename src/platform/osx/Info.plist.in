@@ -5,15 +5,17 @@
   <key>CFBundleExecutable</key>
   <string>@SLIC3R_APP_KEY@</string>
   <key>CFBundleGetInfoString</key>
-  <string>@SLIC3R_APP_NAME@ Copyright (C) 2011-2019 Alessandro Ranellucci, (C) 2016-2026 Prusa Research</string>
+  <string>@SLIC3R_VERSION@</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>Copyright © 2011-2019 Alessandro Ranellucci, © 2016-2026 Prusa Research</string>
   <key>CFBundleIconFile</key>
   <string>PrusaSlicer.icns</string>
   <key>CFBundleName</key>
   <string>@SLIC3R_APP_KEY@</string>
   <key>CFBundleShortVersionString</key>
-  <string>@SLIC3R_APP_NAME@ @SLIC3R_BUILD_ID@</string>
+  <string>@SLIC3R_VERSION_SHORT@</string>
   <key>CFBundleIdentifier</key>
-  <string>com.prusa3d.slic3r/</string>
+  <string>com.prusa3d.slic3r</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundlePackageType</key>
@@ -21,7 +23,7 @@
   <key>CFBundleSignature</key>
   <string>????</string>
   <key>CFBundleVersion</key>
-  <string>@SLIC3R_BUILD_ID@</string>
+  <string>@SLIC3R_VERSION_SHORT@</string>
   <key>CFBundleDocumentTypes</key>
   <array>
     <dict>
