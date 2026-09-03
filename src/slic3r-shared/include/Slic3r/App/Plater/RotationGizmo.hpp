@@ -93,7 +93,7 @@ private:
         bool dragging_bend_slider{false};
         AxisType bend_slider_axis{AxisType::None};
         indexed_triangle_set base_unbent_mesh;
-        Domain::BoundingBox3f base_mesh_bbox;
+        Domain::BoundingBox3d base_mesh_bbox;
         Domain::ElementRef bend_target_element;
         float current_bend_horizontal{0.0f};
         float current_bend_vertical{0.0f};
