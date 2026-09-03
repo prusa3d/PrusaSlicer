@@ -48,6 +48,7 @@ struct ActionParams
     bool slice                              = false;
     bool export_stl                         = false;
     bool export_obj                         = false;
+    bool export_drc                         = false;
     bool export_3mf                         = false;
     bool export_gcode                       = false;
     bool export_sla                         = false;
@@ -79,6 +80,7 @@ struct ActionParams
             || slice
             || export_stl
             || export_obj
+            || export_drc
             || export_3mf
             || export_gcode
             || export_sla
