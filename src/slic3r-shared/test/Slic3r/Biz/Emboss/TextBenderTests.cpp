@@ -82,7 +82,7 @@ TEST_CASE("TextBender mesh bend", "[TextBender]")
         Domain::Vec3f( 20.0f, -5.0f, 0.0f),
         Domain::Vec3f(  0.0f,  5.0f, 0.0f)
     };
-    its.indices = { Domain::Vec3i(0, 1, 2) };
+    its.indices.push_back({0, 1, 2});
 
     BendParams params{ .horizontal_bend = 0.5f, .vertical_curl = 0.2f };
     TextBender::bend_mesh(its, params, bbox);
