@@ -78,11 +78,11 @@ TEST_CASE("TextBender mesh bend", "[TextBender]")
 
     indexed_triangle_set its;
     its.vertices = {
-        Vec3f(-20.0f, -5.0f, 0.0f),
-        Vec3f( 20.0f, -5.0f, 0.0f),
-        Vec3f(  0.0f,  5.0f, 0.0f)
+        Domain::Vec3f(-20.0f, -5.0f, 0.0f),
+        Domain::Vec3f( 20.0f, -5.0f, 0.0f),
+        Domain::Vec3f(  0.0f,  5.0f, 0.0f)
     };
-    its.indices = { Vec3i(0, 1, 2) };
+    its.indices = { Domain::Vec3i(0, 1, 2) };
 
     BendParams params{ .horizontal_bend = 0.5f, .vertical_curl = 0.2f };
     TextBender::bend_mesh(its, params, bbox);
@@ -100,3 +100,21 @@ TEST_CASE("BendedProjection front and back generation", "[BendedProjection]")
     // Back is displaced along depth (Z)
     REQUIRE(back.z() > front.z());
 }
+
+TEST_CASE("TextBender bend and unbend roundtrip", "[TextBender]")
+{
+    Domain::BoundingBox3f bbox(
+        Domain::Vec3f(-50.0f, -10.0f, 0.0f),
+        Domain::Vec3f(50.0f, 10.0f, 5.0f)
+    );
+    BendParams params{ .horizontal_bend = 0.8f, .vertical_curl = -0.4f };
+
+    Domain::Vec3d original(25.0, 5.0, 2.5);
+    Domain::Vec3d bent = TextBender::bend_point(original, params, bbox);
+    Domain::Vec3d unbent = TextBender::unbend_point(bent, params, bbox);
+
+    REQUIRE_THAT(unbent.x(), Catch::Matchers::WithinRel(original.x(), 1e-4));
+    REQUIRE_THAT(unbent.y(), Catch::Matchers::WithinRel(original.y(), 1e-4));
+    REQUIRE_THAT(unbent.z(), Catch::Matchers::WithinRel(original.z(), 1e-4));
+}
+
