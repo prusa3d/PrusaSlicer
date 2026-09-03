@@ -194,22 +194,33 @@ void RotationDialog::apply_bend_change(double horizontal_bend_rad, double vertic
         return;
 
     auto& mutable_volume = const_cast<Domain::ModelVolume&>(*selected_text.volume);
+    float prev_h = mutable_volume.text_configuration->style.prop.bend_horizontal.value_or(0.0f);
+    float prev_v = mutable_volume.text_configuration->style.prop.bend_vertical.value_or(0.0f);
     mutable_volume.text_configuration->style.prop.bend_horizontal = static_cast<float>(horizontal_bend_rad);
     mutable_volume.text_configuration->style.prop.bend_vertical = static_cast<float>(vertical_curl_rad);
 
     indexed_triangle_set bent_its = mutable_volume.mesh().its;
+    auto bbox = mutable_volume.mesh().bounding_box();
+    if (std::abs(prev_h) > 1e-4f || std::abs(prev_v) > 1e-4f) {
+        Biz::Emboss::BendParams prev_params{ .horizontal_bend = prev_h, .vertical_curl = prev_v };
+        Biz::Emboss::TextBender::unbend_mesh(bent_its, prev_params, bbox);
+    }
+
     Biz::Emboss::BendParams params{
         .horizontal_bend = static_cast<float>(horizontal_bend_rad),
         .vertical_curl = static_cast<float>(vertical_curl_rad)
     };
-    Biz::Emboss::TextBender::bend_mesh(bent_its, params, mutable_volume.mesh().bounding_box());
+    Biz::Emboss::TextBender::bend_mesh(bent_its, params, bbox);
     Domain::TriangleMesh bent_mesh(std::move(bent_its));
-    const auto& selection = m_project_interactor.scene_interactor().object_selection();
-    if (!selection.elements.empty()) {
-        Biz::Scene::SceneInteractor::RefMeshes ref_meshes;
-        ref_meshes.emplace_back(selection.elements.front(), std::move(bent_mesh));
-        m_project_interactor.scene_interactor().change_volume_meshes(std::move(ref_meshes));
-    }
+
+    Domain::ElementRef ref(
+        selected_text.volume->get_object()->id().id,
+        selected_text.instance_id.id,
+        selected_text.volume->id().id
+    );
+    Biz::Scene::SceneInteractor::RefMeshes ref_meshes;
+    ref_meshes.emplace_back(ref, std::move(bent_mesh));
+    m_project_interactor.scene_interactor().change_volume_meshes(std::move(ref_meshes));
     m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::Rotate);
 }
 

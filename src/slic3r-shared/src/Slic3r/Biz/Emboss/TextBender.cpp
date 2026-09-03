@@ -73,8 +73,78 @@ void TextBender::bend_mesh(
     const Domain::BoundingBox3d& base_bbox
 )
 {
-    Domain::BoundingBox3f bbox_f(base_bbox.min.cast<float>(), base_bbox.max.cast<float>());
+    Domain::BoundingBox3f bbox_f(base_bbox.min.template cast<float>(), base_bbox.max.template cast<float>());
     bend_mesh(its, params, bbox_f);
+}
+
+Domain::Vec3d TextBender::unbend_point(
+    const Domain::Vec3d& pt,
+    const BendParams& params,
+    const Domain::BoundingBox3f& base_bbox
+)
+{
+    const Domain::Vec3d min_pt = base_bbox.min.template cast<double>();
+    const Domain::Vec3d max_pt = base_bbox.max.template cast<double>();
+    const Domain::Vec3d center = 0.5 * (min_pt + max_pt);
+    const Domain::Vec3d size   = max_pt - min_pt;
+
+    const double W = std::max(size.x(), 1e-3);
+    const double H = std::max(size.y(), 1e-3);
+
+    double x = pt.x();
+    double y = pt.y();
+    double z = pt.z();
+
+    double dz_h = 0.0;
+    double dz_v = 0.0;
+
+    if (std::abs(params.horizontal_bend) > 1e-4f) {
+        const double theta = static_cast<double>(params.horizontal_bend);
+        const double R = W / theta;
+        const double sin_alpha = std::clamp((x - center.x()) * theta / W, -1.0, 1.0);
+        const double alpha = std::asin(sin_alpha);
+        x = center.x() + (alpha * W) / theta;
+        dz_h = R * (1.0 - std::cos(alpha));
+    }
+
+    if (std::abs(params.vertical_curl) > 1e-4f) {
+        const double phi = static_cast<double>(params.vertical_curl);
+        const double Ry = H / phi;
+        const double sin_beta = std::clamp((y - center.y()) * phi / H, -1.0, 1.0);
+        const double beta = std::asin(sin_beta);
+        y = center.y() + (beta * H) / phi;
+        dz_v = Ry * (1.0 - std::cos(beta));
+    }
+
+    z -= (dz_h + dz_v);
+
+    return Domain::Vec3d(x, y, z);
+}
+
+void TextBender::unbend_mesh(
+    indexed_triangle_set& its,
+    const BendParams& params,
+    const Domain::BoundingBox3f& base_bbox
+)
+{
+    if (std::abs(params.horizontal_bend) < 1e-4f && std::abs(params.vertical_curl) < 1e-4f) {
+        return;
+    }
+
+    for (auto& v : its.vertices) {
+        Domain::Vec3d unbent = unbend_point(v.template cast<double>(), params, base_bbox);
+        v = unbent.template cast<float>();
+    }
+}
+
+void TextBender::unbend_mesh(
+    indexed_triangle_set& its,
+    const BendParams& params,
+    const Domain::BoundingBox3d& base_bbox
+)
+{
+    Domain::BoundingBox3f bbox_f(base_bbox.min.template cast<float>(), base_bbox.max.template cast<float>());
+    unbend_mesh(its, params, bbox_f);
 }
 
 } // namespace Slic3r::Biz::Emboss

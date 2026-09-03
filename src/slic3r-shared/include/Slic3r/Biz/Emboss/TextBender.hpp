@@ -33,6 +33,24 @@ public:
         const BendParams& params,
         const Domain::BoundingBox3f& base_bbox
     );
+
+    static void unbend_mesh(
+        indexed_triangle_set& its,
+        const BendParams& params,
+        const Domain::BoundingBox3f& base_bbox
+    );
+
+    static void unbend_mesh(
+        indexed_triangle_set& its,
+        const BendParams& params,
+        const Domain::BoundingBox3d& base_bbox
+    );
+
+    static Domain::Vec3d unbend_point(
+        const Domain::Vec3d& pt,
+        const BendParams& params,
+        const Domain::BoundingBox3f& base_bbox
+    );
 };
 
 } // namespace Slic3r::Biz::Emboss

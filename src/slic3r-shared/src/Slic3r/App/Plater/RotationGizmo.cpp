@@ -412,13 +412,20 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
             if (selected_text.volume && selected_text.volume->text_configuration) {
                 project_context.base_unbent_mesh = selected_text.volume->mesh().its;
                 project_context.base_mesh_bbox = selected_text.volume->mesh().bounding_box();
-                const auto& selection = m_scene_interactor.object_selection();
-                if (!selection.elements.empty()) {
-                    project_context.bend_target_element = selection.elements.front();
-                }
+                project_context.bend_target_element = Domain::ElementRef(
+                    selected_text.volume->get_object()->id().id,
+                    selected_text.instance_id.id,
+                    selected_text.volume->id().id
+                );
                 const auto& prop = selected_text.volume->text_configuration->style.prop;
-                project_context.current_bend_horizontal = prop.bend_horizontal.value_or(0.0f);
-                project_context.current_bend_vertical = prop.bend_vertical.value_or(0.0f);
+                float prev_h = prop.bend_horizontal.value_or(0.0f);
+                float prev_v = prop.bend_vertical.value_or(0.0f);
+                if (std::abs(prev_h) > 1e-4f || std::abs(prev_v) > 1e-4f) {
+                    Biz::Emboss::BendParams prev_params{ .horizontal_bend = prev_h, .vertical_curl = prev_v };
+                    Biz::Emboss::TextBender::unbend_mesh(project_context.base_unbent_mesh, prev_params, project_context.base_mesh_bbox);
+                }
+                project_context.current_bend_horizontal = prev_h;
+                project_context.current_bend_vertical = prev_v;
             }
 
             return Scene::GizmoActivationState::Active;
@@ -467,6 +474,7 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
                         project_context.current_bend_vertical;
                 }
             }
+            project_context.base_unbent_mesh.vertices.clear();
             project_context.dragging_bend_slider = false;
             m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::Rotate);
             return Scene::GizmoActivationState::Done;
@@ -812,7 +820,27 @@ void RotationGizmo::apply_bend_slider_drag(double local_x)
         }
     }
 
-    if (!project_context.base_unbent_mesh.vertices.empty()) {
+    if (project_context.base_unbent_mesh.vertices.empty()) {
+        auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
+        if (selected_text.volume && selected_text.volume->text_configuration) {
+            project_context.base_unbent_mesh = selected_text.volume->mesh().its;
+            project_context.base_mesh_bbox = selected_text.volume->mesh().bounding_box();
+            project_context.bend_target_element = Domain::ElementRef(
+                selected_text.volume->get_object()->id().id,
+                selected_text.instance_id.id,
+                selected_text.volume->id().id
+            );
+            const auto& prop = selected_text.volume->text_configuration->style.prop;
+            float prev_h = prop.bend_horizontal.value_or(0.0f);
+            float prev_v = prop.bend_vertical.value_or(0.0f);
+            if (std::abs(prev_h) > 1e-4f || std::abs(prev_v) > 1e-4f) {
+                Biz::Emboss::BendParams prev_params{ .horizontal_bend = prev_h, .vertical_curl = prev_v };
+                Biz::Emboss::TextBender::unbend_mesh(project_context.base_unbent_mesh, prev_params, project_context.base_mesh_bbox);
+            }
+        }
+    }
+
+    if (!project_context.base_unbent_mesh.vertices.empty() && project_context.bend_target_element.volume_id != 0) {
         indexed_triangle_set bent_its = project_context.base_unbent_mesh;
         Biz::Emboss::BendParams params{
             .horizontal_bend = project_context.current_bend_horizontal,
@@ -820,9 +848,15 @@ void RotationGizmo::apply_bend_slider_drag(double local_x)
         };
         Biz::Emboss::TextBender::bend_mesh(bent_its, params, project_context.base_mesh_bbox);
         Domain::TriangleMesh bent_mesh(std::move(bent_its));
-        Biz::Scene::SceneInteractor::RefMeshes ref_meshes;
-        ref_meshes.emplace_back(project_context.bend_target_element, std::move(bent_mesh));
-        m_scene_interactor.change_volume_meshes(std::move(ref_meshes));
+        Biz::Scene::SceneInteractor::VolumeMeshReplacements replacements;
+        replacements.push_back(Biz::Scene::SceneInteractor::VolumeMeshReplacement{
+            project_context.bend_target_element,
+            std::move(bent_mesh)
+        });
+        auto updated = m_scene_interactor.change_volume_meshes(std::move(replacements));
+        if (!updated.empty()) {
+            project_context.bend_target_element = updated.front();
+        }
     }
 
     if (m_window != nullptr) {
