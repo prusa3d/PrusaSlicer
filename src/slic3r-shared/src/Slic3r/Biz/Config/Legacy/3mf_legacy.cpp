@@ -8,6 +8,7 @@
 #include "Slic3r/Semver.hpp"
 #include "Slic3r/Time.hpp"
 
+#include "Slic3r/Biz/Algorithms/LayerHeight.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/Config/3mf_legacy.hpp"
 
@@ -80,10 +81,11 @@ using Slic3r::Domain::VirtualExtruders;
 
 using namespace Slic3r::Biz;
 
-using Algorithms::open_zip_reader;
 using Algorithms::close_zip_reader;
-using Algorithms::open_zip_writer;
 using Algorithms::close_zip_writer;
+using Algorithms::open_zip_reader;
+using Algorithms::open_zip_writer;
+using Algorithms::LayerHeight::is_valid_layer_height_range;
 
 // Slightly faster than sprintf("%.9g"), but there is an issue with the karma floating point formatter,
 // https://github.com/boostorg/spirit/pull/586
@@ -1637,6 +1639,10 @@ namespace Slic3rLegacy {
                     pt::ptree range_tree = range.second;
                     double min_z = range_tree.get<double>("<xmlattr>.min_z");
                     double max_z = range_tree.get<double>("<xmlattr>.max_z");
+                    if (!is_valid_layer_height_range({min_z, max_z})) {
+                        add_error("Found invalid layer config range");
+                        continue;
+                    }
 
                     // get Z range information
                     Slic3rLegacy::DynamicPrintConfig config;

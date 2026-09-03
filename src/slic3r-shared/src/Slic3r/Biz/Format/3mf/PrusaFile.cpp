@@ -10,6 +10,7 @@
 
 
 #include "Slic3r/Log.hpp"
+#include "Slic3r/Biz/Algorithms/LayerHeight.hpp"
 #include "Slic3r/Biz/Format/ProjectFileConstants.hpp"
 #include "Slic3r/Biz/Format/VirtualExtruder.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
@@ -30,6 +31,8 @@ using Slic3r::Domain::Vec3d;
 using Slic3r::Domain::TriangleSelector::TriangleBitStreamMapping;
 using Slic3r::Domain::TriangleSelector::TriangleSplittingData;
 using Slic3r::Domain::TriangleSelector::TriangleStateType;
+
+using Slic3r::Biz::Algorithms::LayerHeight::is_valid_layer_height_range;
 
 using ModelObject = Slic3r::Domain::ModelObject;
 using ModelVolume = Slic3r::Domain::ModelVolume;
@@ -1255,11 +1258,12 @@ json ranges_to_json(const Domain::LayerConfigRanges &ranges) {
 
     json result = json::array();
     for (const auto &[range, config] : ranges) {
-        ASSERT(range.first < range.second);
+        ASSERT(is_valid_layer_height_range(range));
         json config_json = nlohmann::ordered_json(config);
-        assert(!config_json.empty());
-        if (config_json.empty())
-            continue;
+        if (config_json.empty()) {
+            // A range without any override is still a valid range.
+            config_json = json::object();
+        }
 
         json range_json;
         range_json[Z_RANGE] = range; //{range.first, range.second};
@@ -1289,7 +1293,8 @@ void ranges_from_json(const json &ranges_json, Domain::LayerConfigRanges &ranges
             continue;
         }
         Domain::LayerHeightRange z_range = range_json.value(Z_RANGE, Domain::LayerHeightRange(-1, -1));
-        if (z_range.first > z_range.second || z_range.first < 0) {
+        if (!is_valid_layer_height_range(z_range)) {
+            SPDLOG_WARN("Skipping invalid height range {}.", z_range_json.dump());
             collected_issues.add_issue(Read3mfIssue(RT::project_object_range_bad_z2, z_range_json.dump()));
             continue;
         }

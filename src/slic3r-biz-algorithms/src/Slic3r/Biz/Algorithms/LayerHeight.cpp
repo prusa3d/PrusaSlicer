@@ -843,4 +843,12 @@ ZHeightPairs layer_height_profile_adaptive(
     return layer_height_profile;
 }
 
+bool is_valid_layer_height_range(const LayerHeightRange& range)
+{
+    return std::isfinite(range.first)
+        && std::isfinite(range.second)
+        && 0. <= range.first
+        && range.first <= range.second;
+}
+
 } // namespace Slic3r::Biz::Algorithms::LayerHeight
