@@ -28,7 +28,7 @@ constexpr float CIRCLE_ANGLE_STEP = float(TWO_PI) / CIRCLE_RES;
 constexpr uint8_t SPHERE_RES = 32; // 32 steps in full circle
 constexpr float SPHERE_ANGLE_STEP = float(TWO_PI) / SPHERE_RES;
 
-constexpr uint8_t CYLINDER_RES = 32; // 32 steps in full circle
+constexpr uint8_t CYLINDER_RES = 180; // 180 steps in full circle
 constexpr float CYLINDER_ANGLE_STEP = float(TWO_PI) / CYLINDER_RES;
 
 } // namespace
@@ -87,7 +87,7 @@ void GeometryDataFactory::create_data(GeometryDataId id)
         // creates a cylinder contained into a 1x1x1 box 
         // the cylinder axis is the Z axis
         // the center of the cylinder base is at (0,0,0)
-        its = TriMesh::its_make_cylinder(0.5, 1.0, SPHERE_ANGLE_STEP);
+        its = TriMesh::its_make_cylinder(0.5, 1.0, CYLINDER_ANGLE_STEP);
         break;
 
     case GeometryDataId::ToolMarker:
