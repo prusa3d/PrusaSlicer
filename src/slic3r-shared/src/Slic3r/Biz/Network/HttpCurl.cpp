@@ -387,6 +387,7 @@ void HttpCurl::perform_sync(const HttpRetryOpt& retry_opts)
             break;
         }
 
+        m_buffer.clear();
         res = ::curl_easy_perform(m_curl.get());
         // Clear used data.
         m_upload_data.clear();
