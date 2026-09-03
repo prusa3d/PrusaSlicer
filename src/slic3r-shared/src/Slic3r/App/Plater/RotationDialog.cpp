@@ -215,7 +215,7 @@ void RotationDialog::apply_bend_change(double horizontal_bend_rad, double vertic
 
     Domain::ElementRef ref(
         selected_text.volume->get_object()->id().id,
-        selected_text.instance_id.id,
+        selected_text.instance_id,
         selected_text.volume->id().id
     );
     Biz::Scene::SceneInteractor::RefMeshes ref_meshes;

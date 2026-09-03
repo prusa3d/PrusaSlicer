@@ -414,7 +414,7 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
                 project_context.base_mesh_bbox = selected_text.volume->mesh().bounding_box();
                 project_context.bend_target_element = Domain::ElementRef(
                     selected_text.volume->get_object()->id().id,
-                    selected_text.instance_id.id,
+                    selected_text.instance_id,
                     selected_text.volume->id().id
                 );
                 const auto& prop = selected_text.volume->text_configuration->style.prop;
@@ -827,7 +827,7 @@ void RotationGizmo::apply_bend_slider_drag(double local_x)
             project_context.base_mesh_bbox = selected_text.volume->mesh().bounding_box();
             project_context.bend_target_element = Domain::ElementRef(
                 selected_text.volume->get_object()->id().id,
-                selected_text.instance_id.id,
+                selected_text.instance_id,
                 selected_text.volume->id().id
             );
             const auto& prop = selected_text.volume->text_configuration->style.prop;
