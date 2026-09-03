@@ -82,4 +82,62 @@ tl::expected<Domain::TriangleMesh, std::string> load_drc(const std::string& path
     }
 }
 
+bool store_drc(const std::string& path, const Domain::TriangleMesh& mesh, int bits, int speed)
+{
+    try {
+        const std::vector<stl_triangle_vertex_indices>* indices = &(mesh.its.indices);
+        const std::vector<stl_vertex>* vertices = &(mesh.its.vertices);
+        
+        Mesh dracoMesh;
+
+        dracoMesh.set_num_points(vertices->size());
+        
+        GeometryAttribute gaPos;
+        gaPos.Init(GeometryAttribute::POSITION, nullptr, 3, DT_FLOAT32, false, sizeof(float)*3, 0);
+        int32_t idPos = dracoMesh.AddAttribute(gaPos, true, indices->size() * 3);
+        
+        dracoMesh.attribute(idPos)->Resize(vertices->size());
+        
+        for (size_t i = 0; i < vertices->size(); ++ i) {
+            float vertex[3];
+            vertex[0] = vertices->at(i)(0);
+            vertex[1] = vertices->at(i)(1);
+            vertex[2] = vertices->at(i)(2);
+            dracoMesh.attribute(idPos)->SetAttributeValue(AttributeValueIndex(i), vertex);
+        }
+        
+        dracoMesh.SetNumFaces(indices->size());
+        for (size_t i = 0; i < indices->size(); ++ i) {
+            Mesh::Face face;
+            face[0] = PointIndex(indices->at(i)[0]);
+            face[1] = PointIndex(indices->at(i)[1]);
+            face[2] = PointIndex(indices->at(i)[2]);
+            dracoMesh.SetFace(FaceIndex(i), face);
+        }
+        
+        Encoder encoder;
+        encoder.SetSpeedOptions(speed, speed);
+        encoder.SetAttributeQuantization(GeometryAttribute::POSITION, bits);
+        
+        EncoderBuffer buffer;
+        if (!encoder.EncodeMeshToBuffer(dracoMesh, &buffer).ok()) return false;
+        
+        FILE* fp = boost::nowide::fopen(path.c_str(), "wb");
+        if (!fp) return false;
+        size_t written = fwrite(buffer.data(), 1, buffer.size(), fp);
+        fclose(fp);
+        
+        if (written != buffer.size()) return false;
+    } catch (const std::exception&) {
+        return false;
+    }
+    return true;
+}
+
+bool store_drc(const std::string& path, Domain::Model* model, int bits, int speed)
+{
+    Domain::TriangleMesh mesh = Algorithms::Model::flatten_to_mesh(*model);
+    return store_drc(path, mesh, bits, speed);
+}
+
 }; // namespace Slic3r::Biz
