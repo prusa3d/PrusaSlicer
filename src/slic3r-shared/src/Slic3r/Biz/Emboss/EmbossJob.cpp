@@ -1,4 +1,6 @@
 #include "Slic3r/Biz/Emboss/EmbossJob.hpp"
+#include "Slic3r/Biz/Emboss/TextBender.hpp"
+#include "Slic3r/Biz/Emboss/TextShapeProvider.hpp"
 #include "Slic3r/Log.hpp"
 
 #include "Slic3r/Domain/Model.hpp"
@@ -573,6 +575,17 @@ void UpdateJob::update_volume(Domain::ModelVolume& volume, Domain::TriangleMesh&
         volume.name = base.volume_name;
     }
 
+    if (volume.text_configuration) {
+        float h_bend = volume.text_configuration->style.prop.bend_horizontal.value_or(0.0f);
+        float v_curl = volume.text_configuration->style.prop.bend_vertical.value_or(0.0f);
+        if (std::abs(h_bend) > 1e-4f || std::abs(v_curl) > 1e-4f) {
+            indexed_triangle_set its = mesh.its;
+            Biz::Emboss::BendParams params{ .horizontal_bend = h_bend, .vertical_curl = v_curl };
+            Biz::Emboss::TextBender::bend_mesh(its, params, mesh.bounding_box());
+            mesh = Domain::TriangleMesh(std::move(its));
+        }
+    }
+
     const Domain::ModelObject* object = volume.get_object();
     assert(object != nullptr);
     if (object == nullptr)
@@ -877,7 +890,19 @@ TriMeshResult create_mesh_per_glyph(TriMeshBaseData& input, Fnc was_canceled)
     if (result.empty()) // Whole text do not contain any shape.
         return tl::unexpected{ JobIssue::no_shape };         
 
-    return Biz::Algorithms::TriangleMesh::construct(std::move(result));
+    auto mesh = Biz::Algorithms::TriangleMesh::construct(std::move(result));
+    const auto* tsp = dynamic_cast<const TextShapeProvider*>(input.shape_provider.get());
+    if (tsp != nullptr) {
+        float h_bend = tsp->text_configuration().style.prop.bend_horizontal.value_or(0.0f);
+        float v_curl = tsp->text_configuration().style.prop.bend_vertical.value_or(0.0f);
+        if (std::abs(h_bend) > 1e-4f || std::abs(v_curl) > 1e-4f) {
+            indexed_triangle_set its = mesh.its;
+            Biz::Emboss::BendParams params{ .horizontal_bend = h_bend, .vertical_curl = v_curl };
+            Biz::Emboss::TextBender::bend_mesh(its, params, mesh.bounding_box());
+            mesh = Biz::Algorithms::TriangleMesh::construct(std::move(its));
+        }
+    }
+    return mesh;
 }
 
 template <typename Fnc>
@@ -894,7 +919,19 @@ TriMeshResult try_create_mesh(TriMeshBaseData& input, const Fnc& was_canceled)
         return tl::unexpected{ JobIssue::canceled };
 
     ProjectTransform project = create_projection(input.shape_provider->get_shape(), input.is_outside);
-    return Biz::Algorithms::TriangleMesh::construct(polygons2model(shapes, project));
+    auto mesh = Biz::Algorithms::TriangleMesh::construct(polygons2model(shapes, project));
+    const auto* tsp = dynamic_cast<const TextShapeProvider*>(input.shape_provider.get());
+    if (tsp != nullptr) {
+        float h_bend = tsp->text_configuration().style.prop.bend_horizontal.value_or(0.0f);
+        float v_curl = tsp->text_configuration().style.prop.bend_vertical.value_or(0.0f);
+        if (std::abs(h_bend) > 1e-4f || std::abs(v_curl) > 1e-4f) {
+            indexed_triangle_set its = mesh.its;
+            Biz::Emboss::BendParams params{ .horizontal_bend = h_bend, .vertical_curl = v_curl };
+            Biz::Emboss::TextBender::bend_mesh(its, params, mesh.bounding_box());
+            mesh = Biz::Algorithms::TriangleMesh::construct(std::move(its));
+        }
+    }
+    return mesh;
 }
 
 Domain::TriangleMesh create_default_mesh()

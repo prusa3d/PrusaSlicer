@@ -19,6 +19,7 @@ public:
     create_text_lines(const Domain::Transform3d& tr, const Domain::ModelObject& object) override;
 
     void write(Domain::ModelVolume& volume) const override;
+    const Domain::TextConfiguration& text_configuration() const { return m_text_configuration; }
 
 private:
     // font item is not used for create object

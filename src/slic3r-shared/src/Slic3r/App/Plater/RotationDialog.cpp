@@ -96,7 +96,9 @@ RotationDialog::RotationDialog(
     m_bend_input->set_visible({true, true, false});
     m_bend_input->on_change = [this](const Domain::Vec3d& value, int index)
     {
-        apply_bend_change(deg2rad(value(1)), deg2rad(value(0)));
+        double v_deg = std::clamp(value(0), -180.0, 180.0);
+        double h_deg = std::clamp(value(1), -180.0, 180.0);
+        apply_bend_change(deg2rad(h_deg), deg2rad(v_deg));
     };
     m_bend_section->set_visible(false);
 }
@@ -189,6 +191,9 @@ void RotationDialog::set_bend_values(double horizontal_bend_deg, double vertical
 
 void RotationDialog::apply_bend_change(double horizontal_bend_rad, double vertical_curl_rad)
 {
+    horizontal_bend_rad = std::clamp(horizontal_bend_rad, -std::numbers::pi, std::numbers::pi);
+    vertical_curl_rad   = std::clamp(vertical_curl_rad, -std::numbers::pi, std::numbers::pi);
+
     auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
     if (!selected_text.volume || !selected_text.volume->text_configuration)
         return;
@@ -199,19 +204,21 @@ void RotationDialog::apply_bend_change(double horizontal_bend_rad, double vertic
     mutable_volume.text_configuration->style.prop.bend_horizontal = static_cast<float>(horizontal_bend_rad);
     mutable_volume.text_configuration->style.prop.bend_vertical = static_cast<float>(vertical_curl_rad);
 
-    indexed_triangle_set bent_its = mutable_volume.mesh().its;
+    indexed_triangle_set its = mutable_volume.mesh().its;
     auto bbox = mutable_volume.mesh().bounding_box();
     if (std::abs(prev_h) > 1e-4f || std::abs(prev_v) > 1e-4f) {
         Biz::Emboss::BendParams prev_params{ .horizontal_bend = prev_h, .vertical_curl = prev_v };
-        Biz::Emboss::TextBender::unbend_mesh(bent_its, prev_params, bbox);
+        Biz::Emboss::TextBender::unbend_mesh(its, prev_params, bbox);
     }
+
+    auto unbent_bbox = Domain::bounding_box(its);
 
     Biz::Emboss::BendParams params{
         .horizontal_bend = static_cast<float>(horizontal_bend_rad),
         .vertical_curl = static_cast<float>(vertical_curl_rad)
     };
-    Biz::Emboss::TextBender::bend_mesh(bent_its, params, bbox);
-    Domain::TriangleMesh bent_mesh(std::move(bent_its));
+    Biz::Emboss::TextBender::bend_mesh(its, params, unbent_bbox);
+    Domain::TriangleMesh bent_mesh(std::move(its));
 
     Domain::ElementRef ref(
         selected_text.volume->get_object()->id().id,

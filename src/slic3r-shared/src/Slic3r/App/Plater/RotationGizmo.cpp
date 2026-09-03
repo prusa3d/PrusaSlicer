@@ -275,7 +275,7 @@ static void build_rotate_node(
                 }
             );
 
-            if (axis == AxisType::XAxis || axis == AxisType::YAxis) {
+            if (!use_graded_circle && (axis == AxisType::XAxis || axis == AxisType::YAxis)) {
                 bldr.child(
                     [&](Scene::NodeBuilder& child_bldr)
                     {
@@ -601,7 +601,7 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
 void RotationGizmo::on_transient_mouse(Scene::GizmoEventContext& ctx)
 {
     ProjectContext& project_context{m_projects.selected()};
-    if (!project_context.activated || project_context.dragging) {
+    if (!project_context.activated || project_context.dragging || project_context.dragging_bend_slider) {
         return;
     }
 
@@ -616,6 +616,7 @@ void RotationGizmo::on_transient_mouse(Scene::GizmoEventContext& ctx)
 void RotationGizmo::on_cycle_prepare()
 {
     m_projects.selected().dragging = false;
+    m_projects.selected().dragging_bend_slider = false;
 }
 
 static void hide_xy_axis(Scene::Node& main_node)
@@ -695,8 +696,12 @@ void RotationGizmo::on_scene_selection_bounding_box_changed(
 )
 {
     ProjectContext& project_context{m_projects.selected()};
-    if (project_context.activated && project_context.dragging) {
-        m_scene_presenter.selection_root().set_enabled(false);
+    if (project_context.activated) {
+        if (project_context.dragging) {
+            m_scene_presenter.selection_root().set_enabled(false);
+        } else if (!project_context.dragging_bend_slider) {
+            update_bend_sliders_visibility_and_position();
+        }
     }
 }
 
@@ -752,6 +757,9 @@ bool RotationGizmo::is_selected_volume_emboss_text() const
 void RotationGizmo::update_bend_sliders_visibility_and_position()
 {
     ProjectContext& project_context{m_projects.selected()};
+    if (project_context.dragging_bend_slider) {
+        return;
+    }
     const bool is_text = is_selected_volume_emboss_text();
 
     if (project_context.bend_slider_x != nullptr) {

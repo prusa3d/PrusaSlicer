@@ -39,15 +39,22 @@ Domain::Vec3d BendedProjection::project(const Domain::Vec3d& point) const
         (m_center - 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>(),
         (m_center + 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>()
     );
-    return TextBender::bend_point(point, m_params, bbox);
+    Domain::Vec3d unbent = TextBender::unbend_point(point, m_params, bbox);
+    unbent.z() += m_depth;
+    return TextBender::bend_point(unbent, m_params, bbox);
 }
 
 std::optional<Domain::Vec2d> BendedProjection::unproject(const Domain::Vec3d& p, double* depth) const
 {
+    Domain::BoundingBox3f bbox(
+        (m_center - 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>(),
+        (m_center + 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>()
+    );
+    Domain::Vec3d unbent = TextBender::unbend_point(p, m_params, bbox);
     if (depth != nullptr) {
-        *depth = p.z();
+        *depth = unbent.z();
     }
-    return Domain::Vec2d(p.x(), p.y());
+    return Domain::Vec2d(unbent.x(), unbent.y());
 }
 
 } // namespace Slic3r::Biz::Emboss

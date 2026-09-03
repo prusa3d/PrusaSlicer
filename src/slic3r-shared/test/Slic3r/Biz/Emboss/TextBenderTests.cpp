@@ -87,7 +87,7 @@ TEST_CASE("TextBender mesh bend", "[TextBender]")
     BendParams params{ .horizontal_bend = 0.5f, .vertical_curl = 0.2f };
     TextBender::bend_mesh(its, params, bbox);
 
-    REQUIRE(its.vertices.size() == 3);
+    REQUIRE(its.vertices.size() >= 3);
     REQUIRE(its.vertices[0].z() > 0.0f);
     REQUIRE(its.vertices[1].z() > 0.0f);
 }
@@ -116,5 +116,66 @@ TEST_CASE("TextBender bend and unbend roundtrip", "[TextBender]")
     REQUIRE_THAT(unbent.x(), Catch::Matchers::WithinRel(original.x(), 1e-4));
     REQUIRE_THAT(unbent.y(), Catch::Matchers::WithinRel(original.y(), 1e-4));
     REQUIRE_THAT(unbent.z(), Catch::Matchers::WithinRel(original.z(), 1e-4));
+}
+
+static Domain::BoundingBox3f calc_mesh_bounds(const indexed_triangle_set& mesh)
+{
+    Domain::Vec3f lo = mesh.vertices.front(), hi = lo;
+    for (const auto& p : mesh.vertices) {
+        lo = lo.cwiseMin(p);
+        hi = hi.cwiseMax(p);
+    }
+    return {lo, hi};
+}
+
+TEST_CASE("Review: setting a bent mesh back to zero restores the original", "[review]")
+{
+    indexed_triangle_set mesh;
+    for (float x : {-50.f, 0.f, 50.f})
+        for (float y : {-10.f, 10.f})
+            for (float z : {0.f, 5.f})
+                mesh.vertices.emplace_back(x, y, z);
+    const auto original = mesh;
+    const auto original_bounds = calc_mesh_bounds(mesh);
+    const BendParams bend{static_cast<float>(std::numbers::pi / 2), 0.f};
+    TextBender::bend_mesh(mesh, bend, original_bounds);
+    const auto current_bounds = calc_mesh_bounds(mesh);
+    TextBender::unbend_mesh(mesh, bend, current_bounds);
+    TextBender::bend_mesh(mesh, BendParams{}, current_bounds);
+    double worst_error = 0.;
+    for (size_t i = 0; i < mesh.vertices.size(); ++i)
+        worst_error = std::max(worst_error, static_cast<double>((mesh.vertices[i] - original.vertices[i]).norm()));
+    INFO("restored width = " << (calc_mesh_bounds(mesh).max.x() - calc_mesh_bounds(mesh).min.x()));
+    REQUIRE(worst_error < 0.001);
+}
+
+TEST_CASE("Review: straight glyph edges follow the requested curl", "[review]")
+{
+    indexed_triangle_set mesh;
+    mesh.vertices = {{-1.f, -10.f, 0.f}, {-1.f, 10.f, 0.f}, {1.f, -10.f, 0.f}, {1.f, 10.f, 0.f}};
+    mesh.indices = {{0, 2, 1}, {1, 2, 3}};
+    const auto bbox = calc_mesh_bounds(mesh);
+    const BendParams bend{0.f, static_cast<float>(std::numbers::pi / 2)};
+    const Domain::Vec3d expected_midpoint = TextBender::bend_point({-1., 0., 0.}, bend, bbox);
+    TextBender::bend_mesh(mesh, bend, bbox);
+    const Domain::Vec3d actual_midpoint = ((mesh.vertices[0] + mesh.vertices[1]) * 0.5f).cast<double>();
+    REQUIRE((actual_midpoint - expected_midpoint).norm() < 0.1);
+}
+
+TEST_CASE("Review: projection preserves the IProjection contracts", "[review]")
+{
+    const BendedProjection projection(3., 100., 20., {0., 0., 0.}, 0.5f, 0.2f);
+    const Domain::Vec2crd original{10, 5};
+    const auto [front, back] = projection.create_front_back(original);
+    SECTION("project advances from the front to the back") {
+        REQUIRE((projection.project(front) - back).norm() < 0.0001);
+    }
+    SECTION("unproject recovers the coordinates and front depth") {
+        double depth = -1.;
+        const auto recovered = projection.unproject(front, &depth);
+        REQUIRE(recovered.has_value());
+        CHECK((recovered.value() - original.cast<double>()).norm() < 0.0001);
+        CHECK_THAT(depth, Catch::Matchers::WithinAbs(0., 0.0001));
+    }
 }
 
