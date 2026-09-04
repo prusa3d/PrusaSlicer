@@ -1137,6 +1137,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Format/objparser.hpp
         include/Slic3r/Biz/Format/STEP.hpp
         src/Slic3r/Biz/Format/STEP.cpp
+        include/Slic3r/Biz/Format/DRC.hpp
+        src/Slic3r/Biz/Format/DRC.cpp
 
         include/Slic3r/Biz/ArrangeInteractor.hpp
         src/Slic3r/Biz/ArrangeInteractor.cpp
@@ -1387,6 +1389,7 @@ endif ()
 find_package(magic_enum REQUIRED)
 find_package(range-v3 REQUIRED)
 find_package(libdeflate CONFIG REQUIRED)
+find_package(draco CONFIG REQUIRED)
 
 slic3r_remap_configs("pugixml::static;yoga::yogacore;${YAML_LIB}" RelWithDebInfo Release)
 
@@ -1422,6 +1425,7 @@ target_link_libraries(slic3r-shared PUBLIC
         range-v3::range-v3
         libcereal
         libdeflate::libdeflate_static
+        draco::draco
 )
 target_compile_definitions(slic3r-shared PUBLIC ${SLIC3R_YAML_DEFINE} ${USE_NATIVE_MENU_DEFINE})
 if (SLIC3R_SENTRY_DSN)

@@ -3,6 +3,7 @@
 #include "Slic3r/Biz/Format/SVG.hpp"
 #include "Slic3r/Biz/Format/OBJ.hpp"
 #include "Slic3r/Biz/Format/STEP.hpp"
+#include "Slic3r/Biz/Format/DRC.hpp"
 #include "Slic3r/Biz/Format/3mf.hpp"
 #include "Slic3r/Biz/Config/3mf_legacy.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
@@ -708,8 +709,9 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
     const bool is_svg = boost::algorithm::iends_with(path_str, ".svg");
     const bool is_step = boost::algorithm::iends_with(path_str, ".step") ||
                          boost::algorithm::iends_with(path_str, ".stp");
-    if (is_stl || is_obj) {
-        auto loaded_mesh = is_stl ? Biz::load_stl(path_str) : Biz::load_obj(path_str);
+    const bool is_drc = boost::algorithm::iends_with(path_str, ".drc");
+    if (is_stl || is_obj || is_drc) {
+        auto loaded_mesh = is_stl ? Biz::load_stl(path_str) : is_obj ? Biz::load_obj(path_str) : Biz::load_drc(path_str);
         if (loaded_mesh) {
             Domain::TriangleMesh mesh = loaded_mesh.value();
             ret.mesh                  = mesh;
@@ -1224,6 +1226,7 @@ const std::vector<std::string>& get_import_extensions()
         ".3mf",
         ".stl",
         ".obj",
+        ".drc",
         ".svg",
         ".step", ".stp"
     };
