@@ -5,6 +5,26 @@
 
 namespace Slic3r::Biz::FileDownloader {
 
+
+struct FileDownloaderTag
+{
+    virtual  ~FileDownloaderTag() = default;
+};
+
+using FileDownloaderTagPtr = std::shared_ptr<FileDownloaderTag>;
+
+// TODO: move outside file dowloader
+struct PrintablesFileDownloaderTag : FileDownloaderTag
+{
+    bool new_project{false};
+};
+
+struct PluginFileDownloaderTag : FileDownloaderTag
+{
+    std::string plugin_id;
+    std::string version;
+};
+
 struct FileDownloaderJobProgressPayload
 {
     size_t download_id;
@@ -13,6 +33,7 @@ struct FileDownloaderJobProgressPayload
     size_t load_count;
     boost::filesystem::path final_path;
     size_t total_files;
+    FileDownloaderTagPtr tag;
 };
 
 struct FileDownloaderJobInput
@@ -35,7 +56,7 @@ struct FileDownloaderJobInput
 struct FileDownloaderMultiTicket
 {
     std::vector<FileDownloaderJobInput> jobs;
-    bool new_project {false};
+    FileDownloaderTagPtr tag;
 };
 
 struct FileDownloaderJobData
@@ -47,6 +68,7 @@ struct FileDownloaderJobData
     double percent_from;
     double percent_to;
     size_t total_files;
+    FileDownloaderTagPtr tag;
     // Runtime
     boost::filesystem::path tmp_path;
     size_t written{0};
@@ -59,7 +81,7 @@ struct FileDownloaderJobData
 struct MultiFileDownloaderJobData
 {
     std::vector<FileDownloaderJobData> data;
-    bool new_project;
+    FileDownloaderTagPtr tag;
 };
 
 } // namespace Slic3r::Biz::FileDownloader

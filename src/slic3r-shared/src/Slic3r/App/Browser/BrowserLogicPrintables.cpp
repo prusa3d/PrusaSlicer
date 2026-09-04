@@ -277,6 +277,7 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_dow
     info.load_count = 0;
     Biz::FileDownloader::FileDownloaderMultiTicket sources;
     sources.jobs.push_back(std::move(info));
+    sources.tag = std::make_shared<Biz::FileDownloader::PrintablesFileDownloaderTag>();
     m_project_interactor.download_model_from_printables_tab(std::move(sources));
     return {{BrowserLogicCommandType::SwitchToSlicing, {}}};;
 }
@@ -306,6 +307,7 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_sli
     info.load_count = 1;
     Biz::FileDownloader::FileDownloaderMultiTicket sources;
     sources.jobs.push_back(std::move(info));
+    sources.tag = std::make_shared<Biz::FileDownloader::PrintablesFileDownloaderTag>();
     m_project_interactor.download_model_from_printables_tab(std::move(sources));
     return {{BrowserLogicCommandType::SwitchToSlicing, {}}};
 }
@@ -316,11 +318,13 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_sli
 {
 
     Biz::FileDownloader::FileDownloaderMultiTicket sources;
+    auto tag = std::make_shared<Biz::FileDownloader::PrintablesFileDownloaderTag>();
+    sources.tag = tag;
      
     try {
         nlohmann::json j = nlohmann::json::parse(message_data);
         if (j.contains("new_project") && j["new_project"].is_boolean()) {
-            sources.new_project = j["new_project"].get<bool>();
+            tag->new_project = j["new_project"].get<bool>();
         }
         if (j.contains("objects") && j["objects"].is_array()) {
             for (const auto& obj : j["objects"]) {

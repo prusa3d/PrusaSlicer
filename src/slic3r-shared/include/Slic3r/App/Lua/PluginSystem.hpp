@@ -50,6 +50,11 @@ public:
         const std::string& zip_file_path,
         PublicKeyLookupStrategy key_lookup_strategy = PublicKeyLookupStrategy::Author
     );
+    void download_file(
+        const std::string& plugin_id,
+        const std::string& version,
+        const std::string& url
+    );
     void install_marketplace_bundle(const BundleRequestConfig& config);
 
     Yoga::Passthrough<PluginDialog>& init_dialog();

@@ -586,7 +586,15 @@ public:
     /**
      * @brief Callback from FileDownloader.
      */
-    void on_model_downloaded(const std::vector<boost::filesystem::path>& paths, bool in_new_project) override;
+    void on_files_downloaded(
+        const std::vector<boost::filesystem::path>& paths,
+        FileDownloader::FileDownloaderTagPtr tag
+    ) override;
+
+    FileDownloader::FileDownloaderInteractor& file_downloader_interactor()
+    {
+        return m_file_downloader_interactor;
+    }
 
     /**
      * @brief Callback from AppInstanceMessageHandler.

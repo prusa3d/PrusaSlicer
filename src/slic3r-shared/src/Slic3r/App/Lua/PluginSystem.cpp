@@ -145,6 +145,23 @@ void PluginSystem::
 
 }
 
+void PluginSystem::
+    download_file(const std::string& plugin_id, const std::string& version, const std::string& url)
+{
+    Biz::FileDownloader::FileDownloaderMultiTicket ticket;
+    Biz::FileDownloader::FileDownloaderJobInput job_input;
+    job_input.file_name = fmt::format("{}@{}.zip", plugin_id, version);
+    job_input.file_url = url;
+    ticket.jobs.emplace_back(std::move(job_input));
+
+    auto tag = std::make_shared<Biz::FileDownloader::PluginFileDownloaderTag>();
+    tag->plugin_id = plugin_id;
+    tag->version = version;
+
+    ticket.tag = tag;
+    m_project_interactor.file_downloader_interactor().init_multi_job(std::move(ticket));
+}
+
 std::vector<InstalledBundle> PluginSystem::installed_bundles() const
 {
     const auto& bundles = m_registry.plugin_bundles();

@@ -123,7 +123,15 @@ FileDownloaderJobData perform_job(
     );
 
     Domain::ProgressDetail detail;
-    FileDownloaderJobProgressPayload payload(job_data.id, job_data.input_data.file_name, job_data.input_data.project_url, job_data.input_data.load_count, dest_path, job_data.total_files);
+    FileDownloaderJobProgressPayload payload(
+        job_data.id,
+        job_data.input_data.file_name,
+        job_data.input_data.project_url,
+        job_data.input_data.load_count,
+        dest_path,
+        job_data.total_files,
+        job_data.tag
+    );
     detail.payload = std::move(payload);
     job_progress.set_progress_detail(detail);
 
@@ -246,7 +254,7 @@ FileDownloaderJobData perform_job(
                  dest_path  = job_data.dest_folder / job_data.input_data.file_name;
 
                  Domain::ProgressDetail detail;
-                 FileDownloaderJobProgressPayload payload(job_data.id, job_data.input_data.file_name, job_data.input_data.project_url, job_data.input_data.load_count, dest_path, job_data.total_files);
+                 FileDownloaderJobProgressPayload payload(job_data.id, job_data.input_data.file_name, job_data.input_data.project_url, job_data.input_data.load_count, dest_path, job_data.total_files, job_data.tag);
                  detail.payload = std::move(payload);
                  job_progress.set_progress_detail(detail);
              }

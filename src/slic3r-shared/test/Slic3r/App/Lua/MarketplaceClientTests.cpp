@@ -98,7 +98,7 @@ struct Fixture
     StdMainThreadDispatcher dispatcher;
     RecordingListener listener;
     MarketplaceClient client;
-
+    std::vector<std::unique_ptr<trompeloeil::expectation>> expectations;
     Fixture()
     {
         prev_data_dir = Slic3r::data_dir();
@@ -124,13 +124,14 @@ struct Fixture
     void arrange_http(const Responses& responses)
     {
         Slic3r::Biz::Network::MockHttpProvider::get().set_create_fn(
-            [responses](
+            [responses, this](
                 Slic3r::Biz::Network::IHttp::RequestMethod,
                 const std::string& url,
                 Slic3r::Biz::Network::IHttp::RetryFn retryfn
             ) -> std::unique_ptr<Slic3r::Biz::Network::MockHttp>
             {
                 auto http = std::make_unique<Slic3r::Biz::Network::MockHttp>(url, retryfn);
+                expectations.push_back(NAMED_ALLOW_CALL(*http, size_limit_mock(trompeloeil::_)));
                 http->set_perform_override_fn(
                     [responses,
                      url](Slic3r::Biz::Network::MockHttp* h, const Slic3r::Biz::Network::HttpRetryOpt&)

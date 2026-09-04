@@ -139,6 +139,16 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_script_messag
         return {};
     }
 
+    if (action == "DOWNLOAD") {
+        std::string url     = msg["url"].get<std::string>();
+        std::string id      = msg["id"].get<std::string>();
+        std::string version = msg["version"].get<std::string>();
+        SPDLOG_DEBUG("Download message: URL: {}", url);
+        m_plugin_system.download_file(id, version, url);
+
+        return {};
+    }
+
     SPDLOG_INFO("Plugin Marketplace: unknown action {}", action);
     return {};
 }
