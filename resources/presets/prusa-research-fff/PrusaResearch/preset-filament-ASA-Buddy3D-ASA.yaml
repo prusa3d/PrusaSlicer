@@ -1,0 +1,131 @@
+kind: filament
+inherits:
+- Prusament ASA
+- '*PA_Buddy3D_ASA*'
+name: Buddy3D ASA
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/
+id: Buddy3D ASA
+values:
+  filament_cost: '23.99'
+  filament_vendor: Buddy3D
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: lxinlLlMTli9W1OYoGlgWA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: HSAEbvzvQHaAkOj6Z5eLFg
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: eKS3/29bTau1/O3jBxA4Cg
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: Rl+/xRM3T0emjqXFs+AJqA
+    values:
+      filament_max_volumetric_speed: 12
+    # 0.4HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: Vi2n0W5uRFaJXkPIhp0P/Q
+      values:
+        filament_max_volumetric_speed: 20
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: nGt6ZNy6RFKuuLMh/1Xkww
+    values:
+      filament_max_volumetric_speed: 12
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: 682cF9WoSo63xuyBsYxW2g
+      values:
+        filament_max_volumetric_speed: 20
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: WcS9/hxvTh2brw49mpzung
+    values:
+      filament_max_volumetric_speed: 14
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: Tb6rFdbMS/CW+wcPZDF9BQ
+      values:
+        filament_max_volumetric_speed: 24
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: Jr4VUzsrSpSITH2BA8cNIQ
+    values:
+      filament_max_volumetric_speed: 17
+    # 0.8HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: xaKrD70HQxubru1kTKIcWQ
+      values:
+        filament_max_volumetric_speed: 27
+---
+kind: filament
+# Pressure advance values
+id: '*PA_Buddy3D_ASA*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: plOyuhqPTUG0SO+P7oZXWQ
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 3xD2g3g5Rt+K8fzieJD+/A
+    values:
+      pressure_advance_value: 0.11
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: XnSiD0s4QNGUZbFv5bedEw
+    values:
+      pressure_advance_value: 0.08
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: xSGH3HS+QfySGRaKjG3WWA
+    values:
+      pressure_advance_value: 0.03
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: nfDRvbq+TqqYHQZU0xp9Ug
+      values:
+        pressure_advance_value: 0.03
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: T60xeDyJQMmLCF57mKGqpg
+    values:
+      pressure_advance_value: 0.024
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: cx9zU5l2RZCCa3qCq3gV+g
+      values:
+        pressure_advance_value: 0.024
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: qH61uR9PRxaaHuDyw9Ig0g
+    values:
+      pressure_advance_value: 0.02
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: LlOo3HEUSsKDYTUA4rEcpQ
+      values:
+        pressure_advance_value: 0.02
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: XAMHkgvRTTS3SUMNNMniJQ
+    values:
+      pressure_advance_value: 0.014
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: S/CKGHk8SDmN9yhY7dY+sA
+      values:
+        pressure_advance_value: 0.014

@@ -1,0 +1,65 @@
+kind: filament
+inherits:
+- '*ABSCF*'
+- '*FilaCarbon_MAXVOLSPEED*'
+name: Filatech FilaCarbon
+id: Filatech FilaCarbon
+values:
+  filament_vendor: Filatech
+  extrusion_multiplier: 0.95
+  filament_density: 1.1
+  first_layer_temperature: 255
+  temperature: 255
+---
+kind: filament
+# Maximum volumetric speed limits
+id: '*FilaCarbon_MAXVOLSPEED*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: DuPGJF3VT2+oQNgh1QAacQ
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: bO68Jk2HQE2sSv8ED40UTw
+    values:
+      filament_max_volumetric_speed: 9
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: ZEJJaHbcS+udNJ+xVDVlyg
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: elv01YhyQZactXqzKbFV7Q
+    values:
+      filament_max_volumetric_speed: 15
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: 9TQ68XVjQdSAbpnmqYZUQg
+    values:
+      filament_max_volumetric_speed: 18
+- condition: printer.base_model=~/(MK3|MK3.5|MINI|MK2)/
+  id: vQ9D1K9+RT+ZuOdaXfqfCw
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: VjDCC0OiQ5CT5iIuXjMDwQ
+    values:
+      filament_max_volumetric_speed: 9
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: QGXFr6ULTZqZCdZD5HjNFw
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: SlngOuMJSzKjqlhBy+UJlA
+    values:
+      filament_max_volumetric_speed: 15
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: bwckB72NQWOxDe/L+Oik5A
+    values:
+      filament_max_volumetric_speed: 18
+

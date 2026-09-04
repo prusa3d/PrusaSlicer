@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: eSun ABS
+id: eSun ABS
+values:
+  filament_cost: 27.82
+  filament_vendor: eSun
+  filament_density: 1.01
+  filament_spool_weight: 265
+  filament_infill_max_crossing_speed: 200
+

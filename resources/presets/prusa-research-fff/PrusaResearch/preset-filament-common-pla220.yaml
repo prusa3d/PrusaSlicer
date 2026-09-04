@@ -1,0 +1,443 @@
+kind: filament
+id: '*PLA220*'
+inherits:
+- '*common*'
+- '*PLA*'
+values:
+  first_layer_temperature: 215
+  temperature: 215
+variants:
+  ## C1
+- condition: printer.base_model == "COREONE"
+  id: q7m7+vNtSAeYHguudHu+eA
+  values:
+    temperature: 220
+  variants:
+  # C1 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @COREONE 0.25'
+  # C1 0.3
+    id: sZwhy9cFTnuFhx4IfvRhWA
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLA220* @COREONE 0.3'
+  # C1 0.4
+    id: WPf0YHtIRlyi7eIFW+PJoA
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @COREONE 0.4'
+    id: y+PB67UATjihz7gQ/MfjXw
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @COREONE HF0.4'
+  # C1 0.5
+      id: Wmqgi9yqRbeG9bcLSlqXjQ
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLA220* @COREONE 0.5'
+    id: foF1bFFbTZqHH/SP1j74eA
+    variants:
+    # C1 HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @COREONE HF0.5'
+  # C1 0.6
+      id: oMCcR0URSzy6hLMtvIWA+A
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @COREONE 0.6'
+    id: uFQsYKUJQxecadQF5pBmtw
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @COREONE HF0.6'
+  # C1 0.8
+      id: ngUxjpq4Q7Ke07LT7rqbjA
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @COREONE 0.8'
+    id: vro9WKa3SQyNTBCyL+ltGA
+    values:
+      temperature: 230
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @COREONE HF0.8'
+## XL
+      id: 6XM/Q2U0T62MWQN9iVKu+A
+- condition: printer.model == "XL"
+  id: 8fHTrRlER5OOvXbh4Z1tmw
+  values:
+    temperature: 220
+  variants:
+  # XL 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @XL 0.25'
+  # XL 0.3
+    id: IA8Sa/ZFT5+fMbsQqz74BA
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLA220* @XL 0.3'
+  # XL 0.4
+    id: gx1+vzXXQVaZmNitND4WuQ
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @XL 0.4'
+    id: jG1C5ir2QsCmeFzN/PY8TA
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL HF0.4'
+  # XL 0.5
+      id: BX1kVB5WTlyl0Vfs5JN4rQ
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLA220* @XL 0.5'
+    id: a3Fd1rBDR9+Y1w4kW7iU8Q
+    variants:
+    # XL HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL HF0.5'
+  # XL 0.6
+      id: 0UpdMPneSBufCnw9Ne0fCQ
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @XL 0.6'
+    id: h2DY/7OGSpuf56c4E2xtGA
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL HF0.6'
+  # XL 0.8
+      id: +UJ4XY/ySXipr3vPkYpnXQ
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @XL 0.8'
+    id: rKNzSQfARoO39hhfEh8Xsw
+    values:
+      temperature: 230
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL HF0.8'
+# XL+
+      id: nfTdh+y3T567JAPJnKHSaQ
+- condition: printer.model == "XLP"
+  id: V2bxdHJaS6meAuembUg82Q
+  values:
+    temperature: 220
+  variants:
+  # XL+ 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @XL+ 0.25'
+  # XL+ 0.3
+    id: rBCHXz14Sf61xo3CYTDVqA
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLA220* @XL+ 0.3'
+  # XL+ 0.4
+    id: wnfttzmsQJCToH4bcDI67Q
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @XL+ 0.4'
+    id: MpVWxI0jT+KFyGZGhYibDg
+    variants:
+    # XL+ HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL+ HF0.4'
+  # XL+ 0.5
+      id: Fgop1bc/Qt6MvzAcwyd7pg
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLA220* @XL+ 0.5'
+    id: FdONkh7MRJy65QDUObOwmA
+    variants:
+    # XL+ HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL+ HF0.5'
+  # XL+ 0.6
+      id: zkAKZSV6T7OsRZd2VYzlaQ
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @XL+ 0.6'
+    id: bdCvZy7bS8Cjw+utghSGoQ
+    variants:
+    # XL+ HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL+ HF0.6'
+  # XL+ 0.8
+      id: QLzRYKAsQJuZZWDp7EtKhA
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @XL+ 0.8'
+    id: 3xV7moqaQ7Kc1UF0ZsuoKw
+    values:
+      temperature: 230
+    variants:
+    # XL+ HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @XL+ HF0.8'
+## MK4
+      id: 7jPUekOzRTGPbaJ48ShbAQ
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: T9T9jcifTe+ZbaUB8NoF3A
+  values:
+    temperature: 220
+  variants:
+  # MK4 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @MK4 0.25'
+    id: t30YBVKtSg2KuerI5sHK5w
+    values:
+      temperature: 220
+  # MK4 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLA220* @MK4 0.3'
+    id: jrphRNHpSI+/+nCzqTOeOQ
+    values:
+      temperature: 220
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @MK4 0.4'
+    id: yblIeUbkSJaRnrVzZrnUIw
+    variants:
+    # MK4 HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4 HF0.4'
+  # MK4 0.5
+      id: zE7XYK0hQ2i0cVL+bOq0fQ
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLA220* @MK4 0.5'
+    id: yMK/PXitQPKdecoOdBgg5A
+    variants:
+    # MK4 HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4 HF0.5'
+  # MK4 0.6
+      id: NQBgz5eISMS8apmejOdA0A
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @MK4 0.6'
+    id: MwgNRugOSYKKtvnye2l9hg
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4 HF0.6'
+  # MK4 0.8
+      id: 2ZLLONgqRRS3/Uw3y35I9Q
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @MK4 0.8'
+    id: d5TrrKZLR1u8e7fV1kPwTQ
+    values:
+      temperature: 230
+    variants:
+    # MK4 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4 HF0.8'
+## MK4S
+      id: G0bWilScTRup8ZkIrVQgkg
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: 8zNnCSaDQNCSbq0vw5hHyg
+  values:
+    temperature: 220
+  variants:
+  # MK4S 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @MK4S 0.25'
+  # MK4S 0.3
+    id: daX5RdLdTL66+58+Q11fVQ
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLA220* @MK4S 0.3'
+  # MK4S 0.4
+    id: Inn7zR+SSg6U5YG0K0dy1w
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @MK4S 0.4'
+    id: ss9BJ8+eTRmJrFeI7I84gg
+    variants:
+    # MK4S HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4S HF0.4'
+  # MK4S 0.5
+      id: Rv5SW1sNQoWH8D9mJFvEnQ
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLA220* @MK4S 0.5'
+    id: 4zmbxyRbTVqTPO/ft6j41Q
+    variants:
+    # MK4S HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4S HF0.5'
+  # MK4S 0.6
+      id: CjOjx9XbTmuOfWJxHTcWhQ
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @MK4S 0.6'
+    id: bj4QIw7pRRG3rTsddJQLUA
+    variants:
+    # MK4S HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4S HF0.6'
+  # MK4S 0.8
+      id: f4FMWNHdR8CIFWnI9bFAEg
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @MK4S 0.8'
+    id: Wku0i74JS8GUhh6xk5BvsA
+    values:
+      temperature: 230
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLA220* @MK4S HF0.8'
+## MK3.5
+      id: UevT1v5MRBKy4ifLCladrA
+- condition: printer.base_model == "MK3.5"
+  id: z812zUhbR9q2C3i7TT2rlQ
+  values:
+    temperature: 220
+  variants:
+  # MK3.5 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @MK3.5 0.25'
+    id: Hap2fkBVQUaGtyLjte+0kA
+    values:
+      temperature: 220
+    variants:
+    # MK3.5 0.25 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLA220* @MK3.5 0.25 MMU'
+      id: Sih56nxMT+qMnF+3wm3+oA
+      values:
+        temperature: 205
+  # MK3.5 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLA220* @MK3.5 0.3'
+  # MK3.5 0.4
+    id: Asc8xrZiTAqmVCcDfVDXZw
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @MK3.5 0.4'
+    id: nQss+RWrTp2+9rjeFmodRw
+    variants:
+    # MK3.5 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLA220* @MK3.5 0.4 MMU'
+      id: FTm28wMuR6uAwuRpa9ezNw
+      values:
+        temperature: 205
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLA220* @MK3.5 0.5'
+  # MK3.5 0.6
+    id: hr8FPAXwRYO+GeA0BrihaA
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @MK3.5 0.6'
+    id: yIi2kiMbRiSrnQdVaJGXVw
+    variants:
+    # MK3.5 0.6 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLA220* @MK3.5 0.6 MMU'
+      id: UqirLhoJRTCwkVQl6K15eg
+      values:
+        temperature: 205
+  # MK3.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @MK3.5 0.8'
+    id: aE1gw02zSRaz0eFlHIQRVg
+    values:
+      temperature: 225
+## MINI
+- condition: printer.base_model == "MINI"
+  id: V+gTI2n1QvOaEr6IgkPV3g
+  values:
+    first_layer_temperature: 230
+    temperature: 220
+  variants:
+  # MINI 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @MINI 0.25'
+    id: NJdjGdkpS3qvSW0DcwP0Rg
+    values:
+      temperature: 210
+  # MINI 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @MINI 0.4'
+  # MINI 0.6
+    id: iTD1G66VTGak8L3tVv97aw
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @MINI 0.6'
+  # MINI 0.8
+    id: +waJ4Xk4Qpi0SjfmxD66Rg
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @MINI 0.8'
+    id: ZzH8YUL9TN6vNLot8CRpwg
+    values:
+      temperature: 225
+## MK3, MK3S and MK2.5, MK2.5S
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: SagVEzL2Ryip/CePgQZEYA
+  values:
+    first_layer_temperature: 215
+    temperature: 210
+  variants:
+  # MK3 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @MK2.5_MK3 0.25'
+    id: bWGLjcIETQiv4Wc8DNwoZg
+    values:
+      temperature: 210
+    variants:
+    # MK3 0.25 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLA220* @MK2.5_MK3 0.25 MMU'
+      id: 31wdZv/gQK6vnw+RnULiyQ
+      values:
+        temperature: 205
+  # MK3 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @MK2.5_MK3 0.4'
+    id: QL5MfMBdQPyCVFXMycxI/g
+    variants:
+    # MK3 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLA220* @MK2.5_MK3 0.4 MMU'
+      id: U4VCkSZMSP+6+K88MS8IYA
+      values:
+        temperature: 205
+  # MK3 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @MK2.5_MK3 0.6'
+    id: BtaZBrbTQvSW8c7Xbwp1xA
+    variants:
+    # MK3 0.6 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLA220* @MK2.5_MK3 0.6 MMU'
+      id: TvIQrJTjQd2JPU+IpyF1VQ
+      values:
+        temperature: 205
+  # MK3 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLA220* @MK2.5_MK3 0.8'
+    id: j/XEcRRdTbi3VRtdM2h/nw
+    values:
+      temperature: 225
+## MK2S
+- condition: printer.model == "MK2S"
+  id: LrVme9VhRD2RNF/YIJwA7A
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+  variants:
+  # MK2 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @MK2 0.25'
+    id: 426KLoVESP+kkcyBiGh7hQ
+    values:
+      temperature: 210
+  # MK2 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @MK2 0.4'
+  # MK2 0.6
+    id: 3N5OJGK9TjCP65tRWaKGdA
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @MK2 0.6'
+## MK2S MMU1
+    id: /eZpF+NFRBa75d1OEN6ixg
+- condition: printer.model == "MK2SMM"
+  id: J7V/dPwhQr2jdRKHjiblnw
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+  variants:
+  # MK2SMM 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLA220* @MK2MMU1 0.25'
+  # MK2SMM 0.4
+    id: Ss3NKPKpRZSpNWPSDCIwTA
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLA220* @MK2MMU1 0.4'
+  # MK2SMM 0.6
+    id: 7wgR8UhlTmmBShXTXp4UIg
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLA220* @MK2MMU1 0.6'
+    id: YxhQsCmnSWuGk5FlCBRypA

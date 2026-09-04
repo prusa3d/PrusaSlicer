@@ -1,1 +1,0 @@
-using @_boost_toolset@ : : @CMAKE_CXX_COMPILER@ ;

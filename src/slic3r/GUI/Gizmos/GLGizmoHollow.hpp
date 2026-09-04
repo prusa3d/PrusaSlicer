@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros, Oleksandra Iushchenko @YuSanka, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GLGizmoHollow_hpp_
 #define slic3r_GLGizmoHollow_hpp_
 
@@ -74,7 +78,7 @@ private:
     
     // This map holds all translated description texts, so they can be easily referenced during layout calculations
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.
-    std::map<std::string, wxString> m_desc;
+    std::map<std::string, std::string> m_desc;
 
     GLSelectionRectangle m_selection_rectangle;
 

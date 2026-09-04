@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2018 - 2020 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ ported from lib/Slic3r/GUI/AboutDialog.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Pavel Karoukin @hippich
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_AboutDialog_hpp_
 #define slic3r_GUI_AboutDialog_hpp_
 

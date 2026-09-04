@@ -1,0 +1,70 @@
+kind: filament
+inherits:
+- '*PET*'
+name: Generic PETG
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/
+id: Generic PETG
+values:
+  filament_cost: '19.99'
+  filament_vendor: Generic
+variants:
+## C1 INDX
+- condition: printer.base_model == "COREONE_INDX"
+  id: cueV0RryTnWNLuGKiRCo6w
+  values:
+    pressure_advance: automatic_calibration
+    start_filament_gcode: M573 R
+    first_layer_temperature: 245
+    temperature: 240
+    chamber_minimal_temperature: 0
+    chamber_temperature: 35
+    enable_dynamic_fan_speeds: 1
+    bed_temperature: 90
+    min_fan_speed: 30
+    max_fan_speed: 60
+    bridge_fan_speed: 60
+    overhang_fan_speed_0: 60
+    overhang_fan_speed_1: 60
+    overhang_fan_speed_2: 40
+    overhang_fan_speed_3: 0
+    filament_purge_multiplier: 100%
+    fan_below_layer_time: 25
+    filament_infill_max_speed: 200
+    min_print_speed: 20
+    filament_loading_speed: 0
+    filament_loading_speed_start: 0
+    filament_toolchange_delay: 0
+    filament_cooling_moves: 0
+    filament_cooling_initial_speed: 0
+    filament_cooling_final_speed: 0
+    filament_stamping_loading_speed: 0
+    filament_stamping_distance: 0
+    filament_unloading_speed: 0
+    filament_unloading_speed_start: 0
+    idle_temperature:
+    retract_length_toolchange: 1.6
+    retract_length: 1.6
+    filament_infill_max_crossing_speed: 110
+    filament_multitool_ramming: 1
+    filament_multitool_ramming_flow: 30
+    filament_multitool_ramming_volume: 18
+    filament_minimal_purge_on_wipe_tower: 10
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: Generic PETG @COREONEINDX 0.4
+    id: E/b/sUzkRju2ADnjYkOgJg
+    values:
+      filament_max_volumetric_speed: 12
+      pressure_advance_value: 0.054
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      name: Generic PETG @COREONEINDX HF0.4
+      id: Ny7pdG23TFqFfm+z3Gx/DQ
+      values:
+        filament_max_volumetric_speed: 17
+        pressure_advance_value: 0.055
+  # END
+  - name: '*quit*'
+    id: bR217iLGQICNAJnJgEhoqg

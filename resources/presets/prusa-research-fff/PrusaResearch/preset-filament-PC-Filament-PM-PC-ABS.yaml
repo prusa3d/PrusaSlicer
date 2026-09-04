@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PC*'
+name: Filament PM PC-ABS
+id: Filament PM PC-ABS
+values:
+  filament_vendor: Filament PM
+  filament_cost: 49.9
+  cooling: false
+  filament_density: 1.19
+  filament_spool_weight: 0

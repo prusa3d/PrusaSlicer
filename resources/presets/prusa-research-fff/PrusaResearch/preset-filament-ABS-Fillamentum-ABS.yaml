@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Fillamentum ABS
+id: Fillamentum ABS
+values:
+  filament_cost: '32.4'
+  filament_vendor: Fillamentum
+  first_layer_temperature: 240
+  temperature: 240
+

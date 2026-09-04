@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*FLEX*'
+features:
+  $.type: TPU
+name: Generic FLEX
+id: Generic FLEX
+values:
+  filament_cost: '40'
+  filament_vendor: Generic

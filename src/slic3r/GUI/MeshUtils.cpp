@@ -1,7 +1,11 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Lukáš Matěna @lukasmatena, Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros, Filip Sykala @Jony01, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "MeshUtils.hpp"
 
 #include "libslic3r/Tesselate.hpp"
-#include "libslic3r/TriangleMesh.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
@@ -157,7 +161,7 @@ int MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
     if (!m_result || m_result->cut_islands.empty())
         return -1;
     Vec3d point = m_result->trafo.inverse() * point_in;
-    Point pt_2d = Point::new_scale(Vec2d(point.x(), point.y()));
+    Point pt_2d = scaled(Vec2d{Vec2d(point.x(}), point.y()));
 
     for (int i=0; i<int(m_result->cut_islands.size()); ++i) {
         const CutIsland& isl = m_result->cut_islands[i];
@@ -195,7 +199,7 @@ std::vector<Vec3d> MeshClipper::point_per_contour() const
             double f = 10.;
             while (f > 0.05) {
                 p = (0.5*(b+a)) + f * n;
-                if (isl.expoly.contains(Point::new_scale(p))) {
+                if (isl.expoly.contains(scaled(p))) {
                     done = true;
                     break;
                 }
@@ -422,14 +426,11 @@ void MeshRaycaster::line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3
 
 bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
                                       Vec3f& position, Vec3f& normal, const ClippingPlane* clipping_plane,
-                                      size_t* facet_idx) const
+                                      size_t* facet_idx, const bool require_even_number_of_hits) const
 {
     Vec3d point;
     Vec3d direction;
-    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
-    Transform3d inv = trafo.inverse();
-    point     = inv*point;
-    direction = inv.linear()*direction;
+    line_from_mouse_pos(mouse_pos, trafo, camera, point, direction);
 
     std::vector<AABBMesh::hit_result> hits = m_emesh.query_ray_hits(point, direction);
 
@@ -447,7 +448,7 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
             break;
     }
 
-    if (i==hits.size() || (hits.size()-i) % 2 != 0) {
+    if (i == hits.size() || (require_even_number_of_hits && (hits.size() - i) % 2 != 0)) {
         // All hits are either clipped, or there is an odd number of unclipped
         // hits - meaning the nearest must be from inside the mesh.
         return false;
@@ -465,14 +466,17 @@ bool MeshRaycaster::unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d&
 
 
 
-bool MeshRaycaster::is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const 
+bool MeshRaycaster::intersects_line(Vec3d point, Vec3d direction, const Transform3d& trafo) const 
 {
-    point = trafo.inverse() * point;
+    Transform3d trafo_inv = trafo.inverse();
+    Vec3d to = trafo_inv * (point + direction);
+    point = trafo_inv * point;
+    direction = (to-point).normalized();
 
     std::vector<AABBMesh::hit_result> hits      = m_emesh.query_ray_hits(point, direction);
     std::vector<AABBMesh::hit_result> neg_hits  = m_emesh.query_ray_hits(point, -direction);
 
-    return !hits.empty() && !neg_hits.empty();
+    return !hits.empty() || !neg_hits.empty();
 }
 
 

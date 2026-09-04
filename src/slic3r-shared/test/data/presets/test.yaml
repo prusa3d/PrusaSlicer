@@ -1,0 +1,11 @@
+a: 42
+b: answer
+version:
+  major: 1
+  minor: 12
+  patch: 321
+items:
+  - id: 1
+  - id: 2
+  - id: 3
+param: 3.14

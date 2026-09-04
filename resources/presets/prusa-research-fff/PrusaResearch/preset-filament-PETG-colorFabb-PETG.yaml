@@ -1,0 +1,50 @@
+kind: filament
+inherits:
+- '*PET*'
+# COREONE/MK4/XL family 0.4-0.6
+name: colorFabb PETG
+id: colorFabb PETG
+values:
+  filament_cost: '21.2'
+  filament_density: 1.28
+  filament_spool_weight: 221
+  filament_vendor: colorFabb
+  first_layer_temperature: 250
+  temperature: 250
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: xk2gsEFuQKGpRfFFpFMfyw
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 0s6i9GmxQo+WwaGHHqpqvQ
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: fdZQT27ZS0iz4YcH3oKyJQ
+      values:
+        filament_max_volumetric_speed: 12
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    # 0.5HF
+    id: BnGaev3ERqWcg6jK6jFVVg
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: INxNQd0vS0KvgL+RsPrsGw
+      values:
+        filament_max_volumetric_speed: 12
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    # 0.6HF
+    id: pI0iqIscQpaV2opxIVaOCQ
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: BsHgMopdQnCpXELdaB68MA
+      values:
+        filament_max_volumetric_speed: 17
+  # END
+  - name: '*quit*'
+# END
+    id: YfXwVP39S/2uNx0uQFZSmw
+- name: '*quit*'
+  id: p6cSiKMVREua/rtKGlqo3g

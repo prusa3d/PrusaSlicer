@@ -1,0 +1,13 @@
+name: Run clang-format
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  formatting_check:
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/clang_format.yml@master
+    secrets: inherit
+    with:
+      actions_branch: master
+

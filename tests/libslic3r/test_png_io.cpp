@@ -1,13 +1,18 @@
+#ifndef NOMINMAX
 #define NOMINMAX
-#include <catch2/catch.hpp>
+#endif
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <numeric>
 
-#include "libslic3r/PNGReadWrite.hpp"
+#include "Slic3r/Biz/Algorithms/PNGReadWrite.hpp"
 #include "libslic3r/SLA/AGGRaster.hpp"
-#include "libslic3r/BoundingBox.hpp"
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 
 using namespace Slic3r;
+
+namespace BB = Biz::Algorithms::BoundingBox;
 
 static sla::RasterGrayscaleAA create_raster(const sla::Resolution &res)
 {
@@ -15,8 +20,8 @@ static sla::RasterGrayscaleAA create_raster(const sla::Resolution &res)
 
     auto bb = BoundingBox({0, 0}, {scaled(1.), scaled(1.)});
     sla::RasterBase::Trafo trafo;
-    trafo.center_x = bb.center().x();
-    trafo.center_y = bb.center().y();
+    trafo.center_x = BB::center(bb).x();
+    trafo.center_y = BB::center(bb).y();
 
     return sla::RasterGrayscaleAA{res, pixdim, trafo, agg::gamma_threshold(.5)};
 }

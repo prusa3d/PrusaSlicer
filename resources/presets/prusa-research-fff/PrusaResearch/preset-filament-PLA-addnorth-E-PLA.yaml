@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: addnorth E-PLA
+id: addnorth E-PLA
+values:
+  filament_vendor: addnorth
+  extrusion_multiplier: 0.98
+  filament_cost: '24.99'
+  filament_spool_weight: 0

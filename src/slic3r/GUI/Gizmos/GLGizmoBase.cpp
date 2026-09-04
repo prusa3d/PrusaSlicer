@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GLGizmoBase.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 
@@ -161,7 +165,7 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
 
 std::string GLGizmoBase::get_action_snapshot_name() const
 {
-    return _u8L("Gizmo action");
+    return "Gizmo action";
 }
 
 void GLGizmoBase::set_hover_id(int id)

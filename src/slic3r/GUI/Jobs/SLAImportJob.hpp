@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef SLAIMPORTJOB_HPP
 #define SLAIMPORTJOB_HPP
 

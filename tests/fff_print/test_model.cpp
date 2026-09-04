@@ -1,30 +1,38 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
+#include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Model.hpp"
-#include "libslic3r/ModelArrange.hpp"
 
 #include <boost/nowide/cstdio.hpp>
 #include <boost/filesystem.hpp>
 
 #include "test_data.hpp"
+#include "Slic3r/Biz/Slicing/BackgroundProcess.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::Test;
 
+using Biz::Algorithms::ModelObject::ensure_on_bed;
+using Biz::Algorithms::ModelObject::add_volume;
+using Biz::Slicing::SerializedConfig;
+using Domain::Preset::HwPrinterConfig;
+
 SCENARIO("Model construction", "[Model]") {
     GIVEN("A Slic3r Model") {
-		Slic3r::Model model;
-        Slic3r::TriangleMesh sample_mesh = Slic3r::make_cube(20,20,20);
-        Slic3r::DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
+        Domain::Model model;
+        namespace triangle_mesh = Biz::Algorithms::TriangleMesh;
+        Domain::TriangleMesh sample_mesh = triangle_mesh::make_cube(20,20,20);
+        TestConfig config;
         Slic3r::Print print;
 
         WHEN("Model object is added") {
-            Slic3r::ModelObject *model_object = model.add_object();
+            Domain::ModelObject *model_object = model.add_object();
             THEN("Model object list == 1") {
                 REQUIRE(model.objects.size() == 1);
             }
-            model_object->add_volume(sample_mesh);
+            add_volume(model_object, sample_mesh);
             THEN("Model volume list == 1") {
                 REQUIRE(model_object->volumes.size() == 1);
             }
@@ -41,20 +49,40 @@ SCENARIO("Model construction", "[Model]") {
 					REQUIRE((p2 - p1).norm() < EPSILON);
 				}
             }
+
+            auto pts = config.get_view().get<std::vector<Vec2d>>("bed_shape");
+            Points pts_scaled(pts.size());
+            std::transform(pts.cbegin(), pts.cend(), pts_scaled.begin(), [](const Vec2d& pt) { return Slic3r::scaled(pt); });
+            Vec2d centroid = unscale(Polygon(pts_scaled).centroid());
+
             model_object->add_instance();
-            arrange_objects(model, InfiniteBed{scaled(Vec2d(100, 100))}, ArrangeParams{scaled(min_object_distance(config))});
-			model_object->ensure_on_bed();
-			print.auto_assign_extruders(model_object);
+            model_object->instances.front()->set_offset(Vec3d(centroid.x(), centroid.y(), 0.));
+
+            ensure_on_bed(*model_object);
 			THEN("Print works?") {
-				print.set_status_silent();
-				print.apply(model, config);
-				print.process();
-				boost::filesystem::path temp = boost::filesystem::unique_path();
-                print.export_gcode(temp.string(), nullptr, nullptr);
-                REQUIRE(boost::filesystem::exists(temp));
-				REQUIRE(boost::filesystem::is_regular_file(temp));
-				REQUIRE(boost::filesystem::file_size(temp) > 0);
-				boost::nowide::remove(temp.string().c_str());
+                Domain::Bed model_bed;
+                Domain::BedInstance bed_instance{model_bed};
+
+                for (const Domain::ModelObject* object : model.objects) {
+                    for (Domain::ModelInstance* instance : object->instances) {
+                        bed_instance.model_instances.push_back(instance);
+                    }
+                }
+
+                auto preset_metadata =
+                    create_dummy_selected_preset_metadata(create_dummy_hw_config());
+                auto metadata = Biz::Slicing::build_gcode_metadata({}, preset_metadata, config);
+
+                print.update(
+                    model,
+                    config,
+                    bed_instance,
+                    preset_metadata,
+                    Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config)
+                );
+			    print.process();
+                const Biz::libpgcode::ProcessorResult result{print.process_gcode()};
+                CHECK(result.const_gcode()->str().size() > 0);
 			}
         }
     }

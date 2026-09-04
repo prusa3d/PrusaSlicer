@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PLASILK*'
+name: Generic PLA Silk
+id: Generic PLA Silk
+values:
+  filament_cost: '19.99'
+  filament_vendor: Generic

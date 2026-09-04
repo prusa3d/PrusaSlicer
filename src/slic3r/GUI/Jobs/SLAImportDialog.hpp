@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef SLAIMPORTDIALOG_HPP
 #define SLAIMPORTDIALOG_HPP
 
@@ -89,7 +93,7 @@ public:
         auto szfilepck = new wxBoxSizer{wxHORIZONTAL};
 
         m_filepicker = new wxFilePickerCtrl(this, wxID_ANY,
-                                            from_u8(wxGetApp().app_config->get_last_dir()), _(L("Choose SLA archive:")),
+                                            from_u8(wxGetApp().app_config->get_last_dir()), _L("Choose SLA archive") + ":",
                                             get_readers_wildcard(),
                                             wxDefaultPosition, wxDefaultSize, wxFLP_DEFAULT_STYLE | wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
@@ -114,9 +118,9 @@ public:
         szchoices->Add(new wxStaticText(this, wxID_ANY, _L("Quality") + ": "), 0, wxALIGN_CENTER | wxALL, 5);
 
         static const std::vector<wxString> qual_choices = {
-            _(L("Accurate")),
-            _(L("Balanced")),
-            _(L("Quick"))
+            _L("Accurate"),
+            _L("Balanced"),
+            _L("Fast")
         };
 
         m_quality_dropdown = new wxComboBox(

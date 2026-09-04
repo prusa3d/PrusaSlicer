@@ -12,10 +12,20 @@ xs/MANIFEST.bak
 xs/assertlib*
 .init_bundle.ini
 .vs/*
-local-lib
 /src/TAGS
 /.vscode/
 build-linux/*
+deps/build*
 deps/build-linux/*
 **/.DS_Store
 **/.idea/
+.pkg_cache
+CMakeUserPresets.json
+**/bundle_cache
+
+# These are generated and shouldn't be commit to git# These are generated and shouldn't be commit to git
+/doc/doxy/
+
+.aider*
+/src/slic3r-shared/imgui.ini
+/cmake-build-*/

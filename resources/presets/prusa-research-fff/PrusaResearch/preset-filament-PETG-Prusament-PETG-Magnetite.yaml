@@ -1,0 +1,115 @@
+kind: filament
+inherits:
+- '*PETCF*'
+- '*sheet_PET_magnetite*'
+- '*magnetite_MAXVOLSPEED*'
+name: Prusament PETG Magnetite 40%
+id: Prusament PETG Magnetite 40%
+values:
+  filament_vendor: Prusa Polymers
+  # first_layer_bed_temperature: 100
+  # bed_temperature: 100
+  first_layer_temperature: 265
+  temperature: 270
+  extrusion_multiplier: 1.09
+  filament_cost: 49.99
+  filament_density: 1.82
+  bridge_fan_speed: 20
+  min_fan_speed: 10
+  max_fan_speed: 20
+  fan_always_on: false
+  filament_infill_max_crossing_speed: 150
+---
+kind: filament
+id: '*sheet_PET_magnetite*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: qpg+ntiOR2uGqW8FtIWwRA
+  values:
+    first_layer_bed_temperature: 100
+    bed_temperature: 100
+  variants:
+  - condition: printer.base_model=="XL"
+    id: gaa56nzySSG0RReoKYmjeA
+    values:
+      first_layer_bed_temperature: 90
+      bed_temperature: 90
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: xbMg0yhWSNye+VmUHFVpzQ
+  values:
+    first_layer_bed_temperature: 75
+    bed_temperature: 75
+---
+kind: filament
+# Maximum volumetric speed limits
+id: '*magnetite_MAXVOLSPEED*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: ze+ysDW1RHyOhwkvj0uqog
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: iOWEOdhHRVO7LYvL7+U15A
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: waIur1ikQNuSH8H2DI6diA
+      values:
+        filament_max_volumetric_speed: 21
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: jZ4zm2DjQ7GLQ3q/ZaORlw
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: 3axQaGGCSI+JeM+YV4FeRA
+      values:
+        filament_max_volumetric_speed: 14
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: rrjeNbO0QEyrbiz6wUmUiQ
+    values:
+      filament_max_volumetric_speed: 16
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: G2QUtY/tReqeaeiusyk8uA
+      values:
+        filament_max_volumetric_speed: 16
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: m3UUrX3QReKjmTw5FttaNA
+    values:
+      filament_max_volumetric_speed: 18
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: J6TPhpTTScyHio6nCfEjwQ
+      values:
+        filament_max_volumetric_speed: 18
+## MINI
+- condition: printer.base_model == "MINI"
+  id: 9I5bpochRY2oe4d+JSNZYg
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: gIK2JH64QnC5JXJBvdEPUQ
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 3vZXIHnMS3GSfjSN6PUXuQ
+    values:
+      filament_max_volumetric_speed: 15
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: oqJ4M0hVTdyqFoiKpYwGkA
+    values:
+      filament_max_volumetric_speed: 15

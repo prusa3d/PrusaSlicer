@@ -1,0 +1,100 @@
+kind: filament
+inherits:
+- '*FLEX*'
+name: colorFabb VarioShore TPU
+features:
+  $.type: TPU
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.4 and (feeder.base_model!~/.*MMU.*/ or (feeder.base_model=~/.*MMU.*/ and feeder.single_mode))
+id: colorFabb VarioShore TPU
+values:
+  filament_vendor: colorFabb
+  filament_cost: 77
+  disable_fan_first_layers: 4
+  full_fan_speed_layer: 6
+  min_fan_speed: 60
+  extrusion_multiplier: 0.85
+  filament_density: 1.21
+  first_layer_temperature: 220
+  temperature: 220
+  retract_length: 1.2
+## C1
+variants:
+- condition: printer.base_model == "COREONE"
+  id: YvvKmUyITXSacp2RUvCCyQ
+  values:
+    bridge_fan_speed: 70
+    min_fan_speed: 45
+    max_fan_speed: 45
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 8VbC03K8QV67myqd7v6vzA
+    values:
+      filament_max_volumetric_speed: 1.5
+## XL
+- condition: printer.model == "XL"
+  id: pX2IK4fRQKGnYuE+qTTwfA
+  values:
+    retract_length_toolchange: 2.5
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: sdegW0PrQpiE/UYNnZr+cA
+    values:
+      filament_max_volumetric_speed: 1.5
+      filament_multitool_ramming_flow: 1.5
+## XL+
+- condition: printer.model == "XLP"
+  id: NRC/tPr8TLqjSA3ZFGYCKw
+  values:
+    retract_length_toolchange: 2.5
+    min_fan_speed: 45
+    max_fan_speed: 45
+    bridge_fan_speed: 70
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: kOVLCJpDQaeEvL8bd1OjsA
+    values:
+      filament_max_volumetric_speed: 1.5
+      filament_multitool_ramming_flow: 1.5
+## MK4
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: giJdZYNHTjGuvWr2X0lpSQ
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: uYQ41IS+S9Gi9yyogjThkw
+    values:
+      filament_max_volumetric_speed: 1.5
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: bmIWHOVkQb2qgOd8MQ7d5A
+  values:
+    bridge_fan_speed: 70
+    min_fan_speed: 45
+    max_fan_speed: 45
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: p5nONSugRLeXTiueec8+8g
+    values:
+      filament_max_volumetric_speed: 1.5
+## MK3.5 and MK3 and MK2
+- condition: printer.base_model=~/(MK3.5|MK3|MK2.5|MK2)/
+  id: llFCyabzSGmg/AaIxaoBfw
+  values:
+    extrusion_multiplier: 0.85
+    idle_temperature: 70
+    deretract_speed: 20
+    retract_length: 1.2
+    retract_speed: 45
+    retract_lift: 0
+    travel_ramping_lift: 0
+    filament_max_volumetric_speed: 1.5
+  variants:
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: N4cSOLqXQva07ZiB6TUeRw
+    values:
+      filament_max_volumetric_speed: 1.5

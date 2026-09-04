@@ -1,29 +1,28 @@
-#include <catch2/catch.hpp>
-#include <test_utils.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <libslic3r/Polygon.hpp>
 #include <libslic3r/Polyline.hpp>
 #include <libslic3r/EdgeGrid.hpp>
-#include <libslic3r/Geometry.hpp>
-#include "libslic3r/Geometry/VoronoiUtilsCgal.hpp"
-
-#include <libslic3r/Geometry/VoronoiOffset.hpp>
-#include <libslic3r/Geometry/VoronoiVisualUtils.hpp>
+#include <Slic3r/Biz/CGAL/Algorithms/VoronoiOffset.hpp>
 
 #include <numeric>
+#include <random>
 
-// #define VORONOI_DEBUG_OUT
+//#define VORONOI_DEBUG_OUT
 
 #ifdef VORONOI_DEBUG_OUT
-#include <libslic3r/VoronoiVisualUtils.hpp>
+#include <libslic3r/Geometry/VoronoiVisualUtils.hpp>
+#include <libslic3r/Utils.hpp>
 #endif
 
 using boost::polygon::voronoi_builder;
 using boost::polygon::voronoi_diagram;
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
 
-using VD = Geometry::VoronoiDiagram;
+using VD = CGAL::Algorithms::VoronoiDiagram;
+namespace Voronoi = CGAL::Algorithms::Voronoi;
 
 // https://svn.boost.org/trac10/ticket/12067
 // This bug seems to be confirmed.
@@ -62,7 +61,7 @@ TEST_CASE("Voronoi missing edges - points 12067", "[Voronoi]")
 
     // Construction of the Voronoi Diagram.
     VD vd;
-    construct_voronoi(pts.begin(), pts.end(), &vd);
+    vd.construct_voronoi(pts.begin(), pts.end());
 
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-pts.svg").c_str(),
@@ -188,9 +187,9 @@ TEST_CASE("Voronoi missing edges - Alessandro gapfill 12707", "[Voronoi]")
 
     REQUIRE(intersecting_edges({ poly }).empty());
 
-    Lines lines = to_lines(poly);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
     VD vd;
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    vd.construct_voronoi(lines.begin(), lines.end());
 
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-lines.svg").c_str(),
@@ -297,8 +296,8 @@ TEST_CASE("Voronoi weirdness", "[Voronoi]")
 #endif
 
     VD vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-weirdness.svg").c_str(),
@@ -322,7 +321,7 @@ TEST_CASE("Voronoi division by zero 12903", "[Voronoi]")
     }
 
     VD vd;
-    construct_voronoi(pts.begin(), pts.end(), &vd);
+    vd.construct_voronoi(pts.begin(), pts.end());
 
 #ifdef VORONOI_DEBUG_OUT
     // Scale the voronoi vertices and input points, so that the dump_voronoi_to_svg will display them correctly.
@@ -331,7 +330,7 @@ TEST_CASE("Voronoi division by zero 12903", "[Voronoi]")
         const_cast<double&>(pt.y()) = scale_(pt.y());
     }
     for (auto &pt : pts)
-        pt = Point::new_scale(pt.x(), pt.y());
+        pt = scaled(Vec2d{pt.x(}), pt.y());
     dump_voronoi_to_svg(debug_out_path("voronoi-div-by-zero.svg").c_str(), vd, pts, Lines());
 #endif
 }
@@ -340,7 +339,7 @@ TEST_CASE("Voronoi division by zero 12903", "[Voronoi]")
 // Funny sample from a dental industry?
 // Vojtech confirms this test fails and rightly so, because the input data contain self intersections.
 // This test is suppressed.
-TEST_CASE("Voronoi NaN coordinates 12139", "[Voronoi][!hide][!mayfail]")
+TEST_CASE("Voronoi NaN coordinates 12139", "[Voronoi]")
 {
     Lines lines = {
         { {  260500,1564400 }, { 261040,1562960 } },
@@ -1319,7 +1318,7 @@ TEST_CASE("Voronoi NaN coordinates 12139", "[Voronoi][!hide][!mayfail]")
 #endif
 
     VD vd;
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    vd.construct_voronoi(lines.begin(), lines.end());
 
     for (const auto& edge : vd.edges())
         if (edge.is_finite()) {
@@ -1359,8 +1358,8 @@ TEST_CASE("Voronoi offset", "[VoronoiOffset]")
   REQUIRE(area > 0.);
 
   VD vd;
-  Lines lines = to_lines(poly_with_hole);
-  construct_voronoi(lines.begin(), lines.end(), &vd);
+  Lines lines = Algorithms::Polygon::to_lines(poly_with_hole);
+  vd.construct_voronoi(lines.begin(), lines.end());
 
   for (const OffsetTest &ot : {
             OffsetTest { scale_(0.2), 1, 1 },
@@ -1383,7 +1382,7 @@ TEST_CASE("Voronoi offset", "[VoronoiOffset]")
       REQUIRE(offsetted_polygons_out.size() == ot.num_outer);
 #endif
 
-      Polygons offsetted_polygons_in = Slic3r::Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
+      Polygons offsetted_polygons_in = Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
       dump_voronoi_to_svg(debug_out_path("voronoi-offset-in-%lf.svg", ot.distance).c_str(),
           vd, Points(), lines, offsetted_polygons_in);
@@ -1425,8 +1424,8 @@ TEST_CASE("Voronoi offset 2", "[VoronoiOffset]")
   REQUIRE(area > 0.);
 
   VD vd;
-  Lines lines = to_lines(poly);
-  construct_voronoi(lines.begin(), lines.end(), &vd);
+  Lines lines = Algorithms::Polygon::to_lines(poly);
+  vd.construct_voronoi(lines.begin(), lines.end());
 
   for (const OffsetTest &ot : {
             OffsetTest { scale_(0.2), 2, 2 },
@@ -1439,14 +1438,14 @@ TEST_CASE("Voronoi offset 2", "[VoronoiOffset]")
             OffsetTest { scale_(0.8), 1, 0 }
       }) {
 
-      Polygons offsetted_polygons_out = Slic3r::Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
+      Polygons offsetted_polygons_out = Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
       dump_voronoi_to_svg(debug_out_path("voronoi-offset2-out-%lf.svg", ot.distance).c_str(),
           vd, Points(), lines, offsetted_polygons_out);
 #endif
       REQUIRE(offsetted_polygons_out.size() == ot.num_outer);
 
-      Polygons offsetted_polygons_in = Slic3r::Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
+      Polygons offsetted_polygons_in = Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
       dump_voronoi_to_svg(debug_out_path("voronoi-offset2-in-%lf.svg", ot.distance).c_str(),
           vd, Points(), lines, offsetted_polygons_in);
@@ -1495,8 +1494,8 @@ TEST_CASE("Voronoi offset 3", "[VoronoiOffset]")
     }
 
   VD vd;
-  Lines lines = to_lines(poly);
-  construct_voronoi(lines.begin(), lines.end(), &vd);  
+  Lines lines = Algorithms::Polygon::to_lines(poly);
+  vd.construct_voronoi(lines.begin(), lines.end());
 
   for (const OffsetTest &ot : {
             OffsetTest { scale_(0.2), 2, 2 },
@@ -1514,14 +1513,14 @@ TEST_CASE("Voronoi offset 3", "[VoronoiOffset]")
             OffsetTest { scale_(1.01), 1, 0 },
       }) {
 
-      Polygons offsetted_polygons_out = Slic3r::Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
+      Polygons offsetted_polygons_out = Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
       dump_voronoi_to_svg(debug_out_path("voronoi-offset3-out-%lf.svg", ot.distance).c_str(),
           vd, Points(), lines, offsetted_polygons_out);
 #endif
       REQUIRE(offsetted_polygons_out.size() == ot.num_outer);
 
-      Polygons offsetted_polygons_in = Slic3r::Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
+      Polygons offsetted_polygons_in = Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
       dump_voronoi_to_svg(debug_out_path("voronoi-offset3-in-%lf.svg", ot.distance).c_str(),
           vd, Points(), lines, offsetted_polygons_in);
@@ -1746,8 +1745,8 @@ TEST_CASE("Voronoi offset with edge collapse", "[VoronoiOffset4]")
 
 
   VD vd;
-  Lines lines = to_lines(poly);
-  construct_voronoi(lines.begin(), lines.end(), &vd);
+  Lines lines = Algorithms::Polygon::to_lines(poly);
+  vd.construct_voronoi(lines.begin(), lines.end());
 
   for (const OffsetTest &ot : {
             OffsetTest { scale_(0.2), 2, 2 },
@@ -1764,14 +1763,14 @@ TEST_CASE("Voronoi offset with edge collapse", "[VoronoiOffset4]")
             OffsetTest { scale_(1.01), 1, 2 },
       }) {
 
-      Polygons offsetted_polygons_out = Slic3r::Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
+      Polygons offsetted_polygons_out = Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
       dump_voronoi_to_svg(debug_out_path("voronoi-offset3-out-%lf.svg", ot.distance).c_str(),
           vd, Points(), lines, offsetted_polygons_out);
 #endif
       REQUIRE(offsetted_polygons_out.size() == ot.num_outer);
 
-      Polygons offsetted_polygons_in = Slic3r::Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
+      Polygons offsetted_polygons_in = Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
       dump_voronoi_to_svg(debug_out_path("voronoi-offset3-in-%lf.svg", ot.distance).c_str(),
           vd, Points(), lines, offsetted_polygons_in);
@@ -1857,8 +1856,8 @@ TEST_CASE("Voronoi offset 5", "[VoronoiOffset5]")
     REQUIRE(area > 0.);
 
     VD vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 
     for (const OffsetTest &ot : {
             OffsetTest { scale_(2.8), 1, 1 },
@@ -1866,14 +1865,14 @@ TEST_CASE("Voronoi offset 5", "[VoronoiOffset5]")
             OffsetTest { scale_(3.0), 1, 1 },
     }) {
 
-        Polygons offsetted_polygons_out = Slic3r::Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
+        Polygons offsetted_polygons_out = Voronoi::offset(vd, lines, ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
         dump_voronoi_to_svg(debug_out_path("voronoi-offset5-out-%lf.svg", ot.distance).c_str(),
             vd, Points(), lines, offsetted_polygons_out);
 #endif
         REQUIRE(offsetted_polygons_out.size() == ot.num_outer);
 
-        Polygons offsetted_polygons_in = Slic3r::Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
+        Polygons offsetted_polygons_in = Voronoi::offset(vd, lines, - ot.distance, scale_(0.005));
 #ifdef VORONOI_DEBUG_OUT
         dump_voronoi_to_svg(debug_out_path("voronoi-offset5-in-%lf.svg", ot.distance).c_str(),
             vd, Points(), lines, offsetted_polygons_in);
@@ -1915,30 +1914,13 @@ TEST_CASE("Voronoi skeleton", "[VoronoiSkeleton]")
     REQUIRE(area > 0.);
 
     VD vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
-    Slic3r::Voronoi::annotate_inside_outside(vd, lines);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
+    Voronoi::annotate_inside_outside(vd, lines);
     static constexpr double threshold_alpha = M_PI / 12.; // 30 degrees
-    std::vector<Vec2d> skeleton_edges = Slic3r::Voronoi::skeleton_edges_rough(vd, lines, threshold_alpha);
+    std::vector<Vec2d> skeleton_edges = Voronoi::skeleton_edges_rough(vd, lines, threshold_alpha);
 
     REQUIRE(! skeleton_edges.empty());
-}
-
-// Simple detection with complexity N^2 if there is any point in the input polygons that doesn't have Voronoi vertex.
-[[maybe_unused]] static bool has_missing_voronoi_vertices(const Polygons &polygons, const VD &vd)
-{
-    auto are_equal = [](const VD::vertex_type v, const Point &p) { return (Vec2d(v.x(), v.y()) - p.cast<double>()).norm() <= SCALED_EPSILON; };
-
-    Points            poly_points = to_points(polygons);
-    std::vector<bool> found_vertices(poly_points.size());
-    for (const Point &point : poly_points)
-        for (const auto &vertex : vd.vertices())
-            if (are_equal(vertex, point)) {
-                found_vertices[&point - &poly_points.front()] = true;
-                break;
-            }
-
-    return std::find(found_vertices.begin(), found_vertices.end(), false) != found_vertices.end();
 }
 
 // This case is composed of one square polygon, and one of the edges is divided into two parts by a point that lies on this edge.
@@ -1955,23 +1937,20 @@ TEST_CASE("Voronoi missing vertex 1", "[VoronoiMissingVertex1]")
         {-25000000,  25000000},
         {-25000000, -25000000},
         {-12412500, -25000000},
-//        {- 1650000, -25000000},
         { 25000000, -25000000}
     };
-
-//    poly.rotate(PI / 6);
 
     REQUIRE(poly.area() > 0.);
     REQUIRE(intersecting_edges({poly}).empty());
 
     VD    vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-missing-vertex1-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-//    REQUIRE(!has_missing_voronoi_vertices({poly}, vd));
+    REQUIRE(vd.is_valid());
 }
 
 // This case is composed of two square polygons (contour and hole), and again one of the edges is divided into two parts by a
@@ -1998,20 +1977,18 @@ TEST_CASE("Voronoi missing vertex 2", "[VoronoiMissingVertex2]")
         }
     };
 
-//    polygons_rotate(poly, PI / 6);
-
     double area = std::accumulate(poly.begin(), poly.end(), 0., [](double a, auto &poly) { return a + poly.area(); });
     REQUIRE(area > 0.);
     REQUIRE(intersecting_edges(poly).empty());
 
     VD    vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-missing-vertex2-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-//    REQUIRE(!has_missing_voronoi_vertices(poly, vd));
+    REQUIRE(vd.is_valid());
 }
 
 // This case is composed of two polygons, and again one of the edges is divided into two parts by a point that lies on this edge,
@@ -2042,17 +2019,14 @@ TEST_CASE("Voronoi missing vertex 3", "[VoronoiMissingVertex3]")
     REQUIRE(area > 0.);
     REQUIRE(intersecting_edges(poly).empty());
 
-    //    polygons_rotate(poly, PI/180);
-    //    polygons_rotate(poly, PI/6);
-
     VD vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-missing-vertex3-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-//    REQUIRE(!has_missing_voronoi_vertices(poly, vd));
+    REQUIRE(vd.is_valid());
 }
 
 TEST_CASE("Voronoi missing vertex 4", "[VoronoiMissingVertex4]")
@@ -2087,16 +2061,19 @@ TEST_CASE("Voronoi missing vertex 4", "[VoronoiMissingVertex4]")
         Point(-20000000, -18900000),
     };
 
-    Geometry::VoronoiDiagram vd_1;
-    Geometry::VoronoiDiagram vd_2;
-    Lines                    lines_1 = to_lines(polygon_1);
-    Lines                    lines_2 = to_lines(polygon_2);
-    construct_voronoi(lines_1.begin(), lines_1.end(), &vd_1);
-    construct_voronoi(lines_2.begin(), lines_2.end(), &vd_2);
+    VD vd_1;
+    VD vd_2;
+    Lines                    lines_1 = Algorithms::Polygon::to_lines(polygon_1);
+    Lines                    lines_2 = Algorithms::Polygon::to_lines(polygon_2);
+    vd_1.construct_voronoi(lines_1.begin(), lines_1.end());
+    vd_2.construct_voronoi(lines_2.begin(), lines_2.end());
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-missing-vertex4-1-out.svg").c_str(), vd_1, Points(), lines_1);
     dump_voronoi_to_svg(debug_out_path("voronoi-missing-vertex4-2-out.svg").c_str(), vd_2, Points(), lines_2);
 #endif
+
+    REQUIRE(vd_1.is_valid());
+    REQUIRE(vd_2.is_valid());
 }
 
 // In this case, the Voronoi vertex (146873, -146873) is included twice.
@@ -2117,28 +2094,17 @@ TEST_CASE("Duplicate Voronoi vertices", "[Voronoi]")
         { 25000000,  10790627},
     };
 
-//    poly.rotate(PI / 6);
-
     REQUIRE(poly.area() > 0.);
     REQUIRE(intersecting_edges({poly}).empty());
 
     VD    vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-duplicate-vertices-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-    [[maybe_unused]] auto has_duplicate_vertices = [](const VD &vd) -> bool {
-        std::vector<Vec2d> vertices;
-        for (const auto &vertex : vd.vertices())
-            vertices.emplace_back(Vec2d(vertex.x(), vertex.y()));
-
-        std::sort(vertices.begin(), vertices.end(), [](const Vec2d &l, const Vec2d &r) { return l.x() < r.x() || (l.x() == r.x() && l.y() < r.y()); });
-        return std::unique(vertices.begin(), vertices.end()) != vertices.end();
-    };
-
-//    REQUIRE(!has_duplicate_vertices(vd));
+    REQUIRE(vd.is_valid());
 }
 
 // In this case, there are three very close Voronoi vertices like in the previous test case after rotation. There is also one
@@ -2157,50 +2123,17 @@ TEST_CASE("Intersecting Voronoi edges", "[Voronoi]")
         { 25000000, -  146873},
     };
 
-//    poly.rotate(PI / 6);
-
     REQUIRE(poly.area() > 0.);
     REQUIRE(intersecting_edges({poly}).empty());
 
     VD    vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-intersecting-edges-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-    [[maybe_unused]] auto has_intersecting_edges = [](const Polygon &poly, const VD &vd) -> bool {
-        BoundingBox  bbox         = get_extents(poly);
-        const double bbox_dim_max = double(std::max(bbox.size().x(), bbox.size().y()));
-
-        std::vector<Voronoi::Internal::segment_type> segments;
-        for (const Line &line : to_lines(poly))
-            segments.emplace_back(Voronoi::Internal::point_type(double(line.a.x()), double(line.a.y())),
-                                  Voronoi::Internal::point_type(double(line.b.x()), double(line.b.y())));
-
-        Lines edges;
-        for (const auto &edge : vd.edges())
-            if (edge.cell()->source_index() < edge.twin()->cell()->source_index()) {
-                if (edge.is_finite()) {
-                    edges.emplace_back(Point(coord_t(edge.vertex0()->x()), coord_t(edge.vertex0()->y())),
-                                       Point(coord_t(edge.vertex1()->x()), coord_t(edge.vertex1()->y())));
-                } else if (edge.is_infinite()) {
-                    std::vector<Voronoi::Internal::point_type> samples;
-                    Voronoi::Internal::clip_infinite_edge(poly.points, segments, edge, bbox_dim_max, &samples);
-                    if (!samples.empty())
-                        edges.emplace_back(Point(coord_t(samples[0].x()), coord_t(samples[0].y())), Point(coord_t(samples[1].x()), coord_t(samples[1].y())));
-                }
-            }
-
-        Point intersect_point;
-        for (auto first_it = edges.begin(); first_it != edges.end(); ++first_it)
-            for (auto second_it = first_it + 1; second_it != edges.end(); ++second_it)
-                if (first_it->intersection(*second_it, &intersect_point) && first_it->a != intersect_point && first_it->b != intersect_point)
-                    return true;
-        return false;
-    };
-
-//    REQUIRE(!has_intersecting_edges(poly, vd));
+    REQUIRE(vd.is_valid());
 }
 
 // In this case resulting Voronoi diagram is not planar. This case was distilled from GH issue #8474.
@@ -2219,17 +2152,214 @@ TEST_CASE("Non-planar voronoi diagram", "[VoronoiNonPlanar]")
         { 5500000,  40000000},
     };
 
-//    poly.rotate(PI / 6);
-
     REQUIRE(poly.area() > 0.);
     REQUIRE(intersecting_edges({poly}).empty());
 
     VD    vd;
-    Lines lines = to_lines(poly);
-    construct_voronoi(lines.begin(), lines.end(), &vd);
+    Lines lines = Algorithms::Polygon::to_lines(poly);
+    vd.construct_voronoi(lines.begin(), lines.end());
 #ifdef VORONOI_DEBUG_OUT
     dump_voronoi_to_svg(debug_out_path("voronoi-non-planar-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-//    REQUIRE(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(vd));
+    REQUIRE(vd.is_valid());
 }
+
+// This case is extracted from SPE-1729, where several ExPolygon with very thin lines
+// and holes formed by very close (1-5nm) vertices that are on the edge of our resolution.
+// Those thin lines and holes are both unprintable and cause the Voronoi diagram to be invalid.
+TEST_CASE("Invalid Voronoi diagram - Thin lines - SPE-1729", "[InvalidVoronoiDiagramThinLinesSPE1729]")
+{
+    Polygon contour = {
+        {32247689, -2405501},
+        {32247733, -2308514},
+        {32247692, -2405496},
+        {50484384,   332941},
+        {50374839,  1052546},
+        {32938040, -1637993},
+        {32938024, -1673788},
+        {32942107,  7220481},
+        {32252205,  7447599},
+        {32252476,  8037808},
+        {32555965,  8277599},
+        {17729260,  8904718},
+        {17729236,  8853233},
+        {17729259,  8904722},
+        {17039259,  8935481},
+        {17033440, -3880421},
+        {17204385, -3852156},
+        {17723645, -3441873},
+        {17723762, -3187210},
+        {17728957,  8240730},
+        {17728945,  8213866},
+        {31716233,  7614090},
+        {20801623, -1009882},
+        {21253963, -1580792},
+        {32252082,  7157187},
+        {32248022, -1673787},
+        {24245653, -2925506},
+        {18449246, -3809095},
+        {18728385, -4449246}
+    };
+
+    Polygon hole = {
+        {32247789, -2181284},
+        {32247870, -2003865},
+        {32247872, -2003866},
+        {32247752, -2267007}
+    };
+
+    Polygons polygons = {contour, hole};
+
+    VD    vd;
+    Lines lines = Algorithms::Polygon::to_lines(polygons);
+    vd.construct_voronoi(lines.begin(), lines.end());
+#ifdef VORONOI_DEBUG_OUT
+    dump_voronoi_to_svg(debug_out_path("invalid-voronoi-diagram-thin-lines.svg").c_str(), vd, Points(), lines);
+#endif
+
+//    REQUIRE(vd.is_valid());
+}
+
+TEST_CASE("Voronoi cell doesn't contain a source point - SPE-2298", "[VoronoiCellSourcePointSPE2298]")
+{
+    Polygon polygon = {
+         { 9854534,  -39739718}, {- 4154002, -34864557}, {-13073118, -31802214},
+         {-21265508, -29026626}, {-31388055, -25645073}, {-32409943, -25279942},
+         {-33418087, -24864987}, {-34400568, -24404312}, {-35354754, -23899358},
+         {-36278795, -23351325}, {-37170015, -22762146}, {-38025776, -22134628},
+         {-38845825, -21468175}, {-39627905, -20764801}, {-40370549, -20026061},
+         {-41072075, -19253859}, {-41731000, -18450032}, {-42345940, -17616466},
+         {-42915530, -16755283}, {-43438684, -15868338}, {-43914245, -14957822},
+         {-44341235, -14025879}, {-44718686, -13074712}, {-45045890, -12106566},
+         {-45322386, -11123499}, {-45547674, -10127656}, {-45721021, - 9121581},
+         {-45842174, - 8107658}, {-45910990, - 7088089}, {-45927405, - 6065217},
+         {-45891432, - 5041288}, {-45803222, - 4018728}, {-45663042, - 2999801},
+         {-45471245, - 1986784}, {-45230690, -  991761}, {-38655400,  23513180},
+         {-38366034,  24494742}, {-38025334,  25467666}, {-37636844,  26420074},
+         {-37200678,  27349843}, {-36718169,  28254419}, {-36191104,  29131704},
+         {-35620587,  29979748}, {-35007621,  30796895}, {-34353751,  31580950},
+         {-33660293,  32330182}, {-32928806,  33042775}, {-32160862,  33717057},
+         {-31358104,  34351432}, {-30522331,  34944323}, {-29655434,  35494277},
+         {-28759338,  35999922}, {-27835963,  36460011}, {-26921721,  36858494},
+         {-25914008,  37239556}, {-24919466,  37557049}, {-24204878,  37746930},
+         {-22880526,  38041931}, {-21833362,  38209050}, {-21449204,  38252031},
+         {-20775657,  38324377}, {-19711119,  38387480}, {-18638667,  38398812},
+         {-17762260,  38366962}, {-16480321,  38266321}, {-15396213,  38120856},
+         {-14327987,  37925343}, {- 5801522,  36175494}, {  7791637,  33457589},
+         { 15887399,  31878986}, { 28428609,  29478881}, { 28438392,  29512722},
+         { 27850323,  29743358}, { 27058729,  29970066}, { 14135560,  32452875},
+         {  6101685,  34019760}, {- 5352362,  36305237}, {-14423391,  38160442},
+         {-15528705,  38361745}, {-16625379,  38507834}, {-17721787,  38600631},
+         {-18812787,  38641330}, {-19563804,  38633844}, {-20975692,  38563412},
+         {-22036069,  38446419}, {-23087710,  38277136}, {-24123993,  38056689},
+         {-25141240,  37786307}, {-26138324,  37466465}, {-26851801,  37197652},
+         {-28067514,  36680229}, {-28988984,  36219404}, {-29886302,  35711371},
+         {-30754551,  35158840}, {-31124518,  34896643}, {-31589528,  34564743},
+         {-32392776,  33928220}, {-33161225,  33251721}, {-33454722,  32966117},
+         {-33891684,  32538320}, {-34585318,  31787066}, {-35239508,  31000793},
+         {-35527715,  30616853}, {-35851756,  30182731}, {-36422833,  29331982},
+         {-36950377,  28452000}, {-37265788,  27860633}, {-37432874,  27545549},
+         {-37870512,  26612217}, {-38261423,  25655915}, {-38581885,  24744387},
+         {-38902507,  23671594}, {-45523689, - 1006672}, {-45770290, - 2026713},
+         {-45963584, - 3043930}, {-46104330, - 4066310}, {-46192377, - 5092635},
+         {-46228310, - 6120019}, {-46211987, - 7145807}, {-46143426, - 8167812},
+         {-46022719, - 9183674}, {-45850055, -10191399}, {-45625772, -11188531},
+         {-45350245, -12172975}, {-45023965, -13142600}, {-44647538, -14095222},
+         {-44221691, -15028602}, {-43747176, -15940794}, {-43224933, -16829570},
+         {-42655872, -17693052}, {-42041183, -18529065}, {-41381752, -19335983},
+         {-40677899, -20112975}, {-39932077, -20856972}, {-39145730, -21566171},
+         {-38320552, -22238686}, {-37458030, -22872953}, {-36560036, -23467217},
+         {-35627745, -24020614}, {-34662272, -24532977}, {-33667551, -25000722},
+         {-32645434, -25422669}, {-31588226, -25801077}, {-24380013, -28208306},
+         {-24380013, -28208306}, {-13354262, -31942517}, {-13354261, -31942515},
+         {-2032305,  -35842454}, {  8025116, -39348505}, {  8820397, -39587703},
+         { 9636283,  -39751794}, {  9847092, -39773278}};
+
+    VD    vd;
+    Lines lines = Algorithms::Polygon::to_lines(polygon);
+    vd.construct_voronoi(lines.begin(), lines.end());
+#ifdef VORONOI_DEBUG_OUT
+//    dump_voronoi_to_svg(debug_out_path("voronoi-cell-source-point-spe2298.svg").c_str(), vd, Points(), lines);
+#endif
+
+    REQUIRE(vd.is_valid());
+}
+// */
+
+/*
+//#include <libslic3r/SLA/SupportIslands/LineUtils.hpp>
+TEST_CASE("bad vertex cause overflow of data type precisin when use VD result", "[VoronoiDiagram]")
+{
+    // Points are almost in line
+    Points points = {
+        {-106641371, 61644934},
+        {-56376476, 32588892},
+        {0, 0}
+    };
+
+    //auto perp_distance = sla::LineUtils::perp_distance;
+    auto perp_distance = [](const Linef &line, Vec2d p) {
+        Vec2d v  = line.b - line.a; // direction
+        Vec2d va = p - line.a;
+        return std::abs(cross2(v, va)) / v.norm();
+    };
+
+    using VD      = Slic3r::Geometry::VoronoiDiagram;
+    VD vd;
+    vd.construct_voronoi(points.begin(), points.end());
+
+    // edge between source index 0 and 1 has bad vertex
+    size_t bad_index0 = 0;
+    size_t bad_index1 = 1;
+    for (auto &edge : vd.edges()) {
+        size_t i1 = edge.cell()->source_index();
+        size_t i2 = edge.twin()->cell()->source_index();
+        if ((i1 == bad_index0 && i2 == bad_index1) ||
+            (i1 == bad_index1 && i2 == bad_index0)) {
+            Vec2d p1 = points[bad_index0].cast<double>();
+            Vec2d p2 = points[bad_index1].cast<double>();
+            Vec2d middle = (p1 + p2) / 2;
+            // direction for edge is perpendicular point connection
+            Vec2d direction(p2.y() - p1.y(), p1.x() - p2.x());
+            const VD::vertex_type *vrtx = (edge.vertex0() == nullptr) ?
+                                                edge.vertex1() :
+                                                edge.vertex0();
+            if (vrtx == nullptr) continue;
+            Vec2d vertex(vrtx->x(), vrtx->y());
+
+            double point_distance = (p1 - p2).norm();
+            [[maybe_unused]] double half_point_distance = point_distance / 2;
+
+            Linef line_from_middle(middle, middle + direction); // line between source points
+            double distance_vertex = perp_distance(line_from_middle, vertex);
+            [[maybe_unused]] double distance_p1 = perp_distance(line_from_middle, p1);
+            [[maybe_unused]] double distance_p2 = perp_distance(line_from_middle, p2);
+
+            Linef line_from_vertex(vertex, vertex + direction);
+            [[maybe_unused]] double distance_middle = perp_distance(line_from_vertex, middle);
+            [[maybe_unused]] double distance_p1_ = perp_distance(line_from_vertex, p1);
+            [[maybe_unused]] double distance_p2_ = perp_distance(line_from_vertex, p2);
+
+            double maximal_distance = 9e6;
+            Vec2d  vertex_direction = (vertex - middle);
+            Vec2d  vertex_dir_abs(fabs(vertex_direction.x()),
+                                 fabs(vertex_direction.y()));
+            double divider = (vertex_dir_abs.x() > vertex_dir_abs.y()) ?
+                                 vertex_dir_abs.x() / maximal_distance :
+                                 vertex_dir_abs.y() / maximal_distance;
+            Vec2d  vertex_dir_short = vertex_direction / divider;
+            Vec2d start_point      = middle + vertex_dir_short;
+            Linef  line_short(start_point, start_point + direction);
+            double distance_short_vertex  = perp_distance(line_short, vertex);
+            double distance_short_middle = perp_distance(line_short, middle);
+            [[maybe_unused]] double distance_p1_short = perp_distance(line_short, p1);
+            [[maybe_unused]] double distance_p2_short = perp_distance(line_short, p2);
+
+            CHECK(distance_vertex < 10);
+            //CHECK(distance_middle < 10); // This is bad
+            CHECK(distance_short_vertex < 10);
+            CHECK(distance_short_middle < 10);
+        }
+    }
+}*/

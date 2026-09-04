@@ -1,41 +1,43 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
-#include "libslic3r/GCodeReader.hpp"
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
+#include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
-#include "libslic3r/Layer.hpp"
 
 #include "test_data.hpp" // get access to init_print, etc
 
 using namespace Slic3r::Test;
 using namespace Slic3r;
+using Biz::GCodeReader::GCodeReader;
+using Domain::FloatOrPercentage;
+using Domain::Percentage;
 
 SCENARIO("Gaps", "[Gaps]") {
     GIVEN("Two hollow squares") {
-        auto config = Slic3r::DynamicPrintConfig::full_print_config_with({
-            { "skirts",                         0 },
-            { "perimeter_speed",                66 },
-            { "external_perimeter_speed",       66 },
-            { "small_perimeter_speed",          66 },
-            { "gap_fill_speed",                 99 },
-            { "perimeters",                     1 },
-            // to prevent speeds from being altered
-            { "cooling",                        0 },
-            // to prevent speeds from being altered
-            { "first_layer_speed",              "100%" },
-            { "perimeter_extrusion_width",      0.35 },
-            { "first_layer_extrusion_width",    0.35 }
-        });
-    
+        TestConfig config;
+        config.print.items.opt("skirts").set(0);
+        config.print.items.opt("perimeter_speed").set(66.0);
+        config.print.items.opt("external_perimeter_speed").set(FloatOrPercentage{66.0});
+        config.print.items.opt("small_perimeter_speed").set(FloatOrPercentage{66.0});
+        config.print.items.opt("gap_fill_speed").set(99.0);
+        config.print.items.opt("perimeters").set(1);
+                    // to prevent speeds from being altered
+        config.filament[0].items.opt("cooling").set(false);
+                    // to prevent speeds from being altered
+        config.print.items.opt("first_layer_speed").set(FloatOrPercentage{Percentage{100}});
+        config.print.items.opt("perimeter_extrusion_width").set(FloatOrPercentage{0.35});
+        config.print.items.opt("first_layer_extrusion_width").set(FloatOrPercentage{0.35});
+
         GCodeReader parser;
-        const double perimeter_speed = config.opt_float("perimeter_speed") * 60;
-        const double gap_fill_speed  = config.opt_float("gap_fill_speed") * 60;
+        const double perimeter_speed = config.print.items.opt("perimeter_speed").get<double>() * 60;
+        const double gap_fill_speed  = config.print.items.opt("gap_fill_speed").get<double>() * 60;
         std::string  last; // perimeter or gap
         Points       perimeter_points;
         int          gap_fills_outside_last_perimeters = 0;
         parser.parse_buffer(
             Slic3r::Test::slice({ Slic3r::Test::TestMesh::two_hollow_squares }, config),
             [&perimeter_points, &gap_fills_outside_last_perimeters, &last, perimeter_speed, gap_fill_speed]
-                (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+                (GCodeReader &self, const GCodeReader::GCodeLine &line)
         {
             if (line.extruding(self) && line.dist_XY(self) > 0) {
                 double f = line.new_F(self);
@@ -47,7 +49,7 @@ SCENARIO("Gaps", "[Gaps]") {
                     last = "perimeter";
                 } else if (is_approx(f, gap_fill_speed)) {
                     Polygon convex_hull = Geometry::convex_hull(perimeter_points);
-                    if (! convex_hull.contains(point))
+                    if (! Slic3r::Biz::Algorithms::Polygon::contains(convex_hull, point))
                         ++ gap_fills_outside_last_perimeters;
                     last = "gap";
                 }

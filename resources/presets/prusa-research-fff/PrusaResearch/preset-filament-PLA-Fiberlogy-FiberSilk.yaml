@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PLASILK*'
+name: Fiberlogy FiberSilk
+id: Fiberlogy FiberSilk
+values:
+  filament_cost: '32.35'
+  filament_vendor: Fiberlogy
+  filament_spool_weight: 330
+  filament_density: 1.22
+  extrusion_multiplier: 0.97

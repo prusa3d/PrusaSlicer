@@ -1,0 +1,29 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Extrudr PLA NX2
+id: Extrudr PLA NX2
+values:
+  filament_vendor: Extrudr
+  min_fan_speed: 30
+  max_fan_speed: 90
+  filament_cost: 23.63
+  filament_density: 1.3
+  filament_spool_weight: 262
+variants:
+ ## C1
+- condition: printer.base_model == "COREONE"
+  id: zxT9yspMQJWx4j665/TgyQ
+  values:
+    min_fan_speed: 25
+    max_fan_speed: 75
+    bridge_fan_speed: 100
+    overhang_fan_speed_0: 75
+## MK4S/XL+
+- condition: printer.model=~/(MK4S|MK3.9S|XLP)/
+  id: TajhGtBqTeGeXFGbv71y+A
+  values:
+    min_fan_speed: 25
+    max_fan_speed: 75
+    bridge_fan_speed: 100
+    overhang_fan_speed_0: 75

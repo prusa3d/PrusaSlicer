@@ -1,0 +1,75 @@
+kind: filament
+inherits:
+- '*PETCF*'
+- '*sheets_PET_UltrafusePETCF15*'
+- '*UltrafusePETCF15_MAXVOLSPEED*'
+name: Forward AM Ultrafuse PET-CF15
+# 0.6 nozzle and bigger
+condition: tool.nozzle_diameter >= 0.6 and feeder.base_model!~/.*MMU.*/
+id: Forward AM Ultrafuse PET-CF15
+values:
+  filament_vendor: Forward AM
+  filament_type: PET
+  first_layer_bed_temperature: 270
+  temperature: 270
+  extrusion_multiplier: 1
+  filament_density: 1.36
+  filament_spool_weight: 0
+  bridge_fan_speed: 100
+  disable_fan_first_layers: 1
+  full_fan_speed_layer: 3
+  min_fan_speed: 60
+  max_fan_speed: 100
+  fan_below_layer_time: 30
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: cFrZbZ+0QG6AKnHXbN3HGg
+  values:
+    bridge_fan_speed: 70
+    min_fan_speed: 40
+    max_fan_speed: 70
+---
+kind: filament
+id: '*sheets_PET_UltrafusePETCF15*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: ZOmwUaQ0QL6dze/fvYKVlg
+  values:
+    first_layer_bed_temperature: 75
+    bed_temperature: 75
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: NtUXJ2YFSCmn92vm9B8H2A
+  values:
+    first_layer_bed_temperature: 60
+    bed_temperature: 60
+---
+kind: filament
+# Maximum volumetric speed limits
+id: '*UltrafusePETCF15_MAXVOLSPEED*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: mJktqAycS8S06bB6AbJBtw
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 8P0RWfWFTh+Wiitx+ns/aA
+    values:
+      filament_max_volumetric_speed: 8
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: xPTxyVSqRRusFolTkrlMLA
+    values:
+      filament_max_volumetric_speed: 9
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: GxauOZZORtuRsMFuoG2vJA
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: rcEj10mWTnCX+AE2x5B8mQ
+    values:
+      filament_max_volumetric_speed: 13

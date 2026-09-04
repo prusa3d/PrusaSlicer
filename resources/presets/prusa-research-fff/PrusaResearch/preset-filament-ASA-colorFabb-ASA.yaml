@@ -1,0 +1,115 @@
+kind: filament
+inherits:
+- '*ASA*'
+- '*PA_COLORFABB_ASA*'
+name: colorFabb ASA
+id: colorFabb ASA
+# COREONE/MK4/XL family 0.4 and 0.6 only
+values:
+  filament_cost: '32.29'
+  filament_vendor: colorFabb
+  first_layer_temperature: 260
+  temperature: 260
+  filament_density: 1.07
+  first_layer_bed_temperature: 105
+  bed_temperature: 105
+  min_fan_speed: 10
+  max_fan_speed: 10
+  bridge_fan_speed: 25
+  disable_fan_first_layers: 3
+  filament_spool_weight: 160
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: ssNZQEKVT4C8aecZ23LT8A
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: S0K4zqLUQM+qligMzGB+kw
+    values:
+      filament_max_volumetric_speed: 10
+    # 0.4HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: B8Rf5x0wTwSKjLw0zK0W7Q
+      values:
+        filament_max_volumetric_speed: 14
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: ycCzKZfGTJiWwZC8RWyjaQ
+    values:
+      filament_max_volumetric_speed: 15
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: KlLp3lN4Sv699fjNMaddgA
+      values:
+        filament_max_volumetric_speed: 18
+  # END (available only for 0.4 and 0.6)
+  - name: '*quit*'
+# END
+    id: QfqLJYHkQSOHjwJdWDPpCw
+- name: '*quit*'
+  id: MHy25odERoK/02z6Yez/3Q
+---
+kind: filament
+# Pressure advance values
+id: '*PA_COLORFABB_ASA*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: Mj28CWczTaeLwXdf6FDvNQ
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: eBP5/FK5QAuBJ5wdKtHPoQ
+    values:
+      pressure_advance_value: 0.08
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: PayR16xoSW6t3U13CsSj6w
+    values:
+      pressure_advance_value: 0.054
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: jFIoGTyVTquVFatIj6M9/Q
+    values:
+      pressure_advance_value: 0.024
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: bErgxSSHQNqxXSJo7zS/dg
+      values:
+        pressure_advance_value: 0.024
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: mcp8j7G4Qa+XqoGP7zyf1A
+    values:
+      pressure_advance_value: 0.02
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: TY6spHArQriB4t7PTc/sBQ
+      values:
+        pressure_advance_value: 0.02
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: YDPzOFDHRoaZD4ZD/90xMQ
+    values:
+      pressure_advance_value: 0.017
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: OyZwTdYUTuWk2z724wvGEw
+      values:
+        pressure_advance_value: 0.017
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: 0aoXn4LKQ0q3VNOn2sriKg
+    values:
+      pressure_advance_value: 0.01
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: AKFkx0WlSKuc12GIVzvrFQ
+      values:
+        pressure_advance_value: 0.01

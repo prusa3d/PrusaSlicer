@@ -1,0 +1,42 @@
+kind: filament
+inherits:
+- '*PC*'
+name: Filatech PC
+id: Filatech PC
+values:
+  filament_vendor: Filatech
+  bridge_fan_speed: 25
+  min_fan_speed: 15
+  max_fan_speed: 15
+  cooling: false
+  filament_density: 1.2
+  filament_spool_weight: 0
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: DIhXVi02RxeDmvnfljG2DA
+  values:
+    min_fan_speed: 12
+    max_fan_speed: 12
+    bridge_fan_speed: 20
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: cz1H9uKOR0q1MWy+h6yn3g
+    values:
+      filament_max_volumetric_speed: 8
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: WOzk71k4SCaID8PaF0ZxoQ
+      values:
+        filament_max_volumetric_speed: 20
+- condition: printer.model=~/(MK4|XL)/
+  id: lojlRKMySHGUcDbLcBVy5w
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: ql3Mw+8tTEq0XDv/qGH2UA
+    values:
+      filament_max_volumetric_speed: 8
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: dNnpOGc8T9+icDumGMliBA
+      values:
+        filament_max_volumetric_speed: 20

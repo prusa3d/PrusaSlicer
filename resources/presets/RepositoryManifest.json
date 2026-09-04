@@ -1,0 +1,9 @@
+[{
+    "name": "Prusa FFF",
+    "description": "Prusa FFF printers",
+    "visibility": "",
+    "id": "prusa-research-fff",
+    "url": "http://localhost:8000/prusa-research-fff/",
+    "index_url": "http://localhost:8000/prusa-research-fff/vendor_indices.zip",
+    "selected": true
+}]

@@ -1,0 +1,14 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Numakers ABS
+id: Numakers ABS
+values:
+  extrusion_multiplier: 1.014
+  filament_cost: 26.99
+  filament_vendor: Numakers
+  filament_density: 1.08
+  filament_spool_weight: 230
+  first_layer_temperature: 255
+  temperature: 255
+

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 David Kocík @kocikdav, Roman Beránek @zavorka, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_RemovableDriveManager_hpp_
 #define slic3r_GUI_RemovableDriveManager_hpp_
 
@@ -37,6 +41,8 @@ wxDECLARE_EVENT(EVT_REMOVABLE_DRIVE_EJECTED, RemovableDriveEjectEvent);
 
 using RemovableDrivesChangedEvent = SimpleEvent;
 wxDECLARE_EVENT(EVT_REMOVABLE_DRIVES_CHANGED, RemovableDrivesChangedEvent);
+
+wxDECLARE_EVENT(EVT_REMOVABLE_DRIVE_ADDED, wxCommandEvent);
 
 #if __APPLE__
 	// Callbacks on device plug / unplug work reliably on OSX.
@@ -88,12 +94,13 @@ public:
     // Called by Win32 Volume arrived / detached callback.
 	void 		volumes_changed();
 #endif // _WIN32
-
+	// returns copy of m_current_drives (protected by mutex)
+	std::vector<DriveData> get_drive_list();
 private:
 	bool 			 		m_initialized { false };
 	wxEvtHandler*			m_callback_evt_handler { nullptr };
 
-
+	bool					m_first_update{ true };
 #ifndef REMOVABLE_DRIVE_MANAGER_OS_CALLBACKS
 	// Worker thread, worker thread synchronization and callbacks to the UI thread.
 	void 					thread_proc();

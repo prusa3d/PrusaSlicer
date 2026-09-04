@@ -1,44 +1,48 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <libslic3r/BridgeDetector.hpp>
 #include <libslic3r/Geometry.hpp>
+#include <Slic3r/Biz/GCodeReader/GCodeReader.hpp>
 
 #include "test_data.hpp"
 
 using namespace Slic3r;
+using Biz::GCodeReader::GCodeReader;
 
 SCENARIO("Bridge detector", "[Bridging]") 
 {
-    auto check_angle = [](const ExPolygons &lower, const ExPolygon &bridge, double expected, double tolerance = -1, double expected_coverage = -1) 
+    using namespace Slic3r::Biz;
+
+    auto check_angle = [&](const ExPolygons &lower, const ExPolygon &bridge, double expected, double tolerance = -1, double expected_coverage = -1) 
     {
         if (expected_coverage < 0)
             expected_coverage = bridge.area();
         
         BridgeDetector bridge_detector(bridge, lower, scaled<coord_t>(0.5)); // extrusion width
         if (tolerance < 0)
-            tolerance = Geometry::rad2deg(bridge_detector.resolution) + EPSILON;
+            tolerance = rad2deg(bridge_detector.resolution) + EPSILON;
 
         bridge_detector.detect_angle();
         double   result   = bridge_detector.angle;
         Polygons coverage = bridge_detector.coverage();
         THEN("correct coverage area") {
-            REQUIRE(is_approx(area(coverage), expected_coverage));
+            REQUIRE(is_approx(Algorithms::Polygon::area(coverage), expected_coverage));
         }
         // our epsilon is equal to the steps used by the bridge detection algorithm
         //##use XXX; YYY [ rad2deg($result), $expected ];
         // returned value must be non-negative, check for that too
-        double delta = Geometry::rad2deg(result) - expected;
+        double delta = rad2deg(result) - expected;
         if (delta >= 180. - EPSILON)
             delta -= 180;
         return result >= 0. && std::abs(delta) < tolerance;
     };
     GIVEN("O-shaped overhang") {
-        auto test = [&check_angle](const Point &size, double rotate, double expected_angle, double tolerance = -1) {
+        auto test = [&](const Point &size, double rotate, double expected_angle, double tolerance = -1) {
             ExPolygon lower{
-                Polygon::new_scale({ {-2,-2}, {size.x()+2,-2}, {size.x()+2,size.y()+2}, {-2,size.y()+2} }),
-                Polygon::new_scale({ {0,0}, {0,size.y()}, {size.x(),size.y()}, {size.x(),0} } )
+                Algorithms::Polygon::scaled({ {-2,-2}, {size.x()+2,-2}, {size.x()+2,size.y()+2}, {-2,size.y()+2} }),
+                Algorithms::Polygon::scaled({ {0,0}, {0,size.y()}, {size.x(),size.y()}, {size.x(),0} } )
             };
-            lower.rotate(Geometry::deg2rad(rotate), size / 2);
+            lower.rotate(deg2rad(rotate), size / 2);
             ExPolygon bridge_expoly(lower.holes.front());
             bridge_expoly.contour.reverse();
             return check_angle({ lower }, bridge_expoly, expected_angle, tolerance);
@@ -69,25 +73,25 @@ SCENARIO("Bridge detector", "[Bridging]")
         }
     }
     GIVEN("two-sided bridge") {
-        ExPolygon bridge{ Polygon::new_scale({ {0,0}, {20,0}, {20,10}, {0,10} }) };
-        ExPolygons lower { ExPolygon{ Polygon::new_scale({ {-2,0}, {0,0}, {0,10}, {-2,10} }) } };
+        ExPolygon bridge{ Algorithms::Polygon::scaled({ {0,0}, {20,0}, {20,10}, {0,10} }) };
+        ExPolygons lower { ExPolygon{ Algorithms::Polygon::scaled({ {-2,0}, {0,0}, {0,10}, {-2,10} }) } };
         lower.emplace_back(lower.front());
-        lower.back().translate(Point::new_scale(22, 0));
+        lower.back().translate(scaled(Vec2d{22, 0}));
         THEN("Bridging angle 0 degrees") {
             REQUIRE(check_angle(lower, bridge, 0));
         }
     }
     GIVEN("for C-shaped overhang") {
-        ExPolygon bridge{ Polygon::new_scale({ {0,0}, {20,0}, {10,10}, {0,10} }) };
-        ExPolygon lower{ Polygon::new_scale({ {0,0}, {0,10}, {10,10}, {10,12}, {-2,12}, {-2,-2}, {22,-2}, {22,0} }) };
+        ExPolygon bridge{ Algorithms::Polygon::scaled({ {0,0}, {20,0}, {10,10}, {0,10} }) };
+        ExPolygon lower{ Algorithms::Polygon::scaled({ {0,0}, {0,10}, {10,10}, {10,12}, {-2,12}, {-2,-2}, {22,-2}, {22,0} }) };
         bool valid = check_angle({ lower }, bridge, 135);
         THEN("Bridging angle is 135 degrees") {
             REQUIRE(valid);
         }
     }
     GIVEN("square overhang with L-shaped anchors") {
-        ExPolygon bridge{ Polygon::new_scale({ {10,10}, {20,10}, {20,20}, {10,20} }) };
-        ExPolygon lower{ Polygon::new_scale({ {10,10}, {10,20}, {20,20}, {30,30}, {0,30}, {0,0} }) };
+        ExPolygon bridge{ Algorithms::Polygon::scaled({ {10,10}, {20,10}, {20,20}, {10,20} }) };
+        ExPolygon lower{ Algorithms::Polygon::scaled({ {10,10}, {10,20}, {20,20}, {30,30}, {0,30}, {0,0} }) };
         bool valid = check_angle({ lower }, bridge, 45., -1., bridge.area() / 2.);
         THEN("Bridging angle is 45 degrees") {
             REQUIRE(valid);
@@ -96,19 +100,19 @@ SCENARIO("Bridge detector", "[Bridging]")
 }
 
 SCENARIO("Bridging integration", "[Bridging]") {
-    DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config_with({
-        { "top_solid_layers",       0 },
-        // to prevent bridging on sparse infill
-        { "bridge_speed",           99 }
-    });
+
+    Test::TestConfig config;
+    config.print.items.opt("top_solid_layers").set(0);
+            // to prevent bridging on sparse infill
+    config.print.items.opt("bridge_speed").set(99.0);
 
     std::string gcode = Slic3r::Test::slice({ Slic3r::Test::TestMesh::bridge }, config);
-    
+
     GCodeReader                 parser;
-    const double                bridge_speed = config.opt_float("bridge_speed") * 60.;
+    const double                bridge_speed = config.print.items.opt("bridge_speed").get<double>() * 60.;
     // angle => length
     std::map<coord_t, double>   extrusions;
-    parser.parse_buffer(gcode, [&extrusions, bridge_speed](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+    parser.parse_buffer(gcode, [&](GCodeReader &self, const GCodeReader::GCodeLine &line)
     {
         // if the command is a T command, set the the current tool
         if (line.cmd() == "G1" && is_approx<double>(bridge_speed, line.new_F(self))) {

@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PLASILK*'
+name: ROSA3D PLA Silk
+id: ROSA3D PLA Silk
+values:
+  filament_cost: '19.99'
+  filament_vendor: ROSA3D
+  filament_spool_weight: 250

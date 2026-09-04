@@ -1,12 +1,17 @@
+///|/ Copyright (c) Prusa Research 2019 - 2021 Oleksandra Iushchenko @YuSanka
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_ExtruderSequenceDialog_hpp_
 #define slic3r_GUI_ExtruderSequenceDialog_hpp_
 
 #include "GUI_Utils.hpp"
-#include "DoubleSlider.hpp"
+#include "DoubleSliderForLayers.hpp"
+#include "wxExtensions.hpp"
 
 class wxTextCtrl;
 class wxFlexGridSizer;
-class wxCheckBox;
+class CheckBox;
 
 namespace Slic3r {
 namespace GUI {
@@ -23,8 +28,8 @@ class ExtruderSequenceDialog: public DPIDialog
 
     wxTextCtrl* m_interval_by_layers {nullptr}; 
     wxTextCtrl* m_interval_by_mm {nullptr};
-    wxCheckBox* m_random_sequence {nullptr};
-    wxCheckBox* m_color_repetition{nullptr};
+    CheckBox* m_random_sequence {nullptr};
+    CheckBox* m_color_repetition{nullptr};
 
     wxFlexGridSizer* m_intervals_grid_sizer {nullptr};
     wxFlexGridSizer* m_extruders_grid_sizer {nullptr};

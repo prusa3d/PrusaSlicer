@@ -1,0 +1,366 @@
+id: '*default_print_COREONE_INDX*'
+kind: print
+variants:
+# 0.25
+- condition: tool.nozzle_diameter == 0.25
+  id: 1wKaA0/RSfiulquLuXWdOQ
+  values:
+    default_tool_print: 0.10mm Fine ★
+# 0.3
+- condition: tool.nozzle_diameter == 0.3
+  id: K75XC4fFQlqvnh28felSgA
+  values:
+    default_tool_print: 0.15mm Detail ★
+# 0.4
+- condition: tool.nozzle_diameter == 0.4
+  id: r8A7F10ySnyC1Gx2YdeFYA
+  values:
+    default_tool_print: 0.20mm Balanced ★
+# 0.5
+- condition: tool.nozzle_diameter == 0.5
+  id: xWQi/o2nRM+13IHrGAg8Ng
+  values:
+    default_tool_print: 0.25mm Draft ★
+# 0.6
+- condition: tool.nozzle_diameter == 0.6
+  id: LQUY+ZojREesRXMLp/UkIA
+  values:
+    default_tool_print: 0.30mm Coarse ★
+# 0.8
+- condition: tool.nozzle_diameter == 0.8
+  id: Jc2k/BDrToK4V3VGuMSRTg
+  values:
+    default_tool_print: 0.40mm Extra Coarse ★
+---
+id: 0VkSjedbRgyaEXK2ofKGmg
+kind: print
+inherits:
+- '*common*'
+- '*COREONE_INDX_common_retract*'
+- '*default_print_COREONE_INDX*'
+match_mode: all_matches
+variants:
+## C1 INDX
+- condition: printer.base_model == "COREONE_INDX"
+  id: 24Qde4QGRKmQEh0v4TFdCw
+  values:
+    default_material: Prusament PLA
+    bottom_solid_layers: 4
+    bridge_acceleration: 1500
+    bridge_flow_ratio: 1
+    bridge_speed: 50
+    brim_separation: 0.1
+    default_acceleration: 4000
+    dont_support_bridges: 0
+    elefant_foot_compensation: 0.2
+    enable_dynamic_overhang_speeds: 1
+    external_perimeter_acceleration: 5000
+    external_perimeter_extrusion_width: 0.45
+    external_perimeter_speed: 170
+    extrusion_width: 0.45
+    fill_density: 15%
+    fill_pattern: grid
+    first_layer_acceleration: 500
+    first_layer_acceleration_over_raft: 0
+    first_layer_extrusion_width: 0.5
+    first_layer_speed: 45
+    first_layer_solid_infill_speed: 100
+    first_layer_speed_over_raft: 30
+    gap_fill_enabled: 1
+    gap_fill_speed: 120
+    gcode_resolution: 0.008
+    infill_acceleration: 7000
+    infill_anchor: 2
+    infill_anchor_max: 12
+    infill_every_layers: 1
+    infill_extrusion_width: 0.45
+    infill_overlap: 15%
+    infill_speed: 200
+    max_print_speed: 300
+    max_volumetric_extrusion_rate_slope_negative: 0
+    max_volumetric_extrusion_rate_slope_positive: 0
+    max_volumetric_speed: 0
+    min_bead_width: 85%
+    min_feature_size: 25%
+    only_retract_when_crossing_perimeters: 0
+    overhang_speed_0: 15
+    overhang_speed_1: 25
+    overhang_speed_2: 50
+    overhang_speed_3: 75%
+    overhangs: 1
+    perimeter_acceleration: 6000
+    perimeter_extrusion_width: 0.45
+    perimeter_speed: 170
+    perimeters: 2
+    raft_contact_distance: 0.15
+    raft_expansion: 1.5
+    raft_first_layer_density: 80%
+    support_material_first_layer_density: 80%
+    raft_first_layer_expansion: 3
+    support_material_first_layer_expansion: 3
+    seam_position: aligned
+    small_perimeter_speed: 170
+    solid_infill_acceleration: 7000
+    solid_infill_extrusion_width: 0.45
+    solid_infill_speed: 200
+    over_bridge_speed: 50%
+    support_material: enforcers_only
+    support_material_angle: 0
+    support_material_bottom_contact_distance: 0
+    support_material_bottom_interface_layers: 0
+    support_material_buildplate_only: 0
+    support_material_closing_radius: 2
+    support_material_contact_distance: 0.2
+    support_material_enforce_layers: 0
+    support_material_extruder: 0
+    support_material_extrusion_width: 0.4
+    support_material_interface_contact_loops: 0
+    support_material_interface_extruder: 0
+    support_material_interface_layers: 3
+    support_material_interface_pattern: auto
+    support_material_interface_spacing: 0.2
+    support_material_interface_speed: 50%
+    support_material_pattern: rectilinear
+    support_material_spacing: 2
+    support_material_speed: 120
+    support_material_style: snug
+    support_material_synchronize_layers: 0
+    support_material_threshold: 40
+    support_material_with_sheath: 0
+    support_material_xy_spacing: 80%
+    support_tree_angle: 40
+    support_tree_angle_slow: 25
+    support_tree_branch_diameter: 2
+    support_tree_branch_diameter_angle: 5
+    support_tree_branch_diameter_double_wall: 8
+    support_tree_branch_distance: 1
+    support_tree_tip_diameter: 0.8
+    support_tree_top_rate: 30%
+    top_infill_extrusion_width: 0.42
+    top_solid_infill_acceleration: 2000
+    top_solid_infill_speed: 100
+    top_solid_layers: 5
+    travel_acceleration: 7000
+    travel_speed: 350
+    travel_speed_z: 12
+    thick_bridges: 0
+    top_solid_min_thickness: 0.7
+    bottom_solid_min_thickness: 0.5
+    wipe_tower_extra_spacing: 110%
+    wipe_tower_extra_flow: 250%
+    travel_short_distance_acceleration: 250
+    wipe_tower: false
+    top_one_perimeter_type: top
+  variants:
+  - condition: tool.nozzle_high_flow
+    id: fSfVy6QXRqe6La1ErR31yg
+    variants:
+  # C1 INDX 0.4HF
+    - condition: tool.nozzle_diameter == 0.4
+      id: cswOTdl7QWW3HwBHNzxMpA
+      variants:
+      - name: 0.10mm
+        id: Z0/g4p1mRzSbu/AYadbpqg
+        values:
+          layer_height: 0.10
+      - name: 0.15mm
+        id: sp9t4qR5QSyyIBb4MUPsuw
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: keQU5JiMTF6bCkJEhO74FQ
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: bacaXZhyQAipHg6yVBNnaA
+        values:
+          layer_height: 0.25
+  # C1 INDX 0.5HF
+    - condition: tool.nozzle_diameter == 0.5
+      id: kVaKvqXKTfCmnBJ9QchLgw
+      variants:
+      - name: 0.10mm
+        id: 54pPgyaFSGWWLGsX/GslOQ
+        values:
+          layer_height: 0.10
+      - name: 0.15mm
+        id: L9zhDlB5TdCy6oPvsBVY5g
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: AuXiLobWQcmbu/osL2wVYg
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: MB/9kKT1SiGoOTf+sY0vSw
+        values:
+          layer_height: 0.25
+      - name: 0.30mm
+        id: Cy/7OEzmTsS8b5e3EHaByQ
+        values:
+          layer_height: 0.30
+  # C1 INDX 0.6HF
+    - condition: tool.nozzle_diameter == 0.6
+      id: rEtHibARSSqW3lUB3yfBog
+      variants:
+      - name: 0.15mm
+        id: 5pratuHmSHGXw8niOYA03Q
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: mythAbSJRyuRTee7Myl8wg
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: C4vFrh1MQze4ZDjuKUmphQ
+        values:
+          layer_height: 0.25
+      - name: 0.30mm
+        id: 4za6lgvGQGy65qCc5mXJug
+        values:
+          layer_height: 0.30
+      - name: 0.40mm
+        id: ASSujhdWQjCgjTiLRUJtag
+        values:
+          layer_height: 0.40
+  # C1 INDX 0.8HF
+    - condition: tool.nozzle_diameter == 0.8
+      id: 5kwsmXlRRUGAXGmMISUEjg
+      variants:
+      - name: 0.30mm
+        id: uR6qMns1QPyKer3q87FnDA
+        values:
+          layer_height: 0.30
+      - name: 0.40mm
+        id: I7i8Q44IQmamWf2RaguufA
+        values:
+          layer_height: 0.40
+# C1 INDX non-HF
+  - condition: not tool.nozzle_high_flow
+    id: Lknut/TCQ9++3kni68CrSQ
+    variants:
+  # C1 INDX 0.25
+    - condition: tool.nozzle_diameter == 0.25
+      id: maL+NuhtRS6LUd2WoQdq6Q
+      variants:
+      - name: 0.07mm
+        id: bmG+DKddTUm3/VKONW8Rlw
+        values:
+          layer_height: 0.07
+      - name: 0.10mm
+        id: tjZ+VjtkTsOoUuk3dEpAiw
+        values:
+          layer_height: 0.1
+      - name: 0.15mm
+        id: 41t0EFFKRGmLt+iUrQPOMA
+        values:
+          layer_height: 0.15
+  # C1 INDX 0.3
+    - condition: tool.nozzle_diameter == 0.3
+      id: FAcrbmdrTpelehFWrEM+8w
+      variants:
+      - name: 0.10mm
+        id: 5NzuBJmvR9OfcGFmfiW58g
+        values:
+          layer_height: 0.1
+      - name: 0.15mm
+        id: giDSFBsWSMemzQHKqdF+tg
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: AokxNtIHRIe8tV85qdj2lg
+        values:
+          layer_height: 0.20
+  # C1 INDX 0.4
+    - condition: tool.nozzle_diameter == 0.4
+      id: UxJxS8oVS6uvs5mvashcTg
+      variants:
+      - name: 0.10mm
+        id: Oe6C9qNhRQSk8DX3/5DaPQ
+        values:
+          layer_height: 0.10
+      - name: 0.15mm
+        id: Jt6LyDMjT6uLkqPryPB69g
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: RLq4JV6nS7ygRFt4hRUY8g
+        values:
+          layer_height: 0.20
+  # C1 INDX 0.5
+    - condition: tool.nozzle_diameter == 0.5
+      id: EOLVJ5HxRaa79OycpO66Kw
+      variants:
+      - name: 0.10mm
+        id: vbwh20rLTAOz26MEIaNv9A
+        values:
+          layer_height: 0.10
+      - name: 0.15mm
+        id: s6JEJwtlSVOI2wQd25rSaA
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: BAsCXmDhRo2+lNhYZt0WWg
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: cO50vbvIRgmkVjraF16dxQ
+        values:
+          layer_height: 0.25
+  # C1 INDX 0.6
+    - condition: tool.nozzle_diameter == 0.6
+      id: Y4yAnzWwQh6DT+UvNy4ptQ
+      variants:
+      - name: 0.15mm
+        id: TYGBE+QGRjuT/5agFKAYsA
+        values:
+          layer_height: 0.15
+      - name: 0.20mm
+        id: S9rZshVOTGmjEU0Xi+BzhQ
+        values:
+          layer_height: 0.20
+      - name: 0.25mm
+        id: oTX8QFamSuOrcyoRWY1iNg
+        values:
+          layer_height: 0.25
+      - name: 0.30mm
+        id: ISIzkMZVR4eJn1LUePc1Lw
+        values:
+          layer_height: 0.30
+  # C1 INDX 0.8
+    - condition: tool.nozzle_diameter == 0.8
+      id: phTs09wWQYmkEc4jmCsvlQ
+      variants:
+      - name: 0.30mm
+        id: oqK3P7oRSBmrcFwKmhX63w
+        values:
+          layer_height: 0.32
+      - name: 0.40mm
+        id: B+XUbKAiRrepMbW5X54SAA
+        values:
+          layer_height: 0.40
+---
+id: '*COREONE_INDX_common_retract*'
+kind: print
+variants:
+- condition: printer.base_model == "COREONE_INDX"
+  id: lDXpyyssRROAHXb0av1Y3Q
+  values:
+    retract_layer_change: 1
+    retract_length_toolchange: 0
+    retract_lift_above: 0
+    retract_lift_below: 359
+    retract_restart_extra: 0
+    retract_restart_extra_toolchange: 0
+    travel_ramping_lift: 1
+    travel_slope: 1
+    travel_max_lift: 1.5
+    wipe: 1
+    deretract_speed: 25
+    max_layer_height: 0.30
+    min_layer_height: 0.07
+    retract_before_wipe: 80%
+    retract_length: 0.8
+    retract_lift: 0.3
+    retract_speed: 35
+    retract_before_travel: 1.5

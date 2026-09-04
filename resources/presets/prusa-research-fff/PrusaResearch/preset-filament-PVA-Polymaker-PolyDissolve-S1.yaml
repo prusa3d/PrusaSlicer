@@ -1,0 +1,42 @@
+kind: filament
+inherits:
+- '*PVA*'
+name: Polymaker PolyDissolve S1
+condition: printer.base_model=~/(MK2|MK3|MK2.5|MK3.5|XL)/
+id: Polymaker PolyDissolve S1
+values:
+  filament_vendor: Polymaker
+  bridge_fan_speed: 40
+  full_fan_speed_layer: 3
+  min_fan_speed: 30
+  max_fan_speed: 30
+  cooling: true
+  fan_always_on: true
+  filament_cost: 100
+  filament_density: 1.13
+  filament_spool_weight: 125
+  temperature: 215
+  travel_ramping_lift: true
+  travel_max_lift: 0.6
+  travel_slope: 1
+variants:
+- condition: printer.base_model == "MK4S"
+  id: zn3c3EheTL+d9Ds+1cvgvQ
+  values:
+    min_fan_speed: 20
+    max_fan_speed: 20
+    bridge_fan_speed: 30
+- condition: printer.base_model == "COREONE"
+  id: eQ1wKSrISc2LEX5iBQxsTA
+  values:
+    min_fan_speed: 25
+    max_fan_speed: 25
+    bridge_fan_speed: 30
+    chamber_temperature: 0
+    chamber_minimal_temperature: 0
+- condition: printer.model == "XLP"
+  id: PN1WuNfxSbysltTskb0jZw
+  values:
+    min_fan_speed: 25
+    max_fan_speed: 25
+    bridge_fan_speed: 30

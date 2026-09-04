@@ -1,0 +1,160 @@
+kind: filament
+inherits:
+- '*FLEX*'
+features:
+  $.type: TPU
+name: colorFabb TPU 85A
+id: colorFabb TPU 85A
+# MK4/XL/C1 family 0.4-0.6
+values:
+  extrusion_multiplier: 1.18
+  filament_cost: 44.49
+  filament_density: 1.2
+  filament_vendor: colorFabb
+  filament_spool_weight: 242
+  first_layer_temperature: 240
+  temperature: 240
+  first_layer_bed_temperature: 60
+  bed_temperature: 60
+  bridge_fan_speed: 70
+  disable_fan_first_layers: 5
+  full_fan_speed_layer: 5
+  min_fan_speed: 50
+  max_fan_speed: 50
+  cooling: false
+  filament_max_volumetric_speed: 2
+  retract_length: 1.2
+variants:
+- condition: printer.base_model == "COREONE"
+  id: JbgjD3chRpS0TtzpBCp2sw
+  values:
+    bridge_fan_speed: 70
+    min_fan_speed: 45
+    max_fan_speed: 45
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: ikbTR9dNRj2f1Rh8UYxIQg
+    values:
+      filament_max_volumetric_speed: 2
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: r4tgY7oKRWOMTi+KA7h0Ig
+    values:
+      filament_max_volumetric_speed: 2
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: /A9mvv7tRaaIU0hzpeTl3Q
+    values:
+      filament_max_volumetric_speed: 3
+  # END
+  - name: '*quit*'
+    id: g852HkE+QsCOkIiF5KMDFw
+## XL
+- condition: printer.model == "XL"
+  id: z8ik5CmHQlm3TKqMLsTgFg
+  values:
+    retract_length_toolchange: 2
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: fIUVzu9ZS+Ge7H7aJnhdAQ
+    values:
+      filament_max_volumetric_speed: 2
+      filament_multitool_ramming_flow: 2
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: hCHdu9fnQwiK8oxfVoJPyA
+    values:
+      filament_max_volumetric_speed: 2
+      filament_multitool_ramming_flow: 2
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: Yr2aTAs4R9+JCmRYfHrINw
+    values:
+      filament_max_volumetric_speed: 3
+      filament_multitool_ramming_flow: 3
+  # END
+  - name: '*quit*'
+    id: xyTdlYDPRPy4DPDjkDyhgQ
+## XL+
+- condition: printer.model == "XLP"
+  id: azReyeauQ5C9rVHU15q4Iw
+  values:
+    retract_length_toolchange: 2
+    min_fan_speed: 40
+    max_fan_speed: 40
+    bridge_fan_speed: 70
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: q4XcaDUGS9OLDwdNNZTJuw
+    values:
+      filament_max_volumetric_speed: 2
+      filament_multitool_ramming_flow: 2
+  # XL+ 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: mLO1MwxIQ7CCArWSLOWdeg
+    values:
+      filament_max_volumetric_speed: 2
+      filament_multitool_ramming_flow: 2
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: DYT/myz+SHag/Pa+R9LvSw
+    values:
+      filament_max_volumetric_speed: 3
+      filament_multitool_ramming_flow: 3
+  # END
+  - name: '*quit*'
+## MK4
+    id: jQ8JUE2ORI6guqlqHQeNSw
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: /n5br4s8S0CkiPcMgT0IVQ
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 00dTEYZGQz+knpEEAtCF2A
+    values:
+      filament_max_volumetric_speed: 2
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: CBJJqPbST4+ayxaAi9z5eA
+    values:
+      filament_max_volumetric_speed: 2
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: HDnywt3cSpCqonEBcnCvAA
+    values:
+      filament_max_volumetric_speed: 3
+  # END
+  - name: '*quit*'
+## MK4S
+    id: Gkf4AhdMSIGle2yfpOXwgw
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: v5QQwcCKTbOKb8Wr6Ow5iA
+  values:
+    bridge_fan_speed: 70
+    min_fan_speed: 40
+    max_fan_speed: 40
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: vOVvVuExShGQ+qCgQW8jhQ
+    values:
+      filament_max_volumetric_speed: 2
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: sGhaQW95Rd+gWgBjHFe5qQ
+    values:
+      filament_max_volumetric_speed: 2
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 872XI+b3SdKrgFVYnedU1A
+    values:
+      filament_max_volumetric_speed: 3
+  # END
+  - name: '*quit*'
+# END
+    id: uZkFHId8TUqKwYltkGOchw
+- name: '*quit*'
+  id: QFHR+NdYTFmudvTpQhMUvQ

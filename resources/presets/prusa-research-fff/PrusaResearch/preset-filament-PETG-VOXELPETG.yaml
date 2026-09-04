@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PET*'
+name: VOXELPETG+
+id: VOXELPETG+
+values:
+  filament_cost: '22'
+  filament_density: 1.27
+  filament_vendor: VOXELPLA

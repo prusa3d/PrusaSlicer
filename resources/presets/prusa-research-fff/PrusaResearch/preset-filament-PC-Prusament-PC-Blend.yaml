@@ -1,0 +1,34 @@
+kind: filament
+inherits:
+- '*PC*'
+name: Prusament PC Blend
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/
+id: Prusament PC Blend
+values:
+  filament_cost: '51.53'
+  filament_vendor: Prusa Polymers
+variants:
+- condition: printer.base_model == "COREONE_INDX"
+  id: BsxDfFvUR/6u8ZNW8z302A
+  values:
+    first_layer_temperature: 285
+    temperature: 285
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: i5+PkyyWQsCj7dg+Uw8N1g
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.06
+      filament_infill_max_crossing_speed: 100
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: sPqL6a9uTASuwFtv6wjDLA
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.06
+  # END
+  - name: '*quit*'
+    id: mp2BEJYZSnG0f9vvVp/V1w

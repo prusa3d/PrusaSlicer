@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2021 Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 // LICENSE
 //
 //   This software is dual-licensed to the public domain and under the following

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2022 Enrico Turri @enricoturri1966, Filip Sykala @Jony01
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "RaycastManager.hpp"
 #include <utility>
 
@@ -182,7 +186,8 @@ std::optional<RaycastManager::Hit> RaycastManager::closest_hit(const Vec3d &poin
         std::vector<AABBMesh::hit_result> hits_neg = mesh->query_ray_hits(point_negative, -mesh_direction);
         hits.insert(hits.end(), std::make_move_iterator(hits_neg.begin()), std::make_move_iterator(hits_neg.end()));
         for (const AABBMesh::hit_result &hit : hits) { 
-            double squared_distance = (mesh_point - hit.position()).squaredNorm();
+            Vec3d diff = mesh_point - hit.position();
+            double squared_distance = diff.squaredNorm();
             if (closest.has_value() &&
                 closest->squared_distance < squared_distance)
                 continue;
@@ -357,6 +362,25 @@ std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager        &
     Vec3d direction;
     CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
     return raycaster.first_hit(point, direction, skip);
+}
+
+RaycastManager::AllowVolumes create_condition(const ModelVolumePtrs &volumes, const ObjectID &disallowed_volume_id) {
+    std::vector<size_t> allowed_volumes_id;
+    if (volumes.size() > 1) {
+        allowed_volumes_id.reserve(volumes.size() - 1);
+        for (const ModelVolume *v : volumes) {
+            // drag only above part not modifiers or negative surface
+            if (!v->is_model_part())
+                continue;
+
+            // skip actual selected object
+            if (v->id() == disallowed_volume_id)
+                continue;
+
+            allowed_volumes_id.emplace_back(v->id().id);
+        }
+    }
+    return RaycastManager::AllowVolumes(allowed_volumes_id);
 }
 
 } // namespace Slic3r::GUI

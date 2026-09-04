@@ -1,0 +1,13 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Filatech ABS
+id: Filatech ABS
+values:
+  filament_cost: '24.9'
+  filament_vendor: Filatech
+  filament_density: 1.05
+  first_layer_temperature: 255
+  temperature: 255
+  extrusion_multiplier: 0.95
+

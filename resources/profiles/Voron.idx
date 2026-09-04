@@ -1,7 +1,0 @@
-min_slic3r_version = 2.6.0-alpha6
-1.0.3 Added Voron Switchwire.
-1.0.2 Updated g-code flavor and travel accelerations.
-min_slic3r_version = 2.4.2
-1.0.1 Added 350mm Voron v1 variant. Updated max print heights. Removed redundant v1 volcano nozzle variants.
-min_slic3r_version = 2.4.0-beta0
-1.0.0 Initial version

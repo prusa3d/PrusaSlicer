@@ -1,0 +1,27 @@
+name: Build osx
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'version_*'
+  workflow_dispatch:
+    inputs:
+      enable_sentry:
+        description: 'Enable sentry'
+        default: false
+        type: boolean
+      release_build:
+        description: 'Release build'
+        default: false
+        type: boolean
+
+jobs:
+  build_osx:
+    uses: Prusa-Development/PrusaSlicer-Actions/.github/workflows/build_osx.yml@master
+    secrets: inherit
+    with:
+      actions_branch: master
+      enable_sentry: ${{ inputs.enable_sentry || false }}
+      release_build: ${{ inputs.release_build || startsWith(github.ref, 'refs/tags/version_') }}

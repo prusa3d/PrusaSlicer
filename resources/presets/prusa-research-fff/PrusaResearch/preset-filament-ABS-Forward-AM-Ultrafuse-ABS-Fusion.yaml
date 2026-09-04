@@ -1,0 +1,16 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Forward AM Ultrafuse ABS Fusion+
+id: Forward AM Ultrafuse ABS Fusion+
+values:
+  filament_cost: 25.87
+  filament_vendor: Forward AM
+  filament_density: 1.08
+  retract_before_travel: 2
+  first_layer_temperature: 270
+  temperature: 270
+  disable_fan_first_layers: 3
+  retract_layer_change: false
+  retract_lift: 0
+

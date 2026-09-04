@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PLASILK*'
+name: Prusament PLA Blend
+id: Prusament PLA Blend
+values:
+  filament_cost: '27.99'
+  filament_vendor: Prusa Polymers

@@ -1,0 +1,95 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*sheets_PET_UltrafuserPET*'
+- '*UltrafuserPET_MAXVOLSPEED*'
+name: Forward AM Ultrafuse rPET
+id: Forward AM Ultrafuse rPET
+values:
+  filament_vendor: Forward AM
+  filament_type: PET
+  first_layer_bed_temperature: 235
+  temperature: 235
+  bridge_fan_speed: 100
+  disable_fan_first_layers: 1
+  full_fan_speed_layer: 3
+  min_fan_speed: 50
+  max_fan_speed: 100
+  fan_below_layer_time: 15
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: 095OxHiWRgKlZnW3srjzKg
+  values:
+    bridge_fan_speed: 80
+    min_fan_speed: 40
+    max_fan_speed: 75
+    overhang_fan_speed_0: 75
+---
+kind: filament
+id: '*sheets_PET_UltrafuserPET*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: t3/rUY7WS5qMMhvwaGgqZw
+  values:
+    first_layer_bed_temperature: 75
+    bed_temperature: 75
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: /E3BkAxcQjCIbnL3Auy36g
+  values:
+    first_layer_bed_temperature: 60
+    bed_temperature: 60
+---
+kind: filament
+# Maximum volumetric speed limits
+id: '*UltrafuserPET_MAXVOLSPEED*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: l5oqxXuOSUS6IiYdfC29lg
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 5wrByfpaT3efaUz8E30RLQ
+    values:
+      filament_max_volumetric_speed: 8
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: CRm+OBxCT7Wf29maAsdYdg
+      values:
+        filament_max_volumetric_speed: 16
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: lgEgqP8lR9OEi8OL9jzhHg
+    values:
+      filament_max_volumetric_speed: 9
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: vSxroWqIRL+deirSwzWjIg
+      values:
+        filament_max_volumetric_speed: 18
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 8m1SLUtsT/+h9TV5QButOg
+    values:
+      filament_max_volumetric_speed: 10
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: 7VzmF7mQTgO+pGUJnKRFrQ
+      values:
+        filament_max_volumetric_speed: 20
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: dGMixPTdTo+Kn4AfMWQ8jg
+    values:
+      filament_max_volumetric_speed: 13
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: fRX6Mjp8SPeViMld1KA/Qg
+      values:
+        filament_max_volumetric_speed: 26

@@ -1,0 +1,7 @@
+kind: filament
+inherits:
+- '*PCTG*'
+name: Generic PCTG
+id: Generic PCTG
+values:
+  filament_vendor: Generic

@@ -1,0 +1,52 @@
+kind: filament
+inherits:
+- '*ASA*'
+name: Prusament ASA
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/
+id: Prusament ASA
+values:
+  filament_cost: '35.28'
+  filament_vendor: Prusa Polymers
+variants:
+- condition: printer.base_model == "COREONE_INDX"
+  id: zxQ/JM8nQFGDiv33ptkFlw
+  values:
+    pressure_advance: automatic_calibration
+    cooling_perimeter_transition_distance: 15
+    first_layer_bed_temperature: 110
+    enable_dynamic_fan_speeds: 1
+    idle_temperature:
+    min_fan_speed: 20
+    max_fan_speed: 25
+    min_print_speed: 15
+    bridge_fan_speed: 25
+    overhang_fan_speed_0: 25
+    overhang_fan_speed_1: 0
+    overhang_fan_speed_2: 0
+    overhang_fan_speed_3: 0
+    fan_below_layer_time: 20
+    start_filament_gcode: M573 R
+    retract_length: 0.8
+    travel_max_lift: 0.6
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: zZPO7QPzQtOhIUdN5bQnLQ
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.02
+      filament_infill_max_crossing_speed: 140
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      id: w4E3zN0DRymVZJ3H/CLj1w
+      values:
+        filament_max_volumetric_speed: 30
+        pressure_advance_value: 0.022
+        filament_infill_max_crossing_speed: 200
+        temperature: 265
+        first_layer_temperature: 265
+  # END
+  - name: '*quit*'
+    id: P/1DP0xLR4GmvzzpgEV4bQ

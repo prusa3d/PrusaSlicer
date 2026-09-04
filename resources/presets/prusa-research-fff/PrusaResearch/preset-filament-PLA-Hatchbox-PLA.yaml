@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Hatchbox PLA
+id: Hatchbox PLA
+values:
+  filament_cost: '27.82'
+  filament_vendor: Hatchbox
+  filament_spool_weight: 245
+  filament_density: 1.27

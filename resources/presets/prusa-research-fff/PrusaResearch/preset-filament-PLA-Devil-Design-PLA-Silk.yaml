@@ -1,0 +1,182 @@
+kind: filament
+inherits:
+- '*PLASILK*'
+- '*DDPLASilk_P_ADVANCE_PLA*'
+name: Devil Design PLA Silk
+id: Devil Design PLA Silk
+values:
+  filament_cost: '20'
+  filament_density: 1.23
+  filament_vendor: Devil Design
+  filament_spool_weight: 250
+  first_layer_temperature: 235
+  temperature: 235
+---
+kind: filament
+# Pressure advance values
+id: '*DDPLASilk_P_ADVANCE_PLA*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: IuKpaohgRqaY4EuJ6vJuBQ
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 0uByIeXiQae/+G/JIxV28A
+    values:
+      pressure_advance_value: 0.07
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: L1CxVJ0JSa6ywcsRHjANzA
+    values:
+      pressure_advance_value: 0.05
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: KgA6HY4iQo+FSnnyi9IQiA
+    values:
+      pressure_advance_value: 0.022
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: yft81nqKS1qzYuX7kLl/bg
+      values:
+        pressure_advance_value: 0.022
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 8UIDQvtIQcC1wRPD4BYCJQ
+    values:
+      pressure_advance_value: 0.015
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: lci4LMdFTCamJueu7Fgfew
+      values:
+        pressure_advance_value: 0.015
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: YEXUGUL3Rkml/VWenWc74g
+    values:
+      pressure_advance_value: 0.013
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: i6rJwniOQfGKMUt1x5iMLg
+      values:
+        pressure_advance_value: 0.013
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: nP3pAEIqTEeAZWoArFlR4w
+    values:
+      pressure_advance_value: 0.009
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: 5mHiDAW7T9SeiAuGaBP7Xw
+      values:
+        pressure_advance_value: 0.009
+## MINI
+- condition: printer.base_model == "MINI"
+  id: jqpGfgqvQ7yx8SdPOk2nDw
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: wHNEuH+aQ6qo7pEDh9sZcA
+    values:
+      pressure_advance_value: 0.55
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: gvvkqINATpabcV3YEkcshw
+    values:
+      pressure_advance_value: 0.18
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: WKhMPOhjT/GX4vipIgs31A
+    values:
+      pressure_advance_value: 0.1
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: ENlHJ0F3TlGLQ2DulFmAfA
+    values:
+      pressure_advance_value: 0.075
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: XeAT0xx5ToO2Ggq+B/dkMA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: uB6vvtVIReuzki+eB+ShxA
+    values:
+      pressure_advance_value: 0.07
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: /Ibq2XH+Rpy2x5iDRKw1nA
+    values:
+      pressure_advance_value: 0.05
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: a2jyNCBzTAyUs1+RIbFA3g
+    values:
+      pressure_advance_value: 0.02
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: WStdy1wYRuaBNYZFQZqMSg
+    values:
+      pressure_advance_value: 0.014
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: OAn3lpXuRlS+8Xhx1gnJiw
+    values:
+      pressure_advance_value: 0.013
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: Zalvinn7QfuaDGFWmd7m2A
+    values:
+      pressure_advance_value: 0.009
+## MK3
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: 5+mrHGXARx+mdTZljwHGJA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: yvtFh65pSY6KWSasN3DONg
+    values:
+      pressure_advance_value: 0.06
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: Lt0ZD8UXTuSwJiEUIX7+Gg
+    values:
+      pressure_advance_value: 0.032
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: hidU1dskTyqCtggxnwaZgQ
+    values:
+      pressure_advance_value: 0.026
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: GWP3tC57QnayU2k3m4ufMw
+    values:
+      pressure_advance_value: 0.01
+## MK2
+- condition: printer.base_model == "MK2"
+  id: ibs7k3LRQP2bqeXf79wYaQ
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: +mqH5VFlQJ6IFZaiNcOYlg
+    values:
+      pressure_advance_value: 25
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: bT0fcp7CSLOPNdV7sLh5cg
+    values:
+      pressure_advance_value: 25
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: fh7m7MGyR0S6la5cAtXcJQ
+    values:
+      pressure_advance_value: 15
+## MK2 MMU1 
+- condition: printer.base_model == "MK2MMU1"
+  id: vOD7T7aaScWN2bVhGG5NmQ
+  values:
+    pressure_advance_value: 200

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 23.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   version="1.0"
+   id="Layer_1"
+   x="0px"
+   y="0px"
+   viewBox="0 0 15.999318 16.00075"
+   enable-background="new 0 0 16 16"
+   xml:space="preserve"
+   width="15.999318"
+   height="16.00075"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs2" />
+<g
+   id="cross"
+   transform="matrix(1.1666174,0,0,1.1667218,-1.3332804,-1.3333997)"
+   style="stroke-width:0.85714">
+	<g
+   id="g1"
+   style="stroke-width:0.85714">
+		
+			<line
+   fill="none"
+   stroke="#ed6b21"
+   stroke-width="1.71428"
+   stroke-linecap="round"
+   stroke-miterlimit="10"
+   x1="14"
+   y1="2"
+   x2="2"
+   y2="14"
+   id="line1" />
+	</g>
+	<g
+   id="g2"
+   style="stroke-width:0.85714">
+		
+			<line
+   fill="none"
+   stroke="#ed6b21"
+   stroke-width="1.71428"
+   stroke-linecap="round"
+   stroke-miterlimit="10"
+   x1="2"
+   y1="2"
+   x2="14"
+   y2="14"
+   id="line2" />
+	</g>
+</g>
+</svg>

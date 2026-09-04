@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Pavel Mikuš @Godrak, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Vojtěch Král @vojtechkral, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_BonjourDialog_hpp_
 #define slic3r_BonjourDialog_hpp_
 

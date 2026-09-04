@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: EUMAKERS PLA
+id: EUMAKERS PLA
+values:
+  filament_cost: '19.99'
+  filament_vendor: EUMAKERS

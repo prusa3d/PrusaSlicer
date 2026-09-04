@@ -1,0 +1,174 @@
+id: '*common*'
+kind: filament
+values:
+  compatible_printers_condition: '! (printer_notes=~/.*PRINTER_VENDOR_PRUSA3D.*/ and
+    printer_notes=~/.*PRINTER_MODEL_MK(2.5|3).*/ and single_extruder_multi_material)
+    and printer_notes!~/.*PG.*/'
+  cooling: '1'
+  end_filament_gcode: ; Filament-specific end gcode
+  extrusion_multiplier: '1'
+  filament_cooling_final_speed: '3.4'
+  filament_cooling_initial_speed: '2.2'
+  filament_cooling_moves: '4'
+  filament_cost: '0'
+  filament_density: '0'
+  filament_diameter: '1.75'
+  filament_load_time: '0'
+  filament_loading_speed: '28'
+  filament_loading_speed_start: '3'
+  filament_minimal_purge_on_wipe_tower: '15'
+  filament_notes: ''
+  filament_ramming_parameters: 120 100 6.6 6.8 7.2 7.6 7.9 8.2 8.7 9.4 9.9 10.0| 0.05
+    6.6 0.45 6.8 0.95 7.8 1.45 8.3 1.95 9.7 2.45 10 2.95 7.6 3.45 7.6 3.95 7.6 4.45
+    7.6 4.95 7.6
+  filament_settings_id: ''
+  filament_soluble: '0'
+  filament_toolchange_delay: '0'
+  filament_unload_time: '0'
+  filament_unloading_speed: '90'
+  filament_unloading_speed_start: '100'
+  min_print_speed: '15'
+  slowdown_below_layer_time: '15'
+  start_filament_gcode: M900 K{if printer_notes=~/.*PRINTER_MODEL_MINI.*/}0.2{elsif
+    printer_notes=~/.*PRINTER_HAS_BOWDEN.*/}200{else}30{endif} ; Filament gcode
+---
+id: '*PLA*'
+kind: filament
+values:
+  bed_temperature: '60'
+  bridge_fan_speed: '100'
+  compatible_printers_condition: '! (printer_notes=~/.*PRINTER_VENDOR_PRUSA3D.*/ and
+    printer_notes=~/.*PRINTER_MODEL_MK(2.5|3).*/ and single_extruder_multi_material)
+    and printer_notes!~/.*PG.*/'
+  cooling: '1'
+  disable_fan_first_layers: '1'
+  end_filament_gcode: ; Filament-specific end gcode
+  extrusion_multiplier: '1'
+  fan_always_on: '1'
+  fan_below_layer_time: '100'
+  filament_colour: ''
+  filament_cooling_final_speed: '3.4'
+  filament_cooling_initial_speed: '2.2'
+  filament_cooling_moves: '4'
+  filament_cost: '0'
+  filament_density: '0'
+  filament_diameter: '1.75'
+  filament_load_time: '0'
+  filament_loading_speed: '28'
+  filament_loading_speed_start: '3'
+  filament_max_volumetric_speed: '15'
+  filament_minimal_purge_on_wipe_tower: '15'
+  filament_notes: ''
+  filament_ramming_parameters: 120 100 6.6 6.8 7.2 7.6 7.9 8.2 8.7 9.4 9.9 10.0| 0.05
+    6.6 0.45 6.8 0.95 7.8 1.45 8.3 1.95 9.7 2.45 10 2.95 7.6 3.45 7.6 3.95 7.6 4.45
+    7.6 4.95 7.6
+  filament_settings_id: ''
+  filament_soluble: '0'
+  filament_toolchange_delay: '0'
+  filament_type: PLA
+  filament_unload_time: '0'
+  filament_unloading_speed: '90'
+  filament_unloading_speed_start: '100'
+  first_layer_bed_temperature: '60'
+  first_layer_temperature: '215'
+  full_fan_speed_layer: '4'
+  max_fan_speed: '100'
+  min_fan_speed: '100'
+  min_print_speed: '15'
+  slowdown_below_layer_time: '12'
+  start_filament_gcode: '{if printer_notes!~/.*(MK3.5|MINIIS).*/}\nM900 K{if printer_notes=~/.*PRINTER_MODEL_MINI.*/
+    and nozzle_diameter[0]==0.6}0.12{elsif printer_notes=~/.*PRINTER_MODEL_MINI.*/
+    and nozzle_diameter[0]==0.8}0.06{elsif printer_notes=~/.*PRINTER_MODEL_MINI.*/}0.2{elsif
+    nozzle_diameter[0]==0.8}0.01{elsif nozzle_diameter[0]==0.6}0.04{else}0.05{endif}
+    ; Filament gcode LA 1.5\n{if printer_notes=~/.*PRINTER_MODEL_MINI.*/};{elsif printer_notes=~/.*PRINTER_HAS_BOWDEN.*/}M900
+    K200{elsif nozzle_diameter[0]==0.6}M900 K18{elsif nozzle_diameter[0]==0.8};{else}M900
+    K30{endif} ; Filament gcode LA 1.0\n{endif}\n\n{if printer_notes=~/.*MINIIS.*/}\nM572
+    S{if nozzle_diameter[0]==0.6}0.17{elsif nozzle_diameter[0]==0.8}0.12{elsif nozzle_diameter[0]==0.4}0.27{elsif
+    nozzle_diameter[0]==0.25}0.85{else}0{endif}\n{endif}\n\n{if printer_notes=~/.*MK3.5.*/}\nM572
+    S{if nozzle_diameter[0]==0.4}0.035{elsif nozzle_diameter[0]==0.5}0.025{elsif nozzle_diameter[0]==0.6}0.02{elsif
+    nozzle_diameter[0]==0.8}0.014{elsif nozzle_diameter[0]==0.25}0.12{elsif nozzle_diameter[0]==0.3}0.08{else}0{endif}
+    ; Filament gcode\n{endif}'
+  temperature: '210'
+variants:
+- condition: printer.planetary_gearbox
+  values:
+    compatible_printers_condition: printer_model=~/(MK4|MK4IS|MK4ISMMU3|MK3.9|MK3.9MMU3)/
+      and nozzle_diameter[0]!=0.8 and nozzle_diameter[0]!=0.6 and ! nozzle_high_flow[0]
+    filament_cooling_final_speed: '3.5'
+    filament_cooling_initial_speed: '10'
+    filament_cooling_moves: '2'
+    filament_infill_max_crossing_speed: '0'
+    filament_infill_max_speed: '0'
+    filament_load_time: '10.5'
+    filament_loading_speed: '10'
+    filament_loading_speed_start: '50'
+    filament_minimal_purge_on_wipe_tower: '15'
+    filament_purge_multiplier: 81.25%
+    filament_ramming_parameters: 250 100 40.1613 40.3548 40.4516 40.3548 40.2581|
+      0.05 40.1483 0.45 40.3419 0.95 40.3419 1.45 40.3419 1.95 40.3419 2.45 40.3419
+      2.95 40.3419 3.45 40.3419 3.95 40.3419 4.45 40.3419 4.95 40.3419
+    filament_stamping_distance: '45'
+    filament_stamping_loading_speed: '29'
+    filament_toolchange_delay: '0'
+    filament_travel_max_lift: '0.6'
+    filament_travel_ramping_lift: '1'
+    filament_travel_slope: '1'
+    filament_unload_time: '8.5'
+    filament_unloading_speed: '100'
+    filament_unloading_speed_start: '100'
+    full_fan_speed_layer: '3'
+    idle_temperature: '70'
+    slowdown_below_layer_time: '8'
+    start_filament_gcode: M900 K{if nozzle_diameter[filament_extruder_id]==0.4}0.05{elsif
+      nozzle_diameter[filament_extruder_id]==0.25}0.14{elsif nozzle_diameter[filament_extruder_id]==0.3}0.07{elsif
+      nozzle_diameter[filament_extruder_id]==0.35}0.06{elsif nozzle_diameter[filament_extruder_id]==0.6}0.03{elsif
+      nozzle_diameter[filament_extruder_id]==0.5}0.035{elsif nozzle_diameter[filament_extruder_id]==0.8}0.015{else}0{endif}
+      ; Filament gcode\n\n{if printer_notes=~/.*(MK4IS|XLIS|MK4S|MK3.9S|COREONE).*/}\nM572
+      S{if nozzle_diameter[filament_extruder_id]==0.4}0.036{elsif nozzle_diameter[filament_extruder_id]==0.5}0.025{elsif
+      nozzle_diameter[filament_extruder_id]==0.6}0.02{elsif nozzle_diameter[filament_extruder_id]==0.8}0.014{elsif
+      nozzle_diameter[filament_extruder_id]==0.25}0.12{elsif nozzle_diameter[filament_extruder_id]==0.3}0.08{else}0{endif}
+      ; Filament gcode\n{endif}\n\nM142 S36 ; set heatbreak target temp
+  variants:
+  - condition: printer.input_shaper
+    values:
+      first_layer_temperature: '230'
+      temperature: '220'
+  - condition: tool.high_flow_nozzle
+    values:
+      compatible_printers_condition: printer_model=~/(MK4|MK4IS|MK4ISMMU3|MK3.9|MK3.9MMU3)/
+        and nozzle_diameter[0]!=0.8 and nozzle_diameter[0]!=0.6 and nozzle_diameter[0]!=0.5
+        and nozzle_high_flow[0]
+      filament_cooling_final_speed: '3.5'
+      filament_cooling_initial_speed: '10'
+      filament_cooling_moves: '2'
+      filament_infill_max_crossing_speed: '200'
+      filament_infill_max_speed: '0'
+      filament_load_time: '10.5'
+      filament_loading_speed: '10'
+      filament_loading_speed_start: '50'
+      filament_max_volumetric_speed: '22'
+      filament_minimal_purge_on_wipe_tower: '15'
+      filament_purge_multiplier: 81.25%
+      filament_ramming_parameters: 250 100 39.871 39.871| 0.05 39.9547 0.45 39.9547
+        0.95 39.9547 1.45 39.9547 1.95 39.9547 2.45 39.9547 2.95 39.9547 3.45 39.9547
+        3.95 39.9547 4.45 39.9547 4.95 39.9547
+      filament_stamping_distance: '45'
+      filament_stamping_loading_speed: '29'
+      filament_toolchange_delay: '0'
+      filament_travel_max_lift: '0.6'
+      filament_travel_ramping_lift: '1'
+      filament_travel_slope: '1'
+      filament_unload_time: '8.5'
+      filament_unloading_speed: '100'
+      filament_unloading_speed_start: '100'
+      full_fan_speed_layer: '3'
+      idle_temperature: '70'
+      slowdown_below_layer_time: '8'
+      start_filament_gcode: M572 S{if nozzle_diameter[0]==0.4}0.036{elsif nozzle_diameter[0]==0.5}0.026{elsif
+        nozzle_diameter[0]==0.6}0.02{elsif nozzle_diameter[0]==0.8}0.015{elsif nozzle_diameter[0]==0.25}0.12{elsif
+        nozzle_diameter[0]==0.3}0.08{else}0{endif} ; Filament gcode\n\nM142 S36 ;
+        set heatbreak target temp
+- condition: printer.input_shaper
+  values:
+    first_layer_temperature: '230'
+    temperature: '220'

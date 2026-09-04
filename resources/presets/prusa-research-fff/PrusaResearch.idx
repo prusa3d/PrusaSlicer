@@ -1,0 +1,13 @@
+min_slic3r_version = 3.0.0-alpha0
+1.0.11 Added XL+
+1.0.10 Renamed 0.15mm SPEED to 0.15mm Detail (INDX).
+1.0.9 Vendor updates.
+1.0.8 INDX top one perimeter.
+1.0.7 INDX sync with 2.5.7. TPU->FLEX revert. Renamed printers.
+1.0.6 Updated profiles.
+1.0.5 Updated C1L chamber temperatures, shrinkage temperatures. Renamed first_layer_infill_speed to first_layer_solid_infill_speed.
+1.0.4 Added INDX.
+1.0.3 Minor update
+1.0.2 Minor update
+1.0.0 Initial release
+0.1.0 Bundled release

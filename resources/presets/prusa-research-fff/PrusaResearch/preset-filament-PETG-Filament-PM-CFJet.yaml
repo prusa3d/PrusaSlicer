@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*PETCF*'
+name: Filament PM CFJet
+id: Filament PM CFJet
+values:
+  filament_vendor: Filament PM
+  extrusion_multiplier: 1
+  filament_cost: 27.82
+  filament_spool_weight: 0
+  first_layer_temperature: 245
+  temperature: 255

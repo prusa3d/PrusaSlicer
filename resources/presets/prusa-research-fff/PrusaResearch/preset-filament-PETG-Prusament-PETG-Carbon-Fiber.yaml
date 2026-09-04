@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PETCF*'
+name: Prusament PETG Carbon Fiber
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and tool.nozzle_diameter >= 0.4 and feeder.model != "MMU3_32bit"
+id: Prusament PETG Carbon Fiber
+values:
+  filament_vendor: Prusa Polymers

@@ -28,7 +28,7 @@ struct SlopeDetection
 uniform mat4 view_model_matrix;
 uniform mat4 projection_matrix;
 uniform mat3 view_normal_matrix;
-uniform mat4 volume_world_matrix;
+uniform mat4 model_matrix;
 uniform SlopeDetection slope;
 
 // Clipping plane, x = min z, y = max z. Used by the FFF and SLA previews to clip with a top / bottom plane.
@@ -69,7 +69,7 @@ void main()
 	intensity.x += NdotL * LIGHT_FRONT_DIFFUSE;
 
     // Point in homogenous coordinates.
-    world_pos = volume_world_matrix * vec4(v_position, 1.0);
+    world_pos = model_matrix * vec4(v_position, 1.0);
 
     // z component of normal vector in world coordinate used for slope shading
     world_normal_z = slope.actived ? (normalize(slope.volume_world_normal_matrix * v_normal)).z : 0.0;

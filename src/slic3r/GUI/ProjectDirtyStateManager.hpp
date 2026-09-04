@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_ProjectDirtyStateManager_hpp_
 #define slic3r_ProjectDirtyStateManager_hpp_
 

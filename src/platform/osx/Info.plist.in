@@ -5,7 +5,7 @@
   <key>CFBundleExecutable</key>
   <string>@SLIC3R_APP_KEY@</string>
   <key>CFBundleGetInfoString</key>
-  <string>@SLIC3R_APP_NAME@ Copyright (C) 2011-2019 Alessandro Ranellucci, (C) 2016-2023 Prusa Reseach</string>
+  <string>@SLIC3R_APP_NAME@ Copyright (C) 2011-2019 Alessandro Ranellucci, (C) 2016-2026 Prusa Research</string>
   <key>CFBundleIconFile</key>
   <string>PrusaSlicer.icns</string>
   <key>CFBundleName</key>
@@ -109,6 +109,23 @@
       <key>LSHandlerRank</key>
       <string>Alternate</string>
     </dict>
+    <dict>
+      <key>CFBundleTypeExtensions</key>
+      <array>
+        <string>bgcode</string>
+        <string>BGCODE</string>
+      </array>
+      <key>CFBundleTypeIconFile</key>
+      <string>bgcode.icns</string>
+      <key>CFBundleTypeName</key>
+      <string>BGCODE</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LISsAppleDefaultForType</key>
+      <true/>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+    </dict>
   </array>
   <key>CFBundleURLTypes</key>
     <array>
@@ -122,7 +139,7 @@
       </dict>
     </array>
   <key>LSMinimumSystemVersion</key>
-  <string>10.12</string>
+  <string>@CMAKE_OSX_DEPLOYMENT_TARGET@</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>NSHighResolutionCapable</key>

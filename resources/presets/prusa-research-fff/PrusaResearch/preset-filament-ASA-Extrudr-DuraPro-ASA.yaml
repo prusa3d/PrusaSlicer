@@ -1,0 +1,15 @@
+kind: filament
+inherits:
+- '*ASA*'
+name: Extrudr DuraPro ASA
+id: Extrudr DuraPro ASA
+values:
+  filament_cost: '34.64'
+  filament_vendor: Extrudr
+  first_layer_bed_temperature: 100
+  bed_temperature: 100
+  first_layer_temperature: 240
+  temperature: 240
+  filament_density: 1.05
+  filament_spool_weight: 230
+  disable_fan_first_layers: 3

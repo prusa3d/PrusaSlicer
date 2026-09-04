@@ -1,0 +1,71 @@
+kind: filament
+inherits:
+- '*PET*'
+name: Eolas Prints PETG - UV resistant
+id: Eolas Prints PETG - UV resistant
+values:
+  filament_vendor: Eolas Prints
+  filament_cost: 35.9
+  filament_infill_max_crossing_speed: 100
+  first_layer_temperature: 232
+  temperature: 237
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: iLXQMmtURG+qzMfWGx7Xnw
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: CCysZ5XBQDmS8aM3MHm9EA
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: 7vgZuLL7SxCOYQCNGiCM7Q
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: lDetjfr4TFKiniDk83IBkQ
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: JHRHa/ZUQdma4LrCznFMbw
+      values:
+        filament_max_volumetric_speed: 15
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: Xox0eDiASQG32a59EdeH5w
+    values:
+      filament_max_volumetric_speed: 15
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: Uvq/OsYWSim2iyifPA56iQ
+      values:
+        filament_max_volumetric_speed: 17
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: zwLtGAZtRH6DBILFsevERg
+    values:
+      filament_max_volumetric_speed: 17
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: w4w4PllBQuWs8/Kurq5vuw
+      values:
+        filament_max_volumetric_speed: 20
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: QLm6hU4HSh27G3Tab3PWDw
+    values:
+      filament_max_volumetric_speed: 20
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: 4CuwHHloQIOhHD9J5FN5uw
+      values:
+        filament_max_volumetric_speed: 22
+        first_layer_temperature: 245
+        temperature: 245

@@ -1,0 +1,33 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: colorFabb allPHA
+id: colorFabb allPHA
+values:
+  filament_cost: '33.99'
+  filament_vendor: colorFabb
+  filament_density: 1.24
+  filament_spool_weight: 160
+  first_layer_temperature: 200
+  temperature: 200
+  first_layer_bed_temperature: 0
+  bed_temperature: 0
+  min_fan_speed: 100
+  max_fan_speed: 100
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: s6ATCGvHQ/CAU16f2nzuIw
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: I6QGCigJR1G4kVJ4kkQTHA
+    values:
+      filament_max_volumetric_speed: 4
+  - condition: tool.nozzle_diameter == 0.6
+    id: q4+vF063Q+aRQ9PlQCYSCw
+    values:
+      filament_max_volumetric_speed: 6
+  - name: '*quit*'
+    id: ryAq5PwSQ96gbL5lenx7SA
+# END
+- name: '*quit*'
+  id: YoLxFj3DSeGNHprTa1cE1Q

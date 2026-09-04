@@ -1,0 +1,465 @@
+kind: filament
+inherits:
+- '*PLA*'
+- '*sheets_addnorth_textura*'
+name: addnorth Textura
+id: addnorth Textura
+values:
+  bridge_fan_speed: 60
+  filament_vendor: addnorth
+  extrusion_multiplier: 0.95
+  filament_cost: 24.99
+  min_fan_speed: 20
+  max_fan_speed: 40
+  fan_below_layer_time: 25
+  slowdown_below_layer_time: 8
+  min_print_speed: 20
+variants:
+  ## C1
+- condition: printer.base_model == "COREONE"
+  id: vCohiGKpQy+umy35K7bh9A
+  values:
+    enable_dynamic_fan_speeds: 1
+    min_fan_speed: 15
+    max_fan_speed: 30
+    bridge_fan_speed: 45
+    fan_below_layer_time: 25
+    temperature: 220
+  variants:
+  # C1 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: U/KbttcER1uJNaDPox++cg
+    values:
+      filament_max_volumetric_speed: 8
+  # C1 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: sL6VCgHARei6DZYEO6sVyw
+    values:
+      filament_max_volumetric_speed: 10
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: XvUdR3IQSlq/TnYUEmHwNw
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: TCXTUOh+RdGbP4OqLKvNhA
+      values:
+        filament_max_volumetric_speed: 20
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: g1+JaTQgTWeIT82KsK+piw
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # C1 HF0.5
+    - condition: tool.nozzle_high_flow
+      id: 6Bnn+bTaSRGNGS6Kd4cMZA
+      values:
+        filament_max_volumetric_speed: 24
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: jP/zkj5fTge+9oBdqQg7QQ
+    values:
+      filament_max_volumetric_speed: 15.5
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+      id: MpCC8d5xRXqBvx+j1Sanew
+      values:
+        filament_max_volumetric_speed: 27
+  # C1 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: 7NwdgR3GRw6nVRSfA/adBA
+    values:
+      filament_max_volumetric_speed: 19
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      id: 7VPWb3riTaGTmYFigItCFA
+      values:
+        filament_max_volumetric_speed: 35
+## XL
+- condition: printer.base_model == "XL"
+  id: jE1nLZe2SKeP9ji1NNvuzw
+  values:
+    slowdown_below_layer_time: 10
+  variants:
+  # XL 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: Zp9vfSJrT3+PmBI1R/Lhgw
+    values:
+      filament_max_volumetric_speed: 8
+      slowdown_below_layer_time: 7
+  # XL 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: 3nXJZGNgR9aZ7EBWdjTpyQ
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 9
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 7IKfNx03RqC5kBnnliMqCQ
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 10
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+      id: Ui8li87iTm+U8s/lSEikVg
+      values:
+        filament_max_volumetric_speed: 20
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: eVO52niiR328em87GTIoUA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 11
+    variants:
+    # XL HF0.5
+    - condition: tool.nozzle_high_flow
+      id: 2+i6P9pAS9+yBC0q9rsUow
+      values:
+        filament_max_volumetric_speed: 24
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: TxDxi3ruR4uiH9CTbMcGOQ
+    values:
+      filament_max_volumetric_speed: 15.5
+      slowdown_below_layer_time: 15
+      min_print_speed: 15
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+      id: p7rEpVYoTAGTePPp6hHJ5g
+      values:
+        filament_max_volumetric_speed: 27
+        start_filament_gcode: M142 S36 ; set heatbreak target temp
+  # XL 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: 4uZ11F7SQteeNKN6ofR3ig
+    values:
+      filament_max_volumetric_speed: 19
+      slowdown_below_layer_time: 19
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+      id: dHborvTNSA6DIE1RbZoNzQ
+      values:
+        filament_max_volumetric_speed: 35
+## MK4
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: CaVw+VlCRveo9NbZcPZVLQ
+  variants:
+  # MK4 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 5VU9piz3RdOZu/qRxoDz5w
+    values:
+      filament_max_volumetric_speed: 8
+      slowdown_below_layer_time: 5
+  # MK4 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: hGVI5mDqTr2Ej19ziBt0Aw
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 6
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 7xBEzF2KS1eIEgW2yBouwA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 8
+    variants:
+    # MK4 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: U2xUjkZ7RA+0leY9ghuOGg
+      values:
+        filament_max_volumetric_speed: 20
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: qa6J9V4WRaWflg5IHPQzQA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 10
+    variants:
+    # MK4 HF0.5
+    - condition: tool.nozzle_high_flow
+      id: lASMLulqR2GykxJg49HPDg
+      values:
+        filament_max_volumetric_speed: 25
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: ldHit0SQQjqBzwDWuTID0Q
+    values:
+      filament_max_volumetric_speed: 15.5
+      slowdown_below_layer_time: 15
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+      id: N+ggMuabQ4aE0LOn3v2GEg
+      values:
+        filament_max_volumetric_speed: 28
+  # MK4 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: 4QSlrruVTZqT+H/0kr7xsg
+    values:
+      filament_max_volumetric_speed: 19
+      slowdown_below_layer_time: 17
+    variants:
+    # MK4 HF0.8
+    - condition: tool.nozzle_high_flow
+      id: DDWUw4UaSaunAahSNZVlVA
+      values:
+        filament_max_volumetric_speed: 35
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: yhOtJgHkTReqlHgKFN0ycQ
+  values:
+    enable_dynamic_fan_speeds: 1
+    min_fan_speed: 15
+    max_fan_speed: 30
+    bridge_fan_speed: 45
+    min_print_speed: 20
+    overhang_fan_speed_0: 35
+    fan_below_layer_time: 17
+  variants:
+  # MK4S 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: wTVfxZUiSnays+3GAP63Aw
+    values:
+      filament_max_volumetric_speed: 8
+      slowdown_below_layer_time: 4
+  # MK4S 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: GUxqEHAlQRm2gKAyigByug
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 5
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: pSUsphMnT2qWXb5WFYXAoA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 6
+    variants:
+    # MK4S HF0.4
+    - condition: tool.nozzle_high_flow
+      id: kkq2welCQxCANzk+r0EfqQ
+      values:
+        filament_max_volumetric_speed: 20
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: +UQ6IVmpQ7ip7ZaRTdip4A
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 8
+    variants:
+    # MK4S HF0.5
+    - condition: tool.nozzle_high_flow
+      id: V9x/nTr3QWalkhDO0xFBbQ
+      values:
+        filament_max_volumetric_speed: 25
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: SfK4AGanTVyOFKOx/HPLbA
+    values:
+      filament_max_volumetric_speed: 15.5
+      fan_below_layer_time: 22
+      slowdown_below_layer_time: 10
+    variants:
+    # MK4S HF0.6
+    - condition: tool.nozzle_high_flow
+      id: mlZGmDHxR+eMRnTODfKfVQ
+      values:
+        filament_max_volumetric_speed: 28
+  # MK4S 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: UlpzV82QQRaX9NRoGtBspQ
+    values:
+      filament_max_volumetric_speed: 19
+      fan_below_layer_time: 25
+      slowdown_below_layer_time: 15
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      id: OCpPv0tdREaj+SscSCp8zQ
+      values:
+        filament_max_volumetric_speed: 35
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: IaI7ATRrQcK0RxLrDgOa5w
+  values:
+    first_layer_temperature: 220
+    temperature: 220
+  variants:
+  # MK3.5 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: N9CqNSI4Tg6wU32pblKaFw
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 10
+  # MK3.5 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: fIiyKeILTe+HF3G9qVSLLw
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 12
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: CCe7ohFxSrOz3XnvLAzBKQ
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 12
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 9XcCa/mtSP+o4/v2iija0A
+    values:
+      filament_max_volumetric_speed: 12
+  # MK3.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: nzAENeNhTV+7FLuHxP9MAA
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+  # MK3.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: dd/hcWS3QNicsysH+KfV4w
+    values:
+      filament_max_volumetric_speed: 15
+      temperature: 225
+## MINI
+- condition: printer.base_model == "MINI"
+  id: U3U6/CunSCSIqgwZhtzIDQ
+  values:
+    first_layer_temperature: 225
+    temperature: 220
+  variants:
+  # MINI 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: wdeztdDKQ7CkFpSZAofeSg
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 10
+  # MINI 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: mk2S3+5qRzCikYO4qPeQxw
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 15
+  # MINI 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: luXVZz7dQJmye7EYGz2mnA
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 18
+  # MINI 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: nC65Kw4xRDiEX8HcJi/gag
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 20
+      temperature: 225
+## MK3, MK3S and MK2.5, MK2.5S
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: UTg1VB4sS267A4lhMwJVbA
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+  variants:
+  # MK3 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: +Vb/XBEEQUu1JqzHIlyj9w
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 10
+  # MK3 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: jzhpDi+0Tvaq4Eh9rIIF0g
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 12
+  # MK3 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 1iFNCeW3QpqsoUn3v+WzxQ
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+  # MK3 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: +olV0mUhTGiFE7mAntnoTA
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 20
+      temperature: 225
+## MK2S
+- condition: printer.model == "MK2S"
+  id: 0mCExymjTp6FemHiqukdpw
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+  variants:
+  # MK2 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: OOlIZVHoRj6WCd6juFiW6Q
+    values:
+      filament_max_volumetric_speed: 7
+      slowdown_below_layer_time: 12
+  # MK2 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: pTGNM+mVSTGfyFD5iL6Wtw
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 15
+  # MK2 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: F/iDs/I1Sd29vWEKuqxKhQ
+    values:
+      filament_max_volumetric_speed: 13
+      slowdown_below_layer_time: 20
+## MK2S MMU1
+- condition: printer.model == "MK2SMM"
+  id: ZICONdNgQTOTzkygC8E4Iw
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+  variants:
+  # MK2SMM 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: YYm6F2cvSJCLmvlSZ/rxHQ
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 1210
+  # MK2SMM 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: SRO6ocRQQqaJwOX1VwEb1w
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 15
+  # MK2SMM 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: xawyypdcSk6mYxZCbG9XRA
+    values:
+      filament_max_volumetric_speed: 13
+      slowdown_below_layer_time: 20
+---
+kind: filament
+id: '*sheets_addnorth_textura*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: 0P04UHfiRGqk2+C/S6r42w
+  values:
+    first_layer_bed_temperature: 65
+    bed_temperature: 65
+  # variants:
+  # - condition: printer.base_model == "XL"
+    # values:
+      # first_layer_bed_temperature: 60
+      # bed_temperature: 60
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: IgtOYTUjTGCO+ypPmTFROQ
+  values:
+    first_layer_bed_temperature: 30
+    bed_temperature: 30

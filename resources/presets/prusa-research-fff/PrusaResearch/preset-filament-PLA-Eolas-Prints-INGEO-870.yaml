@@ -1,0 +1,32 @@
+kind: filament
+inherits:
+- '*PLA220*'
+- '*sheets_PLA_INGEO870*'
+name: Eolas Prints INGEO 870
+id: Eolas Prints INGEO 870
+values:
+  filament_vendor: Eolas Prints
+  filament_cost: 25.9
+---
+kind: filament
+id: '*sheets_PLA_INGEO870*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: L2GQ4aJoRrG+cvhRTaOP1Q
+  values:
+    first_layer_bed_temperature: 68
+    bed_temperature: 65
+  # variants:
+  # - condition: printer.base_model == "XL"
+    # values:
+      # first_layer_bed_temperature: 60
+      # bed_temperature: 60
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: PnWncRoYSAO4skST64AKWA
+  values:
+    first_layer_bed_temperature: 40
+    bed_temperature: 35
+
+

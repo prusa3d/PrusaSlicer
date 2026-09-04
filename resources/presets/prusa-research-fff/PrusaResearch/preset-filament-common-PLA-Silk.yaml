@@ -1,0 +1,707 @@
+kind: filament
+id: '*PLASILK*'
+inherits:
+- '*common*'
+- '*PLA*'
+- '*sheets_PLA_common*'
+values:
+  first_layer_temperature: 220
+  temperature: 220
+  filament_max_volumetric_speed: 7
+  pressure_advance: enabled
+  cooling_slowdown_logic: consistent_surface
+  cooling_perimeter_transition_distance: 10
+variants:
+  ## C1
+- condition: printer.base_model == "COREONE"
+  id: kMrUPTzsTEq6kBXt4RDS8w
+  values:
+    first_layer_temperature: 230
+    temperature: 225
+  variants:
+  # C1 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @COREONE 0.25'
+    id: IfsYnbuFSY+6nQHV5vTmWA
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 6
+      pressure_advance_value: 0.12
+      temperature: 220
+  # C1 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLASILK* @COREONE 0.3'
+    id: hJ1m/d9eS42YaiFgD/s+pg
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 8
+      pressure_advance_value: 0.075
+      temperature: 220
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @COREONE 0.4'
+    id: Ll3ZwhcGRha1AsXayAHSVw
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 8
+      pressure_advance_value: 0.03
+      temperature: 225
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @COREONE HF0.4'
+      id: hGb3IqkhRheZW6j/t4iqmw
+      values:
+        filament_max_volumetric_speed: 7.5
+        pressure_advance_value: 0.03
+        temperature: 225
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLASILK* @COREONE 0.5'
+    id: ZFHymEs6TseujBw4+YIS2g
+    values:
+      filament_max_volumetric_speed: 8
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.022
+    variants:
+    # C1 HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @COREONE HF0.5'
+      id: 3xFRT/+GQZWtFsmGt3Zm+Q
+      values:
+        filament_max_volumetric_speed: 8
+        pressure_advance_value: 0.022
+        temperature: 225
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @COREONE 0.6'
+    id: ppgQs4yCSWGRi6hzOscV+A
+    values:
+      filament_max_volumetric_speed: 9
+      pressure_advance_value: 0.018
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @COREONE HF0.6'
+      id: wJExgCi3TGurKwTuuo1S6g
+      values:
+        filament_max_volumetric_speed: 10
+        pressure_advance_value: 0.018
+        temperature: 225
+  # C1 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @COREONE 0.8'
+    id: XaUWzouLSRqhSDeN1NLw1w
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 17
+      pressure_advance_value: 0.012
+      temperature: 230
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @COREONE HF0.8'
+      id: Ap+9IUvzSKOtgHYtEqv0rA
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.012
+## XL
+- condition: printer.model == "XL"
+  id: +RbYP54UQTyFBy1p2Y88XQ
+  values:
+    first_layer_temperature: 230
+    idle_temperature: 70
+    slowdown_below_layer_time: 10
+    temperature: 225
+  variants:
+  # XL 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @XL 0.25'
+    id: sh7+KBRQT0iVUAFMR3sQtg
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 7
+      pressure_advance_value: 0.12
+      temperature: 220
+  # XL 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLASILK* @XL 0.3'
+    id: hOffwt8gTZCkpcJbItDkiw
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.075
+      temperature: 220
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @XL 0.4'
+    id: wD1FXxX9RMW8jIIbAdkPBQ
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.03
+      temperature: 225
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL HF0.4'
+      id: korwwje4S9OokkQTvuCd/g
+      values:
+        filament_max_volumetric_speed: 7.5
+        pressure_advance_value: 0.03
+        temperature: 225
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLASILK* @XL 0.5'
+    id: T2Wx5U8hQ7mkn9e9OkGU3w
+    values:
+      filament_max_volumetric_speed: 8
+      slowdown_below_layer_time: 11
+      pressure_advance_value: 0.022
+    variants:
+    # XL HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL HF0.5'
+      id: z0d40BG/S8y2xqtoCpN1DQ
+      values:
+        filament_max_volumetric_speed: 8
+        pressure_advance_value: 0.022
+        temperature: 225
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @XL 0.6'
+    id: AqNkplYxQkelE+UUvLyxLA
+    values:
+      filament_max_volumetric_speed: 9
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 0.018
+      temperature: 225
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL HF0.6'
+      id: Y4hhdZbrTkG12QlK4yCKXg
+      values:
+        filament_max_volumetric_speed: 10
+        pressure_advance_value: 0.018
+        temperature: 225
+  # XL 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @XL 0.8'
+    id: Sxi0guGdQ9K1j/hv4Vdmmg
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 19
+      pressure_advance_value: 0.012
+      temperature: 230
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL HF0.8'
+      id: NmkRjdOzQ/Wvfi0UZ4zG/w
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.012
+        temperature: 230
+## XL+
+- condition: printer.model == "XLP"
+  id: mmQ8XrBmQZCTkHIxrgIwbQ
+  values:
+    first_layer_temperature: 230
+    idle_temperature: 70
+    slowdown_below_layer_time: 9
+    temperature: 225
+  variants:
+  # XL+ 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @XL+ 0.25'
+    id: YI3D76VgS+qVcdeRSbqhQg
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 5
+      pressure_advance_value: 0.12
+      temperature: 220
+  # XL+ 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLASILK* @XL+ 0.3'
+    id: mUw+haUjS9mySLHmL7U78Q
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 6
+      pressure_advance_value: 0.075
+      temperature: 220
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @XL+ 0.4'
+    id: zr6k17k5TLSdbWlUP19s4g
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.03
+      temperature: 225
+    variants:
+    # XL+ HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL+ HF0.4'
+      id: qBGHddBoRHCBgx/0iw5Njg
+      values:
+        filament_max_volumetric_speed: 7.5
+        pressure_advance_value: 0.03
+        temperature: 225
+  # XL+ 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLASILK* @XL+ 0.5'
+    id: 9ULS+jBfRliUpINW8A8rbw
+    values:
+      filament_max_volumetric_speed: 10
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.022
+    variants:
+    # XL+ HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL+ HF0.5'
+      id: 02U7xujIRaWKuE9px7b8vQ
+      values:
+        filament_max_volumetric_speed: 8
+        pressure_advance_value: 0.022
+        temperature: 225
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @XL+ 0.6'
+    id: pPuWCOgxRsyIe7ICqDn0dA
+    values:
+      filament_max_volumetric_speed: 9
+      slowdown_below_layer_time: 12
+      pressure_advance_value: 0.018
+      temperature: 225
+    variants:
+    # XL+ HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL+ HF0.6'
+      id: NJcv5rJzRkyxDwn1DX1SQQ
+      values:
+        filament_max_volumetric_speed: 10
+        pressure_advance_value: 0.018
+        temperature: 225
+  # XL+ 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @XL+ 0.8'
+    id: VoujF6tDQf6coH4dDV2oKQ
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 16
+      pressure_advance_value: 0.012
+      temperature: 230
+    variants:
+    # XL+ HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @XL+ HF0.8'
+      id: ZVBhs7Q5QcaAFfDafIus/A
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.012
+        temperature: 230
+## MK4
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: gpUSOh2fTyapr4BkBSywaA
+  values:
+    first_layer_temperature: 230
+    temperature: 225
+  variants:
+  # MK4 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @MK4 0.25'
+    id: qbacnyw0QqmaICjHf8oKrw
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 5
+      pressure_advance_value: 0.12
+      temperature: 220
+  # MK4 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLASILK* @MK4 0.3'
+    id: OQ3T9dWsRXOg1pUbDbGwlw
+    values:
+      filament_max_volumetric_speed: 7.5
+      pressure_advance_value: 0.075
+      temperature: 220
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @MK4 0.4'
+    id: MFN05WbSSxSwLsS6xITsaQ
+    values:
+      filament_max_volumetric_speed: 7.5
+      pressure_advance_value: 0.03
+    variants:
+    # MK4 HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4 HF0.4'
+      id: 1je4zJsESlSmg5wGKGSbeA
+      values:
+        filament_max_volumetric_speed: 7.5
+        pressure_advance_value: 0.03
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLASILK* @MK4 0.5'
+    id: OlsGXa9DQ/6m1jA8jHpf0A
+    values:
+      filament_max_volumetric_speed: 8
+      pressure_advance_value: 0.022
+    variants:
+    # MK4 HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4 HF0.5'
+      id: 3FaabujhQAWJx/tyVtk2dg
+      values:
+        filament_max_volumetric_speed: 8
+        pressure_advance_value: 0.022
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @MK4 0.6'
+    id: 9/PXqqDJS2yY60xSN/2UFQ
+    values:
+      filament_max_volumetric_speed: 9
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 0.018
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4 HF0.6'
+      id: irwRh/hzQr6t6xKynJf3MQ
+      values:
+        filament_max_volumetric_speed: 9
+        pressure_advance_value: 0.018
+  # MK4 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @MK4 0.8'
+    id: I2wGXK29TtmAKQW2dU5G3g
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 17
+      pressure_advance_value: 0.012
+      temperature: 230
+    variants:
+    # MK4 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4 HF0.8'
+      id: 3jYY+V5FQCG1+OCRDdSXyw
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.012
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: ytFzOiT9SK6IhU0Us4I8ww
+  values:
+    first_layer_temperature: 230
+    temperature: 225
+  variants:
+  # MK4S 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @MK4S 0.25'
+    id: 4CrO2RnNRrSAOIpEWxESfA
+    values:
+      filament_max_volumetric_speed: 7
+      slowdown_below_layer_time: 4
+      pressure_advance_value: 0.12
+      temperature: 220
+  # MK4S 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLASILK* @MK4S 0.3'
+    id: LeyUXsVrQF+e04kbBW0xKg
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 5
+      pressure_advance_value: 0.075
+      temperature: 220
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @MK4S 0.4'
+    id: pk3bEvhJSme1FrnUiH8x+A
+    values:
+      filament_max_volumetric_speed: 7.5
+      slowdown_below_layer_time: 7
+      pressure_advance_value: 0.03
+    variants:
+    # MK4S HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4S HF0.4'
+      id: q9j9bQv/R++ickzSOj+1+Q
+      values:
+        filament_max_volumetric_speed: 7.5
+        pressure_advance_value: 0.03
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLASILK* @MK4S 0.5'
+    id: McKyknUoSTO5KiymlfGc6w
+    values:
+      filament_max_volumetric_speed: 8
+      pressure_advance_value: 0.022
+    variants:
+    # MK4S HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4S HF0.5'
+      id: 9XLXBtX4QtOmsSdLukzAeg
+      values:
+        filament_max_volumetric_speed: 8
+        pressure_advance_value: 0.022
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @MK4S 0.6'
+    id: TKrdwHB9RwWlfVgZ1zCFXg
+    values:
+      filament_max_volumetric_speed: 9
+      pressure_advance_value: 0.018
+    variants:
+    # MK4S HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4S HF0.6'
+      id: j39BVbvrQ2WaQJNwh8LOVw
+      values:
+        filament_max_volumetric_speed: 10
+        pressure_advance_value: 0.018
+  # MK4S 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @MK4S 0.8'
+    id: GRQncOYMRxKpqOAuO4/6sw
+    values:
+      filament_max_volumetric_speed: 12
+      pressure_advance_value: 0.012
+      temperature: 230
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PLASILK* @MK4S HF0.8'
+      id: 9FaZBcvnSrW10S5DtyD2hg
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.012
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: uyX1KT6vQj+8mq74W9/bzA
+  values:
+    first_layer_temperature: 230
+    temperature: 225
+  variants:
+  # MK3.5 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @MK3.5 0.25'
+    id: dtPlqRfcT0mC5G/zOXJJ7Q
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 0.1
+      temperature: 220
+    variants:
+    # MK3.5 0.25 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLASILK* @MK3.5 0.25 MMU'
+      id: RFjFDCZTSs65dGlkE6wnyg
+      values:
+        temperature: 205
+        filament_max_volumetric_speed: 3
+  # MK3.5 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    name: '*PLASILK* @MK3.5 0.3'
+    id: 18qsM9BmRlu8sq71zvWXsQ
+    values:
+      filament_max_volumetric_speed: 7
+      slowdown_below_layer_time: 12
+      pressure_advance_value: 0.065
+      temperature: 220
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @MK3.5 0.4'
+    id: R7gYViUBS8GQo2vcBCItHw
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 0.03
+    variants:
+    # MK3.5 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLASILK* @MK3.5 0.4 MMU'
+      id: Mx7zmwl5T7CYPxh2Kl1Gzg
+      values:
+        temperature: 205
+        filament_max_volumetric_speed: 7
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PLASILK* @MK3.5 0.5'
+    id: LXrEb01pRtiJbNhHD8RMMQ
+    values:
+      filament_max_volumetric_speed: 8
+      pressure_advance_value: 0.022
+  # MK3.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @MK3.5 0.6'
+    id: ZCxKlMDZRfOye21WGu8BhQ
+    values:
+      filament_max_volumetric_speed: 8
+      pressure_advance_value: 0.017
+    variants:
+    # MK3.5 0.6 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLASILK* @MK3.5 0.6 MMU'
+      id: peut36YMQqOAINKsdZDI4A
+      values:
+        temperature: 205
+        filament_max_volumetric_speed: 8
+  # MK3.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @MK3.5 0.8'
+    id: oLt2tdiKSou80daJWk0FiA
+    values:
+      filament_max_volumetric_speed: 12
+      pressure_advance_value: 0.011
+      temperature: 225
+## MINI
+- condition: printer.base_model == "MINI"
+  id: UBnV9FnEQsGGv0rEJ2gtew
+  values:
+    first_layer_temperature: 230
+    temperature: 225
+  variants:
+  # MINI 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @MINI 0.25'
+    id: k+aZMdcBRaWJqkovHEwMWQ
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 0.85
+      temperature: 215
+  # MINI 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @MINI 0.4'
+    id: fLJXwacKSEWxADHHpUD/Hg
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 0.27
+  # MINI 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @MINI 0.6'
+    id: bGA1wGPeS7qy4MgclHeAww
+    values:
+      filament_max_volumetric_speed: 8
+      pressure_advance_value: 0.17
+  # MINI 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @MINI 0.8'
+    id: 4SmVYskyTyW2/MQKU/prLw
+    values:
+      filament_max_volumetric_speed: 12
+      pressure_advance_value: 0.12
+      temperature: 230
+## MK3, MK3S and MK2.5, MK2.5S
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: hO4KT//9S92eCaT6+PV/pg
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+  variants:
+  # MK3 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @MK2.5_MK3 0.25'
+    id: 0Dg4Wk1ZRO6YCS6VcBf1UQ
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 0.14
+      temperature: 210
+    variants:
+    # MK3 0.25 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLASILK* @MK2.5_MK3 0.25 MMU'
+      id: fzvb/Wx2QEKoJDDrddTUMg
+      values:
+        temperature: 205
+  # MK3 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @MK2.5_MK3 0.4'
+    id: Do8jT889RZizl5xWh72+yg
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 0.05
+    variants:
+    # MK3 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLASILK* @MK2.5_MK3 0.4 MMU'
+      id: /mwCce9pRyethtRQm80oeQ
+      values:
+        temperature: 205
+        filament_max_volumetric_speed: 7
+  # MK3 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @MK2.5_MK3 0.6'
+    id: Ns7yYyk5QfmvSfTTGTagUw
+    values:
+      filament_max_volumetric_speed: 8
+      pressure_advance_value: 0.035
+    variants:
+    # MK3 0.6 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: '*PLASILK* @MK2.5_MK3 0.6 MMU'
+      id: VW3sf9PkS3G0kPhQIYyrHg
+      values:
+        temperature: 205
+        filament_max_volumetric_speed: 8
+  # MK3 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PLASILK* @MK2.5_MK3 0.8'
+    id: 24LCC1AJSN2fbY8LVXEkWQ
+    values:
+      filament_max_volumetric_speed: 12
+      pressure_advance_value: 0.01
+      temperature: 225
+## MK2S
+- condition: printer.model == "MK2S"
+  id: Bqt6TEj/T3OnLX1jxtp5jA
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+  variants:
+  # MK2 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @MK2 0.25'
+    id: /FpWz/fzRiS82EN1CpqY8w
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 30
+      temperature: 210
+  # MK2 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @MK2 0.4'
+    id: 12iLTr8pQxOfHWFRvMt5Uw
+    values:
+      filament_max_volumetric_speed: 7
+      pressure_advance_value: 30
+  # MK2 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @MK2 0.6'
+    id: 6ZgnwW3SSbKqstc7vbvB+Q
+    values:
+      filament_max_volumetric_speed: 8
+      pressure_advance_value: 18
+## MK2S MMU1
+- condition: printer.model == "MK2SMM"
+  id: dci8bZ7FTraCsk+36pVATw
+  values:
+    first_layer_temperature: 215
+    temperature: 215
+    pressure_advance_value: 200
+  variants:
+  # MK2SMM 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    name: '*PLASILK* @MK2MMU1 0.25'
+    id: 6QOjsTzeTIKM9H9bvU1zOw
+    values:
+      filament_max_volumetric_speed: 7
+      temperature: 210
+  # MK2SMM 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PLASILK* @MK2MMU1 0.4'
+    id: Xl9EPR4GSYaeJr8hBuW/1g
+    values:
+      filament_max_volumetric_speed: 7
+  # MK2SMM 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PLASILK* @MK2MMU1 0.6'
+    id: X77hEVLDRsqd5VxLkQbN9A
+    values:
+      filament_max_volumetric_speed: 8

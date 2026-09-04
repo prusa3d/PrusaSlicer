@@ -1,0 +1,34 @@
+--- a/CMakeLists.txt	2024-06-23 07:12:23.000000000 +0200
++++ b/CMakeLists.txt	2026-02-16 12:18:07.287806533 +0100
+@@ -10,7 +10,7 @@
+ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/project-defaults.cmake)
+ 
+ add_subdirectory(yoga)
+-add_subdirectory(tests)
++# add_subdirectory(tests)
+ 
+ option(BUILD_FUZZ_TESTS "Build fuzz tests" OFF)
+ 
+--- a/cmake/project-defaults.cmake	2024-06-23 07:12:23.000000000 +0200
++++ b/cmake/project-defaults.cmake	2026-02-16 13:29:32.761641358 +0100
+@@ -34,8 +34,8 @@
+     # Enable warnings and warnings as errors
+     -Wall
+     -Werror
+-    # Disable RTTI
+-    $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
++    ## Disable RTTI
++    #$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
+     # Use -O2 (prioritize speed)
+     $<$<CONFIG:RELEASE>:-O2>
+     # Enable separate sections per function/data item
+--- a/yoga/CMakeLists.txt	2024-06-23 07:12:23.000000000 +0200
++++ b/yoga/CMakeLists.txt	2026-02-16 13:29:32.770667408 +0100
+@@ -23,7 +23,6 @@
+     ${CMAKE_CURRENT_SOURCE_DIR}/**/*.cpp)
+ 
+ add_library(yogacore STATIC ${SOURCES})
+-
+ # Yoga conditionally uses <android/log> when building for Android
+ if (ANDROID)
+     target_link_libraries(yogacore log)

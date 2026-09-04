@@ -1,0 +1,52 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*sheets_PET_colorFabbHT*'
+name: colorFabb HT
+id: colorFabb HT
+values:
+  filament_vendor: colorFabb
+  filament_density: 1.18
+  filament_cost: 65.66
+  filament_spool_weight: 236
+  min_fan_speed: 10
+  max_fan_speed: 20
+  bridge_fan_speed: 30
+  first_layer_temperature: 270
+  temperature: 270
+  fan_always_on: false
+  fan_below_layer_time: 10
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S)/
+  id: 0xsqHjo0R3uwbaXyS3iArg
+  values:
+    min_fan_speed: 10
+    max_fan_speed: 15
+    bridge_fan_speed: 25
+    overhang_fan_speed_0: 25
+---
+kind: filament
+id: '*sheets_PET_colorFabbHT*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: 9v8MsA5HRviBNhZGFFfyrw
+  values:
+    first_layer_bed_temperature: 105
+    bed_temperature: 105
+  variants:
+  - condition: printer.base_model=~/(XL|MINI)/
+    id: 3lhZTibVTk2KeF7Z2b+dzA
+    values:
+      first_layer_bed_temperature: 95
+      bed_temperature: 95
+  - condition: printer.base_model=~/(MK3|MK2)/
+    id: kqWpmOrZQDKNAcmWU4QzaA
+    values:
+      bed_temperature: 110
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: DmKwy82WRtamJdEko4gVyg
+  values:
+    first_layer_bed_temperature: 65
+    bed_temperature: 65

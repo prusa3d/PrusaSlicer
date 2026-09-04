@@ -1,0 +1,19 @@
+kind: filament
+inherits:
+- '*ASA*'
+name: Tectonic-3D AURA ASA+
+id: Tectonic-3D AURA ASA+
+values:
+  filament_cost: '38.7'
+  filament_vendor: Tectonic-3D
+  filament_spool_weight: 200
+  bridge_fan_speed: 20
+  min_print_speed: 20
+  first_layer_bed_temperature: 90
+  bed_temperature: 90
+variants:
+- condition: printer.base_model == "COREONE"
+  id: 4LLQ9KmjQOeCD9SMnxoTXQ
+  values:
+    chamber_temperature: 0
+    chamber_minimal_temperature: 0

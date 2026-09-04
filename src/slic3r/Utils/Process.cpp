@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 David Kocík @kocikdav, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Process.hpp"
 
 #include <libslic3r/AppConfig.hpp>

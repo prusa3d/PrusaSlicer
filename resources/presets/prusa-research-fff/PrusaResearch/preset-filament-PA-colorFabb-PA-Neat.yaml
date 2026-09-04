@@ -1,0 +1,155 @@
+kind: filament
+inherits:
+- '*PA*'
+name: colorFabb PA Neat
+id: colorFabb PA Neat
+values:
+  filament_vendor: colorFabb
+  first_layer_temperature: 280
+  temperature: 280
+  first_layer_bed_temperature: 100
+  bed_temperature: 100
+  extrusion_multiplier: 1.04
+  filament_cost: 66.39
+  filament_density: 1.3
+  filament_spool_weight: 0
+  bridge_fan_speed: 20
+  min_fan_speed: 10
+  max_fan_speed: 20
+  fan_always_on: false
+  cooling: true
+  overhang_fan_speed_0: 15
+  overhang_fan_speed_1: 10
+  slowdown_below_layer_time: 8
+  filament_max_volumetric_speed: 3
+variants:
+## CORE One
+- condition: printer.base_model == "COREONE"
+  id: 8RtkS37BS2+A+Zp7ySLong
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+    min_fan_speed: 10
+    max_fan_speed: 25
+    fan_below_layer_time: 30
+    overhang_fan_speed_0: 20
+    overhang_fan_speed_1: 15
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 5E/iljKuSMGwQs2FyQS2Hg
+    values:
+      filament_max_volumetric_speed: 3
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 5uoGiR6CQC623htpZwy0JQ
+    values:
+      filament_max_volumetric_speed: 4.5
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: SFquds+rTUy40whaynzj9Q
+    values:
+      filament_max_volumetric_speed: 7
+  # END
+  - name: '*quit*'
+    id: wMIKO5czRVCo31dwE22jaQ
+## XL
+- condition: printer.model == "XL"
+  id: oE7gJ/UaSlS+NiM7p/g1Xw
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: HiDPo1YJRpKCyGZ03reDgg
+    values:
+      filament_max_volumetric_speed: 3
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: U7ARqkq6S9K/SH6BkcU5cA
+    values:
+      filament_max_volumetric_speed: 4.5
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: kBxDN6whQNaJJhZPvGydDw
+    values:
+      filament_max_volumetric_speed: 7
+  # END
+  - name: '*quit*'
+    id: IMGViVP5TdiECC+0oi4GHw
+## XL+
+- condition: printer.model == "XLP"
+  id: xxxX0bSvQmK+riPU36DmKQ
+  values:
+    min_fan_speed: 12
+    max_fan_speed: 20
+    bridge_fan_speed: 20
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: Up/PL7y6RLuySEnGdaomAw
+    values:
+      filament_max_volumetric_speed: 3
+  # XL+ 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: +oZOA2dbTjarg3mGmwstzA
+    values:
+      filament_max_volumetric_speed: 4.5
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 1O7EZMF4Rt+TomCoZpHs+w
+    values:
+      filament_max_volumetric_speed: 7
+  # END
+  - name: '*quit*'
+## MK4
+    id: 1GYglCrHRGexsK0pKYRp8g
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: EvpAGzbLQO6C2sqHTcKKyg
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: w3dy7pz+Q7af7EWaFJX7Bw
+    values:
+      filament_max_volumetric_speed: 3
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: qBwzuc0tQAGtoCJYuCRz5w
+    values:
+      filament_max_volumetric_speed: 4.5
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: h/T7ZHucS92TKDicTfnL7w
+    values:
+      filament_max_volumetric_speed: 7
+  # END
+  - name: '*quit*'
+## MK4S
+    id: xJ79FObrRhOgFbadnURa6w
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: PU2iA+hbSDWmHM3COmLx+A
+  values:
+    bridge_fan_speed: 15
+    min_fan_speed: 10
+    max_fan_speed: 15
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: AU6Ml8P3T6W1V4Q36wymKg
+    values:
+      filament_max_volumetric_speed: 3
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: eZAzNbgFS+OyVGe08dWh6g
+    values:
+      filament_max_volumetric_speed: 4.5
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: cq0aygWmSH2RmC84Tf2+Fg
+    values:
+      filament_max_volumetric_speed: 7
+  # END
+  - name: '*quit*'
+# END
+    id: aU3QijUdTNOz1SRZigcpuw
+- name: '*quit*'
+
+  id: kSfK73VGSc+IKYffWTGswA

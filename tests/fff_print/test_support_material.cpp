@@ -1,42 +1,50 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
-#include "libslic3r/GCodeReader.hpp"
+#include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 #include "libslic3r/Layer.hpp"
 
 #include "test_data.hpp" // get access to init_print, etc
 
 using namespace Slic3r::Test;
 using namespace Slic3r;
+using Domain::FloatOrPercentage;
+using Domain::Percentage;
+using Domain::SupportMode;
+using Slic3r::Biz::Algorithms::TriangleMesh::make_cube;
+using Slic3r::Domain::BoundingBox3d;
+using Slic3r::Domain::TriangleMesh;
 
 TEST_CASE("SupportMaterial: Three raft layers created", "[SupportMaterial]")
 {
 	Slic3r::Print print;
-	Slic3r::Test::init_and_process_print({ TestMesh::cube_20x20x20 }, print, {
-		{ "support_material", 1 },
-		{ "raft_layers",      3 }
-		});
+
+    TestConfig config;
+    config.print.items.opt("support_material").set(SupportMode::Everywhere);
+    config.print.items.opt("raft_layers").set(3);
+
+	Slic3r::Test::init_and_process_print({ TestMesh::cube_20x20x20 }, print, config);
     REQUIRE(print.objects().front()->support_layers().size() == 3);
 }
 
 SCENARIO("SupportMaterial: support_layers_z and contact_distance", "[SupportMaterial]")
 {
     // Box h = 20mm, hole bottom at 5mm, hole height 10mm (top edge at 15mm).
-    TriangleMesh mesh = Slic3r::Test::mesh(Slic3r::Test::TestMesh::cube_with_hole);
-    mesh.rotate_x(float(M_PI / 2));
+    Domain::TriangleMesh mesh = Slic3r::Test::mesh(Slic3r::Test::TestMesh::cube_with_hole);
+    mesh.rotate(float(M_PI / 2), Domain::Axis::X);
 //    mesh.write_binary("d:\\temp\\cube_with_hole.stl");
 
 	auto check = [](Slic3r::Print &print, bool &first_support_layer_height_ok, bool &layer_height_minimum_ok, bool &layer_height_maximum_ok, bool &top_spacing_ok)
 	{
         SpanOfConstPtrs<SupportLayer> support_layers = print.objects().front()->support_layers();
 
-		first_support_layer_height_ok = support_layers.front()->print_z == print.config().first_layer_height.value;
+		first_support_layer_height_ok = support_layers.front()->print_z == print.config().get<FloatOrPercentage>("first_layer_height").float_value();
 
 		layer_height_minimum_ok = true;
 		layer_height_maximum_ok = true;
-		double min_layer_height = print.config().min_layer_height.values.front();
-		double max_layer_height = print.config().nozzle_diameter.values.front();
-		if (print.config().max_layer_height.values.front() > EPSILON)
-			max_layer_height = std::min(max_layer_height, print.config().max_layer_height.values.front());
+		double min_layer_height = print.config().get<std::vector<double>>("min_layer_height").front();
+		double max_layer_height = std::get<double>(print.config().hw_config().tools.front().features.at("nozzle_diameter"));
+		if (print.config().get<std::vector<double>>("max_layer_height").front() > EPSILON)
+			max_layer_height = std::min(max_layer_height, print.config().get<std::vector<double>>("max_layer_height").front());
 		for (size_t i = 1; i < support_layers.size(); ++ i) {
 			if (support_layers[i]->print_z - support_layers[i - 1]->print_z < min_layer_height - EPSILON)
 				layer_height_minimum_ok = false;
@@ -47,8 +55,8 @@ SCENARIO("SupportMaterial: support_layers_z and contact_distance", "[SupportMate
 #if 0
 		double expected_top_spacing = print.default_object_config().layer_height + print.config().nozzle_diameter.get_at(0);
 		bool wrong_top_spacing = 0;
-        std::vector<coordf_t> top_z { 1.1 };
-		for (coordf_t top_z_el : top_z) {
+        std::vector<double> top_z { 1.1 };
+		for (double top_z_el : top_z) {
 			// find layer index of this top surface.
 			size_t layer_id = -1;
 			for (size_t i = 0; i < support_z.size(); ++ i) {
@@ -73,12 +81,14 @@ SCENARIO("SupportMaterial: support_layers_z and contact_distance", "[SupportMate
     GIVEN("A print object having one modelObject") {
         WHEN("First layer height = 0.4") {
 			Slic3r::Print print;
-			Slic3r::Test::init_and_process_print({ mesh }, print, {
-				{ "support_material",	1 },
-				{ "layer_height",		0.2 },
-				{ "first_layer_height", 0.4 },
-                { "dont_support_bridges", false },
-			});
+
+            TestConfig config;
+            config.print.items.opt("support_material").set(SupportMode::Everywhere);
+            config.print.items.opt("layer_height").set(0.2);
+            config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.4});
+            config.print.items.opt("dont_support_bridges").set(false);
+
+			Slic3r::Test::init_and_process_print({ mesh }, print, config);
 			bool a, b, c, d;
             check(print, a, b, c, d);
             THEN("First layer height is honored")					{ REQUIRE(a == true); }
@@ -88,12 +98,14 @@ SCENARIO("SupportMaterial: support_layers_z and contact_distance", "[SupportMate
         }
         WHEN("Layer height = 0.2 and, first layer height = 0.3") {
 			Slic3r::Print print;
-			Slic3r::Test::init_and_process_print({ mesh }, print, {
-				{ "support_material",	1 },
-				{ "layer_height",		0.2 },
-				{ "first_layer_height", 0.3 },
-                { "dont_support_bridges", false },
-            });
+
+            TestConfig config;
+            config.print.items.opt("support_material").set(SupportMode::Everywhere);
+            config.print.items.opt("layer_height").set(0.2);
+            config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.3});
+            config.print.items.opt("dont_support_bridges").set(false);
+
+			Slic3r::Test::init_and_process_print({ mesh }, print, config);
             bool a, b, c, d;
             check(print, a, b, c, d);
             THEN("First layer height is honored")					{ REQUIRE(a == true); }
@@ -103,12 +115,14 @@ SCENARIO("SupportMaterial: support_layers_z and contact_distance", "[SupportMate
         }
         WHEN("Layer height = nozzle_diameter[0]") {
 			Slic3r::Print print;
-			Slic3r::Test::init_and_process_print({ mesh }, print, {
-				{ "support_material",	1 },
-				{ "layer_height",		0.2 },
-				{ "first_layer_height", 0.3 },
-                { "dont_support_bridges", false },
-            });
+
+            TestConfig config;
+            config.print.items.opt("support_material").set(SupportMode::Everywhere);
+            config.print.items.opt("layer_height").set(0.2);
+            config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.3});
+            config.print.items.opt("dont_support_bridges").set(false);
+
+			Slic3r::Test::init_and_process_print({ mesh }, print, config);
             bool a, b, c, d;
             check(print, a, b, c, d);
             THEN("First layer height is honored")					{ REQUIRE(a == true); }
@@ -117,6 +131,80 @@ SCENARIO("SupportMaterial: support_layers_z and contact_distance", "[SupportMate
 //            THEN("Layers above top surfaces are spaced correctly")	{ REQUIRE(d == true); }
         }
     }
+}
+
+TEST_CASE("SupportMaterial: Raft under a levitating object", "[SupportMaterial]")
+{
+    using Biz::Algorithms::TriangleMesh::make_cube;
+
+    // 20mm cube lifted 10mm into the air.
+    TriangleMesh cube = make_cube(20.0, 20.0, 20.0);
+    cube.translate(Vec3f(0.0f, 0.0f, 10.0f));
+
+    TestConfig config;
+    config.print.items.opt("support_material").set(SupportMode::Everywhere);
+    config.print.items.opt("raft_layers").set(20);
+
+    Print print;
+    Test::init_and_process_print({cube}, print, config, false);
+
+    const PrintObject* object   = print.objects().front();
+    const SlicingParameters& sp = object->slicing_parameters();
+
+    // The raft must have at least one dense interface layer.
+    bool has_interface_layer = false;
+    for (const SupportLayer* support_layer : object->support_layers()) {
+        if (support_layer->print_z > sp.raft_interface_top_z + EPSILON) {
+            continue;
+        }
+
+        const ExtrusionRole role = support_layer->support_fills.role();
+        if (role.is_support_interface()) {
+            has_interface_layer = true;
+        }
+    }
+
+    REQUIRE(has_interface_layer);
+}
+
+TEST_CASE("SupportMaterial: Raft under a levitating edge-balanced object", "[SupportMaterial]")
+{
+    using Biz::Algorithms::TriangleMesh::make_cube;
+
+    // 20mm cube tilted 45 deg onto its edge and lifted 10mm into the air.
+    TriangleMesh cube = make_cube(20.0, 20.0, 20.0);
+    cube.rotate(std::numbers::pi_v<float> / 4.f, Axis::X);
+    const BoundingBox3d bb = cube.bounding_box();
+    cube.translate(Vec3f(
+        static_cast<float>(-bb.min.x()),
+        static_cast<float>(-bb.min.y()),
+        static_cast<float>(10.0 - bb.min.z())
+    ));
+
+    TestConfig config;
+    config.print.items.opt("support_material").set(SupportMode::Everywhere);
+    config.print.items.opt("raft_layers").set(20);
+
+    Print print;
+    Test::init_and_process_print({cube}, print, config, false);
+
+    const PrintObject* object   = print.objects().front();
+    const SlicingParameters& sp = object->slicing_parameters();
+
+    // The raft interface must have role SupportMaterialInterface, not Mixed.
+    // Mixed means a dense interface only on the edge plus the support columns.
+    bool pure_raft_interface_layer = false;
+    for (const SupportLayer* support_layer : object->support_layers()) {
+        if (support_layer->print_z > sp.raft_interface_top_z + EPSILON) {
+            continue;
+        }
+
+        if (support_layer->support_fills.role() == ExtrusionRole::SupportMaterialInterface) {
+            pure_raft_interface_layer = true;
+        }
+    }
+
+    REQUIRE(pure_raft_interface_layer);
 }
 
 #if 0
@@ -134,8 +222,8 @@ TEST_CASE("SupportMaterial: forced support is generated", "[SupportMaterial]")
 
     Print print = Print();
 
-    std::vector<coordf_t> contact_z = {1.9};
-    std::vector<coordf_t> top_z = {1.1};
+    std::vector<double> contact_z = {1.9};
+    std::vector<double> top_z = {1.1};
     print.default_object_config.support_material_enforce_layers = 100;
     print.default_object_config.support_material = 0;
     print.default_object_config.layer_height = 0.2;

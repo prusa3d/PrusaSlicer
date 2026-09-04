@@ -1,0 +1,51 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*sheets_PET_HT100*'
+name: Spectrum PETG HT100
+id: Spectrum PETG HT100
+values:
+  filament_vendor: Spectrum
+  filament_density: 1.18
+  disable_fan_first_layers: 1
+  full_fan_speed_layer: 1
+  first_layer_temperature: 260
+  temperature: 260
+  max_fan_speed: 60
+  filament_notes: HT_MBL10
+variants:
+- condition: printer.model=~/(MK4S|MK3.9S|XLP)/
+  id: l9D81h2ySIy25e+D4IBRjQ
+  values:
+    max_fan_speed: 45
+    overhang_fan_speed_0: 45
+    overhang_fan_speed_1: 0
+- condition: printer.base_model == "COREONE"
+  id: AzOihwXuQdWyUmO9h83fPA
+  values:
+    max_fan_speed: 50
+    overhang_fan_speed_0: 50
+    overhang_fan_speed_1: 0
+    chamber_temperature: 45
+---
+kind: filament
+id: '*sheets_PET_HT100*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: 0C18o/wqSR+ULAKjcljz2g
+  values:
+    first_layer_bed_temperature: 105
+    bed_temperature: 105
+  variants:
+  - condition: printer.base_model == "XL"
+    id: sL0ywoh6QMuVEK/PcqURLg
+    values:
+      first_layer_bed_temperature: 100
+      bed_temperature: 100
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: lZWoNQYURVmzvppSelUkRg
+  values:
+    first_layer_bed_temperature: 80
+    bed_temperature: 80

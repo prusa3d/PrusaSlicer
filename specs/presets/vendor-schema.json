@@ -1,0 +1,300 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prusa3d.com/schemas/slicer-presets-vendor",
+  "title": "Slicer Presets Vendor",
+  "type": "object",
+  "$defs": {
+    "value": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    },
+    "technology" : {
+      "enum": ["FFF", "SLA"]
+    },
+    "feature-def": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/value"
+        },
+        "user_editable": {"type": "boolean"},
+        "allowed_values": {
+          "type": "array",
+          "items": {
+            "oneOf": [{"type": "string"}, {"type": "number"}]
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": ["default"]
+    },
+    "features-def": {
+      "type": "object",
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/$defs/feature-def"
+        }
+      }
+    },
+    "feature-vals": {
+      "type": "object",
+      "patternProperties": {
+        ".*": {
+          "$ref": "#/$defs/value"
+        }
+      }
+    },
+    "vendor-def": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "vendor"},
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "features": {
+          "type": "object",
+          "properties": {
+            "printer": {
+              "$ref": "#/$defs/features-def"
+            },
+            "tool": {
+              "$ref": "#/$defs/features-def"
+            },
+            "feeder": {
+              "$ref": "#/$defs/features-def"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "model-def": {
+      "type": "object",
+      "properties": {
+        "base_model": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": ["base_model", "model"]
+    },
+    "visual_def": {
+      "type": "object",
+      "properties": {
+        "bed_model": {
+          "type": "string"
+        },
+        "bed_texture": {
+          "type": "string"
+        },
+        "thumbnail": {
+          "type": "string"
+        }
+      }
+    },
+    "printer-def": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "printer"},
+        "technology": {"$ref":  "#/$defs/technology"},
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "model": {
+          "$ref": "#/$defs/model-def"
+        },
+        "tool_count": {
+          "type": "number",
+          "minimum": 1
+        },
+        "features": {
+          "$ref": "#/$defs/features-def"
+        },
+        "visual": {"$ref": "#/$defs/visual_def"},
+        "legacy_printer_model": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["kind", "name", "model", "tool_count", "technology"],
+      "additionalProperties": false
+    },
+    "tool-def": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "tool"},
+        "technology": {"$ref":  "#/$defs/technology"},
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "condition": {
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/$defs/features-def"
+        }
+      },
+      "required": ["kind", "name", "id"],
+      "additionalProperties": false
+    },
+    "feeder-def": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "feeder"},
+        "technology": {"$ref":  "#/$defs/technology"},
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "condition": {
+          "type": "string"
+        },
+        "model": {
+          "$ref": "#/$defs/model-def"
+        },
+        "feeder_type": {
+          "enum": ["mmu", "manual"]
+        },
+        "slot_count": {
+          "type": "number",
+          "minimum": 0
+        },
+        "features": {
+          "$ref": "#/$defs/features-def"
+        }
+      },
+      "required": [
+        "kind", "name", "id", "slot_count"
+      ],
+      "additionalProperties": false
+    },
+    "sheet-def": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "sheet"},
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "condition": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/$defs/features-def"
+        }
+      },
+      "required": [
+        "kind", "name", "id", "type"
+      ],
+      "additionalProperties": false
+    },
+    "tool-config-template": {
+      "type": "object",
+      "properties": {
+        "tool": {
+          "type": "string"
+        }
+      },
+      "required": ["tool"]
+    },
+    "feeder-config-template": {
+      "type": "object",
+      "properties": {
+        "feeder": {
+          "type": "string"
+        },
+        "address": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "printer-config-template": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "printer_config"},
+        "id": {
+          "type": "string"
+        },
+        "printer": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tool_count": {
+          "type": "number"
+        },
+        "tools": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/tool-config-template"}
+        },
+        "feeders": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/feeder-config-template"}
+        },
+        "sheet": {
+          "type": "string"
+        },
+        "visual": {
+          "$ref": "#/$defs/visual_def"
+        },
+        "legacy_printer_model": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["kind", "id", "printer", "name", "tools", "sheet"]
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/vendor-def"
+    },
+    {
+      "$ref": "#/$defs/printer-def"
+    },
+    {
+      "$ref": "#/$defs/tool-def"
+    },
+    {
+      "$ref": "#/$defs/feeder-def"
+    },
+    {
+      "$ref": "#/$defs/sheet-def"
+    },
+    {
+      "$ref": "#/$defs/printer-config-template"
+    }
+  ]
+}

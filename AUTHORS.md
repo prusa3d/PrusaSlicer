@@ -1,0 +1,265 @@
+### Maintainers
+
+- Alessandro Ranellucci (@alranel) - 2011-2016 (Slic3r)
+- Prusa Research - since 2016 (Slic3rPE, PrusaSlicer)
+
+
+### Prusa Research contributors
+
+- Jan Bařtipán (@barzto)
+- Roman Beránek (@zavorka)
+- Vojtěch Bubník (@bubnikv)
+- Nikita Černá (@Zaraka)
+- Lukáš Hejl (@hejllukas)
+- Oleksandra Iushchenko (@YuSanka)
+- David Kocík (@kocikdav)
+- Vojtěch Král (@vojtechkral)
+- Lukáš Matěna (@lukasmatena)
+- Tomáš Mészáros (@tamasmeszaros)
+- Pavel Mikuš (@Godrak)
+- Pavel Surynek (@surynek)
+- Filip Sykala (@Jony01)
+- Martin Šach (@SachCZ)
+- Roman Týr (@rtyr)
+- Enrico Turri (@enricoturri1966)
+
+
+### Cura (Ultimaker) code
+
+Several important features were either ported from Cura, or used as an inspiration:
+
+- Arachne perimeter generator
+- Organic supports
+- Lightning infill
+- Interlocking
+- Fuzzy skin
+- Adaptive cubic infill
+- Avoid crossing perimeters
+
+Regarding Organic supports, PrusaSlicer ported Cura's tree supports greatly modified in a PR by Thomas Rahm (@thomasrahm).
+
+Many thanks to @ultimaker for keeping their Cura slicer open-source.
+
+
+### Other software that PrusaSlicer pulled from in the past
+
+- SuperSlicer, Remi Durand (@supermerill)
+- OrcaSlicer, SoftFever (@SoftFever)
+- BambuStudio, Bambulab (@Bambulab)
+
+
+### Community contributors over the years
+
+- Ahmed Samir Abdelreheem (@Samir55)
+- Ray Ackley
+- Stephen Albert-Moore
+- André Althaus
+- Luís Andrade
+- Paul Arden (@ardenpm)
+- Ian Bassi
+- Giles Bathgate
+- Stuart P. Bentley
+- Nick Berardi
+- Gregor Best
+- Andrew Boktor
+- Pascal de Bruijn
+- Martin Budden
+- Adrian Bunk
+- Ryan Cavanaugh
+- Kim Chase
+- Mirek Chocholous
+- Mark Choi
+- Boleslaw Ciesielski
+- Manuel Coenen
+- Matt Coleman
+- Alfredo Cortellini
+- Nicolas Dandrimont
+- Maciej Dębski
+- Yuri D'Elia
+- DJ Delorie
+- Maksim Derbasov (@ntfshard)
+- Elia Devito
+- Adam Dinwoodie
+- John Drake (@foxox)
+- Phil Dubach
+- David Eccles (@gringer)
+- Maximilian Engelhardt
+- Vanessa Ezekowitz (@VanessaE)
+- Shlomi Fish
+- Kent Fredric
+- Christoph Friedrich
+- Jarl Friis
+- Matthias Gazzari (@qtux)
+- Can Geliş
+- Simon George
+- Ralph Giles
+- Colin Gilgenbach (@hexane360)
+- Robert Giseburt
+- Tom Glastonbury
+- Daniel Goldman
+- Richard Goodwin
+- Devin Grady
+- Trey Greer
+- Benjamin Greiner
+- Lee Hakmin
+- Sebastian Hammerl
+- Hannes Hauswedell
+- Darío Hereñú
+- Dave Hillier
+- Mark Hindess
+- Miro Hrončok (@hroncok)
+- Felicia Hummel
+- Denis Itskovich (@denis-itskovich)
+- Steven James
+- Li Jiang
+- Chow Loong Jin (@hyperair)
+- Morton Jonuschat
+- Sean P. Kane
+- Sakari Kapanen (@Flannelhead)
+- Piotr Karbowski
+- Pavel Karoukin (@hippich)
+- Christopher Keller
+- Bjoern Kerler
+- Michael Kirsch
+- Akimasa Konishi
+- Dan Kortschak
+- Sergey Kovalev (@RandoMan70)
+- Yuri Kozlov
+- Tuomas Kuosmanen
+- Kamil Kwolek
+- Seth LaForge
+- Pedro Lamas (@PedroLamas)
+- Benjamin Landers
+- Petr Ledvina (@ledvinap)
+- Shien Yang Lee
+- Joseph Lenox (@lordofhyphens)
+- Martin Loidl (@LoidlM)
+- Kyle Maas (@KyleMaas)
+- Alex Matulich (@amatulic)
+- Josh McCullough
+- Jonne Mickelin
+- Will Miles
+- Michael Moon
+- Thomas Moore
+- Scott Mudge (@ScottMudge)
+- Sebastian Nadorp (@snadorp)
+- Klaus Naumann
+- Kristian Nielsen
+- Nicolas North
+- Paul Novak
+- Ondřej Nový (@onovy)
+- Spencer Owen (@spuder)
+- Jernej Pangerc
+- Guilherme Patriota
+- Bjarke Istrup Pedersen
+- Scott Penrose
+- Alex Petsiuk (@apetsiuk)
+- Oleksandr Pidlisnyi
+- Félix Piédallu
+- Forrest Pieper
+- Cyryl Plotnicki-Chudyk
+- Jurriaan Pruis
+- Thomas Rahm (@thomasrahm)
+- Leonid Raiz
+- Mathias Rasmussen
+- Stephan Reichhelm (@stephanr)
+- Johannes Reinhardt
+- Clarence Risher
+- Alexander Rössler (@machinekoder)
+- Piotr Roszatycki
+- Xoan Sampaiño
+- Robert Sanchez
+- Francesco Santini (@fsantini)
+- Y. Sapir
+- Robert Schiele (@schiele)
+- Andreas Schneider
+- Sijmen Schoon
+- Justin Schuh (@jschuh)
+- Daren Schwenke
+- Jason Scurtu
+- Sam Segers
+- Guillaume Seguin
+- Erkki Seppälä
+- Mike Sheldrake (@mesheldrake)
+- Niall Sheridan (@nsheridan)
+- Nicholas Sherlock
+- Adrian Sieber (@adius)
+- Mário Victor Ribeiro Silva
+- Ranvir Singh
+- Andre Sklenar
+- Bryan Smith
+- Italo Soares
+- Raphael Sobik
+- Eyal Soha (@eyal0)
+- Vicky Somma
+- Rob Starling
+- Owen Stenseth
+- Anders Sundman
+- Dylan Thies
+- Greg Thornton (@xdissent)
+- Jason Tibbitts (@jasontibbitts)
+- Len Trigg
+- Matthias Urlichs (@smurfix)
+- Jesse Vincent
+- Ryan Voots
+- Bill Waggoner
+- Mark Walker
+- Florens Wasserfall (@platsch)
+- Sam Wong
+- Kliment Yanev
+- Aaron Yourk
+- Jiang Yue
+- Henner Zeller
+- Ilya (@xorza)
+- Jaggz H
+- Noisyfox
+- Rodrigo
+- Henrik Brix Andersen (@henrikbrixandersen)
+- Jose Luis Perez Diez
+- @akukan
+- @BeldrothTheGold
+- @bgiot
+- @charlie
+- @dakkar
+- @davidjuanesb
+- @dawidpieper
+- @dzmitry
+- @EiNSTeiN-
+- @fredizzimo
+- @Gege2B
+- @harriv
+- @hspil
+- @ils15
+- @Jebtrix
+- @kangkang
+- @Maeyanie
+- @MaleNurse
+- @MarkMan0
+- @Megidd
+- @mikegrb
+- @Mimoja
+- @NateTG
+- @Nohus
+- @odaki
+- @ole00
+- @photodude
+- @photog0411
+- @rk0n
+- @rmpratt1
+- @rockandsalt
+- @rongith
+- @sckunkle
+- @Sebastianv650
+- @themanyone
+- @TheZeroBeast
+- @timor
+- @tjhowse
+- @tmotl
+- @top-gun
+- @uclaros
+- @Vicious-one
+- @vintagepc
+- @vovodroid
+- @wenjie
+
+Note that the list is not-exhaustive. If you feel omitted, reach out and let us make it right.

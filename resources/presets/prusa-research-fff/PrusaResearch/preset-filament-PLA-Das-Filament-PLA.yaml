@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Das Filament PLA
+id: Das Filament PLA
+values:
+  filament_cost: '19.99'
+  filament_vendor: Das Filament

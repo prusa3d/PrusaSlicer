@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Fiberlogy Impact PLA
+id: Fiberlogy Impact PLA
+values:
+  filament_cost: '27.65'
+  filament_density: 1.22
+  filament_vendor: Fiberlogy
+  filament_spool_weight: 330
+  temperature: 230

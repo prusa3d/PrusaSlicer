@@ -1,0 +1,62 @@
+kind: filament
+inherits:
+- '*FLEX*'
+features:
+  $.type: TPE
+name: Filatech FilaFlexible55
+condition: tool.nozzle_diameter >= 0.4 and printer.base_model=~/(MK3.5|MK3|MK2.5|MK2)/ and feeder.base_model!~/.*MMU.*/
+id: Filatech FilaFlexible55
+values:
+  filament_vendor: Filatech
+  first_layer_temperature: 235
+  temperature: 230
+  first_layer_bed_temperature: 60
+  bed_temperature: 60
+  extrusion_multiplier: 1
+  filament_density: 1.18
+  cooling: true
+  fan_below_layer_time: 60
+  min_fan_speed: 50
+  max_fan_speed: 50
+  bridge_fan_speed: 100
+  retract_length: 2
+  retract_speed: 25
+variants:
+## MK3.5 and MK3 and MK2
+- condition: printer.base_model=~/(MK3.5|MK3|MK2.5|MK2)/
+  id: Y0A5RbJPQKGEyhJCDPbcIQ
+  values:
+    first_layer_temperature: 235
+    temperature: 230
+    first_layer_bed_temperature: 60
+    bed_temperature: 60
+    extrusion_multiplier: 1
+    filament_density: 1.18
+    cooling: true
+    fan_below_layer_time: 60
+    min_fan_speed: 50
+    max_fan_speed: 50
+    bridge_fan_speed: 100
+    retract_length: 2
+    retract_speed: 25
+  variants:
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: jTVCCMbKSh+RsBhPvXyJbw
+    values:
+      filament_max_volumetric_speed: 2.5
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: cyrmBZdLTZ21g46RwPwV7Q
+    values:
+      filament_max_volumetric_speed: 2.5
+  # MK3.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: b8isFMQ1TZK2OHKpplMwCQ
+    values:
+      filament_max_volumetric_speed: 3
+  # MK3.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: dCfYksnIRqCmlqOxGEcUKw
+    values:
+      filament_max_volumetric_speed: 4.5

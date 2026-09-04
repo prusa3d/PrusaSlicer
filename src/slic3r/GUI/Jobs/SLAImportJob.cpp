@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Vojtěch Bubník @bubnikv, David Kocík @kocikdav
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "SLAImportJob.hpp"
 
 #include "libslic3r/SLAPrint.hpp"
@@ -91,7 +95,7 @@ void SLAImportJob::reset()
 {
     p->sel     = Sel::modelAndProfile;
     p->mesh    = {};
-    p->profile = p->plater->sla_print().full_print_config();
+    p->profile = p->plater->active_sla_print().full_print_config();
     p->quality = SLAImportQuality::Balanced;
     p->path.Clear();
     p->err     = "";
@@ -101,8 +105,8 @@ void SLAImportJob::prepare()
 {
     reset();
 
-    auto path  = p->import_dlg->get_path();
-    auto nm    = wxFileName(path);
+    const std::string path  = p->import_dlg->get_path();
+    auto nm    = wxFileName(from_u8(path));
     p->path    = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
     if (p->path.empty()) {
         p->err = _u8L("The file does not exist.");
@@ -138,7 +142,7 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
 
     if (p->sel != Sel::modelOnly) {
         if (p->profile.empty())
-            p->profile = p->plater->sla_print().full_print_config();
+            p->profile = p->plater->active_sla_print().full_print_config();
 
         const ModelObjectPtrs& objects = p->plater->model().objects;
         for (auto object : objects)
@@ -157,7 +161,7 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr &eptr)
 
         if (Preset::printer_technology(config) == ptSLA) {
             wxGetApp().preset_bundle->load_config_model(name, std::move(config));
-            p->plater->check_selected_presets_visibility(ptSLA);
+            p->plater->notify_about_installed_presets();;
             wxGetApp().load_current_presets();
         } else {
             p->plater->get_notification_manager()->push_notification(

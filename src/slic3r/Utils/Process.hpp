@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef GUI_PROCESS_HPP
 #define GUI_PROCESS_HPP
 

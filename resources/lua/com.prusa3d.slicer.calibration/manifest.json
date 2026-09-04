@@ -1,0 +1,12 @@
+{
+	"id": "com.prusa3d.slicer.calibration",
+	"name": "Calibration patterns",
+	"license": "AGPL-3.0-only",
+	"min_slicer_version": "3.0.0",
+	"version": "1.0.0",
+	"author": "prusa3d",
+	"description": "Calibration patterns",
+	"required_apis": {
+		"project.plugin": "1.0.0"
+	}
+}

@@ -1,7 +1,9 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <cstdlib>
 
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include "libslic3r/ExtrusionEntityCollection.hpp"
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Point.hpp"
@@ -11,6 +13,8 @@
 #include "test_data.hpp"
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
+using namespace Catch;
 
 static inline Slic3r::Point random_point(float LO=-50, float HI=50) 
 {
@@ -21,7 +25,7 @@ static inline Slic3r::Point random_point(float LO=-50, float HI=50)
 // build a sample extrusion entity collection with random start and end points.
 static Slic3r::ExtrusionPath random_path(size_t length = 20, float LO = -50, float HI = 50)
 {
-    ExtrusionPath t { ExtrusionRole::Perimeter, 1.0, 1.0, 1.0 };
+    ExtrusionPath t{ ExtrusionAttributes{ ExtrusionRole::Perimeter, ExtrusionFlow{ 1.0, 1.0, 1.0 } } };
     for (size_t j = 0; j < length; ++ j)
         t.polyline.append(random_point(LO, HI));
     return t;
@@ -37,9 +41,8 @@ static Slic3r::ExtrusionPaths random_paths(size_t count = 10, size_t length = 20
 
 SCENARIO("ExtrusionPath", "[ExtrusionEntity]") {
     GIVEN("Simple path") {
-        Slic3r::ExtrusionPath path{ ExtrusionRole::ExternalPerimeter };
-        path.polyline = { { 100, 100 }, { 200, 100 }, { 200, 200 } };
-        path.mm3_per_mm = 1.;
+        Slic3r::ExtrusionPath path{ { { 100, 100 }, { 200, 100 }, { 200, 200 } },
+            ExtrusionAttributes{ ExtrusionRole::ExternalPerimeter, ExtrusionFlow{ 1., -1.f, -1.f } } };
         THEN("first point") {
             REQUIRE(path.first_point() == path.polyline.front());
         }
@@ -52,10 +55,7 @@ SCENARIO("ExtrusionPath", "[ExtrusionEntity]") {
 
 static ExtrusionPath new_extrusion_path(const Polyline &polyline, ExtrusionRole role, double mm3_per_mm)
 {
-    ExtrusionPath path(role);
-    path.polyline = polyline;
-    path.mm3_per_mm = 1.;
-    return path;
+    return { polyline, ExtrusionAttributes{ role, ExtrusionFlow{ mm3_per_mm, -1.f, -1.f } } };
 }
 
 SCENARIO("ExtrusionLoop", "[ExtrusionEntity]") 
@@ -64,9 +64,10 @@ SCENARIO("ExtrusionLoop", "[ExtrusionEntity]")
         Polygon square { { 100, 100 }, { 200, 100 }, { 200, 200 }, { 100, 200 } };
 
         ExtrusionLoop loop;
-        loop.paths.emplace_back(new_extrusion_path(square.split_at_first_point(), ExtrusionRole::ExternalPerimeter, 1.));
+        loop.paths.emplace_back(new_extrusion_path(Algorithms::Polygon::split_at_first_point(square), ExtrusionRole::ExternalPerimeter, 1.));
         THEN("polygon area") {
             REQUIRE(loop.polygon().area() == Approx(square.area()));
+            REQUIRE(loop.area() == Approx(square.area()));
         }
         THEN("loop length") {
             REQUIRE(loop.length() == Approx(square.length()));
@@ -110,6 +111,9 @@ SCENARIO("ExtrusionLoop", "[ExtrusionEntity]")
         loop.paths.emplace_back(new_extrusion_path(polyline1, ExtrusionRole::ExternalPerimeter, 1.));
         loop.paths.emplace_back(new_extrusion_path(polyline2, ExtrusionRole::OverhangPerimeter, 1.));
 
+        THEN("area") {
+            REQUIRE(loop.area() == Approx(loop.polygon().area()));
+        }
         double tot_len = polyline1.length() + polyline2.length();
         THEN("length") {
             REQUIRE(loop.length() == Approx(tot_len));
@@ -212,6 +216,9 @@ SCENARIO("ExtrusionLoop", "[ExtrusionEntity]")
         loop.paths.emplace_back(new_extrusion_path(polyline3, ExtrusionRole::ExternalPerimeter, 1.));
         loop.paths.emplace_back(new_extrusion_path(polyline4, ExtrusionRole::OverhangPerimeter, 1.));
         double len = loop.length();
+        THEN("area") {
+            REQUIRE(loop.area() == Approx(loop.polygon().area()));
+        }
         WHEN("splitting at vertex") {
             Point point(4821067, 9321068);
             if (! loop.split_at_vertex(point))
@@ -234,6 +241,9 @@ SCENARIO("ExtrusionLoop", "[ExtrusionEntity]")
             Polyline { { 15896783, 15868739 }, { 24842049, 12117558 }, { 33853238, 15801279 }, { 37591780, 24780128 }, { 37591780, 24844970 }, 
                        { 33853231, 33825297 }, { 24842049, 37509013 }, { 15896798, 33757841 }, { 12211841, 24812544 }, { 15896783, 15868739 } },
             ExtrusionRole::ExternalPerimeter, 1.));
+        THEN("area") {
+            REQUIRE(loop.area() == Approx(loop.polygon().area()));
+        }
         double len = loop.length();
         THEN("split_at() preserves total length") {
             loop.split_at({ 15896783, 15868739 }, false, 0);
@@ -247,7 +257,7 @@ SCENARIO("ExtrusionEntityCollection: Basics", "[ExtrusionEntity]")
     Polyline        polyline { { 100, 100 }, { 200, 100 }, { 200, 200 } };
     ExtrusionPath   path = new_extrusion_path(polyline, ExtrusionRole::ExternalPerimeter, 1.);
     ExtrusionLoop   loop;
-    loop.paths.emplace_back(new_extrusion_path(Polygon(polyline.points).split_at_first_point(), ExtrusionRole::InternalInfill, 1.));
+    loop.paths.emplace_back(new_extrusion_path(Algorithms::Polygon::split_at_first_point(Polygon(polyline.points)), ExtrusionRole::InternalInfill, 1.));
     ExtrusionEntityCollection collection;
     collection.append(path);
     THEN("no_sort is false by default") {
@@ -378,23 +388,27 @@ TEST_CASE("ExtrusionEntityCollection: Chained path", "[ExtrusionEntity]") {
         REQUIRE(chained == test.chained);
         ExtrusionEntityCollection unchained_extrusions;
         extrusion_entities_append_paths(unchained_extrusions.entities, test.unchained,
-            ExtrusionRole::InternalInfill, 0., 0.4f, 0.3f);
+            ExtrusionAttributes{ ExtrusionRole::InternalInfill, ExtrusionFlow{ 0., 0.4f, 0.3f } });
         THEN("Chaining works") {
-            ExtrusionEntityCollection chained_extrusions = unchained_extrusions.chained_path_from(test.initial_point);
-            REQUIRE(chained_extrusions.entities.size() == test.chained.size());
-            for (size_t i = 0; i < chained_extrusions.entities.size(); ++ i) {
+            ExtrusionEntityReferences chained_extrusions = chain_extrusion_references(unchained_extrusions, &test.initial_point);
+            REQUIRE(chained_extrusions.size() == test.chained.size());
+            for (size_t i = 0; i < chained_extrusions.size(); ++ i) {
                 const Points &p1 = test.chained[i].points;
-                const Points &p2 = dynamic_cast<const ExtrusionPath*>(chained_extrusions.entities[i])->polyline.points;
+                Points        p2 = chained_extrusions[i].cast<ExtrusionPath>()->polyline.points;
+                if (chained_extrusions[i].flipped())
+                    std::reverse(p2.begin(), p2.end());
                 REQUIRE(p1 == p2);
             }
         }
         THEN("Chaining produces no change with no_sort") {
             unchained_extrusions.no_sort = true;
-            ExtrusionEntityCollection chained_extrusions = unchained_extrusions.chained_path_from(test.initial_point);
-            REQUIRE(chained_extrusions.entities.size() == test.unchained.size());
-            for (size_t i = 0; i < chained_extrusions.entities.size(); ++ i) {
+            ExtrusionEntityReferences chained_extrusions = chain_extrusion_references(unchained_extrusions, &test.initial_point);
+            REQUIRE(chained_extrusions.size() == test.unchained.size());
+            for (size_t i = 0; i < chained_extrusions.size(); ++ i) {
                 const Points &p1 = test.unchained[i].points;
-                const Points &p2 = dynamic_cast<const ExtrusionPath*>(chained_extrusions.entities[i])->polyline.points;
+                Points        p2 = chained_extrusions[i].cast<ExtrusionPath>()->polyline.points;
+                if (chained_extrusions[i].flipped())
+                    std::reverse(p2.begin(), p2.end());
                 REQUIRE(p1 == p2);
             }
         }

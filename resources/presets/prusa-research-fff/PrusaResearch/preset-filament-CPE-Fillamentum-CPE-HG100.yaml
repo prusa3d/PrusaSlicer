@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*CPE*'
+name: Fillamentum CPE HG100
+id: Fillamentum CPE HG100
+values:
+  filament_cost: '46.65'
+  filament_vendor: Fillamentum
+  filament_density: 1.25
+  filament_spool_weight: 230

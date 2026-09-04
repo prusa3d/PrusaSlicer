@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, Enrico Turri @enricoturri1966, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "PrintHostDialogs.hpp"
 
 #include <algorithm>
@@ -21,6 +25,7 @@
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
+#include "Plater.hpp"
 #include "MsgDialog.hpp"
 #include "I18N.hpp"
 #include "MainFrame.hpp"
@@ -101,10 +106,9 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
         m_valid_suffix = recent_path.substr(extension_start);
     // .gcode suffix control
     auto validate_path = [this](const wxString &path) -> bool {
-        if (! path.Lower().EndsWith(m_valid_suffix.Lower())) {
+        if (!path.Lower().EndsWith(m_valid_suffix.Lower())) {
             MessageDialog msg_wingow(this, wxString::Format(_L("Upload filename doesn't end with \"%s\". Do you wish to continue?"), m_valid_suffix), wxString(SLIC3R_APP_NAME), wxYES | wxNO);
-            if (msg_wingow.ShowModal() == wxID_NO)
-                return false;
+            return msg_wingow.ShowModal() == wxID_YES;
         }
         return true;
     };
@@ -199,7 +203,7 @@ std::string PrintHostSendDialog::storage() const
         return GUI::format("%1%", m_preselected_storage);
     if (combo_storage->GetSelection() < 0 || combo_storage->GetSelection() >= int(m_paths.size()))
         return {};
-    return boost::nowide::narrow(m_paths[combo_storage->GetSelection()]);
+    return into_u8(m_paths[combo_storage->GetSelection()]);
 }
 
 void PrintHostSendDialog::EndModal(int ret)
@@ -383,7 +387,7 @@ void PrintHostQueueDialog::append_job(const PrintHostJob &job)
     // Both strings are UTF-8 encoded.
     upload_names.emplace_back(job.printhost->get_host(), job.upload_data.upload_path.string());
 
-    wxGetApp().notification_manager()->push_upload_job_notification(job_list->GetItemCount(), (float)size_i / 1024 / 1024, job.upload_data.upload_path.string(), job.printhost->get_host());
+    wxGetApp().notification_manager()->push_upload_job_notification(job_list->GetItemCount(), (float)size_i / 1024 / 1024, job.upload_data.upload_path.string(), job.printhost->get_notification_host());
 }
 
 void PrintHostQueueDialog::on_dpi_changed(const wxRect &suggested_rect)
@@ -463,7 +467,9 @@ void PrintHostQueueDialog::on_progress(Event &evt)
         wxVariant nm, hst;
         job_list->GetValue(nm, evt.job_id, COL_FILENAME);
         job_list->GetValue(hst, evt.job_id, COL_HOST);
-        wxGetApp().notification_manager()->set_upload_job_notification_percentage(evt.job_id + 1, boost::nowide::narrow(nm.GetString()), boost::nowide::narrow(hst.GetString()), evt.progress / 100.f);
+        const std::string& nm_str = into_u8(nm.GetString());
+        const std::string& hst_str = into_u8(hst.GetString());
+        wxGetApp().notification_manager()->set_upload_job_notification_percentage(evt.job_id + 1, nm_str, hst_str, evt.progress / 100.f);
     }
 }
 
@@ -484,7 +490,7 @@ void PrintHostQueueDialog::on_error(Event &evt)
     wxVariant nm, hst;
     job_list->GetValue(nm, evt.job_id, COL_FILENAME);
     job_list->GetValue(hst, evt.job_id, COL_HOST);
-    wxGetApp().notification_manager()->upload_job_notification_show_error(evt.job_id + 1, boost::nowide::narrow(nm.GetString()), boost::nowide::narrow(hst.GetString()));
+    wxGetApp().notification_manager()->upload_job_notification_show_error(evt.job_id + 1, into_u8(nm.GetString()), into_u8(hst.GetString()));
 }
 
 void PrintHostQueueDialog::on_cancel(Event &evt)
@@ -499,7 +505,7 @@ void PrintHostQueueDialog::on_cancel(Event &evt)
     wxVariant nm, hst;
     job_list->GetValue(nm, evt.job_id, COL_FILENAME);
     job_list->GetValue(hst, evt.job_id, COL_HOST);
-    wxGetApp().notification_manager()->upload_job_notification_show_canceled(evt.job_id + 1, boost::nowide::narrow(nm.GetString()), boost::nowide::narrow(hst.GetString()));
+    wxGetApp().notification_manager()->upload_job_notification_show_canceled(evt.job_id + 1, into_u8(nm.GetString()), into_u8(hst.GetString()));
 }
 
 void PrintHostQueueDialog::on_info(Event& evt)
@@ -509,19 +515,26 @@ void PrintHostQueueDialog::on_info(Event& evt)
     if (evt.tag == L"resolve") {
         wxVariant hst(evt.status);
         job_list->SetValue(hst, evt.job_id, COL_HOST);
-        wxGetApp().notification_manager()->set_upload_job_notification_host(evt.job_id + 1, boost::nowide::narrow(evt.status));
+        wxGetApp().notification_manager()->set_upload_job_notification_host(evt.job_id + 1, into_u8(evt.status));
     } else if (evt.tag == L"complete") {
         wxVariant hst(evt.status);
         job_list->SetValue(hst, evt.job_id, COL_ERRORMSG);
         wxGetApp().notification_manager()->set_upload_job_notification_completed(evt.job_id + 1);
-        wxGetApp().notification_manager()->set_upload_job_notification_status(evt.job_id + 1, boost::nowide::narrow(evt.status));
+        wxGetApp().notification_manager()->set_upload_job_notification_status(evt.job_id + 1, into_u8(evt.status));
     } else if(evt.tag == L"complete_with_warning"){
         wxVariant hst(evt.status);
         job_list->SetValue(hst, evt.job_id, COL_ERRORMSG);
         wxGetApp().notification_manager()->set_upload_job_notification_completed_with_warning(evt.job_id + 1);
-        wxGetApp().notification_manager()->set_upload_job_notification_status(evt.job_id + 1, boost::nowide::narrow(evt.status));
+        wxGetApp().notification_manager()->set_upload_job_notification_status(evt.job_id + 1, into_u8(evt.status));
     } else if (evt.tag == L"set_complete_off") {
         wxGetApp().notification_manager()->set_upload_job_notification_comp_on_100(evt.job_id + 1, false);
+    } else if (evt.tag == L"prusaconnect_printer_address") {
+        wxGetApp().notification_manager()->set_upload_job_notification_hypertext(evt.job_id + 1
+            , [evt](wxEvtHandler *) {
+                wxGetApp().mainframe->show_connect_tab(into_u8(evt.status));
+                return false ;
+            }
+            );
     }
 }
 

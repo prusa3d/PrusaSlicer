@@ -1,0 +1,85 @@
+kind: filament
+inherits:
+- '*PPCF*'
+name: Prusament PP Carbon Fiber
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.4 and feeder.base_model!~/.*MMU.*/
+id: Prusament PP Carbon Fiber
+values:
+  filament_vendor: Prusa Polymers
+variants:
+- condition: printer.base_model == "COREONE"
+  id: 7WUERE9tQ8i2RFvRANDVOA
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 0
+    idle_temperature: 130
+    cooling: true
+    min_print_speed: 5
+    fan_below_layer_time: 0
+    filament_purge_multiplier: 100%
+    start_filament_gcode: M142 S36 ; set heatbreak target temp
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PPCF* @COREONE 0.4'
+    id: MDu4KRC3Re28Lu/MW6ORnQ
+    values:
+      filament_max_volumetric_speed: 4
+      slowdown_below_layer_time: 6
+      pressure_advance_value: 0.05
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PPCF* @COREONE HF0.4'
+      id: hEglCbm8QmSkMYoTfr42+g
+      values:
+        filament_max_volumetric_speed: 4
+        filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        pressure_advance_value: 0.05
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PPCF* @COREONE 0.5'
+    id: CgUqmdc1RICwTkgs9B1pkw
+    values:
+      filament_max_volumetric_speed: 4
+      slowdown_below_layer_time: 7
+      pressure_advance_value: 0.035
+    variants:
+    # C1 HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PPCF* @COREONE HF0.5'
+      id: QJYdLC8DRkyQ7scYr+IJZA
+      values:
+        filament_max_volumetric_speed: 7
+        # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        pressure_advance_value: 0.035
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PPCF* @COREONE 0.6'
+    id: 8iYALz+LQNWgWpN/6KlN9A
+    values:
+      filament_max_volumetric_speed: 6
+      slowdown_below_layer_time: 8
+      pressure_advance_value: 0.025
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PPCF* @COREONE HF0.6'
+      id: V4DyM8e4SZ6kWRVDanIeDg
+      values:
+        filament_max_volumetric_speed: 6
+  # C1 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PPCF* @COREONE 0.8'
+    id: XUBwc7ysQ1mOEi6ZxI8acQ
+    values:
+      filament_max_volumetric_speed: 8
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.016
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PPCF* @COREONE HF0.8'
+      id: ZTc30pe5TsqydyvPbUWYYA
+      values:
+        filament_max_volumetric_speed: 8

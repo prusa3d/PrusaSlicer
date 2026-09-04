@@ -1,0 +1,139 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*sunluPETG_P_ADVANCE*'
+- '*sunluPETG_MAXVOLSPEED*'
+name: Sunlu PETG
+id: Sunlu PETG
+values:
+  filament_vendor: Sunlu
+  filament_cost: 25
+  filament_density: 1.23
+  filament_spool_weight: 162
+  filament_infill_max_crossing_speed: 100
+---
+kind: filament
+# Pressure advance values
+id: '*sunluPETG_P_ADVANCE*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: spMrmbMOSaiM6meYDMI45Q
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: z4jnIvHmSt+9rACkoDzLsw
+    values:
+      pressure_advance_value: 0.17
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: /cmHYbhaS4W9PJkaWow08Q
+    values:
+      pressure_advance_value: 0.1
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: z9z/wTWUTkWdbE3pzXaXog
+    values:
+      pressure_advance_value: 0.048
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: dxhOc3etQuu5pVjJwApwwg
+      values:
+        pressure_advance_value: 0.048
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: zomwCe4vS0C1K7VH7FZzAQ
+    values:
+      pressure_advance_value: 0.042
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: atP+Ty5pS0qlT+1EVmRXWw
+      values:
+        pressure_advance_value: 0.042
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: cbNLfJFsRKyj/oL3lJzduQ
+    values:
+      pressure_advance_value: 0.032
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: taJK/cK1RfSIC1HqzvO4/w
+      values:
+        pressure_advance_value: 0.032
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: C/GUkZs5SEKGZbjPupPD9w
+    values:
+      pressure_advance_value: 0.018
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: cAY5ts8hSc6MKQG2kLbljA
+      values:
+        pressure_advance_value: 0.018
+---
+kind: filament
+# Maximum volumetric speed limits
+id: '*sunluPETG_MAXVOLSPEED*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: F1+LS0SxQsiTIqULi8b5mg
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: mIYWNEwQQwiDEUH1+1xpuQ
+    values:
+      filament_max_volumetric_speed: 11
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: w27+RkmXT0amv14DSlEJ6g
+    values:
+      filament_max_volumetric_speed: 11
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: YiWDJ0AhSqWNVCPJfHV4jQ
+    values:
+      filament_max_volumetric_speed: 11
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: u30V8ibsS5WQ4RP9BR6hbg
+      values:
+        filament_max_volumetric_speed: 20
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: h4RO75YGQdeV2BHw4mlFPQ
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: ry06y7z3QEuNhj5sIzis2w
+      values:
+        filament_max_volumetric_speed: 24
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: Ok6rSyjSRiGAVSz0gsnj/Q
+    values:
+      filament_max_volumetric_speed: 17
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: nyKwPIKxR2alytBAARtrZg
+      values:
+        filament_max_volumetric_speed: 28
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: w14IPe7gQ6aj6ZBdCTvz3A
+    values:
+      filament_max_volumetric_speed: 22
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: fDkpDxj6S9ikZowgZ2Fc0g
+      values:
+        filament_max_volumetric_speed: 35

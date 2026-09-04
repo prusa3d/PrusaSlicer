@@ -1,45 +1,52 @@
 #version 140
 
-#define INTENSITY_CORRECTION 0.6
+#define MAX_LIGHTS 4
 
-// normalized values for (-0.6/1.31, 0.6/1.31, 1./1.31)
-const vec3 LIGHT_TOP_DIR = vec3(-0.4574957, 0.4574957, 0.7624929);
-#define LIGHT_TOP_DIFFUSE    (0.8 * INTENSITY_CORRECTION)
-#define LIGHT_TOP_SPECULAR   (0.125 * INTENSITY_CORRECTION)
-#define LIGHT_TOP_SHININESS  20.0
+struct Light
+{
+    int system;
+    vec3 direction;
+    float ambient;
+    float diffuse;
+    float specular;
+    float shininess;
+};
 
-// normalized values for (1./1.43, 0.2/1.43, 1./1.43)
-const vec3 LIGHT_FRONT_DIR = vec3(0.6985074, 0.1397015, 0.6985074);
-#define LIGHT_FRONT_DIFFUSE  (0.3 * INTENSITY_CORRECTION)
-
-#define INTENSITY_AMBIENT    0.3
-
+uniform mat4 model_matrix;
+uniform mat4 view_matrix;
 uniform mat4 view_model_matrix;
 uniform mat4 projection_matrix;
 uniform mat3 view_normal_matrix;
+uniform int num_lights;
+uniform Light lights[MAX_LIGHTS];
 
 in vec3 v_position;
 in vec3 v_normal;
 
 // x = tainted, y = specular;
 out vec2 intensity;
+out vec3 world_position;
+
+vec3 light_direction(Light light)
+{
+    // return light direction in eye coordinates
+    return (light.system == 0) ? (view_matrix * vec4(-light.direction, 0.0)).xyz : -light.direction;
+}
 
 void main()
 {
     // First transform the normal into camera space and normalize the result.
-    vec3 normal = normalize(view_normal_matrix * v_normal);
-    
-    // Compute the cos of the angle between the normal and lights direction. The light is directional so the direction is constant for every vertex.
-    // Since these two are normalized the cosine is the dot product. We also need to clamp the result to the [0,1] range.
-    float NdotL = max(dot(normal, LIGHT_TOP_DIR), 0.0);
-
-    intensity.x = INTENSITY_AMBIENT + NdotL * LIGHT_TOP_DIFFUSE;
-    vec4 position = view_model_matrix * vec4(v_position, 1.0);
-    intensity.y = LIGHT_TOP_SPECULAR * pow(max(dot(-normalize(position.xyz), reflect(-LIGHT_TOP_DIR, normal)), 0.0), LIGHT_TOP_SHININESS);
-
-    // Perform the same lighting calculation for the 2nd light source (no specular applied).
-    NdotL = max(dot(normal, LIGHT_FRONT_DIR), 0.0);
-    intensity.x += NdotL * LIGHT_FRONT_DIFFUSE;
-
-    gl_Position = projection_matrix * position;
+    vec3 eye_normal = normalize(view_normal_matrix * v_normal);
+    vec4 eye_position = view_model_matrix * vec4(v_position, 1.0);
+    intensity = vec2(0.0);
+    vec3 v = -normalize(eye_position.xyz);
+    for (int i = 0; i < MAX_LIGHTS; ++i) {
+        if (i >= num_lights)
+            break;
+        vec3 dir = light_direction(lights[i]);
+        intensity.x += lights[i].ambient + max(dot(eye_normal, dir), 0.0) * lights[i].diffuse;
+        intensity.y += lights[i].specular * pow(max(dot(v, reflect(-dir, eye_normal)), 0.0), lights[i].shininess);    
+    }
+    world_position = (model_matrix * vec4(v_position, 1.0)).xyz;
+    gl_Position = projection_matrix * eye_position;
 }

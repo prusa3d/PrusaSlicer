@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Extrudr GreenTEC
+id: Extrudr GreenTEC
+values:
+  filament_cost: '50.91'
+  filament_vendor: Extrudr
+  filament_spool_weight: 262
+  temperature: 220

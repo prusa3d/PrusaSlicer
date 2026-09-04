@@ -1,9 +1,13 @@
+///|/ Copyright (c) Prusa Research 2022 Filip Sykala @Jony01
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_RaycastManager_hpp_
 #define slic3r_RaycastManager_hpp_
 
 #include <memory> // unique_ptr
 #include <optional>
-#include "libslic3r/AABBMesh.hpp" // Structure to cast rays
+#include "Slic3r/Biz/Algorithms/AABBMesh.hpp" // Structure to cast rays
 #include "libslic3r/Point.hpp" // Transform3d
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/Model.hpp" // ModelObjectPtrs, ModelObject, ModelInstance, ModelVolume
@@ -166,6 +170,14 @@ std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager        &
                                                    const Vec2d                 &mouse_pos,
                                                    const Camera                &camera,
                                                    const RaycastManager::ISkip *skip);
+
+/// <summary>
+/// Create condition to allowe only parts from volumes without one given
+/// </summary>
+/// <param name="volumes">List of allowed volumes included one which is dissalowed and non parts</param>
+/// <param name="disallowed_volume_id">Disallowed volume</param>
+/// <returns>Condition</returns>
+RaycastManager::AllowVolumes create_condition(const ModelVolumePtrs &volumes, const ObjectID &disallowed_volume_id);
 
 } // namespace Slic3r::GUI
 

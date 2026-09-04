@@ -1,0 +1,6 @@
+kind: tool_print
+id: common MK35
+variants:
+- condition: printer.model == "MK3.5"
+  name: no tool
+  id: KqbBvKvxRYWKHGxB4U2WYQ

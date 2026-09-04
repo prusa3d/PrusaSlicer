@@ -1,0 +1,197 @@
+id: '*default_print_MK35*'
+kind: printer
+variants:
+# 0.25
+- condition: tool.nozzle_diameter == 0.25
+  id: nLSXOjl7RW60FrWbogERvw
+  values:
+    default_print: 0.12mm SPEED
+# 0.3
+- condition: tool.nozzle_diameter == 0.3
+  id: kHTL36qUQJuho6qsoEQGww
+  values:
+    default_print: 0.15mm SPEED
+# 0.4
+- condition: tool.nozzle_diameter == 0.4
+  id: YkJXOFYmSYWEyk9d91Cavg
+  values:
+    default_print: 0.20mm BALANCED
+# 0.5
+- condition: tool.nozzle_diameter == 0.5
+  id: mRlPXk7RQEG+DQ+vypS4Kw
+  values:
+    default_print: 0.20mm SPEED
+# 0.6
+- condition: tool.nozzle_diameter == 0.6
+  id: NNN0RpaNQPqYGmcZ2TMePw
+  values:
+    default_print: 0.25mm SPEED
+# 0.8
+- condition: tool.nozzle_diameter == 0.8
+  id: y/y6zIf/S3+d5MAl9UYftg
+  values:
+    default_print: 0.40mm QUALITY
+---
+id: PGPofKx2RmaV17VXi9flMA
+kind: printer
+inherits:
+- '*default_print_MK35*'
+variants:
+- condition: printer.model == "MK3.5"
+  name: Original Prusa MK3.5 & MK3.5S
+  id: l9xLkSlFTDaUIXmHfFQ2iw
+  values:
+    bed_shape:
+    - '0x0'
+    - 250x0
+    - 250x210
+    - '0x210'
+    before_layer_gcode: |+
+      ;BEFORE_LAYER_CHANGE
+      G92 E0.0
+      ;[layer_z]
+      M201 X{interpolate_table(extruded_weight_total, (0,4000), (1400,2500), (20000,2500))} Y{interpolate_table(extruded_weight_total, (0,4000), (1400,2500), (20000,2500))}
+
+    binary_gcode: 0
+    stuck_filament_detection: 0
+    enable_pressure_advance_during_ramming: false
+    end_gcode: |-
+      {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+      M104 S0 ; turn off temperature
+      M140 S0 ; turn off heatbed
+      M107 ; turn off fan
+      G1 X241 Y201 F3600 ; park
+      {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+      G4 ; wait
+      M572 S0 ; reset PA
+      M593 X T2 F0 ; disable IS
+      M593 Y T2 F0 ; disable IS
+      M84 X Y E ; disable motors
+      ; max_layer_z = [max_layer_z]
+    extruder_offset: ['0x0']
+    color_change_gcode: M600
+    gcode_flavor: marlin2
+    high_current_on_filament_swap: 0
+    layer_gcode: ";AFTER_LAYER_CHANGE\n;[layer_z]"
+    machine_limits_usage: emit_to_gcode
+    machine_max_acceleration_e: [2500, 2500]
+    machine_max_acceleration_extruding: [4000, 2500]
+    machine_max_acceleration_retracting: [1250, 1250]
+    machine_max_acceleration_travel: [4000, 2500]
+    machine_max_acceleration_x: [4000, 2500]
+    machine_max_acceleration_y: [4000, 2500]
+    machine_max_acceleration_z: [200, 200]
+    machine_max_feedrate_e: [120, 120]
+    machine_max_feedrate_x: [300, 160]
+    machine_max_feedrate_y: [300, 160]
+    machine_max_feedrate_z: [12, 12]
+    machine_max_jerk_e: [5, 5]
+    machine_max_jerk_x: [8, 8]
+    machine_max_jerk_y: [8, 8]
+    machine_max_jerk_z: [2, 2]
+    machine_min_extruding_rate: [0, 0]
+    machine_min_travel_rate: [0, 0]
+    max_print_height: 210
+    printer_technology: FFF
+    remaining_times: 1
+    silent_mode: 1
+    single_extruder_multi_material: 0
+    filament_change_time: 0
+    thumbnails: [16x16/QOI, 313x173/QOI, 480x240/QOI, 380x285/PNG]
+    use_firmware_retraction: 0
+    use_relative_e_distances: 1
+    use_volumetric_e: 0
+    variable_layer_height: 1
+    z_offset: 0
+    cooling_tube_retraction: '40'
+    cooling_tube_length: '20'
+    parking_pos_retraction: '85'
+    extra_loading_move: '-25'
+    multimaterial_purging: '140'
+  variants:
+  - condition: feeder.base_model=~/(MMU2|MMU3)/ and ! feeder.single_mode
+    id: gkDGQai3R3GuH7PTLuzxvA
+    values:
+      filament_change_time: 27
+      start_gcode: |-
+        M17 ; enable steppers
+        M862.1 P[nozzle_diameter] A{((is_extruder_used[0] and filament_abrasive[0]) ? 1 : (is_extruder_used[1] and filament_abrasive[1]) ? 1 : (is_extruder_used[2] and filament_abrasive[2]) ? 1 : (is_extruder_used[3] and filament_abrasive[3]) ? 1 : (is_extruder_used[4] and filament_abrasive[4]) ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+        M862.3 P "MK3.5" ; printer model check
+        M862.5 P2 ; g-code level check
+        M862.6 P"Input shaper" ; FW feature check
+        M862.6 P "MMU3" ; FW feature check
+        M115 U6.4.0+11974
+        ; setup MMU
+        M708 A0x1e X12  ; Pulley current to ~200mA
+
+        M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+        G90 ; use absolute coordinates
+        M83 ; extruder relative mode
+
+        M140 S{first_layer_bed_temperature[initial_tool]} ; set bed temp
+        M104 S170 ; set extruder temp for bed leveling
+        M109 R170 ; wait for temp
+        M190 S{first_layer_bed_temperature[initial_tool]} ; wait for bed temp
+
+
+        G28 ; home all
+
+        G29 P1 ; invalidate mbl & probe print area
+        G29 P1 X23 Y5 W160 H20 C ; probe near purge place
+        G29 P3.2 ; interpolate mbl probes
+        G29 P3.13 ; extrapolate mbl outside probe area
+        G29 A ; activate mbl
+
+        ; prepare for purge
+        M104 S{first_layer_temperature[initial_tool]}
+        G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+        M109 S{first_layer_temperature[initial_tool]}
+
+        T[initial_tool]
+        G1 E{parking_pos_retraction + extra_loading_move} F1000 ; load to the nozzle
+
+        ; Extrude purge line
+
+        G92 E0 ; reset extruder position
+        G0 E7 X15 Z0.2 F500 ; purge
+        G0 X105 E36 F500 ; purge
+        G0 X115 E4 F650 ; purge
+        G0 X125 E4 F800 ; purge
+        G0 X128 Z0.05 F8000 ; wipe, move close to the bed
+        G0 X131 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+        G92 E0
+        M221 S100 ; reset flow to 100%
+      end_gcode: |-
+        {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+        G1 X241 Y201 F7200 ; park
+        {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+49, max_print_height)} F720 ; Move print head further up{endif}
+        {if has_wipe_tower}
+        G1 E-15 F3000
+        {else}
+        G1 E2 F5000
+        G1 E2 F5500
+        G1 E2 F6000
+        G1 E-15 F5800
+        G1 E-20 F5500
+        G1 E10 F3000
+        G1 E-10 F3100
+        G1 E10 F3150
+        G1 E-10 F3250
+        G1 E10 F3300
+        {endif}
+
+        M140 S0 ; turn off heatbed
+        M107 ; turn off fan
+
+        ; Unload filament
+        M702
+
+        G4 ; wait
+        M221 S100 ; reset flow
+        M572 S0 ; reset LA
+        M104 S0 ; turn off temperature
+        M84 ; disable motors
+        ; max_layer_z = [max_layer_z]
+      single_extruder_multi_material: 1

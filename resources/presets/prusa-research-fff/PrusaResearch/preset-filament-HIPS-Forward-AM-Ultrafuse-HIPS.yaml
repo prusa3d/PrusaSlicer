@@ -1,0 +1,15 @@
+kind: filament
+inherits:
+- '*HIPS*'
+name: Forward AM Ultrafuse HIPS
+id: Forward AM Ultrafuse HIPS
+values:
+  filament_vendor: Forward AM
+  filament_density: 1.02
+  bridge_fan_speed: 25
+  fan_always_on: false
+  fan_below_layer_time: 30
+  first_layer_temperature: 255
+  temperature: 250
+  retract_layer_change: false
+  wipe: false

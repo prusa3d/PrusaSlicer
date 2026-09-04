@@ -1,0 +1,14 @@
+kind: filament
+inherits:
+- '*PLAFILL*'
+name: colorFabb bronzeFill
+id: colorFabb bronzeFill
+values:
+  filament_vendor: colorFabb
+  extrusion_multiplier: 1.1
+  filament_cost: '77.28'
+  filament_density: 3.9
+  filament_spool_weight: 236
+  first_layer_temperature: 215
+  temperature: 210
+  filament_abrasive: true

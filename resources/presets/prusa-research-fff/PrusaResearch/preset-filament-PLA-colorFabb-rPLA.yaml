@@ -1,0 +1,68 @@
+kind: filament
+inherits:
+- '*PLA*'
+# XL/MK4/COREONE family 0.25/0.3/0.4/0.5/0.6
+name: colorFabb rPLA
+id: colorFabb rPLA
+values:
+  filament_cost: '25'
+  filament_vendor: colorFabb
+  filament_density: 1.24
+  filament_spool_weight: 221
+  min_fan_speed: 100
+  max_fan_speed: 100
+  first_layer_temperature: 220
+  temperature: 215
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: YLdsK6JfSKq2enqAaoYi7w
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: FEkHYKi1S5WwzkpYk4DhVA
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: 86O0Hb67Q6OeCzo0frj8qw
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: /P9Jw90cTmCtlJbHHMgjMw
+    values:
+      filament_max_volumetric_speed: 10
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: +7rKtouFQymh0x1OHa95BA
+      values:
+        filament_max_volumetric_speed: 14
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 6cHGCAw+S+W7nRmXO1RJqg
+    values:
+      filament_max_volumetric_speed: 12
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: pWDpxH99ScmKCisvpLoSCA
+      values:
+        filament_max_volumetric_speed: 15
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: bvck94cWRheKzTonstJErQ
+    values:
+      filament_max_volumetric_speed: 14
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: M2Z48yueTK+ZCLDk0g6jmQ
+      values:
+        filament_max_volumetric_speed: 17
+  # END
+  - name: '*quit*'
+# END
+    id: 0a7Tw8PVQKSM3I8VsLmHmA
+- name: '*quit*'
+  id: PLjaHzpVTm2a2CtVHPHFMA

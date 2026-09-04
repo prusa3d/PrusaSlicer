@@ -1,44 +1,51 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
+#include "Slic3r/Biz/Algorithms/Line.hpp"
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
+#include "Slic3r/Biz/Algorithms/Polyline.hpp"
 #include "libslic3r/Point.hpp"
-#include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/Polyline.hpp"
 #include "libslic3r/Line.hpp"
 #include "libslic3r/Geometry.hpp"
-#include "libslic3r/Geometry/Circle.hpp"
+#include "Slic3r/Biz/Algorithms/Geometry/Circle.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/ShortestPath.hpp"
+#include "Slic3r/Biz/Algorithms/Point.hpp"
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 
 //#include <random>
-//#include "libnest2d/tools/benchmark.h"
-#include "libslic3r/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
 
-#include "../libnest2d/printer_parts.hpp"
+#include "../data/prusaparts.hpp"
 
 #include <unordered_set>
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
+using Slic3r::Biz::Algorithms::SVG::SVG;
+
+namespace BB = Biz::Algorithms::BoundingBox;
 
 TEST_CASE("Line::parallel_to", "[Geometry]"){
     Line l{ { 100000, 0 }, { 0, 0 } };
     Line l2{ { 200000, 0 }, { 0, 0 } };
-    REQUIRE(l.parallel_to(l));
-    REQUIRE(l.parallel_to(l2));
+    REQUIRE(l.is_parallel_to(l));
+    REQUIRE(l.is_parallel_to(l2));
 
     Line l3(l2);
     l3.rotate(0.9 * EPSILON, { 0, 0 });
-    REQUIRE(l.parallel_to(l3));
+    REQUIRE(l.is_parallel_to(l3));
 
     Line l4(l2);
     l4.rotate(1.1 * EPSILON, { 0, 0 });
-    REQUIRE(! l.parallel_to(l4));
+    REQUIRE(!l.is_parallel_to(l4));
 
     // The angle epsilon is so low that vectors shorter than 100um rotated by epsilon radians are not rotated at all.
     Line l5{ { 20000, 0 }, { 0, 0 } };
     l5.rotate(1.1 * EPSILON, { 0, 0 });
-    REQUIRE(l.parallel_to(l5));
+    REQUIRE(l.is_parallel_to(l5));
 
     l.rotate(1., { 0, 0 });
     Point offset{ 342876, 97636249 };
@@ -47,28 +54,28 @@ TEST_CASE("Line::parallel_to", "[Geometry]"){
     l3.translate(offset);
     l4.rotate(1., { 0, 0 });
     l4.translate(offset);
-    REQUIRE(l.parallel_to(l3));
-    REQUIRE(!l.parallel_to(l4));
+    REQUIRE(l.is_parallel_to(l3));
+    REQUIRE(!l.is_parallel_to(l4));
 }
 
 TEST_CASE("Line::perpendicular_to", "[Geometry]") {
     Line l{ { 100000, 0 }, { 0, 0 } };
     Line l2{ { 0, 200000 }, { 0, 0 } };
-    REQUIRE(! l.perpendicular_to(l));
-    REQUIRE(l.perpendicular_to(l2));
+    REQUIRE(!l.is_perpendicular_to(l));
+    REQUIRE(l.is_perpendicular_to(l2));
 
     Line l3(l2);
     l3.rotate(0.9 * EPSILON, { 0, 0 });
-    REQUIRE(l.perpendicular_to(l3));
+    REQUIRE(l.is_perpendicular_to(l3));
 
     Line l4(l2);
     l4.rotate(1.1 * EPSILON, { 0, 0 });
-    REQUIRE(! l.perpendicular_to(l4));
+    REQUIRE(!l.is_perpendicular_to(l4));
 
     // The angle epsilon is so low that vectors shorter than 100um rotated by epsilon radians are not rotated at all.
     Line l5{ { 0, 20000 }, { 0, 0 } };
     l5.rotate(1.1 * EPSILON, { 0, 0 });
-    REQUIRE(l.perpendicular_to(l5));
+    REQUIRE(l.is_perpendicular_to(l5));
 
     l.rotate(1., { 0, 0 });
     Point offset{ 342876, 97636249 };
@@ -77,26 +84,26 @@ TEST_CASE("Line::perpendicular_to", "[Geometry]") {
     l3.translate(offset);
     l4.rotate(1., { 0, 0 });
     l4.translate(offset);
-    REQUIRE(l.perpendicular_to(l3));
-    REQUIRE(! l.perpendicular_to(l4));
+    REQUIRE(l.is_perpendicular_to(l3));
+    REQUIRE(!l.is_perpendicular_to(l4));
 }
 
 TEST_CASE("Polygon::contains works properly", "[Geometry]"){
    // this test was failing on Windows (GH #1950)
     Slic3r::Polygon polygon(Points({
-        Point(207802834,-57084522),
-        Point(196528149,-37556190),
-        Point(173626821,-25420928),
-        Point(171285751,-21366123),
-        Point(118673592,-21366123),
-        Point(116332562,-25420928),
-        Point(93431208,-37556191),
-        Point(82156517,-57084523),
-        Point(129714478,-84542120),
-        Point(160244873,-84542120)
+        {207802834,-57084522},
+        {196528149,-37556190},
+        {173626821,-25420928},
+        {171285751,-21366123},
+        {118673592,-21366123},
+        {116332562,-25420928},
+        {93431208,-37556191},
+        {82156517,-57084523},
+        {129714478,-84542120},
+        {160244873,-84542120}
     }));
     Point point(95706562, -57294774);
-    REQUIRE(polygon.contains(point));
+    REQUIRE(Algorithms::Polygon::contains(polygon, point));
 }
 
 SCENARIO("Intersections of line segments", "[Geometry]"){
@@ -105,40 +112,46 @@ SCENARIO("Intersections of line segments", "[Geometry]"){
         Line line2(Point(10,20), Point(10,10));
         THEN("The intersection is valid"){
             Point point;
-            line1.intersection(line2,&point);
+            Algorithms::Line::intersection(line1, line2, point);
             REQUIRE(Point(10,15) == point);
         }
     }
-
+    using Slic3r::Biz::Algorithms::Point::round;
     GIVEN("Scaled coordinates"){
-        Line line1(Point(73.6310778185108 / 0.00001, 371.74239268924 / 0.00001), Point(73.6310778185108 / 0.00001, 501.74239268924 / 0.00001));
-        Line line2(Point(75/0.00001, 437.9853/0.00001), Point(62.7484/0.00001, 440.4223/0.00001));
+        Line line1(
+            Point(round(Vec2d{73.6310778185108 / 0.00001, 371.74239268924 / 0.00001}).cast<coord_t>()),
+            Point(round(Vec2d{73.6310778185108 / 0.00001, 501.74239268924 / 0.00001}).cast<coord_t>())
+        );
+        Line line2(
+            Point(round(Vec2d{75 / 0.00001, 437.9853 / 0.00001}).cast<coord_t>()),
+            Point(round(Vec2d{62.7484 / 0.00001, 440.4223 / 0.00001}).cast<coord_t>())
+        );
         THEN("There is still an intersection"){
             Point point;
-            REQUIRE(line1.intersection(line2,&point));
+            REQUIRE(Algorithms::Line::intersection(line1, line2, point));
         }
     }
 }
 
-SCENARIO("polygon_is_convex works") {
+SCENARIO("Algorithms::Polygon::is_convex works") {
     GIVEN("A square of dimension 10") {
         WHEN("Polygon is convex clockwise") {
-            Polygon cw_square  { { {0, 0}, {0,10}, {10,10}, {10,0} } };
+            Polygon cw_square  { { Point{0, 0}, Point{0,10}, Point{10,10}, Point{10,0} } };
             THEN("it is not convex") {
-                REQUIRE(! polygon_is_convex(cw_square));
+                REQUIRE(!Algorithms::Polygon::is_convex(cw_square));
             }
         }
         WHEN("Polygon is convex counter-clockwise") {
-            Polygon ccw_square { { {0, 0}, {10,0}, {10,10}, {0,10} } };
+            Polygon ccw_square { { Point{0, 0}, Point{10,0}, Point{10,10}, Point{0,10} } };
             THEN("it is convex") {
-                REQUIRE(polygon_is_convex(ccw_square));
+                REQUIRE(Algorithms::Polygon::is_convex(ccw_square));
             }
         } 
     }
     GIVEN("A concave polygon") {
-        Polygon concave = { {0,0}, {10,0}, {10,10}, {0,10}, {0,6}, {4,6}, {4,4}, {0,4} };
+        Polygon concave = { Point{0,0}, Point{10,0}, Point{10,10}, Point{0,10}, Point{0,6}, Point{4,6}, Point{4,4}, Point{0,4} };
         THEN("It is not convex") {
-            REQUIRE(! polygon_is_convex(concave));
+            REQUIRE(!Algorithms::Polygon::is_convex(concave));
         }
     }
 }
@@ -146,15 +159,15 @@ SCENARIO("polygon_is_convex works") {
 TEST_CASE("Creating a polyline generates the obvious lines", "[Geometry]"){
     Slic3r::Polyline polyline;
     polyline.points = Points({Point(0, 0), Point(10, 0), Point(20, 0)});
-    REQUIRE(polyline.lines().at(0).a == Point(0,0));
-    REQUIRE(polyline.lines().at(0).b == Point(10,0));
-    REQUIRE(polyline.lines().at(1).a == Point(10,0));
-    REQUIRE(polyline.lines().at(1).b == Point(20,0));
+    REQUIRE(Algorithms::Polyline::to_lines(polyline).at(0).a == Point(0,0));
+    REQUIRE(Algorithms::Polyline::to_lines(polyline).at(0).b == Point(10,0));
+    REQUIRE(Algorithms::Polyline::to_lines(polyline).at(1).a == Point(10,0));
+    REQUIRE(Algorithms::Polyline::to_lines(polyline).at(1).b == Point(20,0));
 }
 
 TEST_CASE("Splitting a Polygon generates a polyline correctly", "[Geometry]"){
     Slic3r::Polygon polygon(Points({Point(0, 0), Point(10, 0), Point(5, 5)}));
-    Slic3r::Polyline split = polygon.split_at_index(1);
+    Slic3r::Polyline split = Algorithms::Polygon::split_at_index(polygon, 1);
     REQUIRE(split.points[0]==Point(10,0));
     REQUIRE(split.points[1]==Point(5,5));
     REQUIRE(split.points[2]==Point(0,0));
@@ -164,13 +177,15 @@ TEST_CASE("Splitting a Polygon generates a polyline correctly", "[Geometry]"){
 
 SCENARIO("BoundingBox", "[Geometry]") {
     WHEN("Bounding boxes are scaled") {
-        BoundingBox bb(Points({Point(0, 1), Point(10, 2), Point(20, 2)}));
-        bb.scale(2);
+        BoundingBox bb(BB::construct(Points({Point(0, 1), Point(10, 2), Point(20, 2)})));
+        const double factor{2};
+        bb.min *= factor;
+        bb.max *= factor;
         REQUIRE(bb.min == Point(0,2));
         REQUIRE(bb.max == Point(40,4));
     }
     WHEN("BoundingBox constructed from points") {
-        BoundingBox bb(Points{ {100,200}, {100, 200}, {500, -600} });
+        BoundingBox bb(BB::construct(Points{ {100,200}, {100, 200}, {500, -600} }));
         THEN("minimum is correct") {
             REQUIRE(bb.min == Point{100,-600});
         }
@@ -180,7 +195,7 @@ SCENARIO("BoundingBox", "[Geometry]") {
     }
     WHEN("BoundingBox constructed from a single point") {
         BoundingBox bb;
-        bb.merge({10, 10});
+        bb = BB::merge(bb, {10, 10});
         THEN("minimum equals to the only defined point") {
             REQUIRE(bb.min == Point{10,10});
         }
@@ -196,6 +211,41 @@ TEST_CASE("Offseting a line generates a polygon correctly", "[Geometry]"){
     REQUIRE(area.area() == Slic3r::Polygon(Points({Point(10,5),Point(20,5),Point(20,15),Point(10,15)})).area());
 }
 
+SCENARIO("Circle Fit, 3 points", "[Geometry]") {
+    WHEN("Three points make a circle") {
+        double s1 = scaled<double>(1.);
+        THEN("circle_center(): A center point { 0, 0 } is returned") {
+            Vec2d center = Biz::Algorithms::Geometry::circle_center(Vec2d{ s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ -s1, 0. }, SCALED_EPSILON);
+            REQUIRE(is_approx(center, Vec2d(0, 0)));
+        }
+        THEN("circle_center(): A center point { 0, 0 } is returned for points in reverse") {
+            Vec2d center = Biz::Algorithms::Geometry::circle_center(Vec2d{ -s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ s1, 0. }, SCALED_EPSILON);
+            REQUIRE(is_approx(center, Vec2d(0, 0)));
+        }
+        THEN("try_circle_center(): A center point { 0, 0 } is returned") {
+            std::optional<Vec2d> center = Biz::Algorithms::Geometry::try_circle_center(Vec2d{ s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ -s1, 0. }, SCALED_EPSILON);
+            REQUIRE(center);
+            REQUIRE(is_approx(*center, Vec2d(0, 0)));
+        }
+        THEN("try_circle_center(): A center point { 0, 0 } is returned for points in reverse") {
+            std::optional<Vec2d> center = Biz::Algorithms::Geometry::try_circle_center(Vec2d{ -s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ s1, 0. }, SCALED_EPSILON);
+            REQUIRE(center);
+            REQUIRE(is_approx(*center, Vec2d(0, 0)));
+        }
+    }
+    WHEN("Three points are collinear") {
+        double s1 = scaled<double>(1.);
+        THEN("circle_center(): A center point { 2, 0 } is returned") {
+            Vec2d center = Biz::Algorithms::Geometry::circle_center(Vec2d{ s1, 0. }, Vec2d{ 2. * s1, 0. }, Vec2d{ 3. * s1, 0. }, SCALED_EPSILON);
+            REQUIRE(is_approx(center, Vec2d(2. * s1, 0)));
+        }
+        THEN("try_circle_center(): Fails for collinear points") {
+            std::optional<Vec2d> center = Biz::Algorithms::Geometry::try_circle_center(Vec2d{ s1, 0. }, Vec2d{ 2. * s1, 0. }, Vec2d{ 3. * s1, 0. }, SCALED_EPSILON);
+            REQUIRE(! center);
+        }
+    }
+}
+
 SCENARIO("Circle Fit, TaubinFit with Newton's method", "[Geometry]") {
     GIVEN("A vector of Vec2ds arranged in a half-circle with approximately the same distance R from some point") {
         Vec2d expected_center(-6, 0);
@@ -204,21 +254,21 @@ SCENARIO("Circle Fit, TaubinFit with Newton's method", "[Geometry]") {
 
         WHEN("Circle fit is called on the entire array") {
             Vec2d result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample);
             THEN("A center point of -6,0 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
         }
         WHEN("Circle fit is called on the first four points") {
             Vec2d result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample.cbegin(), sample.cbegin()+4);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample.cbegin(), sample.cbegin()+4);
             THEN("A center point of -6,0 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
         }
         WHEN("Circle fit is called on the middle four points") {
             Vec2d result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample.cbegin()+2, sample.cbegin()+6);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample.cbegin()+2, sample.cbegin()+6);
             THEN("A center point of -6,0 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
@@ -235,55 +285,103 @@ SCENARIO("Circle Fit, TaubinFit with Newton's method", "[Geometry]") {
 
         WHEN("Circle fit is called on the entire array") {
             Vec2d result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample);
             THEN("A center point of 3,9 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
         }
         WHEN("Circle fit is called on the first four points") {
             Vec2d result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample.cbegin(), sample.cbegin()+4);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample.cbegin(), sample.cbegin()+4);
             THEN("A center point of 3,9 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
         }
         WHEN("Circle fit is called on the middle four points") {
             Vec2d result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample.cbegin()+2, sample.cbegin()+6);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample.cbegin()+2, sample.cbegin()+6);
             THEN("A center point of 3,9 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
         }
     }
     GIVEN("A vector of Points arranged in a half-circle with approximately the same distance R from some point") {
-        Point expected_center { Point::new_scale(-3, 9)};
-        Points sample {Point::new_scale(6.0, 0), Point::new_scale(5.1961524, 3), Point::new_scale(3 ,5.1961524), 
-                        Point::new_scale(0, 6.0), 
-                        Point::new_scale(3, 5.1961524), Point::new_scale(-5.1961524, 3), Point::new_scale(-6.0, 0)};
+        Point expected_center { scaled(Vec2d{-3, 9})};
+        Points sample {scaled(Vec2d{6.0, 0}), scaled(Vec2d{5.1961524, 3}), scaled(Vec2d{3 ,5.1961524}), 
+                        scaled(Vec2d{0, 6.0}), 
+                        scaled(Vec2d{3, 5.1961524}), scaled(Vec2d{-5.1961524, 3}), scaled(Vec2d{-6.0, 0})};
 
         std::transform(sample.begin(), sample.end(), sample.begin(), [expected_center] (const Point& a) { return a + expected_center;});
 
 
         WHEN("Circle fit is called on the entire array") {
             Point result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample);
             THEN("A center point of scaled 3,9 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
         }
         WHEN("Circle fit is called on the first four points") {
             Point result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample.cbegin(), sample.cbegin()+4);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample.cbegin(), sample.cbegin()+4);
             THEN("A center point of scaled 3,9 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
         }
         WHEN("Circle fit is called on the middle four points") {
             Point result_center(0,0);
-            result_center = Geometry::circle_center_taubin_newton(sample.cbegin()+2, sample.cbegin()+6);
+            result_center = Biz::Algorithms::Geometry::circle_center_taubin_newton(sample.cbegin()+2, sample.cbegin()+6);
             THEN("A center point of scaled 3,9 is returned.") {
                 REQUIRE(is_approx(result_center, expected_center));
             }
+        }
+    }
+}
+
+SCENARIO("Circle Fit, least squares by decomposition or by solving normal equation", "[Geometry]") {
+    auto test_circle_fit = [&](const Biz::Algorithms::Geometry::Circled &circle, const Vec2d &center, const double radius) {
+        THEN("A center point matches.") {
+            REQUIRE(is_approx(circle.center, center));
+        }
+        THEN("Radius matches") {
+            REQUIRE(is_approx(circle.radius, radius));
+        }
+    };
+
+    GIVEN("A vector of Vec2ds arranged in a half-circle with approximately the same distance R from some point") {
+        const Vec2d  expected_center(-6., 0.);
+        const double expected_radius = 6.;
+        Vec2ds sample{Vec2d(6.0, 0), Vec2d(5.1961524, 3), Vec2d(3 ,5.1961524), Vec2d(0, 6.0), Vec2d(3, 5.1961524), Vec2d(-5.1961524, 3), Vec2d(-6.0, 0)};
+        std::transform(sample.begin(), sample.end(), sample.begin(), [expected_center] (const Vec2d &a) { return a + expected_center; });
+
+        WHEN("Circle fit is called on the entire array, least squares SVD") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_svd(sample), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the first four points, least squares SVD") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_svd(Vec2ds(sample.cbegin(), sample.cbegin() + 4)), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the middle four points, least squares SVD") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_svd(Vec2ds(sample.cbegin() + 2, sample.cbegin() + 6)), expected_center, expected_radius);
+        }
+
+        WHEN("Circle fit is called on the entire array, least squares QR decomposition") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_qr(sample), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the first four points, least squares QR decomposition") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_qr(Vec2ds(sample.cbegin(), sample.cbegin() + 4)), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the middle four points, least squares QR decomposition") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_qr(Vec2ds(sample.cbegin() + 2, sample.cbegin() + 6)), expected_center, expected_radius);
+        }
+
+        WHEN("Circle fit is called on the entire array, least squares by normal equations") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_normal(sample), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the first four points, least squares by normal equations") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_normal(Vec2ds(sample.cbegin(), sample.cbegin() + 4)), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the middle four points, least squares by normal equations") {
+            test_circle_fit(Biz::Algorithms::Geometry::circle_linear_least_squares_normal(Vec2ds(sample.cbegin() + 2, sample.cbegin() + 6)), expected_center, expected_radius);
         }
     }
 }
@@ -295,7 +393,7 @@ TEST_CASE("smallest_enclosing_circle_welzl", "[Geometry]") {
         { 65874456, 2987546 }, { 98234524, 657654873 }, { 786243598, 287934765 }, { 824356, 734265 }, { 82576449, 7864534 }, { 7826345, 3984765 }
     };
 
-    const auto c = Slic3r::Geometry::smallest_enclosing_circle_welzl(pts);
+    const auto c = Biz::Algorithms::Geometry::smallest_enclosing_circle_welzl(pts);
     // The radius returned is inflated by SCALED_EPSILON, thus all points should be inside.
     bool all_inside = std::all_of(pts.begin(), pts.end(), [c](const Point &pt){ return c.contains(pt.cast<double>()); });
     auto c2(c);
@@ -310,6 +408,7 @@ SCENARIO("Path chaining", "[Geometry]") {
 	GIVEN("A path") {
 		Points points = { Point(26,26),Point(52,26),Point(0,26),Point(26,52),Point(26,0),Point(0,52),Point(52,52),Point(52,0) };
 		THEN("Chained with no diagonals (thus 26 units long)") {
+            // if chain_points() works correctly, these points should be joined with no diagonal paths
 			std::vector<Points::size_type> indices = chain_points(points);
 			for (Points::size_type i = 0; i + 1 < indices.size(); ++ i) {
 				double dist = (points.at(indices.at(i)).cast<double>() - points.at(indices.at(i+1)).cast<double>()).norm();
@@ -381,14 +480,14 @@ SCENARIO("Line distances", "[Geometry]"){
     GIVEN("A line"){
         Line line(Point(0, 0), Point(20, 0));
         THEN("Points on the line segment have 0 distance"){
-            REQUIRE(line.distance_to(Point(0, 0))  == 0);
-            REQUIRE(line.distance_to(Point(20, 0)) == 0);
-            REQUIRE(line.distance_to(Point(10, 0)) == 0);
+            REQUIRE(Algorithms::Line::distance_to(line, Point(0, 0))  == 0);
+            REQUIRE(Algorithms::Line::distance_to(line, Point(20, 0)) == 0);
+            REQUIRE(Algorithms::Line::distance_to(line, Point(10, 0)) == 0);
         
         }
         THEN("Points off the line have the appropriate distance"){
-            REQUIRE(line.distance_to(Point(10, 10)) == 10);
-            REQUIRE(line.distance_to(Point(50, 0)) == 30);
+            REQUIRE(Algorithms::Line::distance_to(line, Point(10, 10)) == 10);
+            REQUIRE(Algorithms::Line::distance_to(line, Point(50, 0)) == 30);
         }
     }
 }
@@ -428,98 +527,11 @@ SCENARIO("Calculating angles", "[Geometry]")
     }
 }
 
-SCENARIO("Polygon convex/concave detection", "[Geometry]"){
-    static constexpr const double angle_threshold = M_PI / 3.;
-    GIVEN(("A Square with dimension 100")){
-        auto square = Slic3r::Polygon /*new_scale*/(Points({
-            Point(100,100),
-            Point(200,100),
-            Point(200,200),
-            Point(100,200)}));
-        THEN("It has 4 convex points counterclockwise"){
-            REQUIRE(square.concave_points(angle_threshold).size() == 0);
-            REQUIRE(square.convex_points(angle_threshold).size() == 4);
-        }
-        THEN("It has 4 concave points clockwise"){
-            square.make_clockwise();
-            REQUIRE(square.concave_points(angle_threshold).size() == 4);
-            REQUIRE(square.convex_points(angle_threshold).size() == 0);
-        }
-    }
-    GIVEN("A Square with an extra colinearvertex"){
-        auto square = Slic3r::Polygon /*new_scale*/(Points({
-            Point(150,100),
-            Point(200,100),
-            Point(200,200),
-            Point(100,200),
-            Point(100,100)}));
-        THEN("It has 4 convex points counterclockwise"){
-            REQUIRE(square.concave_points(angle_threshold).size() == 0);
-            REQUIRE(square.convex_points(angle_threshold).size() == 4);
-        }
-    }
-    GIVEN("A Square with an extra collinear vertex in different order"){
-        auto square = Slic3r::Polygon /*new_scale*/(Points({
-            Point(200,200),
-            Point(100,200),
-            Point(100,100),
-            Point(150,100),
-            Point(200,100)}));
-        THEN("It has 4 convex points counterclockwise"){
-            REQUIRE(square.concave_points(angle_threshold).size() == 0);
-            REQUIRE(square.convex_points(angle_threshold).size() == 4);
-        }
-    }
-
-    GIVEN("A triangle"){
-        auto triangle = Slic3r::Polygon(Points({
-            Point(16000170,26257364),
-            Point(714223,461012),
-            Point(31286371,461008)
-        }));
-        THEN("it has three convex vertices"){
-            REQUIRE(triangle.concave_points(angle_threshold).size() == 0);
-            REQUIRE(triangle.convex_points(angle_threshold).size() == 3);
-        }
-    }
-
-    GIVEN("A triangle with an extra collinear point"){
-        auto triangle = Slic3r::Polygon(Points({
-            Point(16000170,26257364),
-            Point(714223,461012),
-            Point(20000000,461012),
-            Point(31286371,461012)
-        }));
-        THEN("it has three convex vertices"){
-            REQUIRE(triangle.concave_points(angle_threshold).size() == 0);
-            REQUIRE(triangle.convex_points(angle_threshold).size() == 3);
-        }
-    }
-    GIVEN("A polygon with concave vertices with angles of specifically 4/3pi"){
-        // Two concave vertices of this polygon have angle = PI*4/3, so this test fails
-        // if epsilon is not used.
-        auto polygon = Slic3r::Polygon(Points({
-            Point(60246458,14802768),Point(64477191,12360001),
-            Point(63727343,11060995),Point(64086449,10853608),
-            Point(66393722,14850069),Point(66034704,15057334),
-            Point(65284646,13758387),Point(61053864,16200839),
-            Point(69200258,30310849),Point(62172547,42483120),
-            Point(61137680,41850279),Point(67799985,30310848),
-            Point(51399866,1905506),Point(38092663,1905506),
-            Point(38092663,692699),Point(52100125,692699)
-        }));
-        THEN("the correct number of points are detected"){
-            REQUIRE(polygon.concave_points(angle_threshold).size() == 6);
-            REQUIRE(polygon.convex_points(angle_threshold).size() == 10);
-        }
-    }
-}
-
 TEST_CASE("Triangle Simplification does not result in less than 3 points", "[Geometry]"){
-    auto triangle = Slic3r::Polygon(Points({
+    auto triangle = Polygon(Points({
         Point(16000170,26257364), Point(714223,461012), Point(31286371,461008)
     }));
-    REQUIRE(triangle.simplify(250000).at(0).points.size() == 3);
+    REQUIRE(Algorithms::Polygon::simplify(triangle, 250000).at(0).points.size() == 3);
 }
 
 SCENARIO("Ported from xs/t/14_geometry.t", "[Geometry]"){
@@ -607,6 +619,26 @@ TEST_CASE("Convex polygon intersection on two overlapping squares", "[Geometry][
     REQUIRE(is_inters == true);
 }
 
+TEST_CASE("Convex polygons intersection with two almost identical rectangles", "[Geometry][Rotcalip]") {  
+    Polygon A{ {786, 434}, {916, 357}, {1020, 418}, {1009, 547}, {892, 635}, {797, 563} };
+    Polygon B1{ {572, 187}, {1020, 187}, {1020, 237}, {572, 237} };
+    Polygon B2{ {572, 187}, {1021, 187}, {1021, 237}, {572, 237} };
+
+    bool is_inters_a_b1 = Geometry::convex_polygons_intersect(A, B1);
+    REQUIRE(is_inters_a_b1 == false);
+
+    /* The following test was returning a false positive (is_inters_a_b2 == true)              */
+    /* when commenting out the two lines:                                                      */
+    /*                                                                                         */
+    /*     if (!bbA.overlap(bbB))                                                              */
+    /*         return false;                                                                   */
+    /*                                                                                         */
+    /* in function:                                                                            */
+    /*     bool convex_polygons_intersect(const Polygon& A, const Polygon& B) [ConvexHull.cpp] */
+    bool is_inters_a_b2 = Geometry::convex_polygons_intersect(A, B2);
+    REQUIRE(is_inters_a_b2 == false);
+}
+
 //// Only for benchmarking
 //static Polygon gen_convex_poly(std::mt19937_64 &rg, size_t point_cnt)
 //{
@@ -683,15 +715,15 @@ struct Pair
 template<> struct std::hash<Pair> {
     size_t operator()(const Pair &c) const
     {
-        return c.first * PRINTER_PART_POLYGONS.size() + c.second;
+        return c.first * PRUSA_PART_POLYGONS.size() + c.second;
     }
 };
 
 TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcalip]") {
 
     // Overlap of the same polygon should always be an intersection
-    for (size_t i = 0; i < PRINTER_PART_POLYGONS.size(); ++i) {
-        Polygon P = PRINTER_PART_POLYGONS[i];
+    for (size_t i = 0; i < PRUSA_PART_POLYGONS.size(); ++i) {
+        Polygon P = PRUSA_PART_POLYGONS[i];
         P = Geometry::convex_hull(P.points);
         bool res = Geometry::convex_polygons_intersect(P, P);
         if (!res) {
@@ -703,8 +735,8 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
     }
 
     std::unordered_set<Pair> combos;
-    for (size_t i = 0; i < PRINTER_PART_POLYGONS.size(); ++i) {
-        for (size_t j = 0; j < PRINTER_PART_POLYGONS.size(); ++j) {
+    for (size_t i = 0; i < PRUSA_PART_POLYGONS.size(); ++i) {
+        for (size_t j = 0; j < PRUSA_PART_POLYGONS.size(); ++j) {
             if (i != j) {
                 size_t a = std::min(i, j), b = std::max(i, j);
                 combos.insert(Pair{a, b});
@@ -714,17 +746,17 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
 
     // All disjoint
     for (const auto &combo : combos) {
-        Polygon A = PRINTER_PART_POLYGONS[combo.first], B = PRINTER_PART_POLYGONS[combo.second];
+        Polygon A = PRUSA_PART_POLYGONS[combo.first], B = PRUSA_PART_POLYGONS[combo.second];
         A = Geometry::convex_hull(A.points);
         B = Geometry::convex_hull(B.points);
 
-        auto bba = A.bounding_box();
-        auto bbb = B.bounding_box();
+        auto bba = Algorithms::Polygon::get_bounding_box(A);
+        auto bbb = Algorithms::Polygon::get_bounding_box(B);
 
-        A.translate(-bba.center());
-        B.translate(-bbb.center());
+        A.translate(-BB::center(bba));
+        B.translate(-BB::center(bbb));
 
-        B.translate(bba.size() + bbb.size());
+        B.translate(BB::sizes(bba) + BB::sizes(bbb));
 
         bool res = Geometry::convex_polygons_intersect(A, B);
         bool ref = !intersection(A, B).empty();
@@ -741,15 +773,15 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
 
     // All intersecting
     for (const auto &combo : combos) {
-        Polygon A = PRINTER_PART_POLYGONS[combo.first], B = PRINTER_PART_POLYGONS[combo.second];
+        Polygon A = PRUSA_PART_POLYGONS[combo.first], B = PRUSA_PART_POLYGONS[combo.second];
         A = Geometry::convex_hull(A.points);
         B = Geometry::convex_hull(B.points);
 
-        auto bba = A.bounding_box();
-        auto bbb = B.bounding_box();
+        auto bba = Algorithms::Polygon::get_bounding_box(A);
+        auto bbb = Algorithms::Polygon::get_bounding_box(B);
 
-        A.translate(-bba.center());
-        B.translate(-bbb.center());
+        A.translate(-BB::center(bba));
+        B.translate(-BB::center(bbb));
 
         bool res = Geometry::convex_polygons_intersect(A, B);
         bool ref = !intersection(A, B).empty();

@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*PLASILK*'
+name: Numakers PLA Silk
+id: Numakers PLA Silk
+values:
+  filament_vendor: Numakers
+  extrusion_multiplier: 1.03
+  first_layer_temperature: 230
+  temperature: 225
+  filament_cost: 20
+  filament_spool_weight: 0

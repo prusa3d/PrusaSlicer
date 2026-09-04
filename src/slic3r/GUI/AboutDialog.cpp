@@ -1,3 +1,13 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, Lukáš Hejl @hejllukas, David Kocík @kocikdav, Vojtěch Král @vojtechkral
+///|/
+///|/ ported from lib/Slic3r/GUI/AboutDialog.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Pavel Karoukin @hippich
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "AboutDialog.hpp"
 #include "I18N.hpp"
 
@@ -8,7 +18,7 @@
 #include "MainFrame.hpp"
 #include "format.hpp"
 
-#include <wx/clipbrd.h>
+#include <wx/clipbrd.h> // IWYU pragma: keep
 
 namespace Slic3r { 
 namespace GUI {
@@ -60,7 +70,7 @@ CopyrightsDialog::CopyrightsDialog()
     m_html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, 
                               wxSize(40 * em_unit(), 20 * em_unit()), wxHW_SCROLLBAR_AUTO);
 
-    wxFont font = get_default_font(this);
+    wxFont font = this->GetFont();// get_default_font(this);
     const int fs = font.GetPointSize();
     const int fs2 = static_cast<int>(1.2f*fs);
     int size[] = { fs, fs, fs, fs, fs2, fs2, fs2 };
@@ -73,6 +83,7 @@ CopyrightsDialog::CopyrightsDialog()
     m_html->Bind(wxEVT_HTML_LINK_CLICKED, &CopyrightsDialog::onLinkClicked, this);
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxCLOSE);
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
     wxGetApp().UpdateDlgDarkUI(this, true);
     this->SetEscapeId(wxID_CLOSE);
     this->Bind(wxEVT_BUTTON, &CopyrightsDialog::onCloseDialog, this, wxID_CLOSE);
@@ -234,7 +245,7 @@ AboutDialog::AboutDialog()
         wxStaticText* title = new wxStaticText(this, wxID_ANY, wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME, wxDefaultPosition, wxDefaultSize);
         wxFont title_font = GUI::wxGetApp().bold_font();
         title_font.SetFamily(wxFONTFAMILY_ROMAN);
-        title_font.SetPointSize(24);
+        title_font.SetPointSize(int(2.5 * title_font.GetPointSize()));//title_font.SetPointSize(24);
         title->SetFont(title_font);
         vsizer->Add(title, 0, wxALIGN_LEFT | wxTOP, 10);
     }
@@ -257,7 +268,7 @@ AboutDialog::AboutDialog()
     m_html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO/*NEVER*/);
     {
         m_html->SetMinSize(wxSize(-1, 16 * wxGetApp().em_unit()));
-        wxFont font = get_default_font(this);
+        wxFont font = wxGetApp().normal_font();// get_default_font(this);
         const auto text_clr = wxGetApp().get_label_clr_default();
         const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
         const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
@@ -276,7 +287,7 @@ AboutDialog::AboutDialog()
             "<html>"
             "<body bgcolor= %1% link= %2%>"
             "<font color=%3%>"
-            "%4% &copy; 2016-2023 Prusa Research. <br />"
+            "%4% &copy; 2016-2025 Prusa Research. <br />"
             "%5% &copy; 2011-2018 Alessandro Ranellucci. <br />"
             "<a href=\"http://slic3r.org/\">Slic3r</a> %6% "
             "<a href=\"http://www.gnu.org/licenses/agpl-3.0.html\">%7%</a>."
@@ -299,16 +310,19 @@ AboutDialog::AboutDialog()
 
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxCLOSE);
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
 
     m_copy_rights_btn_id = NewControlId();
     auto copy_rights_btn = new wxButton(this, m_copy_rights_btn_id, _L("Portions copyright")+dots);
     buttons->Insert(0, copy_rights_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     copy_rights_btn->Bind(wxEVT_BUTTON, &AboutDialog::onCopyrightBtn, this);
+    wxGetApp().SetWindowVariantForButton(copy_rights_btn);
 
     m_copy_version_btn_id = NewControlId();
     auto copy_version_btn = new wxButton(this, m_copy_version_btn_id, _L("Copy Version Info"));
     buttons->Insert(1, copy_version_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     copy_version_btn->Bind(wxEVT_BUTTON, &AboutDialog::onCopyToClipboard, this);
+    wxGetApp().SetWindowVariantForButton(copy_version_btn);
 
     wxGetApp().UpdateDlgDarkUI(this, true);
     

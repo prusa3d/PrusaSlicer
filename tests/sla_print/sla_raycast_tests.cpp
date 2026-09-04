@@ -1,43 +1,14 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <test_utils.hpp>
 
-#include <libslic3r/AABBMesh.hpp>
+#include <Slic3r/Biz/Algorithms/AABBMesh.hpp>
 #include <libslic3r/SLA/Hollowing.hpp>
 
 #include "sla_test_utils.hpp"
 
 using namespace Slic3r;
-
-// First do a simple test of the hole raycaster.
-TEST_CASE("Raycaster - find intersections of a line and cylinder")
-{
-    sla::DrainHole hole{Vec3f(0,0,0), Vec3f(0,0,1), 5, 10};
-    std::array<std::pair<float, Vec3d>, 2> out;
-    Vec3f s;
-    Vec3f dir;
-
-    // Start inside the hole and cast perpendicular to its axis.
-    s = {-1.f, 0, 5.f};
-    dir = {1.f, 0, 0};
-    hole.get_intersections(s, dir, out);
-    REQUIRE(out[0].first == Approx(-4.f));
-    REQUIRE(out[1].first == Approx(6.f));
-
-    // Start outside and cast parallel to axis.
-    s = {0, 0, -1.f};
-    dir = {0, 0, 1.f};
-    hole.get_intersections(s, dir, out);
-    REQUIRE(std::abs(out[0].first - 1.f) < 0.001f);
-    REQUIRE(std::abs(out[1].first - 11.f) < 0.001f);
-
-    // Start outside and cast so that entry is in base and exit on the cylinder
-    s = {0, -1.f, -1.f};
-    dir = {0, 1.f, 1.f};
-    dir.normalize();
-    hole.get_intersections(s, dir, out);
-    REQUIRE(std::abs(out[0].first - std::sqrt(2.f)) < 0.001f);
-    REQUIRE(std::abs(out[1].first - std::sqrt(72.f)) < 0.001f);
-}
+using namespace Catch;
 
 #ifdef SLIC3R_HOLE_RAYCASTER
 // Create a simple scene with a 20mm cube and a big hole in the front wall 

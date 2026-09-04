@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2022 Filip Sykala @Jony01
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "CreateFontNameImageJob.hpp"
 
 #include "libslic3r/Emboss.hpp"
@@ -74,7 +78,7 @@ void CreateFontImageJob::process(Ctl &ctl)
 
     // normalize height of font
     BoundingBox bounding_box;
-    for (ExPolygon &shape : shapes)
+    for (const ExPolygon &shape : shapes)
         bounding_box.merge(BoundingBox(shape.contour.points));
     if (bounding_box.size().x() < 1 || bounding_box.size().y() < 1) {
         m_input.cancel->store(true);
@@ -142,8 +146,9 @@ void CreateFontImageJob::finalize(bool canceled, std::exception_ptr &)
     glsafe(::glBindTexture(target, m_input.texture_id));
 
     GLsizei w = m_tex_size.x(), h = m_tex_size.y();
-    GLint xoffset = m_input.size.x() - m_tex_size.x(), // arrange right
-          yoffset = m_input.size.y() * m_input.index;
+    GLint xoffset = 0; // align to left
+    // GLint xoffset = m_input.size.x() - m_tex_size.x(); // align right
+    GLint yoffset = m_input.size.y() * m_input.index;
     glsafe(::glTexSubImage2D(target, m_input.level, xoffset, yoffset, w, h,
                              m_input.format, m_input.type, m_result.data()));
 

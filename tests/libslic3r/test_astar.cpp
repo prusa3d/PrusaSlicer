@@ -1,11 +1,17 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
-#include "libslic3r/BoundingBox.hpp"
+#include <algorithm>
+
 #include "libslic3r/AStar.hpp"
-#include "libslic3r/Execution/ExecutionSeq.hpp"
+#include "Slic3r/Biz/Algorithms/Execution/ExecutionSeq.hpp"
 #include "libslic3r/PointGrid.hpp"
 
 using namespace Slic3r;
+using namespace Catch;
+using Domain::Index3;
+using Domain::BoundingBox3f;
 
 TEST_CASE("Testing basic invariants of AStar", "[AStar]") {
     struct DummyTracer {
@@ -37,6 +43,10 @@ TEST_CASE("Testing basic invariants of AStar", "[AStar]") {
     }
 }
 
+Index3 operator+(const Index3& a, const Index3& b) {
+    return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
+}
+
 struct PointGridTracer3D {
     using Node = size_t;
     const PointGrid<float> &grid;
@@ -48,21 +58,21 @@ struct PointGridTracer3D {
     template<class Fn>
     void foreach_reachable(size_t from, Fn &&fn) const
     {
-        Vec3i from_crd = grid.get_coord(from);
+        Index3 from_crd = grid.get_coord(from);
         REQUIRE(grid.get_idx(from_crd) == from);
 
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 1,  0,  0}); i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 0,  1,  0}); i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 0,  0,  1}); i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 1,  1,  0}); i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 0,  1,  1}); i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 1,  1,  1}); i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{-1,  0,  0}); from_crd.x() > 0 && i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 0, -1,  0}); from_crd.y() > 0 && i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 0,  0, -1}); from_crd.z() > 0 && i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{-1, -1,  0}); from_crd.x() > 0 && from_crd.y() > 0 && i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{ 0, -1, -1}); from_crd.y() > 0 && from_crd.z() && i < grid.point_count()) fn(i);
-        if (size_t i = grid.get_idx(from_crd + Vec3i{-1, -1, -1}); from_crd.x() > 0 && from_crd.y() > 0 && from_crd.z() && i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 1,  0,  0}); i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 0,  1,  0}); i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 0,  0,  1}); i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 1,  1,  0}); i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 0,  1,  1}); i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 1,  1,  1}); i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{-1,  0,  0}); from_crd[0] > 0 && i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 0, -1,  0}); from_crd[1] > 0 && i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 0,  0, -1}); from_crd[2] > 0 && i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{-1, -1,  0}); from_crd[0] > 0 && from_crd[1] > 0 && i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{ 0, -1, -1}); from_crd[1] > 0 && from_crd[2] && i < grid.point_count()) fn(i);
+        if (size_t i = grid.get_idx(from_crd + Index3{-1, -1, -1}); from_crd[2] > 0 && from_crd[1] > 0 && from_crd[2] && i < grid.point_count()) fn(i);
 
     }
 
@@ -89,8 +99,9 @@ bool has_duplicates(const std::vector<Node> &res, Cmp cmp = {})
 }
 
 TEST_CASE("astar algorithm test over 3D point grid", "[AStar]") {
-    auto vol = BoundingBox3Base<Vec3f>{{0.f, 0.f, 0.f}, {1.f, 1.f, 1.f}};
+    auto vol = BoundingBox3f{{0.f, 0.f, 0.f}, {1.f, 1.f, 1.f}};
 
+    using Slic3r::Biz::Algorithms::Execution::ex_seq;
     auto pgrid = point_grid(ex_seq, vol, {0.1f, 0.1f, 0.1f});
 
     size_t target = pgrid.point_count() - 1;
@@ -106,7 +117,8 @@ TEST_CASE("astar algorithm test over 3D point grid", "[AStar]") {
 #ifndef NDEBUG
     std::cout << "Route taken: ";
     for (auto it = out.rbegin(); it != out.rend(); ++it) {
-        std::cout << "(" << pgrid.get_coord(*it).transpose() << ") ";
+        const auto coord{pgrid.get_coord(*it)};
+        std::cout << "(" << coord[0] << "," << coord[1] << "," << coord[2] << ") ";
     }
     std::cout << std::endl;
 #endif
@@ -117,70 +129,70 @@ TEST_CASE("astar algorithm test over 3D point grid", "[AStar]") {
 enum CellValue {ON, OFF};
 
 struct CellGridTracer2D_AllDirs {
-    using Node = Vec2i;
+    using Node = Vec2crd;
 
     static constexpr auto Cols = size_t(5);
     static constexpr auto Rows = size_t(8);
     static constexpr size_t GridSize = Cols * Rows;
 
     const std::array<std::array<CellValue, Cols>, Rows> &grid;
-    Vec2i goal;
+    Vec2crd goal;
 
     CellGridTracer2D_AllDirs(const std::array<std::array<CellValue, Cols>, Rows> &g,
-                     const Vec2i &goal_)
+                     const Vec2crd &goal_)
         : grid{g}, goal{goal_}
     {}
 
     template<class Fn>
-    void foreach_reachable(const Vec2i &src, Fn &&fn) const
+    void foreach_reachable(const Vec2crd &src, Fn &&fn) const
     {
-        auto is_inside = [](const Vec2i& v) { return v.x() >= 0 && v.x() < int(Cols) && v.y() >= 0 && v.y() < int(Rows); };
-        if (Vec2i crd = src + Vec2i{0, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{1, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{0, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{-1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{-1, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{1, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{-1, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        auto is_inside = [](const Vec2crd& v) { return v.x() >= 0 && v.x() < int(Cols) && v.y() >= 0 && v.y() < int(Rows); };
+        if (Vec2crd crd = src + Vec2crd{0, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{1, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{0, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{-1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{-1, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{1, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{-1, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
     }
 
-    float distance(const Vec2i & a, const Vec2i & b) const { return (a - b).squaredNorm(); }
+    float distance(const Vec2crd & a, const Vec2crd & b) const { return (a - b).squaredNorm(); }
 
-    float goal_heuristic(const Vec2i & n) const { return n == goal ? -1.f : (n - goal).squaredNorm(); }
+    float goal_heuristic(const Vec2crd & n) const { return n == goal ? -1.f : (n - goal).squaredNorm(); }
 
-    size_t unique_id(const Vec2i & n) const { return n.y() * Cols + n.x(); }
+    size_t unique_id(const Vec2crd & n) const { return n.y() * Cols + n.x(); }
 };
 
 struct CellGridTracer2D_Axis {
-    using Node = Vec2i;
+    using Node = Vec2crd;
 
     static constexpr auto Cols = size_t(5);
     static constexpr auto Rows = size_t(8);
     static constexpr size_t GridSize = Cols * Rows;
 
     const std::array<std::array<CellValue, Cols>, Rows> &grid;
-    Vec2i goal;
+    Vec2crd goal;
 
     CellGridTracer2D_Axis(
         const std::array<std::array<CellValue, Cols>, Rows> &g,
-        const Vec2i                                         &goal_)
+        const Vec2crd                                         &goal_)
         : grid{g}, goal{goal_}
     {}
 
     template<class Fn>
-    void foreach_reachable(const Vec2i &src, Fn &&fn) const
+    void foreach_reachable(const Vec2crd &src, Fn &&fn) const
     {
-        auto is_inside = [](const Vec2i& v) { return v.x() >= 0 && v.x() < int(Cols) && v.y() >= 0 && v.y() < int(Rows); };
-        if (Vec2i crd = src + Vec2i{0, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{0, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
-        if (Vec2i crd = src + Vec2i{-1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        auto is_inside = [](const Vec2crd& v) { return v.x() >= 0 && v.x() < int(Cols) && v.y() >= 0 && v.y() < int(Rows); };
+        if (Vec2crd crd = src + Vec2crd{0, 1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{0, -1}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
+        if (Vec2crd crd = src + Vec2crd{-1, 0}; is_inside(crd) && grid[crd.y()] [crd.x()] == ON) fn(crd);
     }
 
-    float distance(const Vec2i & a, const Vec2i & b) const { return (a - b).squaredNorm(); }
+    float distance(const Vec2crd & a, const Vec2crd & b) const { return (a - b).squaredNorm(); }
 
-    float goal_heuristic(const Vec2i &n) const
+    float goal_heuristic(const Vec2crd &n) const
     {
         int manhattan_dst = std::abs(n.x() - goal.x()) +
                             std::abs(n.y() - goal.y());
@@ -188,7 +200,7 @@ struct CellGridTracer2D_Axis {
         return n == goal ? -1.f : manhattan_dst;
     }
 
-    size_t unique_id(const Vec2i & n) const { return n.y() * Cols + n.x(); }
+    size_t unique_id(const Vec2crd & n) const { return n.y() * Cols + n.x(); }
 };
 
 using TestClasses = std::tuple< CellGridTracer2D_AllDirs, CellGridTracer2D_Axis >;
@@ -206,16 +218,16 @@ TEMPLATE_LIST_TEST_CASE("Astar should avoid simple barrier", "[AStar]", TestClas
         {ON , ON , ON , ON , ON}
     }};
 
-    Vec2i dst = {2, 0};
+    Vec2crd dst = {2, 0};
     TestType cgt{grid, dst};
 
-    std::vector<Vec2i> out;
+    std::vector<Vec2crd> out;
     bool found = astar::search_route(cgt, {2, 7}, std::back_inserter(out));
 
     REQUIRE(found);
     REQUIRE(!out.empty());
     REQUIRE(out.front() == dst);
-    REQUIRE(!has_duplicates(out, [](const Vec2i &a, const Vec2i &b) {
+    REQUIRE(!has_duplicates(out, [](const Vec2crd &a, const Vec2crd &b) {
         return a.x() == b.x() ? a.y() < b.y() : a.x() < b.x();
     }));
 
@@ -241,16 +253,16 @@ TEMPLATE_LIST_TEST_CASE("Astar should manage to avoid arbitrary barriers", "[ASt
         {ON , ON , ON , ON , ON}
     }};
 
-    Vec2i dst = {0, 0};
+    Vec2crd dst = {0, 0};
     TestType cgt{grid, dst};
 
-    std::vector<Vec2i> out;
+    std::vector<Vec2crd> out;
     bool found = astar::search_route(cgt, {0, 7}, std::back_inserter(out));
 
     REQUIRE(found);
     REQUIRE(!out.empty());
     REQUIRE(out.front() == dst);
-    REQUIRE(!has_duplicates(out, [](const Vec2i &a, const Vec2i &b) {
+    REQUIRE(!has_duplicates(out, [](const Vec2crd &a, const Vec2crd &b) {
         return a.x() == b.x() ? a.y() < b.y() : a.x() < b.x();
     }));
 
@@ -276,16 +288,16 @@ TEMPLATE_LIST_TEST_CASE("Astar should find the way out of a labyrinth", "[AStar]
         {OFF, OFF, OFF, OFF, ON }
     }};
 
-    Vec2i dst = {4, 0};
+    Vec2crd dst = {4, 0};
     TestType cgt{grid, dst};
 
-    std::vector<Vec2i> out;
+    std::vector<Vec2crd> out;
     bool found = astar::search_route(cgt, {4, 7}, std::back_inserter(out));
 
     REQUIRE(found);
     REQUIRE(!out.empty());
     REQUIRE(out.front() == dst);
-    REQUIRE(!has_duplicates(out, [](const Vec2i &a, const Vec2i &b) {
+    REQUIRE(!has_duplicates(out, [](const Vec2crd &a, const Vec2crd &b) {
         return a.x() == b.x() ? a.y() < b.y() : a.x() < b.x();
     }));
 

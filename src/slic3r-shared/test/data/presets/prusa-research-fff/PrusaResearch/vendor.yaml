@@ -1,0 +1,255 @@
+kind: vendor
+id: 'PrusaResearch'
+name: 'Prusa Research FFF'
+version: '1.0.0'
+features:
+  printer:
+    input_shaper:
+      default: false
+    planetary_gearbox:
+      default: true
+  tool:
+    nozzle_high_flow:
+      default: false
+    # Not used now, we take info about filament being abrasive
+    #nozzle_haredend:
+    #  default: false
+  sheet:
+    cold:
+      default: false
+
+---
+kind: printer
+technology: FFF
+id: 'xl'
+name: 'Prusa XL'
+model:
+  base_model: 'XL'
+  model: 'XL'
+tool_count: 1
+---
+kind: printer
+technology: FFF
+id: 'COREONE'
+name: 'Prusa CORE One'
+model:
+  base_model: 'COREONE'
+  model: 'COREONE'
+tool_count: 1
+features:
+  input_shaper:
+    default: true
+---
+kind: printer
+technology: FFF
+id: 'MK4'
+name: 'Prusa MK4'
+model:
+  base_model: 'MK4'
+  model: 'MK4'
+tool_count: 1
+features:
+  input_shaper:
+    default: true
+---
+kind: printer
+technology: FFF
+id: 'MK4S'
+name: 'Prusa MK4S'
+model:
+  base_model: 'MK4'
+  model: 'MK4S'
+tool_count: 1
+features:
+  input_shaper:
+    default: true
+---
+kind: tool
+technology: FFF
+id: '0.4'
+name: '0.4'
+features:
+  nozzle_diameter:
+    default: 0.4
+---
+kind: tool
+technology: FFF
+id: '0.25'
+name: '0.25'
+features:
+  nozzle_diameter:
+    default: 0.25
+---
+kind: tool
+technology: FFF
+id: '0.3'
+name: '0.3'
+features:
+  nozzle_diameter:
+    default: 0.3
+---
+kind: tool
+technology: FFF
+id: '0.5'
+name: '0.5'
+features:
+  nozzle_diameter:
+    default: 0.5
+---
+kind: tool
+technology: FFF
+id: '0.6'
+name: '0.6'
+features:
+  nozzle_diameter:
+    default: 0.6
+---
+kind: tool
+technology: FFF
+id: '0.8'
+name: '0.8'
+features:
+  nozzle_diameter:
+    default: 0.8
+---
+kind: tool
+technology: FFF
+id: '0.4HF'
+name: '0.4 HF'
+features:
+  nozzle_diameter:
+    default: 0.4
+  nozzle_high_flow:
+    default: true
+---
+kind: tool
+technology: FFF
+id: '0.5HF'
+name: '0.5 HF'
+features:
+  nozzle_diameter:
+    default: 0.5
+  nozzle_high_flow:
+    default: true
+---
+kind: tool
+technology: FFF
+id: '0.6HF'
+name: '0.6 HF'
+features:
+  nozzle_diameter:
+    default: 0.6
+  nozzle_high_flow:
+    default: true
+---
+kind: tool
+technology: FFF
+id: '0.8HF'
+name: '0.8 HF'
+features:
+  nozzle_diameter:
+    default: 0.8
+  nozzle_high_flow:
+    default: true
+---
+kind: feeder
+technology: FFF
+id: mmu
+name: MMU
+feeder_type: mmu
+model:
+  base_model: MMU
+  model: MMU3Sx
+slot_count: 4
+---
+#sheet.type == "pei_smooth"
+#sheet.type == "pei_grained"
+#sheet.type == "satin"
+#sheet.type == "pa_nylon"
+#sheet.type == "pp"
+#sheet.cold (true/false)
+kind: sheet
+id: 'pei_smooth'
+name: 'PEI Smooth'
+type: 'pei_smooth'
+---
+kind: sheet
+name: 'PEI Grained'
+id: 'pei_grained'
+type: 'pei_grained'
+---
+kind: sheet
+name: 'Satin'
+id: 'satin'
+type: 'satin'
+---
+kind: sheet
+id: 'pa_nylon'
+name: 'PA Nylon'
+type: 'pa_nylon'
+---
+kind: sheet
+name: 'PP'
+id: 'pp'
+type: 'pp'
+---
+kind: sheet
+id: 'cold'
+name: 'Cold'
+type: 'cold'
+features:
+  cold:
+    default: true
+---
+kind: printer_config
+printer: COREONE
+id: 'c1-default'
+name: 'Prusa CORE One'
+tool_count: 1
+tools:
+  - tool: '0.4HF'
+default_sheet: 'pei_smooth'
+---
+kind: printer_config
+printer: COREONE
+id: 'c1-hf0.6'
+name: 'Prusa CORE One'
+tool_count: 1
+tools:
+  - tool: '0.6HF'
+default_sheet: 'pei_smooth'
+---
+kind: printer_config
+printer: xl
+id: 'xl-1t'
+name: 'XL 1T'
+legacy_printer_model: [XLIS, XL]
+tool_count: 1
+tools:
+  - tool: '0.4'
+default_sheet: 'pei_smooth'
+---
+kind: printer_config
+printer: xl
+id: 'xl-2t'
+name: 'XL 2T'
+legacy_printer_model: [XL2IS, XL2]
+tool_count: 2
+tools:
+  - tool: '0.4'
+#feeders:
+#  - feeder: 'mmu'
+default_sheet: 'pei_smooth'
+---
+kind: printer_config
+printer: xl
+id: 'xl-5t'
+name: 'XL 5T'
+legacy_printer_model: [XL5IS, XL5]
+tool_count: 5
+tools:
+  - tool: '0.4'
+feeders:
+  - feeder: 'mmu'
+    address: [0]
+default_sheet: 'pei_smooth'

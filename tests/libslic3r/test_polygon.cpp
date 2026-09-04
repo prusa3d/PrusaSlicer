@@ -1,9 +1,13 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Polygon.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "Slic3r/Domain/ExPolygonsIndex.hpp"
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
 
 SCENARIO("Converted Perl tests", "[Polygon]") {
     GIVEN("ccw_square") {
@@ -30,71 +34,53 @@ SCENARIO("Converted Perl tests", "[Polygon]") {
             REQUIRE(cw_square.centroid() == Point { 150, 150 });
         }
         THEN("ccw_square.contains_point(150, 150)") {
-            REQUIRE(ccw_square.contains({ 150, 150 }));
+            REQUIRE(Algorithms::Polygon::contains(ccw_square, { 150, 150 }));
         }
         THEN("cw_square.contains_point(150, 150)") {
-            REQUIRE(cw_square.contains({ 150, 150 }));
+            REQUIRE(Algorithms::Polygon::contains(cw_square, { 150, 150 }));
         }
         THEN("conversion to lines") {
-            REQUIRE(ccw_square.lines() == Lines{
+            REQUIRE(Algorithms::Polygon::to_lines(ccw_square) == Lines{
                 { { 100, 100 }, { 200, 100 } },
                 { { 200, 100 }, { 200, 200 } },
                 { { 200, 200 }, { 100, 200 } },
                 { { 100, 200 }, { 100, 100 } } });
         }
         THEN("split_at_first_point") {
-            REQUIRE(ccw_square.split_at_first_point() == Polyline { ccw_square[0], ccw_square[1], ccw_square[2], ccw_square[3], ccw_square[0] });
+            REQUIRE(Algorithms::Polygon::split_at_first_point(ccw_square) == Polyline { ccw_square[0], ccw_square[1], ccw_square[2], ccw_square[3], ccw_square[0] });
         }
         THEN("split_at_index(2)") {
-            REQUIRE(ccw_square.split_at_index(2) == Polyline { ccw_square[2], ccw_square[3], ccw_square[0], ccw_square[1], ccw_square[2] });
+            REQUIRE(Algorithms::Polygon::split_at_index(ccw_square, 2) == Polyline { ccw_square[2], ccw_square[3], ccw_square[0], ccw_square[1], ccw_square[2] });
         }
         THEN("split_at_vertex(ccw_square[2])") {
-            REQUIRE(ccw_square.split_at_vertex(ccw_square[2]) == Polyline { ccw_square[2], ccw_square[3], ccw_square[0], ccw_square[1], ccw_square[2] });
+            REQUIRE(Algorithms::Polygon::split_at_vertex(ccw_square, ccw_square[2]) == Polyline { ccw_square[2], ccw_square[3], ccw_square[0], ccw_square[1], ccw_square[2] });
         }
         THEN("is_counter_clockwise") {
-            REQUIRE(ccw_square.is_counter_clockwise());
+            REQUIRE(Algorithms::Polygon::is_counter_clockwise(ccw_square));
         }
         THEN("! is_counter_clockwise") {
-            REQUIRE(! cw_square.is_counter_clockwise());
+            REQUIRE(!Algorithms::Polygon::is_counter_clockwise(cw_square));
         }
         THEN("make_counter_clockwise") {
-            cw_square.make_counter_clockwise();
-            REQUIRE(cw_square.is_counter_clockwise());
+            Algorithms::Polygon::make_counter_clockwise(cw_square);
+            REQUIRE(Algorithms::Polygon::is_counter_clockwise(cw_square));
         }
         THEN("make_counter_clockwise^2") {
-            cw_square.make_counter_clockwise();
-            cw_square.make_counter_clockwise();
-            REQUIRE(cw_square.is_counter_clockwise());
+            Algorithms::Polygon::make_counter_clockwise(cw_square);
+            Algorithms::Polygon::make_counter_clockwise(cw_square);
+            REQUIRE(Algorithms::Polygon::is_counter_clockwise(cw_square));
         }
         THEN("first_point") {
             REQUIRE(&ccw_square.first_point() == &ccw_square.points.front());
         }
     }
-    GIVEN("Triangulating hexagon") {
-        Polygon hexagon{ { 100, 0 } };
-        for (size_t i = 1; i < 6; ++ i) {
-            Point p = hexagon.points.front();
-            p.rotate(PI / 3 * i);
-            hexagon.points.emplace_back(p);
-        }
-        Polygons triangles;
-        hexagon.triangulate_convex(&triangles);
-        THEN("right number of triangles") {
-            REQUIRE(triangles.size() == 4);
-        }
-        THEN("all triangles are ccw") {
-            auto it = std::find_if(triangles.begin(), triangles.end(), [](const Polygon &tri) { return tri.is_clockwise(); });
-            REQUIRE(it == triangles.end());
-        }
-    }
     GIVEN("General triangle") {
         Polygon polygon { { 50000000, 100000000 }, { 300000000, 102000000 }, { 50000000, 104000000 } };
         Line    line { { 175992032, 102000000 }, { 47983964, 102000000 } };
-        Point   intersection;
-        bool    has_intersection = polygon.intersection(line, &intersection);
+        std::optional<Point> intersection_pt = Algorithms::Polygon::intersection(polygon, line);
         THEN("Intersection with line") {
-            REQUIRE(has_intersection);
-            REQUIRE(intersection == Point { 50000000, 102000000 });
+            REQUIRE(intersection_pt.has_value());
+            REQUIRE(intersection_pt.value() == Point { 50000000, 102000000 });
         }
     }
 }
@@ -108,27 +94,27 @@ TEST_CASE("Centroid of Trapezoid must be inside", "[Polygon][Utils]")
         { 9404268, 1049531706 },
     };
     Point centroid = trapezoid.centroid();
-    CHECK(trapezoid.contains(centroid));
+    CHECK(Algorithms::Polygon::contains(trapezoid, centroid));
 }
 
 // This test currently only covers remove_collinear_points.
 // All remaining tests are to be ported from xs/t/06_polygon.t
 
 Slic3r::Points collinear_circle({
-    Slic3r::Point::new_scale(0, 0), // 3 collinear points at beginning
-    Slic3r::Point::new_scale(10, 0),
-    Slic3r::Point::new_scale(20, 0),
-    Slic3r::Point::new_scale(30, 10),
-    Slic3r::Point::new_scale(40, 20), // 2 collinear points
-    Slic3r::Point::new_scale(40, 30),
-    Slic3r::Point::new_scale(30, 40), // 3 collinear points
-    Slic3r::Point::new_scale(20, 40),
-    Slic3r::Point::new_scale(10, 40),
-    Slic3r::Point::new_scale(-10, 20),
-    Slic3r::Point::new_scale(-20, 10),
-    Slic3r::Point::new_scale(-20, 0), // 3 collinear points at end
-    Slic3r::Point::new_scale(-10, 0),
-    Slic3r::Point::new_scale(-5, 0)
+    Slic3r::scaled(Vec2d{0, 0}), // 3 collinear points at beginning
+    Slic3r::scaled(Vec2d{10, 0}),
+    Slic3r::scaled(Vec2d{20, 0}),
+    Slic3r::scaled(Vec2d{30, 10}),
+    Slic3r::scaled(Vec2d{40, 20}), // 2 collinear points
+    Slic3r::scaled(Vec2d{40, 30}),
+    Slic3r::scaled(Vec2d{30, 40}), // 3 collinear points
+    Slic3r::scaled(Vec2d{20, 40}),
+    Slic3r::scaled(Vec2d{10, 40}),
+    Slic3r::scaled(Vec2d{-10, 20}),
+    Slic3r::scaled(Vec2d{-20, 10}),
+    Slic3r::scaled(Vec2d{-20, 0}), // 3 collinear points at end
+    Slic3r::scaled(Vec2d{-10, 0}),
+    Slic3r::scaled(Vec2d{-5, 0})
 });
 
 SCENARIO("Remove collinear points from Polygon", "[Polygon]") {
@@ -137,10 +123,10 @@ SCENARIO("Remove collinear points from Polygon", "[Polygon]") {
         WHEN("collinear points are removed") {
             remove_collinear(p);
             THEN("Leading collinear points are removed") {
-                REQUIRE(p.points.front() == Slic3r::Point::new_scale(20, 0));
+                REQUIRE(p.points.front() == Slic3r::scaled(Vec2d{20, 0}));
             }
             THEN("Trailing collinear points are removed") {
-                REQUIRE(p.points.back() == Slic3r::Point::new_scale(-20, 0));
+                REQUIRE(p.points.back() == Slic3r::scaled(Vec2d{-20, 0}));
             }
             THEN("Number of remaining points is correct") {
                 REQUIRE(p.points.size() == 7);
@@ -152,7 +138,7 @@ SCENARIO("Remove collinear points from Polygon", "[Polygon]") {
 SCENARIO("Simplify polygon", "[Polygon]")
 {
     GIVEN("gear") {
-        auto gear = Polygon::new_scale({
+        auto gear = Algorithms::Polygon::scaled({
             {144.9694,317.1543}, {145.4181,301.5633}, {146.3466,296.921}, {131.8436,294.1643}, {131.7467,294.1464},
             {121.7238,291.5082}, {117.1631,290.2776}, {107.9198,308.2068}, {100.1735,304.5101}, {104.9896,290.3672},
             {106.6511,286.2133}, {93.453,279.2327}, {81.0065,271.4171}, {67.7886,286.5055}, {60.7927,280.1127},
@@ -186,7 +172,7 @@ SCENARIO("Simplify polygon", "[Polygon]")
      
         WHEN("simplified") {
             size_t num_points = gear.size();
-            Polygons simplified = gear.simplify(1000.);
+            Domain::Polygons simplified = Algorithms::Polygon::simplify(gear, 1000.);
             THEN("gear simplified to a single polygon") {
                 REQUIRE(simplified.size() == 1);
             }
@@ -198,17 +184,18 @@ SCENARIO("Simplify polygon", "[Polygon]")
     }
 }
 
-#include "libslic3r/ExPolygon.hpp"
-#include "libslic3r/ExPolygonsIndex.hpp"
+using Slic3r::Domain::ExPolygonsIndex;
+using Slic3r::Domain::ExPolygonsIndices;
+
 TEST_CASE("Indexing expolygons", "[ExPolygon]")
 {
     ExPolygons expolys{
         ExPolygon{Polygon{{0, 0}, {10, 0}, {0, 5}}, Polygon{{4, 3}, {6, 3}, {5, 2}}},
         ExPolygon{Polygon{{100, 0}, {110, 0}, {100, 5}}, Polygon{{104, 3}, {106, 3}, {105, 2}}}    
     };
-    Points points = to_points(expolys);
-    Lines lines = to_lines(expolys);
-    Linesf linesf = to_linesf(expolys);
+    Points points = Algorithms::ExPolygon::to_points(expolys);
+    Lines lines = Algorithms::ExPolygon::to_lines(expolys);
+    Linesf linesf = Algorithms::ExPolygon::to_linesf(expolys);
     ExPolygonsIndices ids(expolys);
     REQUIRE(points.size() == lines.size());
     REQUIRE(points.size() == linesf.size());

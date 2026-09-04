@@ -1,0 +1,519 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*chamber_PET*'
+features:
+  $.type: PETG
+  $.tags: [abrasive, contains_carbon_fiber]
+  $.properties.min_nozzle_diameter: 0.4
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and tool.nozzle_diameter >= 0.4 and feeder.base_model!~/.*MMU.*/
+id: '*PETCF*'
+values:
+  extrusion_multiplier: 1.03
+  filament_cost: 54.99
+  filament_density: 1.27
+  filament_diameter: 1.75
+  first_layer_temperature: 265
+  temperature: 265
+  filament_abrasive: true
+## C1
+variants:
+- condition: printer.base_model == "COREONE"
+  id: iy9PUFFjTEyBTGbRu2uB3g
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @COREONE 0.4'
+    id: jcr3lQMlS7CYYiFpKJ3twg
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @COREONE HF0.4'
+      id: 2Osmn6j0SBK1TvkisizyQQ
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.047
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PETCF* @COREONE 0.5'
+    id: 0NxnOPJDQ1mUcqHDvkO8iA
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # C1 HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @COREONE HF0.5'
+      id: JgsADDSpTdWdozPVRC8MeQ
+      values:
+        filament_max_volumetric_speed: 14
+        pressure_advance_value: 0.042
+        filament_infill_max_crossing_speed: 120
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @COREONE 0.6'
+    id: gXSqB5PrTVuH87xb/CxN0Q
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 15
+      fan_below_layer_time: 30
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @COREONE HF0.6'
+      id: ogUooK0sT/KipmIdG5aALQ
+      values:
+        filament_max_volumetric_speed: 17
+        pressure_advance_value: 0.033
+  # C1 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @COREONE 0.8'
+    id: /bdNJodHS1O3bPg1pbC2Ww
+    values:
+      filament_max_volumetric_speed: 22
+      slowdown_below_layer_time: 20
+      fan_below_layer_time: 35
+      pressure_advance_value: 0.018
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @COREONE HF0.8'
+      id: Kqgx4CSmTXWWWqy5K6/lcQ
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.021
+## XL
+- condition: printer.model == "XL"
+  id: M9CEUABiRKuf395lq90h1g
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @XL 0.4'
+    id: MOcePSbOSEGLgtgrknQklw
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.4'
+      id: i6tiM1LmTBeY+gDWVo6k9g
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.047
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PETCF* @XL 0.5'
+    id: DNbZMWqQRDyhE0CyPv9puQ
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 14
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # XL HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.5'
+      id: ZYB9Rv5iTWakq3TC/WJimg
+      values:
+        filament_max_volumetric_speed: 14
+        pressure_advance_value: 0.042
+        filament_infill_max_crossing_speed: 120
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @XL 0.6'
+    id: v0BLVxhoS0OEjfIoIdCjiA
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.6'
+      id: mtCQDFz8SASzWCqTr4ef4A
+      values:
+        filament_max_volumetric_speed: 17
+        pressure_advance_value: 0.033
+  # XL 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @XL 0.8'
+    id: fbXsMWDbQ3einELbr9v9aw
+    values:
+      filament_max_volumetric_speed: 22
+      slowdown_below_layer_time: 18
+      pressure_advance_value: 0.018
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.8'
+      id: m8qweUGpTpWtsWKj6Xui7w
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.021
+## XL+
+- condition: printer.model == "XLP"
+  id: +sfCatxhRwitNihQJqOvzQ
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @XL 0.4'
+    id: Dw047F1bTW+X2fzVOkbVeA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 7
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # XL+ HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.4'
+      id: 2gsSZBLMSXqSt29PURAwbA
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.047
+  # XL+ 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PETCF* @XL 0.5'
+    id: w6B3WryETWut/1MEvW88qg
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 12
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # XL+ HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.5'
+      id: 2+3rf5a8QJOYLRUeLoOW5A
+      values:
+        filament_max_volumetric_speed: 14
+        pressure_advance_value: 0.042
+        filament_infill_max_crossing_speed: 120
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @XL 0.6'
+    id: S/RUJg69QU2EQ4Qd5RvzBw
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 13
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    variants:
+    # XL+ HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.6'
+      id: PHRlXYbpS1qAnZd7yPe0GA
+      values:
+        filament_max_volumetric_speed: 17
+        pressure_advance_value: 0.033
+  # XL+ 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @XL 0.8'
+    id: +6ISRfA8TIeey/1dwqLtng
+    values:
+      filament_max_volumetric_speed: 22
+      slowdown_below_layer_time: 16
+      pressure_advance_value: 0.018
+    variants:
+    # XL+ HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @XL HF0.8'
+      id: H1spJURhQ8OyyLmw5mlHeA
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.021
+## MK4
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: gt5qp5F8QIK+HmatB3w+NA
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @MK4 0.4'
+    id: WSReb9wGSsSLKx7XbQ7Pwg
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # MK4 HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4 HF0.4'
+      id: O/Bw3vbIQvqtQwpQc3E5Xw
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.047
+        first_layer_temperature: 250
+        temperature: 250
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PETCF* @MK4 0.5'
+    id: vzaOzN6YQn+Kc5p8P4LPTQ
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # MK4 HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4 HF0.5'
+      id: WFtb/BvrQzqYvSr+d9KYKA
+      values:
+        filament_max_volumetric_speed: 14
+        pressure_advance_value: 0.042
+        filament_infill_max_crossing_speed: 120
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @MK4 0.6'
+    id: jQ2GcT1TRkquFj4PfaY0MQ
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 14
+      fan_below_layer_time: 20
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4 HF0.6'
+      id: vx1+rAC6TzyBlsEgu3khPQ
+      values:
+        filament_max_volumetric_speed: 17
+        pressure_advance_value: 0.033
+  # MK4 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @MK4 0.8'
+    id: 0iQ3hDlWQT+c1pKhKsocNQ
+    values:
+      filament_max_volumetric_speed: 22
+      slowdown_below_layer_time: 18
+      fan_below_layer_time: 22
+      pressure_advance_value: 0.018
+    variants:
+    # MK4 HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4 HF0.8'
+      id: iyI4BSRITQah6e5/8PwNFA
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.021
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: 3WETUsI2RsuKX9iPI3paxQ
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @MK4S 0.4'
+    id: 8lbh/jgWSiukWYgyXROn/w
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 7
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # MK4S HF0.4
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4S HF0.4'
+      id: cmMQmRAgTNO36kah1S8FZA
+      values:
+        filament_max_volumetric_speed: 12
+        pressure_advance_value: 0.047
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PETCF* @MK4S 0.5'
+    id: srmvbO0IS/6r/lHcMIxDQg
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 8
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    variants:
+    # MK4S HF0.5
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4S HF0.5'
+      id: 6h3lRdPWRTqwXOYcVmqj0g
+      values:
+        filament_max_volumetric_speed: 14
+        pressure_advance_value: 0.042
+        filament_infill_max_crossing_speed: 120
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @MK4S 0.6'
+    id: 9c4ort7UQoC+kIpy1IoBaw
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 10
+      fan_below_layer_time: 22
+      bridge_fan_speed: 45
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    variants:
+    # MK4S HF0.6
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4S HF0.6'
+      id: nEaK+YA9QIKpV2rJth3mww
+      values:
+        filament_max_volumetric_speed: 17
+        pressure_advance_value: 0.033
+  # MK4S 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @MK4S 0.8'
+    id: N8ybSNTSRWGVMlY40Vmxsw
+    values:
+      filament_max_volumetric_speed: 22
+      slowdown_below_layer_time: 18
+      fan_below_layer_time: 25
+      max_fan_speed: 45
+      bridge_fan_speed: 45
+      pressure_advance_value: 0.018
+    variants:
+    # MK4S HF0.8
+    - condition: tool.nozzle_high_flow
+      name: '*PETCF* @MK4S HF0.8'
+      id: W0M6JHFJQ6KUApkkqGhcpw
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.021
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: TvIDXSaQS9C+qXMolkTbaA
+  variants:
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @MK3.5 0.4'
+    id: 517t3o5BRou3Q9p/yMB+GA
+    values:
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 0.052
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: '*PETCF* @MK3.5 0.5'
+    id: sszkc7QKS9asdAbeFBbXgg
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 16
+      pressure_advance_value: 0.042
+  # MK3.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @MK3.5 0.6'
+    id: xO/Kz3mvRnmCsJEbJNcHLg
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+      max_fan_speed: 60
+      pressure_advance_value: 0.025
+  # MK3.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @MK3.5 0.8'
+    id: BpWrOJjQSsKeB+AhWoRP7w
+    values:
+      filament_max_volumetric_speed: 20
+      slowdown_below_layer_time: 20
+      max_fan_speed: 60
+      pressure_advance_value: 0.018
+## MINI
+- condition: printer.base_model == "MINI"
+  id: qbHLzzeqRiGnJJE801AyWw
+  variants:
+  # MINI 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @MINI 0.4'
+    id: LS0ZKjy1SUm24+Js25BbAg
+    values:
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.36
+  # MINI 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @MINI 0.6'
+    id: a35SZKjbTGq0drfX3f+igQ
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+      pressure_advance_value: 0.22
+  # MINI 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @MINI 0.8'
+    id: GsMEuABJTseDiJDvvYIEHA
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 20
+      pressure_advance_value: 0.15
+## MK3, MK3S and MK2.5, MK2.5S
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: U5VvQuIMQUq3vpay5sy/Fg
+  variants:
+  # MK3 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @MK2.5_MK3 0.4'
+    id: OeKx/nHiQsSi7IJYxXM9pg
+    values:
+      slowdown_below_layer_time: 12
+      pressure_advance_value: 0.08
+  # MK3 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @MK2.5_MK3 0.6'
+    id: ZIjZORqURN22RA91wraU/Q
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+      pressure_advance_value: 0.04
+  # MK3 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    name: '*PETCF* @MK2.5_MK3 0.8'
+    id: wQD53dMbQ5O83a1Gr4Sbmg
+    values:
+      filament_max_volumetric_speed: 20
+      slowdown_below_layer_time: 20
+      pressure_advance_value: 0.02
+## MK2S
+- condition: printer.model == "MK2S"
+  id: clnMKG2FSqGm+G9nGtCZbA
+  variants:
+  # MK2 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @MK2 0.4'
+    id: +/atzUERSnSo4Mhvr8tQtw
+    values:
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 45
+  # MK2 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @MK2 0.6'
+    id: OqQck3PgTR2u73pt5jPJDw
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+      pressure_advance_value: 24
+## MK2S MMU1
+- condition: printer.model == "MK2SMM"
+  id: yp4D8nLORWWa/wkQUUn0YQ
+  variants:
+  # MK2 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: '*PETCF* @MK2MMU1 0.4'
+    id: U/fGMqasSfWnAV0+4SphHw
+    values:
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 200
+  # MK2 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: '*PETCF* @MK2MMU1 0.6'
+    id: vVmyq8zBSKygLpPJlMaQ5w
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 20
+      pressure_advance_value: 200

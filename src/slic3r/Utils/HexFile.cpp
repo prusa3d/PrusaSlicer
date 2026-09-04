@@ -1,7 +1,11 @@
+///|/ Copyright (c) Prusa Research 2018 - 2021 Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "HexFile.hpp"
 
 #include <sstream>
-#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/fstream.hpp> // IWYU pragma: keep
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 

@@ -1,24 +1,27 @@
-#define NOMINMAX
-
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <test_utils.hpp>
 
 #include <fstream>
 
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include <libslic3r/MarchingSquares.hpp>
 #include <libslic3r/SLA/RasterToPolygons.hpp>
 
 #include <libslic3r/SLA/AGGRaster.hpp>
 #include <libslic3r/MTUtils.hpp>
-#include <libslic3r/SVG.hpp>
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
 #include <libslic3r/ClipperUtils.hpp>
 
 #include <libslic3r/TriangleMeshSlicer.hpp>
 #include <libslic3r/TriangulateWall.hpp>
-#include <libslic3r/Tesselate.hpp>
 #include <libslic3r/SlicesToTriangleMesh.hpp>
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
+using Algorithms::SVG::SVG;
+
+namespace BB = Biz::Algorithms::BoundingBox;
 
 static double area(const sla::PixelDim &pxd)
 {
@@ -34,8 +37,8 @@ static Slic3r::sla::RasterGrayscaleAA create_raster(
     
     auto bb = BoundingBox({0, 0}, {scaled(disp_w), scaled(disp_h)});
     sla::RasterBase::Trafo trafo;
-    trafo.center_x = bb.center().x();
-    trafo.center_y = bb.center().y();
+    trafo.center_x = BB::center(bb).x();
+    trafo.center_y = BB::center(bb).y();
 
     return sla::RasterGrayscaleAA{res, pixdim, trafo, agg::gamma_threshold(.5)};
 }
@@ -84,13 +87,13 @@ static ExPolygons circle_with_hole(double r, Point center = {0, 0}) {
     return {poly};
 }
 
-static const Vec2i W4x4 = {4, 4};
-static const Vec2i W2x2 = {2, 2};
+static const std::array<int, 2> W4x4 = {4, 4};
+static const std::array<int, 2> W2x2 = {2, 2};
 
 template<class Rst>
 static void test_expolys(Rst &&             rst,
                          const ExPolygons & ref,
-                         Vec2i window,
+                         std::array<int, 2> window,
                          const std::string &name = "test")
 {
     for (const ExPolygon &expoly : ref) rst.draw(expoly);
@@ -111,17 +114,17 @@ static void test_expolys(Rst &&             rst,
     double max_abs_err = area(pxd) * scaled(1.) * scaled(1.);
     
     BoundingBox ref_bb;
-    for (auto &expoly : ref) ref_bb.merge(expoly.contour.bounding_box());
+    for (auto &expoly : ref) ref_bb = BB::merge(ref_bb, Algorithms::Polygon::get_bounding_box(expoly.contour));
     
     double max_displacement = 4. * (std::pow(pxd.h_mm, 2) + std::pow(pxd.w_mm, 2));
     max_displacement *= scaled<double>(1.) * scaled(1.);
     
     REQUIRE(extracted.size() == ref.size());
     for (size_t i = 0; i < ref.size(); ++i) {
-        REQUIRE(extracted[i].contour.is_counter_clockwise());
+        REQUIRE(Algorithms::Polygon::is_counter_clockwise(extracted[i].contour));
         REQUIRE(extracted[i].holes.size() == ref[i].holes.size());
         
-        for (auto &h : extracted[i].holes) REQUIRE(h.is_clockwise());
+        for (auto &h : extracted[i].holes) REQUIRE(Algorithms::Polygon::is_clockwise(h));
         
         double refa = ref[i].area();
         double abs_err = std::abs(extracted[i].area() - refa);
@@ -130,9 +133,9 @@ static void test_expolys(Rst &&             rst,
         REQUIRE((rel_err <= max_rel_err || abs_err <= max_abs_err));
         
         BoundingBox bb;
-        for (auto &expoly : extracted) bb.merge(expoly.contour.bounding_box());
+        for (auto &expoly : extracted) bb = BB::merge(bb, Algorithms::Polygon::get_bounding_box(expoly.contour));
         
-        Point d = bb.center() - ref_bb.center();
+        Point d = BB::center(bb) - BB::center(ref_bb);
         REQUIRE(double(d.transpose() * d) <= max_displacement);
     }
 }
@@ -312,11 +315,13 @@ TEST_CASE("Circle with hole in the middle", "[MarchingSquares]") {
 }
 
 static void recreate_object_from_rasters(const std::string &objname, float lh) {
-    TriangleMesh mesh = load_model(objname);
+    using Biz::Algorithms::BoundingBox::center;
+
+    Domain::TriangleMesh mesh = load_model(objname);
     
     auto bb = mesh.bounding_box();
-    Vec3f tr = -bb.center().cast<float>();
-    mesh.translate(tr.x(), tr.y(), tr.z());
+    Vec3f tr = -center(bb).cast<float>();
+    mesh.translate(tr);
     bb = mesh.bounding_box();
     
     std::vector<ExPolygons> layers = slice_mesh_ex(mesh.its, grid(float(bb.min.z()) + lh, float(bb.max.z()), lh));

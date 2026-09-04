@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PLA220*'
+name: Eolas Prints INGEO 850
+id: Eolas Prints INGEO 850
+values:
+  filament_vendor: Eolas Prints
+  filament_cost: 25.9

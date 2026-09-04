@@ -11,17 +11,26 @@
 }
 -(void)add_observer:(NSString *)version_hash
 {
-	//NSLog(@"adding observer");
+	//NSLog(@"adding observers");
 	//NSString *nsver = @"OtherPrusaSlicerInstanceMessage" + version_hash;
 	NSString *nsver = [NSString stringWithFormat: @"%@%@", @"OtherPrusaSlicerInstanceMessage", version_hash];
 	[[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(message_update:) name:nsver object:nil suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
 	NSString *nsver2 = [NSString stringWithFormat: @"%@%@", @"OtherPrusaSlicerInstanceClosing", version_hash];
 	[[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(closing_update:) name:nsver2 object:nil suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
+	NSString *nsnover = [NSString stringWithFormat: @"%@", @"OtherPrusaSlicerMulticastMessage"];
+	[[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(message_multicast_update:) name:nsnover object:nil suspensionBehavior:NSNotificationSuspensionBehaviorDeliverImmediately];
 }
 
 -(void)message_update:(NSNotification *)msg
 {
 	[self bring_forward];
+	//pass message  
+	Slic3r::GUI::wxGetApp().other_instance_message_handler()->handle_message(std::string([msg.userInfo[@"data"] UTF8String]));
+}
+
+-(void)message_multicast_update:(NSNotification *)msg
+{
+	//NSLog(@"message_multicast_update");
 	//pass message  
 	Slic3r::GUI::wxGetApp().other_instance_message_handler()->handle_message(std::string([msg.userInfo[@"data"] UTF8String]));
 }
@@ -50,6 +59,14 @@
 @end
 
 namespace Slic3r {
+
+void multicast_message_mac(const std::string &msg)
+{
+	NSString *nsmsg = [NSString stringWithCString:msg.c_str() encoding:[NSString defaultCStringEncoding]];
+	//NSString *nsver = @"OtherPrusaSlicerInstanceMessage" + [NSString stringWithCString:version.c_str() encoding:[NSString defaultCStringEncoding]];
+	NSString *notifname = [NSString stringWithFormat: @"%@", @"OtherPrusaSlicerMulticastMessage"];
+	[[NSDistributedNotificationCenter defaultCenter] postNotificationName:notifname object:nil userInfo:[NSDictionary dictionaryWithObject:nsmsg forKey:@"data"] deliverImmediately:YES];
+}
 
 void send_message_mac(const std::string &msg, const std::string &version)
 {

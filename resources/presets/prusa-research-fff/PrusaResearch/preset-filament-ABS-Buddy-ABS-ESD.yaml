@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Buddy3D ABS ESD
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/
+id: Buddy3D ABS ESD
+values:
+  filament_cost: 34.65
+  filament_vendor: Buddy3D
+  filament_density: 1.08
+  filament_spool_weight: 230
+

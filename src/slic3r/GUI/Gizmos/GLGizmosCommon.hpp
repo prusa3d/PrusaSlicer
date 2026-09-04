@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Lukáš Matěna @lukasmatena, Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros, Lukáš Hejl @hejllukas
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_GLGizmosCommon_hpp_
 #define slic3r_GUI_GLGizmosCommon_hpp_
 

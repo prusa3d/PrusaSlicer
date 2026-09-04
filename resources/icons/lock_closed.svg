@@ -1,10 +1,51 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!-- Generator: Adobe Illustrator 23.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<svg version="1.0" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 16 16" enable-background="new 0 0 16 16" xml:space="preserve">
-<g id="lock_x5F_closed">
-	<path fill="none" stroke="#808080" stroke-width="2" stroke-miterlimit="10" d="M4,8V4c0,0,0-2,2-2c1,0,3,0,4,0c2,0,2,2,2,2v4"/>
-	<path fill="#808080" d="M13,8H3C2.45,8,2,8.45,2,9v5c0,0.55,0.45,1,1,1h10c0.55,0,1-0.45,1-1V9C14,8.45,13.55,8,13,8z M10,12H8.91
-		c-0.21,0.58-0.76,1-1.41,1C6.67,13,6,12.33,6,11.5S6.67,10,7.5,10c0.65,0,1.2,0.42,1.41,1H10V12z"/>
-</g>
+
+<svg
+   version="1.0"
+   id="Layer_1"
+   x="0px"
+   y="0px"
+   viewBox="0 0 16 16"
+   enable-background="new 0 0 16 16"
+   xml:space="preserve"
+   sodipodi:docname="lock_closed.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs2">
+	
+	
+</defs><sodipodi:namedview
+   id="namedview2"
+   pagecolor="#ffffff"
+   bordercolor="#000000"
+   borderopacity="0.25"
+   inkscape:showpageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   inkscape:deskcolor="#d1d1d1"
+   inkscape:zoom="53.4375"
+   inkscape:cx="8"
+   inkscape:cy="8"
+   inkscape:window-width="1920"
+   inkscape:window-height="1111"
+   inkscape:window-x="3831"
+   inkscape:window-y="-9"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="Layer_1" />
+<path
+   fill="none"
+   stroke="#808080"
+   stroke-width="2"
+   stroke-miterlimit="10"
+   d="M 4,8 V 4 c 0,0 0,-2 2,-2 1,0 3,0 4,0 2,0 2,2 2,2 v 4"
+   id="path1"
+   style="stroke:#ffffff;stroke-opacity:1" /><path
+   fill="#808080"
+   d="M 13,8 H 3 C 2.45,8 2,8.45 2,9 v 5 c 0,0.55 0.45,1 1,1 h 10 c 0.55,0 1,-0.45 1,-1 V 9 C 14,8.45 13.55,8 13,8 Z m -3,4 H 8.91 C 8.7,12.58 8.15,13 7.5,13 6.67,13 6,12.33 6,11.5 6,10.67 6.67,10 7.5,10 c 0.65,0 1.2,0.42 1.41,1 H 10 Z"
+   id="path2"
+   style="fill:#ffffff;fill-opacity:1" />
 </svg>

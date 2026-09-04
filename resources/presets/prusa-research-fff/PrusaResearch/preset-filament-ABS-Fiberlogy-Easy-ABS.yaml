@@ -1,0 +1,207 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Fiberlogy Easy ABS
+id: Fiberlogy Easy ABS
+values:
+  bed_temperature: 100
+  first_layer_bed_temperature: 100
+  first_layer_temperature: 250
+  temperature: 250
+  filament_cost: 22.67
+  filament_vendor: Fiberlogy
+  filament_density: 1.09
+  filament_spool_weight: 330
+  disable_fan_first_layers: 5
+## C1
+variants:
+- condition: printer.base_model == "COREONE"
+  id: Y3L5LVTfREWrN+YQBdw+QA
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: LAve6kW5Tm+9ybBlJ3QC1w
+    values:
+      first_layer_temperature: 255
+      temperature: 255
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: 18t15nIqTgu1K84BSG2Y2w
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: iNSxkeHgTUyAtmzMGT+5gA
+    variants:
+    # C1 HF0.5
+    - condition: tool.nozzle_high_flow
+      id: EWyFLe6CS+GE6JrxOg9t6Q
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: mn2rifGdRi2UZ1Mb41uJmg
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+      id: kk1fZ/PcSWm+9SuYKQHe6w
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # C1 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: dv/sIii1QpWeUoWom5JhcA
+    values:
+      first_layer_temperature: 255
+      temperature: 255
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+      id: RKhwkx/iT6aFgkG/VFIpYw
+      values:
+        temperature: 260
+        first_layer_temperature: 260
+## XL
+- condition: printer.base_model == "XL"
+  id: VaUX+iFJTpCVJvE7qZjgwQ
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: mmuEDVpJR/OLKjjBsjxpWw
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+      id: GP6gYx4hSBW0qKV1PTtxuw
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 42giDmo8SzCokrKT/VIJ/w
+    variants:
+    # XL HF0.5
+    - condition: tool.nozzle_high_flow
+      id: c16hODXxSNq8sJGfEKN3YQ
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 8hhlktqhRamj0PvZajaQkQ
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+      id: Hlz8Vvz+SKeqwmTPov+2Lg
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # XL 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: T4wsAsWlRW2eDEcld20e3Q
+    values:
+      first_layer_temperature: 255
+      temperature: 255
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+      id: vYTqhSwMSCq68SQxu0IeyA
+      values:
+        first_layer_temperature: 260
+        temperature: 260
+## MK4
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: Z40wk6LbSfmQMLTqV3ORoA
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: ZdDEylTBS7C0RHjbltZ4aw
+    variants:
+    # MK4 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: 5eKiwcCPQ5e9c3bTBLsktg
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: JqPhCBs/R5Kkj6kcKjwVPA
+    variants:
+    # MK4 HF0.5
+    - condition: tool.nozzle_high_flow
+      id: jahqwbQASzyxNZx7Gx7Nfw
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: n6F/PSLvSTqejJOtt5o6eA
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+      id: 0dIyEF8uRnCLzrkFnSf1/w
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # MK4 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: 7pAYioS6SCSfie8BI2dfmw
+    values:
+      first_layer_temperature: 255
+      temperature: 255
+    variants:
+    # MK4 HF0.8
+    - condition: tool.nozzle_high_flow
+      id: fPCU4J43S4uyDiyYSQkovQ
+      values:
+        first_layer_temperature: 260
+        temperature: 260
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: uFDpcIrbSsippvbkQIu4Pg
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: Piju1/twQQawerg15sNCWw
+    variants:
+    # MK4S HF0.4
+    - condition: tool.nozzle_high_flow
+      id: rv4zs3XPQO2EpjU/1jNn+g
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: EdWDZCaqQfO8MZBBFRwotA
+    variants:
+    # MK4S HF0.5
+    - condition: tool.nozzle_high_flow
+      id: ZHmn3He0SiGJ4m9DOnkHqw
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: kAnyESq8Q3+ekYk4q+tMCA
+    variants:
+    # MK4S HF0.6
+    - condition: tool.nozzle_high_flow
+      id: /L/wLkdJS/mrljNJJtgbiQ
+      values:
+        first_layer_temperature: 255
+        temperature: 255
+  # MK4S 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: FAmVfTciR6ilS+HuefsT+A
+    values:
+      first_layer_temperature: 255
+      temperature: 255
+    variants:
+    # MK4S HF0.8
+    - condition: tool.nozzle_high_flow
+      id: TkY/grn4SuCt+w9EPBO7fA
+      values:
+        first_layer_temperature: 260
+        temperature: 260

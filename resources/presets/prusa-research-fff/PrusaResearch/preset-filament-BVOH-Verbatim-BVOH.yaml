@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*BVOH*'
+name: Verbatim BVOH
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/
+id: Verbatim BVOH
+values:
+  filament_vendor: Verbatim
+  filament_spool_weight: 235

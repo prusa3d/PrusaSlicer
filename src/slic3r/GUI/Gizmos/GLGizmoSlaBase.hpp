@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2022 - 2023 Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GLGizmoSlaBase_hpp_
 #define slic3r_GLGizmoSlaBase_hpp_
 
@@ -44,6 +48,8 @@ protected:
     void show_sla_supports(bool show) { m_show_sla_supports = show; }
 
     const GLVolumeCollection &volumes() const { return m_volumes; }
+
+    static bool selected_print_object_exists(const GLCanvas3D& canvas, const wxString& text);
 
 private:
     GLVolumeCollection m_volumes;

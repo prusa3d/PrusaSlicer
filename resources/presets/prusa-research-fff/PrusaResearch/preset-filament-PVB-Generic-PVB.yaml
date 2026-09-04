@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PVB*'
+name: Generic PVB
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.model!~/(MMU1|MMU3_32bit)/
+id: Generic PVB
+values:
+  filament_vendor: Generic

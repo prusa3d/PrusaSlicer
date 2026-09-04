@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966
+///|/ Copyright (c) 2021 Jurriaan Pruis
+///|/
+///|/ ported from lib/Slic3r/GUI/Preferences.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_Preferences_hpp_
 #define slic3r_Preferences_hpp_
 
@@ -48,7 +57,6 @@ class PreferencesDialog : public DPIDialog
 	wxSizer*                            m_icon_size_sizer {nullptr};
 	wxSlider*							m_icon_size_slider {nullptr};
 	wxRadioButton*						m_rb_old_settings_layout_mode {nullptr};
-	wxRadioButton*						m_rb_new_settings_layout_mode {nullptr};
 	wxRadioButton*						m_rb_dlg_settings_layout_mode {nullptr};
 
 	wxColourPickerCtrl*					m_sys_colour {nullptr};

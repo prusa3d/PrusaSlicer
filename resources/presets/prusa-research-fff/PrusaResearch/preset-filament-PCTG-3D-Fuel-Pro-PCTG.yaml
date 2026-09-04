@@ -1,0 +1,155 @@
+kind: filament
+inherits:
+- '*PCTG*'
+- '*sheets_PCTG_3DFUEL*'
+- '*MAXVOL_3DFUEL_PCTG*'
+# available for XL, MK4, COREONE family
+name: 3D-Fuel Pro PCTG
+id: 3D-Fuel Pro PCTG
+values:
+  filament_vendor: 3D-Fuel
+  extrusion_multiplier: 1
+  filament_cost: 29.95
+  min_fan_speed: 10
+  max_fan_speed: 45
+  first_layer_temperature: 260
+  temperature: 260
+  filament_spool_weight: 0
+  bridge_fan_speed: 70
+  disable_fan_first_layers: 3
+  full_fan_speed_layer: 3
+  enable_dynamic_fan_speeds: true
+  overhang_fan_speed_0: 70
+  overhang_fan_speed_1: 45
+  overhang_fan_speed_2: 30
+variants:
+- condition: printer.base_model == "COREONE"
+  id: ZrbRSFStRxGsGpqO1/5pLA
+  values:
+    min_fan_speed: 10
+    max_fan_speed: 40
+    bridge_fan_speed: 70
+    overhang_fan_speed_0: 70
+    overhang_fan_speed_1: 50
+    overhang_fan_speed_2: 30
+    overhang_fan_speed_3: 0
+    chamber_temperature: 40
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: muKmMmjNSqWF5tMzUfo/hw
+    values:
+      filament_infill_max_crossing_speed: 100
+- condition: printer.model=~/(MK4S|MK3.9S|XLP)/
+  id: jue5P76rR/yor0LKHRysdA
+  values:
+    min_fan_speed: 10
+    max_fan_speed: 40
+    bridge_fan_speed: 60
+    overhang_fan_speed_0: 60
+    overhang_fan_speed_1: 45
+    overhang_fan_speed_2: 30
+    overhang_fan_speed_3: 0
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: 5ZUjFGBwRWWIeenxahgvmg
+    values:
+      filament_infill_max_crossing_speed: 100
+- condition: printer.model=~/(MK4|MK3.9|XL)/
+  id: CqYJ779NRD2GK/6WeXliEg
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: dtMHBekKSkiGn3HGesnyqA
+    values:
+      filament_infill_max_crossing_speed: 100
+  - condition: tool.nozzle_diameter == 0.6
+    id: LD7K4rBjQtu8L+5tTy5dqw
+    values:
+      max_fan_speed: 60
+      bridge_fan_speed: 60
+  - condition: tool.nozzle_diameter == 0.8
+    id: sngnv1sXQVeARCY1WOfQXQ
+    values:
+      max_fan_speed: 60
+      bridge_fan_speed: 60
+# END
+- name: '*quit*'
+  id: 2bIwPdy2QCWFlY24Gys5JA
+---
+kind: filament
+id: '*sheets_PCTG_3DFUEL*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: YXj9KeUvRIyiCB8SMpU3zQ
+  values:
+    first_layer_bed_temperature: 80
+    bed_temperature: 80
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: kQ/uqpmXQZqN1EmoEJMCWw
+  values:
+    first_layer_bed_temperature: 65
+    bed_temperature: 65
+---
+kind: filament
+# Maximum volumetric speed limits
+id: '*MAXVOL_3DFUEL_PCTG*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: OXQMJvrKTWSIPfwm6kIS1w
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: j4+NkugWQmuEh3X846JJ5g
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: aqVA9phNSKG2ikcS6ZfyAw
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: jcR6KzjmTZKO0nG4QOuxDA
+    values:
+      filament_max_volumetric_speed: 10
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: S9wGPYFkR16hj3SOL8o6Yg
+      values:
+        filament_max_volumetric_speed: 14
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 0e078rm1R3KHgSiWPimZxw
+    values:
+      filament_max_volumetric_speed: 10
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: aAle2DsQRFKO8oPxwyki3g
+      values:
+        filament_max_volumetric_speed: 14
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: GHrhhk1/Rv2B3sKagXCQFw
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: cdmQv1m8RU6F0vksZe30Qw
+      values:
+        filament_max_volumetric_speed: 18
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: glEz2ahbSweVaPnIImHr9w
+    values:
+      filament_max_volumetric_speed: 18
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: Ivv7NBwyQkS/9FRp+qFlMg
+      values:
+        filament_max_volumetric_speed: 22

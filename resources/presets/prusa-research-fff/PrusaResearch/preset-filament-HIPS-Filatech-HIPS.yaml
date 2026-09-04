@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*HIPS*'
+name: Filatech HIPS
+id: Filatech HIPS
+values:
+  filament_vendor: Filatech
+  filament_density: 1.07
+  first_layer_temperature: 230
+  temperature: 230

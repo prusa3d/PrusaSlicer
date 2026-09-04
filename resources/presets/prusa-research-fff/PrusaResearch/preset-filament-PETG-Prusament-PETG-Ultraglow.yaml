@@ -1,0 +1,615 @@
+kind: filament
+features:
+  $.type: PETG
+  $.tags: [abrasive, contains_metal]
+  $.properties.min_nozzle_diameter: 0.4
+id: Prusament PETG Ultraglow
+condition: feeder.base_model!~/.*MMU.*/
+values:
+  extrusion_multiplier: 1.03
+  filament_cost: 88
+  first_layer_temperature: 260
+  temperature: 260
+  filament_abrasive: true
+  bed_temperature: 90
+  bridge_fan_speed: 50
+  cooling: 1
+  disable_fan_first_layers: 3
+  end_filament_gcode: ; Filament-specific end gcode
+  fan_always_on: 1
+  fan_below_layer_time: 20
+  filament_colour: ''
+  filament_cooling_final_speed: 2.5
+  filament_cooling_initial_speed: 5
+  filament_cooling_moves: 3
+  filament_density: 1.27
+  filament_diameter: 1.75
+  filament_infill_max_crossing_speed: 0
+  filament_infill_max_speed: 0
+  filament_loading_speed: 10
+  filament_loading_speed_start: 50
+  filament_max_volumetric_speed: 8
+  filament_minimal_purge_on_wipe_tower: 35
+  filament_notes: ''
+  filament_purge_multiplier: 100%
+  filament_ramming_parameters: 250 100 42.4194 42.4194 42.4194 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+  filament_soluble: 0
+  filament_spool_weight: 278
+  filament_stamping_distance: 45
+  filament_stamping_loading_speed: 26.5
+  filament_toolchange_delay: 0
+  # retract_lift: 0.2 
+  travel_max_lift: 1.5
+  travel_ramping_lift: 1
+  travel_slope: 1
+  retract_length: 0.8
+  wipe: 1
+  retract_before_wipe: 20%
+  filament_type: PETG
+  filament_unloading_speed: 100
+  filament_unloading_speed_start: 100
+  filament_vendor: Prusa Polymers
+  first_layer_bed_temperature: 85
+  full_fan_speed_layer: 5
+  max_fan_speed: 50
+  min_fan_speed: 30
+  min_print_speed: 15
+  slowdown_below_layer_time: 15
+  pressure_advance: enabled
+  cooling_slowdown_logic: consistent_surface
+  cooling_perimeter_transition_distance: 10
+## C1
+variants:
+- condition: printer.base_model == "COREONE"
+  id: CEgzEOOgT2WDl6MJvqjYKg
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 35
+    enable_dynamic_fan_speeds: 1
+    first_layer_temperature: 245
+    temperature: 245
+    bed_temperature: 85
+    idle_temperature: 130
+    min_fan_speed: 30
+    max_fan_speed: 60
+    min_print_speed: 15
+    bridge_fan_speed: 60
+    overhang_fan_speed_0: 60
+    overhang_fan_speed_1: 0
+    overhang_fan_speed_2: 0
+    overhang_fan_speed_3: 0
+    filament_purge_multiplier: 100%
+    fan_below_layer_time: 25
+    filament_infill_max_speed: 200
+    start_filament_gcode: M142 S36 ; set heatbreak target temp
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @COREONE 0.4
+    id: CNLYDjCbRH+UsJqbsAN/sw
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # C1 HF0.4
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @COREONE HF0.4'
+      # id: BaNCYJl1SsGPa2DY7FQuHg
+      # values:
+        # filament_max_volumetric_speed: 12
+        # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.047
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @COREONE 0.5
+    id: MWLc3jP8RaiWx5+aZni8pg
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 10
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # C1 HF0.5
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @COREONE HF0.5'
+      # id: yHIZkkKnT8S1Q2F3qAbGNw
+      # values:
+        # filament_max_volumetric_speed: 14
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.042
+        # filament_infill_max_crossing_speed: 120
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @COREONE 0.6
+    id: iCth8yodTDucOwGyU0t23Q
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 15
+      fan_below_layer_time: 30
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    # variants:
+    # # C1 HF0.6
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @COREONE HF0.6'
+      # id: sXzAu/AhRDqhcM9sata4Jg
+      # values:
+        # filament_max_volumetric_speed: 17
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.033
+  # # C1 0.8
+  # - condition: tool.nozzle_diameter == 0.8
+    # name: 'Prusament PETG Ultraglow @COREONE 0.8'
+    # id: 4JD9ilX7QzykcQsulrKaXw
+    # values:
+      # filament_max_volumetric_speed: 22
+      # slowdown_below_layer_time: 20
+      # fan_below_layer_time: 35
+      # pressure_advance_value: 0.018
+    # variants:
+    # # C1 HF0.8
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @COREONE HF0.8'
+      # id: KSVJShBmS6uvo8p0JAkHlw
+      # values:
+        # filament_max_volumetric_speed: 22
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.021
+## XL
+- condition: printer.model == "XL"
+  id: RqlrHqbxSMSkEosnqmuRYw
+  values:
+    first_layer_bed_temperature: 80
+    bed_temperature: 80
+    fan_below_layer_time: 20
+    filament_max_volumetric_speed: 12
+    filament_multitool_ramming: 1
+    filament_multitool_ramming_flow: 40
+    filament_multitool_ramming_volume: 10
+    retract_length_toolchange: 20
+    first_layer_temperature: 245
+    temperature: 245
+    idle_temperature: 70
+    min_print_speed: 15
+    slowdown_below_layer_time: 9
+    filament_infill_max_speed: 200
+    filament_minimal_purge_on_wipe_tower: 35
+    start_filament_gcode: M142 S36 ; set heatbreak target temp
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @XL 0.4
+    id: qh231iUfQiKBVwjWy7jcbA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # XL HF0.4
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @XL HF0.4'
+      # id: dlcJkgq1SqW7reVDwydxGw
+      # values:
+        # filament_max_volumetric_speed: 12
+        # pressure_advance_value: 0.047
+
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @XL 0.5
+    id: XFshEptHS+ShV4EXGZgpsQ
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 14
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # XL HF0.5
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @XL HF0.5'
+      # id: loaXEZcLTZmailIKZdXr2Q
+      # values:
+        # filament_max_volumetric_speed: 14
+        # pressure_advance_value: 0.042
+        # filament_infill_max_crossing_speed: 120
+
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @XL 0.6
+    id: QfHtLVhnTxSaSxPtwPpgNw
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    # variants:
+    # # XL HF0.6
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @XL HF0.6'
+      # values:
+        # filament_max_volumetric_speed: 17
+        # pressure_advance_value: 0.033
+  # # XL 0.8
+  # - condition: tool.nozzle_diameter == 0.8
+    # name: 'Prusament PETG Ultraglow @XL 0.8'
+    # values:
+      # filament_max_volumetric_speed: 22
+      # slowdown_below_layer_time: 18
+      # pressure_advance_value: 0.018
+    # variants:
+    # # XL HF0.8
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @XL HF0.8'
+      # values:
+        # filament_max_volumetric_speed: 22
+        # pressure_advance_value: 0.021
+
+## XL+
+- condition: printer.model == "XLP"
+  id: lnCirM5nTXmy2c1J0yJkzA
+  values:
+    first_layer_bed_temperature: 80
+    bed_temperature: 80
+    fan_below_layer_time: 20
+    filament_max_volumetric_speed: 12
+    filament_multitool_ramming: 1
+    filament_multitool_ramming_flow: 40
+    filament_multitool_ramming_volume: 10
+    retract_length_toolchange: 20
+    first_layer_temperature: 245
+    temperature: 245
+    idle_temperature: 70
+    min_print_speed: 15
+    slowdown_below_layer_time: 9
+    filament_infill_max_speed: 200
+    filament_minimal_purge_on_wipe_tower: 35
+    max_fan_speed: 45
+    min_fan_speed: 25
+    bridge_fan_speed: 40
+    overhang_fan_speed_0: 40
+    start_filament_gcode: M142 S36 ; set heatbreak target temp
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @XL+ 0.4
+    id: YM1AtV3WTLuJG88Z+RhaxA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+  # XL+ 0.5
+  - condition: tool.nozzle_diameter == 0.5 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @XL+ 0.5
+    id: qo5lSDYxRl2nlt+1d9eJfw
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 14
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @XL+ 0.6
+    id: orRv2ZLuQT2u/cbseF71Vg
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+## MK4
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: 94O+ksrQR7qWEujIrbrkug
+  values:
+    enable_dynamic_fan_speeds: 0
+    idle_temperature: 130
+    max_fan_speed: 55
+    min_fan_speed: 30
+    min_print_speed: 15
+    bridge_fan_speed: 50
+    filament_purge_multiplier: 100%
+    fan_below_layer_time: 20
+    filament_infill_max_speed: 200
+    start_filament_gcode: M142 S36 ; set heatbreak target temp
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @MK4 0.4
+    id: rEJQD37PSASq0oRPi/u2gw
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # MK4 HF0.4
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4 HF0.4'
+      # values:
+        # filament_max_volumetric_speed: 12
+        # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.047
+
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @MK4 0.5
+    id: ZK2zFah3Q5itpfQx87RX5Q
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 9
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # MK4 HF0.5
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4 HF0.5'
+      # values:
+        # filament_max_volumetric_speed: 14
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.042
+        # filament_infill_max_crossing_speed: 120
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @MK4 0.6
+    id: 3uVJHLpXSvm5T79uYj+4Fg
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 14
+      fan_below_layer_time: 20
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    # variants:
+    # # MK4 HF0.6
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4 HF0.6'
+      # values:
+        # filament_max_volumetric_speed: 17
+        # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.033   
+  # # MK4 0.8
+  # - condition: tool.nozzle_diameter == 0.8
+    # name: 'Prusament PETG Ultraglow @MK4 0.8'
+    # values:
+      # filament_max_volumetric_speed: 22
+      # slowdown_below_layer_time: 18
+      # fan_below_layer_time: 22
+      # pressure_advance_value: 0.018
+    # variants:
+    # # MK4 HF0.8
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4 HF0.8'
+      # values:
+        # filament_max_volumetric_speed: 22
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.021
+
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: 78WSFifET6OCStMdP9uk5Q
+  values:
+    enable_dynamic_fan_speeds: 1
+    idle_temperature: 70
+    max_fan_speed: 40
+    min_fan_speed: 20
+    min_print_speed: 15
+    bridge_fan_speed: 40
+    overhang_fan_speed_0: 40
+    overhang_fan_speed_1: 0
+    filament_purge_multiplier: 100%
+    fan_below_layer_time: 20
+    filament_infill_max_speed: 200
+    start_filament_gcode: M142 S36 ; set heatbreak target temp
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @MK4S 0.4
+    id: I6RSI5QdRo2Ly2Gq3dC8FA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 7
+      pressure_advance_value: 0.053
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # MK4S HF0.4
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4S HF0.4'
+      # values:
+        # filament_max_volumetric_speed: 12
+        # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.047
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @MK4S 0.5
+    id: y+AIhRT8TyODBRP8MCCLUw
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 8
+      pressure_advance_value: 0.042
+      filament_infill_max_crossing_speed: 110
+    # variants:
+    # # MK4S HF0.5
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4S HF0.5'
+      # values:
+        # filament_max_volumetric_speed: 14
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.042
+        # filament_infill_max_crossing_speed: 120
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6 and ! tool.nozzle_high_flow
+    name: Prusament PETG Ultraglow @MK4S 0.6
+    id: 7azx0s0QQ1uUM3ooWqgseQ
+    values:
+      filament_max_volumetric_speed: 17
+      slowdown_below_layer_time: 10
+      fan_below_layer_time: 22
+      bridge_fan_speed: 45
+      pressure_advance_value: 0.032
+      filament_infill_max_crossing_speed: 140
+    # variants:
+    # # MK4S HF0.6
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4S HF0.6'
+      # values:
+        # filament_max_volumetric_speed: 17
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.033
+  # # MK4S 0.8
+  # - condition: tool.nozzle_diameter == 0.8
+    # name: 'Prusament PETG Ultraglow @MK4S 0.8'
+    # values:
+      # filament_max_volumetric_speed: 22
+      # slowdown_below_layer_time: 18
+      # fan_below_layer_time: 25
+      # max_fan_speed: 45
+      # bridge_fan_speed: 45
+      # pressure_advance_value: 0.018
+    # variants:
+    # # MK4S HF0.8
+    # - condition: tool.nozzle_high_flow
+      # name: 'Prusament PETG Ultraglow @MK4S HF0.8'
+      # values:
+        # filament_max_volumetric_speed: 22
+        # # filament_ramming_parameters: 250 100 42.4194 42.4194| 0.05 42.4387 0.45 42.4387 0.95 42.4387 1.45 42.4387 1.95 42.4387 2.45 42.4387 2.95 42.4387 3.45 42.4387 3.95 42.4387 4.45 42.4387 4.95 42.4387
+        # pressure_advance_value: 0.021
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: 2SmmDjZVQ1SEo4khroWzSA
+  values:
+    filament_ramming_parameters: 120 140 4.70968 4.74194 4.77419 4.80645 4.83871 4.87097 4.90323 5 5.25806 5.67742 6.29032 7.06452 7.83871 8.3871| 0.05 4.72901 0.45 4.73545 0.95 4.83226 1.45 4.88067 1.95 5.05483 2.45 5.93553 2.95 7.53556 3.45 8.6323 3.95 7.6 4.45 7.6 4.95 7.6
+    filament_loading_speed: 14
+    filament_loading_speed_start: 19
+    filament_cooling_final_speed: 1
+    filament_cooling_initial_speed: 2
+    filament_cooling_moves: 1
+    filament_stamping_distance: 0
+    filament_stamping_loading_speed: 20
+    filament_toolchange_delay: 0
+    filament_unloading_speed: 20
+    filament_unloading_speed_start: 120
+    idle_temperature:
+    filament_purge_multiplier: 100%
+    filament_max_volumetric_speed: 8
+    retract_lift: 0.2
+    travel_max_lift: 1.5
+    travel_ramping_lift: 0
+    travel_slope: 1
+    cooling_slowdown_logic: uniform_cooling
+  variants:
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: Prusament PETG Ultraglow @MK3.5 0.4
+    id: ANlqv+zuRUOk1KBQG4vgmQ
+    values:
+      slowdown_below_layer_time: 15
+      pressure_advance_value: 0.052
+    variants:
+    # MK3.5 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: Prusament PETG Ultraglow @MK3.5 0.4 MMU
+      id: WIfkk3GOSHuJz/gQaVhsdQ
+      values:
+        filament_max_volumetric_speed: 7
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    name: Prusament PETG Ultraglow @MK3.5 0.5
+    id: /Ft0Own9SgqUrg8arFOxGQ
+    values:
+      filament_max_volumetric_speed: 14
+      slowdown_below_layer_time: 16
+      pressure_advance_value: 0.042
+  # MK3.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: Prusament PETG Ultraglow @MK3.5 0.6
+    id: KEuANvNdSFa4N4nDEUR2Pg
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+      max_fan_speed: 60
+      pressure_advance_value: 0.025
+    variants:
+    # MK3.5 0.6 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: Prusament PETG Ultraglow @MK3.5 0.6 MMU
+      id: isJbyq5/T/CKc1YmHP6giw
+      values:
+        filament_max_volumetric_speed: 13
+## MK3, MK3S and MK2.5, MK2.5S
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: qxW48DUyT5CDbmro9Yr3uA
+  values:
+    filament_ramming_parameters: 120 140 4.70968 4.74194 4.77419 4.80645 4.83871 4.87097 4.90323 5 5.25806 5.67742 6.29032 7.06452 7.83871 8.3871| 0.05 4.72901 0.45 4.73545 0.95 4.83226 1.45 4.88067 1.95 5.05483 2.45 5.93553 2.95 7.53556 3.45 8.6323 3.95 7.6 4.45 7.6 4.95 7.6
+    filament_loading_speed: 14
+    filament_loading_speed_start: 19
+    filament_cooling_final_speed: 1
+    filament_cooling_initial_speed: 2
+    filament_cooling_moves: 1
+    filament_stamping_distance: 0
+    filament_stamping_loading_speed: 20
+    filament_toolchange_delay: 0
+    filament_unloading_speed: 20
+    filament_unloading_speed_start: 100
+    idle_temperature:
+    filament_purge_multiplier: 100%
+    filament_max_volumetric_speed: 8
+    retract_lift: 0.2
+    travel_ramping_lift: 0
+    retract_length: 1
+    cooling_slowdown_logic: uniform_cooling
+  variants:
+  # MK3 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: Prusament PETG Ultraglow @MK2.5_MK3 0.4
+    id: UhQhz+rzQF2kuO5ahePGMQ
+    values:
+      slowdown_below_layer_time: 12
+      pressure_advance_value: 0.08
+    variants:
+    # MK3 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: Prusament PETG Ultraglow @MK2.5_MK3 0.4 MMU
+      id: mst7ZTuLTve4DAkNatmYow
+      values:
+        filament_max_volumetric_speed: 7
+  # MK3 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    name: Prusament PETG Ultraglow @MK2.5_MK3 0.6
+    id: mIhh7vXjREOZakw8Y52hFA
+    values:
+      filament_max_volumetric_speed: 15
+      slowdown_below_layer_time: 17
+      pressure_advance_value: 0.04
+    variants:
+    # MK3 0.6 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      name: Prusament PETG Ultraglow @MK2.5_MK3 0.6 MMU
+      id: iYyXmnSIS3+5XCp8tpEy2Q
+      values:
+        filament_max_volumetric_speed: 13
+---
+kind: filament
+id: '*sheets_PET_ultraglow*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: HSR3D9f+Qw29AzEzwHHFkQ
+  values:
+    first_layer_bed_temperature: 85
+    bed_temperature: 85
+  variants:
+  - condition: printer.base_model == "XL"
+    id: 9ONO6OKvQ/eACbqiPD3eRA
+    values:
+      first_layer_bed_temperature: 80
+      bed_temperature: 80
+  - condition: printer.base_model=~/(MK3|MK2|MK4)/
+    id: +vGLXzY5QYqRhZLWYV2yQw
+    values:
+      bed_temperature: 90
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: oXWd4mCJQKSXGGyBBWZuwQ
+  values:
+    first_layer_bed_temperature: 65
+    bed_temperature: 65

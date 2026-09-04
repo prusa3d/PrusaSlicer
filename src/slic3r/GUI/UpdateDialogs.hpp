@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 David Kocík @kocikdav, Lukáš Hejl @hejllukas, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_UpdateDialogs_hpp_
 #define slic3r_UpdateDialogs_hpp_
 
@@ -10,6 +14,8 @@
 
 #include "libslic3r/Semver.hpp"
 #include "MsgDialog.hpp"
+
+#include "slic3r/Utils/PresetUpdater.hpp"
 
 class wxBoxSizer;
 class wxCheckBox;
@@ -42,7 +48,7 @@ private:
 class AppUpdateAvailableDialog : public MsgDialog
 {
 public:
-	AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user);
+	AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user, bool browser_on_next);
 	AppUpdateAvailableDialog(AppUpdateAvailableDialog&&) = delete;
 	AppUpdateAvailableDialog(const AppUpdateAvailableDialog&) = delete;
 	AppUpdateAvailableDialog& operator=(AppUpdateAvailableDialog&&) = delete;
@@ -86,17 +92,19 @@ public:
 		Semver version;
 		std::string comment;
 		std::string changelog_url;
+		std::string new_printers;
 
-		Update(std::string vendor, Semver version, std::string comment, std::string changelog_url)
+		Update(std::string vendor, Semver version, std::string comment, std::string changelog_url, std::string new_printers)
 			: vendor(std::move(vendor))
 			, version(std::move(version))
 			, comment(std::move(comment))
 			, changelog_url(std::move(changelog_url))
+			, new_printers(std::move(new_printers))
 		{}
 	};
 
 	// force_before_wizard - indicates that check of updated is forced before ConfigWizard opening
-	MsgUpdateConfig(const std::vector<Update> &updates, bool force_before_wizard = false);
+	MsgUpdateConfig(const std::vector<Update> &updates, PresetUpdater::UpdateParams update_params);
 	MsgUpdateConfig(MsgUpdateConfig &&) = delete;
 	MsgUpdateConfig(const MsgUpdateConfig &) = delete;
 	MsgUpdateConfig &operator=(MsgUpdateConfig &&) = delete;
@@ -114,12 +122,14 @@ public:
 		Semver version;
 		std::string comment;
 		std::string changelog_url;
+		std::string new_printers;
 
-		Update(std::string vendor, Semver version, std::string comment, std::string changelog_url)
+		Update(std::string vendor, Semver version, std::string comment, std::string changelog_url, std::string new_printers)
 			: vendor(std::move(vendor))
 			, version(std::move(version))
 			, comment(std::move(comment))
 			, changelog_url(std::move(changelog_url))
+			, new_printers(std::move(new_printers))
 		{}
 	};
 

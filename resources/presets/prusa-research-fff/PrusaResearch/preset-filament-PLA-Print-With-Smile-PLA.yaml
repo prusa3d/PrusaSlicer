@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Print With Smile PLA
+id: Print With Smile PLA
+values:
+  filament_cost: '535'
+  filament_vendor: Print With Smile
+  filament_spool_weight: 330

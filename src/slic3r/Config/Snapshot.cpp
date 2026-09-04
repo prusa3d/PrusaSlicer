@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Snapshot.hpp"
 
 #include <time.h>

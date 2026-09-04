@@ -1,0 +1,35 @@
+kind: filament
+inherits:
+- '*PPCF*'
+name: Forward AM Ultrafuse PP-GF30
+features:
+  $.type: PP
+  $.tags: [abrasive, contains_glass_fiber]
+  $.properties.min_nozzle_diameter: 0.6
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.6 and feeder.base_model!~/.*MMU.*/
+id: Forward AM Ultrafuse PP-GF30
+values:
+  filament_vendor: Forward AM
+  first_layer_temperature: 240
+  temperature: 240
+  first_layer_bed_temperature: 80
+  bed_temperature: 70
+  extrusion_multiplier: 1
+  filament_cost: 0
+  filament_spool_weight: 0
+  cooling: true
+  disable_fan_first_layers: 1
+  full_fan_speed_layer: 3
+  min_fan_speed: 100
+  max_fan_speed: 100
+  fan_always_on: false
+  fan_below_layer_time: 60
+  min_print_speed: 10
+  pressure_advance_value: 0
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: IF7OF6cKSvy3QZGqhb/V1w
+  values:
+    min_fan_speed: 70
+    max_fan_speed: 70
+    bridge_fan_speed: 70

@@ -1,0 +1,38 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: colorFabb Vibers
+id: colorFabb Vibers
+features:
+  $.type: PLA
+  $.tags: [abrasive]
+  $.properties.min_nozzle_diameter: 0.4
+values:
+  filament_cost: '41.99'
+  filament_vendor: colorFabb
+  filament_density: 1.3
+  filament_spool_weight: 160
+  first_layer_temperature: 210
+  temperature: 210
+  first_layer_bed_temperature: 60
+  bed_temperature: 60
+  min_fan_speed: 100
+  max_fan_speed: 100
+  filament_abrasive: true
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: M3RTWhupQGu386nqZfBQlg
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: s3Y3qd0gTuisir5eYvYZlQ
+    values:
+      filament_max_volumetric_speed: 4
+  - condition: tool.nozzle_diameter == 0.6
+    id: UcYJmMaHRU+0g1wFc9/nPA
+    values:
+      filament_max_volumetric_speed: 6
+  - name: '*quit*'
+# END
+    id: H1zRl1rKSO2v+c2AwgL2Dg
+- name: '*quit*'
+  id: qOEcKbZlRWiOlCV/L8iXsw

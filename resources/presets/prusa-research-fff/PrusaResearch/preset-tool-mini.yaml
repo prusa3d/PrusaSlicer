@@ -1,0 +1,6 @@
+kind: tool_print
+id: common MINI
+variants:
+- condition: printer.model == "MINI"
+  name: no tool
+  id: RGZff64FTOWsAWzIoLFPzQ

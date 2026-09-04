@@ -1,0 +1,169 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*sheets_PET_FiberlogyPETG*'
+name: Fiberlogy Easy PET-G
+id: Fiberlogy Easy PET-G
+values:
+  filament_vendor: Fiberlogy
+  first_layer_temperature: 235
+  temperature: 235
+  filament_cost: 20
+  filament_spool_weight: 330
+  bridge_fan_speed: 60
+  min_fan_speed: 15
+  max_fan_speed: 30
+## C1 and MK4S
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S)/
+  id: wUtRqZTrQymcyHPN8sor9A
+  values:
+    bridge_fan_speed: 60
+    min_fan_speed: 15
+    max_fan_speed: 30
+    overhang_fan_speed_0: 30
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: gJObe9V2SrGRECdWQ5PucQ
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: VHijWMQOS5ydrDTFIvzzdA
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: zMMw2lXuQIeRCItSzFA5Cw
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: Yh6WZ9B2TRCrpMUSp2/A2g
+      values:
+        filament_max_volumetric_speed: 20
+        first_layer_temperature: 245
+        temperature: 245
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: DTtnlp9tQumxBDdwZbSGGA
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: GcOL8DvoTDS5shE/JJr4ew
+      values:
+        filament_max_volumetric_speed: 22
+        first_layer_temperature: 245
+        temperature: 245
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 0eaiim90QB+qQ8WOcRo39w
+    values:
+      filament_max_volumetric_speed: 17
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: +GEwjGt+SLmTEKRO4RotoQ
+      values:
+        filament_max_volumetric_speed: 25
+        first_layer_temperature: 245
+        temperature: 245
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: z1fJ6QpySyaMrPitZV25jw
+    values:
+      filament_max_volumetric_speed: 20
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: O3lyRl7SSMe89c47pNeCdg
+      values:
+        filament_max_volumetric_speed: 31
+        first_layer_temperature: 250
+        temperature: 250
+## XL and MK4
+- condition: printer.model=~/(XL|MK4)/
+  id: melBz6XXT3ahMkcJ4eJ87w
+  variants:
+   # XL 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: mavnQkndQZ6Fzu8EOz0jjQ
+    values:
+      filament_max_volumetric_speed: 12
+  # XL 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: lGqXx/zWQSi+FeJfVl7z0g
+    values:
+      filament_max_volumetric_speed: 12
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 8WLYuhyVTj++fBiyYahZ1g
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+      id: +oq/yaZgQDOuTItJwrqSzg
+      values:
+        filament_max_volumetric_speed: 20
+        first_layer_temperature: 245
+        temperature: 245
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: FSlos6TcSnSAlMPGq8KnDg
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # XL HF0.5
+    - condition: tool.nozzle_high_flow
+      id: qs++Erc4TVCAWo5GvMCRwA
+      values:
+        filament_max_volumetric_speed: 22
+        first_layer_temperature: 245
+        temperature: 245
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: LwH0RAU7SgSPV8/wylJ0YQ
+    values:
+      filament_max_volumetric_speed: 17
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+      id: y7sHpCq+Sg+8WruaFmbRKQ
+      values:
+        filament_max_volumetric_speed: 25
+        first_layer_temperature: 245
+        temperature: 245
+  # XL 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: OlAvj+yATOaM5svq4sq43Q
+    values:
+      filament_max_volumetric_speed: 20
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+      id: 2BR3SmQTQIuT7JqVM13tdA
+      values:
+        filament_max_volumetric_speed: 31
+        first_layer_temperature: 250
+        temperature: 250
+---
+kind: filament
+id: '*sheets_PET_FiberlogyPETG*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: qYicTxpgQh6xIVWQ95qQog
+  values:
+    first_layer_bed_temperature: 80
+    bed_temperature: 80
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: ItGEd7ZcSjSX/GrzJ/Smzg
+  values:
+    first_layer_bed_temperature: 65
+    bed_temperature: 65

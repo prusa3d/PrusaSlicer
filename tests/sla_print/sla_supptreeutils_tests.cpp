@@ -1,16 +1,23 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <test_utils.hpp>
 
 #include <unordered_set>
 
-#include "libslic3r/Execution/ExecutionSeq.hpp"
+#include "Slic3r/Biz/Format/STL.hpp"
+#include "Slic3r/Biz/Algorithms/Execution/ExecutionSeq.hpp"
 #include "libslic3r/SLA/SupportTreeUtils.hpp"
 #include "libslic3r/SLA/SupportTreeUtilsLegacy.hpp"
 
+using Catch::Approx;
+namespace triangle_mesh = Slic3r::Biz::Algorithms::TriangleMesh;
+using Slic3r::Domain::SLA::SupportPoints;
+
 // Test pair hash for 'nums' random number pairs.
-template <class I, class II> void test_pairhash()
+template <class I, class II>
+void test_pairhash()
 {
-    const constexpr size_t nums = 1000;
+    const constexpr size_t nums = 1'000;
     I A[nums] = {0}, B[nums] = {0};
     std::unordered_set<I> CH;
     std::unordered_map<II, std::pair<I, I>> ints;
@@ -18,11 +25,12 @@ template <class I, class II> void test_pairhash()
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    const I Ibits = int(sizeof(I) * CHAR_BIT);
+    const I Ibits   = int(sizeof(I) * CHAR_BIT);
     const II IIbits = int(sizeof(II) * CHAR_BIT);
 
     int bits = IIbits / 2 < Ibits ? Ibits / 2 : Ibits;
-    if (std::is_signed<I>::value) bits -= 1;
+    if (std::is_signed<I>::value)
+        bits -= 1;
     const I Imin = 0;
     const I Imax = I(std::pow(2., bits) - 1);
 
@@ -30,12 +38,20 @@ template <class I, class II> void test_pairhash()
 
     for (size_t i = 0; i < nums;) {
         I a = dis(gen);
-        if (CH.find(a) == CH.end()) { CH.insert(a); A[i] = a; ++i; }
+        if (CH.find(a) == CH.end()) {
+            CH.insert(a);
+            A[i] = a;
+            ++i;
+        }
     }
 
     for (size_t i = 0; i < nums;) {
         I b = dis(gen);
-        if (CH.find(b) == CH.end()) { CH.insert(b); B[i] = b; ++i; }
+        if (CH.find(b) == CH.end()) {
+            CH.insert(b);
+            B[i] = b;
+            ++i;
+        }
     }
 
     for (size_t i = 0; i < nums; ++i) {
@@ -50,31 +66,34 @@ template <class I, class II> void test_pairhash()
         auto it = ints.find(hash_ab);
 
         if (it != ints.end()) {
-            REQUIRE((
-                (it->second.first == a && it->second.second == b) ||
-                (it->second.first == b && it->second.second == a)
-                ));
+            REQUIRE(
+                ((it->second.first == a && it->second.second == b)
+                 || (it->second.first == b && it->second.second == a))
+            );
         } else
             ints[hash_ab] = std::make_pair(a, b);
     }
 }
 
-TEST_CASE("Pillar pairhash should be unique", "[suptreeutils]") {
+TEST_CASE("Pillar pairhash should be unique", "[suptreeutils]")
+{
     test_pairhash<int, int>();
     test_pairhash<int, long>();
     test_pairhash<unsigned, unsigned>();
     test_pairhash<unsigned, unsigned long>();
 }
 
-static void eval_ground_conn(const Slic3r::sla::GroundConnection &conn,
-                             const Slic3r::sla::SupportableMesh &sm,
-                             const Slic3r::sla::Junction &j,
-                             double end_r,
-                             const std::string &stl_fname = "output.stl")
+static void eval_ground_conn(
+    const Slic3r::sla::GroundConnection& conn,
+    const Slic3r::sla::SupportableMesh& sm,
+    const Slic3r::sla::Junction& j,
+    double end_r,
+    const std::string& stl_fname = "output.stl"
+)
 {
     using namespace Slic3r;
 
-//#ifndef NDEBUG
+    // #ifndef NDEBUG
 
     sla::SupportTreeBuilder builder;
 
@@ -84,10 +103,10 @@ static void eval_ground_conn(const Slic3r::sla::GroundConnection &conn,
     sla::build_ground_connection(builder, sm, conn);
 
     indexed_triangle_set mesh = *sm.emesh.get_triangle_mesh();
-    its_merge(mesh, builder.merged_mesh());
+    Domain::its_merge(mesh, builder.merged_mesh());
 
-    its_write_stl_ascii(stl_fname.c_str(), "stl_fname", mesh);
-//#endif
+    Biz::store_stl(stl_fname, Slic3r::Domain::TriangleMesh(std::move(mesh)), false);
+    // #endif
 
     REQUIRE(bool(conn));
 
@@ -102,60 +121,58 @@ static void eval_ground_conn(const Slic3r::sla::GroundConnection &conn,
     REQUIRE(conn.pillar_base->r_top == Approx(end_r));
 }
 
-TEST_CASE("Pillar search dumb case", "[suptreeutils]") {
+TEST_CASE("Pillar search dumb case", "[suptreeutils]")
+{
     using namespace Slic3r;
+    using Slic3r::Biz::Algorithms::Execution::ex_seq;
 
     constexpr double FromR = 0.5;
-    auto j = sla::Junction{Vec3d::Zero(), FromR};
+    auto j                 = sla::Junction{Vec3d::Zero(), FromR};
 
-    SECTION("with empty mesh") {
-        sla::SupportableMesh sm{indexed_triangle_set{},
-                                sla::SupportPoints{},
-                                sla::SupportTreeConfig{}};
+    SECTION("with empty mesh")
+    {
+        sla::SupportableMesh sm{.emesh = AABBMesh(indexed_triangle_set{})};
 
         constexpr double EndR = 1.;
-        sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_seq, sm, j, EndR, sla::DOWN);
+        sla::GroundConnection conn = sla::deepsearch_ground_connection(ex_seq, sm, j, EndR, sla::DOWN);
 
         REQUIRE(conn);
-//        REQUIRE(conn.path.size() == 1);
+        // REQUIRE(conn.path.size() == 1);
         REQUIRE(conn.pillar_base->pos.z() == Approx(ground_level(sm)));
     }
 
-    SECTION("with zero R source and destination") {
-        sla::SupportableMesh sm{indexed_triangle_set{},
-                                sla::SupportPoints{},
-                                sla::SupportTreeConfig{}};
+    SECTION("with zero R source and destination")
+    {
+        sla::SupportableMesh sm{.emesh = AABBMesh(indexed_triangle_set{})};
 
-        j.r = 0.;
+        j.r                   = 0.;
         constexpr double EndR = 0.;
-        sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_seq, sm, j, EndR, sla::DOWN);
+        sla::GroundConnection conn = sla::deepsearch_ground_connection(ex_seq, sm, j, EndR, sla::DOWN);
 
         REQUIRE(conn);
-//        REQUIRE(conn.path.size() == 1);
+        // REQUIRE(conn.path.size() == 1);
         REQUIRE(conn.pillar_base->pos.z() == Approx(ground_level(sm)));
         REQUIRE(conn.pillar_base->r_top == Approx(0.));
     }
 
-    SECTION("with zero init direction") {
-        sla::SupportableMesh sm{indexed_triangle_set{},
-                                sla::SupportPoints{},
-                                sla::SupportTreeConfig{}};
+    SECTION("with zero init direction")
+    {
+        sla::SupportableMesh sm{.emesh = AABBMesh(indexed_triangle_set{})};
 
         constexpr double EndR = 1.;
-        Vec3d init_dir = Vec3d::Zero();
-        sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_seq, sm, j, EndR, init_dir);
+        Vec3d init_dir        = Vec3d::Zero();
+        sla::GroundConnection conn = sla::deepsearch_ground_connection(ex_seq, sm, j, EndR, init_dir);
 
         REQUIRE(conn);
-//        REQUIRE(conn.path.size() == 1);
+        // REQUIRE(conn.path.size() == 1);
         REQUIRE(conn.pillar_base->pos.z() == Approx(ground_level(sm)));
     }
 }
 
 TEST_CASE("Avoid disk below junction", "[suptreeutils]")
 {
+    using Slic3r::Biz::Algorithms::Execution::ex_tbb;
+
     // In this test there will be a disk mesh with some radius, centered at
     // (0, 0, 0) and above the disk, a junction from which the support pillar
     // should be routed. The algorithm needs to find an avoidance route.
@@ -167,41 +184,38 @@ TEST_CASE("Avoid disk below junction", "[suptreeutils]")
     constexpr double CylRadius  = 4.;
     constexpr double CylHeight  = 1.;
 
-    sla::SupportTreeConfig cfg;
-
-    indexed_triangle_set disk = its_make_cylinder(CylRadius, CylHeight);
+    indexed_triangle_set disk = triangle_mesh::its_make_cylinder(CylRadius, CylHeight);
 
     // 2.5 * CyRadius height should be enough to be able to insert a bridge
     // with 45 degree tilt above the disk.
     sla::Junction j{Vec3d{0., 0., 2.5 * CylRadius}, FromRadius};
 
-    sla::SupportableMesh sm{disk, sla::SupportPoints{}, cfg};
+    sla::SupportableMesh sm{.emesh = AABBMesh(disk)};
 
-    SECTION("with elevation") {
-
-        sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_tbb, sm, j, EndRadius, sla::DOWN);
+    SECTION("with elevation")
+    {
+        sla::GroundConnection conn = sla::deepsearch_ground_connection(ex_tbb, sm, j, EndRadius, sla::DOWN);
 
         eval_ground_conn(conn, sm, j, EndRadius, "disk.stl");
 
         // Check if the avoidance junction is indeed outside of the disk barrier's
         // edge.
-        auto p = conn.path.back().pos;
+        auto p    = conn.path.back().pos;
         double pR = std::sqrt(p.x() * p.x()) + std::sqrt(p.y() * p.y());
         REQUIRE(pR + FromRadius > CylRadius);
     }
 
-    SECTION("without elevation") {
+    SECTION("without elevation")
+    {
         sm.cfg.object_elevation_mm = 0.;
 
-        sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_tbb, sm, j, EndRadius, sla::DOWN);
+        sla::GroundConnection conn = sla::deepsearch_ground_connection(ex_tbb, sm, j, EndRadius, sla::DOWN);
 
         eval_ground_conn(conn, sm, j, EndRadius, "disk_ze.stl");
 
         // Check if the avoidance junction is indeed outside of the disk barrier's
         // edge.
-        auto p = conn.path.back().pos;
+        auto p    = conn.path.back().pos;
         double pR = std::sqrt(p.x() * p.x()) + std::sqrt(p.y() * p.y());
         REQUIRE(pR + FromRadius > CylRadius);
     }
@@ -209,6 +223,7 @@ TEST_CASE("Avoid disk below junction", "[suptreeutils]")
 
 TEST_CASE("Avoid disk below junction with barrier on the side", "[suptreeutils]")
 {
+    using Slic3r::Biz::Algorithms::Execution::ex_seq;
     // In this test there will be a disk mesh with some radius, centered at
     // (0, 0, 0) and above the disk, a junction from which the support pillar
     // should be routed. The algorithm needs to find an avoidance route.
@@ -223,68 +238,75 @@ TEST_CASE("Avoid disk below junction with barrier on the side", "[suptreeutils]"
 
     sla::SupportTreeConfig cfg;
 
-    indexed_triangle_set disk = its_make_cylinder(CylRadius, CylHeight);
-    indexed_triangle_set wall = its_make_cube(1., 2 * CylRadius, JElevX * CylRadius);
+    indexed_triangle_set disk = triangle_mesh::its_make_cylinder(CylRadius, CylHeight);
+    indexed_triangle_set wall = triangle_mesh::its_make_cube(1., 2 * CylRadius, JElevX * CylRadius);
     its_translate(wall, Vec3f{float(FromRadius), -float(CylRadius), 0.f});
-    its_merge(disk, wall);
+    Domain::its_merge(disk, wall);
 
     // 2.5 * CyRadius height should be enough to be able to insert a bridge
     // with 45 degree tilt above the disk.
     sla::Junction j{Vec3d{0., 0., JElevX * CylRadius}, FromRadius};
 
-    sla::SupportableMesh sm{disk, sla::SupportPoints{}, cfg};
+    sla::SupportableMesh sm{.emesh = AABBMesh(disk)};
 
-    SECTION("with elevation") {
-        sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
+    SECTION("with elevation")
+    {
+        sla::GroundConnection conn = sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
 
         eval_ground_conn(conn, sm, j, EndRadius, "disk_with_barrier.stl");
 
         // Check if the avoidance junction is indeed outside of the disk barrier's
         // edge.
-        auto p = conn.path.back().pos;
+        auto p    = conn.path.back().pos;
         double pR = std::sqrt(p.x() * p.x()) + std::sqrt(p.y() * p.y());
         REQUIRE(pR + FromRadius > CylRadius);
     }
 
-    SECTION("without elevation") {
+    SECTION("without elevation")
+    {
         sm.cfg.object_elevation_mm = 0.;
 
-        sla::GroundConnection conn =
-                sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
+        sla::GroundConnection conn = sla::deepsearch_ground_connection(ex_seq, sm, j, EndRadius, sla::DOWN);
 
         eval_ground_conn(conn, sm, j, EndRadius, "disk_with_barrier_ze.stl");
 
         // Check if the avoidance junction is indeed outside of the disk barrier's
         // edge.
-        auto p = conn.path.back().pos;
+        auto p    = conn.path.back().pos;
         double pR = std::sqrt(p.x() * p.x()) + std::sqrt(p.y() * p.y());
         REQUIRE(pR + FromRadius > CylRadius);
     }
 }
 
-TEST_CASE("Find ground route just above ground", "[suptreeutils]") {
+TEST_CASE("Find ground route just above ground", "[suptreeutils]")
+{
     using namespace Slic3r;
+    using Slic3r::Biz::Algorithms::Execution::ex_seq;
 
     sla::SupportTreeConfig cfg;
     cfg.object_elevation_mm = 0.;
 
     sla::Junction j{Vec3d{0., 0., 2. * cfg.head_back_radius_mm}, cfg.head_back_radius_mm};
 
-    sla::SupportableMesh sm{{}, sla::SupportPoints{}, cfg};
-
-    sla::GroundConnection conn =
-        sla::deepsearch_ground_connection(ex_seq, sm, j, Geometry::spheric_to_dir(3 * PI/ 4, PI));
+    sla::SupportableMesh sm{.emesh = AABBMesh(indexed_triangle_set{})};
+    sla::GroundConnection conn = sla::deepsearch_ground_connection(
+        ex_seq,
+        sm,
+        j,
+        Geometry::spheric_to_dir(3 * PI / 4, PI)
+    );
 
     REQUIRE(conn);
 
     REQUIRE(conn.pillar_base->pos.z() >= Approx(ground_level(sm)));
 }
 
-TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
+TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]")
+{
     using namespace Slic3r;
 
-    SECTION("Identical points have the same merge point") {
+    SECTION("Identical points have the same merge point")
+    {
         Vec3f a{0.f, 0.f, 0.f}, b = a;
         auto slope = float(PI / 4.);
 
@@ -299,7 +321,8 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
     // | a *
     // |
     // | b * <= mergept
-    SECTION("Points at different heights have the lower point as mergepoint") {
+    SECTION("Points at different heights have the lower point as mergepoint")
+    {
         Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 0.f, -1.f};
         auto slope = float(PI / 4.);
 
@@ -310,10 +333,11 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
     }
 
     // -|---------> X
-    //  a       b
-    //  *       *
-    //      * <= mergept
-    SECTION("Points at different X have mergept in the middle at lower Z") {
+    // a       b
+    // *       *
+    // * <= mergept
+    SECTION("Points at different X have mergept in the middle at lower Z")
+    {
         Vec3f a{0.f, 0.f, 0.f}, b = {1.f, 0.f, 0.f};
         auto slope = float(PI / 4.);
 
@@ -330,10 +354,11 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
     }
 
     // -|---------> Y
-    //  a       b
-    //  *       *
-    //      * <= mergept
-    SECTION("Points at different Y have mergept in the middle at lower Z") {
+    // a       b
+    // *       *
+    // * <= mergept
+    SECTION("Points at different Y have mergept in the middle at lower Z")
+    {
         Vec3f a{0.f, 0.f, 0.f}, b = {0.f, 1.f, 0.f};
         auto slope = float(PI / 4.);
 
@@ -349,7 +374,8 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
         REQUIRE(!sla::is_outside_support_cone(b, *mergept, slope));
     }
 
-    SECTION("Points separated by less than critical angle have the lower point as mergept") {
+    SECTION("Points separated by less than critical angle have the lower point as mergept")
+    {
         Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -2.f};
         auto slope = float(PI / 4.);
 
@@ -360,10 +386,11 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
     }
 
     // -|----------------------------> Y
-    //  a                          b
-    //  *            * <= mergept  *
+    // a                          b
+    // *            * <= mergept  *
     //
-    SECTION("Points at same height have mergepoint in the middle if critical angle is zero ") {
+    SECTION("Points at same height have mergepoint in the middle if critical angle is zero ")
+    {
         Vec3f a{-1.f, -1.f, -1.f}, b = {-1.5f, -1.5f, -1.f};
         auto slope = EPSILON;
 
@@ -374,4 +401,3 @@ TEST_CASE("BranchingSupports::MergePointFinder", "[suptreeutils]") {
         REQUIRE((*mergept - middle).norm() < 4 * EPSILON);
     }
 }
-

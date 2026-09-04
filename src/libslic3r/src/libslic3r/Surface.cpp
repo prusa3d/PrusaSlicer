@@ -1,0 +1,117 @@
+#include "Surface.hpp"
+#include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
+#include "Slic3r/Biz/Algorithms/ClipperUtils.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
+#include "libslic3r/ExPolygon.hpp"
+#include "libslic3r/libslic3r.h"
+
+using Slic3r::Biz::Algorithms::ClipperUtils::diff_ex;
+
+namespace Slic3r {
+
+namespace BB = Biz::Algorithms::BoundingBox;
+
+BoundingBox get_extents(const Surface &surface)
+{
+    return get_extents(surface.expolygon.contour);
+}
+
+BoundingBox get_extents(const Surfaces &surfaces)
+{
+    BoundingBox bbox;
+    if (! surfaces.empty()) {
+        bbox = get_extents(surfaces.front());
+        for (size_t i = 1; i < surfaces.size(); ++ i)
+            bbox = BB::merge(bbox, get_extents(surfaces[i]));
+    }
+    return bbox;
+}
+
+BoundingBox get_extents(const SurfacesPtr &surfaces)
+{
+    BoundingBox bbox;
+    if (! surfaces.empty()) {
+        bbox = get_extents(*surfaces.front());
+        for (size_t i = 1; i < surfaces.size(); ++ i)
+            bbox = BB::merge(bbox, get_extents(*surfaces[i]));
+    }
+    return bbox;
+}
+
+Surfaces surfaces_diff(const Surfaces &surfaces, const Polygons &clip)
+{
+    Surfaces surfaces_out;
+    surfaces_out.reserve(surfaces.size());
+
+    for (const Surface &surface : surfaces) {
+        surfaces_append(surfaces_out, diff_ex(surface.expolygon, clip), surface.surface_type);
+    }
+
+    return surfaces_out;
+}
+
+const char* surface_type_to_color_name(const SurfaceType surface_type)
+{
+    switch (surface_type) {
+        case stTop:             return "rgb(255,0,0)"; // "red";
+        case stBottom:          return "rgb(0,255,0)"; // "green";
+        case stBottomBridge:    return "rgb(0,0,255)"; // "blue";
+        case stInternal:        return "rgb(255,255,128)"; // yellow 
+        case stInternalSolid:   return "rgb(255,0,255)"; // magenta
+        case stInternalBridge:  return "rgb(0,255,255)";
+        case stInternalVoid:    return "rgb(128,128,128)";
+        case stSolidOverBridge: return "rgb(255,128,0)"; // orange
+        case stPerimeter:       return "rgb(128,0,0)"; // maroon
+        default:                return "rgb(64,64,64)";
+    };
+}
+
+Point export_surface_type_legend_to_svg_box_size()
+{
+    return scaled(Vec2d(1.+10.*8., 3.));
+}
+
+void export_surface_type_legend_to_svg(Biz::Algorithms::SVG::SVG &svg, const Point &pos)
+{
+    // 1st row
+    coord_t pos_x0 = pos(0) + scale_(1.);
+    coord_t pos_x = pos_x0;
+    coord_t pos_y = pos(1) + scale_(1.5);
+    coord_t step_x = scale_(10.);
+    svg.draw_legend(Point(pos_x, pos_y), "perimeter"      , surface_type_to_color_name(stPerimeter));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "top"            , surface_type_to_color_name(stTop));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "bottom"         , surface_type_to_color_name(stBottom));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "bottom bridge"  , surface_type_to_color_name(stBottomBridge));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "invalid"        , surface_type_to_color_name(SurfaceType(-1)));
+    // 2nd row
+    pos_x = pos_x0;
+    pos_y = pos(1)+scale_(2.8);
+    svg.draw_legend(Point(pos_x, pos_y), "internal"       , surface_type_to_color_name(stInternal));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "internal solid" , surface_type_to_color_name(stInternalSolid));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "internal bridge", surface_type_to_color_name(stInternalBridge));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "internal void"  , surface_type_to_color_name(stInternalVoid));
+    pos_x += step_x;
+    svg.draw_legend(Point(pos_x, pos_y), "over bridge"    , surface_type_to_color_name(stSolidOverBridge));
+}
+
+bool export_to_svg(const char *path, const Surfaces &surfaces, const float transparency)
+{
+    BoundingBox bbox;
+    for (Surfaces::const_iterator surface = surfaces.begin(); surface != surfaces.end(); ++surface)
+        bbox = BB::merge(bbox, get_extents(surface->expolygon));
+
+    Biz::Algorithms::SVG::SVG svg(path, bbox);
+    for (Surfaces::const_iterator surface = surfaces.begin(); surface != surfaces.end(); ++surface)
+        svg.draw(surface->expolygon, surface_type_to_color_name(surface->surface_type), transparency);
+    svg.Close();
+    return true;
+}
+
+}

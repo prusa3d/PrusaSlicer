@@ -1,0 +1,109 @@
+kind: filament
+inherits:
+- '*PACF*'
+name: colorFabb PA-CF
+id: colorFabb PA-CF
+# XL/MK4/COREONE 0.6
+values:
+  filament_vendor: colorFabb
+  first_layer_temperature: 270
+  temperature: 270
+  filament_colour: '#ECFAFF'
+  first_layer_bed_temperature: 90
+  bed_temperature: 90
+  extrusion_multiplier: 1
+  filament_cost: 66.39
+  filament_density: 1.3
+  filament_spool_weight: 0
+  bridge_fan_speed: 25
+  min_fan_speed: 10
+  max_fan_speed: 25
+  fan_always_on: false
+  cooling: true
+  overhang_fan_speed_0: 25
+  overhang_fan_speed_1: 15
+  slowdown_below_layer_time: 8
+  filament_max_volumetric_speed: 6
+  filament_abrasive: true
+variants:
+## CORE One
+- condition: printer.base_model == "COREONE"
+  id: 8YKkMoWIRtmEHthb/nKbyg
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+    min_fan_speed: 15
+    max_fan_speed: 30
+    bridge_fan_speed: 30
+    fan_below_layer_time: 30
+    overhang_fan_speed_0: 30
+    overhang_fan_speed_1: 20
+  variants:
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: jREU6xbvRc2rznV9qMD0fQ
+    values:
+      filament_max_volumetric_speed: 6
+  # END
+  - name: '*quit*'
+    id: Hgt5u6aMR46x2Um+cf//Cg
+## XL
+- condition: printer.model == "XL"
+  id: 4U2RtjfYSCG7768tpgkXCg
+  variants:
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: ScdPgKXRT8Suagq/PDcgTA
+    values:
+      filament_max_volumetric_speed: 6
+  # END
+  - name: '*quit*'
+    id: 6f9TnA64Sp6XWrKABiH7JQ
+## XL+
+- condition: printer.model == "XLP"
+  id: vDdyX/u5Sny2YLPvspyOsg
+  values:
+    bridge_fan_speed: 25
+    min_fan_speed: 12
+    max_fan_speed: 20
+  variants:
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: oaSgunbGQJiBHouZH+LY+Q
+    values:
+      filament_max_volumetric_speed: 6
+  # END
+  - name: '*quit*'
+## MK4
+    id: tnikNfFQQqiSieLdLme0mQ
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: 9WccKWJwRUmLrntWaPTfMg
+  variants:
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: WeuwIdFLS1+1VLeXVw7lIg
+    values:
+      filament_max_volumetric_speed: 6
+  # END
+  - name: '*quit*'
+    id: noGEbb/YTByOzIjwmeeBWg
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: gy7PBvFaT7C0WriZ+OZlrQ
+  values:
+    bridge_fan_speed: 25
+    min_fan_speed: 10
+    max_fan_speed: 20
+  variants:
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: VP6VDnXuRWC8w/smuXwO8w
+    values:
+      filament_max_volumetric_speed: 6
+  # END
+  - name: '*quit*'
+# END
+    id: BA8t6oP/Q/qXesTg9Dr5gg
+- name: '*quit*'
+
+  id: gzChW9FCTR2kW+Dttm4ZiA

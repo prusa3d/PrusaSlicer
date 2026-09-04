@@ -1,0 +1,37 @@
+--- a/include/wx/generic/private/widthcalc.h
++++ b/include/wx/generic/private/widthcalc.h
+@@ -101,9 +101,9 @@ public:
+                 UpdateWithRow(row);
+             }
+ 
+-            wxLogTrace("items container",
+-                       "determined best size from %zu top, %zu bottom "
+-                       "plus %zu more visible items out of %zu total",
++            wxLogTrace(wxString::FromAscii("items container"),
++                       wxString::FromAscii("determined best size from %zu top, %zu bottom "
++                       "plus %zu more visible items out of %zu total"),
+                        top_part_end,
+                        count - bottom_part_start,
+                        last_visible - first_visible,
+--- a/include/wx/variant.h
++++ b/include/wx/variant.h
+@@ -524,7 +524,7 @@ wxClassInfo* classname##VariantData::GetValueClassInfo()\
+ \
+ expdecl classname& operator << ( classname &value, const wxVariant &variant )\
+ {\
+-    wxASSERT( variant.GetType() == #classname );\
++    wxASSERT( variant.GetType() == wxString::FromAscii(#classname) );\
+     \
+     classname##VariantData *data = (classname##VariantData*) variant.GetData();\
+     value = data->GetValue();\
+--- a/src/gtk/toplevel.cpp
++++ b/src/gtk/toplevel.cpp
+@@ -430,7 +430,7 @@ void wxTopLevelWindowGTK::GTKHandleRealized()
+                 if ((m_gdkFunc & GDK_FUNC_CLOSE) == 0)
+                     layout.Replace("close", empty, false);
+ 
+-                gtk_header_bar_set_decoration_layout(GTK_HEADER_BAR(titlebar), layout);
++                gtk_header_bar_set_decoration_layout(GTK_HEADER_BAR(titlebar), layout.c_str());
+             }
+ #endif // 3.12
+             // Don't set WM decorations when GTK is using Client Side Decorations

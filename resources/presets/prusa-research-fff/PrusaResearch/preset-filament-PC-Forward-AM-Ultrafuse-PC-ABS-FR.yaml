@@ -1,0 +1,41 @@
+kind: filament
+inherits:
+- '*PC*'
+name: Forward AM Ultrafuse PC-ABS-FR
+id: Forward AM Ultrafuse PC-ABS-FR
+values:
+  filament_vendor: Forward AM
+  bed_temperature: 105
+  filament_density: 1.17
+  retract_layer_change: false
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: 67zrNO/LS1OVja9iBCLu8w
+  values:
+    max_fan_speed: 20
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: /O9OzWmaQQ+TYedAOeVGeQ
+    values:
+      filament_max_volumetric_speed: 8
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: qsxSsigCS5qQf2DSb9v/Ng
+      values:
+        filament_max_volumetric_speed: 18
+- condition: printer.model=~/(MK4|XL)/
+  id: Fxv5TOpqRYyh7ZrIo1OppA
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: dr64YT32Rfe9t9u8MnG2lg
+    values:
+      filament_max_volumetric_speed: 8
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: 3dTLUtX4RXS1ZQjuxSaZ5w
+      values:
+        filament_max_volumetric_speed: 18
+- condition: printer.model == "MINI"
+  id: nDW/1+aORzeFLoFzweBJGg
+  values:
+    bed_temperature: 100

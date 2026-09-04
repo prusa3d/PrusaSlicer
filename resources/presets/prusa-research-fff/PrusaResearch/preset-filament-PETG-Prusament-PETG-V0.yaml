@@ -1,0 +1,76 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*PrusamentPETGV0_MAXVOLSPEED*'
+name: Prusament PETG V0
+id: Prusament PETG V0
+values:
+  extrusion_multiplier: 1.04
+  filament_cost: '54.99'
+  filament_vendor: Prusa Polymers
+  filament_spool_weight: 278
+  first_layer_temperature: 230
+  temperature: 230
+---
+kind: filament
+# Maximum volumetric speed limits
+id: '*PrusamentPETGV0_MAXVOLSPEED*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: qk+Zbt0sToKxRwuYjUKaog
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: RwA8ZYebSySUd3dG+olxXQ
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: tNG+vN3mTfuC/rNM6oqz5Q
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: HXDEwDWkT7GsBBuWmn1eqQ
+    values:
+      filament_max_volumetric_speed: 10
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: Rl/6m4soQ/Kl0J6nNqNwCA
+      values:
+        filament_max_volumetric_speed: 16
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: cXuB4ptzQ7+ChvtkteVQBw
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: CLucWhWwRgmRadiRHgldJg
+      values:
+        filament_max_volumetric_speed: 18
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: LONW1CI/Q16KEG6AuY7/5w
+    values:
+      filament_max_volumetric_speed: 17
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: cimVh5PUQSiKX4lc6CUT1Q
+      values:
+        filament_max_volumetric_speed: 22
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: F5frUZUBS3yXStmMI3kcvQ
+    values:
+      filament_max_volumetric_speed: 22
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: VKplaVkzSuO6QUNahiHyfw
+      values:
+        filament_max_volumetric_speed: 27

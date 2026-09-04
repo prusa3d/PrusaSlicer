@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <mask id="arrow-cutout">
+      <rect width="32" height="32" fill="white" />
+      <polygon points="16,7 23,14 19,14 19,27 13,27 13,14 9,14" fill="black" stroke="black" stroke-width="4" stroke-linejoin="round" />
+    </mask>
+  </defs>
+
+  <path mask="url(#arrow-cutout)" d="M10,23 C5.5,23 3,19.5 3,16 C3,13 5,10.5 8,10 C9,6.5 12.5,5 16,5 C19.5,5 23,7 24,10 C26.5,10.5 29,12.5 29,16 C29,19.5 26.5,23 22,23 L10,23 Z" fill="none" stroke="#808080" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+
+  <polygon points="16,7 23,14 19,14 19,27 13,27 13,14 9,14" fill="#ED6B21" stroke="#ED6B21" stroke-width="1.5" stroke-linejoin="round" />
+</svg>

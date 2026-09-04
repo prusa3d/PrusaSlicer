@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Cookiecad PLA
+id: Cookiecad PLA
+values:
+  filament_cost: '34.95'
+  filament_vendor: Cookiecad
+  filament_density: 1.25
+  filament_spool_weight: 180

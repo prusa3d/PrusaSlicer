@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*PLA*'
+- '*sheets_PLA_GreenyHT*'
+name: Spectrum Tough PLA
+id: Spectrum Tough PLA
+values:
+  filament_vendor: Spectrum
+  extrusion_multiplier: 0.95
+  filament_density: 1.54
+  first_layer_temperature: 215
+  temperature: 235

@@ -1,0 +1,39 @@
+kind: vendor
+id: SecondVendor
+name: Second Vendor
+version: 1.0.0
+features:
+  printer: {}
+  tool: {}
+---
+kind: printer
+technology: SLA
+id: sl1s
+name: SL1S SPEED
+model:
+  base_model: SL1
+  model: SL1S
+tool_count: 1
+visual:
+  bed_model: sl1s_bed.stl
+  bed_texture: sl1s.svg
+  thumbnail: SL1S_thumbnail.png
+
+---
+kind: tool
+technology: SLA
+name: SLA default
+id: sla_default
+---
+kind: sheet
+name: SLA default
+id: sla_default
+type: ''
+---
+kind: printer_config
+id: sl1s
+printer: sl1s
+name: SL1S
+tools:
+- tool: sla_default
+sheet: sla_default

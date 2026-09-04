@@ -1,0 +1,68 @@
+id: sl1
+kind: sla_printer
+name: Original Prusa SL1
+condition: printer.model == "SL1"
+values:
+  bed_shape:
+  - 1.48x1.02
+  - 119.48x1.02
+  - 119.48x67.02
+  - 1.48x67.02
+  default_sla_material_profile: Prusa Orange Tough @0.05
+  default_sla_print_profile: 0.05 Normal
+  display_height: '68.04'
+  display_orientation: portrait
+  display_pixels_x: '2560'
+  display_pixels_y: '1440'
+  display_width: '120.96'
+  max_exposure_time: '120'
+  max_initial_exposure_time: '300'
+  max_print_height: '150'
+  min_exposure_time: '1'
+  min_initial_exposure_time: '1'
+  printer_correction: [1.0, 1.0]
+  printer_model: SL1
+  printer_notes: Don't remove the following keywords! These keywords are used in the "compatible printer" condition of the print and filament profiles to link the particular print and filament profiles to this printer profile.\nPRINTER_VENDOR_PRUSA3D\nPRINTER_MODEL_SL1\n
+  printer_technology: SLA
+  printer_variant: default
+  thumbnails:
+  - 400x400
+  - 800x480
+---
+id: sl1s
+kind: sla_printer
+name: Original Prusa SL1S SPEED
+condition: printer.model == "SL1S"
+values:
+  bed_shape:
+  - 0.5x0.5
+  - 127.5x0.5
+  - 127.5x80.5
+  - 0.5x80.5
+  default_sla_material_profile: Prusa Orange Tough @0.05 SL1S
+  default_sla_print_profile: 0.05 Normal @SL1S
+  display_height: '81'
+  display_mirror_x: '1'
+  display_mirror_y: '0'
+  display_orientation: portrait
+  display_pixels_x: '2560'
+  display_pixels_y: '1620'
+  display_width: '128'
+  elefant_foot_compensation: '0.2'
+  elefant_foot_min_width: '0.2'
+  fast_tilt_time: '2.5'
+  gamma_correction: '1'
+  max_exposure_time: '120'
+  max_initial_exposure_time: '300'
+  max_print_height: '150'
+  min_exposure_time: '1'
+  min_initial_exposure_time: '1'
+  printer_correction: [1.0, 1.0]
+  printer_model: SL1S
+  printer_technology: SLA
+  printer_variant: default
+  relative_correction: [1.0, 1.0]
+  slow_tilt_time: '5'
+  thumbnails:
+  - 400x400
+  - 800x480

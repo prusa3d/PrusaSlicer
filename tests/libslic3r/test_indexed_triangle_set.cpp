@@ -1,17 +1,24 @@
 #include <iostream>
 #include <fstream>
-#include <catch2/catch.hpp>
+#include <random>
+#include <catch2/catch_test_macros.hpp>
 
-#include "libslic3r/TriangleMesh.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
+#include "libslic3r/Point.hpp"
+#include "Slic3r/Biz/Algorithms/AABBTreeIndirect.hpp"
 
 using namespace Slic3r;
+using Domain::TriangleMesh;
+using Domain::Index3;
+namespace triangle_mesh = Biz::Algorithms::TriangleMesh;
+namespace AABBTreeIndirect = Biz::Algorithms::AABBTreeIndirect;
 
 TEST_CASE("Split empty mesh", "[its_split][its]") {
     using namespace Slic3r;
 
     indexed_triangle_set its;
 
-    std::vector<indexed_triangle_set> res = its_split(its);
+    std::vector<indexed_triangle_set> res = triangle_mesh::its_split(its);
 
     REQUIRE(res.empty());
 }
@@ -19,9 +26,9 @@ TEST_CASE("Split empty mesh", "[its_split][its]") {
 TEST_CASE("Split simple mesh consisting of one part", "[its_split][its]") {
     using namespace Slic3r;
 
-    auto cube = its_make_cube(10., 10., 10.);
+    auto cube = triangle_mesh::its_make_cube(10., 10., 10.);
 
-    std::vector<indexed_triangle_set> res = its_split(cube);
+    std::vector<indexed_triangle_set> res = triangle_mesh::its_split(cube);
 
     REQUIRE(res.size() == 1);
     REQUIRE(res.front().indices.size() == cube.indices.size());
@@ -41,16 +48,16 @@ void debug_write_obj(const std::vector<indexed_triangle_set> &res, const std::st
 TEST_CASE("Split two non-watertight mesh", "[its_split][its]") {
     using namespace Slic3r;
 
-    auto cube1 = its_make_cube(10., 10., 10.);
+    auto cube1 = triangle_mesh::its_make_cube(10., 10., 10.);
     cube1.indices.pop_back();
     auto cube2 = cube1;
 
     its_transform(cube1, identity3f().translate(Vec3f{-5.f, 0.f, 0.f}));
     its_transform(cube2, identity3f().translate(Vec3f{5.f, 0.f, 0.f}));
 
-    its_merge(cube1, cube2);
+    Domain::its_merge(cube1, cube2);
 
-    std::vector<indexed_triangle_set> res = its_split(cube1);
+    std::vector<indexed_triangle_set> res = triangle_mesh::its_split(cube1);
 
     REQUIRE(res.size() == 2);
     REQUIRE(res[0].indices.size() == res[1].indices.size());
@@ -64,13 +71,13 @@ TEST_CASE("Split two non-watertight mesh", "[its_split][its]") {
 TEST_CASE("Split non-manifold mesh", "[its_split][its]") {
     using namespace Slic3r;
 
-    auto cube = its_make_cube(10., 10., 10.), cube_low = cube;
+    auto cube = triangle_mesh::its_make_cube(10., 10., 10.), cube_low = cube;
 
     its_transform(cube_low, identity3f().translate(Vec3f{10.f, 10.f, 10.f}));
-    its_merge(cube, cube_low);
-    its_merge_vertices(cube);
+    Domain::its_merge(cube, cube_low);
+    triangle_mesh::its_merge_vertices(cube);
 
-    std::vector<indexed_triangle_set> res = its_split(cube);
+    std::vector<indexed_triangle_set> res = triangle_mesh::its_split(cube);
 
     REQUIRE(res.size() == 2);
     REQUIRE(res[0].indices.size() == res[1].indices.size());
@@ -84,14 +91,14 @@ TEST_CASE("Split non-manifold mesh", "[its_split][its]") {
 TEST_CASE("Split two watertight meshes", "[its_split][its]") {
     using namespace Slic3r;
 
-    auto sphere1 = its_make_sphere(10., 2 * PI / 200.), sphere2 = sphere1;
+    auto sphere1 = triangle_mesh::its_make_sphere(10., 2 * PI / 200.), sphere2 = sphere1;
 
     its_transform(sphere1, identity3f().translate(Vec3f{-5.f, 0.f, 0.f}));
     its_transform(sphere2, identity3f().translate(Vec3f{5.f, 0.f, 0.f}));
 
-    its_merge(sphere1, sphere2);
+    Domain::its_merge(sphere1, sphere2);
 
-    std::vector<indexed_triangle_set> res = its_split(sphere1);
+    std::vector<indexed_triangle_set> res = triangle_mesh::its_split(sphere1);
 
     REQUIRE(res.size() == 2);
     REQUIRE(res[0].indices.size() == res[1].indices.size());
@@ -102,7 +109,7 @@ TEST_CASE("Split two watertight meshes", "[its_split][its]") {
     debug_write_obj(res, "parts_watertight");
 }
 
-#include <libslic3r/QuadricEdgeCollapse.hpp>
+#include "Slic3r/Biz/Algorithms/QuadricEdgeCollapse.hpp"
 static float triangle_area(const Vec3f &v0, const Vec3f &v1, const Vec3f &v2)
 {
     Vec3f ab = v1 - v0;
@@ -110,7 +117,7 @@ static float triangle_area(const Vec3f &v0, const Vec3f &v1, const Vec3f &v2)
     return ab.cross(ac).norm() / 2.f;
 }
 
-static float triangle_area(const Vec3crd &triangle_inices, const std::vector<Vec3f> &vertices)
+static float triangle_area(const Domain::Index3 &triangle_inices, const std::vector<Vec3f> &vertices)
 {
     return triangle_area(vertices[triangle_inices[0]],
                          vertices[triangle_inices[1]],
@@ -166,7 +173,6 @@ std::vector<Vec3f> its_sample_surface(const indexed_triangle_set &its,
 }
 
 
-#include "libslic3r/AABBTreeIndirect.hpp"
 
 struct CompareConfig
 {
@@ -199,7 +205,7 @@ bool is_similar(const indexed_triangle_set &from,
         collect_distances(vertex);
     }
 
-    for (const Vec3i &t : to.indices) {
+    for (const Index3 &t : to.indices) {
         Vec3f center(0,0,0);
         for (size_t i = 0; i < 3; ++i) { 
             center += to.vertices[t[i]] / 3;
@@ -219,15 +225,15 @@ bool is_similar(const indexed_triangle_set &from,
 TEST_CASE("Simplify mesh by Quadric edge collapse to 5%", "[its]")
 {
     TriangleMesh mesh = load_model("frog_legs.obj");
-    double original_volume = its_volume(mesh.its);
+    double original_volume = Domain::its_volume(mesh.its);
     uint32_t wanted_count = mesh.its.indices.size() * 0.05;
     REQUIRE_FALSE(mesh.empty());
     indexed_triangle_set its = mesh.its; // copy
     float max_error = std::numeric_limits<float>::max();
-    its_quadric_edge_collapse(its, wanted_count, &max_error);
+    Slic3r::Biz::Algorithms::its_quadric_edge_collapse(its, wanted_count, &max_error);
     //its_write_obj(its, "frog_legs_qec.obj");
     CHECK(its.indices.size() <= wanted_count);
-    double volume = its_volume(its);
+    double volume = Domain::its_volume(its);
     CHECK(fabs(original_volume - volume) < 33.);
 
     CompareConfig cfg;

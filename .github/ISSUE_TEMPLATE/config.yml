@@ -1,12 +1,18 @@
 contact_links:
-  - name: Do you need Support?
+  - name: 💡 Feature request or idea
+    url: https://github.com/prusa3d/PrusaSlicer/discussions/categories/feature-requests
+    about: Want a new feature or have an idea? Share it in Discussions — that's where we collect and discuss them.
+  - name: ❓ Community help
+    url: https://github.com/prusa3d/PrusaSlicer/discussions/categories/community-help
+    about: Need help, or not sure whether it's really a bug? Ask the community in Discussions.
+  - name: 🛟  Prusa official support
     url: https://www.prusa3d.com/page/prusaslicer-support-form_233563/
-    about: If you are not sure whether what you are reporting is a bug, please contact our support team first. We are providing full 24/7 customer support.
-  - name: PrusaSlicer Manual
+    about: Prefer official help? Please contact our support team. We are providing full 24/7 customer support.
+  - name: 📖  PrusaSlicer manual
     url: https://help.prusa3d.com/en/article/customer-support_2287/
     about: We have a comprehensive customer support page and help documentation that could be helpful for troubleshooting.
-  - name: PrusaPrinters Forum
+  - name: 💬  PrusaPrinters forum
     url: https://forum.prusaprinters.org/forum/prusaslicer/
-    about: Please get in touch on our PrusaPrinters Community Forum! (Not an official support channel.)
-    
+    about: Join the PrusaPrinters community forum. (Not an official support channel.)
+
 blank_issues_enabled: false

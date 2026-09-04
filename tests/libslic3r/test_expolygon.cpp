@@ -1,10 +1,14 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
+#include "Slic3r/Biz/Algorithms/ExPolygon.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/ExPolygon.hpp"
 
 using namespace Slic3r;
+using namespace Slic3r::Biz;
+using namespace Catch;
 
 static inline bool points_close(const Point &p1, const Point &p2)
 {
@@ -23,11 +27,11 @@ static bool polygons_close_permuted(const Polygon &poly1, const Polygon &poly2, 
 
 SCENARIO("Basics", "[ExPolygon]") {
     GIVEN("ccw_square") {
-        Polygon ccw_square{ { 100, 100 }, { 200, 100 }, { 200, 200 }, { 100, 200 } };
-        Polygon cw_hole_in_square{ { 140, 140 }, { 140, 160 }, { 160, 160 }, { 160, 140 } };
+        Polygon ccw_square{ Point{ 100, 100 }, Point{ 200, 100 }, Point{ 200, 200 }, Point{ 100, 200 } };
+        Polygon cw_hole_in_square{ Point{ 140, 140 }, Point{ 140, 160 }, Point{ 160, 160 }, Point{ 160, 140 } };
         ExPolygon expolygon { ccw_square, cw_hole_in_square };
         THEN("expolygon is valid") {
-            REQUIRE(expolygon.is_valid());
+            REQUIRE(Algorithms::ExPolygon::is_valid(expolygon));
         }
         THEN("expolygon area") {
             REQUIRE(expolygon.area() == Approx(100*100-20*20));
@@ -65,3 +69,4 @@ SCENARIO("Basics", "[ExPolygon]") {
         }
     }
 }
+

@@ -1,65 +1,62 @@
-name: Bug Report
-description: File a bug report
+name: 🐞 Bug Report
+description: Found a reproducible bug in PrusaSlicer? Report it here.
 body:
   - type: markdown
     attributes:
       value: |
-        Before filing, please check if the issue already exists (either open or closed) by using the search bar on the issues page. If it does, comment there. Even if it's closed, we can reopen it based on your comment.
+        > [!IMPORTANT]
+        > Before filing, please read the [issue tracker policy](https://github.com/prusa3d/PrusaSlicer#issue-tracker-policy), maybe you will find, that you would rather start a [discussion](https://github.com/prusa3d/PrusaSlicer/discussions) than fill in a bug report. Also, make sure that the bug report does not **already exist** (either open or closed) by using the search bar in the [issue tracker](https://github.com/prusa3d/PrusaSlicer/issues?q=is%3Aissue). If it does, comment there even if it's closed. We can **reopen it based on your comment**.
   - type: textarea
     id: what-happened
     attributes:
       label: Description of the bug
-      description: What happened? Please, enclose a screenshot whenever possible (even when you think the description is clear). What did you expect to happen? In case of 3D rendering issues, please attach the content of menu Help -> System Info dialog.
+      description: Please provide a **detailed description** and a **screenshot** if possible. Even if you think the description is clear, still provide the screenshot.
       placeholder: |
-        What is the problem?
-        What did you expect?
-        You paste or drop screenshots here 
+        Description and screenshots
     validations:
       required: true
   - type: textarea
     id: to_reproduce
     attributes:
-      label: Project file & How to reproduce
-      description: "*Please* upload a ZIP archive containing the project file used when the problem arise. Please export it just before the problem occurs. Even if you did nothing and/or there is no object, export it! (it contains your current configuration)."
+      label: Zipped project file & How to reproduce
+      description: "Save your project as 3mf then **ZIP** it and then upload the **ZIP** archive containing the project file. You **cannot** upload the 3mf file as is - **you need to ZIP it**."
       placeholder: |
-        `File`->`Save project as...` then zip it & drop it here
-        Also, if needed include the steps to reproduce the bug:
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
-    validations:
-      required: true
-  - type: checkboxes
-    attributes:
-      label: Checklist of files included above
-      options:
-      - label: Project file
-      - label: Screenshot
+        Steps to reproduce the issue and the zipped 3mf file
     validations:
       required: true
   - type: input
     id: version
     attributes:
       label: Version of PrusaSlicer
-      description: What version of PrusaSlicer are you running? You can see the full version in `Help` -> `About PrusaSlicer`.
-      placeholder: e.g. 2.4.1-alpha2-win64 / 2.3.3-linux / 2.4.1-alpha0+61-win64-gcd2459455 ...
+      description: What version of PrusaSlicer are you running?
+      placeholder: "e.g.: 3.0.0-beta1"
+    validations:
+      required: true
+  - type: dropdown
+    id: os_type
+    attributes:
+      label: Operating system
+      description: What operating system are you on?
+      multiple: true
+      options:
+        - Windows
+        - macOS
+        - Linux
     validations:
       required: true
   - type: input
     id: os
     attributes:
-      label: Operating system
-      description: with the version if possible
-      placeholder: e.g. Windows 7/8/10/11 ... , Ubuntu 22.04/Debian ... , macOS 10.15/11.1 ...
+      label: Operating system version
+      description: On macOS and Windows a version number will suffice, on Linux, please also provide the name of the distribution you are on.
+      placeholder: "e.g.: 11"
     validations:
       required: true
   - type: input
     id: printer
     attributes:
       label: Printer model
-      description: Please, fill this in even when it seems irrelevant.
-      placeholder: voron 2.4 with afterburner
+      description: Please, fill this in even if it seems irrelevant.
+      placeholder: "e.g.: Prusa CORE One"
     validations:
       required: true
-

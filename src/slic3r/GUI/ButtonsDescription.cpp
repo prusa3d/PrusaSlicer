@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ButtonsDescription.hpp"
 #include <wx/sizer.h>
 #include <wx/string.h>
@@ -74,7 +78,7 @@ wxBitmapBundle * ModePaletteComboBox::get_bmp(const std::vector<std::string> &pa
 		// Create the bitmap with color bars.
 		std::vector<wxBitmapBundle*> bmps;
 		for (const auto& color : palette) {
-			bmps.emplace_back(get_bmp_bundle("mode", icon_height, color));
+			bmps.emplace_back(get_bmp_bundle("mode", icon_height, icon_height, color));
 			bmps.emplace_back(get_empty_bmp_bundle(wxOSX ? 5 : 6, icon_height));
 		}
 		bmp_bndl = bitmap_cache().insert_bndl(bitmap_key, bmps);

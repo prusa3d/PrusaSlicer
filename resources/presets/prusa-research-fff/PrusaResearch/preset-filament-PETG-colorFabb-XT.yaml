@@ -1,0 +1,11 @@
+kind: filament
+inherits:
+- '*PET*'
+name: colorFabb XT
+id: colorFabb XT
+values:
+  filament_vendor: colorFabb
+  filament_cost: 62.9
+  filament_spool_weight: 236
+  first_layer_temperature: 260
+  temperature: 270

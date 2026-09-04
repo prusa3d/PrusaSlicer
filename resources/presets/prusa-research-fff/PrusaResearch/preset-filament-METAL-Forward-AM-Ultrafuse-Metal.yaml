@@ -1,0 +1,25 @@
+kind: filament
+inherits:
+- '*common*'
+- '*ABS*'
+name: Forward AM Ultrafuse Metal
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.4 and tool.nozzle_diameter <= 0.6 and tool.nozzle_diameter != 0.5 and feeder.base_model!~/.*MMU.*/
+id: Forward AM Ultrafuse Metal
+values:
+  filament_abrasive: true
+  filament_type: METAL
+  filament_vendor: Forward AM
+  extrusion_multiplier: 1.08
+  first_layer_bed_temperature: 100
+  bed_temperature: 100
+  first_layer_temperature: 250
+  temperature: 250
+  pressure_advance: enabled
+  pressure_advance_value: 0
+  filament_max_volumetric_speed: 4
+  bridge_fan_speed: 0
+  min_fan_speed: 0
+  max_fan_speed: 0
+  cooling: false
+  filament_density: 4.5
+

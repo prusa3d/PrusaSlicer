@@ -1,0 +1,346 @@
+kind: filament
+inherits:
+- '*PLAFILL*'
+- '*NumakersPLAWOOD_P_ADVANCE*'
+name: Numakers PLA Wood
+id: Numakers PLA Wood
+values:
+  filament_vendor: Numakers
+  extrusion_multiplier: 1.027
+  filament_cost: '27.99'
+  filament_spool_weight: 230
+  filament_density: 1.24
+  first_layer_temperature: 230
+  temperature: 220
+variants:
+  ## C1
+- condition: printer.base_model == "COREONE"
+  id: 9uTX3ienTEmVQDjEvn+ZXA
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: rsYMj67fQdOVmhmjb715qw
+    values:
+      filament_max_volumetric_speed: 13
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: JQZrLdB9R5qXPMBZ6A5gog
+    values:
+      filament_max_volumetric_speed: 14
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: VgJo8aBORhW2aQFplZzjwA
+    values:
+      filament_max_volumetric_speed: 15
+  # C1 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: yrRKGvQBRhaysx9+CFlA4A
+    values:
+      filament_max_volumetric_speed: 17
+## XL
+- condition: printer.base_model == "XL"
+  id: 33xb1KrOTJ6QG5vyYSiKXQ
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 85J1wizgQ2aPmO3h3wLnoQ
+    values:
+      filament_max_volumetric_speed: 13
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: vmttAnB2ROyPh9TV0FTpfg
+    values:
+      filament_max_volumetric_speed: 14
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: +RyGWk5iQI+VImX9pL0bOw
+    values:
+      filament_max_volumetric_speed: 15
+  # XL 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: L5EFp55/QlCBMDjFPhLo5A
+    values:
+      filament_max_volumetric_speed: 17
+## MK4
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: iZBzqY/ySwuTV5tsSDbBhw
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: mQGjscctRlqULQzhw3GfXw
+    values:
+      filament_max_volumetric_speed: 13
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: /cpd6jgySrOa2WRhP4egsA
+    values:
+      filament_max_volumetric_speed: 14
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: Xl0eDMzeReGB+0To7usULQ
+    values:
+      filament_max_volumetric_speed: 15
+  # MK4 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: Ack13Nt3TN6iQ8C1HNB4RA
+    values:
+      filament_max_volumetric_speed: 17
+## MK4S
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: AnXEK5omTJqF58ZZr/M6iQ
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: ubko9CJtR4GYHYdY31hPBQ
+    values:
+      filament_max_volumetric_speed: 13
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: O2FQMU3+QRKUnTE7aUn1TQ
+    values:
+      filament_max_volumetric_speed: 14
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: DtC6lk4fQO2f2EADIazWRw
+    values:
+      filament_max_volumetric_speed: 15
+  # MK4S 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: r1cAlSGJRl+68KUbywHXCw
+    values:
+      filament_max_volumetric_speed: 17
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: GQgZ4huvTyqlr4+O+NaZhg
+  variants:
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: Ztljm2wSQK6K0hIM2rLPyw
+    values:
+      filament_max_volumetric_speed: 12
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: bOvu2FdESJ2H5La5i6Y7ng
+    values:
+      filament_max_volumetric_speed: 13
+  # MK3.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: AxQU57f4QPCqre0gOXfvUw
+    values:
+      filament_max_volumetric_speed: 15
+  # MK3.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: LNP0zWlwQIKeBC7RJdJNXw
+    values:
+      filament_max_volumetric_speed: 15
+## MINI
+- condition: printer.base_model == "MINI"
+  id: ghwO/8biSyeDp5O0I4eodQ
+  variants:
+  # MINI 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 06tbuxKeS0SmMDouubgyDQ
+    values:
+      filament_max_volumetric_speed: 10
+  # MINI 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: eRm6R4fyTqWh1YxH7phboQ
+    values:
+      filament_max_volumetric_speed: 12
+  # MINI 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: CiiYcwIiRyKkIp23nti2Fw
+    values:
+      filament_max_volumetric_speed: 15
+## MK3, MK3S and MK2.5, MK2.5S
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: yx1chqI9Rb64kj5fAl2PzA
+  variants:
+  # MK3 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: y3xbXagSSjqiLVNfMkiZ8A
+    values:
+      filament_max_volumetric_speed: 11
+  # MK3 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: tXq85RCfTiuR0Z1nhLXF9Q
+    values:
+      filament_max_volumetric_speed: 12
+  # MK3 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: V06MdPIMQciwoUwDRAM7fw
+    values:
+      filament_max_volumetric_speed: 15
+## MK2S
+- condition: printer.model == "MK2S"
+  id: 2LVbnygdRs+HxnHpJlsptg
+  variants:
+  # MK2 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: AKizZRmGQB61orIcnpvl4w
+    values:
+      filament_max_volumetric_speed: 10
+  # MK2 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: cAasotTFR2W4mVPaxXQ6NA
+    values:
+      filament_max_volumetric_speed: 10
+## MK2S MMU1
+- condition: printer.model == "MK2SMM"
+  id: CLe/P6asQja+xhF7bNOs8Q
+  variants:
+  # MK2SMM 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: R3czj9R0RWifzWYY7MVh+w
+    values:
+      filament_max_volumetric_speed: 8
+  # MK2SMM 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: mxxhoIvfRmSeCriyFzq2XQ
+    values:
+      filament_max_volumetric_speed: 8
+---
+kind: filament
+# Pressure advance values
+id: '*NumakersPLAWOOD_P_ADVANCE*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: +Ig4h77rTdmPqXN1KApUbA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: us7rG1RXTySHQiOMuavNeg
+    values:
+      pressure_advance_value: 0.09
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: BLg85wfnThmLsz8pTTVEOQ
+    values:
+      pressure_advance_value: 0.06
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 75ievBXTTQe17uvGE2fT1Q
+    values:
+      pressure_advance_value: 0.028
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 1hAnXKNEQpiYbtx+zti5AQ
+    values:
+      pressure_advance_value: 0.019
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 4Z/d5qtOSBWhwlQgU8pm7w
+    values:
+      pressure_advance_value: 0.017
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: A/ckGrAjREKEjxVYAj6FkQ
+    values:
+      pressure_advance_value: 0.01
+## MINI
+- condition: printer.base_model == "MINI"
+  id: l1Tg5ejSQfuYgO9Qvp2MdA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 8otLL9MDQ7KD7UXkFC74kg
+    values:
+      pressure_advance_value: 0.66
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: MBKcZZWgTEOSybS1N9a/Iw
+    values:
+      pressure_advance_value: 0.22
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: BWFulEbeRluEFwyRgLgASA
+    values:
+      pressure_advance_value: 0.13
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: E7cxVyW0TS6HnSIwY5rH3Q
+    values:
+      pressure_advance_value: 0.09
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: Cj7I6xEZQ0qPMtGNZBB7uA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 5EW2ku1RQCOfhXZfMqAlmg
+    values:
+      pressure_advance_value: 0.09
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: dVT+Dn43R0qa/IJBAyn1Zw
+    values:
+      pressure_advance_value: 0.06
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 9A0fn4LjTHCiJuWroouKzw
+    values:
+      pressure_advance_value: 0.03
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: jbsuVKMgSamJOCMTBX9PVg
+    values:
+      pressure_advance_value: 0.019
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: yFy9xx9zTkqb6rqXrv0N5w
+    values:
+      pressure_advance_value: 0.017
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: oBke8U7xR0qV6hjJ7CLZuQ
+    values:
+      pressure_advance_value: 0.01
+## MK3
+- condition: printer.base_model == "MK3"
+  id: rrm828YMTESC7hOLCHPRtA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: yOUj1RY4RoOqrYvBUYcrLA
+    values:
+      pressure_advance_value: 0.07
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: J5UzemiSSkStzfFttTnbjA
+    values:
+      pressure_advance_value: 0.05
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: YIUfJEJ2RVCEdIuiW5vpgg
+    values:
+      pressure_advance_value: 0.035
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: CGAb0a8FTZaTbDgWqasbNg
+    values:
+      pressure_advance_value: 0.01
+## MK2
+- condition: printer.base_model == "MK2"
+  id: oRleLSgfRXiivTF2JHzcmg
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 08z3bUE8SD2iVnS4Z7/YnQ
+    values:
+      pressure_advance_value: 30
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: ANomKYbXQ1eWCTGi69DMwQ
+    values:
+      pressure_advance_value: 30
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 6HORSmlyR8evRoUL/INCLg
+    values:
+      pressure_advance_value: 18
+## MK2 MMU1 
+- condition: printer.base_model == "MK2MMU1"
+  id: EBeRwtkrQoKOuHjpqNRdhQ
+  values:
+    pressure_advance_value: 200

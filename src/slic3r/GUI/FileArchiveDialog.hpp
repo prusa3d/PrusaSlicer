@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2023 David Kocík @kocikdav
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_FileArchiveDialog_hpp_
 #define slic3r_GUI_FileArchiveDialog_hpp_
 

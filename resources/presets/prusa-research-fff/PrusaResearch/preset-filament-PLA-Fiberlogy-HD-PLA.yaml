@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Fiberlogy HD PLA
+id: Fiberlogy HD PLA
+values:
+  filament_cost: '30.59'
+  filament_vendor: Fiberlogy
+  filament_spool_weight: 330
+  temperature: 230

@@ -1,16 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Generator: Adobe Illustrator 23.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
-<svg version="1.0" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 viewBox="0 0 16 16" enable-background="new 0 0 16 16" xml:space="preserve">
-<g id="time">
-	<g>
-		<path fill="#808080" d="M8,2c3.31,0,6,2.69,6,6s-2.69,6-6,6s-6-2.69-6-6S4.69,2,8,2 M8,1C4.13,1,1,4.13,1,8s3.13,7,7,7s7-3.13,7-7
-			S11.87,1,8,1L8,1z"/>
-	</g>
-	<g>
-		<line fill="none" stroke="#ED6B21" stroke-linecap="round" stroke-miterlimit="10" x1="5" y1="4" x2="8" y2="8"/>
-	</g>
-	
-		<line fill="none" stroke="#ED6B21" stroke-width="1.5" stroke-linecap="round" stroke-miterlimit="10" x1="11.5" y1="8" x2="8" y2="8"/>
-</g>
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M8 14.5C8.11234 14.5 8.22401 14.4969 8.33496 14.4912C11.6618 14.3229 14.3229 11.6618 14.4912 8.33496C14.3165 11.7658 11.4738 14.5 8 14.5ZM8 14.5C7.88766 14.5 7.77599 14.4969 7.66504 14.4912C4.33823 14.3229 1.6771 11.6618 1.50879 8.33496C1.6835 11.7658 4.5262 14.5 8 14.5ZM8 1.5C8.11234 1.5 8.22401 1.50314 8.33496 1.50879C11.6618 1.6771 14.3229 4.33823 14.4912 7.66504C14.3165 4.23417 11.4738 1.5 8 1.5ZM8 1.5C4.5262 1.5 1.6835 4.23417 1.50879 7.66504C1.6771 4.33823 4.33823 1.6771 7.66504 1.50879C7.77599 1.50314 7.88766 1.5 8 1.5Z" fill="#F7F7F7" stroke="#F7F7F7"/>
+  <path d="M5 4L8 8" stroke="#808080" stroke-miterlimit="10" stroke-linecap="round"/>
+  <path d="M11.5 8H8" stroke="#808080" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round"/>
 </svg>

@@ -1,0 +1,63 @@
+kind: filament
+inherits:
+- '*FLEX*'
+features:
+  $.type: TPC
+name: Forward AM Ultrafuse TPC-45D
+condition: tool.nozzle_diameter >= 0.4 and printer.base_model=~/(MK3.5|MK3|MK2.5|MK2)/ and feeder.base_model!~/.*MMU.*/
+id: Forward AM Ultrafuse TPC-45D
+values:
+  filament_vendor: Forward AM
+  first_layer_temperature: 235
+  temperature: 235
+  first_layer_bed_temperature: 60
+  bed_temperature: 60
+  extrusion_multiplier: 1
+  filament_density: 1.15
+  cooling: true
+  fan_always_on: true
+  fan_below_layer_time: 30
+  min_fan_speed: 10
+  max_fan_speed: 50
+  retract_length: 1.2
+  retract_speed: 25
+  # filament_type: TPC
+variants:
+## MK3.5 and MK3 and MK2
+- condition: printer.base_model=~/(MK3.5|MK3|MK2.5|MK2)/
+  id: 4ubLhynAT1KubwCIQxhlDQ
+  values:
+    first_layer_temperature: 235
+    temperature: 235
+    first_layer_bed_temperature: 60
+    bed_temperature: 60
+    extrusion_multiplier: 1
+    filament_density: 1.15
+    cooling: true
+    fan_always_on: true
+    fan_below_layer_time: 30
+    min_fan_speed: 10
+    max_fan_speed: 50
+    retract_length: 1.2
+    retract_speed: 25
+  variants:
+  # MK3.5 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: wccBn7S9TfeWMCnq1M45YQ
+    values:
+      filament_max_volumetric_speed: 1.2
+  # MK3.5 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: g0V7OzoGSk+qaWlNx9GMvQ
+    values:
+      filament_max_volumetric_speed: 1.2
+  # MK3.5 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: GS4pejkGRRiGOquBHjgUug
+    values:
+      filament_max_volumetric_speed: 1.5
+  # MK3.5 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: wYc2usudT3+zWMwzA92cYA
+    values:
+      filament_max_volumetric_speed: 2.5

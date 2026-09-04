@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Fiberlogy FiberSatin
+id: Fiberlogy FiberSatin
+values:
+  extrusion_multiplier: 1.03
+  filament_cost: '32.35'
+  filament_vendor: Fiberlogy
+  filament_spool_weight: 330
+  filament_density: 1.2
+

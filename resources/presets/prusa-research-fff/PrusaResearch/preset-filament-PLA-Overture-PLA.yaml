@@ -1,0 +1,95 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Overture PLA
+id: Overture PLA
+values:
+  filament_vendor: Overture
+  filament_cost: 22
+  filament_density: 1.21
+  filament_spool_weight: 155
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: 2TmA/lKKTa2i2+nczjZeLg
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: VSWMIyRoSc2tmiAJSgXIyg
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: EqvewvAQTQmkygUFCCVAZg
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 0FAi86CpSsSu/dJ0Kl0zVg
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: h4IX9B1+TBiy+GRXv7ZnOg
+      values:
+        filament_max_volumetric_speed: 20
+## MINI
+- condition: printer.base_model == "MINI"
+  id: sEH2S8NaT0Sr+fToisoB0w
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: dKWXEj71TSSlAdaP7RlpYQ
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: zQC76w1EQ8OLW25Gl4iiwg
+    values:
+      filament_max_volumetric_speed: 12
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: 44KhKxlsTEqI3zrPP3O0Bw
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: vwFJ6xcUQQ2tJHSfiLqRpg
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # MK3.5 0.25 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      id: limvaVk6SXSTazWyXeGM1A
+      values:
+        filament_max_volumetric_speed: 2
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: gpcfU0GiRAuRW+sINON3dw
+    values:
+      filament_max_volumetric_speed: 12
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: SX3BPT24TWKLSZJl7MilXw
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # MK3.5 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      id: TOxJGUYxTfC9oqbzJLUJ0Q
+      values:
+        filament_max_volumetric_speed: 7
+## MK3
+- condition: printer.base_model=~/(MK3|MK2.5)/
+  id: E4fKiFBETSeNYZ8UTKRcBg
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: tU7UjChVROW3WT4Xq24acw
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # MK3 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      id: ntrpn0sKR6ijBXIosqTz4A
+      values:
+        filament_max_volumetric_speed: 7

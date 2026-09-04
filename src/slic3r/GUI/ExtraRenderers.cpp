@@ -1,6 +1,11 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ExtraRenderers.hpp"
 #include "wxExtensions.hpp"
 #include "GUI.hpp"
+#include "GUI_App.hpp"
 #include "I18N.hpp"
 #include "BitmapComboBox.hpp"
 #include "Plater.hpp"
@@ -150,7 +155,14 @@ bool BitmapTextRenderer::Render(wxRect rect, wxDC *dc, int state)
         // workaround for Windows DarkMode : Don't respect to the state & wxDATAVIEW_CELL_SELECTED to avoid update of the text color
         RenderText(m_value.GetText(), xoffset, rect, dc, state & wxDATAVIEW_CELL_SELECTED ? 0 :state);
 #else
+    {
+        wxDataViewCtrl* const view = GetView();
+        if (GetAttr().HasFont())
+            dc->SetFont(GetAttr().GetEffectiveFont(view->GetFont()));
+        else
+            dc->SetFont(view->GetFont());
         RenderText(m_value.GetText(), xoffset, rect, dc, state);
+    }
 #endif
 
     return true;
@@ -161,22 +173,22 @@ wxSize BitmapTextRenderer::GetSize() const
     if (!m_value.GetText().empty())
     {
         wxSize size;
+        wxDataViewCtrl* const view = GetView();
+        wxClientDC dc(view);
+        if (GetAttr().HasFont())
+            dc.SetFont(GetAttr().GetEffectiveFont(view->GetFont()));
+        else
+            dc.SetFont(view->GetFont());
+
 #if defined(SUPPORTS_MARKUP) && defined(wxHAS_GENERIC_DATAVIEWCTRL)
         if (m_markupText)
-        {
-            wxDataViewCtrl* const view = GetView();
-            wxClientDC dc(view);
-            if (GetAttr().HasFont())
-                dc.SetFont(GetAttr().GetEffectiveFont(view->GetFont()));
-
             size = m_markupText->Measure(dc);
-
-            int lines = m_value.GetText().Freq('\n') + 1;
-            size.SetHeight(size.GetHeight() * lines);
-        }
         else
 #endif // SUPPORTS_MARKUP && wxHAS_GENERIC_DATAVIEWCTRL
-            size = GetTextExtent(m_value.GetText());
+            size = dc.GetTextExtent(m_value.GetText());
+
+        int lines = m_value.GetText().Freq('\n') + 1;
+        size.SetHeight(size.GetHeight() * lines);
 
         if (m_value.GetBitmap().IsOk())
             size.x += m_value.GetBitmap().GetWidth() + 4;
@@ -228,7 +240,7 @@ bool BitmapTextRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& value
     if (!text_editor || text_editor->GetValue().IsEmpty())
         return false;
 
-    m_was_unusable_symbol = Slic3r::GUI::Plater::has_illegal_filename_characters(text_editor->GetValue());
+    m_was_unusable_symbol = Slic3r::GUI::has_illegal_characters(text_editor->GetValue());
     if (m_was_unusable_symbol)
         return false;
 
@@ -319,6 +331,10 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
         labelRect.GetTopLeft(), wxSize(labelRect.GetWidth(), -1), 
         0, nullptr , wxCB_READONLY);
 
+#ifdef _WIN32
+    Slic3r::GUI::wxGetApp().UpdateDarkUI(c_editor);
+#endif
+
     int def_id = get_default_extruder_idx ? get_default_extruder_idx() : 0;
     c_editor->Append(_L("default"), def_id < 0 ? wxNullBitmap : *icons[def_id]);
     for (size_t i = 0; i < icons.size(); i++)
@@ -345,7 +361,11 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
 
 bool BitmapChoiceRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& value)
 {
+#ifdef _WIN32
+    Slic3r::GUI::BitmapComboBox* c = static_cast<Slic3r::GUI::BitmapComboBox*>(ctrl);
+#else
     wxBitmapComboBox* c = static_cast<wxBitmapComboBox*>(ctrl);
+#endif
     int selection = c->GetSelection();
     if (selection < 0)
         return false;

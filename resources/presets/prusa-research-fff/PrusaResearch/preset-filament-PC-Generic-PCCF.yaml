@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PCCF*'
+name: Generic PC-CF
+id: Generic PC-CF
+values:
+  filament_cost: '45.10'
+  filament_vendor: Generic

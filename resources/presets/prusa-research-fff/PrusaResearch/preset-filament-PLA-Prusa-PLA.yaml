@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Prusa PLA
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/
+id: Prusa PLA
+values:
+  filament_cost: '19.99'
+  filament_vendor: Made for Prusa

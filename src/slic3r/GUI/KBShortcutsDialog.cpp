@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Filip Sykala @Jony01, David Kocík @kocikdav, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r/libslic3r.h"
 #include "KBShortcutsDialog.hpp"
 #include "I18N.hpp"
@@ -46,7 +50,8 @@ KBShortcutsDialog::KBShortcutsDialog()
     }
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK);
-    wxGetApp().UpdateDarkUI(static_cast<wxButton*>(this->FindWindowById(wxID_OK, this)));
+    wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+    wxGetApp().UpdateDarkUI(buttons->GetAffirmativeButton());
     this->SetEscapeId(wxID_OK);
     main_sizer->Add(buttons, 0, wxEXPAND | wxALL, 5);
 
@@ -159,6 +164,7 @@ void KBShortcutsDialog::fill_shortcuts()
             { "C", L("Gizmo cut") },
             { "F", L("Gizmo Place face on bed") },
             { "H", L("Gizmo SLA hollow") },
+            { "H", L("Gizmo FDM paint-on fuzzy skin") },
             { "L", L("Gizmo SLA support points") },
             { "L", L("Gizmo FDM paint-on supports") },
             { "P", L("Gizmo FDM paint-on seam") },

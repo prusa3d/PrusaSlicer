@@ -1,6 +1,8 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <queue>
+#include <random>
+#include <algorithm>
 
 #include "libslic3r/MutablePriorityQueue.hpp"
 

@@ -1,0 +1,8 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Eolas Prints PLA
+id: Eolas Prints PLA
+values:
+  filament_cost: '23.5'
+  filament_vendor: Eolas Prints

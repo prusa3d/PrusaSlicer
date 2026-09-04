@@ -1,0 +1,74 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*DDPETG_P_ADVANCE*'
+name: Devil Design PETG
+id: Devil Design PETG
+values:
+  filament_vendor: Devil Design
+  filament_cost: 20.99
+  filament_density: 1.23
+  filament_spool_weight: 250
+---
+kind: filament
+# Pressure advance values
+id: '*DDPETG_P_ADVANCE*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: C/fHr55bRsKA0R4/BF4jsA
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: Js8IdlX5ThGjKEaEwV6uUw
+    values:
+      pressure_advance_value: 0.16
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: YQpd2VzgRt6BwN93wkNNzg
+    values:
+      pressure_advance_value: 0.09
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: u+1kdpQiR9qLS1EYC6tJ6Q
+    values:
+      pressure_advance_value: 0.045
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: NnOsAUu5SReKLe0nLzHNFg
+      values:
+        pressure_advance_value: 0.045
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: SgQVGjJqQUSP1uoJpbWYBQ
+    values:
+      pressure_advance_value: 0.04
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: AZoXICB9SnGAskcgbEwqjA
+      values:
+        pressure_advance_value: 0.04
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: BcCoU14aSp6cQhcPKSnQJg
+    values:
+      pressure_advance_value: 0.031
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: HTtiNTsgQsqzlcNYQUfC7A
+      values:
+        pressure_advance_value: 0.031
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: MvhSSpZFThCTiZV4y6aZmw
+    values:
+      pressure_advance_value: 0.02
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: x5q21LuDQ7aNcmdCvvePmA
+      values:
+        pressure_advance_value: 0.02

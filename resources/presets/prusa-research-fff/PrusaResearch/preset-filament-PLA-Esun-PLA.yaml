@@ -1,0 +1,219 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: eSun PLA
+id: eSun PLA
+values:
+  filament_cost: '10'
+  filament_vendor: eSun
+  filament_spool_weight: 265
+variants:
+  ## C1
+- condition: printer.base_model == "COREONE"
+  id: nu/IAnTQTrqI73s6z6fezQ
+  variants:
+  # C1 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: mDtpOd+tRxy53GftOaec0A
+    values:
+      pressure_advance_value: 0.1
+  # C1 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: I6VP7JWCQ2uuDa487ntDmg
+    values:
+      pressure_advance_value: 0.07
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: SL6y+PyMSIiLeWffQsAw2w
+    values:
+      pressure_advance_value: 0.03
+    variants:
+    # C1 HF0.4
+    - condition: tool.nozzle_high_flow
+  # C1 0.5
+      id: RFIzd9o4TCuTMCuFbcMJtg
+  - condition: tool.nozzle_diameter == 0.5
+    id: W4pGisHeRliqexowMiUk5A
+    values:
+      pressure_advance_value: 0.021
+    variants:
+    # C1 HF0.5
+    - condition: tool.nozzle_high_flow
+  # C1 0.6
+      id: T6IpdyU7TNGdXiXcEo35sA
+  - condition: tool.nozzle_diameter == 0.6
+    id: kUSHUxvTSQSzO/13E5pY6Q
+    values:
+      pressure_advance_value: 0.018
+    variants:
+    # C1 HF0.6
+    - condition: tool.nozzle_high_flow
+  # C1 0.8
+      id: mD+qF3UcR0CshaVL9TsJ/g
+  - condition: tool.nozzle_diameter == 0.8
+    id: P6VRW+sdTCywe4zqHgACOw
+    values:
+      pressure_advance_value: 0.01
+    variants:
+    # C1 HF0.8
+    - condition: tool.nozzle_high_flow
+## XL
+      id: M0rOgmQvTUue8m6osP/TpQ
+- condition: printer.base_model == "XL"
+  id: WwJrlnUgQLeXwDLz/N/EFw
+  variants:
+  # XL 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: Tt4r+gWLQcaNBtbuqwjgxw
+    values:
+      pressure_advance_value: 0.1
+  # XL 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: s9VnRJc/QJWeHGuh1d3bYg
+    values:
+      pressure_advance_value: 0.07
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 165e5nNGQGmxxCyF49Eq7A
+    values:
+      pressure_advance_value: 0.03
+    variants:
+    # XL HF0.4
+    - condition: tool.nozzle_high_flow
+  # XL 0.5
+      id: TlHeryQlQQ6WSLNPAf6yDA
+  - condition: tool.nozzle_diameter == 0.5
+    id: Mpb13ebUTZmvBO4YPQXQ9g
+    values:
+      pressure_advance_value: 0.021
+    variants:
+    # XL HF0.5
+    - condition: tool.nozzle_high_flow
+  # XL 0.6
+      id: JfFuNl2LR9WW4Gbi00nF1g
+  - condition: tool.nozzle_diameter == 0.6
+    id: UgYYyPu9Sb2c4DB4LXpg4Q
+    values:
+      pressure_advance_value: 0.018
+    variants:
+    # XL HF0.6
+    - condition: tool.nozzle_high_flow
+  # XL 0.8
+      id: 7x90/UnHTa2BErNT4Jbb3A
+  - condition: tool.nozzle_diameter == 0.8
+    id: HY8fgZ+pRuiSr2INO6Ffkg
+    values:
+      pressure_advance_value: 0.01
+    variants:
+    # XL HF0.8
+    - condition: tool.nozzle_high_flow
+## MK4
+      id: /E7jiIbXSeiGXVSTorZSPg
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: VaqzQH/eTniPCBc65qGRbQ
+  variants:
+  # MK4 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: pZNSOSGXSc20rPxgGaO88g
+    values:
+      pressure_advance_value: 0.1
+  # MK4 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: eA/3jr6XSzusjfBQ8m5Hew
+    values:
+      pressure_advance_value: 0.07
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: XQBCl1wfTaGnxN44J7S87Q
+    values:
+      pressure_advance_value: 0.03
+    variants:
+    # MK4 HF0.4
+    - condition: tool.nozzle_high_flow
+      id: bT/f56mhTwicRIvJ6Nb3Nw
+      values:
+        pressure_advance_value: 0.03
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: rGL46VmkRaCf+trJcRTAKg
+    values:
+      pressure_advance_value: 0.021
+    variants:
+    # MK4 HF0.5
+    - condition: tool.nozzle_high_flow
+  # MK4 0.6
+      id: fo/jbayeSbq05eKbas5cCw
+  - condition: tool.nozzle_diameter == 0.6
+    id: Wl8FsBIcQhqs/5GlUTpupw
+    values:
+      pressure_advance_value: 0.018
+    variants:
+    # MK4 HF0.6
+    - condition: tool.nozzle_high_flow
+  # MK4 0.8
+      id: xqr0slkYTpCdRCaalU7meQ
+  - condition: tool.nozzle_diameter == 0.8
+    id: bV3SxQ/TQgeF0SURvEaEFQ
+    values:
+      pressure_advance_value: 0.01
+    variants:
+    # MK4 HF0.8
+    - condition: tool.nozzle_high_flow
+## MK4S
+      id: hMIGdO0oSR6hHOO7gnhMZA
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: kaE62dmOQSGE9SDUfr+EZw
+  variants:
+  # MK4S 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 2+96WFRcSYeIWAGXzzjCvA
+    values:
+      pressure_advance_value: 0.1
+  # MK4S 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: rJr4fvzMQfu+MqCtOqPNpw
+    values:
+      pressure_advance_value: 0.07
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 4uBxT0WGTH2K/eMDznj+NQ
+    values:
+      pressure_advance_value: 0.03
+    variants:
+    # MK4S HF0.4
+    - condition: tool.nozzle_high_flow
+
+  # MK4S 0.5
+      id: if7oT7SSR/ybAYDjWVjTTQ
+  - condition: tool.nozzle_diameter == 0.5
+    id: RtJKWU0JSoiWAzb/O7cOYQ
+    values:
+      pressure_advance_value: 0.021
+    variants:
+    # MK4S HF0.5
+    - condition: tool.nozzle_high_flow
+      id: XurGrlBySPGeaes3E1LfsQ
+      values:
+        pressure_advance_value: 0.021
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: tJ5yZgiQQNqmenxulytf9Q
+    values:
+      pressure_advance_value: 0.018
+    variants:
+    # MK4S HF0.6
+    - condition: tool.nozzle_high_flow
+      id: 3k+htRIEQPuUchFjtd/x8g
+      values:
+        pressure_advance_value: 0.018
+  # MK4S 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: BelVH7xiTIKcJ+62TFzJrA
+    values:
+      pressure_advance_value: 0.01
+    variants:
+    # MK4S HF0.8
+    - condition: tool.nozzle_high_flow
+      id: WyTQNCCaRue1rynhlZiz4w
+      values:
+        pressure_advance_value: 0.01

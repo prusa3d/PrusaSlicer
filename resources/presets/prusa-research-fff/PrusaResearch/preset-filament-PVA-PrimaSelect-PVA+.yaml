@@ -1,0 +1,16 @@
+kind: filament
+inherits:
+- '*PVA*'
+name: PrimaSelect PVA+
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.model != "MMU3_32bit"
+id: PrimaSelect PVA+
+values:
+  filament_vendor: PrimaSelect
+  filament_cost: 122.1
+  filament_density: 1.23
+  first_layer_temperature: 210
+  temperature: 200
+  travel_ramping_lift: true
+  travel_max_lift: 0.6
+  travel_slope: 1
+  full_fan_speed_layer: 3

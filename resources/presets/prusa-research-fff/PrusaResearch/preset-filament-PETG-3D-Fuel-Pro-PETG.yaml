@@ -1,0 +1,193 @@
+kind: filament
+inherits:
+- '*PET*'
+- '*MAXVOL_3DFUEL_PETG*'
+- '*PA_3DFUEL_PETG*'
+# available for XL, MK4, COREONE family
+name: 3D-Fuel Pro PETG
+id: 3D-Fuel Pro PETG
+values:
+  filament_vendor: 3D-Fuel
+  extrusion_multiplier: 1
+  filament_density: 1.23
+  filament_cost: 29.95
+  min_fan_speed: 20
+  max_fan_speed: 50
+  first_layer_temperature: 255
+  temperature: 255
+  filament_spool_weight: 0
+  bridge_fan_speed: 65
+  disable_fan_first_layers: 3
+  full_fan_speed_layer: 3
+  enable_dynamic_fan_speeds: true
+  overhang_fan_speed_0: 65
+  overhang_fan_speed_1: 50
+  overhang_fan_speed_2: 0
+variants:
+- condition: printer.base_model == "COREONE"
+  id: CssySxAwT3+TyVqV4pvP/A
+  values:
+    min_fan_speed: 25
+    max_fan_speed: 60
+    bridge_fan_speed: 60
+    overhang_fan_speed_0: 60
+    overhang_fan_speed_1: 50
+    overhang_fan_speed_2: 0
+    overhang_fan_speed_3: 0
+    chamber_temperature: 40
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: baxhrCvoSiCxw+njmvLH4Q
+    values:
+      filament_infill_max_crossing_speed: 80
+- condition: printer.model=~/(MK4S|MK3.9S|XLP)/
+  id: acaB+EQ3SVShkvcoYNjyEg
+  values:
+    min_fan_speed: 15
+    max_fan_speed: 40
+    bridge_fan_speed: 55
+    overhang_fan_speed_0: 55
+    overhang_fan_speed_1: 40
+    overhang_fan_speed_2: 0
+    overhang_fan_speed_3: 0
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: HnHvyp1tQ3iKQy0iV+HC1w
+    values:
+      filament_infill_max_crossing_speed: 80
+- condition: printer.model=~/(MK4|MK3.9|XL)/
+  id: 4Y5g17cdQBGNKhEamzuTnQ
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: /MT0JbGBQ1SD03SKhNrNiw
+    values:
+      filament_infill_max_crossing_speed: 80
+# END
+- name: '*quit*'
+  id: rswM+F0nTcGraEhqth78+w
+---
+kind: filament
+id: '*MAXVOL_3DFUEL_PETG*'
+# Maximum volumetric speed limits
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: Cko87vOcQU6wS+nn+uHjeQ
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 9xapyczBSbm7CJPML06zDQ
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: KD8/wSHMSOO3MAaDY2ssmw
+    values:
+      filament_max_volumetric_speed: 10
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: Nca+hcsfTSm+6j/EW90xcQ
+    values:
+      filament_max_volumetric_speed: 12
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: M8im8B7VRkCJMFAJOklLCw
+      values:
+        filament_max_volumetric_speed: 14
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: hmN5OGHASAmJhcBh8fDKUA
+    values:
+      filament_max_volumetric_speed: 10
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: YJK6FXK5R4uR7S4ClK6hfQ
+      values:
+        filament_max_volumetric_speed: 14
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: RaMN/2a9SC+P49XU72BFPg
+    values:
+      filament_max_volumetric_speed: 14
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: PhTU6jktRsmUPJLG53sVJg
+      values:
+        filament_max_volumetric_speed: 20
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: PUgvBdE3RB+bah/dYWSYDQ
+    values:
+      filament_max_volumetric_speed: 18
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: U/6aP2naRl+7HsgYC+wHrw
+      values:
+        filament_max_volumetric_speed: 24
+---
+kind: filament
+# Pressure advance values
+id: '*PA_3DFUEL_PETG*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: BbmH5o7RRLq25MqanXbwBg
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: T7vsEfJWR1y8RDwEtVzo0g
+    values:
+      pressure_advance_value: 0.18
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: OtZtRSdQRFeetAANr1In/g
+    values:
+      pressure_advance_value: 0.1
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 9JKneuCTTNSPAInWyUnH1g
+    values:
+      pressure_advance_value: 0.055
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: AbqsglpDS9y7shRe5KvOKw
+      values:
+        pressure_advance_value: 0.055
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: JffpApmgR+eIu/UWNZEmYQ
+    values:
+      pressure_advance_value: 0.044
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: t0dAYIEBTfS7cfM2P13lUA
+      values:
+        pressure_advance_value: 0.044
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: XhwRrbR8SLONjYbr/7W+3g
+    values:
+      pressure_advance_value: 0.035
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: 2j9WpWCtRpq6mWtDM3Whzw
+      values:
+        pressure_advance_value: 0.035
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: BM9qeeDpQ8W3pWHSMGzWiQ
+    values:
+      pressure_advance_value: 0.021
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: xTPTge4CTAKy/T5GRKMoCA
+      values:
+        pressure_advance_value: 0.021

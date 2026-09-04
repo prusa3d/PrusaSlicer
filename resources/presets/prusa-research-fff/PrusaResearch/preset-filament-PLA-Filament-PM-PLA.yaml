@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: Filament PM PLA
+id: Filament PM PLA
+values:
+  filament_cost: '27.82'
+  filament_vendor: Filament PM
+  filament_spool_weight: 230

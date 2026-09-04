@@ -1,0 +1,129 @@
+kind: filament
+inherits:
+- '*PA*'
+- '*PMPAJet_MAXVOLSPEED_PA*'
+- '*sheets_PA_PMPAJet*'
+name: Filament PM PAJet
+id: Filament PM PAJet
+values:
+  filament_vendor: Filament PM
+  first_layer_temperature: 245
+  temperature: 245
+  extrusion_multiplier: 1.1
+  filament_cost: 27.82
+  filament_density: 1.01
+  filament_spool_weight: 0
+  bridge_fan_speed: 0
+  min_fan_speed: 0
+  max_fan_speed: 0
+  fan_always_on: false
+  cooling: false
+variants:
+- condition: printer.base_model=~/(MK2|MK3|MK3.5)/
+  id: goF6Y2RcSmG6JtvfeBaMVA
+  values:
+    retract_length: 1
+---
+kind: filament
+id: '*PMPAJet_MAXVOLSPEED_PA*'
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: +PHzZ+irRCWsGlryuaj3fQ
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: LqacpZVcQEyX35HX8xvdNw
+    values:
+      filament_max_volumetric_speed: 7
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: 6AKVb2/xSFS5clcJu0CNiw
+      values:
+        filament_max_volumetric_speed: 7
+## MINI
+- condition: printer.base_model == "MINI"
+  id: 95T9WuEvQJaSVh9VKWzW/Q
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: svrlP8VxRIGPWII0CQbuMg
+    values:
+      filament_max_volumetric_speed: 5
+
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: pKzYABQcQ/eDoYvK42B5yA
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: cPTpU6g1RZ6FayATo5vAgw
+    values:
+      filament_max_volumetric_speed: 7
+    variants:
+    # MK3.5 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      id: d8UPKFlOT9KPgd7ct6qSWw
+      values:
+        filament_max_volumetric_speed: 7
+## MK3
+- condition: printer.base_model == "MK3"
+  id: TEZwygyhSD2HIUT6nEf5sQ
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: jvX9iMEDQN6uNpMD7vfm6Q
+    values:
+      filament_max_volumetric_speed: 7
+    variants:
+    # MK3 0.4 MMU
+    - condition: feeder.base_model=~/.*MMU.*/ and ! feeder.single_mode
+      id: LDxbguyHT3OUn1y9PykIbw
+      values:
+        filament_max_volumetric_speed: 7
+## MK2
+- condition: printer.base_model == "MK2"
+  id: 0an4KXC9R+S+4UZPDtqNeQ
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: yL66FUbXQASw9COfmpb8vg
+    values:
+      filament_max_volumetric_speed: 7
+## MK2 MMU1 
+- condition: printer.base_model == "MK2MMU1"
+  id: UTB/sfW5T3C0+weKhBtHag
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: b1kUTZLISUGzBjOAVho5XA
+    values:
+      filament_max_volumetric_speed: 5
+---
+kind: filament
+id: '*sheets_PA_PMPAJet*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "PA"
+  id: 74665yikRT+ffrDSRSrpnA
+  values:
+    first_layer_bed_temperature: 110
+    bed_temperature: 115
+  variants:
+  - condition: printer.model == "MINI"
+    id: REKSrdHoSl69S3RWKyHbCA
+    values:
+      first_layer_bed_temperature: 100
+      bed_temperature: 100
+  - condition: printer.base_model == "XL"
+    id: z1U6OzQERDy5X34oZxbiag
+    values:
+      first_layer_bed_temperature: 105
+      bed_temperature: 105
+# PA sheet
+- condition: sheet.type == "PA"
+  id: 8I2R8Db9Q1CBno0CZRxswg
+  values:
+    first_layer_bed_temperature: 90
+    bed_temperature: 115
+

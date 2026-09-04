@@ -1,0 +1,10 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: VOXELPLA+
+id: VOXELPLA+
+values:
+  filament_vendor: VOXELPLA
+  filament_density: 1.23
+  filament_cost: 21
+  filament_spool_weight: 235

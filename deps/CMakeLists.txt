@@ -1,3 +1,7 @@
+#/|/ Copyright (c) Prusa Research 2018 - 2022 Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+#/|/
+#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+#/|/
 #
 # This CMake project downloads, configures and builds PrusaSlicer dependencies on Unix and Windows.
 #
@@ -19,110 +23,80 @@
 # WARNING: On UNIX platforms wxWidgets hardcode the destdir path into its `wx-conffig` utility,
 # therefore, unfortunatelly, the installation cannot be copied/moved elsewhere without re-installing wxWidgets.
 #
+cmake_minimum_required(VERSION 3.12)
+project(PrusaSlicer_deps)
 
-project(PrusaSlicer-deps)
-cmake_minimum_required(VERSION 3.2)
+add_definitions("-D_WIN32_WINNT=0x0601")
 
-include(ExternalProject)
-include(ProcessorCount)
+# Redefine BUILD_SHARED_LIBS with default being OFF
+option(BUILD_SHARED_LIBS "Build shared libraries instead of static (experimental)" OFF)
 
-ProcessorCount(NPROC)
-if (NPROC EQUAL 0)
-    set(NPROC 1)
+# List libraries to be excluded from build
+set(${PROJECT_NAME}_PACKAGE_EXCLUDES "" CACHE STRING "Exclude packages matching this regex pattern")
+
+# Support legacy parameter DESTDIR
+if (DESTDIR)
+  set(${PROJECT_NAME}_DEP_INSTALL_PREFIX ${DESTDIR}/usr/local CACHE PATH "Destination directory" FORCE)
 endif ()
 
-set(DESTDIR "${CMAKE_CURRENT_BINARY_DIR}/destdir" CACHE PATH "Destination directory")
-set(DEP_DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR} CACHE PATH "Path for downloaded source packages.")
-
-option(DEP_DEBUG "Build debug variants (only applicable on Windows)" ON)
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    option(DEP_WX_GTK3 "Build wxWidgets against GTK3" OFF)
-endif()
-
-# On developer machines, it can be enabled to speed up compilation and suppress warnings coming from IGL. 
-# FIXME:
-# Enabling this option is not safe. IGL will compile itself with its own version of Eigen while
-# Slic3r compiles with a different version which will cause runtime errors.
-# option(DEP_BUILD_IGL_STATIC "Build IGL as a static library. Might cause link errors and increase binary size." OFF)
-
-message(STATUS "PrusaSlicer deps DESTDIR: ${DESTDIR}")
-message(STATUS "PrusaSlicer dowload dir for source packages: ${DEP_DOWNLOAD_DIR}")
-message(STATUS "PrusaSlicer deps debug build: ${DEP_DEBUG}")
-
-find_package(Git REQUIRED)
-
-# The default command line for patching. Only works for newer 
-set(PATCH_CMD ${GIT_EXECUTABLE} apply --verbose --ignore-space-change --whitespace=fix)
-
-get_property(_is_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-
-if (NOT _is_multi AND NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-    message(STATUS "Forcing CMAKE_BUILD_TYPE to Release as it was not specified.")
+# Support legacy parameter DEP_DOWNLOAD_DIR
+if (DEP_DOWNLOAD_DIR)
+  set(${PROJECT_NAME}_DEP_DOWNLOAD_DIR ${DEP_DOWNLOAD_DIR} CACHE PATH "Path for downloaded source packages." FORCE)
 endif ()
 
-function(prusaslicer_add_cmake_project projectname)
-    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND" "CMAKE_ARGS" ${ARGN})
-
-    set(_configs_line -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE})
-    if (_is_multi OR MSVC)
-        set(_configs_line "")
-    endif ()
-
-    set(_gen "")
-    set(_build_j "-j${NPROC}")
-    if (MSVC)
-        set(_gen CMAKE_GENERATOR "${DEP_MSVC_GEN}" CMAKE_GENERATOR_PLATFORM "${DEP_PLATFORM}")
-        set(_build_j "/m")
-        if (${projectname} STREQUAL "OCCT")
-            set(_build_j "/m:1")
-        endif ()
-    endif ()
-
-    ExternalProject_Add(
-        dep_${projectname}
-        EXCLUDE_FROM_ALL    ON
-        INSTALL_DIR         ${DESTDIR}/usr/local
-        DOWNLOAD_DIR        ${DEP_DOWNLOAD_DIR}/${projectname}
-        ${_gen}
-        CMAKE_ARGS
-            -DCMAKE_INSTALL_PREFIX:STRING=${DESTDIR}/usr/local
-            -DCMAKE_MODULE_PATH:STRING=${PROJECT_SOURCE_DIR}/../cmake/modules
-            -DCMAKE_PREFIX_PATH:STRING=${DESTDIR}/usr/local
-            -DCMAKE_DEBUG_POSTFIX:STRING=d
-            -DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}
-            -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
-            -DCMAKE_TOOLCHAIN_FILE:STRING=${CMAKE_TOOLCHAIN_FILE}
-            -DBUILD_SHARED_LIBS:BOOL=OFF
-            "${_configs_line}"
-            ${DEP_CMAKE_OPTS}
-            ${P_ARGS_CMAKE_ARGS}
-       ${P_ARGS_UNPARSED_ARGUMENTS}
-       BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release -- ${_build_j}
-       INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install --config Release
-    )
-
-endfunction(prusaslicer_add_cmake_project)
-
+# Slightly controversial
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/modules)
 
 if (MSVC)
-    if ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
-        message(STATUS "\nDetected 64-bit compiler => building 64-bit deps bundle\n")
-        set(DEPS_BITS 64)
-        include("deps-windows.cmake")
-    elseif ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-        message(STATUS "\nDetected 32-bit compiler => building 32-bit deps bundle\n")
-        set(DEPS_BITS 32)
-        include("deps-windows.cmake")
-    else ()
-        message(FATAL_ERROR "Unable to detect architecture")
-    endif ()
-elseif (APPLE)
-    message("OS X SDK Path: ${CMAKE_OSX_SYSROOT}")
+  option(DEP_DEBUG "Build in debug version of packages automatically" ON)
+endif ()
+
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+    cmake_policy(SET CMP0135 NEW)
+endif ()
+
+include(${PROJECT_SOURCE_DIR}/../cmake/modules/AddCMakeProject.cmake)
+include(${PROJECT_SOURCE_DIR}/../cmake/modules/OSXDeploymentTarget.cmake)
+
+macro(list_projects result curdir)
+  file(GLOB children RELATIVE ${curdir} ${curdir}/*)
+  set(dirlist "")
+  foreach(child ${children})
+    if(IS_DIRECTORY ${curdir}/${child})
+      string(REGEX MATCH "^\\+([a-zA-Z0-9_]+)" is_package_dir ${child})
+      if(is_package_dir AND EXISTS ${curdir}/${child}/${CMAKE_MATCH_1}.cmake) 
+        list(APPEND dirlist ${CMAKE_MATCH_1})
+      endif()
+    endif()
+  endforeach()
+  set(${result} ${dirlist})
+endmacro()
+
+function(dep_message mode msg)
+  if (NOT DEP_MESSAGES_WRITTEN)
+    message(${mode} "${msg}")
+  endif()
+endfunction ()
+
+# Always ON options:
+if (MSVC)
+  if ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+    dep_message(STATUS "Detected 64-bit compiler => building 64-bit deps bundle")
+    set(DEPS_BITS 64)
+  elseif ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+    dep_message(STATUS "Detected 32-bit compiler => building 32-bit deps bundle")
+    set(DEPS_BITS 32)
+  else ()
+    dep_message(FATAL_ERROR "Unable to detect architecture!")
+  endif ()
+else ()
+    set(DEP_CMAKE_OPTS "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+endif ()
+
+if (APPLE)
     if (CMAKE_OSX_DEPLOYMENT_TARGET)
         set(DEP_OSX_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
-        message("OS X Deployment Target: ${DEP_OSX_TARGET}")
+        dep_message(STATUS "OS X Deployment Target: ${DEP_OSX_TARGET}")
     else ()
         # Attempt to infer the SDK version from the CMAKE_OSX_SYSROOT,
         # this is done because wxWidgets need the min version explicitly set
@@ -133,91 +107,184 @@ elseif (APPLE)
             message(FATAL_ERROR "Could not determine OS X SDK version. Please use -DCMAKE_OSX_DEPLOYMENT_TARGET=<version>")
         endif ()
 
-        message("OS X Deployment Target (inferred from SDK): ${DEP_OSX_TARGET}")
+        dep_message(STATUS "OS X Deployment Target (inferred from SDK): ${DEP_OSX_TARGET}")
     endif ()
 
-    include("deps-macos.cmake")
-elseif (MINGW)
-    message(STATUS "Building for MinGW...")
-    include("deps-mingw.cmake")
-else()
-    include("deps-linux.cmake")
+    # This ensures dependencies don't use SDK features which are not available in the version specified by Deployment target
+    # That can happen when one uses a recent SDK but specifies an older Deployment target
+    set(DEP_WERRORS_SDK "-Werror=partial-availability -Werror=unguarded-availability -Werror=unguarded-availability-new")
+    
+    set(DEP_CMAKE_OPTS
+        "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+        "-DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}"
+        "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
+        "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
+        "-DCMAKE_CXX_FLAGS=${DEP_WERRORS_SDK}"
+        "-DCMAKE_C_FLAGS=${DEP_WERRORS_SDK}"
+        "-DCMAKE_FIND_FRAMEWORK=LAST"
+        "-DCMAKE_FIND_APPBUNDLE=LAST"
+    )
+endif ()
+
+list_projects(FOUND_PACKAGES ${CMAKE_CURRENT_LIST_DIR})
+
+dep_message(STATUS "Found external package definitions: ${FOUND_PACKAGES}")
+
+set(${PROJECT_NAME}_PLATFORM_PACKAGES "" CACHE STRING "Select packages which are provided by the platform" )
+set(SYSTEM_PROVIDED_PACKAGES OpenGL)
+
+if (UNIX)
+    # On UNIX systems (including Apple) ZLIB should be available
+    list(APPEND SYSTEM_PROVIDED_PACKAGES ZLIB)
+endif ()
+
+list(APPEND SYSTEM_PROVIDED_PACKAGES ${${PROJECT_NAME}_PLATFORM_PACKAGES})
+list(REMOVE_DUPLICATES SYSTEM_PROVIDED_PACKAGES)
+
+include(CMakeDependentOption)
+option(${PROJECT_NAME}_SELECT_ALL "Choose all external projects to be built." ON)
+
+find_package(Git REQUIRED)
+
+# The default command line for patching. Only works for newer 
+set(PATCH_CMD ${GIT_EXECUTABLE} apply --verbose --ignore-space-change --whitespace=fix)
+
+# all required package targets that have existing definitions will be gathered here
+set(DEPS_TO_BUILD "")
+set(_build_list "")
+set(_build_list_toplevel "")
+set(_checked_list "")
+
+# function to check if a package ought to be provided by the platform can really be found
+function (check_system_package pkg checked_list)
+  if (NOT ${pkg} IN_LIST ${checked_list})
+    find_package(${pkg})
+    if (NOT ${pkg}_FOUND)
+      dep_message(WARNING "No ${pkg} found in system altough marked as system provided. This might cause trouble building the dependencies on this platform")
+    endif ()
+    list(APPEND ${checked_list} ${pkg})
+    set (${checked_list} ${${checked_list}} PARENT_SCOPE)
+  endif ()
+endfunction()
+
+# Go through all the found package definition folders and filter them according to the provided cache options
+set(SUPPORTED_PACKAGES "")
+foreach (pkg ${FOUND_PACKAGES})
+    cmake_dependent_option(${PROJECT_NAME}_SELECT_${pkg} "Select package ${pkg} to be built." OFF  "NOT ${PROJECT_NAME}_SELECT_ALL" OFF)
+    if (NOT ${PROJECT_NAME}_PACKAGE_EXCLUDES MATCHES ${pkg} AND (${PROJECT_NAME}_SELECT_ALL OR ${PROJECT_NAME}_SELECT_${pkg}))
+        include(+${pkg}/${pkg}.cmake)
+
+        list(APPEND SUPPORTED_PACKAGES ${pkg})
+
+        if (${pkg} IN_LIST SYSTEM_PROVIDED_PACKAGES)
+          check_system_package(${pkg} _checked_list)
+        elseif (TARGET dep_${pkg})
+          get_target_property(_is_excluded_from_all dep_${pkg} EXCLUDE_FROM_ALL)
+          if (NOT _is_excluded_from_all)
+            list(APPEND DEPS_TO_BUILD ${pkg})
+          endif ()
+        endif ()
+    else()
+        message(STATUS "Skipping package ${pkg}")
+    endif ()
+endforeach()
+
+# This ugly append ensures that WebView2 was appended no matter what EXCLUDE_FROM_ALL is.
+# (Webview2 is not added by add_cmake_project)
+if (MSVC)
+  list(APPEND DEPS_TO_BUILD WebView2)
 endif()
 
-set(ZLIB_PKG "")
-if (NOT ZLIB_FOUND) 
-    include(ZLIB/ZLIB.cmake)
-    set(ZLIB_PKG dep_ZLIB)
-endif ()
-set(PNG_PKG "")
-if (NOT PNG_FOUND) 
-    include(PNG/PNG.cmake)
-    set(PNG_PKG dep_PNG)
-endif ()
-set(EXPAT_PKG "")
-if (NOT EXPAT_FOUND) 
-    include(EXPAT/EXPAT.cmake)
-    set(EXPAT_PKG dep_EXPAT)
-endif ()
+# Establish dependency graph
+foreach (pkg ${SUPPORTED_PACKAGES})
+  if (${pkg} IN_LIST DEPS_TO_BUILD)
+    list(APPEND _build_list dep_${pkg})
+    list(APPEND _build_list_toplevel dep_${pkg})
+  endif ()
+  foreach(deppkg ${DEP_${pkg}_DEPENDS})
+    if (${deppkg} IN_LIST SYSTEM_PROVIDED_PACKAGES)
+      check_system_package(${deppkg} _checked_list)
+    elseif(TARGET dep_${deppkg})
+      dep_message(STATUS "Mapping dep_${deppkg} => dep_${pkg}")
+      add_dependencies(dep_${pkg} dep_${deppkg})
+      list(APPEND _build_list dep_${deppkg})
+    endif ()
+  endforeach()
+endforeach()
 
-set(DEP_Boost_COMPONENTS system iostreams filesystem thread log locale regex date_time)
-include(Boost/Boost.cmake)
+list(REMOVE_DUPLICATES _build_list)
+dep_message(STATUS "Building dep targets (${CMAKE_BUILD_TYPE}): ${_build_list}")
+add_custom_target(deps ALL DEPENDS ${_build_list_toplevel})
 
-# The order of includes respects the dependencies between libraries
-include(Cereal/Cereal.cmake)
-include(Qhull/Qhull.cmake)
-include(GLEW/GLEW.cmake)
-include(OpenCSG/OpenCSG.cmake)
+# Support legacy option DEP_DEBUG on MSVC to build debug libraries in the same cmake run as for CMAKE_BUILD_TYPE:
+if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # MSVC has this nice feature to not be able to link release mode libs to Debug mode
+  # projects
 
-include(TBB/TBB.cmake)
+  # Exclude the libraries which have no problem to link to Debug builds in
+  # Release mode (mostly C libraries)
+  set(DEP_DEBUG_EXCLUDES GMP MPFR OpenSSL NanoSVG TIFF JPEG ZLIB PNG heatshrink)
+  if (UNIX)
+    # Making a separate debug build on Unix of wx is a nightmare
+    list(APPEND DEP_DEBUG_EXCLUDES wxWidgets)
+  endif ()
+  # sentry does not build in debug mode, but it is only linked when used.
+  # Do not build the debug version on the assumption that it is only used in release mode anyway.
+  list(APPEND DEP_DEBUG_EXCLUDES sentry)
 
-include(Blosc/Blosc.cmake)
-include(OpenEXR/OpenEXR.cmake)
-include(OpenVDB/OpenVDB.cmake)
+  # Create the list of targets needed in debug mode
+  set(_build_list_dbg "")
+  set(_build_list_filt ${_build_list})
+  list(JOIN  DEP_DEBUG_EXCLUDES "|" _excl_regexp)
+  list(FILTER _build_list_filt EXCLUDE REGEX "${_excl_regexp}")
 
-include(GMP/GMP.cmake)
-include(MPFR/MPFR.cmake)
-include(CGAL/CGAL.cmake)
+  foreach (t ${_build_list_filt})
+    list(APPEND _build_list_dbg ${t}_debug)
+  endforeach()
 
-include(NLopt/NLopt.cmake)
+  # Create a subdirectory for the Debug build within the current binary dir:
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d)
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} 
+      -DCMAKE_BUILD_TYPE=Debug
+      -D${PROJECT_NAME}_DEP_DOWNLOAD_DIR=${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}
+      -D${PROJECT_NAME}_DEP_INSTALL_PREFIX=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
+      -D${PROJECT_NAME}_PACKAGE_EXCLUDES="${_excl_regexp}"
+      -D${PROJECT_NAME}_SELECT_ALL=${${PROJECT_NAME}_SELECT_ALL}
+      -D${PROJECT_NAME}_DEP_BUILD_VERBOSE=${${PROJECT_NAME}_DEP_BUILD_VERBOSE}
+      -DCMAKE_DEBUG_POSTFIX=d
+      #TODO: forward per-package selector variables
+      -DDEP_MESSAGES_WRITTEN=ON
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d 
+    OUTPUT_QUIET
+  )
 
-include(OpenSSL/OpenSSL.cmake)
+  dep_message(STATUS "Building dep targets (Debug): ${_build_list_dbg}")
 
-set(CURL_PKG "")
-if (NOT CURL_FOUND) 
-    include(CURL/CURL.cmake)
-    set(CURL_PKG dep_CURL)
-endif ()
-
-include(JPEG/JPEG.cmake)
-include(TIFF/TIFF.cmake)
-include(NanoSVG/NanoSVG.cmake)
-include(wxWidgets/wxWidgets.cmake)
-include(OCCT/OCCT.cmake)
-
-set(_dep_list
-    dep_Boost
-    dep_TBB
-    ${CURL_PKG}
-    dep_wxWidgets
-    dep_Cereal
-    dep_NLopt
-    dep_OpenVDB
-    dep_OpenCSG
-    dep_CGAL
-    dep_Qhull
-    dep_OCCT
-    ${PNG_PKG}
-    ${ZLIB_PKG}
-    ${EXPAT_PKG}
+  # Each lib will have a dep_<package>_debug target to build only the debug counterpart
+  # Not part of ALL (problem with parallelization)
+  foreach(pkgtgt ${_build_list_filt})
+    add_custom_target(${pkgtgt}_debug
+      COMMAND ${CMAKE_COMMAND} --build . --target ${pkgtgt}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d
+      USES_TERMINAL
     )
+  endforeach()
 
-# if (NOT MSVC)
-    # Not working, static build has different Eigen
-    #list(APPEND _dep_list "dep_libigl")
-# endif()
+  # Can be used to build all the debug libs
+  string(JOIN " " _build_list_filt_targets "${_build_list_filt}")
+  add_custom_target(deps_debug ALL 
+    COMMAND ${CMAKE_COMMAND} --build . --target ${_build_list_filt_targets}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d
+    USES_TERMINAL
+  )
 
-add_custom_target(deps ALL DEPENDS ${_dep_list})
+  # The Release must be built before, as there are libs in this debug session which need
+  # the release versions of the excluded libs
+  add_dependencies(deps_debug deps)
 
-# Note: I'm not using any of the LOG_xxx options in ExternalProject_Add() commands
-# because they seem to generate bogus build files (possibly a bug in ExternalProject).
+endif ()
+
+set(DEP_MESSAGES_WRITTEN ON CACHE BOOL "")
+
+install(CODE "message(STATUS \"Built packages succesfully.\")")

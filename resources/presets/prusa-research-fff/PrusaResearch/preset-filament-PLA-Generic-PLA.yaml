@@ -1,0 +1,111 @@
+kind: filament
+inherits:
+- '*PLA*'
+- '*genericpla_P_ADVANCE_PLA*'
+name: Generic PLA
+id: Generic PLA
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI|COREONE_INDX)/
+values:
+  filament_cost: '19.99'
+  filament_vendor: Generic
+variants:
+## C1 INDX
+- condition: printer.base_model == "COREONE_INDX"
+  id: szeF215cSt2/RGBQA6e4TA
+  values:
+    pressure_advance: automatic_calibration
+    chamber_minimal_temperature: 0
+    chamber_temperature: 20
+    enable_dynamic_fan_speeds: 1
+    first_layer_temperature: 220
+    temperature: 215
+    min_fan_speed: 85
+    min_print_speed: 20
+    overhang_fan_speed_0: 100
+    overhang_fan_speed_1: 100
+    overhang_fan_speed_2: 0
+    overhang_fan_speed_3: 0
+    filament_infill_max_crossing_speed: 200
+    filament_infill_max_speed: 0
+    fan_below_layer_time: 40
+    start_filament_gcode: M573 R
+    filament_loading_speed: 0
+    filament_loading_speed_start: 0
+    filament_toolchange_delay: 0
+    filament_cooling_moves: 0
+    filament_cooling_initial_speed: 0
+    filament_cooling_final_speed: 0
+    filament_stamping_loading_speed: 0
+    filament_stamping_distance: 0
+    filament_purge_multiplier: 100%
+    filament_unloading_speed: 0
+    filament_unloading_speed_start: 0
+    idle_temperature:
+    retract_length: 0.8
+    retract_length_toolchange: 0.8
+    wipe: true
+    retract_before_wipe: 70%
+    filament_multitool_ramming: 1
+    filament_multitool_ramming_flow: 30
+    filament_multitool_ramming_volume: 18
+    filament_minimal_purge_on_wipe_tower: 10
+  variants:
+  # C1 INDX 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    name: Generic PLA @COREONEINDX 0.4
+    id: uPV1fGNcRy21ghCvyWX+XA
+    values:
+      filament_max_volumetric_speed: 12
+      slowdown_below_layer_time: 8
+      pressure_advance_value: 0.03
+    variants:
+    # C1 INDX HF0.4
+    - condition: tool.nozzle_high_flow
+      name: Generic PLA @COREONEINDX HF0.4
+      id: uJwbWn9+TLG8jtn0ilS9vA
+      values:
+        filament_max_volumetric_speed: 17
+        pressure_advance_value: 0.03
+        temperature: 215
+  # END
+  - name: '*quit*'
+    id: ufNkt0VRTTGDEISOQuGipg
+---
+kind: filament
+# Pressure advance values
+id: '*genericpla_P_ADVANCE_PLA*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: Jg2rm/79TFid9CbaihHqGg
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 1WjlOy5bR528dpm2PsToGQ
+    values:
+      pressure_advance_value: 0.1
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: 8HPzz6LHRaux0tzzw76hCg
+    values:
+      pressure_advance_value: 0.07
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: TWyTnVg5QziImFdJGCejJw
+    values:
+      pressure_advance_value: 0.03
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: jiltGv5ARz6xKPHUDBa5tg
+    values:
+      pressure_advance_value: 0.022
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: DjxZbbksSJWQSU+eYlUXPA
+    values:
+      pressure_advance_value: 0.019
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: BUEg+wsqQ46hshXr3SJ+Pg
+    values:
+      pressure_advance_value: 0.013

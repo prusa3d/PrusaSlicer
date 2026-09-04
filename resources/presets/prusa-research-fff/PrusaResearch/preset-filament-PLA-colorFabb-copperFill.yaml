@@ -1,0 +1,14 @@
+kind: filament
+inherits:
+- '*PLAFILL*'
+name: colorFabb copperFill
+id: colorFabb copperFill
+values:
+  filament_vendor: colorFabb
+  extrusion_multiplier: 1.15
+  filament_cost: '67.87'
+  filament_density: 3.9
+  filament_spool_weight: 236
+  first_layer_temperature: 215
+  temperature: 210
+  filament_abrasive: true

@@ -1,0 +1,15 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Prusa EasyABS
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/
+id: Prusa EasyABS
+values:
+  filament_cost: 26.99
+  filament_vendor: Made for Prusa
+  filament_density: 1.08
+  filament_spool_weight: 230
+  first_layer_temperature: 255
+  temperature: 255
+
+

@@ -1,0 +1,27 @@
+kind: filament
+inherits:
+- '*PP*'
+name: Verbatim PP
+id: Verbatim PP
+values:
+  filament_vendor: Verbatim
+  first_layer_temperature: 220
+  temperature: 220
+  extrusion_multiplier: 1
+  filament_cost: 72
+  filament_spool_weight: 235
+  min_fan_speed: 100
+  max_fan_speed: 100
+  bridge_fan_speed: 100
+  retract_lift:
+  wipe:
+# Bed temperature global
+  first_layer_bed_temperature: 100
+  bed_temperature: 100
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: jgMfN8RdRfGxE26O+yuryA
+  values:
+    min_fan_speed: 70
+    max_fan_speed: 70
+    bridge_fan_speed: 70

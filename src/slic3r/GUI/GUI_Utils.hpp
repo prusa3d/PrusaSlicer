@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_Utils_hpp_
 #define slic3r_GUI_Utils_hpp_
 
@@ -47,8 +51,6 @@ wxDECLARE_EVENT(EVT_VOLUME_DETACHED, VolumeDetachedEvent);
 
 wxTopLevelWindow* find_toplevel_parent(wxWindow *window);
 
-void on_window_geometry(wxTopLevelWindow *tlw, std::function<void()> callback);
-
 enum { DPI_DEFAULT = 96 };
 
 int get_dpi_for_window(const wxWindow *window);
@@ -92,13 +94,13 @@ public:
 
         if (font_point_size > 0)
             m_normal_font.SetPointSize(font_point_size);
+        else if (parent)
+            m_normal_font.SetPointSize(parent->GetFont().GetPointSize());
 
         /* Because of default window font is a primary display font, 
          * We should set correct font for window before getting em_unit value.
          */
-#ifndef __WXOSX__ // Don't call SetFont under OSX to avoid name cutting in ObjectList 
         this->SetFont(m_normal_font);
-#endif
         this->CenterOnParent();
 #ifdef _WIN32
         update_dark_ui(this);
@@ -107,7 +109,13 @@ public:
         // Linux specific issue : get_dpi_for_window(this) still doesn't responce to the Display's scale in new wxWidgets(3.1.3).
         // So, calculate the m_em_unit value from the font size, as before
 #if !defined(__WXGTK__)
-        m_em_unit = std::max<size_t>(10, 10.0f * m_scale_factor);
+#ifdef _WIN32
+        const double font_to_em_koef = 10./9.;// Default font point size on Windows is 9 pt
+#else // ifdef __WXOSX__
+        const double font_to_em_koef = 10./11.;// Default font point size on OSX is 11 pt
+#endif
+        m_em_unit_from_font_size = int(font_to_em_koef * m_normal_font.GetPointSize());
+        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
 #else
         // initialize default width_unit according to the width of the one symbol ("m") of the currently active font of this window.
         m_em_unit = std::max<size_t>(10, this->GetTextExtent("m").x - 1);
@@ -174,7 +182,6 @@ public:
     float   prev_scale_factor() const   { return m_prev_scale_factor; }
 
     int     em_unit() const             { return m_em_unit; }
-//    int     font_size() const           { return m_font_size; }
     const wxFont& normal_font() const   { return m_normal_font; }
     void enable_force_rescale()         { m_force_rescale = true; }
 
@@ -193,7 +200,7 @@ protected:
 private:
     float m_scale_factor;
     int m_em_unit;
-//    int m_font_size;
+    int m_em_unit_from_font_size {10};
 
     wxFont m_normal_font;
     float m_prev_scale_factor;
@@ -201,14 +208,6 @@ private:
     bool m_force_rescale{ false };
 
     int   m_new_font_point_size;
-
-//    void recalc_font()
-//    {
-//        wxClientDC dc(this);
-//        const auto metrics = dc.GetFontMetrics();
-//        m_font_size = metrics.height;
-//         m_em_unit = metrics.averageWidth;
-//    }
 
     // check if new scale is differ from previous
     bool    is_new_scale_factor() const { return fabs(m_scale_factor - m_prev_scale_factor) > 0.001; }
@@ -250,7 +249,7 @@ private:
         m_normal_font = this->GetFont();
 
         // update em_unit value for new window font
-        m_em_unit = std::max<int>(10, 10.0f * m_scale_factor);
+        m_em_unit = std::max<int>(10, int(m_scale_factor * m_em_unit_from_font_size));
 
         // rescale missed controls sizes and images
         on_dpi_changed(suggested_rect);
@@ -388,26 +387,7 @@ private:
     wxString checkbox_label;
 };
 
-
-class WindowMetrics
-{
-private:
-    wxRect rect;
-    bool maximized;
-
-    WindowMetrics() : maximized(false) {}
-public:
-    static WindowMetrics from_window(wxTopLevelWindow *window);
-    static boost::optional<WindowMetrics> deserialize(const std::string &str);
-
-    const wxRect& get_rect() const { return rect; }
-    bool get_maximized() const { return maximized; }
-
-    void sanitize_for_display(const wxRect &screen_rect);
-    std::string serialize() const;
-};
-
-std::ostream& operator<<(std::ostream &os, const WindowMetrics& metrics);
+//std::ostream& operator<<(std::ostream &os, const WindowMetrics& metrics);
 
 class TaskTimer
 {

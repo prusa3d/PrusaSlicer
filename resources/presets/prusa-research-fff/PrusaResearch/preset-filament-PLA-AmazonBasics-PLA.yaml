@@ -1,0 +1,9 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: AmazonBasics PLA
+id: AmazonBasics PLA
+values:
+  filament_vendor: AmazonBasics
+  filament_cost: '24.99'
+  filament_spool_weight: 0

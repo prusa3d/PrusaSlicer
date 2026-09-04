@@ -1,0 +1,83 @@
+kind: filament
+inherits:
+- '*PLA*'
+# XL/MK4/COREONE family 0.25-0.8
+name: colorFabb PLA High Speed PRO
+id: colorFabb PLA High Speed PRO
+values:
+  filament_cost: '21.34'
+  filament_vendor: colorFabb
+  extrusion_multiplier: 0.99
+  filament_density: 1.24
+  filament_spool_weight: 221
+  min_fan_speed: 100
+  max_fan_speed: 100
+  filament_infill_max_crossing_speed: 0
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: gaCyYSGOSuierEKe/aN5/Q
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: pbGF/R7/Q0iJ6K32ni0PjQ
+    values:
+      pressure_advance_value: 0.1
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: LaHyTQ75Svqf9cciLqIlJw
+    values:
+      pressure_advance_value: 0.07
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: PZ6ayiLpQbmWxDbnGkvtlg
+    values:
+      pressure_advance_value: 0.03
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: LCXhHG0cQc+bR0BtEE8+Rw
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.03
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: mJ00kbnhRiiPbk6mstwf1g
+    values:
+      pressure_advance_value: 0.024
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: rpx2meFRQi2muoumw1lbWw
+      values:
+        filament_max_volumetric_speed: 22
+        pressure_advance_value: 0.024
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: e0nB29CNQbCSYiopIydTtg
+    values:
+      pressure_advance_value: 0.021
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: GnecryISR166NgvfgXac1A
+      values:
+        filament_max_volumetric_speed: 25
+        pressure_advance_value: 0.021
+  # 0.8      
+  - condition: tool.nozzle_diameter == 0.8
+    id: gTtJS3aWTYeSfJAuG9hf2w
+    values:
+      pressure_advance_value: 0.012
+    # 0.8HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: lhFOtRR5SqCLKksLBosivQ
+      values:
+        filament_max_volumetric_speed: 30
+        pressure_advance_value: 0.012
+  # END
+  - name: '*quit*'
+# END
+    id: zZecVR/ZSzW6N4WI4VakJg
+- name: '*quit*'
+  id: 7YcWbrL3TFmFq8mFil8hxA

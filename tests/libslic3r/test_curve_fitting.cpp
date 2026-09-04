@@ -1,9 +1,13 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 #include <test_utils.hpp>
 
 #include <libslic3r/Geometry/Curves.hpp>
 #include <libslic3r/Utils.hpp>
-#include <libslic3r/SVG.hpp>
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
+
+using namespace Catch;
+
 
 TEST_CASE("Curves: cubic b spline fit test", "[Curves]") {
     using namespace Slic3r;
@@ -17,11 +21,11 @@ TEST_CASE("Curves: cubic b spline fit test", "[Curves]") {
         return 1.0f;
     };
 
-    std::vector<Vec<1, float>> observations { };
+    std::vector<LegacyVec<1, float>> observations { };
     std::vector<float> observation_points { };
     std::vector<float> weights { };
     for (size_t index = 0; index < 200; ++index) {
-        observations.push_back(Vec<1, float> { fy(index) });
+        observations.push_back(LegacyVec<1, float> { fy(index) });
         observation_points.push_back(fx(index));
         weights.push_back(1);
     }
@@ -55,11 +59,11 @@ TEST_CASE("Curves: quadratic f cubic b spline fit test", "[Curves]") {
         return (fx(index) - 1) * (fx(index) - 1);
     };
 
-    std::vector<Vec<1, float>> observations { };
+    std::vector<LegacyVec<1, float>> observations { };
     std::vector<float> observation_points { };
     std::vector<float> weights { };
     for (size_t index = 0; index < 200; ++index) {
-        observations.push_back(Vec<1, float> { fy(index) });
+        observations.push_back(LegacyVec<1, float> { fy(index) });
         observation_points.push_back(fx(index));
         weights.push_back(1);
     }
@@ -94,11 +98,11 @@ TEST_CASE("Curves: polynomial fit test", "[Curves]") {
         return (fx(index) - 1) * (fx(index) - 1);
     };
 
-    std::vector<Vec<1, float>> observations { };
+    std::vector<LegacyVec<1, float>> observations { };
     std::vector<float> observation_points { };
     std::vector<float> weights { };
     for (size_t index = 0; index < 200; ++index) {
-        observations.push_back(Vec<1, float> { fy(index) });
+        observations.push_back(LegacyVec<1, float> { fy(index) });
         observation_points.push_back(fx(index));
         weights.push_back(1);
     }

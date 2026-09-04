@@ -1,0 +1,12 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Filament PM ABS
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.model != "MMU3_32bit"
+id: Filament PM ABS
+values:
+  filament_cost: '25'
+  filament_vendor: Filament PM
+  filament_density: 1.08
+  first_layer_temperature: 255
+  temperature: 255

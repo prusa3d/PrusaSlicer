@@ -1,0 +1,47 @@
+kind: filament
+inherits:
+- '*PC*'
+name: Filatech PC-ABS
+id: Filatech PC-ABS
+values:
+  filament_vendor: Filatech
+  extrusion_multiplier: 0.95
+  filament_cost: 49.9
+  cooling: false
+  filament_density: 1.08
+  filament_spool_weight: 0
+  min_fan_speed: 15
+  max_fan_speed: 15
+  disable_fan_first_layers: 6
+  bridge_fan_speed: 25
+  first_layer_temperature: 270
+  temperature: 270
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: JzkpUOBsSr2fZ2mCSjiRLg
+  values:
+    min_fan_speed: 12
+    max_fan_speed: 12
+    bridge_fan_speed: 20
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: aFnrSVvoShKbygrf7AID3A
+    values:
+      filament_max_volumetric_speed: 8
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: l5kfwl8rSVS58bxN0XT26w
+      values:
+        filament_max_volumetric_speed: 20
+- condition: printer.model=~/(MK4|XL)/
+  id: zV5bb8zuQyC33XvyPaYZFQ
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: ZJIEucZdT76GGvZ+e24vlw
+    values:
+      filament_max_volumetric_speed: 8
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: EtUulR11QuG07+bpaUnd+w
+      values:
+        filament_max_volumetric_speed: 20

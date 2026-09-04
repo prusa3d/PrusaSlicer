@@ -1,0 +1,438 @@
+id: '*default_print_MK3*'
+kind: printer
+variants:
+# 0.25
+- condition: tool.nozzle_diameter == 0.25
+  id: wMl2YHfDR8u6ltSwNDj8yA
+  values:
+    default_print: 0.10mm QUALITY
+# 0.4
+- condition: tool.nozzle_diameter == 0.4
+  id: SfpkfAKfSamDVTs4gZ5yHA
+  values:
+    default_print: 0.15mm QUALITY
+# 0.6
+- condition: tool.nozzle_diameter == 0.6
+  id: xU7GyyOcRAqHwEfW+a6s0w
+  values:
+    default_print: 0.30mm QUALITY
+# 0.8
+- condition: tool.nozzle_diameter == 0.8
+  id: 4/BZtmtKRpqbueUAd8x0DQ
+  values:
+    default_print: 0.40mm QUALITY
+---
+id: LFISBxvNQ2uvuZ7SOUV8sA
+kind: printer
+inherits:
+- '*default_print_MK3*'
+- '*MK3_nozzle_variant*'
+variants:
+- condition: printer.base_model == "MK3"
+  id: DYnzKFlOT8iOi2qTzmCoSA
+  values:
+    bed_shape:
+    - '0x0'
+    - 250x0
+    - 250x210
+    - '0x210'
+    before_layer_gcode: |+
+      ;BEFORE_LAYER_CHANGE
+      G92 E0.0
+      ;[layer_z]
+
+    binary_gcode: 0
+    stuck_filament_detection: 0
+    enable_pressure_advance_during_ramming: false
+    end_gcode: |-
+      {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+      G1 X0 Y200 F3600 ; park
+      {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+49, max_print_height)} F720 ; Move print head further up{endif}
+      G4 ; wait
+      M221 S100 ; reset flow
+      M900 K0 ; reset LA
+      M104 S0 ; turn off temperature
+      M140 S0 ; turn off heatbed
+      M107 ; turn off fan
+      M84 ; disable motors
+      ; max_layer_z = [max_layer_z]
+    extruder_offset: ['0x0']
+    gcode_flavor: marlin
+    high_current_on_filament_swap: 0
+    layer_gcode: ";AFTER_LAYER_CHANGE\n;[layer_z]"
+    machine_limits_usage: emit_to_gcode
+    machine_max_acceleration_e: [5000.0, 5000.0]
+    machine_max_acceleration_extruding: [1250.0, 1250.0]
+    machine_max_acceleration_retracting: [1250.0, 1250.0]
+    machine_max_acceleration_travel: [1500.0, 1250.0]
+    machine_max_acceleration_x: [1000.0, 960.0]
+    machine_max_acceleration_y: [1000.0, 960.0]
+    machine_max_acceleration_z: [200.0, 200.0]
+    machine_max_feedrate_e: [120.0, 120.0]
+    machine_max_feedrate_x: [200.0, 100.0]
+    machine_max_feedrate_y: [200.0, 100.0]
+    machine_max_feedrate_z: [12.0, 12.0]
+    machine_max_jerk_e: [4.5, 4.5]
+    machine_max_jerk_x: [8.0, 8.0]
+    machine_max_jerk_y: [8.0, 8.0]
+    machine_max_jerk_z: [0.4, 0.4]
+    machine_min_extruding_rate: [0.0, 0.0]
+    machine_min_travel_rate: [0.0, 0.0]
+    max_print_height: 210
+    printer_technology: FFF
+    remaining_times: 1
+    silent_mode: 1
+    single_extruder_multi_material: 0
+    filament_change_time: 27
+    thumbnails: [160x120/PNG]
+    use_firmware_retraction: 0
+    use_relative_e_distances: 1
+    use_volumetric_e: 0
+    variable_layer_height: 1
+    z_offset: 0
+    cooling_tube_retraction: '40'
+    cooling_tube_length: '20'
+    parking_pos_retraction: '85'
+    extra_loading_move: '-25'
+    multimaterial_purging: '140'
+  variants:
+  - condition: printer.model == "MK3S"
+    name: Original Prusa i3 MK3S & MK3S+
+    id: HyXD2z5/T6yMV4ae1jqjOQ
+    variants:
+    #MMU2S
+    - condition: feeder.base_model == "MMU2"
+      id: y1WFpmqYTQWCLQlPSUO/3A
+      values:
+        single_extruder_multi_material: true
+        filament_change_time: 27
+        start_gcode: |-
+          M862.3 P "MK3SMMU2S" ; printer model check
+          M862.1 P[nozzle_diameter] ; nozzle diameter check
+          M115 U3.14.1 ; tell printer latest fw version
+          G90 ; use absolute coordinates
+          M83 ; extruder relative mode
+          M104 S[first_layer_temperature] ; set extruder temp
+          M140 S[first_layer_bed_temperature] ; set bed temp
+          M190 S[first_layer_bed_temperature] ; wait for bed temp
+          M109 S[first_layer_temperature] ; wait for extruder temp
+          G28 W ; home all without mesh bed level
+          G80 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} W{(first_layer_print_max[0]) - (first_layer_print_min[0])} H{(first_layer_print_max[1]) - (first_layer_print_min[1])} ; mesh bed levelling
+
+          ; Send the filament type to the MMU unit.
+          ; E stands for extruder number, F stands for filament type (0: default; 1:flex; 2: PVA)
+          M403 E0 F{"" + ((filament_type[0]=="FLEX") ? 1 : ((filament_type[0]=="PVA") ? 2 : 0))}
+          M403 E1 F{"" + ((filament_type[1]=="FLEX") ? 1 : ((filament_type[1]=="PVA") ? 2 : 0))}
+          M403 E2 F{"" + ((filament_type[2]=="FLEX") ? 1 : ((filament_type[2]=="PVA") ? 2 : 0))}
+          M403 E3 F{"" + ((filament_type[3]=="FLEX") ? 1 : ((filament_type[3]=="PVA") ? 2 : 0))}
+          M403 E4 F{"" + ((filament_type[4]=="FLEX") ? 1 : ((filament_type[4]=="PVA") ? 2 : 0))}
+
+          {if not has_single_extruder_multi_material_priming}
+          ;go outside print area
+          G1 Y-3 F1000
+          G1 Z0.4 F1000
+          ; select extruder
+          T[initial_tool]
+          ; initial load
+          G1 X55 E29 F1073
+          G1 X5 E29 F1800
+          G1 X55 E8 F2000
+          G1 Z0.3 F1000
+          G92 E0
+          G1 X240 E25 F2200
+          G1 Y-2 F1000
+          G1 X55 E25 F1400
+          G1 Z0.2 F1000
+          G1 X5 E4 F1000
+          G92 E0
+          {endif}
+
+          M221 S{if layer_height<0.075}100{else}95{endif}
+          G92 E0
+        end_gcode: |-
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+          M104 S0 ; turn off temperature
+          M140 S0 ; turn off heatbed
+          M107 ; turn off fan
+          G1 X241 Y170 F3600 ; park
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+          M702 ; unload the current filament
+          G4 ; wait
+          M572 S0 ; reset PA
+          M593 X T2 F0 ; disable IS
+          M593 Y T2 F0 ; disable IS
+          M84 X Y E ; disable motors
+          ; max_layer_z = [max_layer_z]
+      variants:
+      - condition: feeder.single_mode
+        id: yMX3P4b0RuKxVBixZVtd+A
+        values:
+          single_extruder_multi_material: false
+          start_gcode: |-
+            M862.3 P "MK3SMMU2S" ; printer model check
+            M862.1 P[nozzle_diameter] ; nozzle diameter check
+            M115 U3.14.1 ; tell printer latest fw version
+            G90 ; use absolute coordinates
+            M83 ; extruder relative mode
+            M104 S[first_layer_temperature] ; set extruder temp
+            M140 S[first_layer_bed_temperature] ; set bed temp
+            Tx
+            M190 S[first_layer_bed_temperature] ; wait for bed temp
+            M109 S[first_layer_temperature] ; wait for extruder temp
+            G28 W ; home all without mesh bed level
+            G80 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} W{(first_layer_print_max[0]) - (first_layer_print_min[0])} H{(first_layer_print_max[1]) - (first_layer_print_min[1])} ; mesh bed levelling
+
+            ;go outside print area
+            G1 Y-3 F1000
+            G1 Z0.4 F1000
+            ; select extruder
+            Tc
+            ; purge line
+            G1 X55 F2000
+            G1 Z0.3 F1000
+            G92 E0
+            G1 X240 E25 F2200
+            G1 Y-2 F1000
+            G1 X55 E25 F1400
+            G1 Z0.2 F1000
+            G1 X5 E4 F1000
+
+            M221 S{if layer_height<0.075}100{else}95{endif}
+            G92 E0
+          end_gcode: |-
+            {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+            G1 X0 Y210 F7200 ; park
+            {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+49, max_print_height)} F720 ; Move print head further up{endif}
+            G1 E2 F5000
+            G1 E2 F5500
+            G1 E2 F6000
+            G1 E-15 F5800
+            G1 E-20 F5500
+            G1 E10 F3000
+            G1 E-10 F3100
+            G1 E10 F3150
+            G1 E-10 F3250
+            G1 E10 F3300
+
+            M140 S0 ; turn off heatbed
+            M107 ; turn off fan
+            M702 C
+            G4 ; wait
+            M221 S100 ; reset flow
+            M900 K0 ; reset LA
+            M104 S0 ; turn off temperature
+            M84 ; disable motors
+            ; max_layer_z = [max_layer_z]
+          machine_max_acceleration_e: [8000, 8000]
+    #MMU3
+    - condition: feeder.base_model == "MMU3"
+      id: ic2KYKIYQMiM1JKt1WZS+Q
+      values:
+        single_extruder_multi_material: true
+        filament_change_time: 27
+        start_gcode: |-
+          M862.3 P "MK3SMMU3" ; printer model check
+          M862.1 P[nozzle_diameter] ; nozzle diameter check
+          M115 U3.14.1 ; tell printer latest fw version
+          G90 ; use absolute coordinates
+          M83 ; extruder relative mode
+          M104 S[first_layer_temperature] ; set extruder temp
+          M140 S[first_layer_bed_temperature] ; set bed temp
+          M190 S[first_layer_bed_temperature] ; wait for bed temp
+          M109 S[first_layer_temperature] ; wait for extruder temp
+          G28 W ; home all without mesh bed level
+          G80 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} W{(first_layer_print_max[0]) - (first_layer_print_min[0])} H{(first_layer_print_max[1]) - (first_layer_print_min[1])} ; mesh bed levelling
+
+          ; Send the filament type to the MMU unit.
+          ; E stands for extruder number, F stands for filament type (0: default; 1:flex; 2: PVA)
+          M403 E0 F{"" + ((filament_type[0]=="FLEX") ? 1 : ((filament_type[0]=="PVA") ? 2 : 0))}
+          M403 E1 F{"" + ((filament_type[1]=="FLEX") ? 1 : ((filament_type[1]=="PVA") ? 2 : 0))}
+          M403 E2 F{"" + ((filament_type[2]=="FLEX") ? 1 : ((filament_type[2]=="PVA") ? 2 : 0))}
+          M403 E3 F{"" + ((filament_type[3]=="FLEX") ? 1 : ((filament_type[3]=="PVA") ? 2 : 0))}
+          M403 E4 F{"" + ((filament_type[4]=="FLEX") ? 1 : ((filament_type[4]=="PVA") ? 2 : 0))}
+
+          {if not has_single_extruder_multi_material_priming}
+          ;go outside print area
+          G1 Y-3 F1000
+          G1 Z0.4 F1000
+          ; select extruder
+          T[initial_tool]
+          ; initial load
+          G1 X55 E29 F1073
+          G1 X5 E29 F1800
+          G1 X55 E8 F2000
+          G1 Z0.3 F1000
+          G92 E0
+          G1 X240 E25 F2200
+          G1 Y-2 F1000
+          G1 X55 E25 F1400
+          G1 Z0.2 F1000
+          G1 X5 E4 F1000
+          G92 E0
+          {endif}
+
+          M221 S{if layer_height<0.075}100{else}95{endif}
+          G92 E0
+        end_gcode: |-
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+          M104 S0 ; turn off temperature
+          M140 S0 ; turn off heatbed
+          M107 ; turn off fan
+          G1 X241 Y170 F3600 ; park
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+          M702 ; unload the current filament
+          G4 ; wait
+          M572 S0 ; reset PA
+          M593 X T2 F0 ; disable IS
+          M593 Y T2 F0 ; disable IS
+          M84 X Y E ; disable motors
+          ; max_layer_z = [max_layer_z]
+      variants:
+      - condition: feeder.single_mode
+        id: w6rh6WLBQQGh5oMVZ1w2YQ
+        values:
+          single_extruder_multi_material: false
+          start_gcode: |-
+            M862.3 P "MK3SMMU3" ; printer model check
+            M862.1 P[nozzle_diameter] ; nozzle diameter check
+            M115 U3.14.1 ; tell printer latest fw version
+            G90 ; use absolute coordinates
+            M83 ; extruder relative mode
+            M104 S[first_layer_temperature] ; set extruder temp
+            M140 S[first_layer_bed_temperature] ; set bed temp
+            Tx
+            M190 S[first_layer_bed_temperature] ; wait for bed temp
+            M109 S[first_layer_temperature] ; wait for extruder temp
+            G28 W ; home all without mesh bed level
+            G80 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} W{(first_layer_print_max[0]) - (first_layer_print_min[0])} H{(first_layer_print_max[1]) - (first_layer_print_min[1])} ; mesh bed levelling
+
+            ;go outside print area
+            G1 Y-3 F1000
+            G1 Z0.4 F1000
+            ; select extruder
+            Tc
+            ; purge line
+            G1 X55 F2000
+            G1 Z0.3 F1000
+            G92 E0
+            G1 X240 E25 F2200
+            G1 Y-2 F1000
+            G1 X55 E25 F1400
+            G1 Z0.2 F1000
+            G1 X5 E4 F1000
+
+            M221 S{if layer_height<0.075}100{else}95{endif}
+            G92 E0
+          end_gcode: |-
+            {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+            G1 X0 Y210 F7200 ; park
+            {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+49, max_print_height)} F720 ; Move print head further up{endif}
+            G1 E2 F5000
+            G1 E2 F5500
+            G1 E2 F6000
+            G1 E-15 F5800
+            G1 E-20 F5500
+            G1 E10 F3000
+            G1 E-10 F3100
+            G1 E10 F3150
+            G1 E-10 F3250
+            G1 E10 F3300
+
+            M140 S0 ; turn off heatbed
+            M107 ; turn off fan
+            M702 C
+            G4 ; wait
+            M221 S100 ; reset flow
+            M900 K0 ; reset LA
+            M104 S0 ; turn off temperature
+            M84 ; disable motors
+            ; max_layer_z = [max_layer_z]
+          machine_max_acceleration_e: [8000, 8000]
+  - condition: printer.model == "MK3"
+    name: Original Prusa i3 MK3
+    id: qfQfvlJVSuif6K79CZxfLA
+---
+kind: printer
+id: '*MK3_nozzle_variant*'
+variants:
+- condition: printer.base_model == "MK3"
+  id: g3U4vSXSQ1uhbTINvv3DlQ
+  values:
+    start_gcode: |-
+      M862.3 P "[printer_model]" ; printer model check
+      M862.1 P[nozzle_diameter] ; nozzle diameter check
+      M115 U3.14.1 ; tell printer latest fw version
+      G90 ; use absolute coordinates
+      M83 ; extruder relative mode
+      M104 S[first_layer_temperature] ; set extruder temp
+      M140 S[first_layer_bed_temperature] ; set bed temp
+      M190 S[first_layer_bed_temperature] ; wait for bed temp
+      M109 S[first_layer_temperature] ; wait for extruder temp
+      G28 W ; home all without mesh bed level
+      G80 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} W{(first_layer_print_max[0]) - (first_layer_print_min[0])} H{(first_layer_print_max[1]) - (first_layer_print_min[1])} ; mesh bed levelling
+      G1 Z0.2 F720
+      G1 Y-3 F1000 ; go outside print area
+      G92 E0
+      G1 X60 E9 F1000 ; intro line
+      G1 X100 E12.5 F1000 ; intro line
+      G92 E0
+      M221 S{if layer_height<0.075}100{else}95{endif}
+  variants:
+# 0.25 nozzle
+  - condition: tool.nozzle_diameter == 0.25
+    id: HsVPxb6PTyGMNgUAqZqWRg
+    values:
+      start_gcode: |-
+        M862.3 P "[printer_model]" ; printer model check
+        M862.1 P[nozzle_diameter] ; nozzle diameter check
+        M115 U3.14.1 ; tell printer latest fw version
+        G90 ; use absolute coordinates
+        M83 ; extruder relative mode
+        M104 S[first_layer_temperature] ; set extruder temp
+        M140 S[first_layer_bed_temperature] ; set bed temp
+        M190 S[first_layer_bed_temperature] ; wait for bed temp
+        M109 S[first_layer_temperature] ; wait for extruder temp
+        G28 W ; home all without mesh bed level
+        G80 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} W{(first_layer_print_max[0]) - (first_layer_print_min[0])} H{(first_layer_print_max[1]) - (first_layer_print_min[1])} ; mesh bed levelling
+        G1 Z0.2 F720
+        G1 Y-3 F1000 ; go outside print area
+        G92 E0
+        G1 X60 E8 F700 ; intro line
+        G1 X100 E12.5 F700 ; intro line
+        G92 E0
+        M221 S{if layer_height<0.075}100{else}95{endif}
+      color_change_gcode: "M600\nG1 E0.3 F1500 ; prime after color change"
+# 0.4 nozzle
+  - condition: tool.nozzle_diameter == 0.4
+    id: +UE+BvJURZqFhJhdx01GaQ
+    values:
+      start_gcode: |-
+        M862.3 P "[printer_model]" ; printer model check
+        M862.1 P[nozzle_diameter] ; nozzle diameter check
+        M115 U3.14.1 ; tell printer latest fw version
+        G90 ; use absolute coordinates
+        M83 ; extruder relative mode
+        M104 S[first_layer_temperature] ; set extruder temp
+        M140 S[first_layer_bed_temperature] ; set bed temp
+        M190 S[first_layer_bed_temperature] ; wait for bed temp
+        M109 S[first_layer_temperature] ; wait for extruder temp
+        G28 W ; home all without mesh bed level
+        G80 X{first_layer_print_min[0]} Y{first_layer_print_min[1]} W{(first_layer_print_max[0]) - (first_layer_print_min[0])} H{(first_layer_print_max[1]) - (first_layer_print_min[1])} ; mesh bed levelling
+        G1 Z0.2 F720
+        G1 Y-3 F1000 ; go outside print area
+        G92 E0
+        G1 X60 E9 F1000 ; intro line
+        G1 X100 E12.5 F1000 ; intro line
+        G92 E0
+        M221 S{if layer_height<0.075}100{else}95{endif}
+      color_change_gcode: "M600\nG1 E0.3 F1500 ; prime after color change"
+# 0.6 nozzle
+  - condition: tool.nozzle_diameter == 0.6
+    id: yAjq86bLQkW3hmJ94rcoEw
+    values:
+      color_change_gcode: "M600\nG1 E0.4 F1500 ; prime after color change"
+# 0.8 nozzle
+  - condition: tool.nozzle_diameter == 0.8
+    id: kuD4RnZ/QNW4fyUnNQIZvA
+    values:
+      color_change_gcode: "M600\nG1 E0.5 F1500 ; prime after color change"

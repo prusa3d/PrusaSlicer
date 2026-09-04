@@ -1,0 +1,38 @@
+kind: filament
+inherits:
+- '*PLA*'
+name: colorFabb GlowFill
+id: colorFabb GlowFill
+features:
+  $.type: PLA
+  $.tags: [abrasive, glow_in_the_dark]
+  $.properties.min_nozzle_diameter: 0.4
+values:
+  filament_cost: '39.72'
+  filament_vendor: colorFabb
+  filament_density: 1.3
+  filament_spool_weight: 160
+  first_layer_temperature: 210
+  temperature: 210
+  first_layer_bed_temperature: 60
+  bed_temperature: 60
+  min_fan_speed: 100
+  max_fan_speed: 100
+  filament_abrasive: true
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: f9mxKKIMRnmzdd6BSOvsDA
+  variants:
+  - condition: tool.nozzle_diameter == 0.4
+    id: AiY3HsF2T9K/ONH+zALSVQ
+    values:
+      filament_max_volumetric_speed: 4
+  - condition: tool.nozzle_diameter == 0.6
+    id: miEhTOUbRvmSDc4Bzg+EUg
+    values:
+      filament_max_volumetric_speed: 7
+  - name: '*quit*'
+    id: CUuN2RaIRVWYhIybxwQVBQ
+# END
+- name: '*quit*'
+  id: ke0uqmtsRyWfyqLmPz2bkA

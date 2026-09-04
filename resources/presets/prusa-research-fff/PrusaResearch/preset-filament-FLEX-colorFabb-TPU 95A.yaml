@@ -1,0 +1,161 @@
+kind: filament
+inherits:
+- '*FLEX*'
+features:
+  $.type: TPU
+name: colorFabb TPU 95A
+id: colorFabb TPU 95A
+# MK4/XL/C1 family 0.4-0.6
+values:
+  extrusion_multiplier: 1.05
+  filament_cost: 44.49
+  filament_density: 1.2
+  filament_vendor: colorFabb
+  filament_spool_weight: 242
+  first_layer_temperature: 240
+  temperature: 240
+  first_layer_bed_temperature: 60
+  bed_temperature: 60
+  bridge_fan_speed: 70
+  disable_fan_first_layers: 5
+  full_fan_speed_layer: 5
+  min_fan_speed: 50
+  max_fan_speed: 50
+  cooling: false
+  filament_max_volumetric_speed: 3.5
+  retract_length: 2
+variants:
+## CORE One
+- condition: printer.base_model == "COREONE"
+  id: ZCPj6zItSG2manNnpPIeBg
+  values:
+    bridge_fan_speed: 70
+    min_fan_speed: 45
+    max_fan_speed: 45
+  variants:
+  # C1 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: z1pN7uOxQXmP8i4V6BfoZg
+    values:
+      filament_max_volumetric_speed: 3.5
+  # C1 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: pe04asqTQDi4gi3XrIlJfQ
+    values:
+      filament_max_volumetric_speed: 3.5
+  # C1 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: PtrL/SNFSiiFVKouiegyZw
+    values:
+      filament_max_volumetric_speed: 4.5
+  # END
+  - name: '*quit*'
+    id: gN50+UR2S06AOA6ZGZJ5Wg
+## XL
+- condition: printer.model == "XL"
+  id: wH7qwxPnQ9C4a7C4F+E8QQ
+  values:
+    retract_length_toolchange: 2.5
+  variants:
+  # XL 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: QrBivB3CQ3OI0+V2f3F2gw
+    values:
+      filament_max_volumetric_speed: 3
+      filament_multitool_ramming_flow: 3
+  # XL 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 6C+WHGG9TlWsOhl4kfYLvg
+    values:
+      filament_max_volumetric_speed: 3
+      filament_multitool_ramming_flow: 3
+  # XL 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: 1z/KnKkHSDCqRUqLNSgi0g
+    values:
+      filament_max_volumetric_speed: 4
+      filament_multitool_ramming_flow: 4
+  # END
+  - name: '*quit*'
+    id: yLsF6CtAS+aUZBYC5O7uyQ
+## XL+
+- condition: printer.model == "XLP"
+  id: tSaxJoHgS16TPG7tiNYq5g
+  values:
+    retract_length_toolchange: 2.5
+    min_fan_speed: 40
+    max_fan_speed: 40
+    bridge_fan_speed: 70
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: DmYVN7/YS4e08jpv5g7Cwg
+    values:
+      filament_max_volumetric_speed: 3
+      filament_multitool_ramming_flow: 3
+  # XL+ 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: Wg1kFHqdRuWWPOjpDArxzg
+    values:
+      filament_max_volumetric_speed: 3
+      filament_multitool_ramming_flow: 3
+  # XL+ 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: bJgFQlhPTFu76AwXEprm1g
+    values:
+      filament_max_volumetric_speed: 4
+      filament_multitool_ramming_flow: 4
+  # END
+  - name: '*quit*'
+## MK4
+    id: MdWNURmvQ1Gi8Ku9UeSyJw
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: qC/+3dkBSFe4ozjr/e+3qw
+  variants:
+  # MK4 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: B2AUVl81RC2x06tJToBBMA
+    values:
+      filament_max_volumetric_speed: 3.5
+  # MK4 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: gruYIoMYSfmjGorWZodZfw
+    values:
+      filament_max_volumetric_speed: 3.5
+  # MK4 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: gRf7lZCMSE6vPL+EeA6uqA
+    values:
+      filament_max_volumetric_speed: 4.5
+  # END
+  - name: '*quit*'
+## MK4S
+    id: D4yUXW4BScyFLXCvo4BNXw
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: CtP4t0sRSy+jocGe/ffqAg
+  values:
+    bridge_fan_speed: 70
+    min_fan_speed: 40
+    max_fan_speed: 40
+  variants:
+  # MK4S 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: rgZYt1wGSrqhtHTY9L+2uw
+    values:
+      filament_max_volumetric_speed: 3.5
+  # MK4S 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: gF1pQlmeRgC7hylXuhP5qA
+    values:
+      filament_max_volumetric_speed: 3.5
+  # MK4S 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: nEywNg9BSEmA88vW9zosIg
+    values:
+      filament_max_volumetric_speed: 4.5
+  # END
+  - name: '*quit*'
+# END
+    id: DmB1OcbWQwSo3bPdvkWeMg
+- name: '*quit*'
+  id: ywGRh5a1Q4qxnLkIJgnuBA

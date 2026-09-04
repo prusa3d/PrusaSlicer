@@ -1,0 +1,14 @@
+kind: filament
+inherits:
+- '*PACF*'
+name: Prusament PA11 Carbon Fiber
+# No MINI
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5)/ and tool.nozzle_diameter >= 0.4 and feeder.base_model!~/.*MMU.*/
+id: Prusament PA11 Carbon Fiber
+values:
+  filament_vendor: Prusa Polymers
+  first_layer_temperature: 275
+  temperature: 285
+  extrusion_multiplier: 1.05
+  first_layer_bed_temperature: 90
+  bed_temperature: 115

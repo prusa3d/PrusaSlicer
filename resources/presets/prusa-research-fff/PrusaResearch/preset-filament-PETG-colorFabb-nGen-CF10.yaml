@@ -1,0 +1,248 @@
+kind: filament
+inherits:
+- '*PETCF*'
+name: colorFabb nGen-CF10
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and tool.nozzle_diameter >= 0.4 and feeder.model != "MMU3_32bit"
+id: colorFabb nGen-CF10
+# MK4/XL/COREONE family only 0.4-0.6
+values:
+  filament_vendor: colorFabb
+  extrusion_multiplier: 1
+  filament_cost: 55.04
+  filament_density: 1.2
+  filament_spool_weight: 160
+  first_layer_temperature: 245
+  temperature: 245
+  fan_below_layer_time: 9
+  min_fan_speed: 30
+  max_fan_speed: 50
+  bridge_fan_speed: 50
+variants:
+# COREONE
+- condition: printer.base_model == "COREONE"
+  id: GkHUYM8lRV+0jLBFZni02A
+  values:
+    min_fan_speed: 30
+    max_fan_speed: 70
+    bridge_fan_speed: 60
+    overhang_fan_speed_0: 60
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: XX+6Quc0QhSy7KeUC5zrCw
+    values:
+      filament_max_volumetric_speed: 6
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: +vC5l/FhTo2vwlqSSLyBaA
+      values:
+        filament_max_volumetric_speed: 6
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: BEWDq3EpTpSm7dWcaJPolQ
+    values:
+      filament_max_volumetric_speed: 7
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: gPyr+3+9T5iCcydqS43IpQ
+      values:
+        filament_max_volumetric_speed: 7
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: jRVAlD+SSMy6Yhothe7d5Q
+    values:
+      filament_max_volumetric_speed: 10
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: u2xusi59TPmwIDqLFeXCxw
+      values:
+        filament_max_volumetric_speed: 10
+  # END
+  - name: '*quit*'
+# MK4S/MK3.9S
+    id: 3w1mobUWTR2NknblZbdFCQ
+- condition: printer.model=~/(MK4S|MK3.9S)/
+  id: 3zJsvOcOQXam61ayV/UXJw
+  values:
+    min_fan_speed: 30
+    max_fan_speed: 50
+    bridge_fan_speed: 50
+    overhang_fan_speed_0: 50
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: zTD/mJJWS86fGskbtLZB9g
+    values:
+      filament_max_volumetric_speed: 6
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: Vr1cgMazQPi1w5NcBsi/pQ
+      values:
+        filament_max_volumetric_speed: 6
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 0EZjf4J8QHWjPU5Gap67aQ
+    values:
+      filament_max_volumetric_speed: 7
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: uAIraDGZTI2AF9P6dMHapw
+      values:
+        filament_max_volumetric_speed: 7
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: LCzazW2mQoWz0IiOZ4NfYg
+    values:
+      filament_max_volumetric_speed: 10
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: SxrBHU6+TS+K87WjR7O+JA
+      values:
+        filament_max_volumetric_speed: 10
+  # END
+  - name: '*quit*'
+# MK4
+    id: DTqbWhkNR6at8cr9J91L+w
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: Nj9tJ9WfTrShJ0a9oOTJhg
+  values:
+    min_fan_speed: 30
+    max_fan_speed: 60
+    bridge_fan_speed: 60
+    overhang_fan_speed_0: 60
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 9yqaSAnaTTKZu9QNvDY5bg
+    values:
+      filament_max_volumetric_speed: 6
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: 1wkLhsX8TlSh1a2tfAn6GQ
+      values:
+        filament_max_volumetric_speed: 6
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: 8DLlz6UtS+qsK9qpEQ24VQ
+    values:
+      filament_max_volumetric_speed: 7
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: 48FEJC3GQ3u+cnCHQn+0WA
+      values:
+        filament_max_volumetric_speed: 7
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: rL+LLceSTSitqU38iJ5Anw
+    values:
+      filament_max_volumetric_speed: 10
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: QXoBh/UAReOTtge8NJ6Ouw
+      values:
+        filament_max_volumetric_speed: 10
+  # END
+  - name: '*quit*'
+    id: MT1QdwhBSIa1WwLMfSPmeQ
+# XL
+- condition: printer.model == "XL"
+  id: BrfVwhvIQL6rlwSU3BqFHg
+  values:
+    min_fan_speed: 30
+    max_fan_speed: 60
+    bridge_fan_speed: 60
+    overhang_fan_speed_0: 60
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: mHtN4CAGS6uCVjOtMO5zFQ
+    values:
+      filament_max_volumetric_speed: 6
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: aKgEF5lLQlyHgggSFQ6rfw
+      values:
+        filament_max_volumetric_speed: 6
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: S9qJfjO7RkKMNE9s1NFF/Q
+    values:
+      filament_max_volumetric_speed: 7
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: HFNYgpxYSDOPg1B9DZuNVg
+      values:
+        filament_max_volumetric_speed: 7
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: YKrN0qcoRGGBSEsUgH96ug
+    values:
+      filament_max_volumetric_speed: 10
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: GgBt/hOVRzWjOn7tgy3fmA
+      values:
+        filament_max_volumetric_speed: 10
+  # END
+  - name: '*quit*'
+    id: AMjagPTDQ2OKCeodevfiXw
+# XL+
+- condition: printer.model == "XLP"
+  id: Y0YSaxWQSd+FGJNoQSpHyw
+  values:
+    min_fan_speed: 30
+    max_fan_speed: 50
+    bridge_fan_speed: 50
+    overhang_fan_speed_0: 50
+  variants:
+  # XL+ 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: 7u7uqqwPS6G67LUdKk/JZg
+    values:
+      filament_max_volumetric_speed: 6
+    variants:
+    # XL+ 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: Q1xPJPikTomOYAihwjG7CQ
+      values:
+        filament_max_volumetric_speed: 6
+  # XL+ 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: VDtOrb03QOWZ+7ZYeqIu2A
+    values:
+      filament_max_volumetric_speed: 7
+    # XL+ 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: I+03FyaPQUWG+za8XQkglA
+      values:
+        filament_max_volumetric_speed: 7
+  # XL+ 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: IqKMXsvXQbm6yOHX49rlqg
+    values:
+      filament_max_volumetric_speed: 10
+    # XL+ 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: kEmFRwsTTBSgA6VT8L3zxQ
+      values:
+        filament_max_volumetric_speed: 10
+  # END
+  - name: '*quit*'
+# END
+    id: U2yhQ9VlQEmtcI/UfzAouw
+- name: '*quit*'
+  id: 2p5sTrwBQ7Ku+Y87bWh9Kw

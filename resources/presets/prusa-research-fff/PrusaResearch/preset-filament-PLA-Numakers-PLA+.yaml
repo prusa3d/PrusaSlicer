@@ -1,0 +1,67 @@
+kind: filament
+inherits:
+- '*PLA*'
+- '*NumakersPLAPLUS_P_ADVANCE*'
+name: Numakers PLA+
+id: Numakers PLA+
+values:
+  filament_cost: '20.99'
+  filament_vendor: Numakers
+---
+kind: filament
+# Pressure advance values
+id: '*NumakersPLAPLUS_P_ADVANCE*'
+## C1, MK4, XL family
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: zN9hZRfERR64fisB53kjUw
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: Wl84q5C+SVam7W559EgObA
+    values:
+      pressure_advance_value: 0.1
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: qskR/pIeSOeo5SiQbZrPBQ
+    values:
+      pressure_advance_value: 0.074
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: OVFA2mFKTyKZ3vtv0/wECg
+    values:
+      pressure_advance_value: 0.032
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: E7Q/gRewSSuzetYPFrkIug
+    values:
+      pressure_advance_value: 0.022
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: /7Ko6/7/Q5abd9PijbgN8g
+    values:
+      pressure_advance_value: 0.019
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: EZe5bBPnQUWomRSQp+pN6w
+    values:
+      pressure_advance_value: 0.013
+## MK3.5
+- condition: printer.base_model == "MK3.5"
+  id: e27Og5sARvyGBbem7Q3RPQ
+  variants:
+  # 0.25
+  - condition: tool.nozzle_diameter == 0.25
+    id: 5hFKHnoIQw+IxO6P1N0X1Q
+    values:
+      pressure_advance_value: 0.1
+  # 0.3
+  - condition: tool.nozzle_diameter == 0.3
+    id: 7eIh9DZJQZKCf5EkEQATFQ
+    values:
+      pressure_advance_value: 0.075
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: GFdjjj4wRV6e/ZnLu9GaSw
+    values:
+      pressure_advance_value: 0.032

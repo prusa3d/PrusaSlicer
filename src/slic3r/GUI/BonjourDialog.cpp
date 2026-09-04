@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Vojtěch Král @vojtechkral, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "slic3r/Utils/Bonjour.hpp"   // On Windows, boost needs to be included before wxWidgets headers
 
 #include "BonjourDialog.hpp"

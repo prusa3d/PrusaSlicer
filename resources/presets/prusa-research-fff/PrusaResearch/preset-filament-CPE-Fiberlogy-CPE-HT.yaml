@@ -1,0 +1,38 @@
+kind: filament
+inherits:
+- '*CPE*'
+- '*sheets_PET_CPEHT*'
+name: Fiberlogy CPE HT
+id: Fiberlogy CPE HT
+values:
+  extrusion_multiplier: 0.98
+  filament_cost: '42.67'
+  filament_vendor: Fiberlogy
+  filament_density: 1.18
+  filament_spool_weight: 330
+  fan_always_on: false
+  min_fan_speed: 0
+  max_fan_speed: 0
+  bridge_fan_speed: 50
+---
+kind: filament
+id: '*sheets_PET_CPEHT*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: Tl6nyJjORRC7s/1l7z9kTA
+  values:
+    first_layer_bed_temperature: 105
+    bed_temperature: 100
+  variants:
+  - condition: printer.base_model == "XL"
+    id: gpPU/SBcTICGyl/WkS5pRQ
+    values:
+      first_layer_bed_temperature: 100
+      bed_temperature: 100
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: Ln0HBousTXWg9T23/G5L+A
+  values:
+    first_layer_bed_temperature: 80
+    bed_temperature: 80

@@ -1,24 +1,31 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <numeric>
 #include <sstream>
 
+#include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include "libslic3r/libslic3r.h"
 
 #include "libslic3r/ClipperUtils.hpp"
-#include "libslic3r/Fill/Fill.hpp"
 #include "libslic3r/Flow.hpp"
 #include "libslic3r/Layer.hpp"
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Print.hpp"
-#include "libslic3r/SVG.hpp"
+#include "Slic3r/Biz/Algorithms/SVG.hpp"
+#include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 
 #include "test_data.hpp"
 
+#include "boost/algorithm/string.hpp"
+
 using namespace Slic3r;
+using Biz::GCodeReader::GCodeReader;
 using namespace std::literals;
+using Test::TestConfig;
+using Domain::FloatOrPercentage;
+using Domain::Percentage;
 
 bool test_if_solid_surface_filled(const ExPolygon& expolygon, double flow_spacing, double angle = 0, double density = 1.0);
 
@@ -32,7 +39,7 @@ TEST_CASE("Fill: adjusted solid distance") {
 #endif
 
 TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
-    std::unique_ptr<Slic3r::Fill> filler(Slic3r::Fill::new_from_type("rectilinear"));
+    std::unique_ptr<Slic3r::Fill> filler(Slic3r::Fill::new_from_type(Domain::InfillPattern::ipRectilinear));
     filler->angle = float(-(PI)/2.0);
 	FillParams fill_params;
 	filler->spacing = 5;
@@ -50,8 +57,8 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
         test_set.reserve(4);
         std::vector<Vec2d> points { {0,0}, {100,0}, {100,100}, {0,100} };
         for (size_t i = 0; i < 4; ++i) {
-            std::transform(points.cbegin()+i, points.cend(),   std::back_inserter(test_set), [] (const Vec2d& a) -> Point { return Point::new_scale(a.x(), a.y()); } ); 
-            std::transform(points.cbegin(), points.cbegin()+i, std::back_inserter(test_set), [] (const Vec2d& a) -> Point { return Point::new_scale(a.x(), a.y()); } );
+            std::transform(points.cbegin()+i, points.cend(),   std::back_inserter(test_set), [] (const Vec2d& a) -> Point { return scaled(Vec2d(a.x(), a.y())); } ); 
+            std::transform(points.cbegin(), points.cbegin()+i, std::back_inserter(test_set), [] (const Vec2d& a) -> Point { return scaled(Vec2d(a.x(), a.y())); } );
             Slic3r::Polylines paths = test(Slic3r::ExPolygon(test_set));
             REQUIRE(paths.size() == 1); // one continuous path
 
@@ -67,7 +74,7 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
         std::vector<Vec2d> points {Vec2d(0,0), Vec2d(100,0), Vec2d(150,50), Vec2d(100,100), Vec2d(0,100), Vec2d(-50,50)};
         Slic3r::Points test_set;
         test_set.reserve(6);
-        std::transform(points.cbegin(), points.cend(),   std::back_inserter(test_set), [] (const Vec2d& a) -> Point { return Point::new_scale(a.x(), a.y()); } );
+        std::transform(points.cbegin(), points.cend(),   std::back_inserter(test_set), [] (const Vec2d& a) -> Point { return scaled(Vec2d(a.x(), a.y())); } );
         Slic3r::Polylines paths = test(Slic3r::ExPolygon(test_set));
         REQUIRE(paths.size() == 1); // one continuous path
     }
@@ -80,8 +87,8 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
         Slic3r::Points test_hole;
         Slic3r::Points test_square;
 
-        std::transform(square.cbegin(), square.cend(), std::back_inserter(test_square), [] (const Vec2d& a) -> Point { return Point::new_scale(a.x(), a.y()); } );
-        std::transform(hole.cbegin(), hole.cend(), std::back_inserter(test_hole), [] (const Vec2d& a) -> Point { return Point::new_scale(a.x(), a.y()); } );
+        std::transform(square.cbegin(), square.cend(), std::back_inserter(test_square), [] (const Vec2d& a) -> Point { return scaled(Vec2d(a.x(), a.y())); } );
+        std::transform(hole.cbegin(), hole.cend(), std::back_inserter(test_hole), [] (const Vec2d& a) -> Point { return scaled(Vec2d(a.x(), a.y())); } );
 
         for (double angle : {-(PI/2.0), -(PI/4.0), -(PI), PI/2.0, PI}) {
             for (double spacing : {25.0, 5.0, 7.5, 8.5}) {
@@ -124,8 +131,8 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
     }
 
     SECTION("Rotated Square produces one continuous path") {
-        Slic3r::ExPolygon expolygon(Polygon::new_scale({ {0, 0}, {50, 0}, {50, 50}, {0, 50} }));
-        std::unique_ptr<Slic3r::Fill> filler(Slic3r::Fill::new_from_type("rectilinear"));
+        Slic3r::ExPolygon expolygon(Slic3r::Biz::Algorithms::Polygon::scaled({ {0, 0}, {50, 0}, {50, 50}, {0, 50} }));
+        std::unique_ptr<Slic3r::Fill> filler(Slic3r::Fill::new_from_type(Domain::InfillPattern::ipRectilinear));
 		filler->bounding_box = get_extents(expolygon);
         filler->angle = 0;
         
@@ -150,10 +157,10 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
     #if 0   // Disabled temporarily due to precission issues on the Mac VM
     SECTION("Solid surface fill") {
         Slic3r::Points points {
-            Point::new_scale(6883102, 9598327.01296997),
-            Point::new_scale(6883102, 20327272.01297),
-            Point::new_scale(3116896, 20327272.01297),
-            Point::new_scale(3116896, 9598327.01296997) 
+            scaled(Vec2d{6883102, 9598327.01296997}),
+            scaled(Vec2d{6883102, 20327272.01297}),
+            scaled(Vec2d{3116896, 20327272.01297}),
+            scaled(Vec2d{3116896, 9598327.01296997}) 
         };
         Slic3r::ExPolygon expolygon(points);
          
@@ -190,7 +197,7 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
     }
     SECTION("Solid surface fill") {
         Slic3r::Points points {
-            Point::new_scale(0,0),Point::new_scale(98,0),Point::new_scale(98,10), Point::new_scale(0,10)
+            scaled(Vec2d(0,0)),scaled(Vec2d(98,0)),scaled(Vec2d(98,10)), scaled(Vec2d(0,10))
         };
         Slic3r::ExPolygon expolygon(points);
          
@@ -198,36 +205,36 @@ TEST_CASE("Fill: Pattern Path Length", "[Fill]") {
     }
 }
 
-SCENARIO("Infill does not exceed perimeters", "[Fill]") 
+TEST_CASE("Infill does not exceed perimeters", "[Fill]") 
 {
-    auto test = [](const std::string_view pattern) {
-        auto config = Slic3r::DynamicPrintConfig::full_print_config_with({
-            { "nozzle_diameter",        "0.4, 0.4, 0.4, 0.4" },
-            { "fill_pattern",           pattern },
-            { "top_fill_pattern",       pattern },
-            { "bottom_fill_pattern",    pattern },
-            { "perimeters",             1 },
-            { "skirts",                 0 },
-            { "fill_density",           0.2 },
-            { "layer_height",           0.05 },
-            { "perimeter_extruder",     1 },
-            { "infill_extruder",        2 }
-        });
-        
+    auto test = [&](const Domain::InfillPattern pattern, const Domain::InfillPattern top_bottom_pattern) {
+        TestConfig config{4, 0.4};
+        config.print.items.opt("fill_pattern").set(pattern);
+        config.print.items.opt("perimeters").set(1);
+        config.print.items.opt("fill_density").set(Percentage{20.0});
+        config.print.items.opt("top_fill_pattern").set(top_bottom_pattern);
+        config.print.items.opt("bottom_fill_pattern").set(top_bottom_pattern);
+        config.print.items.opt("skirts").set(0);
+        config.print.items.opt("layer_height").set(0.05);
+        config.print.items.opt("perimeter_extruder").set(1);
+        config.print.items.opt("infill_extruder").set(2);
+
         WHEN("40mm cube sliced") {
-            std::string gcode = Slic3r::Test::slice({ mesh(Slic3r::Test::TestMesh::cube_20x20x20, Vec3d::Zero(), 2.0) }, config);
+            std::string gcode = Slic3r::Test::slice(
+                {mesh(Slic3r::Test::TestMesh::cube_20x20x20, Vec3d::Zero(), 2.0)}, config
+            );
             THEN("gcode not empty") {
                 REQUIRE(! gcode.empty());
             }
             THEN("infill does not exceed perimeters") {
                 GCodeReader parser;
-                const int   perimeter_extruder = config.opt_int("perimeter_extruder");
-                const int   infill_extruder    = config.opt_int("infill_extruder");
+                const int   perimeter_extruder = config.print.items.opt("perimeter_extruder").get<int>();
+                const int   infill_extruder    = config.print.items.opt("infill_extruder").get<int>();
                 int         tool = -1;
                 Points      perimeter_points;
                 Points      infill_points;
                 parser.parse_buffer(gcode, [&tool, &perimeter_points, &infill_points, perimeter_extruder, infill_extruder]
-                    (Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+                    (GCodeReader &self, const GCodeReader::GCodeLine &line)
                 {
                     // if the command is a T command, set the the current tool
                     if (boost::starts_with(line.cmd(), "T")) {
@@ -240,115 +247,35 @@ SCENARIO("Infill does not exceed perimeters", "[Fill]")
                     }
                 });
                 auto convex_hull = Geometry::convex_hull(perimeter_points);
-                int num_inside = std::count_if(infill_points.begin(), infill_points.end(), [&convex_hull](const Point &pt){ return convex_hull.contains(pt); });
+                int num_inside = std::count_if(infill_points.begin(), infill_points.end(), [&convex_hull](const Point &pt){ return Slic3r::Biz::Algorithms::Polygon::contains(convex_hull, pt); });
                 REQUIRE(num_inside == infill_points.size());
             }
         }
     };
 
-    GIVEN("Rectilinear") { test("rectilinear"sv); }
-    GIVEN("Honeycomb") { test("honeycomb"sv); }
-    GIVEN("HilbertCurve") { test("hilbertcurve"sv); }
-    GIVEN("Concentric") { test("concentric"sv); }
+    GIVEN("Rectilinear") { test(Domain::InfillPattern::ipRectilinear, Domain::InfillPattern::ipRectilinear); }
+    GIVEN("Honeycomb") { test(Domain::InfillPattern::ipHoneycomb, Domain::InfillPattern::ipRectilinear); }
+    GIVEN("HilbertCurve") { test(Domain::InfillPattern::ipHilbertCurve, Domain::InfillPattern::ipHilbertCurve); }
+    GIVEN("Concentric") { test(Domain::InfillPattern::ipConcentric, Domain::InfillPattern::ipConcentric); }
 }
 
-// SCENARIO("Infill only where needed", "[Fill]")
-// {
-//     DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-//     config.set_deserialize_strict({
-//         { "nozzle_diameter",                "0.4, 0.4, 0.4, 0.4" },
-//         { "infill_only_where_needed",       true },
-//         { "bottom_solid_layers",            0 },
-//         { "infill_extruder",                2 },
-//         { "infill_extrusion_width",         0.5 },
-//         { "wipe_into_infill",               false },
-//         { "fill_density",                   0.4 },
-//         // for preventing speeds from being altered
-//         { "cooling",                        "0, 0, 0, 0" },
-//         // for preventing speeds from being altered
-//         { "first_layer_speed",              "100%" }
-//     });
-
-//     auto test = [&config]() -> double {
-//         TriangleMesh pyramid = Test::mesh(Slic3r::Test::TestMesh::pyramid);
-//         // Arachne doesn't use "Detect thin walls," and because of this, it filters out tiny infill areas differently.
-//         // So, for Arachne, we cut the pyramid model to achieve similar results.
-//         if (config.opt_enum<PerimeterGeneratorType>("perimeter_generator") == Slic3r::PerimeterGeneratorType::Arachne) {
-//             indexed_triangle_set lower{};
-//             cut_mesh(pyramid.its, 35, nullptr, &lower);
-//             pyramid = TriangleMesh(lower);
-//         }
-//         std::string gcode = Slic3r::Test::slice({ pyramid }, config);
-//         THEN("gcode not empty") {
-//             REQUIRE(! gcode.empty());
-//         }
-
-//         GCodeReader parser;
-//         int         tool = -1;
-//         const int   infill_extruder = config.opt_int("infill_extruder");
-//         Points      infill_points;
-//         parser.parse_buffer(gcode, [&tool, &infill_points, infill_extruder](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
-//         {
-//             // if the command is a T command, set the the current tool
-//             if (boost::starts_with(line.cmd(), "T")) {
-//                 tool = atoi(line.cmd().data() + 1) + 1;
-//             } else if (line.cmd() == "G1" && line.extruding(self) && line.dist_XY(self) > 0) {
-//                 if (tool == infill_extruder) {
-//                     infill_points.emplace_back(self.xy_scaled());
-//                     infill_points.emplace_back(line.new_XY_scaled(self));
-//                 }
-//             }
-//         });
-//         // prevent calling convex_hull() with no points
-//         THEN("infill not empty") {
-//             REQUIRE(! infill_points.empty());
-//         }
-
-//         auto opt_width = config.opt<ConfigOptionFloatOrPercent>("infill_extrusion_width");
-//         REQUIRE(! opt_width->percent);
-//         Polygons convex_hull = expand(Geometry::convex_hull(infill_points), scaled<float>(opt_width->value / 2));
-//         return SCALING_FACTOR * SCALING_FACTOR * std::accumulate(convex_hull.begin(), convex_hull.end(), 0., [](double acc, const Polygon &poly){ return acc + poly.area(); });
-//     };
-
-//     double tolerance = 5; // mm^2
-    
-//     // GIVEN("solid_infill_below_area == 0") {
-//     //     config.opt_float("solid_infill_below_area") = 0;
-//     //     WHEN("pyramid is sliced ") {
-//     //         auto area = test();
-//     //         THEN("no infill is generated when using infill_only_where_needed on a pyramid") {
-//     //             REQUIRE(area < tolerance);
-//     //         }
-//     //     }
-//     // }
-//     // GIVEN("solid_infill_below_area == 70") {
-//     //     config.opt_float("solid_infill_below_area") = 70;
-//     //     WHEN("pyramid is sliced ") {
-//     //         auto area = test();
-//     //         THEN("infill is only generated under the forced solid shells") {
-//     //             REQUIRE(std::abs(area - 70) < tolerance);
-//     //         }
-//     //     }
-//     // }
-// }
-
-SCENARIO("Combine infill", "[Fill]")
+TEST_CASE("Combine infill", "[Fill]")
 {
     {
-        auto test = [](const DynamicPrintConfig &config) {
+        auto test = [&](const Test::TestConfig &config) {
             std::string gcode = Test::slice({ Test::TestMesh::cube_20x20x20 }, config);
             THEN("infill_every_layers does not crash") {
                 REQUIRE(! gcode.empty());
             }
 
-            Slic3r::GCodeReader parser;
+            GCodeReader parser;
             int tool = -1;
             std::set<coord_t> layers; // layer_z => 1
             std::map<coord_t, bool> layer_infill; // layer_z => has_infill
-            const int infill_extruder           = config.opt_int("infill_extruder");
-            const int support_material_extruder = config.opt_int("support_material_extruder");
+            const auto infill_extruder           = config.print.items.opt("infill_extruder").get<int>();;
+            const auto support_material_extruder = config.print.items.opt("support_material_extruder").get<int>();
             parser.parse_buffer(gcode,
-                [&tool, &layers, &layer_infill, infill_extruder, support_material_extruder](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line)
+                [&tool, &layers, &layer_infill, infill_extruder, support_material_extruder](GCodeReader &self, const GCodeReader::GCodeLine &line)
             {
                 coord_t z = line.new_Z(self) / SCALING_FACTOR;
                 if (boost::starts_with(line.cmd(), "T")) {
@@ -374,10 +301,10 @@ SCENARIO("Combine infill", "[Fill]")
             auto layers_with_perimeters = int(layer_infill.size());
             auto layers_with_infill     = int(std::count_if(layer_infill.begin(), layer_infill.end(), [](auto &v){ return v.second; }));
             THEN("expected number of layers") {
-                REQUIRE(layers.size() == layers_with_perimeters + config.opt_int("raft_layers"));
+                REQUIRE(layers.size() == layers_with_perimeters + config.print.items.opt("raft_layers").get<int>());
             }
             
-            if (config.opt_int("raft_layers") == 0) {
+            if (config.print.items.opt("raft_layers").get<int>() == 0) {
                 // first infill layer printed directly on print bed is not combined, so we don't consider it.
                 -- layers_with_infill;
                 -- layers_with_perimeters;
@@ -386,43 +313,40 @@ SCENARIO("Combine infill", "[Fill]")
             // we expect that infill is generated for half the number of combined layers
             // plus for each single layer that was not combined (remainder)
             THEN("infill is only present in correct number of layers") {
-                int infill_every = config.opt_int("infill_every_layers");
+                int infill_every = config.print.items.opt("infill_every_layers").get<int>();
                 REQUIRE(layers_with_infill == int(layers_with_perimeters / infill_every) + (layers_with_perimeters % infill_every));
             }
         };
-        
-        auto config = Slic3r::DynamicPrintConfig::full_print_config_with({
-            { "nozzle_diameter",        "0.5, 0.5, 0.5, 0.5" },
-            { "layer_height",           0.2 },
-            { "first_layer_height",     0.2 },
-            { "infill_every_layers",    2  },
-            { "perimeter_extruder",     1 },
-            { "infill_extruder",        2 },
-            { "wipe_into_infill",       false },
-            { "support_material_extruder", 3 },
-            { "support_material_interface_extruder", 3 },
-            { "top_solid_layers",       0 },
-            { "bottom_solid_layers",    0 }
-        });
+
+
+        Test::TestConfig config{4, 0.5};
+        config.print.items.opt("top_solid_layers").set(0);
+        config.print.items.opt("bottom_solid_layers").set(0);
+        config.print.items.opt("infill_every_layers").set(2);
+        config.print.items.opt("support_material_extruder").set(3);
+        config.print.items.opt("support_material_interface_extruder").set(3);
+        config.print.items.opt("layer_height").set(0.2);
+        config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.2});
+        config.print.items.opt("perimeter_extruder").set(1);
+        config.print.items.opt("infill_extruder").set(2);
 
         test(config);
 
         // Reuse the config above
-        config.set_deserialize_strict({
-            { "skirts", 0 }, // prevent usage of perimeter_extruder in raft layers
-            { "raft_layers", 5 }
-        });
+        config.print.items.opt("skirts").set(0);
+        config.print.items.opt("raft_layers").set(5);
         test(config);
     }
 
     WHEN("infill_every_layers == 2") {
         Slic3r::Print print;
-        Slic3r::Test::init_and_process_print({ Test::TestMesh::cube_20x20x20 }, print, {
-            { "nozzle_diameter",        "0.5" },
-            { "layer_height",           0.2 },
-            { "first_layer_height",     0.2 },
-            { "infill_every_layers",    2  }
-        });        
+
+        TestConfig config{1, 0.5};
+        config.print.items.opt("layer_height").set(0.2);
+        config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.2});
+        config.print.items.opt("infill_every_layers").set(2);
+
+        Slic3r::Test::init_and_process_print({ Test::TestMesh::cube_20x20x20 }, print, config);
         THEN("infill combination produces internal void surfaces") {
             bool has_void = false;
             for (const Layer *layer : print.get_object(0)->layers())
@@ -433,16 +357,17 @@ SCENARIO("Combine infill", "[Fill]")
             REQUIRE(has_void);
         }
     }
-        
+
     WHEN("infill_every_layers disabled") {
         // we disable combination after infill has been generated
         Slic3r::Print print;
-        Slic3r::Test::init_and_process_print({ Test::TestMesh::cube_20x20x20 }, print, {
-            { "nozzle_diameter",        "0.5" },
-            { "layer_height",           0.2 },
-            { "first_layer_height",     0.2 },
-            { "infill_every_layers",    1  }
-        });        
+
+        TestConfig config{1, 0.5};
+        config.print.items.opt("layer_height").set(0.2);
+        config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.2});
+        config.print.items.opt("infill_every_layers").set(1);
+
+        Slic3r::Test::init_and_process_print({ Test::TestMesh::cube_20x20x20 }, print, config);
 
         THEN("infill combination is idempotent") {
             bool has_infill_on_each_layer = true;
@@ -459,20 +384,19 @@ SCENARIO("Combine infill", "[Fill]")
 SCENARIO("Infill density zero", "[Fill]")
 {
     WHEN("20mm cube is sliced") {
-        DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-        config.set_deserialize_strict({
-            { "skirts",                         0 },
-            { "perimeters",                     1 },
-            { "fill_density",                   0 },
-            { "top_solid_layers",               0 },
-            { "bottom_solid_layers",            0 },
-            { "solid_infill_below_area",        20000000 },
-            { "solid_infill_every_layers",      2 },
-            { "perimeter_speed",                99 },
-            { "external_perimeter_speed",       99 },
-            { "cooling",                        "0" },
-            { "first_layer_speed",              "100%" }
-        });
+        TestConfig config;
+
+        config.print.items.opt("skirts").set(0);
+        config.print.items.opt("perimeters").set(1);
+        config.print.items.opt("fill_density").set(Percentage{0});
+        config.print.items.opt("top_solid_layers").set(0);
+        config.print.items.opt("bottom_solid_layers").set(0);
+        config.print.items.opt("solid_infill_below_area").set(20000000.0);
+        config.print.items.opt("solid_infill_every_layers").set(2);
+        config.print.items.opt("perimeter_speed").set(99.0);
+        config.print.items.opt("external_perimeter_speed").set(FloatOrPercentage{99.0});
+        config.filament[0].items.opt("cooling").set(false);
+        config.print.items.opt("first_layer_speed").set(FloatOrPercentage{Percentage{100}});
 
         std::string gcode = Slic3r::Test::slice({ Slic3r::Test::TestMesh::cube_20x20x20 }, config);
         THEN("gcode not empty") {
@@ -481,9 +405,9 @@ SCENARIO("Infill density zero", "[Fill]")
 
         THEN("solid_infill_below_area and solid_infill_every_layers are ignored when fill_density is 0") {
             GCodeReader  parser;
-            const double perimeter_speed = config.opt_float("perimeter_speed");
+            const auto perimeter_speed = config.print.items.opt("perimeter_speed").get<double>();
             std::map<double, double> layers_with_extrusion;
-            parser.parse_buffer(gcode, [&layers_with_extrusion, perimeter_speed](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+            parser.parse_buffer(gcode, [&layers_with_extrusion, perimeter_speed](GCodeReader &self, const GCodeReader::GCodeLine &line) {
                 if (line.cmd() == "G1" && line.extruding(self) && line.dist_XY(self) > 0) {
                     double f = line.new_F(self);
                     if (std::abs(f - perimeter_speed * 60.) > 0.01)
@@ -496,20 +420,17 @@ SCENARIO("Infill density zero", "[Fill]")
     }
 
     WHEN("A is sliced") {
-        DynamicPrintConfig config = Slic3r::DynamicPrintConfig::full_print_config();
-        config.set_deserialize_strict({
-            { "skirts",                         0 },
-            { "perimeters",                     3 },
-            { "fill_density",                   0 },
-            { "layer_height",                   0.2 },
-            { "first_layer_height",             0.2 },
-            { "nozzle_diameter",                "0.35,0.35,0.35,0.35" },
-            { "infill_extruder",                2 },
-            { "solid_infill_extruder",          2 },
-            { "infill_extrusion_width",         0.52 },
-            { "solid_infill_extrusion_width",   0.52 },
-            { "first_layer_extrusion_width",    0 }
-        });
+        Test::TestConfig config{4, 0.35};
+        config.print.items.opt("perimeters").set(3);
+        config.print.items.opt("fill_density").set(Percentage{0});
+        config.print.items.opt("infill_extrusion_width").set(FloatOrPercentage{0.52});
+        config.print.items.opt("solid_infill_extrusion_width").set(FloatOrPercentage{0.52});
+        config.print.items.opt("first_layer_extrusion_width").set(FloatOrPercentage{0});
+        config.print.items.opt("skirts").set(0);
+        config.print.items.opt("layer_height").set(0.2);
+        config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.2});
+        config.print.items.opt("infill_extruder").set(2);
+        config.print.items.opt("solid_infill_extruder").set(2);
 
         std::string gcode = Slic3r::Test::slice({ Slic3r::Test::TestMesh::A }, config);
         THEN("gcode not empty") {
@@ -519,9 +440,9 @@ SCENARIO("Infill density zero", "[Fill]")
         THEN("no missing parts in solid shell when fill_density is 0") {
             GCodeReader  parser;
             int          tool = -1;
-            const int    infill_extruder = config.opt_int("infill_extruder");
+            const auto   infill_extruder = config.print.items.opt("infill_extruder").get<int>();
             std::map<coord_t, Lines> infill;
-            parser.parse_buffer(gcode, [&tool, &infill, infill_extruder](Slic3r::GCodeReader &self, const Slic3r::GCodeReader::GCodeLine &line) {
+            parser.parse_buffer(gcode, [&tool, &infill, infill_extruder](GCodeReader &self, const GCodeReader::GCodeLine &line) {
                 if (boost::starts_with(line.cmd(), "T")) {
                     tool = atoi(line.cmd().data() + 1) + 1;
                 } else if (line.cmd() == "G1" && line.extruding(self) && line.dist_XY(self) > 0) {
@@ -529,13 +450,13 @@ SCENARIO("Infill density zero", "[Fill]")
                         infill[scaled<coord_t>(self.z())].emplace_back(self.xy_scaled(), line.new_XY_scaled(self));
                 }
             });
-            auto opt_width = config.opt<ConfigOptionFloatOrPercent>("infill_extrusion_width");
-            REQUIRE(! opt_width->percent);
-            auto grow_d = scaled<float>(opt_width->value / 2);
+            auto opt_width = config.print.items.opt("infill_extrusion_width").get<FloatOrPercentage>();
+            REQUIRE(! opt_width.is_percentage());
+            auto grow_d = scaled<float>(opt_width.float_value() / 2);
             auto inflate_lines = [grow_d](const Lines &lines) {
                 Polygons out;
                 for (const Line &line : lines)
-                    append(out, offset(Polyline{ line.a, line.b }, grow_d, Slic3r::ClipperLib::jtSquare, 3.));
+                    append(out, offset(Polyline{ line.a, line.b }, grow_d, ClipperLib::jtSquare, 3.));
                 return union_(out);
             };
             Polygons     layer0_infill = inflate_lines(infill[scaled<coord_t>(0.2)]);
@@ -666,7 +587,7 @@ SCENARIO("Infill density zero", "[Fill]")
 
 bool test_if_solid_surface_filled(const ExPolygon& expolygon, double flow_spacing, double angle, double density)
 {
-    std::unique_ptr<Slic3r::Fill> filler(Slic3r::Fill::new_from_type("rectilinear"));
+    std::unique_ptr<Slic3r::Fill> filler(Slic3r::Fill::new_from_type(Domain::InfillPattern::ipRectilinear));
 	filler->bounding_box = get_extents(expolygon.contour);
     filler->angle = float(angle);
 
@@ -689,7 +610,7 @@ bool test_if_solid_surface_filled(const ExPolygon& expolygon, double flow_spacin
     // figure out what is actually going on here re: data types
     float line_offset = float(scale_(filler->spacing / 2.0 + EPSILON));
     std::for_each(paths.begin(), paths.end(), [line_offset, &grown_paths] (const Slic3r::Polyline& p) {
-        polygons_append(grown_paths, offset(p, line_offset));
+        Slic3r::append(grown_paths, offset(p, line_offset));
     });
 
 	// Shrink the initial expolygon a bit, this simulates the infill / perimeter overlap that we usually apply.

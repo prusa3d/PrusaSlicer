@@ -1,0 +1,28 @@
+kind: filament
+inherits:
+- '*PCCF*'
+name: Prusament PC Space Grade
+condition: printer.base_model=~/(COREONE|MK4|XL)/ and tool.nozzle_diameter >= 0.4 and feeder.base_model!~/.*MMU.*/
+id: Prusament PC Space Grade
+values:
+  filament_vendor: Prusa Polymers
+  extrusion_multiplier: 1.02
+  filament_cost: 293
+  filament_density: 1.21
+  fan_below_layer_time: 15
+  first_layer_bed_temperature: 120
+  bed_temperature: 120
+  first_layer_temperature: 290
+  temperature: 290
+variants:
+- condition: printer.base_model == "XL"
+  id: p41XDkt1Sn2ItXx/wAGUgQ
+  values:
+    first_layer_bed_temperature: 115
+    bed_temperature: 115
+    fan_below_layer_time: 10
+- condition: printer.model=~/(MK4|MK3.9)/
+  id: y3IhJZ2aRZaY+gDp/deymg
+  values:
+    fan_below_layer_time: 10
+

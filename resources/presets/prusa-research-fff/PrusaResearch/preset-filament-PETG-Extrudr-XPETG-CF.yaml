@@ -1,0 +1,82 @@
+kind: filament
+inherits:
+- '*PETCF*'
+- '*sheets_PET_XPETG*'
+name: Extrudr XPETG CF
+id: Extrudr XPETG CF
+values:
+  filament_vendor: Extrudr
+  first_layer_temperature: 235
+  temperature: 235
+  extrusion_multiplier: 1
+  filament_cost: 62.49
+  filament_density: 1.29
+  filament_spool_weight: 230
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: XsgK+aXoR4Gp0JZxGn72Bg
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: AjS6qo1ASCK/2ypFR53ZpQ
+    values:
+      filament_max_volumetric_speed: 9
+    variants:
+    # HF0.4
+    - condition: tool.nozzle_high_flow
+      id: aztd9LoxR7yzkt64GNXwjg
+      values:
+        filament_max_volumetric_speed: 9
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: YsMTbu3jSxqi88KF0HbKCA
+    values:
+      filament_max_volumetric_speed: 10
+    variants:
+    # HF0.5
+    - condition: tool.nozzle_high_flow
+      id: o6cSyqNHTKSeX2+T0TcSng
+      values:
+        filament_max_volumetric_speed: 10
+  # 0.6
+  - condition: tool.nozzle_diameter == 0.6
+    id: LzAxwr9RRUSICTqmq/2wVg
+    values:
+      filament_max_volumetric_speed: 13
+    variants:
+    # HF0.6
+    - condition: tool.nozzle_high_flow
+      id: /0/qWuX9Sie4XXngBajXMg
+      values:
+        filament_max_volumetric_speed: 13
+  # 0.8
+  - condition: tool.nozzle_diameter == 0.8
+    id: B9dr8MFgSziSjeFFN6WVww
+    values:
+      filament_max_volumetric_speed: 18
+      first_layer_temperature: 245
+      temperature: 245
+    variants:
+    # HF0.8
+    - condition: tool.nozzle_high_flow
+      id: 7aP4+/gGTkiF9G5gJLivLA
+      values:
+        filament_max_volumetric_speed: 18
+        first_layer_temperature: 245
+        temperature: 245
+---
+kind: filament
+id: '*sheets_PET_XPETG*'
+variants:
+# STANDARD sheet
+- condition: sheet.type != "cold"
+  id: pyjahCueRM+2g7yI8sn0hw
+  values:
+    first_layer_bed_temperature: 70
+    bed_temperature: 70
+# COLD sheet
+- condition: sheet.type == "cold"
+  id: Pr4vjpViQwaZh2Xbf6otfQ
+  values:
+    first_layer_bed_temperature: 55
+    bed_temperature: 55

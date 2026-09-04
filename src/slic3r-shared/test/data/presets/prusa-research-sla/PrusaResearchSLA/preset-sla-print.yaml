@@ -1,0 +1,112 @@
+id: '*common*'
+kind: sla_print
+name: '*common*'
+values:
+  compatible_printers_condition: printer_model=="SL1"
+  layer_height: 0.05
+  output_filename_format: '[input_filename_base].sl1'
+  pad_edge_radius: 0.5
+  pad_enable: 1.0
+  pad_max_merge_distance: 50.0
+  pad_wall_height: 0.0
+  pad_wall_slope: 45.0
+  pad_wall_thickness: 1.0
+  slice_closing_radius: 0.005
+  support_base_diameter: 3.0
+  support_base_height: 1.0
+  support_critical_angle: 45.0
+  support_density_at_45: 250.0
+  support_density_at_horizontal: 500.0
+  support_head_front_diameter: 0.4
+  support_head_penetration: 0.4
+  support_head_width: 3.0
+  support_max_bridge_length: 10.0
+  support_minimal_z: 0.0
+  support_object_elevation: 5.0
+  support_pillar_connection_mode: zigzag
+  support_pillar_diameter: 1.0
+  support_pillar_widening_factor: 0.0
+  support_small_pillar_diameter_percent: 60%
+  supports_enable: 1.0
+---
+id: LHMH8XfZQbyG1MYerMeiIw
+inherits:
+- '*common*'
+kind: sla_print
+values:
+  pad_edge_radius: 0.5
+  pad_enable: 1.0
+  pad_max_merge_distance: 50.0
+  pad_wall_height: 0.0
+  pad_wall_slope: 45.0
+  pad_wall_thickness: 1.0
+  slice_closing_radius: 0.005
+  support_base_diameter: 3.0
+  support_base_height: 1.0
+  support_critical_angle: 45.0
+  support_density_at_45: 250.0
+  support_density_at_horizontal: 500.0
+  support_max_bridge_length: 10.0
+  support_minimal_z: 0.0
+  support_object_elevation: 5.0
+  support_pillar_connection_mode: zigzag
+  support_pillar_widening_factor: 0.0
+  support_small_pillar_diameter_percent: 60%
+  supports_enable: 1.0
+variants:
+- condition: printer.model == "SL1S"
+  id: Xi2ExAlKQ+ugmIvbjIZqSg
+  values:
+    compatible_printers_condition: printer_model=="SL1S"
+    output_filename_format: '[input_filename_base].sl1s'
+    support_head_width: 3.0
+    support_pillar_diameter: 1.0
+  variants:
+  - name: 0.025 UltraDetail @SL1S
+    id: EY/Vw8DLSfmtXsC2Yr/upQ
+    values:
+      layer_height: 0.025
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+  - name: 0.05 Normal @SL1S
+    id: E7LLyBCKT+u3rseatNVqrg
+    values:
+      layer_height: 0.05
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+  - name: 0.1 Fast @SL1S
+    id: rSMrO/y9T9KN1wuoo71O0A
+    values:
+      layer_height: 0.1
+      support_head_front_diameter: 0.6
+      support_head_penetration: 0.6
+- condition: printer.model == "SL1"
+  id: QhYcGamhS2KjjrlAmafBVg
+  values:
+    compatible_printers_condition: printer_model=="SL1"
+    output_filename_format: '[input_filename_base].sl1'
+  variants:
+  - name: 0.025 UltraDetail
+    id: RuwgMpK6SQ+XQQeGpEor8g
+    values:
+      layer_height: 0.025
+      support_head_front_diameter: 0.4
+      support_head_penetration: 0.4
+      support_head_width: 2.0
+      support_pillar_diameter: 1.0
+  - name: 0.05 Normal
+    id: 4/GjsAnPTe6yjV3p183rOg
+    values:
+      layer_height: 0.05
+      support_head_front_diameter: 0.4
+      support_head_penetration: 0.4
+      support_head_width: 3.0
+      support_pillar_diameter: 1.0
+  - name: 0.1 Fast
+    id: pSF3wY3rQGiDh5R6iQ+FMA
+    values:
+      layer_height: 0.1
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+      support_head_width: 3.0
+      support_pillar_diameter: 1.3

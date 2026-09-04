@@ -1,0 +1,33 @@
+kind: filament
+inherits:
+- '*PA*'
+name: Fiberthree F3 PA Pure Pro
+id: Fiberthree F3 PA Pure Pro
+values:
+  filament_vendor: Fiberthree
+  first_layer_temperature: 285
+  temperature: 285
+  filament_cost: 200.84
+  filament_density: 1.2
+  filament_spool_weight: 0
+  bridge_fan_speed: 30
+  disable_fan_first_layers: 3
+  min_fan_speed: 20
+  max_fan_speed: 20
+  fan_always_on: true
+  fan_below_layer_time: 20
+  first_layer_bed_temperature: 90
+  bed_temperature: 90
+variants:
+- condition: printer.model=~/(COREONE|COREONEL|COREONEOAK|MK4S|MK3.9S|XLP)/
+  id: yWluVLVfSu65R1tglSIIRg
+  values:
+    bridge_fan_speed: 20
+    min_fan_speed: 15
+    max_fan_speed: 15
+- condition: printer.base_model=~/(MK2|MK3|MK3.5)/
+  id: wTk1IUFNQjiAyCfKek/0wQ
+  values:
+    retract_length: 2
+    retract_speed: 40
+

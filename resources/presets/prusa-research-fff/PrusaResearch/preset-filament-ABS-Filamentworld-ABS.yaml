@@ -1,0 +1,14 @@
+kind: filament
+inherits:
+- '*ABS*'
+name: Filamentworld ABS
+id: Filamentworld ABS
+values:
+  filament_cost: '24.9'
+  filament_vendor: Filamentworld
+  first_layer_temperature: 240
+  temperature: 240
+  first_layer_bed_temperature: 100
+  bed_temperature: 100
+  min_print_speed: 20
+

@@ -1,0 +1,107 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -50,6 +50,7 @@ if(POLICY CMP0091)
+   cmake_policy(SET CMP0091 NEW)
+ endif()
+ 
++
+ ###### Version
+ 
+ set(OpenVDB_MAJOR_VERSION 11)
+@@ -59,6 +60,8 @@ set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB
+ 
+ project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
+ 
++find_package(Threads REQUIRED)
++
+ ###### OpenVDB Build/Component Options
+ 
+ include(CMakeDependentOption)
+--- a/cmake/FindBlosc.cmake
++++ b/cmake/FindBlosc.cmake
+@@ -209,7 +209,11 @@ set(Blosc_LIB_COMPONENTS "")
+ list(APPEND BLOSC_BUILD_TYPES DEBUG RELEASE)
+ 
+ foreach(BUILD_TYPE ${BLOSC_BUILD_TYPES})
+-  set(_BLOSC_LIB_NAME blosc)
++  if(WIN32)
++    set(_BLOSC_LIB_NAME libblosc)
++  else()
++    set(_BLOSC_LIB_NAME blosc)
++  endif()
+ 
+   set(_BLOSC_CMAKE_IGNORE_PATH ${CMAKE_IGNORE_PATH})
+   if(VCPKG_TOOLCHAIN)
+--- a/openvdb/openvdb/CMakeLists.txt
++++ b/openvdb/openvdb/CMakeLists.txt
+@@ -108,6 +108,8 @@ endif()
+ 
+ # Collect and configure lib dependencies
+ 
++find_package(Threads REQUIRED)
++
+ if(OPENVDB_USE_DELAYED_LOADING)
+   find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
+ else()
+@@ -670,14 +672,14 @@ if(OPENVDB_CORE_STATIC)
+     PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
+ 
+   if(MSVC)
+-    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+-      # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
+-      # also add it explicitly as a compile option
+-      set_target_properties(openvdb_static PROPERTIES
+-        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+-      target_compile_options(openvdb_static PUBLIC
+-        "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MT$<$<CONFIG:Debug>:d>>")
+-    endif()
++    # if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
++    #   # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
++    #   # also add it explicitly as a compile option
++    #   set_target_properties(openvdb_static PROPERTIES
++    #     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
++    #   target_compile_options(openvdb_static PUBLIC
++    #     "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MT$<$<CONFIG:Debug>:d>>")
++    # endif()
+     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
+   endif()
+ endif()
+--- a/openvdb/openvdb/tree/NodeManager.h
++++ b/openvdb/openvdb/tree/NodeManager.h
+@@ -327,7 +327,7 @@ private:
+         void operator()(const NodeRange& range) const
+         {
+             for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
+-                OpT::template eval(mNodeOp, it);
++                OpT::template eval<>(mNodeOp, it);
+             }
+         }
+         const NodeOp mNodeOp;
+@@ -347,7 +347,7 @@ private:
+         void operator()(const NodeRange& range) const
+         {
+             for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
+-                OpT::template eval(mNodeOp, it);
++                OpT::template eval<>(mNodeOp, it);
+             }
+         }
+         const NodeOp& mNodeOp;
+@@ -372,7 +372,7 @@ private:
+         void operator()(const NodeRange& range)
+         {
+             for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
+-                OpT::template eval(*mNodeOp, it);
++                OpT::template eval<>(*mNodeOp, it);
+             }
+         }
+         void join(const NodeReducer& other)
+--- a/openvdb_cmd/vdb_print/CMakeLists.txt
++++ b/openvdb_cmd/vdb_print/CMakeLists.txt
+@@ -13,6 +13,7 @@ project(VDBPrint LANGUAGES CXX)
+ include(GNUInstallDirs)
+ 
+ set(SOURCE_FILES main.cc)
++find_package(Threads REQUIRED)
+ add_executable(vdb_print ${SOURCE_FILES})
+ target_link_libraries(vdb_print ${OPENVDB_BINARIES_DEPENDENT_LIBS})
+ 

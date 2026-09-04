@@ -1,0 +1,64 @@
+kind: filament
+inherits:
+- '*PCCF*'
+- '*MAXVOL_Prusament_PCCF*'
+name: Prusament PC Blend Carbon Fiber
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and tool.nozzle_diameter >= 0.4 and feeder.model != "MMU3_32bit"
+id: Prusament PC Blend Carbon Fiber
+values:
+  filament_vendor: Prusa Polymers
+---
+kind: filament
+id: '*MAXVOL_Prusament_PCCF*'
+variants:
+- condition: printer.base_model=~/(COREONE|MK4|XL)/
+  id: W4P0nVwsS16UNfL4L/OZug
+  variants:
+  # 0.4
+  - condition: tool.nozzle_diameter == 0.4
+    id: sVGvdZeNQPacwL/0WFyZUg
+    values:
+      filament_max_volumetric_speed: 9
+    variants:
+    # 0.4HF
+    - condition: tool.nozzle_high_flow
+      id: DJE7dAi9Q7GaCX5HydoSrQ
+      values:
+        filament_max_volumetric_speed: 14
+        pressure_advance_value: 0.038
+  # 0.5
+  - condition: tool.nozzle_diameter == 0.5
+    id: qbg7wMdUQpmLJkHyx3B8Qw
+    values:
+      filament_max_volumetric_speed: 10
+    # 0.5HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: ck9+ah4eT72yliqhjFAEbw
+      values:
+        filament_max_volumetric_speed: 15
+        pressure_advance_value: 0.025
+  # 0.6      
+  - condition: tool.nozzle_diameter == 0.6
+    id: Xb2RIdtMT52TRiSGQNSz2g
+    values:
+      filament_max_volumetric_speed: 13
+    # 0.6HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: K0rz7w7SS3WeCK5nX3I9RQ
+      values:
+        filament_max_volumetric_speed: 18
+        pressure_advance_value: 0.019
+  # 0.8      
+  - condition: tool.nozzle_diameter == 0.8
+    id: 5ccT/kTqR16W1dlqgrpBVg
+    values:
+      filament_max_volumetric_speed: 18
+    # 0.8HF
+    variants:
+    - condition: tool.nozzle_high_flow
+      id: pgPgHinJQZuvbj13zi7CIw
+      values:
+        filament_max_volumetric_speed: 23
+        pressure_advance_value: 0.012

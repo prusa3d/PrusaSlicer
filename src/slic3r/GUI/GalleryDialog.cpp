@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GalleryDialog.hpp"
 
 #include <cstddef>
@@ -14,7 +18,6 @@
 #include <wx/button.h>
 #include <wx/statbox.h>
 #include <wx/wupdlock.h>
-#include <wx/notebook.h>
 #include <wx/listctrl.h>
 
 #include "GUI.hpp"
@@ -22,7 +25,6 @@
 #include "format.hpp"
 #include "wxExtensions.hpp"
 #include "I18N.hpp"
-#include "Notebook.hpp"
 #include "3DScene.hpp"
 #include "GLCanvas3D.hpp"
 #include "Plater.hpp"
@@ -31,8 +33,10 @@
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/FileReader.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Format/OBJ.hpp"
+#include "libslic3r/MultipleBeds.hpp"
 #include "../Utils/MacDarkMode.hpp"
 
 namespace Slic3r {
@@ -61,7 +65,7 @@ bool GalleryDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& f
     // hides the system icon
     this->MSWUpdateDragImageOnLeave();
 #endif // WIN32
-    return gallery_dlg ? gallery_dlg->load_files(filenames) : false;
+    return gallery_dlg ? gallery_dlg->add_files_to_custom_dir(filenames) : false;
 }
 
 
@@ -94,10 +98,12 @@ GalleryDialog::GalleryDialog(wxWindow* parent) :
 #endif
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK | wxCLOSE);
-    m_ok_btn = static_cast<wxButton*>(FindWindowById(wxID_OK, this));
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
+    m_ok_btn = buttons->GetAffirmativeButton();
+    wxGetApp().SetWindowVariantForButton(m_ok_btn);
     m_ok_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(!m_selected_items.empty()); });
 
-    static_cast<wxButton*>(FindWindowById(wxID_CLOSE, this))->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
+    buttons->GetCancelButton()->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
     this->SetEscapeId(wxID_CLOSE);
     auto add_btn = [this, buttons]( size_t pos, int& ID, wxString title, wxString tooltip,
                                     void (GalleryDialog::* method)(wxEvent&), 
@@ -105,6 +111,7 @@ GalleryDialog::GalleryDialog(wxWindow* parent) :
         ID = NewControlId();
         wxButton* btn = new wxButton(this, ID, title);
         btn->SetToolTip(tooltip);
+        wxGetApp().SetWindowVariantForButton(btn);
         btn->Bind(wxEVT_UPDATE_UI, [enable_fn](wxUpdateUIEvent& evt) { evt.Enable(enable_fn()); });
         buttons->Insert(pos, btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
         this->Bind(wxEVT_BUTTON, method, this, ID);
@@ -134,7 +141,12 @@ GalleryDialog::GalleryDialog(wxWindow* parent) :
 }
 
 GalleryDialog::~GalleryDialog()
-{   
+{
+    // From wxWidgets docs:
+    // The method void wxListCtrl::SetImageList(wxImageList* imageList, int which)
+    // does not take ownership of the image list, you have to delete it yourself.
+    if (m_image_list)
+        delete m_image_list;
 }
 
 int GalleryDialog::show(bool show_from_menu) 
@@ -270,7 +282,7 @@ static void generate_thumbnail_from_model(const std::string& filename)
 
     Model model;
     try {
-        model = Model::read_from_file(filename);
+        model = FileReader::load_model(filename);
     }
     catch (std::exception&) {
         BOOST_LOG_TRIVIAL(error) << "Error loading model from " << filename << " in generate_thumbnail_from_model()";
@@ -295,7 +307,9 @@ static void generate_thumbnail_from_model(const std::string& filename)
 
     ThumbnailData thumbnail_data;
     const ThumbnailsParams thumbnail_params = { {}, false, false, false, true };
+    s_multiple_beds.set_thumbnail_bed_idx(-2);
     wxGetApp().plater()->canvas3D()->render_thumbnail(thumbnail_data, 256, 256, thumbnail_params, volumes, Camera::EType::Perspective);
+    s_multiple_beds.set_thumbnail_bed_idx(-1);
 
     if (thumbnail_data.width == 0 || thumbnail_data.height == 0)
         return;
@@ -330,10 +344,15 @@ void GalleryDialog::load_label_icon_list()
 
         std::vector<std::string> sorted_names;
         for (auto& dir_entry : fs::directory_iterator(dir)) {
-            TriangleMesh mesh;
-            if ((is_gallery_file(dir_entry, ".stl") && mesh.ReadSTLFile(dir_entry.path().string().c_str())) || 
-                (is_gallery_file(dir_entry, ".obj") && load_obj(dir_entry.path().string().c_str(), &mesh) )    )
+            if (is_gallery_file(dir_entry, ".stl") || is_gallery_file(dir_entry, ".obj")) {
+                try {
+                    Model model = FileReader::load_model(dir_entry.path().string());
+                }
+                catch (std::exception&) {
+                    continue;
+                }
                 sorted_names.push_back(dir_entry.path().filename().string());
+            }
         }
 
         // sort the filename case insensitive
@@ -405,8 +424,7 @@ void GalleryDialog::load_label_icon_list()
     int img_cnt = m_image_list->GetImageCount();
     for (int i = 0; i < img_cnt; i++) {
         m_list_ctrl->InsertItem(i, from_u8(list_items[i].name), i);
-        if (list_items[i].is_system)
-            m_list_ctrl->SetItemFont(i, wxGetApp().bold_font());
+        m_list_ctrl->SetItemData(i, list_items[i].is_system ? 1 : 0);
     }
 }
 
@@ -429,7 +447,7 @@ void GalleryDialog::add_custom_shapes(wxEvent& event)
     if (input_files.IsEmpty())
         return;
 
-    load_files(input_files);
+    add_files_to_custom_dir(input_files);
 }
 
 void GalleryDialog::del_custom_shapes()
@@ -492,7 +510,7 @@ void GalleryDialog::change_thumbnail()
         png_path.replace_extension("png");
 
         fs::path current = fs::path(into_u8(input_files.Item(0)));
-        fs::copy_file(current, png_path, fs::copy_option::overwrite_if_exists);
+        fs::copy_file(current, png_path, fs::copy_options::overwrite_existing);
     }
     catch (fs::filesystem_error const& e) {
         std::cerr << e.what() << '\n';
@@ -505,7 +523,7 @@ void GalleryDialog::change_thumbnail()
 void GalleryDialog::select(wxListEvent& event)
 {
     int idx = event.GetIndex();
-    Item item { into_u8(m_list_ctrl->GetItemText(idx)), m_list_ctrl->GetItemFont(idx).GetWeight() == wxFONTWEIGHT_BOLD };
+    Item item { into_u8(m_list_ctrl->GetItemText(idx)), m_list_ctrl->GetItemData(idx) == static_cast<wxUIntPtr>(1)};
 
     m_selected_items.push_back(item);
 }
@@ -546,7 +564,7 @@ void GalleryDialog::update()
     load_label_icon_list();
 }
 
-bool GalleryDialog::load_files(const wxArrayString& input_files)
+bool GalleryDialog::add_files_to_custom_dir(const wxArrayString& input_files)
 {
     auto dest_dir = get_dir(false);
 
@@ -565,16 +583,14 @@ bool GalleryDialog::load_files(const wxArrayString& input_files)
     // Iterate through the input files
     for (size_t i = 0; i < input_files.size(); ++i) {
         std::string input_file = into_u8(input_files.Item(i));
-
-        TriangleMesh mesh; 
-        if (is_gallery_file(input_file, ".stl") && !mesh.ReadSTLFile(input_file.c_str())) {
-            show_warning(format_wxstr(_L("Loading of the \"%1%\""), input_file), "STL");
-            continue;
-        }
-
-        if (is_gallery_file(input_file, ".obj") && !load_obj(input_file.c_str(), &mesh)) {
-            show_warning(format_wxstr(_L("Loading of the \"%1%\""), input_file), "OBJ");
-            continue;
+        if (is_gallery_file(input_file, ".stl") || is_gallery_file(input_file, ".obj")) {
+            try {
+                Model model = FileReader::load_model(input_file);
+            }
+            catch (std::exception&) {
+                show_warning(format_wxstr(_L("Loading of the \"%1%\""), input_file), is_gallery_file(input_file, ".obj") ? "OBJ" : "STL");
+                continue;
+            }
         }
 
         try {

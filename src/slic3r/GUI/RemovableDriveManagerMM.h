@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 David Kocík @kocikdav
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #import <Cocoa/Cocoa.h>
 
 @interface RemovableDriveManagerMM : NSObject

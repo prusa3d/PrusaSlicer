@@ -1,77 +1,48 @@
-
-![PrusaSlicer logo](/resources/icons/PrusaSlicer.png?raw=true)
+![PrusaSlicer logo](/resources/icons/PrusaSlicer_128px.png)
 
 # PrusaSlicer
 
-You may want to check the [PrusaSlicer project page](https://www.prusa3d.com/prusaslicer/).
-Prebuilt Windows, OSX and Linux binaries are available through the [git releases page](https://github.com/prusa3d/PrusaSlicer/releases) or from the [Prusa3D downloads page](https://www.prusa3d.com/drivers/). There are also [3rd party Linux builds available](https://github.com/prusa3d/PrusaSlicer/wiki/PrusaSlicer-on-Linux---binary-distributions).
+PrusaSlicer enables you to take your 3D models, generate 3D printing instructions and send them to your 3D printer. It supports both FDM 3D printers and mSLA 3D printers. It is developed by [Prusa Research](https://www.prusa3d.com/) and apart from Prusa printers it supports machines from a wide variety of manufacturers.
 
-PrusaSlicer takes 3D models (STL, OBJ, AMF) and converts them into G-code
-instructions for FFF printers or PNG layers for mSLA 3D printers. It's
-compatible with any modern printer based on the RepRap toolchain, including all
-those based on the Marlin, Prusa, Sprinter and Repetier firmware. It also works
-with Mach3, LinuxCNC and Machinekit controllers.
+PrusaSlicer is originally based on [Slic3r](https://github.com/Slic3r/Slic3r) by Alessandro Ranellucci and the RepRap community.
 
-PrusaSlicer is based on [Slic3r](https://github.com/Slic3r/Slic3r) by Alessandro Ranellucci and the RepRap community.
+## Installation
 
-See the [project homepage](https://www.prusa3d.com/slic3r-prusa-edition/) and
-the [documentation directory](doc/) for more information.
+The **recommended installation method** is to go to the [PrusaSlicer project page](https://www.prusa3d.com/prusaslicer/) and download and install the software by following the instructions there.
 
-### What language is it written in?
+**Alternatively**, for Windows and macOS, you can download the software directly from the [GitHub releases page](https://github.com/prusa3d/PrusaSlicer/releases). For Linux, PrusaSlicer is currently distributed exclusively through [Flathub](https://flathub.org/en/apps/com.prusa3d.PrusaSlicer).
 
-All user facing code is written in C++, and some legacy code as well as unit
-tests are written in Perl. Perl is not required for either development or use
-of PrusaSlicer.
+If you prefer, you can always build PrusaSlicer yourself from source. See the [documentation](doc/Build.md) to learn how to do it.
 
-The slicing core is the `libslic3r` library, which can be built and used in a standalone way.
-The command line interface is a thin wrapper over `libslic3r`.
+### Main features
 
-### What are PrusaSlicer's main features?
+* Set the **printing parameters** with precision - from settings affecting the **whole print** down to **single-layer adjustments**.
+* Modify your objects before printing to best suit your needs, you can **paint**, **cut**, **arrange** and do **many more** directly in PrusaSlicer.
+* Open **multiple projects** at once, each containing **multiple beds** (each with potentially **different settings**).
+* Make full use of **multi-material printing**
+* Use your **preferred method to send your prints to the printer**, PrusaSlicer supports a wide range of possibilities.
+* **View the generated print instructions** in an advanced **3D preview**.
+* You can make use of the **command-line interface** to use **PrusaSlicer without GUI** in your automation setups.
+* If you want, you **can make use of the integration** with [PrusaConnect](https://connect.prusa3d.com/) and [Printables](https://www.printables.com) to greatly simplify your workflow.
 
-Key features are:
+### Reporting a bug
 
-* **multi-platform** (Linux/Mac/Win) and packaged as standalone-app with no dependencies required
-* complete **command-line interface** to use it with no GUI
-* multi-material **(multiple extruders)** object printing
-* multiple G-code flavors supported (RepRap, Makerbot, Mach3, Machinekit etc.)
-* ability to plate **multiple objects having distinct print settings**
-* **multithread** processing
-* **STL auto-repair** (tolerance for broken models)
-* wide automated unit testing
+Did you find a bug? Bugs can be reported in our [GitHub issue tracker](https://github.com/prusa3d/PrusaSlicer/issues), but **first make sure your report complies with the [Issue tracker policy](https://github.com/prusa3d/PrusaSlicer?tab=contributing-ov-file#issue-tracker-policy)**. **Are you not sure?** Get in touch in our [GitHub Discussions](https://www.github.com/prusa3d/discussions), before filing a bug report in the issue tracker. You can always file a bug report later, once you have more confidence.
 
-Other major features are:
+### How to get in touch
 
-* combine infill every 'n' perimeters layer to speed up printing
-* **3D preview** (including multi-material files)
-* **multiple layer heights** in a single print
-* **spiral vase** mode for bumpless vases
-* fine-grained configuration of speed, acceleration, extrusion width
-* several infill patterns including honeycomb, spirals, Hilbert curves
-* support material, raft, brim, skirt
-* **standby temperature** and automatic wiping for multi-extruder printing
-* [customizable **G-code macros**](https://github.com/prusa3d/PrusaSlicer/wiki/Slic3r-Prusa-Edition-Macro-Language) and output filename with variable placeholders
-* support for **post-processing scripts**
-* **cooling logic** controlling fan speed and dynamic print speed
+We maintain a [GitHub Discussions](https://www.github.com/prusa3d/discussions) page in this repository to be used for **general discussions**, **questions** and **feature requests**. Furthermore, there is an announcements category, which we use to communicate with you directly.
 
-### Development
+### Pull requests
 
-If you want to compile the source yourself, follow the instructions on one of
-these documentation pages:
-* [Linux](doc/How%20to%20build%20-%20Linux%20et%20al.md)
-* [macOS](doc/How%20to%20build%20-%20Mac%20OS.md)
-* [Windows](doc/How%20to%20build%20-%20Windows.md)
+Read our [contribution guide](.github/CONTRIBUTING.md) to get more information.
 
-### Can I help?
+### Technical stack
 
-Sure! You can do the following to find things that are available to help with:
-* Add an [issue](https://github.com/prusa3d/PrusaSlicer/issues) to the github tracker if it isn't already present.
-* Look at [issues labeled "volunteer needed"](https://github.com/prusa3d/PrusaSlicer/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3A%22volunteer+needed%22)
+All of PrusaSlicer is written in C++, using CMake as the build system. The code assumes that the compiler supports C++20.
 
-### What's PrusaSlicer license?
+The slicing backend heavily relies on [Clipper](https://www.angusj.com/clipper2) by Angus Johnson, which handles polygon boolean operations, offsets and similar. [Eigen](https://libeigen.gitlab.io/) library is used for basic types and linear algebra calculations.
 
-PrusaSlicer is licensed under the _GNU Affero General Public License, version 3_.
-The PrusaSlicer is originally based on Slic3r by Alessandro Ranellucci.
+[wxWidgets](https://wxwidgets.org) library is used to handle GUI windows and events across platforms. Most of the UI is implemented using a custom OpenGL-based UI toolkit based on the [Yoga layout engine](https://github.com/facebook/yoga) and [Dear ImGui](https://github.com/ocornut/imgui), which makes it platform-independent.
 
-### How can I use PrusaSlicer from the command line?
-
-Please refer to the [Command Line Interface](https://github.com/prusa3d/PrusaSlicer/wiki/Command-Line-Interface) wiki page.
+The application uses many other libraries. You can see the [deps/](deps/) and [bundled_deps/](bundled_deps/) folders in the source tree to see the complete list. We are grateful to the authors and maintainers for open-sourcing their work.

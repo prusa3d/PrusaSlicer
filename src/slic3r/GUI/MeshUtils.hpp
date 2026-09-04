@@ -1,9 +1,13 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Lukáš Matěna @lukasmatena, Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros, Enrico Turri @enricoturri1966, Lukáš Hejl @hejllukas, Filip Sykala @Jony01, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_MeshUtils_hpp_
 #define slic3r_MeshUtils_hpp_
 
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Geometry.hpp"
-#include "libslic3r/TriangleMesh.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "libslic3r/AABBMesh.hpp"
 #include "libslic3r/CSGMesh/TriangleMeshAdapter.hpp"
 #include "libslic3r/CSGMesh/CSGMeshCopy.hpp"
@@ -182,12 +186,15 @@ public:
         Vec3f& position, // where to save the positibon of the hit (mesh coords)
         Vec3f& normal, // normal of the triangle that was hit
         const ClippingPlane* clipping_plane = nullptr, // clipping plane (if active)
-        size_t* facet_idx = nullptr // index of the facet hit
+        size_t* facet_idx = nullptr, // index of the facet hit
+        bool require_even_number_of_hits = true // When it is true, then an odd number (unclipped) of hits are ignored, and false is returned.
     ) const;
     
     const AABBMesh &get_aabb_mesh() const { return m_emesh; }
 
-    bool is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const;
+    // Given a point and direction in world coords, returns whether the respective line
+    // intersects the mesh if it is transformed into world by trafo.
+    bool intersects_line(Vec3d point, Vec3d direction, const Transform3d& trafo) const;
 
     // Given a vector of points in woorld coordinates, this returns vector
     // of indices of points that are visible (i.e. not cut by clipping plane

@@ -1,6 +1,15 @@
+///|/ Copyright (c) Prusa Research 2021 Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
+#include <boost/chrono/duration.hpp>
+#include <boost/variant/get.hpp>
 #include <exception>
 
 #include "BoostThreadWorker.hpp"
+#include "libslic3r/Thread.hpp"
+#include "slic3r/GUI/Jobs/ProgressIndicator.hpp"
+#include "slic3r/GUI/Jobs/ThreadSafeQueue.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -39,9 +48,10 @@ void BoostThreadWorker::WorkerMessage::deliver(BoostThreadWorker &runner)
 void BoostThreadWorker::run()
 {
     bool stop = false;
+
     while (!stop) {
         m_input_queue
-            .consume_one(BlockingWait{0, &m_running}, [this, &stop](JobEntry &e) {
+            .consume_one(BlockingWait{0}, [this, &stop](JobEntry &e) {
                 if (!e.job)
                     stop = true;
                 else {
@@ -56,7 +66,6 @@ void BoostThreadWorker::run()
                     e.canceled = m_canceled.load();
                     m_output_queue.push(std::move(e)); // finalization message
                 }
-                m_running.store(false);
             });
     };
 }
@@ -77,9 +86,12 @@ std::future<void> BoostThreadWorker::call_on_main_thread(std::function<void ()> 
 }
 
 BoostThreadWorker::BoostThreadWorker(std::shared_ptr<ProgressIndicator> pri,
-                                     boost::thread::attributes &attribs,
-                                     const char *               name)
-    : m_progress(std::move(pri)), m_name{name}
+                                     boost::thread::attributes         &attribs,
+                                     const char                        *name)
+    : m_progress(std::move(pri))
+    , m_input_queue{m_running}
+    , m_output_queue{m_running}
+    , m_name{name}
 {
     if (m_progress)
         m_progress->set_cancel_callback([this](){ cancel(); });
@@ -172,10 +184,11 @@ bool BoostThreadWorker::wait_for_idle(unsigned timeout_ms)
 
 bool BoostThreadWorker::push(std::unique_ptr<Job> job)
 {
-    if (job)
-        m_input_queue.push(JobEntry{std::move(job)});
+    if (!job)
+        return false;
 
-    return bool{job};
+    m_input_queue.push(JobEntry{std::move(job)});
+    return true;
 }
 
 }} // namespace Slic3r::GUI

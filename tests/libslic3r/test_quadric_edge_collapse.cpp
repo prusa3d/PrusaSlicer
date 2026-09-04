@@ -1,11 +1,18 @@
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <igl/qslim.h>
 #include <test_utils.hpp>
 
-#include <libslic3r/QuadricEdgeCollapse.hpp>
-#include <libslic3r/TriangleMesh.hpp> // its - indexed_triangle_set
-#include "libslic3r/AABBTreeIndirect.hpp" // is similar
+#include "Slic3r/Biz/Algorithms/QuadricEdgeCollapse.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp" // its - indexed_triangle_set
+#include "Slic3r/Biz/Algorithms/AABBTreeIndirect.hpp" // is similar
 
 using namespace Slic3r;
+using Domain::Index3;
+using Domain::Vec3f;
+using Domain::Vec3d;
+using Domain::TriangleMesh;
+using Slic3r::Biz::Algorithms::its_quadric_edge_collapse;
+namespace AABBTreeIndirect = Biz::Algorithms::AABBTreeIndirect;
 
 namespace Private {
 
@@ -45,7 +52,7 @@ Similarity get_similarity(const indexed_triangle_set &from,
     };
 
     for (const Vec3f &vertex : to.vertices) { collect_distances(vertex); }
-    for (const Vec3i &t : to.indices) {
+    for (const Index3 &t : to.indices) {
         Vec3f center(0, 0, 0);
         for (size_t i = 0; i < 3; ++i) { center += to.vertices[t[i]] / 3; }
         collect_distances(center);
@@ -100,8 +107,8 @@ TEST_CASE("Reduce one edge by Quadric Edge Collapse", "[its]")
                     Vec3f(1.f, 0.f, 0.f), Vec3f(0.f, 0.f, 1.f),
                     // vertex to be removed
                     Vec3f(0.9f, .1f, -.1f)};
-    its.indices  = {Vec3i(1, 0, 3), Vec3i(2, 1, 3), Vec3i(0, 2, 3),
-                   Vec3i(0, 1, 4), Vec3i(1, 2, 4), Vec3i(2, 0, 4)};
+    its.indices  = {Index3{1, 0, 3}, Index3{2, 1, 3}, Index3{0, 2, 3},
+                   Index3{0, 1, 4}, Index3{1, 2, 4}, Index3{2, 0, 4}};
     // edge to remove is between vertices 2 and 4 on trinagles 4 and 5
 
     indexed_triangle_set its_ = its; // copy
@@ -174,8 +181,8 @@ TEST_CASE("Reduce to one triangle by Quadric Edge Collapse", "[its]")
     its.vertices = {Vec3f(0.f, 0.f, 0.f), Vec3f(1.f, 0.f, 0.f),
                     Vec3f(2.f, 0.f, 0.f), Vec3f(0.f, 1.f, 0.f),
                     Vec3f(1.f, 1.f, 0.f), Vec3f(0.f, 2.f, 0.f)};
-    its.indices  = {Vec3i(0, 1, 4), Vec3i(1, 2, 4), Vec3i(0, 4, 3),
-                   Vec3i(3, 4, 5)};
+    its.indices  = {Index3{0, 1, 4}, Index3{1, 2, 4}, Index3{0, 4, 3},
+                   Index3{3, 4, 5}};
     std::vector<stl_vertex> triangle_vertices = {its.vertices[0],
                                                  its.vertices[2],
                                                  its.vertices[5]};
@@ -206,9 +213,9 @@ TEST_CASE("Reduce to one tetrahedron by Quadric Edge Collapse", "[its]")
                                                     its.vertices[5],
                                                     // tetrahedron extetion
                                                     its.vertices[6]};
-    its.indices  = {Vec3i(0, 1, 4), Vec3i(1, 2, 4), Vec3i(0, 4, 3), Vec3i(3, 4, 5),
+    its.indices  = {Index3{0, 1, 4}, Index3{1, 2, 4}, Index3{0, 4, 3}, Index3{3, 4, 5},
         // tetrahedron extetion
-        Vec3i(4, 2, 6), Vec3i(5, 4, 6), Vec3i(3, 5, 6), Vec3i(0, 3, 6), Vec3i(1, 0, 6),  Vec3i(2, 1, 6)
+        Index3{4, 2, 6}, Index3{5, 4, 6}, Index3{3, 5, 6}, Index3{0, 3, 6}, Index3{1, 0, 6},  Index3{2, 1, 6}
     };
     uint32_t wanted_count = 4;
 
@@ -225,7 +232,7 @@ TEST_CASE("Reduce to one tetrahedron by Quadric Edge Collapse", "[its]")
 TEST_CASE("Simplify frog_legs.obj to 5% by Quadric edge collapse", "[its][quadric_edge_collapse]")
 {
     TriangleMesh mesh            = load_model("frog_legs.obj");
-    double       original_volume = its_volume(mesh.its);
+    double       original_volume = Domain::its_volume(mesh.its);
     uint32_t     wanted_count    = mesh.its.indices.size() * 0.05;
     REQUIRE_FALSE(mesh.empty());
     indexed_triangle_set its       = mesh.its; // copy
@@ -233,14 +240,13 @@ TEST_CASE("Simplify frog_legs.obj to 5% by Quadric edge collapse", "[its][quadri
     its_quadric_edge_collapse(its, wanted_count, &max_error);
     // its_write_obj(its, "frog_legs_qec.obj");
     CHECK(its.indices.size() <= wanted_count);
-    double volume = its_volume(its);
+    double volume = Domain::its_volume(its);
     CHECK(fabs(original_volume - volume) < 33.);
 
     Private::is_better_similarity(mesh.its, its, Private::frog_leg_5);
 }
 
-#include <libigl/igl/qslim.h>
-TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
+TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[its]")
 {
     std::string  obj_filename    = "frog_legs.obj";
     TriangleMesh mesh            = load_model(obj_filename);
@@ -258,7 +264,7 @@ TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
 
     for (size_t j = 0; j < its.indices.size(); ++j) {
         const auto &f = its.indices[j];
-        for (int i = 0; i < 3; ++i) F(j, i) = f(i);
+        for (int i = 0; i < 3; ++i) F(j, i) = f[i];
     }
 
     size_t max_m = wanted_count;
@@ -276,7 +282,7 @@ TEST_CASE("Simplify frog_legs.obj to 5% by IGL/qslim", "[]")
         its_out.vertices.emplace_back(U(i, 0), U(i, 1), U(i, 2));
     size_t G_size = G.size() / 3;
     for (size_t i = 0; i < G_size; i++)
-        its_out.indices.emplace_back(G(i, 0), G(i, 1), G(i, 2));
+        its_out.indices.emplace_back(Domain::Index3{G(i, 0), G(i, 1), G(i, 2)});
 
     // check if algorithm is still worse than our
     Private::is_worse_similarity(its_out, its, Private::frog_leg_5);
@@ -296,7 +302,8 @@ TEST_CASE("Simplify trouble case", "[its]")
 
 TEST_CASE("Simplified cube should not be empty.", "[its]")
 {
-    auto     its          = its_make_cube(1, 2, 3);
+    namespace triangle_mesh = Biz::Algorithms::TriangleMesh;
+    auto     its          = triangle_mesh::its_make_cube(1, 2, 3);
     float    max_error    = std::numeric_limits<float>::max();
     uint32_t wanted_count = 0;
     its_quadric_edge_collapse(its, wanted_count, &max_error);
