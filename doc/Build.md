@@ -14,7 +14,7 @@ brew update && brew install automake cmake git gettext libtool texinfo
 ### Linux
 For example on Ubuntu 26.04:
 ```bash
-sudo apt install git build-essential autoconf cmake libglu1-mesa-dev libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev texinfo
+sudo apt install git build-essential autoconf cmake libtool libglu1-mesa-dev libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev texinfo
 ```
 Adapt it for your package manager.
 ## 1. Build dependencies
