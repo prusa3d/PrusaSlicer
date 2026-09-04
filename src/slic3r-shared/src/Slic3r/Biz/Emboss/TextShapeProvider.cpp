@@ -1,5 +1,7 @@
 #include "Slic3r/Biz/Emboss/TextShapeProvider.hpp"
 #include "Slic3r/Biz/Emboss/TextLines.hpp"
+#include "Slic3r/Biz/Emboss/TextBender.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 
 #include <boost/nowide/convert.hpp>
 
@@ -56,11 +58,25 @@ void TextShapeProvider::write(Domain::ModelVolume& volume) const
 {
     ShapeProvider::write(volume); // write emboss_shape
     volume.text_configuration = m_text_configuration; // copy
+    volume.text_configuration->bend_reference = m_bend_reference;
     ASSERT(volume.emboss_shape.has_value());
 
     // Fix for object: stored attribute that volume is embossed per glyph
     if (volume.is_the_only_one_part() && m_text_configuration.style.prop.per_glyph) {
         volume.text_configuration->style.prop.per_glyph = false;
     }
+}
+
+void TextShapeProvider::deform_mesh(Domain::TriangleMesh& mesh) const
+{
+    m_bend_reference = Domain::bounding_box(mesh.its);
+    const auto& prop = m_text_configuration.style.prop;
+    const BendParams params{prop.bend_horizontal.value_or(0.0f), prop.bend_vertical.value_or(0.0f),
+        prop.bend_arc.value_or(0.0f)};
+    if (params.horizontal_bend == 0.0f && params.vertical_curl == 0.0f && params.vertical_arc == 0.0f)
+        return;
+    auto its = std::move(mesh.its);
+    TextBender::bend_mesh(its, params, *m_bend_reference);
+    mesh = Algorithms::TriangleMesh::construct(std::move(its));
 }
 } // namespace Slic3r::Biz::Emboss

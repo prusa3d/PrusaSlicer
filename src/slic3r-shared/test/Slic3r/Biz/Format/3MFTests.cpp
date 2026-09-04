@@ -8,6 +8,7 @@
 
 #include <boost/filesystem.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 using namespace Slic3r;
 using namespace Slic3r::Biz;
@@ -24,6 +25,40 @@ using Slic3r::Domain::TriangleSelector::TriangleStateType;
 static inline std::string test_3mf_path(const char* path)
 {
     return std::string(TEST_DATA_DIR) + "/test_3mf/" + path;
+}
+
+TEST_CASE("3MF preserves text arc and accepts text without an arc", "[3mf][EmbossBend]")
+{
+    Project project;
+    project.model() = Test::generate_cubes(1, 1);
+    Domain::TextConfiguration text;
+    text.text = "Centered arc";
+    text.style.descriptor = {"Test", "test.ttf", Domain::FontDescriptor::Type::file_path};
+    text.style.prop.bend_horizontal = 0.5f;
+    text.style.prop.bend_vertical = -0.4f;
+    text.style.prop.bend_arc = GENERATE(std::optional<float>{}, std::optional<float>{-2.f},
+        std::optional<float>{0.f}, std::optional<float>{2.f});
+    if (text.style.prop.bend_arc)
+        text.bend_reference = Domain::BoundingBox3d{{-50., -10., 0.}, {50., 10., 2.}};
+    project.model().objects.front()->volumes.front()->text_configuration = text;
+
+    const fs::path file_path = fs::temp_directory_path() / fs::unique_path("slic3r-text-arc-%%%%-%%%%.3mf");
+    store_3mf(file_path.string(), project);
+    const auto loaded = load_3mf(file_path.string());
+    fs::remove(file_path);
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    REQUIRE(loaded.model.objects.front()->volumes.size() == 1);
+    const auto& restored = loaded.model.objects.front()->volumes.front()->text_configuration;
+    REQUIRE(restored.has_value());
+    CHECK(restored->text == text.text);
+    CHECK(restored->style.prop == text.style.prop);
+    CHECK(restored->style.prop.bend_arc == text.style.prop.bend_arc);
+    REQUIRE(restored->bend_reference.has_value() == text.bend_reference.has_value());
+    if (text.bend_reference) {
+        CHECK(restored->bend_reference->min == text.bend_reference->min);
+        CHECK(restored->bend_reference->max == text.bend_reference->max);
+    }
 }
 
 TEST_CASE("3MF production extension - component without p:path resolves within same file", "[3mf]")

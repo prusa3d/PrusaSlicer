@@ -5,6 +5,7 @@
 #include <string>
 #include <optional>
 #include "Slic3r/Domain/Types.hpp"
+#include "Slic3r/Domain/BoundingBox.hpp"
 #include "Slic3r/Domain/Constants.hpp"
 
 namespace Slic3r::Domain {
@@ -40,6 +41,10 @@ struct FontProp
     // Vertical curl angle across text height (curl up/down) [-pi, pi]
     // When not set, text is flat along Y and is not stored
     std::optional<float> bend_vertical;
+
+    // Up/down arc across text width in its XY face, centered on the middle [-pi, pi].
+    // When not set, there is no in-plane arc (Z handle slider).
+    std::optional<float> bend_arc;
 
     // Parameter for True Type Font collections
     // Select index of font in collection
@@ -169,6 +174,10 @@ struct TextConfiguration
 
     // Embossed text value
     std::string text = "None";
+
+    // Original mesh dimensions for stable inverse deformation, including at
+    // maximum angles where recovering them from bent bounds loses precision.
+    std::optional<BoundingBox3d> bend_reference;
 };
 
 } // namespace Slic3r::Domain

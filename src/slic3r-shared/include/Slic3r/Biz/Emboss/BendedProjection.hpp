@@ -14,7 +14,8 @@ public:
         double height,
         const Domain::Vec3d& center,
         float horizontal_bend,
-        float vertical_curl
+        float vertical_curl,
+        float vertical_arc = 0.0f
     );
 
     std::pair<Domain::Vec3d, Domain::Vec3d> create_front_back(const Domain::Vec2crd& p) const override;

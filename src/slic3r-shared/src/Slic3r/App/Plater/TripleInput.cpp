@@ -104,4 +104,13 @@ void TripleInput::set_visible(const std::array<bool, 3>& is_visible) {
     }
 }
 
+void TripleInput::set_range(double minimum, double maximum)
+{
+    for (auto* validator : m_validator) {
+        validator->set_from(minimum);
+        validator->set_to(maximum);
+    }
+    set_value(get_value());
+}
+
 } // namespace Slic3r::App::Plater

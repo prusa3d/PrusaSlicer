@@ -69,6 +69,8 @@ private:
     bool is_selected_volume_emboss_text() const;
     void update_bend_sliders_visibility_and_position();
     void apply_bend_slider_drag(double local_x);
+    void finish_bend_drag();
+    std::optional<double> bend_mouse_position(const Scene::GizmoEventContext& ctx);
 
 private:
     Render::Device& m_device;
@@ -91,14 +93,18 @@ private:
         Scene::Node::NodeList handles;
 
         bool dragging_bend_slider{false};
+        bool bend_mesh_changed{false};
+        double bend_drag_offset{0.0};
         AxisType bend_slider_axis{AxisType::None};
         indexed_triangle_set base_unbent_mesh;
         Domain::BoundingBox3d base_mesh_bbox;
         Domain::ElementRef bend_target_element;
         float current_bend_horizontal{0.0f};
         float current_bend_vertical{0.0f};
+        float current_bend_arc{0.0f};
         Scene::Node* bend_slider_x{nullptr};
         Scene::Node* bend_slider_y{nullptr};
+        Scene::Node* bend_slider_z{nullptr};
     };
 
     using ProjectContexts = Biz::ProjectScoped<ProjectContext>;

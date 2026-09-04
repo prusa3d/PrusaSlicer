@@ -205,7 +205,7 @@ void serialize(Archive& ar, Slic3r::Domain::ModelVolume::CutInfo& cut_info)
 template <class Archive>
 void serialize(Archive& ar, Slic3r::Domain::TextConfiguration& text_configuration)
 {
-    ar(text_configuration.style, text_configuration.text);
+    ar(text_configuration.style, text_configuration.text, text_configuration.bend_reference);
 }
 
 template <class Archive>

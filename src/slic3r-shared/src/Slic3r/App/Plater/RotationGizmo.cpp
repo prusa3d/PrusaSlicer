@@ -6,6 +6,7 @@
 
 #include "Slic3r/Biz/Algorithms/Line.hpp"
 #include "Slic3r/Biz/Algorithms/Point.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Domain/Axis.hpp"
 #include "Slic3r/Domain/Color.hpp"
 #include "Slic3r/Domain/Constants.hpp"
@@ -275,7 +276,7 @@ static void build_rotate_node(
                 }
             );
 
-            if (!use_graded_circle && (axis == AxisType::XAxis || axis == AxisType::YAxis)) {
+            if (!use_graded_circle) {
                 bldr.child(
                     [&](Scene::NodeBuilder& child_bldr)
                     {
@@ -397,7 +398,14 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
 
         const RotationGizmoNodeTag& tag = *node->tag_of_type<RotationGizmoNodeTag>();
         if (tag.is_bend_slider && is_selected_volume_emboss_text()) {
+            if (m_window && m_window->is_bend_locked(tag.primary_axis))
+                return Scene::GizmoActivationState::Inactive;
+            const auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
+            if (!selected_text.volume || selected_text.volume->mesh().its.vertices.empty()
+                || !m_scene_interactor.selection_bounding_box())
+                return Scene::GizmoActivationState::Inactive;
             project_context.dragging_bend_slider = true;
+            project_context.bend_mesh_changed = false;
             project_context.bend_slider_axis = tag.primary_axis;
             project_context.curr_axis = tag.primary_axis;
 
@@ -408,7 +416,6 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
                 project_context.start_obb = selection_bounding_box->oriented_bounding_box();
             }
 
-            auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
             if (selected_text.volume && selected_text.volume->text_configuration) {
                 project_context.base_unbent_mesh = selected_text.volume->mesh().its;
                 project_context.base_mesh_bbox = selected_text.volume->mesh().bounding_box();
@@ -420,12 +427,30 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
                 const auto& prop = selected_text.volume->text_configuration->style.prop;
                 float prev_h = prop.bend_horizontal.value_or(0.0f);
                 float prev_v = prop.bend_vertical.value_or(0.0f);
-                if (std::abs(prev_h) > 1e-4f || std::abs(prev_v) > 1e-4f) {
-                    Biz::Emboss::BendParams prev_params{ .horizontal_bend = prev_h, .vertical_curl = prev_v };
-                    Biz::Emboss::TextBender::unbend_mesh(project_context.base_unbent_mesh, prev_params, project_context.base_mesh_bbox);
+                float prev_arc = prop.bend_arc.value_or(0.0f);
+                if (std::abs(prev_h) > 1e-4f || std::abs(prev_v) > 1e-4f || std::abs(prev_arc) > 1e-4f) {
+                    Biz::Emboss::BendParams prev_params{prev_h, prev_v, prev_arc};
+                    if (const auto& reference = selected_text.volume->text_configuration->bend_reference)
+                        Biz::Emboss::TextBender::restore_mesh(project_context.base_unbent_mesh, prev_params, *reference);
+                    else
+                        Biz::Emboss::TextBender::unbend_mesh(project_context.base_unbent_mesh, prev_params, project_context.base_mesh_bbox);
                 }
-                project_context.current_bend_horizontal = prev_h;
-                project_context.current_bend_vertical = prev_v;
+                project_context.base_mesh_bbox = selected_text.volume->text_configuration->bend_reference
+                    .value_or(Domain::bounding_box(project_context.base_unbent_mesh));
+                Biz::Emboss::TextBender::prepare_mesh(project_context.base_unbent_mesh, project_context.base_mesh_bbox);
+                project_context.current_bend_horizontal = static_cast<float>(Biz::Emboss::TextBender::clamp_angle(prev_h));
+                project_context.current_bend_vertical = static_cast<float>(Biz::Emboss::TextBender::clamp_angle(prev_v));
+                project_context.current_bend_arc = static_cast<float>(Biz::Emboss::TextBender::clamp_angle(prev_arc));
+                const auto position = bend_mouse_position(ctx);
+                if (!position) {
+                    on_stop_dragging();
+                    return Scene::GizmoActivationState::Inactive;
+                }
+                const float angle = tag.primary_axis == AxisType::YAxis
+                    ? project_context.current_bend_horizontal : tag.primary_axis == AxisType::XAxis
+                    ? project_context.current_bend_vertical : project_context.current_bend_arc;
+                project_context.bend_drag_offset = HANDLE_STEM_LENGTH * (0.5 + 0.35 * angle / std::numbers::pi)
+                    - *position;
             }
 
             return Scene::GizmoActivationState::Active;
@@ -438,45 +463,13 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
 
     if (project_context.dragging_bend_slider) {
         if (event_type == Platform::MouseEvent::Type::Move) {
-            Domain::Transform3d orient_matrix{Domain::Transform3d::Identity()};
-            orient_matrix.rotate(project_context.start_obb.rotation);
-            Vec2d pos = to_2d(mouse_position_in_local_plane(
-                project_context.curr_axis,
-                orient_matrix,
-                project_context.start_obb.center,
-                Domain::Line3d(pick_ray.origin, pick_ray.point_at(10.0))
-            ));
-
-            const App::Scene::INodeTransformModifier* modifier =
-                m_scene_presenter.selection_root().transform_modifier();
-            if (modifier != nullptr) {
-                const App::Scene::Camera& camera = m_scene_presenter.scene().camera();
-                double scale = camera.cam_projection().constant_screen_space_size_scale(
-                                   camera,
-                                   (project_context.start_obb.center - camera.position()).norm()
-                               )
-                    * Scene::SELECTION_ROOT_SCALE_MODIFIER;
-                pos /= scale;
-            }
-
-            apply_bend_slider_drag(pos.x());
+            if (const auto position = bend_mouse_position(ctx))
+                apply_bend_slider_drag(*position + project_context.bend_drag_offset);
             return Scene::GizmoActivationState::Active;
         }
 
         if (event_type == Platform::MouseEvent::Type::ButtonUp) {
-            auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
-            if (selected_text.volume && selected_text.volume->text_configuration) {
-                auto& mutable_volume = const_cast<Domain::ModelVolume&>(*selected_text.volume);
-                if (mutable_volume.text_configuration) {
-                    mutable_volume.text_configuration->style.prop.bend_horizontal =
-                        project_context.current_bend_horizontal;
-                    mutable_volume.text_configuration->style.prop.bend_vertical =
-                        project_context.current_bend_vertical;
-                }
-            }
-            project_context.base_unbent_mesh.vertices.clear();
-            project_context.dragging_bend_slider = false;
-            m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::Rotate);
+            on_stop_dragging();
             return Scene::GizmoActivationState::Done;
         }
     }
@@ -606,17 +599,18 @@ void RotationGizmo::on_transient_mouse(Scene::GizmoEventContext& ctx)
     }
 
     const auto* node{ctx.pick_result_node_with_tag_of_type<RotationGizmoNodeTag>()};
-    if (node == nullptr) {
+    if (node == nullptr || node->tag_of_type<RotationGizmoNodeTag>()->is_bend_slider) {
+        // Bend cubes stay on the main node; highlighting must not hide them.
         remove_highlight_node();
     } else {
-        add_highlight_node(node->parent()->tag_of_type<RotationGizmoNodeTag>()->primary_axis);
+        add_highlight_node(node->tag_of_type<RotationGizmoNodeTag>()->primary_axis);
     }
 }
 
 void RotationGizmo::on_cycle_prepare()
 {
+    finish_bend_drag();
     m_projects.selected().dragging = false;
-    m_projects.selected().dragging_bend_slider = false;
 }
 
 static void hide_xy_axis(Scene::Node& main_node)
@@ -653,6 +647,7 @@ void RotationGizmo::on_activated()
 
     project_context.bend_slider_x = nullptr;
     project_context.bend_slider_y = nullptr;
+    project_context.bend_slider_z = nullptr;
     visit(
         *project_context.main_node,
         [&project_context](Scene::Node& n)
@@ -663,6 +658,8 @@ void RotationGizmo::on_activated()
                     project_context.bend_slider_x = &n;
                 else if (tag->primary_axis == AxisType::YAxis)
                     project_context.bend_slider_y = &n;
+                else if (tag->primary_axis == AxisType::ZAxis)
+                    project_context.bend_slider_z = &n;
             }
         },
         true
@@ -677,9 +674,12 @@ void RotationGizmo::on_activated()
 void RotationGizmo::on_deactivated()
 {
     ProjectContext& project_context{m_projects.selected()};
-    remove_highlight_node();
+    on_stop_dragging();
     project_context.activated = false;
     project_context.main_node = nullptr;
+    project_context.bend_slider_x = nullptr;
+    project_context.bend_slider_y = nullptr;
+    project_context.bend_slider_z = nullptr;
     m_window->on_deactivated();
     m_scene_presenter.clear_selection_root_children();
 
@@ -695,13 +695,21 @@ void RotationGizmo::on_scene_selection_bounding_box_changed(
     const std::optional<Biz::Scene::SelectionExtents>&
 )
 {
+    if (project_id != m_project_interactor.selected_project_id())
+        return;
     ProjectContext& project_context{m_projects.selected()};
-    if (project_context.activated) {
-        if (project_context.dragging) {
-            m_scene_presenter.selection_root().set_enabled(false);
-        } else if (!project_context.dragging_bend_slider) {
-            update_bend_sliders_visibility_and_position();
-        }
+    if (!project_context.activated)
+        return;
+    if (project_context.dragging) {
+        m_scene_presenter.selection_root().set_enabled(false);
+    } else if (project_context.dragging_bend_slider) {
+        // Keep the stem fixed while mesh bounds move underneath it.
+        Transform3d transform = Transform3d::Identity();
+        transform.translate(project_context.start_obb.center);
+        transform.rotate(project_context.start_obb.rotation);
+        m_scene_presenter.selection_root().set_world_transform(transform);
+    } else {
+        update_bend_sliders_visibility_and_position();
     }
 }
 
@@ -738,14 +746,15 @@ std::unique_ptr<GizmoWindow> RotationGizmo::release_ui_window()
 {
     auto window{std::make_unique<RotationDialog>(m_scene_presenter, m_project_interactor)};
     m_window = window.get();
+    m_window->on_bend_locks_changed = [this]() { update_bend_sliders_visibility_and_position(); };
     return window;
 }
 
 void RotationGizmo::on_stop_dragging()
 {
+    finish_bend_drag();
     remove_highlight_node();
     m_projects.selected().dragging = false;
-    m_projects.selected().dragging_bend_slider = false;
 }
 
 bool RotationGizmo::is_selected_volume_emboss_text() const
@@ -763,18 +772,22 @@ void RotationGizmo::update_bend_sliders_visibility_and_position()
     const bool is_text = is_selected_volume_emboss_text();
 
     if (project_context.bend_slider_x != nullptr) {
-        project_context.bend_slider_x->set_enabled(is_text);
+        project_context.bend_slider_x->set_enabled(is_text && (!m_window || !m_window->is_bend_locked(AxisType::XAxis)));
     }
     if (project_context.bend_slider_y != nullptr) {
-        project_context.bend_slider_y->set_enabled(is_text);
+        project_context.bend_slider_y->set_enabled(is_text && (!m_window || !m_window->is_bend_locked(AxisType::YAxis)));
+    }
+    if (project_context.bend_slider_z != nullptr) {
+        project_context.bend_slider_z->set_enabled(is_text && (!m_window || !m_window->is_bend_locked(AxisType::ZAxis)));
     }
 
     if (is_text) {
         auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
         if (selected_text.volume && selected_text.volume->text_configuration) {
             const auto& prop = selected_text.volume->text_configuration->style.prop;
-            project_context.current_bend_horizontal = prop.bend_horizontal.value_or(0.0f);
-            project_context.current_bend_vertical = prop.bend_vertical.value_or(0.0f);
+            project_context.current_bend_horizontal = static_cast<float>(Biz::Emboss::TextBender::clamp_angle(prop.bend_horizontal.value_or(0.0f)));
+            project_context.current_bend_vertical = static_cast<float>(Biz::Emboss::TextBender::clamp_angle(prop.bend_vertical.value_or(0.0f)));
+            project_context.current_bend_arc = static_cast<float>(Biz::Emboss::TextBender::clamp_angle(prop.bend_arc.value_or(0.0f)));
 
             const double L = HANDLE_STEM_LENGTH;
             const double x0 = 0.5 * L;
@@ -796,83 +809,121 @@ void RotationGizmo::update_bend_sliders_visibility_and_position()
                 xform.translate(Vec3d(local_x_pos, 0.0, 0.0)).scale(0.5 * HANDLE_CUBE_SIZE);
                 project_context.bend_slider_x->set_local_transform(xform);
             }
+            if (project_context.bend_slider_z != nullptr) {
+                const double tz = static_cast<double>(project_context.current_bend_arc) / std::numbers::pi;
+                Transform3d xform = Transform3d::Identity();
+                xform.translate(Vec3d(x0 + tz * (x_max - x0), 0.0, 0.0)).scale(0.5 * HANDLE_CUBE_SIZE);
+                project_context.bend_slider_z->set_local_transform(xform);
+            }
         }
+    }
+}
+
+std::optional<double> RotationGizmo::bend_mouse_position(const Scene::GizmoEventContext& ctx)
+{
+    const auto& project_context = m_projects.selected();
+    Transform3d orientation = Transform3d::Identity();
+    orientation.rotate(project_context.start_obb.rotation);
+    orientation = orientation * axis_transform(project_context.bend_slider_axis);
+    const Scene::Ray stem{project_context.start_obb.center, orientation.linear() * Vec3d::UnitX()};
+    const auto& ray = ctx.pick_ray();
+    if (std::abs(stem.direction.normalized().dot(ray.direction.normalized())) > 1.0 - 1e-8)
+        return std::nullopt;
+    double position = 0.0;
+    if (!stem.closest_point_from_ray(ray, position))
+        return std::nullopt;
+    if (m_scene_presenter.selection_root().transform_modifier() != nullptr) {
+        const auto& camera = m_scene_presenter.scene().camera();
+        const double scale = camera.cam_projection().constant_screen_space_size_scale(
+            camera, (project_context.start_obb.center - camera.position()).norm())
+            * Scene::SELECTION_ROOT_SCALE_MODIFIER;
+        if (scale <= 0.0)
+            return std::nullopt;
+        position /= scale;
+    }
+    return std::isfinite(position) ? std::optional<double>(position) : std::nullopt;
+}
+
+void RotationGizmo::finish_bend_drag()
+{
+    auto& project_context = m_projects.selected();
+    if (!project_context.dragging_bend_slider)
+        return;
+    project_context.dragging_bend_slider = false;
+    project_context.base_unbent_mesh = {};
+    project_context.bend_slider_axis = AxisType::None;
+    if (project_context.activated && project_context.main_node) {
+        if (const auto bounds = m_scene_interactor.selection_bounding_box()) {
+            Transform3d transform = Transform3d::Identity();
+            transform.translate(bounds->oriented_bounding_box().center);
+            transform.rotate(bounds->oriented_bounding_box().rotation);
+            m_scene_presenter.selection_root().set_world_transform(transform);
+        }
+        update_bend_sliders_visibility_and_position();
+    }
+    if (project_context.bend_mesh_changed) {
+        project_context.bend_mesh_changed = false;
+        m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::Rotate);
     }
 }
 
 void RotationGizmo::apply_bend_slider_drag(double local_x)
 {
-    ProjectContext& project_context{m_projects.selected()};
-    const double L = HANDLE_STEM_LENGTH;
-    const double x0 = 0.5 * L;
-    const double x_min = 0.15 * L;
-    const double x_max = 0.85 * L;
+    auto& project_context = m_projects.selected();
+    if (project_context.base_unbent_mesh.vertices.empty() || !std::isfinite(local_x))
+        return;
+    auto* volume = m_project_interactor.selected_project().find_volume_by_id(
+        project_context.bend_target_element.object_id, project_context.bend_target_element.volume_id);
+    if (!volume || !volume->text_configuration)
+        return;
 
-    double clamped_x = std::clamp(local_x, x_min, x_max);
-    double t = (clamped_x - x0) / (x_max - x0); // [-1.0, 1.0]
-    float bend_angle = static_cast<float>(t * std::numbers::pi); // [-pi, pi]
+    const double position = std::clamp(local_x, 0.15 * HANDLE_STEM_LENGTH, 0.85 * HANDLE_STEM_LENGTH);
+    const float angle = static_cast<float>(Biz::Emboss::TextBender::clamp_angle(
+        (position / HANDLE_STEM_LENGTH - 0.5) * std::numbers::pi / 0.35));
+    Biz::Emboss::BendParams params{project_context.current_bend_horizontal, project_context.current_bend_vertical,
+        project_context.current_bend_arc};
+    if (project_context.bend_slider_axis == AxisType::YAxis)
+        params.horizontal_bend = angle;
+    else if (project_context.bend_slider_axis == AxisType::XAxis)
+        params.vertical_curl = angle;
+    else if (project_context.bend_slider_axis == AxisType::ZAxis)
+        params.vertical_arc = angle;
+    if (params.horizontal_bend == project_context.current_bend_horizontal
+        && params.vertical_curl == project_context.current_bend_vertical
+        && params.vertical_arc == project_context.current_bend_arc)
+        return;
 
-    if (project_context.bend_slider_axis == AxisType::YAxis) {
-        project_context.current_bend_horizontal = bend_angle;
-        if (project_context.bend_slider_y != nullptr) {
-            Transform3d xform = Transform3d::Identity();
-            xform.translate(Vec3d(clamped_x, 0.0, 0.0)).scale(0.5 * HANDLE_CUBE_SIZE);
-            project_context.bend_slider_y->set_local_transform(xform);
-        }
-    } else if (project_context.bend_slider_axis == AxisType::XAxis) {
-        project_context.current_bend_vertical = bend_angle;
-        if (project_context.bend_slider_x != nullptr) {
-            Transform3d xform = Transform3d::Identity();
-            xform.translate(Vec3d(clamped_x, 0.0, 0.0)).scale(0.5 * HANDLE_CUBE_SIZE);
-            project_context.bend_slider_x->set_local_transform(xform);
-        }
+    auto mesh = project_context.base_unbent_mesh;
+    Biz::Emboss::TextBender::bend_mesh(mesh, params, project_context.base_mesh_bbox);
+    auto bent_mesh = Biz::Algorithms::TriangleMesh::construct(std::move(mesh));
+    project_context.current_bend_horizontal = params.horizontal_bend;
+    project_context.current_bend_vertical = params.vertical_curl;
+    project_context.current_bend_arc = params.vertical_arc;
+    // Publish matching parameters before synchronous mesh/selection notifications.
+    // Finishing or interrupting the drag then records one undo step.
+    volume->text_configuration->style.prop.bend_horizontal = params.horizontal_bend;
+    volume->text_configuration->style.prop.bend_vertical = params.vertical_curl;
+    volume->text_configuration->style.prop.bend_arc = params.vertical_arc;
+    volume->text_configuration->bend_reference = project_context.base_mesh_bbox;
+    Biz::Scene::SceneInteractor::VolumeMeshReplacements replacements;
+    replacements.push_back({project_context.bend_target_element, std::move(bent_mesh)});
+    const auto updated = m_scene_interactor.change_volume_meshes(std::move(replacements));
+    if (!updated.empty()) {
+        project_context.bend_target_element = updated.front();
+        project_context.bend_mesh_changed = true;
     }
 
-    if (project_context.base_unbent_mesh.vertices.empty()) {
-        auto selected_text = Biz::Emboss::get_selected_text_volume(m_project_interactor);
-        if (selected_text.volume && selected_text.volume->text_configuration) {
-            project_context.base_unbent_mesh = selected_text.volume->mesh().its;
-            project_context.base_mesh_bbox = selected_text.volume->mesh().bounding_box();
-            project_context.bend_target_element = Domain::ElementRef(
-                selected_text.volume->get_object()->id().id,
-                selected_text.instance_id,
-                selected_text.volume->id().id
-            );
-            const auto& prop = selected_text.volume->text_configuration->style.prop;
-            float prev_h = prop.bend_horizontal.value_or(0.0f);
-            float prev_v = prop.bend_vertical.value_or(0.0f);
-            if (std::abs(prev_h) > 1e-4f || std::abs(prev_v) > 1e-4f) {
-                Biz::Emboss::BendParams prev_params{ .horizontal_bend = prev_h, .vertical_curl = prev_v };
-                Biz::Emboss::TextBender::unbend_mesh(project_context.base_unbent_mesh, prev_params, project_context.base_mesh_bbox);
-            }
-        }
+    Scene::Node* slider = project_context.bend_slider_axis == AxisType::YAxis
+        ? project_context.bend_slider_y : project_context.bend_slider_axis == AxisType::XAxis
+        ? project_context.bend_slider_x : project_context.bend_slider_z;
+    if (slider) {
+        Transform3d transform = Transform3d::Identity();
+        transform.translate(Vec3d(position, 0.0, 0.0)).scale(0.5 * HANDLE_CUBE_SIZE);
+        slider->set_local_transform(transform);
     }
-
-    if (!project_context.base_unbent_mesh.vertices.empty() && project_context.bend_target_element.volume_id != 0) {
-        indexed_triangle_set bent_its = project_context.base_unbent_mesh;
-        Biz::Emboss::BendParams params{
-            .horizontal_bend = project_context.current_bend_horizontal,
-            .vertical_curl = project_context.current_bend_vertical
-        };
-        Biz::Emboss::TextBender::bend_mesh(bent_its, params, project_context.base_mesh_bbox);
-        Domain::TriangleMesh bent_mesh(std::move(bent_its));
-        Biz::Scene::SceneInteractor::VolumeMeshReplacements replacements;
-        replacements.push_back(Biz::Scene::SceneInteractor::VolumeMeshReplacement{
-            project_context.bend_target_element,
-            std::move(bent_mesh)
-        });
-        auto updated = m_scene_interactor.change_volume_meshes(std::move(replacements));
-        if (!updated.empty()) {
-            project_context.bend_target_element = updated.front();
-        }
-    }
-
-    if (m_window != nullptr) {
-        m_window->set_bend_values(
-            rad2deg(static_cast<double>(project_context.current_bend_horizontal)),
-            rad2deg(static_cast<double>(project_context.current_bend_vertical))
-        );
-    }
+    if (m_window)
+        m_window->set_bend_values(rad2deg(static_cast<double>(params.horizontal_bend)),
+            rad2deg(static_cast<double>(params.vertical_curl)), rad2deg(static_cast<double>(params.vertical_arc)));
 }
 
 void RotationGizmo::add_highlight_node(AxisType axis)

@@ -1,301 +1,280 @@
 #include "Slic3r/Biz/Emboss/TextBender.hpp"
-#include <cmath>
+
 #include <algorithm>
+#include <cmath>
 #include <map>
-#include <vector>
+#include <limits>
 
 namespace Slic3r::Biz::Emboss {
+namespace {
 
-Domain::Vec3d TextBender::bend_point(
-    const Domain::Vec3d& pt,
-    const BendParams& params,
-    const Domain::BoundingBox3f& base_bbox
-)
+constexpr double ANGLE_EPSILON = 1e-4;
+
+double effective_angle(float angle)
 {
-    const Domain::Vec3d min_pt = base_bbox.min.cast<double>();
-    const Domain::Vec3d max_pt = base_bbox.max.cast<double>();
-    const Domain::Vec3d center = 0.5 * (min_pt + max_pt);
-    const Domain::Vec3d size   = max_pt - min_pt;
-
-    const double W = std::max(size.x(), 1e-3);
-    const double H = std::max(size.y(), 1e-3);
-
-    double x = pt.x();
-    double y = pt.y();
-    double z = pt.z();
-
-    const double dx = x - center.x();
-    const double dy = y - center.y();
-
-    double dz_h = 0.0;
-    double dz_v = 0.0;
-
-    // 1. Horizontal bend along length (in/out across X axis, controlled by Y handle slider)
-    if (std::abs(params.horizontal_bend) > 1e-4f) {
-        const double theta = static_cast<double>(params.horizontal_bend);
-        const double R = W / theta;
-        const double alpha = (dx * theta) / W; // range [-theta/2, +theta/2]
-        x = center.x() + R * std::sin(alpha);
-        dz_h = R * (1.0 - std::cos(alpha));
-    }
-
-    // 2. Vertical curl along height (curl up/down across Y axis, controlled by X handle slider)
-    if (std::abs(params.vertical_curl) > 1e-4f) {
-        const double phi = static_cast<double>(params.vertical_curl);
-        const double Ry = H / phi;
-        const double beta = (dy * phi) / H; // range [-phi/2, +phi/2]
-        y = center.y() + Ry * std::sin(beta);
-        dz_v = Ry * (1.0 - std::cos(beta));
-    }
-
-    z += (dz_h + dz_v);
-
-    return Domain::Vec3d(x, y, z);
+    const double value = TextBender::clamp_angle(angle);
+    return std::abs(value) <= ANGLE_EPSILON ? 0.0 : value;
 }
 
-static void subdivide_long_edges(
-    indexed_triangle_set& its,
-    const BendParams& params,
-    double W,
-    double H
-)
+Domain::BoundingBox3d to_double(const Domain::BoundingBox3f& box)
 {
-    if (its.indices.empty() || its.vertices.empty())
+    return {box.min.cast<double>(), box.max.cast<double>()};
+}
+
+struct BendGeometry {
+    Domain::Vec3d center;
+    double width;
+    double height;
+    double horizontal;
+    double vertical;
+    double arc;
+    double inverse_tolerance = 0.0;
+
+    BendGeometry(const BendParams& params, const Domain::BoundingBox3d& box) :
+        center(0.5 * (box.min + box.max)),
+        width(std::max(box.max.x() - box.min.x(), 1e-3)),
+        height(std::max(box.max.y() - box.min.y(), 1e-3)),
+        horizontal(effective_angle(params.horizontal_bend)),
+        vertical(effective_angle(params.vertical_curl)),
+        arc(effective_angle(params.vertical_arc))
+    {}
+
+    bool flat() const { return horizontal == 0.0 && vertical == 0.0 && arc == 0.0; }
+
+    double arc_span() const
+    {
+        const double half = 0.5 * horizontal;
+        return half == 0.0 ? width : width * std::sin(half) / half;
+    }
+
+    double inverse_angle(double offset, double radius, double angle) const
+    {
+        const double sine = std::clamp(offset / radius, -1.0, 1.0);
+        const double half = 0.5 * std::abs(angle);
+        // Mesh vertices are floats. At a semicircle's ends, asin amplifies
+        // their rounding error; retain the known endpoint within that error.
+        if (inverse_tolerance > 0.0
+            && std::abs(std::abs(sine) - std::sin(half)) <= inverse_tolerance / std::abs(radius))
+            return std::copysign(half, sine);
+        return std::asin(sine);
+    }
+
+    Domain::Vec3d unbend_arc(const Domain::Vec3d& point, double span) const
+    {
+        if (arc == 0.0)
+            return point;
+        const double radius = span / arc;
+        const double beta = inverse_angle(point.x() - center.x(), radius, arc);
+        Domain::Vec3d result = point;
+        result.x() = center.x() + radius * beta;
+        result.y() -= 2.0 * radius * std::pow(std::sin(0.5 * beta), 2);
+        return result;
+    }
+
+    Domain::Vec3d bend(const Domain::Vec3d& point) const
+    {
+        Domain::Vec3d result = point;
+        auto bend_axis = [&](int axis, double span, double angle) {
+            if (angle == 0.0)
+                return;
+            const double alpha = (point[axis] - center[axis]) * angle / span;
+            const double radius = span / angle;
+            result[axis] = center[axis] + radius * std::sin(alpha);
+            // This form avoids cancellation for small angles.
+            result.z() += 2.0 * radius * std::pow(std::sin(0.5 * alpha), 2);
+        };
+        bend_axis(0, width, horizontal);
+        bend_axis(1, height, vertical);
+        // Apply the in-plane arc after the two depth bends. The middle remains
+        // fixed; both ends rise for a positive angle and fall for a negative one.
+        if (arc != 0.0) {
+            const double radius = arc_span() / arc;
+            const double beta = (result.x() - center.x()) / radius;
+            result.x() = center.x() + radius * std::sin(beta);
+            result.y() += 2.0 * radius * std::pow(std::sin(0.5 * beta), 2);
+        }
+        return result;
+    }
+
+    Domain::Vec3d unbend(const Domain::Vec3d& point) const
+    {
+        Domain::Vec3d result = unbend_arc(point, arc_span());
+        auto unbend_axis = [&](int axis, double span, double angle) {
+            if (angle == 0.0)
+                return;
+            const double radius = span / angle;
+            const double alpha = inverse_angle(result[axis] - center[axis], radius, angle);
+            result[axis] = center[axis] + radius * alpha;
+            result.z() -= 2.0 * radius * std::pow(std::sin(0.5 * alpha), 2);
+        };
+        unbend_axis(0, width, horizontal);
+        unbend_axis(1, height, vertical);
+        return result;
+    }
+};
+
+// Split every marked edge in both incident triangles. Sharing midpoint indices
+// and handling all three edges together prevents cracks and T junctions.
+void subdivide_edges(indexed_triangle_set& mesh, const BendGeometry& geometry)
+{
+    if (geometry.flat())
         return;
-
-    const bool has_h = std::abs(params.horizontal_bend) > 1e-4f;
-    const bool has_v = std::abs(params.vertical_curl) > 1e-4f;
-    if (!has_h && !has_v)
-        return;
-
-    const float max_dx = has_h ? static_cast<float>(std::max(1.5, W / 20.0)) : 1e9f;
-    const float max_dy = has_v ? static_cast<float>(std::max(1.5, H / 20.0)) : 1e9f;
-
-    for (int pass = 0; pass < 5; ++pass) {
-        bool subdivided = false;
-        std::map<std::pair<int, int>, int> edge_midpoints;
-        std::vector<stl_triangle_vertex_indices> new_indices;
-        new_indices.reserve(its.indices.size() * 2);
-
-        auto get_midpoint = [&](int i1, int i2) -> int {
-            auto key = std::minmax(i1, i2);
-            auto it = edge_midpoints.find(key);
-            if (it != edge_midpoints.end())
-                return it->second;
-            int mid_idx = static_cast<int>(its.vertices.size());
-            its.vertices.push_back(0.5f * (its.vertices[i1] + its.vertices[i2]));
-            edge_midpoints[key] = mid_idx;
-            return mid_idx;
+    // The final arc can amplify the preceding deformation by at most sqrt(2).
+    const double amplification = geometry.arc == 0.0 ? 1.0 : std::sqrt(2.0);
+    const double curvature_x = amplification * std::abs(geometry.horizontal) / geometry.width
+        + std::abs(geometry.arc) / geometry.arc_span();
+    const double curvature_y = amplification * std::abs(geometry.vertical) / geometry.height;
+    for (;;) {
+        std::map<std::pair<int, int>, int> midpoints;
+        auto midpoint = [&](int a, int b) {
+            const Domain::Vec3d delta = (mesh.vertices[a] - mesh.vertices[b]).cast<double>();
+            // Bound the deviation of the warped edge from a straight segment.
+            const double error = (curvature_x * delta.x() * delta.x()
+                + curvature_y * delta.y() * delta.y()) / 8.0;
+            if (error <= TextBender::MAX_CHORD_ERROR)
+                return -1;
+            const std::pair<int, int> key = std::minmax(a, b);
+            const auto found = midpoints.find(key);
+            if (found != midpoints.end())
+                return found->second;
+            const int index = static_cast<int>(mesh.vertices.size());
+            const Domain::Vec3f position = 0.5f * (mesh.vertices[a] + mesh.vertices[b]);
+            mesh.vertices.push_back(position);
+            midpoints.emplace(key, index);
+            return index;
         };
 
-        for (const auto& tri : its.indices) {
-            int v0 = tri[0], v1 = tri[1], v2 = tri[2];
-            float d01_x = std::abs(its.vertices[v0].x() - its.vertices[v1].x());
-            float d01_y = std::abs(its.vertices[v0].y() - its.vertices[v1].y());
-            float d12_x = std::abs(its.vertices[v1].x() - its.vertices[v2].x());
-            float d12_y = std::abs(its.vertices[v1].y() - its.vertices[v2].y());
-            float d20_x = std::abs(its.vertices[v2].x() - its.vertices[v0].x());
-            float d20_y = std::abs(its.vertices[v2].y() - its.vertices[v0].y());
-
-            bool split01 = (d01_x > max_dx || d01_y > max_dy);
-            bool split12 = (d12_x > max_dx || d12_y > max_dy);
-            bool split20 = (d20_x > max_dx || d20_y > max_dy);
-
-            if (!split01 && !split12 && !split20) {
-                new_indices.push_back(tri);
-                continue;
-            }
-
-            subdivided = true;
-            float len01 = d01_x * d01_x + d01_y * d01_y;
-            float len12 = d12_x * d12_x + d12_y * d12_y;
-            float len20 = d20_x * d20_x + d20_y * d20_y;
-
-            if (len01 >= len12 && len01 >= len20) {
-                int m = get_midpoint(v0, v1);
-                new_indices.push_back(stl_triangle_vertex_indices{v0, m, v2});
-                new_indices.push_back(stl_triangle_vertex_indices{m, v1, v2});
-            } else if (len12 >= len01 && len12 >= len20) {
-                int m = get_midpoint(v1, v2);
-                new_indices.push_back(stl_triangle_vertex_indices{v1, m, v0});
-                new_indices.push_back(stl_triangle_vertex_indices{m, v2, v0});
+        std::vector<Domain::Index3> triangles;
+        triangles.reserve(mesh.indices.size());
+        for (const auto& tri : mesh.indices) {
+            const int mids[] = {midpoint(tri[0], tri[1]), midpoint(tri[1], tri[2]), midpoint(tri[2], tri[0])};
+            const int count = (mids[0] >= 0) + (mids[1] >= 0) + (mids[2] >= 0);
+            if (count == 0) {
+                triangles.push_back(tri);
+            } else if (count == 3) {
+                triangles.push_back({tri[0], mids[0], mids[2]});
+                triangles.push_back({mids[0], tri[1], mids[1]});
+                triangles.push_back({mids[2], mids[1], tri[2]});
+                triangles.push_back({mids[0], mids[1], mids[2]});
             } else {
-                int m = get_midpoint(v2, v0);
-                new_indices.push_back(stl_triangle_vertex_indices{v2, m, v1});
-                new_indices.push_back(stl_triangle_vertex_indices{m, v0, v1});
+                int edge = 0;
+                while (mids[edge] < 0 || (count == 2 && mids[(edge + 1) % 3] < 0))
+                    ++edge;
+                const int a = tri[edge], b = tri[(edge + 1) % 3], c = tri[(edge + 2) % 3];
+                const int m = mids[edge];
+                if (count == 1) {
+                    triangles.push_back({a, m, c});
+                    triangles.push_back({m, b, c});
+                } else {
+                    const int n = mids[(edge + 1) % 3];
+                    triangles.push_back({b, n, m});
+                    triangles.push_back({a, m, c});
+                    triangles.push_back({m, n, c});
+                }
             }
         }
-
-        its.indices = std::move(new_indices);
-        if (!subdivided)
+        if (midpoints.empty())
             break;
+        mesh.indices = std::move(triangles);
     }
+}
 
-    // For curl, ensure the edge midpoint along x ≈ -1 is represented at vertices 0 and 1
-    if (has_v && its.vertices.size() > 4) {
-        const float target_x = its.vertices[0].x();
-        int mid_idx = -1;
-        float best_d = 1e9f;
-        for (int i = 4; i < static_cast<int>(its.vertices.size()); ++i) {
-            if (std::abs(its.vertices[i].x() - target_x) < 1e-2f) {
-                float d = std::abs(its.vertices[i].y());
-                if (d < best_d) {
-                    best_d = d;
-                    mid_idx = i;
-                }
-            }
+} // namespace
+
+double TextBender::clamp_angle(double radians)
+{
+    return std::isfinite(radians) ? std::clamp(radians, -std::numbers::pi, std::numbers::pi) : 0.0;
+}
+
+Domain::Vec3d TextBender::bend_point(const Domain::Vec3d& point, const BendParams& params,
+    const Domain::BoundingBox3f& base_bbox)
+{
+    return BendGeometry(params, to_double(base_bbox)).bend(point);
+}
+
+Domain::Vec3d TextBender::unbend_point(const Domain::Vec3d& point, const BendParams& params,
+    const Domain::BoundingBox3f& base_bbox)
+{
+    return BendGeometry(params, to_double(base_bbox)).unbend(point);
+}
+
+void TextBender::prepare_mesh(indexed_triangle_set& mesh, const Domain::BoundingBox3d& base_bbox)
+{
+    const float limit = static_cast<float>(std::numbers::pi);
+    subdivide_edges(mesh, BendGeometry({limit, limit, limit}, base_bbox));
+}
+
+void TextBender::restore_mesh(indexed_triangle_set& mesh, const BendParams& params,
+    const Domain::BoundingBox3d& base_bbox)
+{
+    BendGeometry geometry(params, base_bbox);
+    if (geometry.flat())
+        return;
+    geometry.inverse_tolerance = 4.0 * std::numeric_limits<float>::epsilon()
+        * std::max({1.0, base_bbox.min.cwiseAbs().maxCoeff(), base_bbox.max.cwiseAbs().maxCoeff()});
+    for (auto& vertex : mesh.vertices)
+        vertex = geometry.unbend(vertex.cast<double>()).cast<float>();
+}
+
+void TextBender::bend_mesh(indexed_triangle_set& mesh, const BendParams& params,
+    const Domain::BoundingBox3f& base_bbox)
+{
+    bend_mesh(mesh, params, to_double(base_bbox));
+}
+
+void TextBender::bend_mesh(indexed_triangle_set& mesh, const BendParams& params,
+    const Domain::BoundingBox3d& base_bbox)
+{
+    const BendGeometry geometry(params, base_bbox);
+    if (geometry.flat())
+        return;
+    subdivide_edges(mesh, geometry);
+    for (auto& vertex : mesh.vertices)
+        vertex = geometry.bend(vertex.cast<double>()).cast<float>();
+}
+
+void TextBender::unbend_mesh(indexed_triangle_set& mesh, const BendParams& params,
+    const Domain::BoundingBox3f& bent_bbox)
+{
+    unbend_mesh(mesh, params, to_double(bent_bbox));
+}
+
+void TextBender::unbend_mesh(indexed_triangle_set& mesh, const BendParams& params,
+    const Domain::BoundingBox3d& bent_bbox)
+{
+    BendGeometry geometry(params, bent_bbox);
+    if (geometry.flat() || mesh.vertices.empty())
+        return;
+    // The bent extrema are chord endpoints. Recover the arc lengths before
+    // applying each inverse stage.
+    auto arc_length = [](double chord, double angle) {
+        const double half = 0.5 * std::abs(angle);
+        return half == 0.0 ? chord : chord * half / std::sin(half);
+    };
+    if (geometry.arc != 0.0) {
+        const double span = arc_length(geometry.width, geometry.arc);
+        std::vector<Domain::Vec3d> intermediate;
+        intermediate.reserve(mesh.vertices.size());
+        for (const auto& vertex : mesh.vertices)
+            intermediate.push_back(geometry.unbend_arc(vertex.cast<double>(), span));
+        Domain::Vec3d lo = intermediate.front(), hi = lo;
+        for (const auto& vertex : intermediate) {
+            lo = lo.cwiseMin(vertex);
+            hi = hi.cwiseMax(vertex);
         }
-        if (mid_idx != -1 && best_d < 1e-2f) {
-            auto v0_orig = its.vertices[0];
-            auto v1_orig = its.vertices[1];
-            auto v_mid   = its.vertices[mid_idx];
-
-            int new_v0_idx = static_cast<int>(its.vertices.size());
-            its.vertices.push_back(v0_orig);
-            int new_v1_idx = static_cast<int>(its.vertices.size());
-            its.vertices.push_back(v1_orig);
-
-            for (auto& tri : its.indices) {
-                for (int c = 0; c < 3; ++c) {
-                    if (tri[c] == 0) tri[c] = new_v0_idx;
-                    else if (tri[c] == 1) tri[c] = new_v1_idx;
-                    else if (tri[c] == mid_idx) tri[c] = 0;
-                }
-            }
-
-            its.vertices[0] = v_mid;
-            its.vertices[1] = v_mid;
-        }
-    }
-}
-
-void TextBender::bend_mesh(
-    indexed_triangle_set& its,
-    const BendParams& params,
-    const Domain::BoundingBox3f& base_bbox
-)
-{
-    if (std::abs(params.horizontal_bend) < 1e-4f && std::abs(params.vertical_curl) < 1e-4f) {
-        return; // flat / unbent
-    }
-
-    const Domain::Vec3d min_pt = base_bbox.min.cast<double>();
-    const Domain::Vec3d max_pt = base_bbox.max.cast<double>();
-    const Domain::Vec3d size   = max_pt - min_pt;
-    const double W = std::max(size.x(), 1e-3);
-    const double H = std::max(size.y(), 1e-3);
-
-    subdivide_long_edges(its, params, W, H);
-
-    for (auto& v : its.vertices) {
-        Domain::Vec3d bent = bend_point(v.template cast<double>(), params, base_bbox);
-        v = bent.template cast<float>();
-    }
-}
-
-void TextBender::bend_mesh(
-    indexed_triangle_set& its,
-    const BendParams& params,
-    const Domain::BoundingBox3d& base_bbox
-)
-{
-    Domain::BoundingBox3f bbox_f(base_bbox.min.template cast<float>(), base_bbox.max.template cast<float>());
-    bend_mesh(its, params, bbox_f);
-}
-
-Domain::Vec3d TextBender::unbend_point(
-    const Domain::Vec3d& pt,
-    const BendParams& params,
-    const Domain::BoundingBox3f& base_bbox
-)
-{
-    const Domain::Vec3d min_pt = base_bbox.min.template cast<double>();
-    const Domain::Vec3d max_pt = base_bbox.max.cast<double>();
-    const Domain::Vec3d center = 0.5 * (min_pt + max_pt);
-    const Domain::Vec3d size   = max_pt - min_pt;
-
-    const double W = std::max(size.x(), 1e-3);
-    const double H = std::max(size.y(), 1e-3);
-
-    double x = pt.x();
-    double y = pt.y();
-    double z = pt.z();
-
-    double dz_h = 0.0;
-    double dz_v = 0.0;
-
-    if (std::abs(params.horizontal_bend) > 1e-4f) {
-        const double theta = static_cast<double>(params.horizontal_bend);
-        const double R = W / theta;
-        const double sin_alpha = std::clamp((x - center.x()) / R, -1.0, 1.0);
-        const double alpha = std::asin(sin_alpha);
-        x = center.x() + (alpha * W) / theta;
-        dz_h = R * (1.0 - std::cos(alpha));
-    }
-
-    if (std::abs(params.vertical_curl) > 1e-4f) {
-        const double phi = static_cast<double>(params.vertical_curl);
-        const double Ry = H / phi;
-        const double sin_beta = std::clamp((y - center.y()) / Ry, -1.0, 1.0);
-        const double beta = std::asin(sin_beta);
-        y = center.y() + (beta * H) / phi;
-        dz_v = Ry * (1.0 - std::cos(beta));
-    }
-
-    z -= (dz_h + dz_v);
-
-    return Domain::Vec3d(x, y, z);
-}
-
-void TextBender::unbend_mesh(
-    indexed_triangle_set& its,
-    const BendParams& params,
-    const Domain::BoundingBox3f& base_bbox
-)
-{
-    if (std::abs(params.horizontal_bend) < 1e-4f && std::abs(params.vertical_curl) < 1e-4f) {
+        // The in-plane arc shifts Y bounds. Undo it before recovering the
+        // original height, keeping intermediate values in double precision.
+        geometry = BendGeometry({params.horizontal_bend, params.vertical_curl}, {lo, hi});
+        geometry.width = arc_length(geometry.width, geometry.horizontal);
+        geometry.height = arc_length(geometry.height, geometry.vertical);
+        for (size_t i = 0; i < mesh.vertices.size(); ++i)
+            mesh.vertices[i] = geometry.unbend(intermediate[i]).cast<float>();
         return;
     }
-
-    Domain::BoundingBox3f effective_bbox = base_bbox;
-    const Domain::Vec3d min_pt = base_bbox.min.cast<double>();
-    const Domain::Vec3d max_pt = base_bbox.max.cast<double>();
-    const Domain::Vec3d size   = max_pt - min_pt;
-    double W = std::max(size.x(), 1e-3);
-    double H = std::max(size.y(), 1e-3);
-
-    if (std::abs(params.horizontal_bend) > 1e-4f) {
-        const double theta = static_cast<double>(params.horizontal_bend);
-        const double half_theta = 0.5 * std::abs(theta);
-        if (half_theta > 1e-5) {
-            W *= (half_theta / std::sin(half_theta));
-        }
-    }
-    if (std::abs(params.vertical_curl) > 1e-4f) {
-        const double phi = static_cast<double>(params.vertical_curl);
-        const double half_phi = 0.5 * std::abs(phi);
-        if (half_phi > 1e-5) {
-            H *= (half_phi / std::sin(half_phi));
-        }
-    }
-    const Domain::Vec3d center = 0.5 * (min_pt + max_pt);
-    effective_bbox.min = (center - 0.5 * Domain::Vec3d(W, H, size.z())).cast<float>();
-    effective_bbox.max = (center + 0.5 * Domain::Vec3d(W, H, size.z())).cast<float>();
-
-    for (auto& v : its.vertices) {
-        Domain::Vec3d unbent = unbend_point(v.template cast<double>(), params, effective_bbox);
-        v = unbent.template cast<float>();
-    }
-}
-
-void TextBender::unbend_mesh(
-    indexed_triangle_set& its,
-    const BendParams& params,
-    const Domain::BoundingBox3d& base_bbox
-)
-{
-    Domain::BoundingBox3f bbox_f(base_bbox.min.template cast<float>(), base_bbox.max.template cast<float>());
-    unbend_mesh(its, params, bbox_f);
+    geometry.width = arc_length(geometry.width, geometry.horizontal);
+    geometry.height = arc_length(geometry.height, geometry.vertical);
+    for (auto& vertex : mesh.vertices)
+        vertex = geometry.unbend(vertex.cast<double>()).cast<float>();
 }
 
 } // namespace Slic3r::Biz::Emboss

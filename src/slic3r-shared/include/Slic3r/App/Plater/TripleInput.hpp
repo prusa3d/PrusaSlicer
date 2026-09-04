@@ -22,6 +22,7 @@ public:
     Domain::Vec3d get_value() const;
     void set_value(const Domain::Vec3d& value);
     void set_visible(const std::array<bool, 3>& is_visible);
+    void set_range(double minimum, double maximum);
 
 private:
     std::array<InputWithLabel*, 3> m_input;

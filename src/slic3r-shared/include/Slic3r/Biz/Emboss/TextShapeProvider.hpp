@@ -19,11 +19,12 @@ public:
     create_text_lines(const Domain::Transform3d& tr, const Domain::ModelObject& object) override;
 
     void write(Domain::ModelVolume& volume) const override;
-    const Domain::TextConfiguration& text_configuration() const { return m_text_configuration; }
+    void deform_mesh(Domain::TriangleMesh& mesh) const override;
 
 private:
     // font item is not used for create object
     Domain::TextConfiguration m_text_configuration;
+    mutable std::optional<Domain::BoundingBox3d> m_bend_reference;
     FontFileWithCache m_font_with_cache;
 };
 

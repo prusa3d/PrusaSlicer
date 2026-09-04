@@ -361,10 +361,14 @@ constexpr std::string_view FONT_STYLE = "style";
 constexpr std::string_view FONT_WEIGHT = "weight";
 constexpr std::string_view BEND_HORIZONTAL = "bend_horizontal";
 constexpr std::string_view BEND_VERTICAL   = "bend_vertical";
+constexpr std::string_view BEND_ARC        = "bend_arc";
+constexpr std::string_view BEND_BASE_MIN   = "bend_base_min";
+constexpr std::string_view BEND_BASE_MAX   = "bend_base_max";
 
 const NamesType NAMES = {{TEXT, STYLE_NAME, FONT_DESCRIPTOR, FONT_DESCRIPTOR_TYPE, 
 CHAR_GAP, LINE_GAP, LINE_HEIGHT, BOLDNESS, SKEW, PER_GLYPH, HORIZONTAL_ALIGN, VERTICAL_ALIGN, COLLECTION_NUMBER,
-FONT_FAMILY, FONT_FACE_NAME, FONT_STYLE, FONT_WEIGHT, BEND_HORIZONTAL, BEND_VERTICAL}};
+FONT_FAMILY, FONT_FACE_NAME, FONT_STYLE, FONT_WEIGHT, BEND_HORIZONTAL, BEND_VERTICAL, BEND_ARC,
+BEND_BASE_MIN, BEND_BASE_MAX}};
 
 using TypeToName = boost::bimap<FontDescriptor::Type, std::string_view>;
 const TypeToName type_to_name = 
@@ -391,6 +395,10 @@ const VerticalAlignToName vertical_align_to_name =
 json to_json(const TextConfiguration &tc) {
     json result = json::object();
     result[TEXT] = tc.text;
+    if (tc.bend_reference) {
+        result[BEND_BASE_MIN] = ::to_json(tc.bend_reference->min);
+        result[BEND_BASE_MAX] = ::to_json(tc.bend_reference->max);
+    }
     // font item
     const EmbossStyle &style = tc.style;
     result[STYLE_NAME] = style.descriptor.name;
@@ -407,6 +415,7 @@ json to_json(const TextConfiguration &tc) {
     if (fp.skew.has_value())     result[SKEW] = *fp.skew;
     if (fp.bend_horizontal.has_value()) result[BEND_HORIZONTAL] = *fp.bend_horizontal;
     if (fp.bend_vertical.has_value())   result[BEND_VERTICAL]   = *fp.bend_vertical;
+    if (fp.bend_arc.has_value())        result[BEND_ARC]        = *fp.bend_arc;
     if (fp.per_glyph)            result[PER_GLYPH] = true;
     result[HORIZONTAL_ALIGN] = ::to_json(fp.align.horizontal, horizontal_align_to_name);
     result[VERTICAL_ALIGN] = ::to_json(fp.align.vertical, vertical_align_to_name);
@@ -423,6 +432,11 @@ void load(const json &tc_json, TextConfiguration &tc, Read3mfIssues& collected_i
     if(!is_valid(tc_json, NAMES, collected_issues, RT::project_text_configuration_unknown_property))
         return;
     from_json(tc_json, TEXT, tc.text, collected_issues, RT::project_text_configuration_text_issue, true);
+    Domain::Vec3d base_min = Domain::Vec3d::Zero(), base_max = Domain::Vec3d::Zero();
+    if (from_json(tc_json, BEND_BASE_MIN, base_min, collected_issues, RT::project_text_configuration_skew_issue)
+        && from_json(tc_json, BEND_BASE_MAX, base_max, collected_issues, RT::project_text_configuration_skew_issue)
+        && base_min.allFinite() && base_max.allFinite() && (base_min.array() < base_max.array()).all())
+        tc.bend_reference = Domain::BoundingBox3d{base_min, base_max};
     EmbossStyle &style = tc.style;
     from_json(tc_json, STYLE_NAME,           style.descriptor.name, collected_issues, RT::project_text_configuration_style_name_issue, true);
     from_json(tc_json, FONT_DESCRIPTOR,      style.descriptor.path, collected_issues, RT::project_text_configuration_font_descriptor_issue, true);
@@ -435,6 +449,7 @@ void load(const json &tc_json, TextConfiguration &tc, Read3mfIssues& collected_i
     from_json(tc_json, SKEW,        fp.skew      , collected_issues, RT::project_text_configuration_skew_issue);
     from_json(tc_json, BEND_HORIZONTAL, fp.bend_horizontal, collected_issues, RT::project_text_configuration_skew_issue);
     from_json(tc_json, BEND_VERTICAL,   fp.bend_vertical,   collected_issues, RT::project_text_configuration_skew_issue);
+    from_json(tc_json, BEND_ARC,        fp.bend_arc,        collected_issues, RT::project_text_configuration_skew_issue);
     from_json(tc_json, PER_GLYPH,   fp.per_glyph , collected_issues, RT::project_text_configuration_per_glyph_issue);
     from_json(tc_json, HORIZONTAL_ALIGN , fp.align.horizontal , horizontal_align_to_name, collected_issues, RT::project_text_configuration_horizontal_align_issue, true);
     from_json(tc_json, VERTICAL_ALIGN   , fp.align.vertical, vertical_align_to_name  , collected_issues, RT::project_text_configuration_vertical_align_issue, true);

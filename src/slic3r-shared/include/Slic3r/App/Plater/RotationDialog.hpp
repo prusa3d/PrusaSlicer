@@ -4,7 +4,9 @@
 #include "Slic3r/App/Plater/PlaterScenePresenter.hpp"
 #include "Slic3r/App/Plater/ReferenceFramePicker.hpp"
 #include "Slic3r/App/Plater/GizmoWindow.hpp"
+#include "Slic3r/App/Plater/GizmoNodeTag.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
+#include <array>
 
 namespace Slic3r::Biz {
     class ProjectInteractor;
@@ -43,8 +45,10 @@ public:
     void on_deactivated();
     PlaceOnBedButton& place_on_bed_button();
 
-    void set_bend_values(double horizontal_bend_deg, double vertical_curl_deg);
-    void apply_bend_change(double horizontal_bend_rad, double vertical_curl_rad);
+    void set_bend_values(double horizontal_bend_deg, double vertical_curl_deg, double vertical_arc_deg);
+    void apply_bend_change(double horizontal_bend_rad, double vertical_curl_rad, double vertical_arc_rad);
+    bool is_bend_locked(AxisType axis) const;
+    std::function<void()> on_bend_locks_changed;
 
 private:
     std::optional<Domain::Vec3d> get_obb_rotation() const;
@@ -55,10 +59,17 @@ private:
     PlaceOnBedButton* m_place_on_bed_button{nullptr};
     ReferenceFramePicker* m_reference_frame_picker;
     Yoga::Item* m_bend_section{nullptr};
-    TripleInput* m_bend_input{nullptr};
+    std::array<Yoga::SliderWithInput*, 3> m_bend_inputs{};
+    std::array<Yoga::LayoutButton*, 3> m_bend_locks{};
+    bool m_updating_bend_controls{false};
+
+    void add_bend_control(AxisType axis, const std::string& label, const std::string& reset_tooltip);
+    void apply_bend_axis_change(AxisType axis, double degrees);
+    void update_bend_locks();
 
     struct ProjectContext {
         bool activated{false};
+        std::array<bool, 3> bend_locked{};
         Biz::Scene::SceneInteractor::ElementTransforms reset_rotation_candidates;
     };
 

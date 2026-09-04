@@ -1,6 +1,4 @@
 #include "Slic3r/Biz/Emboss/EmbossJob.hpp"
-#include "Slic3r/Biz/Emboss/TextBender.hpp"
-#include "Slic3r/Biz/Emboss/TextShapeProvider.hpp"
 #include "Slic3r/Log.hpp"
 
 #include "Slic3r/Domain/Model.hpp"
@@ -575,17 +573,6 @@ void UpdateJob::update_volume(Domain::ModelVolume& volume, Domain::TriangleMesh&
         volume.name = base.volume_name;
     }
 
-    if (volume.text_configuration) {
-        float h_bend = volume.text_configuration->style.prop.bend_horizontal.value_or(0.0f);
-        float v_curl = volume.text_configuration->style.prop.bend_vertical.value_or(0.0f);
-        if (std::abs(h_bend) > 1e-4f || std::abs(v_curl) > 1e-4f) {
-            indexed_triangle_set its = mesh.its;
-            Biz::Emboss::BendParams params{ .horizontal_bend = h_bend, .vertical_curl = v_curl };
-            Biz::Emboss::TextBender::bend_mesh(its, params, mesh.bounding_box());
-            mesh = Domain::TriangleMesh(std::move(its));
-        }
-    }
-
     const Domain::ModelObject* object = volume.get_object();
     assert(object != nullptr);
     if (object == nullptr)
@@ -891,17 +878,11 @@ TriMeshResult create_mesh_per_glyph(TriMeshBaseData& input, Fnc was_canceled)
         return tl::unexpected{ JobIssue::no_shape };         
 
     auto mesh = Biz::Algorithms::TriangleMesh::construct(std::move(result));
-    const auto* tsp = dynamic_cast<const TextShapeProvider*>(input.shape_provider.get());
-    if (tsp != nullptr) {
-        float h_bend = tsp->text_configuration().style.prop.bend_horizontal.value_or(0.0f);
-        float v_curl = tsp->text_configuration().style.prop.bend_vertical.value_or(0.0f);
-        if (std::abs(h_bend) > 1e-4f || std::abs(v_curl) > 1e-4f) {
-            indexed_triangle_set its = mesh.its;
-            Biz::Emboss::BendParams params{ .horizontal_bend = h_bend, .vertical_curl = v_curl };
-            Biz::Emboss::TextBender::bend_mesh(its, params, mesh.bounding_box());
-            mesh = Biz::Algorithms::TriangleMesh::construct(std::move(its));
-        }
-    }
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    input.shape_provider->deform_mesh(mesh);
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
     return mesh;
 }
 
@@ -920,17 +901,11 @@ TriMeshResult try_create_mesh(TriMeshBaseData& input, const Fnc& was_canceled)
 
     ProjectTransform project = create_projection(input.shape_provider->get_shape(), input.is_outside);
     auto mesh = Biz::Algorithms::TriangleMesh::construct(polygons2model(shapes, project));
-    const auto* tsp = dynamic_cast<const TextShapeProvider*>(input.shape_provider.get());
-    if (tsp != nullptr) {
-        float h_bend = tsp->text_configuration().style.prop.bend_horizontal.value_or(0.0f);
-        float v_curl = tsp->text_configuration().style.prop.bend_vertical.value_or(0.0f);
-        if (std::abs(h_bend) > 1e-4f || std::abs(v_curl) > 1e-4f) {
-            indexed_triangle_set its = mesh.its;
-            Biz::Emboss::BendParams params{ .horizontal_bend = h_bend, .vertical_curl = v_curl };
-            Biz::Emboss::TextBender::bend_mesh(its, params, mesh.bounding_box());
-            mesh = Biz::Algorithms::TriangleMesh::construct(std::move(its));
-        }
-    }
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    input.shape_provider->deform_mesh(mesh);
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
     return mesh;
 }
 
@@ -1224,7 +1199,10 @@ TriMeshResult cut_surface(BaseData& input1, const SurfaceVolumeData& input2, con
 {
     if (!input1.tri_mesh.shape_provider->get_text_lines().empty()) {
         input1.tri_mesh.shape_provider->create_shape();
-        return cut_per_glyph_surface(input1, input2, was_canceled);
+        auto mesh = cut_per_glyph_surface(input1, input2, was_canceled);
+        if (mesh.has_value() && !was_canceled())
+            input1.tri_mesh.shape_provider->deform_mesh(mesh.value());
+        return was_canceled() ? TriMeshResult(tl::unexpected{JobIssue::canceled}) : std::move(mesh);
     }
 
     const Domain::ExPolygons& shapes = create_shape(*input1.tri_mesh.shape_provider, was_canceled);
@@ -1241,7 +1219,11 @@ TriMeshResult cut_surface(BaseData& input1, const SurfaceVolumeData& input2, con
     if (its.empty())
         return tl::unexpected{JobIssue::no_surface};
 
-    return Biz::Algorithms::TriangleMesh::construct(std::move(its));
+    auto mesh = Biz::Algorithms::TriangleMesh::construct(std::move(its));
+    input1.tri_mesh.shape_provider->deform_mesh(mesh);
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    return mesh;
 }
 
 ModelSources create_sources(const Domain::ModelVolumePtrs& volumes, std::optional<size_t> text_volume_id)

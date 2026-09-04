@@ -1,4 +1,5 @@
 #include "Slic3r/Biz/Emboss/BendedProjection.hpp"
+#include <algorithm>
 
 namespace Slic3r::Biz::Emboss {
 
@@ -8,13 +9,14 @@ BendedProjection::BendedProjection(
     double height,
     const Domain::Vec3d& center,
     float horizontal_bend,
-    float vertical_curl
+    float vertical_curl,
+    float vertical_arc
 ) :
     m_depth(depth),
     m_width(width),
     m_height(height),
     m_center(center),
-    m_params{horizontal_bend, vertical_curl}
+    m_params{horizontal_bend, vertical_curl, vertical_arc}
 {}
 
 std::pair<Domain::Vec3d, Domain::Vec3d> BendedProjection::create_front_back(const Domain::Vec2crd& p) const
@@ -35,22 +37,24 @@ std::pair<Domain::Vec3d, Domain::Vec3d> BendedProjection::create_front_back(cons
 
 Domain::Vec3d BendedProjection::project(const Domain::Vec3d& point) const
 {
-    Domain::BoundingBox3f bbox(
-        (m_center - 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>(),
-        (m_center + 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>()
-    );
-    Domain::Vec3d unbent = TextBender::unbend_point(point, m_params, bbox);
-    unbent.z() += m_depth;
-    return TextBender::bend_point(unbent, m_params, bbox);
+    // Bend displacement is independent of Z, so projection follows the same
+    // extrusion direction without applying the deformation a second time.
+    Domain::Vec3d result = point;
+    result.z() += m_depth;
+    return result;
 }
 
 std::optional<Domain::Vec2d> BendedProjection::unproject(const Domain::Vec3d& p, double* depth) const
 {
+    if (!p.allFinite())
+        return std::nullopt;
     Domain::BoundingBox3f bbox(
         (m_center - 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>(),
         (m_center + 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>()
     );
     Domain::Vec3d unbent = TextBender::unbend_point(p, m_params, bbox);
+    if ((TextBender::bend_point(unbent, m_params, bbox) - p).norm() > 1e-7 * std::max(1.0, p.norm()))
+        return std::nullopt;
     if (depth != nullptr) {
         *depth = unbent.z();
     }

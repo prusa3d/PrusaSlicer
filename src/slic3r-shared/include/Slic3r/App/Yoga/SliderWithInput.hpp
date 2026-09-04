@@ -32,6 +32,7 @@ public:
 
     void set_input_width(double width);
     void set_input_width_percent(double width_percent);
+    void set_step_buttons_visible(bool visible);
 
     double value() const;
     void set_value(double value);
@@ -67,6 +68,7 @@ private:
 private:
     Slider* m_slider = nullptr;
     InputTextField* m_input = nullptr;
+    Item* m_step_buttons = nullptr;
     Text* m_unit;
     Callbacks m_callbacks;
 };

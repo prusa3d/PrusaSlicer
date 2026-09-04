@@ -46,6 +46,7 @@ namespace cereal {
         ar(prop.collection_number);
         ar(prop.bend_horizontal);
         ar(prop.bend_vertical);
+        ar(prop.bend_arc);
     }
 
     template <class Archive>

@@ -29,6 +29,9 @@ public:
     */
     virtual void write(Domain::ModelVolume& volume) const;
 
+    // Apply provider-specific deformation once, after flat or surface mesh generation.
+    virtual void deform_mesh(Domain::TriangleMesh& mesh) const {}
+
     /**
     @brief Used only with text for embossing per glyph
            \note Only for new volume creation(without ui)
