@@ -17,6 +17,12 @@ For example on Ubuntu 26.04:
 sudo apt install git build-essential autoconf cmake libglu1-mesa-dev libgtk-3-dev libdbus-1-dev libwebkit2gtk-4.1-dev texinfo
 ```
 Adapt it for your package manager.
+
+Check that `locale` shows reasonable UTF-8-capable locales.
+If not, for example in Ubuntu 26.04 containers the default is `POSIX`, run
+```bash
+export LC_ALL=C.UTF-8
+```
 ## 1. Build dependencies
 From the repository root:
 ```bash
