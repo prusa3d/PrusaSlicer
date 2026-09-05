@@ -217,3 +217,86 @@ TEST_CASE("Combinators treat no inputs as no constraint", "[ConfigItemPredicate]
     CHECK_FALSE(static_cast<bool>(negate(ConfigItemPredicate{})));
     CHECK(evaluate(negate(ConfigItemPredicate{}), cfg));
 }
+
+namespace {
+
+enum class SupportMode
+{
+    None,
+    EnforcersOnly,
+    Everywhere
+};
+
+const EnumValueDefs support_mode_def{{
+    {int(SupportMode::None), "none", "Off"},
+    {int(SupportMode::EnforcersOnly), "enforcers_only", "Manual Only"},
+    {int(SupportMode::Everywhere), "everywhere", "On"},
+}};
+
+} // namespace
+
+TEST_CASE("Support rules read the mode enum, not a boolean", "[ConfigItemPredicate]")
+{
+    // support_material was a bool in 2.x and is an enum here. Reading it as a
+    // bool would fall back to false and silently disable every support setting,
+    // so these rules pin the enum semantics.
+    const ConfigItemPredicate supports_on =
+        negate(when_enum_is("support_material", int(SupportMode::None)));
+    const ConfigItemPredicate have_support =
+        any_of({supports_on, when_positive("raft_layers")});
+    const ConfigItemPredicate threshold =
+        when_enum_is("support_material", int(SupportMode::Everywhere));
+
+    FakeLookup cfg;
+    cfg.set("raft_layers", 0);
+
+    SECTION("off means no support settings apply")
+    {
+        cfg.set("support_material", EnumWrapper{SupportMode::None, &support_mode_def});
+        CHECK_FALSE(have_support(cfg));
+        CHECK_FALSE(threshold(cfg));
+    }
+
+    SECTION("a raft brings the support machinery without the auto threshold")
+    {
+        cfg.set("support_material", EnumWrapper{SupportMode::None, &support_mode_def});
+        cfg.set("raft_layers", 3);
+        CHECK(have_support(cfg));
+        CHECK_FALSE(threshold(cfg));
+    }
+
+    SECTION("enforcer-only supports are placed by hand, so no overhang threshold")
+    {
+        cfg.set("support_material", EnumWrapper{SupportMode::EnforcersOnly, &support_mode_def});
+        CHECK(have_support(cfg));
+        CHECK_FALSE(threshold(cfg));
+    }
+
+    SECTION("automatic supports use the threshold")
+    {
+        cfg.set("support_material", EnumWrapper{SupportMode::Everywhere, &support_mode_def});
+        CHECK(have_support(cfg));
+        CHECK(threshold(cfg));
+    }
+}
+
+TEST_CASE("Soluble supports are zero contact distance", "[ConfigItemPredicate]")
+{
+    const ConfigItemPredicate supports_on =
+        negate(when_enum_is("support_material", int(SupportMode::None)));
+    const ConfigItemPredicate soluble = all_of(
+        {supports_on, negate(when_positive("support_material_contact_distance"))}
+    );
+
+    FakeLookup cfg;
+    cfg.set("support_material", EnumWrapper{SupportMode::Everywhere, &support_mode_def});
+
+    cfg.set("support_material_contact_distance", 0.2);
+    CHECK_FALSE(soluble(cfg));
+    // The bottom contact distance is a non-soluble concern.
+    CHECK(all_of({supports_on, negate(soluble)})(cfg));
+
+    cfg.set("support_material_contact_distance", 0.0);
+    CHECK(soluble(cfg));
+    CHECK_FALSE(all_of({supports_on, negate(soluble)})(cfg));
+}
