@@ -51,6 +51,14 @@ private:
 
     void on_index_update() override;
 
+    /**
+     * @brief Build the custom controls registered for this group, if any.
+     *
+     * They render above the default rows, and the settings they claim are
+     * filtered out of those rows so nothing is shown twice.
+     */
+    void rebuild_form_elements();
+
 private:
     Biz::ConfigBoxInteractor& m_cbi;
     Biz::IConfigBoxSetter& m_cbi_container;
@@ -59,6 +67,7 @@ private:
     ConfigRowListView* m_rows_list_view{nullptr};
     Biz::UnsharedPointer<Biz::ObservableListSortFilter<Biz::ConfigItemContext>> m_rows_filter_list;
     Yoga::Text* m_label{nullptr};
+    Yoga::Item* m_form_elements{nullptr};
     Domain::ConfigItemDef::OptionGroup m_option_group{Domain::ConfigItemDef::OptionGroup::Unknown};
     Domain::ConfigItemDef::Category m_category{Domain::ConfigItemDef::Category::Unknown};
 };

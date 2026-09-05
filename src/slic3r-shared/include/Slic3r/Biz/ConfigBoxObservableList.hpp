@@ -21,6 +21,16 @@ public:
 
     const Domain::ConfigValue* find(const std::string& name) const;
 
+    /**
+     * @brief The setting itself, not just its value.
+     *
+     * Writing a setting goes through IConfigBoxSetter, which takes the item, so
+     * a control that writes a setting it was not built from needs this.
+     *
+     * @return nullptr when no such setting is in this box.
+     */
+    const Domain::ConfigItem* find_item(const std::string& name) const;
+
     bool is_dirty(const std::string& key) const;
     bool is_dirty() const;
 
