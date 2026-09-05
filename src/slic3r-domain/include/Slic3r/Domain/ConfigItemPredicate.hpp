@@ -71,6 +71,37 @@ ConfigItemPredicate when_enum_is(std::string key, int value);
 /// True while the named enum setting holds any of @p values.
 ConfigItemPredicate when_enum_in(std::string key, std::vector<int> values);
 
+/**
+ * @brief A condition a setting needs, and what to tell the user when it fails.
+ *
+ * A bare enable_if greys a setting out and leaves the user to work out why,
+ * which for a setting with real preconditions — the wipe tower needs relative E
+ * addressing, a supported G-code flavour and no volumetric E — is barely better
+ * than the slicing error it replaces. Naming the unmet condition is the point:
+ * a greyed control that says what would un-grey it is a hint, one that says
+ * nothing is a dead end.
+ */
+struct ConfigItemRequirement
+{
+    ConfigItemPredicate predicate;
+    /// Shown when @c predicate does not hold. Phrase it as what is needed.
+    std::string reason;
+};
+
+/// Convenience for declaring a requirement inline.
+ConfigItemRequirement requires_that(ConfigItemPredicate predicate, std::string reason);
+
+/**
+ * @brief The first requirement that does not hold, or nullptr when all do.
+ *
+ * The first rather than all of them: a list of everything wrong at once is
+ * harder to act on than the next thing to fix.
+ */
+const ConfigItemRequirement* first_unmet(
+    const std::vector<ConfigItemRequirement>& requirements,
+    const ConfigItemLookup& lookup
+);
+
 /// Combines predicates. Empty inputs are true, matching "no constraint".
 ConfigItemPredicate all_of(std::vector<ConfigItemPredicate> predicates);
 ConfigItemPredicate any_of(std::vector<ConfigItemPredicate> predicates);

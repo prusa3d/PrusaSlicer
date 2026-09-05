@@ -217,3 +217,69 @@ TEST_CASE("Combinators treat no inputs as no constraint", "[ConfigItemPredicate]
     CHECK_FALSE(static_cast<bool>(negate(ConfigItemPredicate{})));
     CHECK(evaluate(negate(ConfigItemPredicate{}), cfg));
 }
+
+TEST_CASE("Requirements report the first unmet condition", "[ConfigItemPredicate]")
+{
+    // The wipe tower's preconditions, as registered in ConfigDefsFDM.cpp. Each
+    // corresponds to a Print::validate() rejection.
+    const std::vector<Slic3r::Domain::ConfigItemRequirement> requirements{
+        Slic3r::Domain::requires_that(
+            when_enabled("use_relative_e_distances"), "Requires relative E distances"
+        ),
+        Slic3r::Domain::requires_that(
+            when_disabled("use_volumetric_e"), "Not available with volumetric E"
+        ),
+        Slic3r::Domain::requires_that(
+            negate(when_all_enabled({"ooze_prevention", "single_extruder_multi_material"})),
+            "Not available with ooze prevention on a single-extruder multi-material printer"
+        ),
+    };
+
+    FakeLookup cfg;
+    cfg.set("use_relative_e_distances", true);
+    cfg.set("use_volumetric_e", false);
+    cfg.set("ooze_prevention", false);
+    cfg.set("single_extruder_multi_material", false);
+
+    SECTION("a valid setup has nothing unmet")
+    {
+        CHECK(Slic3r::Domain::first_unmet(requirements, cfg) == nullptr);
+        CHECK(Slic3r::Domain::first_unmet({}, cfg) == nullptr);
+    }
+
+    SECTION("each condition reports its own reason")
+    {
+        cfg.set("use_relative_e_distances", false);
+        REQUIRE(Slic3r::Domain::first_unmet(requirements, cfg) != nullptr);
+        CHECK(
+            Slic3r::Domain::first_unmet(requirements, cfg)->reason
+            == "Requires relative E distances"
+        );
+
+        cfg.set("use_relative_e_distances", true);
+        cfg.set("use_volumetric_e", true);
+        REQUIRE(Slic3r::Domain::first_unmet(requirements, cfg) != nullptr);
+        CHECK(
+            Slic3r::Domain::first_unmet(requirements, cfg)->reason
+            == "Not available with volumetric E"
+        );
+    }
+
+    SECTION("a pairwise condition needs both halves to fail")
+    {
+        cfg.set("ooze_prevention", true);
+        CHECK(Slic3r::Domain::first_unmet(requirements, cfg) == nullptr);
+        cfg.set("single_extruder_multi_material", true);
+        CHECK(Slic3r::Domain::first_unmet(requirements, cfg) != nullptr);
+    }
+
+    SECTION("the first unmet is reported, not the last")
+    {
+        cfg.set("use_relative_e_distances", false);
+        cfg.set("use_volumetric_e", true);
+        CHECK(
+            Slic3r::Domain::first_unmet(requirements, cfg)->reason
+            == "Requires relative E distances"
+        );
+    }
+}

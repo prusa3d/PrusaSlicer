@@ -143,4 +143,21 @@ bool evaluate(const ConfigItemPredicate& predicate, const ConfigItemLookup& look
     return predicate ? predicate(lookup) : true;
 }
 
+ConfigItemRequirement requires_that(ConfigItemPredicate predicate, std::string reason)
+{
+    return ConfigItemRequirement{std::move(predicate), std::move(reason)};
+}
+
+const ConfigItemRequirement* first_unmet(
+    const std::vector<ConfigItemRequirement>& requirements,
+    const ConfigItemLookup& lookup
+)
+{
+    for (const ConfigItemRequirement& requirement : requirements) {
+        if (!evaluate(requirement.predicate, lookup))
+            return &requirement;
+    }
+    return nullptr;
+}
+
 } // namespace Slic3r::Domain
