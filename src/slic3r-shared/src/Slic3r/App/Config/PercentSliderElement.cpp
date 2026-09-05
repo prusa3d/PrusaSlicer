@@ -92,8 +92,12 @@ void PercentSliderElement::refresh_from_config()
     m_applying_from_config = true;
     m_slider->set_value(current);
     m_applying_from_config = false;
-    // The slider snaps to its step, so read back rather than echoing the input.
-    update_readout(m_slider->value());
+
+    // Report the stored value, not the slider's. set_value() snaps to the step,
+    // so a profile holding a value off the step would otherwise be displayed as
+    // a number it does not have, with nothing written to reconcile the two. The
+    // slider position is an approximation of the value; the readout is not.
+    update_readout(current);
 }
 
 void PercentSliderElement::render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size)
