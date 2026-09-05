@@ -122,6 +122,41 @@ static void apply_dependency_rules(ConfigDefinitions& defs)
         when_enabled("wipe_tower")
     );
 
+    // --- Wipe tower preconditions -------------------------------------------
+    // Print::validate() rejects each of these at slice time (Print.cpp:836-864).
+    // Stated here, the wipe tower is simply not offered until it could work,
+    // and says which condition is in the way -- rather than being accepted and
+    // then refused once the user asks for a result.
+    if (ConfigItemDef* wipe_tower = defs.find_mutable("wipe_tower")) {
+        wipe_tower->requirements = {
+            requires_that(
+                when_enum_in(
+                    "gcode_flavor",
+                    {int(GCodeFlavor::gcfRepRapSprinter), int(GCodeFlavor::gcfRepRapFirmware),
+                     int(GCodeFlavor::gcfRepetier), int(GCodeFlavor::gcfMarlinLegacy),
+                     int(GCodeFlavor::gcfMarlinFirmware), int(GCodeFlavor::gcfPrusaFirmwareBuddy),
+                     int(GCodeFlavor::gcfKlipper)}
+                ),
+                L("Not available for this G-code flavor")
+            ),
+            requires_that(
+                when_enabled("use_relative_e_distances"),
+                L("Requires relative E distances")
+            ),
+            requires_that(
+                when_disabled("use_volumetric_e"),
+                L("Not available with volumetric E")
+            ),
+            requires_that(
+                negate(all_of(
+                    {when_enabled("ooze_prevention"),
+                     when_enabled("single_extruder_multi_material")}
+                )),
+                L("Not available with ooze prevention on a single-extruder multi-material printer")
+            ),
+        };
+    }
+
     // --- Multi-material segmentation ----------------------------------------
     rule(
         "mmu_segmented_region_interlocking_depth",

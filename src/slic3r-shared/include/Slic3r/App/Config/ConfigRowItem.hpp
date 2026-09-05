@@ -68,6 +68,9 @@ private:
     void apply_enabled_state();
     void apply_label_color();
 
+    /// Show or hide the text naming the unmet requirement.
+    void apply_reason_text();
+
 private:
     Biz::IConfigBoxSetter& m_cb_setter;
     std::optional<bool> m_last_full_width{std::nullopt};
@@ -96,6 +99,11 @@ private:
     bool m_enabled_by_dependency{true};
 
     bool m_can_revert{false};
+
+    /// Reason currently displayed, empty when every requirement holds.
+    std::string m_shown_reason;
+    /// Built only for settings that actually declare requirements.
+    Yoga::Text* m_reason{nullptr};
 };
 
 } // namespace Slic3r::App
