@@ -418,6 +418,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Config/ConfigFormElementRegistry.cpp
         include/Slic3r/App/Config/TravelAvoidanceElement.hpp
         src/Slic3r/App/Config/TravelAvoidanceElement.cpp
+        include/Slic3r/App/Config/EnumCardsElement.hpp
+        src/Slic3r/App/Config/EnumCardsElement.cpp
+        include/Slic3r/App/Config/PercentSliderElement.hpp
+        src/Slic3r/App/Config/PercentSliderElement.cpp
         include/Slic3r/App/Config/ConfigRowItem.hpp
         src/Slic3r/App/Config/ConfigRowItem.cpp
         include/Slic3r/App/Config/ConfigItemContextRowItem.hpp
