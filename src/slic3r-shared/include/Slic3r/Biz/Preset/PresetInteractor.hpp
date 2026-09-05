@@ -298,6 +298,8 @@ public:
 
     void set_item_override(const Domain::ConfigItem& item, bool enable, size_t index = 0) override;
 
+    const Domain::ConfigItemLookup* item_lookup() const override;
+
     template <typename T>
     using ConstRefBoolPair = std::pair<std::reference_wrapper<const T>, bool>;
     template <typename T>
@@ -1007,6 +1009,26 @@ private:
     ObjectSettingsInteractor m_object_settings_interactor;
 
     ProjectContexts m_project_contexts;
+
+    /**
+     * @brief Resolves a setting by name across the boxes, for dependency rules.
+     *
+     * A rule names the setting it depends on and nothing else — which box that
+     * setting lives in is exactly the detail the rule should not have to carry,
+     * and settings do move between boxes. So look through them in turn.
+     */
+    class ItemLookup : public Domain::ConfigItemLookup
+    {
+    public:
+        const Domain::ConfigValue* find_value(const std::string& key) const override;
+
+        const PresetInteractor* owner{nullptr};
+    };
+
+    // Mutable and re-pointed on every item_lookup() call: PresetInteractor is
+    // movable, so an owner captured at construction would be left pointing at
+    // the moved-from object.
+    mutable ItemLookup m_item_lookup;
 
     ConfigBoxInteractor::SetAccessor m_printer_cbi_accessor;
     ConfigBoxInteractor m_printer_cbi;

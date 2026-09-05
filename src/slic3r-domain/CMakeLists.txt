@@ -100,6 +100,9 @@ add_library(slic3r-domain STATIC
     include/Slic3r/Domain/ConfigValue.hpp
     src/Slic3r/Domain/ConfigValue.cpp
 
+    include/Slic3r/Domain/ConfigItemPredicate.hpp
+    src/Slic3r/Domain/ConfigItemPredicate.cpp
+
     include/Slic3r/Domain/ConfigDef.hpp
     src/Slic3r/Domain/ConfigDef.cpp
 
@@ -217,6 +220,7 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/Domain/TestUtils.hpp
         test/Slic3r/Domain/TestUtils.cpp
         test/Slic3r/Domain/ConfigValueTests.cpp
+        test/Slic3r/Domain/ConfigItemPredicateTests.cpp
         test/Slic3r/Domain/ConfigTests.cpp
         test/Slic3r/Domain/FDMConfigTests.cpp
         test/Slic3r/Domain/Preset/PresetTreeTests.cpp

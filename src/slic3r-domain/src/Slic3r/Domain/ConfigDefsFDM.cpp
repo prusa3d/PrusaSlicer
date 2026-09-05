@@ -34,6 +34,101 @@ const ConfigDefinitions& get_defs_fdm() {
     return defs_fdm;
 }
 
+/**
+ * @brief Declare which settings depend on which others.
+ *
+ * These say when a setting is actually in play. A setting whose rule does not
+ * hold is greyed out rather than silently accepted and then rejected by the
+ * slicer, so an impossible combination is visible before it is requested.
+ *
+ * They live here, after every definition exists, because a rule names other
+ * settings and reads better next to the rules it belongs with than scattered
+ * across the definitions it constrains.
+ *
+ * Ported from AbstractConfigManipulation::toggle_print_fff_options(), which
+ * carried the same rules imperatively.
+ */
+static void apply_dependency_rules(ConfigDefinitions& defs)
+{
+    // Names come from the same file the rules do, so a typo would silently drop
+    // a rule. Fail loudly instead.
+    const auto rule = [&defs](const std::string_view key, ConfigItemPredicate predicate)
+    {
+        ConfigItemDef* target = defs.find_mutable(key);
+        ASSERT(target != nullptr);
+        // Guarded as well as asserted: a renamed setting should cost its rule,
+        // not crash a release build on startup.
+        if (target != nullptr)
+            target->enable_if = std::move(predicate);
+    };
+    const auto rule_each =
+        [&rule](std::initializer_list<std::string_view> keys, const ConfigItemPredicate& predicate)
+    {
+        for (const std::string_view key : keys)
+            rule(key, predicate);
+    };
+
+    // --- Perimeters ---------------------------------------------------------
+    const ConfigItemPredicate have_perimeters = when_positive("perimeters");
+    rule_each(
+        {"extra_perimeters", "extra_perimeters_on_overhangs", "overhangs", "seam_position",
+         "staggered_inner_seams", "external_perimeters_first", "external_perimeter_extrusion_width",
+         "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed",
+         "enable_dynamic_overhang_speeds", "gap_fill_speed"},
+        have_perimeters
+    );
+
+    const ConfigItemPredicate dynamic_overhang_speeds =
+        all_of({have_perimeters, when_enabled("enable_dynamic_overhang_speeds")});
+    for (size_t i = 0; i < 4; ++i)
+        rule("overhang_speed_" + std::to_string(i), dynamic_overhang_speeds);
+
+    // --- Infill -------------------------------------------------------------
+    const ConfigItemPredicate have_infill = when_positive("fill_density");
+    rule_each(
+        {"fill_pattern", "infill_every_layers", "solid_infill_every_layers",
+         "solid_infill_below_area", "infill_extruder", "infill_anchor_max"},
+        have_infill
+    );
+    // Open anchors are only configurable once anchoring itself is on.
+    rule("infill_anchor", all_of({have_infill, when_positive("infill_anchor_max")}));
+
+    // --- Travel avoidance ---------------------------------------------------
+    // The two avoidance strategies are mutually exclusive: each rules the other
+    // out, so whichever is on disables its counterpart rather than letting both
+    // be set and having slicing object afterwards.
+    rule("avoid_crossing_curled_overhangs", when_disabled("avoid_crossing_perimeters"));
+    rule("avoid_crossing_perimeters", when_disabled("avoid_crossing_curled_overhangs"));
+    rule("avoid_crossing_perimeters_max_detour", when_enabled("avoid_crossing_perimeters"));
+
+    // --- Perimeter generator ------------------------------------------------
+    const ConfigItemPredicate have_arachne =
+        when_enum_is("perimeter_generator", static_cast<int>(PerimeterGeneratorType::Arachne));
+    rule_each(
+        {"wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
+         "wall_distribution_count", "min_feature_size", "min_bead_width"},
+        have_arachne
+    );
+    // Thin walls are a classic-generator concept; Arachne handles them inherently.
+    rule("thin_walls", all_of({have_perimeters, negate(have_arachne)}));
+
+    // --- Wipe tower ---------------------------------------------------------
+    // wipe_tower_x, wipe_tower_y and wipe_tower_rotation_angle carried this rule
+    // in 2.x but no longer exist: the tower is placed per bed now.
+    rule_each(
+        {"wipe_tower_width", "wipe_tower_brim_width", "wipe_tower_cone_angle",
+         "wipe_tower_extra_spacing", "wipe_tower_extra_flow", "wipe_tower_bridging",
+         "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming"},
+        when_enabled("wipe_tower")
+    );
+
+    // --- Multi-material segmentation ----------------------------------------
+    rule(
+        "mmu_segmented_region_interlocking_depth",
+        when_positive("mmu_segmented_region_max_width")
+    );
+}
+
 // Now define the init function. This function will be called by ConfigDefinitions
 // constructor and will fill the definitions with all the necessary data.
 void fdm_config_init_fn(ConfigDefinitions& defs)
@@ -5045,6 +5140,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("Name or ID of tool print preset to use as default when this print preset is selected.");
     def->init_fn = init_with("");
 
+    apply_dependency_rules(defs);
 }
 
 } // namespace Slic3r::Domain

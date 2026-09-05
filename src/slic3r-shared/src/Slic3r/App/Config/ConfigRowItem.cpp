@@ -7,6 +7,7 @@
 #include "Slic3r/App/Config/ConfigItemSpinBox.hpp"
 
 #include "Slic3r/Biz/IConfigBoxSetter.hpp"
+#include "Slic3r/Domain/ConfigItemPredicate.hpp"
 #include <Slic3r/Biz/I18N/I18N.hpp>
 
 using namespace Slic3r::App::Yoga;
@@ -68,7 +69,53 @@ void ConfigRowItem::set_label_text_color(const ImColor& color)
 
 void ConfigRowItem::set_enabled_control(bool enabled)
 {
-    m_input->set_enabled(enabled);
+    m_enabled_by_caller = enabled;
+    apply_enabled_state();
+}
+
+void ConfigRowItem::apply_enabled_state()
+{
+    if (m_input)
+        m_input->set_enabled(m_enabled_by_caller && m_enabled_by_dependency);
+}
+
+void ConfigRowItem::refresh_dependency_state()
+{
+    const Domain::ConfigItemLookup* lookup = m_cb_setter.item_lookup();
+    if (lookup == nullptr || m_state == nullptr)
+        return;
+
+    const bool applies = Domain::evaluate(m_state->def().enable_if, *lookup);
+    if (applies == m_enabled_by_dependency)
+        return;
+
+    m_enabled_by_dependency = applies;
+    apply_enabled_state();
+    apply_label_color();
+}
+
+void ConfigRowItem::apply_label_color()
+{
+    // Dim the label alongside the input. Greying only the input reads as "this
+    // control is busy"; greying the pair reads as "this setting is not in play
+    // right now", which is what the rule actually means. A dependency that does
+    // not hold outranks the modified-value highlight: the value is still
+    // modified, but saying so is noise while the setting has no effect.
+    if (!m_enabled_by_dependency) {
+        m_label->set_text_color(
+            m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
+        );
+        return;
+    }
+    m_label->set_text_color(m_theme->color_imgui(
+        m_can_revert ? Platform::Color::AccentTertiary : Platform::Color::Text
+    ));
+}
+
+void ConfigRowItem::render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size)
+{
+    refresh_dependency_state();
+    Rectangle::render(pos, size);
 }
 
 void ConfigRowItem::on_data_update()
@@ -152,11 +199,10 @@ void ConfigRowItem::on_data_update()
 
     m_control->set_state(*m_state);
 
-    const bool can_revert = m_enable_revert();
-    m_revert_button->set_visible(can_revert);
-    m_label->set_text_color(
-        m_theme->color_imgui(can_revert ? Platform::Color::AccentTertiary : Platform::Color::Text)
-    );
+    m_can_revert = m_enable_revert();
+    m_revert_button->set_visible(m_can_revert);
+    apply_enabled_state();
+    apply_label_color();
 }
 
 void ConfigRowItem::navigate_to_item(const Domain::ConfigItem* config_item)

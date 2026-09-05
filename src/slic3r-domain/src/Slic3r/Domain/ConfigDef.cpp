@@ -385,6 +385,21 @@ ConfigItemDef* ConfigDefinitions::add(const std::string_view name, const std::ty
     return &m_defs.emplace_back(ConfigItemDef{std::string(name), &type});
 }
 
+ConfigItemDef* ConfigDefinitions::find_mutable(const std::string_view name)
+{
+    ASSERT(!m_finalized);
+    // A linear scan, deliberately: the definitions are only sorted once the
+    // init function has returned, so during construction — the only time this
+    // may be called — there is no order to binary search. It runs a few dozen
+    // times at startup, once.
+    const auto it = std::find_if(
+        m_defs.begin(),
+        m_defs.end(),
+        [name](const ConfigItemDef& def) { return def.name == name; }
+    );
+    return it == m_defs.end() ? nullptr : &*it;
+}
+
 void ConfigDefinitions::check_valid() const
 {
     ASSERT(std::is_sorted(m_defs.begin(), m_defs.end()));

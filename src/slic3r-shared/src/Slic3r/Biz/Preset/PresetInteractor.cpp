@@ -2660,6 +2660,21 @@ void PresetInteractor::set_item_override(const Domain::ConfigItem& item, bool en
     invoke_slicing_input_changed();
 }
 
+const Domain::ConfigValue* PresetInteractor::ItemLookup::find_value(const std::string& key) const
+{
+    if (owner == nullptr)
+        return nullptr;
+    if (const Domain::ConfigValue* value = owner->m_print_tool_cbi.find_print_value(key))
+        return value;
+    return owner->m_printer_cbi.find(key);
+}
+
+const Domain::ConfigItemLookup* PresetInteractor::item_lookup() const
+{
+    m_item_lookup.owner = this;
+    return &m_item_lookup;
+}
+
 void PresetInteractor::invoke_slicing_input_changed()
 {
     const auto& ccc     = selected_config_container_context();
