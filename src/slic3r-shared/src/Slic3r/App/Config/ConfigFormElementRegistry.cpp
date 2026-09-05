@@ -55,7 +55,7 @@ ConfigFormElementRegistry& ConfigFormElementRegistry::instance()
         // the eight-option top/bottom fill patterns stay as they are until there
         // is artwork to compare, and degree-like enums (draft shield) keep their
         // dropdown too.
-        const auto cards = [&registry](
+        const auto cards = [](
                                Category category,
                                OptionGroup group,
                                std::string key,

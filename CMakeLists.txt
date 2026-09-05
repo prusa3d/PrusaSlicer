@@ -80,7 +80,7 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (default Release)" FORCE)
 endif()
 if (APPLE AND CMAKE_BUILD_TYPE STREQUAL "Release" AND SLIC3R_RELEASE_DEBUG_SYMBOLS)
-    set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -g)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif ()
 if (SLIC3R_STATIC)
     # Prefer config scripts over find modules. This is helpful when building with
