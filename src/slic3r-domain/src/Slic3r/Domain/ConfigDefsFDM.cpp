@@ -122,6 +122,119 @@ static void apply_dependency_rules(ConfigDefinitions& defs)
         when_enabled("wipe_tower")
     );
 
+    // --- Acceleration -------------------------------------------------------
+    // Every per-feature acceleration is relative to the default one, so with no
+    // default set none of them mean anything.
+    rule_each(
+        {"perimeter_acceleration", "infill_acceleration", "top_solid_infill_acceleration",
+         "solid_infill_acceleration", "external_perimeter_acceleration", "bridge_acceleration",
+         "first_layer_acceleration", "wipe_tower_acceleration"},
+        when_positive("default_acceleration")
+    );
+
+    // --- Skirt --------------------------------------------------------------
+    const ConfigItemPredicate have_skirt = when_positive("skirts");
+    rule_each({"skirt_distance", "draft_shield", "min_skirt_length"}, have_skirt);
+    // A fully enabled draft shield runs the whole height, so its own height
+    // setting has nothing left to say.
+    rule(
+        "skirt_height",
+        all_of(
+            {have_skirt,
+             negate(when_enum_is("draft_shield", static_cast<int>(DraftShield::dsEnabled)))}
+        )
+    );
+
+    // --- Brim ---------------------------------------------------------------
+    const ConfigItemPredicate have_brim =
+        negate(when_enum_is("brim_type", static_cast<int>(BrimType::NoBrim)));
+    rule_each({"brim_width", "brim_separation"}, have_brim);
+
+    // --- Supports and raft --------------------------------------------------
+    // support_material is an enum here, not the bool it was in 2.x: None,
+    // EnforcersOnly, Everywhere. Anything but None generates supports, and a
+    // raft brings the support machinery along with it.
+    const ConfigItemPredicate supports_on =
+        negate(when_enum_is("support_material", static_cast<int>(SupportMode::None)));
+    const ConfigItemPredicate have_raft = when_positive("raft_layers");
+    const ConfigItemPredicate have_support_material = any_of({supports_on, have_raft});
+
+    rule_each(
+        {"support_material_style", "support_material_pattern", "support_material_with_sheath",
+         "support_material_spacing", "support_material_angle", "support_material_interface_pattern",
+         "support_material_interface_layers", "dont_support_bridges",
+         "support_material_extrusion_width", "support_material_contact_distance",
+         "support_material_xy_spacing"},
+        have_support_material
+    );
+
+    // The overhang threshold only applies to automatically placed supports;
+    // enforcer-only supports are placed by hand. This replaces 2.x's
+    // support_material_auto, which the enum absorbed.
+    rule(
+        "support_material_threshold",
+        when_enum_is("support_material", static_cast<int>(SupportMode::Everywhere))
+    );
+
+    // Zero contact distance means soluble supports, printed against the object.
+    const ConfigItemPredicate soluble_supports = all_of(
+        {have_support_material, negate(when_positive("support_material_contact_distance"))}
+    );
+    rule(
+        "support_material_bottom_contact_distance",
+        all_of({have_support_material, negate(soluble_supports)})
+    );
+    rule("support_material_synchronize_layers", soluble_supports);
+    rule("raft_contact_distance", all_of({have_raft, negate(soluble_supports)}));
+
+    rule(
+        "support_material_closing_radius",
+        all_of(
+            {have_support_material,
+             when_enum_is("support_material_style", static_cast<int>(SupportMaterialStyle::smsSnug))}
+        )
+    );
+
+    const ConfigItemPredicate organic_supports = all_of(
+        {when_enum_is("support_material_style", static_cast<int>(SupportMaterialStyle::smsOrganic)),
+         any_of({supports_on, when_positive("support_material_enforce_layers")})}
+    );
+    rule_each(
+        {"support_tree_angle", "support_tree_angle_slow", "support_tree_branch_diameter",
+         "support_tree_branch_diameter_angle", "support_tree_branch_diameter_double_wall",
+         "support_tree_tip_diameter", "support_tree_branch_distance", "support_tree_top_rate"},
+        organic_supports
+    );
+
+    const ConfigItemPredicate have_support_interface =
+        all_of({have_support_material, when_positive("support_material_interface_layers")});
+    rule_each(
+        {"support_material_bottom_interface_layers", "support_material_interface_spacing",
+         "support_material_interface_extruder", "support_material_interface_speed",
+         "support_material_interface_contact_loops"},
+        have_support_interface
+    );
+
+    rule_each({"raft_expansion", "first_layer_acceleration_over_raft", "first_layer_speed_over_raft"},
+              have_raft);
+
+    // Shared extruders and speeds: needed as soon as anything that uses them is
+    // being printed.
+    rule("perimeter_extruder", any_of({have_perimeters, have_brim}));
+    rule("perimeter_extrusion_width", any_of({have_perimeters, have_skirt, have_brim}));
+    rule("support_material_extruder", any_of({have_support_material, have_skirt}));
+    rule("support_material_speed", any_of({have_support_material, have_brim, have_skirt}));
+
+    // --- Ironing ------------------------------------------------------------
+    rule_each({"ironing_type", "ironing_flowrate", "ironing_spacing", "ironing_speed"},
+              when_enabled("ironing"));
+
+    // --- Sequential printing ------------------------------------------------
+    rule_each({"extruder_clearance_radius", "extruder_clearance_height"},
+              when_enabled("complete_objects"));
+
+    // --- Ooze prevention ----------------------------------------------------
+    rule("standby_temperature_delta", when_enabled("ooze_prevention"));
     // --- Wipe tower preconditions -------------------------------------------
     // Print::validate() rejects each of these at slice time (Print.cpp:836-864).
     // Stated here, the wipe tower is simply not offered until it could work,
