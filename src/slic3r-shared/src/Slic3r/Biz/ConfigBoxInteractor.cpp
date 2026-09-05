@@ -17,6 +17,11 @@ const Domain::ConfigValue* ConfigBoxInteractor::find(const std::string& name) co
     return m_config_box_list->find(name);
 }
 
+const Domain::ConfigItem* ConfigBoxInteractor::find_item(const std::string& name) const
+{
+    return m_config_box_list->find_item(name);
+}
+
 std::weak_ptr<ConfigBoxObservableList> ConfigBoxInteractor::config_box_list()
 {
     return m_config_box_list.get();

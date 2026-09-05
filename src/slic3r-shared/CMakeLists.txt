@@ -412,6 +412,12 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Config/ConfigSubcategoryListView.cpp
         include/Slic3r/App/Config/ConfigSubcategoryItem.hpp
         src/Slic3r/App/Config/ConfigSubcategoryItem.cpp
+        include/Slic3r/App/Config/ConfigFormElement.hpp
+        src/Slic3r/App/Config/ConfigFormElement.cpp
+        include/Slic3r/App/Config/ConfigFormElementRegistry.hpp
+        src/Slic3r/App/Config/ConfigFormElementRegistry.cpp
+        include/Slic3r/App/Config/TravelAvoidanceElement.hpp
+        src/Slic3r/App/Config/TravelAvoidanceElement.cpp
         include/Slic3r/App/Config/ConfigRowItem.hpp
         src/Slic3r/App/Config/ConfigRowItem.cpp
         include/Slic3r/App/Config/ConfigItemContextRowItem.hpp

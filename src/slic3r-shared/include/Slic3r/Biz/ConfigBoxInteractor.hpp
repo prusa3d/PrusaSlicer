@@ -41,6 +41,9 @@ public:
 
     const Domain::ConfigValue* find(const std::string& name) const;
 
+    /// The setting itself, for a control that writes a setting it was not built from.
+    const Domain::ConfigItem* find_item(const std::string& name) const;
+
     std::weak_ptr<ConfigBoxObservableList> config_box_list();
 
     std::weak_ptr<const ConfigBoxObservableList> config_box_list() const;

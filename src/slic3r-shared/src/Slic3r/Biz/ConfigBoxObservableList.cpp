@@ -100,4 +100,9 @@ const Domain::ConfigValue* ConfigBoxObservableList::find(const std::string& name
     return found_item ? &found_item->value() : nullptr;
 }
 
+const Domain::ConfigItem* ConfigBoxObservableList::find_item(const std::string& name) const
+{
+    return m_config_box == nullptr ? nullptr : m_config_box->items.find(name);
+}
+
 } // namespace Slic3r::Biz

@@ -3,8 +3,11 @@
 #include "Slic3r/Biz/ConfigBoxInteractor.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
+#include "Slic3r/App/Config/ConfigFormElementRegistry.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Imgui/ImguiExtension.hpp"
+
+#include <utility>
 
 using namespace Slic3r::App::Yoga;
 
@@ -38,11 +41,23 @@ ConfigSubcategoryItem::ConfigSubcategoryItem(
         Render::ImguiFontType::Bold
     );
 
+    // Custom controls render above the default rows. Built before the row list
+    // so that they keep that position as the list changes.
+    m_form_elements = emplace_back<Item>();
+    m_form_elements->set_orientation(Orientation::Vertical);
+    m_form_elements->set_gap(5);
+    m_form_elements->set_padding(20);
+
     m_rows_filter_list->set_filter_fn(
         [this](const Biz::ConfigItemContext& item) -> bool
         {
-            return item.config_item->def().option_group == m_option_group
-                && item.config_item->def().category == m_category;
+            const Domain::ConfigItemDef& def = item.config_item->def();
+            if (def.option_group != m_option_group || def.category != m_category)
+                return false;
+            // A setting a custom control renders gets no row of its own.
+            return !ConfigFormElementRegistry::instance().is_claimed(
+                m_category, m_option_group, item.name
+            );
         }
     );
     // also group by row_group
@@ -114,7 +129,22 @@ void ConfigSubcategoryItem::on_data_update()
     if (option_group != m_option_group || m_category != category) {
         m_option_group = option_group;
         m_category     = category;
+        rebuild_form_elements();
         m_rows_filter_list->invalidate();
+    }
+}
+
+void ConfigSubcategoryItem::rebuild_form_elements()
+{
+    while (m_form_elements->object_count() > 0)
+        m_form_elements->remove(m_form_elements->get_item(0));
+
+    const ConfigFormContext context{&m_cbi_container, &m_cbi, m_cbi_index};
+    for (const ConfigFormElementRegistry::Entry* entry :
+         ConfigFormElementRegistry::instance().elements_for(m_category, m_option_group))
+    {
+        if (std::unique_ptr<ConfigFormElement> element = entry->factory(context))
+            m_form_elements->append(std::move(element));
     }
 }
 
