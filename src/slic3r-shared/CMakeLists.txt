@@ -996,6 +996,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Emboss/SvgShapeProvider.hpp
         include/Slic3r/Biz/Emboss/TextShapeProvider.hpp
         include/Slic3r/Biz/Emboss/stbtt_FlattenCurves.hpp
+        include/Slic3r/Biz/Emboss/TextBender.hpp
+        include/Slic3r/Biz/Emboss/BendedProjection.hpp
         src/Slic3r/Biz/Emboss/Emboss.cpp
         src/Slic3r/Biz/Emboss/EmbossJob.cpp
         src/Slic3r/Biz/Emboss/NSVGUtils.cpp
@@ -1006,6 +1008,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Emboss/SvgShapeProvider.cpp
         src/Slic3r/Biz/Emboss/TextShapeProvider.cpp
         src/Slic3r/Biz/Emboss/stbtt_FlattenCurves.cpp
+        src/Slic3r/Biz/Emboss/TextBender.cpp
+        src/Slic3r/Biz/Emboss/BendedProjection.cpp
 
         include/Slic3r/Biz/Network/IHttp.hpp
         include/Slic3r/Biz/Network/HttpFactory.hpp
@@ -1550,6 +1554,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/App/Yoga/AbstractButtonTests.cpp
             test/Slic3r/App/Yoga/FavoriteButtonTests.cpp
             test/Slic3r/App/Yoga/InputTextTests.cpp
+            test/Slic3r/App/Yoga/SliderWithInputTests.cpp
             test/Slic3r/App/Yoga/ValidatorTests.cpp
             test/Slic3r/App/Yoga/TestRootItem.hpp
             test/Slic3r/App/Yoga/SegmentedControlTests.cpp
@@ -1564,6 +1569,8 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/Biz/ProjectInteractorTests.cpp
             test/Slic3r/Biz/ExportGcodeTests.cpp
+            test/Slic3r/Biz/Emboss/TextBenderTests.cpp
+            test/Slic3r/Biz/Emboss/EmbossBendTests.cpp
             test/Slic3r/Biz/Scene/SceneInteractorTests.cpp
             test/Slic3r/Biz/Scene/VirtualBedPreviewTests.cpp
             test/Slic3r/Biz/WeakerPointerTests.cpp

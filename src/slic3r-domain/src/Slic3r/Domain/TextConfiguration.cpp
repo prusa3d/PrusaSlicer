@@ -18,7 +18,10 @@ bool FontProp::operator==(const FontProp& other) const
         && align == other.align
         && is_approx(size_in_mm, other.size_in_mm)
         && is_approx(boldness, other.boldness)
-        && is_approx(skew, other.skew);
+        && is_approx(skew, other.skew)
+        && is_approx(bend_horizontal, other.bend_horizontal)
+        && is_approx(bend_vertical, other.bend_vertical)
+        && is_approx(bend_arc, other.bend_arc);
 }
 
 bool FontProp::Align::operator==(const Align& other) const {

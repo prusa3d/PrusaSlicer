@@ -1,4 +1,5 @@
 #include "Slic3r/Biz/Emboss/TextPresetManager.hpp"
+#include "Slic3r/Biz/Emboss/TextPresetSerialization.hpp"
 #include "Slic3r/Biz/CerealUtils.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/App/IDialogManager.hpp"
@@ -12,7 +13,6 @@ using namespace Slic3r;
 /// For store/load emboss style to/from file
 /// </summary>
 namespace {
-constexpr std::uint32_t STYLE_OBJ_VERSION = 1;
 using PresetsObj                           = Biz::Emboss::TextPresetManager::PresetsObj;
 void store_styles_obj(const std::string& path, /*const */ PresetsObj& data);
 bool load_styles_obj(const std::string& path, PresetsObj& data);
@@ -363,26 +363,6 @@ std::vector<std::string> TextPresetManager::get_presets_names() const
 #include <cereal/types/optional.hpp>
 #include <cereal/archives/binary.hpp>
 
-namespace cereal {
-template <class Archive>
-void serialize(Archive& ar, Biz::Emboss::TextPresetManager::Preset& s)
-{
-    // ignore truncated_name and image(which are created on demand)
-    ar((Domain::EmbossStyle&) s, s.projection, s.distance, s.angle);
-}
-
-template <class Archive>
-void serialize(Archive& ar, Biz::Emboss::TextPresetManager::PresetsObj& data, const std::uint32_t version)
-{
-    // When performing a load, the version associated with the class
-    // is whatever it was when that data was originally serialized
-    // When we save, we'll use the version that is defined in the macro
-    if (version != ::STYLE_OBJ_VERSION)
-        return;
-    ar(data.presets, data.current_index);
-}
-} // namespace cereal
-
 // StylesSerializable
 namespace {
 void store_styles_obj(const std::string& path, PresetsObj& data)
@@ -412,7 +392,7 @@ bool load_styles_obj(const std::string& path, PresetsObj& data)
         SPDLOG_ERROR("Failed to read from file - {}: {}", path, ex.what());
         return false;
     }
-    return true;
+    return !data.presets.empty() && data.current_index < data.presets.size();
 }
 
 void make_unique_name(const Biz::Emboss::TextPresetManager::Presets& presets, std::string& name)
@@ -463,5 +443,3 @@ Presets create_default_styles(Biz::Emboss::IFontManager& font_manager)
 }
 
 } // namespace
-
-CEREAL_CLASS_VERSION(Slic3r::Biz::Emboss::TextPresetManager::PresetsObj, ::STYLE_OBJ_VERSION); // register class version

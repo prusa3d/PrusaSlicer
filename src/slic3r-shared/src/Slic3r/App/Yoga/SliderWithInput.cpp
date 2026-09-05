@@ -2,7 +2,9 @@
 #include "Slic3r/App/Yoga/Slider.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/InputTextField.hpp"
+#include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/Validator.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 #include <fmt/format.h>
 
 namespace Slic3r::App::Yoga {
@@ -78,6 +80,35 @@ void SliderWithInput::set_input_width(double width)
 void SliderWithInput::set_input_width_percent(double width_percent)
 {
     m_input->set_width_percent(width_percent);
+}
+
+void SliderWithInput::set_step_buttons_visible(bool visible)
+{
+    if (visible && !m_step_buttons) {
+        m_step_buttons = m_input->emplace_back<Item>();
+        m_step_buttons->set_orientation(Orientation::Vertical);
+        m_step_buttons->set_justify_content(YGJustifyCenter);
+        m_step_buttons->set_gap(2);
+        m_step_buttons->set_padding(Paddings(0, 0, 4, 0));
+        m_step_buttons->set_flex_shrink(0.f);
+
+        auto add_step_button = [this](Render::Icon icon, const std::string& tooltip, double direction)
+        {
+            auto* button = m_step_buttons->emplace_back<LayoutButton>(std::string{}, icon, tooltip);
+            button->set_width(12);
+            button->set_height(12);
+            button->set_content_padding(0);
+            button->callbacks().action = [this, direction]()
+            {
+                if (enabled())
+                    set_value(value() + direction * step());
+            };
+        };
+        add_step_button(Render::Icon::Plus, Biz::_u8L("Increase value"), 1.);
+        add_step_button(Render::Icon::Minus, Biz::_u8L("Decrease value"), -1.);
+    }
+    if (m_step_buttons)
+        m_step_buttons->set_visible(visible);
 }
 
 double SliderWithInput::value() const

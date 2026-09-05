@@ -53,10 +53,12 @@ struct RotationGizmoNodeTag
 {
     AxisType primary_axis;
     bool is_handle{false};
+    bool is_bend_slider{false};
 
-    explicit RotationGizmoNodeTag(AxisType primary_axis, bool is_handle = false) :
+    explicit RotationGizmoNodeTag(AxisType primary_axis, bool is_handle = false, bool is_bend_slider = false) :
         primary_axis(primary_axis),
-        is_handle(is_handle)
+        is_handle(is_handle),
+        is_bend_slider(is_bend_slider)
     {}
 
     Domain::Vec3d primary_axis_dir() const

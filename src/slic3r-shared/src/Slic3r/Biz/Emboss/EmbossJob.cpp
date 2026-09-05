@@ -877,7 +877,13 @@ TriMeshResult create_mesh_per_glyph(TriMeshBaseData& input, Fnc was_canceled)
     if (result.empty()) // Whole text do not contain any shape.
         return tl::unexpected{ JobIssue::no_shape };         
 
-    return Biz::Algorithms::TriangleMesh::construct(std::move(result));
+    auto mesh = Biz::Algorithms::TriangleMesh::construct(std::move(result));
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    input.shape_provider->deform_mesh(mesh);
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    return mesh;
 }
 
 template <typename Fnc>
@@ -894,7 +900,13 @@ TriMeshResult try_create_mesh(TriMeshBaseData& input, const Fnc& was_canceled)
         return tl::unexpected{ JobIssue::canceled };
 
     ProjectTransform project = create_projection(input.shape_provider->get_shape(), input.is_outside);
-    return Biz::Algorithms::TriangleMesh::construct(polygons2model(shapes, project));
+    auto mesh = Biz::Algorithms::TriangleMesh::construct(polygons2model(shapes, project));
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    input.shape_provider->deform_mesh(mesh);
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    return mesh;
 }
 
 Domain::TriangleMesh create_default_mesh()
@@ -1187,7 +1199,10 @@ TriMeshResult cut_surface(BaseData& input1, const SurfaceVolumeData& input2, con
 {
     if (!input1.tri_mesh.shape_provider->get_text_lines().empty()) {
         input1.tri_mesh.shape_provider->create_shape();
-        return cut_per_glyph_surface(input1, input2, was_canceled);
+        auto mesh = cut_per_glyph_surface(input1, input2, was_canceled);
+        if (mesh.has_value() && !was_canceled())
+            input1.tri_mesh.shape_provider->deform_mesh(mesh.value());
+        return was_canceled() ? TriMeshResult(tl::unexpected{JobIssue::canceled}) : std::move(mesh);
     }
 
     const Domain::ExPolygons& shapes = create_shape(*input1.tri_mesh.shape_provider, was_canceled);
@@ -1204,7 +1219,11 @@ TriMeshResult cut_surface(BaseData& input1, const SurfaceVolumeData& input2, con
     if (its.empty())
         return tl::unexpected{JobIssue::no_surface};
 
-    return Biz::Algorithms::TriangleMesh::construct(std::move(its));
+    auto mesh = Biz::Algorithms::TriangleMesh::construct(std::move(its));
+    input1.tri_mesh.shape_provider->deform_mesh(mesh);
+    if (was_canceled())
+        return tl::unexpected{JobIssue::canceled};
+    return mesh;
 }
 
 ModelSources create_sources(const Domain::ModelVolumePtrs& volumes, std::optional<size_t> text_volume_id)
