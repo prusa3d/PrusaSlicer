@@ -44,10 +44,29 @@ public:
     void clear_navigation() override;
 
     void set_label_text_color(const ImColor& color);
+
+    /// Enable or disable the input for a caller's own reason, such as whether an
+    /// override is active. Combined with the def's own dependency rule.
     void set_enabled_control(bool enabled);
+
+    void render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size) override;
 
 private:
     void on_data_update() override;
+
+    /**
+     * @brief Re-evaluate the def's enable_if against the current config.
+     *
+     * Called every frame rather than driven by change notifications: the rule
+     * depends on *other* settings, so there is no update of this row to hang it
+     * off. Evaluation is a map lookup per visible row, and the item is only
+     * touched when the answer actually changes, so nothing is invalidated while
+     * the answer holds steady.
+     */
+    void refresh_dependency_state();
+
+    void apply_enabled_state();
+    void apply_label_color();
 
 private:
     Biz::IConfigBoxSetter& m_cb_setter;
@@ -69,6 +88,14 @@ private:
     }; ///< valid only if ConfigItem gui type is spinbox
 
     FnEnableRevert m_enable_revert{nullptr};
+
+    // The input is disabled when either reason says so: a caller's (an inactive
+    // override) or the def's own dependency rule. Kept apart so that neither can
+    // silently re-enable what the other disabled.
+    bool m_enabled_by_caller{true};
+    bool m_enabled_by_dependency{true};
+
+    bool m_can_revert{false};
 };
 
 } // namespace Slic3r::App

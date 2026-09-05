@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Slic3r/Domain/ConfigItemPredicate.hpp"
 #include "Slic3r/Domain/ConfigValue.hpp"
 #include "Slic3r/Domain/PrinterTechnology.hpp"
 
@@ -397,6 +398,28 @@ struct ConfigItemDef
         unit_or_percentage,
     };
     GUIType gui_type = GUIType::undefined;
+
+    /**
+     * @brief When set and evaluating false, the setting is shown but not editable.
+     *
+     * This is where a setting says what it depends on. Slicing rejects nonsense
+     * combinations either way, but a rejection arrives after the user has asked
+     * for a result; greying the field out says the same thing before they can
+     * reach the mistake, and shows at a glance which settings are live.
+     *
+     * Leave unset for a setting that always applies.
+     */
+    ConfigItemPredicate enable_if;
+
+    /**
+     * @brief When set and evaluating false, the setting is not shown at all.
+     *
+     * Prefer @c enable_if. Hiding a setting also hides that it exists and that
+     * something turns it on, so reserve this for settings that are meaningless
+     * rather than merely inactive — a parameter of a strategy that is not the
+     * selected one, say.
+     */
+    ConfigItemPredicate visible_if;
 };
 
 // A collection of definitions of all config items. ConfigItems will keep references into it,
@@ -423,6 +446,20 @@ public:
 
     // Add a config definition. Calling this after ctr finishes is an error.
     ConfigItemDef* add(const std::string_view name, const std::type_info& type);
+
+    /**
+     * @brief Find a definition by name while the definitions are still being built.
+     *
+     * For rules that reference other settings: those read better declared
+     * together once every setting exists, and that is also the only point at
+     * which they can be, since add() invalidates the pointers it handed out
+     * earlier. Calling this after the ctr finishes is an error.
+     *
+     * @note Linear — the definitions are not sorted until construction ends.
+     *
+     * @return nullptr when no setting of that name has been defined.
+     */
+    ConfigItemDef* find_mutable(const std::string_view name);
 
 private:
     void check_valid() const;
