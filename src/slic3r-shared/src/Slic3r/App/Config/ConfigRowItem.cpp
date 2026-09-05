@@ -85,13 +85,51 @@ void ConfigRowItem::refresh_dependency_state()
     if (lookup == nullptr || m_state == nullptr)
         return;
 
-    const bool applies = Domain::evaluate(m_state->def().enable_if, *lookup);
-    if (applies == m_enabled_by_dependency)
+    const Domain::ConfigItemDef& def = m_state->def();
+    const Domain::ConfigItemRequirement* unmet =
+        Domain::first_unmet(def.requirements, *lookup);
+    const bool applies = unmet == nullptr && Domain::evaluate(def.enable_if, *lookup);
+
+    const std::string reason = unmet == nullptr ? std::string{} : Biz::_u8(unmet->reason);
+    if (applies == m_enabled_by_dependency && reason == m_shown_reason)
         return;
 
     m_enabled_by_dependency = applies;
+    m_shown_reason          = reason;
     apply_enabled_state();
     apply_label_color();
+    apply_reason_text();
+}
+
+void ConfigRowItem::apply_reason_text()
+{
+    if (m_shown_reason.empty()) {
+        if (m_reason != nullptr)
+            m_reason->set_visible(false);
+        return;
+    }
+
+    // Created on first need: most settings have no requirements, and an always
+    // present empty label would cost a node on every row in the form.
+    //
+    // Placed after the input, in the row's existing horizontal flow, rather
+    // than below it. Putting it below would mean making the row vertical and
+    // nesting the label and input in a sub-row — a restructure of the one item
+    // every settings row is built from, which is not worth doing sight unseen.
+    // Only settings that declare requirements grow this text at all.
+    if (m_reason == nullptr) {
+        m_reason = emplace_back<Text>(m_shown_reason);
+        m_reason->set_wrap_mode(Text::WrapMode::WrapElide);
+        m_reason->set_flex_shrink(1.f);
+        m_reason->set_max_width(260);
+        m_reason->set_align({AlignH::Left, AlignV::Center});
+        m_reason->set_text_color(
+            m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
+        );
+    } else {
+        m_reason->set_text(m_shown_reason);
+    }
+    m_reason->set_visible(true);
 }
 
 void ConfigRowItem::apply_label_color()

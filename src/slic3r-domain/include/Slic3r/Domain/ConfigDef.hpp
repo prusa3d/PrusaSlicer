@@ -420,6 +420,20 @@ struct ConfigItemDef
      * selected one, say.
      */
     ConfigItemPredicate visible_if;
+
+    /**
+     * @brief Conditions this setting needs, each with a reason to show when unmet.
+     *
+     * Same effect as @c enable_if — the setting is not editable while any of
+     * these fails — but the failing one names what is missing, so the user can
+     * act on it. Use this rather than @c enable_if wherever the answer to "why
+     * is this greyed out?" is not obvious from the setting next to it.
+     *
+     * Where the slicer would reject a combination at slice time, encoding it
+     * here moves the objection to before the mistake instead of after the
+     * request.
+     */
+    std::vector<ConfigItemRequirement> requirements;
 };
 
 // A collection of definitions of all config items. ConfigItems will keep references into it,
