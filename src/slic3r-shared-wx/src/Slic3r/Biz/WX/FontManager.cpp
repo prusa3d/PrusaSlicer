@@ -292,6 +292,18 @@ Domain::FontList FontManager::create_favorit()
     };
 
     auto is_invalid = [](const Domain::FontDescriptor& descriptor) {
+        // create_descriptor() returns a default constructed FontDescriptor when
+        // the wxFont has no counterpart in the openable list -- its path is empty
+        // and its type is 'undefined'. Such a descriptor must never survive as a
+        // favorite: FontManager::open() rejects every type that is neither
+        // file_path nor the current platform's, so it hands back a null FontFile,
+        // which the emboss code dereferences without checking.
+        //
+        // The TrueType check below cannot catch it on Linux: an empty path means
+        // an empty font family, and fontconfig resolves an empty family to the
+        // system default font rather than failing.
+        if (descriptor.path.empty())
+            return true;
         // Check that exsit valid TrueType Font for wx font
         return create_font_file(load_wxFont(descriptor.path)) == nullptr;
     };
