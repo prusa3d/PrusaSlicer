@@ -44,6 +44,46 @@ ConfigFormElementRegistry& ConfigFormElementRegistry::instance()
             { return std::make_unique<EnumCardsElement>(context, "fill_pattern", 3); }
         });
 
+        // Enums whose options are compared rather than looked up. Each is a
+        // short list of self-describing choices, so laying them out shows the
+        // decision at a glance where a dropdown shows one option and hides the
+        // rest.
+        //
+        // Deliberately not every enum. Without illustrations, cards only beat a
+        // dropdown when the options are few and their names carry their meaning;
+        // a long list of bare labels is just a dropdown that takes more room. So
+        // the eight-option top/bottom fill patterns stay as they are until there
+        // is artwork to compare, and degree-like enums (draft shield) keep their
+        // dropdown too.
+        const auto cards = [&registry](
+                               Category category,
+                               OptionGroup group,
+                               std::string key,
+                               size_t columns = 1
+                           )
+        {
+            registry.register_element(Entry{
+                .category     = category,
+                .option_group = group,
+                .claimed_keys = {key},
+                .factory =
+                    [key, columns](const ConfigFormContext& context)
+                { return std::make_unique<EnumCardsElement>(context, key, columns); }
+            });
+        };
+
+        cards(Category::Print_WallsPerimeters, OptionGroup::Print_WallsPerimeters_Seams,
+              "seam_position");
+        cards(Category::Print_WallsPerimeters, OptionGroup::Print_WallsPerimeters_FuzzySkin,
+              "fuzzy_skin");
+        cards(Category::Print_BedAdhesion, OptionGroup::Print_BedAdhesion_Brim, "brim_type");
+        cards(Category::Print_Supports, OptionGroup::Print_Supports_Generation,
+              "support_material_style");
+        cards(Category::Print_Supports, OptionGroup::Print_Supports_PatternDensity,
+              "support_material_pattern");
+        cards(Category::Print_LayersSurfaces, OptionGroup::Print_LayerSurfaces_Ironing,
+              "ironing_type");
+
         return true;
     }();
     (void) builtins_registered;
