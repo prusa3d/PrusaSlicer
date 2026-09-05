@@ -116,4 +116,19 @@ void draw_dashed_rounded_rect(
     float gap_length
 );
 
+/**
+ * @brief Whole wheel detents a stepped control should apply this frame.
+ *
+ * io.MouseWheel is a continuous quantity. A notched wheel delivers one detent
+ * per click, but a trackpad delivers a small fraction of one many times per
+ * second, so a control that steps once per non-zero value races away under the
+ * fingers. This accumulates the fractions per control and only reports detents
+ * once they complete, which makes a trackpad advance a stepped control at the
+ * same rate as the equivalent travel on a wheel.
+ *
+ * @param id Control identity, so that two controls do not share a residue.
+ * @return Signed number of detents, usually 0.
+ */
+int consume_wheel_detents(ImGuiID id);
+
 } // namespace Slic3r::App::Imgui

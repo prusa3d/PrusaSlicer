@@ -1057,17 +1057,23 @@ PaintOnGizmoBase::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
     }
 
     if (mouse_event.type() == MouseEvent::Type::Wheel) {
-        const float wheel_rotation =
-            mouse_event.wheel_delta_y() / std::abs(mouse_event.wheel_delta_y());
+        // Brush size steps per detent, so use the accumulated whole-detent count
+        // rather than the raw delta: a trackpad reports dozens of sub-detent
+        // events per swipe, which would otherwise resize the brush that many
+        // times. A swipe too small to complete a detent yields no steps at all.
+        const int steps = mouse_event.wheel_steps_y();
         const PaintOnGizmoEvent::Type wheel_event_type =
-            (wheel_rotation > 0.f ? PaintOnGizmoEvent::Type::MouseWheelUp :
-                                    PaintOnGizmoEvent::Type::MouseWheelDown);
+            (steps > 0 ? PaintOnGizmoEvent::Type::MouseWheelUp :
+                         PaintOnGizmoEvent::Type::MouseWheelDown);
 
-        if (this->process_gizmo_event(
+        bool handled = false;
+        for (int i = std::abs(steps); i > 0; --i) {
+            handled |= this->process_gizmo_event(
                 {wheel_event_type, mouse_position, shift_down, alt_down, ctrl_down},
                 ctx
-            ))
-        {
+            );
+        }
+        if (handled) {
             return GizmoActivationState::Done;
         }
     }

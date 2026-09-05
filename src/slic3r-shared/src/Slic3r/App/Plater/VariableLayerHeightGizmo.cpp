@@ -889,7 +889,10 @@ bool VariableLayerHeightGizmo::process_gizmo_event(const GizmoEvent& event)
             return true;
         }
 
-        const double wheel_rotation = event.wheel_delta / std::abs(event.wheel_delta);
+        // Scale by the detent count itself rather than its sign. Because the
+        // adjustment is multiplicative, a swipe split across many small events
+        // ends up at the same band width as one delivered in a single event.
+        const double wheel_rotation = std::clamp(double(event.wheel_delta), -4., 4.);
         m_band_width = std::clamp(m_band_width * (1. + 0.1 * wheel_rotation), 1.5, 10.);
 
         m_material_wrapper.set_cursor_band_width(static_cast<float>(m_band_width));

@@ -435,7 +435,7 @@ void TestRenderModule::on_scene_mouse_event(const Platform::MouseEvent &e)
     } else if (e.type() == Platform::MouseEvent::Type::Wheel) {
         const float wheel_delta_y = e.wheel_delta_y();
         if (wheel_delta_y != 0) {
-            trackball.update_zoom(wheel_delta_y / std::abs(wheel_delta_y));
+            trackball.update_zoom(wheel_delta_y);
         }
 
     }

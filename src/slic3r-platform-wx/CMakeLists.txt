@@ -1,9 +1,22 @@
-add_library(slic3r-platform-wx STATIC
+set(SLIC3R_PLATFORM_WX_FILES
     include/Slic3r/App/Platform/WX/WXRenderCanvas.hpp
     src/Slic3r/App/Platform/WX/WXRenderCanvas.cpp
     include/Slic3r/App/Platform/WX/WXMainThreadDispatcher.hpp
     src/Slic3r/App/Platform/WX/WXMainThreadDispatcher.cpp
+    src/Slic3r/App/Platform/WX/NativeScroll.hpp
 )
+
+if(APPLE)
+    list(APPEND SLIC3R_PLATFORM_WX_FILES src/Slic3r/App/Platform/WX/NativeScrollMac.mm)
+else()
+    list(APPEND SLIC3R_PLATFORM_WX_FILES src/Slic3r/App/Platform/WX/NativeScrollGeneric.cpp)
+endif()
+
+add_library(slic3r-platform-wx STATIC ${SLIC3R_PLATFORM_WX_FILES})
+
+if(APPLE)
+    target_link_libraries(slic3r-platform-wx PRIVATE "-framework AppKit")
+endif()
 
 if(WIN32)
     message(STATUS "WXWIN environment set to: $ENV{WXWIN}")
