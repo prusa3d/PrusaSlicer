@@ -31,7 +31,9 @@ ConfigFormElementRegistry& ConfigFormElementRegistry::instance()
             .claimed_keys = {"fill_density"},
             .factory =
                 [](const ConfigFormContext& context)
-            { return std::make_unique<PercentSliderElement>(context, "fill_density", 5.0); }
+            // 1% steps: the slider snaps, and coarser steps would make a stored
+            // value that is not a multiple of the step unreachable by dragging.
+            { return std::make_unique<PercentSliderElement>(context, "fill_density", 1.0); }
         });
         registry.register_element(Entry{
             .category     = Category::Print_Infill,
