@@ -28,4 +28,45 @@ void ConfigFormElement::set_flag(const std::string& key, bool value)
     m_context.setter->set_item_value(*item, Domain::ConfigValue{value}, {m_context.cbi_index});
 }
 
+int ConfigFormElement::enum_of(const std::string& key, int fallback) const
+{
+    const Domain::ConfigItem* item = config_item(key);
+    if (item == nullptr || !item->holds_alternative<Domain::EnumWrapper>())
+        return fallback;
+    return item->value().get<Domain::EnumWrapper>().value();
+}
+
+void ConfigFormElement::set_enum(const std::string& key, int value)
+{
+    const Domain::ConfigItem* item = config_item(key);
+    if (item == nullptr || m_context.setter == nullptr
+        || !item->holds_alternative<Domain::EnumWrapper>())
+    {
+        return;
+    }
+    // Rebuild from the current value so the enum's C++ type and its value
+    // definitions carry over; the caller only knows the underlying integer.
+    const Domain::EnumWrapper current = item->value().get<Domain::EnumWrapper>();
+    const Domain::EnumWrapper next{value, current.type(), current.def()};
+    m_context.setter->set_item_value(*item, Domain::ConfigValue{next}, {m_context.cbi_index});
+}
+
+double ConfigFormElement::percent_of(const std::string& key, double fallback) const
+{
+    const Domain::ConfigItem* item = config_item(key);
+    if (item == nullptr || !item->holds_alternative<Domain::Percentage>())
+        return fallback;
+    return item->value().get<Domain::Percentage>().value;
+}
+
+void ConfigFormElement::set_percent(const std::string& key, double value)
+{
+    const Domain::ConfigItem* item = config_item(key);
+    if (item == nullptr || m_context.setter == nullptr)
+        return;
+    m_context.setter->set_item_value(
+        *item, Domain::ConfigValue{Domain::Percentage{value}}, {m_context.cbi_index}
+    );
+}
+
 } // namespace Slic3r::App

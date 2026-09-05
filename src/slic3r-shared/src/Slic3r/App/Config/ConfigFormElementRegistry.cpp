@@ -1,5 +1,7 @@
 #include "Slic3r/App/Config/ConfigFormElementRegistry.hpp"
 
+#include "Slic3r/App/Config/EnumCardsElement.hpp"
+#include "Slic3r/App/Config/PercentSliderElement.hpp"
 #include "Slic3r/App/Config/TravelAvoidanceElement.hpp"
 
 #include <algorithm>
@@ -17,6 +19,29 @@ ConfigFormElementRegistry& ConfigFormElementRegistry::instance()
     static const bool builtins_registered = []
     {
         register_travel_avoidance_element(registry);
+
+        // Infill density and pattern. Density is a bounded quantity tuned by
+        // feel, and pattern is a choice made by comparing the alternatives —
+        // neither is served by the text field and dropdown they get by default.
+        using Category    = Domain::ConfigItemDef::Category;
+        using OptionGroup = Domain::ConfigItemDef::OptionGroup;
+        registry.register_element(Entry{
+            .category     = Category::Print_Infill,
+            .option_group = OptionGroup::Print_Infill_DensityPattern,
+            .claimed_keys = {"fill_density"},
+            .factory =
+                [](const ConfigFormContext& context)
+            { return std::make_unique<PercentSliderElement>(context, "fill_density", 5.0); }
+        });
+        registry.register_element(Entry{
+            .category     = Category::Print_Infill,
+            .option_group = OptionGroup::Print_Infill_DensityPattern,
+            .claimed_keys = {"fill_pattern"},
+            .factory =
+                [](const ConfigFormContext& context)
+            { return std::make_unique<EnumCardsElement>(context, "fill_pattern", 3); }
+        });
+
         return true;
     }();
     (void) builtins_registered;

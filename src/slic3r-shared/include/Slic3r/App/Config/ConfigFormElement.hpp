@@ -65,6 +65,22 @@ protected:
      */
     void set_flag(const std::string& key, bool value);
 
+    /// Underlying integer of a claimed enum, or @p fallback when absent.
+    int enum_of(const std::string& key, int fallback = -1) const;
+
+    /**
+     * @brief Write a claimed enum by its underlying integer.
+     *
+     * The value definitions come from the setting's current value, so the
+     * caller does not need to know the enum's C++ type.
+     */
+    void set_enum(const std::string& key, int value);
+
+    /// Value of a claimed percentage, or @p fallback when absent.
+    double percent_of(const std::string& key, double fallback = 0.0) const;
+
+    void set_percent(const std::string& key, double value);
+
     const ConfigFormContext& context() const { return m_context; }
 
 private:
