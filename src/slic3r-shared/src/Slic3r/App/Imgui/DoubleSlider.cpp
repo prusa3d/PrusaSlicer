@@ -577,11 +577,11 @@ static bool behavior(ImGuiID id, const ImRect& region,
         if (change_on_mouse_move)
             v_new = v_min + (ImS32)(v_range * mouse_pos_ratio + 0.5f);
         else {
-            float mw = io.MouseWheel;
-#if defined(__APPLE__)
-            if (mw > 0.f) mw = 1.0f;
-            if (mw < 0.f) mw = -1.0f;
-#endif // __APPLE__
+            // Whole detents only. The previous macOS special case clamped the
+            // wheel to +/-1, which made every one of the many sub-detent events
+            // a trackpad sends move a full layer; accumulating instead gives the
+            // same layer-per-notch rate on every device.
+            const float mw = static_cast<float>(consume_wheel_detents(id));
             float accer = io.KeyCtrl || io.KeyShift ? 5.0f : 1.0f;
             v_new = ImClamp(*out_value + (ImS32)(mw * accer), v_min, v_max);
         }

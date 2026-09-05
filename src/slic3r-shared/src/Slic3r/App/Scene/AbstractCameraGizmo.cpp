@@ -385,11 +385,13 @@ void AbstractCameraGizmo::update_pan(const Vec3d& delta, bool synchronize_cam_pi
 
 void AbstractCameraGizmo::update_zoom(float wheel_delta_y)
 {
-    // On OSX with TrackPad when doing a small movement with two fingers (the scroll gesture)
-    // the wheel_delta_y may be 0 (!) so prevent handling such events (this would lead to NaN in
-    // zoom factor)
-    if (wheel_delta_y != 0)
-        m_scene_provider.scene().camera_trackball().update_zoom(wheel_delta_y / std::abs(wheel_delta_y));
+    // The delta is a count of wheel detents, fractional on precise devices such
+    // as a trackpad. Passing it through rather than reducing it to its sign is
+    // what makes a pinch or a two-finger swipe zoom by the amount the fingers
+    // asked for instead of a full detent per event.
+    if (wheel_delta_y == 0)
+        return;
+    m_scene_provider.scene().camera_trackball().update_zoom(wheel_delta_y);
 }
 
 void AbstractCameraGizmo::update_rotation(float delta_x, float delta_y, float delta_for_180_rotation)

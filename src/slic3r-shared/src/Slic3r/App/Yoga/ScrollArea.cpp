@@ -27,12 +27,15 @@ void ScrollArea::render(const Vec2f& p, const Vec2f& size)
         && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
     {
         ImGuiIO& io  = ImGui::GetIO();
-        float delta  = io.MouseWheel;
-        float deltaH = io.MouseWheelH;
-        float speed  = ImGui::GetFontSize() * 1.5f;
+        // Convert back to pixels using the same per-axis steps ImGui applies
+        // internally (5x the font size vertically, 2x horizontally), so that a
+        // given amount of finger or wheel travel moves this remapped area by the
+        // same distance it would move an ordinary vertical scroll area.
+        const float font = ImGui::GetFontSize();
+        const float pixels = io.MouseWheel * 5.0f * font + io.MouseWheelH * 2.0f * font;
 
         float x = ImGui::GetScrollX();
-        x -= (delta + deltaH) * speed;
+        x -= pixels;
         x = std::clamp(x, 0.0f, ImGui::GetScrollMaxX());
         ImGui::SetScrollX(x);
     }

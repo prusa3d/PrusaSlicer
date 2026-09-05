@@ -1,6 +1,7 @@
 #include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/App/Yoga/Slider.hpp"
 #include "Slic3r/App/Yoga/Circle.hpp"
+#include "Slic3r/App/Imgui/ImguiExtension.hpp"
 
 #include "imgui/imgui_internal.h"
 #include "Slic3r/Math.hpp"
@@ -146,14 +147,16 @@ void Slider::render(const Vec2f& pos, const Vec2f& size)
     // wheel behavior
     else if (m_hovered)
     {
-        double mw    = sign(io.MouseWheel);
-        double accer = io.KeyCtrl || io.KeyShift ? 5. : 1.;
-        double value = clamp(m_value + mw * accer * step);
+        const double mw = Imgui::consume_wheel_detents(ImGui::GetID(object_name().c_str()));
+        if (mw != 0.) {
+            double accer = io.KeyCtrl || io.KeyShift ? 5. : 1.;
+            double value = clamp(m_value + mw * accer * step);
 
-        if (!Domain::fuzzy_compare(m_value, value)) {
-            set_style_dirty(); // to ask for redraw
+            if (!Domain::fuzzy_compare(m_value, value)) {
+                set_style_dirty(); // to ask for redraw
+            }
+            set_value(value);
         }
-        set_value(value);
     }
 
     Oval::render(pos, size);

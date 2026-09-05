@@ -174,10 +174,36 @@ void AbstractRenderCanvas::begin_imgui_frame()
 {
     ZoneScoped;
 
+    // Hand ImGui the scroll accumulated since the last frame. ImGui consumes
+    // io.MouseWheel inside NewFrame(), multiplying it by a step of 5x (vertical)
+    // or 2x (horizontal) the window's reference font size, so divide by that to
+    // land on the pixel distance the device actually asked for.
+    ImGuiIO& io = ImGui::GetIO();
+    const float font_ref = std::max(1.0f, m_imgui_font_ref_px);
+    io.MouseWheel  = m_imgui_scroll_px_y / (5.0f * font_ref);
+    io.MouseWheelH = m_imgui_scroll_px_x / (2.0f * font_ref);
+    m_imgui_scroll_px_x = 0.0f;
+    m_imgui_scroll_px_y = 0.0f;
+
     // Start the Dear ImGui frame
     m_imgui_render->new_frame();
     begin_imgui_frame_platform();
     ImGui::NewFrame();
+
+    // Sample the font for the next frame's conversion, now that NewFrame() has
+    // resolved it. Text scale changes lag by one frame, which no one can feel.
+    m_imgui_font_ref_px = ImGui::GetFontSize();
+}
+
+void AbstractRenderCanvas::enqueue_imgui_scroll(float pixels_x, float pixels_y)
+{
+    m_imgui_scroll_px_x += pixels_x;
+    m_imgui_scroll_px_y += pixels_y;
+}
+
+float AbstractRenderCanvas::imgui_scroll_step_px(bool horizontal) const
+{
+    return (horizontal ? 2.0f : 5.0f) * std::max(1.0f, m_imgui_font_ref_px);
 }
 
 void AbstractRenderCanvas::end_imgui_frame()

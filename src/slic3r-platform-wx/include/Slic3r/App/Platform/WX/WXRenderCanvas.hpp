@@ -4,9 +4,11 @@
 #include <chrono>
 
 #include <GL/glew.h>
+#include <wx/event.h>
 #include <wx/glcanvas.h>
 
 #include "Slic3r/App/Platform/AbstractRenderCanvas.hpp"
+#include "Slic3r/App/Platform/MouseEvent.hpp"
 
 namespace Slic3r::App::Platform::WX {
 
@@ -47,6 +49,18 @@ private:
     void on_mouse_enter(wxMouseEvent& event);
     void on_mouse_leave(wxMouseEvent& event);
     void on_idle(wxIdleEvent& event);
+    void on_gesture_zoom(wxZoomGestureEvent& event);
+
+    /**
+     * @brief Translate a wheel event into the three scroll units the app needs.
+     *
+     * Handles precise (trackpad) and notched devices alike, and accumulates
+     * sub-detent movement so that quantised consumers still see whole steps.
+     */
+    MouseEvent::Scroll build_scroll(const wxMouseEvent& evt);
+
+    /// Feed the camera a zoom as if it came from the wheel, at the given position.
+    void emit_synthetic_zoom(float wheel_delta, int x, int y, KeyModifiers mods);
 
     static KeyModifiers modifiers(const wxKeyboardState& event);
 
@@ -70,6 +84,16 @@ private:
     size_t m_current_frame_idx{0};
 
     size_t m_timeout_fps{30};
+
+    // Sub-detent wheel movement carried over between events, so that a trackpad
+    // produces one discrete step per detent-worth of travel rather than one per
+    // event. Reset when the scroll direction reverses.
+    float m_wheel_residue_x{0};
+    float m_wheel_residue_y{0};
+
+    // Zoom factor reported by the last pinch gesture event. wx reports the
+    // factor relative to the start of the gesture, so it has to be differenced.
+    double m_gesture_last_zoom{1.0};
 
 #if DEBUG_RENDER_TIMING
     struct FrameTiming

@@ -1,6 +1,9 @@
 #include "Slic3r/App/Platform/WX/WXRenderCanvas.hpp"
+#include "NativeScroll.hpp"
 #include "fmt/ostream.h"
 
+#include <algorithm>
+#include <cmath>
 #include <iostream>
 
 #include <wx/frame.h>
@@ -396,6 +399,13 @@ WXRenderCanvas::WXRenderCanvas(wxWindow* parent, int id) :
     Bind(wxEVT_RIGHT_DCLICK, &WXRenderCanvas::on_mouse, this);
     Bind(wxEVT_MIDDLE_DCLICK, &WXRenderCanvas::on_mouse, this);
     Bind(wxEVT_LEAVE_WINDOW, &WXRenderCanvas::on_mouse_leave, this);
+
+    // Pinch-to-zoom. Trackpad magnify gestures arrive as their own event type,
+    // never as wheel events, so without this they are silently dropped.
+    if (EnableTouchEvents(wxTOUCH_ZOOM_GESTURE))
+        Bind(wxEVT_GESTURE_ZOOM, &WXRenderCanvas::on_gesture_zoom, this);
+    else
+        SPDLOG_DEBUG("Zoom gestures are not available on this platform");
 
     this->Bind(
         wxEVT_KILL_FOCUS,
@@ -957,19 +967,15 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
         button = MouseButton::Middle;
     }
 
-    float wheel_x = 0;
-    float wheel_y = 0;
-    switch (evt.GetWheelAxis()) {
-    case wxMOUSE_WHEEL_VERTICAL:
-        wheel_y = evt.GetWheelRotation();
-        break;
-    case wxMOUSE_WHEEL_HORIZONTAL:
-        wheel_x = evt.GetWheelRotation();
-        break;
+    MouseEvent::Scroll scroll;
+    if (platform_event_type == MouseEvent::Type::Wheel) {
+        scroll = build_scroll(evt);
+        // ImGui drives the Yoga widget tree, so panel scrolling goes through it.
+        enqueue_imgui_scroll(scroll.pixels_x, scroll.pixels_y);
     }
 
     MouseEvent
-        platform_event{platform_event_type, button, mouse_x, mouse_y, wheel_x, wheel_y, modifiers(evt)};
+        platform_event{platform_event_type, button, mouse_x, mouse_y, scroll, modifiers(evt)};
     enqueue_mouse(platform_event);
 
     ImGuiIO& io = ImGui::GetIO();
@@ -983,12 +989,131 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
     io.MouseDoubleClicked[0] = evt.LeftDClick();
     io.MouseDoubleClicked[1] = evt.RightDClick();
     io.MouseDoubleClicked[2] = evt.MiddleDClick();
-    float wheel_delta        = static_cast<float>(evt.GetWheelDelta());
-    if (wheel_delta != 0.0f)
-        io.MouseWheel = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
-
 
     repaint();
+}
+
+MouseEvent::Scroll WXRenderCanvas::build_scroll(const wxMouseEvent& evt)
+{
+    MouseEvent::Scroll scroll;
+
+    // Pixels first, because that is the only unit a precise device really has.
+    // Everything else is derived from it.
+    if (NativeScrollInfo native; query_native_scroll(native)) {
+        scroll.precise  = native.precise;
+        scroll.momentum = native.momentum;
+        scroll.pixels_x = native.delta_x;
+        scroll.pixels_y = native.delta_y;
+    } else {
+        // A notched wheel: rotation/delta is the detent count, possibly
+        // fractional on high-resolution wheels. Convert to pixels using the same
+        // step ImGui would have applied, so the feel here is unchanged.
+        const float wheel_delta = static_cast<float>(evt.GetWheelDelta());
+        const float detents     = wheel_delta != 0.0f ?
+            static_cast<float>(evt.GetWheelRotation()) / wheel_delta : 0.0f;
+        const bool horizontal = evt.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL;
+
+        if (horizontal)
+            scroll.pixels_x = detents * imgui_scroll_step_px(true);
+        else
+            scroll.pixels_y = detents * imgui_scroll_step_px(false);
+    }
+
+    // "Too fast" is a matter of taste and of hardware, so let the user scale it.
+    // Applied to pixels, before detents are derived, so panel scrolling and 3D
+    // zoom stay in step with each other.
+    const int speed_percent =
+        AppServices::instance().app_config().get<int>("scroll_speed");
+    if (speed_percent != 100) {
+        const float speed = float(speed_percent) / 100.0f;
+        scroll.pixels_x *= speed;
+        scroll.pixels_y *= speed;
+    }
+
+    // One detent is a full "notch" of travel. For precise devices this is what
+    // decides how far a swipe has to go to count as one wheel click; it is the
+    // knob to turn if trackpad zoom feels too coarse or too fine. For notched
+    // devices the same steps used above are reversed, so a click stays a click.
+    constexpr float PIXELS_PER_DETENT = 50.0f;
+    const float detent_px_x = scroll.precise ? PIXELS_PER_DETENT : imgui_scroll_step_px(true);
+    const float detent_px_y = scroll.precise ? PIXELS_PER_DETENT : imgui_scroll_step_px(false);
+    scroll.delta_x = scroll.pixels_x / detent_px_x;
+    scroll.delta_y = scroll.pixels_y / detent_px_y;
+
+    // Quantised consumers (brush size, layer height) need whole detents, so
+    // accumulate the fractions and hand over steps as they complete. Without
+    // this a trackpad fires a step per event and the value runs away.
+    auto accumulate_steps = [](float delta, float& residue) {
+        // A direction change starts a fresh detent rather than completing the
+        // one that was building up in the opposite direction.
+        if (delta != 0.0f && residue != 0.0f && (delta < 0.0f) != (residue < 0.0f))
+            residue = 0.0f;
+        residue += delta;
+        const int steps = static_cast<int>(residue);
+        residue -= static_cast<float>(steps);
+        return steps;
+    };
+    scroll.steps_x = accumulate_steps(scroll.delta_x, m_wheel_residue_x);
+    scroll.steps_y = accumulate_steps(scroll.delta_y, m_wheel_residue_y);
+
+    return scroll;
+}
+
+void WXRenderCanvas::emit_synthetic_zoom(float wheel_delta, int x, int y, KeyModifiers mods)
+{
+    MouseEvent::Scroll scroll;
+    scroll.delta_y = wheel_delta;
+    scroll.precise = true;
+
+    // The camera inverts wheel zoom when the user asked for it, but spreading
+    // the fingers must always zoom in — that is a platform convention, not a
+    // mouse preference. Pre-invert so the camera's inversion cancels out.
+    if (AppServices::instance().app_config().get<bool>("reverse_mouse_wheel_zoom"))
+        scroll.delta_y = -scroll.delta_y;
+
+    // Deliberately no pixels and no steps: a pinch is a zoom, not a scroll, so
+    // it must not move panels or bump quantised values.
+    enqueue_mouse(MouseEvent{MouseEvent::Type::Wheel, MouseButton::NoButton, x, y, scroll, mods});
+    repaint();
+}
+
+void WXRenderCanvas::on_gesture_zoom(wxZoomGestureEvent& evt)
+{
+    if (!m_render_module || !m_render_module->is_initialized())
+        return;
+
+    if (evt.IsGestureStart()) {
+        m_gesture_last_zoom = 1.0;
+        return;
+    }
+
+    // wx reports the factor relative to the start of the gesture, so difference
+    // it to get this event's contribution.
+    const double factor = evt.GetZoomFactor();
+    if (factor <= 0.0 || m_gesture_last_zoom <= 0.0) {
+        m_gesture_last_zoom = factor > 0.0 ? factor : 1.0;
+        return;
+    }
+    const double ratio = factor / m_gesture_last_zoom;
+    m_gesture_last_zoom = factor;
+
+    if (evt.IsGestureEnd())
+        return;
+
+    // The camera applies zoom as 1/(1 - delta*0.1) per unit, so the delta that
+    // reproduces a given ratio is (1 - 1/ratio) * 10. Deriving it this way keeps
+    // the pinch proportional: pinching to twice the size always doubles the
+    // zoom, no matter how many events the gesture was delivered in.
+    const double delta = (1.0 - 1.0 / ratio) * 10.0;
+    if (std::abs(delta) < 1e-6)
+        return;
+
+    // Gesture events carry no keyboard state, so use the modifiers the canvas
+    // has been tracking from key events.
+    const wxPoint pos = evt.GetPosition();
+    emit_synthetic_zoom(
+        static_cast<float>(delta), ToDIP(pos.x), ToDIP(pos.y), m_key_modifiers
+    );
 }
 
 void WXRenderCanvas::on_idle(wxIdleEvent& event)

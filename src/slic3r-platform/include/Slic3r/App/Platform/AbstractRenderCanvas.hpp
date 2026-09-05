@@ -76,6 +76,29 @@ protected:
     void enqueue_mouse(const MouseEvent& e);
     void enqueue_keyboard(const KeyboardEvent& e);
 
+    /**
+     * @brief Queue a scroll for the ImGui layer, expressed in logical pixels.
+     *
+     * ImGui's own unit is "wheel detents", which it multiplies by a font-derived
+     * step. Feeding it a trackpad's point deltas directly makes the UI scroll by
+     * that step for every point of finger travel. Going through this method
+     * instead converts pixels into whatever unit produces exactly that many
+     * pixels of movement, so precise devices track the fingers 1:1 and notched
+     * wheels keep their existing feel.
+     *
+     * Deltas accumulate until the next frame, so several scroll events arriving
+     * within one frame all take effect instead of the last one winning.
+     */
+    void enqueue_imgui_scroll(float pixels_x, float pixels_y);
+
+    /**
+     * @brief Pixels of content travel ImGui produces per wheel detent.
+     *
+     * ImGui uses a different step per axis, so the axis has to be named to
+     * convert between detents and pixels without changing the scroll distance.
+     */
+    [[nodiscard]] float imgui_scroll_step_px(bool horizontal = false) const;
+
     virtual void emit_mouse(const MouseEvent& e);
 
     virtual void emit_keyboard(const KeyboardEvent& e);
@@ -120,6 +143,14 @@ private:
     std::unique_ptr<Render::ImguiRender> m_imgui_render;
     AnimationManager m_animation_manager;
     double m_last_time{0};
+
+    // Scroll pending for the ImGui layer, in logical pixels, flushed once per frame.
+    float m_imgui_scroll_px_x{0};
+    float m_imgui_scroll_px_y{0};
+    // ImGui's reference font size, sampled each frame. ImGui scrolls by
+    // 5x this vertically and 2x horizontally per wheel detent. The seed matches
+    // ImGui's default font so the very first scroll of a session is not wild.
+    float m_imgui_font_ref_px{13.0f};
 };
 
 } // namespace Slic3r::App::Platform

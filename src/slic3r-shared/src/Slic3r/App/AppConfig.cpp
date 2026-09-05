@@ -113,6 +113,21 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
     def->init_fn = []() { return Domain::ConfigValue(false); };
 
+    def = defs.add("scroll_speed", typeid(int));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::spinbox;
+    def->label = L("Scrolling speed");
+    def->tooltip = L(
+        "Scales how far a mouse wheel or trackpad scrolls panels and zooms the 3D scene. "
+        "Lower it if scrolling feels too fast."
+    );
+    def->units = {"%"};
+    def->category = Domain::ConfigItemDef::Category::AppConfig_General;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
+    def->min = 25;
+    def->max = 300;
+    def->init_fn = []() { return Domain::ConfigValue{100}; };
+
     def               = defs.add("graphics_quality", typeid(Domain::EnumWrapper));
     def->location     = Domain::AppConfigLocation{};
     def->label        = L("Graphics quality");

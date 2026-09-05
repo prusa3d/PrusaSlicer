@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 #include <vector>
 
 namespace Slic3r::App::Imgui {
@@ -716,6 +717,47 @@ void draw_dashed_rounded_rect(
             }
         }
     }
+}
+
+int consume_wheel_detents(ImGuiID id)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.MouseWheel == 0.0f)
+        return 0;
+
+    struct Residue
+    {
+        float value{0.0f};
+        int last_frame{0};
+    };
+    static std::unordered_map<ImGuiID, Residue> residues;
+
+    const int frame = ImGui::GetFrameCount();
+    Residue& residue = residues[id];
+
+    // A control the wheel has not touched for a while starts fresh, otherwise a
+    // half-detent left over from minutes ago would make its next step early.
+    // This doubles as the eviction check that keeps the map from growing.
+    constexpr int STALE_FRAMES = 60;
+    if (frame - residue.last_frame > STALE_FRAMES)
+        residue.value = 0.0f;
+    residue.last_frame = frame;
+
+    // Reversing direction abandons the partial detent rather than completing it.
+    if (residue.value != 0.0f && (io.MouseWheel < 0.0f) != (residue.value < 0.0f))
+        residue.value = 0.0f;
+
+    residue.value += io.MouseWheel;
+    const int detents = static_cast<int>(residue.value);
+    residue.value -= static_cast<float>(detents);
+
+    if (residues.size() > 64) {
+        std::erase_if(residues, [frame](const auto& item) {
+            return frame - item.second.last_frame > STALE_FRAMES;
+        });
+    }
+
+    return detents;
 }
 
 } // namespace Slic3r::App::Imgui
