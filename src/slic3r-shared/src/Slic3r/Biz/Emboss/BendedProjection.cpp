@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/Emboss/BendedProjection.hpp"
 #include <algorithm>
+#include <optional>
 
 namespace Slic3r::Biz::Emboss {
 
@@ -37,11 +38,13 @@ std::pair<Domain::Vec3d, Domain::Vec3d> BendedProjection::create_front_back(cons
 
 Domain::Vec3d BendedProjection::project(const Domain::Vec3d& point) const
 {
-    // Bend displacement is independent of Z, so projection follows the same
-    // extrusion direction without applying the deformation a second time.
-    Domain::Vec3d result = point;
-    result.z() += m_depth;
-    return result;
+    Domain::BoundingBox3f bbox(
+        (m_center - 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>(),
+        (m_center + 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>()
+    );
+    Domain::Vec3d unbent = TextBender::unbend_point(point, m_params, bbox);
+    unbent.z() += m_depth;
+    return TextBender::bend_point(unbent, m_params, bbox);
 }
 
 std::optional<Domain::Vec2d> BendedProjection::unproject(const Domain::Vec3d& p, double* depth) const
@@ -53,7 +56,7 @@ std::optional<Domain::Vec2d> BendedProjection::unproject(const Domain::Vec3d& p,
         (m_center + 0.5 * Domain::Vec3d(m_width, m_height, m_depth)).cast<float>()
     );
     Domain::Vec3d unbent = TextBender::unbend_point(p, m_params, bbox);
-    if ((TextBender::bend_point(unbent, m_params, bbox) - p).norm() > 1e-7 * std::max(1.0, p.norm()))
+    if ((TextBender::bend_point(unbent, m_params, bbox) - p).norm() > 1e-6 * std::max(1.0, p.norm()))
         return std::nullopt;
     if (depth != nullptr) {
         *depth = unbent.z();

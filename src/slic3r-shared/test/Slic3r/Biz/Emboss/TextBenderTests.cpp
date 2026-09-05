@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <array>
 #include <limits>
 #include <map>
 #include <catch2/matchers/catch_matchers.hpp>
@@ -119,6 +120,38 @@ TEST_CASE("TextBender bend and unbend roundtrip", "[TextBender]")
     REQUIRE_THAT(unbent.x(), Catch::Matchers::WithinRel(original.x(), 1e-4));
     REQUIRE_THAT(unbent.y(), Catch::Matchers::WithinRel(original.y(), 1e-4));
     REQUIRE_THAT(unbent.z(), Catch::Matchers::WithinRel(original.z(), 1e-4));
+}
+
+TEST_CASE("Bend curl and arc preserve text thickness normal to the face", "[TextBender]")
+{
+    const Domain::BoundingBox3f bbox{{-50.f, -10.f, 0.f}, {50.f, 10.f, 2.f}};
+    const std::array<BendParams, 5> bends{{
+        {2.6f, 0.f, 0.f},
+        {0.f, -2.4f, 0.f},
+        {0.f, 0.f, 2.7f},
+        {1.8f, -1.5f, 2.2f},
+        {3.1415927f, -3.1415927f, 3.1415927f}
+    }};
+
+    for (const BendParams& params : bends) {
+        for (double x : {-45., 0., 45.}) {
+            for (double y : {-8., 0., 8.}) {
+                CAPTURE(params.horizontal_bend, params.vertical_curl, params.vertical_arc, x, y);
+                const Domain::Vec3d front = TextBender::bend_point({x, y, 0.}, params, bbox);
+                const Domain::Vec3d back = TextBender::bend_point({x, y, 2.}, params, bbox);
+                const Domain::Vec3d middle{x, y, 1.};
+                constexpr double step = 1e-3;
+                const Domain::Vec3d tangent_x = TextBender::bend_point(middle + Domain::Vec3d{step, 0., 0.}, params, bbox)
+                    - TextBender::bend_point(middle - Domain::Vec3d{step, 0., 0.}, params, bbox);
+                const Domain::Vec3d tangent_y = TextBender::bend_point(middle + Domain::Vec3d{0., step, 0.}, params, bbox)
+                    - TextBender::bend_point(middle - Domain::Vec3d{0., step, 0.}, params, bbox);
+                const Domain::Vec3d normal = tangent_x.cross(tangent_y).normalized();
+                const Domain::Vec3d extrusion = back - front;
+                CHECK_THAT(extrusion.norm(), Catch::Matchers::WithinAbs(2., 1e-7));
+                CHECK_THAT(std::abs(extrusion.dot(normal)), Catch::Matchers::WithinAbs(2., 1e-6));
+            }
+        }
+    }
 }
 
 static Domain::BoundingBox3f calc_mesh_bounds(const indexed_triangle_set& mesh)

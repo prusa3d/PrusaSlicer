@@ -1,5 +1,6 @@
 Build
 Build.bat
+Run_PrusaSlicer.bat
 /build/
 MYMETA.json
 MYMETA.yml
@@ -31,3 +32,5 @@ CMakeUserPresets.json
 /cmake-build-*/
 /build-*/
 build-default/
+compile_commands.json
+.clangd
