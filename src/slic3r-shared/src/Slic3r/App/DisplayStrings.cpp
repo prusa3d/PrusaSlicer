@@ -174,6 +174,13 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
         return _u8L("The print is empty. The model is not printable with current print settings.");
     case ErrorCode::InvalidThumbnailRequest:
         return _u8L("Unable to parse 'thumbnails' config option.");
+    case ErrorCode::ArachneInvalidGraph:
+        return _u8L(
+            "Arachne failed to generate a valid perimeter graph.\n\n"
+            "Please open a Github issue at "
+            "https://github.com/prusa3d/PrusaSlicer/issues and attach the project file.\n\n"
+            "As a workaround, try changing Print Settings: Precision & Slicing -> Perimeter Generator -> Classic"
+        );
     case ErrorCode::NoPadGenerated:
         return _u8L("No pad can be generated for this model with the current configuration.");
     case ErrorCode::UnprintableObjects:

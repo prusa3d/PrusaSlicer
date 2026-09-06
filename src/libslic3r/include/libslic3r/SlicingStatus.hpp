@@ -97,6 +97,7 @@ enum class ErrorCode
     NoExtrusions, // _u8L("No extrusions were generated for objects.")
     EmptyPrint, // "The print is empty. The model is not printable with current print settings."
     InvalidThumbnailRequest,
+    ArachneInvalidGraph,
 
     // SLA
     NoPadGenerated, // _u8L("No pad can be generated for this model with the current configuration")
