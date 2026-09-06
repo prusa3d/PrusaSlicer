@@ -22,6 +22,7 @@
 #include "libslic3r/Arachne/utils/ExtrusionLine.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "Slic3r/Biz/Algorithms/Point.hpp"
+#include "libslic3r/SlicingStatus.hpp"
 
 #ifndef NDEBUG
     #include "libslic3r/EdgeGrid.hpp"
@@ -450,6 +451,18 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
 #ifdef ARACHNE_DEBUG
     assert(VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(voronoi_diagram));
 #endif
+
+    const size_t unpaired_edges = std::count_if(
+        graph.edges.begin(),
+        graph.edges.end(),
+        [](const edge_t &edge) { return edge.twin == nullptr; });
+
+    if (unpaired_edges != 0) {
+        SPDLOG_ERROR("Arachne generated an invalid perimeter graph with {} unpaired half-edges", unpaired_edges);
+        throw Biz::Slicing::Exception(Biz::Slicing::Error {
+            .code = Biz::Slicing::ErrorCode::ArachneInvalidGraph,
+        });
+    }
 
     separatePointyQuadEndNodes();
 

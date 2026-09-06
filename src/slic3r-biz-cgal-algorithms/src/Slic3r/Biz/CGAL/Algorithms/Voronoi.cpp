@@ -178,8 +178,15 @@ VoronoiDiagram::detect_known_issues(const VoronoiDiagram &voronoi_diagram, Segme
         return edge_issue_type;
     } else if (const IssueType cell_issue_type = detect_known_voronoi_cell_issues(voronoi_diagram, segment_begin, segment_end); cell_issue_type != IssueType::NO_ISSUE_DETECTED) {
         return cell_issue_type;
-    } else if (!VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segment_begin, segment_end)) {
-        // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514 and #8446.
+    } else if (!VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segment_begin, segment_end) ||
+               !VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(voronoi_diagram)) {
+        // is_voronoi_diagram_planar_angle:        Detects topology errors around a vertex 
+        //                                         at least GH issues #8474, #8514 and #8446
+        //
+        // is_voronoi_diagram_planar_intersection: Detects crossings between otherwise locally well-ordered edges 
+        //                                         at least GH issue #14421
+        //
+        // Both make the diagram unusable by Arachne.
         return IssueType::NON_PLANAR_VORONOI_DIAGRAM;
     }
 
