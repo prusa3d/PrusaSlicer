@@ -11,6 +11,7 @@
 #include <imgui/backends/imgui_impl_opengl3.h>
 
 #include <Slic3r/Biz/Platform/Termination.hpp>
+#include <Slic3r/Biz/Platform/PlatformServices.hpp>
 #include <Slic3r/App/Platform/PlatformError.hpp>
 #include <Slic3r/App/Render/Init.hpp>
 #include <Slic3r/App/Render/Context.hpp>
@@ -418,6 +419,10 @@ WXRenderCanvas::WXRenderCanvas(wxWindow* parent, int id) :
 
 WXRenderCanvas::~WXRenderCanvas()
 {
+    auto& platform_services = Biz::Platform::PlatformServices::instance();
+    if (&platform_services.render_request_handler() == this) {
+        platform_services.set_render_request_handler(nullptr);
+    }
     ImGui_ImplWX_Shutdown();
     Render::shutdown_render();
 }
