@@ -295,7 +295,7 @@ bool TextPresetManager::load_preset(const Preset& style)
     PresetCache& cache = m_proj_preset_cache.selected();
     //cache.font_file = FontFileWithCache(descriptor, std::move(font_ptr));
     cache.preset       = style; // copy
-    cache.preset_index = std::numeric_limits<size_t>::max();
+    cache.preset_index.reset();
     return true;
 }
 
@@ -313,6 +313,11 @@ const TextPresetManager::Preset* TextPresetManager::get_stored_preset() const
     if (!preset_index.has_value() || *preset_index >= m_data.presets.size())
         return nullptr;
     return &m_data.presets[*preset_index];
+}
+
+bool TextPresetManager::exist_stored_style() const
+{
+    return this->get_stored_preset() != nullptr;
 }
 
 FontFileWithCache& TextPresetManager::get_font_file_with_cache()
