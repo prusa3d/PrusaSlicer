@@ -62,7 +62,7 @@ D::Preset::VendorData hardware(const Orca::Vendor& source)
     vendor.info.id = source.id;
     vendor.info.repo_id = source.id;
     vendor.info.name = source.name;
-    vendor.info.version = "1.0.0";
+    vendor.info.version = source.version.empty() ? "1.0.0" : source.version;
     auto& defs = vendor.defs[D::PrinterTechnology::FFF];
     defs.technology = D::PrinterTechnology::FFF;
     D::Preset::HwSheetConfigDef sheet;
@@ -149,12 +149,15 @@ void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, boo
     // Explicit sources and local drop-ins override app drop-ins.
     // Native PS3 vendor IDs are never reused.
     std::set<std::string> loaded;
+    for (const auto& [id, vendor] : bundle.vendor_bundles) loaded.insert(id);
     std::set<fs::path> visited_roots;
+    const auto cache_root = paths.populate_local_bundle && !paths.local_bundle_path.empty()
+        ? std::filesystem::u8path(paths.local_bundle_path) : std::filesystem::path{};
     for (const auto& root : orca_profile_roots(paths)) {
         if (root.empty()) continue;
         try {
             if (!visited_roots.insert(fs::weakly_canonical(root)).second) continue;
-            for (auto& source : Orca::convert(std::filesystem::u8path(root.string()), schema, include_prusa)) {
+            for (auto& source : Orca::convert(std::filesystem::u8path(root.string()), schema, include_prusa, cache_root, loaded)) {
                 if (bundle.vendor_bundles.contains(source.id) || !loaded.insert(source.id).second) continue;
                 try {
                     if (!source.machines.empty()) {
@@ -164,8 +167,10 @@ void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, boo
                             const auto assets = fs::path(paths.local_bundle_path) / source.id / source.id / "assets";
                             for (const auto& [name, original] : source.assets) {
                                 const auto destination = assets / name;
-                                fs::create_directories(destination.parent_path());
-                                fs::copy_file(fs::path(original.string()), destination, fs::copy_options::update_existing);
+                                if (!source.cache_hit || !fs::is_regular_file(destination)) {
+                                    fs::create_directories(destination.parent_path());
+                                    fs::copy_file(fs::path(original.string()), destination, fs::copy_options::overwrite_existing);
+                                }
                             }
                         }
                         PresetLoader loader;
@@ -180,7 +185,8 @@ void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, boo
                         }
                         std::tie(vendor.presets, vendor.preset_names) = loader.release();
                         bundle.vendor_bundles.emplace(source.id, std::move(vendor));
-                        SPDLOG_INFO("Loaded Orca vendor {}: {} printers", source.name, source.machines.size());
+                        SPDLOG_INFO("Loaded Orca vendor {}: {} printers ({})", source.name, source.machines.size(),
+                            source.cache_hit ? "cached conversion" : "converted source");
                     }
                 } catch (const std::exception& e) {
                     source.diagnostics.push_back({{"message", e.what()}, {"key", "vendor"}});
@@ -189,6 +195,7 @@ void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, boo
                 if (!source.diagnostics.empty())
                     SPDLOG_WARN("Orca vendor {} has {} import diagnostics; see orca-profile-import-report.json", source.id, source.diagnostics.size());
                 reports.push_back({{"source", root.string()}, {"vendor", source.id}, {"printers", source.machines.size()},
+                    {"version", source.version}, {"cached", source.cache_hit},
                     {"loaded", bundle.vendor_bundles.contains(source.id)},
                     {"diagnostics", std::move(source.diagnostics)}});
             }

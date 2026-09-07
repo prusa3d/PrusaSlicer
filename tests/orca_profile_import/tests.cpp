@@ -85,6 +85,71 @@ int main(int argc, char** argv)
         check(v.presets[1]["variants"][0]["values"]["retract_length"] == 0.8, "machine retraction defaults retained");
         check(v.presets[1]["variants"][0]["values"]["default_material"] == "PLA", "machine default filament is retained");
         check(v.presets.back()["values"]["temperature"] == 215, "filament scalar conversion");
+        // Both startup and online-source reloads use this persistent per-vendor
+        // cache. A second independent vendor exposes accidental global invalidation.
+        const auto cache = root / "presets/local";
+        write(root / "Other.json", {{"version", "1.0"}, {"machine_list", {{{"sub_path", "machine/printer.json"}}}}});
+        write(root / "Other/machine/printer.json", {{"type", "machine"}, {"name", "Other"},
+            {"instantiation", "true"}, {"nozzle_diameter", {"0.4"}}});
+        auto cached = O::convert(root, schema(), false, cache);
+        check(cached.size() == 2 && !cached[0].cache_hit && !cached[1].cache_hit, "first load converts both vendors");
+        const auto cache_file = cache / "Orca-Example/Orca-Example/orca-conversion-cache.json";
+        check(fs::is_regular_file(cache_file), "conversion persisted under presets/local/Orca-*");
+        const auto cache_time = fs::last_write_time(cache_file);
+        auto reload = O::convert(root, schema(), false, cache);
+        check(reload[0].cache_hit && reload[1].cache_hit, "startup reuses persistent conversions");
+        check(reload[0].presets == cached[0].presets && reload[0].machines == cached[0].machines
+            && reload[0].diagnostics == cached[0].diagnostics, "cached conversion preserves presets, hardware and diagnostics");
+        write(cache / "Native/Native/vendor.yaml", {{"version", "updated online"}});
+        fs::last_write_time(root / "Example/machine/base.json", fs::file_time_type::clock::now());
+        reload = O::convert(root, schema(), false, cache);
+        check(reload[0].cache_hit && reload[1].cache_hit, "online native updates and timestamp-only changes preserve Orca caches");
+        check(fs::last_write_time(cache_file) == cache_time, "cache hits do not rewrite the local conversion");
+        auto example_manifest = Json::parse(std::ifstream(root / "Example.json"));
+        example_manifest["version"] = "2.0";
+        write(root / "Example.json", example_manifest);
+        reload = O::convert(root, schema(), false, cache);
+        check(!reload[0].cache_hit && reload[0].version == "2.0" && reload[1].cache_hit,
+            "version change reprocesses only its vendor");
+        reload = O::convert(root, schema(), false, cache);
+        check(reload[0].cache_hit, "replacement cache is reused after version change");
+        const auto base_file = root / "Example/machine/base.json";
+        const auto base_time = fs::last_write_time(base_file);
+        auto base_profile = Json::parse(std::ifstream(base_file));
+        base_profile["retraction_length"] = {"0.9"};
+        write(base_file, base_profile);
+        fs::last_write_time(base_file, base_time);
+        reload = O::convert(root, schema(), false, cache);
+        check(!reload[0].cache_hit && reload[1].cache_hit, "same-version same-timestamp inherited content change invalidates only its vendor");
+        check(reload[0].presets[1]["variants"][0]["values"]["retract_length"] == 0.9, "changed inheritance is reprocessed");
+        base_profile["retraction_length"] = {"0.8"};
+        write(base_file, base_profile);
+        write(root / "OrcaFilamentLibrary.json", {{"filament_list", {{{"sub_path", "filament/shared.json"}}}}});
+        write(root / "OrcaFilamentLibrary/filament/shared.json", {{"type", "filament"},
+            {"name", "Shared"}, {"instantiation", "false"}, {"nozzle_temperature", {"200"}}});
+        reload = O::convert(root, schema(), false, cache);
+        check(!reload[0].cache_hit && !reload[1].cache_hit, "adding shared library invalidates its dependent vendors");
+        reload = O::convert(root, schema(), false, cache);
+        check(reload[0].cache_hit && reload[1].cache_hit, "shared library fingerprint is stable");
+        write(root / "OrcaFilamentLibrary/filament/shared.json", {{"type", "filament"},
+            {"name", "Shared"}, {"instantiation", "false"}, {"nozzle_temperature", {"210"}}});
+        reload = O::convert(root, schema(), false, cache);
+        check(!reload[0].cache_hit && !reload[1].cache_hit, "shared inherited content change invalidates dependent vendors");
+        std::ofstream(cache_file, std::ios::trunc) << "incomplete cache";
+        reload = O::convert(root, schema(), false, cache);
+        check(!reload[0].cache_hit && reload[1].cache_hit, "corrupt cache recovers only the affected vendor");
+        auto changed_schema = schema();
+        changed_schema["printer"]["printer_notes"] = {{"type", "string"}};
+        reload = O::convert(root, changed_schema, false, cache);
+        check(!reload[0].cache_hit && !reload[1].cache_hit, "changed conversion schema cannot reuse obsolete results");
+        check(O::convert(root, schema(), false, cache, {"Orca-Example", "Orca-Other"}).empty(),
+            "lower-priority duplicate vendors are not converted or cached");
+        const auto blocked_cache = root / "not-a-directory";
+        std::ofstream(blocked_cache) << "file";
+        reload = O::convert(root, schema(), false, blocked_cache);
+        check(reload.size() == 2 && !reload[0].cache_hit && !reload[0].machines.empty(),
+            "cache write failure does not prevent source conversion");
+        fs::remove(root / "Other.json");
         write(root / "Example/process/normal.json", {{"type", "process"}, {"name", "Normal"}, {"instantiation", "true"},
             {"exclude_object", "1"}, {"gcode_label_objects", true}, {"ensure_vertical_shell_thickness", {true}},
             {"infill_combination", "1"}, {"bridge_acceleration", {"50%"}}, {"outer_wall_acceleration", {"3000"}}});

@@ -1,6 +1,9 @@
 #include "OrcaProfileConverter.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <cmath>
 #include <cctype>
 #include <fstream>
@@ -30,6 +33,103 @@ Json read(const fs::path& path)
     std::ifstream stream(path, std::ios::binary);
     if (!stream) throw std::runtime_error("Cannot read " + path.generic_string());
     return Json::parse(stream);
+}
+
+// Stable FNV-1a content checksum: timestamps and directory enumeration order
+// must not invalidate imports when an online updater recopies identical files.
+class Checksum
+{
+public:
+    void append(std::string_view value)
+    {
+        for (const unsigned char byte : value) {
+            m_value ^= byte;
+            m_value *= UINT64_C(1099511628211);
+        }
+    }
+    void field(std::string_view value) { append(std::to_string(value.size())); append(":"); append(value); }
+    void file(const fs::path& path)
+    {
+        field(std::to_string(fs::file_size(path)));
+        std::ifstream input(path, std::ios::binary);
+        if (!input) throw std::runtime_error("Cannot checksum " + path.generic_string());
+        char buffer[65536];
+        while (input.read(buffer, sizeof(buffer)) || input.gcount())
+            append(std::string_view(buffer, static_cast<size_t>(input.gcount())));
+        if (input.bad()) throw std::runtime_error("Cannot checksum " + path.generic_string());
+    }
+    std::string value() const { return std::to_string(m_value); }
+private:
+    uint64_t m_value = UINT64_C(14695981039346656037);
+};
+
+std::string source_checksum(const fs::path& root, const std::string& name)
+{
+    Checksum checksum;
+    const auto manifest = root / fs::u8path(name + ".json");
+    if (!fs::exists(manifest)) return "missing";
+    checksum.file(manifest);
+    const auto base = root / fs::u8path(name);
+    std::vector<fs::path> files;
+    if (fs::is_directory(base)) {
+        for (const auto& entry : fs::recursive_directory_iterator(base))
+            if (entry.is_regular_file()) files.push_back(entry.path());
+    }
+    std::sort(files.begin(), files.end());
+    for (const auto& file : files) {
+        checksum.field(file.lexically_relative(base).generic_string());
+        checksum.file(file);
+    }
+    return checksum.value();
+}
+
+bool restore_conversion(const fs::path& path, const Json& identity, Vendor& vendor)
+{
+    try {
+        const auto cached = read(path);
+        if (cached.at("identity") != identity) return false;
+        Vendor restored;
+        restored.id = cached.at("id").get<std::string>();
+        restored.name = cached.at("name").get<std::string>();
+        restored.version = cached.at("version").get<std::string>();
+        restored.machines = cached.at("machines");
+        restored.presets = cached.at("presets");
+        restored.diagnostics = cached.at("diagnostics");
+        if (restored.id != vendor.id || !restored.machines.is_array()
+            || !restored.presets.is_array() || !restored.diagnostics.is_array()) return false;
+        for (const auto& [name, source] : cached.at("assets").items())
+            restored.assets.emplace(name, fs::u8path(source.get<std::string>()));
+        restored.cache_hit = true;
+        vendor = std::move(restored);
+        return true;
+    } catch (const std::exception&) {
+        return false; // Missing, obsolete or interrupted caches are recoverable.
+    }
+}
+
+void save_conversion(const fs::path& path, const Json& identity, const Vendor& vendor)
+{
+    static std::atomic<unsigned long long> sequence{0};
+    auto temporary = path;
+    temporary += ".tmp-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())
+        + "-" + std::to_string(sequence++);
+    try {
+        Json assets = Json::object();
+        for (const auto& [name, source] : vendor.assets) assets[name] = source.generic_string();
+        const Json cached = {{"identity", identity}, {"id", vendor.id}, {"name", vendor.name},
+            {"version", vendor.version}, {"machines", vendor.machines}, {"presets", vendor.presets},
+            {"diagnostics", vendor.diagnostics}, {"assets", std::move(assets)}};
+        fs::create_directories(path.parent_path());
+        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+        output.exceptions(std::ios::failbit | std::ios::badbit);
+        output << cached.dump();
+        output.close();
+        fs::rename(temporary, path);
+    } catch (const std::exception&) {
+        // A read-only data directory must not prevent loading source profiles.
+        std::error_code ec;
+        fs::remove(temporary, ec);
+    }
 }
 
 void issue(Vendor& vendor, const std::string& profile, const std::string& key, const std::string& message)
@@ -635,7 +735,8 @@ std::string rewrite_gcode(const std::string& source, const std::map<std::string,
     return result;
 }
 
-std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool include_prusa)
+std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool include_prusa,
+    const fs::path& cache_root, const std::set<std::string>& loaded_vendors)
 {
     std::vector<Vendor> vendors;
     if (root.empty() || !fs::is_directory(root)) return vendors;
@@ -644,16 +745,38 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
         if (entry.is_regular_file() && entry.path().extension() == ".json" && fs::is_directory(root / entry.path().stem()))
             manifests.push_back(entry.path());
     std::sort(manifests.begin(), manifests.end());
+    // The library is inherited by each vendor, but unrelated online/native
+    // repositories and other Orca vendors are deliberately absent from this key.
+    std::string library_checksum;
+    Checksum schema_checksum;
+    if (!cache_root.empty()) {
+        library_checksum = source_checksum(root, "OrcaFilamentLibrary");
+        schema_checksum.field(Json(schema).dump());
+    }
     for (const auto& path : manifests) {
         const auto vendor_name = path.stem().string();
         if (vendor_name == "Prusa" && !include_prusa) continue;
         Vendor vendor;
         vendor.id = "Orca-" + vendor_name;
+        if (loaded_vendors.contains(vendor.id)) continue;
         vendor.name = vendor_name + " (OrcaSlicer)";
         try {
             const auto manifest = read(path);
             vendor.name = manifest.value("name", vendor_name) + " (OrcaSlicer)";
             if (!manifest.contains("machine_list")) continue;
+            vendor.version = text(manifest.value("version", Json("")));
+            fs::path cache_path;
+            Json identity;
+            if (!cache_root.empty()) {
+                cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
+                identity = {{"format", 1}, {"source", fs::weakly_canonical(root).generic_string()},
+                    {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
+                    {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
+                if (restore_conversion(cache_path, identity, vendor)) {
+                    vendors.push_back(std::move(vendor));
+                    continue;
+                }
+            }
             Index index;
             if (fs::exists(root / "OrcaFilamentLibrary.json") && vendor_name != "OrcaFilamentLibrary")
                 load_manifest(index, root, "OrcaFilamentLibrary", vendor);
@@ -773,6 +896,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
                     if (!known) issue(vendor, flat.value("name", key), it.key(), "No PrusaSlicer equivalent; source setting was not applied");
                 }
             }
+            if (!cache_path.empty() && !vendor.machines.empty()) save_conversion(cache_path, identity, vendor);
         } catch (const std::exception& e) { issue(vendor, vendor_name, "manifest", e.what()); }
         if (!vendor.machines.empty() || !vendor.diagnostics.empty()) vendors.push_back(std::move(vendor));
     }
