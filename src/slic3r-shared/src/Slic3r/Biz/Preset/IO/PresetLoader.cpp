@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/Preset/IO/PresetLoader.hpp"
 #include "Slic3r/Biz/Yaml/Yaml.hpp"
 #include "Slic3r/Biz/Yaml/YamlSlic3rTypes.hpp"
+#include "Slic3r/Log.hpp"
 
 #include <boost/filesystem/directory.hpp>
 
@@ -87,8 +88,23 @@ void PresetLoader::load_dir(const std::string& dir_path, PresetOrigin origin)
     std::mutex mutex;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, paths.size()),
         [this, &mutex, &paths, origin](const tbb::blocked_range<size_t> &range) {
-            for (size_t i = range.begin(); i < range.end(); ++i)
-                load(paths[i].string(), mutex, origin);
+            for (size_t i = range.begin(); i < range.end(); ++i) {
+                auto path = paths[i].string();
+                if (origin == PresetOrigin::User) {
+                    // for user presets, we want to catch and report exception early,
+                    // so one bad file won't stop loading user presets
+                    try {
+                        load(path, mutex, origin);
+                    } catch (std::exception& e) {
+                        SPDLOG_ERROR("Loading user preset {} failed with error {}", path, e.what());
+                    }
+                } else {
+                    // for system presets, we want to propagate exception up,
+                    // so single bad file will stop whole vendor from loading,
+                    // and we can try to load older version (if bundled with app)
+                    load(path, mutex, origin);
+                }
+            }
         }
     );
 }

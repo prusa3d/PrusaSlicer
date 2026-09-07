@@ -152,6 +152,9 @@ Domain::Preset::Bundle load_bundle(const BundlePaths& bundle_paths)
 
                 // prevent continuing with fallback
                 break;
+            } else {
+                // Clean up presets that failed loading (half loaded to the point of failure)
+                preset_loader.release();
             }
         }
     }
