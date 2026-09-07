@@ -3,6 +3,7 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
+#include "Slic3r/Biz/HwConfigMatchers.hpp"
 
 #include "Slic3r/Log.hpp"
 #include "nlohmann/json.hpp"
@@ -202,27 +203,6 @@ compare_feature(const Domain::Preset::FeatureValue& hw_feature, const nlohmann::
         },
         static_cast<const Domain::JsonVariant&>(hw_feature)
     );
-}
-
-const Domain::Preset::HwPrinterConfig*
-find_matching_printer_config(const auto& printer_configs_view, const nlohmann::json& j)
-{
-    std::string j_model        = j.value("model", "");
-    std::string j_base_model   = j.value("base_model", "");
-    uint8_t j_tool_count       = j.value("tool_count", static_cast<uint8_t>(0));
-    size_t j_tools_array_size  = j.contains("tools") ? j["tools"].size() : 0;
-
-    for (const auto& item : printer_configs_view) {
-        const auto& hw_config = item.first.get();
-        if (hw_config.model.model == j_model
-            && hw_config.model.base_model == j_base_model
-            && hw_config.tool_count == j_tool_count
-            && hw_config.material_slot_count() == j_tools_array_size)
-        {
-            return &hw_config;
-        }
-    }
-    return nullptr;
 }
 
 const Preset::PresetItem* find_matching_preset_item(
@@ -439,7 +419,7 @@ void ConnectMessageHandler::do_select_printer_from_connect(
     }
 
     const auto& printer_configs_view = m_preset_interactor.get_printer_configs();
-    
+
     const Domain::Preset::HwPrinterConfig* config =
         find_matching_printer_config(printer_configs_view, parsed_printer_json);
 

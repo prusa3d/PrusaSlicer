@@ -11,7 +11,7 @@ namespace Slic3r::Domain::Preset {
 tl::expected<Address, std::string> to_address(const std::string& input)
 {
     Address address;
-    for (const auto& slot : std::views::split(input, ".")) {
+    for (const auto& slot : std::views::split(input, '.')) {
         int slot_v;
         auto result =
             std::from_chars(std::to_address(slot.begin()), std::to_address(slot.end()), slot_v, 10);
