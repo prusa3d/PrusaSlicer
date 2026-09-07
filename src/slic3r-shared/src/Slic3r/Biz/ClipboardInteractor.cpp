@@ -161,8 +161,10 @@ void ClipboardInteractor::paste_volumes(SelectionId project_id)
         return;
     }
 
-    const size_t selection_instance_id = selection.elements.front().instance_id;
-    for (const ModelVolume* source_volume : source_object->volumes) {
+    // Pasting into the source object modifies its volume list, so iterate over a copy.
+    const Domain::ModelVolumePtrs source_volumes = source_object->volumes;
+    const size_t selection_instance_id           = selection.elements.front().instance_id;
+    for (const ModelVolume* source_volume : source_volumes) {
         if (!selected_volume_ids.contains(source_volume->id().id)) {
             continue;
         }
