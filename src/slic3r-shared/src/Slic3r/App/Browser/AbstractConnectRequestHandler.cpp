@@ -25,6 +25,22 @@ AbstractConnectRequestHandler::AbstractConnectRequestHandler(Biz::ProjectInterac
     m_actions["RELOAD_HOME_PAGE"] = std::bind(&AbstractConnectRequestHandler::on_webview_reload_event, this, std::placeholders::_1);
     m_actions["CLOSE_DIALOG"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_close_dialog, this, std::placeholders::_1);
     m_actions["LOG_IN_IN_BROWSER"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_log_in_in_browser, this, std::placeholders::_1);
+    m_actions["UNSUPPORTED_WEBVIEW"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_unsupported_webview, this, std::placeholders::_1);
+    m_actions["OPEN_CONNECT_IN_BROWSER"] = std::bind(&AbstractConnectRequestHandler::on_connect_action_open_connect_in_browser, this, std::placeholders::_1);
+}
+
+std::string AbstractConnectRequestHandler::get_engine_check_script() const
+{
+    return R"(
+        if (location.protocol === 'https:' && window._prusaSlicer) {
+            try {
+                new Function('class _{static{}}');
+                new RegExp('(?<=a)b');
+            } catch (e) {
+                _prusaSlicer.postMessage({action: 'UNSUPPORTED_WEBVIEW', error: String(e)});
+            }
+        }
+    )";
 }
 
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::handle_message(const std::string& message)
@@ -64,6 +80,17 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::handle_message(c
 std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_action_error(const std::string &message_data)
 {
     SPDLOG_ERROR("WebView runtime error: {}", message_data);
+    return {};
+}
+
+std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_action_unsupported_webview(const std::string& message_data)
+{
+    SPDLOG_ERROR("WebView engine does not support Connect web app: {}", message_data);
+    return {};
+}
+
+std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_action_open_connect_in_browser(const std::string& message_data)
+{
     return {};
 }
 

@@ -124,18 +124,27 @@ void BrowserLogicConnectPage::emplace_load_logged_out_page_commands(std::vector<
     res.emplace_back(BrowserLogicCommandType::LoadResourcesPage, "connect_logged_out");
 }
 
+void BrowserLogicConnectPage::emplace_load_unsupported_page_commands(std::vector<BrowserLogicCommand>& res)
+{
+    m_styles_defined = false;
+    m_unsupported_engine = true;
+    res.emplace_back(BrowserLogicCommandType::LoadResourcesPage, "connect_unsupported");
+}
+
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_page_will_load_webview_event()
 {
+    std::vector<BrowserLogicCommand> result;
+    result.emplace_back(BrowserLogicCommandType::AddUserScript, get_engine_check_script());
     if (!m_project_interactor.user_account_interactor().is_logged_in()) {
-        return {};
+        return result;
     }
-    std::string javascript = get_login_script(false, m_project_interactor.user_account_interactor().access_token());
-    return {{BrowserLogicCommandType::AddUserScript, std::move(javascript)}};
+    result.emplace_back(BrowserLogicCommandType::AddUserScript, get_login_script(false, m_project_interactor.user_account_interactor().access_token()));
+    return result;
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_user_account_id_success(bool is_refresh, const std::string& current_url)
 {
-    if (m_load_default_url) {
+    if (m_load_default_url || m_unsupported_engine) {
         return {};
     }
     if (m_logged_out) {
@@ -159,6 +168,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_user_account_logged
     if (m_load_default_url) {
         return {};
     }
+    m_unsupported_engine = false;
     std::vector<BrowserLogicCommand> res = {{BrowserLogicCommandType::RunScript, get_logout_script()}};
     emplace_load_logged_out_page_commands(res);
     return res; 
@@ -205,6 +215,7 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_webview_reload_even
 {
      // Event from our error page button or keyboard shortcut 
     m_styles_defined = false;
+    m_unsupported_engine = false;
     try {
         nlohmann::json j = nlohmann::json::parse(message_data);
         if (j.contains("fromKeyboard") && j["fromKeyboard"].is_boolean() && j["fromKeyboard"].get<bool>()) {
@@ -261,6 +272,19 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_erro
 {
     SPDLOG_ERROR("WebView runtime error: {}", message_data);
     return {};
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_unsupported_webview(const std::string& message_data)
+{
+    SPDLOG_ERROR("WebView engine does not support Connect web app: {}", message_data);
+    std::vector<BrowserLogicCommand> res;
+    emplace_load_unsupported_page_commands(res);
+    return res;
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_open_connect_in_browser(const std::string& message_data)
+{
+    return {{BrowserLogicCommandType::OpenExternalBrowser, m_url}};
 }
 
 std::string BrowserLogicConnectPage::get_login_script(bool refresh, const std::string& access_token) const
