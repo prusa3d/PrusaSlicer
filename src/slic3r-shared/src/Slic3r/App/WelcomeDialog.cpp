@@ -357,13 +357,6 @@ static ItemPtr create_changelog_screen(const Theme& theme, std::function<void()>
                 },
             },
             {{Biz::_u8L("Standalone G-code viewer is not available in this release.")}},
-            {
-                {Biz::_u8L("Third-party printer profiles are not included in this alpha.")},
-                {
-                    Biz::_u8L("They will be added later."),
-                    secondary_color,
-                },
-            },
         })};
     negative_notes->set_gap(notes_gap);
 

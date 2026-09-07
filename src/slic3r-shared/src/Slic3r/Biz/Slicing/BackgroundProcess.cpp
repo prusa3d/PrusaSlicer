@@ -270,6 +270,9 @@ void BackgroundProcess::slice(
                     slicing_error = exception.error();
                 } catch (CanceledException&) {
                     /* Intentionally pass. */
+                } catch (const std::exception& exception) {
+                    SPDLOG_CRITICAL("Unhandled exception on background thread: {}", exception.what());
+                    m_on_exception(std::current_exception());
                 } catch (...) {
                     SPDLOG_CRITICAL("Unhandled exception on background thread!");
                     m_on_exception(std::current_exception());

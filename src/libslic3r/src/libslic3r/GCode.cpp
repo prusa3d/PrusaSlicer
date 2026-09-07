@@ -728,8 +728,10 @@ Biz::libpgcode::ProcessorResult GCodeGenerator::do_export(
     if (! m_placeholder_parser_integration.failed_templates.empty()) {
         // G-code export proceeded, but some of the PlaceholderParser substitutions failed.
         std::vector<std::string> failed_config_keys;
-        for (const auto& [name, error] : m_placeholder_parser_integration.failed_templates)
+        for (const auto& [name, error] : m_placeholder_parser_integration.failed_templates) {
+            SPDLOG_ERROR("Custom G-code error in {}: {}", name, error);
             failed_config_keys.emplace_back(name);
+        }
         throw Biz::Slicing::Exception{
             Biz::Slicing::Error{
                 Biz::Slicing::ErrorCode::PlaceholderParser,
@@ -1188,6 +1190,14 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
     // Let the start-up script prime the 1st printing tool.
     this->placeholder_parser().set("initial_tool", static_cast<int>(initial_extruder_id));
     this->placeholder_parser().set("initial_extruder", static_cast<int>(initial_extruder_id));
+    unsigned int initial_non_support = initial_extruder_id;
+    for (const auto tool : tool_ordering.all_extruders()) {
+        if (!print.config().get<std::vector<bool>>("filament_soluble").at(tool)) {
+            initial_non_support = tool;
+            break;
+        }
+    }
+    this->placeholder_parser().set("initial_no_support_extruder", static_cast<int>(initial_non_support));
     this->placeholder_parser().set("current_extruder", static_cast<int>(initial_extruder_id));
     //Set variable for total layer count so it can be used in custom gcode.
     this->placeholder_parser().set("total_layer_count", static_cast<int>(m_layer_count));
@@ -1222,6 +1232,9 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
         this->placeholder_parser().set("first_layer_print_min",  std::vector<double>{ bbox.min.x(), bbox.min.y() });
         this->placeholder_parser().set("first_layer_print_max",  std::vector<double>{ bbox.max.x(), bbox.max.y() });
         this->placeholder_parser().set("first_layer_print_size", std::vector<double>{ BB::sizes(bbox).x(), BB::sizes(bbox).y() });
+        const auto islands_bounds = get_extents(print.first_layer_islands());
+        const auto islands_center = BB::center(islands_bounds);
+        this->placeholder_parser().set("first_layer_center_no_wipe_tower", std::vector<double>{unscale<double>(islands_center.x()), unscale<double>(islands_center.y())});
         this->placeholder_parser().set("num_extruders", int(print.config().hw_config().material_slot_count()));
         // PlaceholderParser currently substitues non-existent vector values with the zero'th value, which is harmful in the case of "is_extruder_used[]"
         // as Slicer may lie about availability of such non-existent extruder.

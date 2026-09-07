@@ -877,6 +877,11 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Preset/IO/PresetMetadataLegacyLoader.cpp
         include/Slic3r/Biz/Preset/IO/BundleLoader.hpp
         src/Slic3r/Biz/Preset/IO/BundleLoader.cpp
+        include/Slic3r/Biz/Preset/IO/OrcaProfileLoader.hpp
+        src/Slic3r/Biz/Preset/IO/OrcaProfileLoader.cpp
+        src/Slic3r/Biz/Preset/IO/OrcaProfileConverter.hpp
+        src/Slic3r/Biz/Preset/IO/OrcaProfileConverter.cpp
+        src/Slic3r/Biz/Preset/IO/OrcaProfileMappings.inc
         include/Slic3r/Biz/CerealUtils.hpp
         src/Slic3r/Biz/Yaml/Yaml.hpp
         src/Slic3r/Biz/Yaml/Yaml.cpp

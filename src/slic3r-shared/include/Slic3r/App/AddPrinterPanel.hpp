@@ -39,6 +39,9 @@ private:
 
     Yoga::Item* m_printers{nullptr};
     Yoga::Item* m_detail{nullptr};
+    Yoga::Item* m_vendors{nullptr};
+    std::string m_selected_vendor;
+    std::map<std::string, std::string> m_vendor_names;
 
     Yoga::ItemPtr create_printer_family(const PrinterFamily& printer_family);
 
