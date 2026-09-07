@@ -11,10 +11,8 @@
 #include <atlbase.h>
 #include <unordered_map>
 
-#include <wx/msw/registry.h>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
-#include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/nowide/convert.hpp>
 
 #include <wx/webview.h>
@@ -300,28 +298,6 @@ void load_request(wxWebView* web_view, const std::string& address, const std::st
     hr = webview2_2->NavigateWithWebResourceRequest(request.Get());
     if (FAILED(hr)) {
         SPDLOG_ERROR("{} Failed: NavigateWithWebResourceRequest failed. HRESULT: {:x}", __FUNCTION__, (unsigned int)hr);
-    }
-}
-
-void register_prusaslicer_url()
-{
-    boost::filesystem::path binary_path(boost::filesystem::canonical(boost::dll::program_location()));
-    // the path to binary needs to be correctly saved in string with respect to localized characters
-    wxString key_wstring = L"\"" + from_u8(binary_path.string()) + L"\" \"--single-instance\" \"%1\"";
-    SPDLOG_INFO("Downloader registration: Path of binary: {}", into_u8(key_wstring));
-    wxRegKey key_first(wxRegKey::HKCU, L"Software\\Classes\\prusaslicer");
-    wxRegKey key_full(wxRegKey::HKCU, L"Software\\Classes\\prusaslicer\\shell\\open\\command");
-    if (!key_first.Exists()) {
-        key_first.Create(false);
-    }
-    key_first.SetValue(L"URL Protocol", L"");
-    if (!key_full.Exists()) {
-        key_full.Create(false);
-    }
-    bool success = key_full.SetValue(L"", key_wstring);
-
-    if (!success) {
-        SPDLOG_ERROR("Failed to write registry value.");
     }
 }
 

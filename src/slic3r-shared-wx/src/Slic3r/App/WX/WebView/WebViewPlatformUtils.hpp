@@ -9,7 +9,6 @@ namespace Slic3r::App::WX::WebView {
     void delete_cookies(wxWebView* web_view, const std::string& url);
     void delete_cookies_with_counter(wxWebView* web_view, const std::string& url, std::atomic<size_t>& counter);
     void load_request(wxWebView* web_view, const std::string& address, const std::string& token);
-    void register_prusaslicer_url();
     void setup_webview_devtools(wxWebView* web_view);
 }
 
