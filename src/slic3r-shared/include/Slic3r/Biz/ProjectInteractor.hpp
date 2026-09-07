@@ -515,7 +515,7 @@ public:
     /**
      * @brief Callback from AppInstanceMessageHandler.
      */
-    void on_open_models(std::vector<boost::filesystem::path> paths) override
+    void on_open_models(const std::vector<boost::filesystem::path>& paths) override
     {
         load_models_to_project(paths);
     }
@@ -523,7 +523,7 @@ public:
     /**
      * @brief Callback from AppInstanceMessageHandler.
      */
-    void on_download_models(std::vector<std::string> message) override;
+    void on_download_models(const std::vector<std::string>& message) override;
 
     void download_model_from_printables_tab(FileDownloader::FileDownloaderMultiTicket data);
 

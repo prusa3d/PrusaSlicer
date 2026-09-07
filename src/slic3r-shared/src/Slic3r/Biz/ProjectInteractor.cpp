@@ -1012,7 +1012,7 @@ void ProjectInteractor::do_result_upload_connect(
     do_result_export_inner(id, std::move(config), std::move(data));
 }
 
-void ProjectInteractor::on_download_models(std::vector<std::string> message)
+void ProjectInteractor::on_download_models(const std::vector<std::string>& message)
 {
     if (m_raise_app_fn) {
         m_raise_app_fn();
