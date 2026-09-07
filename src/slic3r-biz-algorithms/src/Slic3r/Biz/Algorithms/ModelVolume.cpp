@@ -133,6 +133,8 @@ size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
     if (volume->text_configuration.has_value())
         volume->text_configuration.reset();
 
+    volume->reset_extra_facets();
+
     Domain::ModelObject* object = volume->get_object();
 
     size_t idx = 0;
