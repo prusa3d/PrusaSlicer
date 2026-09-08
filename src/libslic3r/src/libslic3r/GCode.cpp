@@ -1448,10 +1448,15 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
             config.set("filament_extruder_id", extruder_id);
             file.writeln(this->placeholder_parser_process("end_filament_gcode", print.config().get<std::vector<std::string>>("end_filament_gcode").at(extruder_id), extruder_id, &config));
         } else {
-            for (const std::string &end_gcode : print.config().get<std::vector<std::string>>("end_filament_gcode")) {
-                int extruder_id = (unsigned int)(&end_gcode - &print.config().get<std::vector<std::string>>("end_filament_gcode").front());
+            const std::vector<std::string>& end_filament_gcode{
+                print.config().get<std::vector<std::string>>("end_filament_gcode")};
+            for (int extruder_id{}; extruder_id < end_filament_gcode.size(); ++extruder_id) {
                 config.set("filament_extruder_id", extruder_id);
-                file.writeln(this->placeholder_parser_process("end_filament_gcode", end_gcode, extruder_id, &config));
+                file.writeln(this->placeholder_parser_process(
+                    "end_filament_gcode",
+                    end_filament_gcode.at(extruder_id),
+                    extruder_id,
+                    &config));
             }
         }
         file.writeln(this->placeholder_parser_process("end_gcode", print.config().get<std::string>("end_gcode"), m_writer.extruder()->id(), &config));
