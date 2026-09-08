@@ -139,7 +139,6 @@ public:
     void on_sla_result(const Domain::SlicingId&, SLAResult&&) override;
     void on_sla_object(const Domain::SlicingId&, Sla::Object&&) override;
     void on_status(const StatusUpdate, Domain::SlicingId) override;
-    void on_exception(std::exception_ptr exception, Domain::SlicingId) override;
     void on_wipe_tower_geometry(Slicing::OptWipeTowerGeometry&& wipe_tower_geometry, const Domain::SlicingId id) override;
     void on_extruder_candidates(std::vector<unsigned>&& extruder_candidates, const Domain::SlicingId id) override;
     void on_generated_support_points(

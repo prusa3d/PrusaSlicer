@@ -177,12 +177,14 @@ struct ConfigValue {
     template <typename T>
     requires (!std::is_enum_v<T> && !Impl::is_enum_vector<T>())
     T get() const {
+        ASSERT(holds_alternative<T>());
         return std::get<T>(m_value);
     }
 
     template <typename T>
     requires std::is_enum_v<T>
     T get() const {
+        ASSERT(holds_alternative<EnumWrapper>());
         return std::get<EnumWrapper>(m_value).get<T>();
     }
 
@@ -190,6 +192,7 @@ struct ConfigValue {
     requires (Impl::is_enum_vector<T>())
     T get() const
     {
+        ASSERT(holds_alternative<EnumVectorWrapper>());
         return std::get<EnumVectorWrapper>(m_value).get<T>();
     }
 
