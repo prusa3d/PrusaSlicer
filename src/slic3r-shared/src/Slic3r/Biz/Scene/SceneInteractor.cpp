@@ -173,14 +173,18 @@ SelectionMode transform_selection_instance_mode(
 
     if (initialize_memento) {
         memento.elements.reserve(sel.elements.size());
+    }
 
-        for (const auto& e : sel.elements) {
-            if (!e.is_wipe_tower()) {
-                continue;
-            }
-            Domain::BedInstance* bed_instance =
-                proj.project.find_bed_instance_by_id(e.wipe_tower_id.bed_instance_id);
-            ASSERT(bed_instance);
+    for (const auto& e : sel.elements) {
+        if (!e.is_wipe_tower()) {
+            continue;
+        }
+        Domain::BedInstance* bed_instance =
+            proj.project.find_bed_instance_by_id(e.wipe_tower_id.bed_instance_id);
+        if (bed_instance == nullptr) {
+            continue;
+        }
+        if (!memento.elements.contains(e)) {
             memento.elements.insert({e, {e, get_wipe_tower_transform(*bed_instance)}});
         }
     }
@@ -191,7 +195,9 @@ SelectionMode transform_selection_instance_mode(
         }
         Domain::BedInstance* bed_instance =
             proj.project.find_bed_instance_by_id(e.element.wipe_tower_id.bed_instance_id);
-        ASSERT(bed_instance);
+        if (bed_instance == nullptr) {
+            continue;
+        }
         set_wipe_tower_transformation(
             transform_product(e.original_xform, relative_transform),
             *bed_instance
@@ -3032,7 +3038,9 @@ void SceneInteractor::finalize_transform_selection(
         const Transformation xform{Transform3d{e.original_xform}};
         Domain::BedInstance* bed_instance =
             proj.project.find_bed_instance_by_id(e.element.wipe_tower_id.bed_instance_id);
-        ASSERT(bed_instance);
+        if (bed_instance == nullptr) {
+            continue;
+        }
         set_wipe_tower_transformation(xform, *bed_instance);
         invoke_listeners<ISceneChangedListener>(
             [&](auto listener) { listener->on_wipe_tower_moved(e.element.wipe_tower_id); }

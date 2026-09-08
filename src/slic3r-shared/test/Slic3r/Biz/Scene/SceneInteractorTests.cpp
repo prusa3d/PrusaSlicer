@@ -670,3 +670,36 @@ TEST_CASE_METHOD(
 
     CHECK(memento.elements.empty());
 }
+
+TEST_CASE_METHOD(TransformInProgressFixture, "Wipe tower bed removed during drag", "[SceneInteractor]")
+{
+    const Project& project{project_interactor.selected_project()};
+    Scene::TransformMemento memento;
+
+    const Domain::ElementRef wipe_tower_ref{
+        Domain::SlicingId{project_interactor.selected_project_id(), second_bed_ref.instance_id}
+    };
+    scene_interactor.set_object_selection(
+        Scene::ObjectSelection{Scene::SelectionMode::Instance, {wipe_tower_ref}}
+    );
+
+    scene_interactor.transform_selection(translation(10), memento);
+    REQUIRE(memento.elements.contains(wipe_tower_ref));
+
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_removed(_));
+        scene_interactor.remove_bed_instance(second_bed_ref);
+    }
+
+    scene_interactor.transform_selection(translation(20), memento);
+
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        scene_interactor.finalize_transform_selection(memento, false);
+    }
+
+    CHECK(project.config_containers().front()->bed_instances().size() == 1);
+    CHECK_FALSE(scene_interactor.object_selection().is_selected(wipe_tower_ref));
+    CHECK(memento.elements.empty());
+}
