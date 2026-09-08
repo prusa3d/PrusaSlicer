@@ -10,6 +10,7 @@
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 #include "Slic3r/Biz/Algorithms/Geometry/ConvexHull.hpp"
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/ModelVolume.hpp"
 #include "Slic3r/Biz/Algorithms/Point.hpp"
 #include "Slic3r/Biz/Algorithms/VirtualExtruder.hpp"
 #include "Slic3r/Biz/Scene/Selection.hpp"
@@ -432,11 +433,18 @@ void fix_volume_transformation(ModelVolume& volume) {
     std::optional<Transform3d> &fix_opt = volume.emboss_shape->legacy_fix_3mf_tr;
     if (!fix_opt.has_value())
         return; // version without storing fix matrix (can't help)
-    
-    volume.set_transformation(volume.get_matrix() * fix_opt->inverse());
-    indexed_triangle_set its = volume.mesh_ptr()->its; // copy
-    its_transform(its, *fix_opt);
-    volume.set_mesh(Algorithms::TriangleMesh::construct(std::move(its)));
+
+    // The legacy fix expects a mesh centered at its bounding box center.
+    Transform3d mesh_trafo = *fix_opt;
+    mesh_trafo.translate(-Algorithms::BoundingBox::center(volume.mesh().bounding_box()));
+
+    TriangleMesh mesh = volume.mesh();
+    mesh.transform(mesh_trafo, true);
+
+    volume.set_transformation(volume.get_matrix() * mesh_trafo.inverse());
+    volume.set_mesh(std::move(mesh));
+    Algorithms::ModelVolume::calculate_convex_hull(volume);
+
     // data for fix transformation is not useable anymore
     fix_opt.reset();
 }
