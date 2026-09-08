@@ -322,7 +322,19 @@ void LogicalPrinterSettingsDialog::create_page_list()
                 UndoSnapshotType::SelectPrinterPreset
             );
         },
-        [this](size_t index) { m_preset_favorite_filter->invalidate(); },
+        [this](size_t index) {
+            const auto item = m_printer_list_view->item_at(index)->preset_item();
+            auto& favorites = AppServices::instance().app_config().app_settings_advanced().printer_favorite_presets;
+            if (favorites.contains(item.id)) {
+                try {
+                    m_project_interactor.preset_interactor().ensure_printer_profiles(item.hw_printer_config_id);
+                } catch (const std::exception& e) {
+                    favorites.erase(item.id);
+                    AppServices::instance().dialog_manager().show_error_dialog(e.what());
+                }
+            }
+            m_preset_favorite_filter->invalidate();
+        },
         m_project_interactor.preset_interactor()
     );
 

@@ -22,6 +22,7 @@ static Yoga::Item* append_item(Yoga::Item* parent, Yoga::ItemPtr item)
 
 struct AddPrinterPanel::PrinterFamily
 {
+    std::string vendor_id;
     std::string base_model;
     std::vector<AddPrinterPanel::Printer> printers;
 };
@@ -125,17 +126,11 @@ AddPrinterPanel::AddPrinterPanel(
     left_bar->set_width(240_fpx);
     left_bar->set_padding({0, 20_fpx, 0, 20_fpx});
     left_bar->set_orientation(Orientation::Vertical);
+    m_vendors = left_bar;
 
     auto vertical_separator{content->emplace_back<Rectangle>()};
     vertical_separator->set_fill(secondary_color);
     vertical_separator->set_width(1_px);
-
-    auto source{left_bar->emplace_back<LayoutButton>("Prusa3D")};
-    source->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
-    source->set_rounding(0);
-    source->set_checkable(true);
-    source->set_checked(true);
-    source->set_content_justify_content(YGJustifyFlexStart);
 
     m_printers = content->emplace_back<ScrollArea>();
     m_printers->set_flex_grow(1);
@@ -214,6 +209,32 @@ ItemPtr AddPrinterPanel::create_printer_family(const PrinterFamily& printer_fami
 
 void AddPrinterPanel::reload()
 {
+    std::map<std::string, std::string> vendors{{"", Biz::_u8L("All vendors")}};
+    const auto& bundles = m_project_interactor.workbench().preset_bundle().vendor_bundles;
+    for (std::size_t i = 0; i < m_sort_filter->size(); ++i) {
+        const auto& item = m_sort_filter->at(i);
+        const auto& config = m_project_interactor.preset_interactor()
+            .get_printer_config(m_project_interactor.selected_project_id(), item.hw_printer_config_id).first.get();
+        const auto vendor = bundles.find(config.vendor_id);
+        vendors.emplace(config.vendor_id, vendor == bundles.end() ? config.vendor_id : vendor->second.vendor_data.info.name);
+    }
+    if (!vendors.contains(m_selected_vendor)) m_selected_vendor.clear();
+    if (vendors != m_vendor_names) {
+        m_vendor_names = vendors;
+        while (!m_vendors->items().empty()) m_vendors->remove(m_vendors->items().back());
+        for (const auto& [id, name] : vendors) {
+            auto button = m_vendors->emplace_back<LayoutButton>(name);
+            button->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
+            button->set_rounding(0);
+            button->set_checkable(true);
+            button->set_flex_shrink(0);
+            button->set_content_justify_content(YGJustifyFlexStart);
+            button->callbacks().action = [this, id] { m_selected_vendor = id; reload(); };
+        }
+    }
+    std::size_t vendor_index = 0;
+    for (const auto& [id, name] : m_vendor_names)
+        static_cast<LayoutButton*>(m_vendors->items()[vendor_index++])->set_checked(id == m_selected_vendor);
     m_detail->set_visible(false);
     m_printers->set_visible(true);
     std::vector<PrinterFamily> printer_families;
@@ -227,10 +248,12 @@ void AddPrinterPanel::reload()
                                     preset_item.hw_printer_config_id)
                 .first.get()};
 
+        if (!m_selected_vendor.empty() && config.vendor_id != m_selected_vendor) continue;
+
         const auto it{
             std::ranges::find_if(printer_families,
                                  [&](const PrinterFamily& family)
-                                 { return family.base_model == config.model.base_model; })};
+                                 { return family.vendor_id == config.vendor_id && family.base_model == config.model.base_model; })};
 
         const AddPrinterPanel::Printer printer_settings{
             .preset_item_id = preset_item.id,
@@ -239,7 +262,7 @@ void AddPrinterPanel::reload()
             .sheets         = m_project_interactor.preset_interactor().get_sheet_items(config)};
 
         if (it == printer_families.end()) {
-            printer_families.push_back(PrinterFamily{.base_model = config.model.base_model,
+            printer_families.push_back(PrinterFamily{.vendor_id = config.vendor_id, .base_model = config.model.base_model,
                                                      .printers   = {printer_settings}});
         } else {
             it->printers.push_back(printer_settings);

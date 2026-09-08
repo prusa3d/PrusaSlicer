@@ -110,6 +110,8 @@ public:
     PresetInteractor(PresetInteractor&&) = default;
 
     void load_preset_bundle(const IO::BundlePaths& paths);
+    void ensure_printer_profiles(const std::string& hw_config_id);
+    void ensure_printer_profiles(Domain::Preset::HwPrinterConfig config);
     void save_user_preset(
         Domain::Preset::PresetKind kind,
         size_t slot_index

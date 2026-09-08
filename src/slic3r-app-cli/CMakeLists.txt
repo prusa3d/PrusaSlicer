@@ -43,8 +43,11 @@ if (SLIC3R_BUILD_TESTS)
     target_include_directories(slic3r-app-cli-tests PRIVATE test src)
     target_link_libraries(slic3r-app-cli-tests PRIVATE slic3r-app-cli Catch2::Catch2)
 
-    # The tests run the CLI against the real preset bundle from the repository.
-    set(CLI_TEST_RESOURCES_DIR ${CMAKE_SOURCE_DIR}/resources)
+    # Keep the generic CLI round-trip matrix deterministic. Optional Orca
+    # drop-ins beside resources/presets are exercised by orca_profile_import
+    # and its end-to-end parity_smoke.ps1, not by this native preset fixture.
+    set(CLI_TEST_RESOURCES_DIR ${CMAKE_CURRENT_BINARY_DIR}/test-resources)
+    file(COPY ${CMAKE_SOURCE_DIR}/resources/presets DESTINATION ${CLI_TEST_RESOURCES_DIR})
     file(TO_NATIVE_PATH "${CLI_TEST_RESOURCES_DIR}" CLI_TEST_RESOURCES_DIR)
 
     target_compile_definitions(slic3r-app-cli-tests PRIVATE CLI_TEST_RESOURCES_DIR=R"\(${CLI_TEST_RESOURCES_DIR}\)")

@@ -357,13 +357,6 @@ static ItemPtr create_changelog_screen(const Theme& theme, std::function<void()>
                 },
             },
             {{Biz::_u8L("Standalone G-code viewer is not available in this release.")}},
-            {
-                {Biz::_u8L("Third-party printer profiles are not included in this alpha.")},
-                {
-                    Biz::_u8L("They will be added later."),
-                    secondary_color,
-                },
-            },
         })};
     negative_notes->set_gap(notes_gap);
 
@@ -1355,6 +1348,13 @@ void WelcomeDialog::finalize(const std::vector<PrinterToAdd>& printers)
         printer_preset_item_ids.push_back(printer.preset_item_id);
     }
 
+    try {
+        for (const auto& config : printer_configs)
+            m_project_interactor.preset_interactor().ensure_printer_profiles(config);
+    } catch (const std::exception& e) {
+        AppServices::instance().dialog_manager().show_error_dialog(e.what());
+        return;
+    }
     m_project_interactor.preset_interactor().update_changed_printer_configs(printer_configs);
 
     AppSettingsAdvanced& app_settings_advanced{

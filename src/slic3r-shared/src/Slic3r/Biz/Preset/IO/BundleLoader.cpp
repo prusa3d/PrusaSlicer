@@ -4,6 +4,7 @@
 #include "Slic3r/Biz/Yaml/Yaml.hpp"
 #include "Slic3r/Biz/Preset/IO/PresetLoader.hpp"
 #include "Slic3r/Biz/Preset/IO/HwConfigLoader.hpp"
+#include "Slic3r/Biz/Preset/IO/OrcaProfileLoader.hpp"
 #include "Slic3r/Biz/CerealUtils.hpp"
 
 #include <boost/filesystem/directory.hpp>
@@ -14,6 +15,7 @@
 
 #include <functional>
 #include <numeric>
+#include <algorithm>
 
 #include <cereal/archives/binary.hpp>
 
@@ -156,6 +158,7 @@ Domain::Preset::Bundle load_bundle(const BundlePaths& bundle_paths)
         }
     }
 
+    load_orca_profiles(bundle_paths, bundle, false, true);
     return bundle;
 }
 
@@ -189,9 +192,15 @@ static size_t hash_folder_recursive(const fs::path& path)
 {
     size_t seed = 0;
     try {
+        std::vector<fs::path> files;
         for (const auto& entry : fs::recursive_directory_iterator(path)) {
             if (fs::is_regular_file(entry))
-                seed ^= combine_hashes(get_file_hash(entry.path().string()), seed);
+                files.push_back(entry.path());
+        }
+        std::sort(files.begin(), files.end());
+        for (const auto& file : files) {
+            seed = combine_hashes(seed, std::hash<std::string>{}(file.lexically_relative(path).string()));
+            seed = combine_hashes(seed, get_file_hash(file.string()));
         }
     } catch (const fs::filesystem_error& e) {
         throw std::runtime_error(std::string("Error iterating directory ") + path.string() + ": " + e.what());
@@ -202,6 +211,11 @@ static size_t hash_folder_recursive(const fs::path& path)
 static size_t get_cache_footprint(const BundlePaths& bundle_paths, const std::string& slicer_version)
 {
     size_t folder_hash = 0;
+    for (const auto& [vendor, printers] : bundle_paths.orca_selected_printers) {
+        folder_hash = combine_hashes(folder_hash, std::hash<std::string>{}(vendor));
+        for (const auto& printer : printers)
+            folder_hash = combine_hashes(folder_hash, std::hash<std::string>{}(printer));
+    }
     boost::system::error_code ec;
 
     auto update_folder_hash = [&folder_hash, &ec](const std::string& path)
@@ -213,13 +227,17 @@ static size_t get_cache_footprint(const BundlePaths& bundle_paths, const std::st
     };
 
     update_folder_hash(bundle_paths.app_bundle_path);
+    for (const auto& root : orca_profile_roots(bundle_paths)) {
+        folder_hash = combine_hashes(folder_hash, std::hash<std::string>{}(root.string()));
+        update_folder_hash(root.string());
+    }
     update_folder_hash(bundle_paths.local_bundle_path);
     update_folder_hash(bundle_paths.user_bundle_path);
     // Combine the two hashes and a hash of slicer version
     size_t hash = combine_hashes(folder_hash, std::hash<std::string>{}(slicer_version));
 
     // Increment the following value to enforce invalidation of caches from older versions:
-    size_t cache_epoch = 13;
+    size_t cache_epoch = 16;
     return combine_hashes(hash, std::hash<int>{}(cache_epoch));
 }
 

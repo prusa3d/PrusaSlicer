@@ -10,6 +10,7 @@
 #include "Slic3r/Biz/Preset/HwConfigEvaluator.hpp"
 #include "Slic3r/Biz/Preset/PresetEvaluator.hpp"
 #include "Slic3r/Biz/Preset/IO/BundleLoader.hpp"
+#include "Slic3r/Biz/Preset/IO/OrcaProfileLoader.hpp"
 #include "Slic3r/Biz/Preset/IO/PresetSaver.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Biz/Preset/ProjectPresetView.hpp"
@@ -237,7 +238,10 @@ void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bu
             for (size_t i = r.begin(); i != r.end(); ++i) {
                 try {
                     const auto& hw_config = vendor_bundle.printer_configs[i];
-                    auto epps = preset_evaluator.evaluate(hw_config, true);
+                    const bool catalog_only = vendor_id.starts_with("Orca-")
+                        && (!m_bundle_paths.orca_selected_printers.contains(vendor_id)
+                            || !m_bundle_paths.orca_selected_printers.at(vendor_id).contains(hw_config.model.model));
+                    auto epps = preset_evaluator.evaluate(hw_config, true, catalog_only);
                     {
                         std::lock_guard<std::mutex> guard(mut);
                         preset_bundle.evaluated_presets[hw_config.id] = std::move(epps);
@@ -280,7 +284,10 @@ void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bu
             const auto& hw_config = ctx.runtime_presets.printer_configs.at(std::string(hw_id));
 
             try {
-                auto epps = preset_evaluator.evaluate(hw_config, true);
+                const bool catalog_only = vendor_id.starts_with("Orca-")
+                    && (!m_bundle_paths.orca_selected_printers.contains(vendor_id)
+                        || !m_bundle_paths.orca_selected_printers.at(vendor_id).contains(hw_config.model.model));
+                auto epps = preset_evaluator.evaluate(hw_config, true, catalog_only);
                 {
                     std::lock_guard<std::mutex> guard(mut);
                     append_evaluated_presets_to_runtime(ctx.runtime_presets, hw_config, epps);
@@ -295,8 +302,62 @@ void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bu
 
 }
 
-void PresetInteractor::load_preset_bundle(const IO::BundlePaths& bundle_paths)
+void PresetInteractor::ensure_printer_profiles(const std::string& hw_config_id)
 {
+    ensure_printer_profiles(get_printer_config(hw_config_id).first.get());
+}
+
+void PresetInteractor::ensure_printer_profiles(Domain::Preset::HwPrinterConfig config)
+{
+    // Copy identifiers before evaluation invalidates references into the bundle.
+    const auto& vendor_id = config.vendor_id;
+    if (!vendor_id.starts_with("Orca-") || !m_workbench.preset_bundle().vendor_bundles.contains(vendor_id)) return;
+    auto paths = m_bundle_paths;
+    if (!paths.orca_selected_printers[vendor_id].insert(config.model.model).second) return;
+    auto& bundle = m_workbench.preset_bundle();
+    Domain::Preset::Bundle converted;
+    for (const auto& [id, vendor] : bundle.vendor_bundles)
+        if (id != vendor_id) converted.vendor_bundles.emplace(id, Domain::Preset::VendorBundle{});
+    IO::load_orca_profiles(paths, converted, false, true);
+    if (!converted.vendor_bundles.contains(vendor_id))
+        throw std::runtime_error("Unable to load Orca printer profiles: " + config.name);
+    auto& loaded = converted.vendor_bundles.at(vendor_id);
+    PresetEvaluator evaluator(loaded.presets);
+    std::map<std::string, PresetEvaluator::EvaluatedPrinterPresets> evaluated;
+    for (const auto& [id, hw] : bundle.printer_configs) {
+        if (hw.vendor_id != vendor_id || hw.model.model != config.model.model) continue;
+        auto presets = evaluator.evaluate(hw);
+        if (presets.empty() || std::ranges::all_of(presets, [](const auto& p) { return p.prints.empty(); }))
+            throw std::runtime_error("No usable Orca slicing profiles for " + config.name);
+        evaluated.emplace(id, std::move(presets));
+    }
+    std::vector<std::tuple<size_t, std::string, PresetEvaluator::EvaluatedPrinterPresets>> runtime_evaluated;
+    for (const auto& [project_id, ctx] : m_project_contexts) {
+        for (const auto& [id, hw] : ctx.runtime_presets.printer_configs) {
+            if (hw.vendor_id == vendor_id && hw.model.model == config.model.model)
+                runtime_evaluated.emplace_back(project_id, id, evaluator.evaluate(hw));
+        }
+    }
+    auto& vendor = bundle.vendor_bundles.at(vendor_id);
+    vendor.presets = std::move(loaded.presets);
+    vendor.preset_names = std::move(loaded.preset_names);
+    // Preserve evaluated settings for other printers: UI accessors may point into them.
+    for (auto& [id, presets] : evaluated)
+        bundle.evaluated_presets[id] = std::move(presets);
+    for (const auto& [project_id, id, presets] : runtime_evaluated) {
+        auto& runtime = m_project_contexts.at(project_id).runtime_presets;
+        std::erase_if(runtime.printer[id], [](const auto& p) { return p.origin != Domain::Preset::PresetOrigin::Runtime; });
+        append_evaluated_presets_to_runtime(runtime, runtime.printer_configs.at(id), presets);
+    }
+    m_bundle_paths = std::move(paths);
+}
+
+void PresetInteractor::load_preset_bundle(const IO::BundlePaths& requested_paths)
+{
+    auto bundle_paths = requested_paths;
+    for (const auto& [vendor, printers] : m_bundle_paths.orca_selected_printers)
+        bundle_paths.orca_selected_printers[vendor].insert(printers.begin(), printers.end());
+    m_bundle_paths = bundle_paths;
     std::optional<Domain::Preset::Bundle> preset_bundle_opt;
 #if !defined(NDEBUG) && !DEBUG_CONDITION_EVAL && SLIC3R_DEBUG_PRESET_CACHE
     namespace fs = boost::filesystem;
@@ -321,18 +382,14 @@ void PresetInteractor::load_preset_bundle(const IO::BundlePaths& bundle_paths)
         // TODO: remove this when config wizard is ready
         {
             HwConfigEvaluator config_eval;
-            for (const auto& vendor : {"PrusaResearch", "PrusaResearchSLA"}) {
-                auto vendor_bundle_it = preset_bundle.vendor_bundles.find(vendor);
-                ASSERT(vendor_bundle_it != preset_bundle.vendor_bundles.end() || strcmp(vendor, "PrusaResearch") != 0);
-                if (vendor_bundle_it == preset_bundle.vendor_bundles.end()
-                    || std::ranges::any_of(
+            for (auto& [vendor, vendor_bundle] : preset_bundle.vendor_bundles) {
+                if (std::ranges::any_of(
                         preset_bundle.printer_configs | std::views::values,
                         [&](const auto& hw_config) { return hw_config.vendor_id == vendor; }
                     ))
                 {
                     continue;
                 }
-                auto& vendor_bundle = vendor_bundle_it->second;
                 for (const auto& hw_printer_template : vendor_bundle.vendor_data.printer_configs) {
                     auto printer_config = config_eval.create_printer_config(
                         hw_printer_template,
@@ -1371,6 +1428,7 @@ void PresetInteractor::fill_config_container_with_selected_preset(
     ListenerInvokeLaterBag& bag
 )
 {
+    ensure_printer_profiles(printer_hw_config_id);
     const auto& hw_config      = get_printer_config(printer_hw_config_id).first.get();
 
     if (printer_only) {
@@ -1601,15 +1659,35 @@ void PresetInteractor::fill_printer_presets(bool no_data_update, ListenerInvokeL
 
         idx++;
     }
+    size_t default_index = 0;
+    // A blank project must not activate the first catalog printer just because
+    // its display name sorts before the native defaults.
+    for (size_t i = 0; i < items.size(); ++i) {
+        const auto& item = items.at(i);
+        const auto& hw = get_printer_config(item.hw_printer_config_id).first.get();
+        if (!hw.vendor_id.starts_with("Orca-")
+            || (m_bundle_paths.orca_selected_printers.contains(hw.vendor_id)
+                && m_bundle_paths.orca_selected_printers.at(hw.vendor_id).contains(hw.model.model))) {
+            default_index = i;
+            break;
+        }
+    }
+    size_t selected_index_val = selected_index.value_or(selected_index_by_hw.value_or(default_index));
+    std::optional<PresetItem> selected_item;
+    if (!items.empty())
+        selected_item = items.at(selected_index_val);
+
     m_printer_presets.items().set_items(std::move(items));
-    size_t selected_index_val = selected_index.value_or(selected_index_by_hw.value_or(0));
+    if (!selected_item.has_value()) {
+        m_printer_presets.set_selected_index(Domain::INVALID_ID);
+        return;
+    }
 
     // make sure the new selection is propagated
     if (!selected_index.has_value()) {
-        const auto& selected_item = m_printer_presets.items().at(selected_index_val);
         select_printer_preset_internal(
-            selected_item.hw_printer_config_id,
-            selected_item.id,
+            selected_item->hw_printer_config_id,
+            selected_item->id,
             no_data_update,
             bag
         );
@@ -1936,6 +2014,7 @@ void PresetInteractor::select_printer_preset_internal(
     ListenerInvokeLaterBag& bag
 )
 {
+    ensure_printer_profiles(printer_hw_config_id);
     auto& project   = m_workbench.project(m_selected_project_id);
     const auto& ccc = selected_config_container_context();
     auto* cc        = project.find_config_container(ccc.config_container_id);
@@ -3323,6 +3402,12 @@ tl::expected<void, std::string>  PresetInteractor::load_selected_preset_from_3mf
 
     bool runtime_presets_evaluation_required = false;
     const auto& preset_bundle = m_workbench.preset_bundle();
+
+    try {
+        ensure_printer_profiles(selected_preset.hw_config);
+    } catch (const std::exception& e) {
+        return tl::unexpected(std::string(e.what()));
+    }
 
     // update origin:
     selected_preset.printer.origin = PresetOrigin::Runtime;
