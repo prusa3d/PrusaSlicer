@@ -207,7 +207,7 @@ SelectionMode transform_selection_instance_mode(
         if (volume_transform_mode) {
             object_ids.insert(inst->get_object()->id().id);
         } else {
-            if (initialize_memento) {
+            if (!memento.elements.contains(e)) {
                 memento.elements.insert({e, {e, inst->get_matrix().matrix()}});
             }
             inst->set_transformation(
@@ -253,7 +253,9 @@ void transform_selection_volume_mode(const SceneInteractorProjectContext& proj, 
     const bool initialize_memento = memento.elements.empty();
     const auto& sel               = proj.object_selection;
     DEBUG_ASSERT(sel.mode == SelectionMode::Volume);
-    ASSERT(!sel.elements.empty());
+    if (sel.elements.empty()) {
+        return;
+    }
     const auto& first_el = sel.elements[0];
     // assert that all elements are of same instance
     DEBUG_ASSERT(
@@ -273,7 +275,7 @@ void transform_selection_volume_mode(const SceneInteractorProjectContext& proj, 
     for (const auto& e : sel.elements) {
         DEBUG_ASSERT(e.volume_id != 0);
         auto* vol = proj.project.find_volume_by_id(e.object_id, e.volume_id);
-        if (initialize_memento)
+        if (!memento.elements.contains(e))
             memento.elements.insert({e, {e, vol->get_matrix().matrix()}});
         vol->set_transformation(transform_product(memento.elements[e].original_xform, volume_relative_transform));
     }
@@ -3056,9 +3058,15 @@ void SceneInteractor::finalize_transform_selection(
             }
             if (vol_mode) {
                 auto* vol = proj.project.find_volume_by_id(e.element.object_id, e.element.volume_id);
+                if (vol == nullptr) {
+                    continue;
+                }
                 vol->set_transformation(xform);
             } else {
                 auto* inst = proj.project.find_instance_by_id(e.element.object_id, e.element.instance_id);
+                if (inst == nullptr) {
+                    continue;
+                }
                 inst->set_transformation(xform);
             }
         }
@@ -3066,6 +3074,9 @@ void SceneInteractor::finalize_transform_selection(
         changes = update_elements_bed_placement(proj.object_selection.elements, vol_mode, false);
     } else if (!canceled) {
         for (const auto& bed_ref : memento.changes.updated_beds) {
+            if (proj.project.find_bed_instance_by_id(bed_ref.instance_id) == nullptr) {
+                continue;
+            }
             invoke_slicing_input_changed(bed_ref);
         }
     }

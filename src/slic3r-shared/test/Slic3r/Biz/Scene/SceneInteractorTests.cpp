@@ -499,3 +499,174 @@ TEST_CASE_METHOD(SceneInteractorFixture, "Bed selection", "[SceneInteractor]")
     CHECK(scene_interactor.bed_selection().is_selected(beds[0]));
     CHECK(scene_interactor.bed_selection().last_selected_bed() == beds[0]);
 }
+
+struct TransformInProgressFixture : SceneInteractorFixture
+{
+    TransformInProgressFixture()
+    {
+        const auto cube{
+            []()
+            { return Domain::TriangleMesh{TriMesh::make_cube(cube_side, cube_side, cube_side)}; }};
+
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+
+        const Domain::Project& project{project_interactor.selected_project()};
+
+        scene_interactor.new_object_from_mesh(cube());
+        const Domain::ModelObject* first_object{project.model().objects.front()};
+        first_instance_ref = {first_object->id().id, first_object->instances.front()->id().id};
+
+        // Two volumes, selecting a single volume would otherwise be promoted to Instance mode.
+        scene_interactor.new_object_from_mesh(cube());
+        scene_interactor.add_volume_from_mesh(cube(), Domain::ModelVolumeType::MODEL_PART);
+        const Domain::ModelObject* second_object{project.model().objects.back()};
+        second_instance_ref = {second_object->id().id, second_object->instances.front()->id().id};
+        second_volume_ref   = {
+            second_object->id().id,
+            second_object->instances.front()->id().id,
+            second_object->volumes.front()->id().id};
+
+        const Domain::ConfigContainer* config_container{project.config_containers().front().get()};
+        scene_interactor.add_bed_instance(config_container->id().id);
+        const Domain::ConfigContainer::BedInstanceList& bed_instances{
+            config_container->bed_instances()};
+        second_bed_ref = Domain::BedRef{config_container->id().id, bed_instances[1]->id().id};
+        bed_pitch      = bed_instances[1]->transformation.get_offset()
+            - bed_instances[0]->transformation.get_offset();
+    }
+
+    static constexpr double cube_side{20.0}; // mm
+
+    static Domain::SquareMatrix4d translation(double offset)
+    {
+        Transform3d xform{Transform3d::Identity()};
+        xform.translate(Vec3d{offset, 0, 0});
+        return xform.matrix();
+    }
+
+    Domain::ElementRef first_instance_ref;
+    Domain::ElementRef second_instance_ref;
+    Domain::ElementRef second_volume_ref;
+    Domain::BedRef second_bed_ref;
+    Vec3d bed_pitch;
+};
+
+TEST_CASE_METHOD(
+    TransformInProgressFixture,
+    "Selection change during object drag",
+    "[SceneInteractor]")
+{
+    const Project& project{project_interactor.selected_project()};
+    Scene::TransformMemento memento;
+
+    scene_interactor.set_object_selection(
+        Scene::ObjectSelection{Scene::SelectionMode::Instance, {second_instance_ref}});
+    const Domain::ModelInstance& second_instance{*project.find_instance_by_id(
+        second_instance_ref.object_id,
+        second_instance_ref.instance_id)};
+    const double second_original_x{second_instance.get_matrix().translation().x()};
+    scene_interactor.transform_selection(translation(10), memento);
+
+    scene_interactor.set_object_selection(Scene::ObjectSelection{
+        Scene::SelectionMode::Instance,
+        {first_instance_ref, second_instance_ref}});
+    const Domain::ModelInstance& first_instance{
+        *project.find_instance_by_id(first_instance_ref.object_id, first_instance_ref.instance_id)};
+    const double first_original_x{first_instance.get_matrix().translation().x()};
+    scene_interactor.transform_selection(translation(20), memento);
+
+    CHECK(first_instance.get_matrix().translation().x()
+          == Catch::Approx(first_original_x + 20.0).margin(1e-6));
+    CHECK(second_instance.get_matrix().translation().x()
+          == Catch::Approx(second_original_x + 20.0).margin(1e-6));
+}
+
+TEST_CASE_METHOD(
+    TransformInProgressFixture,
+    "Bed instance removed during object drag",
+    "[SceneInteractor]")
+{
+    const Project& project{project_interactor.selected_project()};
+    Scene::TransformMemento memento;
+
+    scene_interactor.set_object_selection(
+        Scene::ObjectSelection{Scene::SelectionMode::Instance, {first_instance_ref}});
+    scene_interactor.transform_selection(translation(bed_pitch.x()), memento);
+    REQUIRE(project.config_containers().front()->bed_instances()[1]->model_instances.size() == 1);
+    REQUIRE(memento.changes.updated_beds.contains(second_bed_ref));
+
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_removed(_));
+        scene_interactor.remove_bed_instance(second_bed_ref);
+    }
+
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        scene_interactor.finalize_transform_selection(memento, false);
+    }
+
+    CHECK(project.config_containers().front()->bed_instances().size() == 1);
+    CHECK(project.model().objects.size() == 1);
+    CHECK(memento.elements.empty());
+}
+
+TEST_CASE_METHOD(
+    TransformInProgressFixture,
+    "Selection emptied during volume drag",
+    "[SceneInteractor]")
+{
+    const Project& project{project_interactor.selected_project()};
+    Scene::TransformMemento memento;
+
+    scene_interactor.set_object_selection(
+        Scene::ObjectSelection{Scene::SelectionMode::Volume, {second_volume_ref}});
+    const Domain::ModelInstance& second_instance{
+        *project.find_instance_by_id(second_volume_ref.object_id, second_volume_ref.instance_id)};
+    const Domain::ModelVolume& second_volume{
+        *project.find_volume_by_id(second_volume_ref.object_id, second_volume_ref.volume_id)};
+    const auto world_x = [&]
+    { return (second_instance.get_matrix() * second_volume.get_matrix()).translation().x(); };
+    const double world_original_x{world_x()};
+
+    scene_interactor.transform_selection(translation(10), memento);
+    REQUIRE(world_x() == Catch::Approx(world_original_x + 10.0).margin(1e-6));
+
+    scene_interactor.set_object_selection(Scene::ObjectSelection{Scene::SelectionMode::Volume, {}});
+    scene_interactor.transform_selection(translation(20), memento);
+
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        scene_interactor.finalize_transform_selection(memento, false);
+    }
+
+    CHECK(world_x() == Catch::Approx(world_original_x + 10.0).margin(1e-6));
+}
+
+TEST_CASE_METHOD(
+    TransformInProgressFixture,
+    "Dragged volume deleted during drag",
+    "[SceneInteractor]")
+{
+    const Project& project{project_interactor.selected_project()};
+    Scene::TransformMemento memento;
+
+    scene_interactor.set_object_selection(
+        Scene::ObjectSelection{Scene::SelectionMode::Volume, {second_volume_ref}});
+    scene_interactor.transform_selection(translation(10), memento);
+    REQUIRE(memento.elements.contains(second_volume_ref));
+
+    scene_interactor.set_object_selection(Scene::ObjectSelection{
+        Scene::SelectionMode::Instance,
+        {{second_volume_ref.object_id, second_volume_ref.instance_id}}});
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        scene_interactor.delete_selected_elements();
+    }
+    REQUIRE(project.model().objects.size() == 1);
+
+    scene_interactor.set_object_selection(Scene::ObjectSelection{Scene::SelectionMode::Volume, {}});
+    scene_interactor.finalize_transform_selection(memento, true);
+
+    CHECK(memento.elements.empty());
+}
