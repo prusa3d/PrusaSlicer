@@ -13,6 +13,7 @@
 #include "Slic3r/Domain/Bed.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/Project.hpp"
+#include "Slic3r/Domain/TemplateUtils.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -49,6 +50,7 @@ using Slic3r::Domain::SelectionId;
 using Slic3r::Domain::SLAConfigLocation;
 using Slic3r::Domain::Vec2d;
 using Slic3r::Domain::Preset::HwPrinterConfig;
+using Slic3r::Domain::Preset::SelectedPreset;
 
 using namespace Slic3r::Biz;
 
@@ -151,12 +153,74 @@ static std::optional<SelectionId> load_geometry_project(
 }
 
 /**
+ * @brief Applies the preset and configuration to the selected config container.
+ *
+ * @return False when the presets could not be registered for the selected project.
+ */
+static bool apply_preset_and_config(CLIRuntime& runtime, const PresetAndConfig& preset_and_config)
+{
+    ProjectInteractor& project_interactor = runtime.project_interactor();
+    PresetInteractor& preset_interactor   = project_interactor.preset_interactor();
+
+    // The presets have to be registered in the project before they can be selected.
+    SelectedPreset preset_to_select =
+        SelectedPreset::make(preset_and_config.preset_metadata, preset_and_config.config_pack);
+    const tl::expected<void, std::string> registration_result =
+        preset_interactor.load_selected_preset_from_3mf(
+            project_interactor.selected_project_id(),
+            preset_to_select
+        );
+
+    if (!registration_result.has_value()) {
+        boost::nowide::cerr
+            << "Error while applying the loaded configuration: "
+            << registration_result.error()
+            << std::endl;
+        return false;
+    }
+
+    preset_interactor
+        .select_printer_preset(preset_to_select.hw_config.id, preset_to_select.printer.id);
+    preset_interactor.select_print_preset(preset_to_select.print.id);
+
+    for (size_t tool_idx = 0; tool_idx < preset_to_select.tools.size(); ++tool_idx) {
+        preset_interactor.select_tool_print_preset(tool_idx, preset_to_select.tools[tool_idx].id);
+    }
+
+    for (size_t slot_idx = 0; slot_idx < preset_to_select.materials.size(); ++slot_idx) {
+        preset_interactor.select_material_preset(slot_idx, preset_to_select.materials[slot_idx].id);
+    }
+
+    // The project settings are not part of the presets, so they are copied separately.
+    std::visit(
+        Domain::overloaded{
+            [&project_interactor](const ConfigPackFDM& config_pack_fdm)
+            {
+                project_interactor.selected_config_container().project_settings() =
+                    config_pack_fdm.project;
+            },
+            [](const ConfigPackSLA&)
+            {
+                // TODO: Copy the SLA project settings once ConfigPackSLA has them.
+            }
+        },
+        preset_and_config.config_pack
+    );
+
+    return true;
+}
+
+/**
  * @brief Loads the geometry and configuration of the given 3MF file into a new project.
  *
+ * @param base_preset_config Preset and configuration applied over the configuration of the loaded project.
  * @return ID of the loaded project, or std::nullopt on failure.
  */
-static std::optional<SelectionId>
-load_3mf_project(CLIRuntime& runtime, const std::string& input_file)
+static std::optional<SelectionId> load_3mf_project(
+    CLIRuntime& runtime,
+    const std::string& input_file,
+    const std::optional<PresetAndConfig>& base_preset_config
+)
 {
     ProjectInteractor& project_interactor = runtime.project_interactor();
 
@@ -184,6 +248,12 @@ load_3mf_project(CLIRuntime& runtime, const std::string& input_file)
         input_file,
         load_result_listener.loaded_project_id.value()
     );
+
+    if (base_preset_config.has_value()
+        && !apply_preset_and_config(runtime, base_preset_config.value()))
+    {
+        return std::nullopt;
+    }
 
     return load_result_listener.loaded_project_id;
 }
@@ -216,7 +286,7 @@ static bool process_input_files(
                     continue;
                 }
             } else {
-                project_id = load_3mf_project(runtime, input_file);
+                project_id = load_3mf_project(runtime, input_file, base_preset_config);
                 if (!project_id.has_value()) {
                     return false;
                 }
