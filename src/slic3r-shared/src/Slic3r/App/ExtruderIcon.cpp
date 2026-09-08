@@ -17,6 +17,7 @@ ExtruderIcon::ExtruderIcon()
     m_label->set_flex_grow(1);
     m_label->set_font_type(Render::ImguiFontType::Bold);
     m_label->set_margin(Margins{0, -1, -1, 0});
+    m_label->set_visible(m_extruder_index_visible);
 
     set_extruder_color(m_theme->color_imgui(Platform::Color::AccentPrimary));
     set_extruder_index(1);
@@ -28,14 +29,39 @@ ExtruderIcon::ExtruderIcon()
 
 void ExtruderIcon::set_extruder_color(const ImColor& color)
 {
-    m_fill_collor = color;
+    set_colors({color});
     m_label->set_text_color(Imgui::contrast_color(color));
     update_color();
 }
 
+void ExtruderIcon::set_extruders_colors(const std::vector<ImColor>& colors)
+{
+    set_colors(colors);
+    set_deflate(0.f);
+    set_border_width(0);
+    m_label->set_visible(m_extruder_index_visible && colors.size() == 1);
+}
+
 void ExtruderIcon::set_extruder_index(const size_t index)
 {
+    set_extruder_index_visible(true);
     m_label->set_text(std::to_string(index));
+}
+
+void ExtruderIcon::set_extruder_index_visible(bool visible)
+{
+    m_extruder_index_visible = visible;
+    m_label->set_visible(m_extruder_index_visible);
+}
+
+void ExtruderIcon::set_invalid()
+{
+    set_deflate(2.f);
+    set_colors({m_theme->color_imgui(Platform::Color::Transparent)});
+    set_border_width(2);
+    set_border_color(m_theme->color_imgui(Platform::Color::Error));
+
+    set_extruder_index_visible(false);
 }
 
 void ExtruderIcon::enabled_updated_internal()

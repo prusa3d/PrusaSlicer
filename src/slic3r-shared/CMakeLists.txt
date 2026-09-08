@@ -628,6 +628,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/Yoga/Oval.hpp
         src/Slic3r/App/Yoga/Circle.cpp
         include/Slic3r/App/Yoga/Circle.hpp
+        src/Slic3r/App/Yoga/MulticolorCircle.cpp
+        include/Slic3r/App/Yoga/MulticolorCircle.hpp
         src/Slic3r/App/Yoga/Toggler.cpp
         include/Slic3r/App/Yoga/Toggler.hpp
         src/Slic3r/App/Yoga/ToggleButton.cpp

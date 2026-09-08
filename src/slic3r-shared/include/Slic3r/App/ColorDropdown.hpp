@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Slic3r/App/Render/ImguiTypes.hpp"
-#include "Slic3r/App/Yoga/Circle.hpp"
 #include "Slic3r/App/Yoga/ContextPopup.hpp"
 #include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/App/Yoga/RectangleButton.hpp"
@@ -11,9 +9,11 @@
 #include "Slic3r/Biz/IColorsChangedListener.hpp"
 #include "Slic3r/Biz/IVirtualExtrudersChangedListener.hpp"
 
-namespace Slic3r::App::Yoga {
+namespace Slic3r::App {
+class ExtruderIcon;
+} // namespace Slic3r::App
 
-class MulticolorCircle;
+namespace Slic3r::App::Yoga {
 
 class ColorMenuItem : public Yoga::RectangleButton
 {
@@ -24,21 +24,20 @@ public:
         bool selectable,
         bool dropdown_indicator = false,
         bool hollow = false,
-        std::optional<std::string> index = std::nullopt
+        std::optional<size_t> index = std::nullopt
     );
 
     void set_entry(
         const std::string& label,
         const std::vector<Domain::ColorRGBA>& colors,
         bool hollow = false,
-        std::optional<std::string> index = std::nullopt
+        std::optional<size_t> index = std::nullopt
     );
 
     void render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size) override;
 
 private:
-    MulticolorCircle* m_swatch{nullptr};
-    Text* m_text{nullptr};
+    ExtruderIcon* m_swatch{nullptr};
     std::string m_label;
     bool m_dropdown_indicator{false};
 };
