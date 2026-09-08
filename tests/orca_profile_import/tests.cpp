@@ -73,6 +73,42 @@ int main(int argc, char** argv)
             {"wall_loops", "3"}, {"compatible_printers", {"Printer"}}});
         write(root / "Example/filament/pla.json", {{"type", "filament"}, {"name", "PLA"}, {"instantiation", "true"},
             {"nozzle_temperature", {"215"}}, {"filament_flow_ratio", {"0.98"}}});
+        std::map<std::string, std::set<std::string>> selected;
+        const auto catalog_cache = root / "catalog-cache";
+        fs::rename(root / "Example/process/normal.json", root / "Example/process/normal.saved");
+        auto catalog = O::convert(root, {}, false, catalog_cache, {}, &selected);
+        check(catalog[0].diagnostics.empty(), "catalog does not attempt to read process files");
+        fs::rename(root / "Example/process/normal.saved", root / "Example/process/normal.json");
+        check(catalog.size() == 1 && catalog[0].machines.size() == 1, "catalog lists printer without a conversion schema");
+        check(catalog[0].presets.size() == 1 && catalog[0].presets[0]["values"].empty(),
+            "catalog contains only a printer identity, no converted slicing settings");
+        check(!fs::exists(catalog_cache), "catalog does not create a full conversion cache");
+        selected["Orca-Example"].insert("Printer");
+        auto activated = O::convert(root, schema(), false, catalog_cache, {}, &selected);
+        check(activated[0].presets[0]["values"]["max_print_height"] == 300.0,
+            "adding printer converts its settings");
+        check(activated[0].presets.back()["values"]["temperature"] == 215,
+            "adding printer converts compatible material settings");
+        selected.clear();
+        catalog = O::convert(root, {}, false, catalog_cache, {}, &selected);
+        check(!catalog[0].cache_hit && catalog[0].presets[0]["values"].empty(),
+            "browsing ignores an existing full conversion cache");
+        const auto original_manifest = Json::parse(std::ifstream(root / "Example.json"));
+        auto two_printers = original_manifest;
+        two_printers["machine_list"].push_back({{"name", "Second"}, {"sub_path", "machine/second.json"}});
+        write(root / "Example.json", two_printers);
+        write(root / "Example/machine/second.json", {{"type", "machine"}, {"name", "Second"},
+            {"instantiation", "true"}, {"inherits", "Base"}, {"printable_height", "400"}});
+        selected["Orca-Example"].insert("Printer");
+        activated = O::convert(root, schema(), false, catalog_cache, {}, &selected);
+        check(activated[0].machines.size() == 2, "adding one printer retains other catalog entries");
+        check(activated[0].presets[0]["name"] == "Second" && activated[0].presets[0]["values"].empty(),
+            "another printer in the same vendor is not converted");
+        selected["Orca-Example"].insert("Second");
+        activated = O::convert(root, schema(), false, catalog_cache, {}, &selected);
+        check(!activated[0].cache_hit && activated[0].presets[1]["values"]["max_print_height"] == 400.0,
+            "adding another printer invalidates the selection cache and converts it");
+        write(root / "Example.json", original_manifest);
         auto vendors = O::convert(root, schema());
         check(vendors.size() == 1, "vendor discovery");
         auto& v = vendors.front();

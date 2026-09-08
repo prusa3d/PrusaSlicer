@@ -169,11 +169,12 @@ struct Index
     }
 };
 
-void load_manifest(Index& index, const fs::path& root, const std::string& vendor, Vendor& report)
+void load_manifest(Index& index, const fs::path& root, const std::string& vendor, Vendor& report, bool machines_only = false)
 {
     const auto manifest = read(root / fs::u8path(vendor + ".json"));
     const auto base = fs::weakly_canonical(root / fs::u8path(vendor));
     for (const auto& list : {"machine_model_list", "machine_list", "process_list", "filament_list"}) {
+        if (machines_only && (std::string(list) == "process_list" || std::string(list) == "filament_list")) continue;
         if (!manifest.contains(list)) continue;
         for (const auto& entry : manifest.at(list)) {
             try {
@@ -736,7 +737,8 @@ std::string rewrite_gcode(const std::string& source, const std::map<std::string,
 }
 
 std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool include_prusa,
-    const fs::path& cache_root, const std::set<std::string>& loaded_vendors)
+    const fs::path& cache_root, const std::set<std::string>& loaded_vendors,
+    const std::map<std::string, std::set<std::string>>* selected_printers)
 {
     std::vector<Vendor> vendors;
     if (root.empty() || !fs::is_directory(root)) return vendors;
@@ -749,7 +751,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
     // repositories and other Orca vendors are deliberately absent from this key.
     std::string library_checksum;
     Checksum schema_checksum;
-    if (!cache_root.empty()) {
+    if (!cache_root.empty() && (!selected_printers || !selected_printers->empty())) {
         library_checksum = source_checksum(root, "OrcaFilamentLibrary");
         schema_checksum.field(Json(schema).dump());
     }
@@ -759,6 +761,10 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
         Vendor vendor;
         vendor.id = "Orca-" + vendor_name;
         if (loaded_vendors.contains(vendor.id)) continue;
+        const std::set<std::string> empty_selection;
+        const auto& selected = selected_printers && selected_printers->contains(vendor.id)
+            ? selected_printers->at(vendor.id) : empty_selection;
+        const bool catalog_only = selected_printers && selected.empty();
         vendor.name = vendor_name + " (OrcaSlicer)";
         try {
             const auto manifest = read(path);
@@ -767,9 +773,9 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             vendor.version = text(manifest.value("version", Json("")));
             fs::path cache_path;
             Json identity;
-            if (!cache_root.empty()) {
+            if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 1}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 2}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {
@@ -778,9 +784,9 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
                 }
             }
             Index index;
-            if (fs::exists(root / "OrcaFilamentLibrary.json") && vendor_name != "OrcaFilamentLibrary")
+            if (!catalog_only && fs::exists(root / "OrcaFilamentLibrary.json") && vendor_name != "OrcaFilamentLibrary")
                 load_manifest(index, root, "OrcaFilamentLibrary", vendor);
-            load_manifest(index, root, vendor_name, vendor);
+            load_manifest(index, root, vendor_name, vendor, catalog_only);
             std::vector<Json> processes, filaments;
             for (const auto& [key, raw] : index.profiles) {
                 if (!enabled(raw.value("instantiation", Json(false)))) continue;
@@ -825,7 +831,18 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
                 vendor.presets.push_back({{"kind", kind}, {"id", kind + "/" + flat.at("name").get<std::string>()},
                     {"name", flat.at("name")}, {"condition", cond}, {"values", std::move(v)}});
             };
+            Json active_machines = Json::array();
             for (const auto& m : vendor.machines) {
+                if (!selected_printers || selected.contains(m.at("name").get<std::string>()))
+                    active_machines.push_back(m);
+                else
+                    emit(m, "printer", "printer.model == " + m.at("name").dump(), Json::object());
+            }
+            if (catalog_only) {
+                vendors.push_back(std::move(vendor));
+                continue;
+            }
+            for (const auto& m : active_machines) {
                 auto v = values(m, schema.at("printer"), vendor);
                 v.erase("nozzle_diameter"); // Owned by the hardware definition.
                 if (v.value("use_relative_e_distances", false)) {
@@ -837,7 +854,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
                 emit(m, "printer", "printer.model == " + m.at("name").dump(), std::move(v));
             }
             std::map<std::string, Json> machine_print_defaults;
-            for (const auto& m : vendor.machines) {
+            for (const auto& m : active_machines) {
                 auto defaults = values(m, schema.at("print"), vendor);
                 if (schema.at("print").contains("default_material") && m.contains("default_filament_profile")) {
                     auto material = m.at("default_filament_profile");
@@ -856,7 +873,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             }
             for (const auto& p : processes) {
                 std::string cond;
-                try { cond = condition(p, vendor.machines); }
+                try { cond = condition(p, active_machines); }
                 catch (const std::exception& e) { issue(vendor, text(p.at("name")), "compatibility", e.what()); continue; }
                 if (cond == "false") continue;
                 auto v = values(p, schema.at("print"), vendor);
@@ -864,7 +881,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
                 // Machine retraction defaults belong to the print settings in PS3.
                 // Keep them as machine-conditioned variants, never average tools.
                 Json variants = Json::array();
-                for (const auto& m : vendor.machines) {
+                for (const auto& m : active_machines) {
                     if (condition(p, Json::array({m})) == "false") continue;
                     auto defaults = machine_print_defaults.at(text(m.at("name")));
                     for (auto it = v.begin(); it != v.end(); ++it) defaults.erase(it.key());
@@ -878,7 +895,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
                 {"name", "Orca tool defaults"}, {"values", Json::object()}});
             for (const auto& f : filaments) {
                 std::string cond;
-                try { cond = condition(f, vendor.machines); }
+                try { cond = condition(f, active_machines); }
                 catch (const std::exception& e) { issue(vendor, text(f.at("name")), "compatibility", e.what()); continue; }
                 if (cond == "false") continue;
                 if (!f.value("compatible_prints_condition", "").empty() || !f.value("compatible_prints", Json::array()).empty()) {

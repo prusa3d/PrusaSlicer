@@ -4,6 +4,7 @@
 
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/IDialogManager.hpp"
 
 using namespace Slic3r::App::Yoga;
 
@@ -26,6 +27,12 @@ PrinterAddDialog::PrinterAddDialog(Biz::ProjectInteractor& project_interactor) :
             AppSettingsAdvanced& settings =
                 AppServices::instance().app_config().app_settings_advanced();
 
+            try {
+                m_project_interactor.preset_interactor().ensure_printer_profiles(printer.default_config);
+            } catch (const std::exception& e) {
+                AppServices::instance().dialog_manager().show_error_dialog(e.what());
+                return;
+            }
             settings.printer_favorite_presets.insert(printer.preset_item_id);
             if (m_callbacks.printer_added) {
                 m_callbacks.printer_added();

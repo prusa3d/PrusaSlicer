@@ -377,6 +377,7 @@ bool can_select_printer_preset(
     const std::string& printer_preset_id
 )
 {
+    preset_interactor.ensure_printer_profiles(printer_hw_config_id);
     if (!is_dirty_selected_preset(preset_interactor))
         return true;
 

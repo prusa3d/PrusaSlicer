@@ -158,7 +158,7 @@ Domain::Preset::Bundle load_bundle(const BundlePaths& bundle_paths)
         }
     }
 
-    load_orca_profiles(bundle_paths, bundle);
+    load_orca_profiles(bundle_paths, bundle, false, true);
     return bundle;
 }
 
@@ -211,6 +211,11 @@ static size_t hash_folder_recursive(const fs::path& path)
 static size_t get_cache_footprint(const BundlePaths& bundle_paths, const std::string& slicer_version)
 {
     size_t folder_hash = 0;
+    for (const auto& [vendor, printers] : bundle_paths.orca_selected_printers) {
+        folder_hash = combine_hashes(folder_hash, std::hash<std::string>{}(vendor));
+        for (const auto& printer : printers)
+            folder_hash = combine_hashes(folder_hash, std::hash<std::string>{}(printer));
+    }
     boost::system::error_code ec;
 
     auto update_folder_hash = [&folder_hash, &ec](const std::string& path)
@@ -232,7 +237,7 @@ static size_t get_cache_footprint(const BundlePaths& bundle_paths, const std::st
     size_t hash = combine_hashes(folder_hash, std::hash<std::string>{}(slicer_version));
 
     // Increment the following value to enforce invalidation of caches from older versions:
-    size_t cache_epoch = 15;
+    size_t cache_epoch = 16;
     return combine_hashes(hash, std::hash<int>{}(cache_epoch));
 }
 

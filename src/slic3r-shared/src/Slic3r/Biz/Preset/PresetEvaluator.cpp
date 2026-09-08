@@ -504,7 +504,7 @@ void PresetEvaluator::fill_missing_tool_overrides_from_print(
     }
 }
 
-PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrinterConfig& hw_config, bool use_material_cache) const
+PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrinterConfig& hw_config, bool use_material_cache, bool catalog_only) const
 {
     Expr::ValueMap printer_values;
     append_printer_values(printer_values, hw_config);
@@ -543,6 +543,11 @@ PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrint
             printer_preset
         );
         update_printer_preset_from_hw_config(hw_config, ep.preset.config_box());
+
+        if (catalog_only) {
+            ret.push_back(std::move(ep));
+            continue;
+        }
 
         // 2. Print preset
         PresetKind print_kind = Domain::Preset::print_kind(hw_config.technology);

@@ -138,10 +138,10 @@ std::vector<boost::filesystem::path> orca_profile_roots(const BundlePaths& paths
     return roots;
 }
 
-void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, bool include_prusa)
+void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, bool include_prusa, bool deferred)
 {
     namespace fs = boost::filesystem;
-    const Orca::Schema schema{
+    const Orca::Schema schema = deferred && paths.orca_selected_printers.empty() ? Orca::Schema{} : Orca::Schema{
         {"printer", schema_for(D::PrinterSettings{})}, {"print", schema_for(D::PrintSettings{})},
         {"tool_print", schema_for(D::ToolPrintSettings{})}, {"filament", schema_for(D::FilamentSettings{})}
     };
@@ -157,7 +157,7 @@ void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, boo
         if (root.empty()) continue;
         try {
             if (!visited_roots.insert(fs::weakly_canonical(root)).second) continue;
-            for (auto& source : Orca::convert(std::filesystem::u8path(root.string()), schema, include_prusa, cache_root, loaded)) {
+            for (auto& source : Orca::convert(std::filesystem::u8path(root.string()), schema, include_prusa, cache_root, loaded, deferred ? &paths.orca_selected_printers : nullptr)) {
                 if (bundle.vendor_bundles.contains(source.id) || !loaded.insert(source.id).second) continue;
                 try {
                     if (!source.machines.empty()) {
@@ -186,7 +186,7 @@ void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, boo
                         std::tie(vendor.presets, vendor.preset_names) = loader.release();
                         bundle.vendor_bundles.emplace(source.id, std::move(vendor));
                         SPDLOG_INFO("Loaded Orca vendor {}: {} printers ({})", source.name, source.machines.size(),
-                            source.cache_hit ? "cached conversion" : "converted source");
+                            source.cache_hit ? "cached conversion" : (deferred && !paths.orca_selected_printers.contains(source.id) ? "catalog" : "converted source"));
                     }
                 } catch (const std::exception& e) {
                     source.diagnostics.push_back({{"message", e.what()}, {"key", "vendor"}});

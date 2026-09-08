@@ -129,7 +129,19 @@ int main(int argc, char** argv)
             paths.app_bundle_path = (root / "presets").string();
             paths.local_bundle_path = (root / "local").string();
             paths.populate_local_bundle = true;
-            P::IO::load_orca_profiles(paths, bundle);
+            D::Preset::Bundle catalog;
+            P::IO::load_orca_profiles(paths, catalog, false, true);
+            const auto& catalog_vendor = catalog.vendor_bundles.at("Orca-NativeTest");
+            P::HwConfigEvaluator catalog_hw_eval;
+            const auto catalog_hw = catalog_hw_eval.create_printer_config(
+                catalog_vendor.vendor_data.printer_configs.at(0), catalog_vendor.vendor_data);
+            P::PresetEvaluator catalog_eval(catalog_vendor.presets);
+            const auto catalog_printers = catalog_eval.evaluate(catalog_hw, true, true);
+            require(catalog_printers.size() == 1 && catalog_printers[0].prints.empty(),
+                "catalog evaluates printer identity without slicing presets");
+            require(catalog_hw.visual.thumbnail == "Test model_cover.png", "catalog retains thumbnail");
+            paths.orca_selected_printers["Orca-NativeTest"].insert("Native test printer");
+            P::IO::load_orca_profiles(paths, bundle, false, true);
             const auto& vendor = bundle.vendor_bundles.at("Orca-NativeTest");
             P::HwConfigEvaluator hw_eval;
             const auto hw = hw_eval.create_printer_config(vendor.vendor_data.printer_configs.at(0), vendor.vendor_data);

@@ -30,8 +30,11 @@ struct Vendor
 // enabled explicitly by regression tests.
 // An optional persistent conversion cache, rooted at presets/local. Each vendor
 // is validated independently against its source content and conversion schema.
+// A non-null selection enables deferred loading: unselected printers expose only
+// catalog identities; selected printers receive compatible slicing presets.
 std::vector<Vendor> convert(const std::filesystem::path& root, const Schema& schema, bool include_prusa = false,
-    const std::filesystem::path& cache_root = {}, const std::set<std::string>& loaded_vendors = {});
+    const std::filesystem::path& cache_root = {}, const std::set<std::string>& loaded_vendors = {},
+    const std::map<std::string, std::set<std::string>>* selected_printers = nullptr);
 std::string rewrite_gcode(const std::string& source, const std::map<std::string, std::string>& context = {});
 
 } // namespace Slic3r::Biz::Preset::IO::Orca

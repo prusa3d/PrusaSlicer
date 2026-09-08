@@ -1348,6 +1348,13 @@ void WelcomeDialog::finalize(const std::vector<PrinterToAdd>& printers)
         printer_preset_item_ids.push_back(printer.preset_item_id);
     }
 
+    try {
+        for (const auto& config : printer_configs)
+            m_project_interactor.preset_interactor().ensure_printer_profiles(config);
+    } catch (const std::exception& e) {
+        AppServices::instance().dialog_manager().show_error_dialog(e.what());
+        return;
+    }
     m_project_interactor.preset_interactor().update_changed_printer_configs(printer_configs);
 
     AppSettingsAdvanced& app_settings_advanced{
