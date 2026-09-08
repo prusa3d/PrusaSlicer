@@ -835,7 +835,8 @@ void WXRenderCanvas::on_keyboard(wxKeyEvent& evt)
             enqueue_keyboard(platform_event);
         }
     }
-    repaint();
+
+    request_render();
 }
 
 void WXRenderCanvas::on_mouse_enter(wxMouseEvent& event)
@@ -993,12 +994,20 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
     io.MouseDoubleClicked[0] = evt.LeftDClick();
     io.MouseDoubleClicked[1] = evt.RightDClick();
     io.MouseDoubleClicked[2] = evt.MiddleDClick();
-    float wheel_delta        = static_cast<float>(evt.GetWheelDelta());
-    if (wheel_delta != 0.0f)
-        io.MouseWheel = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
+    float wheel_delta = static_cast<float>(evt.GetWheelDelta());
+    if (!Domain::fuzzy_compare(wheel_delta, 0.0f)) {
+        // Accumulate rather than overwrite: several wheel events can arrive between
+        // two ImGui::NewFrame() calls, and NewFrame() only zeroes MouseWheel(H) once
+        // per frame, so overwriting drops earlier events in the same frame window.
+        float wheel_ticks = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
+        if (evt.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL) {
+            io.MouseWheelH += wheel_ticks;
+        } else {
+            io.MouseWheel += wheel_ticks;
+        }
+    }
 
-
-    repaint();
+    request_render();
 }
 
 void WXRenderCanvas::on_idle(wxIdleEvent& event)
