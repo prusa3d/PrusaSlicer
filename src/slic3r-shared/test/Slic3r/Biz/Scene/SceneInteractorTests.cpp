@@ -10,7 +10,9 @@
 #include "Slic3r/TestUtils/TestData.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
+#include "Slic3r/Biz/Arrange/Arrange.hpp"
 #include "Slic3r/Domain/Types.hpp"
+#include "Slic3r/Math.hpp"
 
 #include "Slic3r/Directories.hpp"
 
@@ -702,4 +704,48 @@ TEST_CASE_METHOD(TransformInProgressFixture, "Wipe tower bed removed during drag
     CHECK(project.config_containers().front()->bed_instances().size() == 1);
     CHECK_FALSE(scene_interactor.object_selection().is_selected(wipe_tower_ref));
     CHECK(memento.elements.empty());
+}
+
+TEST_CASE_METHOD(
+    SceneInteractorFixture,
+    "Arrange transform rotates instance around world Z only",
+    "[SceneInteractor]"
+)
+{
+    Project& project{project_interactor.selected_project()};
+
+    Domain::ElementRefs refs;
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        refs = scene_interactor.new_object_from_mesh(
+            Domain::TriangleMesh{TriMesh::make_cube(100.0, 100.0, 100.0)}
+        );
+    }
+    REQUIRE(refs.size() == 1);
+    const Domain::ElementRef& ref{refs.front()};
+
+    Domain::ModelInstance* instance{project.find_instance_by_id(ref.object_id, ref.instance_id)};
+    REQUIRE(instance);
+
+    // Tilt the instance around X so its local Z axis is not the world Z axis.
+    instance->set_rotation(Vec3d{deg2rad(45.0), 0.0, 0.0});
+    const double offset_z_before{instance->get_offset().z()};
+
+    {
+        ALLOW_CALL(slicing_input_changed_listener, on_slicing_input_changed(_));
+        scene_interactor.transform_instances(
+            {Biz::Arrange::InstanceTransform2D{ref, Domain::Vec2d{10.0, 20.0}, deg2rad(90.0)}}
+        );
+    }
+
+    // The arrange rotation delta must only change the rotation around the world Z axis.
+    const Vec3d rotation{instance->get_rotation()};
+    CHECK(rotation.x() == Catch::Approx(deg2rad(45.0)));
+    CHECK(rotation.y() == Catch::Approx(0.0));
+    CHECK(rotation.z() == Catch::Approx(deg2rad(90.0)));
+
+    const Vec3d offset{instance->get_offset()};
+    CHECK(offset.x() == Catch::Approx(10.0));
+    CHECK(offset.y() == Catch::Approx(20.0));
+    CHECK(offset.z() == Catch::Approx(offset_z_before));
 }

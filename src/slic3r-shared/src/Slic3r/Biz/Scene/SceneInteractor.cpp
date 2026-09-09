@@ -2907,14 +2907,18 @@ void SceneInteractor::transform_instances(const std::vector<Arrange::InstanceTra
             if (instance == nullptr) {
                 continue;
             }
-            Domain::Transform3d offset_trafo{instance->get_transformation().get_matrix()};
-            offset_trafo.translation().x() = trafo.absolute_offset.x();
-            offset_trafo.translation().y() = trafo.absolute_offset.y();
+            Domain::Transform3d rotation_trafo{Domain::Transform3d::Identity()};
+            rotation_trafo.rotate(
+                Eigen::AngleAxisd(trafo.rotation_delta, Eigen::Vector3d::UnitZ())
+            );
 
-            auto rotation_trafo{Domain::Transform3d::Identity()};
-            rotation_trafo.rotate(Eigen::AngleAxisd(trafo.rotation_delta, Eigen::Vector3d::UnitZ()));
+            Domain::Transform3d new_trafo{
+                rotation_trafo * instance->get_transformation().get_matrix()
+            };
+            new_trafo.translation().x() = trafo.absolute_offset.x();
+            new_trafo.translation().y() = trafo.absolute_offset.y();
 
-            instance->set_transformation(Transformation{offset_trafo * rotation_trafo});
+            instance->set_transformation(Transformation{new_trafo});
         }
         elements.push_back(trafo.instance_ref);
     }
