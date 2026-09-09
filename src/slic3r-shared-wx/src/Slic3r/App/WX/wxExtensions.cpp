@@ -23,26 +23,9 @@ void msw_buttons_rescale(wxDialog* dlg, const int em_unit, const std::vector<int
     }
 }
 
-/* Function for getting of em_unit value from correct parent.
- * In most of cases it is m_em_unit value from WidgetsConfig,
- * but for DPIDialogs it's its own value. 
- * This value will be used to correct rescale after moving between 
- * Displays with different HDPI */
 int em_unit(wxWindow* win)
 {
-    /*
-    if (win)
-    {
-        wxTopLevelWindow *toplevel = Slic3r::GUI::find_toplevel_parent(win);
-        Slic3r::GUI::DPIDialog* dlg = dynamic_cast<Slic3r::GUI::DPIDialog*>(toplevel);
-        if (dlg)
-            return dlg->em_unit();
-        Slic3r::GUI::DPIFrame* frame = dynamic_cast<Slic3r::GUI::DPIFrame*>(toplevel);
-        if (frame)
-            return frame->em_unit();
-    }
-    */
-    return w_config()->em_unit();
+    return win ? w_config()->em_unit(win) : w_config()->em_unit();
 }
 
 

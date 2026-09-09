@@ -54,92 +54,15 @@
 #include <shlobj.h>
 #endif
 
+#ifdef __WXGTK__
+#include <gtk/gtk.h>
+#endif
+
+#include <Slic3r/App/Platform/WX/DpiScale.hpp>
+
 namespace Slic3r::App::Desktop {
 
 using namespace WX;
-
-// just temporary function to test color mode / font size testing
-#ifdef TOP_BAR
-static void add_experimets_page(TopBar* top_bar, MainFrame* main_frame)
-#else
-static void add_experimets_page(TabsBar* top_bar, MainFrame* main_frame)
-#endif
-{
-    wxPanel* test_panel = new wxPanel(top_bar, wxID_ANY);
-    wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
-    test_panel->SetSizer(main_sizer);
-    main_sizer->SetSizeHints(test_panel);
-
-    wxBoxSizer* test_sizer = new wxBoxSizer(wxHORIZONTAL);
-    main_sizer->Add(test_sizer, 0, wxEXPAND);
-
-    wxStaticText* test_txt = new wxStaticText(test_panel, wxID_ANY, from_u8("Change: "));
-    test_sizer->Add(test_txt, 0, wxALIGN_CENTRE_VERTICAL | wxALL, 20);
-
-    ScalableButton* test_btn = new ScalableButton(test_panel, wxID_ANY, "cog", _L("Color mode"));
-    test_btn->SetFont(w_config()->bold_font());
-    ScalableButton* test_btn2 = new ScalableButton(test_panel, wxID_ANY, "edit", _L("Apply"));
-    test_btn2->SetFont(w_config()->bold_font());
-
-    ScalableButton* lang_selection_btn = new ScalableButton(test_panel, wxID_ANY, "language", _L("Select the language"), wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER, 24);
-    lang_selection_btn->SetFont(w_config()->bold_font());
-
-    test_sizer->Add(test_btn, 0, wxALIGN_CENTRE_VERTICAL | wxALL, 20);
-
-    wxBoxSizer* test_sizer2 = new wxBoxSizer(wxHORIZONTAL);
-    main_sizer->Add(test_sizer2, 0, wxEXPAND);
-
-    main_sizer->Add(lang_selection_btn, 0, wxALL, 40);
-
-    wxStaticText* test_txt2 = new wxStaticText(test_panel, wxID_ANY, from_u8("Text size: "));
-    test_sizer2->Add(test_txt2, 0, wxALIGN_CENTRE_VERTICAL | wxALL, 20);
-
-    wxTextCtrl* edit_font = new wxTextCtrl(
-        test_panel,
-        wxID_ANY,
-        wxString::Format(from_u8("%d"), w_config()->normal_font().GetPointSize())
-    );
-    test_sizer2->Add(edit_font, 0, wxALIGN_CENTRE_VERTICAL | wxALL, 20);
-
-    test_sizer2->Add(test_btn2, 0, wxALIGN_CENTRE_VERTICAL | wxALL, 20);
-
-    test_btn->Bind(
-        wxEVT_BUTTON,
-        [=](wxCommandEvent& e)
-        {
-            main_frame->sys_color_changed();
-
-            test_btn->sys_color_changed();
-            test_btn2->sys_color_changed();
-            lang_selection_btn->sys_color_changed();
-            test_panel->Refresh();
-        }
-    );
-
-    test_btn2->Bind(
-        wxEVT_BUTTON,
-        [=](wxCommandEvent& e)
-        {
-            int font_sz;
-            edit_font->GetValue().ToInt(&font_sz);
-
-            if (w_config()->normal_font().GetPointSize() != font_sz) {
-                wxFont font = w_config()->normal_font();
-                font.SetPointSize(font_sz);
-                w_config()->update_fonts(font, w_config()->em_unit());
-                w_config()->force_fonts_update(main_frame, true);
-            }
-
-            test_panel->Layout();
-        }
-    );
-
-    lang_selection_btn->Bind(wxEVT_BUTTON, [=](wxCommandEvent& e) { main_frame->select_language(); });
-
-#ifdef DEBUG
-    top_bar->AddPage(test_panel, from_u8("UI - test"));
-#endif
-}
 
 #if _WIN32
 // Loads all sizes embedded in the exe's icon resource directly from the module image
@@ -190,11 +113,14 @@ MainFrame::MainFrame(
     project_interactor.physical_printer_interactor().add_listener<Biz::PhysicalPrinter::IPhysicalPrinterChangedListener>(this);
 
     localization().add_listener<ILanguageChangedListener>(this);
-    auto em = w_config()->em_unit();
+    update_min_size();
 
-    const wxSize min_size = FromDIP(wxSize(110 * em, 60 * em));
-    this->SetMinSize(min_size);
-    this->SetSize(min_size);
+#if defined(__WXGTK__)
+    GtkSettings* gtk_settings = gtk_settings_get_for_screen(gtk_widget_get_screen(GetHandle()));
+    m_dpi_signal_id = g_signal_connect(gtk_settings, "notify::gtk-xft-dpi", G_CALLBACK(+[](GObject*, GParamSpec*, gpointer data) {
+        static_cast<MainFrame*>(data)->on_scale_changed();
+    }), this);
+#endif
 
     wxFont font = w_config()->normal_font();
     w_config()->update_fonts(font, w_config()->em_unit());
@@ -270,14 +196,7 @@ MainFrame::MainFrame(
         [this](wxDPIChangedEvent& event)
         {
             event.Skip();
-            m_left_bar->Rescale();
-
-            if (IsMaximized()) {
-                // When maximized, the OS does not send a real WM_SIZE on DPI change,
-                // so wxBookCtrlBase never re-distributes space between its control strip
-                // and pages. Sending a size event to m_left_bar triggers that re-layout.
-                m_left_bar->SendSizeEvent();
-            }
+            on_scale_changed();
         }
     );
 #endif
@@ -397,6 +316,9 @@ MainFrame::~MainFrame()
     }
 #endif
     localization().remove_listener<ILanguageChangedListener>(this);
+#if defined(__WXGTK__)
+    g_signal_handler_disconnect(gtk_settings_get_for_screen(gtk_widget_get_screen(GetHandle())), m_dpi_signal_id);
+#endif
 }
 
 void MainFrame::on_language_changed()
@@ -529,6 +451,36 @@ void MainFrame::on_close(wxCloseEvent& event)
     }
 }
 
+void MainFrame::update_min_size()
+{
+    const int em = w_config()->em_unit();
+#if defined(__WXGTK__)
+    // FromDIP() is a no-op on GTK3: it relies on GTK's own window scale factor,
+    // which is integer-only and misses fractional desktop scales (125%, 150%...),
+    // unlike Windows/Mac where FromDIP already reflects the true fractional scale.
+    const float scale = Platform::WX::get_dpi_scale(this).dpi_scale;
+    const wxSize min_size(int(110 * em * scale), int(60 * em * scale));
+#else
+    const wxSize min_size = FromDIP(wxSize(110 * em, 60 * em));
+#endif
+    SetMinClientSize(min_size);
+    SetClientSize(min_size);
+}
+
+void MainFrame::on_scale_changed()
+{
+    m_left_bar->Rescale();
+
+    if (IsMaximized()) {
+        // When maximized, the OS does not send a real WM_SIZE on DPI change,
+        // so wxBookCtrlBase never re-distributes space between its control strip
+        // and pages. Sending a size event to m_left_bar triggers that re-layout.
+        m_left_bar->SendSizeEvent();
+    } else {
+        update_min_size();
+    }
+}
+
 void MainFrame::update_accel_table()
 {
 #ifdef USE_NATIVE_MENU
@@ -622,9 +574,6 @@ void MainFrame::init_left_bar(Biz::ProjectInteractor& project_interactor)
         init_physical_printer_page(project_interactor);
     }
     init_preferences_button();
-
-    //! experiments just for UI testing
-    add_experimets_page(m_left_bar, this);
 }
 
 void MainFrame::init_preferences_button()

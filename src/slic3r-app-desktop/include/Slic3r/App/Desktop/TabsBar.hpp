@@ -347,13 +347,6 @@ protected:
         return win;
     }
 
-    void DoSize() override
-    {
-        wxWindow* const page = GetCurrentPage();
-        if (page)
-            page->SetSize(GetPageRect());
-    }
-
     void DoShowPage(wxWindow * page, bool show) override
     {
         if (show)

@@ -10,6 +10,7 @@
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
 
+#include <Slic3r/App/Platform/WX/DpiScale.hpp>
 #include <Slic3r/Biz/Platform/Termination.hpp>
 #include <Slic3r/Biz/Platform/PlatformServices.hpp>
 #include <Slic3r/App/Platform/PlatformError.hpp>
@@ -844,6 +845,15 @@ void WXRenderCanvas::on_keyboard(wxKeyEvent& evt)
     request_render();
 }
 
+int WXRenderCanvas::to_dip(int coord)
+{
+#if defined(__WXGTK__)
+    return int(coord / get_dpi_scale(this).dpi_scale);
+#else
+    return ToDIP(coord);
+#endif
+}
+
 void WXRenderCanvas::on_mouse_enter(wxMouseEvent& event)
 {
     ZoneScoped;
@@ -870,8 +880,8 @@ void WXRenderCanvas::on_mouse_enter(wxMouseEvent& event)
     }
 #endif
 
-    int mouse_x = ToDIP(event.GetX());
-    int mouse_y = ToDIP(event.GetY());
+    int mouse_x = to_dip(event.GetX());
+    int mouse_y = to_dip(event.GetY());
 
     MouseEvent platform_event{
         MouseEvent::Type::Enter,
@@ -893,8 +903,8 @@ void WXRenderCanvas::on_mouse_leave(wxMouseEvent& event)
         return;
     }
 
-    int mouse_x = ToDIP(event.GetX());
-    int mouse_y = ToDIP(event.GetY());
+    int mouse_x = to_dip(event.GetX());
+    int mouse_y = to_dip(event.GetY());
 
     MouseEvent platform_event{
         MouseEvent::Type::Leave,
@@ -928,8 +938,8 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
         SetFocus();
     }
 
-    const int mouse_x = ToDIP(evt.GetX());
-    const int mouse_y = ToDIP(evt.GetY());
+    const int mouse_x = to_dip(evt.GetX());
+    const int mouse_y = to_dip(evt.GetY());
     m_mouse_x   = mouse_x;
     m_mouse_y   = mouse_y;
     // int mouse_x = evt.GetX();
@@ -1072,12 +1082,22 @@ bool WXRenderCanvas::begin_frame_platform()
     // Setup display size (every frame to accommodate for window resizing)
     int w, h;
     GetClientSize(&w, &h);
+#if defined(__WXGTK__)
+    const DpiScale dpi_scale = get_dpi_scale(this);
+    const float scale_factor = dpi_scale.total();
+#else
     const float scale_factor = wxWindow::GetDPIScaleFactor();
+#endif
 #if WIN32
     size_t display_w = w;
     size_t display_h = h;
     w /= scale_factor;
     h /= scale_factor;
+#elif defined(__WXGTK__)
+    size_t display_w = w * dpi_scale.buffer_scale;
+    size_t display_h = h * dpi_scale.buffer_scale;
+    w /= dpi_scale.dpi_scale;
+    h /= dpi_scale.dpi_scale;
 #else
     size_t display_w = ToPhys(w);
     size_t display_h = ToPhys(h);
@@ -1095,7 +1115,12 @@ bool WXRenderCanvas::begin_frame_platform()
     style.FontScaleMain = 1; // We are scaling whole canvas, no need for ImGui scaling
     style.FontSizeBase  = font_size_px;
 
-    set_screen_size({display_w, display_h, scale_factor, GetDPI().x, font_size_px, font_size_pt});
+#if defined(__WXGTK__)
+    const int dpi = int(96.0f * scale_factor + 0.5f);
+#else
+    const int dpi = GetDPI().x;
+#endif
+    set_screen_size({display_w, display_h, scale_factor, dpi, font_size_px, font_size_pt});
     io.DisplayFramebufferScale =
         ImVec2(scale_factor, scale_factor);
 

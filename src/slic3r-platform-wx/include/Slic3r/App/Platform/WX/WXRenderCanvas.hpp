@@ -50,6 +50,11 @@ private:
 
     static KeyModifiers modifiers(const wxKeyboardState& event);
 
+    /**
+     * @brief to_dip is helper to unify ToDIP conversion across OS
+     */
+    int to_dip(int coord);
+
     void init();
     void init_wx_imgui();
     void repaint();
