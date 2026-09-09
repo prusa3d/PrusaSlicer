@@ -2624,19 +2624,24 @@ static std::vector<Domain::SelectionId> get_bed_ids(
     return result;
 }
 
+bool SceneInteractor::is_bed_related_preset_key(const std::string& name)
+{
+    static const std::vector<std::string> bed_related_keys{
+        "bed_shape",
+        "max_print_height",
+        "bed_custom_model",
+        "bed_custom_texture",
+    };
+    return std::ranges::find(bed_related_keys, name) != bed_related_keys.end();
+}
+
 void SceneInteractor::on_preset_value_changed(
     Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
     const Domain::ConfigItem& item
 )
 {
-    const std::vector<std::string> bed_related_keys{
-        "bed_shape",
-        "max_print_height",
-        "bed_custom_model",
-        "bed_custom_texture",
-    };
-    if (std::ranges::find(bed_related_keys, item.def().name) != bed_related_keys.end()) {
+    if (is_bed_related_preset_key(item.def().name)) {
         update_config_container_bed(project_id, config_container_id);
         for (const Domain::SelectionId& bed_id :
              get_bed_ids(m_workbench, project_id, config_container_id))

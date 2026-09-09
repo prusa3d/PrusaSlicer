@@ -179,8 +179,6 @@ PlaterScenePresenter::PlaterScenePresenter(
 
     m_project_interactor.project_settings_interactor()
         .add_listener<Biz::IColorsChangedListener>(this);
-    m_project_interactor.preset_interactor()
-        .add_listener<IPresetChangedListener>(this);
     m_project_interactor.virtual_extruder_interactor()
         .add_listener<Biz::IVirtualExtrudersChangedListener>(this);
 
@@ -382,6 +380,12 @@ void PlaterScenePresenter::on_preset_value_changed(
     const ConfigItem& item
 )
 {
+    // Fully overrides ScenePresenterBase::on_preset_value_changed, so it must be forwarded
+    // explicitly to keep the shared bed-related-key handling (e.g. camera re-centering).
+    Scene::ScenePresenterBase<PlaterScenePresenterProjectContext>::on_preset_value_changed(
+        project_id, config_container_id, item
+    );
+
     const constexpr std::array<std::string_view, 4>
         extruder_keys{"extruder", "perimeter_extruder", "infill_extruder", "solid_infill_extruder"};
 

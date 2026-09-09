@@ -10,6 +10,7 @@
 #include "Slic3r/App/Scene/CameraFrustumUpdater.hpp"
 #include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/IAppConfigChangedListener.hpp"
+#include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 
 #include <functional>
 #include <optional>
@@ -34,7 +35,8 @@ template <typename ProjectContextT>
 class ScenePresenterBase :
     public ISceneProvider,
     public ISceneChangedListener,
-    public IAppConfigChangedListener
+    public IAppConfigChangedListener,
+    public Biz::Preset::IPresetChangedListener
 {
 public:
     using ProjectContexts = std::unordered_map<Domain::SelectionId, ProjectContextT>;
@@ -69,6 +71,18 @@ public:
     void screen_resized(const Render::Rect& viewport);
 
     void center_camera_on_selected_bed(bool animated);
+
+    void on_preset_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        Biz::Preset::PresetItemType type
+    ) override;
+
+    void on_preset_value_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        const Domain::ConfigItem& item
+    ) override;
 
     const std::optional<Platform::CameraSynchData>& camera_synch_data() const { return project_context().camera_synch_data(); }
     void set_camera_synch_data(const Platform::CameraSynchData& data) { project_context().set_camera_synch_data(data); }

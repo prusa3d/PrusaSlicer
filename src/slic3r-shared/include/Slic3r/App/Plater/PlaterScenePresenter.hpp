@@ -58,8 +58,7 @@ class PlaterScenePresenter :
     public Biz::ISLAResultCacheChangedListener,
     public Biz::IProjectsChangedListener,
     public Biz::IColorsChangedListener,
-    public Biz::IVirtualExtrudersChangedListener,
-    public Biz::Preset::IPresetChangedListener
+    public Biz::IVirtualExtrudersChangedListener
 {
 public:
     void load_selected_project();

@@ -6,6 +6,7 @@
 #include "Slic3r/App/Scene/CameraHelper.hpp"
 #include "Slic3r/App/Scene/ScenePresenterProjectContext.hpp"
 #include "Slic3r/App/Plater/PlaterScenePresenterProjectContext.hpp"
+#include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 
 #include <algorithm>
 
@@ -25,6 +26,7 @@ ScenePresenterBase<ProjectContextT>::ScenePresenterBase(
     m_bed_render_updater(*this, workbench, device, project_interactor.scene_interactor())
 {
     AppServices::instance().app_config_interactor().add_listener<IAppConfigChangedListener>(this);
+    project_interactor.preset_interactor().add_listener<Biz::Preset::IPresetChangedListener>(this);
 }
 
 template <typename ProjectContextT>
@@ -65,6 +67,28 @@ void ScenePresenterBase<ProjectContextT>::center_camera_on_selected_bed(bool ani
     else
         center_camera_on_bed(m_workbench.project(m_project_interactor.selected_project_id()),
             m_project_interactor.scene_interactor().bed_selection().last_selected_bed(), scene().camera_trackball());
+}
+
+template <typename ProjectContextT>
+void ScenePresenterBase<ProjectContextT>::on_preset_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    Biz::Preset::PresetItemType type
+)
+{
+    if (type == Biz::Preset::PresetItemType::PrinterPreset)
+        center_camera_on_selected_bed(true);
+}
+
+template <typename ProjectContextT>
+void ScenePresenterBase<ProjectContextT>::on_preset_value_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    const Domain::ConfigItem& item
+)
+{
+    if (Biz::Scene::SceneInteractor::is_bed_related_preset_key(item.def().name))
+        center_camera_on_selected_bed(true);
 }
 
 template <typename ProjectContextT>
