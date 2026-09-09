@@ -7,6 +7,7 @@
 #include "Slic3r/Biz/Platform/ISingleInstanceChecker.hpp"
 #include "Slic3r/Biz/AppInstance/AbstractAppInstanceMessageHandler.hpp"
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Log.hpp"
 
 #include <string>
 #include <boost/filesystem.hpp>
@@ -14,6 +15,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <boost/nowide/convert.hpp>
+#else
+#include <boost/dll/runtime_symbol_info.hpp>
 #endif
 
 namespace Slic3r::App::Desktop::AppInstance {
@@ -55,6 +58,18 @@ std::string get_canonical_executable_path_win32()
         return {};
     return boost::nowide::narrow(final_path, count);
 }
+#else
+// Launch independent executable path, canonicalized so macOS agrees with Linux. "" on failure.
+std::string get_canonical_executable_path_posix()
+{
+    boost::dll::fs::error_code ec;
+    const boost::filesystem::path location = boost::dll::program_location(ec);
+    if (ec)
+        return {};
+
+    const boost::filesystem::path canonical = boost::filesystem::canonical(location, ec);
+    return ec ? location.string() : canonical.string();
+}
 #endif // _WIN32
 } // namespace
 
@@ -63,6 +78,8 @@ bool instance_check(const Slic3r::App::InitParams& init_params, bool app_config_
     std::string program_path;
 #ifdef _WIN32
     program_path = get_canonical_executable_path_win32();
+#else
+    program_path = get_canonical_executable_path_posix();
 #endif
     if (program_path.empty()) {
         program_path = boost::filesystem::absolute(
@@ -73,6 +90,7 @@ bool instance_check(const Slic3r::App::InitParams& init_params, bool app_config_
     size_t hashed_path    = std::hash<std::string>{}(program_path);
     std::string lock_name = std::to_string(hashed_path);
     Biz::Platform::PlatformServices::instance().set_app_hash(hashed_path);
+    SPDLOG_INFO("App instance hash {} from executable {}", hashed_path, program_path);
 
     // Parameters from init params override app config value
     bool should_send_and_exit = app_config_single_instance;
