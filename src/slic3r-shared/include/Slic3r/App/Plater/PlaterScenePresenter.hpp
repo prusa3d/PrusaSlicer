@@ -4,6 +4,7 @@
 
 #include "Slic3r/App/Scene/GeometryDataFactory.hpp"
 #include "Slic3r/App/Scene/GizmoManager.hpp"
+#include "Slic3r/App/IAppConfigChangedListener.hpp"
 #include "Slic3r/Domain/Color.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
 #include "Slic3r/Domain/Workbench.hpp"
@@ -62,7 +63,8 @@ class PlaterScenePresenter :
     public Biz::IProjectsChangedListener,
     public Biz::IColorsChangedListener,
     public Biz::IVirtualExtrudersChangedListener,
-    public Biz::Preset::IPresetChangedListener
+    public Biz::Preset::IPresetChangedListener,
+    public IAppConfigChangedListener
 {
 public:
     using ProjectContexts = std::unordered_map<Domain::SelectionId, PlaterScenePresenterProjectContext>;
@@ -215,6 +217,8 @@ public:
 
 private:
     void update_cameras(const std::function<void(Scene::Camera&)>& modifier);
+
+    void on_app_config_changed(const std::string& key) override;
 
     void set_scene_aabb_as_dirty() { m_camera_frustum_updater.set_scene_aabb_as_dirty(); }
 

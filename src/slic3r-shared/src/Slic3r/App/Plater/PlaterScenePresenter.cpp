@@ -1,5 +1,8 @@
 #include "Slic3r/App/Plater/PlaterScenePresenter.hpp"
 
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/Plater/MMPaintedVolumeRendering.hpp"
 #include "Slic3r/App/Plater/PlaterSceneLayer.hpp"
 #include "Slic3r/App/Plater/ThumbnailRenderer.hpp"
@@ -11,6 +14,7 @@
 #include "Slic3r/App/Scene/BedNodeBuilder.hpp"
 #include "Slic3r/App/Scene/BedNodeTag.hpp"
 #include "Slic3r/App/Scene/BedRenderHelper.hpp"
+#include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Scene/CameraHelper.hpp"
 #include "Slic3r/App/Scene/MeshRenderNodeComponent.hpp"
 #include "Slic3r/App/Scene/NodeBuilder.hpp"
@@ -194,6 +198,8 @@ PlaterScenePresenter::PlaterScenePresenter(
     scene_interactor.add_listener<ISceneBedInstanceChangedListener>(this);
     scene_interactor.add_listener<ISceneSelectionChangedListener>(this);
     scene_interactor.add_listener<ISelectedBedInstancesChangedListener>(this);
+
+    AppServices::instance().app_config_interactor().add_listener<IAppConfigChangedListener>(this);
 }
 
 void PlaterScenePresenter::load_selected_project()
@@ -449,6 +455,14 @@ void PlaterScenePresenter::update_cameras(const std::function<void(Scene::Camera
         m_projects.end(),
         [modifier](auto& p) { modifier(p.second.scene().camera()); }
     );
+}
+
+void PlaterScenePresenter::on_app_config_changed(const std::string& key)
+{
+    if (key == "camera_projection_type") {
+        auto type = AppServices::instance().app_config().get<Scene::CameraProjectionType>("camera_projection_type");
+        update_cameras([type](Scene::Camera& cam) { cam.set_projection_type(type); });
+    }
 }
 
 namespace {

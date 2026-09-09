@@ -7,6 +7,7 @@
 #include "Slic3r/Biz/Config/ConfigLoad.hpp"
 #include "Slic3r/Biz/Config/ConfigSerialize.hpp"
 
+#include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Theme.hpp"
 
 #include "Slic3r/Directories.hpp"
@@ -101,6 +102,21 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
             {int(MouseNavigationScheme::Fusion),
              "fusion",
              def->L_CONTEXT("Fusion", "Mouse navigation scheme")},
+        }
+    );
+
+    def               = defs.add("camera_projection_type", typeid(Domain::EnumWrapper));
+    def->location     = Domain::AppConfigLocation{};
+    def->label        = L("Camera projection");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_General;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
+    def->gui_type     = GUIType::combobox;
+    def->tooltip      = L("Default camera projection type");
+    def->init_fn      = Domain::init_with(
+        Scene::CameraProjectionType::Perspective,
+        {
+            {int(Scene::CameraProjectionType::Perspective), "perspective", def->L_CONTEXT("Perspective", "Camera projection")},
+            {int(Scene::CameraProjectionType::Orthographic), "orthographic", def->L_CONTEXT("Orthographic", "Camera projection")},
         }
     );
 

@@ -1,7 +1,12 @@
 #include "Slic3r/App/Preview/PreviewScenePresenter.hpp"
+
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/Scene/BedNodeTag.hpp"
 #include "Slic3r/App/Scene/BedNodeBuilder.hpp"
 #include "Slic3r/App/Preview/PreviewSceneLayer.hpp"
+#include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Scene/CameraHelper.hpp"
 #include "Slic3r/App/Scene/SceneNodeTag.hpp"
 #include "Slic3r/App/Render/GeometryBuilder.hpp"
@@ -29,6 +34,8 @@ PreviewScenePresenter::PreviewScenePresenter(
 {
     m_project_interactor.add_listener<Biz::ISelectedProjectChangedListener>(this);
     m_project_interactor.add_listener<Biz::ISelectedProjectChangedListener>(&m_bed_render_updater);
+
+    AppServices::instance().app_config_interactor().add_listener<IAppConfigChangedListener>(this);
 
     size_t project_id = m_project_interactor.selected_project_id();
     on_selected_project_changed(project_id);
@@ -339,6 +346,14 @@ void PreviewScenePresenter::update_cameras(const std::function<void(Scene::Camer
 {
     std::for_each(m_projects.begin(), m_projects.end(),
         [modifier](auto& p) { modifier(p.second.scene().camera()); });
+}
+
+void PreviewScenePresenter::on_app_config_changed(const std::string& key)
+{
+    if (key == "camera_projection_type") {
+        auto type = AppServices::instance().app_config().get<Scene::CameraProjectionType>("camera_projection_type");
+        update_cameras([type](Scene::Camera& cam) { cam.set_projection_type(type); });
+    }
 }
 
 } // namespace Slic3r::App::Preview

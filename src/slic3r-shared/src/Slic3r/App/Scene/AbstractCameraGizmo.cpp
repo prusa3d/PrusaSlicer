@@ -8,6 +8,7 @@
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/App/Scene/MouseBindingScheme.hpp"
 #include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/AppConfigInteractor.hpp"
 
 #include <tracy/Tracy.hpp>
 
@@ -51,7 +52,19 @@ void AbstractCameraGizmo::register_commands(Platform::CommandRegistry& registry)
         .register_command(
             std::make_unique<UIItemCommand>(
                 CommandName::CameraProjectionSwitch,
-                [this]() { m_scene_provider.scene().camera_trackball().switch_projection_type(); },
+                []() {
+                    AppConfigInteractor& app_config_interactor = AppServices::instance().app_config_interactor();
+                    const CameraProjectionType new_type =
+                        AppServices::instance().app_config().get<CameraProjectionType>("camera_projection_type")
+                            == CameraProjectionType::Perspective
+                        ? CameraProjectionType::Orthographic : CameraProjectionType::Perspective;
+
+                    // Copy the existing (correctly enum-wrapped) value rather than constructing a
+                    // fresh Domain::ConfigValue, which would not carry the enum's type/def info.
+                    Domain::ConfigValue new_value = *app_config_interactor.app_config_cbi().find("camera_projection_type");
+                    new_value.set(new_type);
+                    app_config_interactor.set_item_value("camera_projection_type", new_value);
+                },
                 UIItemCommandExtraOpts{
                     .keyboard_shortcuts =
                         Platform::KeyboardShortcuts{

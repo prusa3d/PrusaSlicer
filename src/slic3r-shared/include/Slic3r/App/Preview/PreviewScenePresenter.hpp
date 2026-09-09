@@ -11,6 +11,7 @@
 #include "Slic3r/App/Scene/CameraFrustumUpdater.hpp"
 #include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Scene/ISceneChangedListener.hpp"
+#include "Slic3r/App/IAppConfigChangedListener.hpp"
 
 namespace Slic3r::App::Platform {
 class AnimationManager;
@@ -22,7 +23,8 @@ class PreviewScenePresenter : public Biz::ISelectedProjectChangedListener,
                               public PreviewSceneRenderCustomizer,
                               public Scene::ISceneProvider,
                               public Scene::ICameraUpdateListener,
-                              public Scene::ISceneChangedListener
+                              public Scene::ISceneChangedListener,
+                              public IAppConfigChangedListener
 {
 public:
     using ProjectContexts = std::unordered_map<Domain::SelectionId, Scene::ScenePresenterProjectContext>;
@@ -119,6 +121,8 @@ private:
     }
 
     void update_cameras(const std::function<void(Scene::Camera&)>& modifier);
+
+    void on_app_config_changed(const std::string& key) override;
 
     void set_scene_aabb_as_dirty() { m_camera_frustum_updater.set_scene_aabb_as_dirty(); }
 
