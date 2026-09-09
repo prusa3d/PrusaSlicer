@@ -373,15 +373,6 @@ void AppConfig::handle_legacy_config(AppConfig& app_config)
     if (!semver.has_value()) {
         return;
     }
-
-    const Semver version300_alpha9{3, 0, 0, nullptr, "alpha9"};
-    if (semver <= version300_alpha9) {
-        // reset font size to new default value
-        const Domain::ConfigItem* font_size_item =
-            app_config.get_config_box().items.find("font_size");
-        ASSERT(font_size_item);
-        app_config.set("font_size", font_size_item->def().init_fn());
-    }
 }
 
 AppConfig::AppConfig() :
