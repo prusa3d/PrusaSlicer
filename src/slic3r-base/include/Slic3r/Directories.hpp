@@ -48,6 +48,12 @@ const std::string& cache_dir();
 
 std::string get_default_cachedir();
 
+/** Return the web view data directory of this application version, or an empty string to let the web view backend pick its own. */
+std::string webview_data_dir();
+
+/** Remove web view data directories of other application versions. Safe to call from any thread. */
+void prune_stale_webview_data_dirs();
+
 boost::filesystem::path system_downloads_dir();
 
 boost::filesystem::path temp_dir();

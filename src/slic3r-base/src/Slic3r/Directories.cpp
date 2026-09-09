@@ -5,11 +5,14 @@
 #include "Slic3r/Semver.hpp"
 
 #include <boost/filesystem/path.hpp>
+#include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/nowide/convert.hpp>
 #include "Slic3r/Assert.hpp"
 
-#include <fstream> 
+#include <ctime>
+#include <fstream>
+#include <limits>
 #include <regex>
 
 #if defined(_WIN32)
@@ -150,6 +153,31 @@ static std::string get_platform_data_dir()
     return boost::nowide::narrow(buffer);
 }
 
+static std::string get_platform_local_data_dir()
+{
+    std::wstring buffer;
+    buffer.resize(MAX_PATH);
+
+    HRESULT hr = ::SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, SHGFP_TYPE_CURRENT, (LPWSTR) buffer.data());
+
+    if (hr == E_FAIL) {
+        hr = ::SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, SHGFP_TYPE_DEFAULT, (LPWSTR) buffer.data());
+    }
+
+    if (FAILED(hr)) {
+        return {};
+    }
+
+    for (int i = 0; i < MAX_PATH; i++) {
+        if (buffer.data()[i] == '\0') {
+            buffer.resize(i);
+            break;
+        }
+    }
+
+    return boost::nowide::narrow(buffer);
+}
+
 #elif defined(__linux__)
 
 std::optional<std::string> get_env(std::string_view key)
@@ -231,6 +259,158 @@ std::string get_default_datadir()
     const std::string config_dir = get_platform_data_dir();
     std::string data_dir = (boost::filesystem::path(config_dir) / datadir_name).make_preferred().string();
     return data_dir;
+}
+
+#if defined(_WIN32)
+
+static bool is_safe_dir_name_char(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
+}
+
+static std::string webview_version_dir_name()
+{
+    std::string name(::Slic3r::VERSION);
+    for (char& c : name) {
+        if (!is_safe_dir_name_char(c)) {
+            c = '_';
+        }
+    }
+    return name;
+}
+
+static fs::path webview_data_root()
+{
+    const std::string local_data_dir = get_platform_local_data_dir();
+    if (local_data_dir.empty()) {
+        return {};
+    }
+
+    return (fs::path(local_data_dir) / ::Slic3r::APP_NAME / "WebView").make_preferred();
+}
+
+static constexpr std::time_t WEBVIEW_DATA_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
+static constexpr int WEBVIEW_DATA_MAX_EXAMINED_DIRS = 64;
+static const char* WEBVIEW_DATA_SCRATCH_SUFFIX = ".delete-";
+
+static std::time_t webview_data_dir_last_used(const fs::path& dir)
+{
+    boost::system::error_code ec;
+    const std::time_t dir_stamp = fs::last_write_time(dir, ec);
+    if (ec) {
+        return (std::numeric_limits<std::time_t>::max)();
+    }
+
+    std::time_t newest = dir_stamp;
+    for (const char* marker : {"Last Version", "Local State"}) {
+        boost::system::error_code marker_ec;
+        const std::time_t marker_stamp = fs::last_write_time(dir / "EBWebView" / marker, marker_ec);
+        if (!marker_ec && marker_stamp > newest) {
+            newest = marker_stamp;
+        }
+    }
+
+    return newest;
+}
+
+#endif
+
+std::string webview_data_dir()
+{
+#if defined(_WIN32)
+    const fs::path root = webview_data_root();
+    if (root.empty()) {
+        SPDLOG_WARN("Could not resolve the local application data directory. Web view will use its default data directory.");
+        return {};
+    }
+
+    const fs::path dir = (root / webview_version_dir_name()).make_preferred();
+
+    boost::system::error_code ec;
+    fs::create_directories(dir, ec);
+    if (ec) {
+        SPDLOG_WARN("Could not create web view data directory {}: {}. Web view will use its default data directory.", dir.string(), ec.message());
+        return {};
+    }
+
+    return dir.string();
+#else
+    return {};
+#endif
+}
+
+void prune_stale_webview_data_dirs()
+{
+#if defined(_WIN32)
+    const fs::path root = webview_data_root();
+    if (root.empty()) {
+        return;
+    }
+
+    boost::system::error_code ec;
+    if (!fs::is_directory(root, ec) || ec) {
+        return;
+    }
+
+    const std::string current_dir_name = webview_version_dir_name();
+    const std::time_t remove_before = std::time(nullptr) - WEBVIEW_DATA_MAX_AGE_SECONDS;
+    int examined = 0;
+
+    for (auto it = fs::directory_iterator(root, ec); it != fs::directory_iterator(); it.increment(ec)) {
+        if (ec) {
+            SPDLOG_WARN("Failed to iterate web view data directory: {}", ec.message());
+            break;
+        }
+
+        if (++examined > WEBVIEW_DATA_MAX_EXAMINED_DIRS) {
+            break;
+        }
+
+        const fs::path entry = it->path();
+        const std::string name = entry.filename().string();
+
+        boost::system::error_code type_ec;
+        if (!fs::is_directory(entry, type_ec) || type_ec) {
+            continue;
+        }
+
+        if (name.find(WEBVIEW_DATA_SCRATCH_SUFFIX) != std::string::npos) {
+            boost::system::error_code sweep_ec;
+            fs::remove_all(entry, sweep_ec);
+            continue;
+        }
+
+        if (name == current_dir_name || name == "EBWebView") {
+            continue;
+        }
+
+        if (!Semver::parse(name)) {
+            continue;
+        }
+
+        if (webview_data_dir_last_used(entry) >= remove_before) {
+            continue;
+        }
+
+        const fs::path scratch = root
+            / (name + WEBVIEW_DATA_SCRATCH_SUFFIX + std::to_string(::GetCurrentProcessId()));
+
+        boost::system::error_code rename_ec;
+        fs::rename(entry, scratch, rename_ec);
+        if (rename_ec) {
+            SPDLOG_DEBUG("Web view data directory {} is still in use, keeping it.", entry.string());
+            continue;
+        }
+
+        boost::system::error_code rm_ec;
+        fs::remove_all(scratch, rm_ec);
+        if (rm_ec) {
+            SPDLOG_WARN("Failed to remove stale web view data directory {}: {}", entry.string(), rm_ec.message());
+        } else {
+            SPDLOG_INFO("Removed stale web view data directory {}", entry.string());
+        }
+    }
+#endif
 }
 
 static std::string g_cache_dir;

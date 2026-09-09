@@ -5,6 +5,8 @@
 #include "Slic3r/App/Browser/AbstractBrowserLogicCommandHandler.hpp"
 
 #include <wx/webview.h>
+#include <wx/sizer.h>
+#include <wx/timer.h>
 #include <memory>
 #include <atomic>
 
@@ -52,9 +54,12 @@ private:
     void on_loaded(wxWebViewEvent& evt);
 
     void run_script(const wxString& javascript);
+    void show_unavailable_message();
     void load_error_page();
     void EndModal(int retCode) wxOVERRIDE;
     void do_reload();
+
+    wxBoxSizer* topsizer{nullptr};
 
 #ifdef DEBUG_URL_PANEL
     wxBoxSizer* bSizer_toolbar;
@@ -82,6 +87,10 @@ private:
     size_t m_counter_to_match{0};
     bool m_force_close{false};
     bool m_busy_cursor_set {false};
+    bool m_webview_created{false};
+    bool m_webview_failed{false};
+
+    wxTimer m_webview_create_watchdog;
 
 protected:
     bool handle_logic_command_LoadURL(const std::string& data) override;

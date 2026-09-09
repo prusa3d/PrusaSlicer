@@ -345,6 +345,12 @@ bool DesktopApp::OnInit()
         .add_listener<Biz::Platform::JobManager::IJobManagerStatusChangedListener>(
             &app_services.pop_notification_center()
         );
+    platform_services.job_manager()
+        .create_job(
+            "prune_webview_data",
+            [](Biz::JThread::StopToken) { prune_stale_webview_data_dirs(); }
+        )
+        .start();
     m_project_interactor->user_account_interactor()
         .add_listener<Biz::UserAccount::IUserAccountListener>(
             &app_services.pop_notification_center()

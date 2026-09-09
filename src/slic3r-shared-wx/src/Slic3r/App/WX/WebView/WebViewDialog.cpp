@@ -34,7 +34,7 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
     m_web_view(WebView::web_view_new())
 {
     ASSERT(m_logic);
-    wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
+    topsizer = new wxBoxSizer(wxVERTICAL);
 #ifdef DEBUG_URL_PANEL
     // Create the button
     bSizer_toolbar = new wxBoxSizer(wxHORIZONTAL);
@@ -94,26 +94,34 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
 
     this->CenterOnParent();
 
+    // Connect the idle events
+    Bind(wxEVT_IDLE, &WebViewDialog::on_idle, this);
+    Bind(wxEVT_CLOSE_WINDOW, ([this](wxCloseEvent& evt) { EndModal(wxID_CANCEL); }));
+
     // Create the webview
     if (!m_web_view) {
-        wxStaticText* text = new wxStaticText(this, wxID_ANY, _L("Failed to load a web browser."));
-        topsizer->Add(text, 0, wxALIGN_LEFT | wxBOTTOM, 10);
+        show_unavailable_message();
         return;
     }
-    if (!m_logic->url().empty()) {
-        WebView::web_view_create(m_web_view, this, from_u8(m_logic->url()), m_logic->script_message_handler_names());
-    } else {
-        WebView::web_view_create(
-            m_web_view,
-            this,
-            format_wxstr(
-                "file://%1%/web/%2%%3%.html",
-                boost::filesystem::path(resources_dir()).generic_string(),
-                m_logic->loading_html(),
-                w_config()->dark_mode() ? "_dark" : ""
-            ),
-            m_logic->script_message_handler_names()
-        );
+    const bool created = m_logic->url().empty()
+        ? WebView::web_view_create(
+              m_web_view,
+              this,
+              format_wxstr(
+                  "file://%1%/web/%2%%3%.html",
+                  boost::filesystem::path(resources_dir()).generic_string(),
+                  m_logic->loading_html(),
+                  w_config()->dark_mode() ? "_dark" : ""
+              ),
+              m_logic->script_message_handler_names()
+          )
+        : WebView::web_view_create(m_web_view, this, from_u8(m_logic->url()), m_logic->script_message_handler_names());
+
+    if (!created) {
+        m_web_view->Destroy();
+        m_web_view = nullptr;
+        show_unavailable_message();
+        return;
     }
 
     if (Biz::Network::ServiceConfig::instance().webdev_enabled()) {
@@ -145,8 +153,19 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
 
     // Connect the webview events
     Bind(wxEVT_WEBVIEW_ERROR, &WebViewDialog::on_error, this, m_web_view->GetId());
-    // Connect the idle events
-    Bind(wxEVT_IDLE, &WebViewDialog::on_idle, this);
+    Bind(wxEVT_WEBVIEW_CREATED, ([this](wxWebViewEvent& evt) {
+        m_webview_created = true;
+        m_webview_create_watchdog.Stop();
+    }), m_web_view->GetId());
+
+    m_webview_create_watchdog.SetOwner(this, wxWindow::NewControlId());
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
+        if (!m_webview_created) {
+            SPDLOG_ERROR("Web view was not created within {} ms.", WEBVIEW_CREATE_TIMEOUT_MS);
+            show_unavailable_message();
+        }
+    }, m_webview_create_watchdog.GetId());
+    m_webview_create_watchdog.StartOnce(WEBVIEW_CREATE_TIMEOUT_MS);
 #ifdef DEBUG_URL_PANEL
     // Connect the button events
     Bind(wxEVT_BUTTON, &WebViewDialog::on_back_button, this, m_button_back->GetId());
@@ -166,8 +185,6 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
 #endif
     Bind(wxEVT_WEBVIEW_NAVIGATING, &WebViewDialog::on_navigation_request, this, m_web_view->GetId());
     Bind(wxEVT_WEBVIEW_LOADED, &WebViewDialog::on_loaded, this, m_web_view->GetId());
-
-    Bind(wxEVT_CLOSE_WINDOW, ([this](wxCloseEvent& evt) { EndModal(wxID_CANCEL); }));
 
 #ifdef DEBUG_URL_PANEL
     m_url->SetLabelText(url);
@@ -421,13 +438,30 @@ case type: \
         WX_ERROR_CASE(wxWEBVIEW_NAV_ERR_OTHER);
     }
 
-    SPDLOG_ERROR("WebViewDialog error: {}", category);
+    SPDLOG_ERROR("WebViewDialog error: {} {}", category, into_u8(evt.GetString()));
+
+    if (!m_webview_created && m_web_view && m_web_view->GetNativeBackend() == nullptr) {
+        show_unavailable_message();
+        return;
+    }
+
     load_error_page();
+}
+
+void WebViewDialog::show_unavailable_message()
+{
+    if (m_webview_failed) {
+        return;
+    }
+    m_webview_failed = true;
+    m_load_error_page = false;
+    m_webview_create_watchdog.Stop();
+    WebView::web_view_show_unavailable_message(this, topsizer, m_web_view);
 }
 
 void WebViewDialog::load_error_page()
 {
-    if (!m_web_view)
+    if (!m_web_view || m_webview_failed)
         return;
 
     m_web_view->Stop();
@@ -475,18 +509,27 @@ void WebViewDialog::do_reload()
 
 void WebViewDialog::on_user_account_id_success(bool is_refresh, const std::string& username)
 {
+    if (!m_web_view) {
+        return;
+    }
     [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_id_success(is_refresh, into_u8(m_web_view->GetCurrentURL())));
     DEBUG_ASSERT(r, "False return value signals Veto which cannot be done here.");
 }
 
 void WebViewDialog::on_user_account_logged_out()
 {
+    if (!m_web_view) {
+        return;
+    }
     [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_logged_out(into_u8(m_web_view->GetCurrentURL())));
     DEBUG_ASSERT(r, "False return value signals Veto which cannot be done here.");
 }
 
 void WebViewDialog::on_user_account_will_refresh()
 {
+    if (!m_web_view) {
+        return;
+    }
     [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_will_refresh());
     DEBUG_ASSERT(r, "False return value signals Veto which cannot be done here.");
 }

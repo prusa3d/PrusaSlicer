@@ -125,21 +125,26 @@ void WebViewPanel::late_create()
     m_web_view               = WebView::web_view_new();
 
     if (!m_web_view) {
-        wxStaticText* text = new wxStaticText(this, wxID_ANY, _L("Failed to load a web browser."));
-        topsizer->Add(text, 0, wxALIGN_LEFT | wxBOTTOM, 10);
+        show_unavailable_message();
         return;
     }
-    WebView::web_view_create(
-        m_web_view,
-        this,
-        format_wxstr(
-            "file://%1%/web/%2%%3%.html",
-            boost::filesystem::path(resources_dir()).generic_string(),
-            m_logic->loading_html(),
-            w_config()->dark_mode() ? "_dark" : ""
-        ),
-        m_logic->script_message_handler_names()
-    );
+    if (!WebView::web_view_create(
+            m_web_view,
+            this,
+            format_wxstr(
+                "file://%1%/web/%2%%3%.html",
+                boost::filesystem::path(resources_dir()).generic_string(),
+                m_logic->loading_html(),
+                w_config()->dark_mode() ? "_dark" : ""
+            ),
+            m_logic->script_message_handler_names()
+        ))
+    {
+        m_web_view->Destroy();
+        m_web_view = nullptr;
+        show_unavailable_message();
+        return;
+    }
 
     if (Biz::Network::ServiceConfig::instance().webdev_enabled()) {
         setup_webview_devtools(m_web_view);
@@ -153,11 +158,31 @@ void WebViewPanel::late_create()
     Bind(wxEVT_WEBVIEW_LOADED, &WebViewPanel::on_loaded, this, m_web_view->GetId());
     Bind(wxEVT_WEBVIEW_CREATED, &WebViewPanel::on_created, this, m_web_view->GetId());
 
+    m_webview_create_watchdog.SetOwner(this, wxWindow::NewControlId());
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
+        if (!m_webview_created) {
+            SPDLOG_ERROR("Web view was not created within {} ms.", WEBVIEW_CREATE_TIMEOUT_MS);
+            show_unavailable_message();
+        }
+    }, m_webview_create_watchdog.GetId());
+    m_webview_create_watchdog.StartOnce(WEBVIEW_CREATE_TIMEOUT_MS);
+
     Layout();
 
 #ifdef DEBUG_URL_PANEL
     setup_webview_devtools(m_web_view);
 #endif
+}
+
+void WebViewPanel::show_unavailable_message()
+{
+    if (m_webview_failed) {
+        return;
+    }
+    m_webview_failed = true;
+    m_load_error_page = false;
+    m_webview_create_watchdog.Stop();
+    WebView::web_view_show_unavailable_message(this, topsizer, m_web_view);
 }
 
 void WebViewPanel::on_user_account_id_success(bool is_refresh, const std::string& username)
@@ -184,8 +209,11 @@ void WebViewPanel::on_user_account_will_refresh()
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
 
-void WebViewPanel::on_printables_secret_token(const std::string& body) 
+void WebViewPanel::on_printables_secret_token(const std::string& body)
 {
+    if (!m_web_view) {
+        return;
+    }
     [[maybe_unused]] bool b = process_logic_command_vector(m_logic->on_printables_secret_token(body));
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
@@ -209,7 +237,7 @@ void WebViewPanel::load_url(const wxString& url)
 
 void WebViewPanel::load_error_page()
 {
-    if (!m_web_view || m_do_late_webview_create) {
+    if (!m_web_view || m_do_late_webview_create || m_webview_failed) {
         return;
     }
 
@@ -265,6 +293,9 @@ void WebViewPanel::on_show(wxShowEvent& evt)
         late_create();
         return;
     }
+    if (!m_web_view) {
+        return;
+    }
     [[maybe_unused]] bool b = process_logic_command_vector(std::move(m_logic->on_show_webview_event(evt.IsShown())));
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
@@ -309,6 +340,8 @@ void WebViewPanel::on_page_will_load()
 
 void WebViewPanel::on_created(wxWebViewEvent& evt)
 {
+    m_webview_created = true;
+    m_webview_create_watchdog.Stop();
     [[maybe_unused]] bool b = process_logic_command_vector(m_logic->on_webview_created());
     DEBUG_ASSERT(b, "False return value signals Veto which cannot be done here.");
 }
@@ -332,13 +365,19 @@ case type: \
         WX_ERROR_CASE(wxWEBVIEW_NAV_ERR_OTHER);
     }
 
-    SPDLOG_ERROR("WebViewDialog error: {}", category);
+    SPDLOG_ERROR("WebViewPanel error: {} {}", category, into_u8(evt.GetString()));
+
+    if (!m_webview_created && m_web_view && m_web_view->GetNativeBackend() == nullptr) {
+        show_unavailable_message();
+        return;
+    }
+
     load_error_page();
 }
 
 void WebViewPanel::on_idle(wxIdleEvent& evt)
 {
-    if (!m_web_view || m_do_late_webview_create)
+    if (!m_web_view || m_do_late_webview_create || m_webview_failed)
         return;
 
     bool is_busy = m_web_view->IsBusy();
