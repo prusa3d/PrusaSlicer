@@ -131,10 +131,8 @@ static std::optional<PaintOnGizmoBase::PaintableVolumes> collect_paintable_volum
 {
     std::set<std::pair<size_t, size_t>> paintable_objects_instances_ids;
     for (const Domain::ElementRef& selected_element : object_selection.elements) {
-        paintable_objects_instances_ids.emplace(
-            selected_element.object_id,
-            selected_element.instance_id
-        );
+        paintable_objects_instances_ids
+            .emplace(selected_element.object_id, selected_element.instance_id);
     }
 
     PaintOnGizmoBase::PaintableVolumes paintable_volumes;
@@ -152,10 +150,8 @@ static std::optional<PaintOnGizmoBase::PaintableVolumes> collect_paintable_volum
                 continue;
             }
 
-            const Scene::AuxiliaryElementId volume_id{
-                Scene::AuxiliaryElementId::Type::Volume,
-                model_volume->id().id
-            };
+            const Scene::AuxiliaryElementId
+                volume_id{Scene::AuxiliaryElementId::Type::Volume, model_volume->id().id};
             const Scene::TriangleMesh* mesh = mesh_manager.get(volume_id);
             if (mesh == nullptr) {
                 return std::nullopt;
@@ -195,10 +191,8 @@ static Domain::Vec4f get_clipping_plane_data(const Scene::Clipper& clipper)
 static bool is_any_paintable_volume_sinking(const PaintOnGizmoBase::PaintableVolumes& volumes)
 {
     for (const PaintOnGizmoBase::PaintableVolume& volume : volumes) {
-        Domain::BoundingBox3d box = Algorithms::BoundingBox::transformed(
-            volume.model_volume.mesh().bounding_box(),
-            volume.world_trafo
-        );
+        Domain::BoundingBox3d box = Algorithms::BoundingBox::
+            transformed(volume.model_volume.mesh().bounding_box(), volume.world_trafo);
 
         if (box.min.z() < Domain::SINKING_Z_THRESHOLD && box.max.z() >= Domain::SINKING_Z_THRESHOLD)
         {
@@ -278,10 +272,8 @@ void PaintOnGizmoBase::on_model_reloaded(Domain::SelectionId project_id)
     rebuild_paintable_geometry();
 }
 
-void PaintOnGizmoBase::on_scene_selection_changed(
-    const SelectionId project_id,
-    const ObjectSelection& selection
-)
+void PaintOnGizmoBase::
+    on_scene_selection_changed(const SelectionId project_id, const ObjectSelection& selection)
 {
     this->rebuild_paintable_geometry();
 }
@@ -344,15 +336,21 @@ void PaintOnGizmoBase::init_main_nodes()
     scene.add_child(cursors_node.release(), m_main_node);
 
     Scene::NodeBuilder clipping_plane_presenter_node_builder{scene};
-    clipping_plane_presenter_node_builder.set_debug_name("PaintOnGizmoBase - clipping_plane_presenter node");
-    std::unique_ptr<Scene::Node> clipping_plane_presenter_node = clipping_plane_presenter_node_builder.build();
-    m_clipping_plane_presenter_node                            = clipping_plane_presenter_node.get();
+    clipping_plane_presenter_node_builder.set_debug_name(
+        "PaintOnGizmoBase - clipping_plane_presenter node"
+    );
+    std::unique_ptr<Scene::Node> clipping_plane_presenter_node =
+        clipping_plane_presenter_node_builder.build();
+    m_clipping_plane_presenter_node = clipping_plane_presenter_node.get();
     scene.add_child(clipping_plane_presenter_node.release(), m_main_node);
 
     Scene::NodeBuilder sinking_plane_presenter_node_builder{scene};
-    sinking_plane_presenter_node_builder.set_debug_name("PaintOnGizmoBase - sinking_plane_presenter node");
-    std::unique_ptr<Scene::Node> sinking_plane_presenter_node = sinking_plane_presenter_node_builder.build();
-    m_sinking_plane_presenter_node                            = sinking_plane_presenter_node.get();
+    sinking_plane_presenter_node_builder.set_debug_name(
+        "PaintOnGizmoBase - sinking_plane_presenter node"
+    );
+    std::unique_ptr<Scene::Node> sinking_plane_presenter_node =
+        sinking_plane_presenter_node_builder.build();
+    m_sinking_plane_presenter_node = sinking_plane_presenter_node.get();
     scene.add_child(sinking_plane_presenter_node.release(), m_main_node);
 }
 
@@ -381,13 +379,23 @@ void PaintOnGizmoBase::init_clipper_presenters()
         project.find_instance_by_id(element.object_id, element.instance_id);
 
     ASSERT(selected_instance && selected_object);
-    m_clipping_plane_presenter
-        .activate(selected_object, selected_instance, m_clipping_plane_presenter_node, 0., Scene::BuildMeshesNodes::No);
+    m_clipping_plane_presenter.activate(
+        selected_object,
+        selected_instance,
+        m_clipping_plane_presenter_node,
+        0.,
+        Scene::BuildMeshesNodes::No
+    );
     m_clipping_plane_presenter.set_behavior(true, true, 0.);
     m_clipping_plane_presenter.set_position_by_ratio(m_clipping_plane_clipper.get_position(), true);
 
-    m_sinking_plane_presenter
-        .activate(selected_object, selected_instance, m_sinking_plane_presenter_node, 0., Scene::BuildMeshesNodes::No);
+    m_sinking_plane_presenter.activate(
+        selected_object,
+        selected_instance,
+        m_sinking_plane_presenter_node,
+        0.,
+        Scene::BuildMeshesNodes::No
+    );
     m_sinking_plane_presenter.set_behavior(true, true, 0.);
 
     if (is_any_paintable_volume_sinking(m_paintable_volumes)) {
@@ -478,8 +486,9 @@ void PaintOnGizmoBase::on_activated()
     m_visible_volumes_nodes = collect_visible_volumes_nodes(project, scene);
     m_paintable_volumes     = std::move(*paintable_volumes);
     m_painting_colors       = this->create_painting_colors();
-    m_mouse_dragging        = false;
 
+    this->reset_painting_stroke_state();
+    this->reset_raycast_cache();
     this->hide_visible_volumes();
 
     this->init_main_nodes();
@@ -528,6 +537,15 @@ void PaintOnGizmoBase::on_activated()
 
 void PaintOnGizmoBase::on_deactivated()
 {
+    if (m_button_down != Button::None) {
+        this->finish_painting_stroke();
+    }
+
+    this->release_gizmo_scene_state();
+}
+
+void PaintOnGizmoBase::release_gizmo_scene_state()
+{
     Scene::Scene& scene = m_scene_presenter.scene();
 
     // Restore the originally visible nodes.
@@ -536,11 +554,11 @@ void PaintOnGizmoBase::on_deactivated()
     // Remove all the scene nodes created by this gizmo.
     if (m_main_node != nullptr) {
         scene.remove_child(m_main_node);
-        m_main_node               = nullptr;
-        m_cursors_node            = nullptr;
-        m_triangle_selectors_node = nullptr;
+        m_main_node                     = nullptr;
+        m_cursors_node                  = nullptr;
+        m_triangle_selectors_node       = nullptr;
         m_clipping_plane_presenter_node = nullptr;
-        m_sinking_plane_presenter_node = nullptr;
+        m_sinking_plane_presenter_node  = nullptr;
     }
 
     m_triangle_selector_wrappers.clear();
@@ -559,17 +577,17 @@ void PaintOnGizmoBase::on_project_activated(size_t new_project_id)
 
 void PaintOnGizmoBase::on_project_deactivated(size_t old_project_id)
 {
-    on_deactivated();
+    // The selected project has already changed, so the in-progress stroke can't be applied anymore.
+    this->reset_painting_stroke_state();
+    this->release_gizmo_scene_state();
 }
 
 // Following function is called from GLCanvas3D to inform the gizmo about a mouse/keyboard event.
 // The gizmo has an opportunity to react - if it does, it should return true so that the Canvas3D is
 // aware that the event was reacted to and stops trying to make different sense of it. If the gizmo
 // concludes that the event was not intended for it, it should return false.
-bool PaintOnGizmoBase::process_gizmo_event(
-    const PaintOnGizmoEvent& gizmo_event,
-    const Scene::GizmoEventContext& ctx
-)
+bool PaintOnGizmoBase::
+    process_gizmo_event(const PaintOnGizmoEvent& gizmo_event, const Scene::GizmoEventContext& ctx)
 {
     using namespace Slic3r::Biz::Algorithms;
 
@@ -605,8 +623,9 @@ bool PaintOnGizmoBase::process_gizmo_event(
                 return true;
             } else if (m_tool_type == ToolType::SMART_FILL || m_tool_type == ToolType::BUCKET_FILL)
             {
-                float& fill_angle = (m_tool_type == ToolType::SMART_FILL) ? m_smart_fill_angle :
-                                                                            m_bucket_fill_angle;
+                float& fill_angle = (m_tool_type == ToolType::SMART_FILL) ?
+                    m_smart_fill_angle :
+                    m_bucket_fill_angle;
                 fill_angle        = (gizmo_event.type == PaintOnGizmoEvent::Type::MouseWheelDown) ?
                            std::max(fill_angle - SmartFillAngleStep, SmartFillAngleMin) :
                            std::min(fill_angle + SmartFillAngleStep, SmartFillAngleMax);
@@ -684,8 +703,9 @@ bool PaintOnGizmoBase::process_gizmo_event(
         TriangleStateType new_state = TriangleStateType::NONE;
         if (!gizmo_event.shift_down) {
             if (gizmo_event.type == PaintOnGizmoEvent::Type::Dragging) {
-                new_state = (m_button_down == Button::Left) ? this->get_left_button_state_type() :
-                                                              this->get_right_button_state_type();
+                new_state = (m_button_down == Button::Left) ?
+                    this->get_left_button_state_type() :
+                    this->get_right_button_state_type();
             } else {
                 new_state = (gizmo_event.type == PaintOnGizmoEvent::Type::LeftDown) ?
                     this->get_left_button_state_type() :
@@ -713,8 +733,9 @@ bool PaintOnGizmoBase::process_gizmo_event(
             // shall not capture the mouse.
             if (volume_idx != -1 && m_button_down == Button::None) {
                 m_button_down =
-                    ((gizmo_event.type == PaintOnGizmoEvent::Type::LeftDown) ? Button::Left :
-                                                                               Button::Right);
+                    ((gizmo_event.type == PaintOnGizmoEvent::Type::LeftDown) ?
+                         Button::Left :
+                         Button::Right);
             }
 
             // In case we have no valid hit, we can return. The event will be stopped when
@@ -841,20 +862,21 @@ bool PaintOnGizmoBase::process_gizmo_event(
                 }
             } else if (m_tool_type == ToolType::HEIGHT_RANGE) {
                 for (const VolumeHitPoint& volume_hit_point : volume_hit_points) {
-                    const Vec3d& hit_position     = volume_hit_point.volume_hit_position;
-                    const int facet_idx           = int(volume_hit_point.facet_idx);
-                    const BoundingBoxf3 mesh_bbox = m_paintable_volumes[volume_hit_point.volume_idx]
-                                                        .model_volume.mesh()
-                                                        .bounding_box();
+                    const Vec3d& hit_position = volume_hit_point.volume_hit_position;
+                    const int facet_idx       = int(volume_hit_point.facet_idx);
+                    const BoundingBoxf3 mesh_bbox =
+                        m_paintable_volumes[volume_hit_point.volume_idx]
+                            .model_volume.mesh()
+                            .bounding_box();
 
-                    std::unique_ptr<TriangleSelector::Cursor> cursor =
-                        std::make_unique<TriangleSelector::HeightRange>(
-                            hit_position.cast<float>(),
-                            mesh_bbox,
-                            m_height_range_z_range,
-                            trafo_matrix,
-                            clp
-                        );
+                    std::unique_ptr<TriangleSelector::Cursor> cursor = std::make_unique<
+                        TriangleSelector::HeightRange>(
+                        hit_position.cast<float>(),
+                        mesh_bbox,
+                        m_height_range_z_range,
+                        trafo_matrix,
+                        clp
+                    );
                     triangle_selector.select_patch(
                         facet_idx,
                         std::move(cursor),
@@ -891,10 +913,8 @@ bool PaintOnGizmoBase::process_gizmo_event(
                                 m_paintable_volumes[idx].world_trafo;
                             const TriangleSelector::ClippingPlane& volume_clp =
                                 this->get_clipping_plane_in_volume_coordinates(volume_trafo_matrix);
-                            wrapper.triangle_selector().select_triangles_by_state_type(
-                                selected_state.value(),
-                                volume_clp
-                            );
+                            wrapper.triangle_selector()
+                                .select_triangles_by_state_type(selected_state.value(), volume_clp);
                         }
                     }
 
@@ -999,10 +1019,8 @@ bool PaintOnGizmoBase::process_gizmo_event(
                     const Transform3d& volume_trafo_matrix = m_paintable_volumes[idx].world_trafo;
                     const TriangleSelector::ClippingPlane& volume_clp =
                         this->get_clipping_plane_in_volume_coordinates(volume_trafo_matrix);
-                    wrapper.triangle_selector().select_triangles_by_state_type(
-                        selected_state.value(),
-                        volume_clp
-                    );
+                    wrapper.triangle_selector()
+                        .select_triangles_by_state_type(selected_state.value(), volume_clp);
                 }
             }
         }
@@ -1023,11 +1041,7 @@ bool PaintOnGizmoBase::process_gizmo_event(
          || gizmo_event.type == PaintOnGizmoEvent::Type::RightUp)
         && m_button_down != Button::None)
     {
-        this->apply_painting_to_model();
-        this->on_painting_stroke_applied();
-
-        m_button_down      = Button::None;
-        m_last_mouse_click = Vec2d::Zero();
+        this->finish_painting_stroke();
         return true;
     }
 
@@ -1060,8 +1074,9 @@ PaintOnGizmoBase::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
         const float wheel_rotation =
             mouse_event.wheel_delta_y() / std::abs(mouse_event.wheel_delta_y());
         const PaintOnGizmoEvent::Type wheel_event_type =
-            (wheel_rotation > 0.f ? PaintOnGizmoEvent::Type::MouseWheelUp :
-                                    PaintOnGizmoEvent::Type::MouseWheelDown);
+            (wheel_rotation > 0.f ?
+                 PaintOnGizmoEvent::Type::MouseWheelUp :
+                 PaintOnGizmoEvent::Type::MouseWheelDown);
 
         if (this->process_gizmo_event(
                 {wheel_event_type, mouse_position, shift_down, alt_down, ctrl_down},
@@ -1256,6 +1271,9 @@ void PaintOnGizmoBase::rebuild_paintable_geometry()
     const MeshManager& mesh_manager         = m_scene_presenter.model_triangle_mesh_manager();
     Scene::Scene& scene                     = m_scene_presenter.scene();
 
+    // Triangle selectors get rebuilt from the model, so the in-progress stroke is discarded.
+    this->reset_painting_stroke_state();
+    this->reset_raycast_cache();
     this->restore_visible_volumes();
 
     // Remove all the scene nodes created by this gizmo.
@@ -1351,9 +1369,8 @@ void PaintOnGizmoBase::provide_gizmo_controller(Scene::IGizmoController& gizmo_c
     m_gizmo_controller = &gizmo_controller;
 }
 
-TriangleSelector::ClippingPlane PaintOnGizmoBase::get_clipping_plane_in_volume_coordinates(
-    const Transform3d& trafo
-) const
+TriangleSelector::ClippingPlane
+PaintOnGizmoBase::get_clipping_plane_in_volume_coordinates(const Transform3d& trafo) const
 {
     const ClippingPlane& clipping_plane = m_clipping_plane_clipper.get_clipping_plane();
     if (!clipping_plane.is_active()) {
@@ -1548,10 +1565,22 @@ bool PaintOnGizmoBase::is_mesh_point_clipped(const Vec3d& point, const Transform
     return m_clipping_plane_clipper.get_clipping_plane().is_point_clipped(transformed_point);
 }
 
-void PaintOnGizmoBase::update_raycast_cache(
-    const Vec2d& mouse_position,
-    const Scene::Camera& camera
-) const
+void PaintOnGizmoBase::finish_painting_stroke()
+{
+    this->apply_painting_to_model();
+    this->on_painting_stroke_applied();
+    this->reset_painting_stroke_state();
+}
+
+void PaintOnGizmoBase::reset_painting_stroke_state()
+{
+    m_button_down      = Button::None;
+    m_last_mouse_click = Vec2d::Zero();
+    m_mouse_dragging   = false;
+}
+
+void PaintOnGizmoBase::
+    update_raycast_cache(const Vec2d& mouse_position, const Scene::Camera& camera) const
 {
     // Check if we have a cached result for this mouse position.
     if (m_raycast_cache.mouse_position == mouse_position) {
@@ -1606,6 +1635,12 @@ PaintOnGizmoBase::perform_raycast(const Vec2d& mouse_position, const Scene::Came
     }
 
     return {closest_hit_position, closest_volume_idx, closest_facet_idx};
+}
+
+void PaintOnGizmoBase::reset_raycast_cache()
+{
+    m_raycast_cache          = {};
+    m_seed_fill_last_mesh_id = -1;
 }
 
 } // namespace Slic3r::App::Plater
