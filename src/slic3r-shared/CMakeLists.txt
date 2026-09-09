@@ -559,6 +559,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/Scene/SelectionExtents.hpp
         src/Slic3r/Biz/Scene/SelectionExtents.cpp
 
+        include/Slic3r/App/RenderModuleBase.hpp
+        src/Slic3r/App/RenderModuleBase.cpp
         include/Slic3r/App/TestRenderModule.hpp
         src/Slic3r/App/TestRenderModule.cpp
         include/Slic3r/App/LoadingRenderModule.hpp
