@@ -1,13 +1,8 @@
 #include "Slic3r/App/Preview/PreviewScenePresenter.hpp"
 
-#include "Slic3r/App/AppServices.hpp"
-#include "Slic3r/App/AppConfig.hpp"
-#include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/Scene/BedNodeTag.hpp"
 #include "Slic3r/App/Scene/BedNodeBuilder.hpp"
 #include "Slic3r/App/Preview/PreviewSceneLayer.hpp"
-#include "Slic3r/App/Scene/Camera.hpp"
-#include "Slic3r/App/Scene/CameraHelper.hpp"
 #include "Slic3r/App/Scene/SceneNodeTag.hpp"
 #include "Slic3r/App/Render/GeometryBuilder.hpp"
 #include "Slic3r/App/Scene/VolumeColor.hpp"
@@ -26,16 +21,10 @@ PreviewScenePresenter::PreviewScenePresenter(
     Render::Device& device,
     Platform::AnimationManager& animation_manager
 ) :
-    m_workbench(workbench),
-    m_project_interactor(project_interactor),
-    m_device(device),
-    m_animation_manager(animation_manager),
-    m_bed_render_updater(*this, workbench, device, project_interactor.scene_interactor())
+    ScenePresenterBase(workbench, project_interactor, device, animation_manager)
 {
     m_project_interactor.add_listener<Biz::ISelectedProjectChangedListener>(this);
     m_project_interactor.add_listener<Biz::ISelectedProjectChangedListener>(&m_bed_render_updater);
-
-    AppServices::instance().app_config_interactor().add_listener<IAppConfigChangedListener>(this);
 
     size_t project_id = m_project_interactor.selected_project_id();
     on_selected_project_changed(project_id);
@@ -66,12 +55,6 @@ void PreviewScenePresenter::render_imgui(const Render::ScreenInfo& screen_info)
     }
 }
 
-void PreviewScenePresenter::screen_resized(const Render::Rect& viewport)
-{
-    m_viewport = viewport;
-    update_cameras([&viewport](auto& cam) { cam.set_viewport(viewport); });
-}
-
 void PreviewScenePresenter::on_selected_project_changed(size_t index)
 {
     m_selected_project_id = index;
@@ -86,24 +69,6 @@ void PreviewScenePresenter::on_selected_project_changed(size_t index)
         project_context().scene().add_listener<Scene::ISceneChangedListener>(this);
     }
     set_scene_aabb_as_dirty();
-}
-
-void PreviewScenePresenter::on_node_added(Scene::Node* node)
-{
-    if (node != nullptr && node->contains_raycast_component())
-        set_scene_aabb_as_dirty();
-}
-
-void PreviewScenePresenter::on_node_removed(Scene::Node* node)
-{
-    if (node != nullptr && node->contains_raycast_component())
-        set_scene_aabb_as_dirty();
-}
-
-void PreviewScenePresenter::on_node_changed(Scene::Node* node)
-{
-    if (node != nullptr && node->contains_raycast_component())
-        set_scene_aabb_as_dirty();
 }
 
 void PreviewScenePresenter::remove_all_bed_instances()
@@ -170,17 +135,6 @@ bool PreviewScenePresenter::update_bed_instance_error_state(const Domain::Slicin
     if (ret)
         update_bed_instances();
     return ret;
-}
-
-void PreviewScenePresenter::center_camera_on_selected_bed(bool animated)
-{
-    if (animated)
-        animated_center_camera_on_bed(m_workbench.project(m_project_interactor.selected_project_id()),
-            m_project_interactor.scene_interactor().bed_selection().last_selected_bed(), scene().camera_trackball(),
-            m_animation_manager);
-    else
-        center_camera_on_bed(m_workbench.project(m_project_interactor.selected_project_id()),
-            m_project_interactor.scene_interactor().bed_selection().last_selected_bed(), scene().camera_trackball());
 }
 
 void PreviewScenePresenter::remove_all_shells()
@@ -340,20 +294,6 @@ void PreviewScenePresenter::update_shells_visibility()
             n.set_enabled(enabled);
         }
     }, true);
-}
-
-void PreviewScenePresenter::update_cameras(const std::function<void(Scene::Camera&)>& modifier)
-{
-    std::for_each(m_projects.begin(), m_projects.end(),
-        [modifier](auto& p) { modifier(p.second.scene().camera()); });
-}
-
-void PreviewScenePresenter::on_app_config_changed(const std::string& key)
-{
-    if (key == "camera_projection_type") {
-        auto type = AppServices::instance().app_config().get<Scene::CameraProjectionType>("camera_projection_type");
-        update_cameras([type](Scene::Camera& cam) { cam.set_projection_type(type); });
-    }
 }
 
 } // namespace Slic3r::App::Preview

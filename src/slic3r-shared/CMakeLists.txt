@@ -515,6 +515,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/Scene/IProjectSceneProvider.hpp
         include/Slic3r/App/Scene/ScenePresenterProjectContext.hpp
         src/Slic3r/App/Scene/ScenePresenterProjectContext.cpp
+        include/Slic3r/App/Scene/ScenePresenterBase.hpp
+        src/Slic3r/App/Scene/ScenePresenterBase.cpp
         src/Slic3r/App/Scene/Lights.cpp
         include/Slic3r/App/Scene/Lights.hpp
         include/Slic3r/App/Scene/LightingHelper.hpp
