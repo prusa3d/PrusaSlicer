@@ -38,7 +38,10 @@ public:
 
     void set_zoom(double value) { m_camera.set_zoom(value); }
     void update_zoom(double value) { m_camera.update_zoom(value); }
-    void switch_projection_type() { m_camera.switch_projection_type(); }
+    void switch_projection_type() {
+        m_camera.set_projection_type(m_camera.cam_projection().type() == CameraProjectionType::Perspective
+            ? CameraProjectionType::Orthographic : CameraProjectionType::Perspective);
+    }
 
     double azimuth() const { return m_azimuth; }
     double zenith() const { return m_zenith; }
