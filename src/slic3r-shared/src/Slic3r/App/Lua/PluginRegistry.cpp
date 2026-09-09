@@ -133,7 +133,7 @@ PluginInstallResult PluginRegistry::install(PluginBundle& bundle)
                 + bundle.meta().id
             );
         }
-    } catch (Biz::Crypto::CryptoException& e) {
+    } catch (Biz::Crypto::CryptoException&) {
         return tl::unexpected(
             fmt::format(
                 fmt::runtime(

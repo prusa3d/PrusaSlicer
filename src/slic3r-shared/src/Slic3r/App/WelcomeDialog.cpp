@@ -718,7 +718,7 @@ public:
                     const Domain::Preset::HwToolConfigDef* hw_tool_config_def{nullptr};
                     try {
                         hw_tool_config_def = find_tool_config_def(tool, tool_defs);
-                    } catch (const nlohmann::json::exception& e) {
+                    } catch (const nlohmann::json::exception&) {
                         // Intentionally pass
                     }
                     if (!hw_tool_config_def) {
@@ -842,7 +842,7 @@ public:
                                         printers.push_back(*printer);
                                     }
                                 }
-                            } catch (const nlohmann::json::exception& e) {
+                            } catch (const nlohmann::json::exception&) {
                                 handle_error(Biz::_u8L("Failed to parse response"));
                                 return;
                             }

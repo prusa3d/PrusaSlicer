@@ -1984,9 +1984,7 @@ void MenuCommandRegistrar::register_undo_redo_commands()
                     .enabled =
                         [&]()
                     {
-                        if (auto plater_render_module{
-                                dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module)
-                            })
+                        if (dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module))
                         {
                             return m_project_interactor.undo_provider().is_undo_possible();
                         }
@@ -2014,9 +2012,7 @@ void MenuCommandRegistrar::register_undo_redo_commands()
                         },
                     .enabled = [&]()
                     {
-                        if (auto plater_render_module{
-                                dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module)
-                            })
+                        if (dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module))
                         {
                             return m_project_interactor.undo_provider().is_redo_possible();
                         }
