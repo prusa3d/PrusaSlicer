@@ -180,6 +180,15 @@ template<> bool value_from_json(const json &data_json, json::number_unsigned_t &
 }
 template<> bool value_from_json(const json &data_json, json::number_integer_t &value, Read3mfIssues& collected_issues, RT issue)
 {
+    // NOTE: is_number() also accepts number_unsigned, but get_value() is
+    // type-exact, so unsigned literals must be routed through the unsigned overload
+    if (data_json.is_number_unsigned()) {
+        json::number_unsigned_t value_uint;
+        if (!value_from_json(data_json, value_uint, collected_issues, issue))
+            return false;
+        value = static_cast<json::number_integer_t>(value_uint);
+        return true;
+    }
     if (!data_json.is_number()) {
         collected_issues.add_issue(Read3mfIssue(issue, std::string("Not an integer number"), data_json.dump()));
         return false;
@@ -206,6 +215,15 @@ template<> bool value_from_json(const json &data_json, json::number_float_t &val
 {
     if (data_json.is_number_float()) return get_value(data_json, value, collected_issues, issue);
     // Load int value into floating point value without issue
+    // NOTE: is_number_integer() also accepts number_unsigned, but get_value() is
+    // type-exact, so unsigned literals must be routed through the unsigned overload
+    if (data_json.is_number_unsigned()) {
+        json::number_unsigned_t value_uint;
+        if (!value_from_json(data_json, value_uint, collected_issues, issue))
+            return false;
+        value = static_cast<json::number_float_t>(value_uint);
+        return true;
+    }
     if (!data_json.is_number_integer()) {
         collected_issues.add_issue(Read3mfIssue(issue, std::string("Not a number"), data_json.dump()));
         return false;
