@@ -291,10 +291,10 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
         auto payload = std::get_if<InvalidToolchangeWarningPayload>(&warning.payload);
         ASSERT(payload != nullptr, "Expected InvalidToolchangeWarningPayload");
         message = fmt::format(
-            // TRN {} is a custom G-code
             fmt::runtime(_u8L(
+                // TRN {} is a custom G-code
                 "G-code Post-Processor encountered an invalid toolchange, maybe from a custom G-code: {}\n"
-                "Generated M104 lines may be incorrect."
+                "Generating M104 lines for it was skipped."
             )),
             payload->gcode_line
         );
