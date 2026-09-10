@@ -16,6 +16,8 @@ Dialog::Dialog(const std::string& name)
     window->set_gap(0);
     window->set_padding(0);
     window->set_flags(ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+    window->set_max_width(100_ww);
+    window->set_max_height(100_wh);
 
     m_top_row = window->emplace_back<Item>();
     m_top_row->set_max_height(40);
