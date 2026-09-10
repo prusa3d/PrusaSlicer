@@ -171,6 +171,7 @@ struct HwPrinterConfig
 {
     std::string id;
     std::string printer_id;
+    std::optional<std::string> template_id;
     std::optional<std::string> legacy_printer_model;
     std::string vendor_id;
     std::string repo_id;
@@ -321,6 +322,13 @@ struct VendorFeatures
 
 };
 
+struct PrinterFamilyInfo
+{
+    std::string label;
+    std::string base_model;
+    std::vector<std::string> printer_configs_order;
+};
+
 struct VendorInfo
 {
     std::string id;
@@ -328,6 +336,7 @@ struct VendorInfo
     std::string name;
     std::string version;
     VendorFeatures features;
+    std::vector<PrinterFamilyInfo> printer_families;
 };
 
 struct VendorData
