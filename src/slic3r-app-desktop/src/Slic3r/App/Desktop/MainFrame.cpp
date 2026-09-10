@@ -389,6 +389,13 @@ MainFrame::MainFrame(
 
 MainFrame::~MainFrame()
 {
+#ifdef USE_NATIVE_MENU
+    if (m_canvas) {
+        m_canvas->remove_listener<Platform::IInputTextFocusChangedListener>(
+            m_native_menu_bar.get()
+        );
+    }
+#endif
     localization().remove_listener<ILanguageChangedListener>(this);
 }
 
@@ -1134,6 +1141,10 @@ void MainFrame::setup_macos_native_menu_bar()
         command_binding_manager,
         [this]() { m_canvas->SetFocus(); }
     );
+
+    if (m_canvas) {
+        m_canvas->add_listener<Platform::IInputTextFocusChangedListener>(m_native_menu_bar.get());
+    }
 
     m_project_interactor.status_cache().add_listener<Biz::IStatusCacheChangedListener>(
         m_native_menu_bar.get()

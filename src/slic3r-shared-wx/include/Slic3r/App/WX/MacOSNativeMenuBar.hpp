@@ -1,6 +1,7 @@
 #pragma once
 
 #ifdef USE_NATIVE_MENU
+#include "Slic3r/App/Platform/AbstractRenderCanvas.hpp"
 
 #include <wx/menu.h>
 #include <functional>
@@ -8,6 +9,7 @@
 
 #include "Slic3r/Biz/IProjectsChangedListener.hpp"
 #include "Slic3r/Biz/Platform/ListenerScope.hpp"
+#include "Slic3r/App/Platform/AbstractRenderCanvas.hpp"
 #include "Slic3r/Biz/RemovableDrive/IRemovableDriveStatusListener.hpp"
 #include "Slic3r/Biz/StatusCache.hpp"
 #include "Slic3r/Biz/ISelectedBedInstanceChangedListener.hpp"
@@ -45,7 +47,8 @@ class MacOSNativeMenuBar :
     public Biz::IStatusCacheChangedListener,
     public Biz::ISelectedBedInstancesChangedListener,
     public Biz::RemovableDrive::IRemovableDriveStatusListener,
-    public Biz::IProjectsChangedListener
+    public Biz::IProjectsChangedListener,
+    public Slic3r::App::Platform::IInputTextFocusChangedListener
 {
 public:
     /**
@@ -113,6 +116,8 @@ public:
     void on_project_loaded(Domain::SelectionId project_id) override;
     void on_project_saved(Domain::SelectionId project_id) override;
 
+    void on_input_text_focus_changed(bool focused) override;
+
 private:
     void build_menu_from_name(MenuItemName menu_item_name);
     wxMenu* build_menu_from_item(MenuItem* menu_item);
@@ -144,6 +149,11 @@ private:
 
     // Maps wxMenuItem IDs to command names for execution
     std::unordered_map<int, std::string> m_id_to_command;
+
+    // Saved accelerator table of m_menu_bar, used to temporarily disable/restore
+    // native menu keyboard shortcuts while a text input widget has focus
+    // (see on_input_text_focus_changed()).
+    wxAcceleratorTable m_accel_table;
 };
 
 } // namespace Slic3r::App::WX
