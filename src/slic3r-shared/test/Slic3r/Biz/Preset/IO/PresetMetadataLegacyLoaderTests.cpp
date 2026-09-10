@@ -10,6 +10,7 @@
 #include "Slic3r/Biz/Preset/IO/PresetMetadataLegacyLoader.hpp"
 #include "Slic3r/Domain/Workbench.hpp"
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Biz/Expr/Parser.hpp"
 
 TEST_CASE("PresetMetadataLegacyLoader tests", "[preset][legacy]")
 {
@@ -36,13 +37,24 @@ TEST_CASE("PresetMetadataLegacyLoader tests", "[preset][legacy]")
         BundlePaths::make_test_runtime(data_dir)
     );
 
+    auto can_parse_exprs = [](const auto& exprs)
+    {
+        static Expr::Parser parser;
+        try {
+            for (const auto& expr : exprs) {
+                parser.parse(expr);
+            }
+            return true;
+        } catch (...) {
+            return false;
+        }
+    };
 
-
-    const Domain::ConfigPack config;
     const Domain::Preset::Bundle& preset_bundle = project_interactor.workbench().preset_bundle();
 
     SECTION("FDM: XL will load successfully")
     {
+        const Domain::ConfigPackFDM config;
         LegacyPresetMetadata legacy_preset = {
             .technology           = Domain::PrinterTechnology::FFF,
             .printer_model        = "XLIS",
@@ -64,10 +76,20 @@ TEST_CASE("PresetMetadataLegacyLoader tests", "[preset][legacy]")
         REQUIRE(v.print.name == "10mm Fast");
         REQUIRE(v.materials.size() == 1);
         REQUIRE(v.materials.at(0).name == "Generic PETG");
+
+        REQUIRE(!v.printer.conditions.empty());
+        REQUIRE(!v.print.conditions.empty());
+        REQUIRE(!v.tools.at(0).conditions.empty());
+        REQUIRE(!v.materials.at(0).conditions.empty());
+        REQUIRE(can_parse_exprs(v.printer.conditions));
+        REQUIRE(can_parse_exprs(v.print.conditions));
+        REQUIRE(can_parse_exprs(v.tools.at(0).conditions));
+        REQUIRE(can_parse_exprs(v.materials.at(0).conditions));
     }
 
     SECTION("SLA: SL1S will load successfully")
     {
+        const Domain::ConfigPackSLA config;
         LegacyPresetMetadata legacy_preset = {
             .technology           = Domain::PrinterTechnology::SLA,
             .printer_model        = "SL1S",
@@ -87,8 +109,17 @@ TEST_CASE("PresetMetadataLegacyLoader tests", "[preset][legacy]")
         REQUIRE(v.hw_config.name == "SL1S SPEED");
         REQUIRE(v.printer.name == "Original SL1 SPEED");
         REQUIRE(v.print.name == "0.10mm Fast");
+
         REQUIRE(v.materials.size() == 1);
         REQUIRE(v.materials.at(0).name == "Generic Resin");
+
+        REQUIRE(!v.printer.conditions.empty());
+        REQUIRE(!v.print.conditions.empty());
+        REQUIRE(!v.materials.at(0).conditions.empty());
+
+        REQUIRE(can_parse_exprs(v.printer.conditions));
+        REQUIRE(can_parse_exprs(v.print.conditions));
+        REQUIRE(can_parse_exprs(v.materials.at(0).conditions));
     }
 
     dispatcher.close();
