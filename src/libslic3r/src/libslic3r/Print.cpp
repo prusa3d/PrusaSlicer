@@ -426,6 +426,7 @@ Biz::Slicing::ApplyStatus::Status Print::update(
             model,
             slicing_input.value(),
             metadata,
+            bed.name(),
             serializer,
             bed.wipe_tower,
             bed.custom_gcode,
