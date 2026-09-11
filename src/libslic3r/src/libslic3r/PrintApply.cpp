@@ -867,6 +867,11 @@ PlaceholderParser init_placeholder_parser(
 )
 {
     PlaceholderParser parser{new_config};
+    parser.set("num_extruders", int(metadata.hw_config.material_slot_count()));
+    parser.set("sheet_type", metadata.hw_config.sheet.type);
+    // TODO: fill from bed info
+    parser.set("bed_name", std::string{"<bed name>"});
+
 
     // set preset IDs to be compatible with legacy printers
     parser.set("printer_settings_id", metadata.printer.name);
