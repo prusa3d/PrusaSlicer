@@ -143,17 +143,13 @@ private:
     wxMenuItem* m_recent_project_item{nullptr};
     wxMenu* m_plugins_menu{nullptr};
     wxMenuItem* m_plugins_item{nullptr};
+    bool m_bypass{false};
 
     Biz::ListenerScope<Biz::IProjectsChangedListener, Biz::ProjectInteractor, MacOSNativeMenuBar>
         m_projects_changed_listener_scope;
 
     // Maps wxMenuItem IDs to command names for execution
     std::unordered_map<int, std::string> m_id_to_command;
-
-    // Saved accelerator table of m_menu_bar, used to temporarily disable/restore
-    // native menu keyboard shortcuts while a text input widget has focus
-    // (see on_input_text_focus_changed()).
-    wxAcceleratorTable m_accel_table;
 };
 
 } // namespace Slic3r::App::WX

@@ -255,7 +255,7 @@ void MacOSNativeMenuBar::update_menu_states()
         const Platform::ICommand& cmd = m_command_binding_manager.command(command_name.c_str());
         wxMenuItem* item              = m_menu_bar->FindItem(id);
         if (item) {
-            item->Enable(cmd.enabled());
+            item->Enable(!m_bypass && cmd.enabled());
         }
     }
 }
@@ -307,22 +307,8 @@ void MacOSNativeMenuBar::on_input_text_focus_changed(bool focused)
         return;
     }
 
-    if (focused) {
-        // A text input widget (e.g. an ImGui text field) just gained focus.
-        // On macOS the menu bar's accelerator table intercepts key-down/char
-        // events at the OS level before they reach the render canvas, so
-        // wxGLCanvas (and ImGui on top of it) would only ever see key-up
-        // events for any key that matches a menu shortcut. Save the current
-        // table and clear it so raw keyboard input reaches the text field.
-        if (const wxAcceleratorTable* accel = m_menu_bar->GetAcceleratorTable()) {
-            m_accel_table = *accel;
-        }
-        m_menu_bar->SetAcceleratorTable(wxNullAcceleratorTable);
-    } else {
-        // The text input widget lost focus: restore the previously saved
-        // accelerator table so the native menu keyboard shortcuts work again.
-        m_menu_bar->SetAcceleratorTable(m_accel_table);
-    }
+    m_bypass = focused;
+    update_menu_states();
 }
 
 void MacOSNativeMenuBar::update_recent_projects()
