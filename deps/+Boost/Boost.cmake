@@ -1,6 +1,7 @@
 
 set(_context_abi_line "")
 set(_context_arch_line "")
+set(_context_implementation_line "-DBOOST_CONTEXT_IMPLEMENTATION:STRING=fcontext")
 if (APPLE AND CMAKE_OSX_ARCHITECTURES)
     if (CMAKE_OSX_ARCHITECTURES MATCHES "x86")
         set(_context_abi_line "-DBOOST_CONTEXT_ABI:STRING=sysv")
@@ -8,6 +9,10 @@ if (APPLE AND CMAKE_OSX_ARCHITECTURES)
         set (_context_abi_line "-DBOOST_CONTEXT_ABI:STRING=aapcs")
     endif ()
     set(_context_arch_line "-DBOOST_CONTEXT_ARCHITECTURE:STRING=${CMAKE_OSX_ARCHITECTURES}")
+endif ()
+
+if (MSVC AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+    set(_context_implementation_line "-DBOOST_CONTEXT_IMPLEMENTATION=winfib")
 endif ()
 
 set(_excluded_libs contract|fiber|numpy|stacktrace|wave|test|log)
@@ -30,6 +35,7 @@ add_cmake_project(Boost
         "-DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
         "${_context_abi_line}"
         "${_context_arch_line}"
+        "${_context_implementation_line}"
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
 
