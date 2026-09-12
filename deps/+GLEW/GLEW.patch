@@ -1,0 +1,13 @@
+--- ./build/cmake/CMakeLists.txt	2024-07-16 21:32:44.530717300 -0600
++++ ./build/cmake/CMakeLists.txt	2024-07-16 21:32:14.245830500 -0600
+@@ -115,7 +115,9 @@
+   # add options from visual studio project
+   target_compile_definitions (glew PRIVATE "GLEW_BUILD;VC_EXTRALEAN")
+   target_compile_definitions (glew_s PRIVATE "GLEW_STATIC;VC_EXTRALEAN")
+-  target_link_libraries (glew LINK_PRIVATE -BASE:0x62AA0000)
++  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(i?86|x86|x86_32)$")
++    target_link_libraries (glew LINK_PRIVATE -BASE:0x62AA0000)
++  endif()
+   # kill security checks which are dependent on stdlib
+   target_compile_options (glew PRIVATE -GS-)
+   target_compile_options (glew_s PRIVATE -GS-)
