@@ -11,6 +11,7 @@
 #include "Slic3r/Domain/Bed.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
 #include "Slic3r/Domain/ModelObject.hpp"
+#include "Slic3r/Domain/ModelVolume.hpp"
 #include "Slic3r/Domain/Percentage.hpp"
 #include "Slic3r/Domain/Preset/Bundle.hpp"
 
@@ -31,6 +32,27 @@ using namespace Slic3r::Biz;
 using namespace Slic3r::App::CLI::Test;
 
 namespace fs = boost::filesystem;
+
+TEST_CASE("Legacy emboss import keeps modifier slicing bounds around the mesh", "[cli][3mf][emboss]")
+{
+    // Synthetic cuboids with a legacy rotated emboss transform; no font is needed.
+    const auto model = FileLoadingLogic::read_model_from_file(
+        (fs::path(CLI_TEST_DATA_DIR) / "legacy-emboss-modifier.3mf").string(), nullptr);
+    REQUIRE(model.has_value());
+    REQUIRE(model->objects.size() == 1);
+    const auto& volumes = model->objects.front()->volumes;
+    REQUIRE(volumes.size() == 2);
+    const auto& modifier = *volumes.back();
+    REQUIRE(modifier.is_modifier());
+    REQUIRE(modifier.emboss_shape.has_value());
+    REQUIRE_FALSE(modifier.emboss_shape->legacy_fix_3mf_tr.has_value());
+    const auto mesh_bounds = modifier.mesh().bounding_box();
+    const auto hull_bounds = modifier.get_convex_hull().bounding_box();
+    for (int axis = 0; axis < 3; ++axis) {
+        CHECK(hull_bounds.min[axis] == Catch::Approx(mesh_bounds.min[axis]).margin(1e-5));
+        CHECK(hull_bounds.max[axis] == Catch::Approx(mesh_bounds.max[axis]).margin(1e-5));
+    }
+}
 
 TEST_CASE("CLI slices a single-tool 3MF project", "[cli][timeout]")
 {

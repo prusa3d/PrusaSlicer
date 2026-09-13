@@ -48,6 +48,7 @@ if (SLIC3R_BUILD_TESTS)
     file(TO_NATIVE_PATH "${CLI_TEST_RESOURCES_DIR}" CLI_TEST_RESOURCES_DIR)
 
     target_compile_definitions(slic3r-app-cli-tests PRIVATE CLI_TEST_RESOURCES_DIR=R"\(${CLI_TEST_RESOURCES_DIR}\)")
+    target_compile_definitions(slic3r-app-cli-tests PRIVATE CLI_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data")
 
     add_test(NAME slic3r-app-cli-tests
             COMMAND slic3r-app-cli-tests ${CATCH_ALL_ARGS}
