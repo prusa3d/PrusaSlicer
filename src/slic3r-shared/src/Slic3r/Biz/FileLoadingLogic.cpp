@@ -10,6 +10,7 @@
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 #include "Slic3r/Biz/Algorithms/Geometry/ConvexHull.hpp"
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/ModelVolume.hpp"
 #include "Slic3r/Biz/Algorithms/Point.hpp"
 #include "Slic3r/Biz/Algorithms/VirtualExtruder.hpp"
 #include "Slic3r/Biz/Scene/Selection.hpp"
@@ -437,6 +438,9 @@ void fix_volume_transformation(ModelVolume& volume) {
     indexed_triangle_set its = volume.mesh_ptr()->its; // copy
     its_transform(its, *fix_opt);
     volume.set_mesh(Algorithms::TriangleMesh::construct(std::move(its)));
+    // Slicing uses the hull to bound modifier regions. Keep it in the same
+    // local coordinates as the mesh after undoing the legacy baked transform.
+    Algorithms::ModelVolume::calculate_convex_hull(volume);
     // data for fix transformation is not useable anymore
     fix_opt.reset();
 }
