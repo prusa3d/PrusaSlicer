@@ -1117,8 +1117,23 @@ void WXRenderCanvas::end_frame_platform()
         FrameMark;
 
         ZoneScopedN("swap_buffers");
-        if (!wxGLCanvas::SwapBuffers()) {
-            SPDLOG_ERROR("Swapping buffers failed!");
+        if (wxGLCanvas::SwapBuffers()) {
+            m_presented_once = true;
+            m_surface_ready  = true;
+        } else {
+            // The canvas has no surface to present to while it is off screen,
+            // and gets a new one when it is mapped again, which is only ready
+            // once the compositor has signalled it. Both are ordinary states,
+            // and the same ones the canvas starts up in.
+            if (!IsShownOnScreen()) {
+                m_surface_ready = false;
+            }
+
+            if (m_surface_ready) {
+                SPDLOG_ERROR("Swapping buffers failed!");
+            } else {
+                SPDLOG_DEBUG("Swapping buffers before the surface is ready.");
+            }
         }
         m_frame_fence[m_current_frame_idx] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
         //assert_no_gl_error();
