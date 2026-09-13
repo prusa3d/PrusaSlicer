@@ -162,10 +162,12 @@ int run(const Slic3r::App::InitParams& init_params, AppServices& app_services)
     ::setenv("WEBKIT_DISABLE_COMPOSITING_MODE", "1", /* replace */ false);
     ::setenv("WEBKIT_DISABLE_DMABUF_RENDERER", "1", /* replace */ false);
 
-    // On Linux, wxGTK has no support for Wayland, and the app crashes on
-    // startup if gtk3 is used. This env var has to be set explicitly to
-    // instruct the window manager to fall back to X server mode.
-    ::setenv("GDK_BACKEND", "x11", /* replace */ true);
+    // wxGLCanvas now uses EGL, which works on Wayland as well as X11, so the
+    // backend no longer has to be forced. Fall back to X11 only without a
+    // Wayland session, and leave an explicitly set GDK_BACKEND alone.
+    if (::getenv("WAYLAND_DISPLAY") == nullptr) {
+        ::setenv("GDK_BACKEND", "x11", /* replace */ false);
+    }
 
     if (app_services.app_config().get<Theme::Style>("theme") == Theme::Style::Light) {
         setenv("GTK_THEME", "Adwaita:light", 1);
