@@ -6,6 +6,8 @@
 #include <jthread/JThread.hpp>
 #include <condition_variable>
 #include <mutex>
+#include <string>
+#include <unordered_map>
 
 namespace Slic3r::Biz::RemovableDrive {
 
@@ -66,6 +68,12 @@ private:
 
     void dispatch_status(const boost::filesystem::path& drive_path, RemovableDriveStatus status);
 
+    /**
+     * @brief Returns the path a document portal path stands for, or the path itself.
+     * Other paths are returned unchanged without asking the portal.
+     */
+    boost::filesystem::path resolve_document_portal_path(const boost::filesystem::path& path) const;
+
     JThread::JThread m_thread;
     std::condition_variable m_thread_stop_condition;
     mutable std::mutex m_thread_stop_mutex;
@@ -74,5 +82,10 @@ private:
 
     std::vector<DriveData> m_current_drives;
     mutable std::mutex m_drives_mutex;
+
+    // A document keeps the path it was created for, so the answer is worth
+    // keeping: it is asked for on the main thread, once per exported file.
+    mutable std::unordered_map<std::string, boost::filesystem::path> m_document_paths;
+    mutable std::mutex m_document_paths_mutex;
 };
 } // namespace Slic3r::Biz::RemovableDrive
