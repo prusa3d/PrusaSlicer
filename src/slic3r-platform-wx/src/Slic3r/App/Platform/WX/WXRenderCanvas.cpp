@@ -998,6 +998,25 @@ void WXRenderCanvas::on_idle(wxIdleEvent& event)
         return;
     }
 
+    // Queued work can block the main thread for a long time, loading the preset
+    // bundles being the obvious case, which would leave the window empty for
+    // its whole duration. Get a frame out first. Under Wayland presenting only
+    // succeeds once the compositor says the surface is ready, so give up after
+    // a deadline rather than postponing start up if no frame ever gets through.
+    if (!m_presented_once) {
+        const auto now = std::chrono::steady_clock::now();
+        if (!m_first_present_deadline) {
+            m_first_present_deadline = now + std::chrono::milliseconds(500);
+        }
+
+        repaint();
+
+        if (!m_presented_once && now < *m_first_present_deadline) {
+            wxWakeUpIdle();
+            return;
+        }
+    }
+
     m_main_thread_dispatcher.dispatch_enqueued();
     bool render_requested = get_and_reset_render_requested();
     // std::cout << "Idle: render requested: " << render_requested << "\n";
