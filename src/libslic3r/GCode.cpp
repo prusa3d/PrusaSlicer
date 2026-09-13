@@ -4072,12 +4072,14 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
 // convert a model-space scaled point into G-code coordinates
 Point GCodeGenerator::gcode_to_point(const Vec2d &point) const
 {
-    Vec2d pt = point - m_origin;
-    // Reverse XY skew correction (inverse of point_to_gcode shear).
-    // The forward transform only modifies X: x' = x + (y - y_ref) * k,
-    // so Y is unchanged and the inverse is: x = x' - (y - y_ref) * k.
+    Vec2d pt = point;
+    // point_to_gcode shears last, after adding the origin and subtracting the
+    // extruder offset, so the shear is undone first, in that same frame.
+    // Removing the origin first would un-shear with the wrong Y and leave an
+    // X error of origin.y * m_skew_xy_k.
     if (m_skew_xy_k != 0.0)
         pt.x() -= (pt.y() - m_skew_y_ref) * m_skew_xy_k;
+    pt -= m_origin;
     if (const Extruder *extruder = m_writer.extruder(); extruder)
         // This function may be called at the very start from toolchange G-code when the extruder is not assigned yet.
         pt += m_config.extruder_offset.get_at(extruder->id());

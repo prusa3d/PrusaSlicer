@@ -15,12 +15,13 @@ using Catch::Approx;
 
 // Helper to configure a GCodeGenerator with skew correction via PrintConfig.
 // This tests the full config → apply → transform pipeline.
-static std::unique_ptr<GCodeGenerator> make_skewed_generator(double skew_deg)
+static std::unique_ptr<GCodeGenerator> make_skewed_generator(double skew_deg, const std::string &extruder_offset = "0x0")
 {
     PrintConfig config;
     config.set_deserialize_strict({
         { "skew_xy_correction", std::to_string(skew_deg) },
         { "nozzle_diameter",    "0.4" },
+        { "extruder_offset",    extruder_offset },
     });
     // Set a bed shape so the skew Y reference can be computed
     config.set_deserialize_strict({
@@ -59,6 +60,26 @@ TEST_CASE("Skew correction round-trip: point_to_gcode -> gcode_to_point", "[skew
         // Should recover the original point within G-code resolution (~1 micron)
         CHECK(recovered.x() == Approx(pt.x()).margin(10)); // 10 nm tolerance
         CHECK(recovered.y() == Approx(pt.y()).margin(10));
+    }
+}
+
+TEST_CASE("Skew correction round-trip with a non-zero origin and extruder offset", "[skew]")
+{
+    // While an object prints, the origin is the instance's position on the bed,
+    // and each tool can carry an extruder offset. point_to_gcode applies both
+    // before shearing, so gcode_to_point has to un-shear first and only then
+    // remove them. Removing the origin first leaves an X error of
+    // origin.y * tan(skew), which a zero-origin round trip cannot detect.
+    auto gen = make_skewed_generator(2.0, "1.5x-2.5");
+    gen->set_origin(125.0, 105.0);
+
+    for (auto p_xy : { Vec2d(-40.0, -30.0), Vec2d(0.0, 0.0), Vec2d(35.0, 60.0), Vec2d(-110.0, 90.0) }) {
+        Point pt = scaled(p_xy);
+        Vec2d gp = gen->point_to_gcode(pt);
+        Point rec = gen->gcode_to_point(gp);
+        INFO("model point (" << p_xy.x() << "," << p_xy.y() << ")  recovered (" << rec.x() << "," << rec.y() << ")");
+        CHECK(rec.x() == Approx(pt.x()).margin(10));
+        CHECK(rec.y() == Approx(pt.y()).margin(10));
     }
 }
 
