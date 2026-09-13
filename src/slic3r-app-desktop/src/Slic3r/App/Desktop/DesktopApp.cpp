@@ -1,5 +1,11 @@
 #include "DesktopApp.hpp"
 
+#ifdef __WXGTK__
+#include <glib.h>
+
+#include "Slic3r/Version.hpp"
+#endif
+
 #include "MainFrame.hpp"
 #include "Slic3r/App/Undo/Store.hpp"
 #include "SplashScreen.hpp"
@@ -168,6 +174,11 @@ int run(const Slic3r::App::InitParams& init_params, AppServices& app_services)
     if (::getenv("WAYLAND_DISPLAY") == nullptr) {
         ::setenv("GDK_BACKEND", "x11", /* replace */ false);
     }
+
+    // A compositor finds a window's icon through the desktop file named after
+    // the app id the window announces. GTK takes that from the program name,
+    // which defaults to the executable, so it has to be set before GTK starts.
+    ::g_set_prgname(SLIC3R_DESKTOP_FILE_NAME);
 
     if (app_services.app_config().get<Theme::Style>("theme") == Theme::Style::Light) {
         setenv("GTK_THEME", "Adwaita:light", 1);

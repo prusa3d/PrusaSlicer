@@ -96,10 +96,13 @@ include(GNUInstallDirs)
 include(CMakeDependentOption)
 include(Utils)
 
+# Also the app id the window announces, see g_set_prgname() in DesktopApp.cpp.
+set(SLIC3R_DESKTOP_FILE_NAME "com.prusa3d.PrusaSlicer")
+
 if (UNIX AND NOT APPLE)
     configure_file(
-        ${CMAKE_SOURCE_DIR}/src/platform/unix/com.prusa3d.PrusaSlicer.desktop.in
-        ${CMAKE_BINARY_DIR}/com.prusa3d.PrusaSlicer.desktop
+        ${CMAKE_SOURCE_DIR}/src/platform/unix/${SLIC3R_DESKTOP_FILE_NAME}.desktop.in
+        ${CMAKE_BINARY_DIR}/${SLIC3R_DESKTOP_FILE_NAME}.desktop
         @ONLY
     )
 endif ()
