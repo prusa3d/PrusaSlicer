@@ -221,6 +221,8 @@ int main(int argc, char** argv)
             const auto& process_settings = std::get<D::PrintSettings>(print.preset.values);
             require(process_settings.find("small_perimeter_threshold").item->value().get<double>() == 0.0,
                 "Orca disabled small-perimeter threshold overrides the native 6.5 mm default");
+            require(process_settings.find("enable_dynamic_overhang_speeds").item->value().get<bool>(),
+                "Orca enabled overhang default survives native preset evaluation");
             require(process_settings.find("preheat_time").item->value().get<double>() == 30.0
                 && process_settings.find("preheat_steps").item->value().get<int>() == 1,
                 "native process preserves Orca preheat defaults");

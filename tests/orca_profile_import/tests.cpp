@@ -247,6 +247,13 @@ int main(int argc, char** argv)
         check(converted["ensure_vertical_shell_thickness"] == "enabled", "singleton boolean converts to shell enum");
         check(converted["automatic_infill_combination"] == true, "automatic infill remains automatic");
         check(converted["bridge_acceleration"] == 1500.0, "bridge percent uses outer wall acceleration");
+        check(converted["enable_dynamic_overhang_speeds"] == true,
+            "omitted overhang switch retains Orca's enabled engine default");
+        write(root / "Example/process/normal.json", {{"type", "process"}, {"name", "Normal"}, {"instantiation", "true"},
+            {"enable_overhang_speed", {"0"}}});
+        vendors = O::convert(root, schema());
+        check(vendors.front().presets[1]["values"]["enable_dynamic_overhang_speeds"] == false,
+            "explicit disabled overhang switch overrides the imported default");
         write(root / "Example/process/normal.json", {{"type", "process"}, {"name", "Normal"}, {"instantiation", "true"},
             {"initial_layer_infill_speed", "25"}, {"enable_overhang_speed", "1"},
             {"overhang_1_4_speed", "0"}, {"overhang_2_4_speed", "40"},

@@ -435,6 +435,10 @@ Json values(const Json& flat, const Json& schema, Vendor& vendor)
         // Orca disables small-perimeter slowdown by default. PS3's native
         // historical threshold is 6.5 mm and must not leak into imported jobs.
         if (schema.contains("small_perimeter_threshold")) result["small_perimeter_threshold"] = 0.0;
+        // Orca enables overhang slowdown even when no ancestor supplies the
+        // switch (for example the U1 process family). PS3 defaults it to false.
+        // Explicit source values below, including false, take precedence.
+        if (schema.contains("enable_dynamic_overhang_speeds")) result["enable_dynamic_overhang_speeds"] = true;
     }
     for (auto it = flat.begin(); it != flat.end(); ++it) {
         const auto& src = it.key();
@@ -807,7 +811,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 5}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 6}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {

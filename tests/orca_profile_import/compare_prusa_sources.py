@@ -89,7 +89,7 @@ def main():
                                        transformation='Compatible default filament selection'))
             if emitted and candidates:
                 origin = 'explicit_source' if len(candidates) == 1 else 'multiple_explicit_sources_review_precedence'
-            elif emitted and key in ('preheat_time', 'preheat_steps', 'small_perimeter_threshold'):
+            elif emitted and key in ('preheat_time', 'preheat_steps', 'small_perimeter_threshold', 'enable_dynamic_overhang_speeds'):
                 origin = 'importer_default'
             elif emitted and key in ('custom_parameters_printer', 'custom_parameters_filament', 'default_tool_print'):
                 origin = 'importer_generated'
@@ -107,7 +107,7 @@ def main():
                          'ps3_default': imported['ps3_defaults_for_hardware'].get(key),
                          'emitted_inputs': emitted, 'source_candidates': candidates, 'ignored_nil_sources': ignored}
             if origin == 'importer_default':
-                rows[key]['evidence'] = 'OrcaProfileConverter.cpp values() explicitly injects preheat_time=30 / preheat_steps=1 / small_perimeter_threshold=0 before applying source settings. These match the defaults in local Orca PrintConfig.cpp; no native Prusa comparison is used to infer them.'
+                rows[key]['evidence'] = 'OrcaProfileConverter.cpp values() explicitly injects preheat_time=30 / preheat_steps=1 / small_perimeter_threshold=0 / enable_dynamic_overhang_speeds=true before applying source settings. These match the defaults in local Orca PrintConfig.cpp; no native Prusa comparison is used to infer them.'
         evidence[name] = {'source_profiles': sources, 'fields': rows}
         differences = {key: row for key, row in rows.items() if row['native'] != row['imported']}
         counts = Counter(row['origin'] for row in differences.values())
