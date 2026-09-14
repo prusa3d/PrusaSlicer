@@ -65,7 +65,8 @@ static void check_preheating()
 }
 
 static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
-    const D::Preset::EvaluatedPrinterPreset& printer, const D::Preset::EvaluatedPrintPreset& print)
+    const D::Preset::EvaluatedPrinterPreset& printer, const D::Preset::EvaluatedPrintPreset& print,
+    unsigned initial = 0, bool use_all = false)
 {
     D::ConfigPackFDM pack(static_cast<int>(hw.material_slot_count()));
     pack.printer = std::get<D::PrinterSettings>(printer.preset.values);
@@ -85,7 +86,10 @@ static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
     view.finalize();
     Slic3r::Biz::Parser::PlaceholderParser parser(Slic3r::Biz::Parser::IO::get_parser_config(view));
     for (const auto* key : {"initial_tool", "current_extruder", "previous_extruder", "filament_extruder_id", "layer_num"}) parser.set(key, 0);
-    parser.set("next_extruder", hw.tool_count > 1 ? 1 : 0);
+    parser.set("initial_tool", static_cast<int>(initial));
+    parser.set("current_extruder", static_cast<int>(initial));
+    parser.set("filament_extruder_id", static_cast<int>(initial));
+    parser.set("next_extruder", hw.material_slot_count() > 1 && initial == 0 ? 1 : 0);
     parser.set("filament_settings_id", filament_names);
     parser.set("printer_settings_id", printer.preset.name);
     parser.set("print_settings_id", print.preset.name);
@@ -95,9 +99,9 @@ static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
     parser.set("extruded_volume_total", 0.0);
     parser.set("extruded_weight", std::vector<double>(hw.material_slot_count(), 0.0));
     parser.set("extruded_volume", std::vector<double>(hw.material_slot_count(), 0.0));
-    parser.set("has_wipe_tower", false);
+    parser.set("has_wipe_tower", use_all);
     parser.set("has_single_extruder_multi_material_priming", false);
-    parser.set("total_toolchanges", 0);
+    parser.set("total_toolchanges", use_all ? 10 : 0);
     parser.set("zhop", 0.0);
     parser.set("layer_z", 0.2);
     parser.set("max_layer_z", 20.0);
@@ -106,7 +110,8 @@ static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
     parser.set("print_bed_min", std::vector<double>{0, 0});
     parser.set("print_bed_max", std::vector<double>{180, 180});
     std::vector<bool> used(255, false);
-    used[0] = true;
+    used[initial] = true;
+    if (use_all) std::fill_n(used.begin(), hw.material_slot_count(), true);
     parser.set("is_extruder_used", used);
     for (const auto* key : {"start_gcode", "before_layer_gcode", "layer_gcode", "toolchange_gcode", "end_gcode"}) {
         const auto script = pack.printer.find(key).item->value().get<std::string>();
@@ -118,16 +123,22 @@ static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
             outputs.set("e_restart_extra", std::vector<double>(hw.material_slot_count(), 0.0));
             outputs.set("e_position", std::vector<double>(hw.material_slot_count(), 0.0));
             Slic3r::Biz::Parser::PlaceholderParser::ContextData context;
-            try { parser.process(script, 0, nullptr, &outputs, &context); }
+            try { parser.process(script, initial, nullptr, &outputs, &context); }
             catch (const std::exception& e) { throw std::runtime_error(hw.name + " / " + print.preset.name + " / " + key + ": " + e.what()); }
         }
     }
 }
 
+#include "prusa_comparison.hpp"
+
 int main(int argc, char** argv)
 {
     const auto root = fs::temp_directory_path() / ("ps-orca-native-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
+        if (argc == 5 && std::string_view(argv[1]) == "--compare-prusa") {
+            compare_prusa_presets(argv[2], argv[3], argv[4]);
+            return 0;
+        }
         check_preheating();
         const auto write = [&](const char* name, const Json& value) {
             const auto path = root / name;
@@ -208,6 +219,8 @@ int main(int argc, char** argv)
             require(!filament.find("idle_temperature").item->value().get<std::optional<int>>(),
                 "Orca idle zero evaluates to unspecified rather than heater off");
             const auto& process_settings = std::get<D::PrintSettings>(print.preset.values);
+            require(process_settings.find("small_perimeter_threshold").item->value().get<double>() == 0.0,
+                "Orca disabled small-perimeter threshold overrides the native 6.5 mm default");
             require(process_settings.find("preheat_time").item->value().get<double>() == 30.0
                 && process_settings.find("preheat_steps").item->value().get<int>() == 1,
                 "native process preserves Orca preheat defaults");

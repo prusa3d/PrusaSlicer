@@ -3638,13 +3638,25 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->category = ConfigItemDef::Category::Print_Speed;
     def->order = 2;
     def->gui_type = ConfigItemDef::GUIType::unit_or_percentage;
-    def->tooltip = L("This separate setting will affect the speed of perimeters having radius <= 6.5mm "
+    def->tooltip = L("This separate setting will affect the speed of perimeters within the small perimeter threshold "
                    "(usually holes). If expressed as percentage (for example: 80%) it will be calculated "
                    "on the perimeters speed setting above. Set to zero for auto.");
     def->units = {L("mm/s"), L("%")};
     def->min = 0;
     def->init_fn = init_with(FloatOrPercentage{15.});
     def->ratio_over = "perimeter_speed";
+
+    def = defs.add("small_perimeter_threshold", typeid(double));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Object, Volume };
+    def->label = L("Small perimeter threshold");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Speed_MainStructure;
+    def->category = ConfigItemDef::Category::Print_Speed;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Apply the small perimeter speed to loops with a circumference no greater than a circle of this radius. Zero disables the small perimeter slowdown.");
+    def->units = {L("mm")};
+    def->min = 0;
+    def->init_fn = init_with(6.5);
 
     def = defs.add("solid_infill_below_area", typeid(double));
     def->location = Print;

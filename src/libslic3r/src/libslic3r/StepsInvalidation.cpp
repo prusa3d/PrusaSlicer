@@ -452,6 +452,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"slicing_mode", steps({propagate(posSlice)})},
     {"slowdown_below_layer_time", steps({propagate(psGCodeExport)})},
     {"small_perimeter_speed", steps({propagate(psGCodeExport)})},
+    {"small_perimeter_threshold", steps({propagate(psGCodeExport)})},
     {"solid_infill_acceleration", steps({propagate(psGCodeExport)})},
     {"solid_infill_below_area", steps({propagate(posPrepareInfill)})},
     {"solid_infill_every_layers", steps({propagate(posPrepareInfill)})},

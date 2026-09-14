@@ -305,7 +305,24 @@ std::string rewrite_expression(const std::string& source, const std::map<std::st
                 const auto index_end = source.find(']', index_begin);
                 if (index_end != std::string::npos) {
                     auto indexed = token + source.substr(index_begin, index_end - index_begin + 1);
-                    if (token == "flush_volumetric_speeds" || token == "flush_temperatures") {
+                    // Orca uses numeric zero for an unspecified idle temperature;
+                    // native presets use an optional value. Translate the sentinel
+                    // comparison without touching quoted strings or other arithmetic.
+                    const auto preceding = i == 0 ? std::string::npos : source.find_last_not_of(" \t\r\n", i - 1);
+                    const bool standalone_lhs = preceding == std::string::npos
+                        || std::string_view("+-*/%<>=!").find(source[preceding]) == std::string_view::npos;
+                    auto op = source.find_first_not_of(" \t", index_end + 1);
+                    auto zero = op == std::string::npos ? op : source.find_first_not_of(" \t", op + 2);
+                    auto tail = zero == std::string::npos ? zero : source.find_first_not_of(" \t", zero + 1);
+                    if (token == "idle_temperature" && standalone_lhs && op != std::string::npos
+                        && (source.compare(op, 2, "==") == 0 || source.compare(op, 2, "!=") == 0)
+                        && zero != std::string::npos && source[zero] == '0'
+                        && (tail == std::string::npos || source[tail] == ')' || source[tail] == '?')) {
+                        const auto index = rewrite_expression(source.substr(index_begin + 1, index_end - index_begin - 1), context);
+                        token = std::string(source[op] == '!' ? "!is_nil(" : "is_nil(") + "idle_temperature[" + index + "])";
+                        end = zero + 1;
+                        contextual = true;
+                    } else if (token == "flush_volumetric_speeds" || token == "flush_temperatures") {
                         const auto index = "[" + rewrite_expression(source.substr(index_begin + 1, index_end - index_begin - 1), context) + "]";
                         const bool speed = token == "flush_volumetric_speeds";
                         const auto custom = std::string("custom_parameter_filament_orca_") + (speed ? "flush_speed" : "flush_temperature") + index;
@@ -415,6 +432,9 @@ Json values(const Json& flat, const Json& schema, Vendor& vendor)
     if (flat.value("type", "") == "process") {
         if (schema.contains("preheat_time")) result["preheat_time"] = 30.0;
         if (schema.contains("preheat_steps")) result["preheat_steps"] = 1;
+        // Orca disables small-perimeter slowdown by default. PS3's native
+        // historical threshold is 6.5 mm and must not leak into imported jobs.
+        if (schema.contains("small_perimeter_threshold")) result["small_perimeter_threshold"] = 0.0;
     }
     for (auto it = flat.begin(); it != flat.end(); ++it) {
         const auto& src = it.key();
@@ -787,7 +807,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 3}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 5}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {

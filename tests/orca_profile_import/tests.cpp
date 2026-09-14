@@ -23,6 +23,7 @@ O::Schema schema()
             {"use_relative_e_distances", {{"type", "bool"}}}, {"max_print_height", {{"type", "float"}}}}},
         {"print", {{"perimeters", {{"type", "int"}}}, {"retract_length", {{"type", "float"}}},
             {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
+            {"small_perimeter_threshold", {{"type", "float"}}},
             {"bridge_acceleration", {{"type", "float"}}},
             {"first_layer_infill_speed", {{"type", "float_or_percent"}}},
             {"first_layer_solid_infill_speed", {{"type", "float_or_percent"}}},
@@ -50,6 +51,16 @@ int main(int argc, char** argv)
         check(O::rewrite_gcode("{nozzle_temperature[2]}") == "{temperature[2]}", "explicit tool index");
         check(O::rewrite_gcode("{initial_extruder}") == "{initial_tool}", "initial tool alias");
         check(O::rewrite_gcode("{outer_wall_speed}") == "{external_perimeter_speed[initial_tool]}", "process vectors require a tool index");
+        check(O::rewrite_gcode("{if idle_temperature[initial_extruder] == 0}70{else}{idle_temperature[initial_extruder]}{endif}")
+            == "{if is_nil(idle_temperature[initial_tool])}70{else}{idle_temperature[initial_tool]}{endif}", "idle zero sentinel becomes a nil check");
+        check(O::rewrite_gcode("{idle_temperature[2] != 0 ? idle_temperature[2] : 70}")
+            == "{!is_nil(idle_temperature[2]) ? idle_temperature[2] : 70}", "explicit idle temperature sentinel inequality");
+        check(O::rewrite_gcode("{is_nil(idle_temperature[2])}") == "{is_nil(idle_temperature[2])}", "native nil check stays unchanged");
+        check(O::rewrite_gcode("{idle_temperature[2] == 0 + 1}") == "{idle_temperature[2] == 0 + 1}", "idle arithmetic is not a sentinel check");
+        check(O::rewrite_gcode("{temperature[2] + idle_temperature[2] == 0}")
+            == "{temperature[2] + idle_temperature[2] == 0}", "idle arithmetic on the left is not a sentinel check");
+        check(O::rewrite_gcode("{\"idle_temperature[2] == 0\"}") == "{\"idle_temperature[2] == 0\"}",
+            "quoted idle checks stay literal");
         const auto flush = O::rewrite_gcode("{flush_volumetric_speeds[initial_extruder]}");
         check(flush == "{(custom_parameter_filament_orca_flush_speed[initial_tool] > 0 ? custom_parameter_filament_orca_flush_speed[initial_tool] : filament_max_volumetric_speed[initial_tool])}",
             "purge speed preserves a selected filament override and runtime fallback");
@@ -123,6 +134,8 @@ int main(int argc, char** argv)
         check(v.presets[1]["variants"][0]["values"]["retract_length"] == 0.8, "machine retraction defaults retained");
         check(v.presets[1]["variants"][0]["values"]["default_material"] == "PLA", "machine default filament is retained");
         check(v.presets.back()["values"]["temperature"] == 215, "filament scalar conversion");
+        check(v.presets[1]["values"].at("small_perimeter_threshold") == 0.0,
+            "missing small-perimeter threshold preserves Orca disabled default");
         check(v.presets[1]["values"]["preheat_time"] == 30.0 && v.presets[1]["values"]["preheat_steps"] == 1,
             "missing preheat settings use Orca defaults");
         const auto filament_path = root / "Example/filament/pla.json";
@@ -150,6 +163,14 @@ int main(int argc, char** argv)
             const auto converted = O::convert(root, schema());
             check(converted[0].presets[1]["values"].at("preheat_time") == seconds,
                 "explicit preheat timing including disabled survives import");
+        }
+        for (double threshold : {0.0, 6.5, 8.0}) {
+            auto fixture = original_process;
+            fixture["small_perimeter_threshold"] = std::to_string(threshold);
+            write(process_path, fixture);
+            const auto converted = O::convert(root, schema());
+            check(converted[0].presets[1]["values"].at("small_perimeter_threshold") == threshold,
+                "explicit small-perimeter thresholds override the Orca default");
         }
         write(process_path, original_process);
         // Both startup and online-source reloads use this persistent per-vendor

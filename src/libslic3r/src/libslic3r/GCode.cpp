@@ -3276,7 +3276,10 @@ std::string GCodeGenerator::extrude_perimeters(
     for (const GCode::ExtrusionOrder::Perimeter &perimeter : perimeters) {
         double speed{-1};
         // Apply the small perimeter speed.
-        if (perimeter.extrusion_entity->length() <= SMALL_PERIMETER_LENGTH)
+        const double small_perimeter_threshold = region.extruder_config_value<double>(
+            "small_perimeter_threshold", FlowRole::frExternalPerimeter);
+        if (small_perimeter_threshold > 0
+            && perimeter.extrusion_entity->length() <= (small_perimeter_threshold / SCALING_FACTOR) * 2 * PI)
             speed = region
                         .extruder_config_value<Domain::FloatOrPercentage>(
                             "small_perimeter_speed",

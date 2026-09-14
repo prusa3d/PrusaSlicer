@@ -23,4 +23,11 @@ if(TARGET slic3r-shared AND TARGET slic3r-biz-parser)
     target_include_directories(orca_profile_native_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/../../src/libslic3r/src")
     set_property(TARGET orca_profile_native_tests PROPERTY DISABLE_PRECOMPILE_HEADERS ON)
     add_test(NAME orca_profile_native COMMAND orca_profile_native_tests)
+    set(ORCA_PRUSA_COMPARISON_ROOT "" CACHE PATH "Orca profile tree for opt-in native/Orca Prusa comparison")
+    if(ORCA_PRUSA_COMPARISON_ROOT)
+        add_test(NAME orca_prusa_comparison COMMAND orca_profile_native_tests --compare-prusa
+            "${CMAKE_CURRENT_LIST_DIR}/../../resources/presets/prusa-research-fff/PrusaResearch"
+            "${ORCA_PRUSA_COMPARISON_ROOT}"
+            "${CMAKE_CURRENT_BINARY_DIR}/prusa-comparison.json")
+    endif()
 endif()
