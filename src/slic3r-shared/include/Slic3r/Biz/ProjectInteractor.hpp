@@ -95,7 +95,7 @@ public:
         m_slicing_interactor(dispatcher, thumbnail_image_generator),
         m_result_export_interactor(dispatcher),
         m_user_account_interactor(dispatcher),
-        m_preset_updater_interactor(dispatcher),
+        m_preset_updater_interactor(dispatcher, m_user_account_interactor),
         m_removable_drive_service(dispatcher),
         m_file_downloader_interactor(dispatcher),
         m_physical_printer_interactor(dispatcher, m_preset_interactor, m_user_account_interactor),

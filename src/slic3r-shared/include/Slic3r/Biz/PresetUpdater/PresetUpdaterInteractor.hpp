@@ -4,6 +4,7 @@
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterReconfigurationList.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterRepositoryDescriptor.hpp"
 #include "Slic3r/Biz/PresetUpdater/IPresetUpdaterResultListener.hpp"
+#include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
 #include "Slic3r/Biz/Platform/IMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/Platform/JobManager/ProgressTracker.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
@@ -35,7 +36,10 @@ namespace Slic3r::Biz::PresetUpdater {
 class PresetUpdaterInteractor : public WithListeners<IPresetUpdaterResultListener>
 {
 public:
-    PresetUpdaterInteractor(Platform::IMainThreadDispatcher& dispatcher);
+    PresetUpdaterInteractor(
+        Platform::IMainThreadDispatcher& dispatcher,
+        UserAccount::UserAccountInteractor& user_account_interactor
+    );
     ~PresetUpdaterInteractor();
 
     /**
@@ -175,6 +179,7 @@ private:
     bool m_shut_down{false};
 
     Platform::IMainThreadDispatcher& m_dispatcher;
+    UserAccount::UserAccountInteractor& m_user_account_interactor;
 
     // Error - operation has failed
     void dispatch_error(JobId job_id, const std::string& body, PresetUpdaterReason reason);
