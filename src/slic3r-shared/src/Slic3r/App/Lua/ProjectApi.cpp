@@ -751,16 +751,23 @@ void ProjectApi::register_api(Biz::Lua::LuaEngine& lua)
            const Domain::Preset::HwToolConfig& config,
            const std::string& name) -> sol::object
         { return feature_value(state, config.features, name); },
+        //-- Gets nozzle diameter (if present)
+        //--@return number|nil
+        //- function HwToolConfig:nozzle_diameter() end
         "nozzle_diameter",
         [](sol::this_state state, const Domain::Preset::HwToolConfig& config) -> std::optional<double>
         {
             auto val = feature_value(state, config.features, "nozzle_diameter");
-            //return val == sol::lua_nil ? 0.4 : val.as<double>();
             return val == sol::lua_nil ? std::nullopt : std::make_optional(val.as<double>());
         }
 
     );
 
+    //--@class HwPrinterConfig
+    //--@field name string
+    //--@field tool_count number
+    //--@field tools HwToolConfig[] Tool descriptions
+    //- local HwPrinterConfig = {}
     state.new_usertype<Domain::Preset::HwPrinterConfig>(
         "HwPrinterConfig",
         sol::no_constructor,
@@ -771,6 +778,8 @@ void ProjectApi::register_api(Biz::Lua::LuaEngine& lua)
 
     //--@class BedInstRef
     //- local BedInstRef = {}
+    //--@return HwPrinterConfig
+    //- function BedInstRef:printer_config() end
     //--@return ConfigBox
     //- function BedInstRef:printer_presets() end
     //--@return ConfigBox
@@ -1020,10 +1029,10 @@ void ProjectApi::register_api(Biz::Lua::LuaEngine& lua)
     };
 
     //--@class EmbossTextOpts
-    //--@field font FontDescriptor font to be used
+    //--@field font? FontDescriptor font to be used
     //--@field text string Text to emboss
-    //--@field depth double Depth of emboss [mm]
-    //--@field line_height double Height of single line text [mm]
+    //--@field depth? double Depth of emboss [mm]
+    //--@field line_height? double Height of single line text [mm]
     //- local EmbossTextOpts = {}
 
     //-- Embosses text into a mesh.
