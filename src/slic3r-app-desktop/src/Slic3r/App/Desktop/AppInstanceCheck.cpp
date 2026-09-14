@@ -11,12 +11,11 @@
 
 #include <string>
 #include <boost/filesystem.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <boost/nowide/convert.hpp>
-#else
-#include <boost/dll/runtime_symbol_info.hpp>
 #endif
 
 namespace Slic3r::App::Desktop::AppInstance {
@@ -36,51 +35,49 @@ std::string get_init_params_in_string(int argc, char** argv)
 }
 
 #ifdef _WIN32
-// Normalizes case/short-path variance that argv[0] canonicalization misses. "" on failure.
-std::string get_canonical_executable_path_win32()
+// Normalizes case/short-path variance that canonicalization misses.
+std::string normalize_executable_path(const boost::filesystem::path& location)
 {
-    wchar_t module_path[MAX_PATH];
-    DWORD len = GetModuleFileNameW(nullptr, module_path, MAX_PATH);
-    if (len == 0 || len == MAX_PATH)
-        return {};
-
     HANDLE file = CreateFileW(
-        module_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        location.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr
     );
-    if (file == INVALID_HANDLE_VALUE)
-        return {};
+    if (file == INVALID_HANDLE_VALUE) {
+        return location.string();
+    }
 
     wchar_t final_path[32768];
     DWORD count = GetFinalPathNameByHandleW(file, final_path, 32768, FILE_NAME_NORMALIZED);
     CloseHandle(file);
-    if (count == 0 || count >= 32768)
-        return {};
+    if (count == 0 || count >= 32768) {
+        return location.string();
+    }
     return boost::nowide::narrow(final_path, count);
 }
 #else
-// Launch independent executable path, canonicalized so macOS agrees with Linux. "" on failure.
-std::string get_canonical_executable_path_posix()
+std::string normalize_executable_path(const boost::filesystem::path& location)
 {
-    boost::dll::fs::error_code ec;
-    const boost::filesystem::path location = boost::dll::program_location(ec);
-    if (ec)
-        return {};
-
+    boost::system::error_code ec;
     const boost::filesystem::path canonical = boost::filesystem::canonical(location, ec);
     return ec ? location.string() : canonical.string();
 }
 #endif // _WIN32
+
+// Launch independent executable path, normalized so repeated launches agree. "" on failure.
+std::string get_canonical_executable_path()
+{
+    boost::dll::fs::error_code ec;
+    const boost::filesystem::path location = boost::dll::program_location(ec);
+    if (ec) {
+        return {};
+    }
+    return normalize_executable_path(location);
+}
 } // namespace
 
 bool instance_check(const Slic3r::App::InitParams& init_params, bool app_config_single_instance)
 {
-    std::string program_path;
-#ifdef _WIN32
-    program_path = get_canonical_executable_path_win32();
-#else
-    program_path = get_canonical_executable_path_posix();
-#endif
+    std::string program_path = get_canonical_executable_path();
     if (program_path.empty()) {
         program_path = boost::filesystem::absolute(
                            boost::filesystem::weakly_canonical(init_params.argv[0])
