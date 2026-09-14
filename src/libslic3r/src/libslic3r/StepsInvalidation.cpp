@@ -194,6 +194,8 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"elefant_foot_compensation", steps({propagate(posSlice)})},
     {"enable_dynamic_fan_speeds", all_steps()}, // TODO: probably to harsh
     {"enable_dynamic_overhang_speeds", all_steps()}, // TODO: probably to harsh
+    {"orca_perimeter_speed_compatibility", all_steps()},
+    {"slowdown_for_curled_perimeters", all_steps()},
     {"enable_pressure_advance_during_ramming", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"end_filament_gcode", steps({propagate(psGCodeExport)})},
     {"end_gcode", steps({propagate(psGCodeExport)})},
@@ -386,6 +388,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"nozzle_high_flow", steps({propagate(psGCodeExport)})},
     {"only_one_perimeter_first_layer", steps({propagate(posPerimeters)})},
     {"only_retract_when_crossing_perimeters", steps({propagate(psGCodeExport)})},
+    {"retract_before_perimeters", steps({propagate(psGCodeExport)})},
     {"ooze_prevention", steps({propagate(psSkirtBrim)})},
     {"output_filename_format", steps({})},
     {"over_bridge_speed", steps({propagate(psGCodeExport)})},

@@ -24,6 +24,11 @@ O::Schema schema()
         {"print", {{"perimeters", {{"type", "int"}}}, {"retract_length", {{"type", "float"}}},
             {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
             {"small_perimeter_threshold", {{"type", "float"}}},
+            {"small_perimeter_speed", {{"type", "float_or_percent"}}},
+            {"perimeter_speed", {{"type", "float"}}},
+            {"external_perimeter_speed", {{"type", "float_or_percent"}}},
+            {"slowdown_for_curled_perimeters", {{"type", "bool"}}},
+            {"orca_perimeter_speed_compatibility", {{"type", "bool"}}},
             {"bridge_acceleration", {{"type", "float"}}},
             {"first_layer_infill_speed", {{"type", "float_or_percent"}}},
             {"first_layer_solid_infill_speed", {{"type", "float_or_percent"}}},
@@ -146,8 +151,8 @@ int main(int argc, char** argv)
             write(filament_path, fixture);
             const auto converted = O::convert(root, schema());
             if (idle.is_null() || idle == "nil") {
-                check(!converted[0].presets.back()["values"].contains("idle_temperature"),
-                    "unset source settings retain native defaults");
+                check(converted[0].presets.back()["values"].at("idle_temperature").is_null(),
+                    "unset idle temperature uses Orca's unspecified default rather than native tuning");
                 continue;
             }
             check(converted[0].presets.back()["values"].at("idle_temperature") == (idle == "170" ? Json(170) : Json(nullptr)),
@@ -249,6 +254,20 @@ int main(int argc, char** argv)
         check(converted["bridge_acceleration"] == 1500.0, "bridge percent uses outer wall acceleration");
         check(converted["enable_dynamic_overhang_speeds"] == true,
             "omitted overhang switch retains Orca's enabled engine default");
+        check(converted["small_perimeter_speed"] == "50%" && converted["small_perimeter_threshold"] == 0.0
+            && converted["slowdown_for_curled_perimeters"] == false && converted["orca_perimeter_speed_compatibility"] == true,
+            "import uses the complete source speed defaults with Orca perimeter semantics");
+        check(!converted.contains("retract_length"), "process defaults must not erase machine-owned retraction settings");
+        write(root / "Example/process/normal.json", {{"type", "process"}, {"name", "Normal"}, {"instantiation", "true"},
+            {"small_perimeter_speed", "0"}, {"enable_overhang_speed", {"nil"}},
+            {"perimeter_speed", "123"}, {"first_layer_solid_infill_speed", "17"}});
+        vendors = O::convert(root, schema());
+        const auto explicit_speeds = vendors.front().presets[1]["values"];
+        check(explicit_speeds["small_perimeter_speed"] == 0.0 && explicit_speeds["perimeter_speed"] == 123.0
+            && explicit_speeds["first_layer_solid_infill_speed"] == 17.0,
+            "explicit zero and accepted target names take precedence over aliased defaults");
+        check(explicit_speeds["enable_dynamic_overhang_speeds"] == true,
+            "nullable process values resolve to Orca defaults rather than PS3 defaults");
         write(root / "Example/process/normal.json", {{"type", "process"}, {"name", "Normal"}, {"instantiation", "true"},
             {"enable_overhang_speed", {"0"}}});
         vendors = O::convert(root, schema());
@@ -271,7 +290,7 @@ int main(int argc, char** argv)
             {"inherits", "Base"}, {"printer_notes", "first line\nPRINTER_MODEL_TEST\nlast line"},
             {"thumbnails", {"48x48", "300x300"}}, {"before_layer_change_gcode", "G92 E0.0\n"}});
         vendors = O::convert(root, schema());
-        check(!vendors.front().presets[0]["values"].contains("layer_gcode"), "existing before-layer reset is not duplicated");
+        check(vendors.front().presets[0]["values"]["layer_gcode"] == "", "existing before-layer reset is not duplicated");
         check(vendors.front().presets[0]["values"]["thumbnails"] == "48x48/PNG, 300x300/PNG", "thumbnail arrays are formatted lists, not per-tool values");
         write(root / "Example/process/normal.json", {{"type", "process"}, {"name", "Normal"}, {"instantiation", "true"},
             {"wall_loops", "3"}, {"compatible_printers_condition", "nozzle_diameter[0] == 0.4 and name =~ /Print.*/ and printer_notes =~ /.*PRINTER_MODEL_TEST.*/"}});

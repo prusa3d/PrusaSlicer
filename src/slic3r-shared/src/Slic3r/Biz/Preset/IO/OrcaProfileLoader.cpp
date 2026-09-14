@@ -87,9 +87,16 @@ D::Preset::VendorData hardware(const Orca::Vendor& source)
         }
         printer.features["multi_extruder"].default_value = count > 1;
         printer.features["supports_tool_preheating"].default_value = count > 1;
-        // Imported non-XL toolchangers use ordinary M104, not Buddy M104.1.
+        // Mirror Orca's declared firmware markers (PrintConfig.cpp is_XL_printer),
+        // not the vendor directory, display name or printer_model. A renamed
+        // preset must keep the same command behavior.
+        auto notes_value = machine.value("printer_notes", Json(""));
+        // Orca profile JSON accepts a singleton array for string options too.
+        if (notes_value.is_array()) notes_value = notes_value.empty() ? Json("") : notes_value.front();
+        const auto notes = notes_value.is_string() ? notes_value.get<std::string>() : std::string{};
         printer.features["tool_preheating_m104"].default_value =
-            !(source.id == "Orca-Prusa" && machine.value("printer_model", name).starts_with("Prusa XL"));
+            !(notes.find("PRINTER_VENDOR_PRUSA3D") != std::string::npos
+                && notes.find("PRINTER_MODEL_XL") != std::string::npos);
         defs.printers.emplace(name, std::move(printer));
         D::Preset::HwPrinterConfigTemplate config;
         config.id = source.id + "/" + name;

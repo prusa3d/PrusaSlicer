@@ -194,6 +194,18 @@ static std::map<float, float> calc_print_speed_sections(
                                  { 50, config.overhang_speed_2.at(extruder_id)},
                                  { 75, config.overhang_speed_3.at(extruder_id)},
                                  {100, Domain::FloatOrPercentage{default_speed}}};
+        if (config.orca_perimeter_speed_compatibility.at(extruder_id)) {
+            overhangs_with_speeds = {
+                {0, config.slowdown_for_curled_perimeters.at(extruder_id)
+                    ? config.overhang_speed_0.at(extruder_id)
+                    : Domain::FloatOrPercentage{config.bridge_speed.at(extruder_id)}},
+                {13, config.overhang_speed_0.at(extruder_id)},
+                {25, config.overhang_speed_1.at(extruder_id)},
+                {50, config.overhang_speed_2.at(extruder_id)},
+                {75, config.overhang_speed_3.at(extruder_id)},
+                {90, Domain::FloatOrPercentage{external_perimeter_reference_speed}}
+            };
+        }
     }
 
     const float            speed_base = external_perimeter_reference_speed > 0 ? external_perimeter_reference_speed : default_speed;
@@ -201,6 +213,14 @@ static std::map<float, float> calc_print_speed_sections(
     for (OverhangWithSpeed &overhangs_with_speed : overhangs_with_speeds) {
         const float distance = attributes.width * (1.f - (float(overhangs_with_speed.percent) / 100.f));
         float       speed    = float(overhangs_with_speed.print_speed.get_abs_value(speed_base));
+        // Orca treats wall-overhang speeds below 0.5 mm/s as "no slowdown",
+        // including percentages that fall below that limit after the role/MVS
+        // reference is known. Its separate bridge-speed anchor is exempt.
+        if (config.orca_perimeter_speed_compatibility.at(extruder_id)
+            && overhangs_with_speed.percent != 90
+            && (overhangs_with_speed.percent != 0 || config.slowdown_for_curled_perimeters.at(extruder_id))
+            && speed < 0.5f)
+            speed = speed_base;
 
         if (speed < EPSILON) {
             speed = speed_base;
@@ -277,9 +297,17 @@ OverhangSpeeds calculate_overhang_speed(
     );
     const std::map<float, float> fan_speed_sections = calc_fan_speed_sections(attributes, config, extruder_id);
 
-    const float extrusion_speed   = std::min(interpolate_speed(speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
-                                             interpolate_speed(speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
-    const float curled_base_speed = interpolate_speed(speed_sections, attributes.width * attributes.overhang_attributes->proximity_to_curled_lines);
+    const bool orca = config.orca_perimeter_speed_compatibility.at(extruder_id);
+    const auto print_speed_at = [&](float distance) {
+        if (orca && distance <= speed_sections.begin()->first) return default_speed;
+        const float speed = interpolate_speed(speed_sections, distance);
+        return orca ? std::min(default_speed, std::round(speed)) : speed;
+    };
+    const float extrusion_speed = std::min(print_speed_at(attributes.overhang_attributes->start_distance_from_prev_layer),
+                                          print_speed_at(attributes.overhang_attributes->end_distance_from_prev_layer));
+    const float curled_base_speed = config.slowdown_for_curled_perimeters.at(extruder_id)
+        ? print_speed_at(attributes.width * attributes.overhang_attributes->proximity_to_curled_lines)
+        : extrusion_speed;
 
     const float fan_speed         = std::min(interpolate_speed(fan_speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
                                              interpolate_speed(fan_speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));

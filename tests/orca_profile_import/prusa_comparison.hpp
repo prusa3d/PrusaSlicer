@@ -35,7 +35,8 @@ static Json comparison_box(const D::ConfigBox& box)
     return result;
 }
 
-static Json comparison_snapshot(const D::Preset::VendorBundle& vendor, const std::string& name)
+static Json comparison_snapshot(const D::Preset::VendorBundle& vendor, const std::string& name,
+    const std::string& process_name = {}, const std::string& filament_name = {})
 {
     const auto& templates = vendor.vendor_data.printer_configs;
     auto templ = std::find_if(templates.begin(), templates.end(), [&](const auto& t) { return t.name == name; });
@@ -46,7 +47,8 @@ static Json comparison_snapshot(const D::Preset::VendorBundle& vendor, const std
     auto printers = eval.evaluate(hw);
     require(printers.size() == 1, "comparison needs an unambiguous printer preset");
     const auto& printer = printers.front();
-    const auto process = std::find_if(printer.prints.begin(), printer.prints.end(), [](const auto& p) {
+    const auto process = std::find_if(printer.prints.begin(), printer.prints.end(), [&](const auto& p) {
+        if (!process_name.empty()) return p.preset.name == process_name;
         std::string name = p.preset.name;
         std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return name.find("0.20") != std::string::npos && (name.find("speed") != std::string::npos || name == "0.20mm");
@@ -80,14 +82,18 @@ static Json comparison_snapshot(const D::Preset::VendorBundle& vendor, const std
     }
     result["filaments"] = Json::array();
     for (const auto& choices : process->materials) {
-        auto pla = std::find_if(choices.begin(), choices.end(), [](const auto& p) {
-            return p.preset.name.find("Prusament PLA") != std::string::npos;
+        auto pla = std::find_if(choices.begin(), choices.end(), [&](const auto& p) {
+            return filament_name.empty() ? p.preset.name.find("Prusament PLA") != std::string::npos
+                : p.preset.name == filament_name;
         });
         if (pla == choices.end()) throw std::runtime_error("Missing Prusament PLA for " + name);
         pack.filament[result["filaments"].size()] = std::get<D::FilamentSettings>(pla->preset.values);
         result["filament_name"] = pla->preset.name;
         result["filaments"].push_back(comparison_box(std::get<D::FilamentSettings>(pla->preset.values)));
     }
+    // Preserve the actual project serialization contract for diagnostic 3MF
+    // copies; comparison_value's compact percent notation is only a report.
+    result["project_configuration"] = Json::parse(nlohmann::ordered_json(D::as_boxes(pack)).dump());
     std::vector<unsigned> slots;
     for (unsigned i = 0; i < hw.material_slot_count(); ++i) slots.push_back(i);
     auto full = std::make_shared<D::FullConfigFDM>(pack, slots, hw);
@@ -104,7 +110,7 @@ static Json comparison_snapshot(const D::Preset::VendorBundle& vendor, const std
     result["ps3_defaults_for_hardware"] = Json::object();
     for (const auto& [key, value] : default_view.values())
         result["ps3_defaults_for_hardware"][key] = value.visit([](const auto& v) { return comparison_value(v); });
-    if (vendor.vendor_data.info.id == "Orca-Prusa") {
+    if (vendor.vendor_data.info.id.starts_with("Orca-")) {
         result["converted_inputs"] = Json::object();
         for (const auto& [kind, group, selected] : {
                  std::tuple{D::Preset::PresetKind::FdmPrinter, "printer", printer.preset.name},
@@ -132,8 +138,10 @@ static Json comparison_snapshot(const D::Preset::VendorBundle& vendor, const std
             }
         }
     }
-    check_prusa_gcode(hw, printer, *process);
-    check_prusa_gcode(hw, printer, *process, static_cast<unsigned>(hw.material_slot_count() - 1), true);
+    if (vendor.vendor_data.info.id == "Orca-Prusa" || !vendor.vendor_data.info.id.starts_with("Orca-")) {
+        check_prusa_gcode(hw, printer, *process);
+        check_prusa_gcode(hw, printer, *process, static_cast<unsigned>(hw.material_slot_count() - 1), true);
+    }
     return result;
 }
 

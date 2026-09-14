@@ -43,6 +43,8 @@ struct ExtrudeConfig
     std::vector<double> filament_infill_max_speed{};
 
     std::vector<bool> enable_dynamic_overhang_speeds{};
+    std::vector<bool> orca_perimeter_speed_compatibility{};
+    std::vector<bool> slowdown_for_curled_perimeters{};
     std::vector<Domain::FloatOrPercentage> overhang_speed_0{};
     std::vector<Domain::FloatOrPercentage> overhang_speed_1{};
     std::vector<Domain::FloatOrPercentage> overhang_speed_2{};
@@ -85,6 +87,7 @@ struct ExtrudeConfig
     Domain::ScarfSeamPlacement scarf_seam_placement{};
 
     bool only_retract_when_crossing_perimeters{};
+    bool retract_before_perimeters{};
     bool avoid_crossing_perimeters{};
     bool avoid_crossing_curled_overhangs{};
 };

@@ -401,6 +401,26 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->init_fn = init_with(false);
 
+    def = defs.add("orca_perimeter_speed_compatibility", typeid(bool));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Object, Volume };
+    def->label = L("Use Orca perimeter speed rules");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Speed_DynamicOverhangSpeed;
+    def->category = ConfigItemDef::Category::Print_Speed;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use Orca's overhang overlap curve and outer-wall reference for small-perimeter speeds. Enabled for imported Orca profiles.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("slowdown_for_curled_perimeters", typeid(bool));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Object, Volume };
+    def->label = L("Slow down for curled perimeters");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Speed_DynamicOverhangSpeed;
+    def->category = ConfigItemDef::Category::Print_Speed;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("When dynamic overhang speeds are enabled, also slow down near predicted curled edges.");
+    def->init_fn = init_with(true);
+
     // TRN PrintSettings : "Dynamic overhang speed"
     auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
                         "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
@@ -2857,6 +2877,15 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("Disables retraction when the travel path does not exceed the upper layer's perimeters "
                    "(and thus any ooze will be probably invisible).");
+    def->init_fn = init_with(false);
+
+    def = defs.add("retract_before_perimeters", typeid(bool));
+    def->location = Print;
+    def->label = L("Keep retraction before perimeters");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Infill_Advanced;
+    def->category = ConfigItemDef::Category::Print_Infill;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("When reducing retractions inside infill, still retract before travel to a perimeter if the minimum travel distance is reached. Enabled for imported Orca profiles.");
     def->init_fn = init_with(false);
 
     def = defs.add("ooze_prevention", typeid(bool));

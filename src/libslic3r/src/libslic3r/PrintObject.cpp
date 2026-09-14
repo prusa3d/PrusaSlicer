@@ -604,7 +604,10 @@ void PrintObject::estimate_curled_extrusions()
     if (this->set_started(posEstimateCurledExtrusions)) {
         if (this->print()->config().get<bool>("avoid_crossing_curled_overhangs") ||
             std::any_of(this->print()->m_print_regions.begin(), this->print()->m_print_regions.end(),
-                        [](const PrintRegion *region) { return region->extruder_config_value<bool>("enable_dynamic_overhang_speeds", FlowRole::frPerimeter); })) {
+                        [](const PrintRegion *region) {
+                            return region->extruder_config_value<bool>("enable_dynamic_overhang_speeds", FlowRole::frPerimeter)
+                                && region->extruder_config_value<bool>("slowdown_for_curled_perimeters", FlowRole::frPerimeter);
+                        })) {
             SPDLOG_DEBUG("Estimating areas with curled extrusions - start");
             m_print->set_status(Domain::Percentage{88}, Biz::Slicing::ProgressInfo::EstimatingCurledExtrusions);
 

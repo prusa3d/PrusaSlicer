@@ -503,7 +503,7 @@ private:
     Backtrace m_backtrace_T;
 
     void apply_config() {
-        m_backtrace_T = { m_config.preheat_time, m_config.tool_preheating_m104 ? 1u : std::max(1u, m_config.preheat_steps) };
+        m_backtrace_T = { m_config.preheat_time, std::max(1u, m_config.preheat_steps) };
         for (size_t i = 0; i < TIME_MODES_COUNT; ++i) {
             m_last_exported_main[i] = { 0, time_in_minutes(m_config.time_machines[i].time) };
         }

@@ -3276,19 +3276,23 @@ std::string GCodeGenerator::extrude_perimeters(
     for (const GCode::ExtrusionOrder::Perimeter &perimeter : perimeters) {
         double speed{-1};
         // Apply the small perimeter speed.
-        const double small_perimeter_threshold = region.extruder_config_value<double>(
-            "small_perimeter_threshold", FlowRole::frExternalPerimeter);
+        const auto tool = m_writer.extruder()->id();
+        const bool orca = config.orca_perimeter_speed_compatibility.at(tool);
+        const double small_perimeter_threshold = orca
+            ? region.config().get<std::vector<double>>("small_perimeter_threshold").at(tool)
+            : region.extruder_config_value<double>("small_perimeter_threshold", FlowRole::frExternalPerimeter);
         if (small_perimeter_threshold > 0
+            && (!orca || perimeter.extrusion_entity->is_loop())
             && perimeter.extrusion_entity->length() <= (small_perimeter_threshold / SCALING_FACTOR) * 2 * PI)
-            speed = region
-                        .extruder_config_value<Domain::FloatOrPercentage>(
-                            "small_perimeter_speed",
-                            FlowRole::frExternalPerimeter
-                        )
-                        .get_abs_value(region.extruder_config_value<double>(
-                            "perimeter_speed",
-                            FlowRole::frExternalPerimeter
-                        ));
+        {
+            const double reference = orca
+                ? config.external_perimeter_speed.at(tool).get_abs_value(config.perimeter_speed.at(tool))
+                : region.extruder_config_value<double>("perimeter_speed", FlowRole::frExternalPerimeter);
+            const auto requested = orca
+                ? region.config().get<std::vector<Domain::FloatOrPercentage>>("small_perimeter_speed").at(tool)
+                : region.extruder_config_value<Domain::FloatOrPercentage>("small_perimeter_speed", FlowRole::frExternalPerimeter);
+            speed = orca && requested.is_zero() ? reference * 0.5 : requested.get_abs_value(reference);
+        }
         gcode += this->extrude_smooth_path(
             perimeter.smooth_path,
             perimeter.extrusion_entity->is_loop(),
@@ -3569,6 +3573,9 @@ std::string GCodeGenerator::_extrude(
 
     using Domain::FloatOrPercentage;
     const auto perimeter_speed = config.perimeter_speed.at(extruder_id);
+    const bool orca_perimeter_speeds = config.orca_perimeter_speed_compatibility.at(extruder_id);
+    // Orca never applies the loop's small-perimeter speed to bridge wall paths.
+    if (orca_perimeter_speeds && path_attr.role.is_perimeter() && path_attr.role.is_bridge()) speed = -1;
     const auto infill_speed = config.infill_speed.at(extruder_id);
     const auto solid_infill_speed = config.solid_infill_speed
                                         .at(extruder_id)
@@ -3636,6 +3643,8 @@ std::string GCodeGenerator::_extrude(
             config.external_perimeter_speed
                 .at(extruder_id)
                 .get_abs_value(perimeter_speed);
+        if (orca_perimeter_speeds && !path_attr.role.is_external_perimeter())
+            external_perimeter_reference_speed = perimeter_speed;
         if (external_perimeter_reference_speed == 0) {
             external_perimeter_reference_speed = m_volumetric_speed.at(extruder_id) / path_attr.mm3_per_mm;
         }
@@ -3891,6 +3900,8 @@ bool GCodeGenerator::needs_retraction(
         }
 
     if (config.only_retract_when_crossing_perimeters
+        // Orca's reduction applies to infill travel, never travel to a wall.
+        && (!config.retract_before_perimeters || !role.is_perimeter())
         && m_layer != nullptr
         && config.fill_density.at(extruder_id)
             > Domain::Percentage{0}

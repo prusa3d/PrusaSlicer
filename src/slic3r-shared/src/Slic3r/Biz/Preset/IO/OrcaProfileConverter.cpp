@@ -13,6 +13,19 @@
 #include <stdexcept>
 
 namespace Slic3r::Biz::Preset::IO::Orca {
+const Json& default_snapshot()
+{
+    static const Json snapshot = [] {
+        const char* const chunks[] = {
+#include "OrcaProfileDefaults.inc"
+        };
+        std::string json;
+        for (const auto* chunk : chunks) json += chunk;
+        return Json::parse(json);
+    }();
+    return snapshot;
+}
+
 namespace {
 namespace fs = std::filesystem;
 #include "OrcaProfileMappings.inc"
@@ -26,6 +39,12 @@ bool enabled(const Json& v)
 {
     const auto s = text(v.is_array() && !v.empty() ? v.front() : v);
     return s == "1" || s == "true" || s == "enabled";
+}
+
+bool unspecified(const Json& value)
+{
+    return value == "nil" || value.is_null() || (value.is_array() && !value.empty()
+        && std::all_of(value.begin(), value.end(), [](const Json& element) { return element == "nil" || element.is_null(); }));
 }
 
 Json read(const fs::path& path)
@@ -424,22 +443,24 @@ std::map<std::string, std::string> gcode_context(const Json& machine, const Json
     return result;
 }
 
-Json values(const Json& flat, const Json& schema, Vendor& vendor)
+Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
 {
+    const auto kind = explicit_values.value("type", "");
+    const auto& groups = default_snapshot().at("defaults");
+    Json flat = groups.contains(kind) ? groups.at(kind) : Json::object();
+    flat.update(explicit_values);
+    for (auto it = explicit_values.begin(); it != explicit_values.end(); ++it)
+        if (unspecified(it.value()) && groups.contains(kind) && groups.at(kind).contains(it.key()))
+            flat[it.key()] = groups.at(kind).at(it.key());
+    std::set<std::string> explicit_targets;
+    for (auto it = explicit_values.begin(); it != explicit_values.end(); ++it)
+        explicit_targets.insert(key_map.contains(it.key()) ? key_map.at(it.key()) : it.key());
     Json result = Json::object();
     const auto context = gcode_context(flat, schema);
-    // Orca's defaults differ from the native XL preheat defaults.
-    if (flat.value("type", "") == "process") {
-        if (schema.contains("preheat_time")) result["preheat_time"] = 30.0;
-        if (schema.contains("preheat_steps")) result["preheat_steps"] = 1;
-        // Orca disables small-perimeter slowdown by default. PS3's native
-        // historical threshold is 6.5 mm and must not leak into imported jobs.
-        if (schema.contains("small_perimeter_threshold")) result["small_perimeter_threshold"] = 0.0;
-        // Orca enables overhang slowdown even when no ancestor supplies the
-        // switch (for example the U1 process family). PS3 defaults it to false.
-        // Explicit source values below, including false, take precedence.
-        if (schema.contains("enable_dynamic_overhang_speeds")) result["enable_dynamic_overhang_speeds"] = true;
-    }
+    if (kind == "process" && schema.contains("orca_perimeter_speed_compatibility"))
+        result["orca_perimeter_speed_compatibility"] = true;
+    if (kind == "process" && schema.contains("retract_before_perimeters"))
+        result["retract_before_perimeters"] = true;
     for (auto it = flat.begin(); it != flat.end(); ++it) {
         const auto& src = it.key();
         if (metadata.contains(src) || src.starts_with("__")) continue;
@@ -448,11 +469,13 @@ Json values(const Json& flat, const Json& schema, Vendor& vendor)
             continue;
         }
         auto key = key_map.contains(src) ? key_map.at(src) : src;
+        // A default under an Orca alias must never overwrite an explicit value
+        // under another accepted name. Do not depend on alphabetical key order.
+        if (!explicit_values.contains(src) && explicit_targets.contains(key)) continue;
         Json v = it.value();
         if (src == "support_style" || src == "support_type") key = "support_material_style";
         if (!schema.contains(key)) continue; // Report unknowns once, across all kinds.
-        if (v == "nil" || v.is_null() || (v.is_array() && !v.empty()
-            && std::all_of(v.begin(), v.end(), [](const Json& element) { return element == "nil" || element.is_null(); }))) continue;
+        if (unspecified(v)) continue;
         try {
             const auto map_elements = [](Json value, const auto& fn) -> Json {
                 if (value.is_array()) for (auto& element : value) element = fn(element);
@@ -518,6 +541,8 @@ Json values(const Json& flat, const Json& schema, Vendor& vendor)
             }
             else if (src == "enable_support") v = bool_enum("everywhere", "none");
             else if (src == "enable_pressure_advance") v = bool_enum("enabled", "disabled");
+            else if (src == "fuzzy_skin" && v == "disabled_fuzzy") v = "none";
+            else if (src == "toolchange_ordering" && v == "default") v = "optimized";
             else if (src.starts_with("overhang_") && src.ends_with("_4_speed")) {
                 v = map_elements(v, [](const Json& element) -> Json {
                     const auto s = text(element);
@@ -574,13 +599,19 @@ Json values(const Json& flat, const Json& schema, Vendor& vendor)
             }
             result[key] = coerce(v, schema.at(key));
             // Orca uses one speed for both sparse and solid first-layer infill.
-            if (src == "initial_layer_infill_speed" && schema.contains("first_layer_solid_infill_speed"))
+            if (src == "initial_layer_infill_speed" && schema.contains("first_layer_solid_infill_speed")
+                && !explicit_values.contains("first_layer_solid_infill_speed"))
                 result["first_layer_solid_infill_speed"] = coerce(v, schema.at("first_layer_solid_infill_speed"));
         } catch (const std::exception& e) {
             issue(vendor, flat.value("name", ""), src, e.what());
         }
     }
-    const auto kind = flat.value("type", "");
+    // Orca's print_machine_envelope ignores the emission switch for Klipper.
+    // PS3 rejects that combination, so encode Orca's effective behavior here
+    // instead of relaxing native validation or emitting unsupported commands.
+    if (kind == "machine" && result.value("gcode_flavor", "") == "klipper"
+        && result.value("machine_limits_usage", "") == "emit_to_gcode")
+        result["machine_limits_usage"] = "time_estimate_only";
     const auto parameter_key = kind == "machine" ? "custom_parameters_printer" : "custom_parameters_filament";
     if ((kind == "machine" || kind == "filament") && schema.contains(parameter_key)) {
         Json parameters = Json::object();
@@ -811,7 +842,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 6}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 7}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {

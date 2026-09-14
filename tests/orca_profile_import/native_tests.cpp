@@ -3,8 +3,11 @@
 #include "Slic3r/Biz/Preset/PresetEvaluator.hpp"
 #include "Slic3r/Biz/Parser/PlaceholderParser.hpp"
 #include "Slic3r/Domain/FullConfigFDM.hpp"
+#include "Slic3r/Biz/Config/ConfigLoad.hpp"
+#include "Slic3r/Biz/Config/ConfigSerialize.hpp"
 #include "Slic3r/Biz/libpgcode/Processor.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
+#include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <chrono>
@@ -25,7 +28,7 @@ static void require(bool ok, const char* message)
 static void check_preheating()
 {
     namespace G = Slic3r::Biz::libpgcode;
-    for (bool ordinary : {false, true}) for (float seconds : {0.0f, 30.0f, 60.0f}) {
+    for (bool ordinary : {false, true}) for (unsigned steps : {1u, 10u}) for (float seconds : {0.0f, 30.0f, 60.0f}) {
         G::ProcessorConfig config;
         config.flavor = D::GCodeFlavor::gcfKlipper;
         config.extruders.count = 2;
@@ -34,7 +37,7 @@ static void check_preheating()
         config.do_M104_backtrace = true;
         config.tool_preheating_m104 = ordinary;
         config.preheat_time = seconds;
-        config.preheat_steps = 10;
+        config.preheat_steps = steps;
         G::Processor processor(std::move(config));
         std::string input = "G90\nM83\nT0\n";
         for (int i = 1; i <= 100; ++i)
@@ -54,12 +57,12 @@ static void check_preheating()
                 ++commands;
                 require(line.starts_with(ordinary ? "M104 T1 S220" : "M104.1 T1"),
                     "preheat uses the selected firmware command and next tool");
-                if (ordinary)
+                if (ordinary && commands == 1)
                     require(std::abs(last_x - (100 - static_cast<int>(seconds))) <= 2,
                         "ordinary preheat is inserted at the configured advance time");
             }
         }
-        require(seconds == 0 ? commands == 0 : ordinary ? commands == 1 : commands > 1,
+        require(seconds == 0 ? commands == 0 : steps == 1 ? commands == 1 : commands > 1,
             "disabled, single-command and scheduled preheat modes");
     }
 }
@@ -131,12 +134,111 @@ static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
 
 #include "prusa_comparison.hpp"
 
+static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::PrintSettings& imported_settings)
+{
+    D::ConfigPackFDM pack(static_cast<int>(hw.material_slot_count()));
+    pack.tool.resize(hw.tool_count);
+    std::vector<unsigned> slots;
+    for (unsigned i = 0; i < hw.material_slot_count(); ++i) slots.push_back(i);
+    auto full = std::make_shared<D::FullConfigFDM>(pack, slots, hw);
+    D::ConfigView view(full, {});
+    view.finalize();
+    Slic3r::Biz::Slicing::ExtrudeConfig config(view);
+    require(!config.orca_perimeter_speed_compatibility.at(0) && config.slowdown_for_curled_perimeters.at(0),
+        "native perimeter and curl defaults are preserved");
+    require(!config.retract_before_perimeters, "native travel retraction behavior is preserved");
+    config.enable_dynamic_overhang_speeds[0] = true;
+    config.enable_dynamic_fan_speeds[0] = false;
+    config.overhang_speed_0[0] = D::FloatOrPercentage{10.};
+    config.overhang_speed_1[0] = D::FloatOrPercentage{10.};
+    config.overhang_speed_2[0] = D::FloatOrPercentage{30.};
+    config.overhang_speed_3[0] = D::FloatOrPercentage{60.};
+    config.bridge_speed[0] = 50.;
+    Slic3r::ExtrusionAttributes attrs(Slic3r::ExtrusionRole::ExternalPerimeter);
+    attrs.width = 0.4f;
+    const auto speed_at = [&](float overlap, float curl = 0.f, float requested = 200.f) {
+        const float distance = attrs.width * (1.f - overlap / 100.f);
+        attrs.overhang_attributes = Slic3r::OverhangAttributes{distance, distance, curl};
+        return Slic3r::ExtrusionProcessor::calculate_overhang_speed(attrs, config, 0, 200.f, requested, {}).print_speed;
+    };
+    require(std::abs(speed_at(90) - 144.f) < .01f, "native 90-percent overlap interpolation remains unchanged");
+    require(std::abs(speed_at(100, 1) - 10.f) < .01f, "native curled-edge slowdown remains enabled");
+    config.orca_perimeter_speed_compatibility[0] = true;
+    config.slowdown_for_curled_perimeters[0] = false;
+    for (const auto& [overlap, expected] : {std::pair{100.f,200.f}, {90.f,200.f}, {75.f,60.f},
+             {50.f,30.f}, {25.f,10.f}, {13.f,10.f}, {0.f,50.f}})
+        require(std::abs(speed_at(overlap) - expected) < .01f, "Orca overlap curve matches its reference anchors");
+    require(speed_at(100, 1) == 200.f, "disabled curl slowdown cannot override supported-wall speed");
+    require(speed_at(90, 0, 80) == 80.f && speed_at(75, 0, 40) == 40.f,
+        "Orca overhang processing never raises a prior speed limit");
+    config.overhang_speed_3[0] = D::FloatOrPercentage{0.4};
+    require(speed_at(75) == 200.f, "Orca treats sub-0.5 mm/s overhang speed as no slowdown");
+    config.overhang_speed_3[0] = D::FloatOrPercentage{60.};
+    config.slowdown_for_curled_perimeters[0] = true;
+    require(speed_at(0) == 10.f && speed_at(100, 1) == 10.f,
+        "explicit Orca curl mode keeps its fully unsupported speed and curl cap");
+    pack.print = imported_settings;
+    // Exercise the same configuration serialization/load path as PS3 projects.
+    // New optional settings must roundtrip, while their absence in older files
+    // must retain native behavior. Percentage storage remains unchanged.
+    const nlohmann::ordered_json saved = D::as_boxes(pack);
+    const auto loaded = Slic3r::Biz::Config::load(saved, hw);
+    require(loaded && loaded.value().issues.empty(), "imported project settings load without conversion issues");
+    require(std::get<D::ConfigPackFDM>(loaded.value().config) == pack,
+        "imported settings and percentages survive the existing project roundtrip");
+    auto legacy = saved;
+    legacy["print_settings"].erase("orca_perimeter_speed_compatibility");
+    legacy["print_settings"].erase("slowdown_for_curled_perimeters");
+    legacy["print_settings"].erase("retract_before_perimeters");
+    const auto old_loaded = Slic3r::Biz::Config::load(legacy, hw);
+    require(bool(old_loaded), "older project settings remain loadable");
+    // Missing newly introduced settings use the loader's existing nonfatal
+    // NotFound diagnostics; do not change that project-loading contract.
+    require(old_loaded.value().issues.size() == 1, "older settings have no unrelated load issues");
+    const auto& missing = std::get<Slic3r::Biz::Config::BoxIssues>(
+        old_loaded.value().issues.at(D::FDMConfigLocation::Print));
+    require(missing.size() == 3
+        && missing.at("orca_perimeter_speed_compatibility").type == Slic3r::Biz::Config::NotFound
+        && missing.at("retract_before_perimeters").type == Slic3r::Biz::Config::NotFound
+        && missing.at("slowdown_for_curled_perimeters").type == Slic3r::Biz::Config::NotFound,
+        "older projects only report the absent additive settings");
+    const auto& old_print = std::get<D::ConfigPackFDM>(old_loaded.value().config).print;
+    require(!old_print.find("orca_perimeter_speed_compatibility").item->value().get<bool>()
+        && !old_print.find("retract_before_perimeters").item->value().get<bool>()
+        && old_print.find("slowdown_for_curled_perimeters").item->value().get<bool>(),
+        "older projects retain native perimeter and curl defaults");
+    auto imported_full = std::make_shared<D::FullConfigFDM>(pack, slots, hw);
+    D::ConfigView imported_view(imported_full, {});
+    imported_view.finalize();
+    const auto small = imported_view.get<std::vector<D::FloatOrPercentage>>("small_perimeter_speed").at(0);
+    require(small.is_percentage() && small.get_abs_value(200.) == 100.,
+        "Orca small-perimeter percentage survives ConfigView's native percentage resolution");
+    Slic3r::Biz::Parser::PlaceholderParser parser(Slic3r::Biz::Parser::IO::get_parser_config(imported_view));
+    const auto nominal_outer = imported_view.get<std::vector<D::FloatOrPercentage>>("external_perimeter_speed").at(0).float_value();
+    require(std::abs(std::stod(parser.process("{small_perimeter_speed[0]}")) - nominal_outer * .5) < .001,
+        "templates receive numeric Orca perimeter speeds while engine percentages remain intact");
+}
+
 int main(int argc, char** argv)
 {
     const auto root = fs::temp_directory_path() / ("ps-orca-native-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
         if (argc == 5 && std::string_view(argv[1]) == "--compare-prusa") {
             compare_prusa_presets(argv[2], argv[3], argv[4]);
+            return 0;
+        }
+        if (argc == 4 && std::string_view(argv[1]) == "--snapshot-u1") {
+            D::Preset::Bundle bundle;
+            P::IO::BundlePaths paths;
+            paths.app_bundle_path = argv[2];
+            P::IO::load_orca_profiles(paths, bundle);
+            const auto& vendor = bundle.vendor_bundles.at("Orca-Snapmaker");
+            Json report;
+            for (const auto* material : {"Generic PLA @System", "Overture Air PLA @System"})
+                report[material] = comparison_snapshot(vendor, "Snapmaker U1 (0.4 nozzle)",
+                    "0.16 Optimal @Snapmaker U1 (0.4 nozzle)", material);
+            std::ofstream(argv[3]) << report.dump(2);
+            std::cout << "U1 effective preset snapshots written\n";
             return 0;
         }
         check_preheating();
@@ -156,6 +258,7 @@ int main(int argc, char** argv)
             {"printer_model", "Test model"},
             {"type", "machine"}, {"name", "Native test printer"}, {"instantiation", "true"},
             {"nozzle_diameter", {"0.4", "0.4", "0.4", "0.4"}}, {"gcode_flavor", "klipper"},
+            {"emit_machine_limits_to_gcode", "1"},
             {"thumbnails", "48x48"},
             {"printable_area", {"0,0", "270,0", "270,270", "0,270"}}, {"printable_height", "270"},
             {"bed_mesh_min", "3,3"}, {"bed_mesh_max", "267,267"}, {"bed_mesh_probe_distance", "50,50"},
@@ -214,6 +317,9 @@ int main(int argc, char** argv)
             P::PresetEvaluator eval(vendor.presets);
             const auto printers = eval.evaluate(hw);
             require(printers.size() == 1 && printers[0].prints.size() == 1, "printer and compatible process evaluate");
+            const auto& machine_settings = std::get<D::PrinterSettings>(printers[0].preset.values);
+            require(machine_settings.find("machine_limits_usage").item->value().get<D::EnumWrapper>().get_string()
+                == "time_estimate_only", "Klipper import preserves Orca's non-emitting machine-envelope behavior");
             const auto& print = printers[0].prints[0];
             const auto& filament = std::get<D::FilamentSettings>(print.materials.at(0).at(0).preset.values);
             require(!filament.find("idle_temperature").item->value().get<std::optional<int>>(),
@@ -223,6 +329,11 @@ int main(int argc, char** argv)
                 "Orca disabled small-perimeter threshold overrides the native 6.5 mm default");
             require(process_settings.find("enable_dynamic_overhang_speeds").item->value().get<bool>(),
                 "Orca enabled overhang default survives native preset evaluation");
+            require(process_settings.find("orca_perimeter_speed_compatibility").item->value().get<bool>()
+                && process_settings.find("retract_before_perimeters").item->value().get<bool>()
+                && !process_settings.find("slowdown_for_curled_perimeters").item->value().get<bool>(),
+                "Orca perimeter semantics and its disabled curl default survive native evaluation");
+            check_overhang_rules(hw, process_settings);
             require(process_settings.find("preheat_time").item->value().get<double>() == 30.0
                 && process_settings.find("preheat_steps").item->value().get<int>() == 1,
                 "native process preserves Orca preheat defaults");

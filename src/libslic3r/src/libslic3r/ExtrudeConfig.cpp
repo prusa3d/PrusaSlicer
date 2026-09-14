@@ -42,6 +42,8 @@ ExtrudeConfig::ExtrudeConfig(const Domain::ConfigView& config) :
     },
     filament_infill_max_speed{config.get<std::vector<double>>("filament_infill_max_speed")},
     enable_dynamic_overhang_speeds{config.get<std::vector<bool>>("enable_dynamic_overhang_speeds")},
+    orca_perimeter_speed_compatibility{config.get<std::vector<bool>>("orca_perimeter_speed_compatibility")},
+    slowdown_for_curled_perimeters{config.get<std::vector<bool>>("slowdown_for_curled_perimeters")},
     overhang_speed_0{config.get<std::vector<Domain::FloatOrPercentage>>("overhang_speed_0")},
     overhang_speed_1{config.get<std::vector<Domain::FloatOrPercentage>>("overhang_speed_1")},
     overhang_speed_2{config.get<std::vector<Domain::FloatOrPercentage>>("overhang_speed_2")},
@@ -105,6 +107,7 @@ ExtrudeConfig::ExtrudeConfig(const Domain::ConfigView& config) :
     only_retract_when_crossing_perimeters{
         config.get<bool>("only_retract_when_crossing_perimeters")
     },
+    retract_before_perimeters{config.get<bool>("retract_before_perimeters")},
     avoid_crossing_perimeters{config.get<bool>("avoid_crossing_perimeters")},
     avoid_crossing_curled_overhangs{config.get<bool>("avoid_crossing_curled_overhangs")}
 {}

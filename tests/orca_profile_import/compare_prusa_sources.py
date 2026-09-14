@@ -7,12 +7,12 @@ from collections import Counter
 from pathlib import Path
 
 
-def profile_index(root):
-    manifest = json.loads((root / 'Prusa.json').read_text(encoding='utf-8-sig'))
+def profile_index(root, vendor='Prusa'):
+    manifest = json.loads((root / (vendor+'.json')).read_text(encoding='utf-8-sig'))
     index = {}
     for group in ('machine_list', 'process_list', 'filament_list'):
         for entry in manifest.get(group, []):
-            path = root / 'Prusa' / entry['sub_path']
+            path = root / vendor / entry['sub_path']
             data = json.loads(path.read_text(encoding='utf-8-sig'))
             index[(data['type'], data['name'])] = (data, path)
     return index
@@ -43,6 +43,11 @@ def compact(value):
     return json.dumps(value, ensure_ascii=False).replace('|', '\\|')
 
 
+def read_default_snapshot(path):
+    chunks = re.findall(r'R"orca_defaults\((.*?)\)orca_defaults"', Path(path).read_text(encoding='utf-8'), re.S)
+    return json.loads(''.join(chunks))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('report', type=Path)
@@ -53,6 +58,8 @@ def main():
     mappings_text = args.mappings.read_text().split('static const std::set')[0]
     aliases = dict(re.findall(r'\{"([^"]+)",\s*"([^"]+)"\}', mappings_text))
     aliases.update(support_style='support_material_style', support_type='support_material_style')
+    defaults_path = args.mappings.with_name('OrcaProfileDefaults.inc')
+    default_snapshot = read_default_snapshot(defaults_path)
     index = profile_index(args.orca_profiles)
     evidence = {}
     markdown = ['# Native / imported Prusa comparison', '',
@@ -74,12 +81,21 @@ def main():
             emitted = {group: values[key] for group, values in inputs.items() if key in values}
             candidates = []
             ignored = []
+            engine_defaults = []
             for kind, fields in sources.items():
                 for source_key, entry in fields.items():
                     if aliases.get(source_key, source_key) != key:
                         continue
                     candidate = dict(entry, kind=kind)
                     (ignored if absent(entry['value']) else candidates).append(candidate)
+            for kind, values in default_snapshot['defaults'].items():
+                for source_key, default_value in values.items():
+                    if aliases.get(source_key, source_key) != key:
+                        continue
+                    explicit = sources[kind].get(source_key)
+                    if explicit is None or absent(explicit['value']):
+                        engine_defaults.append({'key': source_key, 'value': default_value, 'kind': kind,
+                                                'file': str(defaults_path), 'evidence': default_snapshot['evidence']})
             # This one-to-many translation is explicit in the converter, not a PS3 default.
             if key == 'first_layer_solid_infill_speed' and 'initial_layer_infill_speed' in sources['process']:
                 candidates.append(dict(sources['process']['initial_layer_infill_speed'], kind='process',
@@ -89,9 +105,9 @@ def main():
                                        transformation='Compatible default filament selection'))
             if emitted and candidates:
                 origin = 'explicit_source' if len(candidates) == 1 else 'multiple_explicit_sources_review_precedence'
-            elif emitted and key in ('preheat_time', 'preheat_steps', 'small_perimeter_threshold', 'enable_dynamic_overhang_speeds'):
-                origin = 'importer_default'
-            elif emitted and key in ('custom_parameters_printer', 'custom_parameters_filament', 'default_tool_print'):
+            elif emitted and engine_defaults:
+                origin = 'orca_engine_default'
+            elif emitted and key in ('custom_parameters_printer', 'custom_parameters_filament', 'default_tool_print', 'orca_perimeter_speed_compatibility', 'retract_before_perimeters'):
                 origin = 'importer_generated'
             elif emitted:
                 origin = 'importer_generated_or_untraced'
@@ -106,8 +122,7 @@ def main():
             rows[key] = {'origin': origin, 'native': pair['native']['effective'].get(key), 'imported': value,
                          'ps3_default': imported['ps3_defaults_for_hardware'].get(key),
                          'emitted_inputs': emitted, 'source_candidates': candidates, 'ignored_nil_sources': ignored}
-            if origin == 'importer_default':
-                rows[key]['evidence'] = 'OrcaProfileConverter.cpp values() explicitly injects preheat_time=30 / preheat_steps=1 / small_perimeter_threshold=0 / enable_dynamic_overhang_speeds=true before applying source settings. These match the defaults in local Orca PrintConfig.cpp; no native Prusa comparison is used to infer them.'
+            rows[key]['orca_engine_default_candidates'] = engine_defaults
         evidence[name] = {'source_profiles': sources, 'fields': rows}
         differences = {key: row for key, row in rows.items() if row['native'] != row['imported']}
         counts = Counter(row['origin'] for row in differences.values())

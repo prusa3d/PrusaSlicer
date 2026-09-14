@@ -36,5 +36,7 @@ std::vector<Vendor> convert(const std::filesystem::path& root, const Schema& sch
     const std::filesystem::path& cache_root = {}, const std::set<std::string>& loaded_vendors = {},
     const std::map<std::string, std::set<std::string>>* selected_printers = nullptr);
 std::string rewrite_gcode(const std::string& source, const std::map<std::string, std::string>& context = {});
+// Pinned executable defaults and their evidence, separate from explicit profiles.
+const Json& default_snapshot();
 
 } // namespace Slic3r::Biz::Preset::IO::Orca

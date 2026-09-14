@@ -353,6 +353,20 @@ Config get_parser_config(const ConfigView& config_view)
 {
     Config result;
     for (const auto& [key, value] : config_view.values()) {
+        // Orca-mode perimeter percentages remain unevaluated for the extrusion
+        // engine, which knows the wall role and volumetric cap. Templates have
+        // no path context: expose the nominal outer-wall-based numeric value,
+        // as Orca's placeholder definitions do, without mutating the engine view.
+        if ((key == "small_perimeter_speed" || key.starts_with("overhang_speed_"))
+            && value.holds_alternative<std::vector<Domain::FloatOrPercentage>>()) {
+            const auto& speeds = value.get<std::vector<Domain::FloatOrPercentage>>();
+            const auto& outer = config_view.get<std::vector<Domain::FloatOrPercentage>>("external_perimeter_speed");
+            std::vector<double> resolved;
+            for (std::size_t i = 0; i < speeds.size(); ++i)
+                resolved.push_back(speeds[i].get_abs_value(outer.at(i).float_value()));
+            result.set(key, resolved);
+            continue;
+        }
         copy(key, value, result);
     }
     return result;
