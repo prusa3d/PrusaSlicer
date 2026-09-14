@@ -577,6 +577,14 @@ namespace DoExport {
             "supports_tool_preheating"
         )};
         processor_config.do_M104_backtrace = supports_tool_preheating && *supports_tool_preheating;
+        processor_config.tool_preheating_m104 = Domain::Preset::get_feature<bool>(
+            hw_printer_config.features, "tool_preheating_m104").value_or(false);
+        processor_config.preheat_time = static_cast<float>(config.get<double>("preheat_time"));
+        processor_config.preheat_steps = static_cast<unsigned int>(config.get<int>("preheat_steps"));
+        processor_config.do_M104_backtrace = processor_config.do_M104_backtrace && processor_config.preheat_time > 0;
+        if (processor_config.tool_preheating_m104)
+            processor_config.do_M104_backtrace = processor_config.do_M104_backtrace
+                && config.get<bool>("ooze_prevention") && !config.get<bool>("single_extruder_multi_material");
         processor_config.extruders.count = config.hw_config().material_slot_count();
 
         std::vector<Vec2f> out_bed_shape;

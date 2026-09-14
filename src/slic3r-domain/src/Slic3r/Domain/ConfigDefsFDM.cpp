@@ -2869,6 +2869,29 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("This option will drop the temperature of the inactive extruders to prevent oozing.");
     def->init_fn = init_with(false);
 
+    def = defs.add("preheat_time", typeid(double));
+    def->location = Print;
+    def->label = L("Preheat time");
+    def->gui_type = ConfigItemDef::GUIType::spinbox;
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_OozePrevention;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->tooltip = L("How many seconds before a tool change to start preheating the next tool. Zero disables advance preheating.");
+    def->units = {"s"};
+    def->min = 0;
+    def->max = 120;
+    def->init_fn = init_with(120.0);
+
+    def = defs.add("preheat_steps", typeid(int));
+    def->location = Print;
+    def->label = L("Preheat steps");
+    def->gui_type = ConfigItemDef::GUIType::spinbox;
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_OozePrevention;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->tooltip = L("Number of advance temperature commands for printers supporting scheduled preheating. Other printers use one command.");
+    def->min = 1;
+    def->max = 10;
+    def->init_fn = init_with(10);
+
     def = defs.add("overhangs", typeid(bool));
     def->location = Print;
     def->overrides_in = Locations{ Tool, Object, Volume };

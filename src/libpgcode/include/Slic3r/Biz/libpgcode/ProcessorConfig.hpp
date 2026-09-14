@@ -85,6 +85,9 @@ struct ProcessorConfig
     bool spiral_vase_enabled{ false };
     bool sequential_print{ false };
     bool do_M104_backtrace{ false };
+    bool tool_preheating_m104{ false };
+    float preheat_time{ 120.0f };
+    unsigned int preheat_steps{ 10 };
     bool single_extruder_multi_material{ false };
     float z_offset{ 0.0f };
     float max_print_height{ 0.0f };

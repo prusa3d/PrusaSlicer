@@ -22,6 +22,7 @@ O::Schema schema()
             {"before_layer_gcode", {{"type", "string"}}}, {"thumbnails", {{"type", "string"}}},
             {"use_relative_e_distances", {{"type", "bool"}}}, {"max_print_height", {{"type", "float"}}}}},
         {"print", {{"perimeters", {{"type", "int"}}}, {"retract_length", {{"type", "float"}}},
+            {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
             {"bridge_acceleration", {{"type", "float"}}},
             {"first_layer_infill_speed", {{"type", "float_or_percent"}}},
             {"first_layer_solid_infill_speed", {{"type", "float_or_percent"}}},
@@ -36,7 +37,8 @@ O::Schema schema()
             {"ensure_vertical_shell_thickness", {{"type", "enum"}, {"values", {"disabled", "partial", "enabled"}}}},
             {"default_tool_print", {{"type", "string"}}}, {"default_material", {{"type", "string"}}}}},
         {"tool_print", Json::object()},
-        {"filament", {{"temperature", {{"type", "int"}}}, {"extrusion_multiplier", {{"type", "float"}}}}}
+        {"filament", {{"temperature", {{"type", "int"}}}, {"extrusion_multiplier", {{"type", "float"}}},
+            {"idle_temperature", {{"type", "optional_int"}}}}}
     };
 }
 
@@ -121,6 +123,35 @@ int main(int argc, char** argv)
         check(v.presets[1]["variants"][0]["values"]["retract_length"] == 0.8, "machine retraction defaults retained");
         check(v.presets[1]["variants"][0]["values"]["default_material"] == "PLA", "machine default filament is retained");
         check(v.presets.back()["values"]["temperature"] == 215, "filament scalar conversion");
+        check(v.presets[1]["values"]["preheat_time"] == 30.0 && v.presets[1]["values"]["preheat_steps"] == 1,
+            "missing preheat settings use Orca defaults");
+        const auto filament_path = root / "Example/filament/pla.json";
+        const auto original_filament = Json::parse(std::ifstream(filament_path));
+        for (const auto& idle : {Json("0"), Json(0), Json("170"), Json("nil"), Json(nullptr)}) {
+            auto fixture = original_filament;
+            fixture["idle_temperature"] = Json::array({idle});
+            write(filament_path, fixture);
+            const auto converted = O::convert(root, schema());
+            if (idle.is_null() || idle == "nil") {
+                check(!converted[0].presets.back()["values"].contains("idle_temperature"),
+                    "unset source settings retain native defaults");
+                continue;
+            }
+            check(converted[0].presets.back()["values"].at("idle_temperature") == (idle == "170" ? Json(170) : Json(nullptr)),
+                "idle zero maps to unspecified while explicit idle temperatures survive");
+        }
+        write(filament_path, original_filament);
+        const auto process_path = root / "Example/process/normal.json";
+        const auto original_process = Json::parse(std::ifstream(process_path));
+        for (double seconds : {0.0, 30.0, 31.0}) {
+            auto fixture = original_process;
+            fixture["preheat_time"] = std::to_string(seconds);
+            write(process_path, fixture);
+            const auto converted = O::convert(root, schema());
+            check(converted[0].presets[1]["values"].at("preheat_time") == seconds,
+                "explicit preheat timing including disabled survives import");
+        }
+        write(process_path, original_process);
         // Both startup and online-source reloads use this persistent per-vendor
         // cache. A second independent vendor exposes accidental global invalidation.
         const auto cache = root / "presets/local";

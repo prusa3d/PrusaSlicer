@@ -411,6 +411,11 @@ Json values(const Json& flat, const Json& schema, Vendor& vendor)
 {
     Json result = Json::object();
     const auto context = gcode_context(flat, schema);
+    // Orca's defaults differ from the native XL preheat defaults.
+    if (flat.value("type", "") == "process") {
+        if (schema.contains("preheat_time")) result["preheat_time"] = 30.0;
+        if (schema.contains("preheat_steps")) result["preheat_steps"] = 1;
+    }
     for (auto it = flat.begin(); it != flat.end(); ++it) {
         const auto& src = it.key();
         if (metadata.contains(src) || src.starts_with("__")) continue;
@@ -437,7 +442,14 @@ Json values(const Json& flat, const Json& schema, Vendor& vendor)
                     return coerce(element, {{"type", "bool"}}).get<bool>() ? yes : no;
                 });
             };
-            if (src == "filament_shrink" || src == "filament_shrinkage_compensation_z") {
+            if (src == "idle_temperature") {
+                // Orca zero means unspecified; PS3 represents that with null.
+                v = map_elements(v, [](const Json& element) -> Json {
+                    if (element.is_null() || element == "nil" || number(element) == 0) return nullptr;
+                    return element;
+                });
+            }
+            else if (src == "filament_shrink" || src == "filament_shrinkage_compensation_z") {
                 // Orca stores retained dimensions (99% means 1% shrinkage).
                 // PS3 stores the lost percentage, with 0% as the neutral value.
                 v = map_elements(v, [](const Json& element) -> Json {
@@ -775,7 +787,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 2}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 3}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {

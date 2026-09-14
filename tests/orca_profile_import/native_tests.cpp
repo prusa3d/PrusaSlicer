@@ -3,6 +3,8 @@
 #include "Slic3r/Biz/Preset/PresetEvaluator.hpp"
 #include "Slic3r/Biz/Parser/PlaceholderParser.hpp"
 #include "Slic3r/Domain/FullConfigFDM.hpp"
+#include "Slic3r/Biz/libpgcode/Processor.hpp"
+#include "libslic3r/GCode/PostProcessor.hpp"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <chrono>
@@ -18,6 +20,48 @@ using Json = nlohmann::json;
 static void require(bool ok, const char* message)
 {
     if (!ok) throw std::runtime_error(message);
+}
+
+static void check_preheating()
+{
+    namespace G = Slic3r::Biz::libpgcode;
+    for (bool ordinary : {false, true}) for (float seconds : {0.0f, 30.0f, 60.0f}) {
+        G::ProcessorConfig config;
+        config.flavor = D::GCodeFlavor::gcfKlipper;
+        config.extruders.count = 2;
+        config.extruders.temps_config = {220, 220};
+        config.extruders.temps_first_layer_config = {220, 220};
+        config.do_M104_backtrace = true;
+        config.tool_preheating_m104 = ordinary;
+        config.preheat_time = seconds;
+        config.preheat_steps = 10;
+        G::Processor processor(std::move(config));
+        std::string input = "G90\nM83\nT0\n";
+        for (int i = 1; i <= 100; ++i)
+            input += "G1 X" + std::to_string(i) + " F60\n";
+        input += "T1\nM109 T1 S220\nG1 X101 F60\n";
+        processor.process_buffer(std::move(input));
+        auto result = processor.finalize();
+        const auto post_config = processor.post_processor_config();
+        require(post_config.preheat_time == seconds && post_config.tool_preheating_m104 == ordinary,
+            "processor forwards preheat settings");
+        result = Slic3r::GCode::post_process(post_config, std::move(result), {}, {}, nullptr);
+        int commands = 0;
+        int last_x = 0;
+        for (const auto line : result.gcode()) {
+            if (line.starts_with("G1 X")) last_x = std::stoi(std::string(line.substr(4)));
+            if (line.starts_with("M104")) {
+                ++commands;
+                require(line.starts_with(ordinary ? "M104 T1 S220" : "M104.1 T1"),
+                    "preheat uses the selected firmware command and next tool");
+                if (ordinary)
+                    require(std::abs(last_x - (100 - static_cast<int>(seconds))) <= 2,
+                        "ordinary preheat is inserted at the configured advance time");
+            }
+        }
+        require(seconds == 0 ? commands == 0 : ordinary ? commands == 1 : commands > 1,
+            "disabled, single-command and scheduled preheat modes");
+    }
 }
 
 static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
@@ -84,6 +128,7 @@ int main(int argc, char** argv)
 {
     const auto root = fs::temp_directory_path() / ("ps-orca-native-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
+        check_preheating();
         const auto write = [&](const char* name, const Json& value) {
             const auto path = root / name;
             fs::create_directories(path.parent_path());
@@ -118,6 +163,7 @@ int main(int argc, char** argv)
         write("profiles/NativeTest/filament/pla.json", {
             {"type", "filament"}, {"name", "PLA"}, {"instantiation", "true"},
             {"filament_retract_before_wipe", {"nil", "nil", "nil", "nil"}},
+            {"idle_temperature", {"0"}},
             {"nozzle_temperature", {"210"}}, {"nozzle_temperature_initial_layer", {"215"}},
             {"filament_shrink", {"100%"}}, {"filament_shrinkage_compensation_z", {"99.5%"}},
             {"filament_flush_temp", {"245"}}, {"filament_flush_volumetric_speed", {"18"}}
@@ -151,11 +197,20 @@ int main(int argc, char** argv)
             for (const auto* asset : {"bed.stl", "bed.svg", "Test model_cover.png"})
                 require(fs::is_regular_file(root / "local/Orca-NativeTest/Orca-NativeTest/assets" / asset), "artwork is staged for the resource resolver");
             require(hw.tool_count == 4 && hw.tools.size() == 4, "four physical tools survive import");
+            require(D::Preset::get_feature<bool>(hw.features, "supports_tool_preheating").value_or(false)
+                && D::Preset::get_feature<bool>(hw.features, "tool_preheating_m104").value_or(false),
+                "imported toolchanger enables ordinary M104 preheating");
             P::PresetEvaluator eval(vendor.presets);
             const auto printers = eval.evaluate(hw);
             require(printers.size() == 1 && printers[0].prints.size() == 1, "printer and compatible process evaluate");
             const auto& print = printers[0].prints[0];
             const auto& filament = std::get<D::FilamentSettings>(print.materials.at(0).at(0).preset.values);
+            require(!filament.find("idle_temperature").item->value().get<std::optional<int>>(),
+                "Orca idle zero evaluates to unspecified rather than heater off");
+            const auto& process_settings = std::get<D::PrintSettings>(print.preset.values);
+            require(process_settings.find("preheat_time").item->value().get<double>() == 30.0
+                && process_settings.find("preheat_steps").item->value().get<int>() == 1,
+                "native process preserves Orca preheat defaults");
             require(filament.find("filament_shrinkage_compensation_xy").item->value().get<D::Percentage>().value == 0.0,
                 "Orca neutral XY shrinkage must not enlarge the sliced model");
             require(filament.find("filament_shrinkage_compensation_z").item->value().get<D::Percentage>().value == 0.5,

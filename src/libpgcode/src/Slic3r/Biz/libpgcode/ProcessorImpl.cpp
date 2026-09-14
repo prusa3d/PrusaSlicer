@@ -158,6 +158,9 @@ PostProcessorConfig ProcessorImpl::post_processor_config()
     PostProcessorConfig ret;
     ret.export_remaining_time_enabled = m_config.export_remaining_time_enabled;
     ret.do_M104_backtrace = m_config.do_M104_backtrace;
+    ret.tool_preheating_m104 = m_config.tool_preheating_m104;
+    ret.preheat_time = m_config.preheat_time;
+    ret.preheat_steps = m_config.preheat_steps;
     ret.extruder_temps_config = m_config.extruders.temps_config;
     ret.extruder_temps_first_layer_config = m_config.extruders.temps_first_layer_config;
 

@@ -86,6 +86,10 @@ D::Preset::VendorData hardware(const Orca::Vendor& source)
             if (visual.contains("thumbnail")) printer.visual.thumbnail = visual.at("thumbnail").get<std::string>();
         }
         printer.features["multi_extruder"].default_value = count > 1;
+        printer.features["supports_tool_preheating"].default_value = count > 1;
+        // Imported non-XL toolchangers use ordinary M104, not Buddy M104.1.
+        printer.features["tool_preheating_m104"].default_value =
+            !(source.id == "Orca-Prusa" && machine.value("printer_model", name).starts_with("Prusa XL"));
         defs.printers.emplace(name, std::move(printer));
         D::Preset::HwPrinterConfigTemplate config;
         config.id = source.id + "/" + name;

@@ -500,9 +500,10 @@ private:
 
     WarningCallback m_warning_callback{ nullptr };
     // Backtrace data for Tx gcode lines
-    static const Backtrace s_BACKTRACE_T;
+    Backtrace m_backtrace_T;
 
     void apply_config() {
+        m_backtrace_T = { m_config.preheat_time, m_config.tool_preheating_m104 ? 1u : std::max(1u, m_config.preheat_steps) };
         for (size_t i = 0; i < TIME_MODES_COUNT; ++i) {
             m_last_exported_main[i] = { 0, time_in_minutes(m_config.time_machines[i].time) };
         }
@@ -586,7 +587,7 @@ private:
             }
             else if (GCodeLine::cmd_is(line, "G28"))
                 ++g1_lines_counter;
-            else if (m_config.do_M104_backtrace && GCodeLine::cmd_starts_with(line, "T")) {
+            else if (m_config.do_M104_backtrace && m_backtrace_T.time > 0 && GCodeLine::cmd_starts_with(line, "T")) {
                 // add lines M104 where needed
                 const auto& [insertions, replacements] =
                     process_line_T(line, i, m_warning_callback);
@@ -603,7 +604,7 @@ private:
                     }
                     processed = true;
                 }
-                max_backtrace_time = std::max(max_backtrace_time, s_BACKTRACE_T.time);
+                max_backtrace_time = std::max(max_backtrace_time, m_backtrace_T.time);
                 if (processed)
                     continue;
             }
@@ -870,6 +871,11 @@ private:
                 [this, layer_id, tool_number, &ret](size_t line_id, const std::vector<float>& time_diffs) {
                     const int temperature = int(layer_id) != 0 ? m_config.extruder_temps_config[tool_number] : 
                         m_config.extruder_temps_first_layer_config[tool_number];
+                    if (m_config.tool_preheating_m104) {
+                        ret.first.push_back({ line_id, "M104 T" + std::to_string(tool_number)
+                            + " S" + std::to_string(temperature) + " ;preheat\n" });
+                        return;
+                    }
                     std::string new_line = "M104.1 T" + std::to_string(tool_number);
                     if (time_diffs.size() > 0)
                         new_line += " P" + std::to_string(int(std::round(time_diffs[0])));
@@ -907,14 +913,14 @@ private:
     void insert_M104_lines(size_t lines_counter, const std::string& cmd,
         std::function<void(size_t, const std::vector<float>&)> line_inserter,
         std::function<void(size_t, const std::string&)> line_replacer) {
-        const float time_step = s_BACKTRACE_T.time_step();
+        const float time_step = m_backtrace_T.time_step();
         const size_t base_rev_it_dist = m_result.gcode().size() - lines_counter; // distance from the current gcode line to the end of gcode
         auto base_gcode_rev_it = m_result.gcode().rbegin() + base_rev_it_dist; // reverse iterator to the current gcode line
         auto base_times_rev_it = m_gcode_times.rbegin() + base_rev_it_dist; // reverse iterator to the current gcode line times
 
         size_t rev_it_dist = 0; // distance from the current gcode line of the starting point of the backtrace
         float last_time_insertion = 0.0f; // used to avoid inserting two lines at the same time
-        for (unsigned int i = 0; i < s_BACKTRACE_T.steps; ++i) {
+        for (unsigned int i = 0; i < m_backtrace_T.steps; ++i) {
             const float backtrace_time_i = float(i + 1) * time_step;
             const float time_threshold_i = m_times[size_t(TimeMode::Normal)] - backtrace_time_i;
             auto gcode_rev_it = base_gcode_rev_it + rev_it_dist;
@@ -951,8 +957,6 @@ private:
         }
     }
 };
-
-const PostProcessor::Backtrace PostProcessor::s_BACKTRACE_T = { 120.0f, 10 };
 
 ProcessorResult post_process(
     const PostProcessorConfig& config,

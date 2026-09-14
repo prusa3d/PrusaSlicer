@@ -462,6 +462,8 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"spiral_vase", steps({propagate(posSlice)})},
     {"staggered_inner_seams", steps({propagate(psGCodeExport)})},
     {"standby_temperature_delta", steps({propagate(psGCodeExport)})},
+    {"preheat_time", steps({propagate(psGCodeExport)})},
+    {"preheat_steps", steps({propagate(psGCodeExport)})},
     {"start_filament_gcode", steps({propagate(psGCodeExport)})},
     {"start_gcode", steps({propagate(psGCodeExport)})},
     {"stuck_filament_detection", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
