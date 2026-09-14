@@ -7,7 +7,7 @@
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ISelectedProjectChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
-#include "Slic3r/App/Platform/AbstractRenderModule.hpp"
+#include "Slic3r/App/RenderModuleBase.hpp"
 #include "Slic3r/App/Platform/CommandExecutionNotifier.hpp"
 #include "Slic3r/Biz/Emboss/IFontManager.hpp"
 #include "Slic3r/App/Yoga/Item.hpp"
@@ -81,7 +81,7 @@ class History;
 class ThumbnailImageGenerator;
 
 class PlaterRenderModule final :
-    public Platform::AbstractRenderModule,
+    public App::RenderModuleBase,
     public Platform::ICommandExecutedListener,
     public Biz::IStatusCacheChangedListener,
     public Biz::Scene::ISceneSelectionChangedListener,
@@ -102,20 +102,17 @@ public:
         std::unique_ptr<Biz::Emboss::IFontManager> font_manager,
         std::shared_ptr<ProjectSaver> project_saver
     );
-    ~PlaterRenderModule();
+    ~PlaterRenderModule() override;
 
     void render_scene(Render::CommandBuffer& cmd_buffer) override;
     void render_imgui(Render::CommandBuffer& cmd_buffer) override;
     void on_scene_mouse_event(const Platform::MouseEvent& e) override;
-    void on_scene_keyboard_event(const Platform::KeyboardEvent& e) override;
     void on_scene_selection_changed(
         Domain::SelectionId project_id,
         const Biz::Scene::ObjectSelection& selection
     ) override;
 
     void on_command_executed() override;
-
-    void set_navigator(Navigator* navigator) override;
 
     void on_status_cache_status_code_changed(const Domain::SlicingId id) override;
     void on_show_context_menu(ContextMenuType type, Domain::Vec2f mouse_pos) override;
@@ -125,15 +122,10 @@ public:
     const std::optional<Platform::CameraSynchData>& camera_synch_data() const override;
     void set_camera_synch_data(const Platform::CameraSynchData& data) override;
 
-    void set_opened_dialog(Yoga::Dialog* opened_dialog);
-    void open_invalid_data_dialog();
-
     void navigate_to_item(const Domain::ConfigItem* config_item);
 
     void open_search();
     void set_modal_dialog(ModalDialog dialog);
-
-    void set_object_list_collapsed(bool collapsed);
 
     virtual void get_user_number_and_process(
         const std::string& message,
@@ -144,35 +136,6 @@ public:
         int max,
         std::function<void(int)> on_process
     ) override;
-
-    MenuManager& menu_manager() override
-    {
-        return m_menu_manager;
-    }
-
-    CommandBindingManager& command_binding_manager() override
-    {
-        return m_command_binding_manager;
-    }
-
-    const Platform::CommandRegistry::CommandsMap& gizmo_commands() const override
-    {
-        ASSERT(m_gizmo_manager);
-        return m_gizmo_manager->commands();
-    }
-
-    const Platform::ICommand& command(const char* name) const override
-    {
-        if (gizmo_commands().contains(name)) {
-            return m_gizmo_manager->command(name);
-        }
-        return m_command_registry.command(name);
-    }
-
-    bool is_gizmo_manager_completed() const override
-    {
-        return m_gizmo_manager.get();
-    }
 
     Scene::IToolGizmo* tool_gizmo(Scene::ToolType type, Domain::PrinterTechnology pt) override;
 
@@ -234,7 +197,6 @@ private:
     Biz::ProjectInteractor& m_project_interactor;
     App::Undo::Store& m_undo_store;
     std::unique_ptr<PlaterScenePresenter> m_scene_presenter;
-    std::unique_ptr<Scene::GizmoManager> m_gizmo_manager;
 
     Yoga::Menu* m_bed_menu = nullptr;
     Yoga::Menu* m_object_menu = nullptr;
@@ -244,15 +206,12 @@ private:
 
     // We need these to outlive the TopBar bellow
     std::unique_ptr<Biz::Emboss::IFontManager> m_font_manager = nullptr;
-    MenuManager m_menu_manager;
-    CommandBindingManager m_command_binding_manager;
     Lua::PluginSystem m_plugin_system;
 
     // main window layout
     std::unique_ptr<PlaterRenderLayout> m_layout;
     // Layout objects
     Yoga::Passthrough<TopBar> m_top_bar;
-    Yoga::Passthrough<ObjectListWindow> m_object_list;
     Yoga::Passthrough<CubeView> m_cube_view;
     Yoga::Passthrough<PopNotification::PopNotificationListView> m_pop_notification_list_view;
     Yoga::Passthrough<SidebarBed> m_sidebar_bed;
@@ -264,7 +223,6 @@ private:
     Yoga::Passthrough<NumberEntryDialog> m_number_entry_dialog;
     Yoga::Passthrough<PresetUpdaterDialog> m_preset_updater_dialog;
     Yoga::Passthrough<WelcomeDialog> m_welcome_dialog;
-    Yoga::Passthrough<InvalidDataDialog> m_invalid_data_dialog;
     Yoga::Passthrough<CrashedProjectsDialog> m_crashed_projects_dialog;
 
     ToolBarButton* m_toolbar_add                     = nullptr;
@@ -310,10 +268,6 @@ private:
     std::shared_ptr<ThumbnailStoreUpdater> m_thumbnail_store_updater;
     std::shared_ptr<Plater::ThumbnailImageGenerator> m_thumbnail_image_generator;
     std::shared_ptr<ProjectSaver> m_project_saver;
-
-    Navigator* m_render_module_navigator{nullptr};
-
-    DialogNavigation m_dialog_navigation;
 
     std::set<Yoga::Dialog*> m_gizmo_dialogs;
 };

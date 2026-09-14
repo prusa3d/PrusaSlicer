@@ -213,8 +213,7 @@ Images ThumbnailRenderer::generate_object_thumbnails(
     });
 
     Scene::Camera& camera = scene.camera();
-    if (camera_type != camera.cam_projection().type())
-        camera.switch_projection_type();
+    camera.set_projection_type(camera_type);
 
     // setup camera trackball
     Scene::CameraTrackballController& trackball = scene.camera_trackball();

@@ -11,7 +11,6 @@
 #include "Slic3r/App/Scene/BedNodeBuilder.hpp"
 #include "Slic3r/App/Scene/BedNodeTag.hpp"
 #include "Slic3r/App/Scene/BedRenderHelper.hpp"
-#include "Slic3r/App/Scene/CameraHelper.hpp"
 #include "Slic3r/App/Scene/MeshRenderNodeComponent.hpp"
 #include "Slic3r/App/Scene/NodeBuilder.hpp"
 #include "Slic3r/App/Scene/NodeVisitor.hpp"
@@ -169,11 +168,7 @@ PlaterScenePresenter::PlaterScenePresenter(
     Render::Device& device,
     Platform::AnimationManager& animation_manager
 ) :
-    m_workbench(workbench),
-    m_project_interactor(project_interactor),
-    m_device(device),
-    m_bed_render_updater(*this, workbench, device, project_interactor.scene_interactor()),
-    m_animation_manager(animation_manager),
+    ScenePresenterBase(workbench, project_interactor, device, animation_manager),
     m_data_factory(device, "plater_scene_presenter")
 {
     load_selected_project();
@@ -335,34 +330,10 @@ void PlaterScenePresenter::render_imgui(const Render::ScreenInfo& screen_info)
     }
 }
 
-void PlaterScenePresenter::screen_resized(const Render::Rect& viewport)
-{
-    m_viewport = viewport;
-    update_cameras([&viewport](auto& cam) { cam.set_viewport(viewport); });
-}
-
 void PlaterScenePresenter::on_hover_changed(const HoverData& hover_data)
 {
     m_hover_data = hover_data;
     m_volume_materials_dirty = true;
-}
-
-void PlaterScenePresenter::on_node_added(Scene::Node* node)
-{
-    if (node != nullptr && node->contains_raycast_component())
-        set_scene_aabb_as_dirty();
-}
-
-void PlaterScenePresenter::on_node_removed(Scene::Node* node)
-{
-    if (node != nullptr && node->contains_raycast_component())
-        set_scene_aabb_as_dirty();
-}
-
-void PlaterScenePresenter::on_node_changed(Scene::Node* node)
-{
-    if (node != nullptr && node->contains_raycast_component())
-        set_scene_aabb_as_dirty();
 }
 
 void PlaterScenePresenter::camera_updated(const Scene::Camera& cam)
@@ -440,15 +411,6 @@ void PlaterScenePresenter::update_bed_instances()
 {
     m_bed_render_updater.update_all(scene().camera(), project_context().bed_error());
     update_cc_selection_geometry();
-}
-
-void PlaterScenePresenter::update_cameras(const std::function<void(Scene::Camera&)>& modifier)
-{
-    std::for_each(
-        m_projects.begin(),
-        m_projects.end(),
-        [modifier](auto& p) { modifier(p.second.scene().camera()); }
-    );
 }
 
 namespace {
@@ -754,17 +716,6 @@ void PlaterScenePresenter::update_volume_materials()
         },
         true
     );
-}
-
-void PlaterScenePresenter::center_camera_on_selected_bed(bool animated)
-{
-    if (animated)
-        animated_center_camera_on_bed(m_workbench.project(m_project_interactor.selected_project_id()),
-            m_project_interactor.scene_interactor().bed_selection().last_selected_bed(), scene().camera_trackball(),
-            m_animation_manager);
-    else
-        center_camera_on_bed(m_workbench.project(m_project_interactor.selected_project_id()),
-            m_project_interactor.scene_interactor().bed_selection().last_selected_bed(), scene().camera_trackball());
 }
 
 void PlaterScenePresenter::on_selected_project_changed(size_t index)

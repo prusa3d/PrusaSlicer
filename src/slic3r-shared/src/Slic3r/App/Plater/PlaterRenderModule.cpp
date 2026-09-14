@@ -138,8 +138,6 @@ PlaterRenderModule::PlaterRenderModule(
     m_project_interactor(project_interactor),
     m_undo_store(undo_store),
     m_font_manager(std::move(font_manager)),
-    m_menu_manager(m_command_registry),
-    m_command_binding_manager(m_command_registry),
     m_plugin_system(
         {resources_dir() + "/lua", data_dir() + "/lua"},
         project_interactor,
@@ -155,12 +153,13 @@ PlaterRenderModule::~PlaterRenderModule()
 {
     if (m_gizmo_manager) {
         m_gizmo_manager->remove_listener<IGizmoActiveToolListener>(this);
+        // m_gizmo_manager lives in the RenderModuleBase base class, which is destroyed after
+        // this class's own members (including m_scene_presenter). Several gizmos unregister
+        // themselves from m_scene_presenter in their destructors, so it must be torn down here,
+        // while m_scene_presenter is still alive, instead of relying on implicit member/base
+        // destruction order.
+        m_gizmo_manager.reset();
     }
-}
-
-void PlaterRenderModule::set_opened_dialog(Yoga::Dialog* opened_dialog)
-{
-    m_dialog_navigation.open_dialog(opened_dialog);
 }
 
 void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
@@ -180,20 +179,6 @@ void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
 
     request_render();
-}
-
-void PlaterRenderModule::open_invalid_data_dialog()
-{
-    if (m_invalid_data_dialog.get()) {
-        set_opened_dialog(m_invalid_data_dialog.get());
-    }
-}
-
-void PlaterRenderModule::set_object_list_collapsed(bool collapsed)
-{
-    if (m_object_list.get()) {
-        m_object_list->set_collapsed(collapsed);
-    }
 }
 
 void PlaterRenderModule::get_user_number_and_process(
@@ -1152,11 +1137,6 @@ void PlaterRenderModule::active_tool_changed(Scene::IToolGizmo* active_tool)
     m_command_binding_manager.update_ui_items();
 }
 
-void PlaterRenderModule::set_navigator(Navigator* navigator)
-{
-    m_render_module_navigator = navigator;
-}
-
 void PlaterRenderModule::on_status_cache_status_code_changed(const Domain::SlicingId id)
 {
     // request redraw
@@ -1327,15 +1307,6 @@ void PlaterRenderModule::on_scene_mouse_event(const Platform::MouseEvent& e)
         && e.type() == Platform::MouseEvent::Type::ButtonUp)
     {
         close_all_menus();
-    }
-}
-
-void PlaterRenderModule::on_scene_keyboard_event(const Platform::KeyboardEvent& e)
-{
-    if (!m_render_module_navigator->is_any_modal_dialog_opened()
-        && !m_gizmo_manager->on_scene_keyboard_event(e))
-    {
-        Platform::AbstractRenderModule::on_scene_keyboard_event(e);
     }
 }
 

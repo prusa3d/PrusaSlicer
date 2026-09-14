@@ -50,10 +50,12 @@ void Camera::look_at(const Vec3d& eye, const Vec3d& center, const Vec3d& up)
     invoke_listeners<ICameraUpdateListener>([this](auto* l) { l->camera_updated(*this); });
 }
 
-void Camera::switch_projection_type()
+void Camera::set_projection_type(CameraProjectionType type)
 {
     DEBUG_ASSERT(m_projection_getter != nullptr);
-    if (m_projection_getter->type() == CameraProjectionType::Perspective) {
+    if (m_projection_getter->type() == type)
+        return;
+    if (type == CameraProjectionType::Orthographic) {
         m_projection_getter.reset(new OrthographicCameraProjection);
         m_zoom = CameraProjectionParameters::orthographic_zoom_from_perspective(m_zoom);
     }
@@ -137,8 +139,7 @@ void Camera::update_synch_data(Platform::CameraSynchData& data) const
 
 void Camera::synchronize_from(const Platform::CameraSynchData& data)
 {
-    if (uint8_t(cam_projection().type()) != data.type)
-        switch_projection_type();
+    set_projection_type(CameraProjectionType(data.type));
 
     set_model(data.model);
     set_zoom(data.zoom);

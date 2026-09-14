@@ -1,5 +1,8 @@
 #include "Slic3r/App/Scene/ScenePresenterProjectContext.hpp"
 #include "Slic3r/App/Scene/OBBNodeHelper.hpp"
+#include "Slic3r/App/Scene/Camera.hpp"
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/AppConfig.hpp"
 
 namespace Slic3r::App::Scene {
 
@@ -75,6 +78,10 @@ ScenePresenterProjectContext::ScenePresenterProjectContext() :
     m_selection_scene_change_session{*m_scene},
     selection_root{initialize_node("global_selection_root", true, *m_scene)},
     plain_selection_root{initialize_node("scaling_global_selection_root", false, *m_scene)}
-{}
+{
+    m_scene->camera().set_projection_type(
+        AppServices::instance().app_config().get<CameraProjectionType>("camera_projection_type")
+    );
+}
 
 } // namespace Slic3r::App::Scene
