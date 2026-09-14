@@ -71,7 +71,7 @@ bool PrintHostMKS::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn err
     return res;
 }
 
-bool PrintHostMKS::test(std::string& msg, RetryFn retry_fn) const
+bool PrintHostMKS::test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     Network::TCPConsole console(m_print_host_config.host, m_console_port);
 

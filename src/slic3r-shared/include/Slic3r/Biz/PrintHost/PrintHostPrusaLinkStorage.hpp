@@ -26,7 +26,7 @@ public:
     bool perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
     const char* get_name() const override { return "PrusaLink"; }
-    bool test(std::string& msg, RetryFn retry_fn) const override {return false; }
+    bool test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const override {return false; }
 
     std::string operation_type() const override { return "storage"; }
 private:

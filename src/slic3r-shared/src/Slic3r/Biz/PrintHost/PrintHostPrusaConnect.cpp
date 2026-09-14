@@ -98,7 +98,7 @@ std::string replace_placeholders(const std::string& text, const std::string& v1,
 }
 } // namespace
 
-bool PrintHostPrusaConnect::test(std::string& curl_msg, RetryFn retry_fn) const
+bool PrintHostPrusaConnect::test(std::string& curl_msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     // Test is not used by upload and gets list of files on a device.
 
@@ -129,6 +129,7 @@ bool PrintHostPrusaConnect::test(std::string& curl_msg, RetryFn retry_fn) const
         .on_complete([&](std::string body, unsigned) {
             SPDLOG_INFO("{}: Got files/raw: {}", name, body);
         })
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;

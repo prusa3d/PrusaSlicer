@@ -134,6 +134,7 @@ void Theme::initialize_dark_colors()
     m_colors[Platform::Color::AccentSecondary]  = ColorEntry{{0.32f, 0.48f, 0.84f, 1.0f}};
     m_colors[Platform::Color::AccentTertiary]   = ColorEntry{{175, 119, 255}};
     m_colors[Platform::Color::Error]            = ColorEntry{{0.79f, 0.18f, 0.14f, 1.0f}};
+    m_colors[Platform::Color::Success]          = ColorEntry{{0.14f, 0.65f, 0.27f, 1.0f}};
     m_colors[Platform::Color::Warning]          = ColorEntry{{255, 193, 7}};
     m_colors[Platform::Color::ModalWindowDimBg] = ColorEntry{{0.80f, 0.80f, 0.80f, 0.35f}};
 
@@ -226,6 +227,7 @@ void Theme::initialize_light_colors()
     m_colors[Platform::Color::AccentSecondary]  = ColorEntry{{0.32f, 0.48f, 0.84f, 1.0f}};
     m_colors[Platform::Color::AccentTertiary]   = ColorEntry{{175, 119, 255}};
     m_colors[Platform::Color::Error]            = ColorEntry{{0.79f, 0.18f, 0.14f, 1.0f}};
+    m_colors[Platform::Color::Success]          = ColorEntry{{0.14f, 0.65f, 0.27f, 1.0f}};
     m_colors[Platform::Color::Warning]          = ColorEntry{{0.85f, 0.47f, 0.02f, 1.0f}};
     m_colors[Platform::Color::ModalWindowDimBg] = ColorEntry{{0.20f, 0.20f, 0.20f, 0.35f}};
 

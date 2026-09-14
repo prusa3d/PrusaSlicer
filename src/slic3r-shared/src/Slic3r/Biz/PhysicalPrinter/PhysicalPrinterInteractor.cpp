@@ -5,15 +5,35 @@
 #include "Slic3r/Biz/RemovableDrive/RemovableDriveService.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/Platform/IAppConfigProvider.hpp"
+#include "Slic3r/Biz/PrintHost/IPrintHost.hpp"
+#include "Slic3r/Biz/PrintHost/PrintHostFactory.hpp"
+#include "Slic3r/Biz/PrintHost/PrintHostJobData.hpp"
+#include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 
 #include "Slic3r/Log.hpp"
 
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <variant>
 
 namespace Slic3r::Biz::PhysicalPrinter {
+
+namespace {
+
+constexpr const char* CONNECTION_TEST_JOB_NAME = "physical_printer_connection_test";
+
+bool auth_type_supported_by_host(Domain::PrintHostType type, Domain::PrintHostAuthType auth_type)
+{
+    if (type != Domain::PrusaLink && type != Domain::SL1Host) {
+        return true;
+    }
+    return auth_type != Domain::PrintHostAuthType::None;
+}
+
+} // namespace
 
 PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     Platform::IMainThreadDispatcher& dispatcher,
@@ -341,6 +361,132 @@ void PhysicalPrinterInteractor::on_selected_config_container_changed(Domain::Sel
     }
 
     select_default();
+}
+
+bool PhysicalPrinterInteractor::is_connection_testable() const
+{
+    const PhysicalPrinterConfig& printer = edited_printer();
+    if (printer.host.empty()) {
+        return false;
+    }
+
+    const PrinterUpload* upload = std::get_if<PrinterUpload>(&printer.payload);
+    if (upload == nullptr) {
+        return false;
+    }
+
+    return auth_type_supported_by_host(upload->type, upload->auth_type);
+}
+
+bool PhysicalPrinterInteractor::is_connection_test_in_flight() const
+{
+    return m_connection_test_in_flight;
+}
+
+void PhysicalPrinterInteractor::test_edited_printer_connection(
+    std::function<void(PrintHostTestResult)> callback
+)
+{
+    if (m_connection_test_in_flight || !is_connection_testable()) {
+        return;
+    }
+
+    m_connection_test_callback  = std::move(callback);
+    m_connection_test_in_flight = true;
+
+    const size_t generation = ++m_connection_test_generation;
+    m_connection_test_job_name = CONNECTION_TEST_JOB_NAME + std::to_string(generation);
+
+    PhysicalPrinterConfig config = edited_printer();
+
+    std::function job_func = [](JThread::StopToken stop_token,
+                                PhysicalPrinterConfig printer) -> PrintHostTestResult
+    {
+        std::unique_ptr<PrintHost::IPrintHost> host = PrintHost::create_print_host(
+            std::move(printer),
+            PrintHost::PrintHostJobData{
+                std::monostate{},
+                {},
+                PrintHost::PrintHostExportFormat::Undefined
+            }
+        );
+        if (!host) {
+            // TRN Error shown when no print host implementation matches the printer settings.
+            return {false, {}, _u8L("Could not get a valid printer host reference.")};
+        }
+
+        std::string msg;
+        const bool ok = host->test(
+            msg,
+            [stop_token](Network::IHttp::Progress, bool& cancel)
+            {
+                if (stop_token.stop_requested()) {
+                    cancel = true;
+                }
+            },
+            [stop_token](Network::IHttp::Retry, bool& cancel)
+            {
+                if (stop_token.stop_requested()) {
+                    cancel = true;
+                }
+            }
+        );
+
+        if (stop_token.stop_requested()) {
+            return {false, {}, {}};
+        }
+
+        return {ok, std::string{host->get_name()}, ok ? std::string{} : std::move(msg)};
+    };
+
+    Platform::PlatformServices::instance()
+        .job_manager()
+        .create_job(m_connection_test_job_name, std::move(job_func), std::move(config))
+        .on_result(
+            [this, generation](PrintHostTestResult result)
+            { finish_connection_test(generation, std::move(result)); }
+        )
+        .on_exception(
+            [this, generation](const std::exception_ptr&)
+            {
+                // TRN Error shown when the print host connection test itself failed unexpectedly.
+                finish_connection_test(generation, {false, {}, _u8L("Connection test failed.")});
+            }
+        )
+        .start();
+}
+
+void PhysicalPrinterInteractor::cancel_edited_printer_connection_test()
+{
+    if (!m_connection_test_in_flight) {
+        return;
+    }
+
+    ++m_connection_test_generation;
+    m_connection_test_in_flight = false;
+    m_connection_test_callback  = nullptr;
+
+    if (Platform::PlatformServices::instance().has_job_manager()) {
+        Platform::PlatformServices::instance().job_manager().request_job_stop(m_connection_test_job_name);
+    }
+    m_connection_test_job_name.clear();
+}
+
+void PhysicalPrinterInteractor::finish_connection_test(size_t generation, PrintHostTestResult result)
+{
+    if (generation != m_connection_test_generation) {
+        return;
+    }
+
+    m_connection_test_in_flight = false;
+    m_connection_test_job_name.clear();
+
+    std::function<void(PrintHostTestResult)> callback = std::move(m_connection_test_callback);
+    m_connection_test_callback = nullptr;
+
+    if (callback) {
+        callback(std::move(result));
+    }
 }
 
 } // namespace Slic3r::Biz::PhysicalPrinter

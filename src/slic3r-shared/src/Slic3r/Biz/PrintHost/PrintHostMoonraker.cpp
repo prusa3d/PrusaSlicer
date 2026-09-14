@@ -25,7 +25,7 @@ bool PrintHostMoonraker::perform(ProgressFn progress_fn, RetryFn retry_fn, Error
 
     // If test fails, test_msg_or_host_ip contains the error message.
     std::string test_msg_or_host_ip;
-    if (!test(test_msg_or_host_ip, retry_fn)) {
+    if (!test(test_msg_or_host_ip, progress_fn, retry_fn)) {
         error_fn(std::move(test_msg_or_host_ip));
         return false;
     }
@@ -111,7 +111,7 @@ bool PrintHostMoonraker::perform(ProgressFn progress_fn, RetryFn retry_fn, Error
     return res;
 }
 
-bool PrintHostMoonraker::test(std::string& msg, RetryFn retry_fn) const
+bool PrintHostMoonraker::test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     // GET /server/info
 
@@ -171,6 +171,7 @@ bool PrintHostMoonraker::test(std::string& msg, RetryFn retry_fn) const
             msg = address;
         })
 #endif // _WIN32
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;

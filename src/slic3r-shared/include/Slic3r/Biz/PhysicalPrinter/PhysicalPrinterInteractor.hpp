@@ -13,6 +13,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <functional>
 #include <optional>
 
 namespace Slic3r::Domain::Preset {
@@ -32,6 +33,13 @@ class RemovableDriveService;
 } // namespace Slic3r::Biz::RemovableDrive
 
 namespace Slic3r::Biz::PhysicalPrinter {
+
+struct PrintHostTestResult
+{
+    bool ok{false};
+    std::string host_name;
+    std::string error_message;
+};
 
 /// Owns the selectable upload destinations, the current selection, and the last used destination.
 class PhysicalPrinterInteractor :
@@ -101,6 +109,15 @@ public:
     /// Prepares the editor to add a new printer.
     void on_dialog_button_add_new();
 
+    bool is_connection_testable() const;
+
+    bool is_connection_test_in_flight() const;
+
+    void test_edited_printer_connection(std::function<void(PrintHostTestResult)> callback);
+
+    /// Discards the running test's result so a new one may start at once. Safe to call repeatedly.
+    void cancel_edited_printer_connection_test();
+
     bool is_printer_compatible(
         const std::string& uuid,
         const Domain::Preset::HwPrinterConfig& config
@@ -130,6 +147,8 @@ private:
     size_t index_of(const std::string& uuid) const;
     std::optional<size_t> find_index(const std::string& uuid) const;
 
+    void finish_connection_test(size_t generation, PrintHostTestResult result);
+
 private:
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;
@@ -146,5 +165,10 @@ private:
     size_t m_selected_index;
     bool m_explicit_selection{false};
     std::string m_last_used_uuid;
+
+    std::function<void(PrintHostTestResult)> m_connection_test_callback;
+    std::string m_connection_test_job_name;
+    size_t m_connection_test_generation{0};
+    bool m_connection_test_in_flight{false};
 };
 } // namespace Slic3r::Biz::PhysicalPrinter

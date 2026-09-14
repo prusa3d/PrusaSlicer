@@ -22,7 +22,7 @@ public:
     bool perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
     const char* get_name() const override { return "AstroBox"; }
-    bool test(std::string& msg, RetryFn retry_fn) const override;
+    bool test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const override;
 private:
     std::string make_url(const std::string& path) const;
     void set_auth(Network::IHttp* http) const;

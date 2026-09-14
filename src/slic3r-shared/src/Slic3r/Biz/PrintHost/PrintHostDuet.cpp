@@ -15,7 +15,7 @@ namespace Slic3r::Biz::PrintHost {
 bool PrintHostDuet::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
     std::string connect_msg;
-    auto connectionType = connect(connect_msg, retry_fn);
+    auto connectionType = connect(connect_msg, progress_fn, retry_fn);
     if (connectionType == ConnectionType::error) {
         error_fn(std::move(connect_msg));
         return false;
@@ -86,19 +86,19 @@ bool PrintHostDuet::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn er
         })
         .perform_sync();
 
-    disconnect(connectionType, retry_fn);
+    disconnect(connectionType, progress_fn, retry_fn);
     return res;
 }
 
-bool PrintHostDuet::test(std::string& msg, RetryFn retry_fn) const
+bool PrintHostDuet::test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
-    auto connectionType = connect(msg, retry_fn);
-    disconnect(connectionType, retry_fn);
+    auto connectionType = connect(msg, progress_fn, retry_fn);
+    disconnect(connectionType, progress_fn, retry_fn);
 
     return connectionType != ConnectionType::error;
 }
 
-PrintHostDuet::ConnectionType PrintHostDuet::connect(std::string& msg, RetryFn retry_fn) const
+PrintHostDuet::ConnectionType PrintHostDuet::connect(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     auto res = ConnectionType::error;
     auto url = get_connect_url(false);
@@ -136,6 +136,7 @@ PrintHostDuet::ConnectionType PrintHostDuet::connect(std::string& msg, RetryFn r
                         res = ConnectionType::error;
                     }
                 })
+                .on_progress(progress_fn)
                 .perform_sync();
         })
         .on_complete([&](std::string body, unsigned) {
@@ -157,12 +158,13 @@ PrintHostDuet::ConnectionType PrintHostDuet::connect(std::string& msg, RetryFn r
                 break;
             }
         })
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;
 }
 
-void PrintHostDuet::disconnect(PrintHostDuet::ConnectionType connectionType, RetryFn retry_fn) const
+void PrintHostDuet::disconnect(PrintHostDuet::ConnectionType connectionType, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     // we don't need to disconnect from DSF or if it failed anyway
     if (connectionType != ConnectionType::rrf) {
@@ -179,6 +181,7 @@ void PrintHostDuet::disconnect(PrintHostDuet::ConnectionType connectionType, Ret
             // we don't care about it, if disconnect is not working Duet will disconnect automatically after some time
             SPDLOG_ERROR("Duet: Error disconnecting: {}, HTTP {}, body: `{}`", error, status, body);
         })
+        .on_progress(progress_fn)
         .perform_sync();
 }
 
