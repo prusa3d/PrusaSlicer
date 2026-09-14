@@ -533,16 +533,21 @@ void set_font_prop(const sol::table& def, std::string_view key, std::function<T&
     }
 }
 
-EmbossTextOpts parse_emboss_text_opts(const sol::table& def)
+EmbossTextOpts parse_emboss_text_opts(const Domain::FontList& fav_fonts, const sol::table& def)
 {
     Domain::FontProp font_prop;
 
     set_font_prop<float>(def, "line_height", [&]() -> auto& { return font_prop.size_in_mm; });
     set_font_prop<bool>(def, "per_glyph", [&]() -> auto& { return font_prop.per_glyph; });
 
+    auto default_font = fav_fonts.front();
     return {
-        .font = def.get<Domain::FontDescriptor>("font"),
+        .font = def.get_or(
+            "font",
+            default_font
+        ),
         .text = def.get<std::string>("text"),
+        .depth = def.get_or("depth", 1.0),
         .font_prop = std::move(font_prop)
     };
 }
@@ -1028,7 +1033,7 @@ void ProjectApi::register_api(Biz::Lua::LuaEngine& lua)
     api["emboss_text"] =
         [this](const sol::table& def)
         {
-            auto opts = parse_emboss_text_opts(def);
+            auto opts = parse_emboss_text_opts(m_fav_fonts, def);
             return emboss_text(m_text_preset_manager, opts);
         };
 }
