@@ -870,7 +870,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 10}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 11}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {

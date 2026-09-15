@@ -640,6 +640,20 @@ WipeTower::WipeTower(
         default_speed
     );
 
+    if (m_orca_type2_minimum) {
+        // Orca's type-2 tower uses the initial tool's speed settings. Its
+        // first layer uses initial_layer_speed for both fill and walls.
+        m_infill_speed = get_min_speed(config.get<std::vector<double>>("infill_speed"), {unsigned(initial_tool)});
+        m_perimeter_speed = get_min_speed(config.get<std::vector<double>>("perimeter_speed"), {unsigned(initial_tool)});
+        m_first_layer_perimeter_speed = get_min_speed(
+            config.get<std::vector<Domain::FloatOrPercentage>>("first_layer_perimeter_speed"),
+            {unsigned(initial_tool)}, default_speed);
+        m_first_layer_infill_speed = m_first_layer_perimeter_speed;
+        const float limit = static_cast<float>(config.get<double>("wipe_tower_max_purge_speed"));
+        m_infill_speed = std::min(m_infill_speed, limit);
+        m_perimeter_speed = std::min(m_perimeter_speed, limit);
+    }
+
     // If this is a single extruder MM printer, we will use all the SE-specific config values.
     // Otherwise, the defaults will be used to turn off the SE stuff.
     if (m_semm) {
@@ -1241,7 +1255,9 @@ void WipeTower::toolchange_Wipe(
         x_to_wipe = std::max(x_to_wipe, x_to_fill_cleaning_box);
     }
 
-    const float target_speed = is_first_layer() ? m_first_layer_infill_speed * 60.f : m_infill_speed * 60.f;
+    const bool first_layer_speed = is_first_layer()
+        || (m_orca_type2_minimum && m_num_tool_changes <= 1 && m_no_sparse_layers);
+    const float target_speed = first_layer_speed ? m_first_layer_infill_speed * 60.f : m_infill_speed * 60.f;
     float wipe_speed = 0.33f * target_speed;
 
     // if there is less than 2.5*line_width to the edge, advance straightaway (there is likely a blob anyway)

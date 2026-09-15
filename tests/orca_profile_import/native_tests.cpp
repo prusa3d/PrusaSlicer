@@ -9,6 +9,7 @@
 #include "libslic3r/GCode/PostProcessor.hpp"
 #include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "libslic3r/GCode/WipeTower.hpp"
+#include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <chrono>
@@ -197,6 +198,30 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
         require(minimum.first > zero.first && large.first > minimum.first,
             "SEMM/MEMM tower paths honor minimum and prime volumes with or without a finishing filament");
     }
+    pack.printer.items.opt("single_extruder_multi_material").set(false);
+    pack.print.items.opt("first_layer_perimeter_speed").set(D::FloatOrPercentage{20.});
+    pack.print.items.opt("first_layer_infill_speed").set(D::FloatOrPercentage{80.});
+    pack.print.items.opt("wipe_tower_max_purge_speed").set(25.);
+    const auto native_slow_setting = generate(false, 36., 15.);
+    const auto imported_slow = generate(true, 36., 15.);
+    pack.print.items.opt("wipe_tower_max_purge_speed").set(90.);
+    require(native_slow_setting == generate(false, 36., 15.),
+        "native tower output ignores the imported speed limit");
+    const auto imported_fast = generate(true, 36., 15.);
+    require(imported_slow.first == imported_fast.first && imported_slow.second != imported_fast.second,
+        "tower speed limits alter feedrates without changing generated geometry");
+    Slic3r::Biz::GCodeReader::GCodeReader tower_parser;
+    unsigned capped_moves = 0;
+    tower_parser.parse_buffer("M83\n" + imported_slow.second,
+        [&](auto& reader, const auto& line) {
+            if (line.cmd_is("G1") && line.extruding(reader) && line.dist_XY(reader) > 0.) {
+                require(line.new_F(reader) <= 25. * 60. + 0.01,
+                    "imported first-layer fill and subsequent tower extrusion honor their speed settings");
+                ++capped_moves;
+            }
+        });
+    require(capped_moves > 0, "tower speed regression observes actual extrusion");
+
     pack.printer.items.opt("single_extruder_multi_material").set(true);
     pack.print.items.opt("orca_fixed_prime_volume").set(false);
     pack.print.items.opt("orca_matrix_flush").set(true);
@@ -286,6 +311,7 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     legacy["print_settings"].erase("prime_volume");
     legacy["print_settings"].erase("orca_matrix_flush");
     legacy["print_settings"].erase("orca_matrix_flush_multiplier");
+    legacy["print_settings"].erase("wipe_tower_max_purge_speed");
     for (const char* key : {"orca_wipe_compatibility", "role_based_wipe_speed", "wipe_speed", "wipe_distance", "retract_after_wipe"})
         legacy["print_settings"].erase(key);
     const auto old_loaded = Slic3r::Biz::Config::load(legacy, hw);
@@ -295,7 +321,8 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     require(old_loaded.value().issues.size() == 1, "older settings have no unrelated load issues");
     const auto& missing = std::get<Slic3r::Biz::Config::BoxIssues>(
         old_loaded.value().issues.at(D::FDMConfigLocation::Print));
-    require(missing.size() == 12
+    require(missing.size() == 13
+        && missing.at("wipe_tower_max_purge_speed").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_matrix_flush").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_matrix_flush_multiplier").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_wipe_compatibility").type == Slic3r::Biz::Config::NotFound

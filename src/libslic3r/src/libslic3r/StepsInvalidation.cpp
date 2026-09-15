@@ -543,6 +543,7 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"orca_fixed_prime_volume", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"orca_matrix_flush", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"orca_matrix_flush_multiplier", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
+    {"wipe_tower_max_purge_speed", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"prime_volume", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"orca_wipe_compatibility", steps({propagate(psGCodeExport)})},
     {"role_based_wipe_speed", steps({propagate(psGCodeExport)})},

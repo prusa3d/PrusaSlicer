@@ -4845,6 +4845,17 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->min = 0;
     def->init_fn = init_with(1.);
 
+    def = defs.add("wipe_tower_max_purge_speed", typeid(double));
+    def->location = Print;
+    def->label = L("Maximum imported tower speed");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Maximum purge and structural extrusion speed for imported Orca type-2 towers. The first layer uses first-layer perimeter speed. Native tower behavior is unchanged.");
+    def->units = {L("mm/s")};
+    def->min = 10;
+    def->init_fn = init_with(90.);
+
     def = defs.add("prime_volume", typeid(double));
     def->location = Print;
     def->label = L("Prime volume");

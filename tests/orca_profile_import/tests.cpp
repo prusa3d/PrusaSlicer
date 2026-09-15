@@ -27,6 +27,7 @@ O::Schema schema()
             {"orca_fixed_prime_volume", {{"type", "bool"}}},
             {"orca_matrix_flush", {{"type", "bool"}}},
             {"orca_matrix_flush_multiplier", {{"type", "float"}}},
+            {"wipe_tower_max_purge_speed", {{"type", "float"}}},
             {"orca_wipe_compatibility", {{"type", "bool"}}},
             {"role_based_wipe_speed", {{"type", "bool"}}},
             {"wipe_speed", {{"type", "float_or_percent"}}},
@@ -189,6 +190,8 @@ int main(int argc, char** argv)
         const auto process_path = root / "Example/process/normal.json";
         const auto original_process = Json::parse(std::ifstream(process_path));
         check(v.presets[1]["values"].at("prime_volume") == 45.0, "prime volume uses the captured Orca default");
+        check(v.presets[1]["values"].at("wipe_tower_max_purge_speed") == 90.,
+            "tower speed limit uses the captured source default");
         check(v.presets[1]["values"].at("orca_matrix_flush_multiplier") == 0.3,
             "matrix flush uses the Orca project default separately from the profile snapshot");
         for (double multiplier : {0., 0.3, 2.}) {
