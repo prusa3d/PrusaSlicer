@@ -257,6 +257,8 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     legacy["print_settings"].erase("retract_before_perimeters");
     legacy["print_settings"].erase("orca_fixed_prime_volume");
     legacy["print_settings"].erase("prime_volume");
+    for (const char* key : {"orca_wipe_compatibility", "role_based_wipe_speed", "wipe_speed", "wipe_distance", "retract_after_wipe"})
+        legacy["print_settings"].erase(key);
     const auto old_loaded = Slic3r::Biz::Config::load(legacy, hw);
     require(bool(old_loaded), "older project settings remain loadable");
     // Missing newly introduced settings use the loader's existing nonfatal
@@ -264,7 +266,12 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     require(old_loaded.value().issues.size() == 1, "older settings have no unrelated load issues");
     const auto& missing = std::get<Slic3r::Biz::Config::BoxIssues>(
         old_loaded.value().issues.at(D::FDMConfigLocation::Print));
-    require(missing.size() == 5
+    require(missing.size() == 10
+        && missing.at("orca_wipe_compatibility").type == Slic3r::Biz::Config::NotFound
+        && missing.at("role_based_wipe_speed").type == Slic3r::Biz::Config::NotFound
+        && missing.at("wipe_speed").type == Slic3r::Biz::Config::NotFound
+        && missing.at("wipe_distance").type == Slic3r::Biz::Config::NotFound
+        && missing.at("retract_after_wipe").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_fixed_prime_volume").type == Slic3r::Biz::Config::NotFound
         && missing.at("prime_volume").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_perimeter_speed_compatibility").type == Slic3r::Biz::Config::NotFound
@@ -273,6 +280,7 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
         "older projects only report the absent additive settings");
     const auto& old_print = std::get<D::ConfigPackFDM>(old_loaded.value().config).print;
     require(!old_print.find("orca_fixed_prime_volume").item->value().get<bool>()
+        && !old_print.find("orca_wipe_compatibility").item->value().get<bool>()
         && old_print.find("prime_volume").item->value().get<double>() == 0.
         && !old_print.find("orca_perimeter_speed_compatibility").item->value().get<bool>()
         && !old_print.find("retract_before_perimeters").item->value().get<bool>()
@@ -331,6 +339,7 @@ int main(int argc, char** argv)
             {"nozzle_diameter", {"0.4", "0.4", "0.4", "0.4"}}, {"gcode_flavor", "klipper"},
             {"emit_machine_limits_to_gcode", "1"},
             {"single_extruder_multi_material", "0"}, {"purge_in_prime_tower", "0"},
+            {"wipe_distance", {"2"}},
             {"thumbnails", "48x48"},
             {"printable_area", {"0,0", "270,0", "270,270", "0,270"}}, {"printable_height", "270"},
             {"bed_mesh_min", "3,3"}, {"bed_mesh_max", "267,267"}, {"bed_mesh_probe_distance", "50,50"},
@@ -401,6 +410,10 @@ int main(int argc, char** argv)
                 && process_settings.find("prime_volume").item->value().get<double>() == 36.,
                 "native evaluation combines the machine prime policy and explicit process volume");
             check_prime_volume(hw);
+            require(process_settings.find("orca_wipe_compatibility").item->value().get<bool>()
+                && process_settings.find("role_based_wipe_speed").item->value().get<bool>()
+                && process_settings.find("wipe_distance").item->value().get<double>() == 2.,
+                "native evaluation preserves the imported wipe policy and machine distance");
             require(process_settings.find("small_perimeter_threshold").item->value().get<double>() == 0.0,
                 "Orca disabled small-perimeter threshold overrides the native 6.5 mm default");
             require(process_settings.find("enable_dynamic_overhang_speeds").item->value().get<bool>(),

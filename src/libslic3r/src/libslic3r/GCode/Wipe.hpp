@@ -30,6 +30,7 @@ public:
     void            enable(double wipe_len_max) { m_enabled = true; m_wipe_len_max = wipe_len_max; }
     void            disable() { m_enabled = false; }
     bool            enabled() const { return m_enabled; }
+    bool            uses_orca_rules() const { return m_orca_rules; }
 
     const Path&     path() const { return m_path; }
     bool            has_path() const { assert(m_path.empty() || m_path.size() > 1); return ! m_path.empty(); }
@@ -65,6 +66,12 @@ public:
         { return 0.95 * floor(retract_speed.at(extruder_id) + 0.5) / calc_wipe_speed(travel_speed); }
 
 private:
+    std::string wipe_orca(GCodeGenerator& gcodegen, const std::vector<double>& retract_speed, double travel_speed, bool toolchange);
+    bool m_orca_rules = false;
+    bool m_role_based_speed = false;
+    std::vector<Domain::FloatOrPercentage> m_wipe_speed;
+    std::vector<double> m_wipe_distance;
+    std::vector<Domain::Percentage> m_retract_after_wipe;
     bool    m_enabled{ false };
     // Maximum length of a path to accumulate. Only wipes shorter than this threshold will be requested.
     double  m_wipe_len_max{ 0. };

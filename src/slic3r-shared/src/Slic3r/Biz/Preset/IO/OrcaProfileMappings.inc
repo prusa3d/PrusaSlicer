@@ -152,6 +152,8 @@ static const std::map<std::string, std::string> key_map{
     {"filament_retract_restart_extra", "retract_restart_extra"},
     {"filament_retract_length_toolchange", "retract_length_toolchange"},
     {"filament_wipe", "wipe"},
+    {"filament_wipe_distance", "wipe_distance"},
+    {"filament_retract_after_wipe", "retract_after_wipe"},
     {"filament_z_hop", "retract_lift"},
     {"slow_down_for_layer_cooling", "cooling"},
     {"slow_down_min_speed", "min_print_speed"},

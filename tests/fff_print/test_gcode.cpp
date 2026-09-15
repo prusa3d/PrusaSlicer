@@ -63,6 +63,62 @@ TEST_CASE("Imported small perimeter speeds use outer wall percentages", "[GCode]
     }
 }
 
+TEST_CASE("Imported wipe distance speed and retraction budgets", "[GCode][Orca]") {
+    struct Case { double distance; bool role_speed; double before; double after; bool volumetric; };
+    for (const auto test : {Case{2., true, 0., 0., false}, Case{2., false, 0., 0., false},
+             Case{0., true, 0., 0., false}, Case{2., true, 100., 0., false},
+             Case{2., true, 0., 100., false}, Case{2., false, 25., 25., true}}) {
+        TestConfig config;
+        config.print.items.opt("orca_wipe_compatibility").set(true);
+        config.print.items.opt("wipe").set(true);
+        config.print.items.opt("wipe_distance").set(test.distance);
+        config.print.items.opt("role_based_wipe_speed").set(test.role_speed);
+        config.print.items.opt("wipe_speed").set(FloatOrPercentage{Percentage{50.}});
+        config.print.items.opt("travel_speed").set(200.);
+        config.print.items.opt("retract_speed").set(20.);
+        config.print.items.opt("retract_length").set(0.8);
+        config.print.items.opt("retract_before_wipe").set(Percentage{test.before});
+        config.print.items.opt("retract_after_wipe").set(Percentage{test.after});
+        config.print.items.opt("enable_dynamic_overhang_speeds").set(false);
+        config.print.items.opt("gcode_comments").set(true);
+        config.filament[0].items.opt("slowdown_below_layer_time").set(0);
+        config.filament[0].items.opt("filament_max_volumetric_speed").set(0.);
+        config.printer.items.opt("use_volumetric_e").set(test.volumetric);
+        const double diameter = config.filament[0].items.opt("filament_diameter").get<double>();
+        const double area = test.volumetric ? diameter * diameter * PI / 4. : 1.;
+        unsigned wipes = 0;
+        bool in_wipe = false;
+        double distance = 0., retracted = 0., seconds = 0., last_print_f = 0., expected_f = 0.;
+        GCodeReader parser;
+        parser.parse_buffer(Slic3r::Test::slice({TestMesh::cube_20x20x20}, config),
+            [&](GCodeReader& self, const GCodeReader::GCodeLine& line) {
+                if (line.raw() == ";WIPE_START") {
+                    in_wipe = true;
+                    distance = retracted = seconds = 0.;
+                    expected_f = test.role_speed ? std::max(600., last_print_f) : 6000.;
+                } else if (line.raw() == ";WIPE_END") {
+                    CAPTURE(test.distance, test.role_speed, test.before, test.after, test.volumetric);
+                    CHECK(distance > 0.);
+                    CHECK(distance <= test.distance + 0.002);
+                    CHECK(retracted >= -0.00001);
+                    CHECK(retracted / area <= 0.8 * std::max(0., 1. - (test.before + test.after) / 100.) + 0.0002);
+                    CHECK(retracted / area <= 20. * seconds + 0.0002);
+                    ++wipes;
+                    in_wipe = false;
+                } else if (in_wipe && line.cmd_is("G1") && line.dist_XY(self) > 0.) {
+                    CHECK(line.new_F(self) == Approx(expected_f).margin(0.02));
+                    distance += line.dist_XY(self);
+                    retracted -= line.dist_E(self);
+                    seconds += 60. * line.dist_XY(self) / line.new_F(self);
+                } else if (!in_wipe && line.extruding(self) && line.dist_XY(self) > 0.) {
+                    last_print_f = line.new_F(self);
+                }
+            });
+        if (test.distance == 0.) REQUIRE(wipes == 0);
+        else REQUIRE(wipes > 0);
+    }
+}
+
 TEST_CASE("Origin manipulation", "[GCode]") {
     Print print;
     TestConfig test_config;

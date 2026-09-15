@@ -4063,7 +4063,8 @@ std::string GCodeGenerator::retract_and_wipe(
 
     // wipe (if it's enabled for this extruder and we have a stored wipe path)
     if (m_wipe_enabled.at(m_writer.extruder()->id()) && m_wipe.has_path()) {
-        gcode += toolchange ? m_writer.retract_for_toolchange(true) : m_writer.retract(true);
+        if (!m_wipe.uses_orca_rules())
+            gcode += toolchange ? m_writer.retract_for_toolchange(true) : m_writer.retract(true);
         gcode += m_wipe.wipe(*this, retract_speed, travel_speed, toolchange);
     }
 

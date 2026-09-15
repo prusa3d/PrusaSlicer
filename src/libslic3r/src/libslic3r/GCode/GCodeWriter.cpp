@@ -317,6 +317,7 @@ std::string GCodeWriter::set_speed(double F, const std::string_view comment, con
 {
     assert(F > 0.);
     assert(F < 100000.);
+    m_current_speed = F;
 
     GCodeG1Formatter w;
     w.emit_f(F);
@@ -512,6 +513,12 @@ std::string GCodeWriter::retract_for_toolchange(bool before_wipe)
         m_extruder->retract_restart_extra_toolchange(),
         "retract for toolchange"
     );
+}
+
+std::string GCodeWriter::retract_to_length(double length, bool toolchange)
+{
+    return _retract(length, toolchange ? m_extruder->retract_restart_extra_toolchange() : m_extruder->retract_restart_extra(),
+        toolchange ? "retract for toolchange" : "retract");
 }
 
 std::string GCodeWriter::_retract(double length, double restart_extra, const std::string_view comment)

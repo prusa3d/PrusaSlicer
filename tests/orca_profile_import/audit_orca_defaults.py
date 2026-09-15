@@ -73,7 +73,7 @@ def main():
                             engine.append({'key': source_key, 'kind': kind, 'value': defaults['defaults'][kind][source_key]})
             if inputs and explicit: origin = 'explicit_source' if len(explicit)==1 else 'multiple_explicit_sources_review_precedence'
             elif inputs and engine: origin = 'orca_engine_default'
-            elif inputs and key in ('orca_perimeter_speed_compatibility', 'retract_before_perimeters', 'orca_fixed_prime_volume'):
+            elif inputs and key in ('orca_perimeter_speed_compatibility', 'retract_before_perimeters', 'orca_fixed_prime_volume', 'orca_wipe_compatibility'):
                 origin = 'importer_semantic_adapter'
             elif inputs and key in ('custom_parameters_printer', 'custom_parameters_filament', 'default_tool_print'):
                 origin = 'importer_generated'

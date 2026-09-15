@@ -25,6 +25,11 @@ O::Schema schema()
             {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
             {"prime_volume", {{"type", "float"}}},
             {"orca_fixed_prime_volume", {{"type", "bool"}}},
+            {"orca_wipe_compatibility", {{"type", "bool"}}},
+            {"role_based_wipe_speed", {{"type", "bool"}}},
+            {"wipe_speed", {{"type", "float_or_percent"}}},
+            {"wipe_distance", {{"type", "float"}}},
+            {"retract_after_wipe", {{"type", "percent"}}},
             {"small_perimeter_threshold", {{"type", "float"}}},
             {"small_perimeter_speed", {{"type", "float_or_percent"}}},
             {"perimeter_speed", {{"type", "float"}}},
@@ -46,6 +51,7 @@ O::Schema schema()
             {"default_tool_print", {{"type", "string"}}}, {"default_material", {{"type", "string"}}}}},
         {"tool_print", Json::object()},
         {"filament", {{"temperature", {{"type", "int"}}}, {"extrusion_multiplier", {{"type", "float"}}},
+            {"wipe_distance", {{"type", "float"}}}, {"retract_after_wipe", {{"type", "percent"}}},
             {"idle_temperature", {{"type", "optional_int"}}}}}
     };
 }
@@ -147,6 +153,23 @@ int main(int argc, char** argv)
             "missing preheat settings use Orca defaults");
         const auto filament_path = root / "Example/filament/pla.json";
         const auto original_filament = Json::parse(std::ifstream(filament_path));
+        check(v.presets[1]["values"].at("orca_wipe_compatibility") == true
+            && v.presets[1]["values"].at("role_based_wipe_speed") == true
+            && v.presets[1]["values"].at("wipe_speed") == "80%",
+            "Orca wipe policy and process speed defaults are imported");
+        check(v.presets[1]["variants"][0]["values"].at("wipe_distance") == 1.,
+            "machine wipe distance supplies the captured one-millimetre default");
+        for (double distance : {0., 1.5}) {
+            auto fixture = original_filament;
+            fixture["filament_wipe_distance"] = Json::array({std::to_string(distance)});
+            fixture["filament_retract_after_wipe"] = Json::array({"25%"});
+            write(filament_path, fixture);
+            const auto converted = O::convert(root, schema());
+            check(converted[0].presets.back()["values"].at("wipe_distance") == distance
+                && converted[0].presets.back()["values"].at("retract_after_wipe") == "25%",
+                "filament wipe overrides preserve explicit zero and after-wipe percentage");
+        }
+        write(filament_path, original_filament);
         for (const auto& idle : {Json("0"), Json(0), Json("170"), Json("nil"), Json(nullptr)}) {
             auto fixture = original_filament;
             fixture["idle_temperature"] = Json::array({idle});

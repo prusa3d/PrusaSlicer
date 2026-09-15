@@ -3261,6 +3261,62 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->units = {L("%")};
     def->init_fn = init_with(Percentage{0.});
 
+    def = defs.add("orca_wipe_compatibility", typeid(bool));
+    def->location = Print;
+    def->label = L("Use Orca wipe rules");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use a configured wipe distance and distribute retraction before, during and after wiping. Enabled for imported Orca profiles.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("role_based_wipe_speed", typeid(bool));
+    def->location = Print;
+    def->label = L("Use extrusion speed for wiping");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("With Orca wipe rules enabled, use the preceding extrusion speed for the wipe, with a minimum of 10 mm/s.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("wipe_speed", typeid(FloatOrPercentage));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool };
+    def->label = L("Wipe speed");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Wipe speed when Orca wipe rules are enabled and extrusion-based wiping speed is disabled. A percentage is relative to travel speed.");
+    def->ratio_over = "travel_speed";
+    def->units = {L("mm/s"), L("%")};
+    def->min = 0;
+    def->init_fn = init_with(FloatOrPercentage{Percentage{80.}});
+
+    def = defs.add("wipe_distance", typeid(double));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Filament };
+    def->label = L("Wipe distance");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Maximum distance to wipe with Orca wipe rules enabled. Zero disables wiping for this tool.");
+    def->units = {L("mm")};
+    def->min = 0;
+    def->init_fn = init_with(2.);
+
+    def = defs.add("retract_after_wipe", typeid(Percentage));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Filament };
+    def->label = L("Retract amount after wipe");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Retraction reserved until after the wipe when Orca wipe rules are enabled.");
+    def->units = {L("%")};
+    def->min = 0;
+    def->max = 100;
+    def->init_fn = init_with(Percentage{0.});
+
     def = defs.add("retract_layer_change", typeid(bool));
     def->location = Print;
     def->overrides_in = Locations{ Tool, Filament };
