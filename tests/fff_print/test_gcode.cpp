@@ -28,6 +28,41 @@ using Biz::GCodeReader::GCodeReader;
 
 constexpr bool debug_files = false;
 
+TEST_CASE("Imported small perimeter speeds use outer wall percentages", "[GCode][Orca]") {
+    for (const bool imported : {false, true}) {
+        for (const double threshold : {0., 100.}) {
+            TestConfig config;
+            config.print.items.opt("orca_perimeter_speed_compatibility").set(imported);
+            config.print.items.opt("small_perimeter_threshold").set(threshold);
+            config.print.items.opt("small_perimeter_speed").set(FloatOrPercentage{Percentage{50.}});
+            config.print.items.opt("perimeter_speed").set(100.);
+            config.print.items.opt("external_perimeter_speed").set(FloatOrPercentage{40.});
+            config.print.items.opt("enable_dynamic_overhang_speeds").set(false);
+            config.print.items.opt("gcode_comments").set(true);
+            config.filament[0].items.opt("slowdown_below_layer_time").set(0);
+            config.filament[0].items.opt("filament_max_volumetric_speed").set(0.);
+            // The cube's loops fit the positive threshold. Skip first-layer limits
+            // and inspect actual wall extrusion feedrates after postprocessing.
+            const double expected = threshold == 0. ? 40. : (imported ? 20. : 50.);
+            unsigned checked = 0;
+            bool external_perimeter = false;
+            GCodeReader parser;
+            parser.parse_buffer(Slic3r::Test::slice({TestMesh::cube_20x20x20}, config),
+                [&](GCodeReader& self, const GCodeReader::GCodeLine& line) {
+                    if (line.raw().starts_with(";TYPE:"))
+                        external_perimeter = line.raw() == ";TYPE:External perimeter";
+                    if (self.z() > 1. && line.extruding(self) && line.dist_XY(self) > 0.
+                        && external_perimeter) {
+                        CAPTURE(imported, threshold);
+                        CHECK(line.new_F(self) / 60. == Approx(expected).margin(0.02));
+                        ++checked;
+                    }
+                });
+            REQUIRE(checked > 0);
+        }
+    }
+}
+
 TEST_CASE("Origin manipulation", "[GCode]") {
     Print print;
     TestConfig test_config;
