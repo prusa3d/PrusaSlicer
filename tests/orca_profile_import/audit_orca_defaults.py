@@ -38,13 +38,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('snapshots', type=Path)
     parser.add_argument('--orca-profiles', type=Path, required=True)
+    parser.add_argument('--vendor', default='Snapmaker', help='Orca vendor manifest ID (default: Snapmaker)')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     base = Path(__file__).resolve().parents[2] / 'src/slic3r-shared/src/Slic3r/Biz/Preset/IO'
     aliases = dict(re.findall(r'\{"([^"]+)",\s*"([^"]+)"\}', (base/'OrcaProfileMappings.inc').read_text().split('static const std::set')[0]))
     defaults = read_default_snapshot(base/'OrcaProfileDefaults.inc')
     index = profile_index(args.orca_profiles, 'OrcaFilamentLibrary') if (args.orca_profiles/'OrcaFilamentLibrary.json').exists() else {}
-    index.update(profile_index(args.orca_profiles, 'Snapmaker'))
+    index.update(profile_index(args.orca_profiles, args.vendor))
     snapshots = json.loads(args.snapshots.read_text())
     report = {'engine_default_evidence': defaults['evidence'], 'snapshots': {}}
     md = ['# Imported Orca default audit', '',
@@ -72,7 +73,7 @@ def main():
                             engine.append({'key': source_key, 'kind': kind, 'value': defaults['defaults'][kind][source_key]})
             if inputs and explicit: origin = 'explicit_source' if len(explicit)==1 else 'multiple_explicit_sources_review_precedence'
             elif inputs and engine: origin = 'orca_engine_default'
-            elif inputs and key in ('orca_perimeter_speed_compatibility', 'retract_before_perimeters'):
+            elif inputs and key in ('orca_perimeter_speed_compatibility', 'retract_before_perimeters', 'orca_fixed_prime_volume'):
                 origin = 'importer_semantic_adapter'
             elif inputs and key in ('custom_parameters_printer', 'custom_parameters_filament', 'default_tool_print'):
                 origin = 'importer_generated'
