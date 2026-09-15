@@ -185,7 +185,21 @@ void load_orca_profiles(const BundlePaths& paths, D::Preset::Bundle& bundle, boo
                             }
                         }
                         PresetLoader loader;
-                        for (const auto& preset : source.presets) loader.load_from_string(preset.dump());
+                        for (const auto& preset : source.presets) {
+                            if (preset.value("kind", "") == "print") {
+                                const auto log_preheat = [&](const Orca::Json& values, const std::string& condition) {
+                                    SPDLOG_INFO("Orca preheat import: vendor={}, preset={}, cached={}, condition={}, preheat_time={}, preheat_steps={}",
+                                        source.id, preset.value("name", ""), source.cache_hit, condition,
+                                        values.contains("preheat_time") ? values.at("preheat_time").dump() : "<absent>",
+                                        values.contains("preheat_steps") ? values.at("preheat_steps").dump() : "<absent>");
+                                };
+                                log_preheat(preset.at("values"), "base");
+                                if (preset.contains("variants"))
+                                    for (const auto& variant : preset.at("variants"))
+                                        log_preheat(variant.at("values"), variant.value("condition", ""));
+                            }
+                            loader.load_from_string(preset.dump());
+                        }
                         const auto user_dir = paths.user_preset_dir_path(source.id, source.id);
                         if (!paths.user_bundle_path.empty() && fs::is_directory(user_dir)) {
                             try { loader.load_dir(user_dir.string(), D::Preset::PresetOrigin::User); }
