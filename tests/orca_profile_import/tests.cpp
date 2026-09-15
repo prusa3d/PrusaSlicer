@@ -22,6 +22,7 @@ O::Schema schema()
             {"before_layer_gcode", {{"type", "string"}}}, {"thumbnails", {{"type", "string"}}},
             {"use_relative_e_distances", {{"type", "bool"}}}, {"max_print_height", {{"type", "float"}}}}},
         {"print", {{"perimeters", {{"type", "int"}}}, {"retract_length", {{"type", "float"}}},
+            {"support_material_style", {{"type", "enum"}, {"values", {"grid", "snug", "organic"}}}},
             {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
             {"prime_volume", {{"type", "float"}}},
             {"orca_fixed_prime_volume", {{"type", "bool"}}},
@@ -192,6 +193,24 @@ int main(int argc, char** argv)
         write(filament_path, original_filament);
         const auto process_path = root / "Example/process/normal.json";
         const auto original_process = Json::parse(std::ifstream(process_path));
+        for (bool array : {false, true}) {
+            for (const auto* type : {"normal(auto)", "normal(manual)", "tree(auto)", "tree(manual)"}) {
+                for (const auto* style : {"default", "snug", "grid", "organic", "tree_hybrid"}) {
+                    if (!std::string(type).starts_with("tree")
+                        && (std::string(style) == "organic" || std::string(style) == "tree_hybrid")) continue;
+                    auto fixture = original_process;
+                    fixture["support_type"] = array ? Json::array({type}) : Json(type);
+                    fixture["support_style"] = array ? Json::array({style}) : Json(style);
+                    write(process_path, fixture);
+                    const auto converted = O::convert(root, schema());
+                    const auto expected = std::string(type).starts_with("tree") ? "organic"
+                        : std::string(style) == "default" ? "grid" : style;
+                    check(converted[0].presets[1]["values"].at("support_material_style") == expected,
+                        "support type does not overwrite the selected normal style; tree defaults to organic");
+                }
+            }
+        }
+        write(process_path, original_process);
         check(v.presets[1]["values"].at("prime_volume") == 45.0, "prime volume uses the captured Orca default");
         check(v.presets[1]["values"].at("wipe_tower_max_purge_speed") == 90.,
             "tower speed limit uses the captured source default");

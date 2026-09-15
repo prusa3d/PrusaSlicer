@@ -488,6 +488,8 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
     for (auto it = flat.begin(); it != flat.end(); ++it) {
         const auto& src = it.key();
         if (metadata.contains(src) || src.starts_with("__")) continue;
+        // Resolve these together below, independently of JSON key order.
+        if (src == "support_style" || src == "support_type") continue;
         if (src == "post_process") {
             if (!it.value().empty()) issue(vendor, flat.value("name", ""), src, "Imported external post-processing commands are not enabled automatically");
             continue;
@@ -497,7 +499,6 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
         // under another accepted name. Do not depend on alphabetical key order.
         if (!explicit_values.contains(src) && explicit_targets.contains(key)) continue;
         Json v = it.value();
-        if (src == "support_style" || src == "support_type") key = "support_material_style";
         if (!schema.contains(key)) continue; // Report unknowns once, across all kinds.
         if (unspecified(v)) continue;
         try {
@@ -586,11 +587,7 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
                 issue(vendor, flat.value("name", ""), src, "Crosshatch is approximated with grid infill");
             }
             else if (src == "print_sequence") v = text(v) == "by object";
-            else if (src == "support_type") v = text(v).find("tree") != std::string::npos ? "organic" : "grid";
-            else if (src == "support_style") {
-                auto s = text(v);
-                v = s.starts_with("tree") ? "organic" : s == "default" ? "grid" : s;
-            } else if (src == "top_surface_pattern" || src == "bottom_surface_pattern") {
+            else if (src == "top_surface_pattern" || src == "bottom_surface_pattern") {
                 if (v == "monotonicline") v = "monotoniclines";
             } else if (src == "support_base_pattern") {
                 if (v == "default") v = "rectilinear";
@@ -634,6 +631,33 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
                 result["first_layer_solid_infill_speed"] = coerce(v, schema.at("first_layer_solid_infill_speed"));
         } catch (const std::exception& e) {
             issue(vendor, flat.value("name", ""), src, e.what());
+        }
+    }
+    if (kind == "process" && schema.contains("support_material_style")
+        && !explicit_values.contains("support_material_style")) {
+        try {
+            const auto scalar = [](const Json& value) {
+                return coerce(value, {{"type", "string"}}).get<std::string>();
+            };
+            const auto type = scalar(flat.at("support_type"));
+            const auto style = scalar(flat.at("support_style"));
+            if (type != "normal(auto)" && type != "normal(manual)"
+                && type != "tree(auto)" && type != "tree(manual)")
+                throw std::runtime_error("Unsupported support type: " + type);
+            std::string converted;
+            if (type.starts_with("tree")) {
+                converted = "organic"; // Orca's default tree style is organic.
+                if (style != "default" && style != "organic")
+                    issue(vendor, flat.value("name", ""), "support_style",
+                        "Source tree support style " + style + " is approximated with organic supports");
+            } else {
+                if (style != "default" && style != "grid" && style != "snug")
+                    throw std::runtime_error("Unsupported normal support style: " + style);
+                converted = style == "default" ? "grid" : style;
+            }
+            result["support_material_style"] = coerce(converted, schema.at("support_material_style"));
+        } catch (const std::exception& e) {
+            issue(vendor, flat.value("name", ""), "support_style", e.what());
         }
     }
     // Orca's print_machine_envelope ignores the emission switch for Klipper.
@@ -872,7 +896,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 12}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 13}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {
