@@ -7,6 +7,33 @@ import re
 from compare_prusa_sources import absent, compact, flatten, profile_index, read_default_snapshot
 
 
+def unmapped_source_fields(sources, defaults, effective_keys, aliases):
+    """Retain explicit-only fields as well as omitted engine defaults.
+
+    Absence of a direct PS3 key does not prove absence of an adapter. These rows
+    are review candidates, with source/default evidence kept separate.
+    """
+    result = {}
+    for kind, fields in sources.items():
+        rows = {}
+        for key in sorted(fields.keys() | defaults[kind].keys()):
+            if aliases.get(key, key) in effective_keys:
+                continue
+            entry = fields.get(key)
+            explicit = entry is not None and not absent(entry['value'])
+            rows[key] = {
+                'origin': 'explicit_source' if explicit else (
+                    'orca_engine_default' if key in defaults[kind] else 'unset_source'),
+                'value': entry['value'] if explicit else defaults[kind].get(key),
+                'explicit_source': entry if explicit else None,
+                'nil_source': entry if entry is not None and not explicit else None,
+                'has_engine_default': key in defaults[kind],
+                'engine_default': defaults[kind].get(key),
+            }
+        result[kind] = rows
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('snapshots', type=Path)
@@ -58,7 +85,9 @@ def main():
         unsupported = {}
         for kind in ('machine','process','filament'):
             unsupported[kind] = {k:v for k,v in defaults['defaults'][kind].items() if aliases.get(k,k) not in fields}
-        report['snapshots'][name] = {'fields':fields,'engine_fields_without_direct_ps3_key':unsupported}
+        unmapped = unmapped_source_fields(sources, defaults['defaults'], fields, aliases)
+        report['snapshots'][name] = {'fields':fields,'engine_fields_without_direct_ps3_key':unsupported,
+                                   'source_fields_without_direct_ps3_key': unmapped}
         counts = Counter(v['origin'] for v in fields.values())
         md += [f'## {name}', '', ', '.join(f'{k}: {v}' for k,v in sorted(counts.items())), '',
                '| PS3 field | Effective | Origin | Explicit source / Orca default |', '|---|---|---|---|']
@@ -66,6 +95,17 @@ def main():
             evidence = ['explicit '+x['key']+'='+compact(x['value']) for x in row['explicit_sources']]
             evidence += ['default '+x['key']+'='+compact(x['value']) for x in row['orca_engine_defaults']]
             md.append(f"| {key} | {compact(row['effective'])} | {row['origin']} | {'; '.join(evidence)} |")
+        md += ['', '### Source fields without a direct PS3 key', '',
+               'Review candidates, not a declaration that every field is unsupported. '
+               'Metadata, custom G-code parameters and semantic adapters can also appear here. '
+               'Explicit-only fields are included even when the engine snapshot omits them.', '',
+               '| Source kind | Field | Value | Origin | Source profile |',
+               '|---|---|---|---|---|']
+        for kind, rows in unmapped.items():
+            for key, row in rows.items():
+                evidence = row['explicit_source'] or row['nil_source'] or {}
+                md.append(f"| {kind} | {key} | {compact(row['value'])} | {row['origin']} | "
+                          f"{compact(evidence.get('profile', ''))} |")
     args.output.write_text(json.dumps(report, indent=2))
     args.output.with_suffix('.md').write_text('\n'.join(md)+'\n', encoding='utf-8')
     print('Audit written to', args.output)
