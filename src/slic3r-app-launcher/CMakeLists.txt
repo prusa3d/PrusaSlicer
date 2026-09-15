@@ -77,6 +77,7 @@ if (MSVC)
 endif ()
 
 slic3r_link_resources(slic3r-app-launcher ${SLIC3R_RESOURCES_DIR})
+add_dependencies(slic3r-app-launcher orca_profiles)
 slic3r_app_extract_symbols(slic3r-app-launcher)
 
 if (WIN32)

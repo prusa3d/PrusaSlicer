@@ -90,6 +90,7 @@ if (SLIC3R_STATIC)
     set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
 endif ()
 set(SLIC3R_RESOURCES_DIR ${CMAKE_SOURCE_DIR}/resources)
+include(cmake/modules/OrcaProfiles.cmake)
 
 include("version.inc")
 include(GNUInstallDirs)
