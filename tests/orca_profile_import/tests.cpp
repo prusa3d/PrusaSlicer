@@ -23,6 +23,11 @@ O::Schema schema()
             {"use_relative_e_distances", {{"type", "bool"}}}, {"max_print_height", {{"type", "float"}}}}},
         {"print", {{"perimeters", {{"type", "int"}}}, {"retract_length", {{"type", "float"}}},
             {"support_material_style", {{"type", "enum"}, {"values", {"grid", "snug", "organic"}}}},
+            {"complete_objects", {{"type", "bool"}}},
+            {"ironing", {{"type", "bool"}}},
+            {"ironing_type", {{"type", "enum"}, {"values", {"top", "topmost", "solid"}}}},
+            {"fuzzy_skin", {{"type", "enum"}, {"values", {"none", "external", "all"}}}},
+            {"top_fill_pattern", {{"type", "enum"}, {"values", {"monotoniclines", "monotonic"}}}},
             {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
             {"prime_volume", {{"type", "float"}}},
             {"orca_fixed_prime_volume", {{"type", "bool"}}},
@@ -193,6 +198,36 @@ int main(int argc, char** argv)
         write(filament_path, original_filament);
         const auto process_path = root / "Example/process/normal.json";
         const auto original_process = Json::parse(std::ifstream(process_path));
+        for (bool array : {false, true}) {
+            auto fixture = original_process;
+            const Json semantic_values{{"print_sequence", "by object"},
+                     {"ironing_type", "no ironing"}, {"fuzzy_skin", "disabled_fuzzy"},
+                     {"top_surface_pattern", "monotonicline"}, {"sparse_infill_pattern", "crosshatch"}};
+            for (const auto& [key, value] : semantic_values.items())
+                fixture[key] = array ? Json::array({value}) : value;
+            write(process_path, fixture);
+            const auto converted = O::convert(root, schema());
+            const auto& settings = converted[0].presets[1]["values"];
+            check(settings.at("complete_objects") == true && settings.at("ironing") == false
+                && settings.at("fuzzy_skin") == "none" && settings.at("top_fill_pattern") == "monotoniclines"
+                && settings.at("fill_pattern") == "grid",
+                "scalar and singleton-array options receive the same semantic conversion");
+            fixture["ironing_type"] = array ? Json::array({"top surfaces"}) : Json("top surfaces");
+            write(process_path, fixture);
+            const auto ironed = O::convert(root, schema());
+            check(ironed[0].presets[1]["values"].at("ironing") == true
+                && ironed[0].presets[1]["values"].at("ironing_type") == "top",
+                "singleton-array ironing retains enabled mode and surface selection");
+        }
+        {
+            auto fixture = original_process;
+            fixture["print_sequence"] = Json::array({"by object", "by layer"});
+            write(process_path, fixture);
+            const auto converted = O::convert(root, schema());
+            check(!converted[0].presets[1]["values"].contains("complete_objects"),
+                "unequal scalar arrays are diagnosed instead of silently selecting by-layer printing");
+        }
+        write(process_path, original_process);
         for (bool array : {false, true}) {
             for (const auto* type : {"normal(auto)", "normal(manual)", "tree(auto)", "tree(manual)"}) {
                 for (const auto* style : {"default", "snug", "grid", "organic", "tree_hybrid"}) {
@@ -399,7 +434,7 @@ int main(int argc, char** argv)
         check(speeds["fill_pattern"] == "grid", "crosshatch gets an explicit grid approximation");
         write(root / "Example/machine/printer.json", {{"type", "machine"}, {"name", "Printer"}, {"instantiation", "true"},
             {"inherits", "Base"}, {"printer_notes", "first line\nPRINTER_MODEL_TEST\nlast line"},
-            {"thumbnails", {"48x48", "300x300"}}, {"before_layer_change_gcode", "G92 E0.0\n"}});
+            {"thumbnails", {"48x48", "300x300"}}, {"thumbnails_format", {"PNG"}}, {"before_layer_change_gcode", "G92 E0.0\n"}});
         vendors = O::convert(root, schema());
         check(vendors.front().presets[0]["values"]["layer_gcode"] == "", "existing before-layer reset is not duplicated");
         check(vendors.front().presets[0]["values"]["thumbnails"] == "48x48/PNG, 300x300/PNG", "thumbnail arrays are formatted lists, not per-tool values");

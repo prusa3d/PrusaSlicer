@@ -502,6 +502,12 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
         if (!schema.contains(key)) continue; // Report unknowns once, across all kinds.
         if (unspecified(v)) continue;
         try {
+            // Orca JSON accepts scalar options wrapped in a singleton array.
+            // Unwrap before enum/sequence semantic translation, not after it.
+            // Do not collapse actual vector options or select unequal values.
+            if (v.is_array() && !schema.at(key).value("vector", false)
+                && (schema.at(key).value("type", "") == "enum" || src == "print_sequence"))
+                v = coerce(v, {{"type", "string"}});
             const auto map_elements = [](Json value, const auto& fn) -> Json {
                 if (value.is_array()) for (auto& element : value) element = fn(element);
                 else value = fn(value);
@@ -539,7 +545,8 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
             else if (src == "thumbnails") {
                 // A bare single "48x48" is a point in the PS3 YAML schema.
                 // Include the image format to preserve its string type.
-                const auto format = flat.value("thumbnails_format", "PNG");
+                const auto format = coerce(flat.value("thumbnails_format", Json("PNG")),
+                    {{"type", "string"}}).get<std::string>();
                 auto thumbnails = v.is_array() ? v : Json::array({v});
                 std::string joined;
                 for (const auto& thumbnail : thumbnails) {
@@ -586,7 +593,11 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
                 v = "grid";
                 issue(vendor, flat.value("name", ""), src, "Crosshatch is approximated with grid infill");
             }
-            else if (src == "print_sequence") v = text(v) == "by object";
+            else if (src == "print_sequence") {
+                if (v != "by object" && v != "by layer")
+                    throw std::runtime_error("Unsupported print sequence: " + text(v));
+                v = v == "by object";
+            }
             else if (src == "top_surface_pattern" || src == "bottom_surface_pattern") {
                 if (v == "monotonicline") v = "monotoniclines";
             } else if (src == "support_base_pattern") {
@@ -896,7 +907,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 13}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 14}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {
