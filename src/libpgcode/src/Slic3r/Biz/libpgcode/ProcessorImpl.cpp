@@ -1669,6 +1669,12 @@ void ProcessorImpl::process_M566(const GCodeReader::GCodeLine& line)
 void ProcessorImpl::process_M702(const GCodeReader::GCodeLine& line)
 {
     if (line.has('C')) {
+        if (m_config.orca_toolchange_timing) {
+            simulate_st_synchronize(static_cast<float>(m_toolchange_timing.unload(
+                m_config.single_extruder_multi_material, m_config.orca_filament_unload_time)));
+            m_time_processor.extruder_unloaded = true;
+            return;
+        }
         // MK3 MMU2 specific M code:
         // // M702 C is expected to be sent by the custom end G-code when finalizing a print.
         // // The MK3 unit shall unload and park the active filament into the MMU2 unit.
@@ -1753,7 +1759,8 @@ void ProcessorImpl::process_T(const std::string_view command)
         }
         else {
             uint8_t id = uint8_t(eid);
-            if (m_extruder_id != id) {
+            if (m_extruder_id != id || (m_config.orca_toolchange_timing
+                && m_toolchange_timing.needs_selection(id, m_config.single_extruder_multi_material))) {
                 if (((m_config.producer == GCodeProducer::PrusaSlicer || m_config.producer == GCodeProducer::Slic3rPE || m_config.producer == GCodeProducer::Slic3r) && id >= m_result.extruders_count) ||
                     ((m_config.producer != GCodeProducer::PrusaSlicer && m_config.producer != GCodeProducer::Slic3rPE && m_config.producer != GCodeProducer::Slic3r) && id >= m_result.extruder_str_colors.size())) {
                     if (m_cb_log != nullptr)
@@ -1767,7 +1774,11 @@ void ProcessorImpl::process_T(const std::string_view command)
                     // Specific to the MK3 MMU2:
                     // The initial value of extruder_unloaded is set to true indicating
                     // that the filament is parked in the MMU2 unit and there is nothing to be unloaded yet.
-                    float extra_time = m_time_processor.tool_change_time;
+                    float extra_time = m_config.orca_toolchange_timing
+                        ? static_cast<float>(m_toolchange_timing.select(id, m_config.single_extruder_multi_material,
+                            m_config.orca_filament_load_time, m_config.orca_filament_unload_time,
+                            m_time_processor.tool_change_time))
+                        : m_time_processor.tool_change_time;
                     m_time_processor.extruder_unloaded = false;
                     if (m_config.producer == GCodeProducer::KISSlicer && m_config.flavor == GCodeFlavor::gcfMarlinLegacy)
                         extra_time += m_config.kisslicer_toolchange_time_correction;
@@ -2580,6 +2591,7 @@ void ProcessorImpl::set_extrusion_role(GCodeExtrusionRole role)
 
 void ProcessorImpl::reset()
 {
+    m_toolchange_timing = {};
     m_extruder_id = 0;
     m_wiping = false;
     m_flushing = false;
@@ -2684,6 +2696,16 @@ void ProcessorImpl::calculate_time(size_t keep_last_n_blocks, float additional_t
     for (size_t i = 0; i < TIME_MODES_COUNT; ++i) {
         TimeMachine& machine = m_time_processor.machines[i];
         const TimeMode mode = TimeMode(i);
+        // The motion planner returns early with fewer than two queued moves.
+        // Loading before the first move and unloading after the final move
+        // still take time. Preserve the native accounting unless opted in.
+        if (m_config.orca_toolchange_timing && machine.enabled
+            && machine.blocks.size() < 2 && additional_time > 0.f) {
+            machine.time += additional_time;
+            machine.gcode_time.cache += additional_time;
+            if (m_layer_id <= 1) machine.first_layer_time += additional_time;
+            if (!moves.empty()) moves.back().time[i] += additional_time;
+        }
         machine.calculate_time(m_result, mode, keep_last_n_blocks, additional_time);
         if (mode == TimeMode::Normal)
             actual_speed_moves = std::move(machine.actual_speed_moves);

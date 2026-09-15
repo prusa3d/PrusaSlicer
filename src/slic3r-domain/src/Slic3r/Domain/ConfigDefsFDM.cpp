@@ -4826,6 +4826,28 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("Use the imported Orca process prime volume on each tool change, without allocating it to infill. The filament minimum remains a separate limit.");
     def->init_fn = init_with(false);
 
+    def = defs.add("orca_toolchange_timing", typeid(bool));
+    def->location = Print;
+    def->label = L("Separate filament and tool timing");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Estimate initial loading, filament swaps, physical tool changes and final unloading separately for imported Orca profiles.");
+    def->init_fn = init_with(false);
+
+    for (const auto* key : {"orca_filament_load_time", "orca_filament_unload_time"}) {
+        def = defs.add(key, typeid(double));
+        def->location = Print;
+        def->label = std::string_view(key) == "orca_filament_load_time" ? L("Filament loading time") : L("Filament unloading time");
+        def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+        def->category = ConfigItemDef::Category::Print_MultiMaterial;
+        def->gui_type = ConfigItemDef::GUIType::textfield;
+        def->tooltip = L("Additional time for this operation when separate filament and tool timing is enabled.");
+        def->units = {L("s")};
+        def->min = 0;
+        def->init_fn = init_with(0.);
+    }
+
     def = defs.add("orca_matrix_flush", typeid(bool));
     def->location = Print;
     def->label = L("Use Orca matrix flushing");

@@ -28,6 +28,9 @@ O::Schema schema()
             {"orca_matrix_flush", {{"type", "bool"}}},
             {"orca_matrix_flush_multiplier", {{"type", "float"}}},
             {"wipe_tower_max_purge_speed", {{"type", "float"}}},
+            {"orca_toolchange_timing", {{"type", "bool"}}},
+            {"orca_filament_load_time", {{"type", "float"}}},
+            {"orca_filament_unload_time", {{"type", "float"}}},
             {"orca_wipe_compatibility", {{"type", "bool"}}},
             {"role_based_wipe_speed", {{"type", "bool"}}},
             {"wipe_speed", {{"type", "float_or_percent"}}},
@@ -213,6 +216,17 @@ int main(int argc, char** argv)
         write(process_path, original_process);
         const auto machine_path = root / "Example/machine/printer.json";
         const auto original_machine = Json::parse(std::ifstream(machine_path));
+        {
+            auto fixture = original_machine;
+            fixture["machine_load_filament_time"] = "10.9";
+            fixture["machine_unload_filament_time"] = "8.9";
+            write(machine_path, fixture);
+            const auto converted = O::convert(root, schema());
+            const auto& values = converted[0].presets[1]["variants"][0]["values"];
+            check(values.at("orca_toolchange_timing") == true && values.at("orca_filament_load_time") == 10.9
+                && values.at("orca_filament_unload_time") == 8.9,
+                "machine variants retain distinct explicit load and unload times");
+        }
         for (const auto* tower : {"type1", "type2"}) for (bool semm : {false, true}) for (bool purge : {false, true}) {
             auto fixture = original_machine;
             fixture["wipe_tower_type"] = Json::array({tower});

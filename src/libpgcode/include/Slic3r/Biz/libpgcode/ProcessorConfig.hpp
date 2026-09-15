@@ -96,6 +96,9 @@ struct ProcessorConfig
     float extra_loading_move{ 0.0f };
     float kisslicer_toolchange_time_correction{ 0.0f };
     float filament_change_time{ 0.0f };
+    bool orca_toolchange_timing{ false };
+    float orca_filament_load_time{ 0.0f };
+    float orca_filament_unload_time{ 0.0f };
     std::string color_change_gcode;
     std::string pause_print_gcode;
     std::string template_custom_gcode;

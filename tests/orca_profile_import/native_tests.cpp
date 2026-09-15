@@ -9,6 +9,7 @@
 #include "libslic3r/GCode/PostProcessor.hpp"
 #include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "libslic3r/GCode/WipeTower.hpp"
+#include "libslic3r/GCode/ProcessorConfig.hpp"
 #include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -40,6 +41,41 @@ static void check_config_controls()
                 && type != typeid(double) && type != typeid(D::Percentage))
                 throw std::runtime_error("Unsupported textbox type for " + std::string(def.name));
         }
+    }
+}
+
+static void check_toolchange_timing()
+{
+    namespace G = Slic3r::Biz::libpgcode;
+    const std::string code = "G90\nM83\nT0\nG1 X10 F60\nG4 P1\nT0\nG1 X20\nG4 P1\n"
+        "T1\nG1 X30\nG4 P1\nT0\nG1 X40\nG4 P1\nM702 C\nG1 X50\nG4 P1\n"
+        "M702 C\nG1 X60\nG4 P1\nT0\nG1 X70\nG4 P1\nG1 X80\n";
+    const auto estimate = [&](bool imported, bool semm, double load, double unload, double change) {
+        G::ProcessorConfig config;
+        config.producer = G::GCodeProducer::PrusaSlicer;
+        config.flavor = D::GCodeFlavor::gcfMarlinLegacy;
+        config.extruders.count = 2;
+        config.extruders.temps_config = {200, 200};
+        config.extruders.temps_first_layer_config = {200, 200};
+        config.single_extruder_multi_material = semm;
+        config.orca_toolchange_timing = imported;
+        config.orca_filament_load_time = static_cast<float>(load);
+        config.orca_filament_unload_time = static_cast<float>(unload);
+        config.filament_change_time = static_cast<float>(change);
+        G::Processor processor(std::move(config));
+        processor.process_buffer(std::string(code));
+        const auto result = processor.finalize();
+        return std::visit([](const auto& stats) { return stats.normal_mode_time.time; }, result.print_statistics);
+    };
+    for (bool semm : {false, true}) {
+        const double baseline = estimate(true, semm, 0., 0., 0.);
+        const double actual = estimate(true, semm, 10.9, 8.9, 5.) - baseline;
+        if (std::abs(actual - (semm ? 70.3 : 51.6)) >= 0.02)
+            std::cerr << "Timing delta semm=" << semm << " actual=" << actual << '\n';
+        require(std::abs(actual - (semm ? 70.3 : 51.6)) < 0.02,
+            "identical G-code charges initial load, real swaps and one final unload, retaining inactive MEMM loads");
+        require(estimate(false, semm, 10.9, 8.9, 5.) == estimate(false, semm, 0., 0., 5.),
+            "native estimator ignores separate imported load and unload values");
     }
 }
 
@@ -327,6 +363,8 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     legacy["print_settings"].erase("orca_matrix_flush");
     legacy["print_settings"].erase("orca_matrix_flush_multiplier");
     legacy["print_settings"].erase("wipe_tower_max_purge_speed");
+    for (const char* key : {"orca_toolchange_timing", "orca_filament_load_time", "orca_filament_unload_time"})
+        legacy["print_settings"].erase(key);
     for (const char* key : {"orca_wipe_compatibility", "role_based_wipe_speed", "wipe_speed", "wipe_distance", "retract_after_wipe"})
         legacy["print_settings"].erase(key);
     const auto old_loaded = Slic3r::Biz::Config::load(legacy, hw);
@@ -336,7 +374,10 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     require(old_loaded.value().issues.size() == 1, "older settings have no unrelated load issues");
     const auto& missing = std::get<Slic3r::Biz::Config::BoxIssues>(
         old_loaded.value().issues.at(D::FDMConfigLocation::Print));
-    require(missing.size() == 13
+    require(missing.size() == 16
+        && missing.at("orca_toolchange_timing").type == Slic3r::Biz::Config::NotFound
+        && missing.at("orca_filament_load_time").type == Slic3r::Biz::Config::NotFound
+        && missing.at("orca_filament_unload_time").type == Slic3r::Biz::Config::NotFound
         && missing.at("wipe_tower_max_purge_speed").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_matrix_flush").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_matrix_flush_multiplier").type == Slic3r::Biz::Config::NotFound
@@ -353,6 +394,7 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
         "older projects only report the absent additive settings");
     const auto& old_print = std::get<D::ConfigPackFDM>(old_loaded.value().config).print;
     require(!old_print.find("orca_fixed_prime_volume").item->value().get<bool>()
+        && !old_print.find("orca_toolchange_timing").item->value().get<bool>()
         && !old_print.find("orca_matrix_flush").item->value().get<bool>()
         && old_print.find("orca_matrix_flush_multiplier").item->value().get<double>() == 1.
         && !old_print.find("orca_wipe_compatibility").item->value().get<bool>()
@@ -377,6 +419,47 @@ int main(int argc, char** argv)
 {
     const auto root = fs::temp_directory_path() / ("ps-orca-native-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     try {
+        if (argc == 6 && std::string_view(argv[1]) == "--estimate-gcode") {
+            std::ifstream input(argv[4], std::ios::binary);
+            if (!input) throw std::runtime_error("Cannot open input G-code");
+            std::string gcode{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+            namespace G = Slic3r::Biz::libpgcode;
+            D::Preset::Bundle bundle;
+            P::IO::BundlePaths paths;
+            paths.app_bundle_path = argv[2];
+            P::IO::load_orca_profiles(paths, bundle);
+            const Json descriptor = Json::parse(std::ifstream(argv[3]));
+            const auto& vendor = bundle.vendor_bundles.at(descriptor.at("vendor").get<std::string>());
+            const auto& templates = vendor.vendor_data.printer_configs;
+            const auto printer = std::find_if(templates.begin(), templates.end(), [&](const auto& item) {
+                return item.name == descriptor.at("printer").get<std::string>();
+            });
+            if (printer == templates.end()) throw std::runtime_error("Missing estimator hardware template");
+            P::HwConfigEvaluator evaluator;
+            const auto hw = evaluator.create_printer_config(*printer, vendor.vendor_data);
+            const auto loaded = Slic3r::Biz::Config::load(
+                nlohmann::ordered_json::parse(descriptor.at("configuration").dump()), hw);
+            if (!loaded || !loaded.value().issues.empty()) throw std::runtime_error("Estimator project configuration has load issues");
+            const auto& pack = std::get<D::ConfigPackFDM>(loaded.value().config);
+            std::vector<unsigned> slots;
+            for (unsigned i = 0; i < hw.material_slot_count(); ++i) slots.push_back(i);
+            Slic3r::PrintConfigView view(std::make_shared<D::FullConfigFDM>(pack, slots, hw));
+            auto config = Slic3r::make_gcode_processor_config(view);
+            Json report{{"gcode", argv[4]}, {"bytes", gcode.size()},
+                {"extruders", config.extruders.count}, {"tool_change_seconds", config.filament_change_time}};
+            G::Processor processor(std::move(config));
+            processor.process_buffer(std::move(gcode));
+            const auto result = processor.finalize();
+            report["seconds"] = std::visit([](const auto& stats) { return stats.normal_mode_time.time; }, result.print_statistics);
+            std::map<int, double> move_times;
+            for (const auto& move : *result.const_moves()) move_times[static_cast<int>(move.type)] += move.time[0];
+            for (const auto& [type, seconds] : move_times) report["seconds_by_move_type"][std::to_string(type)] = seconds;
+            std::ofstream output(argv[5]);
+            if (!output) throw std::runtime_error("Cannot open estimate report");
+            output << report.dump(2);
+            std::cout << "G-code estimate written\n";
+            return 0;
+        }
         if (argc == 5 && std::string_view(argv[1]) == "--compare-prusa") {
             compare_prusa_presets(argv[2], argv[3], argv[4]);
             return 0;
@@ -397,6 +480,7 @@ int main(int argc, char** argv)
         }
         check_config_controls();
         check_preheating();
+        check_toolchange_timing();
         const auto write = [&](const char* name, const Json& value) {
             const auto path = root / name;
             fs::create_directories(path.parent_path());

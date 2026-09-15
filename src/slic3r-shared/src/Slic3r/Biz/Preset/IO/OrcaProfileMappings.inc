@@ -29,6 +29,8 @@ static const std::map<std::string, std::string> key_map{
     {"z_hop", "retract_lift"},
     {"emit_machine_limits_to_gcode", "machine_limits_usage"},
     {"machine_tool_change_time", "filament_change_time"},
+    {"machine_load_filament_time", "orca_filament_load_time"},
+    {"machine_unload_filament_time", "orca_filament_unload_time"},
     {"default_print_profile", "default_print"},
     {"initial_layer_print_height", "first_layer_height"},
     {"wall_loops", "perimeters"},

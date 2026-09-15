@@ -658,6 +658,9 @@ namespace DoExport {
         // As of now the fields are shown at the UI dialog in the same combo box as the ramming values, so they
         // are considered to be active for the single extruder multi-material printers only.
         processor_config.filament_change_time = (float) config.get<double>("filament_change_time");
+        processor_config.orca_toolchange_timing = config.get<bool>("orca_toolchange_timing");
+        processor_config.orca_filament_load_time = static_cast<float>(config.get<double>("orca_filament_load_time"));
+        processor_config.orca_filament_unload_time = static_cast<float>(config.get<double>("orca_filament_unload_time"));
 
         processor_config.extruders.str_colors = config.get<std::vector<std::string>>("extruder_colour");
 
@@ -669,6 +672,11 @@ namespace DoExport {
     }
 
 } // namespace DoExport
+
+Biz::libpgcode::ProcessorConfig make_gcode_processor_config(const PrintConfigView& config)
+{
+    return DoExport::populate_processor_config(config, config.hw_config());
+}
 
 GCodeGenerator::GCodeGenerator(const Print* print) :
     m_origin(Vec2d::Zero()),
@@ -4090,6 +4098,11 @@ std::string GCodeGenerator::retract_and_wipe(
 
 std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_z, const Domain::ConfigView& config)
 {
+    const double toolchange_time = config.get<bool>("orca_toolchange_timing")
+        ? m_toolchange_timing.select(extruder_id, config.get<bool>("single_extruder_multi_material"),
+            config.get<double>("orca_filament_load_time"), config.get<double>("orca_filament_unload_time"),
+            config.get<double>("filament_change_time"))
+        : config.get<double>("filament_change_time");
     if (!m_writer.need_toolchange(extruder_id))
         return "";
 
@@ -4190,7 +4203,6 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
     }
 
     // Emit toolchange time annotation for CoolingBuffer.
-    const double toolchange_time = config.get<double>("filament_change_time");
     if (toolchange_time > 0.) {
         gcode += ";_TOOLCHANGE_TIME" + std::to_string(toolchange_time) + "\n";
     }
