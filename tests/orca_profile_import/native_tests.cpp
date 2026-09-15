@@ -28,6 +28,21 @@ static void require(bool ok, const char* message)
     if (!ok) throw std::runtime_error(message);
 }
 
+static void check_config_controls()
+{
+    // ConfigItemTextField cannot render FloatOrPercentage (or integer) values.
+    // Check the complete schema so opening a settings page cannot introduce
+    // another unsupported type through a newly imported option.
+    for (const auto& def : D::get_defs_fdm().defs()) {
+        if (def.gui_type == D::ConfigItemDef::GUIType::textfield) {
+            const auto& type = *def.type;
+            if (type != typeid(std::string) && type != typeid(std::vector<std::string>)
+                && type != typeid(double) && type != typeid(D::Percentage))
+                throw std::runtime_error("Unsupported textbox type for " + std::string(def.name));
+        }
+    }
+}
+
 static void check_preheating()
 {
     namespace G = Slic3r::Biz::libpgcode;
@@ -380,6 +395,7 @@ int main(int argc, char** argv)
             std::cout << "U1 effective preset snapshots written\n";
             return 0;
         }
+        check_config_controls();
         check_preheating();
         const auto write = [&](const char* name, const Json& value) {
             const auto path = root / name;

@@ -3285,7 +3285,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("Wipe speed");
     def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
     def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
-    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->gui_type = ConfigItemDef::GUIType::unit_or_percentage;
     def->tooltip = L("Wipe speed when Orca wipe rules are enabled and extrusion-based wiping speed is disabled. A percentage is relative to travel speed.");
     def->ratio_over = "travel_speed";
     def->units = {L("mm/s"), L("%")};
