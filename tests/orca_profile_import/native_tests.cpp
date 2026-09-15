@@ -214,7 +214,7 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
         require(view.get<std::vector<double>>("wiping_volumes_matrix") == saved_matrix,
             "prime-volume planning never changes saved matrix settings");
     }
-    const auto generate = [&](bool fixed, double prime, double minimum) {
+    const auto generate = [&](bool fixed, double prime, double minimum, bool single_layer = false, float* depth = nullptr) {
         pack.print.items.opt("orca_fixed_prime_volume").set(fixed);
         pack.print.items.opt("prime_volume").set(prime);
         for (auto& filament : pack.filament) {
@@ -226,9 +226,11 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
         Slic3r::WipeTower tower(D::Vec2f{0.f, 0.f}, 0., view, matrix, 0, slots);
         for (unsigned i = 0; i < count; ++i) tower.set_extruder(i, view);
         tower.plan_toolchange(.2f, .2f, 0, 1, Slic3r::WipeTower::toolchange_wipe_volume(view, matrix, 0, 1));
-        tower.plan_toolchange(.4f, .2f, 1, 0, Slic3r::WipeTower::toolchange_wipe_volume(view, matrix, 1, 0));
+        if (!single_layer)
+            tower.plan_toolchange(.4f, .2f, 1, 0, Slic3r::WipeTower::toolchange_wipe_volume(view, matrix, 1, 0));
         std::vector<std::vector<Slic3r::WipeTower::ToolChangeResult>> layers;
         tower.generate(layers);
+        if (depth) *depth = tower.get_depth();
         double length = 0.;
         std::string gcode;
         for (auto& layer : layers) for (auto& change : layer) {
@@ -272,6 +274,24 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
             }
         });
     require(capped_moves > 0, "tower speed regression observes actual extrusion");
+
+    for (bool soluble : {false, true}) {
+        for (auto& filament : pack.filament) filament.items.opt("filament_soluble").set(soluble);
+        pack.print.items.opt("wipe_tower_extra_spacing").set(D::Percentage{100.});
+        float first_depth, native_depth, spaced_depth, native_spaced_depth;
+        generate(true, 300., 15., true, &first_depth);
+        generate(false, 300., 15., true, &native_depth);
+        pack.print.items.opt("wipe_tower_extra_spacing").set(D::Percentage{200.});
+        generate(true, 300., 15., true, &spaced_depth);
+        generate(false, 300., 15., true, &native_spaced_depth);
+        // The shared spacing setting still changes the reserved ramming row.
+        // Allow that row and one rounding row, but not expanded purge rows.
+        require(std::abs(spaced_depth - first_depth) <= 1.01f,
+            "imported first-layer depth retains purge-row spacing with or without finish credit");
+        require(native_spaced_depth > native_depth + 1.01f,
+            "native first-layer planning retains its existing spacing behavior");
+    }
+    pack.print.items.opt("wipe_tower_extra_spacing").set(D::Percentage{100.});
 
     pack.printer.items.opt("single_extruder_multi_material").set(true);
     pack.print.items.opt("orca_fixed_prime_volume").set(false);
