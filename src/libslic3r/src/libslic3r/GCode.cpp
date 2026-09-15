@@ -4130,9 +4130,14 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
 
     // Process the custom toolchange_gcode. If it is empty, insert just a Tn command.
     if (!toolchange_gcode.empty()) {
+        // Do not count the current toolchange.
+        if (prev_extruder_id >= 0) {
+            ++ m_toolchange_count;
+        }
         ParserConfig dynamic_config;
         dynamic_config.set("previous_extruder", prev_extruder_id);
-        dynamic_config.set("next_extruder",     (int)extruder_id);
+        dynamic_config.set("next_extruder",     int(extruder_id));
+        dynamic_config.set("toolchange_count",  int(m_toolchange_count));
         dynamic_config.set("layer_num",         m_layer_index);
         dynamic_config.set("layer_z",           print_z);
         dynamic_config.set("toolchange_z",      print_z);
