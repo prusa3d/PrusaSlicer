@@ -283,6 +283,8 @@ std::string WipeTowerIntegration::tool_change(GCodeGenerator &gcodegen, const Do
 // Print is finished. Now it remains to unload the filament safely with ramming over the wipe tower.
 std::string WipeTowerIntegration::finalize(GCodeGenerator &gcodegen, const Domain::ConfigView& config)
 {
+    if (m_final_purge.gcode.empty())
+        return {};
     std::string gcode;
     const double purge_z{m_final_purge.print_z + config.get<double>("z_offset")};
     if (std::abs(gcodegen.writer().get_position().z() - purge_z) > EPSILON)

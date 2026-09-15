@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "Slic3r/Biz/Algorithms/Polygon.hpp"
+#include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "libslic3r/GCode.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "test_data.hpp"
@@ -27,6 +29,41 @@ using Domain::Percentage;
 using Biz::GCodeReader::GCodeReader;
 
 constexpr bool debug_files = false;
+
+TEST_CASE("Imported short towers omit unsupported final purge", "[GCode][Orca]") {
+    for (const bool imported : {false, true}) {
+        TestConfig config{2};
+        config.print.items.opt("wipe_tower").set(true);
+        config.print.items.opt("orca_fixed_prime_volume").set(imported);
+        config.print.items.opt("prime_volume").set(36.);
+        config.printer.items.opt("single_extruder_multi_material").set(false);
+        config.printer.items.opt("use_relative_e_distances").set(true);
+        config.printer.items.opt("layer_gcode").set(std::string{"G92 E0\n"});
+        config.print.items.opt("support_material_extruder").set(0);
+        config.print.items.opt("support_material_interface_extruder").set(0);
+        for (auto& filament : config.filament)
+            filament.items.opt("filament_multitool_ramming").set(true);
+        Domain::Model model;
+        for (int i = 0; i < 2; ++i) {
+            auto* object = model.add_object();
+            Biz::Algorithms::ModelObject::add_volume(object,
+                Biz::Algorithms::TriangleMesh::make_cube(10., 10., i == 0 ? 6. : 2.));
+            object->add_instance();
+            for (const auto* key : {"perimeter_extruder", "infill_extruder", "solid_infill_extruder"})
+                object->object_settings.overrides.set(key, i + 1);
+        }
+        Print print;
+        Test::init_print(std::vector<Domain::TriangleMesh>{}, print, model, config);
+        print.process();
+        REQUIRE(print.wipe_tower_data().has_value());
+        REQUIRE(print.tool_ordering().back().wipe_tower_partitions == 0);
+        CHECK(print.wipe_tower_data()->final_purge->gcode.empty() == imported);
+        const std::string gcode = Test::gcode(print);
+        const auto last_layer = gcode.rfind("\n;LAYER_CHANGE\n");
+        REQUIRE(last_layer != std::string::npos);
+        CHECK((gcode.find("; CP TOOLCHANGE UNLOAD", last_layer) == std::string::npos) == imported);
+    }
+}
 
 TEST_CASE("Imported small perimeter speeds use outer wall percentages", "[GCode][Orca]") {
     for (const bool imported : {false, true}) {

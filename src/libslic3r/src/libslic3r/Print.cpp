@@ -2127,6 +2127,8 @@ std::optional<WipeTowerData> Print::generate_wipe_tower_data()
 
     // Unload the current filament over the purge tower.
     double layer_height = m_objects.front()->config().get<double>("layer_height");
+    const bool skip_final_purge = m_tool_ordering.back().wipe_tower_partitions == 0
+        && (config().get<bool>("orca_fixed_prime_volume") || config().get<bool>("orca_matrix_flush"));
     if (m_tool_ordering.back().wipe_tower_partitions > 0) {
         // The wipe tower goes up to the last layer of the print.
         if (wipe_tower.layer_finished()) {
@@ -2141,8 +2143,11 @@ std::optional<WipeTowerData> Print::generate_wipe_tower_data()
         assert(m_tool_ordering.back().wipe_tower_partitions == 0);
         wipe_tower.set_layer(float(m_tool_ordering.back().print_z), float(layer_height));
     }
-    result.final_purge = std::make_unique<WipeTower::ToolChangeResult>(
-        wipe_tower.tool_change((unsigned int)(-1)));
+    // Imported type-2 towers that end below the print have no surface for
+    // the final ram at print height. Match the source's omitted final purge.
+    result.final_purge = skip_final_purge
+        ? std::make_unique<WipeTower::ToolChangeResult>()
+        : std::make_unique<WipeTower::ToolChangeResult>(wipe_tower.tool_change((unsigned int)(-1)));
 
     result.used_filament_until_layer = wipe_tower.get_used_filament_until_layer();
     result.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
