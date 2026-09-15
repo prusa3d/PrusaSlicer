@@ -463,6 +463,10 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
         result["retract_before_perimeters"] = true;
     if (kind == "process" && schema.contains("orca_wipe_compatibility"))
         result["orca_wipe_compatibility"] = true;
+    // Project-owned in Orca, hence excluded from the profile-default snapshot.
+    // PrintConfig defines its initial slot as 0.3; explicit inputs override it.
+    if (kind == "process" && schema.contains("orca_matrix_flush_multiplier"))
+        result["orca_matrix_flush_multiplier"] = 0.3;
     if (kind == "machine" && schema.contains("orca_fixed_prime_volume")) {
         auto tower_type = flat.value("wipe_tower_type", Json("type2"));
         if (tower_type.is_array() && !tower_type.empty()) tower_type = Json(tower_type.front());
@@ -471,6 +475,10 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
         result["orca_fixed_prime_volume"] = vendor.id != "Orca-BBL" && tower_type == "type2"
             && !(enabled(flat.value("single_extruder_multi_material", Json(false)))
                 && enabled(flat.value("purge_in_prime_tower", Json(true))));
+        if (schema.contains("orca_matrix_flush"))
+            result["orca_matrix_flush"] = vendor.id != "Orca-BBL" && tower_type == "type2"
+                && enabled(flat.value("single_extruder_multi_material", Json(false)))
+                && enabled(flat.value("purge_in_prime_tower", Json(true)));
         if (vendor.id == "Orca-BBL" || tower_type != "type2")
             issue(vendor, flat.value("name", ""), "wipe_tower_type",
                 "Orca type-1 or unknown tower planning is not supported; native tower behavior is used");
@@ -503,7 +511,13 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
                     return coerce(element, {{"type", "bool"}}).get<bool>() ? yes : no;
                 });
             };
-            if (src == "idle_temperature") {
+            if (src == "flush_multiplier") {
+                // The type-2 SEMM branch reads slot zero, even if later slots
+                // differ. Type-1 per-extruder/fast-mode rules are not selected.
+                if (v.is_array() && !v.empty()) v = Json(v.front());
+                if (number(v) < 0.) throw std::runtime_error("Negative flush multiplier");
+            }
+            else if (src == "idle_temperature") {
                 // Orca zero means unspecified; PS3 represents that with null.
                 v = map_elements(v, [](const Json& element) -> Json {
                     if (element.is_null() || element == "nil" || number(element) == 0) return nullptr;
@@ -856,7 +870,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 9}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 10}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {

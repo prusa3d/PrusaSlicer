@@ -541,6 +541,8 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"wipe_into_objects", steps({propagate(psWipeTower), propagate(psGCodeExport)})},
     {"wipe_tower", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"orca_fixed_prime_volume", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
+    {"orca_matrix_flush", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
+    {"orca_matrix_flush_multiplier", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"prime_volume", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"orca_wipe_compatibility", steps({propagate(psGCodeExport)})},
     {"role_based_wipe_speed", steps({propagate(psGCodeExport)})},

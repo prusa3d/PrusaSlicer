@@ -25,6 +25,8 @@ O::Schema schema()
             {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
             {"prime_volume", {{"type", "float"}}},
             {"orca_fixed_prime_volume", {{"type", "bool"}}},
+            {"orca_matrix_flush", {{"type", "bool"}}},
+            {"orca_matrix_flush_multiplier", {{"type", "float"}}},
             {"orca_wipe_compatibility", {{"type", "bool"}}},
             {"role_based_wipe_speed", {{"type", "bool"}}},
             {"wipe_speed", {{"type", "float_or_percent"}}},
@@ -187,6 +189,16 @@ int main(int argc, char** argv)
         const auto process_path = root / "Example/process/normal.json";
         const auto original_process = Json::parse(std::ifstream(process_path));
         check(v.presets[1]["values"].at("prime_volume") == 45.0, "prime volume uses the captured Orca default");
+        check(v.presets[1]["values"].at("orca_matrix_flush_multiplier") == 0.3,
+            "matrix flush uses the Orca project default separately from the profile snapshot");
+        for (double multiplier : {0., 0.3, 2.}) {
+            auto fixture = original_process;
+            fixture["flush_multiplier"] = Json::array({std::to_string(multiplier), "7"});
+            write(process_path, fixture);
+            const auto converted = O::convert(root, schema());
+            check(converted[0].presets[1]["values"].at("orca_matrix_flush_multiplier") == multiplier,
+                "type-2 matrix flushing uses slot zero and preserves explicit zero");
+        }
         for (double volume : {0.0, 36.0, 45.0}) {
             auto fixture = original_process;
             fixture["prime_volume"] = std::to_string(volume);
@@ -208,6 +220,9 @@ int main(int argc, char** argv)
             check(converted[0].presets[1]["variants"][0]["values"].at("orca_fixed_prime_volume")
                 == (std::string(tower) == "type2" && !(semm && purge)),
                 "machine variant selects fixed type-2 priming only for the matching source branch");
+            check(converted[0].presets[1]["variants"][0]["values"].at("orca_matrix_flush")
+                == (std::string(tower) == "type2" && semm && purge),
+                "matrix flushing is selected only for type-2 shared-nozzle tower purging");
         }
         write(machine_path, original_machine);
         auto bbl_machine = original_machine;

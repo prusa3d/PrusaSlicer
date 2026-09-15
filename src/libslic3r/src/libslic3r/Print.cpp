@@ -2092,9 +2092,8 @@ std::optional<WipeTowerData> Print::generate_wipe_tower_data()
                 const unsigned last_extruder_id{m_tool_ordering.all_extruders().back()};
                 if (is_toolchange_required(first_layer, last_extruder_id, extruder_id, current_extruder_id)) {
                     const bool fixed_prime = m_config.get<bool>("orca_fixed_prime_volume");
-                    float volume_to_wipe = fixed_prime
-                        ? static_cast<float>(m_config.get<double>("prime_volume"))
-                        : wipe_volumes[current_extruder_id][extruder_id];
+                    float volume_to_wipe = WipeTower::toolchange_wipe_volume(
+                        m_config, wipe_volumes, current_extruder_id, extruder_id);
                     if (!fixed_prime) {
                         // Not all of that can be used for infill purging:
                         volume_to_wipe -= (float)m_config.get<std::vector<double>>("filament_minimal_purge_on_wipe_tower").at(extruder_id);

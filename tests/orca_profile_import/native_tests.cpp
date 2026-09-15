@@ -173,8 +173,8 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
         const auto matrix = Slic3r::WipeTower::extract_wipe_volumes(view);
         Slic3r::WipeTower tower(D::Vec2f{0.f, 0.f}, 0., view, matrix, 0, slots);
         for (unsigned i = 0; i < count; ++i) tower.set_extruder(i, view);
-        tower.plan_toolchange(.2f, .2f, 0, 1, static_cast<float>(fixed ? prime : matrix[0][1]));
-        tower.plan_toolchange(.4f, .2f, 1, 0, static_cast<float>(fixed ? prime : matrix[1][0]));
+        tower.plan_toolchange(.2f, .2f, 0, 1, Slic3r::WipeTower::toolchange_wipe_volume(view, matrix, 0, 1));
+        tower.plan_toolchange(.4f, .2f, 1, 0, Slic3r::WipeTower::toolchange_wipe_volume(view, matrix, 1, 0));
         std::vector<std::vector<Slic3r::WipeTower::ToolChangeResult>> layers;
         tower.generate(layers);
         double length = 0.;
@@ -196,6 +196,33 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
         const auto large = generate(true, 300., 15.);
         require(minimum.first > zero.first && large.first > minimum.first,
             "SEMM/MEMM tower paths honor minimum and prime volumes with or without a finishing filament");
+    }
+    pack.printer.items.opt("single_extruder_multi_material").set(true);
+    pack.print.items.opt("orca_fixed_prime_volume").set(false);
+    pack.print.items.opt("orca_matrix_flush").set(true);
+    saved_matrix[0] = 0.;
+    saved_matrix[1] = 10.;
+    pack.project.items.opt("wiping_volumes_matrix").set(saved_matrix);
+    for (double multiplier : {0., 0.3, 2.}) {
+        pack.print.items.opt("orca_matrix_flush_multiplier").set(multiplier);
+        const auto view = make_view();
+        const auto matrix = Slic3r::WipeTower::extract_wipe_volumes(view);
+        require(matrix[0][0] == 0. && matrix[0][1] == 10. && matrix[1][0] == 100.,
+            "matrix initial priming preserves raw zero and below-minimum entries without scaling");
+        require(std::abs(Slic3r::WipeTower::toolchange_wipe_volume(view, matrix, 0, 1) - 10. * multiplier) < 0.00001,
+            "matrix scaling precedes minimum reservation and does not scale clamped values");
+        require(view.get<std::vector<double>>("wiping_volumes_matrix") == saved_matrix,
+            "matrix flushing never rewrites saved project volumes");
+    }
+    for (bool soluble : {false, true}) {
+        for (auto& filament : pack.filament) filament.items.opt("filament_soluble").set(soluble);
+        pack.print.items.opt("orca_matrix_flush_multiplier").set(0.);
+        const auto zero = generate(false, 0., 0.);
+        const auto minimum = generate(false, 0., 15.);
+        pack.print.items.opt("orca_matrix_flush_multiplier").set(3.);
+        const auto scaled = generate(false, 0., 15.);
+        require(minimum.first > zero.first && scaled.first > minimum.first,
+            "generated matrix towers preserve minima at zero scaling and increase purge at positive scaling");
     }
 }
 
@@ -257,6 +284,8 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     legacy["print_settings"].erase("retract_before_perimeters");
     legacy["print_settings"].erase("orca_fixed_prime_volume");
     legacy["print_settings"].erase("prime_volume");
+    legacy["print_settings"].erase("orca_matrix_flush");
+    legacy["print_settings"].erase("orca_matrix_flush_multiplier");
     for (const char* key : {"orca_wipe_compatibility", "role_based_wipe_speed", "wipe_speed", "wipe_distance", "retract_after_wipe"})
         legacy["print_settings"].erase(key);
     const auto old_loaded = Slic3r::Biz::Config::load(legacy, hw);
@@ -266,7 +295,9 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     require(old_loaded.value().issues.size() == 1, "older settings have no unrelated load issues");
     const auto& missing = std::get<Slic3r::Biz::Config::BoxIssues>(
         old_loaded.value().issues.at(D::FDMConfigLocation::Print));
-    require(missing.size() == 10
+    require(missing.size() == 12
+        && missing.at("orca_matrix_flush").type == Slic3r::Biz::Config::NotFound
+        && missing.at("orca_matrix_flush_multiplier").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_wipe_compatibility").type == Slic3r::Biz::Config::NotFound
         && missing.at("role_based_wipe_speed").type == Slic3r::Biz::Config::NotFound
         && missing.at("wipe_speed").type == Slic3r::Biz::Config::NotFound
@@ -280,6 +311,8 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
         "older projects only report the absent additive settings");
     const auto& old_print = std::get<D::ConfigPackFDM>(old_loaded.value().config).print;
     require(!old_print.find("orca_fixed_prime_volume").item->value().get<bool>()
+        && !old_print.find("orca_matrix_flush").item->value().get<bool>()
+        && old_print.find("orca_matrix_flush_multiplier").item->value().get<double>() == 1.
         && !old_print.find("orca_wipe_compatibility").item->value().get<bool>()
         && old_print.find("prime_volume").item->value().get<double>() == 0.
         && !old_print.find("orca_perimeter_speed_compatibility").item->value().get<bool>()

@@ -599,7 +599,7 @@ WipeTower::WipeTower(
     const std::vector<unsigned>& extruder_candidates
 ) :
     m_semm(config.get<bool>("single_extruder_multi_material")),
-    m_orca_fixed_prime_volume(config.get<bool>("orca_fixed_prime_volume")),
+    m_orca_type2_minimum(config.get<bool>("orca_fixed_prime_volume") || config.get<bool>("orca_matrix_flush")),
     m_wipe_tower_pos(pos),
     m_wipe_tower_width(float(config.get<double>("wipe_tower_width"))),
     m_wipe_tower_cone_angle(float(config.get<double>("wipe_tower_cone_angle"))),
@@ -1576,6 +1576,17 @@ std::vector<std::vector<float>> WipeTower::extract_wipe_volumes(const PrintConfi
         return result;
     }
 
+    if (config.get<bool>("orca_matrix_flush")) {
+        // Orca initial priming consumes the raw project matrix. Per-change
+        // scaling and minimum reservation happen later, without modifying it.
+        const auto count = config.hw_config().material_slot_count();
+        std::vector<std::vector<float>> result(count);
+        for (size_t i = 0; i < count; ++i)
+            for (size_t j = 0; j < count; ++j)
+                result[i].push_back(wiping_matrix.at(i * count + j));
+        return result;
+    }
+
     // The values shall only be used when SEMM is enabled. The purging for other printers
     // is determined by filament_minimal_purge_on_wipe_tower.
     if (! config.get<bool>("single_extruder_multi_material"))
@@ -1604,6 +1615,16 @@ std::vector<std::vector<float>> WipeTower::extract_wipe_volumes(const PrintConfi
             wipe_volumes[i][j] = std::max<float>(wipe_volumes[i][j], config.get<std::vector<double>>("filament_minimal_purge_on_wipe_tower").at(j));
 
     return wipe_volumes;
+}
+
+float WipeTower::toolchange_wipe_volume(const PrintConfigView& config,
+    const std::vector<std::vector<float>>& volumes, unsigned from, unsigned to)
+{
+    if (config.get<bool>("orca_fixed_prime_volume"))
+        return static_cast<float>(config.get<double>("prime_volume"));
+    const float volume = volumes.at(from).at(to);
+    return config.get<bool>("orca_matrix_flush")
+        ? volume * static_cast<float>(config.get<double>("orca_matrix_flush_multiplier")) : volume;
 }
 
 static float get_wipe_depth(float volume, float layer_height, float perimeter_width, float extra_flow, float extra_spacing, float width)
@@ -1703,7 +1724,7 @@ void WipeTower::save_on_last_wipe()
             auto& toolchange = m_layer_info->tool_changes[i];
             tool_change(toolchange.new_tool);
 
-            if (i == idx || (m_orca_fixed_prime_volume
+            if (i == idx || (m_orca_type2_minimum
                 && toolchange.wipe_volume < m_filpar[toolchange.new_tool].filament_minimal_purge_on_wipe_tower)) {
                 float width = m_wipe_tower_width - 3*m_perimeter_width; // width we draw into
 

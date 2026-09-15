@@ -4826,6 +4826,25 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("Use the imported Orca process prime volume on each tool change, without allocating it to infill. The filament minimum remains a separate limit.");
     def->init_fn = init_with(false);
 
+    def = defs.add("orca_matrix_flush", typeid(bool));
+    def->location = Print;
+    def->label = L("Use Orca matrix flushing");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use the saved purge matrix for imported Orca type-2 shared-nozzle towers. Apply the flush multiplier before reserving filament minima and allocating infill purge.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("orca_matrix_flush_multiplier", typeid(double));
+    def->location = Print;
+    def->label = L("Matrix flush multiplier");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Scale the saved matrix for each tool change with Orca matrix flushing enabled. Initial priming and the saved matrix remain unchanged. Zero retains the independent filament minimum.");
+    def->min = 0;
+    def->init_fn = init_with(1.);
+
     def = defs.add("prime_volume", typeid(double));
     def->location = Print;
     def->label = L("Prime volume");

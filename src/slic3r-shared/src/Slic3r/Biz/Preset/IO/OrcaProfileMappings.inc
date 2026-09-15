@@ -82,6 +82,7 @@ static const std::map<std::string, std::string> key_map{
     {"enable_prime_tower", "wipe_tower"},
     {"prime_tower_width", "wipe_tower_width"},
     {"prime_tower_brim_width", "wipe_tower_brim_width"},
+    {"flush_multiplier", "orca_matrix_flush_multiplier"},
     {"print_sequence", "complete_objects"},
     {"bridge_flow", "bridge_flow_ratio"},
     {"infill_wall_overlap", "infill_overlap"},
