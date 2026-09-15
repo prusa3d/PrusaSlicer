@@ -746,6 +746,8 @@ void WipeTower::set_extruder(size_t idx, const PrintConfigView& config)
         float vol  = config.get<std::vector<double>>("filament_multitool_ramming_volume").at(idx);
         float flow = config.get<std::vector<double>>("filament_multitool_ramming_flow").at(idx);
         m_filpar[idx].multitool_ramming = config.get<std::vector<bool>>("filament_multitool_ramming").at(idx);
+        if (m_orca_type2_minimum)
+            m_filpar[idx].multitool_ramming = m_filpar[idx].multitool_ramming && vol > 0.f && flow > 0.f;
         m_filpar[idx].ramming_line_width_multiplicator = 2.;
         m_filpar[idx].ramming_step_multiplicator = 1.;
 
@@ -755,7 +757,7 @@ void WipeTower::set_extruder(size_t idx, const PrintConfigView& config)
         // ramming_speed vector that would respect both the volume and flow (because of 
         // rounding issues with small volumes and high flow).
         m_filpar[idx].ramming_speed.push_back(flow);
-        m_filpar[idx].multitool_ramming_time = vol/flow;
+        m_filpar[idx].multitool_ramming_time = m_orca_type2_minimum && flow <= 0.f ? 0.f : vol/flow;
     }
 
     m_used_filament_length.resize(std::max(m_used_filament_length.size(), idx + 1)); // makes sure that the vector is big enough so we don't have to check later
@@ -1670,12 +1672,16 @@ void WipeTower::plan_toolchange(float z_par, float layer_height_par, unsigned in
         return;
 
     // this is an actual toolchange - let's calculate depth to reserve on the wipe tower
-    float width = m_wipe_tower_width - 3*m_perimeter_width; 
-	float length_to_extrude = volume_to_length(0.25f * std::accumulate(m_filpar[old_tool].ramming_speed.begin(), m_filpar[old_tool].ramming_speed.end(), 0.f),
+    float width = m_wipe_tower_width - 3*m_perimeter_width;
+    const bool do_ramming = !m_orca_type2_minimum || m_semm || m_filpar[old_tool].multitool_ramming;
+    const float ramming_time = m_orca_type2_minimum && !m_semm
+        ? m_filpar[old_tool].multitool_ramming_time : 0.25f;
+	float length_to_extrude = volume_to_length(ramming_time * std::accumulate(m_filpar[old_tool].ramming_speed.begin(), m_filpar[old_tool].ramming_speed.end(), 0.f),
 										m_perimeter_width * m_filpar[old_tool].ramming_line_width_multiplicator,
 										layer_height_par);
-	float ramming_depth = (int(length_to_extrude / width) + 1) * (m_perimeter_width * m_filpar[old_tool].ramming_line_width_multiplicator * m_filpar[old_tool].ramming_step_multiplicator) * m_extra_spacing_ramming;
-    float first_wipe_line = - (width*((length_to_extrude / width)-int(length_to_extrude / width)) - width);
+	float ramming_depth = do_ramming ? (int(length_to_extrude / width) + 1) * (m_perimeter_width * m_filpar[old_tool].ramming_line_width_multiplicator * m_filpar[old_tool].ramming_step_multiplicator) * m_extra_spacing_ramming : 0.f;
+    // A free partial wipe row exists only when a ram was actually reserved.
+    float first_wipe_line = do_ramming ? - (width*((length_to_extrude / width)-int(length_to_extrude / width)) - width) : 0.f;
 
     float first_wipe_volume = length_to_volume(first_wipe_line, m_perimeter_width * m_extra_flow, layer_height_par);
     const float planning_spacing = m_orca_type2_minimum && m_plan.size() - 1 == m_first_layer_idx

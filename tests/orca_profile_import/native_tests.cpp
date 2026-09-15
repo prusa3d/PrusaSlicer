@@ -214,12 +214,12 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
         require(view.get<std::vector<double>>("wiping_volumes_matrix") == saved_matrix,
             "prime-volume planning never changes saved matrix settings");
     }
-    const auto generate = [&](bool fixed, double prime, double minimum, bool single_layer = false, float* depth = nullptr) {
+    const auto generate = [&](bool fixed, double prime, double minimum, bool single_layer = false, float* depth = nullptr, bool ramming = false) {
         pack.print.items.opt("orca_fixed_prime_volume").set(fixed);
         pack.print.items.opt("prime_volume").set(prime);
         for (auto& filament : pack.filament) {
             filament.items.opt("filament_minimal_purge_on_wipe_tower").set(minimum);
-            filament.items.opt("filament_multitool_ramming").set(false);
+            filament.items.opt("filament_multitool_ramming").set(ramming);
         }
         const auto view = make_view();
         const auto matrix = Slic3r::WipeTower::extract_wipe_volumes(view);
@@ -292,6 +292,27 @@ static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
             "native first-layer planning retains its existing spacing behavior");
     }
     pack.print.items.opt("wipe_tower_extra_spacing").set(D::Percentage{100.});
+
+    for (auto& filament : pack.filament) {
+        filament.items.opt("filament_soluble").set(false);
+        filament.items.opt("filament_multitool_ramming_volume").set(5.);
+        filament.items.opt("filament_multitool_ramming_flow").set(8.);
+    }
+    const double slow_ram = generate(true, 36., 15., false, nullptr, true).first;
+    const double native_slow_ram = generate(false, 36., 15., false, nullptr, true).first;
+    for (auto& filament : pack.filament) filament.items.opt("filament_multitool_ramming_flow").set(20.);
+    require(std::abs(slow_ram - generate(true, 36., 15., false, nullptr, true).first) < 0.01,
+        "imported MEMM tower geometry reserves ramming volume independently of its flow rate");
+    require(std::abs(native_slow_ram - generate(false, 36., 15., false, nullptr, true).first) > 0.01,
+        "native MEMM reservation keeps its original timing rule");
+    for (bool zero_flow : {false, true}) {
+        for (auto& filament : pack.filament) {
+            filament.items.opt("filament_multitool_ramming_volume").set(zero_flow ? 5. : 0.);
+            filament.items.opt("filament_multitool_ramming_flow").set(zero_flow ? 0. : 8.);
+        }
+        require(generate(true, 36., 15., false, nullptr, true) == generate(true, 36., 15.),
+            "imported zero-volume or zero-flow ramming emits no ram and reserves no phantom band");
+    }
 
     pack.printer.items.opt("single_extruder_multi_material").set(true);
     pack.print.items.opt("orca_fixed_prime_volume").set(false);
