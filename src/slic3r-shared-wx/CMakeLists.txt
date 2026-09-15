@@ -126,6 +126,8 @@ if (SLIC3R_ENABLE_WEBKIT)
         src/Slic3r/App/WX/WebView/WebViewDialog.hpp
         src/Slic3r/App/WX/WebView/WebViewDialog.cpp
         src/Slic3r/App/WX/WebView/WebViewPlatformUtils.hpp
+        src/Slic3r/App/WX/WebView/WebViewHost.hpp
+        src/Slic3r/App/WX/WebView/WebViewHost.cpp
         src/Slic3r/App/WX/WebView/WebViewPanel.hpp
         src/Slic3r/App/WX/WebView/WebViewPanel.cpp
         src/Slic3r/App/WX/WebView/WebViewFactoryWithLibs.cpp

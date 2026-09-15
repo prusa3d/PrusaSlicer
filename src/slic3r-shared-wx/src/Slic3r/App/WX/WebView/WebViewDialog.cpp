@@ -2,11 +2,9 @@
 
 #include "WebViewPlatformUtils.hpp"
 
-#include "Slic3r/App/WX/WebView/WebView.hpp"
 #include "Slic3r/App/WX/UrlProtocolRegistration.hpp"
 #include "Slic3r/App/WX/StringConversions.hpp"
 #include "Slic3r/App/WX/I18N.hpp"
-#include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/App/WX/format.hpp"
 #include "Slic3r/App/WX/WidgetsConfig.hpp"
 
@@ -30,8 +28,7 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
         wxSize(logic->size(w_config()->em_unit()).first, logic->size(w_config()->em_unit()).second),
         wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER
     ),
-    m_logic(std::move(logic)),
-    m_web_view(WebView::web_view_new())
+    m_logic(std::move(logic))
 {
     ASSERT(m_logic);
     topsizer = new wxBoxSizer(wxVERTICAL);
@@ -99,36 +96,24 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
     Bind(wxEVT_CLOSE_WINDOW, ([this](wxCloseEvent& evt) { EndModal(wxID_CANCEL); }));
 
     // Create the webview
-    if (!m_web_view) {
-        show_unavailable_message();
-        return;
-    }
-    const bool created = m_logic->url().empty()
-        ? WebView::web_view_create(
-              m_web_view,
-              this,
-              format_wxstr(
-                  "file://%1%/web/%2%%3%.html",
-                  boost::filesystem::path(resources_dir()).generic_string(),
-                  m_logic->loading_html(),
-                  w_config()->dark_mode() ? "_dark" : ""
-              ),
-              m_logic->script_message_handler_names()
-          )
-        : WebView::web_view_create(m_web_view, this, from_u8(m_logic->url()), m_logic->script_message_handler_names());
-
-    if (!created) {
-        m_web_view->Destroy();
-        m_web_view = nullptr;
-        show_unavailable_message();
+    if (!m_host.create(
+            this,
+            topsizer,
+            m_logic->url().empty()
+                ? format_wxstr(
+                      "file://%1%/web/%2%%3%.html",
+                      boost::filesystem::path(resources_dir()).generic_string(),
+                      m_logic->loading_html(),
+                      w_config()->dark_mode() ? "_dark" : ""
+                  )
+                : from_u8(m_logic->url()),
+            m_logic->script_message_handler_names()
+        ))
+    {
         return;
     }
 
-    if (Biz::Network::ServiceConfig::instance().webdev_enabled()) {
-        setup_webview_devtools(m_web_view);
-    }
-
-    topsizer->Add(m_web_view, wxSizerFlags().Expand().Proportion(1));
+    wxWebView* web_view = m_host.get();
 
 #ifdef DEBUG_URL_PANEL
     // Create the Tools menu
@@ -149,23 +134,11 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
 #endif
 
     Bind(wxEVT_SHOW, &WebViewDialog::on_show, this);
-    Bind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED, &WebViewDialog::on_script_message, this, m_web_view->GetId());
+    Bind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED, &WebViewDialog::on_script_message, this, web_view->GetId());
 
     // Connect the webview events
-    Bind(wxEVT_WEBVIEW_ERROR, &WebViewDialog::on_error, this, m_web_view->GetId());
-    Bind(wxEVT_WEBVIEW_CREATED, ([this](wxWebViewEvent& evt) {
-        m_webview_created = true;
-        m_webview_create_watchdog.Stop();
-    }), m_web_view->GetId());
-
-    m_webview_create_watchdog.SetOwner(this, wxWindow::NewControlId());
-    Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
-        if (!m_webview_created) {
-            SPDLOG_ERROR("Web view was not created within {} ms.", WEBVIEW_CREATE_TIMEOUT_MS);
-            show_unavailable_message();
-        }
-    }, m_webview_create_watchdog.GetId());
-    m_webview_create_watchdog.StartOnce(WEBVIEW_CREATE_TIMEOUT_MS);
+    Bind(wxEVT_WEBVIEW_ERROR, &WebViewDialog::on_error, this, web_view->GetId());
+    Bind(wxEVT_WEBVIEW_CREATED, ([this](wxWebViewEvent& evt) { m_host.notify_created(); }), web_view->GetId());
 #ifdef DEBUG_URL_PANEL
     // Connect the button events
     Bind(wxEVT_BUTTON, &WebViewDialog::on_back_button, this, m_button_back->GetId());
@@ -183,8 +156,8 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
     Bind(wxEVT_MENU, &WebViewDialog::on_run_script_custom, this, m_script_custom->GetId());
     Bind(wxEVT_MENU, &WebViewDialog::on_add_user_script, this, addUserScript->GetId());
 #endif
-    Bind(wxEVT_WEBVIEW_NAVIGATING, &WebViewDialog::on_navigation_request, this, m_web_view->GetId());
-    Bind(wxEVT_WEBVIEW_LOADED, &WebViewDialog::on_loaded, this, m_web_view->GetId());
+    Bind(wxEVT_WEBVIEW_NAVIGATING, &WebViewDialog::on_navigation_request, this, web_view->GetId());
+    Bind(wxEVT_WEBVIEW_LOADED, &WebViewDialog::on_loaded, this, web_view->GetId());
 
 #ifdef DEBUG_URL_PANEL
     m_url->SetLabelText(url);
@@ -203,10 +176,9 @@ constexpr bool is_linux =
 
 void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
-        return;
+    wxWebView* web_view = m_host.get();
 
-    bool is_busy = m_web_view->IsBusy();
+    const bool is_busy = web_view && web_view->IsBusy();
 
     if constexpr (!is_linux) {
         if (is_busy && !m_busy_cursor_set) {
@@ -219,9 +191,9 @@ void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
     }
 
     if (!is_busy) {
-        if (m_load_error_page) {
+        if (web_view && m_load_error_page) {
             m_load_error_page = false;
-            m_web_view->LoadURL(format_wxstr(
+            web_view->LoadURL(format_wxstr(
                 "file://%1%/web/error_no_reload%2%.html",
                 boost::filesystem::path(resources_dir()).generic_string(),
                 w_config()->dark_mode() ? "_dark" : ""
@@ -242,48 +214,56 @@ void WebViewDialog::on_idle(wxIdleEvent& WXUNUSED(evt))
 
 void WebViewDialog::on_url(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 #ifdef DEBUG_URL_PANEL
-    m_web_view->LoadURL(m_url->GetValue());
-    m_web_view->SetFocus();
+    web_view->LoadURL(m_url->GetValue());
+    web_view->SetFocus();
 #endif
 }
 
 void WebViewDialog::on_back_button(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
-    m_web_view->GoBack();
+    web_view->GoBack();
 }
 
 void WebViewDialog::on_forward_button(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
-    m_web_view->GoForward();
+    web_view->GoForward();
 }
 
 void WebViewDialog::on_stop_button(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
-    m_web_view->Stop();
+    web_view->Stop();
 }
 
 void WebViewDialog::on_reload_button(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
-    m_web_view->Reload();
+    web_view->Reload();
 }
 
 void WebViewDialog::on_navigation_request(wxWebViewEvent& evt)
 {
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
+        return;
     if (!process_logic_command_vector(
             std::move(m_logic->on_navigation_request_webview_event(
                 into_u8(evt.GetURL()),
-                into_u8(m_web_view->GetCurrentURL())
+                into_u8(web_view->GetCurrentURL())
             ))
         ))
     {
@@ -293,6 +273,8 @@ void WebViewDialog::on_navigation_request(wxWebViewEvent& evt)
 
 void WebViewDialog::on_loaded(wxWebViewEvent& evt)
 {
+    if (!m_host)
+        return;
     if (!process_logic_command_vector(std::move(m_logic->on_loaded_webview_event(into_u8(evt.GetURL())))))
     {
         evt.Veto();
@@ -301,27 +283,31 @@ void WebViewDialog::on_loaded(wxWebViewEvent& evt)
 
 void WebViewDialog::on_script_message(wxWebViewEvent& evt)
 {
+    if (!m_host)
+        return;
     if (!process_logic_command_vector(std::move(m_logic->on_script_message_webview_event(into_u8(evt.GetString())))))
     {
-        ;
         evt.Veto();
     }
 }
 
 void WebViewDialog::on_show(wxShowEvent& evt)
 {
+    if (!m_host)
+        return;
     [[maybe_unused]] bool b = process_logic_command_vector(std::move(m_logic->on_show_webview_event(evt.IsShown())));
     DEBUG_ASSERT(b, "Can't veto wxShowEvent.");
 }
 
 void WebViewDialog::on_view_text_request(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
     wxDialog textViewDialog(this, wxID_ANY, L"Page Text", wxDefaultPosition, wxSize(700, 500), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
 
-    wxTextCtrl* text = new wxTextCtrl(this, wxID_ANY, m_web_view->GetPageText(), wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_RICH | wxTE_READONLY);
+    wxTextCtrl* text = new wxTextCtrl(this, wxID_ANY, web_view->GetPageText(), wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_RICH | wxTE_READONLY);
 
     wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(text, 1, wxEXPAND);
@@ -331,12 +317,13 @@ void WebViewDialog::on_view_text_request(wxCommandEvent& WXUNUSED(evt))
 
 void WebViewDialog::on_tools_clicked(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
 #ifdef DEBUG_URL_PANEL
-    m_context_menu->Check(m_web_view->IsContextMenuEnabled());
-    m_dev_tools->Check(m_web_view->IsAccessToDevToolsEnabled());
+    m_context_menu->Check(web_view->IsContextMenuEnabled());
+    m_dev_tools->Check(web_view->IsAccessToDevToolsEnabled());
 
     wxPoint position = ScreenToClient(wxGetMousePosition());
     PopupMenu(m_tools_menu, position.x, position.y);
@@ -354,6 +341,10 @@ void WebViewDialog::on_run_script_custom(wxCommandEvent& WXUNUSED(evt))
 
 void WebViewDialog::on_add_user_script(wxCommandEvent& WXUNUSED(evt))
 {
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
+        return;
+
     wxString userScript = L"window.wx_test_var = 'wxWidgets webview sample';";
     wxTextEntryDialog dialog(this, L"Enter the JavaScript code to run as the initialization script that runs before any script in the HTML document.", from_u8(wxGetTextFromUserPromptStr), userScript, wxOK | wxCANCEL | wxCENTRE | wxTE_MULTILINE);
     if (dialog.ShowModal() != wxID_OK)
@@ -361,13 +352,14 @@ void WebViewDialog::on_add_user_script(wxCommandEvent& WXUNUSED(evt))
 
     const wxString& javascript = dialog.GetValue();
 
-    if (!m_web_view->AddUserScript(javascript))
+    if (!web_view->AddUserScript(javascript))
         SPDLOG_ERROR("Could not add user script");
 }
 
 void WebViewDialog::on_set_custom_user_agent(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
     wxString customUserAgent;
@@ -375,48 +367,53 @@ void WebViewDialog::on_set_custom_user_agent(wxCommandEvent& WXUNUSED(evt))
     if (dialog.ShowModal() != wxID_OK)
         return;
 
-    if (!m_web_view->SetUserAgent(customUserAgent))
+    if (!web_view->SetUserAgent(customUserAgent))
         SPDLOG_ERROR("Could not set custom user agent");
 }
 
 void WebViewDialog::on_clear_selection(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
-    m_web_view->ClearSelection();
+    web_view->ClearSelection();
 }
 
 void WebViewDialog::on_delete_selection(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
-    m_web_view->DeleteSelection();
+    web_view->DeleteSelection();
 }
 
 void WebViewDialog::on_select_all(wxCommandEvent& WXUNUSED(evt))
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
-    m_web_view->SelectAll();
+    web_view->SelectAll();
 }
 
 void WebViewDialog::On_enable_context_menu(wxCommandEvent& evt)
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
-    m_web_view->EnableContextMenu(evt.IsChecked());
+    web_view->EnableContextMenu(evt.IsChecked());
 }
 
 void WebViewDialog::On_enable_dev_tools(wxCommandEvent& evt)
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
-    m_web_view->EnableAccessToDevTools(evt.IsChecked());
+    web_view->EnableAccessToDevTools(evt.IsChecked());
 }
 
 void WebViewDialog::on_error(wxWebViewEvent& evt)
@@ -440,48 +437,38 @@ case type: \
 
     SPDLOG_ERROR("WebViewDialog error: {} {}", category, into_u8(evt.GetString()));
 
-    if (!m_webview_created && m_web_view && m_web_view->GetNativeBackend() == nullptr) {
-        show_unavailable_message();
+    if (m_host.notify_error()) {
         return;
     }
 
     load_error_page();
 }
 
-void WebViewDialog::show_unavailable_message()
-{
-    if (m_webview_failed) {
-        return;
-    }
-    m_webview_failed = true;
-    m_load_error_page = false;
-    m_webview_create_watchdog.Stop();
-    WebView::web_view_show_unavailable_message(this, topsizer, m_web_view);
-}
-
 void WebViewDialog::load_error_page()
 {
-    if (!m_web_view || m_webview_failed)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
-    m_web_view->Stop();
+    web_view->Stop();
     m_load_error_page = true;
 }
 
 void WebViewDialog::run_script(const wxString& javascript)
 {
-    if (!m_web_view)
+    wxWebView* web_view = m_host.get();
+    if (!web_view)
         return;
 
     //SPDLOG_INFO("RunScript {}\n", into_u8(javascript));
-    m_web_view->RunScriptAsync(javascript);
+    web_view->RunScriptAsync(javascript);
 }
 
 void WebViewDialog::EndModal(int retCode)
 {
-    if (m_web_view) {
+    if (wxWebView* web_view = m_host.get_unguarded()) {
         for (const std::string& handler : m_logic->script_message_handler_names()) {
-            m_web_view->RemoveScriptMessageHandler(from_u8(handler));
+            web_view->RemoveScriptMessageHandler(from_u8(handler));
         }
     }
 
@@ -490,44 +477,47 @@ void WebViewDialog::EndModal(int retCode)
 
 void WebViewDialog::do_reload()
 {
-    if (!m_web_view) {
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
         return;
     }
     // IsBusy on Linux very often returns true due to loading about:blank after loading requested url.
 #ifndef __linux__
-    if (m_web_view->IsBusy()) {
+    if (web_view->IsBusy()) {
         return;
     }
 #endif
-    const wxString current_url = m_web_view->GetCurrentURL();
+    const wxString current_url = web_view->GetCurrentURL();
     if (current_url.StartsWith(from_u8(m_logic->url()))) {
-        m_web_view->Reload();
+        web_view->Reload();
         return;
     }
-    m_web_view->LoadURL(from_u8(m_logic->url()));
+    web_view->LoadURL(from_u8(m_logic->url()));
 }
 
 void WebViewDialog::on_user_account_id_success(bool is_refresh, const std::string& username)
 {
-    if (!m_web_view) {
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
         return;
     }
-    [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_id_success(is_refresh, into_u8(m_web_view->GetCurrentURL())));
+    [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_id_success(is_refresh, into_u8(web_view->GetCurrentURL())));
     DEBUG_ASSERT(r, "False return value signals Veto which cannot be done here.");
 }
 
 void WebViewDialog::on_user_account_logged_out()
 {
-    if (!m_web_view) {
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
         return;
     }
-    [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_logged_out(into_u8(m_web_view->GetCurrentURL())));
+    [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_logged_out(into_u8(web_view->GetCurrentURL())));
     DEBUG_ASSERT(r, "False return value signals Veto which cannot be done here.");
 }
 
 void WebViewDialog::on_user_account_will_refresh()
 {
-    if (!m_web_view) {
+    if (!m_host) {
         return;
     }
     [[maybe_unused]] bool r = process_logic_command_vector(m_logic->on_user_account_will_refresh());
@@ -536,13 +526,21 @@ void WebViewDialog::on_user_account_will_refresh()
 
 bool WebViewDialog::handle_logic_command_LoadURL(const std::string& data)
 {
-    m_web_view->LoadURL(from_u8(data));
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
+        return true;
+    }
+    web_view->LoadURL(from_u8(data));
     return true;
 }
 
 bool WebViewDialog::handle_logic_command_LoadRequest(const std::string& data)
 {
-    load_request(m_web_view, data, m_logic->access_token());
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
+        return true;
+    }
+    load_request(web_view, data, m_logic->access_token());
     return true;
 }
 
@@ -566,16 +564,25 @@ bool WebViewDialog::handle_logic_command_EndModalCancel(const std::string& data)
 
 bool WebViewDialog::handle_logic_command_DeleteCookies(const std::string& data)
 {
-    delete_cookies(m_web_view, data);
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
+        return true;
+    }
+    delete_cookies(web_view, data);
     return true;
 }
 
 bool WebViewDialog::handle_logic_command_DeleteCookiesWithCounter(const std::string& data)
 {
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
+        m_force_close = true;
+        return true;
+    }
     m_waiting_for_counters = true;
     m_atomic_counter       = 0;
     m_counter_to_match++;
-    delete_cookies_with_counter(m_web_view, data, m_atomic_counter);
+    delete_cookies_with_counter(web_view, data, m_atomic_counter);
     return true;
 }
 
@@ -593,13 +600,21 @@ bool WebViewDialog::handle_logic_command_DoReload(const std::string& data)
 
 bool WebViewDialog::handle_logic_command_AddUserScript(const std::string& data)
 {
-    m_web_view->AddUserScript(from_u8(data));
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
+        return true;
+    }
+    web_view->AddUserScript(from_u8(data));
     return true;
 }
 
 bool WebViewDialog::handle_logic_command_LoadResourcesPage(const std::string& data)
 {
-    m_web_view->LoadURL(format_wxstr(
+    wxWebView* web_view = m_host.get();
+    if (!web_view) {
+        return true;
+    }
+    web_view->LoadURL(format_wxstr(
         "file://%1%/web/%2%%3%.html",
         boost::filesystem::path(resources_dir()).generic_string(),
         data,

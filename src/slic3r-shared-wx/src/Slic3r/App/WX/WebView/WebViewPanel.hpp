@@ -2,11 +2,11 @@
 
 #include "Slic3r/App/Browser/AbstractBrowserLogic.hpp"
 #include "Slic3r/App/WX/WebView/AbstractWebViewPanel.hpp"
+#include "Slic3r/App/WX/WebView/WebViewHost.hpp"
 #include "Slic3r/App/Browser/AbstractBrowserLogicCommandHandler.hpp"
 
 #include <wx/webview.h>
 #include <wx/sizer.h>
-#include <wx/timer.h>
 #include <memory>
 
 #ifdef DEBUG_URL_PANEL
@@ -47,23 +47,17 @@ public:
 
 private:
     std::unique_ptr<App::Browser::AbstractBrowserLogic> m_logic;
-    wxWebView* m_web_view{nullptr};
+    WebViewHost m_host;
 
     std::vector<std::string> m_script_message_hadler_names;
 
 
-    bool m_do_late_webview_create{false};
     bool m_busy_cursor_set {false};
     bool m_load_error_page{false};
     bool m_shown{false};
     bool m_load_default_url_on_next_error{false};
-    bool m_webview_created{false};
-    bool m_webview_failed{false};
-
-    wxTimer m_webview_create_watchdog;
 
     void late_create();
-    void show_unavailable_message();
     void load_error_page();
     void load_default_url();
     void run_script(const wxString& javascript);
