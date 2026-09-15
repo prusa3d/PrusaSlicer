@@ -1,9 +1,25 @@
 import unittest
 
-from audit_orca_defaults import unmapped_source_fields
+from audit_orca_defaults import loading_resolution, unmapped_source_fields
 
 
 class SourceCoverageTests(unittest.TestCase):
+    def test_first_layer_resolution_requires_matching_imported_base(self):
+        snapshot = {'converted_inputs': {'process': {'first_layer_speed': 50.}},
+                    'effective': {'first_layer_speed': [50., 50.]}}
+        self.assertEqual(loading_resolution('first_layer_perimeter_speed', [50., 50.], snapshot)['base_inputs'],
+                         {'process': 50.})
+        self.assertIsNone(loading_resolution('first_layer_perimeter_speed', [30., 30.], snapshot))
+        snapshot['converted_inputs']['process']['first_layer_perimeter_speed'] = 50.
+        self.assertIsNone(loading_resolution('first_layer_perimeter_speed', [50., 50.], snapshot))
+        self.assertIsNone(loading_resolution('unknown', [], snapshot))
+
+    def test_nozzle_resolution_requires_matching_source_hardware(self):
+        snapshot = {'converted_inputs': {}, 'effective': {}}
+        source = [{'kind': 'machine', 'key': 'nozzle_diameter', 'value': ['0.4', '0.6']}]
+        self.assertIsNotNone(loading_resolution('nozzle_diameter', [0.4, 0.6], snapshot, source))
+        self.assertIsNone(loading_resolution('nozzle_diameter', [0.4, 0.4], snapshot, source))
+
     def test_explicit_only_zero_and_default_precedence(self):
         sources = {'process': {
             'prime_volume': {'value': '0', 'profile': 'saved process'},

@@ -7,6 +7,64 @@ import re
 from compare_prusa_sources import absent, compact, flatten, profile_index, read_default_snapshot
 
 
+def loading_resolution(key, value, snap, explicit_sources=()):
+    """Explain known loader paths only when this snapshot supplies their evidence."""
+    emitted = snap['converted_inputs']
+    effective = snap['effective']
+    inputs = {group: values[key] for group, values in emitted.items() if key in values}
+    first_layer_roles = {
+        'first_layer_perimeter_speed', 'first_layer_external_perimeter_speed',
+        'first_layer_support_material_speed', 'first_layer_top_solid_infill_speed',
+        'first_layer_gap_fill_speed',
+    }
+    if key in first_layer_roles and not inputs and isinstance(value, list) and value:
+        base = {group: values['first_layer_speed'] for group, values in emitted.items()
+                if 'first_layer_speed' in values}
+        # Evaluation consumes the generic key. For absolute speeds, require
+        # every imported base to match every evaluated role slot. Percentages
+        # and differing overrides still need their own derivation evidence.
+        if base and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                        and value == [v] * len(value) for v in base.values()):
+            return {'origin': 'native_derived_from_imported_first_layer_speed',
+                    'base_inputs': base,
+                    'implementation': 'Domain/Config.cpp: zero role speeds inherit first_layer_speed'}
+    if key == 'ironing_type' and effective.get('ironing') is False \
+            and any(values.get('ironing') is False for values in emitted.values()):
+        return {'origin': 'inactive_source_ironing_mode',
+                'implementation': 'OrcaProfileConverter.cpp: no ironing disables ironing; surface mode is inactive'}
+    if key == 'printer_model' and value == snap.get('name'):
+        return {'origin': 'loader_hardware_identity',
+                'implementation': 'OrcaProfileLoader.cpp: hardware model identifier is the selected machine name'}
+    if key == 'nozzle_diameter' and isinstance(value, list):
+        for source in explicit_sources:
+            if source['key'] != 'nozzle_diameter' or source['kind'] != 'machine':
+                continue
+            raw = source['value']
+            try:
+                diameters = [float(v) for v in (raw if isinstance(raw, list) else [raw])]
+            except (TypeError, ValueError):
+                continue
+            if value == diameters:
+                return {'origin': 'loader_hardware_nozzle_definition',
+                        'implementation': 'OrcaProfileLoader.cpp: source nozzle diameters define hardware tools'}
+    if key == 'extruder_colour' and value == []:
+        return {'origin': 'project_owned_setting_not_profile_loaded',
+                'implementation': 'ConfigDefsFDM.cpp: extruder_colour location is Project'}
+    if key == 'printer_variant' and value == '':
+        return {'origin': 'source_metadata_not_native_setting',
+                'implementation': 'OrcaProfileMappings.inc metadata; nozzle variants use hardware definitions'}
+    if key == 'post_process' and not inputs and value == []:
+        return {'origin': 'external_commands_not_automatically_enabled',
+                'implementation': 'OrcaProfileConverter.cpp: post_process is skipped with a diagnostic when nonempty'}
+    if key == 'support_material_style' and inputs:
+        return {'origin': 'combined_source_support_selection',
+                'implementation': 'OrcaProfileConverter.cpp: support_type and support_style are resolved jointly'}
+    if key == 'gcode_label_objects' and inputs:
+        return {'origin': 'combined_source_object_label_selection',
+                'implementation': 'OrcaProfileConverter.cpp: exclude_object takes precedence over legacy labels'}
+    return None
+
+
 def unmapped_source_fields(sources, defaults, effective_keys, aliases):
     """Retain explicit-only fields as well as omitted engine defaults.
 
@@ -85,6 +143,10 @@ def main():
             else: origin = 'ps3_derived_or_untraced'
             fields[key] = {'origin':origin, 'effective':value, 'ps3_default':snap['ps3_defaults_for_hardware'].get(key),
                            'emitted_inputs':inputs, 'explicit_sources':explicit, 'orca_engine_defaults':engine, 'nil_sources':nil}
+            resolution = loading_resolution(key, value, snap, explicit)
+            if resolution:
+                fields[key]['origin'] = resolution['origin']
+                fields[key]['loading_resolution'] = resolution
         unsupported = {}
         for kind in ('machine','process','filament'):
             unsupported[kind] = {k:v for k,v in defaults['defaults'][kind].items() if aliases.get(k,k) not in fields}
