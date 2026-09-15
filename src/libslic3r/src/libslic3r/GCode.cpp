@@ -3878,6 +3878,13 @@ bool GCodeGenerator::needs_retraction(
         return false;
     }
 
+    // Orca also protects departures from visible walls, even when the next
+    // extrusion is infill and the travel remains inside an internal region.
+    if (config.retract_before_perimeters
+        && (m_last_processor_extrusion_role == GCodeExtrusionRole::ExternalPerimeter
+            || m_last_processor_extrusion_role == GCodeExtrusionRole::OverhangPerimeter))
+        return true;
+
     if (role == ExtrusionRole::SupportMaterial)
         if (const SupportLayer *support_layer = dynamic_cast<const SupportLayer*>(m_layer);
             support_layer != nullptr && ! support_layer->support_islands_bboxes.empty()) {

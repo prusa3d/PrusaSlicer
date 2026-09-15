@@ -119,6 +119,46 @@ TEST_CASE("Imported wipe distance speed and retraction budgets", "[GCode][Orca]"
     }
 }
 
+TEST_CASE("Imported wall departures retain retraction", "[GCode][Orca]") {
+    for (bool imported : {false, true}) {
+        TestConfig config;
+        config.print.items.opt("retract_before_perimeters").set(imported);
+        config.print.items.opt("only_retract_when_crossing_perimeters").set(true);
+        config.print.items.opt("perimeters").set(1);
+        config.print.items.opt("wipe").set(false);
+        config.print.items.opt("retract_before_travel").set(1.);
+        config.print.items.opt("retract_length").set(0.8);
+        config.print.items.opt("gcode_comments").set(true);
+        bool departed = false, retracted = false;
+        double distance = 0.;
+        unsigned protected_departures = 0, unprotected_departures = 0;
+        std::string role, preceding_role;
+        GCodeReader parser;
+        parser.parse_buffer(Slic3r::Test::slice({TestMesh::cube_20x20x20}, config),
+            [&](GCodeReader& self, const GCodeReader::GCodeLine& line) {
+                if (line.raw().starts_with(";TYPE:")) role = line.raw().substr(6);
+                if (!line.cmd_is("G1")) return;
+                if (line.dist_E(self) < 0.) retracted = true;
+                if (line.extruding(self) && line.dist_XY(self) > 0.) {
+                    if (departed && preceding_role == "External perimeter" && distance >= 1.001) {
+                        if (retracted) ++protected_departures;
+                        else ++unprotected_departures;
+                    }
+                    preceding_role = role;
+                    departed = retracted = false;
+                    distance = 0.;
+                } else if (line.dist_XY(self) > 0.) {
+                    departed = true;
+                    distance += line.dist_XY(self);
+                }
+            });
+        CAPTURE(imported, protected_departures, unprotected_departures);
+        REQUIRE(protected_departures > 0);
+        if (imported) REQUIRE(unprotected_departures == 0);
+        else REQUIRE(unprotected_departures > 0);
+    }
+}
+
 TEST_CASE("Origin manipulation", "[GCode]") {
     Print print;
     TestConfig test_config;
