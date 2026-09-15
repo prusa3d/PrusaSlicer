@@ -599,6 +599,7 @@ WipeTower::WipeTower(
     const std::vector<unsigned>& extruder_candidates
 ) :
     m_semm(config.get<bool>("single_extruder_multi_material")),
+    m_orca_fixed_prime_volume(config.get<bool>("orca_fixed_prime_volume")),
     m_wipe_tower_pos(pos),
     m_wipe_tower_width(float(config.get<double>("wipe_tower_width"))),
     m_wipe_tower_cone_angle(float(config.get<double>("wipe_tower_cone_angle"))),
@@ -1563,6 +1564,18 @@ std::vector<std::vector<float>> WipeTower::extract_wipe_volumes(const PrintConfi
     // Get wiping matrix to get number of extruders and convert vector<double> to vector<float>:
     std::vector<float> wiping_matrix(cast<float>(config.get<std::vector<double>>("wiping_volumes_matrix")));
 
+    if (config.get<bool>("orca_fixed_prime_volume")) {
+        // Initial priming preserves zero entries. Subsequent tool changes use
+        // prime_volume directly in Print, independently of this matrix.
+        const auto count = config.hw_config().material_slot_count();
+        const float prime = static_cast<float>(config.get<double>("prime_volume"));
+        std::vector<std::vector<float>> result(count, std::vector<float>(count, 0.f));
+        for (size_t i = 0; i < count; ++i)
+            for (size_t j = 0; j < count; ++j)
+                if (wiping_matrix.at(i * count + j) > 0.f) result[i][j] = prime;
+        return result;
+    }
+
     // The values shall only be used when SEMM is enabled. The purging for other printers
     // is determined by filament_minimal_purge_on_wipe_tower.
     if (! config.get<bool>("single_extruder_multi_material"))
@@ -1690,10 +1703,13 @@ void WipeTower::save_on_last_wipe()
             auto& toolchange = m_layer_info->tool_changes[i];
             tool_change(toolchange.new_tool);
 
-            if (i == idx) {
+            if (i == idx || (m_orca_fixed_prime_volume
+                && toolchange.wipe_volume < m_filpar[toolchange.new_tool].filament_minimal_purge_on_wipe_tower)) {
                 float width = m_wipe_tower_width - 3*m_perimeter_width; // width we draw into
 
-                float volume_to_save = length_to_volume(finish_layer().total_extrusion_length_in_plane(), m_perimeter_width, m_layer_info->height);
+                float volume_to_save = i == idx
+                    ? length_to_volume(finish_layer().total_extrusion_length_in_plane(), m_perimeter_width, m_layer_info->height)
+                    : 0.f;
                 float volume_left_to_wipe = std::max(m_filpar[toolchange.new_tool].filament_minimal_purge_on_wipe_tower, toolchange.wipe_volume_total - volume_to_save);
                 float volume_we_need_depth_for = std::max(0.f, volume_left_to_wipe - length_to_volume(toolchange.first_wipe_line, m_perimeter_width*m_extra_flow, m_layer_info->height));
                 float depth_to_wipe = get_wipe_depth(volume_we_need_depth_for, m_layer_info->height, m_perimeter_width, m_extra_flow, m_extra_spacing_wipe, width);

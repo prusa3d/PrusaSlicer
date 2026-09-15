@@ -4761,6 +4761,26 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
                    "Extrude the excess material into the wipe tower.");
     def->init_fn = init_with(false);
 
+    def = defs.add("orca_fixed_prime_volume", typeid(bool));
+    def->location = Print;
+    def->label = L("Use fixed prime volume");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use the imported Orca process prime volume on each tool change, without allocating it to infill. The filament minimum remains a separate limit.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("prime_volume", typeid(double));
+    def->location = Print;
+    def->label = L("Prime volume");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Requested volume per tool change when fixed prime volume is enabled. Tower perimeter extrusion can count towards this volume; the filament minimum still applies. Zero does not disable the tower.");
+    def->units = {L("mm³")};
+    def->min = 0;
+    def->init_fn = init_with(0.);
+
     def = defs.add("wiping_volumes_matrix", typeid(std::vector<double>));
     def->location = Project;
     def->category = ConfigItemDef::Category::Hidden;

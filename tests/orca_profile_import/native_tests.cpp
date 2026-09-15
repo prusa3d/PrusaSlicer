@@ -8,9 +8,11 @@
 #include "Slic3r/Biz/libpgcode/Processor.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
 #include "libslic3r/GCode/ExtrusionProcessor.hpp"
+#include "libslic3r/GCode/WipeTower.hpp"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -134,6 +136,69 @@ static void check_prusa_gcode(const D::Preset::HwPrinterConfig& hw,
 
 #include "prusa_comparison.hpp"
 
+static void check_prime_volume(const D::Preset::HwPrinterConfig& hw)
+{
+    D::ConfigPackFDM pack(static_cast<int>(hw.material_slot_count()));
+    pack.tool.resize(hw.tool_count);
+    std::vector<unsigned> slots;
+    for (unsigned i = 0; i < hw.material_slot_count(); ++i) slots.push_back(i);
+    const auto count = hw.material_slot_count();
+    std::vector<double> saved_matrix(count * count, 100.);
+    saved_matrix[0] = 0.;
+    saved_matrix[1] = 0.; // A zero off-diagonal entry must survive initial priming.
+    pack.project.items.opt("wiping_volumes_matrix").set(saved_matrix);
+    pack.project.items.opt("wiping_volumes_use_custom_matrix").set(true);
+    const auto make_view = [&] {
+        return Slic3r::PrintConfigView(std::make_shared<D::FullConfigFDM>(pack, slots, hw));
+    };
+    for (bool semm : {false, true}) for (bool fixed : {false, true}) for (double prime : {0., 36.}) {
+        pack.printer.items.opt("single_extruder_multi_material").set(semm);
+        pack.print.items.opt("orca_fixed_prime_volume").set(fixed);
+        pack.print.items.opt("prime_volume").set(prime);
+        const auto view = make_view();
+        const auto matrix = Slic3r::WipeTower::extract_wipe_volumes(view);
+        require(matrix[0][1] == (fixed ? 0.f : 15.f), "initial zero matrix entries and native minimum remain distinct");
+        require(matrix[1][0] == (fixed ? prime : (semm ? 100. : 15.)), "fixed prime volume does not rewrite native SEMM or MEMM rules");
+        require(view.get<std::vector<double>>("wiping_volumes_matrix") == saved_matrix,
+            "prime-volume planning never changes saved matrix settings");
+    }
+    const auto generate = [&](bool fixed, double prime, double minimum) {
+        pack.print.items.opt("orca_fixed_prime_volume").set(fixed);
+        pack.print.items.opt("prime_volume").set(prime);
+        for (auto& filament : pack.filament) {
+            filament.items.opt("filament_minimal_purge_on_wipe_tower").set(minimum);
+            filament.items.opt("filament_multitool_ramming").set(false);
+        }
+        const auto view = make_view();
+        const auto matrix = Slic3r::WipeTower::extract_wipe_volumes(view);
+        Slic3r::WipeTower tower(D::Vec2f{0.f, 0.f}, 0., view, matrix, 0, slots);
+        for (unsigned i = 0; i < count; ++i) tower.set_extruder(i, view);
+        tower.plan_toolchange(.2f, .2f, 0, 1, static_cast<float>(fixed ? prime : matrix[0][1]));
+        tower.plan_toolchange(.4f, .2f, 1, 0, static_cast<float>(fixed ? prime : matrix[1][0]));
+        std::vector<std::vector<Slic3r::WipeTower::ToolChangeResult>> layers;
+        tower.generate(layers);
+        double length = 0.;
+        std::string gcode;
+        for (auto& layer : layers) for (auto& change : layer) {
+            length += change.total_extrusion_length_in_plane();
+            gcode += change.gcode;
+        }
+        require(std::isfinite(length) && !gcode.empty(), "zero and positive prime volumes generate finite tower paths");
+        return std::pair{length, gcode};
+    };
+    for (bool semm : {false, true}) for (bool soluble : {false, true}) {
+        pack.printer.items.opt("single_extruder_multi_material").set(semm);
+        for (auto& filament : pack.filament) filament.items.opt("filament_soluble").set(soluble);
+        require(generate(false, 0., 15.) == generate(false, 300., 15.),
+            "disabled prime adapter preserves native generated tower output");
+        const auto zero = generate(true, 0., 0.);
+        const auto minimum = generate(true, 0., 15.);
+        const auto large = generate(true, 300., 15.);
+        require(minimum.first > zero.first && large.first > minimum.first,
+            "SEMM/MEMM tower paths honor minimum and prime volumes with or without a finishing filament");
+    }
+}
+
 static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::PrintSettings& imported_settings)
 {
     D::ConfigPackFDM pack(static_cast<int>(hw.material_slot_count()));
@@ -190,6 +255,8 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     legacy["print_settings"].erase("orca_perimeter_speed_compatibility");
     legacy["print_settings"].erase("slowdown_for_curled_perimeters");
     legacy["print_settings"].erase("retract_before_perimeters");
+    legacy["print_settings"].erase("orca_fixed_prime_volume");
+    legacy["print_settings"].erase("prime_volume");
     const auto old_loaded = Slic3r::Biz::Config::load(legacy, hw);
     require(bool(old_loaded), "older project settings remain loadable");
     // Missing newly introduced settings use the loader's existing nonfatal
@@ -197,13 +264,17 @@ static void check_overhang_rules(const D::Preset::HwPrinterConfig& hw, const D::
     require(old_loaded.value().issues.size() == 1, "older settings have no unrelated load issues");
     const auto& missing = std::get<Slic3r::Biz::Config::BoxIssues>(
         old_loaded.value().issues.at(D::FDMConfigLocation::Print));
-    require(missing.size() == 3
+    require(missing.size() == 5
+        && missing.at("orca_fixed_prime_volume").type == Slic3r::Biz::Config::NotFound
+        && missing.at("prime_volume").type == Slic3r::Biz::Config::NotFound
         && missing.at("orca_perimeter_speed_compatibility").type == Slic3r::Biz::Config::NotFound
         && missing.at("retract_before_perimeters").type == Slic3r::Biz::Config::NotFound
         && missing.at("slowdown_for_curled_perimeters").type == Slic3r::Biz::Config::NotFound,
         "older projects only report the absent additive settings");
     const auto& old_print = std::get<D::ConfigPackFDM>(old_loaded.value().config).print;
-    require(!old_print.find("orca_perimeter_speed_compatibility").item->value().get<bool>()
+    require(!old_print.find("orca_fixed_prime_volume").item->value().get<bool>()
+        && old_print.find("prime_volume").item->value().get<double>() == 0.
+        && !old_print.find("orca_perimeter_speed_compatibility").item->value().get<bool>()
         && !old_print.find("retract_before_perimeters").item->value().get<bool>()
         && old_print.find("slowdown_for_curled_perimeters").item->value().get<bool>(),
         "older projects retain native perimeter and curl defaults");
@@ -259,6 +330,7 @@ int main(int argc, char** argv)
             {"type", "machine"}, {"name", "Native test printer"}, {"instantiation", "true"},
             {"nozzle_diameter", {"0.4", "0.4", "0.4", "0.4"}}, {"gcode_flavor", "klipper"},
             {"emit_machine_limits_to_gcode", "1"},
+            {"single_extruder_multi_material", "0"}, {"purge_in_prime_tower", "0"},
             {"thumbnails", "48x48"},
             {"printable_area", {"0,0", "270,0", "270,270", "0,270"}}, {"printable_height", "270"},
             {"bed_mesh_min", "3,3"}, {"bed_mesh_max", "267,267"}, {"bed_mesh_probe_distance", "50,50"},
@@ -272,7 +344,7 @@ int main(int argc, char** argv)
             std::ofstream(root / "profiles/NativeTest" / asset) << "asset fixture " << asset;
         write("profiles/NativeTest/process/normal.json", {
             {"type", "process"}, {"name", "Normal"}, {"instantiation", "true"},
-            {"wall_loops", "3"}, {"layer_height", "0.2"}, {"compatible_printers", {"Native test printer"}}
+            {"wall_loops", "3"}, {"layer_height", "0.2"}, {"prime_volume", "36"}, {"compatible_printers", {"Native test printer"}}
         });
         write("profiles/NativeTest/filament/pla.json", {
             {"type", "filament"}, {"name", "PLA"}, {"instantiation", "true"},
@@ -325,6 +397,10 @@ int main(int argc, char** argv)
             require(!filament.find("idle_temperature").item->value().get<std::optional<int>>(),
                 "Orca idle zero evaluates to unspecified rather than heater off");
             const auto& process_settings = std::get<D::PrintSettings>(print.preset.values);
+            require(process_settings.find("orca_fixed_prime_volume").item->value().get<bool>()
+                && process_settings.find("prime_volume").item->value().get<double>() == 36.,
+                "native evaluation combines the machine prime policy and explicit process volume");
+            check_prime_volume(hw);
             require(process_settings.find("small_perimeter_threshold").item->value().get<double>() == 0.0,
                 "Orca disabled small-perimeter threshold overrides the native 6.5 mm default");
             require(process_settings.find("enable_dynamic_overhang_speeds").item->value().get<bool>(),

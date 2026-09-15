@@ -269,6 +269,7 @@ private:
 
 
 	bool   m_semm               = true; // Are we using a single extruder multimaterial printer?
+    bool   m_orca_fixed_prime_volume = false;
     bool   m_switch_filament_monitoring = false;
     bool   m_enable_pressure_advance_during_ramming = false;
     Domain::Vec2f m_wipe_tower_pos; 			// Left front corner of the wipe tower in mm.

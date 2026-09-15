@@ -461,6 +461,18 @@ Json values(const Json& explicit_values, const Json& schema, Vendor& vendor)
         result["orca_perimeter_speed_compatibility"] = true;
     if (kind == "process" && schema.contains("retract_before_perimeters"))
         result["retract_before_perimeters"] = true;
+    if (kind == "machine" && schema.contains("orca_fixed_prime_volume")) {
+        auto tower_type = flat.value("wipe_tower_type", Json("type2"));
+        if (tower_type.is_array() && !tower_type.empty()) tower_type = Json(tower_type.front());
+        // Orca selects BBL's type-1 tower by vendor, overriding the stored type.
+        // Other printers use fixed type-2 priming unless SEMM purges on the tower.
+        result["orca_fixed_prime_volume"] = vendor.id != "Orca-BBL" && tower_type == "type2"
+            && !(enabled(flat.value("single_extruder_multi_material", Json(false)))
+                && enabled(flat.value("purge_in_prime_tower", Json(true))));
+        if (vendor.id == "Orca-BBL" || tower_type != "type2")
+            issue(vendor, flat.value("name", ""), "wipe_tower_type",
+                "Orca type-1 or unknown tower planning is not supported; native tower behavior is used");
+    }
     for (auto it = flat.begin(); it != flat.end(); ++it) {
         const auto& src = it.key();
         if (metadata.contains(src) || src.starts_with("__")) continue;
@@ -842,7 +854,7 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
             Json identity;
             if (!cache_root.empty() && !catalog_only) {
                 cache_path = cache_root / fs::u8path(vendor.id) / fs::u8path(vendor.id) / "orca-conversion-cache.json";
-                identity = {{"format", 7}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
+                identity = {{"format", 8}, {"defaults", default_snapshot()}, {"selected", selected_printers ? Json(selected) : Json(nullptr)}, {"source", fs::weakly_canonical(root).generic_string()},
                     {"version", vendor.version}, {"checksum", source_checksum(root, vendor_name)},
                     {"library_checksum", library_checksum}, {"schema_checksum", schema_checksum.value()}};
                 if (restore_conversion(cache_path, identity, vendor)) {
@@ -975,7 +987,9 @@ std::vector<Vendor> convert(const fs::path& root, const Schema& schema, bool inc
                 for (auto it = flat.begin(); it != flat.end(); ++it) {
                     if (metadata.contains(it.key()) || it.key().starts_with("__")) continue;
                     const auto mapped = key_map.contains(it.key()) ? key_map.at(it.key()) : it.key();
-                    bool known = false;
+                    bool known = flat.value("type", "") == "machine" && schema.contains("print")
+                        && schema.at("print").contains("orca_fixed_prime_volume")
+                        && (it.key() == "wipe_tower_type" || it.key() == "purge_in_prime_tower");
                     for (const auto& [kind, defs] : schema) known = known || defs.contains(mapped);
                     if (!known) issue(vendor, flat.value("name", key), it.key(), "No PrusaSlicer equivalent; source setting was not applied");
                 }

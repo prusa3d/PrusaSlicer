@@ -540,6 +540,8 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"wipe_into_infill", steps({propagate(psWipeTower), propagate(psGCodeExport)})},
     {"wipe_into_objects", steps({propagate(psWipeTower), propagate(psGCodeExport)})},
     {"wipe_tower", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
+    {"orca_fixed_prime_volume", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
+    {"prime_volume", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"wipe_tower_acceleration", steps({propagate(psGCodeExport)})},
     {"wipe_tower_bridging", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},
     {"wipe_tower_brim_width", steps({propagate(psWipeTower), propagate(psSkirtBrim)})},

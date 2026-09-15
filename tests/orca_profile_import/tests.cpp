@@ -23,6 +23,8 @@ O::Schema schema()
             {"use_relative_e_distances", {{"type", "bool"}}}, {"max_print_height", {{"type", "float"}}}}},
         {"print", {{"perimeters", {{"type", "int"}}}, {"retract_length", {{"type", "float"}}},
             {"preheat_time", {{"type", "float"}}}, {"preheat_steps", {{"type", "int"}}},
+            {"prime_volume", {{"type", "float"}}},
+            {"orca_fixed_prime_volume", {{"type", "bool"}}},
             {"small_perimeter_threshold", {{"type", "float"}}},
             {"small_perimeter_speed", {{"type", "float_or_percent"}}},
             {"perimeter_speed", {{"type", "float"}}},
@@ -161,6 +163,41 @@ int main(int argc, char** argv)
         write(filament_path, original_filament);
         const auto process_path = root / "Example/process/normal.json";
         const auto original_process = Json::parse(std::ifstream(process_path));
+        check(v.presets[1]["values"].at("prime_volume") == 45.0, "prime volume uses the captured Orca default");
+        for (double volume : {0.0, 36.0, 45.0}) {
+            auto fixture = original_process;
+            fixture["prime_volume"] = std::to_string(volume);
+            write(process_path, fixture);
+            const auto converted = O::convert(root, schema());
+            check(converted[0].presets[1]["values"].at("prime_volume") == volume,
+                "prime volume preserves explicit zero and process values");
+        }
+        write(process_path, original_process);
+        const auto machine_path = root / "Example/machine/printer.json";
+        const auto original_machine = Json::parse(std::ifstream(machine_path));
+        for (const auto* tower : {"type1", "type2"}) for (bool semm : {false, true}) for (bool purge : {false, true}) {
+            auto fixture = original_machine;
+            fixture["wipe_tower_type"] = Json::array({tower});
+            fixture["single_extruder_multi_material"] = Json::array({semm ? "1" : "0"});
+            fixture["purge_in_prime_tower"] = Json::array({purge ? "1" : "0"});
+            write(machine_path, fixture);
+            const auto converted = O::convert(root, schema());
+            check(converted[0].presets[1]["variants"][0]["values"].at("orca_fixed_prime_volume")
+                == (std::string(tower) == "type2" && !(semm && purge)),
+                "machine variant selects fixed type-2 priming only for the matching source branch");
+        }
+        write(machine_path, original_machine);
+        auto bbl_machine = original_machine;
+        bbl_machine["single_extruder_multi_material"] = "0";
+        bbl_machine["wipe_tower_type"] = "type2";
+        fs::copy(root / "Example", root / "BBL", fs::copy_options::recursive);
+        write(root / "BBL.json", original_manifest);
+        write(root / "BBL/machine/printer.json", bbl_machine);
+        const auto bbl = O::convert(root, schema());
+        check(bbl[0].id == "Orca-BBL" && !bbl[0].presets[1]["variants"][0]["values"].at("orca_fixed_prime_volume").get<bool>(),
+            "BBL vendor remains type 1 even with a stored type-2 setting");
+        fs::remove(root / "BBL.json");
+        fs::remove_all(root / "BBL");
         for (double seconds : {0.0, 30.0, 31.0}) {
             auto fixture = original_process;
             fixture["preheat_time"] = std::to_string(seconds);
