@@ -40,6 +40,7 @@ SCENARIO("PrintObject: Perimeter generation", "[PrintObject]") {
             Slic3r::Print print;
             TestConfig config;
             config.print.items.opt("fill_density").set(Percentage{0});
+            config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.35});
             Slic3r::Test::init_and_process_print({TestMesh::cube_20x20x20}, print, config);
 			const PrintObject &object = *print.objects().front();
 			THEN("67 layers exist in the model") {
@@ -166,6 +167,7 @@ SCENARIO("Print: Brim generation", "[Print]") {
         WHEN("Brim is set to 6mm, extrusion width 0.5mm")  {
 	        Slic3r::Print print;
             TestConfig config;
+            config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.35});
             config.print.items.opt("first_layer_extrusion_width").set(FloatOrPercentage{0.5});
             config.print.items.opt("brim_type").set(BrimType::OuterOnly);
             config.print.items.opt("brim_width").set(6.0);

@@ -335,7 +335,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
 
     def = defs.add("top_one_perimeter_type", typeid(EnumWrapper));
     def->location = Print;
-    def->overrides_in = Locations{ Object, Volume };
+    def->overrides_in = Locations{ Tool, Object, Volume };
     def->label = L("Single perimeter on top surfaces");
     def->option_group = ConfigItemDef::OptionGroup::Print_LayerSurfaces_OnlyOnePerimeter;
     def->category = ConfigItemDef::Category::Print_LayersSurfaces;
@@ -351,7 +351,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
 
     def = defs.add("only_one_perimeter_first_layer", typeid(bool));
     def->location = Print;
-    def->overrides_in = Locations{ Object, Volume };
+    def->overrides_in = Locations{ Tool, Object, Volume };
     def->label = L("Only one perimeter on first layer");
     def->option_group = ConfigItemDef::OptionGroup::Print_LayerSurfaces_OnlyOnePerimeter;
     def->category = ConfigItemDef::Category::Print_LayersSurfaces;
@@ -1692,6 +1692,8 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
 
     def = defs.add("first_layer_height", typeid(FloatOrPercentage));
     def->location = Print;
+    def->overrides_in = { Tool };
+    def->compatibility_rule = CompatibilityRule::Min;
     def->label = L("First layer height");
     def->option_group = ConfigItemDef::OptionGroup::Print_LayerSurfaces_LayerHeight;
     def->category = ConfigItemDef::Category::Print_LayersSurfaces;
@@ -1701,7 +1703,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
                    "bottom layer to improve adhesion and tolerance for non perfect build plates.");
     def->units = {L("mm"), L("%")};;
     def->min = 0;
-    def->init_fn = init_with(FloatOrPercentage{0.35});
+    def->init_fn = init_with(FloatOrPercentage{0.2});
     def->ratio_over = "layer_height";
 
     // This parameter does not exist on the backend.

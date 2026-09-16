@@ -1035,14 +1035,14 @@ void PerimeterGenerator::process_arachne(
     // extra perimeters for each one
     // detect how many perimeters must be generated for this island
     int loop_number = params.config.get<std::vector<int>>("perimeters").at(extruder_id) + surface.extra_perimeters - 1; // 0-indexed loops
-    if (loop_number > 0 && ((params.config.get<Domain::TopOnePerimeterType>("top_one_perimeter_type") == Domain::TopOnePerimeterType::TopmostOnly && upper_slices == nullptr) || (params.config.get<bool>("only_one_perimeter_first_layer") && params.layer_id == 0)))
+    if (loop_number > 0 && ((params.config.get<std::vector<Domain::TopOnePerimeterType>>("top_one_perimeter_type").at(extruder_id) == Domain::TopOnePerimeterType::TopmostOnly && upper_slices == nullptr) || (params.config.get<std::vector<bool>>("only_one_perimeter_first_layer").at(extruder_id) && params.layer_id == 0)))
         loop_number = 0;
 
     // Calculate how many inner loops remain when TopSurfaces is selected.
-    const int inner_loop_number = (params.config.get<Domain::TopOnePerimeterType>("top_one_perimeter_type") == Domain::TopOnePerimeterType::TopSurfaces && upper_slices != nullptr) ? loop_number - 1 : -1;
+    const int inner_loop_number = (params.config.get<std::vector<Domain::TopOnePerimeterType>>("top_one_perimeter_type").at(extruder_id) == Domain::TopOnePerimeterType::TopSurfaces && upper_slices != nullptr) ? loop_number - 1 : -1;
 
     // Set one perimeter when TopSurfaces is selected.
-    if (params.config.get<Domain::TopOnePerimeterType>("top_one_perimeter_type") == Domain::TopOnePerimeterType::TopSurfaces)
+    if (params.config.get<std::vector<Domain::TopOnePerimeterType>>("top_one_perimeter_type").at(extruder_id) == Domain::TopOnePerimeterType::TopSurfaces)
         loop_number = 0;
 
     ExPolygons last   = offset_ex(Algorithms::ExPolygon::simplify_to_polygons(surface.expolygon, params.scaled_resolution), - float(ext_perimeter_width / 2. - ext_perimeter_spacing / 2.));
@@ -1263,7 +1263,7 @@ void PerimeterGenerator::process_classic(
     int        loop_number = params.config.get<std::vector<int>>("perimeters").at(extruder_id) + surface.extra_perimeters - 1;  // 0-indexed loops
 
     // Set the topmost layer to be one perimeter.
-    if (loop_number > 0 && ((params.config.get<Domain::TopOnePerimeterType>("top_one_perimeter_type") != Domain::TopOnePerimeterType::None && upper_slices == nullptr) || (params.config.get<bool>("only_one_perimeter_first_layer") && params.layer_id == 0)))
+    if (loop_number > 0 && ((params.config.get<std::vector<Domain::TopOnePerimeterType>>("top_one_perimeter_type").at(extruder_id) != Domain::TopOnePerimeterType::None && upper_slices == nullptr) || (params.config.get<std::vector<bool>>("only_one_perimeter_first_layer").at(extruder_id) && params.layer_id == 0)))
         loop_number = 0;
 
     ExPolygons last = union_ex(Algorithms::ExPolygon::simplify_to_polygons(surface.expolygon, params.scaled_resolution));
@@ -1360,7 +1360,7 @@ void PerimeterGenerator::process_classic(
             last = std::move(offsets);
 
             // Store surface for top infill if top_one_perimeter_type is set to TopSurfaces.
-            if (i == 0 && i != loop_number && params.config.get<Domain::TopOnePerimeterType>("top_one_perimeter_type") == Domain::TopOnePerimeterType::TopSurfaces && upper_slices != nullptr) {
+            if (i == 0 && i != loop_number && params.config.get<std::vector<Domain::TopOnePerimeterType>>("top_one_perimeter_type").at(extruder_id) == Domain::TopOnePerimeterType::TopSurfaces && upper_slices != nullptr) {
                 // Split the polygons with top/not_top.
 
                 // Get the offset from solid surface anchor.
