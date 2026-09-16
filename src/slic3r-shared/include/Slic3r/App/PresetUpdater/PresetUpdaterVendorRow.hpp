@@ -74,6 +74,8 @@ private:
 
     void build_action_slot(Yoga::Item* header);
 
+    void confirm_removal();
+
     PresetUpdater::PresetUpdaterController& m_controller;
 
     Yoga::Icon* m_state_icon{nullptr};
@@ -81,6 +83,9 @@ private:
     Yoga::Text* m_comment{nullptr};
     Yoga::Text* m_change{nullptr};
     Yoga::Text* m_skipped_text{nullptr};
+    Yoga::Item* m_remove_slot{nullptr};
+    Yoga::LayoutButton* m_remove_button{nullptr};
+
     Yoga::Item* m_version_group{nullptr};
     Yoga::Text* m_current_version{nullptr};
     Yoga::Text* m_version_arrow{nullptr};
@@ -89,6 +94,7 @@ private:
     Yoga::StackLayout* m_action{nullptr};
     Yoga::LayoutButton* m_action_button{nullptr};
     Yoga::LayoutButton* m_retry_button{nullptr};
+    Yoga::Text* m_running_text{nullptr};
     Yoga::Text* m_done_text{nullptr};
     Yoga::Text* m_failed_text{nullptr};
 };

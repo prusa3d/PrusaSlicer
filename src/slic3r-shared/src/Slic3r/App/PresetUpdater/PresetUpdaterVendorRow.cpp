@@ -1,11 +1,15 @@
 #include "Slic3r/App/PresetUpdater/PresetUpdaterVendorRow.hpp"
 
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/IDialogManager.hpp"
 #include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/StackLayout.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
+
+#include <fmt/format.h>
 
 using namespace Slic3r::App::Yoga;
 
@@ -65,14 +69,24 @@ std::string action_label(VendorReconfigurationState state)
     return {};
 }
 
-std::string done_label(VendorReconfigurationState state)
+std::string done_label(VendorReconfigurationState state, bool removing)
 {
-    if (state == VendorReconfigurationState::RemoveVendor) {
+    if (removing || state == VendorReconfigurationState::RemoveVendor) {
         // TRN Preset updater vendor row. The presets were deleted.
         return Biz::_u8L("Removed");
     }
     // TRN Preset updater vendor row. Install finished.
     return Biz::_u8L("Updated");
+}
+
+std::string running_label(bool removing)
+{
+    if (removing) {
+        // TRN Preset updater vendor row. Deletion running.
+        return Biz::_u8L("Removing...");
+    }
+    // TRN Preset updater vendor row. Install running.
+    return Biz::_u8L("Installing...");
 }
 
 bool has_warning_icon(VendorReconfigurationState state)
@@ -159,6 +173,24 @@ PresetUpdaterVendorRow::PresetUpdaterVendorRow(
     m_skipped_text->set_flex_grow(1);
     m_skipped_text->set_visible(false);
 
+    m_remove_slot = header->emplace_back<Item>();
+    m_remove_slot->set_orientation(Orientation::Horizontal);
+    m_remove_slot->set_align_items(YGAlignCenter);
+    m_remove_slot->set_justify_content(YGJustifyFlexEnd);
+    m_remove_slot->set_width(icon_slot_width);
+    m_remove_slot->set_flex_shrink(0);
+
+    // TRN Preset updater vendor row. Tooltip of the button deleting the installed presets.
+    const std::string remove_tooltip = Biz::_u8L("Remove presets");
+    m_remove_button = m_remove_slot->emplace_back<LayoutButton>(
+        std::string(),
+        Render::Icon::RemoveTick,
+        remove_tooltip
+    );
+    m_remove_button->set_width(icon_button_size);
+    m_remove_button->set_height(icon_button_size);
+    m_remove_button->callbacks().action = [this]() { confirm_removal(); };
+
     m_version_group = header->emplace_back<Item>();
     m_version_group->set_orientation(Orientation::Horizontal);
     m_version_group->set_align_items(YGAlignCenter);
@@ -207,8 +239,7 @@ void PresetUpdaterVendorRow::build_action_slot(Item* header)
     // TRN Preset updater vendor row. Install not started yet, another one is running.
     add_elided_text(m_action, Biz::_u8L("Waiting..."));
 
-    // TRN Preset updater vendor row. Install running.
-    add_elided_text(m_action, Biz::_u8L("Installing..."));
+    m_running_text = add_elided_text(m_action, std::string());
 
     Item* done = m_action->emplace_back<Item>();
     done->set_flex_grow(1);
@@ -238,10 +269,45 @@ void PresetUpdaterVendorRow::build_action_slot(Item* header)
     m_retry_button->callbacks().action = [this]()
     {
         const PresetUpdater::VendorRowState* row = state();
+        if (row == nullptr) {
+            return;
+        }
+        if (row->removing) {
+            m_controller.remove_vendor(row->repo_id, row->vendor_id);
+            return;
+        }
         m_controller.update_vendor(row->repo_id, row->vendor_id);
     };
 
     m_action->emplace_back<Item>();
+}
+
+void PresetUpdaterVendorRow::confirm_removal()
+{
+    const PresetUpdater::VendorRowState* row = state();
+    if (row == nullptr) {
+        return;
+    }
+
+    PresetUpdater::PresetUpdaterController* controller = &m_controller;
+    const std::string repo_id   = row->repo_id;
+    const std::string vendor_id = row->vendor_id;
+
+    // TRN Preset updater vendor row. Title of the dialog confirming a deletion.
+    const std::string title = Biz::_u8L("Remove presets?");
+    // TRN Preset updater vendor row. {} is the vendor name.
+    const std::string format = Biz::_u8L("Delete the installed presets of {}?");
+
+    AppServices::instance().dialog_manager().show_yesno_dialog(
+        title,
+        fmt::format(fmt::runtime(format), vendor_id),
+        [controller, repo_id, vendor_id](bool confirmed)
+        {
+            if (confirmed) {
+                controller->remove_vendor(repo_id, vendor_id);
+            }
+        }
+    );
 }
 
 void PresetUpdaterVendorRow::on_data_update()
@@ -262,6 +328,7 @@ void PresetUpdaterVendorRow::on_data_update()
     m_change->set_visible(!row->skipped);
     m_version_group->set_visible(!row->skipped);
     m_action->set_visible(!row->skipped);
+    m_remove_slot->set_visible(!row->skipped);
     m_skipped_text->set_visible(row->skipped);
     if (row->skipped) {
         // TRN Preset updater vendor row. Line under the vendor name.
@@ -276,29 +343,43 @@ void PresetUpdaterVendorRow::on_data_update()
     m_recommended_version->set_visible(!row->up_to_date);
     m_current_version->set_text(version_label(row->current_version));
 
+    const bool idle = row->install_state == PresetUpdater::InstallState::Idle;
+    m_remove_button->set_visible(
+        !PresetUpdater::is_protected_vendor(row->vendor_id)
+        && row->state != VendorReconfigurationState::NewVendor
+    );
+    m_remove_button->set_enabled(
+        !row->install_locked
+        && (idle || row->install_state == PresetUpdater::InstallState::Failed)
+    );
+
     if (row->up_to_date) {
         // TRN Preset updater vendor row. This vendor needs no change.
         m_change->set_text(Biz::_u8L("Up to date"));
         m_comment->set_visible(false);
-        m_action->set_current_index(ActionNone);
-        return;
+    } else {
+        m_comment->set_text(row->comment);
+        m_comment->set_visible(!row->comment.empty());
+
+        m_change->set_text(change_label(row->state));
+        m_recommended_version->set_text(version_label(row->recommended_version));
+        m_recommended_version->set_font_type(
+            row->recommended_version != row->current_version ? Render::ImguiFontType::Bold :
+                                                               Render::ImguiFontType::Regular
+        );
+        m_action_button->set_label(action_label(row->state));
     }
 
-    m_comment->set_text(row->comment);
-    m_comment->set_visible(!row->comment.empty());
-
-    m_change->set_text(change_label(row->state));
-    m_recommended_version->set_text(version_label(row->recommended_version));
-    m_recommended_version->set_font_type(
-        row->recommended_version != row->current_version ? Render::ImguiFontType::Bold :
-                                                           Render::ImguiFontType::Regular
-    );
-
-    m_action_button->set_label(action_label(row->state));
-    m_done_text->set_text(done_label(row->state));
+    m_running_text->set_text(running_label(row->removing));
+    m_done_text->set_text(done_label(row->state, row->removing));
     m_failed_text->set_text(row->error_text);
     m_retry_button->set_tooltip(row->error_text);
     m_retry_button->set_visible(!row->install_locked);
+
+    if (row->up_to_date && idle) {
+        m_action->set_current_index(ActionNone);
+        return;
+    }
 
     switch (row->install_state) {
     case PresetUpdater::InstallState::Idle:
