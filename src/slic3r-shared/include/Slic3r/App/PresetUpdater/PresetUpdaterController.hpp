@@ -68,6 +68,7 @@ struct VendorRowState
 
     bool install_locked{false};
     bool skipped{false};
+    bool up_to_date{false};
 
     bool operator==(const VendorRowState&) const = default;
 };
@@ -320,6 +321,7 @@ public:
         Slic3r::Semver current_version;
         Slic3r::Semver recommended_version;
         bool skipped{false};
+        bool up_to_date{false};
     };
 
     /// What one check said, sorted by source. Built once, applied once.
@@ -472,6 +474,7 @@ private:
         Slic3r::Semver current_version;
         Slic3r::Semver recommended_version;
         bool skipped{false};
+        bool up_to_date{false};
 
         InstallState install_state{InstallState::Idle};
         std::string error_text;

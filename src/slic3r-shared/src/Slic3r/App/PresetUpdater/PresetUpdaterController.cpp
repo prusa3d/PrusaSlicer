@@ -363,6 +363,24 @@ SourceStore::CheckOutcome SourceStore::CheckOutcome::from(
         }
     }
 
+    for (const Biz::PresetUpdater::UpToDateVendor& vendor : reconfigurations.up_to_date()) {
+        std::vector<VendorReport>& reported = outcome.by_repo[vendor.vendor_repo_id];
+        const bool already_reported = std::any_of(
+            reported.begin(),
+            reported.end(),
+            [&vendor](const VendorReport& report)
+            { return report.vendor_id == vendor.vendor_id; }
+        );
+        if (already_reported) {
+            continue;
+        }
+        VendorReport report;
+        report.vendor_id       = vendor.vendor_id;
+        report.current_version = vendor.current_version;
+        report.up_to_date      = true;
+        reported.push_back(std::move(report));
+    }
+
     return outcome;
 }
 
@@ -559,7 +577,7 @@ std::vector<VendorKey> SourceStore::actionable_of(const SourceEntry& entry, bool
         return keys;
     }
     for (const VendorEntry& vendor : entry.vendors) {
-        if (vendor.skipped) {
+        if (vendor.skipped || vendor.up_to_date) {
             continue;
         }
         if (required_only && vendor.state != VendorReconfigurationState::ForcedUpdate
@@ -880,6 +898,7 @@ void SourceStore::merge_vendors(SourceEntry& entry, const std::vector<VendorRepo
         vendor.current_version     = report.current_version;
         vendor.recommended_version = report.recommended_version;
         vendor.skipped             = report.skipped;
+        vendor.up_to_date          = report.up_to_date;
 
         const auto previous_vendor = previous.find(report.vendor_id);
         if (previous_vendor != previous.end()
@@ -911,7 +930,7 @@ SourceStore::InstallRequest SourceStore::make_install_request(
     InstallRequest request;
     for (const VendorKey& key : keys) {
         const VendorEntry* vendor = find_vendor(key);
-        if (vendor == nullptr || vendor->skipped) {
+        if (vendor == nullptr || vendor->skipped || vendor->up_to_date) {
             continue;
         }
         request.list.emplace_back(
@@ -1060,7 +1079,7 @@ SourceCounts SourceStore::counts_of(const SourceEntry& entry)
 {
     SourceCounts counts;
     for (const VendorEntry& vendor : entry.vendors) {
-        if (vendor.skipped || vendor.install_state == InstallState::Done) {
+        if (vendor.skipped || vendor.up_to_date || vendor.install_state == InstallState::Done) {
             continue;
         }
         switch (vendor.state) {
@@ -1162,6 +1181,7 @@ bool SourceStore::publish_vendors(const SourceEntry& entry, bool install_locked)
         row.error_text          = vendor.error_text;
         row.install_locked      = install_locked;
         row.skipped             = vendor.skipped;
+        row.up_to_date          = vendor.up_to_date;
         rows.push_back(std::move(row));
     }
 

@@ -120,13 +120,17 @@ PresetUpdaterVendorRow::PresetUpdaterVendorRow(
     Biz::DataObserver<PresetUpdater::VendorRowState>(index, data),
     m_controller(controller)
 {
-    set_orientation(Orientation::Horizontal);
-    set_align_items(YGAlignCenter);
-    set_gap(column_gap);
-    set_height(vendor_row_height);
+    set_orientation(Orientation::Vertical);
     set_flex_shrink(0);
 
-    Item* lead_slot = emplace_back<Item>();
+    Item* header = emplace_back<Item>();
+    header->set_orientation(Orientation::Horizontal);
+    header->set_align_items(YGAlignCenter);
+    header->set_gap(column_gap);
+    header->set_height(vendor_row_height);
+    header->set_flex_shrink(0);
+
+    Item* lead_slot = header->emplace_back<Item>();
     lead_slot->set_orientation(Orientation::Horizontal);
     lead_slot->set_align_items(YGAlignCenter);
     lead_slot->set_justify_content(YGJustifyFlexEnd);
@@ -139,30 +143,23 @@ PresetUpdaterVendorRow::PresetUpdaterVendorRow(
     m_state_icon->set_flex_shrink(0);
     m_state_icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
 
-    Item* name_column = emplace_back<Item>();
-    name_column->set_orientation(Orientation::Vertical);
-    name_column->set_justify_content(YGJustifyCenter);
-    name_column->set_min_width(name_width);
-    name_column->set_flex_grow(1);
-    name_column->set_flex_shrink(0);
-
-    m_name = name_column->emplace_back<Text>(std::string(), Render::ImguiFontType::Bold);
+    m_name = header->emplace_back<Text>(std::string(), Render::ImguiFontType::Bold);
     m_name->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_name->set_min_width(name_width);
+    m_name->set_flex_grow(1);
+    m_name->set_flex_shrink(0);
 
-    m_comment = name_column->emplace_back<Text>(std::string());
-    m_comment->set_wrap_mode(Text::WrapMode::WrapElide);
-
-    m_change = emplace_back<Text>(std::string());
+    m_change = header->emplace_back<Text>(std::string());
     m_change->set_width(change_width);
     m_change->set_flex_shrink(0);
     m_change->set_wrap_mode(Text::WrapMode::WrapElide);
 
-    m_skipped_text = emplace_back<Text>(std::string());
+    m_skipped_text = header->emplace_back<Text>(std::string());
     m_skipped_text->set_wrap_mode(Text::WrapMode::WrapElide);
     m_skipped_text->set_flex_grow(1);
     m_skipped_text->set_visible(false);
 
-    m_version_group = emplace_back<Item>();
+    m_version_group = header->emplace_back<Item>();
     m_version_group->set_orientation(Orientation::Horizontal);
     m_version_group->set_align_items(YGAlignCenter);
     m_version_group->set_gap(column_gap);
@@ -172,26 +169,29 @@ PresetUpdaterVendorRow::PresetUpdaterVendorRow(
     m_current_version = m_version_group->emplace_back<Text>(std::string());
     m_current_version->set_flex_shrink(0);
 
-    Text* arrow = m_version_group->emplace_back<Text>("->");
-    arrow->set_flex_shrink(0);
+    m_version_arrow = m_version_group->emplace_back<Text>("->");
+    m_version_arrow->set_flex_shrink(0);
 
     m_recommended_version = m_version_group->emplace_back<Text>(std::string());
     m_recommended_version->set_wrap_mode(Text::WrapMode::WrapElide);
     m_recommended_version->set_flex_grow(1);
 
-    // TRN Preset updater vendor row button. Opens the release notes.
-    m_changelog_button = emplace_back<LayoutButton>(Biz::_u8L("Changelog"));
-    apply_button_size(m_changelog_button);
-    m_changelog_button->set_visible(false);
+    build_action_slot(header);
 
-    build_action_slot();
+    m_comment = emplace_back<Text>(std::string());
+    m_comment->set_wrap_mode(Text::WrapMode::Wrap);
+    m_comment->set_flex_shrink(0);
+    m_comment->set_margin(Margins{comment_indent, 0_fpx, column_gap, comment_bottom_margin});
+    m_comment->set_text_color(
+        m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
+    );
 
     on_data_update();
 }
 
-void PresetUpdaterVendorRow::build_action_slot()
+void PresetUpdaterVendorRow::build_action_slot(Item* header)
 {
-    m_action = emplace_back<StackLayout>();
+    m_action = header->emplace_back<StackLayout>();
     m_action->set_width(action_slot_width);
     m_action->set_flex_shrink(0);
 
@@ -272,11 +272,22 @@ void PresetUpdaterVendorRow::on_data_update()
         return;
     }
 
+    m_version_arrow->set_visible(!row->up_to_date);
+    m_recommended_version->set_visible(!row->up_to_date);
+    m_current_version->set_text(version_label(row->current_version));
+
+    if (row->up_to_date) {
+        // TRN Preset updater vendor row. This vendor needs no change.
+        m_change->set_text(Biz::_u8L("Up to date"));
+        m_comment->set_visible(false);
+        m_action->set_current_index(ActionNone);
+        return;
+    }
+
     m_comment->set_text(row->comment);
     m_comment->set_visible(!row->comment.empty());
 
     m_change->set_text(change_label(row->state));
-    m_current_version->set_text(version_label(row->current_version));
     m_recommended_version->set_text(version_label(row->recommended_version));
     m_recommended_version->set_font_type(
         row->recommended_version != row->current_version ? Render::ImguiFontType::Bold :
