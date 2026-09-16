@@ -57,6 +57,10 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_loaded_webview_even
     
     std::vector<BrowserLogicCommand> result;
     if (url.find(m_url) == 0) {
+        if (m_unsupported_engine) {
+            emplace_load_unsupported_page_commands(result);
+            return result;
+        }
         emplace_define_css_commands(result);
     } else {
         m_styles_defined = false;
@@ -277,9 +281,9 @@ std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_erro
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_unsupported_webview(const std::string& message_data)
 {
     SPDLOG_ERROR("WebView engine does not support Connect web app: {}", message_data);
-    std::vector<BrowserLogicCommand> res;
-    emplace_load_unsupported_page_commands(res);
-    return res;
+    // Deferred to on_loaded_webview_event, navigating away mid-load would cancel both loads.
+    m_unsupported_engine = true;
+    return {};
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicConnectPage::on_connect_action_open_connect_in_browser(const std::string& message_data)
