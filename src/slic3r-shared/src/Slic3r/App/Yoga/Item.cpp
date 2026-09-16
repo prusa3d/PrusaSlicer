@@ -399,7 +399,7 @@ void Item::set_flex_wrap(YGWrap wrap)
     set_style_dirty();
 }
 
-void Item::remove_later(Item* child)
+void Item::remove_later(Object* child)
 {
     ASSERT(child);
     ASSERT(index_of(child).has_value());

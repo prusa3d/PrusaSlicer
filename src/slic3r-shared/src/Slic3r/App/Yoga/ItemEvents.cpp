@@ -22,7 +22,7 @@ bool Event::is_valid() const
     return !m_object_heartbeat.expired() && !m_parent_heartbeat.expired();
 }
 
-RemoveEvent::RemoveEvent(Item* item) : Event(item) {}
+RemoveEvent::RemoveEvent(Object* item) : Event(item) {}
 
 Event::ChangeList RemoveEvent::process()
 {

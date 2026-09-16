@@ -586,6 +586,9 @@ set(SLIC3R_SHARED_FILES
 
         src/Slic3r/App/Navigator.cpp
         include/Slic3r/App/Navigator.hpp
+        include/Slic3r/App/MsgBoxHandler.hpp
+        src/Slic3r/App/MsgBoxHandler.cpp
+        include/Slic3r/App/IMsgBoxProvider.hpp
 
         include/Slic3r/App/Yoga/Namespace.hpp
         src/Slic3r/App/Yoga/Namespace.cpp

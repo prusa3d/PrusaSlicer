@@ -8,8 +8,8 @@ enum class ModalDialog
     Preferences,
     CrashedProjects,
     Welcome,
-    NumberEntry,
-    PresetUpdater
+    PresetUpdater,
+    MsgBox, ///< One-of modal dialogs created by MsgBoxHandler
 };
 
 } // namespace Slic3r::App

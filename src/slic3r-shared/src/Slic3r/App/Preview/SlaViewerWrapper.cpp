@@ -1,10 +1,5 @@
 #include "Slic3r/App/Preview/SlaViewerWrapper.hpp"
 
-#include "Slic3r/App/Imgui/ImguiExtension.hpp"
-
-#include "Slic3r/Biz/I18N/I18N.hpp"
-#include "Slic3r/Biz/libpgcode/Utils.hpp"
-
 #include "Slic3r/Domain/Constants.hpp"
 
 #include <iostream>
@@ -43,7 +38,7 @@ bool SlaViewerWrapper::set_settings(const ViewerWrapperBaseSettings& settings)
     m_settings = settings;
 
     try {
-        m_slider_layers = Yoga::Passthrough(std::make_unique<DoubleSliderForLayers>());
+        m_slider_layers = Yoga::Passthrough(std::make_unique<DoubleSliderForLayers>(*settings.navigator));
         set_layers_slider_base_flags(m_settings.layers_slider_base_flags);
 
         m_slider_layers->set_draw_mode(true, false);

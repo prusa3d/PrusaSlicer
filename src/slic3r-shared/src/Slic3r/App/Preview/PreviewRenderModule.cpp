@@ -415,8 +415,18 @@ void PreviewRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_preferences_dialog.get(), ModalDialog::Preferences);
     handle_dialog(m_crashed_projects_dialog.get(), ModalDialog::CrashedProjects);
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
+    if (modal_dialog == ModalDialog::MsgBox) {
+        msg_box_handler()->open_modal();
+    } else {
+        msg_box_handler()->close_modal();
+    }
 
     request_render();
+}
+
+MsgBoxHandler* PreviewRenderModule::msg_box_handler()
+{
+    return &m_layout->msg_box_handler();
 }
 
 void PreviewRenderModule::on_init(
@@ -722,9 +732,13 @@ void PreviewRenderModule::init_viewers(Render::Device& device)
     // Initialize the SLA ViewerWrapper
 
     ViewerWrapperBaseSettings base_settings;
-    base_settings.layers_slider_base_flags.show_ruler           = app_config.get<bool>("show_ruler_in_dbl_slider");
-    base_settings.layers_slider_base_flags.show_ruler_bg        = app_config.get<bool>("show_ruler_bg_in_dbl_slider");
-    base_settings.layers_slider_base_flags.show_estimated_times = app_config.get<bool>("show_estimated_times_in_dbl_slider");
+    base_settings.navigator = m_render_module_navigator;
+    base_settings.layers_slider_base_flags.show_ruler =
+        app_config.get<bool>("show_ruler_in_dbl_slider");
+    base_settings.layers_slider_base_flags.show_ruler_bg =
+        app_config.get<bool>("show_ruler_bg_in_dbl_slider");
+    base_settings.layers_slider_base_flags.show_estimated_times =
+        app_config.get<bool>("show_estimated_times_in_dbl_slider");
     // set layers slider callbacks
     base_settings.layers_slider_base_callbacks.on_thumb_move =
         std::bind(&PreviewRenderModule::on_slider_layers_on_thumb_move, this);
@@ -751,6 +765,7 @@ void PreviewRenderModule::init_viewers(Render::Device& device)
     FdmViewerWrapperSettings settings;
     settings.ViewerWrapperBaseSettings::operator=(base_settings);
 
+    settings.navigator                        = m_render_module_navigator;
     settings.mode                             = mode;
     settings.slider_layers_use_default_colors = app_config.get<bool>("use_default_colors_in_dbl_slider");
     settings.seq_top_layer_only               = app_config.get<bool>("seq_top_layer_only");
@@ -811,10 +826,6 @@ void PreviewRenderModule::init_scene_layout()
         *m_render_module_navigator
     );
 
-    m_number_entry_dialog = std::make_unique<NumberEntryDialog>(
-        *m_render_module_navigator
-    );
-
     m_invalid_data_dialog = std::make_unique<InvalidDataDialog>(
         m_project_interactor,
         *m_render_module_navigator
@@ -871,7 +882,6 @@ void PreviewRenderModule::init_scene_layout()
         m_sla_slider_layers.release(),
         m_slider_gcode.release(),
         m_sidebar_auto_reslice.release(),
-        m_number_entry_dialog.release(),
         m_invalid_data_dialog.release(),
         m_crashed_projects_dialog.release(),
         m_preset_updater_dialog.release()

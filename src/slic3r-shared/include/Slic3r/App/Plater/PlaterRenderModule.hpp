@@ -12,8 +12,6 @@
 #include "Slic3r/Biz/Emboss/IFontManager.hpp"
 #include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/App/DialogNavigation.hpp"
-#include "Slic3r/App/MenuManager.hpp"
-#include "Slic3r/App/CommandBindingManager.hpp"
 #include "Slic3r/App/Lua/PluginSystem.hpp"
 #include "Slic3r/App/Scene/GizmoManager.hpp"
 #include "Slic3r/App/Scene/ModelGeometryProvider.hpp"
@@ -38,10 +36,10 @@ class TopBar;
 class PreferencesDialog;
 class ToolBarButton;
 class ToolBarSwitchButton;
-class NumberEntryDialog;
 class CrashedProjectsDialog;
 class ProjectSaver;
 class PresetUpdaterDialog;
+class MsgBoxHandler;
 } // namespace Slic3r::App
 
 namespace Slic3r::App::Lua {
@@ -125,17 +123,9 @@ public:
     void navigate_to_item(const Domain::ConfigItem* config_item);
 
     void open_search();
-    void set_modal_dialog(ModalDialog dialog);
+    void set_modal_dialog(ModalDialog dialog) override;
 
-    virtual void get_user_number_and_process(
-        const std::string& message,
-        const std::string& prompt,
-        const std::string& title,
-        int value,
-        int min,
-        int max,
-        std::function<void(int)> on_process
-    ) override;
+    MsgBoxHandler* msg_box_handler() override;
 
     Scene::IToolGizmo* tool_gizmo(Scene::ToolType type, Domain::PrinterTechnology pt) override;
 
@@ -220,7 +210,6 @@ private:
     Yoga::Passthrough<SidebarPlaterActionButtons> m_sidebar_action_buttons;
     Yoga::Passthrough<History> m_history;
     Yoga::Passthrough<PreferencesDialog> m_preferences_dialog;
-    Yoga::Passthrough<NumberEntryDialog> m_number_entry_dialog;
     Yoga::Passthrough<PresetUpdaterDialog> m_preset_updater_dialog;
     Yoga::Passthrough<WelcomeDialog> m_welcome_dialog;
     Yoga::Passthrough<CrashedProjectsDialog> m_crashed_projects_dialog;

@@ -5,6 +5,7 @@
 #include "Slic3r/App/MenuManager.hpp"
 #include "Slic3r/App/CommandBindingManager.hpp"
 #include "Slic3r/App/Yoga/Item.hpp"
+#include "Slic3r/App/ModalDialog.hpp"
 
 #include <memory>
 
@@ -13,6 +14,7 @@ namespace Slic3r::App {
 class Navigator;
 class ObjectListWindow;
 class InvalidDataDialog;
+class MsgBoxHandler;
 
 namespace Scene {
 class GizmoManager;
@@ -42,6 +44,10 @@ public:
     void set_opened_dialog(Yoga::Dialog* opened_dialog);
     void open_invalid_data_dialog();
     void set_object_list_collapsed(bool collapsed);
+
+    virtual void set_modal_dialog(ModalDialog dialog);
+
+    virtual MsgBoxHandler* msg_box_handler();
 
 protected:
     Navigator* m_render_module_navigator{nullptr};

@@ -1,4 +1,5 @@
 #include "Slic3r/App/NumberEntryDialog.hpp"
+
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
@@ -10,23 +11,38 @@
 
 namespace Slic3r::App {
 
-NumberEntryDialog::NumberEntryDialog(Navigator& navigator) :
+NumberEntryDialog::NumberEntryDialog(
+    const std::string& title,
+    const std::string& text,
+    const std::string& prompt,
+    int value,
+    int min,
+    int max,
+    IMsgBoxProvider::FnAcceptedNumber fn_accepted_number,
+    IMsgBoxProvider::FnCancelled fn_cancelled,
+    IMsgBoxProvider::DialogButtons buttons,
+    Navigator& navigator
+) :
     Yoga::Dialog("NumberEntryDialog"),
-    m_navigator(navigator)
+    m_navigator(navigator),
+    m_fn_accepted_number(fn_accepted_number),
+    m_fn_cancelled(fn_cancelled)
 {
     using namespace Yoga;
 
-    this->set_closable(true);
+    set_closable(true);
     content_item()->set_modal(true);
 
-    m_title_button = append_tab("Some Title");
+    append_tab(title);
 
     content()->set_orientation(Orientation::Vertical);
-    m_message = content()->emplace_back<Text>("msg");
+    if (!text.empty()) {
+        content()->emplace_back<Text>(text);
+    }
 
-    const float row_padding = 5.f;
-    const float row_gap = 10.f;
-    const Paddings button_padding(15.f, 5.f);
+    constexpr Unit row_padding = 5_fpx;
+    constexpr Unit row_gap     = 10_fpx;
+    const Paddings button_padding(15_fpx, 5_fpx);
 
     Item* input_row = content()->emplace_back<Item>();
     input_row->set_orientation(Orientation::Horizontal);
@@ -35,8 +51,10 @@ NumberEntryDialog::NumberEntryDialog(Navigator& navigator) :
     input_row->set_align_items(YGAlignCenter);
     input_row->set_flex_grow(1.f);
 
-    m_prompt = input_row->emplace_back<Text>("prompt");
-    m_input  = input_row->emplace_back<InputTextWithSpin>(std::make_unique<IntValidator>());
+    if (!prompt.empty()) {
+        input_row->emplace_back<Text>(prompt);
+    }
+    m_input = input_row->emplace_back<InputTextWithSpin>(std::make_unique<IntValidator>());
     m_input->set_flex_grow(1.f);
     m_input_validator = dynamic_cast<IntValidator*>(m_input->validator());
     ASSERT(m_input_validator);
@@ -52,43 +70,27 @@ NumberEntryDialog::NumberEntryDialog(Navigator& navigator) :
     ok_btn->set_content_padding(button_padding);
     ok_btn->callbacks().action = [this]()
     {
-        if (m_on_process) {
-            m_on_process(m_input_validator->value());
+        if (m_fn_accepted_number) {
+            m_fn_accepted_number(m_input_validator->value());
         }
         close_action();
     };
-    
+
     LayoutButton* cancel_btn = buttons_row->emplace_back<LayoutButton>(Biz::_u8L("Cancel"));
     cancel_btn->set_content_padding(button_padding);
-    cancel_btn->callbacks().action = [this]()
-    { close_action(); };
-}
-
-void NumberEntryDialog::get_user_number_and_process(
-    const std::string& message,
-    const std::string& prompt,
-    const std::string& title,
-    int value,
-    int min,
-    int max,
-    std::function<void(int)> on_process
-)
-{
-    m_title_button->set_label(title);
-    m_prompt->set_text(prompt);
-    m_message->set_text(message);
+    cancel_btn->callbacks().action = [this]() { close_action(); };
 
     m_input_validator->set_from(min);
     m_input_validator->set_to(max);
 
     m_input->set_text(fmt::format("{}", value));
-
-    m_on_process = on_process;
 }
 
 void NumberEntryDialog::close_action()
 {
-    m_on_process = nullptr;
+    if (m_fn_cancelled) {
+        m_fn_cancelled();
+    }
     m_navigator.set_modal_dialog(ModalDialog::None);
 }
 

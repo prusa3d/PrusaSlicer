@@ -60,4 +60,11 @@ void RenderModuleBase::set_object_list_collapsed(bool collapsed)
     }
 }
 
+MsgBoxHandler* RenderModuleBase::msg_box_handler()
+{
+    return nullptr;
+}
+
+void RenderModuleBase::set_modal_dialog(ModalDialog dialog) {}
+
 } // namespace Slic3r::App

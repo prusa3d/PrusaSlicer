@@ -472,9 +472,9 @@ void MenuCommandRegistrar::register_object_menu_commands()
                     init_cnt = object->instances.size();
                 }
 
-                m_render_module.get_user_number_and_process(
-                    " ",
-                    Biz::_u8L("Enter the number of copies:"),
+                m_navigator.input_number(
+                    Biz::_u8L("Enter the number of copies"),
+                    std::string{},
                     Biz::_u8L("Copies of the selected object"),
                     init_cnt,
                     1,
@@ -495,7 +495,8 @@ void MenuCommandRegistrar::register_object_menu_commands()
                             target_bed,
                             UndoSnapshotType::SetNumberOfInstances
                         );
-                    }
+                    },
+                    [] {}
                 );
             },
             UIItemCommandExtraOpts{

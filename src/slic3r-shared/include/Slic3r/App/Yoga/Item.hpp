@@ -153,7 +153,7 @@ public:
      * @brief remove_later removes item only after render traversal
      * @param child to remove
      */
-    void remove_later(Item* child);
+    void remove_later(Object* child);
     /**
      * @brief move_later moves this item only after render traversal
      * @param target to move this item

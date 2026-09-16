@@ -36,6 +36,7 @@ struct FdmViewerWrapperSettings : public ViewerWrapperBaseSettings
     bool slider_layers_editable{ false };
     bool slider_layers_use_default_colors{ false };
     bool seq_top_layer_only{ false };
+    Navigator* navigator{ nullptr };
 
     //
     // wrapper callbacks

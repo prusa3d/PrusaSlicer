@@ -33,7 +33,6 @@ public:
         std::unique_ptr<SidebarObject> sidebar_object,
         std::unique_ptr<SidebarPlaterActionButtons> sidebar_action_buttons,
         std::unique_ptr<History> history,
-        std::unique_ptr<NumberEntryDialog> number_entry_dialog,
         std::unique_ptr<WelcomeDialog> welcome_dialog,
         std::unique_ptr<InvalidDataDialog> invalid_data_dialog,
         std::unique_ptr<Lua::PluginDialog> plugin_dialog,

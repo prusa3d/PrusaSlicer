@@ -48,6 +48,16 @@ void ColorPicker::render(const Vec2f& pos, const Vec2f& size)
     render_item_end(pos, size);
 }
 
+Domain::ColorRGB ColorPicker::color_rgb() const
+{
+    return {m_data[0], m_data[1], m_data[2]};
+}
+
+Domain::ColorRGBA ColorPicker::color_rgba() const
+{
+    return {m_data[0], m_data[1], m_data[2], m_data[3]};
+}
+
 void ColorPicker::set_color(const ImColor& color)
 {
     m_data[0] = color.Value.x;

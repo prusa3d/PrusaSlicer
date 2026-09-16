@@ -39,6 +39,7 @@ struct LayersSliderBaseCallbacks
 
 struct ViewerWrapperBaseSettings
 {
+    Navigator* navigator{nullptr};
     LayersSliderBaseFlags layers_slider_base_flags;
     LayersSliderBaseCallbacks layers_slider_base_callbacks;
 };

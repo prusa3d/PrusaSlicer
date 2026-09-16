@@ -23,7 +23,6 @@
 #include "Slic3r/App/MenuManager.hpp"
 #include "Slic3r/App/CommandBindingManager.hpp"
 #include "Slic3r/App/Scene/ModelGeometryProvider.hpp"
-#include "Slic3r/App/ModalDialog.hpp"
 
 #include <map>
 #include <memory>
@@ -144,12 +143,9 @@ public:
     const std::optional<Platform::CameraSynchData>& camera_synch_data() const override;
     void set_camera_synch_data(const Platform::CameraSynchData& data) override;
 
-    void set_modal_dialog(ModalDialog dialog);
+    void set_modal_dialog(ModalDialog dialog) override;
 
-    TopBar* top_bar()
-    {
-        return m_top_bar.get();
-    }
+    MsgBoxHandler* msg_box_handler() override;
 
 protected:
     /**
@@ -201,7 +197,6 @@ private:
     Yoga::Passthrough<DoubleSliderForLayers> m_sla_slider_layers;
     Yoga::Passthrough<SidebarAutoReslice> m_sidebar_auto_reslice;
     Yoga::Passthrough<PreferencesDialog> m_preferences_dialog;
-    Yoga::Passthrough<NumberEntryDialog> m_number_entry_dialog;
     Yoga::Passthrough<CrashedProjectsDialog> m_crashed_projects_dialog;
     Yoga::Passthrough<PresetUpdaterDialog> m_preset_updater_dialog;
     // temporary variable to allow to switch yoga layout on/off

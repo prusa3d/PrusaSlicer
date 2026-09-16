@@ -6,7 +6,7 @@
 #include "Slic3r/App/Yoga/Separator.hpp"
 
 namespace Slic3r::App::Yoga {
-constexpr float dialog_padding = 10;
+constexpr Unit dialog_padding = 10_fpx;
 
 Dialog::Dialog(const std::string& name)
 {
@@ -20,7 +20,7 @@ Dialog::Dialog(const std::string& name)
     window->set_max_height(100_wh);
 
     m_top_row = window->emplace_back<Item>();
-    m_top_row->set_max_height(40);
+    m_top_row->set_max_height(40_fpx);
     m_top_row->set_flex_shrink(0);
 
     m_tab_container = m_top_row->emplace_back<Item>();
@@ -53,8 +53,8 @@ Dialog::Dialog(const std::string& name)
     buttons_rect->set_rounding(0);
 
     m_close_button = buttons_rect->emplace_back<LayoutButton>(std::string{}, Render::Icon::PrintIdle);
-    m_close_button->set_min_width(20);
-    m_close_button->set_min_height(20);
+    m_close_button->set_min_width(20_fpx);
+    m_close_button->set_min_height(20_fpx);
     m_close_button->callbacks().action = [this] {
         close_action();
     };
@@ -116,7 +116,7 @@ LayoutButton* Dialog::append_tab(const std::string& tab)
 {
     LayoutButton* tab_button = m_tab_container->emplace_back<LayoutButton>(tab);
     tab_button->set_checkable(true);
-    tab_button->set_content_padding({10, 3});
+    tab_button->set_content_padding({10_fpx, 3_fpx});
     tab_button->set_background_color(Platform::Color::WindowBgAlternate);
     tab_button->set_background_color_checked(m_theme->color_imgui(Platform::Color::WindowBg));
 

@@ -39,7 +39,6 @@ public:
         std::unique_ptr<DoubleSliderForLayers> sla_double_slider_layers,
         std::unique_ptr<DoubleSliderForGcode> double_slider_gcode,
         std::unique_ptr<SidebarAutoReslice> sidebar_auto_reslice,
-        std::unique_ptr<NumberEntryDialog> numbers_entry_dialog,
         std::unique_ptr<InvalidDataDialog> invalid_data_dialog,
         std::unique_ptr<CrashedProjectsDialog> crashed_projects_dialog,
         std::unique_ptr<PresetUpdaterDialog> preset_updater_dialog

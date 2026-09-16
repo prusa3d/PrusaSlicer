@@ -83,7 +83,6 @@
 #include "Slic3r/App/TopBar.hpp"
 #include "Slic3r/App/Wildcards.hpp"
 #include "Slic3r/App/PreferencesDialog.hpp"
-#include "Slic3r/App/NumberEntryDialog.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
 #include "Slic3r/App/SidebarStackLayout.hpp"
 #include "Slic3r/App/ColorMix/ColorMixDialog.hpp"
@@ -164,7 +163,8 @@ PlaterRenderModule::~PlaterRenderModule()
 
 void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
 {
-    auto handle_dialog = [&](Yoga::Popup* dialog, ModalDialog modal){
+    auto handle_dialog = [&](Yoga::Popup* dialog, ModalDialog modal)
+    {
         if (modal_dialog == modal) {
             dialog->open();
         } else {
@@ -174,28 +174,20 @@ void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
 
     handle_dialog(m_preferences_dialog.get(), ModalDialog::Preferences);
     handle_dialog(m_welcome_dialog.get(), ModalDialog::Welcome);
-    handle_dialog(m_number_entry_dialog.get(), ModalDialog::NumberEntry);
     handle_dialog(m_crashed_projects_dialog.get(), ModalDialog::CrashedProjects);
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
+    if (modal_dialog == ModalDialog::MsgBox) {
+        msg_box_handler()->open_modal();
+    } else {
+        msg_box_handler()->close_modal();
+    }
 
     request_render();
 }
 
-void PlaterRenderModule::get_user_number_and_process(
-    const std::string& message,
-    const std::string& prompt,
-    const std::string& title,
-    int value,
-    int min,
-    int max,
-    std::function<void(int)> on_process
-)
+MsgBoxHandler* PlaterRenderModule::msg_box_handler()
 {
-    if (m_number_entry_dialog.get()) {
-        m_number_entry_dialog
-            ->get_user_number_and_process(message, prompt, title, value, min, max, on_process);
-        set_opened_dialog(m_number_entry_dialog.get());
-    }
+    return &m_layout->msg_box_handler();
 }
 
 Scene::IToolGizmo* PlaterRenderModule::tool_gizmo(Scene::ToolType type, Domain::PrinterTechnology pt)
@@ -547,10 +539,6 @@ void PlaterRenderModule::init_scene_layout()
         *m_render_module_navigator
     );
 
-    m_number_entry_dialog = std::make_unique<NumberEntryDialog>(
-        *m_render_module_navigator
-    );
-
     m_preset_updater_dialog = std::make_unique<PresetUpdaterDialog>(
         AppServices::instance().preset_updater_controller(),
         *m_render_module_navigator
@@ -618,7 +606,6 @@ void PlaterRenderModule::init_scene_layout()
         m_sidebar_object.release(),
         m_sidebar_action_buttons.release(),
         m_history.release(),
-        m_number_entry_dialog.release(),
         m_welcome_dialog.release(),
         m_invalid_data_dialog.release(),
         m_plugin_system.init_dialog().release(),
@@ -804,7 +791,6 @@ void PlaterRenderModule::init_dialog_navigation()
 
     m_dialog_navigation.insert_dialog(&m_sidebar_print->print_settings_dialog());
     m_dialog_navigation.insert_dialog(m_preferences_dialog.get());
-    m_dialog_navigation.insert_dialog(m_number_entry_dialog.get());
     m_dialog_navigation.insert_dialog(m_invalid_data_dialog.get());
 
     m_dialog_navigation.insert_dialog(&m_sidebar_action_buttons->physical_printer_settings_dialog());

@@ -55,12 +55,12 @@ bool FdmViewerWrapper::init(Render::Device& device, Scene::Scene& scene, Scene::
     }
 }
 
-bool FdmViewerWrapper::set_settings(const FdmViewerWrapperSettings &settings)
+bool FdmViewerWrapper::set_settings(const FdmViewerWrapperSettings& settings)
 {
     m_settings = settings;
 
     try {
-        m_slider_layers = Yoga::Passthrough<DoubleSliderForLayers>(std::make_unique<DoubleSliderForLayers>());
+        m_slider_layers = Yoga::Passthrough<DoubleSliderForLayers>(std::make_unique<DoubleSliderForLayers>(*m_settings.navigator));
         set_layers_slider_base_flags(m_settings.layers_slider_base_flags);
         m_slider_layers->seq_top_layer_only(m_settings.seq_top_layer_only);
         m_slider_layers->set_use_default_colors(m_settings.slider_layers_use_default_colors);

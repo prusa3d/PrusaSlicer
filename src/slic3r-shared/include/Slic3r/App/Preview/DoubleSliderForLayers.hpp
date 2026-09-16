@@ -7,6 +7,10 @@
 #include "TickCodeManager.hpp"
 #include "Types.hpp"
 
+namespace Slic3r::App {
+class Navigator;
+}
+
 namespace Slic3r::App::Yoga {
 class LayoutButton;
 class Menu;
@@ -41,7 +45,7 @@ enum class LabelType
 class DoubleSliderForLayers : public Imgui::DoubleSlider::Manager<float>
 {
 public:
-    explicit DoubleSliderForLayers();
+    explicit DoubleSliderForLayers(Navigator& navigator);
 
     void change_one_layer_lock();
 
@@ -150,10 +154,6 @@ private:
     bool render_multi_extruders_menu(bool switch_current_code = false);
 
     bool render_get_jump_to_value_popup(const ImVec2& pos);
-    bool render_pause_print_popup(const ImVec2& pos);
-    bool render_color_picker_popup(const ImVec2& pos);
-    bool render_custom_gcode_popup(const ImVec2& pos);
-    bool render_yes_no_cancel_popup(const ImVec2& pos);
 
     void auto_color_change();
     void perform_auto_color_change();
@@ -162,11 +162,12 @@ private:
     void edit_tick(int tick = -1);
     void discard_all_ticks();
 
+    void open_pause_print_dialog(int tick, int extruder, bool editing);
+    void open_color_change_dialog(int tick, int extruder, bool editing);
+    void open_custom_gcode_dialog(int tick, int extruder, bool editing);
+    void finish_tick_edit(bool ticks_count_changed);
+
     void process_jump_to_value();
-    void process_pause_print();
-    void process_color_picker();
-    void process_custom_gcode();
-    void process_yes_no_cancel();
 
     bool can_edit() const { return m_allow_editing && m_draw_mode != DrawMode::SlaPrint; }
 
@@ -182,6 +183,8 @@ private:
     ImU32 tick_clr() const;
 
 private:
+    Navigator& m_navigator;
+
     Biz::libpgcode::UnitsSystem m_units{ Biz::libpgcode::UnitsSystem::SI };
 
     bool m_is_osx{ false };
@@ -221,39 +224,6 @@ private:
     Yoga::MenuItem* m_show_estimated_times_item{ nullptr };
     Yoga::MenuItem* m_show_ruler_item{ nullptr };
     Yoga::MenuItem* m_show_ruler_background_item{ nullptr };
-
-    struct TickPopup
-    {
-        std::string data;
-        std::string cache;
-        int extruder_id{0};
-        int tick{-1};
-        float z{0.0f};
-        bool editing{false};
-        bool show{false};
-    };
-
-    TickPopup m_pause_print_popup;
-    TickPopup m_color_picker_popup;
-    TickPopup m_custom_gcode_popup;
-
-    enum class PopupResult
-    {
-        Undefined,
-        Yes,
-        No,
-        Cancel
-    };
-
-    struct YesNoCancelPopup
-    {
-        std::string caller;
-        std::string caption;
-        std::string txt;
-        bool show{ false };
-        PopupResult result{ PopupResult::Undefined };
-    };
-    YesNoCancelPopup m_yes_no_cancel_popup;
 
     bool m_show_just_color_change_menu{ false };
     bool m_show_get_jump_value_popup{ false };

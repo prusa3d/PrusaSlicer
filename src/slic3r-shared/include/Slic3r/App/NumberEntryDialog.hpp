@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Slic3r/App/Yoga/Dialog.hpp"
-//#include "Slic3r/App/IConfigNavigable.hpp"
+#include "Slic3r/App/IMsgBoxProvider.hpp"
 
 #include <string>
 
@@ -16,19 +16,20 @@ class IntValidator;
 
 class Navigator;
 
-class NumberEntryDialog : public Yoga::Dialog//, public IConfigNavigable
+class NumberEntryDialog : public Yoga::Dialog
 {
 public:
-    explicit NumberEntryDialog(Navigator& navigator);
-
-    void get_user_number_and_process(
-        const std::string& message,
-        const std::string& prompt,
+    explicit NumberEntryDialog(
         const std::string& title,
+        const std::string& text,
+        const std::string& prompt,
         int value,
         int min,
         int max,
-        std::function<void(int)> on_process
+        IMsgBoxProvider::FnAcceptedNumber fn_accepted_number,
+        IMsgBoxProvider::FnCancelled fn_cancelled,
+        IMsgBoxProvider::DialogButtons buttons,
+        Navigator& navigator
     );
 
 protected:
@@ -36,13 +37,10 @@ protected:
 
 private:
     Navigator& m_navigator;
+    IMsgBoxProvider::FnAcceptedNumber m_fn_accepted_number;
+    IMsgBoxProvider::FnCancelled m_fn_cancelled;
 
-    Yoga::LayoutButton* m_title_button{nullptr};
-    Yoga::Text* m_message{nullptr};
-    Yoga::Text* m_prompt{nullptr};
     Yoga::InputTextWithSpin* m_input{nullptr};
-    Yoga::IntValidator* m_input_validator{ nullptr };
-
-    std::function<void(int)> m_on_process{nullptr};
+    Yoga::IntValidator* m_input_validator{nullptr};
 };
 } // namespace Slic3r::App

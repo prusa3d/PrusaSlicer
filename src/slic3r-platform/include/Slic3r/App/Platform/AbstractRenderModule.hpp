@@ -79,16 +79,6 @@ public:
         return nullptr;
     }
 
-    virtual void get_user_number_and_process(
-        const std::string& message,
-        const std::string& prompt,
-        const std::string& title,
-        int value,
-        int min,
-        int max,
-        std::function<void(int)> on_process
-    ) {}
-
 protected:
     /**
      * Initialize all Render objects here.

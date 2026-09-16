@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Slic3r/Domain/Color.hpp"
+
 #include "Slic3r/App/Yoga/Item.hpp"
 
 namespace Slic3r::App::Yoga {
@@ -15,6 +17,9 @@ public:
     };
 
     void render(const Vec2f& pos, const Vec2f& size) override;
+
+    Domain::ColorRGB color_rgb() const;
+    Domain::ColorRGBA color_rgba() const;
 
     Callbacks& callbacks();
 

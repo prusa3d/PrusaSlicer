@@ -5,12 +5,15 @@
 
 #include "Slic3r/App/IAppConfigChangedListener.hpp"
 #include "Slic3r/App/ModalDialog.hpp"
+#include "Slic3r/App/IMsgBoxProvider.hpp"
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
 } // namespace Slic3r::Biz
 
 namespace Slic3r::App {
+
+class RenderModuleBase;
 
 namespace Plater {
 class PlaterRenderModule;
@@ -37,7 +40,10 @@ enum class ModuleType
 };
 } // namespace Render
 
-class Navigator : public Biz::ISelectedProjectChangedListener, public IAppConfigChangedListener
+class Navigator :
+    public Biz::ISelectedProjectChangedListener,
+    public IAppConfigChangedListener,
+    public IMsgBoxProvider
 {
 public:
     ~Navigator();
@@ -84,6 +90,45 @@ public:
     bool object_list_collapsed() const;
     void set_object_list_collapsed(bool collapsed);
 
+    void pick_color(
+        const std::string& title,
+        const Domain::ColorRGB& input_color = Domain::ColorRGB{0.f, 0.f, 0.f},
+        FnColorPicked fn_color_picked       = nullptr,
+        FnCancelled fn_cancelled            = nullptr,
+        DialogButtons buttons               = AcceptCancelButtons
+    ) override;
+
+    void input_text(
+        const std::string& title,
+        const std::string& text,
+        const std::string& input_text   = std::string{},
+        FnAcceptedText fn_accepted_text = nullptr,
+        FnCancelled fn_cancelled        = nullptr,
+        DialogButtons buttons           = AcceptCancelButtons,
+        bool multiline                  = false
+    ) override;
+
+    void yes_no_cancel(
+        const std::string& title,
+        const std::string& text,
+        FnAccepted fn_accepted   = nullptr,
+        FnRejected fn_rejected   = nullptr,
+        FnCancelled fn_cancelled = nullptr,
+        DialogButtons buttons    = AcceptRejectCancelButtons
+    ) override;
+
+    void input_number(
+        const std::string& title,
+        const std::string& text,
+        const std::string& prompt,
+        int value,
+        int min,
+        int max,
+        FnAcceptedNumber fn_accepted_number = nullptr,
+        FnCancelled fn_cancelled            = nullptr,
+        DialogButtons buttons               = AcceptCancelButtons
+    ) override;
+
     bool has_fullscreen() const;
     bool is_fullscreen() const;
     void set_fullscreen(bool fullscreen);
@@ -93,6 +138,8 @@ public:
 
 private:
     void set_render_module_type(Render::ModuleType type);
+
+    RenderModuleBase* current_render_module();
 
 private:
     struct ProjectContext

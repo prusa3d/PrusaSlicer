@@ -46,7 +46,7 @@ using EventPtr = std::unique_ptr<Event>;
 class RemoveEvent : public Event
 {
 public:
-    RemoveEvent(Item* item);
+    RemoveEvent(Object* object);
 
     ChangeList process() override;
 };
