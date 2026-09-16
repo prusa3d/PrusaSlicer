@@ -30,6 +30,13 @@ PresetUpdaterCLI::PresetUpdaterCLI(Biz::PresetUpdater::PresetUpdaterInteractor& 
     );
 }
 
+PresetUpdaterCLI::~PresetUpdaterCLI()
+{
+    m_preset_updater_interactor.remove_listener<Biz::PresetUpdater::IPresetUpdaterResultListener>(
+        this
+    );
+}
+
 void PresetUpdaterCLI::start(const ActionParams& action, const std::string data)
 {
     if (action.preset_updater_sync) {

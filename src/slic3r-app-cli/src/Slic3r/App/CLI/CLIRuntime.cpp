@@ -208,6 +208,7 @@ void CLIRuntime::wait_until(const std::function<bool()>& predicate)
     while (true) {
         this->dispatcher().dispatch_enqueued();
         if (predicate()) {
+            while (this->dispatcher().dispatch_enqueued()) { }
             return;
         }
 

@@ -11,6 +11,7 @@ class PresetUpdaterCLI : public Biz::PresetUpdater::IPresetUpdaterResultListener
 {
 public:
     PresetUpdaterCLI(Biz::PresetUpdater::PresetUpdaterInteractor& preset_updater_interactor);
+    ~PresetUpdaterCLI();
 
     void start(const ActionParams& action, const std::string data);
 
