@@ -248,4 +248,9 @@ void Icon::set_rounding(Unit rounding)
         set_style_dirty();
     }
 }
+
+const std::shared_ptr<Render::Texture>& Icon::texture()
+{
+    return m_texture;
+}
 } // namespace Slic3r::App::Yoga

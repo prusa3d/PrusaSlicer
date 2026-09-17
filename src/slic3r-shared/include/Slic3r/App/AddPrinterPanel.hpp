@@ -14,6 +14,7 @@
 
 namespace Slic3r::App::Yoga {
 class ScrollArea;
+class Icon;
 }
 
 namespace Slic3r::App {
@@ -67,6 +68,10 @@ private:
     Yoga::Item* m_printers{nullptr};
     Yoga::Item* m_detail{nullptr};
 
+    // Keep alive the thumbnail textures. Reloading them takes too much time.
+    std::queue<std::shared_ptr<Render::Texture>> m_texture_cache;
+    std::vector<Yoga::Icon*> m_shown_thumbnails;
+
     Yoga::ItemPtr create_printer_family(
         const PrinterFamily& printer_family,
         const std::vector<const PrinterEntry*>& printers
@@ -77,5 +82,6 @@ private:
     void rebuild_printer_families();
     void rebuild_printer_view();
     void clear_printer_items();
+    void emplace_vendor_button(const std::string& name, const std::string& id);
 };
 } // namespace Slic3r::App

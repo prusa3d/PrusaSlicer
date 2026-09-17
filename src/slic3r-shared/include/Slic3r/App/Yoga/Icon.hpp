@@ -82,6 +82,8 @@ public:
 
     void set_rounding(Unit rounding);
 
+    const std::shared_ptr<Render::Texture>& texture();
+
 private:
     void size_info_changed(const SizeInfo &info_size) override;
     void update_draw_sizes();

@@ -212,10 +212,29 @@ ItemPtr AddPrinterPanel::create_printer_family(
         image->set_height(80_fpx);
         image->set_aspect_ratio(1.0);
         image->set_flex_shrink(0);
+        m_shown_thumbnails.push_back(image);
 
         printer_content->emplace_back<Text>(entry->printer.default_config.short_name);
     }
     return result;
+}
+
+void AddPrinterPanel::emplace_vendor_button(const std::string& name, const std::string& id)
+{
+    auto button{m_left_bar->emplace_back<LayoutButton>(name)};
+    button->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
+    button->set_rounding(0);
+    button->set_checkable(true);
+    button->set_content_justify_content(YGJustifyFlexStart);
+    button->set_flex_shrink(0);
+    m_button_vendors.emplace(button, id);
+
+    if (m_selected_vendor == id) {
+        button->set_checked(true);
+        m_vendor_button_group.insert_button(button);
+    } else {
+        m_vendor_button_group.insert_button(button);
+    }
 }
 
 void AddPrinterPanel::reload_vendor_buttons(const Domain::Preset::Bundle& preset_bundle)
@@ -251,29 +270,17 @@ void AddPrinterPanel::reload_vendor_buttons(const Domain::Preset::Bundle& preset
         }
     }
 
-    LayoutButton* selected_button{nullptr};
-    std::vector<LayoutButton*> unselected_buttons;
+    const std::string prefer_vendor_id{"PrusaResearch"};
+    const auto it{vendor_bundles.find(prefer_vendor_id)};
+    if (it != vendor_bundles.end()) {
+        emplace_vendor_button(it->second.vendor_data.info.name, it->first);
+    }
+
     for (const auto& [vendor_id, vendor_bundle] : vendor_bundles) {
-        auto button{m_left_bar->emplace_back<LayoutButton>(vendor_bundle.vendor_data.info.name)};
-        button->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
-        button->set_rounding(0);
-        button->set_checkable(true);
-        button->set_content_justify_content(YGJustifyFlexStart);
-        m_button_vendors.emplace(button, vendor_id);
-
-        if (m_selected_vendor == vendor_id) {
-            selected_button = button;
-        } else {
-            unselected_buttons.push_back(button);
+        if (vendor_id == prefer_vendor_id) {
+            continue;
         }
-    }
-
-    if (selected_button != nullptr) {
-        selected_button->set_checked(true);
-        m_vendor_button_group.insert_button(selected_button);
-    }
-    for (LayoutButton* button : unselected_buttons) {
-        m_vendor_button_group.insert_button(button);
+        emplace_vendor_button(vendor_bundle.vendor_data.info.name, vendor_id);
     }
 }
 
@@ -402,9 +409,18 @@ void AddPrinterPanel::rebuild_printer_view()
 
 void AddPrinterPanel::clear_printer_items()
 {
+    for (Yoga::Icon* thumbnail : m_shown_thumbnails) {
+        if (thumbnail->texture()) {
+            m_texture_cache.push(thumbnail->texture());
+        }
+    }
+    while (m_texture_cache.size() > 100) {
+        m_texture_cache.pop();
+    }
     while (!m_printers->items().empty()) {
         m_printers->remove(m_printers->items().back());
     }
+    m_shown_thumbnails.clear();
 }
 
 void AddPrinterPanel::reload()
