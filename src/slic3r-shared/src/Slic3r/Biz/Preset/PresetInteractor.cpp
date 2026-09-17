@@ -312,7 +312,21 @@ void PresetInteractor::load_preset_bundle(const IO::BundlePaths& bundle_paths)
         Domain::Preset::Bundle& preset_bundle = *preset_bundle_opt;
         // copy over printer configs from original bundle, so these are not lost on reload
         if (m_workbench.has_preset_bundle()) {
-            preset_bundle.printer_configs = m_workbench.preset_bundle().printer_configs;
+            // Copy over original hw_configs (to preserve them between loads
+            std::ranges::copy(
+                m_workbench.preset_bundle().printer_configs
+                    | std::views::filter(
+                        [&preset_bundle](const auto& hw_config)
+                        {
+                            // filter out removed vendors
+                            return preset_bundle.vendor_bundles.contains(
+                                hw_config.second.vendor_id
+                            );
+                        }
+                    ),
+                std::inserter(preset_bundle.printer_configs, preset_bundle.printer_configs.end())
+            );
+
             for (const auto& hw_config : preset_bundle.printer_configs | std::views::values) {
                 auto& vendor_bundle = preset_bundle.vendor_bundles.at(hw_config.vendor_id);
                 vendor_bundle.printer_configs.push_back(hw_config);
