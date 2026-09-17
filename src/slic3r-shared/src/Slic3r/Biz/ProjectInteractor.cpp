@@ -72,6 +72,11 @@ const Domain::Project& ProjectInteractor::selected_project() const
     return m_workbench.project(m_selection.project_id);
 }
 
+bool ProjectInteractor::selected_project_is_empty() const
+{
+    return selected_project().model().objects.empty();
+}
+
 Domain::Project& ProjectInteractor::selected_project()
 {
     ASSERT(m_selection.project_id != Domain::INVALID_ID);
@@ -228,8 +233,15 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
     return project_id;
 }
 
-void ProjectInteractor::load_project(const boost::filesystem::path& file_path)
+void ProjectInteractor::load_project(
+    const boost::filesystem::path& file_path,
+    EmptyProjectAction empty_project_action
+)
 {
+    invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
+        l->on_file_load_started();
+    });
+
     auto report_error{
         [this](const std::string& description)
         {
@@ -239,8 +251,18 @@ void ProjectInteractor::load_project(const boost::filesystem::path& file_path)
         }
     };
 
-    auto on_result{[this, file_path](Project&& project)
-                   { this->do_load_project(std::move(project), file_path); }};
+    auto on_result{[this, file_path, empty_project_action](Project&& project)
+    {
+        const SelectionId previous_project_id = m_selection.project_id;
+        const bool replace_previous_project = empty_project_action == EmptyProjectAction::Replace
+            && selected_project_is_empty();
+
+        if (this->do_load_project(std::move(project), file_path).has_value()
+            && replace_previous_project)
+        {
+            this->remove_project(previous_project_id);
+        }
+    }};
 
     auto on_error{[report_error](std::exception_ptr eptr)
                   {
@@ -990,6 +1012,39 @@ void ProjectInteractor::do_result_upload_connect(
     do_result_export_inner(id, std::move(config), std::move(data));
 }
 
+void ProjectInteractor::on_download_models(const std::vector<std::string>& message)
+{
+    if (m_raise_app_fn) {
+        m_raise_app_fn();
+    }
+    m_file_downloader_interactor.download_files_prusaslicer_url(
+        message,
+        selected_project_is_empty()
+    );
+}
+
+void ProjectInteractor::download_model_from_printables_tab(FileDownloader::FileDownloaderMultiTicket data)
+{
+    m_file_downloader_interactor.init_multi_job(std::move(data));
+}
+
+void ProjectInteractor::open_downloaded_file(const boost::filesystem::path& path, bool in_new_project)
+{
+    if (in_new_project) {
+        // file path could have locale dependent characters, do not use tolower
+        const std::string ext = path.extension().string();
+        const bool is_3mf     = ext == ".3mf" || ext == ".3MF";
+        // A single 3MF opened as a new project loads its full content (geometry + print,
+        // filament and printer settings). Other files start an empty project and add geometry.
+        if (is_3mf) {
+            load_project(path);
+            return;
+        }
+        new_project();
+    }
+    load_models_to_project({path});
+}
+
 void ProjectInteractor::on_model_downloaded(const std::vector<boost::filesystem::path>& paths, bool in_new_project)
 {
     ASSERT(!paths.empty());
@@ -998,11 +1053,11 @@ void ProjectInteractor::on_model_downloaded(const std::vector<boost::filesystem:
     // file path could have locale dependent characters, do not use tolower
     bool load_as_single_project = paths.size() ==1 && (ext_str == ".3mf" || ext_str == ".3MF");
     if (in_new_project && load_as_single_project) {
-        load_project(paths.front());
+        load_project(paths.front(), EmptyProjectAction::Replace);
         return;
     }
 
-    if (in_new_project) {
+    if (in_new_project && !selected_project_is_empty()) {
         new_project();
     }
     load_models_to_project(paths);
@@ -1089,13 +1144,17 @@ void ProjectInteractor::set_output_extension(Domain::SelectionId project_id, con
 
 void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::path> paths)
 {
+    invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
+        l->on_file_load_started();
+    });
+
     const auto& proj            = m_workbench.project(selected_project_id());
     Domain::BedRef selected_bed = scene_interactor().bed_selection().last_selected_bed();
     const Domain::ConfigContainer* cc =
         proj.find_config_container(selected_bed.config_container_id);
     const Domain::BedInstance& inst = cc->find_bed_instance(selected_bed.instance_id);
     int slot_count             = cc->selected_preset().hw_config.material_slot_count();
-    const Domain::ElementRefs new_instances = FileLoadingLogic::import_files_and_add_to_scene(
+    const FileLoadingLogic::ImportToSceneResult import_result = FileLoadingLogic::import_files_and_add_to_scene(
         paths,
         slot_count,
         scene_interactor(),
@@ -1103,7 +1162,7 @@ void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::pa
         m_dialog_provider
     );
 
-    if (new_instances.empty()) {
+    if (import_result.instances.empty()) {
         return;
     }
 
@@ -1111,10 +1170,16 @@ void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::pa
 
     arrange_interactor().arrange_added_instances(
         selected_project_id(),
-        new_instances,
+        import_result.instances,
         selected_bed,
         UndoSnapshotType::AddObject
     );
+
+    if (import_result.geometry_only_3mf) {
+        invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
+            l->on_geometry_only_imported();
+        });
+    }
 }
 
 Domain::SelectionId ProjectInteractor::add_config_container()

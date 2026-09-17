@@ -1229,6 +1229,29 @@ void PopNotificationCenter::on_project_will_be_removed(const Domain::SelectionId
     );
 }
 
+void PopNotificationCenter::on_file_load_started()
+{
+    m_notification_list.close_notifications_of_type(PopNotificationType::GeometryOnlyImport);
+}
+
+void PopNotificationCenter::on_geometry_only_imported()
+{
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::GeometryOnlyImport,
+            PopNotificationLevel::Regular,
+            10s,
+            PopNotificationLayoutHeaderText{
+                // TRN Notification header: only geometry was taken from a 3MF added to a project.
+                _u8L("Imported geometry only."),
+                // TRN Notification body: settings of a 3MF added to a project were not applied.
+                _u8L("3MF settings ignored to preserve your project.")
+            }
+        },
+        never_equal_matcher
+    );
+}
+
 std::optional<int>
 get_instance_index(const Domain::ModelObject& model_object, const Domain::SelectionId instance_id)
 {

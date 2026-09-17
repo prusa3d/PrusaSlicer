@@ -34,12 +34,20 @@ Domain::Project load_file_as_project(
 );
 
 /**
+ * Result of importing source files into the scene graph.
+ */
+struct ImportToSceneResult {
+    // Instance-level element refs of all newly added objects.
+    Domain::ElementRefs instances;
+    // True if at least one 3MF was loaded as geometry only.
+    bool geometry_only_3mf = false;
+};
+
+/**
  * Load meshes (e.g., STL, OBJ) and complex models (e.g., 3MF) from multiple source files
  * and insert them into the scene graph.
- *
- * @return Instance-level element refs of all newly added objects.
  */
-Domain::ElementRefs import_files_and_add_to_scene(
+ImportToSceneResult import_files_and_add_to_scene(
     const std::vector<boost::filesystem::path>& input_file_paths,
     int tool_count,
     Scene::SceneInteractor& scene_interactor,

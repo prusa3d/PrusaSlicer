@@ -31,6 +31,7 @@ set(SLIC3R_SHARED_WX_FILES
         src/Slic3r/App/WX/DialogManager.cpp
         include/Slic3r/App/WX/FileExplorerHandler.hpp
         src/Slic3r/App/WX/FileExplorerHandler.cpp
+        include/Slic3r/App/WX/UrlProtocolRegistration.hpp
         include/Slic3r/App/WX/DiffDialog.hpp
         src/Slic3r/App/WX/DiffDialog.cpp
         src/Slic3r/App/WX/DiffNamespace.hpp
@@ -101,6 +102,7 @@ if (WIN32)
         include/Slic3r/Biz/WX/SingleInstanceChecker.hpp
         src/Slic3r/Biz/WX/SingleInstanceChecker.cpp
         src/Slic3r/App/WX/FileExplorerHandlerWin32.cpp
+        src/Slic3r/App/WX/UrlProtocolRegistrationWin32.cpp
     )
 elseif (APPLE)
     list(APPEND SLIC3R_SHARED_WX_FILES
@@ -108,10 +110,12 @@ elseif (APPLE)
         include/Slic3r/Biz/WX/SecretStore.hpp
         src/Slic3r/Biz/WX/SecretStore.cpp
         src/Slic3r/App/WX/FileExplorerHandlerMac.cpp
+        src/Slic3r/App/WX/UrlProtocolRegistrationMac.mm
     )
 else ()
     list(APPEND SLIC3R_SHARED_WX_FILES
         src/Slic3r/App/WX/FileExplorerHandlerLinux.cpp
+        src/Slic3r/App/WX/UrlProtocolRegistrationLinux.cpp
     )
 endif ()
 

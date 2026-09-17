@@ -27,6 +27,7 @@
 #include <Slic3r/App/WX/StringConversions.hpp>
 #include <Slic3r/App/WX/DialogManager.hpp>
 #include <Slic3r/App/WX/WindowMetrics.hpp>
+#include <Slic3r/App/WX/UrlProtocolRegistration.hpp>
 #include <Slic3r/App/ProjectSaver.hpp>
 
 #include <Slic3r/Directories.hpp>
@@ -290,6 +291,7 @@ bool DesktopApp::OnInit()
 
     auto& platform_services{PlatformServices::instance()};
     init_translations();
+    WX::register_prusaslicer_url();
 
     platform_services.set_main_thread_dispatcher(std::make_unique<WXMainThreadDispatcher>());
 

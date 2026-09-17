@@ -142,11 +142,10 @@ void AbstractAppInstanceMessageHandler::handle_message_type_cli(const std::strin
     if (!paths.empty()) {
         std::lock_guard<std::mutex> lock(m_dispatcher_mutex);
         m_dispatcher.dispatch_on_main_thread(
-            [this, paths = std::move(paths)]() mutable
+            [this, paths = std::move(paths)]()
             {
                 invoke_listeners<Platform::IAppInstanceMessageContentListener>(
-                    [paths = std::move(paths)](auto* listener) mutable
-                    { listener->on_open_models(std::move(paths)); }
+                    [&paths](auto* listener) { listener->on_open_models(paths); }
                 );
             }
         );
@@ -154,11 +153,10 @@ void AbstractAppInstanceMessageHandler::handle_message_type_cli(const std::strin
     if (!downloads.empty()) {
         std::lock_guard<std::mutex> lock(m_dispatcher_mutex);
         m_dispatcher.dispatch_on_main_thread(
-            [this, downloads = std::move(downloads)]() mutable
+            [this, downloads = std::move(downloads)]()
             {
                 invoke_listeners<Platform::IAppInstanceMessageContentListener>(
-                    [downloads = std::move(downloads)](auto* listener) mutable
-                    { listener->on_download_models(std::move(downloads)); }
+                    [&downloads](auto* listener) { listener->on_download_models(downloads); }
                 );
             }
         );

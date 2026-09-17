@@ -11,9 +11,9 @@ class IAppInstanceMessageContentListener
 public:
     virtual ~IAppInstanceMessageContentListener() = default;
 
-    virtual void on_open_models(std::vector<boost::filesystem::path> message) {}
+    virtual void on_open_models(const std::vector<boost::filesystem::path>& message) {}
 
-    virtual void on_download_models(std::vector<std::string> message) {}
+    virtual void on_download_models(const std::vector<std::string>& message) {}
 
     virtual void on_read_token_store_message() {}
 

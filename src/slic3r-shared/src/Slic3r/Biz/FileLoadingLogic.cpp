@@ -48,6 +48,7 @@ struct ReturnData
     boost::filesystem::path file_path;
     std::optional<Domain::TriangleMesh> mesh;
     std::optional<Domain::Model> model;
+    bool geometry_only_3mf = false;
 };
 
 struct FileLoadError
@@ -745,7 +746,8 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
                 );
             }
 
-            ret.model = loaded_3mf.model;
+            ret.model             = loaded_3mf.model;
+            ret.geometry_only_3mf = true;
             return ret;
         } catch (const Loaded3MFException& e) {
             return tl::make_unexpected(FileLoadError::error(
@@ -1093,7 +1095,7 @@ std::optional<ModelVolume::Source> volume_source_from_path(const boost::filesyst
 }
 } // namespace
 
-ElementRefs import_files_and_add_to_scene(
+ImportToSceneResult import_files_and_add_to_scene(
     const std::vector<boost::filesystem::path>& file_paths,
     int tool_count,
     Scene::SceneInteractor& scene_interactor,
@@ -1103,8 +1105,11 @@ ElementRefs import_files_and_add_to_scene(
 {
     auto data = Biz::FileLoadingLogic::import_files(file_paths, dialog_provider, tool_count);
 
-    ElementRefs added_instances;
+    ImportToSceneResult result;
+    ElementRefs& added_instances = result.instances;
     for (Biz::FileLoadingLogic::ReturnData& file_data : data) {
+        result.geometry_only_3mf |= file_data.geometry_only_3mf;
+
         Domain::BoundingBox3d bbox;
         ElementRefs new_instances;
         using namespace Biz::Algorithms;
@@ -1143,7 +1148,7 @@ ElementRefs import_files_and_add_to_scene(
         added_instances.insert(added_instances.end(), new_instances.begin(), new_instances.end());
     }
 
-    return added_instances;
+    return result;
 }
 
 /**
