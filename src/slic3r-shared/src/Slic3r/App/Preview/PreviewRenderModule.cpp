@@ -626,7 +626,7 @@ void PreviewRenderModule::register_commands()
         {CommandName::ShowRetractions, OptionType::Retractions},
         {CommandName::ShowUnretractions, OptionType::Unretractions},
         {CommandName::ShowSeams, OptionType::Seams},
-        {CommandName::ShowToolChanges, OptionType::ToolMarker},
+        {CommandName::ShowToolChanges, OptionType::ToolChanges},
         {CommandName::ShowColorChanges, OptionType::ColorChanges},
         {CommandName::ShowPausePrints, OptionType::PausePrints},
         {CommandName::ShowCustomGCodes, OptionType::CustomGCodes},
