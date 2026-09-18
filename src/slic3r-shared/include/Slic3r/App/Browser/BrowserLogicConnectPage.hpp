@@ -40,15 +40,19 @@ protected:
     std::vector<BrowserLogicCommand> on_connect_action_request_login(const std::string &message_data) override;
     std::vector<BrowserLogicCommand> on_connect_action_error(const std::string &message_data) override;
     std::vector<BrowserLogicCommand> on_connect_action_log_in_in_browser(const std::string& message_data) override;
+    std::vector<BrowserLogicCommand> on_connect_action_unsupported_webview(const std::string& message_data) override;
+    std::vector<BrowserLogicCommand> on_connect_action_open_connect_in_browser(const std::string& message_data) override;
 
 private:
     bool m_styles_defined {false};
     bool m_reached_default_url {false};
     bool m_load_default_url { true };
     bool m_logged_out {false};
+    bool m_unsupported_engine {false};
 
     void emplace_load_default_url_commands(std::vector<BrowserLogicCommand>& res);
     void emplace_load_logged_out_page_commands(std::vector<BrowserLogicCommand>& res);
+    void emplace_load_unsupported_page_commands(std::vector<BrowserLogicCommand>& res);
     void emplace_define_css_commands(std::vector<BrowserLogicCommand>& res);
     std::string get_login_script(bool refresh, const std::string& access_token) const;
     std::string get_logout_script() const;
