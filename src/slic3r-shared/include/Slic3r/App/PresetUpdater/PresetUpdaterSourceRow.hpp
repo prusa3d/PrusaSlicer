@@ -6,6 +6,7 @@
 #include "Slic3r/App/Yoga/ListView.hpp"
 
 #include "Slic3r/Biz/DataObserver.hpp"
+#include "Slic3r/Biz/ObservableListSortFilter.hpp"
 
 namespace Slic3r::App {
 
@@ -36,6 +37,7 @@ public:
         PresetUpdater::PresetUpdaterController&>;
     using VendorListView =
         Yoga::ListView<PresetUpdaterVendorRow, PresetUpdater::VendorRowState, VendorFactory>;
+    using VendorSortFilter = Biz::ObservableListSortFilter<PresetUpdater::VendorRowState>;
 
     PresetUpdaterSourceRow(
         size_t index,
@@ -88,6 +90,7 @@ private:
 
     Yoga::Item* m_vendor_container{nullptr};
     VendorListView* m_vendor_list_view{nullptr};
+    Biz::UnsharedPointer<VendorSortFilter> m_vendor_filter;
 };
 
 } // namespace Slic3r::App

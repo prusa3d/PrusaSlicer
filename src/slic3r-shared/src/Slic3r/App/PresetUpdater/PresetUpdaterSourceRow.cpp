@@ -11,6 +11,7 @@
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <fmt/format.h>
 
 #include <optional>
@@ -119,7 +120,8 @@ PresetUpdaterSourceRow::PresetUpdaterSourceRow(
     PresetUpdater::PresetUpdaterController& controller
 ) :
     Biz::DataObserver<PresetUpdater::SourceRowState>(index, data),
-    m_controller(controller)
+    m_controller(controller),
+    m_vendor_filter(std::make_shared<VendorSortFilter>())
 {
     set_orientation(Orientation::Vertical);
     set_gap(2_fpx);
@@ -141,8 +143,14 @@ PresetUpdaterSourceRow::PresetUpdaterSourceRow(
 
     m_vendor_list_view = m_vendor_container->emplace_back<VendorListView>(VendorFactory{controller});
     m_vendor_list_view->set_orientation(Orientation::Vertical);
-    m_vendor_list_view->set_gap(2_fpx);
+    m_vendor_list_view->set_gap(6_fpx);
     m_vendor_list_view->set_flex_shrink(0);
+
+    m_vendor_filter->set_sort_fn(
+        [](const PresetUpdater::VendorRowState& lhs, const PresetUpdater::VendorRowState& rhs)
+        { return boost::ilexicographical_compare(lhs.vendor_id, rhs.vendor_id); }
+    );
+    m_vendor_list_view->set_source_list(m_vendor_filter.get());
 
     on_data_update();
 }
@@ -304,7 +312,7 @@ void PresetUpdaterSourceRow::on_data_update()
     m_remove_button->set_visible(is_local);
     m_remove_button->set_enabled(!row->install_locked);
 
-    m_vendor_list_view->set_source_list(std::weak_ptr<PresetUpdater::VendorRowList>(row->vendors));
+    m_vendor_filter->set_source_model(std::weak_ptr<PresetUpdater::VendorRowList>(row->vendors));
 
     const bool has_vendors = row->vendors->size() > 0;
     m_arrow->set_enabled(has_vendors);

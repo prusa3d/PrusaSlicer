@@ -83,6 +83,8 @@ const char* job_kind_name(JobKind kind)
         return "source selection";
     case JobKind::Install:
         return "install";
+    case JobKind::RemoveVendor:
+        return "remove vendor";
     case JobKind::AddSource:
         return "add source";
     case JobKind::RemoveSource:
@@ -91,7 +93,17 @@ const char* job_kind_name(JobKind kind)
     return "unknown";
 }
 
+bool carries_vendor_keys(JobKind kind)
+{
+    return kind == JobKind::Install || kind == JobKind::RemoveVendor;
+}
+
 } // namespace
+
+bool is_protected_vendor(const std::string& vendor_id)
+{
+    return vendor_id == "PrusaResearch" || vendor_id == "PrusaResearchSLA";
+}
 
 // =============================================================================================
 // JobLedger
@@ -363,6 +375,24 @@ SourceStore::CheckOutcome SourceStore::CheckOutcome::from(
         }
     }
 
+    for (const Biz::PresetUpdater::UpToDateVendor& vendor : reconfigurations.up_to_date()) {
+        std::vector<VendorReport>& reported = outcome.by_repo[vendor.vendor_repo_id];
+        const bool already_reported = std::any_of(
+            reported.begin(),
+            reported.end(),
+            [&vendor](const VendorReport& report)
+            { return report.vendor_id == vendor.vendor_id; }
+        );
+        if (already_reported) {
+            continue;
+        }
+        VendorReport report;
+        report.vendor_id       = vendor.vendor_id;
+        report.current_version = vendor.current_version;
+        report.up_to_date      = true;
+        reported.push_back(std::move(report));
+    }
+
     return outcome;
 }
 
@@ -559,7 +589,7 @@ std::vector<VendorKey> SourceStore::actionable_of(const SourceEntry& entry, bool
         return keys;
     }
     for (const VendorEntry& vendor : entry.vendors) {
-        if (vendor.skipped) {
+        if (vendor.skipped || vendor.up_to_date) {
             continue;
         }
         if (required_only && vendor.state != VendorReconfigurationState::ForcedUpdate
@@ -880,6 +910,7 @@ void SourceStore::merge_vendors(SourceEntry& entry, const std::vector<VendorRepo
         vendor.current_version     = report.current_version;
         vendor.recommended_version = report.recommended_version;
         vendor.skipped             = report.skipped;
+        vendor.up_to_date          = report.up_to_date;
 
         const auto previous_vendor = previous.find(report.vendor_id);
         if (previous_vendor != previous.end()
@@ -888,6 +919,7 @@ void SourceStore::merge_vendors(SourceEntry& entry, const std::vector<VendorRepo
             // Work in flight, or a failure the user has not dealt with, outlives a re-check.
             vendor.install_state = previous_vendor->second.install_state;
             vendor.error_text    = previous_vendor->second.error_text;
+            vendor.removing      = previous_vendor->second.removing;
         }
 
         merged.push_back(std::move(vendor));
@@ -911,7 +943,7 @@ SourceStore::InstallRequest SourceStore::make_install_request(
     InstallRequest request;
     for (const VendorKey& key : keys) {
         const VendorEntry* vendor = find_vendor(key);
-        if (vendor == nullptr || vendor->skipped) {
+        if (vendor == nullptr || vendor->skipped || vendor->up_to_date) {
             continue;
         }
         request.list.emplace_back(
@@ -924,6 +956,33 @@ SourceStore::InstallRequest SourceStore::make_install_request(
         );
         request.keys.push_back(key);
     }
+    return request;
+}
+
+SourceStore::InstallRequest SourceStore::make_removal_request(const VendorKey& key) const
+{
+    InstallRequest request;
+    const VendorEntry* vendor = find_vendor(key);
+    if (vendor == nullptr || vendor->skipped || is_protected_vendor(vendor->vendor_id)) {
+        return request;
+    }
+    if (vendor->state == VendorReconfigurationState::NewVendor) {
+        return request;
+    }
+    if (vendor->install_state != InstallState::Idle
+        && vendor->install_state != InstallState::Failed)
+    {
+        return request;
+    }
+    request.list.emplace_back(
+        VendorReconfigurationState::RemoveVendor,
+        vendor->vendor_id,
+        key.repo_id,
+        vendor->current_version,
+        Slic3r::Semver(),
+        std::string{}
+    );
+    request.keys.push_back(key);
     return request;
 }
 
@@ -958,6 +1017,17 @@ void SourceStore::set_install_state(const std::vector<VendorKey>& keys, InstallS
         }
         vendor->install_state = state;
         vendor->error_text.clear();
+    }
+}
+
+void SourceStore::set_removing(const std::vector<VendorKey>& keys)
+{
+    for (const VendorKey& key : keys) {
+        VendorEntry* vendor = find_vendor(key);
+        if (vendor == nullptr) {
+            continue;
+        }
+        vendor->removing = true;
     }
 }
 
@@ -1060,7 +1130,7 @@ SourceCounts SourceStore::counts_of(const SourceEntry& entry)
 {
     SourceCounts counts;
     for (const VendorEntry& vendor : entry.vendors) {
-        if (vendor.skipped || vendor.install_state == InstallState::Done) {
+        if (vendor.skipped || vendor.up_to_date || vendor.install_state == InstallState::Done) {
             continue;
         }
         switch (vendor.state) {
@@ -1162,6 +1232,8 @@ bool SourceStore::publish_vendors(const SourceEntry& entry, bool install_locked)
         row.error_text          = vendor.error_text;
         row.install_locked      = install_locked;
         row.skipped             = vendor.skipped;
+        row.up_to_date          = vendor.up_to_date;
+        row.removing            = vendor.removing;
         rows.push_back(std::move(row));
     }
 
@@ -1628,6 +1700,47 @@ void PresetUpdaterController::update_vendor(
     start_install({key});
 }
 
+void PresetUpdaterController::remove_vendor(
+    const std::string& repo_id, const std::string& vendor_id
+)
+{
+    if (m_shut_down || forced_mode()) {
+        return;
+    }
+
+    Transaction transaction(*this);
+
+    const SourceStore::InstallRequest request =
+        m_store.make_removal_request(VendorKey{repo_id, vendor_id});
+    if (request.keys.empty()) {
+        return;
+    }
+
+    m_operation_failed = false;
+
+    const JobId job_id = submit(
+        JobKind::RemoveVendor,
+        [this, &request]()
+        {
+            return m_interactor.perform_reconfigurations(
+                request.list, Biz::PresetUpdater::ReconfigurationType::Removals
+            );
+        }
+    );
+    if (job_id == k_invalid_job_id) {
+        return;
+    }
+
+    m_ledger.set_install_keys(job_id, request.keys);
+    m_store.set_removing(request.keys);
+    m_store.set_install_state(
+        request.keys,
+        m_interactor.pending_job_count() > 1 ? InstallState::Queued : InstallState::Running
+    );
+
+    m_activity_reporter.begin_activity(job_id, Activity::Installing);
+}
+
 void PresetUpdaterController::update_source(const std::string& uuid)
 {
     start_install(m_store.actionable_keys_of_source(uuid, forced_mode()));
@@ -1647,7 +1760,7 @@ void PresetUpdaterController::update_required()
 
 ControllerActivity PresetUpdaterController::activity() const
 {
-    if (m_ledger.any_pending(JobKind::Install)) {
+    if (m_ledger.any_pending(JobKind::Install) || m_ledger.any_pending(JobKind::RemoveVendor)) {
         return ControllerActivity::Installing;
     }
     if (m_ledger.any_pending(JobKind::Check) || m_ledger.any_pending(JobKind::ForcedCheck)) {
@@ -1795,7 +1908,7 @@ void PresetUpdaterController::on_preset_updater_error(
     const JobLedger::Record* record = m_ledger.find(job_id);
     m_activity_reporter.report_error(reason, record == nullptr ? std::string{} : record->subject);
 
-    if (record != nullptr && record->kind == JobKind::Install) {
+    if (record != nullptr && carries_vendor_keys(record->kind)) {
         for (const VendorKey& key : record->keys) {
             m_store.set_install_failed(key, body);
         }
@@ -1877,11 +1990,13 @@ void PresetUpdaterController::on_preset_updater_reconfigurations_performed(
     }
 
     const JobLedger::Record* record = m_ledger.find(job_id);
-    if (record == nullptr || record->kind != JobKind::Install) {
+    if (record == nullptr || !carries_vendor_keys(record->kind)) {
         return;
     }
 
     m_warnings = warnings;
+
+    const bool removal = record->kind == JobKind::RemoveVendor;
 
     // A warning naming a vendor is that one's install having failed; the others went through.
     const auto failure_of = [&warnings](const VendorKey& key)
@@ -1905,11 +2020,17 @@ void PresetUpdaterController::on_preset_updater_reconfigurations_performed(
         succeeded.push_back(key);
     }
 
-    m_activity_reporter.report_install_finished(m_store.installed_vendors_for(succeeded));
+    if (!removal) {
+        m_activity_reporter.report_install_finished(m_store.installed_vendors_for(succeeded));
+    }
 
     for (const VendorKey& key : succeeded) {
         m_store.set_install_done(key);
         m_forced.mark_satisfied(key);
+    }
+
+    if (removal && !succeeded.empty()) {
+        start_check(Biz::PresetUpdater::SourceListSync::UseStored, CheckReporting::Silent);
     }
 }
 
@@ -1928,7 +2049,7 @@ void PresetUpdaterController::on_preset_updater_status(
     m_activity_reporter.report_progress(job_id, target, attempt);
 
     const JobLedger::Record* record = m_ledger.find(job_id);
-    if (record == nullptr || record->kind != JobKind::Install) {
+    if (record == nullptr || !carries_vendor_keys(record->kind)) {
         return;
     }
 
@@ -2004,6 +2125,7 @@ void PresetUpdaterController::on_preset_updater_job_finished(
 
     switch (kind) {
     case JobKind::Install:
+    case JobKind::RemoveVendor:
         if (state != Biz::PresetUpdater::JobState::Succeeded) {
             m_store.abandon_install(
                 record->keys, state == Biz::PresetUpdater::JobState::Canceled

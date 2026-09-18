@@ -66,7 +66,7 @@ bool has_forced_vendor(const PresetUpdater::SourceRowState& source)
 {
     for (size_t index = 0; index < source.vendors->size(); ++index) {
         const PresetUpdater::VendorRowState& vendor = source.vendors->at(index);
-        if (vendor.skipped) {
+        if (vendor.skipped || vendor.up_to_date) {
             continue;
         }
         if (vendor.state == Biz::PresetUpdater::VendorReconfigurationState::ForcedUpdate

@@ -27,11 +27,13 @@ constexpr Yoga::Unit status_width{150, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit name_width{140, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit change_width{160, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit source_row_height{40, Yoga::Unit::Type::FigmaPixel};
-constexpr Yoga::Unit vendor_row_height{44, Yoga::Unit::Type::FigmaPixel};
+constexpr Yoga::Unit vendor_row_height{36, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit button_height{30, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit button_padding{7, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit source_frame_padding_horizontal{8, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit source_frame_padding_vertical{4, Yoga::Unit::Type::FigmaPixel};
+constexpr Yoga::Unit comment_indent{60, Yoga::Unit::Type::FigmaPixel};
+constexpr Yoga::Unit comment_bottom_margin{4, Yoga::Unit::Type::FigmaPixel};
 
 /// Gives a text button the size the settings dialogs use for their footer buttons.
 void apply_button_size(Yoga::LayoutButton* button);
@@ -70,7 +72,9 @@ private:
         ActionNone    = 5
     };
 
-    void build_action_slot();
+    void build_action_slot(Yoga::Item* header);
+
+    void confirm_removal();
 
     PresetUpdater::PresetUpdaterController& m_controller;
 
@@ -79,17 +83,20 @@ private:
     Yoga::Text* m_comment{nullptr};
     Yoga::Text* m_change{nullptr};
     Yoga::Text* m_skipped_text{nullptr};
+    Yoga::Item* m_remove_slot{nullptr};
+    Yoga::LayoutButton* m_remove_button{nullptr};
+
     Yoga::Item* m_version_group{nullptr};
     Yoga::Text* m_current_version{nullptr};
+    Yoga::Text* m_version_arrow{nullptr};
     Yoga::Text* m_recommended_version{nullptr};
 
     Yoga::StackLayout* m_action{nullptr};
     Yoga::LayoutButton* m_action_button{nullptr};
     Yoga::LayoutButton* m_retry_button{nullptr};
+    Yoga::Text* m_running_text{nullptr};
     Yoga::Text* m_done_text{nullptr};
     Yoga::Text* m_failed_text{nullptr};
-
-    Yoga::LayoutButton* m_changelog_button{nullptr};
 };
 
 } // namespace Slic3r::App
