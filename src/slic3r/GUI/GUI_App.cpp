@@ -3277,7 +3277,10 @@ Sidebar& GUI_App::sidebar()
 
 ObjectManipulation* GUI_App::obj_manipul()
 {
-    // If this method is called before plater_ has been initialized, return nullptr (to avoid a crash)
+    // If this method is called before plater_ has been initialized, return nullptr (to avoid a crash).
+    // This is also the guard that keeps teardown safe: ~Plater() clears plater_ before its children
+    // are destroyed, so the canvas destructors that reach here via Selection::clear() see nullptr
+    // instead of a half-destroyed Plater.
     return (plater_ != nullptr) ? sidebar().obj_manipul() : nullptr;
 }
 
@@ -3288,8 +3291,9 @@ ObjectSettings* GUI_App::obj_settings()
 
 ObjectList* GUI_App::obj_list()
 {
-    // If this method is called before plater_ has been initialized, return nullptr (to avoid a crash)
-    return plater_ ? sidebar().obj_list() : nullptr;
+    // If this method is called before plater_ has been initialized, return nullptr (to avoid a crash).
+    // See obj_manipul() for why this also covers teardown.
+    return (plater_ != nullptr) ? sidebar().obj_list() : nullptr;
 }
 
 ObjectLayers* GUI_App::obj_layers()

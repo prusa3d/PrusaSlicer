@@ -4594,7 +4594,25 @@ Plater::Plater(wxWindow *parent, MainFrame *main_frame)
     p->init();
 }
 
-Plater::~Plater() = default;
+Plater::~Plater()
+{
+    // Stop anything from reaching this Plater through GUI_App while it is being destroyed.
+    //
+    // Plater is a wxPanel, so its children (View3D / Preview and the GLCanvas3D each owns) are
+    // destroyed by the wxWindow base destructor -- that is, after every Plater member has already
+    // been destroyed. Those child destructors call back in via
+    // ~GLCanvas3D -> reset_volumes() -> Selection::clear() -> wxGetApp().obj_manipul(), so the
+    // "is this Plater still usable?" answer cannot live in a Plater member: by then the member's
+    // lifetime is over and reading it is undefined behaviour. It has to live somewhere that
+    // outlives us, and GUI_App::plater_ is exactly that.
+    //
+    // Guarded on `== this` because GUI_App::recreate_GUI() destroys the old frame (and its Plater)
+    // only after the new MainFrame has already published its own Plater here.
+    if (wxGetApp().plater_ == this)
+        wxGetApp().plater_ = nullptr;
+
+    p.reset();
+}
 
 bool Plater::is_project_dirty() const { return p->is_project_dirty(); }
 bool Plater::is_presets_dirty() const { return p->is_presets_dirty(); }

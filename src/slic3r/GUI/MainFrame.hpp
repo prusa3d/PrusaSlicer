@@ -86,6 +86,8 @@ protected:
 class MainFrame : public DPIFrame
 {
     bool        m_loaded {false};
+    // Set by shutdown() so it runs exactly once, no matter how the application exits.
+    bool        m_shutdown_done {false};
 
     wxString    m_qs_last_input_file = wxEmptyString;
     wxString    m_qs_last_output_file = wxEmptyString;
@@ -164,12 +166,14 @@ protected:
 
 public:
     MainFrame(const int font_point_size);
-    ~MainFrame() = default;
+    ~MainFrame();
 
     void update_layout();
     void update_mode_markers();
 
 	// Called when closing the application and when switching the application language.
+	// Idempotent: repeated calls are no-ops, so it is safe to call it both from the
+	// wxEVT_CLOSE_WINDOW handler and from ~MainFrame().
 	void 		shutdown();
 
     Plater*     plater() { return m_plater; }

@@ -498,9 +498,31 @@ void MainFrame::update_layout()
     Thaw();
 }
 
+MainFrame::~MainFrame()
+{
+    // The wxEVT_CLOSE_WINDOW handler is the usual place where shutdown() runs, but it is not the
+    // only way the application can go away: when the main loop is left without the frame having
+    // been closed (on macOS this is the -applicationShouldTerminate: / ExitMainLoop() route taken
+    // by Cmd+Q, the Dock "Quit" item and by logout/restart), wxAppBase::CleanUp() destroys the
+    // top level windows directly and no close event is ever delivered. Without shutdown() having
+    // run, wxGetApp().plater_ still points at this frame's Plater while that Plater is being
+    // destroyed, and the canvas destructors call back into it through
+    // ~GLCanvas3D -> reset_volumes() -> Selection::clear() -> GUI_App::obj_manipul(), which
+    // dereferences the already destroyed pimpl and segfaults.
+    // Running shutdown() from here closes that hole; it is idempotent, so the normal close path
+    // (and MainFrame recreation on a language switch) is unaffected.
+    // Note this runs before the wxWindow base destructor, so m_plater and the other children are
+    // still fully alive at this point.
+    shutdown();
+}
+
 // Called when closing the application and when switching the application language.
 void MainFrame::shutdown()
 {
+    if (m_shutdown_done)
+        return;
+    m_shutdown_done = true;
+
 #ifdef _WIN32
 	if (m_hDeviceNotify) {
 		::UnregisterDeviceNotification(HDEVNOTIFY(m_hDeviceNotify));
