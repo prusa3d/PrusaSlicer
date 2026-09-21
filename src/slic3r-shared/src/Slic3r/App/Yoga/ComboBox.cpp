@@ -429,6 +429,13 @@ Vec2f ComboBox::get_item_size()
     return {50, ImGui::GetTextLineHeight() + GImGui->Style.FramePadding.y * 2.0f};
 }
 
+void ComboBox::visible_updated_internal()
+{
+    if (!is_visible()) {
+        m_tooltip->close();
+    }
+}
+
 Render::ImguiFontType ComboBox::label_font_type() const
 {
     return m_label_font_type;

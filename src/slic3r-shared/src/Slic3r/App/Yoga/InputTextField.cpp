@@ -192,4 +192,13 @@ void InputTextField::set_color(std::optional<Platform::Color> color)
     m_color = color;
     update_fill();
 }
+
+void InputTextField::visible_updated_internal()
+{
+    if (!is_visible()) {
+        m_tooltip->close();
+    }
+}
+
+void InputTextField::text_updated_internal() {}
 } // namespace Slic3r::App::Yoga

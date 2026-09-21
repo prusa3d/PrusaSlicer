@@ -86,6 +86,7 @@ public:
 
 protected:
     Vec2f get_item_size() override;
+    void visible_updated_internal() override;
 
 private:
     ////////////////////// Copied from ImGui //////////////////////////////////////

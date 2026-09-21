@@ -111,4 +111,11 @@ void ConfigItemFilePicker::on_data_update()
     m_remove_btn->set_visible(!init_val.empty());
 }
 
+void ConfigItemFilePicker::visible_updated_internal()
+{
+    if (!is_visible()) {
+        m_tooltip->close();
+    }
+}
+
 } // namespace Slic3r::App

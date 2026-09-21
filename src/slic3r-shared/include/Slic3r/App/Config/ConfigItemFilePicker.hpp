@@ -23,6 +23,7 @@ public:
 
 protected:
     void on_data_update() override;
+    void visible_updated_internal() override;
 
 private:
     //! InputText is used instead of Text to allow displaying a tooltip for the label on hovering.

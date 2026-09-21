@@ -52,7 +52,9 @@ public:
     void set_color(std::optional<Platform::Color> color);
 
 protected:
-    virtual void text_updated_internal() {}
+    virtual void text_updated_internal();
+
+    void visible_updated_internal() override;
 
     InputText* input_text() const;
 
