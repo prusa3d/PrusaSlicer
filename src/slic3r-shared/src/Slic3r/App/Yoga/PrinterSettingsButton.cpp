@@ -36,7 +36,7 @@ PrinterSettingsButton::PrinterSettingsButton(const std::string& tooltip) : Recta
 
     m_printers_btn =
         add_button(Render::Icon::ConfigContainer, Biz::_u8L("Show info about printer"));
-    m_cog_btn = add_button(Render::Icon::PrintIconMarker, Biz::_u8L("Show extruder settings"));
+    m_cog_btn = add_button(Render::Icon::PrintIconMarker, Biz::_u8L("Show printer settings"));
 }
 
 void PrinterSettingsButton::set_image(const std::string& image)

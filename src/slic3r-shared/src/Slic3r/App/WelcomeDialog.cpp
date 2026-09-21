@@ -14,9 +14,11 @@
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/AddPrinterPanel.hpp"
+#include "Slic3r/App/WarningPanel.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/Preset/HwConfigEvaluator.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
+#include "Slic3r/Biz/HwConfigMatchers.hpp"
 
 #include "Slic3r/Version.hpp"
 
@@ -537,6 +539,13 @@ static const Domain::Preset::HwToolConfigDef* find_tool_config_def(
     return &(*it);
 }
 
+struct PrinterIdentifier {
+    std::string uuid{"unknown"};
+    std::string model{"unknown"};
+
+    auto operator<=>(const PrinterIdentifier&) const = default;
+};
+
 class PrinterScreen : public Item
 {
 public:
@@ -575,6 +584,23 @@ public:
         m_printers->set_orientation(Orientation::Vertical);
         m_printers->set_gap(10_fpx);
         m_printers->set_visible(false);
+
+        const Unit m_boxes_width{400_fpx};
+
+        m_warnings = m_screen->content()->emplace_back<Item>();
+        m_warnings->set_gap(10_fpx);
+        m_warnings->set_orientation(Orientation::Vertical);
+        m_warnings->set_flex_shrink(0);
+        m_warnings->set_visible(false);
+        m_warnings->set_width(m_boxes_width);
+
+        m_errors = m_screen->content()->emplace_back<Item>();
+        m_errors->set_gap(10_fpx);
+        m_errors->set_orientation(Orientation::Vertical);
+        m_errors->set_flex_shrink(0);
+        m_errors->set_visible(false);
+        m_errors->set_width(m_boxes_width);
+
         m_dialog = emplace_back<AddPrinterPanel>(
             project_interactor,
             [this]() { show_dialog(false); },
@@ -666,9 +692,7 @@ public:
 
         m_printers->remove_later(m_printers->items().at(index));
         m_printers_to_add.erase(it);
-        m_title->set_title(m_default_title);
-        m_title->set_sub_title(m_default_subtitle);
-        reload_content_state();
+        clear_state();
     }
 
     void clear_printers()
@@ -679,60 +703,85 @@ public:
         m_printers_to_add.clear();
     }
 
-    std::optional<PrinterToAdd> parse_printer_json(const nlohmann::json& json)
+    static PrinterIdentifier
+    create_printer_identifier(const nlohmann::json& json)
+    {
+        PrinterIdentifier result;
+        if (json.contains("uuid")) {
+            result.uuid = json["uuid"].get<std::string>();
+        }
+        if (json.contains("model")) {
+            result.model = json["model"].get<std::string>();
+        }
+        return result;
+    }
+
+    std::optional<PrinterToAdd> parse_printer_json(
+        const nlohmann::json& json,
+        std::map<PrinterIdentifier, std::vector<std::string>>& warnings)
     {
         const Biz::Preset::PresetInteractor& preset_interactor{
             m_project_interactor.preset_interactor()};
 
+        const Domain::Preset::HwPrinterConfig* found_config{
+            Biz::find_matching_printer_config(preset_interactor.get_printer_configs(), json)};
+        if (!found_config) {
+            return std::nullopt;
+        }
+        Domain::Preset::HwPrinterConfig config{*found_config};
+
+        const Domain::Preset::VendorData& vendor_data{
+            m_project_interactor.workbench()
+                .preset_bundle()
+                .vendor_bundles.at(config.vendor_id)
+                .vendor_data};
+
         const auto& presets{preset_interactor.printer_presets().items()};
-
+        const Biz::Preset::PresetItem* preset{nullptr};
         for (std::size_t i{}; i < presets.size(); ++i) {
-            const auto& preset{presets.at(i)};
-            Domain::Preset::HwPrinterConfig config{
-                m_project_interactor.preset_interactor()
-                    .get_printer_config(m_project_interactor.selected_project_id(),
-                                        preset.hw_printer_config_id)
-                    .first.get()};
-
-            const Domain::Preset::VendorData& vendor_data{m_project_interactor.workbench()
-                                                              .preset_bundle()
-                                                              .vendor_bundles.at(config.vendor_id)
-                                                              .vendor_data};
-
-            const std::vector<Domain::Preset::HwToolConfigDef> tool_defs{
-                m_project_interactor.preset_interactor().get_tool_items(config).tool_defs};
-
-            std::string model{json.value("model", "")};
-            std::string base_model{json.value("base_model", "")};
-            uint8_t tool_count{json.value("tool_count", static_cast<uint8_t>(0))};
-            size_t tools_array_size{
-                json.contains("tools") && json["tools"].is_object() ? json["tools"].size() : 0};
-
-            if (config.model.model == model
-                && config.model.base_model == base_model
-                && config.tool_count == tool_count
-                && config.material_slot_count() == tools_array_size)
+            if (presets.at(i).hw_printer_config_id == config.id
+                && presets.at(i).origin == Domain::Preset::PresetOrigin::System)
             {
-                config.tools.clear();
-                for (const auto& [_, tool] : json["tools"].items()) {
-                    const Domain::Preset::HwToolConfigDef* hw_tool_config_def{nullptr};
-                    try {
-                        hw_tool_config_def = find_tool_config_def(tool, tool_defs);
-                    } catch (const nlohmann::json::exception& e) {
-                        // Intentionally pass
-                    }
-                    if (!hw_tool_config_def) {
-                        continue;
-                    }
-                    config.tools.push_back(Biz::Preset::from_def(vendor_data, *hw_tool_config_def));
-                }
-                if (config.tools.size() != tool_count) {
-                    continue;
-                }
-                return PrinterToAdd{config, preset.id};
+                preset = &presets.at(i);
+                break;
             }
         }
-        return std::nullopt;
+        if (!preset) {
+            return std::nullopt;
+        }
+
+        const std::vector<Domain::Preset::HwToolConfigDef>& tool_defs{
+            m_project_interactor.preset_interactor().get_tool_items(config).tool_defs};
+
+        if (!json.contains("tools")) {
+            warnings[create_printer_identifier(json)].push_back(
+                Biz::_u8L("Failed to parse printer tools, using default"));
+        }
+        std::size_t address{0};
+        for (Domain::Preset::HwToolConfig& tool_config : config.tools) {
+            const Domain::Preset::HwToolConfigDef* hw_tool_config_def{nullptr};
+            const std::string tool_address{std::to_string(address++)};
+            auto it{json["tools"].find(tool_address)};
+            if (it != json["tools"].end()) {
+                const auto& tool{*it};
+
+                try {
+                    hw_tool_config_def = find_tool_config_def(tool, tool_defs);
+                } catch (const nlohmann::json::exception& e) {
+                    // Intentionally pass
+                }
+            }
+
+            if (hw_tool_config_def) {
+                tool_config = Biz::Preset::from_def(vendor_data, *hw_tool_config_def);
+            } else {
+                warnings[create_printer_identifier(json)].push_back(fmt::format(
+                    fmt::runtime(Biz::_u8L("Failed to synchronize {}. tool")),
+                    tool_address));
+            }
+        }
+
+        return PrinterToAdd{config, preset->id};
     }
 
     void sync_printers()
@@ -756,10 +805,14 @@ public:
                 Biz::Platform::PlatformServices::instance()
                     .main_thread_dispatcher()
                     .dispatch_on_main_thread(
-                        [this]()
+                        [this, error]()
                         {
                             m_title->set_title(Biz::_u8L("Unable to synchronize your printers"));
-                            m_title->set_sub_title(Biz::_u8L("Please add your printers manually"));
+                            m_title->set_sub_title(fmt::format(
+                                fmt::runtime(Biz::_u8L(
+                                    // TRN {} is an error message
+                                    "Synchronization failed: {}. Please add your printers manually")),
+                                error));
                             reload_content_state();
                         });
             }};
@@ -811,7 +864,12 @@ public:
                     .dispatch_on_main_thread(
                         [handle_error, body, this]()
                         {
+                            const ScopeGuard guard{[&](){
+                                reload_content_state();
+                            }};
                             std::vector<PrinterToAdd> printers;
+                            std::vector<PrinterIdentifier> parsing_failures;
+                            std::map<PrinterIdentifier, std::vector<std::string>> parsing_warnings;
                             try {
                                 auto json{nlohmann::json::parse(body)};
                                 const auto& root{json.is_array() && json.size() == 1 ? json[0] :
@@ -827,36 +885,101 @@ public:
                                 if (root["printers"].empty()) {
                                     m_title->set_title(Biz::_u8L("There are no printers to synchronize."));
                                     m_title->set_sub_title(Biz::_u8L("Please add your printer manually."));
-                                    reload_content_state();
                                     return;
                                 }
 
                                 for (const nlohmann::json& printer_json : root["printers"]) {
                                     if (!printer_json.is_object()) {
-                                        handle_error(Biz::_u8L("Failed to parse response"));
+                                        handle_error(Biz::_u8L("No printers in the respose"));
                                         return;
                                     }
                                     std::optional<PrinterToAdd> printer{
-                                        parse_printer_json(printer_json)};
+                                        parse_printer_json(printer_json, parsing_warnings)};
                                     if (printer) {
                                         printers.push_back(*printer);
+                                    } else {
+                                        parsing_failures.push_back(create_printer_identifier(printer_json));
                                     }
                                 }
                             } catch (const nlohmann::json::exception& e) {
-                                handle_error(Biz::_u8L("Failed to parse response"));
+                                SPDLOG_DEBUG("Response body: {}", body);
+                                handle_error(Biz::_u8L("Generic parsing error"));
                                 return;
                             }
                             for (const PrinterToAdd& printer : printers) {
                                 add_printer(printer);
                             }
 
-                            m_title->set_title(
-                                Biz::_u8L("Successfully synchronized your printers"));
-                            m_title->set_sub_title(Biz::_u8L(
-                                "If you have any offline printers, you can also add them now"));
+                            if (parsing_failures.empty() && parsing_warnings.empty()) {
+                                m_title->set_title(
+                                    Biz::_u8L("Successfully synchronized your printers"));
+                                m_title->set_sub_title(Biz::_u8L(
+                                    "If you have any offline printers, you can also add them now"));
+                            } else if (!parsing_failures.empty()) {
+                                SPDLOG_DEBUG("Response body: {}", body);
+                                if (!printers.empty()) {
+                                    m_title->set_title(
+                                        Biz::_u8L("Some printers failed to synchronize"));
+                                } else {
+                                    m_title->set_title(Biz::_u8L("Printers failed to synchronize"));
+                                }
+                                m_title->set_sub_title("Please add them manually");
+                            } else {
+                                SPDLOG_DEBUG("Response body: {}", body);
+                                m_title->set_title(Biz::_u8L("Printers synchronized with warnings"));
+                                m_title->set_sub_title("Please resolve any inconsistencies manually");
+                            }
+
+                            if (!parsing_failures.empty()) {
+                                m_errors->set_visible(true);
+                            }
+                            for (const PrinterIdentifier& error : parsing_failures) {
+                                auto panel{
+                                    m_errors->emplace_back<WarningPanel>(Platform::Color::Error)};
+                                panel->set_rounding(10);
+                                panel->set_warning(
+                                    fmt::format(fmt::runtime(Biz::_u8L("Unable to synchronize {}")),
+                                                error.model),
+                                    {fmt::format("uuid: {}", error.uuid), ""});
+                            }
+
+                            if (!parsing_warnings.empty()) {
+                                m_warnings->set_visible(true);
+                            }
+                            for (const auto& [identifier, warnings] : parsing_warnings) {
+                                auto panel{m_warnings->emplace_back<WarningPanel>(
+                                    Platform::Color::Warning)};
+                                panel->set_rounding(10);
+
+                                std::vector<std::string>
+                                    to_display{fmt::format("uuid: {}", identifier.uuid), ""};
+                                to_display
+                                    .insert(to_display.end(), warnings.begin(), warnings.end());
+
+                                panel->set_warning(
+                                    fmt::format(fmt::runtime(Biz::_u8L("Issues in {}")),
+                                                identifier.model),
+                                    to_display);
+                            }
                         });
             },
             handle_error, handle_retry, handle_progress);
+    }
+
+    void clear_state() {
+        m_title->set_title(m_default_title);
+        m_title->set_sub_title(m_default_subtitle);
+
+        while(!m_errors->items().empty()) {
+            m_errors->remove(m_errors->items().back());
+        }
+        m_errors->set_visible(false);
+        while(!m_warnings->items().empty()) {
+            m_warnings->remove(m_warnings->items().back());
+        }
+        m_warnings->set_visible(false);
+
+        reload_content_state();
     }
 
     void add_printer(const PrinterToAdd& printer)
@@ -922,9 +1045,7 @@ public:
         delete_button->callbacks().action = [this, id = printer.preset_item_id]()
         { delete_printer(id); };
 
-        m_title->set_title(m_default_title);
-        m_title->set_sub_title(m_default_subtitle);
-        reload_content_state();
+        clear_state();
     }
 
 private:
@@ -935,6 +1056,8 @@ private:
     Screen* m_screen{nullptr};
     AddPrinterPanel* m_dialog{nullptr};
     Title* m_title{nullptr};
+    Item* m_errors{nullptr};
+    Item* m_warnings{nullptr};
     LayoutButton* m_add_button{nullptr};
     Rectangle* m_printers{nullptr};
     std::vector<PrinterToAdd> m_printers_to_add;

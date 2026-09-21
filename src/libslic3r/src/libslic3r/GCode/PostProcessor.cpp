@@ -849,20 +849,21 @@ private:
             const std::vector<int>& extruder_temps_config = m_config.extruder_temps_config;
             const uint32_t layer_id = m_result.layer_id_at(uint32_t(lines_counter));
 
-            if (tool_number != -1) {
-                if (tool_number < 0 || int(extruder_temps_config.size()) <= tool_number) {
-                    // found an invalid value, clamp it to a valid one
-                    tool_number = std::clamp<int>(0, extruder_temps_config.size() - 1, tool_number);
-
-                    warning_callback(
-                        Biz::Slicing::Warning{
-                            Biz::Slicing::WarningCode::InvalidToolchange,
-                            {},
-                            std::nullopt,
-                            Biz::Slicing::InvalidToolchangeWarningPayload{gcode_line}
-                        }
-                    );
-                }
+            if (ss.fail()) {
+                // Not a toolchange at all, silently skip.
+                return ret;
+            }
+            if (tool_number < 0 || int(extruder_temps_config.size()) <= tool_number) {
+                // Not a valid extruder, skip with warning.
+                warning_callback(
+                    Biz::Slicing::Warning{
+                        Biz::Slicing::WarningCode::InvalidToolchange,
+                        {},
+                        std::nullopt,
+                        Biz::Slicing::InvalidToolchangeWarningPayload{gcode_line}
+                    }
+                );
+                return ret;
             }
 
             insert_M104_lines(lines_counter, cmd,

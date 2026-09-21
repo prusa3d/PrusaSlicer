@@ -76,7 +76,8 @@ void PrintToolItem::update_value()
 
         const bool all_same{std::ranges::all_of(
             values,
-            [&](const Domain::ConfigValue& value) { return value == values.front(); })};
+            [&](const Domain::ConfigValue& value) { return value == values.front(); }
+        )};
 
         if (all_same) {
             value = {values.front(), false};
@@ -90,33 +91,34 @@ void PrintToolItem::update_value()
         // Commenting this out means that UI shows nan due to the last-resort fallback.
         //
         // const bool all_percentage{std::ranges::all_of(
-        //     values,
-        //     [](const Domain::ConfigValue& value)
-        //     { return value.get<Domain::FloatOrPercentage>().is_percentage(); })};
+        // values,
+        // [](const Domain::ConfigValue& value)
+        // { return value.get<Domain::FloatOrPercentage>().is_percentage(); })};
 
         // if (all_percentage) {
-        //     std::vector<double> percentage_values;
-        //     for (const Domain::ConfigValue& value : values) {
-        //         percentage_values.push_back(value.get<Domain::FloatOrPercentage>().get_abs_value(100));
-        //     }
-        //     double resulting_value{};
-        //     if (print_item->def().compatibility_rule == Domain::CompatibilityRule::Average) {
-        //         resulting_value = get_average(percentage_values);
-        //     } else if (print_item->def().compatibility_rule == Domain::CompatibilityRule::Min) {
-        //         resulting_value = get_min(percentage_values);
-        //     } else if (print_item->def().compatibility_rule == Domain::CompatibilityRule::Max) {
-        //         resulting_value = get_max(percentage_values);
-        //     } else {
-        //         PANIC("Invalid compatibility rule");
-        //     }
-        //     value = {Domain::ConfigValue{Domain::FloatOrPercentage{Domain::Percentage{resulting_value}}}, true};
-        //     return;
+        // std::vector<double> percentage_values;
+        // for (const Domain::ConfigValue& value : values) {
+        // percentage_values.push_back(value.get<Domain::FloatOrPercentage>().get_abs_value(100));
+        // }
+        // double resulting_value{};
+        // if (print_item->def().compatibility_rule == Domain::CompatibilityRule::Average) {
+        // resulting_value = get_average(percentage_values);
+        // } else if (print_item->def().compatibility_rule == Domain::CompatibilityRule::Min) {
+        // resulting_value = get_min(percentage_values);
+        // } else if (print_item->def().compatibility_rule == Domain::CompatibilityRule::Max) {
+        // resulting_value = get_max(percentage_values);
+        // } else {
+        // PANIC("Invalid compatibility rule");
+        // }
+        // value = {Domain::ConfigValue{Domain::FloatOrPercentage{Domain::Percentage{resulting_value}}}, true};
+        // return;
         // }
 
         const bool all_floats{std::ranges::all_of(
             values,
             [](const Domain::ConfigValue& value)
-            { return !value.get<Domain::FloatOrPercentage>().is_percentage(); })};
+            { return !value.get<Domain::FloatOrPercentage>().is_percentage(); }
+        )};
 
         if (all_floats) {
             std::vector<double> float_values;
@@ -178,6 +180,15 @@ bool PrintToolItem::is_dirty_tool(std::optional<size_t> index) const
         }
     }
     return false;
+}
+
+bool PrintToolItem::contains_item(const Domain::ConfigItem& item) const
+{
+    return *print_item == item
+        || std::ranges::any_of(
+            tool_overrides,
+            [&](const Domain::ConfigItem* override) { return item == *override; }
+        );
 }
 
 } // namespace Slic3r::Biz

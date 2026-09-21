@@ -155,7 +155,7 @@ public:
 
     void set_projection(const Domain::SquareMatrix4d& m);
 
-    void switch_projection_type();
+    void set_projection_type(CameraProjectionType type);
 
     Transform view() const
     {

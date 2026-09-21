@@ -385,6 +385,10 @@ std::vector<BrowserLogicCommand> BrowserLogicPrintables::on_printables_event_ope
         SPDLOG_ERROR("Could not parse Printables message. {}", e.what());
         return {};
     }
+    if (url.empty()) {
+        SPDLOG_ERROR("Printables message does not contain a valid url. {}", message_data);
+        return {};
+    }
     return {{BrowserLogicCommandType::OpenExternalBrowser, url}};
 }
 

@@ -66,6 +66,13 @@ struct VendorReconfiguration
     VendorReconfiguration() = default;
 };
 
+struct UpToDateVendor
+{
+    std::string vendor_id;
+    std::string vendor_repo_id;
+    Slic3r::Semver current_version;
+};
+
 class PresetUpdaterReconfigurationList
 {
 public:
@@ -156,6 +163,21 @@ public:
         return m_removals;
     }
 
+    void add_up_to_date(
+        const std::string& vendor_id,
+        const std::string& vendor_repo_id,
+        const Slic3r::Semver& current_version
+    )
+    {
+        m_up_to_date.emplace_back(UpToDateVendor{vendor_id, vendor_repo_id, current_version});
+    }
+
+    /// Installed vendors that need no change. Not reconfigurations - nothing here is ever performed.
+    const std::vector<UpToDateVendor>& up_to_date() const
+    {
+        return m_up_to_date;
+    }
+
     bool empty() const
     {
         return m_regular_updates.empty()
@@ -173,6 +195,7 @@ private:
     std::vector<VendorReconfiguration> m_not_in_index;
     std::vector<VendorReconfiguration> m_new_vendors;
     std::vector<VendorReconfiguration> m_removals;
+    std::vector<UpToDateVendor> m_up_to_date;
 };
 
 void to_json(nlohmann::json& j, const PresetUpdaterReconfigurationList& list);

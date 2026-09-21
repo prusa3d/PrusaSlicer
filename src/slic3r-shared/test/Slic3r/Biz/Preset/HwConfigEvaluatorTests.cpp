@@ -106,6 +106,7 @@ TEST_CASE("HwConfigEvaluator", "[preset]")
         );
         REQUIRE(printer_config.id.empty() == false);
         REQUIRE(printer_config.printer_id == "MK4S");
+        REQUIRE(printer_config.template_id == "MK4S MMU3S");
         REQUIRE(printer_config.tools.size() == 1);
         REQUIRE(printer_config.tools[0].id == "0.4");
         REQUIRE(std::get<double>(printer_config.tools[0].features["nozzle_diameter"]) == 0.4);

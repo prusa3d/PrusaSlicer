@@ -105,7 +105,7 @@ bool PrintHostOctoPrint::perform(ProgressFn progress_fn, RetryFn retry_fn, Error
 #endif // WIN32
 }
 
-bool PrintHostOctoPrint::test(std::string& msg, RetryFn retry_fn) const
+bool PrintHostOctoPrint::test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     const PhysicalPrinter::PrinterUpload* auth = std::get_if<PhysicalPrinter::PrinterUpload>(&m_print_host_config.payload);
     ASSERT(auth);
@@ -161,13 +161,14 @@ bool PrintHostOctoPrint::test(std::string& msg, RetryFn retry_fn) const
             msg = address;
         })
 #endif // WIN32
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;
 }
 
 #ifdef WIN32
-bool PrintHostOctoPrint::test_with_resolved_ip(std::string& msg, RetryFn retry_fn) const
+bool PrintHostOctoPrint::test_with_resolved_ip(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     // Since the request is performed synchronously here,
     // it is ok to refer to `msg` from within the closure
@@ -236,6 +237,7 @@ bool PrintHostOctoPrint::test_with_resolved_ip(std::string& msg, RetryFn retry_f
             }
         })
         .ssl_revoke_best_effort(auth->ssl_revoke_best_effort)
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;
@@ -260,7 +262,7 @@ bool PrintHostOctoPrint::upload_inner_with_host(
     // If test fails, test_msg contains the error message.
     // Otherwise on Windows it contains the resolved IP address of the host.
     std::string test_msg;
-    if (!test(test_msg, retry_fn)) {
+    if (!test(test_msg, progress_fn, retry_fn)) {
         error_fn(std::move(test_msg));
         return false;
     }
@@ -365,7 +367,7 @@ bool PrintHostOctoPrint::upload_inner_with_resolved_ip(
     // Otherwise on Windows it contains the resolved IP address of the host.
     // Test_msg already contains resolved ip and will be cleared on start of test().
     std::string test_msg = resolved_addr.to_string();
-    if (!test_with_resolved_ip(test_msg, retry_fn)) {
+    if (!test_with_resolved_ip(test_msg, progress_fn, retry_fn)) {
         error_fn(std::move(test_msg));
         return false;
     }

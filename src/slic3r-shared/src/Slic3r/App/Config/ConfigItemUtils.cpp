@@ -49,14 +49,16 @@ std::string ConfigItemUtils::config_item_to_string(
 )
 {
     std::string result;
+    const std::string unit_text =
+        config_item.def().units.empty() ? std::string{} : " " + config_item.def().units.front();
     if (*config_item.def().type == typeid(std::string)) {
-        result = value.get<std::string>();
+        result = value.get<std::string>() + unit_text;
     } else if (*config_item.def().type == typeid(int)) {
-        result = std::to_string(value.get<int>());
+        result = std::to_string(value.get<int>()) + unit_text;
     } else if (*config_item.def().type == typeid(double)) {
-        result = fmt::format("{:.10g}", value.get<double>());
+        result = fmt::format("{:.10g}{}", value.get<double>(), unit_text);
     } else if (*config_item.def().type == typeid(Domain::Percentage)) {
-        result = fmt::format("{:.10g}", value.get<Domain::Percentage>().value);
+        result = fmt::format("{:.10g}{}", value.get<Domain::Percentage>().value, unit_text);
     } else if (*config_item.def().type == typeid(Domain::FloatOrPercentage)) {
         Domain::FloatOrPercentage fop = value.get<Domain::FloatOrPercentage>();
         if (fop.is_percentage()) {

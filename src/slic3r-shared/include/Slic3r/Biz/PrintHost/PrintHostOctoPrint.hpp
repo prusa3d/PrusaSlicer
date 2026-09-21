@@ -25,13 +25,13 @@ public:
     bool perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
     const char* get_name() const override { return "OctoPrint"; }
-    bool test(std::string& msg, RetryFn retry_fn) const override;
+    bool test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const override;
 
 private:
     bool upload_inner_with_host(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const;
 #ifdef WIN32
     bool upload_inner_with_resolved_ip(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn, const boost::asio::ip::address& resolved_addr) const;
-    bool test_with_resolved_ip(std::string& msg, RetryFn retry_fn) const;
+    bool test_with_resolved_ip(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const;
 #endif
     std::string make_url(const std::string& path) const;
     void set_auth(Network::IHttp* http) const;

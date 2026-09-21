@@ -2,27 +2,54 @@
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
+#include "Slic3r/Biz/RemovableDrive/RemovableDriveService.hpp"
+#include "Slic3r/Biz/Platform/PlatformServices.hpp"
+#include "Slic3r/Biz/Platform/IAppConfigProvider.hpp"
+#include "Slic3r/Biz/PrintHost/IPrintHost.hpp"
+#include "Slic3r/Biz/PrintHost/PrintHostFactory.hpp"
+#include "Slic3r/Biz/PrintHost/PrintHostJobData.hpp"
+#include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 
 #include "Slic3r/Log.hpp"
 
 #include <algorithm>
+#include <memory>
+#include <optional>
 #include <variant>
 
 namespace Slic3r::Biz::PhysicalPrinter {
 
+namespace {
+
+constexpr const char* CONNECTION_TEST_JOB_NAME = "physical_printer_connection_test";
+
+bool auth_type_supported_by_host(Domain::PrintHostType type, Domain::PrintHostAuthType auth_type)
+{
+    if (type != Domain::PrusaLink && type != Domain::SL1Host) {
+        return true;
+    }
+    return auth_type != Domain::PrintHostAuthType::None;
+}
+
+} // namespace
+
 PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     Platform::IMainThreadDispatcher& dispatcher,
     Preset::PresetInteractor& preset_interactor,
-    UserAccount::UserAccountInteractor& user_account_interactor
+    UserAccount::UserAccountInteractor& user_account_interactor,
+    RemovableDrive::RemovableDriveService& removable_drive_service
 ) :
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
-    m_user_account_interactor(user_account_interactor)
+    m_user_account_interactor(user_account_interactor),
+    m_removable_drive_service(removable_drive_service)
 {
     read_storage();
     m_selected_uuid = m_observable_list.at(0).uuid;
     m_selected_index = 0;
+    restore_last_used_selection();
 }
 
 PhysicalPrinterInteractor::~PhysicalPrinterInteractor()
@@ -50,17 +77,61 @@ void PhysicalPrinterInteractor::read_storage()
     m_observable_list.reset(std::move(printers));
 }
 
+void PhysicalPrinterInteractor::restore_last_used_selection()
+{
+    auto& services = Platform::PlatformServices::instance();
+    if (!services.has_app_config_provider()) {
+        return;
+    }
+    m_last_used_uuid = services.app_config_provider().last_used_physical_printer();
+
+    auto index = find_index(m_last_used_uuid);
+    if (!index || !can_be_selected_at(*index)) {
+        return;
+    }
+    m_selected_uuid     = m_last_used_uuid;
+    m_selected_index    = *index;
+    m_explicit_selection = true;
+}
+
+void PhysicalPrinterInteractor::set_last_used(const std::string& uuid)
+{
+    if (uuid == m_last_used_uuid) {
+        return;
+    }
+    m_last_used_uuid = uuid;
+    auto& services = Platform::PlatformServices::instance();
+    if (services.has_app_config_provider()) {
+        services.app_config_provider().set_last_used_physical_printer(uuid);
+    }
+}
+
+void PhysicalPrinterInteractor::remember_used_destination(const std::string& uuid)
+{
+    if (!find_index(uuid)) {
+        return;
+    }
+    set_last_used(uuid);
+}
+
 bool PhysicalPrinterInteractor::can_be_selected(const std::string& uuid) const
 {
-    auto index = index_of(uuid);
+    return can_be_selected_at(index_of(uuid));
+}
+
+bool PhysicalPrinterInteractor::can_be_selected_at(size_t index) const
+{
     const auto& printer = m_observable_list.at(index);
     if (std::holds_alternative<ConnectUpload>(printer.payload)) {
         return m_user_account_interactor.is_logged_in();
     }
+    if (const auto* fs = std::get_if<FileSystemExport>(&printer.payload); fs && fs->prefer_removable) {
+        return m_removable_drive_service.has_removable_drives();
+    }
     return true;
 }
 
-void PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
+void PhysicalPrinterInteractor::apply_selection(const std::string& uuid)
 {
     m_selected_uuid = uuid;
     m_selected_index = index_of(uuid);
@@ -73,44 +144,67 @@ void PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
     );
 }
 
+void PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
+{
+    apply_selection(uuid);
+    m_explicit_selection = true;
+}
+
 void PhysicalPrinterInteractor::select_default()
 {
     if (m_observable_list.size() == 0) {
         return;
     }
-    select_uuid(m_observable_list.at(0).uuid);
+    apply_selection(m_observable_list.at(0).uuid);
+    m_explicit_selection = false;
 }
 
-void PhysicalPrinterInteractor::select_connect_upload(bool prefer_physical_printer)
+void PhysicalPrinterInteractor::select_connect_upload()
 {
-    if (m_selected_index != 0 && prefer_physical_printer) {
+    select_uuid(std::string(PRUSA_CONNECT_UUID));
+}
+
+void PhysicalPrinterInteractor::select_connect_upload_if_default()
+{
+    if (m_selected_index != 0 || m_explicit_selection) {
         return;
     }
+    apply_selection(std::string(PRUSA_CONNECT_UUID));
+}
 
-    // Note: This implementation works only in case there is single connect upload item
-    for (size_t i = 0; i < m_observable_list.size(); ++i) {
-        if (std::holds_alternative<ConnectUpload>(m_observable_list.at(i).payload)) {
-            select_uuid(m_observable_list.at(i).uuid);
-            return;
-        }
+void PhysicalPrinterInteractor::on_removable_drive_status_changed(
+    const boost::filesystem::path& /* drive_path */,
+    RemovableDrive::RemovableDriveStatus status
+)
+{
+    if (status != RemovableDrive::RemovableDriveStatus::Inserted) {
+        return;
     }
-    DEBUG_ASSERT(false, "ConnectUpload missing in list of physical printers");
+    if (m_explicit_selection || m_last_used_uuid != REMOVABLE_DRIVE_UUID || m_selected_uuid == REMOVABLE_DRIVE_UUID) {
+        return;
+    }
+    apply_selection(m_last_used_uuid);
 }
 
 void PhysicalPrinterInteractor::remove_uuid(const std::string& uuid)
 {
+    ASSERT(!is_reserved_uuid(uuid));
     size_t index = index_of(uuid);
-    ASSERT(index != 0);
     bool was_selected = (uuid == m_selected_uuid);
 
     m_storage.remove_one(uuid);
     m_observable_list.remove({index, index});
+    std::erase_if(m_container_to_printer_uuid_map, [&uuid](const auto& entry) { return entry.second == uuid; });
 
     // Always call some select method after removal to invoke listeners
     if (was_selected) {
         select_default();
     } else {
-        select_uuid(m_selected_uuid);
+        apply_selection(m_selected_uuid);
+    }
+
+    if (uuid == m_last_used_uuid) {
+        set_last_used({});
     }
 }
 
@@ -175,13 +269,14 @@ bool PhysicalPrinterInteractor::selected_hw_matches_current() const
 
 void PhysicalPrinterInteractor::save_new_printer()
 {
-    ASSERT(m_selected_index == 0);
+    ASSERT(is_filesystem_export_selected());
     const Domain::Preset::HwPrinterConfig& current_printer_config = m_preset_interactor.current_printer_config();
 
     std::string uuid = m_storage.create_from_dummy(current_printer_config);
 
     m_observable_list.append(m_storage.all_printers().at(uuid));
-    select_uuid(uuid); // Reuses the internal logic directly via UUID
+    select_uuid(uuid);
+    set_last_used(uuid);
 }
 
 void PhysicalPrinterInteractor::on_dialog_button_add_new()
@@ -216,13 +311,17 @@ const ObservableList<PhysicalPrinterConfig>&  PhysicalPrinterInteractor::observa
 
 size_t PhysicalPrinterInteractor::index_of(const std::string& uuid) const
 {
+    return *ASSERT_VAL(find_index(uuid));
+}
+
+std::optional<size_t> PhysicalPrinterInteractor::find_index(const std::string& uuid) const
+{
     for (size_t i = 0; i < m_observable_list.size(); ++i) {
         if (m_observable_list.at(i).uuid == uuid) {
             return i;
         }
     }
-    ASSERT(false);
-    return 0;
+    return std::nullopt;
 }
 
 const PhysicalPrinterConfig& PhysicalPrinterInteractor::selected_physical_printer_data()
@@ -232,13 +331,10 @@ const PhysicalPrinterConfig& PhysicalPrinterInteractor::selected_physical_printe
 
 bool PhysicalPrinterInteractor::is_printer_compatible(const std::string& uuid, const Domain::Preset::HwPrinterConfig& config) const
 {
-    if (uuid == m_observable_list.at(0).uuid) {  // Default is always compatible
-        return true;
-    }
-
     const auto& printer = m_observable_list.at(index_of(uuid));
 
-    if (std::holds_alternative<ConnectUpload>(printer.payload)) {
+    if (std::holds_alternative<FileSystemExport>(printer.payload)
+        || std::holds_alternative<ConnectUpload>(printer.payload)) {
         return true;
     }
 
@@ -256,7 +352,7 @@ void PhysicalPrinterInteractor::on_selected_config_container_changed(Domain::Sel
     bool hw_compatible = is_printer_compatible(m_selected_uuid, m_preset_interactor.current_printer_config());
     if (auto it = m_container_to_printer_uuid_map.find(m_current_container); it != m_container_to_printer_uuid_map.end()) {
         if (can_be_selected(it->second)) {
-            select_uuid(it->second);
+            apply_selection(it->second);
             return;
         }
     } else if (can_be_selected(m_selected_uuid) && hw_compatible) {
@@ -265,6 +361,132 @@ void PhysicalPrinterInteractor::on_selected_config_container_changed(Domain::Sel
     }
 
     select_default();
+}
+
+bool PhysicalPrinterInteractor::is_connection_testable() const
+{
+    const PhysicalPrinterConfig& printer = edited_printer();
+    if (printer.host.empty()) {
+        return false;
+    }
+
+    const PrinterUpload* upload = std::get_if<PrinterUpload>(&printer.payload);
+    if (upload == nullptr) {
+        return false;
+    }
+
+    return auth_type_supported_by_host(upload->type, upload->auth_type);
+}
+
+bool PhysicalPrinterInteractor::is_connection_test_in_flight() const
+{
+    return m_connection_test_in_flight;
+}
+
+void PhysicalPrinterInteractor::test_edited_printer_connection(
+    std::function<void(PrintHostTestResult)> callback
+)
+{
+    if (m_connection_test_in_flight || !is_connection_testable()) {
+        return;
+    }
+
+    m_connection_test_callback  = std::move(callback);
+    m_connection_test_in_flight = true;
+
+    const size_t generation = ++m_connection_test_generation;
+    m_connection_test_job_name = CONNECTION_TEST_JOB_NAME + std::to_string(generation);
+
+    PhysicalPrinterConfig config = edited_printer();
+
+    std::function job_func = [](JThread::StopToken stop_token,
+                                PhysicalPrinterConfig printer) -> PrintHostTestResult
+    {
+        std::unique_ptr<PrintHost::IPrintHost> host = PrintHost::create_print_host(
+            std::move(printer),
+            PrintHost::PrintHostJobData{
+                std::monostate{},
+                {},
+                PrintHost::PrintHostExportFormat::Undefined
+            }
+        );
+        if (!host) {
+            // TRN Error shown when no print host implementation matches the printer settings.
+            return {false, {}, _u8L("Could not get a valid printer host reference.")};
+        }
+
+        std::string msg;
+        const bool ok = host->test(
+            msg,
+            [stop_token](Network::IHttp::Progress, bool& cancel)
+            {
+                if (stop_token.stop_requested()) {
+                    cancel = true;
+                }
+            },
+            [stop_token](Network::IHttp::Retry, bool& cancel)
+            {
+                if (stop_token.stop_requested()) {
+                    cancel = true;
+                }
+            }
+        );
+
+        if (stop_token.stop_requested()) {
+            return {false, {}, {}};
+        }
+
+        return {ok, std::string{host->get_name()}, ok ? std::string{} : std::move(msg)};
+    };
+
+    Platform::PlatformServices::instance()
+        .job_manager()
+        .create_job(m_connection_test_job_name, std::move(job_func), std::move(config))
+        .on_result(
+            [this, generation](PrintHostTestResult result)
+            { finish_connection_test(generation, std::move(result)); }
+        )
+        .on_exception(
+            [this, generation](const std::exception_ptr&)
+            {
+                // TRN Error shown when the print host connection test itself failed unexpectedly.
+                finish_connection_test(generation, {false, {}, _u8L("Connection test failed.")});
+            }
+        )
+        .start();
+}
+
+void PhysicalPrinterInteractor::cancel_edited_printer_connection_test()
+{
+    if (!m_connection_test_in_flight) {
+        return;
+    }
+
+    ++m_connection_test_generation;
+    m_connection_test_in_flight = false;
+    m_connection_test_callback  = nullptr;
+
+    if (Platform::PlatformServices::instance().has_job_manager()) {
+        Platform::PlatformServices::instance().job_manager().request_job_stop(m_connection_test_job_name);
+    }
+    m_connection_test_job_name.clear();
+}
+
+void PhysicalPrinterInteractor::finish_connection_test(size_t generation, PrintHostTestResult result)
+{
+    if (generation != m_connection_test_generation) {
+        return;
+    }
+
+    m_connection_test_in_flight = false;
+    m_connection_test_job_name.clear();
+
+    std::function<void(PrintHostTestResult)> callback = std::move(m_connection_test_callback);
+    m_connection_test_callback = nullptr;
+
+    if (callback) {
+        callback(std::move(result));
+    }
 }
 
 } // namespace Slic3r::Biz::PhysicalPrinter

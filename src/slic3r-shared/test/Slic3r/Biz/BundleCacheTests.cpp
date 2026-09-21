@@ -73,6 +73,7 @@ TEST_CASE("Preset::Bundle Serialization Roundtrip", "[Serialization][Preset]")
     original.printer_configs["MyPrinterConfig"] = Domain::Preset::HwPrinterConfig{
         "MyPrinterConfig",
         "",
+        "MyTemplate",
         std::nullopt,
         "",
         "",
@@ -101,6 +102,7 @@ TEST_CASE("Preset::Bundle Serialization Roundtrip", "[Serialization][Preset]")
     REQUIRE(deserialized.printer_configs.count("MyPrinterConfig"));
     const auto& printer_config = deserialized.printer_configs.at("MyPrinterConfig");
     REQUIRE(printer_config.id == "MyPrinterConfig");
+    REQUIRE(printer_config.template_id == "MyTemplate");
     REQUIRE(printer_config.name == "My Printer");
     REQUIRE(printer_config.technology == Domain::PrinterTechnology::FFF);
     REQUIRE(printer_config.model.model == "MP-1");

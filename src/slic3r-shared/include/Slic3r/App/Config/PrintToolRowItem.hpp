@@ -74,6 +74,18 @@ public:
         Biz::Preset::PresetItemType type
     ) override;
 
+    void on_preset_discarded_changes(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        Biz::Preset::PresetItemType type
+    ) override;
+
+    void on_preset_item_discarded_changes(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        const Domain::ConfigItem& item
+    ) override;
+
 protected:
     using ToolRowOverridePtr = std::unique_ptr<ToolRowOverride>;
 
@@ -83,7 +95,7 @@ protected:
     void initialize();
     void update_explanation();
 
-    void exclude_tool(size_t tool_index);
+    void tool_clicked(size_t tool_index);
     void move_tool(size_t tool_index, size_t group_index);
 
     void presort_overrides();

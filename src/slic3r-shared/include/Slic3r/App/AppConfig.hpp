@@ -25,6 +25,13 @@ enum class MouseNavigationScheme
     Fusion
 };
 
+enum class HyperlinkPolicy
+{
+    Ask,
+    AlwaysOpen,
+    NeverOpen
+};
+
 class AppSettings : public Domain::ConfigBox
 {
 public:

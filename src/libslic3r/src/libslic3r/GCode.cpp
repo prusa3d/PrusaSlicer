@@ -1222,7 +1222,6 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
         this->placeholder_parser().set("first_layer_print_min",  std::vector<double>{ bbox.min.x(), bbox.min.y() });
         this->placeholder_parser().set("first_layer_print_max",  std::vector<double>{ bbox.max.x(), bbox.max.y() });
         this->placeholder_parser().set("first_layer_print_size", std::vector<double>{ BB::sizes(bbox).x(), BB::sizes(bbox).y() });
-        this->placeholder_parser().set("num_extruders", int(print.config().hw_config().material_slot_count()));
         // PlaceholderParser currently substitues non-existent vector values with the zero'th value, which is harmful in the case of "is_extruder_used[]"
         // as Slicer may lie about availability of such non-existent extruder.
         // We rather sacrifice 256B of memory before we change the behavior of the PlaceholderParser, which should really only fill in the non-existent
@@ -1448,10 +1447,15 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
             config.set("filament_extruder_id", extruder_id);
             file.writeln(this->placeholder_parser_process("end_filament_gcode", print.config().get<std::vector<std::string>>("end_filament_gcode").at(extruder_id), extruder_id, &config));
         } else {
-            for (const std::string &end_gcode : print.config().get<std::vector<std::string>>("end_filament_gcode")) {
-                int extruder_id = (unsigned int)(&end_gcode - &print.config().get<std::vector<std::string>>("end_filament_gcode").front());
+            const std::vector<std::string>& end_filament_gcode{
+                print.config().get<std::vector<std::string>>("end_filament_gcode")};
+            for (int extruder_id{}; extruder_id < end_filament_gcode.size(); ++extruder_id) {
                 config.set("filament_extruder_id", extruder_id);
-                file.writeln(this->placeholder_parser_process("end_filament_gcode", end_gcode, extruder_id, &config));
+                file.writeln(this->placeholder_parser_process(
+                    "end_filament_gcode",
+                    end_filament_gcode.at(extruder_id),
+                    extruder_id,
+                    &config));
             }
         }
         file.writeln(this->placeholder_parser_process("end_gcode", print.config().get<std::string>("end_gcode"), m_writer.extruder()->id(), &config));
@@ -4126,9 +4130,14 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
 
     // Process the custom toolchange_gcode. If it is empty, insert just a Tn command.
     if (!toolchange_gcode.empty()) {
+        // Do not count the current toolchange.
+        if (prev_extruder_id >= 0) {
+            ++ m_toolchange_count;
+        }
         ParserConfig dynamic_config;
         dynamic_config.set("previous_extruder", prev_extruder_id);
-        dynamic_config.set("next_extruder",     (int)extruder_id);
+        dynamic_config.set("next_extruder",     int(extruder_id));
+        dynamic_config.set("toolchange_count",  int(m_toolchange_count));
         dynamic_config.set("layer_num",         m_layer_index);
         dynamic_config.set("layer_z",           print_z);
         dynamic_config.set("toolchange_z",      print_z);

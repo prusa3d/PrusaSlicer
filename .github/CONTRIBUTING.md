@@ -4,7 +4,7 @@ You can contribute to the PrusaSlicer project by reporting a bug or creating a p
 
 ## Issue tracker policy
 
-The [GitHub issue tracker](https://github.com/prusa3d/PrusaSlicer/issues) is **only** for reporting bugs. Feature requests, suggestions or any general questions/comments should be submitted to [GitHub Discussions](https://www.github.com/prusa3d/discussions). The bug report must be **well-formed** and provide all the necessary details for us to be able to reproduce it. The policy more formally:
+The [GitHub issue tracker](https://github.com/prusa3d/PrusaSlicer/issues) is **only** for reporting bugs. Feature requests, suggestions or any general questions/comments should be submitted to [GitHub Discussions](https://github.com/prusa3d/PrusaSlicer/discussions). The bug report must be **well-formed** and provide all the necessary details for us to be able to reproduce it. The policy more formally:
 
 1. The report must be a bug.
 2. You must provide all the necessary details for us to reproduce the issue. This includes a clear detailed description in English, a project file (3mf) where applicable and any screenshots/videos to support the written description.
@@ -18,7 +18,7 @@ The [GitHub issue tracker](https://github.com/prusa3d/PrusaSlicer/issues) is **o
 
 These rules are intentionally **quite strict** with the aim to keep the issue tracker clean and useful for everyone. Once a bug is **acknowledged** in the issue tracker and not closed/moved to Discussions, it means we **will do our best to fix it**.
 
-Also note that we **really want your feedback** and these rules apply **only to the issue tracker**. You can always voice your concerns/questions/remarks in the [GitHub Discussions](https://www.github.com/prusa3d/discussions).
+Also note that we **really want your feedback** and these rules apply **only to the issue tracker**. You can always voice your concerns/questions/remarks in the [GitHub Discussions](https://github.com/prusa3d/PrusaSlicer/discussions).
 
 ## Submitting a pull request
 
@@ -62,7 +62,7 @@ We have seen pull requests that did not do what they claimed at all. We have see
 
 ### Coding style
 
-Coding style is described in [doc/CodeStyle.md](doc/CodeStyle.md) in more detail.
+Coding style is described in [doc/CodeStyle.md](../doc/CodeStyle.md) in more detail.
 
 ### Disclaimer
 

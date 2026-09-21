@@ -166,6 +166,8 @@ private:
     std::optional<float> m_last_cursor_z;
     Domain::ZHeightPairs m_baseline_layer_height_profile;
 
+    void release_gizmo_scene_state();
+
     void restore_visible_volumes();
     void hide_visible_volumes();
 
@@ -199,6 +201,9 @@ private:
     perform_raycast(const Domain::Vec2d& mouse_position, const Scene::Camera& camera) const;
 
     void rebuild_gizmo_state();
+
+    void finish_layer_height_profile_stroke();
+    void reset_layer_height_profile_stroke_state();
 };
 
 } // namespace Slic3r::App::Plater

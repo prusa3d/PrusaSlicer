@@ -334,7 +334,7 @@ bool whole_repository_failed(
     return process_status->has_vendor_warning(repo_id, {});
 }
 
-void collect_removal_of_unusable_vendor(
+void collect_vendor_without_staged_index(
     const fs::path& installed_repo_dir,
     const std::string& repo_id,
     const PresetUpdaterIndex& index,
@@ -367,7 +367,13 @@ void collect_removal_of_unusable_vendor(
 
     const Semver current_version = Semver(vendor_data.info.version);
     const PresetUpdaterIndex::const_iterator installed = index.find(current_version);
-    if (installed == index.end() || installed->is_current_slic3r_supported()) {
+    if (installed == index.end()) {
+        return;
+    }
+    if (installed->is_current_slic3r_supported()) {
+        if (!process_status->has_vendor_warning(repo_id, vendor_data.info.id)) {
+            results.add_up_to_date(vendor_data.info.id, repo_id, current_version);
+        }
         return;
     }
 
@@ -939,7 +945,7 @@ PresetUpdaterReconfigurationList check_reconfigurations(
                 }
             } else {
                 if (!whole_repository_failed(process_status, repo_id)) {
-                    collect_removal_of_unusable_vendor(
+                    collect_vendor_without_staged_index(
                         archive_dir.path(), repo_id, index, results, process_status
                     );
                 }
@@ -1050,6 +1056,8 @@ PresetUpdaterReconfigurationList check_reconfigurations(
                         recommended->config_version,
                         recommended->comment
                     );
+                } else if (!process_status->has_vendor_warning(repo_id, vendor_data.info.id)) {
+                    results.add_up_to_date(vendor_data.info.id, repo_id, current_version);
                 }
                 continue;
             }

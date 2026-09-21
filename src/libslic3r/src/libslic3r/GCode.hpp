@@ -433,6 +433,7 @@ private:
     unsigned int                        m_layer_count;
     // Progress bar indicator. Increments from -1 up to layer_count.
     int                                 m_layer_index;
+    unsigned int                        m_toolchange_count{ 0 };
     // Current layer processed. In sequential printing mode, only a single copy will be printed.
     // In non-sequential mode, all its copies will be printed.
     const Layer*                        m_layer;

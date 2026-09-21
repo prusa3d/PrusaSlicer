@@ -32,11 +32,7 @@ public:
     void set_app_config_provider(std::unique_ptr<IAppConfigProvider>&& provider);
     void set_app_instance_message_handler(std::unique_ptr<IAppInstanceMessageHandler>&& message_handler);
 
-    IRenderRequestHandler& render_request_handler()
-    {
-        ASSERT(m_render_request_handler != nullptr);
-        return *m_render_request_handler;
-    }
+    IRenderRequestHandler& render_request_handler();
 
     IMainThreadDispatcher& main_thread_dispatcher()
     {
@@ -78,6 +74,11 @@ public:
     }
 
     IAppConfigProvider& app_config_provider();
+
+    bool has_app_config_provider() const
+    {
+        return m_app_config_provider != nullptr;
+    }
 
 private:
     IRenderRequestHandler* m_render_request_handler{nullptr};

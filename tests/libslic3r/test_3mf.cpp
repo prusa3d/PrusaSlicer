@@ -144,7 +144,7 @@ TEST_CASE("Export+Import geometry to/from 3mf file cycle", "[3mf]") {
     }
 }
 
-#ifndef __APPLE__
+#if 0
 // The ifndef is a hotfix of an intermitted test failure happenning only on macOS.
 
 SCENARIO("2D convex hull of sinking object", "[3mf]") {

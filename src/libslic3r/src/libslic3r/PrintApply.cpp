@@ -863,10 +863,15 @@ FDMPrintSteps get_custom_gcode_invalidated_steps(
 PlaceholderParser init_placeholder_parser(
     const ParserConfig& new_config,
     const std::optional<ModelWipeTower>& wipe_tower,
-    const Domain::Preset::SelectedPresetMetadata& metadata
+    const Domain::Preset::SelectedPresetMetadata& metadata,
+    const std::string& bed_name
 )
 {
     PlaceholderParser parser{new_config};
+    parser.set("num_extruders", int(metadata.hw_config.material_slot_count()));
+    parser.set("sheet_type", metadata.hw_config.sheet.type);
+    parser.set("bed_name", bed_name);
+
 
     // set preset IDs to be compatible with legacy printers
     parser.set("printer_settings_id", metadata.printer.name);
@@ -1535,6 +1540,7 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
     const Domain::Model& model,
     const FullConfigFDMPtr& new_full_config_ptr,
     const Domain::Preset::SelectedPresetMetadata& metadata,
+    const std::string& bed_name,
     const MetadataSerializeFn& serializer,
     const Domain::ModelWipeTower& wipe_tower,
     const std::optional<Domain::CustomGCode::Info>& custom_gcode,
@@ -1607,7 +1613,8 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
     m_placeholder_parser = init_placeholder_parser(
         Biz::Parser::IO::get_parser_config(new_print_config),
         wipe_tower,
-        metadata
+        metadata,
+        bed_name
     );
 
     InvalidatedSteps wipe_tower_invalidated_steps;

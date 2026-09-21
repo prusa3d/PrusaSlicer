@@ -155,10 +155,10 @@ public:
         return new_name;
     }
 
-    NamesPerKindMap show_save_print_tool_dialog(
+    NamesPerKindMap show_save_print_tool_dialog (
         const NamesPerKindMap& original_names_per_kind,
         const Slic3r::Biz::Preset::PresetInteractor& preset_interactor
-    )
+    ) override
     {
         return new_print_tool_names;
     }

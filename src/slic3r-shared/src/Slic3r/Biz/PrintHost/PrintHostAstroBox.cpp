@@ -20,7 +20,7 @@ bool PrintHostAstroBox::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorF
     const auto upload_parent_path = m_upload_data.dest_path.parent_path();
 
     std::string test_msg;
-    if (!test(test_msg, retry_fn)) {
+    if (!test(test_msg, progress_fn, retry_fn)) {
         error_fn(std::move(test_msg));
         return false;
     }
@@ -72,7 +72,7 @@ bool PrintHostAstroBox::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorF
     return res;
 }
 
-bool PrintHostAstroBox::test(std::string& msg, RetryFn retry_fn) const
+bool PrintHostAstroBox::test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     // Since the request is performed synchronously here,
     // it is ok to refer to `msg` from within the closure
@@ -120,6 +120,7 @@ bool PrintHostAstroBox::test(std::string& msg, RetryFn retry_fn) const
                 msg = "Could not parse server response";
             }
         })
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;

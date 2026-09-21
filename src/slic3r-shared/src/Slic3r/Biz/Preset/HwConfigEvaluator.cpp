@@ -54,6 +54,7 @@ Domain::Preset::HwPrinterConfig from_def(
     Domain::Preset::HwPrinterConfig printer_config = {
         .id           = generate_uuid(),
         .printer_id   = printer_def.id,
+        .template_id  = templ == nullptr ? std::nullopt : std::optional{templ->id},
         .vendor_id    = vendor_data.info.id,
         .repo_id      = vendor_data.info.repo_id,
         .repo_version = vendor_data.info.version,

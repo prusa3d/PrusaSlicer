@@ -173,14 +173,18 @@ SelectionMode transform_selection_instance_mode(
 
     if (initialize_memento) {
         memento.elements.reserve(sel.elements.size());
+    }
 
-        for (const auto& e : sel.elements) {
-            if (!e.is_wipe_tower()) {
-                continue;
-            }
-            Domain::BedInstance* bed_instance =
-                proj.project.find_bed_instance_by_id(e.wipe_tower_id.bed_instance_id);
-            ASSERT(bed_instance);
+    for (const auto& e : sel.elements) {
+        if (!e.is_wipe_tower()) {
+            continue;
+        }
+        Domain::BedInstance* bed_instance =
+            proj.project.find_bed_instance_by_id(e.wipe_tower_id.bed_instance_id);
+        if (bed_instance == nullptr) {
+            continue;
+        }
+        if (!memento.elements.contains(e)) {
             memento.elements.insert({e, {e, get_wipe_tower_transform(*bed_instance)}});
         }
     }
@@ -191,7 +195,9 @@ SelectionMode transform_selection_instance_mode(
         }
         Domain::BedInstance* bed_instance =
             proj.project.find_bed_instance_by_id(e.element.wipe_tower_id.bed_instance_id);
-        ASSERT(bed_instance);
+        if (bed_instance == nullptr) {
+            continue;
+        }
         set_wipe_tower_transformation(
             transform_product(e.original_xform, relative_transform),
             *bed_instance
@@ -207,7 +213,7 @@ SelectionMode transform_selection_instance_mode(
         if (volume_transform_mode) {
             object_ids.insert(inst->get_object()->id().id);
         } else {
-            if (initialize_memento) {
+            if (!memento.elements.contains(e)) {
                 memento.elements.insert({e, {e, inst->get_matrix().matrix()}});
             }
             inst->set_transformation(
@@ -253,7 +259,9 @@ void transform_selection_volume_mode(const SceneInteractorProjectContext& proj, 
     const bool initialize_memento = memento.elements.empty();
     const auto& sel               = proj.object_selection;
     DEBUG_ASSERT(sel.mode == SelectionMode::Volume);
-    ASSERT(!sel.elements.empty());
+    if (sel.elements.empty()) {
+        return;
+    }
     const auto& first_el = sel.elements[0];
     // assert that all elements are of same instance
     DEBUG_ASSERT(
@@ -273,7 +281,7 @@ void transform_selection_volume_mode(const SceneInteractorProjectContext& proj, 
     for (const auto& e : sel.elements) {
         DEBUG_ASSERT(e.volume_id != 0);
         auto* vol = proj.project.find_volume_by_id(e.object_id, e.volume_id);
-        if (initialize_memento)
+        if (!memento.elements.contains(e))
             memento.elements.insert({e, {e, vol->get_matrix().matrix()}});
         vol->set_transformation(transform_product(memento.elements[e].original_xform, volume_relative_transform));
     }
@@ -2616,19 +2624,24 @@ static std::vector<Domain::SelectionId> get_bed_ids(
     return result;
 }
 
+bool SceneInteractor::is_bed_related_preset_key(const std::string& name)
+{
+    static const std::vector<std::string> bed_related_keys{
+        "bed_shape",
+        "max_print_height",
+        "bed_custom_model",
+        "bed_custom_texture",
+    };
+    return std::ranges::find(bed_related_keys, name) != bed_related_keys.end();
+}
+
 void SceneInteractor::on_preset_value_changed(
     Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
     const Domain::ConfigItem& item
 )
 {
-    const std::vector<std::string> bed_related_keys{
-        "bed_shape",
-        "max_print_height",
-        "bed_custom_model",
-        "bed_custom_texture",
-    };
-    if (std::ranges::find(bed_related_keys, item.def().name) != bed_related_keys.end()) {
+    if (is_bed_related_preset_key(item.def().name)) {
         update_config_container_bed(project_id, config_container_id);
         for (const Domain::SelectionId& bed_id :
              get_bed_ids(m_workbench, project_id, config_container_id))
@@ -2894,14 +2907,18 @@ void SceneInteractor::transform_instances(const std::vector<Arrange::InstanceTra
             if (instance == nullptr) {
                 continue;
             }
-            Domain::Transform3d offset_trafo{instance->get_transformation().get_matrix()};
-            offset_trafo.translation().x() = trafo.absolute_offset.x();
-            offset_trafo.translation().y() = trafo.absolute_offset.y();
+            Domain::Transform3d rotation_trafo{Domain::Transform3d::Identity()};
+            rotation_trafo.rotate(
+                Eigen::AngleAxisd(trafo.rotation_delta, Eigen::Vector3d::UnitZ())
+            );
 
-            auto rotation_trafo{Domain::Transform3d::Identity()};
-            rotation_trafo.rotate(Eigen::AngleAxisd(trafo.rotation_delta, Eigen::Vector3d::UnitZ()));
+            Domain::Transform3d new_trafo{
+                rotation_trafo * instance->get_transformation().get_matrix()
+            };
+            new_trafo.translation().x() = trafo.absolute_offset.x();
+            new_trafo.translation().y() = trafo.absolute_offset.y();
 
-            instance->set_transformation(Transformation{offset_trafo * rotation_trafo});
+            instance->set_transformation(Transformation{new_trafo});
         }
         elements.push_back(trafo.instance_ref);
     }
@@ -3030,7 +3047,9 @@ void SceneInteractor::finalize_transform_selection(
         const Transformation xform{Transform3d{e.original_xform}};
         Domain::BedInstance* bed_instance =
             proj.project.find_bed_instance_by_id(e.element.wipe_tower_id.bed_instance_id);
-        ASSERT(bed_instance);
+        if (bed_instance == nullptr) {
+            continue;
+        }
         set_wipe_tower_transformation(xform, *bed_instance);
         invoke_listeners<ISceneChangedListener>(
             [&](auto listener) { listener->on_wipe_tower_moved(e.element.wipe_tower_id); }
@@ -3056,9 +3075,15 @@ void SceneInteractor::finalize_transform_selection(
             }
             if (vol_mode) {
                 auto* vol = proj.project.find_volume_by_id(e.element.object_id, e.element.volume_id);
+                if (vol == nullptr) {
+                    continue;
+                }
                 vol->set_transformation(xform);
             } else {
                 auto* inst = proj.project.find_instance_by_id(e.element.object_id, e.element.instance_id);
+                if (inst == nullptr) {
+                    continue;
+                }
                 inst->set_transformation(xform);
             }
         }
@@ -3066,6 +3091,9 @@ void SceneInteractor::finalize_transform_selection(
         changes = update_elements_bed_placement(proj.object_selection.elements, vol_mode, false);
     } else if (!canceled) {
         for (const auto& bed_ref : memento.changes.updated_beds) {
+            if (proj.project.find_bed_instance_by_id(bed_ref.instance_id) == nullptr) {
+                continue;
+            }
             invoke_slicing_input_changed(bed_ref);
         }
     }

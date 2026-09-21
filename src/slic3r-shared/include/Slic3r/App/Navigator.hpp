@@ -53,6 +53,8 @@ public:
     /// Makes the canvas reachable before the plater and preview modules exist.
     void set_canvas(Platform::AbstractRenderCanvas& canvas);
 
+    void set_hide_sidebars(bool hide);
+
     /// False between set_canvas and on_init, while the app runs without the plater and preview.
     bool has_modules() const;
 

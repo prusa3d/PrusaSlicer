@@ -118,11 +118,10 @@ public:
             && ff.font_file->infos.size() > 1;
     }
 
-    // True when activ style has same name as some of stored style
-    bool exist_stored_style() const
-    {
-        return m_proj_preset_cache.selected().preset_index.has_value();
-    }
+    /**
+     * @brief True when the active preset refers to a valid stored preset.
+     */
+    bool exist_stored_style() const;
 
     bool is_unique_style_name(const std::string& name) const;
 

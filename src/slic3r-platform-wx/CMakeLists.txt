@@ -3,6 +3,8 @@ add_library(slic3r-platform-wx STATIC
     src/Slic3r/App/Platform/WX/WXRenderCanvas.cpp
     include/Slic3r/App/Platform/WX/WXMainThreadDispatcher.hpp
     src/Slic3r/App/Platform/WX/WXMainThreadDispatcher.cpp
+    include/Slic3r/App/Platform/WX/DpiScale.hpp
+    src/Slic3r/App/Platform/WX/DpiScale.cpp
 )
 
 if(WIN32)
@@ -37,6 +39,11 @@ target_link_libraries(slic3r-platform-wx PUBLIC
     slic3r-shared
 )
 target_include_directories(slic3r-platform-wx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+if (UNIX AND NOT APPLE)
+    find_package(GTK3 REQUIRED)
+    target_link_libraries(slic3r-platform-wx PRIVATE GTK3::GTK3)
+endif ()
 
 
 # Doxygen

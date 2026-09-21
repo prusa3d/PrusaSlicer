@@ -71,6 +71,8 @@ public:
     // Projects Changed
     void on_project_load_failed(const std::string& error) override;
     void on_project_will_be_removed(Domain::SelectionId project_id) override;
+    void on_file_load_started() override;
+    void on_geometry_only_imported() override;
 
     // Arrange
     void on_elements_not_arranged(

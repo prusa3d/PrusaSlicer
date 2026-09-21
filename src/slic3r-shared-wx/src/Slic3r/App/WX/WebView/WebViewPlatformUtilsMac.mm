@@ -165,11 +165,6 @@ void delete_cookies_with_counter(wxWebView* web_view, const std::string& url, st
     counter++;
 }
 
-void register_prusaslicer_url()
-{
-    // unused on MacOS
-}
-
 void load_request(wxWebView* web_view, const std::string& address, const std::string& token)
 {
     WKWebView* backend = static_cast<WKWebView*>(web_view->GetNativeBackend());

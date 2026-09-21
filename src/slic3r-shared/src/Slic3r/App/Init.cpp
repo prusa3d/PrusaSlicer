@@ -55,7 +55,11 @@ void init_common()
 #ifdef __EMSCRIPTEN__
     boost::filesystem::path path_resources = "/resources";
 #else
+#ifdef _WIN32
+    // nowide_filesystem calls std::locale("") which may throw on Linux
+    // with unsupported locale, we should call this just on Windows
     boost::nowide::nowide_filesystem();
+#endif
 
     // See Invoking prusa-slicer from $PATH environment variable crashes #5542
     // boost::filesystem::path path_to_binary = boost::filesystem::system_complete(argv[0]);

@@ -354,6 +354,7 @@ void serialize(Archive& archive, Slic3r::Domain::Preset::HwPrinterConfig& config
     archive(
         config.id,
         config.printer_id,
+        config.template_id,
         config.legacy_printer_model,
         config.vendor_id,
         config.repo_id,
@@ -462,9 +463,15 @@ void serialize(Archive& archive, Slic3r::Domain::Preset::VendorFeatures& feature
 }
 
 template <class Archive>
+void serialize(Archive& archive, Slic3r::Domain::Preset::PrinterFamilyInfo& family)
+{
+    archive(family.label, family.base_model, family.printer_configs_order);
+}
+
+template <class Archive>
 void serialize(Archive& archive, Slic3r::Domain::Preset::VendorInfo& info)
 {
-    archive(info.id, info.repo_id, info.name, info.version, info.features);
+    archive(info.id, info.repo_id, info.name, info.version, info.features, info.printer_families);
 }
 
 template <class Archive>

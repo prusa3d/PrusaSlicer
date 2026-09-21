@@ -14,6 +14,8 @@ endif ()
 
 # Common CMake arguments for Blosc
 set(_blosc_cmake_args
+        -DCMAKE_C_FLAGS="-std=gnu17"
+        -DCMAKE_CXX_FLAGS="-std=gnu++17"
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DBUILD_SHARED=${_build_shared}
         -DBUILD_STATIC=${_build_static}

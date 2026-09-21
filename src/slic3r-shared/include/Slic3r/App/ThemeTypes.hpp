@@ -22,6 +22,7 @@ enum class Color
     Scrollbar,
     NavCursor,
     ModalWindowDimBg,
+    Success,
     Warning,
     Error,
     SceneBgTop,

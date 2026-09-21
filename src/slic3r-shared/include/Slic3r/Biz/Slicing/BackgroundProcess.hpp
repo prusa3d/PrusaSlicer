@@ -81,7 +81,6 @@ private:
     std::string m_hw_config_id;
     std::unique_ptr<Biz::Slicing::IPrint> m_print;
     std::function<void(StatusUpdate)> m_on_status;
-    std::function<void(std::exception_ptr)> m_on_exception;
     std::function<StatusCode()> m_get_status;
     Domain::SlicingId m_id;
 

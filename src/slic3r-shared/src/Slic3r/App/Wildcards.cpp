@@ -37,6 +37,8 @@ const std::map<TypeFlag, std::string>& get_wildcard_map()
         {TypeFlag::Zip,            "Zip files (*.zip)|*.zip"},
         {TypeFlag::Drc,            "Draco files (*.drc)|*.drc"},
         {TypeFlag::AllTextures,    "Texture files|*.png;*.svg"},
+        {TypeFlag::Certificate,    "Certificate files (*.crt, *.pem)|*.crt;*.pem"},
+        {TypeFlag::AllFiles,       "All files|*.*"},
     };
     return map;
 }

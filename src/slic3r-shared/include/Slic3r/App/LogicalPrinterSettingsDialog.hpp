@@ -84,7 +84,7 @@ private:
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id
     ) override;
-
+    void on_preset_bundles_loaded() override;
 protected:
     void close_action() override;
 
@@ -97,7 +97,7 @@ private:
         LogicalPrinterSettingsButton::FnIndexClicked,
         LogicalPrinterSettingsButton::FnIndexClicked,
         LogicalPrinterSettingsButton::FnIndexClicked,
-        const Biz::Preset::PresetInteractor&>;
+        Biz::Preset::PresetInteractor&>;
     using PrinterListView = Yoga::ListView<
         LogicalPrinterSettingsButton,
         Biz::Preset::PresetItem,

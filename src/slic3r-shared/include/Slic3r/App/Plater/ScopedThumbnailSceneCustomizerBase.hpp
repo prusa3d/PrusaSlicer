@@ -27,8 +27,7 @@ public:
         // Notify listeners that thumbnail rendering begins.
         m_scene.notify_thumbnail_render_begin();
 
-        if (m_camera.cam_projection().type() != camera_type)
-            m_camera.switch_projection_type();
+        m_camera.set_projection_type(camera_type);
     }
     virtual ~ScopedThumbnailSceneCustomizerBase();
 

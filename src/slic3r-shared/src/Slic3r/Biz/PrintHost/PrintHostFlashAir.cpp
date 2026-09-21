@@ -35,7 +35,7 @@ bool PrintHostFlashAir::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorF
     const auto upload_filename    = m_upload_data.dest_path.filename();
     const auto upload_parent_path = m_upload_data.dest_path.parent_path();
     std::string test_msg;
-    if (!test(test_msg, retry_fn)) {
+    if (!test(test_msg, progress_fn, retry_fn)) {
         error_fn(std::move(test_msg));
         return false;
     }
@@ -144,7 +144,7 @@ bool PrintHostFlashAir::perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorF
     return res;
 }
 
-bool PrintHostFlashAir::test(std::string& msg, RetryFn retry_fn) const
+bool PrintHostFlashAir::test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     // Since the request is performed synchronously here,
     // it is ok to refer to `msg` from within the closure
@@ -180,6 +180,7 @@ bool PrintHostFlashAir::test(std::string& msg, RetryFn retry_fn) const
                 msg = _u8L("Upload not enabled on FlashAir card.");
             }
         })
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;

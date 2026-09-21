@@ -156,9 +156,8 @@ protected:
     PaintingPalette m_painting_colors;
 
     virtual Domain::FacetsAnnotationKind get_facets_annotation_kind() const = 0;
-    virtual const Domain::FacetsAnnotation& get_facets_annotation(
-        const Domain::ModelVolume& model_volume
-    ) const = 0;
+    virtual const Domain::FacetsAnnotation&
+    get_facets_annotation(const Domain::ModelVolume& model_volume) const = 0;
     virtual bool set_facets_annotation(
         Domain::ModelVolume& model_volume,
         const Biz::Algorithms::TriangleSelector& triangle_selector
@@ -178,9 +177,8 @@ protected:
 
     void apply_painting_to_model() const;
 
-    virtual Domain::ColorRGBA create_default_painting_color(
-        const Domain::ModelVolume& model_volume
-    ) const;
+    virtual Domain::ColorRGBA
+    create_default_painting_color(const Domain::ModelVolume& model_volume) const;
     virtual PaintingPalette create_painting_colors() const;
     virtual Domain::ColorRGBA get_cursor_sphere_left_button_color() const;
     virtual Domain::ColorRGBA get_cursor_sphere_right_button_color() const;
@@ -232,11 +230,11 @@ private:
         Right
     };
 
-    Scene::Node* m_main_node               = nullptr;
-    Scene::Node* m_cursors_node            = nullptr;
-    Scene::Node* m_triangle_selectors_node = nullptr;
+    Scene::Node* m_main_node                     = nullptr;
+    Scene::Node* m_cursors_node                  = nullptr;
+    Scene::Node* m_triangle_selectors_node       = nullptr;
     Scene::Node* m_clipping_plane_presenter_node = nullptr;
-    Scene::Node* m_sinking_plane_presenter_node = nullptr;
+    Scene::Node* m_sinking_plane_presenter_node  = nullptr;
 
     Scene::Node::NodeList
         m_visible_volumes_nodes; // Nodes that will be hidden when the gizmo is activated and shown when deactivated.
@@ -255,12 +253,13 @@ private:
 
     mutable RaycastCache m_raycast_cache;
 
+    void release_gizmo_scene_state();
+
     bool
     process_gizmo_event(const PaintOnGizmoEvent& gizmo_event, const Scene::GizmoEventContext& ctx);
 
-    Biz::Algorithms::TriangleSelector::ClippingPlane get_clipping_plane_in_volume_coordinates(
-        const Domain::Transform3d& trafo
-    ) const;
+    Biz::Algorithms::TriangleSelector::ClippingPlane
+    get_clipping_plane_in_volume_coordinates(const Domain::Transform3d& trafo) const;
 
     std::vector<VolumeHitPoints> get_projected_mouse_positions(
         const Domain::Vec2d& mouse_position,
@@ -270,13 +269,22 @@ private:
 
     bool is_mesh_point_clipped(const Domain::Vec3d& point, const Domain::Transform3d& trafo) const;
 
-    // Updates the cached raycast result for the given mouse position.
+    /**
+     * @brief Updates the cached raycast result for the given mouse position.
+     */
     void
     update_raycast_cache(const Domain::Vec2d& mouse_position, const Scene::Camera& camera) const;
 
-    // Performs the actual raycast computation (without using cache)
+    /**
+     * @brief Performs the actual raycast computation (without using cache).
+     */
     VolumeHitPoint
     perform_raycast(const Domain::Vec2d& mouse_position, const Scene::Camera& camera) const;
+
+    /**
+     * @brief Invalidates the cached raycast result.
+     */
+    void reset_raycast_cache();
 
     /**
      * @brief Unselects all triangles selected by seed fill in all volumes
@@ -292,6 +300,9 @@ private:
     void init_cursors_nodes();
     void update_cursors();
     void rebuild_paintable_geometry();
+
+    void finish_painting_stroke();
+    void reset_painting_stroke_state();
 };
 
 } // namespace Slic3r::App::Plater

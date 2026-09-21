@@ -255,7 +255,7 @@ void MacOSNativeMenuBar::update_menu_states()
         const Platform::ICommand& cmd = m_command_binding_manager.command(command_name.c_str());
         wxMenuItem* item              = m_menu_bar->FindItem(id);
         if (item) {
-            item->Enable(cmd.enabled());
+            item->Enable(!m_bypass && cmd.enabled());
         }
     }
 }
@@ -299,6 +299,16 @@ void MacOSNativeMenuBar::on_project_loaded(Domain::SelectionId project_id)
 void MacOSNativeMenuBar::on_project_saved(Domain::SelectionId project_id)
 {
     update_recent_projects();
+}
+
+void MacOSNativeMenuBar::on_input_text_focus_changed(bool focused)
+{
+    if (!m_menu_bar) {
+        return;
+    }
+
+    m_bypass = focused;
+    update_menu_states();
 }
 
 void MacOSNativeMenuBar::update_recent_projects()

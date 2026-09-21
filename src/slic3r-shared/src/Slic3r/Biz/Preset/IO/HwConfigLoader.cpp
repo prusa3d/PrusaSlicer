@@ -132,11 +132,19 @@ STRUCT_DESC(
 );
 
 STRUCT_DESC(
+    PrinterFamilyInfo,
+    FIELD_DESC_SIMPLE(label),
+    FIELD_DESC_SIMPLE(base_model),
+    FIELD_DESC_IMPLICIT_VALUE(printer_configs_order, {})
+);
+
+STRUCT_DESC(
     VendorInfo,
     FIELD_DESC_SIMPLE(id),
     FIELD_DESC_SIMPLE(name),
     FIELD_DESC_SIMPLE(version),
-    FIELD_DESC_SIMPLE(features)
+    FIELD_DESC_SIMPLE(features),
+    FIELD_DESC_IMPLICIT_VALUE(printer_families, {})
 );
 
 namespace Slic3r::Biz::Preset::IO {

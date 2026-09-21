@@ -21,7 +21,10 @@ public:
         );
     }
 
-    void download_files_prusaslicer_url(const std::vector<std::string>& files_url);
+    void download_files_prusaslicer_url(
+        const std::vector<std::string>& files_url,
+        bool open_in_new_project = false
+    );
 
     void init_multi_job(FileDownloaderMultiTicket ticket);
 

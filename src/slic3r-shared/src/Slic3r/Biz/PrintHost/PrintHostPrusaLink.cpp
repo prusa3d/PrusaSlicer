@@ -149,7 +149,7 @@ bool PrintHostPrusaLink::perform(ProgressFn progress_fn, RetryFn retry_fn, Error
 #endif // WIN32
 }
 
-bool PrintHostPrusaLink::test(std::string& msg, RetryFn retry_fn) const
+bool PrintHostPrusaLink::test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     const PhysicalPrinter::PrinterUpload* auth = std::get_if<PhysicalPrinter::PrinterUpload>(&m_print_host_config.payload);
     ASSERT(auth);
@@ -208,12 +208,13 @@ bool PrintHostPrusaLink::test(std::string& msg, RetryFn retry_fn) const
             msg = address;
         })
 #endif // WIN32
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;
 }
 
-bool PrintHostPrusaLink::test_with_method_check(std::string& msg, bool& use_put, RetryFn retry_fn) const
+bool PrintHostPrusaLink::test_with_method_check(std::string& msg, bool& use_put, ProgressFn progress_fn, RetryFn retry_fn) const
 {
     // Since the request is performed synchronously here,
     // it is ok to refer to `msg` from within the closure
@@ -282,6 +283,7 @@ bool PrintHostPrusaLink::test_with_method_check(std::string& msg, bool& use_put,
             msg = address;
         })
 #endif // WIN32
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;
@@ -291,6 +293,7 @@ bool PrintHostPrusaLink::test_with_method_check(std::string& msg, bool& use_put,
 bool PrintHostPrusaLink::test_with_resolved_ip_and_method_check(
     std::string& msg,
     bool& use_put,
+    ProgressFn progress_fn,
     RetryFn retry_fn
 ) const
 {
@@ -370,6 +373,7 @@ bool PrintHostPrusaLink::test_with_resolved_ip_and_method_check(
             }
         })
         .ssl_revoke_best_effort(auth->ssl_revoke_best_effort)
+        .on_progress(progress_fn)
         .perform_sync();
 
     return res;
@@ -390,7 +394,7 @@ bool PrintHostPrusaLink::upload_inner_with_resolved_ip(
     // Test_msg already contains resolved ip and will be cleared on start of test().
     std::string test_msg = resolved_addr.to_string();
     bool use_put         = false;
-    if (!test_with_resolved_ip_and_method_check(test_msg, use_put, retry_fn)) {
+    if (!test_with_resolved_ip_and_method_check(test_msg, use_put, progress_fn, retry_fn)) {
         error_fn(std::move(test_msg));
         return false;
     }
@@ -438,7 +442,7 @@ bool PrintHostPrusaLink::upload_inner_with_host(
     // Otherwise on Windows it contains the resolved IP address of the host.
     std::string test_msg;
     bool use_put = false;
-    if (!test_with_method_check(test_msg, use_put, retry_fn)) {
+    if (!test_with_method_check(test_msg, use_put, progress_fn, retry_fn)) {
         error_fn(std::move(test_msg));
         return false;
     }

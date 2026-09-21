@@ -38,6 +38,9 @@ struct VendorKey
     auto operator<=>(const VendorKey&) const = default;
 };
 
+/// Vendors the application cannot run without, so they are never offered for removal.
+bool is_protected_vendor(const std::string& vendor_id);
+
 // ---------------------------------------------------------------------------------------------
 // View projections
 //
@@ -68,6 +71,8 @@ struct VendorRowState
 
     bool install_locked{false};
     bool skipped{false};
+    bool up_to_date{false};
+    bool removing{false};
 
     bool operator==(const VendorRowState&) const = default;
 };
@@ -143,6 +148,7 @@ enum class JobKind
     Check,
     Selection,
     Install,
+    RemoveVendor,
     AddSource,
     RemoveSource
 };
@@ -320,6 +326,7 @@ public:
         Slic3r::Semver current_version;
         Slic3r::Semver recommended_version;
         bool skipped{false};
+        bool up_to_date{false};
     };
 
     /// What one check said, sorted by source. Built once, applied once.
@@ -396,6 +403,16 @@ public:
 
     InstallRequest make_install_request(const std::vector<VendorKey>& keys) const;
 
+    /**
+     * @brief Builds the deletion of one installed vendor, whatever the check last said about it.
+     *
+     * Unlike make_install_request this does not read the stored state, because an up to date
+     * vendor has nothing on offer and would be refused.
+     *
+     * @return an empty request when the vendor is unknown, protected, not installed, or busy.
+     */
+    InstallRequest make_removal_request(const VendorKey& key) const;
+
     std::vector<PresetUpdaterActivityReporter::InstalledVendor> installed_vendors_for(
         const std::vector<VendorKey>& keys
     ) const;
@@ -436,6 +453,9 @@ public:
 
     void set_install_state(const std::vector<VendorKey>& keys, InstallState state);
 
+    /// Marks what the job in flight is doing, so a finished or retried row reads as a deletion.
+    void set_removing(const std::vector<VendorKey>& keys);
+
     void set_install_failed(const VendorKey& key, const std::string& error_text);
 
     void set_install_done(const VendorKey& key);
@@ -472,6 +492,8 @@ private:
         Slic3r::Semver current_version;
         Slic3r::Semver recommended_version;
         bool skipped{false};
+        bool up_to_date{false};
+        bool removing{false};
 
         InstallState install_state{InstallState::Idle};
         std::string error_text;
@@ -686,6 +708,7 @@ public:
     void remove_local_repository(const std::string& uuid);
 
     void update_vendor(const std::string& repo_id, const std::string& vendor_id);
+    void remove_vendor(const std::string& repo_id, const std::string& vendor_id);
     void update_source(const std::string& uuid);
     void update_everything();
     void update_required();

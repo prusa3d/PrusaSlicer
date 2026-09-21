@@ -841,12 +841,18 @@ void HeightRangeGizmo::perform_height_range_value_change(
     ASSERT(selected_range_it != m_layer_config_ranges.end());
 
     const double object_max_z = m_layer_height_params.object_print_z_uncompensated_height;
-    const LayerHeightRange new_range{
-        std::clamp(min_z.value_or(selected_range_it->first.first), 0., object_max_z),
-        std::clamp(max_z.value_or(selected_range_it->first.second), 0., object_max_z)
-    };
+
+    LayerHeightRange new_range = selected_range_it->first;
+    if (min_z.has_value()) {
+        new_range.first = std::clamp(min_z.value(), 0., max_z.value_or(new_range.second));
+    }
+
+    if (max_z.has_value()) {
+        new_range.second = std::clamp(max_z.value(), new_range.first, object_max_z);
+    }
 
     if (m_selected_layer_height_range.value() == new_range) {
+        this->perform_height_range_selection(new_range);
         return;
     }
 

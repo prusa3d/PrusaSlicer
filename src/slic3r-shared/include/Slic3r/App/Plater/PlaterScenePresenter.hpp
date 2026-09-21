@@ -14,12 +14,10 @@
 #include "Slic3r/App/Plater/PlaterScenePresenterProjectContext.hpp"
 #include "Slic3r/App/Render/GeometryManager.hpp"
 #include "Slic3r/App/Scene/TriangleMeshManager.hpp"
-#include "Slic3r/App/Scene/ISceneProvider.hpp"
+#include "Slic3r/App/Scene/ScenePresenterBase.hpp"
 #include "Slic3r/App/Scene/IProjectSceneProvider.hpp"
-#include "Slic3r/App/Scene/BedRenderUpdater.hpp"
 #include "Slic3r/App/Plater/IBedVisuallyChangedListener.hpp"
 #include "Slic3r/App/Plater/ISelectionExtentsChangedListener.hpp"
-#include "Slic3r/App/Scene/CameraFrustumUpdater.hpp"
 #include "Slic3r/App/Plater/QuickSelectGizmo.hpp"
 #include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Scene/ISceneChangedListener.hpp"
@@ -50,10 +48,9 @@ class PlaterScenePresenter :
     public Biz::Scene::ISceneSelectionChangedListener,
     public Biz::ISelectedBedInstancesChangedListener,
     public Biz::Scene::ISceneChangedListener,
-    public Scene::ISceneChangedListener,
     public Biz::Scene::ISceneBedInstanceChangedListener,
     public Scene::MinimalSceneRenderCustomizer,
-    public Scene::ISceneProvider,
+    public Scene::ScenePresenterBase<PlaterScenePresenterProjectContext>,
     public Scene::IProjectSceneProvider,
     public IHoverChangedListener,
     public Scene::ICameraUpdateListener,
@@ -61,12 +58,9 @@ class PlaterScenePresenter :
     public Biz::ISLAResultCacheChangedListener,
     public Biz::IProjectsChangedListener,
     public Biz::IColorsChangedListener,
-    public Biz::IVirtualExtrudersChangedListener,
-    public Biz::Preset::IPresetChangedListener
+    public Biz::IVirtualExtrudersChangedListener
 {
 public:
-    using ProjectContexts = std::unordered_map<Domain::SelectionId, PlaterScenePresenterProjectContext>;
-
     void load_selected_project();
     PlaterScenePresenter(
         const Domain::Workbench& m_workbench,
@@ -77,13 +71,6 @@ public:
 
     bool project_ready() const { return !m_projects.empty(); }
 
-    Scene::Scene& scene() override { return project_context().scene(); }
-    const Scene::Scene& scene() const override { return project_context().scene(); }
-    Scene::SceneChangeSession& selection_scene_changes() override
-    {
-        return project_context().selection_scene_changes();
-    }
-
     using MeshManager = Scene::TriangleMeshManager<Scene::AuxiliaryElementId>;
     const MeshManager& model_triangle_mesh_manager(Domain::SelectionId project_id = Domain::INVALID_ID) const {
         if (project_id == Domain::INVALID_ID)
@@ -91,16 +78,6 @@ public:
         auto it = m_projects.find(project_id);
         ASSERT(it != m_projects.end());
         return it->second.model_triangle_mesh_manager();
-    }
-
-    Scene::Node& selection_root() override
-    {
-        return project_context().selection_root;
-    }
-
-    Scene::Node& plain_selection_root() override
-    {
-        return project_context().plain_selection_root;
     }
 
     void set_selection_bounding_box_visible(bool visible)
@@ -113,12 +90,8 @@ public:
     void render_scene(Render::CommandBuffer& command_buffer);
     void render_imgui(const Render::ScreenInfo& screen_info);
 
-    void screen_resized(const Render::Rect& viewport);
-
     void set_freeze_selection_center(bool freeze) { m_freeze_selection_center = freeze; }
     bool freeze_selection_center() const { return m_freeze_selection_center; }
-
-    void center_camera_on_selected_bed(bool animated);
 
     /**
      * @name Implementation of Scene::IProjectSceneProvider public interface
@@ -138,15 +111,6 @@ public:
      * @{
      */
     void on_hover_changed(const HoverData& hover_data) override;
-    /**@}*/
-
-    /**
-     * @name Implementation of App::Scene::ISceneChangedListener public interface
-     * @{
-     */
-    void on_node_added(Scene::Node* node) override;
-    void on_node_removed(Scene::Node* node) override;
-    void on_node_changed(Scene::Node* node) override;
     /**@}*/
 
     /**
@@ -214,22 +178,6 @@ public:
     using BedInstances = std::vector<std::reference_wrapper<const Domain::BedInstance>>;
 
 private:
-    void update_cameras(const std::function<void(Scene::Camera&)>& modifier);
-
-    void set_scene_aabb_as_dirty() { m_camera_frustum_updater.set_scene_aabb_as_dirty(); }
-
-    PlaterScenePresenterProjectContext& project_context()
-    {
-        ASSERT(m_selected_project_id != Domain::INVALID_ID);
-        return m_projects[m_selected_project_id];
-    }
-
-    const PlaterScenePresenterProjectContext& project_context() const
-    {
-        ASSERT(m_selected_project_id != Domain::INVALID_ID);
-        return m_projects.find(m_selected_project_id)->second;
-    }
-
     void on_selected_project_changed(size_t index) override;
     void on_selected_project_changed_final(size_t index) override;
 
@@ -318,17 +266,7 @@ private:
 
     void update_cc_selection_geometry();
 private:
-    const Domain::Workbench& m_workbench;
-    Biz::ProjectInteractor& m_project_interactor;
-    Render::Device& m_device;
-    Render::Rect m_viewport;
-
-    Domain::SelectionId m_selected_project_id{Domain::INVALID_ID};
-    ProjectContexts m_projects;
-    Scene::BedRenderUpdater m_bed_render_updater;
-    Scene::CameraFrustumUpdater m_camera_frustum_updater;
     HoverData m_hover_data;
-    Platform::AnimationManager& m_animation_manager;
     Scene::GeometryDataFactory m_data_factory;
 
     bool m_freeze_selection_center{ false };

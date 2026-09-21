@@ -12,6 +12,7 @@
 #include "Slic3r/App/Render/CommandBuffer.hpp"
 #include "Slic3r/App/Render/MathUtils.hpp"
 
+#include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Scene/Scene.hpp"
 #include "Slic3r/App/Scene/MeshRenderNodeComponent.hpp"
 #include "Slic3r/App/Scene/NodeBuilder.hpp"
@@ -470,7 +471,11 @@ void TestRenderModule::register_commands()
         .register_command(
             std::make_unique<Platform::FuncCommand>(
                 "switch-camera-type",
-                [&]() { m_scene->camera_trackball().switch_projection_type(); },
+                [&]() {
+                    auto& cam = m_scene->camera();
+                    cam.set_projection_type(cam.cam_projection().type() == Scene::CameraProjectionType::Perspective
+                        ? Scene::CameraProjectionType::Orthographic : Scene::CameraProjectionType::Perspective);
+                },
                 Platform::FuncCommandExtraOpts{
                     .keyboard_shortcuts =
                         Platform::KeyboardShortcuts{

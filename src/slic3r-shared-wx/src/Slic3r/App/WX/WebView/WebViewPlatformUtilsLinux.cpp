@@ -117,12 +117,6 @@ void delete_cookies_with_counter(wxWebView* web_view, const std::string& url, st
     counter++;
 }
 
-void register_prusaslicer_url()
-{
-    // unused on Linux
-    // Should stay empty.
-}
-
 void load_request(wxWebView* web_view, const std::string& address, const std::string& token)
 {
     WebKitWebView* native_backend = static_cast<WebKitWebView *>(web_view->GetNativeBackend());

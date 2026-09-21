@@ -7,7 +7,7 @@
 
 #include "Slic3r/App/Plater/ThumbnailImageGenerator.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
-#include "Slic3r/App/Platform/AbstractRenderModule.hpp"
+#include "Slic3r/App/RenderModuleBase.hpp"
 #include "Slic3r/App/Preview/PreviewScenePresenter.hpp"
 #include "Slic3r/App/Scene/GizmoManager.hpp"
 #include "Slic3r/App/Preview/PreviewRenderLayout.hpp"
@@ -62,7 +62,7 @@ struct ProjectGCodeViewTypeStates
 };
 
 class PreviewRenderModule final :
-    public Platform::AbstractRenderModule,
+    public App::RenderModuleBase,
     public Biz::ISelectedBedInstancesChangedListener,
     public Biz::IFDMResultCacheChangedListener,
     public Biz::ISelectedProjectChangedListener,
@@ -86,8 +86,6 @@ public:
         m_workbench(workbench),
         m_project_interactor(project_interactor),
         m_undo_store(undo_store),
-        m_menu_manager(m_command_registry),
-        m_command_binding_manager(m_command_registry),
         m_shared_model_geometry_provider(model_geometry_provider),
         m_thumbnail_store(thumbnail_store),
         m_thumbnail_store_updater(thumbnail_store_updater),
@@ -97,6 +95,8 @@ public:
         m_project_saver(project_saver)
     {}
 
+    ~PreviewRenderModule() override;
+
     /**
      * @name Implementation of Platform::AbstractRenderModule public interface
      * @{
@@ -104,8 +104,6 @@ public:
     void render_scene(Render::CommandBuffer& cmd_buffer) override;
     void render_imgui(Render::CommandBuffer& cmd_buffer) override;
     void on_scene_mouse_event(const Platform::MouseEvent& e) override;
-    void on_scene_keyboard_event(const Platform::KeyboardEvent& e) override;
-    void set_navigator(Navigator* navigator) override;
     /**@}*/
 
     void on_selected_bed_instances_changed(Domain::SelectionId project_id, const Biz::Scene::BedSelection& selection) override;
@@ -146,41 +144,7 @@ public:
     const std::optional<Platform::CameraSynchData>& camera_synch_data() const override;
     void set_camera_synch_data(const Platform::CameraSynchData& data) override;
 
-    void set_opened_dialog(Yoga::Dialog* opened_dialog);
-    void open_invalid_data_dialog();
-
     void set_modal_dialog(ModalDialog dialog);
-
-    void set_object_list_collapsed(bool collapsed);
-
-    MenuManager& menu_manager() override
-    {
-        return m_menu_manager;
-    }
-
-    CommandBindingManager& command_binding_manager() override
-    {
-        return m_command_binding_manager;
-    }
-
-    const Platform::CommandRegistry::CommandsMap& gizmo_commands() const override
-    {
-        ASSERT(m_gizmo_manager);
-        return m_gizmo_manager->commands();
-    }
-
-    const Platform::ICommand& command(const char* name) const override
-    {
-        if (gizmo_commands().contains(name)) {
-            return m_gizmo_manager->command(name);
-        }
-        return m_command_registry.command(name);
-    }
-
-    bool is_gizmo_manager_completed() const override
-    {
-        return m_gizmo_manager ? true : false;
-    }
 
     TopBar* top_bar()
     {
@@ -211,10 +175,6 @@ private:
     Biz::ProjectInteractor& m_project_interactor;
     Undo::Store& m_undo_store;
     std::unique_ptr<PreviewScenePresenter> m_scene_presenter;
-    std::unique_ptr<Scene::GizmoManager> m_gizmo_manager;
-    DialogNavigation m_dialog_navigation;
-    MenuManager m_menu_manager;
-    CommandBindingManager m_command_binding_manager;
     Scene::ISharedModelGeometryProvider* m_shared_model_geometry_provider{ nullptr };
 
     PreviewCameraGizmo* m_camera_gizmo{ nullptr };
@@ -228,7 +188,6 @@ private:
     std::unique_ptr<PreviewRenderLayout> m_layout;
     // Layout objects
     Yoga::Passthrough<TopBar> m_top_bar;
-    Yoga::Passthrough<ObjectListWindow> m_object_list;
     Yoga::Passthrough<CubeView> m_cube_view;
     Yoga::Passthrough<PopNotification::PopNotificationListView> m_pop_notification_list_view;
     Yoga::Passthrough<SidebarBed> m_sidebar_bed;
@@ -243,7 +202,6 @@ private:
     Yoga::Passthrough<SidebarAutoReslice> m_sidebar_auto_reslice;
     Yoga::Passthrough<PreferencesDialog> m_preferences_dialog;
     Yoga::Passthrough<NumberEntryDialog> m_number_entry_dialog;
-    Yoga::Passthrough<InvalidDataDialog> m_invalid_data_dialog;
     Yoga::Passthrough<CrashedProjectsDialog> m_crashed_projects_dialog;
     Yoga::Passthrough<PresetUpdaterDialog> m_preset_updater_dialog;
     // temporary variable to allow to switch yoga layout on/off
@@ -268,7 +226,6 @@ private:
     std::shared_ptr<ThumbnailStoreUpdater> m_thumbnail_store_updater;
     std::shared_ptr<Plater::ThumbnailImageGenerator> m_thumbnail_image_generator;
 
-    Navigator* m_render_module_navigator{nullptr};
     Lua::PluginSystem* m_plugin_system{nullptr};
     Biz::ProjectScoped<ProjectGCodeViewTypeStates> m_gcode_view_type_states;
     std::shared_ptr<ProjectSaver> m_project_saver;

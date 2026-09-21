@@ -3,9 +3,15 @@
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
+#include "Slic3r/Biz/Network/IHttp.hpp"
 #include "Slic3r/Domain/ConfigPhysical.hpp"
 
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/IDialogManager.hpp"
 #include "Slic3r/App/Navigator.hpp"
+#include "Slic3r/App/Theme.hpp"
+#include "Slic3r/App/Wildcards.hpp"
 #include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/InputTextField.hpp"
@@ -15,6 +21,8 @@
 #include "Slic3r/App/Yoga/Separator.hpp"
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
 #include "Slic3r/App/Yoga/Validator.hpp"
+
+#include <fmt/format.h>
 
 #include <memory>
 #include <variant>
@@ -27,6 +35,9 @@ using namespace Slic3r::Biz::PhysicalPrinter;
 namespace Slic3r::App {
 
 namespace {
+
+constexpr Unit STATUS_LINE_HEIGHT = 1.3_rem;
+constexpr Unit ICON_BUTTON_SIZE = 24_fpx;
 
 constexpr Domain::PrintHostType HOST_TYPES[] = {
     Domain::PrusaLink,
@@ -60,14 +71,25 @@ Domain::PrintHostType host_type_from_index(int index)
 
 std::vector<Domain::PrintHostAuthType> supported_auth_types(Domain::PrintHostType host_type)
 {
-    std::vector<Domain::PrintHostAuthType> types{
-        Domain::PrintHostAuthType::None,
-        Domain::PrintHostAuthType::ApiKey,
-    };
-    if (host_type == Domain::PrusaLink) {
-        types.push_back(Domain::PrintHostAuthType::Digest);
+    using Auth = Domain::PrintHostAuthType;
+
+    switch (host_type) {
+    case Domain::PrusaLink:
+    case Domain::PrusaLinkStorage:
+    case Domain::SL1Host:
+        return {Auth::ApiKey, Auth::Digest};
+    case Domain::Moonraker:
+        return {Auth::None, Auth::ApiKey, Auth::Digest};
+    case Domain::FlashAir:
+    case Domain::MKS:
+        return {Auth::None, Auth::ApiKey};
+    case Domain::OctoPrint:
+    case Domain::Duet:
+    case Domain::AstroBox:
+    case Domain::Repetier:
+        return {Auth::ApiKey};
     }
-    return types;
+    return {Auth::ApiKey};
 }
 
 std::string auth_type_label(Domain::PrintHostAuthType type)
@@ -96,7 +118,10 @@ PhysicalPrinterAdvancedSettingsDialog::PhysicalPrinterAdvancedSettingsDialog(
     load_from_interactor();
 }
 
-PhysicalPrinterAdvancedSettingsDialog::~PhysicalPrinterAdvancedSettingsDialog() = default;
+PhysicalPrinterAdvancedSettingsDialog::~PhysicalPrinterAdvancedSettingsDialog()
+{
+    m_physical_printer_interactor.cancel_edited_printer_connection_test();
+}
 
 void PhysicalPrinterAdvancedSettingsDialog::build_form()
 {
@@ -114,7 +139,7 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
 
     auto commit = [this] {
         if (!m_loading) {
-            commit_to_interactor();
+            commit_edits();
         }
     };
 
@@ -201,10 +226,22 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
         _u8L("Port number. Optional parameter."));
     m_port->set_input_flags(ImGuiInputTextFlags_CharsDecimal);
     m_port->set_validator(std::make_unique<IntValidator>(0, 65535));
-    m_ca_file  = add_input(unused_row, _u8L("HTTPS CA File"),
+    Item* ca_file_row = nullptr;
+    m_ca_file  = add_input(ca_file_row, _u8L("HTTPS CA File"),
         _u8L("Custom CA certificate file can be specified for HTTPS OctoPrint connections,\n"
              "in crt/pem format.\n"
              "If left blank, the default OS CA certificate repository is used."));
+
+    m_ca_file_browse_button = ca_file_row->emplace_back<LayoutButton>(
+        std::string{},
+        Render::Icon::TobBarLoad,
+        // TRN Tooltip of the button that opens a file dialog for the HTTPS CA certificate.
+        _u8L("Browse for a CA certificate file."));
+    m_ca_file_browse_button->set_min_width(ICON_BUTTON_SIZE);
+    m_ca_file_browse_button->set_min_height(ICON_BUTTON_SIZE);
+    m_ca_file_browse_button->callbacks().action = [this] { browse_ca_file(); };
+
+    ca_file_row->set_visible(Network::IHttp::ca_file_supported());
 
     // Boolean option: label on the left column, bare toggle on the right.
     {
@@ -224,9 +261,43 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
 
     content()->emplace_back<Separator>(Orientation::Horizontal);
 
+    m_test_status_row = content()->emplace_back<Item>();
+    m_test_status_row->set_orientation(Orientation::Vertical);
+    m_test_status_row->set_visible(false);
+
+    Item* status_text_area = m_test_status_row->emplace_back<Item>();
+    status_text_area->set_orientation(Orientation::Vertical);
+    status_text_area->set_padding(10_fpx);
+
+    m_test_status = status_text_area->emplace_back<Text>(std::string{});
+    m_test_status->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_test_status->set_font_size(1_rem);
+    m_test_status->set_height(STATUS_LINE_HEIGHT);
+
+    m_test_status_detail = status_text_area->emplace_back<Text>(std::string{});
+    m_test_status_detail->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_test_status_detail->set_font_size(1_rem);
+    m_test_status_detail->set_height(STATUS_LINE_HEIGHT * 3.f);
+    m_test_status_detail->set_visible(false);
+
+    m_test_status_row->emplace_back<Separator>(Orientation::Horizontal);
+
     Item* footer = content()->emplace_back<Item>();
     footer->set_padding(10_fpx);
     footer->set_justify_content(YGJustifyFlexEnd);
+    footer->set_align_items(YGAlignCenter);
+    footer->set_gap(5_fpx);
+
+    // TRN Button that verifies the connection to the configured print host.
+    m_test_button = footer->emplace_back<LayoutButton>(_u8L("Test"));
+    m_test_button->callbacks().action = [this] {
+        m_test_button->set_enabled(false);
+        // TRN Status shown in the printer dialog while the connection test is running.
+        set_test_status(_u8L("Testing connection..."), {}, Platform::Color::Text);
+        m_physical_printer_interactor.test_edited_printer_connection(
+            [this](PrintHostTestResult result) { on_connection_test_finished(std::move(result)); }
+        );
+    };
 
     m_save_button = footer->emplace_back<LayoutButton>(_u8L("Save"));
     m_save_button->callbacks().action = [this] {
@@ -245,6 +316,9 @@ void PhysicalPrinterAdvancedSettingsDialog::build_form()
 
 void PhysicalPrinterAdvancedSettingsDialog::load_from_interactor()
 {
+    clear_test_status();
+    update_test_button_state();
+
     const PhysicalPrinterConfig& printer = m_physical_printer_interactor.edited_printer();
     const PrinterUpload* up = std::get_if<PrinterUpload>(&printer.payload);
     if (!up) {
@@ -267,6 +341,7 @@ void PhysicalPrinterAdvancedSettingsDialog::load_from_interactor()
     m_loading = false;
 
     update_field_visibility();
+    update_test_button_state();
     m_save_button->set_visible(m_physical_printer_interactor.is_filesystem_export_selected());
     m_change_hw_button->set_visible(
         m_physical_printer_interactor.is_printer_upload_selected()
@@ -298,6 +373,23 @@ void PhysicalPrinterAdvancedSettingsDialog::commit_to_interactor()
     printer.host    = m_host->text();
 
     m_physical_printer_interactor.set_edited_printer(printer);
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::commit_edits()
+{
+    m_physical_printer_interactor.cancel_edited_printer_connection_test();
+    commit_to_interactor();
+    clear_test_status();
+    update_test_button_state();
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::persist_coerced_auth_type()
+{
+    const PhysicalPrinterConfig& printer = m_physical_printer_interactor.edited_printer();
+    const PrinterUpload* up = std::get_if<PrinterUpload>(&printer.payload);
+    if (up != nullptr && current_auth_type() != up->auth_type) {
+        commit_edits();
+    }
 }
 
 void PhysicalPrinterAdvancedSettingsDialog::update_field_visibility()
@@ -352,12 +444,98 @@ Domain::PrintHostAuthType PhysicalPrinterAdvancedSettingsDialog::current_auth_ty
 
 void PhysicalPrinterAdvancedSettingsDialog::on_selected_physical_printer_changed()
 {
+    m_physical_printer_interactor.cancel_edited_printer_connection_test();
     load_from_interactor();
+    if (opened()) {
+        persist_coerced_auth_type();
+    }
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::update_test_button_state()
+{
+    m_test_button->set_enabled(
+        m_physical_printer_interactor.is_connection_testable()
+        && !m_physical_printer_interactor.is_connection_test_in_flight()
+    );
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::on_connection_test_finished(PrintHostTestResult result)
+{
+    update_test_button_state();
+
+    if (result.ok) {
+        // TRN {} is the print host name, e.g. "OctoPrint".
+        set_test_status(
+            fmt::format(fmt::runtime(_u8L("Connection to {} works correctly.")), result.host_name),
+            {},
+            Platform::Color::Success
+        );
+        return;
+    }
+
+    set_test_status(
+        // TRN {} is the print host name, e.g. "OctoPrint".
+        fmt::format(fmt::runtime(_u8L("Could not connect to {}")), result.host_name),
+        result.error_message,
+        Platform::Color::Error
+    );
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::set_test_status(
+    const std::string& text,
+    const std::string& detail,
+    Platform::Color color
+)
+{
+    m_test_status->set_text(text);
+    m_test_status->set_text_color(m_theme->color_imgui(color));
+
+    m_test_status_detail->set_text(detail);
+    m_test_status_detail->set_visible(!detail.empty());
+
+    m_test_status_row->set_visible(true);
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::clear_test_status()
+{
+    m_test_status->set_text(std::string{});
+    m_test_status_detail->set_text(std::string{});
+    m_test_status_detail->set_visible(false);
+    m_test_status_row->set_visible(false);
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::browse_ca_file()
+{
+    IDialogManager::FileCallback callback =
+        [this](bool success, const std::vector<boost::filesystem::path>& file_paths)
+    {
+        if (!success || file_paths.empty()) {
+            return;
+        }
+        m_ca_file->set_text(file_paths.front().string());
+        commit_edits();
+    };
+
+    AppServices::instance().dialog_manager().show_file_dialog(
+        FileDialogType::Open,
+        // TRN Title of the file dialog that picks an HTTPS CA certificate file.
+        _u8L("Open CA certificate file"),
+        AppServices::instance().app_config().get<std::string>("last_used_directory"),
+        std::string{},
+        Wildcards::generate_wildcards(Wildcards::TypeFlag::Certificate | Wildcards::TypeFlag::AllFiles),
+        callback
+    );
 }
 
 void PhysicalPrinterAdvancedSettingsDialog::on_about_to_show()
 {
     load_from_interactor();
+    persist_coerced_auth_type();
+}
+
+void PhysicalPrinterAdvancedSettingsDialog::on_about_to_close()
+{
+    m_physical_printer_interactor.cancel_edited_printer_connection_test();
 }
 
 void PhysicalPrinterAdvancedSettingsDialog::close_action()

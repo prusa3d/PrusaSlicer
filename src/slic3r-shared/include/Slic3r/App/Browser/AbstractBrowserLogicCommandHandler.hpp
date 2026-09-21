@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Slic3r/App/Browser/BrowserLogicCommand.hpp"
+#include "Slic3r/App/OpenBrowser.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Log.hpp"
 
@@ -27,7 +28,6 @@ protected:
     virtual bool handle_logic_command_DoReload(const std::string& data) = 0;
     virtual bool handle_logic_command_AddUserScript(const std::string& data) = 0;
     virtual bool handle_logic_command_LoadResourcesPage(const std::string& data) = 0;
-    virtual bool handle_logic_command_OpenExternalBrowser(const std::string& data) = 0;
     virtual bool handle_logic_command_RegisterPrusaSlicerURL(const std::string& data) = 0;
     virtual bool handle_logic_command_SetLoadDefaultURLOnErrorTrue(const std::string& data) = 0;
     virtual bool handle_logic_command_SetLoadDefaultURLOnErrorFalse(const std::string& data) = 0;
@@ -60,7 +60,12 @@ protected:
         case BrowserLogicCommandType::DoReload:                      return handle_logic_command_DoReload(command.data);
         case BrowserLogicCommandType::AddUserScript:                 return handle_logic_command_AddUserScript(command.data);
         case BrowserLogicCommandType::LoadResourcesPage:             return handle_logic_command_LoadResourcesPage(command.data);
-        case BrowserLogicCommandType::OpenExternalBrowser:           return handle_logic_command_OpenExternalBrowser(command.data);
+        case BrowserLogicCommandType::OpenExternalBrowser:
+            open_browser({.url = command.data});
+            return true;
+        case BrowserLogicCommandType::OpenExternalBrowserForced:
+            open_browser({.url = command.data, .skip_confirmation = true});
+            return true;
         case BrowserLogicCommandType::RegisterPrusaSlicerURL:        return handle_logic_command_RegisterPrusaSlicerURL(command.data);
         case BrowserLogicCommandType::SetLoadDefaultURLOnErrorTrue:  return handle_logic_command_SetLoadDefaultURLOnErrorTrue(command.data);
         case BrowserLogicCommandType::SetLoadDefaultURLOnErrorFalse: return handle_logic_command_SetLoadDefaultURLOnErrorFalse(command.data);
