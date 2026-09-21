@@ -14,6 +14,7 @@
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/Project.hpp"
 #include "Slic3r/Domain/TemplateUtils.hpp"
+#include "Slic3r/Log.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -26,8 +27,6 @@
 #include <boost/nowide/iostream.hpp>
 
 #include <nlohmann/json.hpp>
-
-#include <spdlog/spdlog.h>
 
 using Slic3r::Biz::IProjectsChangedListener;
 using Slic3r::Biz::ProjectInteractor;

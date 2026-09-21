@@ -1,6 +1,5 @@
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 
-#include "spdlog/stopwatch.h"
 #include "Slic3r/Domain/ConfigContainer.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Assert.hpp"

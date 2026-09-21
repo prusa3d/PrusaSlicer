@@ -2,9 +2,9 @@
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/LegacyFormat.hpp"
+#include "Slic3r/Log.hpp"
 
 #include <functional>
-#include <spdlog/spdlog.h>
 #include <tl/expected.hpp>
 #include <utility>
 
