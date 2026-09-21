@@ -85,6 +85,7 @@ Many thanks to @ultimaker for keeping their Cura slicer open-source.
 - David Eccles (@gringer)
 - Maximilian Engelhardt
 - Vanessa Ezekowitz (@VanessaE)
+- Merten Falk (@nevesenin)
 - Shlomi Fish
 - Kent Fredric
 - Christoph Friedrich
@@ -137,6 +138,7 @@ Many thanks to @ultimaker for keeping their Cura slicer open-source.
 - Kyle Maas (@KyleMaas)
 - Alex Matulich (@amatulic)
 - Josh McCullough
+- Ben Mega (@benmega)
 - Jonne Mickelin
 - Will Miles
 - Michael Moon
@@ -151,6 +153,7 @@ Many thanks to @ultimaker for keeping their Cura slicer open-source.
 - Spencer Owen (@spuder)
 - Jernej Pangerc
 - Guilherme Patriota
+- Jan Pazdziora (@adelton)
 - Bjarke Istrup Pedersen
 - Scott Penrose
 - Alex Petsiuk (@apetsiuk)
@@ -161,6 +164,7 @@ Many thanks to @ultimaker for keeping their Cura slicer open-source.
 - Jurriaan Pruis
 - Thomas Rahm (@thomasrahm)
 - Leonid Raiz
+- Dmitry Rantovov (@rantovov5)
 - Mathias Rasmussen
 - Stephan Reichhelm (@stephanr)
 - Johannes Reinhardt
