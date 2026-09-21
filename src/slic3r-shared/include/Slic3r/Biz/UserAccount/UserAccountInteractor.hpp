@@ -7,6 +7,7 @@
 #include "Slic3r/Biz/Platform/IMainThreadDispatcher.hpp"
 
 #include <functional>
+#include <mutex>
 #include <map>
 
 namespace Slic3r::Biz {
@@ -120,8 +121,10 @@ public:
 private:
     void on_user_id(const std::string& body);
     void notify_action_retry_finished();
+    void replace_communication(std::unique_ptr<IUserAccountCommunication> communication);
 
     Platform::IMainThreadDispatcher& m_dispatcher;
+    mutable std::mutex m_communication_mutex;
     std::unique_ptr<IUserAccountCommunication> m_communication;
 
     std::map<std::string, std::string> m_account_user_data;

@@ -218,7 +218,7 @@ JobId PresetUpdaterInteractor::check_forced_reconfigurations()
     // Forced reconfigurations must be checked on startup
 
     return enqueue(
-        [this, access_token = m_user_account_interactor.access_token()](
+        [this](
             JThread::StopToken stop_token,
             Platform::JobManager::ProgressTracker progress_tracker,
             JobId job_id
@@ -228,7 +228,9 @@ JobId PresetUpdaterInteractor::check_forced_reconfigurations()
                 make_status_callback(job_id, progress_tracker, VerboseStyle::NoProgress),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token(access_token);
+            process_status.set_access_token_provider(
+                [this] { return m_user_account_interactor.access_token(); }
+            );
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
             if (process_status.has_error()) {
                 dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());
@@ -265,7 +267,7 @@ JobId PresetUpdaterInteractor::sync_indices_and_reconfiguration_check(
 )
 {
     return enqueue(
-        [this, online_allowed, verbose, source_list, required_repo_ids, access_token = m_user_account_interactor.access_token()](
+        [this, online_allowed, verbose, source_list, required_repo_ids](
             JThread::StopToken stop_token,
             Platform::JobManager::ProgressTracker progress_tracker,
             JobId job_id
@@ -275,7 +277,9 @@ JobId PresetUpdaterInteractor::sync_indices_and_reconfiguration_check(
                 make_status_callback(job_id, progress_tracker, verbose),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token(access_token);
+            process_status.set_access_token_provider(
+                [this] { return m_user_account_interactor.access_token(); }
+            );
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
             PresetUpdaterRepositorySync archive_sync;
 
@@ -337,7 +341,7 @@ JobId PresetUpdaterInteractor::perform_reconfigurations(
     // Possible forced reconfigurations must be able to be performed
 
     return enqueue(
-        [this, reconfigurations, online_allowed, types_to_perform, ignore_hash, access_token = m_user_account_interactor.access_token()](
+        [this, reconfigurations, online_allowed, types_to_perform, ignore_hash](
             JThread::StopToken stop_token,
             Platform::JobManager::ProgressTracker progress_tracker,
             JobId job_id
@@ -350,7 +354,9 @@ JobId PresetUpdaterInteractor::perform_reconfigurations(
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES,
                 ignore_hash
             );
-            process_status.set_access_token(access_token);
+            process_status.set_access_token_provider(
+                [this] { return m_user_account_interactor.access_token(); }
+            );
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
             if (process_status.has_error()) {
                 dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());
@@ -383,7 +389,7 @@ JobId PresetUpdaterInteractor::apply_repository_selection(
 )
 {
     return enqueue(
-        [this, repos, access_token = m_user_account_interactor.access_token()](
+        [this, repos](
             JThread::StopToken stop_token,
             Platform::JobManager::ProgressTracker progress_tracker,
             JobId job_id
@@ -395,7 +401,9 @@ JobId PresetUpdaterInteractor::apply_repository_selection(
                 ),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token(access_token);
+            process_status.set_access_token_provider(
+                [this] { return m_user_account_interactor.access_token(); }
+            );
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
 
             if (process_status.has_error()) {
@@ -489,7 +497,7 @@ JobId PresetUpdaterInteractor::remove_local_repository(const std::string& uuid)
 JobId PresetUpdaterInteractor::list_repositories(bool online_allowed, bool force_sync /*= true*/)
 {
     return enqueue(
-        [this, force_sync = force_sync && online_allowed, access_token = m_user_account_interactor.access_token()](
+        [this, force_sync = force_sync && online_allowed](
             JThread::StopToken stop_token,
             Platform::JobManager::ProgressTracker progress_tracker,
             JobId job_id
@@ -501,7 +509,9 @@ JobId PresetUpdaterInteractor::list_repositories(bool online_allowed, bool force
                 ),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token(access_token);
+            process_status.set_access_token_provider(
+                [this] { return m_user_account_interactor.access_token(); }
+            );
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
 
             if (process_status.has_error()) {
@@ -528,7 +538,7 @@ JobId PresetUpdaterInteractor::list_repositories(bool online_allowed, bool force
 JobId PresetUpdaterInteractor::cleanup_update_sync()
 {
     return enqueue(
-        [this, access_token = m_user_account_interactor.access_token()](
+        [this](
             JThread::StopToken stop_token,
             Platform::JobManager::ProgressTracker progress_tracker,
             JobId job_id
@@ -538,7 +548,9 @@ JobId PresetUpdaterInteractor::cleanup_update_sync()
                 make_status_callback(job_id, progress_tracker, VerboseStyle::NoProgress),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token(access_token);
+            process_status.set_access_token_provider(
+                [this] { return m_user_account_interactor.access_token(); }
+            );
             PresetUpdater::cleanup_update_sync(&process_status);
             if (process_status.has_error()) {
                 dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());

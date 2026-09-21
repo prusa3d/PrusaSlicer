@@ -5,6 +5,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <utility>
+
 namespace Slic3r::Biz::UserAccount {
 UserAccountInteractor::UserAccountInteractor(Platform::IMainThreadDispatcher& dispatcher) :
     m_dispatcher{dispatcher},
@@ -18,7 +20,7 @@ void UserAccountInteractor::init(bool app_config_enabled)
     bool was_enabled = is_enabled();
     if (app_config_enabled) {
         if (!is_enabled()) {
-            m_communication = std::make_unique<UserAccountCommunication>(m_dispatcher);
+            replace_communication(std::make_unique<UserAccountCommunication>(m_dispatcher));
             m_communication->add_session_listener(this);
             m_communication->init();
         }
@@ -26,7 +28,7 @@ void UserAccountInteractor::init(bool app_config_enabled)
         if (is_enabled()) {
             bool was_logged = is_logged_in();
             do_log_out();
-            m_communication = std::make_unique<UserAccountCommunicationDummy>();
+            replace_communication(std::make_unique<UserAccountCommunicationDummy>());
             m_communication->add_session_listener(this);
 
             // This switch ends dispatching from UserAccountSessionDispatchBase before it can asynchrtonously dispatch loggout.
@@ -45,6 +47,17 @@ void UserAccountInteractor::init(bool app_config_enabled)
         invoke_listeners<IUserAccountListener>(
             [enabled](auto* listener) { listener->on_user_account_enabled_state_changed(enabled); }
         );
+    }
+}
+
+void UserAccountInteractor::replace_communication(
+    std::unique_ptr<IUserAccountCommunication> communication
+)
+{
+    std::unique_ptr<IUserAccountCommunication> released_after_unlock;
+    {
+        std::lock_guard<std::mutex> lock(m_communication_mutex);
+        released_after_unlock = std::exchange(m_communication, std::move(communication));
     }
 }
 
@@ -115,6 +128,7 @@ bool UserAccountInteractor::validate_and_refresh()
 
 std::string UserAccountInteractor::access_token() const
 {
+    std::lock_guard<std::mutex> lock(m_communication_mutex);
     return m_communication->access_token();
 }
 

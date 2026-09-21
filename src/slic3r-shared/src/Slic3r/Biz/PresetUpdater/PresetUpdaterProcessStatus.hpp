@@ -106,14 +106,21 @@ public:
         return m_retry_policy;
     }
 
-    void set_access_token(const std::string& token)
+    /**
+     * @brief Sets how the current access token is obtained.
+     *
+     * The account service rotates the token every few minutes and stops honouring the previous
+     * one, so a job that outlives a rotation has to ask again instead of carrying a copy. The
+     * provider is called on the job thread, once per request.
+     */
+    void set_access_token_provider(std::function<std::string()> provider)
     {
-        m_access_token = token;
+        m_access_token_provider = std::move(provider);
     }
 
     std::string access_token() const
     {
-        return m_access_token;
+        return m_access_token_provider ? m_access_token_provider() : std::string{};
     }
 
     bool on_attempt(int attempt, unsigned delay);
@@ -165,7 +172,7 @@ private:
     std::string m_warning_target_vendor;
     PresetUpdaterProgress m_progress;
     Network::HttpRetryOpt m_retry_policy;
-    std::string m_access_token;
+    std::function<std::string()> m_access_token_provider;
     StatusChangedFn m_dispatch_status_fn;
 
     JThread::StopToken m_stop_token;

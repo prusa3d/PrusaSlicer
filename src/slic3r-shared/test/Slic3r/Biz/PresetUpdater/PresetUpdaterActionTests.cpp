@@ -1,5 +1,7 @@
 ﻿#include "Slic3r/Biz/PresetUpdater/PresetUpdaterTestFixture.hpp"
 
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterProcessStatus.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <ctime>
@@ -912,4 +914,25 @@ TEST_CASE("PresetUpdater leaves no empty directories behind after an install", "
 
     CHECK(fs::is_empty(Slic3r::updater_staging_dir()));
     CHECK(fs::is_empty(fx.staged_path));
+}
+
+TEST_CASE("PresetUpdaterProcessStatus reads the access token per request", "[preset_updater]")
+{
+    int calls = 0;
+    PresetUpdater::PresetUpdaterProcessStatus process_status(
+        JThread::StopToken{},
+        [](const PresetUpdater::PresetUpdaterProgress&) {},
+        PresetUpdater::PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_NO_RETRY
+    );
+
+    CHECK(process_status.access_token().empty());
+
+    process_status.set_access_token_provider([&calls] {
+        ++calls;
+        return calls == 1 ? std::string{"first"} : std::string{"rotated"};
+    });
+
+    CHECK(process_status.access_token() == "first");
+    CHECK(process_status.access_token() == "rotated");
+    CHECK(calls == 2);
 }
