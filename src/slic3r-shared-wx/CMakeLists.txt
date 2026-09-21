@@ -52,6 +52,8 @@ set(SLIC3R_SHARED_WX_FILES
         src/Slic3r/App/WX/RammingDialog.cpp
         include/Slic3r/App/WX/RammingChart.hpp
         src/Slic3r/App/WX/RammingChart.cpp
+        include/Slic3r/App/WX/WipingDialog.hpp
+        src/Slic3r/App/WX/WipingDialog.cpp
         include/Slic3r/App/WX/SavePresetDialog.hpp
         src/Slic3r/App/WX/SavePresetDialog.cpp
         include/Slic3r/Biz/WX/FontManager.hpp

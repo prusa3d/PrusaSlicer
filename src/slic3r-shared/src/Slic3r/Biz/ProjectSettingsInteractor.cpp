@@ -3,6 +3,7 @@
 #include "Slic3r/Biz/Algorithms/Color.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
+#include "Slic3r/Domain/Percentage.hpp"
 #include "Slic3r/Domain/Preset/SelectedPresetConfigPack.hpp"
 #include "Slic3r/Domain/Project.hpp"
 #include "Slic3r/Domain/Workbench.hpp"
@@ -138,6 +139,112 @@ void ProjectSettingsInteractor::set_colors_from_connect(
         store_and_notify(config_container_id, std::move(colors));
         return;
     }
+}
+
+WipingVolumesData ProjectSettingsInteractor::get_wiping_volumes_data(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+) const
+{
+    WipingVolumesData data;
+
+    const Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc)
+        return data;
+
+    data.extruder_colours = get_colors(config_container_id);
+    data.use_custom_matrix =
+        cc->project_settings().items.opt("wiping_volumes_use_custom_matrix").get<bool>();
+
+    if (cc->print_technology() != Domain::PrinterTechnology::FFF)
+        return data;
+
+    // Resolve the selected preset pack once; it feeds both the printer purging volume and the
+    // per-filament multipliers below, and (if needed) the matrix reconciliation.
+    Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc->selected_preset());
+
+    data.printer_purging_volume =
+        preset_config_pack.get_printer().items.opt("multimaterial_purging").get<double>();
+
+    data.filament_purging_multipliers.reserve(preset_config_pack.filament_size());
+    for (size_t i = 0; i < preset_config_pack.filament_size(); ++i) {
+        data.filament_purging_multipliers.push_back(
+            preset_config_pack.get_filament(i)
+                .items.opt("filament_purge_multiplier")
+                .get<Domain::Percentage>()
+                .value
+        );
+    }
+
+    const std::vector<double> old_matrix =
+        cc->project_settings().items.opt("wiping_volumes_matrix").get<std::vector<double>>();
+
+    // Verify if wiping_volumes_matrix has proper size
+    // (it is used to deduce number of extruders in wipe tower generator):
+    const size_t old_num_extruders = size_t(std::sqrt(old_matrix.size()) + Domain::EPSILON);
+    const size_t num_extruders     = data.extruder_colours.size();
+    if (num_extruders == old_num_extruders) {
+        data.matrix = old_matrix;
+        return data;
+    }
+
+    // Extend/shrink the matrix to match the current extruder count, filling new entries from
+    // the (possibly modified) printer/filament settings resolved above.
+    data.matrix.reserve(num_extruders * num_extruders);
+    for (unsigned int i = 0; i < num_extruders; ++i) {
+        for (unsigned int j = 0; j < num_extruders; ++j) {
+            // append the value for this pair from the old matrix (if it's there):
+            if (i < old_num_extruders && j < old_num_extruders)
+                data.matrix.push_back(old_matrix[i * old_num_extruders + j]);
+            else
+                data.matrix.push_back(
+                    i == j ? 0. :
+                              data.printer_purging_volume * data.filament_purging_multipliers[j]
+                                  / 100.
+                );
+        }
+    }
+    return data;
+}
+
+void ProjectSettingsInteractor::set_wiping_volumes_data(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    std::vector<double> matrix,
+    bool use_custom_matrix
+)
+{
+    if (Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id)) {
+        cc->project_settings().items.opt("wiping_volumes_matrix").set(std::move(matrix));
+        cc->project_settings()
+            .items.opt("wiping_volumes_use_custom_matrix")
+            .set(use_custom_matrix);
+
+        for (const auto& instance : cc->bed_instances()) {
+            Domain::BedRef bed(cc->id().id, instance->id().id);
+            this->invoke_listeners<ISlicingInputChangedListener>(
+                [&](auto* l) { l->on_slicing_input_changed(bed); }
+            );
+        }
+    }
+}
+
+Domain::ConfigContainer* ProjectSettingsInteractor::find_config_container(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+)
+{
+    Domain::Project* project = m_workbench.find_project_by_id(project_id);
+    return project ? project->find_config_container(config_container_id) : nullptr;
+}
+
+const Domain::ConfigContainer* ProjectSettingsInteractor::find_config_container(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+) const
+{
+    const Domain::Project* project = m_workbench.find_project_by_id(project_id);
+    return project ? project->find_config_container(config_container_id) : nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +404,7 @@ void ProjectSettingsInteractor::store_and_notify(
 
         cc->project_settings().items.opt("extruder_colour").set(colors);
 
-        const auto rgb_colors = hex_colors_to_rgb(colors);
+    const auto rgb_colors = hex_colors_to_rgb(colors);
 
         invoke_listeners<IColorsChangedListener>(
             [&](auto* listener)

@@ -116,6 +116,17 @@ public:
         PANIC("Ramming dialog not implemented for CLI");
     }
 
+    std::optional<WipingDialogResult> show_wiping_dialog(
+        const std::vector<double>& matrix,
+        const std::vector<Domain::ColorRGB>& extruder_colours,
+        double printer_purging_volume,
+        const std::vector<double>& filament_purging_multipliers,
+        bool use_custom_matrix
+    ) override
+    {
+        PANIC("Wiping dialog not implemented for CLI");
+    }
+
     void open_in_browser(const std::string& link, int flag) override
     {
         PANIC("Open browser not implemented for CLI");

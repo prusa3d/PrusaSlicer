@@ -12,6 +12,9 @@
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
+#include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/IDialogManager.hpp"
+
 #include <imgui/imgui_internal.h>
 
 using namespace Slic3r::App::Yoga;
@@ -25,11 +28,8 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
     m_navigator(navigator)
 {
     m_printer_add_dialog              = emplace_back<PrinterAddDialog>(m_project_interactor);
-    m_logical_printer_settings_dialog = emplace_back<LogicalPrinterSettingsDialog>(
-        project_interactor,
-        m_printer_add_dialog,
-        m_navigator
-    );
+    m_logical_printer_settings_dialog = emplace_back<
+        LogicalPrinterSettingsDialog>(project_interactor, m_printer_add_dialog, m_navigator);
 
     m_material_selection_dialog =
         emplace_back<MaterialSelectionDialog>(project_interactor, m_navigator);
@@ -131,6 +131,29 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
         }
     };
 
+    m_purging_volumes_button = emplace_back<LayoutButton>(Biz::_u8L("Purging volumes"));
+    m_purging_volumes_button->callbacks().action = [this]()
+    {
+        Biz::ProjectSettingsInteractor& psi  = m_project_interactor.project_settings_interactor();
+        const Domain::SelectionId project_id = m_project_interactor.selected_project_id();
+        const Domain::SelectionId cc_id      = m_project_interactor.selected_config_container_id();
+
+        const Biz::WipingVolumesData data = psi.get_wiping_volumes_data(project_id, cc_id);
+
+        const std::optional<WipingDialogResult> result =
+            AppServices::instance().dialog_manager().show_wiping_dialog(
+                data.matrix,
+                data.extruder_colours,
+                data.printer_purging_volume,
+                data.filament_purging_multipliers,
+                data.use_custom_matrix
+            );
+        if (!result)
+            return;
+
+        psi.set_wiping_volumes_data(project_id, cc_id, result->matrix, result->use_custom_matrix);
+    };
+
     m_project_interactor.preset_interactor()
         .printer_presets()
         .add_listener<Biz::IListSelectionChangedListener>(this);
@@ -145,6 +168,8 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
         m_project_interactor.selected_project_id(),
         m_project_interactor.scene_interactor().bed_selection()
     );
+
+    update_purging_volumes_button_visibility();
 }
 
 void SidebarBed::on_list_selection_changed(Domain::SelectionId new_selection)
@@ -192,9 +217,8 @@ void SidebarBed::on_selected_bed_instances_changed(
     }
 
     Domain::BedInstance* bed_instance =
-        m_project_interactor.selected_project().find_bed_instance_by_id(
-            bed_selection.last_selected_bed().instance_id
-        );
+        m_project_interactor.selected_project()
+            .find_bed_instance_by_id(bed_selection.last_selected_bed().instance_id);
 
     ASSERT(bed_instance);
 
@@ -208,6 +232,28 @@ void SidebarBed::refresh_printer_label_color()
     m_logical_printer_button->set_printer_name(m_selected_printer_preset_name, is_modified_preset);
 }
 
+void SidebarBed::update_purging_volumes_button_visibility()
+{
+    const Domain::ConfigContainer& cc = m_project_interactor.selected_config_container();
+    if (cc.print_technology() != Domain::PrinterTechnology::FFF) {
+        // "wipe_tower" is an FDM-only option; the SLA print config box doesn't define it.
+        m_purging_volumes_button->set_visible(false);
+        return;
+    }
+
+    const Domain::Preset::SelectedPreset& selected_preset = cc.selected_preset();
+    const bool has_wipe_tower =
+        selected_preset.print.config_box().items.opt("wipe_tower").get<bool>();
+    const bool has_single_extruder_multi_material =
+        selected_preset.printer.config_box()
+            .items.opt("single_extruder_multi_material")
+            .get<bool>();
+    const bool has_multi_materials = selected_preset.materials.size() > 1;
+    m_purging_volumes_button->set_visible(
+        has_wipe_tower && has_multi_materials && has_single_extruder_multi_material
+    );
+}
+
 void SidebarBed::on_preset_value_changed(
     Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
@@ -215,13 +261,17 @@ void SidebarBed::on_preset_value_changed(
 )
 {
     if (std::holds_alternative<Domain::FDMConfigLocation>(item.location())) {
-        const auto location{ std::get<Domain::FDMConfigLocation>(item.location()) };
-        if (location != Domain::FDMConfigLocation::Printer) {
+        const auto location{std::get<Domain::FDMConfigLocation>(item.location())};
+        if ((location == Domain::FDMConfigLocation::Printer
+             && item.name() == "single_extruder_multi_material")
+            || (location == Domain::FDMConfigLocation::Print && item.name() == "wipe_tower"))
+        {
+            update_purging_volumes_button_visibility();
+        } else if (location != Domain::FDMConfigLocation::Printer) {
             return;
         }
-    }
-    else if (std::holds_alternative<Domain::SLAConfigLocation>(item.location())) {
-        const auto location{ std::get<Domain::SLAConfigLocation>(item.location()) };
+    } else if (std::holds_alternative<Domain::SLAConfigLocation>(item.location())) {
+        const auto location{std::get<Domain::SLAConfigLocation>(item.location())};
         if (location != Domain::SLAConfigLocation::Printer) {
             return;
         }
@@ -233,6 +283,17 @@ void SidebarBed::on_preset_value_changed(
 void SidebarBed::on_preset_bundles_loaded()
 {
     refresh_printer_label_color();
+}
+
+void SidebarBed::on_preset_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    Biz::Preset::PresetItemType type
+)
+{
+    if (m_project_interactor.selected_project_id() == project_id) {
+        update_purging_volumes_button_visibility();
+    }
 }
 
 LogicalPrinterSettingsDialog& SidebarBed::logical_printer_settings_dialog()

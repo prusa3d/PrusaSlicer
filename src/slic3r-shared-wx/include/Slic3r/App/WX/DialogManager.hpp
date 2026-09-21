@@ -98,6 +98,15 @@ public:
     ) override;
 
     std::string show_ramming_dialog(const std::string& ramming_parameters) override;
+
+    std::optional<WipingDialogResult> show_wiping_dialog(
+        const std::vector<double>& matrix,
+        const std::vector<Domain::ColorRGB>& extruder_colours,
+        double printer_purging_volume,
+        const std::vector<double>& filament_purging_multipliers,
+        bool use_custom_matrix
+    ) override;
+
     std::optional<Biz::StepLoadDialogResult> show_load_step_dialog(
         const std::string& filename,
         double linear_precision,

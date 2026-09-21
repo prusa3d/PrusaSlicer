@@ -128,6 +128,7 @@ public:
         m_preset_interactor.add_listener<Preset::IPresetChangedListener>(&m_project_settings_interactor);
         m_preset_interactor.add_listener<Preset::IPresetChangedListener>(&m_virtual_extruder_interactor);
         m_project_settings_interactor.add_listener<IColorsChangedListener>(this);
+        m_project_settings_interactor.add_listener<ISlicingInputChangedListener>(this);
         m_virtual_extruder_interactor.add_listener<IVirtualExtrudersChangedListener>(this);
         m_slicing_interactor.set_listener<Slicing::IFDMResultListener>(&m_fdm_result_cache);
         m_slicing_interactor.set_listener<Slicing::ISLAResultListener>(&m_sla_result_cache);

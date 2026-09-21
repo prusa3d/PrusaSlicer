@@ -6,7 +6,9 @@
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterRepositoryDescriptor.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterReconfigurationList.hpp"
 #include "Slic3r/Assert.hpp"
+#include "Slic3r/Domain/Color.hpp"
 #include <memory>
+#include <optional>
 #include <vector>
 #include <boost/filesystem/path.hpp>
 
@@ -30,6 +32,11 @@ enum class FileDialogType
     Open,
     OpenMultiple,
     Save
+};
+
+struct WipingDialogResult {
+    std::vector<double> matrix;
+    bool use_custom_matrix = false;
 };
 
 class IDialogManager :
@@ -96,6 +103,14 @@ public:
     ) = 0;
 
     virtual std::string show_ramming_dialog(const std::string& ramming_parameters) = 0;
+
+    virtual std::optional<WipingDialogResult> show_wiping_dialog(
+        const std::vector<double>& matrix,
+        const std::vector<Domain::ColorRGB>& extruder_colours,
+        double printer_purging_volume,
+        const std::vector<double>& filament_purging_multipliers,
+        bool use_custom_matrix
+    ) = 0;
 
     virtual void open_in_browser(const std::string& link, int flag) = 0;
 };

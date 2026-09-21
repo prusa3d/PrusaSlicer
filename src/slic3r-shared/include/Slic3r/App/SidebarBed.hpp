@@ -53,12 +53,19 @@ public:
     ) override;
     void on_preset_bundles_loaded() override;
 
+    void on_preset_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        Biz::Preset::PresetItemType type
+    ) override;
+
     LogicalPrinterSettingsDialog& logical_printer_settings_dialog();
     PrinterAddDialog& printer_add_dialog();
     MaterialSelectionDialog& material_selection_dialog();
 
 private:
     void refresh_printer_label_color();
+    void update_purging_volumes_button_visibility();
 
 private:
     Biz::ListenerScope<
@@ -74,6 +81,8 @@ private:
     Yoga::PrinterSettingsButton* m_logical_printer_button{nullptr};
 
     std::shared_ptr<Yoga::ButtonGroup> m_material_button_group;
+    Yoga::LayoutButton* m_purging_volumes_button{nullptr};
+
     using MaterialListViewFactory = Yoga::ViewFactory<
         Yoga::MaterialSettingsButton,
         Biz::Preset::PresetItemObservableList,
@@ -92,7 +101,6 @@ private:
     MaterialSelectionDialog* m_material_selection_dialog{nullptr};
 
     std::string m_selected_printer_preset_name{};
-
 };
 
 } // namespace Slic3r::App

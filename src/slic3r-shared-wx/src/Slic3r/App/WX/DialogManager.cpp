@@ -6,6 +6,7 @@
 #include "Slic3r/App/WX/DiffDialog.hpp"
 #include "Slic3r/App/WX/UnsavedChangesDialog.hpp"
 #include "Slic3r/App/WX/RammingDialog.hpp"
+#include "Slic3r/App/WX/WipingDialog.hpp"
 #include "Slic3r/App/WX/WidgetsConfig.hpp"
 #include "Slic3r/App/WX/LoadStepDialog.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
@@ -360,6 +361,24 @@ std::string DialogManager::show_ramming_dialog(const std::string& ramming_parame
         return dlg.get_parameters();
     }
     return ramming_parameters;
+}
+
+std::optional<WipingDialogResult> DialogManager::show_wiping_dialog(
+    const std::vector<double>& matrix,
+    const std::vector<Domain::ColorRGB>& extruder_colours,
+    double printer_purging_volume,
+    const std::vector<double>& filament_purging_multipliers,
+    bool use_custom_matrix
+)
+{
+    WipingDialog dlg(matrix, extruder_colours, printer_purging_volume, filament_purging_multipliers, use_custom_matrix);
+    if (dlg.ShowModal() == wxID_OK) {
+        WipingDialogResult result;
+        result.matrix             = dlg.get_matrix();
+        result.use_custom_matrix  = dlg.get_use_custom_matrix();
+        return result;
+    }
+    return std::nullopt;
 }
 
 std::optional<Biz::StepLoadDialogResult> DialogManager::show_load_step_dialog(

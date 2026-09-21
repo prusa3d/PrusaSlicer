@@ -8,15 +8,28 @@
 #include "Slic3r/Biz/IMdb.hpp"
 #include "Slic3r/Domain/Color.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
+#include "Slic3r/Biz/ISlicingInputChangedListener.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
 
 namespace Slic3r::Domain {
 class Workbench;
+class ConfigContainer;
 } // namespace Slic3r::Domain
 
 namespace Slic3r::Biz {
+
+/**
+ * @brief Everything WX::WipingDialog needs to populate itself, resolved in a single pass.
+ */
+struct WipingVolumesData {
+    std::vector<double> matrix;
+    std::vector<Domain::ColorRGB> extruder_colours;
+    double printer_purging_volume = 0.;
+    std::vector<double> filament_purging_multipliers;
+    bool use_custom_matrix = false;
+};
 
 /**
  * @brief Manages per-config-container project settings, including the extruder slot color map.
@@ -26,7 +39,7 @@ namespace Slic3r::Biz {
 class ProjectSettingsInteractor :
     public ISelectedConfigContainerChangedListener,
     public Preset::IPresetChangedListener,
-    public WithListeners<IColorsChangedListener>
+    public WithListeners<ISlicingInputChangedListener, IColorsChangedListener>
 {
 public:
     ProjectSettingsInteractor(Domain::Workbench& workbench, const IMdb& mdb);
@@ -62,6 +75,28 @@ public:
     void set_colors_from_connect(
         Domain::SelectionId config_container_id,
         std::vector<std::string> colors
+    );
+
+    /**
+     * @brief Returns everything WX::WipingDialog needs (matrix, colours, printer purging
+     *        volume, filament multipliers, custom-matrix flag), resolving the config
+     *        container and selected preset pack only once.
+     * @return A default-constructed WipingVolumesData if the container is not found.
+     */
+    WipingVolumesData get_wiping_volumes_data(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    ) const;
+
+    /**
+     * @brief Stores the wipe tower purging volumes matrix and custom-matrix flag, as edited
+     *        in WX::WipingDialog.
+     */
+    void set_wiping_volumes_data(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        std::vector<double> matrix,
+        bool use_custom_matrix
     );
 
     /**
@@ -130,7 +165,18 @@ private:
      * @brief Return the number of extruder slots for the given config container.
      * @return 0 if not found or not FDM.
      */
-    int extruder_count(
+    int
+    extruder_count(Domain::SelectionId project_id, Domain::SelectionId config_container_id) const;
+
+    /**
+     * @brief Resolve a config container by project + container id in one lookup.
+     * @return nullptr if the project or container is not found.
+     */
+    Domain::ConfigContainer* find_config_container(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    );
+    const Domain::ConfigContainer* find_config_container(
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id
     ) const;
@@ -139,20 +185,15 @@ private:
      * @brief Load stored colors from ProjectSettings, reconcile length with extruder count,
      *        and notify listeners.
      */
-    void load_and_reconcile(
-        Domain::SelectionId project_id,
-        Domain::SelectionId config_container_id
-    );
+    void
+    load_and_reconcile(Domain::SelectionId project_id, Domain::SelectionId config_container_id);
 
     /**
      * @brief Write the color vector back to the ProjectSettings of
      *        the config container and notify listeners.
 
      */
-    void store_and_notify(
-        Domain::SelectionId config_container_id,
-        std::vector<std::string> colors
-    );
+    void store_and_notify(Domain::SelectionId config_container_id, std::vector<std::string> colors);
 
     Domain::Workbench& m_workbench;
     const IMdb& m_mdb;
