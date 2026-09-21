@@ -22,6 +22,7 @@ public:
     {
         std::function<void(bool hovered)> hovered_changed{nullptr};
         std::function<void(bool active)> active_changed{nullptr};
+        std::function<void(float wheel_delta)> mouse_wheel{nullptr};
         /**
          * @brief text_edited is fired only after editing is finished (e.g. Enter/ESC or item lost
          * it's focus) This is due to optional validator which is invoked just before this callback

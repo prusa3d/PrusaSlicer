@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <Slic3r/App/Yoga/InputText.hpp>
+#include <Slic3r/App/Yoga/InputTextWithSpin.hpp>
+#include <Slic3r/App/Yoga/ScrollArea.hpp>
 #include <Slic3r/App/Yoga/Validator.hpp>
 
 #include "YogaComponentFixture.hpp"
@@ -135,4 +137,77 @@ TEST_CASE_METHOD(YogaComponentFixture, "InputText: hovered is true when mouse is
     render();
 
     REQUIRE(input->hovered());
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "InputText: mouse_wheel fires while hovered")
+{
+    InputText* input = make_input(*this);
+
+    float wheel_delta             = 0.f;
+    input->callbacks().mouse_wheel = [&](float delta) { wheel_delta = delta; };
+
+    render();
+    const Vec2f pos = input->get_global_pos();
+    mouse_move(pos.x() + input->width() * 0.5f, pos.y() + input->height() * 0.5f);
+    ImGui::GetIO().AddMouseWheelEvent(0.f, 1.f);
+    render();
+
+    REQUIRE(wheel_delta == 1.f);
+}
+
+TEST_CASE_METHOD(YogaComponentFixture, "InputTextWithSpin: mouse wheel changes value")
+{
+    auto* input = window->emplace_back<InputTextWithSpin>(std::make_unique<IntValidator>());
+    input->set_width(300.f);
+    input->set_height(30.f);
+    input->set_margin(Margins(200.f, 200.f, 0.f, 0.f));
+    input->set_text("2");
+
+    render();
+    const Vec2f pos = input->get_global_pos();
+    mouse_move(pos.x() + input->width() * 0.5f, pos.y() + input->height() * 0.5f);
+    render();
+    ImGui::GetIO().AddMouseWheelEvent(0.f, 1.f);
+    render();
+    REQUIRE(input->text() == "3");
+
+    ImGui::GetIO().AddMouseWheelEvent(0.f, -1.f);
+    render();
+    REQUIRE(input->text() == "2");
+}
+
+TEST_CASE_METHOD(
+    YogaComponentFixture,
+    "InputTextWithSpin: mouse wheel does not scroll parent ScrollArea"
+)
+{
+    ScrollArea* scroll_area = window->emplace_back<ScrollArea>();
+    scroll_area->set_width(300.f);
+    scroll_area->set_height(100.f);
+    scroll_area->set_orientation(Orientation::Vertical);
+
+    auto* input = scroll_area->emplace_back<InputTextWithSpin>(
+        std::make_unique<IntValidator>()
+    );
+    input->set_width(280.f);
+    input->set_height(30.f);
+    input->set_flex_shrink(0.f);
+    input->set_text("2");
+
+    Item* overflow = scroll_area->emplace_back<Item>();
+    overflow->set_height(300.f);
+    overflow->set_flex_shrink(0.f);
+
+    render();
+    render();
+    REQUIRE(scroll_area->scroll_size().y() > 0.f);
+
+    const Vec2f pos = input->get_global_pos();
+    mouse_move(pos.x() + input->width() * 0.5f, pos.y() + input->height() * 0.5f);
+    render();
+    ImGui::GetIO().AddMouseWheelEvent(0.f, -1.f);
+    render();
+
+    REQUIRE(input->text() == "1");
+    REQUIRE(scroll_area->scroll_pos().y() == 0.f);
 }
