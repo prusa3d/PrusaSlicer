@@ -200,7 +200,17 @@ bool OnlinePresetUpdaterRepository::get_file_inner(
             boost::nowide::fstream file(tmp_path, std::ios::out | std::ios::binary | std::ios::trunc);
             file.write(body.c_str(), body.size());
             file.close();
-            safe_move(tmp_path, target_path);
+
+            // Same directory, so this is a rename. Copying here would write every downloaded
+            // byte to disk a second time.
+            if (const std::error_code ec = Utils::rename_file(tmp_path.string(), target_path.string()); ec) {
+                SPDLOG_ERROR(
+                    "Failed to move downloaded file to {}: {}", target_path.string(), ec.message()
+                );
+                boost::system::error_code remove_ec;
+                fs::remove(tmp_path, remove_ec);
+                return;
+            }
             res = true;
         })
         .perform_sync(process_status->get_retry_policy());
@@ -226,8 +236,6 @@ bool OnlinePresetUpdaterRepository::get_file(
     PresetUpdaterProcessStatus* process_status
 ) const
 {
-    process_status->set_download_target(target_path.filename().string());
-
     const std::string escaped_source_subpath = Network::IHttp::escape_path_by_element(
         fs::path(source_subpath)
     );
@@ -241,8 +249,6 @@ bool OnlinePresetUpdaterRepository::get_version_manifest(
     PresetUpdaterProcessStatus* process_status
 ) const
 {
-    process_status->set_download_target(target_path.filename().string());
-
     const std::string escaped_source_subpath = Network::IHttp::escape_path_by_element(
         fs::path(source_subpath)
     );

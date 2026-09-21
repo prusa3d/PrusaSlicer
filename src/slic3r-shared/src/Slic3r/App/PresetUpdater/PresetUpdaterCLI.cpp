@@ -40,10 +40,10 @@ PresetUpdaterCLI::~PresetUpdaterCLI()
 void PresetUpdaterCLI::start(const ActionParams& action, const std::string data)
 {
     if (action.preset_updater_sync) {
-        m_preset_updater_interactor.build_update_sync_and_reconfiguration_check(true, Biz::PresetUpdater::VerboseStyle::NoProgress);
+        m_preset_updater_interactor.sync_indices_and_reconfiguration_check(true, Biz::PresetUpdater::VerboseStyle::NoProgress);
     } else if (action.preset_updater_perform) {
         m_perform_after_sync = true;
-        m_preset_updater_interactor.build_update_sync_and_reconfiguration_check(true, Biz::PresetUpdater::VerboseStyle::NoProgress);
+        m_preset_updater_interactor.sync_indices_and_reconfiguration_check(true, Biz::PresetUpdater::VerboseStyle::NoProgress);
     } else if (action.preset_updater_add_local) {
         ASSERT(!data.empty());
         boost::filesystem::path path(data);
@@ -75,9 +75,22 @@ void PresetUpdaterCLI::on_preset_updater_error(
     m_has_result = true;
 }
 
-void PresetUpdaterCLI::on_preset_updater_status(Biz::PresetUpdater::JobId job_id, const std::string& target, int attempt, unsigned delay, Biz::PresetUpdater::VerboseStyle verbose)
+void PresetUpdaterCLI::on_preset_updater_status(
+    Biz::PresetUpdater::JobId job_id,
+    const Biz::PresetUpdater::PresetUpdaterProgress& progress,
+    Biz::PresetUpdater::VerboseStyle verbose
+)
 {
-    SPDLOG_INFO("target:{} attempt:{} delay:{}", target, attempt, delay);
+    SPDLOG_INFO(
+        "step:{} vendor:{} version:{} {}/{} attempt:{} delay:{}",
+        static_cast<int>(progress.step),
+        progress.vendor_id,
+        progress.version,
+        progress.index,
+        progress.total,
+        progress.attempt,
+        progress.delay
+    );
 }
 
 void PresetUpdaterCLI::on_preset_updater_forced_reconfigurations_list(
@@ -108,7 +121,7 @@ void PresetUpdaterCLI::on_preset_updater_reconfigurations_list(
     if (m_perform_after_sync) {
         m_perform_after_sync = false;
         m_preset_updater_interactor.perform_reconfigurations(
-            reconfigurations, Biz::PresetUpdater::ReconfigurationType::All
+            reconfigurations, true, Biz::PresetUpdater::ReconfigurationType::All
         );
     } else {
         if (!warnings.empty()) {

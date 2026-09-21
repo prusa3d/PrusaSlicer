@@ -1,6 +1,8 @@
 #include "Slic3r/App/Init.hpp"
 
 #include "Slic3r/Biz/Platform/BlacklistedLibraryCheck.hpp"
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterStaging.hpp"
+#include "Slic3r/Biz/Utils/CopyFile.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Platform.hpp"
 #include "Slic3r/Log.hpp"
@@ -10,6 +12,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/nowide/cstdlib.hpp>
 #include <boost/nowide/filesystem.hpp>
+#include <boost/nowide/fstream.hpp>
 #include <boost/nowide/convert.hpp>
 
 namespace Slic3r::App {
@@ -98,6 +101,61 @@ void init_common()
     Slic3r::set_custom_gcodes_dir((path_resources / "custom_gcodes").string());
 }
 
+namespace {
+
+bool can_rename_into_data_dir(const boost::filesystem::path& candidate)
+{
+    boost::system::error_code ec;
+    boost::filesystem::create_directories(candidate, ec);
+    if (ec) {
+        return false;
+    }
+
+    const boost::filesystem::path probe_name =
+        boost::filesystem::unique_path(".volume_probe-%%%%-%%%%-%%%%-%%%%");
+    const boost::filesystem::path source = candidate / probe_name;
+    const boost::filesystem::path target = boost::filesystem::path(Slic3r::data_dir()) / probe_name;
+
+    {
+        boost::nowide::ofstream probe(source.string().c_str());
+        if (!probe) {
+            return false;
+        }
+    }
+
+    const bool renamed = !Biz::Utils::rename_file(source.string(), target.string());
+    boost::filesystem::remove(source, ec);
+    boost::filesystem::remove(target, ec);
+    return renamed;
+}
+
+/**
+ * @brief Picks the staging root, preferring the platform cache but insisting on a rename.
+ *
+ * Installing finishes by renaming staged files over the installed ones, which only works within
+ * one volume. A data directory on another drive would otherwise silently turn every install into
+ * a copy that can run out of space after the download already succeeded.
+ */
+std::string resolve_updater_cache_dir(bool datadir_overridden)
+{
+    const std::string candidate = Slic3r::get_default_updater_cache_dir(datadir_overridden);
+    if (datadir_overridden) {
+        // Already inside the data directory, so it shares its volume by construction.
+        return candidate;
+    }
+    if (can_rename_into_data_dir(candidate)) {
+        return candidate;
+    }
+    SPDLOG_INFO(
+        "{} is not on the same volume as the data directory. Staging preset downloads inside the"
+        " data directory instead.",
+        candidate
+    );
+    return Slic3r::get_default_updater_cache_dir(true);
+}
+
+} // namespace
+
 void init_paths(const InitParams& init_params)
 {
     // Data/config dir
@@ -136,6 +194,19 @@ void init_paths(const InitParams& init_params)
             boost::filesystem::create_directory(sub);
         }
     }
+
+    // After the data dir exists: the probe renames into it.
+    Slic3r::set_updater_cache_dir(
+        resolve_updater_cache_dir(init_params.misc.datadir.has_value())
+    );
+
+    const boost::filesystem::path staging = Slic3r::updater_staging_dir();
+    boost::system::error_code ec;
+    boost::filesystem::create_directories(staging, ec);
+    if (ec) {
+        SPDLOG_ERROR("Failed to create directory {}: {}", staging.string(), ec.message());
+    }
+    Biz::PresetUpdater::sweep_stale_staging();
 }
 
 } // namespace Slic3r::App

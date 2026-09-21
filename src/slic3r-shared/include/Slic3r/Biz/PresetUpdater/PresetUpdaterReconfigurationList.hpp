@@ -2,7 +2,9 @@
 
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Semver.hpp"
+#include <set>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -186,6 +188,25 @@ public:
             && m_not_in_index.empty()
             && m_new_vendors.empty()
             && m_removals.empty();
+    }
+
+    /// Every source named by a reconfiguration, each once. Performing them needs these sources.
+    std::set<std::string> repo_ids() const
+    {
+        std::set<std::string> ids;
+        for (const std::vector<VendorReconfiguration>* bucket :
+             {&m_regular_updates,
+              &m_forced_updates,
+              &m_forced_downgrades,
+              &m_not_in_index,
+              &m_new_vendors,
+              &m_removals})
+        {
+            for (const VendorReconfiguration& reconfiguration : *bucket) {
+                ids.insert(reconfiguration.vendor_repo_id);
+            }
+        }
+        return ids;
     }
 
 private:

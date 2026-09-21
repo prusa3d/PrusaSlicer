@@ -49,33 +49,44 @@ public:
     JobId check_forced_reconfigurations();
 
     /**
-     * @brief Does full construction of update_sync folder and checks reconfigurations.
+     * @brief Stages what every source offers and checks it against the installed presets.
      * Success is on_preset_updater_reconfigurations_list.
+     *
+     * Only indices are fetched - one small archive per online source. The vendor data itself is
+     * downloaded by perform_reconfigurations, once the user has asked for it.
+     *
      * @param online_allowed when false the job touches no network at all: the source list is taken
      * from the data dir and online sources are left with whatever is already staged for them. What
      * comes with the installation and what local sources offer is staged and checked either way.
-     * @param ignore_hash should be true ONLY for testing purpose.
      * @param source_list fetches the repository manifest from the server first. Pass UseStored to
      * check against the source list already in the data dir, which needs no network - the listing
      * or selection this check follows has just written it.
      * @param required_repo_ids sources to stage and check on top of the selected ones, because a
      * forced reconfiguration names them and its presets stay unusable until they are updated.
      */
-    JobId build_update_sync_and_reconfiguration_check(
+    JobId sync_indices_and_reconfiguration_check(
         bool online_allowed,
         VerboseStyle verbose,
-        bool ignore_hash                              = false,
-        SourceListSync source_list                    = SourceListSync::Fetch,
+        SourceListSync source_list                     = SourceListSync::Fetch,
         const std::set<std::string>& required_repo_ids = {}
     );
 
     /**
-     * @brief Performs the selected buckets of a ReconfigurationList.
+     * @brief Downloads and performs the selected buckets of a ReconfigurationList.
      * Success is on_preset_updater_reconfigurations_performed.
+     *
+     * This is where vendor data is fetched, so unlike a check it can fail because a source cannot
+     * be reached. A vendor the installation carries is installed without the network either way.
+     *
+     * @param online_allowed when false, only what is already on this computer can be installed.
+     * @param ignore_hash accepts whatever arrives without checking it against the manifest. Should
+     * be true ONLY for testing purpose.
      */
     JobId perform_reconfigurations(
         const PresetUpdaterReconfigurationList& reconfigurations,
-        ReconfigurationType types_to_perform = ReconfigurationType::All
+        bool online_allowed,
+        ReconfigurationType types_to_perform = ReconfigurationType::All,
+        bool ignore_hash                     = false
     );
 
     /**
@@ -169,7 +180,7 @@ private:
      * listeners as before and additionally feeds the job's ProgressTracker, so preset updater work
      * is visible in the global job status.
      */
-    std::function<void(const std::string&, int, unsigned)> make_status_callback(
+    std::function<void(const PresetUpdaterProgress&)> make_status_callback(
         JobId job_id, Platform::JobManager::ProgressTracker progress_tracker, VerboseStyle verbose
     );
 
@@ -184,7 +195,7 @@ private:
     // Error - operation has failed
     void dispatch_error(JobId job_id, const std::string& body, PresetUpdaterReason reason);
     // Status - operation is ongoing
-    void dispatch_status(JobId job_id, const std::string& target, int attempt, unsigned delay, VerboseStyle verbose);
+    void dispatch_status(JobId job_id, const PresetUpdaterProgress& progress, VerboseStyle verbose);
     // Success - operation has finished
     void dispatch_forced_reconfigurations_list(JobId job_id, const PresetUpdaterReconfigurationList& reconfigurations, const std::vector<PresetUpdaterWarning>& warnings);
     void dispatch_reconfigurations_list(JobId job_id, const PresetUpdaterReconfigurationList& reconfigurations, const std::vector<PresetUpdaterWarning>& warnings, VerboseStyle verbose);

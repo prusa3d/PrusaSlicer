@@ -28,6 +28,13 @@ using FileOpResult = tl::expected<void, std::string>;
 
 FileOpResult safe_move(const boost::filesystem::path& source, const boost::filesystem::path& target);
 
+bool move_directory_contents(
+    const boost::filesystem::path& source_dir,
+    const boost::filesystem::path& dest_dir,
+    PresetUpdaterProcessStatus* process_status,
+    const char* caller_name
+);
+
 bool copy_file_wrapper(
     const boost::filesystem::path& source,
     const boost::filesystem::path& target,
@@ -35,10 +42,6 @@ bool copy_file_wrapper(
 );
 
 std::vector<PresetUpdaterIndex> load_vendors_db(const boost::filesystem::path& archive_path);
-std::vector<PresetUpdaterIndex> load_vendors_db_filtered(
-    const boost::filesystem::path& from_path,
-    const std::vector<std::string>& filter
-);
 std::map<std::string, std::string> read_version_manifest(
     const boost::filesystem::path& path,
     PresetUpdaterProcessStatus* process_status
@@ -57,9 +60,16 @@ PresetUpdaterReconfigurationList check_reconfigurations(
     PresetUpdaterProcessStatus* process_status
 );
 
+/**
+ * @param repos the sources the reconfigurations came from. Vendor data is downloaded here rather
+ * than during a check, so a reconfiguration whose source is gone cannot be performed.
+ * @param online_allowed when false, only what is already on this computer can be installed.
+ */
 void perform_reconfigurations(
     const PresetUpdaterReconfigurationList& reconfigurations,
     ReconfigurationType types_to_perform,
+    const SharedRepositoryVector& repos,
+    bool online_allowed,
     PresetUpdaterProcessStatus* process_status
 );
 

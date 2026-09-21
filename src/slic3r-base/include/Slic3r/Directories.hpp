@@ -42,6 +42,10 @@ const std::string& data_dir();
 
 std::string get_default_datadir();
 
+// Directory name this build uses under the platform config and cache roots,
+// e.g. "PrusaSlicer3", or "PrusaSlicer3-dev" for an alpha or beta.
+std::string app_versioned_dir_name();
+
 void set_cache_dir(const std::string& path);
 
 const std::string& cache_dir();
@@ -53,6 +57,24 @@ std::string webview_data_dir();
 
 /** Remove web view data directories of other application versions. Safe to call from any thread. */
 void prune_stale_webview_data_dirs();
+/**
+ * @brief Where the preset updater keeps downloads it has not installed yet.
+ *
+ * Staging has to share a volume with the installed presets, so that finishing an install is a
+ * rename and cannot fail once the download succeeded. When the data directory was chosen
+ * explicitly, staging therefore belongs inside it; otherwise the platform cache location is used.
+ *
+ * @param datadir_overridden whether --datadir was passed. Reads data_dir() when it was, so
+ * set_data_dir must already have been called.
+ */
+std::string get_default_updater_cache_dir(bool datadir_overridden);
+
+void set_updater_cache_dir(const std::string& path);
+
+const std::string& updater_cache_dir();
+
+// Where the preset updater downloads to before installing. Inside updater_cache_dir().
+boost::filesystem::path updater_staging_dir();
 
 boost::filesystem::path system_downloads_dir();
 

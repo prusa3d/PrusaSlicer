@@ -1,8 +1,8 @@
 #pragma once
 
-#include <memory>
+#include "Slic3r/Semver.hpp"
+
 #include <vector>
-#include <map>
 #include <string>
 
 namespace boost::filesystem {
@@ -13,6 +13,7 @@ namespace Slic3r::Biz::PresetUpdater {
 
 class PresetUpdaterIndex;
 class AbstractPresetUpdaterRepository;
+class StagingArea;
 
 typedef std::vector<const AbstractPresetUpdaterRepository*> SharedRepositoryVector;
 
@@ -29,67 +30,81 @@ public:
     ~PresetUpdaterRepositorySync()                                             = default;
 
     /**
-     * @brief Stages from resources for every repository, then from the repositories themselves.
-     * @param online_allowed when false, online repositories are left untouched - what is already
-     * staged for them stays, and nothing is fetched.
+     * @brief Records what every source offers, by staging its indices into update_sync.
+     *
+     * Downloads one index archive per online repository and nothing else. Vendor data is large
+     * and most of it is never installed, so it is fetched by install_vendor instead, once the
+     * user has asked for it.
+     *
+     * @param online_allowed when false, online repositories are left untouched - whatever index
+     * is already staged for them stays, and nothing is fetched.
      */
-    void sync(
+    void sync_indices(
         const SharedRepositoryVector& repositories,
         bool online_allowed,
         PresetUpdaterProcessStatus* process_status
     ) const;
 
+    /**
+     * @brief Puts one vendor version in place, downloading it first unless it ships with the app.
+     *
+     * Nothing installed is touched until the new version is known to be complete, so a download
+     * that fails or is cancelled leaves the installed presets as they were. Whatever was
+     * downloaded is dropped again, installed or not.
+     *
+     * @param target_version the version the staged index recommends.
+     * @param online_allowed when false, a version that has to be downloaded is refused outright
+     * rather than attempted and retried. What the installation carries is installed either way.
+     * @param staging the download space of the job this install belongs to.
+     * @return false when nothing was installed, in which case process_status carries the reason.
+     */
+    bool install_vendor(
+        const AbstractPresetUpdaterRepository* repo,
+        const std::string& vendor_id,
+        const Slic3r::Semver& target_version,
+        bool online_allowed,
+        const StagingArea& staging,
+        PresetUpdaterProcessStatus* process_status
+    ) const;
+
 private:
     /**
-     * @brief Uses resources as source. It stages reconfigurations into update_sync.
+     * @brief Stages the indices the installation carries, for repositories that have them.
      */
-    void stage_rencofigurations_from_resources(
+    void stage_indices_from_resources(
         const boost::filesystem::path& source_dir,
         const AbstractPresetUpdaterRepository* repo,
         PresetUpdaterProcessStatus* process_status
     ) const;
 
-    void stage_not_installed_vendor_from_resources(
-        const boost::filesystem::path& source_dir,
-        const AbstractPresetUpdaterRepository* repo,
-        PresetUpdaterProcessStatus* process_status,
-        const PresetUpdaterIndex& source_index
-    ) const;
-
-    void stage_installed_vendor_from_resources(
-        const boost::filesystem::path& source_dir,
-        const AbstractPresetUpdaterRepository* repo,
-        PresetUpdaterProcessStatus* process_status,
-        const PresetUpdaterIndex& source_index
-    ) const;
-
     /**
-     * Downloads index archive to temp_path. For each index calls sync_not_installed_vendor or sync_installed_vendor.
+     * @brief Downloads the index archive of one repository and stages every index in it.
      */
-    void sync_repository(
+    void stage_indices_from_repository(
         const boost::filesystem::path& temp_path,
         const AbstractPresetUpdaterRepository* repo,
         PresetUpdaterProcessStatus* process_status
     ) const;
 
     /**
-     * Downloads recommended bundle to temp_path / vendor_name. Then calls check_missing_resources.
+     * @brief Installs from the data the application was shipped with. Needs no network.
      */
-    void sync_not_installed_vendor(
-        const boost::filesystem::path& temp_path,
+    bool install_from_resources(
         const AbstractPresetUpdaterRepository* repo,
-        PresetUpdaterProcessStatus* process_status,
-        const PresetUpdaterIndex& index
+        const std::string& vendor_id,
+        const Slic3r::Semver& target_version,
+        PresetUpdaterProcessStatus* process_status
     ) const;
 
     /**
-     * Compares version of installed bundle of vendor with index. Then downloads recommended bundle to temp_path / vendor_name if needed. Then calls check_missing_resources.
+     * @brief Downloads whatever the installed version does not already provide, then installs.
      */
-    void sync_installed_vendor(
-        const boost::filesystem::path& temp_path,
+    bool download_and_install(
         const AbstractPresetUpdaterRepository* repo,
-        PresetUpdaterProcessStatus* process_status,
-        const PresetUpdaterIndex& index
+        const std::string& vendor_id,
+        const Slic3r::Semver& target_version,
+        const boost::filesystem::path& staging_dir,
+        PresetUpdaterProcessStatus* process_status
     ) const;
 };
 

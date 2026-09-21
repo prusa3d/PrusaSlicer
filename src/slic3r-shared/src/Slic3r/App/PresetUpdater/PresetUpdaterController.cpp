@@ -1532,8 +1532,8 @@ void PresetUpdaterController::start_check(
         JobKind::Check,
         [this, online, source_list, &required]()
         {
-            return m_interactor.build_update_sync_and_reconfiguration_check(
-                online, Biz::PresetUpdater::VerboseStyle::NoProgress, false, source_list, required
+            return m_interactor.sync_indices_and_reconfiguration_check(
+                online, Biz::PresetUpdater::VerboseStyle::NoProgress, source_list, required
             );
         }
     );
@@ -1571,7 +1571,7 @@ void PresetUpdaterController::start_install(const std::vector<VendorKey>& keys)
         [this, &request]()
         {
             return m_interactor.perform_reconfigurations(
-                request.list, Biz::PresetUpdater::ReconfigurationType::All
+                request.list, online_allowed(), Biz::PresetUpdater::ReconfigurationType::All
             );
         }
     );
@@ -1723,7 +1723,7 @@ void PresetUpdaterController::remove_vendor(
         [this, &request]()
         {
             return m_interactor.perform_reconfigurations(
-                request.list, Biz::PresetUpdater::ReconfigurationType::Removals
+                request.list, online_allowed(), Biz::PresetUpdater::ReconfigurationType::Removals
             );
         }
     );
@@ -1738,7 +1738,7 @@ void PresetUpdaterController::remove_vendor(
         m_interactor.pending_job_count() > 1 ? InstallState::Queued : InstallState::Running
     );
 
-    m_activity_reporter.begin_activity(job_id, Activity::Installing);
+    m_activity_reporter.begin_activity(job_id, Activity::RemovingVendor);
 }
 
 void PresetUpdaterController::update_source(const std::string& uuid)
@@ -2036,17 +2036,24 @@ void PresetUpdaterController::on_preset_updater_reconfigurations_performed(
 
 void PresetUpdaterController::on_preset_updater_status(
     JobId job_id,
-    const std::string& target,
-    int attempt,
-    unsigned delay,
+    const Biz::PresetUpdater::PresetUpdaterProgress& progress,
     Biz::PresetUpdater::VerboseStyle verbose
 )
 {
     Transaction transaction(*this);
 
-    SPDLOG_INFO("Preset updater status: target:{} attempt:{} delay:{}", target, attempt, delay);
+    SPDLOG_INFO(
+        "Preset updater status: step:{} vendor:{} version:{} {}/{} attempt:{} delay:{}",
+        static_cast<int>(progress.step),
+        progress.vendor_id,
+        progress.version,
+        progress.index,
+        progress.total,
+        progress.attempt,
+        progress.delay
+    );
 
-    m_activity_reporter.report_progress(job_id, target, attempt);
+    m_activity_reporter.report_progress(job_id, progress);
 
     const JobLedger::Record* record = m_ledger.find(job_id);
     if (record == nullptr || !carries_vendor_keys(record->kind)) {

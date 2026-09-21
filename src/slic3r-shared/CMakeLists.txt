@@ -1178,9 +1178,12 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/PresetUpdater/IPresetUpdaterResultListener.hpp
         include/Slic3r/Biz/PresetUpdater/PresetUpdaterInteractor.hpp
         include/Slic3r/Biz/PresetUpdater/PresetUpdaterJob.hpp
+        include/Slic3r/Biz/PresetUpdater/PresetUpdaterProgress.hpp
         include/Slic3r/Biz/PresetUpdater/PresetUpdaterReconfigurationList.hpp
         include/Slic3r/Biz/PresetUpdater/PresetUpdaterRepositoryDescriptor.hpp
         include/Slic3r/Biz/PresetUpdater/PresetUpdaterReason.hpp
+        include/Slic3r/Biz/PresetUpdater/PresetUpdaterStaging.hpp
+        src/Slic3r/Biz/PresetUpdater/PresetUpdaterStaging.cpp
         include/Slic3r/Biz/PresetUpdater/PresetUpdaterWarning.hpp
         src/Slic3r/Biz/PresetUpdater/PresetUpdaterProcessStatus.hpp
         src/Slic3r/Biz/PresetUpdater/PresetUpdaterProcessStatus.cpp

@@ -39,7 +39,11 @@ public:
         const std::vector<Biz::PresetUpdater::PresetUpdaterWarning>& warnings
     ) override;
 
-    void on_preset_updater_status(Biz::PresetUpdater::JobId job_id, const std::string& target, int attempt, unsigned delay, Biz::PresetUpdater::VerboseStyle verbose) override;
+    void on_preset_updater_status(
+        Biz::PresetUpdater::JobId job_id,
+        const Biz::PresetUpdater::PresetUpdaterProgress& progress,
+        Biz::PresetUpdater::VerboseStyle verbose
+    ) override;
 
     void on_preset_updater_repository_info_vector(
         Biz::PresetUpdater::JobId job_id,

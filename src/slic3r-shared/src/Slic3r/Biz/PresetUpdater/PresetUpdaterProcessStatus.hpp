@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterProgress.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterWarning.hpp"
 
 #include "Slic3r/Assert.hpp"
@@ -23,8 +24,7 @@ public:
         PURP_NO_RETRY,
     };
 
-    typedef std::function<void(const std::string& /* target */, int /* attempt */, unsigned /* delay */)>
-        StatusChangedFn;
+    typedef std::function<void(const PresetUpdaterProgress&)> StatusChangedFn;
 
     // called from PresetUpdaterWrapper
     PresetUpdaterProcessStatus(JThread::StopToken stop_token, StatusChangedFn status_fn, PresetUpdaterRetryPolicy retry_policy, bool ignore_hash = false);
@@ -130,12 +130,20 @@ public:
         m_warning_target_vendor = {};
     }
 
-    void set_download_target(const std::string& target)
-    {
-        m_download_target = target;
-    }
+    /**
+     * @brief Names the vendor being worked on and what is happening to it.
+     *
+     * Reported straight away, and again with every later network attempt, until the next call
+     * replaces it.
+     */
+    void set_step(PresetUpdaterStep step, std::string vendor_id, std::string version = {});
 
-    void set_install_target(const std::string& target);
+    /// Places the current vendor in the batch, for a job that walks several of them.
+    void set_batch_position(std::size_t index, std::size_t total)
+    {
+        m_progress.index = index;
+        m_progress.total = total;
+    }
 
     bool has_vendor_warning(const std::string& repo, const std::string& vendor) const
     {
@@ -155,7 +163,7 @@ private:
     std::vector<PresetUpdaterWarning> m_warnings;
     std::string m_warning_target_repo;
     std::string m_warning_target_vendor;
-    std::string m_download_target;
+    PresetUpdaterProgress m_progress;
     Network::HttpRetryOpt m_retry_policy;
     std::string m_access_token;
     StatusChangedFn m_dispatch_status_fn;

@@ -684,9 +684,12 @@ std::error_code rename_file(const std::string& from, const std::string& to)
     return WindowsSupport::rename(from, to);
 #else
     boost::nowide::remove(to.c_str());
-    return std::make_error_code(
-        static_cast<std::errc>(boost::nowide::rename(from.c_str(), to.c_str()))
-    );
+    // rename() reports failure as -1 and leaves the reason in errno, so the return value itself
+    // says nothing. Callers need EXDEV in particular to be distinguishable.
+    if (boost::nowide::rename(from.c_str(), to.c_str()) != 0) {
+        return std::error_code(errno, std::generic_category());
+    }
+    return {};
 #endif
 }
 } // namespace Slic3r::Biz::Utils

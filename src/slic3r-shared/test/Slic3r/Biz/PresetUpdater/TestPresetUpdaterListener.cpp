@@ -81,7 +81,7 @@ void TestPresetUpdaterListener::start(ExpectedReconfiguration expected)
 {
     m_has_result = false;
     m_expected = std::move(expected);
-    m_preset_updater_interactor.build_update_sync_and_reconfiguration_check(true, Biz::PresetUpdater::VerboseStyle::NoProgress, true);
+    m_preset_updater_interactor.sync_indices_and_reconfiguration_check(true, Biz::PresetUpdater::VerboseStyle::NoProgress);
 }
 
 void TestPresetUpdaterListener::check_reasons(const std::vector<PresetUpdaterWarning>& warnings)
@@ -201,9 +201,7 @@ void TestPresetUpdaterListener::on_preset_updater_reconfigurations_performed(
 
 void TestPresetUpdaterListener::on_preset_updater_status(
     JobId job_id,
-    const std::string& target,
-    int attempt,
-    unsigned delay,
+    const Biz::PresetUpdater::PresetUpdaterProgress& progress,
     Biz::PresetUpdater::VerboseStyle verbose
 )
 {}

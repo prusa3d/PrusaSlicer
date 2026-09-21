@@ -22,7 +22,8 @@ download/install pipeline, and the files written to disk.
 | --- | --- |
 | stdout | JSON result of the action. A failure is an object with an `"error"` key. |
 | `<datadir>/shared_runtime/RepositoryManifest.json` | The sources list and their `selected` flags |
-| `<datadir>/update_sync/<repo_id>/…` | Files staged (downloaded) but not yet installed |
+| `<datadir>/update_sync/<repo_id>/<Vendor>.idx` | What each source offers. Indices only — never vendor data |
+| `<cache>/staging/<job>/<repo_id>/<Vendor>/<version>/` | Downloads of a running install, one `<job>` directory per install, removed when it ends. One left behind by a crash is dropped after two days. `<cache>` is `<datadir>/cache` when `--datadir` is passed, otherwise the platform cache directory (`%LOCALAPPDATA%\PrusaSlicer3`, `~/.cache/PrusaSlicer3`, `~/Library/Caches/PrusaSlicer3`) |
 | `<datadir>/presets/local/<repo_id>/<Vendor>/` + `<Vendor>.idx` | Installed vendor profiles |
 | `<datadir>/local_repositories/<uuid>/` | Unzipped local (offline) sources |
 
@@ -43,15 +44,18 @@ prusa-slicer --datadir <tmp> --preset-update-list
 ```
 - [ ] Prints `{"result": { … }}` where `new_vendors` lists the online vendors and the other
       arrays (`regular_updates`, `forced_updates`, `forced_downgrades`, `not_in_index`) are empty.
-- [ ] Files appear under `update_sync/<repo_id>/`.
+- [ ] **Only `.idx` files appear under `update_sync/<repo_id>/`** — no vendor directories, no
+      `vendor.yaml`, no `.manifest`. A check learns what is on offer without downloading it.
+- [ ] `<datadir>/cache/staging/` is empty — nothing is downloaded until you ask to install.
 - [ ] No `"error"` in the output.
 
-### 3. List again (still staged, not installed)
+### 3. List again (nothing was downloaded)
 ```
 prusa-slicer --datadir <tmp> --preset-update-list
 ```
-- [ ] Same `new_vendors` result as step 2 — staging does **not** install, so the vendors are
+- [ ] Same `new_vendors` result as step 2 — a check does **not** install, so the vendors are
       still "new". No `"error"`.
+- [ ] `update_sync/<repo_id>/` still holds only `.idx` files.
 
 ### 4. Install
 ```
@@ -62,7 +66,9 @@ prusa-slicer --datadir <tmp> --preset-update
 - [ ] `presets/local/<repo_id>/<Vendor>/vendor.yaml` and `presets/local/<repo_id>/<Vendor>.idx`
       now exist.
 - [ ] The installed `vendor.yaml` `version` equals the `recommended_version` shown in step 2.
-- [ ] There are no files in `update_sync/<repo_id>/`.
+- [ ] This is the command that downloads the vendor data, so it takes noticeably longer than
+      step 2 did.
+- [ ] There are no files in `update_sync/<repo_id>/` and `staging/` is empty again.
 
 ### 5. List after install
 ```
@@ -145,7 +151,21 @@ prusa-slicer --datadir <tmp> --preset-update-cleanup
 ```
 - [ ] Prints `{"result": { … }}` (a reconfiguration check after cleanup).
 - [ ] Everything under `update_sync/` is removed.
+- [ ] A `staging/<job>/` directory untouched for more than two days is removed; a recent one
+      (possibly a running install) is kept.
 - [ ] Already-installed profiles under `presets/local/` are left untouched.
+
+### 14b. Staging location follows `--datadir`
+```
+prusa-slicer --preset-update-list                       # no --datadir
+prusa-slicer --datadir <tmp> --preset-update-list
+```
+- [ ] Without `--datadir`, staging is under the platform cache directory (see the table above),
+      **not** under `%APPDATA%`/`~/.config`.
+- [ ] With `--datadir`, staging is under `<tmp>/cache/staging` — so the whole updater footprint
+      is inside the data directory you passed.
+- [ ] Sentry's `.sentry-native` directory is exactly where it was before this change on your
+      platform — it is deliberately unaffected.
 
 ### 15. GUI smoke test (best effort)
 - [ ] Launch the GUI build against the same `<datadir>` and confirm the updater

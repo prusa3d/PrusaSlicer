@@ -128,7 +128,9 @@ struct PresetUpdaterApprovalListener : public Biz::PresetUpdater::IPresetUpdater
     }
 
     void on_preset_updater_status(
-        Biz::PresetUpdater::JobId, const std::string&, int, unsigned, Biz::PresetUpdater::VerboseStyle) override
+        Biz::PresetUpdater::JobId,
+        const Biz::PresetUpdater::PresetUpdaterProgress&,
+        Biz::PresetUpdater::VerboseStyle) override
     {
         // Ignored on purpose. Only forced reconfigurations matters.
     }

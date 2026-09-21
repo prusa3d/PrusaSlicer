@@ -18,9 +18,6 @@ enum class SourceListSync
     UseStored
 };
 
-/// name for UI layer
-inline constexpr std::string_view k_manifest_download_target{"Sources Database Manifest"};
-
 struct PresetUpdaterRepositoryDescriptor
 {
     // mandatory

@@ -246,7 +246,7 @@ static std::string get_platform_data_dir()
 }
 #endif
 
-std::string get_default_datadir()
+std::string app_versioned_dir_name()
 {
     Semver semver(::Slic3r::VERSION);
     bool is_alpha = semver.prerelease() && std::string{semver.prerelease()}.find("alpha") != std::string::npos;
@@ -256,8 +256,13 @@ std::string get_default_datadir()
     if (is_alpha || is_beta)
         datadir_name += "-dev";
 
+    return datadir_name;
+}
+
+std::string get_default_datadir()
+{
     const std::string config_dir = get_platform_data_dir();
-    std::string data_dir = (boost::filesystem::path(config_dir) / datadir_name).make_preferred().string();
+    std::string data_dir = (boost::filesystem::path(config_dir) / app_versioned_dir_name()).make_preferred().string();
     return data_dir;
 }
 
@@ -451,6 +456,54 @@ std::string get_default_cachedir() {
     return data_dir();
 }
 #endif
+
+namespace {
+std::string platform_cache_root()
+{
+#if defined(__linux__)
+    return get_xdg_cache_home().string();
+#elif defined(__APPLE__)
+    return get_platform_cache_dir();
+#elif defined(_WIN32)
+    PWSTR path = nullptr;
+    if (SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) {
+        std::string result = boost::nowide::narrow(path);
+        ::CoTaskMemFree(path);
+        return result;
+    }
+    SPDLOG_ERROR("Failed to resolve the local application data directory.");
+    return get_platform_data_dir();
+#else
+    return get_platform_data_dir();
+#endif
+}
+} // namespace
+
+std::string get_default_updater_cache_dir(bool datadir_overridden)
+{
+    if (datadir_overridden) {
+        return (fs::path(data_dir()) / "cache").make_preferred().string();
+    }
+    return (fs::path(platform_cache_root()) / app_versioned_dir_name()).make_preferred().string();
+}
+
+static std::string g_updater_cache_dir;
+
+void set_updater_cache_dir(const std::string& path)
+{
+    g_updater_cache_dir = path;
+}
+
+const std::string& updater_cache_dir()
+{
+    ASSERT(!g_updater_cache_dir.empty());
+    return g_updater_cache_dir;
+}
+
+fs::path updater_staging_dir()
+{
+    return fs::path(updater_cache_dir()) / "staging";
+}
 
 #ifdef _WIN32
 boost::filesystem::path system_downloads_dir()

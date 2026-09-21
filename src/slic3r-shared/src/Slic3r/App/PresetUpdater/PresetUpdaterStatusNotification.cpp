@@ -6,7 +6,6 @@
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterInteractor.hpp"
-#include "Slic3r/Biz/PresetUpdater/PresetUpdaterRepositoryDescriptor.hpp"
 
 #include <fmt/format.h>
 
@@ -18,6 +17,8 @@ namespace Slic3r::App {
 namespace {
 
 using Activity = PresetUpdaterStatusNotification::Activity;
+using Progress = Biz::PresetUpdater::PresetUpdaterProgress;
+using Step     = Biz::PresetUpdater::PresetUpdaterStep;
 
 std::string activity_header(Activity activity)
 {
@@ -40,12 +41,38 @@ std::string activity_header(Activity activity)
     case Activity::Installing:
         // TRN Preset updater notification header.
         return Biz::_u8L("Installing presets...");
+    case Activity::RemovingVendor:
+        // TRN Preset updater notification header.
+        return Biz::_u8L("Removing presets...");
     }
     ASSERT(false, "Missing Activity handling.");
     return {};
 }
 
-std::string activity_body(Activity activity, const std::string& target)
+std::string vendor_subject(const Progress& progress)
+{
+    switch (progress.step) {
+    case Step::Downloading:
+        // TRN Preset updater notification. {} is a vendor, {} the version being downloaded.
+        return fmt::format(
+            fmt::runtime(Biz::_u8L("Downloading {} {}")), progress.vendor_id, progress.version
+        );
+    case Step::Installing:
+        // TRN Preset updater notification. {} is a vendor, {} the version being installed.
+        return fmt::format(
+            fmt::runtime(Biz::_u8L("Installing {} {}")), progress.vendor_id, progress.version
+        );
+    case Step::Removing:
+        // TRN Preset updater notification. {} is the vendor whose presets are being deleted.
+        return fmt::format(fmt::runtime(Biz::_u8L("Removing {}")), progress.vendor_id);
+    case Step::None:
+        return {};
+    }
+    ASSERT(false, "Missing PresetUpdaterStep handling.");
+    return {};
+}
+
+std::string waiting_body(Activity activity)
 {
     switch (activity) {
     case Activity::ListingSources:
@@ -55,37 +82,38 @@ std::string activity_body(Activity activity, const std::string& target)
         // TRN Preset updater notification. Body under "Saving source selection...".
         return Biz::_u8L("Writing the choice to the application configuration.");
     case Activity::AddingSource:
-        if (target.empty()) {
-            // TRN Preset updater notification. Body under "Adding source...".
-            return Biz::_u8L("Unpacking the archive and reading the presets it offers.");
-        }
-        // TRN Preset updater notification. {} is the archive being unpacked.
-        return fmt::format(fmt::runtime(Biz::_u8L("Unpacking {}.")), target);
+        // TRN Preset updater notification. Body under "Adding source...".
+        return Biz::_u8L("Unpacking the archive and reading the presets it offers.");
     case Activity::RemovingSource:
         // TRN Preset updater notification. Body under "Removing source...".
         return Biz::_u8L("Deleting the presets unpacked from the archive.");
     case Activity::Checking:
-        if (target.empty()) {
-            // TRN Preset updater notification. Body under "Checking for updates...".
-            return Biz::_u8L("Comparing the installed presets with what the sources offer.");
-        }
-        // TRN Preset updater notification. {} is the file being downloaded.
-        return fmt::format(fmt::runtime(Biz::_u8L("Downloading {}.")), target);
+        // TRN Preset updater notification. Body under "Checking for updates...".
+        return Biz::_u8L("Comparing the installed presets with what the sources offer.");
     case Activity::Installing:
-        if (target.empty()) {
-            // TRN Preset updater notification. Body under "Installing presets...".
-            return Biz::_u8L("Copying the new presets into the configuration.");
-        }
-        // TRN Preset updater notification. {} is the vendor being installed.
-        return fmt::format(fmt::runtime(Biz::_u8L("Installing {}.")), target);
+        // TRN Preset updater notification. Body under "Installing presets...".
+        return Biz::_u8L("Copying the new presets into the configuration.");
+    case Activity::RemovingVendor:
+        // TRN Preset updater notification. Body under "Removing presets...".
+        return Biz::_u8L("Deleting the presets that were installed.");
     }
     ASSERT(false, "Missing Activity handling.");
     return {};
 }
 
-bool is_cancelable(Activity activity)
+std::string activity_body(Activity activity, const Progress& progress)
 {
-    return activity == Activity::Checking;
+    const std::string subject = vendor_subject(progress);
+    if (subject.empty()) {
+        return waiting_body(activity);
+    }
+    if (progress.total <= 1) {
+        return subject;
+    }
+    // TRN Preset updater notification. {} names the vendor, then its place in the batch.
+    return fmt::format(
+        fmt::runtime(Biz::_u8L("{}  ({} of {})")), subject, progress.index, progress.total
+    );
 }
 
 } // namespace
@@ -104,8 +132,7 @@ void PresetUpdaterStatusNotification::begin_activity(
         return;
     }
     if (m_activities.empty()) {
-        m_activity_target.clear();
-        m_activity_attempt = 0;
+        m_activity_progress = {};
     }
     m_activities.emplace_back(job_id, activity);
     refresh();
@@ -126,8 +153,7 @@ void PresetUpdaterStatusNotification::end_activity(Biz::PresetUpdater::JobId job
     const bool was_front = it == m_activities.begin();
     m_activities.erase(it);
     if (was_front) {
-        m_activity_target.clear();
-        m_activity_attempt = 0;
+        m_activity_progress = {};
     }
     refresh();
 }
@@ -143,28 +169,20 @@ bool PresetUpdaterStatusNotification::tracks(Biz::PresetUpdater::JobId job_id) c
 }
 
 void PresetUpdaterStatusNotification::report_progress(
-    Biz::PresetUpdater::JobId job_id, const std::string& target, int attempt
+    Biz::PresetUpdater::JobId job_id, const Biz::PresetUpdater::PresetUpdaterProgress& progress
 )
 {
     if (!tracks(job_id)) {
         return;
     }
-    m_activity_target  = target;
-    m_activity_attempt = attempt;
-    refresh();
-}
-
-void PresetUpdaterStatusNotification::set_dialog_open(bool dialog_open)
-{
-    m_dialog_open = dialog_open;
+    m_activity_progress = progress;
     refresh();
 }
 
 void PresetUpdaterStatusNotification::reset()
 {
     m_activities.clear();
-    m_activity_target.clear();
-    m_activity_attempt = 0;
+    m_activity_progress = {};
 }
 
 void PresetUpdaterStatusNotification::refresh()
@@ -180,8 +198,7 @@ void PresetUpdaterStatusNotification::refresh()
         { return !m_preset_updater_interactor.is_job_pending(entry.first); }
     );
     if (m_activities.size() != tracked) {
-        m_activity_target.clear();
-        m_activity_attempt = 0;
+        m_activity_progress = {};
     }
 
     if (m_activities.empty()) {
@@ -189,41 +206,14 @@ void PresetUpdaterStatusNotification::refresh()
         return;
     }
 
-    const std::pair<Biz::PresetUpdater::JobId, Activity>& current = m_activities.front();
+    const Activity activity = m_activities.front().second;
 
-    // The manifest fetch reads as the source list being updated, not as a file download.
-    Activity activity = current.second;
-    if (activity == Activity::Checking
-        && m_activity_target == Biz::PresetUpdater::k_manifest_download_target)
-    {
-        activity = Activity::ListingSources;
-    }
-
-    std::string body = activity_body(activity, m_activity_target);
-    if (m_activity_attempt > 1) {
+    std::string body = activity_body(activity, m_activity_progress);
+    if (m_activity_progress.attempt > 1) {
         body += "\n";
         // TRN Preset updater notification. {} is the retry number.
         const std::string retry = Biz::_u8L("(Attempt {}) The connection is taking longer than usual. Please wait.");
-        body += fmt::format(fmt::runtime(retry), m_activity_attempt);
-    }
-
-    // A different layout type, not an empty button list: the view rebuilds only on a type change.
-    PopNotificationLayout layout = PopNotificationLayoutHeaderText{activity_header(activity), body};
-    if (!m_dialog_open && is_cancelable(current.second)) {
-        const Biz::PresetUpdater::JobId job_id = current.first;
-        layout = PopNotificationLayoutHeaderTextButtons{
-            activity_header(activity),
-            body,
-            {
-                // TRN Preset updater notification button. Stops the running job.
-                {Biz::_u8L("Cancel"),
-                 [this, job_id]()
-                 {
-                     m_preset_updater_interactor.cancel_job(job_id);
-                     return true;
-                 }},
-            }
-        };
+        body += fmt::format(fmt::runtime(retry), m_activity_progress.attempt);
     }
 
     center.upsert_notification(
@@ -231,7 +221,7 @@ void PresetUpdaterStatusNotification::refresh()
             PopNotificationType::PresetUpdaterStatus,
             PopNotificationLevel::Regular,
             std::chrono::seconds{0},
-            std::move(layout)
+            PopNotificationLayoutHeaderText{activity_header(activity), body}
         },
         always_equal_matcher
     );

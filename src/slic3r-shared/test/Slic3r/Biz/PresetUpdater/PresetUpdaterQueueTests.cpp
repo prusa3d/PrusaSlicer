@@ -106,7 +106,7 @@ TEST_CASE("PresetUpdater queue mixes operation kinds without losing results", "[
 
     const PresetUpdater::JobId list = fx.interactor().list_repositories(true);
     const PresetUpdater::JobId check = fx.interactor()
-        .build_update_sync_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress, true);
+        .sync_indices_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress);
     const PresetUpdater::JobId forced = fx.interactor().check_forced_reconfigurations();
     const PresetUpdater::JobId cleanup = fx.interactor().cleanup_update_sync();
 
@@ -130,7 +130,7 @@ TEST_CASE("PresetUpdater queue reports pending jobs while one is running", "[pre
     CaptureListener listener(fx.interactor());
 
     const PresetUpdater::JobId running = fx.interactor()
-        .build_update_sync_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress, true);
+        .sync_indices_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress);
     const PresetUpdater::JobId queued_a = fx.interactor().list_repositories(true);
     const PresetUpdater::JobId queued_b = fx.interactor().list_repositories(true);
 
@@ -154,7 +154,7 @@ TEST_CASE("PresetUpdater cancels the running job and keeps the queue", "[preset_
     CaptureListener listener(fx.interactor());
 
     const PresetUpdater::JobId running = fx.interactor()
-        .build_update_sync_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress, true);
+        .sync_indices_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress);
     const PresetUpdater::JobId queued_a = fx.interactor().list_repositories(true);
     const PresetUpdater::JobId queued_b = fx.interactor().list_repositories(true);
 
@@ -180,7 +180,7 @@ TEST_CASE("PresetUpdater drops one queued job without disturbing the rest", "[pr
     CaptureListener listener(fx.interactor());
 
     const PresetUpdater::JobId running = fx.interactor()
-        .build_update_sync_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress, true);
+        .sync_indices_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress);
     const PresetUpdater::JobId doomed   = fx.interactor().list_repositories(true);
     const PresetUpdater::JobId survivor = fx.interactor().list_repositories(true);
 
@@ -206,7 +206,7 @@ TEST_CASE("PresetUpdater cancel_all_jobs empties the queue", "[preset_updater]")
     CaptureListener listener(fx.interactor());
 
     const PresetUpdater::JobId running = fx.interactor()
-        .build_update_sync_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress, true);
+        .sync_indices_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress);
     const PresetUpdater::JobId queued_a = fx.interactor().list_repositories(true);
     const PresetUpdater::JobId queued_b = fx.interactor().list_repositories(true);
 
@@ -276,7 +276,7 @@ TEST_CASE("PresetUpdater runs its work through the app job manager", "[preset_up
     jobs.add_listener<Platform::JobManager::IJobManagerStatusChangedListener>(&recorder);
 
     const PresetUpdater::JobId running = fx.interactor()
-        .build_update_sync_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress, true);
+        .sync_indices_and_reconfiguration_check(true, PresetUpdater::VerboseStyle::NoProgress);
     const PresetUpdater::JobId queued = fx.interactor().list_repositories(true);
 
     const std::string running_name =
@@ -315,8 +315,8 @@ TEST_CASE("PresetUpdater shuts down cleanly with work still queued", "[preset_up
 
         CaptureListener listener(fx.interactor());
 
-        fx.interactor().build_update_sync_and_reconfiguration_check(
-            true, PresetUpdater::VerboseStyle::NoProgress, true
+        fx.interactor().sync_indices_and_reconfiguration_check(
+            true, PresetUpdater::VerboseStyle::NoProgress
         );
         fx.interactor().list_repositories(true);
         fx.interactor().list_repositories(true);

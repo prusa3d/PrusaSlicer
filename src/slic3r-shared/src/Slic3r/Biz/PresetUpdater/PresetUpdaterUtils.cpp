@@ -7,6 +7,8 @@
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Biz/Preset/IO/HwConfigLoader.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterRepository.hpp"
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterStaging.hpp"
+#include "PresetUpdaterRepositorySync.hpp"
 
 #include "Slic3r/Exception.hpp"
 #include "Slic3r/Assert.hpp"
@@ -19,7 +21,9 @@
 #include <boost/nowide/cstdio.hpp>
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
+#include <cstddef>
 #include <type_traits>
+#include <vector>
 
 namespace fs = boost::filesystem;
 
@@ -44,6 +48,13 @@ FileOpResult safe_move(const boost::filesystem::path& source, const boost::files
     std::string src, tgt, error_message;
     src = source.string();
     tgt = target.string();
+
+    // Within one volume this moves no data at all. Copying is the fallback for the case the two
+    // paths turn out to live on different volumes, where a rename cannot work.
+    if (!Utils::rename_file(src, tgt)) {
+        return {};
+    }
+
     auto result = Utils::copy_file(src, tgt, error_message);
     if (result == Utils::Success) {
         boost::nowide::remove(src.c_str());
@@ -170,63 +181,6 @@ std::vector<PresetUpdaterIndex> load_vendors_db(const fs::path& archive_path)
     return index_db;
 }
 
-std::vector<PresetUpdaterIndex> load_vendors_db_filtered(
-    const boost::filesystem::path& from_path,
-    const std::vector<std::string>& filter
-)
-{
-    // We want only indicies of vendors from filter vector
-    // Rest of the idx files are vendors of different archive
-    std::vector<PresetUpdaterIndex> index_db;
-    std::string errors_cumulative;
-    boost::system::error_code ec;
-    if (!fs::exists(from_path, ec) || ec) {
-        throw Slic3r::RuntimeError(from_path.string() + " does not exists. " + ec.message());
-    }
-    if (!fs::is_directory(from_path, ec) || ec) {
-        throw Slic3r::RuntimeError(from_path.string() + " is not directory. " + ec.message());
-    }
-
-    fs::directory_iterator source_directory_iterator(from_path, ec);
-    // PresetUpdaterIndex work with dir entries, so we iterate every time
-    for (auto& dir_entry : source_directory_iterator) {
-        if (is_idx_file(dir_entry)) {
-            if (std::find(filter.begin(), filter.end(), dir_entry.path().filename().string())
-                == filter.end())
-            {
-                // not an index from this archive
-                continue;
-            }
-            PresetUpdaterIndex idx;
-            try {
-                idx.load(dir_entry.path());
-            } catch (const std::runtime_error& err) {
-                errors_cumulative += err.what();
-                errors_cumulative += "\n";
-                continue;
-            }
-            if (std::find_if(
-                    index_db.begin(),
-                    index_db.end(),
-                    [idx](const PresetUpdaterIndex& index) { return idx.vendor() == index.vendor(); }
-                )
-                == index_db.end())
-            {
-                index_db.emplace_back(std::move(idx));
-            } else {
-                SPDLOG_ERROR(
-                    "Index {} names vendor {}, which another index in {} already names. Skipping it.",
-                    dir_entry.path().string(),
-                    idx.vendor(),
-                    from_path.string()
-                );
-            }
-        }
-    }
-    if (!errors_cumulative.empty())
-        throw Slic3r::RuntimeError(errors_cumulative);
-    return index_db;
-}
 
 std::map<std::string, std::string> read_version_manifest(
     const fs::path& path,
@@ -291,6 +245,8 @@ namespace {
 
 void perform_removals(
     const std::vector<VendorReconfiguration>& removals,
+    std::size_t& batch_position,
+    std::size_t batch_total,
     PresetUpdaterProcessStatus* process_status
 )
 {
@@ -301,6 +257,9 @@ void perform_removals(
             " directory itself, and the removal wipes every installed vendor."
         );
         SPDLOG_INFO("Deleting unusable bundle {}", removal.vendor_id);
+
+        process_status->set_batch_position(++batch_position, batch_total);
+        process_status->set_step(PresetUpdaterStep::Removing, removal.vendor_id);
 
         const fs::path dir_path = local_vendor_path(removal.vendor_repo_id, removal.vendor_id);
         const fs::path idx_path =
@@ -392,302 +351,56 @@ void collect_vendor_without_staged_index(
     );
 }
 
-void perform_update_no_source_manifest(
-    const VendorReconfiguration& update,
-    PresetUpdaterProcessStatus* process_status
-)
-{
-    boost::system::error_code ec;
-
-    const fs::path update_sync_path   = fs::path(data_dir()) / "update_sync";
-
-    const fs::path vendor_dest_dir_path =
-        local_vendor_path(update.vendor_repo_id, update.vendor_id);
-    const fs::path vendor_dest_idx_path =
-        local_vendor_path(update.vendor_repo_id, update.vendor_id, ".idx");
-
-    const fs::path vendor_source_dir_path = update_sync_path / update.vendor_repo_id / update.vendor_id;
-    const fs::path vendor_source_idx_path = update_sync_path
-        / update.vendor_repo_id
-        / (update.vendor_id + ".idx");
-    const fs::path vendor_source_manifest_path = vendor_source_dir_path
-        / (update.vendor_id + ".manifest");
-
-    if (!fs::is_directory(vendor_source_dir_path, ec)
-        || !fs::is_regular_file(vendor_source_idx_path, ec))
-    {
-        process_status->set_warning(
-            fmt::format(
-                "Staged data of vendor {} is not at {} anymore. Nothing was installed.",
-                update.vendor_id,
-                vendor_source_dir_path.string()
-            )
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-
-    process_status->set_install_target(update.vendor_id);
-
-    if (!fs::create_directories(vendor_dest_dir_path, ec) && ec) {
-        process_status->set_warning(
-            fmt::format("Failed to create directory {}: {}", vendor_dest_dir_path.string(), ec.message())
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-
-    // Delete all files in source
-    for (const auto& entry : fs::directory_iterator(vendor_dest_dir_path, ec)) {
-        const fs::path& path = entry.path();
-        SPDLOG_INFO("Deleting {}", path.string());
-        if (!fs::remove_all(path, ec) || ec) {
-            process_status->set_warning(
-                fmt::format("Failed to remove file {}: {}", path.string(), ec.message())
-            , PresetUpdaterReason::InstallFailed);
-            return;
-        }
-    }
-    if (ec) {
-        std::string msg = fmt::format(
-            "{}: Error traversing directory {}: {}",
-            std::string(__FUNCTION__),
-            vendor_dest_dir_path.string(),
-            ec.message()
-        );
-        SPDLOG_ERROR(msg);
-        process_status->set_warning(msg, PresetUpdaterReason::InstallFailed);
-    }
-
-    // move alle files from source
-    if (!move_directory_contents(vendor_source_dir_path, vendor_dest_dir_path, process_status, __FUNCTION__)) {
-        return;
-    }
-
-    // move index
-    auto result = safe_move(vendor_source_idx_path, vendor_dest_idx_path);
-    if (!result) {
-        process_status->set_warning(
-            fmt::format(
-                "Failed to move file {} to {}: {}",
-                vendor_source_idx_path.string(),
-                vendor_dest_idx_path.string(),
-                result.error()
-            )
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-
-    // cleanup source
-    if (!fs::remove_all(vendor_source_dir_path, ec) || ec) {
-        process_status->set_warning(
-            fmt::format("Failed to remove {}: {}", vendor_source_dir_path.string(), ec.message())
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-}
-
-bool staged_update_is_complete(
-    const std::map<std::string, std::string>& files_in_version_manifest,
-    const fs::path& vendor_source_dir_path,
-    const fs::path& vendor_dest_dir_path,
-    PresetUpdaterProcessStatus* process_status
-)
-{
-    if (files_in_version_manifest.empty()) {
-        process_status->set_warning(
-            fmt::format(
-                "Version manifest of vendor {} names no file, so an unreadable manifest cannot be"
-                " told apart from a complete one. Nothing was installed.",
-                vendor_source_dir_path.filename().string()
-            )
-        , PresetUpdaterReason::InstallFailed);
-        return false;
-    }
-
-    boost::system::error_code ec;
-    for (const auto& [name, hash] : files_in_version_manifest) {
-        if (fs::is_regular_file(vendor_source_dir_path / name, ec) && !ec) {
-            continue;
-        }
-        const fs::path installed_path = vendor_dest_dir_path / name;
-        if (fs::is_regular_file(installed_path, ec)
-            && !ec
-            && file_hash(installed_path, process_status) == hash)
-        {
-            continue;
-        }
-        process_status->set_warning(
-            fmt::format(
-                "Staged data of vendor {} is incomplete: {} is neither staged at {} nor already"
-                " installed at the version the manifest names. Nothing was installed.",
-                vendor_source_dir_path.filename().string(),
-                name,
-                vendor_source_dir_path.string()
-            )
-        , PresetUpdaterReason::InstallFailed);
-        return false;
-    }
-
-    return true;
-}
-
-void perform_update_with_source_manifest(
-    const VendorReconfiguration& update,
-    PresetUpdaterProcessStatus* process_status
-)
-{
-    boost::system::error_code ec;
-
-    const fs::path profile_local_path = local_presets_path();
-    const fs::path update_sync_path   = fs::path(data_dir()) / "update_sync";
-    
-    const fs::path repo_dest_dir_path = profile_local_path / update.vendor_repo_id;
-    const fs::path vendor_dest_dir_path = repo_dest_dir_path / update.vendor_id;
-    const fs::path vendor_dest_idx_path = repo_dest_dir_path / (update.vendor_id + ".idx");
-
-    const fs::path vendor_source_dir_path = update_sync_path / update.vendor_repo_id / update.vendor_id;
-    const fs::path vendor_source_idx_path = update_sync_path
-        / update.vendor_repo_id
-        / (update.vendor_id + ".idx");
-    const fs::path vendor_source_manifest_path = vendor_source_dir_path
-        / (update.vendor_id + ".manifest");
-
-    if (!fs::is_directory(vendor_source_dir_path, ec)
-        || !fs::is_regular_file(vendor_source_idx_path, ec)
-        || !fs::is_regular_file(vendor_source_manifest_path, ec))
-    {
-        process_status->set_warning(
-            fmt::format(
-                "Staged data of vendor {} is not at {} anymore. Nothing was installed.",
-                update.vendor_id,
-                vendor_source_dir_path.string()
-            )
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-
-    process_status->set_install_target(update.vendor_id);
-
-    // Read manifest
-    std::map<std::string, std::string> files_in_version_manifest = read_version_manifest(
-        vendor_source_manifest_path,
-        process_status
-    );
-
-    // Nothing installed is deleted before the new version is known to be complete.
-    if (!staged_update_is_complete(
-            files_in_version_manifest, vendor_source_dir_path, vendor_dest_dir_path, process_status
-        ))
-    {
-        return;
-    }
-
-    // in case of new vendor, repo_dest_dir_path needs to be created
-    if (!fs::create_directory(repo_dest_dir_path, ec) && ec) {
-        process_status->set_warning(
-            fmt::format("Failed to create directory {}: {}", repo_dest_dir_path.string(), ec.message())
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-
-    if (!fs::create_directory(vendor_dest_dir_path, ec) && ec) {
-        process_status->set_warning(
-            fmt::format("Failed to create directory {}: {}", vendor_dest_dir_path.string(), ec.message())
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-
-    // Delete files that are not in manifest
-    for (const auto& entry : fs::recursive_directory_iterator(vendor_dest_dir_path, ec)) {
-        if (!entry.is_regular_file(ec) || ec) {
-            continue;
-        }
-        const fs::path& path = entry.path();
-        if (files_in_version_manifest.find(fs::relative(path, vendor_dest_dir_path).generic_string())
-            == files_in_version_manifest.end())
-        {
-            if (!fs::remove(path, ec) || ec) {
-                process_status->set_warning(
-                    fmt::format("Failed to remove file {}: {}", path.string(), ec.message())
-                , PresetUpdaterReason::InstallFailed);
-                return;
-            }
-        }
-    }
-    if (ec) {
-        std::string msg = fmt::format(
-            "{}: Error traversing directory {}: {}",
-            std::string(__FUNCTION__),
-            vendor_dest_dir_path.string(),
-            ec.message()
-        );
-        SPDLOG_ERROR(msg);
-        process_status->set_warning(msg, PresetUpdaterReason::InstallFailed);
-    }
-
-    // move files that are staged
-    if (!move_directory_contents(vendor_source_dir_path, vendor_dest_dir_path, process_status, __FUNCTION__)) {
-        return;
-    }
-
-    // move index
-    auto result = safe_move(vendor_source_idx_path, vendor_dest_idx_path);
-    if (!result) {
-        process_status->set_warning(
-            fmt::format(
-                "Failed to move file {} to {}: {}",
-                vendor_source_idx_path.string(),
-                vendor_dest_idx_path.string(),
-                result.error()
-            )
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-
-    // cleanup source
-    if (!fs::remove_all(vendor_source_dir_path, ec) || ec) {
-        process_status->set_warning(
-            fmt::format("Failed to remove {}: {}", vendor_source_dir_path.string(), ec.message())
-        , PresetUpdaterReason::InstallFailed);
-        return;
-    }
-}
-
 void perform_updates(
     const std::vector<VendorReconfiguration>& updates,
+    const SharedRepositoryVector& repos,
+    bool online_allowed,
+    const StagingArea& staging,
+    std::size_t& batch_position,
+    std::size_t batch_total,
     PresetUpdaterProcessStatus* process_status
 )
 {
-    const fs::path update_sync_path = fs::path(data_dir()) / "update_sync";
-    boost::system::error_code ec;
+    const PresetUpdaterRepositorySync sync;
+
     for (const VendorReconfiguration& update : updates) {
         ASSERT(
             !update.vendor_id.empty() && !update.vendor_repo_id.empty(),
             "Every path below is built from these two names. An empty one addresses the source"
             " directory instead of the vendor directory, and the install wipes it."
         );
+        if (process_status->get_canceled()) {
+            return;
+        }
         SPDLOG_INFO("Updating bundle {}", update.vendor_id);
 
-        const fs::path vendor_source_manifest_path = update_sync_path
-            / update.vendor_repo_id
-            / update.vendor_id
-            / (update.vendor_id + ".manifest");
+        process_status->set_batch_position(++batch_position, batch_total);
+
+        const auto repo_it = std::find_if(
+            repos.begin(),
+            repos.end(),
+            [&update](const AbstractPresetUpdaterRepository* repo)
+            { return repo->descriptor().id == update.vendor_repo_id; }
+        );
 
         process_status->set_warning_target(update.vendor_repo_id, update.vendor_id);
-        if (fs::exists(vendor_source_manifest_path, ec)
-            && !ec
-            && fs::is_regular_file(vendor_source_manifest_path, ec)
-            && !ec)
-        {
-            perform_update_with_source_manifest(update, process_status);
+        if (repo_it == repos.end()) {
+            process_status->set_warning(
+                fmt::format(
+                    "No source offers {} any more, so it cannot be installed.", update.vendor_id
+                )
+            , PresetUpdaterReason::SourceNotFound);
         } else {
-            perform_update_no_source_manifest(update, process_status);
+            sync.install_vendor(
+                *repo_it,
+                update.vendor_id,
+                update.recommended_version,
+                online_allowed,
+                staging,
+                process_status
+            );
         }
         process_status->clear_warning_target();
-        // cleanup the repo dir
-        const fs::path repo_path = update_sync_path / update.vendor_repo_id;
-        if (fs::is_empty(repo_path, ec) && !ec) {
-            fs::remove(repo_path, ec);
-        }
     }
 }
 
@@ -1162,24 +875,8 @@ PresetUpdaterReconfigurationList check_reconfigurations(
                 , PresetUpdaterReason::NoUsableVersion);
                 continue;
             }
-            const fs::path vendor_yaml = update_sync_index.path().parent_path() / update_sync_index.vendor() / "vendor.yaml";
-            Domain::Preset::VendorData vendor_data;
-            try {
-                Preset::IO::HwConfigLoader hw_config_loader;
-                vendor_data = hw_config_loader.load(vendor_yaml.string());
-                Semver update_sync_version = Semver(vendor_data.info.version);
-                if (update_sync_version != recommended->config_version) {
-                    process_status->set_warning(
-                        fmt::format("Vendor data in update_sync failed sanity check. Its version is not recommended by its index. Vendor: {}", update_sync_index.vendor())
-                    , PresetUpdaterReason::DataInconsistent);
-                    continue;
-                }
-            } catch (const std::exception& e) {
-                process_status->set_warning(
-                    fmt::format("Failed to load vendor file {}: {}", vendor_yaml.string(), e.what())
-                , PresetUpdaterReason::DataInconsistent);
-                continue;
-            }
+            // The index is all there is to go on: the vendor data itself is downloaded when the
+            // user asks for it, and checked against the index then.
             // update_sync_index is new vendor
             results.emplace_back(
                 VendorReconfigurationState::NewVendor,
@@ -1220,38 +917,53 @@ constexpr bool has_flag(Enum auto flags, Enum auto flag) {
 void perform_reconfigurations(
     const PresetUpdaterReconfigurationList& reconfigurations,
     ReconfigurationType types_to_perform,
+    const SharedRepositoryVector& repos,
+    bool online_allowed,
     PresetUpdaterProcessStatus* process_status
 ) {
-    if (has_flag(types_to_perform, ReconfigurationType::ForcedDowngrades)) {
-        perform_updates(reconfigurations.forced_downgrades(), process_status);
+    using Pass = const std::vector<VendorReconfiguration>*;
+
+    std::vector<Pass> update_passes;
+    const auto take_updates = [&](ReconfigurationType type, Pass pass)
+    {
+        if (has_flag(types_to_perform, type)) {
+            update_passes.push_back(pass);
+        }
+    };
+    take_updates(ReconfigurationType::ForcedDowngrades, &reconfigurations.forced_downgrades());
+    take_updates(ReconfigurationType::ForcedUpdates, &reconfigurations.forced_updates());
+    take_updates(ReconfigurationType::RegularUpdates, &reconfigurations.regular_updates());
+    take_updates(ReconfigurationType::NotInIndex, &reconfigurations.not_in_index());
+    take_updates(ReconfigurationType::NewVendors, &reconfigurations.new_vendors());
+
+    const Pass removals = has_flag(types_to_perform, ReconfigurationType::Removals) ?
+        &reconfigurations.removals() :
+        nullptr;
+
+    std::size_t batch_total = removals != nullptr ? removals->size() : 0;
+    for (const Pass pass : update_passes) {
+        batch_total += pass->size();
     }
 
-    if (has_flag(types_to_perform, ReconfigurationType::ForcedUpdates)) {
-        perform_updates(reconfigurations.forced_updates(), process_status);
+    const StagingArea staging;
+    std::size_t batch_position = 0;
+    for (const Pass pass : update_passes) {
+        perform_updates(
+            *pass, repos, online_allowed, staging, batch_position, batch_total, process_status
+        );
     }
 
-    if (has_flag(types_to_perform, ReconfigurationType::RegularUpdates)) {
-        perform_updates(reconfigurations.regular_updates(), process_status);
-    }
-
-    if (has_flag(types_to_perform, ReconfigurationType::NotInIndex)) {
-        perform_updates(reconfigurations.not_in_index(), process_status);
-    }
-
-    if (has_flag(types_to_perform, ReconfigurationType::NewVendors)) {
-        perform_updates(reconfigurations.new_vendors(), process_status);
-    }
-
-    if (has_flag(types_to_perform, ReconfigurationType::Removals)) {
-        perform_removals(reconfigurations.removals(), process_status);
+    if (removals != nullptr) {
+        perform_removals(*removals, batch_position, batch_total, process_status);
     }
 }
 
-void cleanup_update_sync(PresetUpdaterProcessStatus* process_status)
+namespace {
+
+void clear_directory_contents(const fs::path& dir, PresetUpdaterProcessStatus* process_status)
 {
-    const fs::path update_sync_path = fs::path(data_dir()) / "update_sync";
     boost::system::error_code ec;
-    for (const auto& entry : fs::directory_iterator(update_sync_path, ec)) {
+    for (const auto& entry : fs::directory_iterator(dir, ec)) {
         const fs::path& path = entry.path();
         SPDLOG_INFO("Deleting {}", path.string());
         if (!fs::remove_all(path, ec) || ec) {
@@ -1260,5 +972,13 @@ void cleanup_update_sync(PresetUpdaterProcessStatus* process_status)
             , PresetUpdaterReason::LocalStorageFailed);
         }
     }
+}
+
+} // namespace
+
+void cleanup_update_sync(PresetUpdaterProcessStatus* process_status)
+{
+    clear_directory_contents(fs::path(data_dir()) / "update_sync", process_status);
+    sweep_stale_staging();
 }
 } // namespace Slic3r::Biz::PresetUpdater

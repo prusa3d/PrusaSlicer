@@ -24,25 +24,10 @@ namespace Slic3r::Biz::PresetUpdater {
 
 PresetUpdaterRepositoryDatabase::PresetUpdaterRepositoryDatabase(PresetUpdaterProcessStatus* process_status)
 {
-    boost::system::error_code ec;
-    m_unq_tmp_path = Slic3r::temp_dir() / fs::unique_path();
-    if (!fs::create_directories(m_unq_tmp_path, ec) && ec) {
-        process_status->set_error(
-            fmt::format("Failed to create temp directory {}: {}.", m_unq_tmp_path.string(), ec.what())
-        , PresetUpdaterReason::DataDirUnusable);
-        return;
-    }
     load_app_manifest_json(process_status);
 }
 
-PresetUpdaterRepositoryDatabase::~PresetUpdaterRepositoryDatabase()
-{
-    boost::system::error_code ec;
-    fs::remove_all(m_unq_tmp_path, ec);
-    if (ec) {
-        SPDLOG_ERROR("Failed to remove temp directory {}: {}", m_unq_tmp_path.string(), ec.what());
-    }
-}
+PresetUpdaterRepositoryDatabase::~PresetUpdaterRepositoryDatabase() = default;
 
 void PresetUpdaterRepositoryDatabase::add_local_repository(
     const boost::filesystem::path& zip_path,
@@ -715,7 +700,6 @@ bool PresetUpdaterRepositoryDatabase::sync(PresetUpdaterProcessStatus* process_s
 {
     std::string manifest;
     bool sync_res = false;
-    process_status->set_download_target(std::string(k_manifest_download_target));
     sync_res = sync_inner(manifest, process_status);
     if (!sync_res) {
         return false;

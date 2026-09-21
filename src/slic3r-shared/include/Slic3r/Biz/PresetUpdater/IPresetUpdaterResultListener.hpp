@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterJob.hpp"
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterProgress.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterReconfigurationList.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterRepositoryDescriptor.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterWarning.hpp"
@@ -31,7 +32,7 @@ public:
         const std::vector<PresetUpdaterWarning>& warnings
     ) {};
     virtual void on_preset_updater_status(
-        JobId job_id, const std::string& target, int attempt, unsigned delay, VerboseStyle verbose
+        JobId job_id, const PresetUpdaterProgress& progress, VerboseStyle verbose
     ) = 0;
     virtual void on_preset_updater_repository_info_vector(
         JobId job_id,

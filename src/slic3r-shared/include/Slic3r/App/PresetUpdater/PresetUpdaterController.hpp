@@ -758,9 +758,7 @@ public:
     ) override;
     void on_preset_updater_status(
         JobId job_id,
-        const std::string& target,
-        int attempt,
-        unsigned delay,
+        const Biz::PresetUpdater::PresetUpdaterProgress& progress,
         Biz::PresetUpdater::VerboseStyle verbose
     ) override;
     void on_preset_updater_repository_info_vector(

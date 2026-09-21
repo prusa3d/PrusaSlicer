@@ -118,7 +118,6 @@ private:
     void clear_online_repos();
     
     boost::filesystem::path get_stored_manifest_path() const;
-    boost::filesystem::path m_unq_tmp_path;
     PrivateRepositoryVector m_all_repositories;
     
     static std::string get_next_uuid();

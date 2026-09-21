@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterJob.hpp"
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterProgress.hpp"
 
 #include <string>
 #include <utility>
@@ -22,7 +23,8 @@ public:
         AddingSource,
         RemovingSource,
         Checking,
-        Installing
+        Installing,
+        RemovingVendor
     };
 
     explicit PresetUpdaterStatusNotification(
@@ -38,9 +40,9 @@ public:
     bool tracks(Biz::PresetUpdater::JobId job_id) const;
 
     /// Names what the running job is working on. Ignored for an untracked job.
-    void report_progress(Biz::PresetUpdater::JobId job_id, const std::string& target, int attempt);
-
-    void set_dialog_open(bool dialog_open);
+    void report_progress(
+        Biz::PresetUpdater::JobId job_id, const Biz::PresetUpdater::PresetUpdaterProgress& progress
+    );
 
     void refresh();
 
@@ -52,10 +54,7 @@ private:
 
     /// Insertion ordered, so the front entry is the one the user is waiting on.
     std::vector<std::pair<Biz::PresetUpdater::JobId, Activity>> m_activities;
-    std::string m_activity_target;
-    /// Latest retry attempt, which is what turns on the "taking longer than usual" line.
-    int m_activity_attempt{0};
-    bool m_dialog_open{false};
+    Biz::PresetUpdater::PresetUpdaterProgress m_activity_progress;
 };
 
 } // namespace Slic3r::App

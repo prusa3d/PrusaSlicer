@@ -40,7 +40,9 @@ public:
     bool tracks(Biz::PresetUpdater::JobId job_id) const;
 
     /// Names what the running job is working on. Ignored for an untracked job.
-    void report_progress(Biz::PresetUpdater::JobId job_id, const std::string& target, int attempt);
+    void report_progress(
+        Biz::PresetUpdater::JobId job_id, const Biz::PresetUpdater::PresetUpdaterProgress& progress
+    );
 
     void report_install_finished(const std::vector<InstalledVendor>& installed);
 

@@ -48,10 +48,10 @@ bool PresetUpdaterActivityReporter::tracks(Biz::PresetUpdater::JobId job_id) con
 }
 
 void PresetUpdaterActivityReporter::report_progress(
-    Biz::PresetUpdater::JobId job_id, const std::string& target, int attempt
+    Biz::PresetUpdater::JobId job_id, const Biz::PresetUpdater::PresetUpdaterProgress& progress
 )
 {
-    m_status.report_progress(job_id, target, attempt);
+    m_status.report_progress(job_id, progress);
 }
 
 void PresetUpdaterActivityReporter::report_install_finished(
@@ -78,8 +78,8 @@ void PresetUpdaterActivityReporter::report_updates_available(size_t update_count
     const std::string header = Biz::_u8L("Configuration updates available");
     // TRN Preset updater notification. {} counts the updates found.
     const std::string format = Biz::_L_PLURAL_u8(
-        "{} preset update is ready to install.",
-        "{} preset updates are ready to install.",
+        "{} preset update is available.",
+        "{} preset updates are available.",
         static_cast<int>(update_count)
     );
     const std::string body = fmt::format(fmt::runtime(format), update_count);
@@ -133,7 +133,6 @@ void PresetUpdaterActivityReporter::set_dialog_open(bool dialog_open)
         );
     }
 
-    m_status.set_dialog_open(dialog_open);
     m_problems.set_dialog_open(dialog_open);
 }
 
