@@ -14,7 +14,7 @@
 
 #include <tracy/Tracy.hpp>
 
-#include <GL/glew.h>
+#include <Slic3r/App/Render/GL/commonGL.hpp>
 #include <tracy/TracyOpenGL.hpp>
 #include <Slic3r/Log.hpp>
 

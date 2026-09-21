@@ -38,7 +38,7 @@ if (NOT EMSCRIPTEN)
     # There is conflict with Emscripten Port GLFW
     find_package(glfw3 3.3 REQUIRED)
     target_link_libraries(
-            imgui_backend_ogl3_glfw PUBLIC glfw3 OpenGL::GL GLEW::GLEW
+            imgui_backend_ogl3_glfw PUBLIC glfw3 OpenGL::GL GLAD::GL
     )
 
     if (APPLE)
