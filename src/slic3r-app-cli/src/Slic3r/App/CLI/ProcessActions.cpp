@@ -15,6 +15,7 @@
 #include "Slic3r/Biz/Format/OBJ.hpp"
 #include "Slic3r/Biz/Format/ProjectFileConstants.hpp"
 #include "Slic3r/Biz/Format/STL.hpp"
+#include "Slic3r/Biz/Format/DRC.hpp"
 #include "Slic3r/Biz/Platform/JobManager/JobManager.hpp"
 #include "Slic3r/Biz/Preset/IO/BundleLoader.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
@@ -504,7 +505,8 @@ enum ExportFormat : int
     STL,
     // SVG,
     TMF,
-    Gcode
+    Gcode,
+    DRC
 };
 } // namespace IO
 
@@ -518,6 +520,9 @@ output_filepath(const Project& project, IO::ExportFormat format, const std::stri
         break;
     case IO::STL:
         ext = ".stl";
+        break;
+    case IO::DRC:
+        ext = ".drc";
         break;
     case IO::TMF:
         ext = ".3mf";
@@ -569,6 +574,10 @@ static bool export_projects(
         }
         case IO::STL: {
             success = store_stl(path, Algorithms::Model::flatten_to_mesh(project.model()), true);
+            break;
+        }
+        case IO::DRC: {
+            success = store_drc(path.c_str(), &project.model());
             break;
         }
         case IO::TMF: {
@@ -730,6 +739,12 @@ static bool perform_model_exports(
         }
     }
 
+    if (action.export_drc) {
+        if (!export_projects(runtime, project_ids, IO::DRC, output)) {
+            return false;
+        }
+    }
+
     if (action.export_3mf) {
         if (!export_projects(runtime, project_ids, IO::TMF, output)) {
             return false;
@@ -846,7 +861,7 @@ bool process_actions(
         }
     }
 
-    if (action.export_stl || action.export_obj || action.export_3mf) {
+    if (action.export_stl || action.export_obj || action.export_drc || action.export_3mf) {
         if (!perform_model_exports(runtime, init_params, project_ids)) {
             return true;
         }

@@ -23,9 +23,10 @@ enum class TypeFlag : int
     Svg            = 1 << 10,
     AllTextures    = 1 << 11,
     Zip            = 1 << 12,
-    Certificate    = 1 << 13,
-    AllFiles       = 1 << 14,
-    AllFlags       = 1 << 15
+    Drc            = 1 << 13,
+    Certificate    = 1 << 14,
+    AllFiles       = 1 << 15,
+    AllFlags       = 1 << 16
 };
 
 constexpr TypeFlag operator|(TypeFlag lhs, TypeFlag rhs)

@@ -4,6 +4,7 @@
 #include "Slic3r/Biz/CGAL/Algorithms/MergeObjectVolumes.hpp"
 #include "Slic3r/Biz/Format/OBJ.hpp"
 #include "Slic3r/Biz/Format/STL.hpp"
+#include "Slic3r/Biz/Format/DRC.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/IMessageDialogProvider.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
@@ -40,6 +41,10 @@ bool store_mesh_by_extension(const boost::filesystem::path& output_path, const T
 
     if (boost::algorithm::iequals(extension, ".obj")) {
         return store_obj(output_path.string(), mesh);
+    }
+
+    if (boost::algorithm::iequals(extension, ".drc")) {
+        return store_drc(output_path.string(), mesh);
     }
 
     return false;

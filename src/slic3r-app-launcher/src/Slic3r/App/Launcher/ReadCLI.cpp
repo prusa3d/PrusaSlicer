@@ -417,6 +417,8 @@ void add_action_options(CLI::App& app, App::InitParams& params)
 
     app.add_flag("--export-stl", params.action.export_stl, "Export the model(s) as STL.");
 
+    app.add_flag("--export-drc", params.action.export_drc, "Export the model(s) as DRC.");
+
     app.add_flag(
         "--gcodeviewer",
         params.action.gcode_viewer,

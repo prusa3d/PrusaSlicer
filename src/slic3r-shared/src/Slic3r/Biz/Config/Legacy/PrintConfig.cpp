@@ -5951,6 +5951,11 @@ CLIActionsConfigDef::CLIActionsConfigDef()
     def->tooltip = L("Export the model(s) as STL.");
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("export_drc", coBool);
+    def->label = L("Export DRC");
+    def->tooltip = L("Export the model(s) as DRC.");
+    def->set_default_value(new ConfigOptionBool(false));
+
     // needs model and configuration
 
     def = this->add("export_3mf", coBool);

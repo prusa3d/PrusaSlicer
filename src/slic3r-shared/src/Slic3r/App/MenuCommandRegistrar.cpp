@@ -55,7 +55,8 @@ constexpr Wildcards::TypeFlag import_file_types = Wildcards::TypeFlag::Project3m
     | Wildcards::TypeFlag::Stl
     | Wildcards::TypeFlag::Obj
     | Wildcards::TypeFlag::Svg
-    | Wildcards::TypeFlag::Step;
+    | Wildcards::TypeFlag::Step
+    | Wildcards::TypeFlag::Drc;
 
 /**
  * File types offered when replacing or reloading a volume mesh.
@@ -63,7 +64,8 @@ constexpr Wildcards::TypeFlag import_file_types = Wildcards::TypeFlag::Project3m
 constexpr Wildcards::TypeFlag model_file_types = Wildcards::TypeFlag::Project3mf
     | Wildcards::TypeFlag::Stl
     | Wildcards::TypeFlag::Obj
-    | Wildcards::TypeFlag::Step;
+    | Wildcards::TypeFlag::Step
+    | Wildcards::TypeFlag::Drc;
 
 class CommandBuilder
 {
@@ -1344,7 +1346,7 @@ void MenuCommandRegistrar::export_selection_as_stl_obj()
         this->default_dialog_folder(),
         MeshExportLogic::proposed_export_file_name(m_project_interactor.scene_interactor()),
         Wildcards::generate_wildcards(
-            Wildcards::TypeFlag::Stl | Wildcards::TypeFlag::Obj,
+            Wildcards::TypeFlag::Stl | Wildcards::TypeFlag::Obj | Wildcards::TypeFlag::Drc,
             Wildcards::TypeFlag::Stl
         ),
         callback
