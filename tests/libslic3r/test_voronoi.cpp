@@ -4,6 +4,7 @@
 #include <libslic3r/Polyline.hpp>
 #include <libslic3r/EdgeGrid.hpp>
 #include <Slic3r/Biz/CGAL/Algorithms/VoronoiOffset.hpp>
+#include <Slic3r/Biz/CGAL/Algorithms/VoronoiUtilsCgal.hpp>
 
 #include <numeric>
 #include <random>
@@ -2163,6 +2164,51 @@ TEST_CASE("Non-planar voronoi diagram", "[VoronoiNonPlanar]")
 #endif
 
     REQUIRE(vd.is_valid());
+}
+
+// This diagram contains crossing finite edges even though the local edge-angle
+// validation considers it planar. It was extracted from an Arachne failure that
+// produced unpaired edges in the skeletal trapezoidation graph. GH issue #14421
+TEST_CASE("Non-planar Voronoi diagram detected by edge intersections", "[VoronoiNonPlanarIntersection]")
+{
+    Polygons polygons {
+        Polygon {
+            { 89969957,  65969957}, {-89969955,  65969957},
+            {-89969955, -65969955}, { 89969957, -65969955},
+        },
+        Polygon {
+            {-75530043, -42030043}, {-75530043,  50030045}, {-64469955,  50030045},
+            {-64469955,  15030045}, {-15469955,  15030045}, {-15469955,  -2191375},
+            {-23308654, -10030043}, {-39469955, -10030043}, {-39469955, -42030043},
+        },
+        Polygon {
+            {-15530043, -62030043}, {-15530043, -52030043}, {-16280043, -52030043},
+            {-16280043,  -9987554}, {-10530043,  -4237556}, {-10530043,  19969957},
+            {-59530044,  19969957}, {-59530044,  50030045}, { 58530045,  50030045},
+            { 58530045,  12530045}, { 72530045,  12530045}, { 72530045,   3530045},
+            { 85530045,   3530045}, { 85530045,   1530045}, { 86530045,   1530045},
+            { 86530045,  -2030043}, { 79530045,  -2030044}, { 79530045, -15030043},
+            { 29469957, -15030043}, { 29469957,  -7469955}, { 70469957,  -7469955},
+            { 70469957,    -30043}, { 52530045,    -30043}, { 52530045,  -2030043},
+            { 30469957,  -2030043}, { 30469957,    469957}, { 23469957,    469957},
+            { 23469957,   3530045}, { 31469957,   3530045}, { 31469957,  39969957},
+            { 10530045,  39969957}, { 10530045,  -4237557}, { 16280045,  -9987553},
+            { 16280045, -52030043}, { 15530045, -52030043}, { 15530045, -62030043},
+        },
+        Polygon {
+            {39469957, -42030043}, {39469957, -19969955},
+            {75530045, -19969955}, {75530045, -42030043},
+        },
+    };
+
+    REQUIRE(intersecting_edges(polygons).empty());
+
+    VD vd;
+    Lines lines = Algorithms::Polygon::to_lines(polygons);
+    vd.construct_voronoi(lines.begin(), lines.end());
+
+    REQUIRE(vd.get_state() == VD::State::REPAIR_SUCCESSFUL);
+    REQUIRE(CGAL::Algorithms::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(vd));
 }
 
 // This case is extracted from SPE-1729, where several ExPolygon with very thin lines
