@@ -2,7 +2,19 @@
 
 #include "LogIncludeSPD.hpp"
 
+#include <cstdint>
+
 namespace Slic3r {
+
+enum class LogLevel : std::uint8_t
+{
+    Critical = 0,
+    Error    = 1,
+    Warning  = 2,
+    Info     = 3,
+    Debug    = 4,
+    Trace    = 5,
+};
 
 struct FileLogConfig
 {
@@ -12,7 +24,7 @@ struct FileLogConfig
 
 void init_logging();
 
-void set_log_level(unsigned level);
+void set_log_level(LogLevel level);
 const FileLogConfig& get_file_log_config();
 void set_file_log_config(const FileLogConfig& config);
 

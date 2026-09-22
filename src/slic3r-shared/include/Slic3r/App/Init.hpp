@@ -4,6 +4,7 @@
 #include "Slic3r/Domain/PrinterTechnology.hpp"
 #include "Slic3r/Domain/Percentage.hpp"
 #include "Slic3r/Domain/Types.hpp"
+#include "Slic3r/Log.hpp"
 
 #include <array>
 #include <optional>
@@ -147,7 +148,7 @@ struct TransformParams
 struct MiscParams
 {
     std::optional<std::string> datadir;
-    std::optional<uint8_t> loglevel;
+    std::optional<LogLevel> loglevel;
     std::optional<std::string> output;
     std::optional<std::string> config_model_json_file;
 
@@ -182,6 +183,8 @@ public:
 
     std::optional<int> exit_code;
 };
+
+std::optional<LogLevel> log_level_from_env();
 
 void init_paths(const InitParams& init_params);
 

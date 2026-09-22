@@ -112,8 +112,6 @@ int main(int argc, char** argv)
 
     if (init_params.misc.loglevel.has_value()) {
         Slic3r::set_log_level(init_params.misc.loglevel.value());
-    } else {
-        Slic3r::set_log_level(4);
     }
 
     if (init_params.misc.threads.has_value()) {

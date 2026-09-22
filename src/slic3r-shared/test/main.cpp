@@ -22,7 +22,7 @@ using Slic3r::Biz::SecretStoreDummy;
 
 int main( int argc, char* argv[] ) {
     Slic3r::init_logging();
-    Slic3r::set_log_level(0);
+    Slic3r::set_log_level(Slic3r::LogLevel::Critical);
 
     using Slic3r::Biz::Platform::PlatformServices;
 

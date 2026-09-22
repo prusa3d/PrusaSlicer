@@ -50,7 +50,7 @@ void Geometry::upload(
     Render::IndexType index_format
 )
 {
-    SPDLOG_TRACE("Buffer::upload() Part 1");
+    // SPDLOG_TRACE("Buffer::upload() Part 1");
 
     auto& ctx = Context::instance();
     // TODO: handle ES with VAO
@@ -66,7 +66,7 @@ void Geometry::upload(
         }
         device.bind_vao(0);
     }
-    SPDLOG_TRACE("Buffer::upload() Part 2");
+    // SPDLOG_TRACE("Buffer::upload() Part 2");
 
     DEBUG_ASSERT_BOUND_VAO(0);
 
