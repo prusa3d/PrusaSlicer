@@ -17,6 +17,20 @@
 
 namespace Slic3r::App::WX {
 
+namespace {
+// wxWidgets menu labels treat a single '&' as a mnemonic marker (it's dropped on macOS,
+// underlines the next character on Windows/GTK). Menu item names are plain, un-mnemonic'd
+// strings shared with Yoga::MenuItem (which renders them literally), so a literal '&' in a
+// label (e.g. "Preset Sources & Updates") must be escaped as "&&" only for this wx-native
+// consumer, to render as a plain ampersand instead of being swallowed.
+wxString mnemonic_safe_label(const std::string& text)
+{
+    wxString label = from_u8(text);
+    label.Replace(from_u8("&"), from_u8("&&"));
+    return label;
+}
+} // namespace
+
 MacOSNativeMenuBar::MacOSNativeMenuBar(
     Biz::ProjectInteractor& project_interactor,
     MenuManager& menu_manager,
@@ -66,7 +80,7 @@ void MacOSNativeMenuBar::build_menu_from_name(MenuItemName menu_item_name)
     if (MenuItem* menu = m_menu_manager.menu_item(menu_item_name)) {
         wxMenu* wx_menu = build_menu_from_item(menu);
         if (wx_menu) {
-            m_menu_bar->Append(wx_menu, from_u8(MenuBuilder::item_name_translated(menu_item_name)));
+            m_menu_bar->Append(wx_menu, mnemonic_safe_label(MenuBuilder::item_name_translated(menu_item_name)));
         }
     }
 }
@@ -94,7 +108,7 @@ void MacOSNativeMenuBar::add_menu_item_to_menu(
         return;
     }
 
-    wxString label = from_u8(MenuBuilder::item_name_translated(item->name()));
+    wxString label = mnemonic_safe_label(MenuBuilder::item_name_translated(item->name()));
 
     // Add keyboard shortcut to label if available
     wxString shortcut = get_shortcut_string(cmd->name());
@@ -137,7 +151,7 @@ void MacOSNativeMenuBar::populate_menu(wxMenu* wx_menu, MenuItem* parent_item)
             continue;
         }
 
-        wxString label = from_u8(MenuBuilder::item_name_translated(item->name()));
+        wxString label = mnemonic_safe_label(MenuBuilder::item_name_translated(item->name()));
 
         if (item->name().matches(MenuItemName::RecentProjects))
         {
@@ -325,7 +339,7 @@ void MacOSNativeMenuBar::update_recent_projects()
     for (const std::string& filepath : recent_projects) {
         const int id = wxWindow::NewControlId();
 
-        m_recent_project_menu->Append(id, from_u8(filepath));
+        m_recent_project_menu->Append(id, mnemonic_safe_label(filepath));
 
         m_recent_project_menu->Bind(
             wxEVT_MENU,
