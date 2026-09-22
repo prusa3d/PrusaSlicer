@@ -46,14 +46,29 @@ void populate_local_bundle(const BundlePaths& bundle_paths)
                     fs::remove_all(dest_path);
                 }
                 fs::create_directories(dest_path);
-                fs::copy(
-                    src_path,
-                    dest_path,
-                    fs::copy_options::recursive | fs::copy_options::overwrite_existing
-                );
+
+                // The presence of vendor.yaml marks the vendor as completely copied, so it must be written last.
+                for (const fs::directory_entry& bundle_entry : fs::directory_iterator(src_path)) {
+                    if (bundle_entry.path().filename() == "vendor.yaml") {
+                        continue;
+                    }
+
+                    fs::copy(
+                        bundle_entry.path(),
+                        dest_path / bundle_entry.path().filename(),
+                        fs::copy_options::recursive | fs::copy_options::overwrite_existing
+                    );
+                }
                 fs::copy_file(
                     src_path.string() + ".idx",
                     dest_path.string() + ".idx",
+                    fs::copy_options::overwrite_existing
+                );
+
+                // This must be the last write because it marks the vendor as complete.
+                fs::copy_file(
+                    src_path / "vendor.yaml",
+                    dest_path / "vendor.yaml",
                     fs::copy_options::overwrite_existing
                 );
             }
