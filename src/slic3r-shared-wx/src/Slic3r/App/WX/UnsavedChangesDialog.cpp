@@ -95,9 +95,10 @@ UnsavedChangesDialog::UnsavedChangesDialog(
 
 void UnsavedChangesDialog::create_tree()
 {
-    int em = w_config()->em_unit();
+    int em = w_config()->em_unit(this);
     m_tree = new DiffViewCtrl(this, wxSize(em * (m_config_new ? 90 : 65), em * 40));
     m_tree->SetFont(this->GetFont());
+    m_tree->set_em_unit(em);
 
 #ifdef __linux__
     const int toggle_column_width = 10;
@@ -117,8 +118,9 @@ void UnsavedChangesDialog::add_buttons(wxBoxSizer* buttons)
 {
     // Add Buttons
     wxFont btn_font = this->GetFont().Scaled(1.4f);
+    int em = w_config()->em_unit(this);
 
-    auto add_btn = [this, buttons, btn_font](
+    auto add_btn = [this, em, buttons, btn_font](
                        wxButton** btn,
                        const std::string& icon_name,
                        Biz::Preset::PresetDiffOperation close_act,
@@ -132,11 +134,11 @@ void UnsavedChangesDialog::add_buttons(wxBoxSizer* buttons)
             wxID_ANY,
             label,
             wxDefaultPosition,
-            wxSize(wxDefaultCoord, 30),
+            wxSize(wxDefaultCoord, 3 * em),
             wxBORDER_SIMPLE
         );
         (*btn)->SetBitmap(*get_bmp_bundle(icon_name, 20, 20));
-        (*btn)->SetBitmapMargins(int(0.5 * w_config()->em_unit(this)), 0);
+        (*btn)->SetBitmapMargins(int(0.5 * em), 0);
 
         buttons->Add(*btn, 1, wxLEFT, buttons->IsEmpty() ? 0 : 5);
         (*btn)->SetFont(btn_font);
