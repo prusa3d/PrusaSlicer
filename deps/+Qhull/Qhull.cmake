@@ -8,8 +8,8 @@ if (BUILD_SHARED_LIBS)
 endif ()
 
 add_cmake_project(Qhull
-    URL "https://github.com/qhull/qhull/archive/refs/tags/v8.1-alpha3.zip"
-    URL_HASH SHA256=7bd9b5ffae01e69c2ead52f9a9b688af6c65f9a1da05da0a170fa20d81404c06
+    URL "https://github.com/qhull/qhull/archive/v8.1-alpha6.zip"
+    URL_HASH SHA256=d79b73774236f82e4940ce74c8b6cbb6ef3c72ef053d01d1bbfb19ab65dbfc22
     CMAKE_ARGS 
         -DINCLUDE_INSTALL_DIR=${CMAKE_INSTALL_INCLUDEDIR}
         -DBUILD_APPLICATIONS:BOOL=OFF
