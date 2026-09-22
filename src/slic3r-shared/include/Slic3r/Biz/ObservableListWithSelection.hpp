@@ -43,6 +43,12 @@ public:
         return m_selected_index;
     }
 
+    void set_items(typename List::Items&& items, Domain::SelectionId selected_index)
+    {
+        m_selected_index = selected_index;
+        m_items.set_items(std::move(items));
+    }
+
     void set_selected_index(size_t index)
     {
         ASSERT(index < m_items.size() || index == Domain::INVALID_ID);

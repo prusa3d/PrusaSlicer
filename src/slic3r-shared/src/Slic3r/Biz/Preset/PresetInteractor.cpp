@@ -1540,7 +1540,7 @@ void
 set_items(PresetItemObservableList& dest, std::vector<PresetItem>&& items, size_t selected_index)
 {
     ASSERT(selected_index == Domain::INVALID_ID || !items.empty());
-    dest.items().set_items(std::move(items));
+    dest.set_items(std::move(items), selected_index);
     dest.set_selected_index(selected_index);
 }
 
@@ -1645,8 +1645,8 @@ void PresetInteractor::fill_printer_presets(bool no_data_update, ListenerInvokeL
 
         idx++;
     }
-    m_printer_presets.items().set_items(std::move(items));
-    size_t selected_index_val = selected_index.value_or(selected_index_by_hw.value_or(0));
+    const size_t selected_index_val = selected_index.value_or(selected_index_by_hw.value_or(0));
+    m_printer_presets.set_items(std::move(items), selected_index_val);
 
     // make sure the new selection is propagated
     if (!selected_index.has_value()) {
