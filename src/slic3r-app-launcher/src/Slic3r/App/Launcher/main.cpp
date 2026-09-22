@@ -21,7 +21,9 @@
 
 #include <CLI/CLI.hpp>
 
+#include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/nowide/iostream.hpp>
 
 #include "Slic3r/Version.hpp"
 #include "libslic3r/Utils.hpp"
@@ -89,7 +91,17 @@ int main(int argc, char** argv)
         return init_params.exit_code.value();
     }
 
-    Slic3r::App::init_paths(init_params);
+    try {
+        Slic3r::App::init_paths(init_params);
+    } catch (const boost::filesystem::filesystem_error& filesystem_error) {
+        boost::nowide::cerr
+            << "Error: The data directory \""
+            << filesystem_error.path1().string()
+            << "\" could not be created: "
+            << filesystem_error.code().message()
+            << std::endl;
+        return EXIT_FAILURE;
+    }
 
     boost::filesystem::path log_path = boost::filesystem::path{Slic3r::get_default_datadir()} / "shared_runtime" / "log.txt";
     Slic3r::FileLogConfig file_log_config;

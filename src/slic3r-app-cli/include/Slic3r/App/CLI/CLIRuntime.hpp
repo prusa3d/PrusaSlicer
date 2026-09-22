@@ -74,6 +74,8 @@ public:
 
     Biz::Platform::IMainThreadDispatcher& dispatcher();
 
+    void load_standard_preset_bundle();
+
     void wait_until(const std::function<bool()>& predicate);
 
 private:

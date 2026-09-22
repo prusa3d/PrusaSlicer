@@ -10,6 +10,8 @@
 #include "Slic3r/Domain/SelectionId.hpp"
 
 #include <algorithm>
+#include <boost/filesystem/exception.hpp>
+#include <boost/nowide/iostream.hpp>
 
 using Slic3r::Biz::ProjectInteractor;
 using Slic3r::Biz::StepLoadDialogResult;
@@ -187,6 +189,24 @@ int run(InitParams& init_params)
     app_services.set_dialog_manager(std::make_unique<CLIDummyDialogManager>());
 
     CLIRuntime runtime{init_params};
+
+    // subcommands do not need loaded presets
+    if (!init_params.action.has_subcommand_action()) {
+        try {
+            runtime.load_standard_preset_bundle();
+        } catch (const boost::filesystem::filesystem_error& filesystem_error) {
+            const boost::filesystem::path& failed_path = filesystem_error.path2().empty() ?
+                filesystem_error.path1() :
+                filesystem_error.path2();
+            boost::nowide::cerr
+                << "Error: Copying the system presets failed at \""
+                << failed_path.string()
+                << "\": "
+                << filesystem_error.code().message()
+                << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
 
     if (process_profiles_sharing(runtime, init_params)) {
         return EXIT_SUCCESS;

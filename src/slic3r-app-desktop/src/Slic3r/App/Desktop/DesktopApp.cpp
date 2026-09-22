@@ -45,6 +45,7 @@
 #include "Slic3r/Biz/WX/FontManager.hpp"
 
 #include "Slic3r/Biz/Scene/BedGeometry.hpp"
+#include <boost/filesystem/exception.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -469,7 +470,36 @@ void DesktopApp::finish_init()
 
     // load new presets
     m_bundle_paths = Biz::Preset::IO::BundlePaths::make_standard_runtime();
-    preset_interactor.load_preset_bundle(m_bundle_paths);
+
+    try {
+        preset_interactor.load_preset_bundle(m_bundle_paths);
+    } catch (const fs::filesystem_error& filesystem_error) {
+        if (m_splash_screen) {
+            m_splash_screen->Destroy();
+        }
+
+        const std::string message =
+            // TRN Error dialog shown at startup. The path of the folder follows on the next line.
+            Biz::_u8L("PrusaSlicer could not copy the system presets into its data folder:")
+            + "\n"
+            + m_bundle_paths.local_bundle_path
+            + "\n\n"
+            + Biz::_u8L(
+                "Make sure the folder is writable, the disk is not full and the folder path is not too long."
+            )
+            + "\n\n"
+            + Biz::_u8L("Details:")
+            + "\n"
+            + filesystem_error.what()
+            + "\n\n"
+            + Biz::_u8L("PrusaSlicer will close.");
+
+        app_services.dialog_manager()
+            .show_error_dialog(message, Biz::_u8L("PrusaSlicer - Loading presets failed"));
+        m_main_frame->Close(true);
+
+        return;
+    }
 
     if (m_splash_screen)
         m_splash_screen->SetText(WX::_L("Initializing Prepare Mode") + dots);

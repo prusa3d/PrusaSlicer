@@ -171,13 +171,6 @@ CLIRuntime::CLIRuntime(const InitParams& init_params) :
         platform_services.main_thread_dispatcher(),
         m_thumbnail_image_generator
     );
-
-    // subcommands do not need loaded presets
-    if (!init_params.action.has_subcommand_action()) {
-        m_project_interactor->preset_interactor().load_preset_bundle(
-            Preset::IO::BundlePaths::make_standard_runtime()
-        );
-    }
 }
 
 CLIRuntime::~CLIRuntime()
@@ -201,6 +194,13 @@ ProjectInteractor& CLIRuntime::project_interactor()
 IMainThreadDispatcher& CLIRuntime::dispatcher()
 {
     return PlatformServices::instance().main_thread_dispatcher();
+}
+
+void CLIRuntime::load_standard_preset_bundle()
+{
+    this->project_interactor().preset_interactor().load_preset_bundle(
+        Preset::IO::BundlePaths::make_standard_runtime()
+    );
 }
 
 void CLIRuntime::wait_until(const std::function<bool()>& predicate)
