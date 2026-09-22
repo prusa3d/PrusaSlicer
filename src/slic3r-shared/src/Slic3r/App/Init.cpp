@@ -20,6 +20,8 @@
 
 namespace Slic3r::App {
 
+const constexpr std::size_t log_file_max_size = 1 * 1024 * 1024;
+
 constexpr bool is_debug_build =
 #ifdef NDEBUG
     false;
@@ -58,6 +60,17 @@ std::optional<LogLevel> log_level_from_env()
 
 void init_common()
 {
+#ifdef _WIN32
+    // nowide_filesystem calls std::locale("") which may throw on Linux
+    // with unsupported locale, we should call this just on Windows.
+    boost::nowide::nowide_filesystem();
+#endif
+
+    const boost::filesystem::path log_path =
+        boost::filesystem::path{Slic3r::get_default_datadir()} / "shared_runtime" / "log.txt";
+    Slic3r::set_file_log_config(FileLogConfig{log_path.string(), log_file_max_size});
+    Slic3r::init_logging();
+
     Slic3r::set_log_level(log_level_from_env().value_or(default_log_level()));
 
     // Detect the operating system flavor after SLIC3R_LOGLEVEL is set.
@@ -85,12 +98,6 @@ void init_common()
 #ifdef __EMSCRIPTEN__
     boost::filesystem::path path_resources = "/resources";
 #else
-#ifdef _WIN32
-    // nowide_filesystem calls std::locale("") which may throw on Linux
-    // with unsupported locale, we should call this just on Windows
-    boost::nowide::nowide_filesystem();
-#endif
-
     // See Invoking prusa-slicer from $PATH environment variable crashes #5542
     // boost::filesystem::path path_to_binary = boost::filesystem::system_complete(argv[0]);
     boost::filesystem::path path_to_binary = boost::dll::program_location();

@@ -9,7 +9,6 @@
 #include "Slic3r/App/Launcher/ReadCLI.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
 #include "Slic3r/Assert.hpp"
-#include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/AppServices.hpp"
@@ -83,13 +82,13 @@ int main(int argc, char** argv)
     CLI::App app{app_description(), app_name};
     argv = app.ensure_utf8(argv);
 
-    Slic3r::App::init_common();
-
     Slic3r::App::InitParams init_params =
         Slic3r::App::Launcher::read_cli(app, SLIC3R_VERSION, argc, argv);
     if (init_params.exit_code.has_value()) {
         return init_params.exit_code.value();
     }
+
+    Slic3r::App::init_common();
 
     try {
         Slic3r::App::init_paths(init_params);
@@ -102,13 +101,6 @@ int main(int argc, char** argv)
             << std::endl;
         return EXIT_FAILURE;
     }
-
-    boost::filesystem::path log_path = boost::filesystem::path{Slic3r::get_default_datadir()} / "shared_runtime" / "log.txt";
-    Slic3r::FileLogConfig file_log_config;
-    file_log_config.log_file = log_path.string();
-    file_log_config.log_file_size = 1 * 1024 * 1024;
-    Slic3r::set_file_log_config(file_log_config);
-    Slic3r::init_logging();
 
     if (init_params.misc.loglevel.has_value()) {
         Slic3r::set_log_level(init_params.misc.loglevel.value());

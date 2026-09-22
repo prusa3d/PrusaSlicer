@@ -45,8 +45,6 @@ static spdlog::level::level_enum log_level_to_spdlog(LogLevel level)
 
 void init_logging()
 {
-    // TODO: add optional logging to file here
-
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     msvc_sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
     spdlog::apply_all([&](std::shared_ptr<spdlog::logger> l) { l->sinks().push_back(msvc_sink); });
@@ -58,13 +56,18 @@ void init_logging()
 #else
         const std::string& os_specific_path = file_log_config.log_file;
 #endif
-        file_logger = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            os_specific_path,
-            file_log_config.log_file_size,
-            1
-        );
-        spdlog::apply_all([&](std::shared_ptr<spdlog::logger> l)
-                          { l->sinks().push_back(file_logger); });
+        try {
+            file_logger = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+                os_specific_path,
+                file_log_config.log_file_size,
+                1
+            );
+            spdlog::apply_all(
+                [&](std::shared_ptr<spdlog::logger> l) { l->sinks().push_back(file_logger); }
+            );
+        } catch (const std::exception& e) {
+            SPDLOG_ERROR(e.what());
+        }
     }
 }
 
