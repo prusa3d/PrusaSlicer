@@ -14,9 +14,11 @@
 #include <cstddef>
 #include <deque>
 #include <functional>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace Slic3r::Biz::PresetUpdater {
 
@@ -95,6 +97,17 @@ public:
      * Use list_repositories to query sources without changing the selection.
      */
     JobId apply_repository_selection(const SharedPresetUpdaterRepositoryInfoVector& repos);
+
+    /**
+     * @brief Records that these vendors have been offered to the user, keyed by source id.
+     * Reports nothing but the terminal on_preset_updater_job_finished.
+     *
+     * A vendor a source offers and the user does not install stays new for good, so what has been
+     * shown once is remembered instead of being announced again after every check.
+     */
+    JobId acknowledge_new_vendors(
+        const std::map<std::string, std::vector<std::string>>& vendors_by_repo_id
+    );
 
     /**
      * @brief Adds local repository to app manifest file, unzipping it into the data dir.

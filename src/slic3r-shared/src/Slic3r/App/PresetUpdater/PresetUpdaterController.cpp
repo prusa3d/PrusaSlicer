@@ -46,6 +46,15 @@ std::vector<VendorKey> forced_keys(const PresetUpdaterReconfigurationList& list)
     return keys;
 }
 
+size_t unacknowledged_count(const std::vector<VendorReconfiguration>& new_vendors)
+{
+    return static_cast<size_t>(std::count_if(
+        new_vendors.begin(),
+        new_vendors.end(),
+        [](const VendorReconfiguration& reconfiguration) { return !reconfiguration.acknowledged; }
+    ));
+}
+
 void log_reconfigurations(const PresetUpdaterReconfigurationList& list)
 {
     const std::pair<const char*, const std::vector<VendorReconfiguration>*> buckets[]{
@@ -89,6 +98,8 @@ const char* job_kind_name(JobKind kind)
         return "add source";
     case JobKind::RemoveSource:
         return "remove source";
+    case JobKind::AcknowledgeNewVendors:
+        return "acknowledge new vendors";
     }
     return "unknown";
 }
@@ -1590,6 +1601,28 @@ void PresetUpdaterController::start_install(const std::vector<VendorKey>& keys)
     m_activity_reporter.begin_activity(job_id, Activity::Installing);
 }
 
+void PresetUpdaterController::acknowledge_new_vendors(
+    const PresetUpdaterReconfigurationList& reconfigurations
+)
+{
+    std::map<std::string, std::vector<std::string>> by_repo_id;
+    for (const VendorReconfiguration& reconfiguration : reconfigurations.new_vendors()) {
+        if (reconfiguration.acknowledged) {
+            continue;
+        }
+        by_repo_id[reconfiguration.vendor_repo_id].push_back(reconfiguration.vendor_id);
+    }
+
+    if (by_repo_id.empty()) {
+        return;
+    }
+
+    submit(
+        JobKind::AcknowledgeNewVendors,
+        [this, &by_repo_id]() { return m_interactor.acknowledge_new_vendors(by_repo_id); }
+    );
+}
+
 void PresetUpdaterController::commit_selection()
 {
     if (m_shut_down) {
@@ -1965,6 +1998,10 @@ void PresetUpdaterController::on_preset_updater_reconfigurations_list(
     const std::set<std::string> evaluated = m_store.apply_check(outcome);
     m_forced.reconcile(reconfigurations, evaluated, outcome.unjudged_keys());
 
+    if (dialog_open()) {
+        acknowledge_new_vendors(reconfigurations);
+    }
+
     if (forced_mode()) {
         show_dialog();
         return;
@@ -1972,7 +2009,8 @@ void PresetUpdaterController::on_preset_updater_reconfigurations_list(
 
     // Only what is on offer: presets of a version the source does not list cannot be installed.
     m_activity_reporter.report_check_finished(
-        reconfigurations.regular_updates().size() + reconfigurations.new_vendors().size()
+        reconfigurations.regular_updates().size(),
+        unacknowledged_count(reconfigurations.new_vendors())
     );
 }
 

@@ -220,6 +220,25 @@ TEST_CASE("PresetUpdaterController runs the background check without narrating i
     CHECK(updates_notification_shown());
 }
 
+TEST_CASE("PresetUpdaterController announces a new vendor only until the dialog has shown it", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.put_server("100");
+
+    fx.controller->on_dialog_opened();
+    REQUIRE(fx.settle());
+    REQUIRE(fx.online_row().counts.new_vendors == 1);
+
+    REQUIRE(fx.pump([&fx]() { return fx.interactor().pending_job_count() == 0; }));
+
+    fx.controller->on_dialog_closed();
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+
+    CHECK_FALSE(updates_notification_shown());
+    CHECK(fx.online_row().counts.new_vendors == 1);
+}
+
 TEST_CASE("PresetUpdaterController narrates a check the user asked for", "[preset_updater][controller]")
 {
     ControllerFixture fx;

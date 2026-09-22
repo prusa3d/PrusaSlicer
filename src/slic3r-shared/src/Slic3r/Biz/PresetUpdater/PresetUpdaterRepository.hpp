@@ -3,7 +3,10 @@
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterRepositoryDescriptor.hpp"
 #include "PresetUpdaterFileHash.hpp"
 #include "Slic3r/Assert.hpp"
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 #include <boost/filesystem/path.hpp>
 
 #include "nlohmann/json.hpp"
@@ -92,6 +95,32 @@ public:
         m_selected = selected;
     }
 
+    /**
+     * @brief Whether this vendor has already been offered to the user.
+     *
+     * A vendor a source offers and the user does not install stays new for good, so the offer is
+     * announced once and the answer remembered. Only the announcement reads this.
+     */
+    bool is_vendor_acknowledged(const std::string& vendor_id) const
+    {
+        return m_acknowledged_vendors.contains(vendor_id);
+    }
+
+    const std::set<std::string>& acknowledged_vendors() const
+    {
+        return m_acknowledged_vendors;
+    }
+
+    void acknowledge_vendors(const std::vector<std::string>& vendor_ids)
+    {
+        m_acknowledged_vendors.insert(vendor_ids.begin(), vendor_ids.end());
+    }
+
+    void set_acknowledged_vendors(std::set<std::string> vendor_ids)
+    {
+        m_acknowledged_vendors = std::move(vendor_ids);
+    }
+
     static bool extract_repository_header(
         const nlohmann::json& json,
         PresetUpdaterRepositoryDescriptor& data,
@@ -102,6 +131,7 @@ protected:
     PresetUpdaterRepositoryDescriptor m_data;
     std::string m_uuid;
     bool m_selected;
+    std::set<std::string> m_acknowledged_vendors;
 };
 
 class OnlinePresetUpdaterRepository : public AbstractPresetUpdaterRepository

@@ -150,7 +150,8 @@ enum class JobKind
     Install,
     RemoveVendor,
     AddSource,
-    RemoveSource
+    RemoveSource,
+    AcknowledgeNewVendors
 };
 
 /**
@@ -832,6 +833,11 @@ private:
 
     void notify_forced_state(bool has_forced);
     void show_dialog();
+
+    /// Records the new vendors of a check the user has just been shown, so they are announced once.
+    void acknowledge_new_vendors(
+        const Biz::PresetUpdater::PresetUpdaterReconfigurationList& reconfigurations
+    );
 
     Biz::PresetUpdater::PresetUpdaterInteractor& m_interactor;
     ControllerEnvironment m_environment;

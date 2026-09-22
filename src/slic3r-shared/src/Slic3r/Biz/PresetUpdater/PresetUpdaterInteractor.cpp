@@ -9,6 +9,7 @@
 #include "Slic3r/Log.hpp"
 
 #include <algorithm>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -419,6 +420,38 @@ JobId PresetUpdaterInteractor::apply_repository_selection(
             dispatch_repository_selection_performed(
                 job_id, repo_database.get_all_repositories(), process_status.warnings()
             );
+            return JobState::Succeeded;
+        }
+    );
+}
+
+JobId PresetUpdaterInteractor::acknowledge_new_vendors(
+    const std::map<std::string, std::vector<std::string>>& vendors_by_repo_id
+)
+{
+    return enqueue(
+        [this, vendors_by_repo_id](
+            JThread::StopToken stop_token,
+            Platform::JobManager::ProgressTracker progress_tracker,
+            JobId job_id
+        ) {
+            PresetUpdaterProcessStatus process_status(
+                stop_token,
+                make_status_callback(job_id, progress_tracker, VerboseStyle::NoProgress),
+                PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
+            );
+            PresetUpdaterRepositoryDatabase repo_database(&process_status);
+
+            if (process_status.has_error()) {
+                dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());
+                return JobState::Failed;
+            }
+
+            repo_database.acknowledge_vendors(vendors_by_repo_id, &process_status);
+            if (process_status.has_error()) {
+                dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());
+                return JobState::Failed;
+            }
             return JobState::Succeeded;
         }
     );

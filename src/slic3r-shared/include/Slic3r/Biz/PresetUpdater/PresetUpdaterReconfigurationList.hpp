@@ -42,6 +42,8 @@ struct VendorReconfiguration
     Slic3r::Semver current_version;
     Slic3r::Semver recommended_version;
     std::string comment;
+    /// Whether this offer has already been shown to the user. Only NewVendor ever sets it.
+    bool acknowledged{false};
     //std::string changelog_url;
     //std::string new_printers;
 
@@ -51,7 +53,8 @@ struct VendorReconfiguration
         const std::string& archive_id,
         const Slic3r::Semver& current_version,
         const Slic3r::Semver& recommended_version,
-        const std::string& comment
+        const std::string& comment,
+        bool acknowledged = false
         //const std::string& changelog_url,
         //const std::string& new_printers
     ) :
@@ -60,7 +63,8 @@ struct VendorReconfiguration
         vendor_repo_id(archive_id),
         current_version(current_version),
         recommended_version(recommended_version),
-        comment(comment)
+        comment(comment),
+        acknowledged(acknowledged)
         //changelog_url(changelog_url),
         //new_printers(new_printers)
     {}

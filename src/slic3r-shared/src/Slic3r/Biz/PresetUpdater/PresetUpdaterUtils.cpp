@@ -884,7 +884,8 @@ PresetUpdaterReconfigurationList check_reconfigurations(
                 repo_id,
                 Slic3r::Semver(),
                 recommended->config_version,
-                recommended->comment
+                recommended->comment,
+                repository->is_vendor_acknowledged(update_sync_index.vendor())
             );
         }
     }

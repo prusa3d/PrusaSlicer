@@ -46,9 +46,15 @@ public:
 
     void report_install_finished(const std::vector<InstalledVendor>& installed);
 
-    void report_updates_available(size_t update_count);
+    /**
+     * @brief Offers the way into the dialog for what a check found.
+     * @param new_vendor_count vendors this computer has none of, counted only while the user has
+     * not been shown them yet. They are announced once, unlike an update, which is announced until
+     * it is installed.
+     */
+    void report_updates_available(size_t update_count, size_t new_vendor_count);
 
-    void report_check_finished(size_t update_count);
+    void report_check_finished(size_t update_count, size_t new_vendor_count);
 
     /// Reports everything the last check or install ran into. An empty list takes it down.
     void report_problems(std::vector<Problem> problems);

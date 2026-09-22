@@ -936,3 +936,61 @@ TEST_CASE("PresetUpdaterProcessStatus reads the access token per request", "[pre
     CHECK(process_status.access_token() == "rotated");
     CHECK(calls == 2);
 }
+
+TEST_CASE("PresetUpdater remembers that a new vendor has been offered", "[preset_updater]")
+{
+    Fixture fx;
+    fx.put_server("100");
+
+    CaptureListener listener(fx.interactor());
+
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        true, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE(listener.reconfigurations().has_value());
+    REQUIRE(listener.reconfigurations()->new_vendors().size() == 1);
+    CHECK_FALSE(listener.reconfigurations()->new_vendors().front().acknowledged);
+
+    listener.reset();
+    fx.interactor().acknowledge_new_vendors({{k_repo_name, {k_vendor_name}}});
+    REQUIRE(fx.wait_for_finished(listener, 1));
+
+    const std::string manifest = read_file(fx.shared_runtime_path / "RepositoryManifest.json");
+    CHECK(manifest.find("acknowledged_vendors") != std::string::npos);
+    CHECK(manifest.find(k_vendor_name) != std::string::npos);
+
+    listener.reset();
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        true, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE(listener.reconfigurations().has_value());
+    REQUIRE(listener.reconfigurations()->new_vendors().size() == 1);
+    CHECK(listener.reconfigurations()->new_vendors().front().acknowledged);
+}
+
+TEST_CASE("PresetUpdater keeps acknowledged vendors across a source list sync", "[preset_updater]")
+{
+    Fixture fx;
+    fx.put_server("100");
+
+    CaptureListener listener(fx.interactor());
+
+    fx.interactor().acknowledge_new_vendors({{k_repo_name, {k_vendor_name}}});
+    REQUIRE(fx.wait_for_finished(listener, 1));
+
+    listener.reset();
+    fx.interactor().list_repositories(true);
+    REQUIRE(fx.wait(listener));
+    REQUIRE(listener.repos().size() == 1);
+
+    listener.reset();
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        true, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE(listener.reconfigurations().has_value());
+    REQUIRE(listener.reconfigurations()->new_vendors().size() == 1);
+    CHECK(listener.reconfigurations()->new_vendors().front().acknowledged);
+}
