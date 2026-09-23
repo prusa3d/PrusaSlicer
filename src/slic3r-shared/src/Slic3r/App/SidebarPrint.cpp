@@ -61,7 +61,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     text_rect->set_fill(m_theme->color_imgui(Platform::Color::WindowBgAlternate));
     text_rect->set_align_items(YGAlignCenter);
     text_rect->set_flags(ImDrawFlags_RoundCornersTopLeft | ImDrawFlags_RoundCornersBottomLeft);
-    text_rect->set_padding(Paddings(5, 0));
+    text_rect->set_padding(Paddings(5_fpx, 0));
     text_rect->emplace_back<Text>(Biz::_u8L("Print preset"));
 
     m_combo_print =
@@ -97,7 +97,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     m_settings_set_btn =
         layer_height_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::Cog);
     m_settings_set_btn->set_checkable(true);
-    m_settings_set_btn->set_height(24.f);
+    m_settings_set_btn->set_height(24_fpx);
     m_settings_set_btn->set_self_align(YGAlignCenter);
     m_settings_set_btn->set_background_color(Platform::Color::ButtonTransparent);
     m_settings_set_btn->callbacks().action = [this]()

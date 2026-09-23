@@ -748,18 +748,18 @@ void CutDialog::confirm_connectors()
 
 void CutDialog::init_connectors_header()
 {
-    top_bar()->set_gap(10.);
+    top_bar()->set_gap(10_fpx);
     top_bar()->set_orientation(Orientation::Vertical);
-    top_bar()->set_padding(5.f);
+    top_bar()->set_padding(5_fpx);
 
     Item* header = top_bar()->emplace_back<Item>();
     header->set_gap(gap_size());
-    header->set_padding(5.f);
+    header->set_padding(5_fpx);
     header->set_align_items(YGAlignCenter);
     header->set_flex_shrink(0);
     LayoutButton* back_btn = header->emplace_back<LayoutButton>("", Render::Icon::ChevronLeft);
     back_btn->callbacks().action = [this]() { confirm_connectors(); };
-    back_btn->set_height(24.f);
+    back_btn->set_height(24_fpx);
     Text* text = header->emplace_back<Text>(_u8L("Connectors"));
     text->set_self_align(YGAlignCenter);
     text->set_font_type(Render::ImguiFontType::Bold);
@@ -774,7 +774,7 @@ void CutDialog::init_connectors_header()
         }
     };
 
-    add_separator(top_bar())->set_margin({ 0, -5.f, 0, 0 });
+    add_separator(top_bar())->set_margin({ 0, -5_fpx, 0, 0 });
 }
 
 void CutDialog::init_connectors_input_panel()

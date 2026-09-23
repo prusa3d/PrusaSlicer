@@ -355,7 +355,7 @@ void AbstractRenderLayout::init_right_column()
 
 void AbstractRenderLayout::init_toolbar_row()
 {
-    constexpr float button_size = 40.f;
+    constexpr Yoga::Unit button_size = 40_fpx;
 
     m_layout_middle_toolbar_row = m_layout_middle_column->emplace_back<Item>();
     m_layout_middle_toolbar_row->set_orientation(Orientation::Horizontal);

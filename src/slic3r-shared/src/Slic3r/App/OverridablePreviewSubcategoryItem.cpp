@@ -33,11 +33,11 @@ OverridablePreviewSubcategoryItem::OverridablePreviewSubcategoryItem(
         preset_interactor.object_settings_interactor().object_observable_list()
     );
 
-    set_object_name("OverridablePriviewSubcategoryItem");
+    set_object_name("OverridablePreviewSubcategoryItem");
     set_orientation(Orientation::Vertical);
     set_flex_shrink(0);
-    set_gap(15);
-    set_padding({0, 10, 0, 0});
+    set_gap(15_fpx);
+    set_padding({0, 10_fpx, 0, 0});
 
     m_label = emplace_back<Text>(std::string{}, Render::ImguiFontType::Bold);
 
@@ -45,7 +45,7 @@ OverridablePreviewSubcategoryItem::OverridablePreviewSubcategoryItem(
         emplace_back<ConfigPreviewRowListView>(ConfigPreviewRowListViewFactory{preset_interactor});
     m_rows_list_view->set_source_list(m_rows_filter_list.get());
     m_rows_list_view->set_orientation(Orientation::Vertical);
-    m_rows_list_view->set_gap(5);
+    m_rows_list_view->set_gap(5_fpx);
 
     emplace_back<Separator>(Orientation::Horizontal);
 

@@ -23,9 +23,9 @@ static LayoutButton* add_button(
     if (icon_tint_color) {
         button->set_icon_tint(icon_tint_color.value());
     }
-    button->set_width(22);
-    button->set_height(22);
-    button->set_content_padding(Paddings(2));
+    button->set_width(22_fpx);
+    button->set_height(22_fpx);
+    button->set_content_padding(Paddings(2_fpx));
     button->set_flex_shrink(0);
 
     return button;
@@ -39,19 +39,19 @@ OverrideItemPreviewRow::OverrideItemPreviewRow(
     Biz::DataObserver<Biz::OverrideItem>(index, data),
     m_preset_interactor(preset_interactor)
 {
-    set_gap(10);
-    set_padding({0, 0, 10, 0});
+    set_gap(10_fpx);
+    set_padding({0, 0, 10_fpx, 0});
     set_flex_shrink(0);
     set_object_name("OverrideItemPreviewRow");
-    set_height(26);
+    set_height(26_fpx);
     set_align_items(YGAlignCenter);
 
     m_label = emplace_back<Text>(std::string());
-    m_label->set_width(170);
+    m_label->set_width(170_fpx);
     m_label->set_wrap_mode(Text::WrapMode::Wrap);
 
     Item* container = emplace_back<Item>();
-    container->set_gap(3);
+    container->set_gap(3_fpx);
     container->set_flex_grow(1);
     container->set_align_items(YGAlignCenter);
 

@@ -10,15 +10,12 @@ using namespace Slic3r::App::Yoga;
 
 namespace Slic3r::App::Plater {
 
-const constexpr float HEIGHT_RANGE_ROW_HEIGHT = 26.f;
-
 HeightRangeRow::HeightRangeRow(const HeightRangeEntry& height_range) : m_height_range(height_range)
 {
     this->set_object_name("HeightRangeRow");
     this->set_flex_shrink(0);
     this->set_orientation(Orientation::Horizontal);
-    this->set_height(HEIGHT_RANGE_ROW_HEIGHT);
-    this->set_gap(4.f);
+    this->set_gap(4_fpx);
 
     m_height_range_button                              = emplace_back<HeightRangeButton>();
     m_height_range_button->callbacks().action          = [this]() { m_callbacks.selected(); };
@@ -26,8 +23,8 @@ HeightRangeRow::HeightRangeRow(const HeightRangeEntry& height_range) : m_height_
     { m_callbacks.hovered(hovered); };
 
     m_undo_button = emplace_back<LayoutButton>("", Render::Icon::UndoGizmo);
-    m_undo_button->set_width(22);
-    m_undo_button->set_height(22);
+    m_undo_button->set_width(22_fpx);
+    m_undo_button->set_height(22_fpx);
     m_undo_button->set_self_align(YGAlignCenter);
     m_undo_button->set_flex_shrink(0);
     m_undo_button->set_background_color(Platform::Color::ButtonTransparent);
@@ -39,8 +36,8 @@ HeightRangeRow::HeightRangeRow(const HeightRangeEntry& height_range) : m_height_
     };
 
     m_delete_button = emplace_back<LayoutButton>("", Render::Icon::Minus);
-    m_delete_button->set_width(22);
-    m_delete_button->set_height(22);
+    m_delete_button->set_width(22_fpx);
+    m_delete_button->set_height(22_fpx);
     m_delete_button->set_self_align(YGAlignCenter);
     m_delete_button->set_flex_shrink(0);
     m_delete_button->set_background_color(Platform::Color::ButtonTransparent);

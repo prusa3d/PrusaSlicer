@@ -13,7 +13,7 @@ namespace Slic3r::App {
 
 ToolBar::ToolBar(const std::string& name) : Window(name)
 {
-    set_padding(4);
+    set_padding(4_fpx);
     // Button More is used for collapsible and should never be part of m_buttons
     m_button_more = emplace_back<ToolBarButton>(Render::Icon::Ellipsis, "Show more");
     m_button_more->set_object_name(name + "ShowMoreButton");
@@ -53,14 +53,14 @@ bool ToolBar::contains(ToolBarButton* button) const
     return index_of(button).has_value();
 }
 
-float ToolBar::button_width() const
+const Yoga::Unit& ToolBar::button_width() const
 {
     return m_button_width;
 }
 
-void ToolBar::set_button_width(const float button_width)
+void ToolBar::set_button_width(const Yoga::Unit& button_width)
 {
-    if (!Domain::fuzzy_compare(m_button_width, button_width)) {
+    if (m_button_width != button_width) {
         m_button_width = button_width;
         for (ToolBarButton* button : std::as_const(m_buttons)) {
             if (orientation() == Orientation::Horizontal && !button->label().empty()) {
@@ -72,14 +72,14 @@ void ToolBar::set_button_width(const float button_width)
     }
 }
 
-float ToolBar::button_height() const
+const Yoga::Unit& ToolBar::button_height() const
 {
     return m_button_height;
 }
 
-void ToolBar::set_button_height(float button_height)
+void ToolBar::set_button_height(const Yoga::Unit& button_height)
 {
-    if (!Domain::fuzzy_compare(m_button_height, button_height)) {
+    if (m_button_height != button_height) {
         m_button_height = button_height;
         for (ToolBarButton* button : std::as_const(m_buttons)) {
             if (orientation() == Orientation::Vertical && !button->label().empty()) {
@@ -101,11 +101,13 @@ void ToolBar::insert(ObjectPtr child, size_t index)
     ToolBarButton* button = dynamic_cast<ToolBarButton*>(child.get());
     ASSERT(button);
 
-    if (m_button_width > 0 && (orientation() != Orientation::Horizontal || button->label().empty()))
+    if (m_button_width.value > 0
+        && (orientation() != Orientation::Horizontal || button->label().empty()))
     {
         button->set_width(m_button_width);
     }
-    if (m_button_height > 0 && (orientation() != Orientation::Vertical || button->label().empty()))
+    if (m_button_height.value > 0
+        && (orientation() != Orientation::Vertical || button->label().empty()))
     {
         button->set_height(m_button_height);
     }
@@ -159,8 +161,8 @@ void ToolBar::style_node()
     bool has_enough_space = true;
     if (m_collapsible
         && parent_item()
-        && m_button_width > 0
-        && m_button_height > 0
+        && m_button_width.value > 0
+        && m_button_height.value > 0
         && is_visible()
         && width() > 0
         && height() > 0)
@@ -187,10 +189,12 @@ void ToolBar::style_node()
         // Decide which buttons will be included
 
         // Assume button size
-        const float button_size =
+        Unit button_size_unit =
             orientation() == Orientation::Horizontal ? m_button_width : m_button_height;
+        EvaluatedUnit button_size_eu{button_size_unit};
+        button_size_eu.evaluate(m_size_info);
         // Take away size from collapsed button
-        available_size -= button_size;
+        available_size -= button_size_eu.result;
 
         std::vector<ToolBarButton*> included_buttons;
         std::vector<ToolBarButton*> collapsed_buttons;
@@ -204,7 +208,7 @@ void ToolBar::style_node()
                 continue;
             }
 
-            available_size -= button_size;
+            available_size -= button_size_eu.result;
             if (available_size > 0) {
                 included_buttons.push_back(button);
             } else {
@@ -242,7 +246,9 @@ void ToolBar::style_node()
         }
 
         has_enough_space = collapsed_buttons.empty();
-        if (has_enough_space && !m_has_enough_space && m_toolbar_callbacks.expand_margin
+        if (has_enough_space
+            && !m_has_enough_space
+            && m_toolbar_callbacks.expand_margin
             && available_size < m_toolbar_callbacks.expand_margin())
         {
             // The extra room may only exist because a sibling shrank in reaction to us

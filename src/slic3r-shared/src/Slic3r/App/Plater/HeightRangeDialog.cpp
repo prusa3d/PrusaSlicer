@@ -141,8 +141,8 @@ void HeightRangeDialog::add_height_range_section(Item* parent)
 
     LayoutButton* add_range_button =
         add_range_row->emplace_back<LayoutButton>("", Render::Icon::PlusHeightRange);
-    add_range_button->set_width(22);
-    add_range_button->set_height(22);
+    add_range_button->set_width(22_fpx);
+    add_range_button->set_height(22_fpx);
     add_range_button->callbacks().action = [this]() { m_callbacks.add_range_clicked(); };
 
     add_range_row->set_padding({0.f, 0.f, 0.f, 5.f});

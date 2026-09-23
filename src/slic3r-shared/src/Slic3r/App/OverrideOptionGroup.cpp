@@ -15,9 +15,9 @@ static LayoutButton* add_button(Item* parent, Render::Icon icon, const std::stri
 {
     LayoutButton* button = parent->emplace_back<LayoutButton>(std::string(), icon, tooltip);
     button->set_background_color(Platform::Color::ButtonTransparent);
-    button->set_width(22);
-    button->set_height(22);
-    button->set_content_padding(Paddings(2));
+    button->set_width(22_fpx);
+    button->set_height(22_fpx);
+    button->set_content_padding(Paddings(2_fpx));
     return button;
 }
 
@@ -33,10 +33,10 @@ OverrideOptionGroup::OverrideOptionGroup(
 {
     set_orientation(Orientation::Vertical);
     set_flex_shrink(0);
-    set_gap(5);
+    set_gap(5_fpx);
 
     Item* label_row = emplace_back<Item>();
-    label_row->set_padding({0, 10, 0, 5});
+    label_row->set_padding({0, 10_fpx, 0, 5_fpx});
 
     m_text_group_name = label_row->emplace_back<Text>(std::string());
     m_text_group_name->set_self_align(YGAlignCenter);
@@ -88,7 +88,7 @@ OverrideOptionGroup::OverrideOptionGroup(
         OverrideConfigListViewFactory{m_project_interactor.preset_interactor(), true}
     );
     m_override_config_list_view->set_orientation(Orientation::Vertical);
-    m_override_config_list_view->set_gap(10);
+    m_override_config_list_view->set_gap(10_fpx);
     m_override_config_list_view->set_padding(0);
     m_override_config_list_view->set_source_list(m_override_config_filter.get());
 
@@ -96,7 +96,7 @@ OverrideOptionGroup::OverrideOptionGroup(
                                                    .object_settings_interactor()
                                                    .object_observable_list());
 
-    emplace_back<Separator>(Orientation::Horizontal)->set_margin(Margins(-20, 5, -20, 0));
+    emplace_back<Separator>(Orientation::Horizontal)->set_margin(Margins(-20_fpx, 5_fpx, -20_fpx, 0));
 
     on_data_update();
 }

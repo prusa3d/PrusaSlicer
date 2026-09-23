@@ -26,18 +26,18 @@ SearchBar::SearchBar(Biz::ProjectInteractor& project_interactor, Navigator& navi
         m_navigator,
         m_search_observable_list.get()
     );
-    m_search_popup->attach_to_item(this, Position::Bottom, 15);
+    m_search_popup->attach_to_item(this, Position::Bottom, 15_fpx);
 
     set_gap(5);
     set_align_items(YGAlignCenter);
 
     Icon* icon = emplace_back<Icon>(Render::Icon::Search);
-    icon->set_width(18);
-    icon->set_height(18);
+    icon->set_width(18_fpx);
+    icon->set_height(18_fpx);
 
     m_input_text = emplace_back<InputText>();
     m_input_text->set_hint(_u8L("Search..."));
-    m_input_text->set_width(150);
+    m_input_text->set_width(150_fpx);
     m_input_text->set_flags(ImGuiInputTextFlags_EscapeClearsAll);
 
     m_input_text->callbacks().text_entered = [this] { m_search_popup->open_selected(); };

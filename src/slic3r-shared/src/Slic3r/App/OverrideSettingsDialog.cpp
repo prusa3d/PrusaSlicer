@@ -15,8 +15,8 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
     Dialog({Biz::_u8L("Settings")}, "OverrideSettingsDialog"),
     m_project_interactor(project_interactor)
 {
-    content()->set_width(350);
-    content()->set_padding(20);
+    content()->set_width(350_fpx);
+    content()->set_padding(20_fpx);
 
     Biz::Preset::PresetInteractor& preset_interactor = project_interactor.preset_interactor();
 
@@ -48,7 +48,7 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
         OverrideCategoryFactory{project_interactor, m_select_category}
     );
     m_override_category_list_view->set_orientation(Orientation::Vertical);
-    m_override_category_list_view->set_gap(5);
+    m_override_category_list_view->set_gap(5_fpx);
     m_override_category_list_view->set_padding(0);
     m_override_category_list_view->set_source_list(m_categorizer.get());
 
@@ -58,15 +58,15 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
 
     Item* options_page = m_stack_layout->emplace_back<Item>();
     options_page->set_orientation(Orientation::Vertical);
-    options_page->set_gap(5);
+    options_page->set_gap(5_fpx);
 
     Item* back_row = options_page->emplace_back<Item>();
-    back_row->set_gap(5);
+    back_row->set_gap(5_fpx);
     back_row->set_flex_shrink(0);
     back_row->set_margin({0, -10, 0, 0});
-    LayoutButton* back_button = back_row->emplace_back<LayoutButton>("", Render::Icon::ChevronLeft);
-    back_button->set_width(22);
-    back_button->set_height(22);
+    LayoutButton* back_button = back_row->emplace_back<LayoutButton>(std::string{}, Render::Icon::ChevronLeft);
+    back_button->set_width(22_fpx);
+    back_button->set_height(22_fpx);
     back_button->set_content_padding(Paddings(0));
     back_button->set_background_color(Platform::Color::ButtonTransparent);
     back_button->callbacks().action = [this]() { on_about_to_show(); };
@@ -75,7 +75,7 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
     m_options_category_text->set_self_align(YGAlignCenter);
     m_options_category_text->set_font_type(Render::ImguiFontType::Bold);
 
-    options_page->emplace_back<Separator>(Orientation::Horizontal)->set_margin(Margins(-20, 0));
+    options_page->emplace_back<Separator>(Orientation::Horizontal)->set_margin(Margins(-20_fpx, 0));
 
     m_category_filter = std::make_shared<OverrideConfigFilter>();
     m_category_filter->set_filter_fn(
@@ -115,11 +115,11 @@ OverrideSettingsDialog::OverrideSettingsDialog(Biz::ProjectInteractor& project_i
         OverrideConfigListViewFactory{preset_interactor}
     );
     m_override_config_list_view->set_orientation(Orientation::Vertical);
-    m_override_config_list_view->set_gap(10);
-    m_override_config_list_view->set_margin(Margins(0, 0, -20, 0));
-    m_override_config_list_view->set_padding(Paddings(0, 0, 10, 0));
+    m_override_config_list_view->set_gap(10_fpx);
+    m_override_config_list_view->set_margin(Margins(0, 0, -20_fpx, 0));
+    m_override_config_list_view->set_padding(Paddings(0, 0, 10_fpx, 0));
     m_override_config_list_view->set_source_list(m_category_filter.get());
-    m_override_config_list_view->set_max_height(350);
+    m_override_config_list_view->set_max_height(350_fpx);
 
     m_category_filter->set_source_model(
         preset_interactor.object_settings_interactor().object_observable_list()

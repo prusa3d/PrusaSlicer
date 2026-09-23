@@ -24,8 +24,8 @@ static LayoutButton* add_button(Item* parent, Render::Icon icon)
 {
     LayoutButton* button = parent->emplace_back<LayoutButton>(std::string{}, icon);
     button->set_background_color(Platform::Color::ButtonTransparent);
-    button->set_width(20);
-    button->set_height(20);
+    button->set_width(20_fpx);
+    button->set_height(20_fpx);
 
     return button;
 }

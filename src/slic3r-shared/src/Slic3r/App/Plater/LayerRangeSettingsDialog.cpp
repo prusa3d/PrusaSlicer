@@ -30,7 +30,7 @@ LayerRangeSettingsDialog::LayerRangeSettingsDialog(IConfigBoxSetter* config_box_
     Dialog({_u8L("Settings")}, "LayerRangeSettingsDialog"),
     m_config_box_setter(config_box_setter)
 {
-    this->content()->set_width(380);
+    this->content()->set_width(380_fpx);
     this->content()->set_orientation(Orientation::Vertical);
 
     m_stack_layout = this->content()->emplace_back<StackLayout>();
@@ -61,8 +61,8 @@ void LayerRangeSettingsDialog::init_categories_page()
 
     ScrollArea* categories_scroll = m_stack_layout->emplace_back<ScrollArea>();
     categories_scroll->set_orientation(Orientation::Vertical);
-    categories_scroll->set_gap(5);
-    categories_scroll->set_max_height(350);
+    categories_scroll->set_gap(5_fpx);
+    categories_scroll->set_max_height(350_fpx);
 
     for (const auto& [category, category_name] : category_names) {
         LayoutButton* button = categories_scroll->emplace_back<LayoutButton>(
@@ -82,16 +82,16 @@ void LayerRangeSettingsDialog::init_settings_page()
 {
     Item* options_page = m_stack_layout->emplace_back<Item>();
     options_page->set_orientation(Orientation::Vertical);
-    options_page->set_gap(5);
+    options_page->set_gap(5_fpx);
 
     Item* back_row = options_page->emplace_back<Item>();
-    back_row->set_gap(5);
+    back_row->set_gap(5_fpx);
     back_row->set_flex_shrink(0);
 
     LayoutButton* back_button = back_row->emplace_back<LayoutButton>("", Render::Icon::ChevronLeft);
-    back_button->set_width(18);
-    back_button->set_height(18);
-    back_button->set_content_padding(Paddings(2));
+    back_button->set_width(18_fpx);
+    back_button->set_height(18_fpx);
+    back_button->set_content_padding(Paddings(2_fpx));
     back_button->callbacks().action = [this]() { on_about_to_show(); };
 
     m_options_category_text = back_row->emplace_back<Text>(std::string());
@@ -102,8 +102,8 @@ void LayerRangeSettingsDialog::init_settings_page()
 
     m_settings_scroll = options_page->emplace_back<ScrollArea>();
     m_settings_scroll->set_orientation(Orientation::Vertical);
-    m_settings_scroll->set_gap(5);
-    m_settings_scroll->set_max_height(350);
+    m_settings_scroll->set_gap(5_fpx);
+    m_settings_scroll->set_max_height(350_fpx);
 }
 
 void LayerRangeSettingsDialog::set_config_box(const ConfigBox* config_box)
@@ -161,7 +161,7 @@ void LayerRangeSettingsDialog::create_settings_page_for_category(ConfigItemDef::
         Text* label_text = setting_row->emplace_back<Text>(setting_label);
         label_text->set_wrap_mode(Text::WrapMode::Wrap);
         label_text->set_align({AlignH::Left, AlignV::Center});
-        label_text->set_width(120);
+        label_text->set_width(120_fpx);
 
         ConfigItemControl* control = ConfigItemControl::config_item_control_factory(
             setting_row,
@@ -173,7 +173,7 @@ void LayerRangeSettingsDialog::create_settings_page_for_category(ConfigItemDef::
         );
 
         if (Item* control_item = dynamic_cast<Item*>(control); control_item != nullptr) {
-            control_item->set_width(100);
+            control_item->set_width(100_fpx);
             control_item->set_flex_shrink(0);
         }
 

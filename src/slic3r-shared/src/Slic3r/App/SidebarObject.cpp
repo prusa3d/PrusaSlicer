@@ -239,11 +239,11 @@ SidebarObject::SidebarObject(Biz::ProjectInteractor& project_interactor) :
     m_override_settings_dialog = emplace_back<OverrideSettingsDialog>(m_project_interactor);
 
     set_orientation(Orientation::Vertical);
-    set_min_height(60);
+    set_min_height(60_fpx);
     set_flex_grow(1);
     set_padding(0);
 
-    const Unit gap{0.8_rem};
+    const Unit gap{5_fpx};
 
     auto title{emplace_back<Item>()};
     title->set_flex_shrink(0);
@@ -256,8 +256,8 @@ SidebarObject::SidebarObject(Biz::ProjectInteractor& project_interactor) :
     LayoutButton* close_button =
         title->emplace_back<LayoutButton>(std::string{}, Render::Icon::PrintIdle);
     close_button->set_background_color(Platform::Color::ButtonTransparent);
-    close_button->set_width(20);
-    close_button->set_height(20);
+    close_button->set_width(20_fpx);
+    close_button->set_height(20_fpx);
     close_button->callbacks().action = [this]
     { m_project_interactor.scene_interactor().clear_object_selection(); };
 

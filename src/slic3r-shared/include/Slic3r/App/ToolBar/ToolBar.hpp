@@ -28,11 +28,11 @@ public:
     std::optional<size_t> index_of(ToolBarButton* button) const;
     bool contains(ToolBarButton* button) const;
 
-    float button_width() const;
-    void set_button_width(float button_width);
+    const Yoga::Unit& button_width() const;
+    void set_button_width(const Yoga::Unit& button_width);
 
-    float button_height() const;
-    void set_button_height(float button_height);
+    const Yoga::Unit& button_height() const;
+    void set_button_height(const Yoga::Unit& button_height);
 
     float available_size() const;
     void set_available_size(float available_size);
@@ -56,8 +56,8 @@ private:
 
     std::vector<ToolBarButton*> m_buttons;
     ToolBarButton* m_button_more = nullptr;
-    float m_button_width         = 0;
-    float m_button_height        = 0;
+    Yoga::Unit m_button_width    = 0;
+    Yoga::Unit m_button_height   = 0;
     float m_available_size       = YGUndefined;
     bool m_collapsible           = false;
     bool m_hovered               = false;

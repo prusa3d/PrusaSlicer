@@ -15,7 +15,7 @@ ToolBarButton::ToolBarButton(Render::Icon icon, const std::string& tooltip) :
 {
     set_background_color(Platform::Color::ButtonTransparent);
 
-    set_content_padding(10.f);
+    set_content_padding(10);
     m_tooltip->set_preferred_position(Position::Bottom);
 }
 
@@ -85,11 +85,11 @@ Yoga::ContextPopup* ToolBarButton::get_or_create_subtoolbar()
 {
     if (!m_subtoolbar) {
         m_subtoolbar                  = emplace_back<ContextPopup>("SubToolBar");
-        constexpr const float PADDING = 4.f;
+        constexpr const Unit PADDING = 4_fpx;
         m_subtoolbar->set_padding(PADDING);
         parent_item()->orientation() == Orientation::Horizontal ?
-            m_subtoolbar->set_height(40 + PADDING * 2) :
-            m_subtoolbar->set_width(40 + PADDING * 2);
+            m_subtoolbar->set_height(40_fpx + PADDING * 2) :
+            m_subtoolbar->set_width(40_fpx + PADDING * 2);
         m_subtoolbar->set_position(Position::Bottom);
 
         m_subtoolbar->callbacks().opened = [this] { set_checked(true); };
