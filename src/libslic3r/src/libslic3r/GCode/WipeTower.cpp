@@ -28,6 +28,7 @@
 
 using namespace Slic3r::Biz;
 using Slic3r::Domain::GCodeFlavor;
+using Slic3r::Domain::PressureAdvance;
 
 namespace Slic3r
 {
@@ -705,6 +706,11 @@ void WipeTower::set_extruder(size_t idx, const PrintConfigView& config)
         m_filpar[idx].ramming_initial_delay = float(config.get<std::vector<double>>("filament_ramming_initial_delay").at(idx));
     }
 
+    // same condition GCodeGenerator::set_extruder uses to emit pressure advance after a toolchange
+    m_filpar[idx].pressure_advance_restored_by_slicer =
+        config.get<std::vector<PressureAdvance>>("pressure_advance").at(idx) != PressureAdvance::Disabled
+        && config.get<std::vector<double>>("pressure_advance_value").at(idx) > 0.;
+
     m_filpar[idx].filament_area = float((M_PI/4.f) * pow(config.get<std::vector<double>>("filament_diameter").at(idx), 2)); // all extruders are assumed to have the same filament diameter at this point
     float nozzle_diameter = float(Biz::Slicing::get_nozzle_diameter(config.hw_config(), idx));
     m_filpar[idx].nozzle_diameter = nozzle_diameter; // to be used in future with (non-single) multiextruder MM
@@ -816,7 +822,7 @@ std::vector<WipeTower::ToolChangeResult> WipeTower::prime(
             toolchange_Wipe(writer, cleaning_box , 20.f);
             box_coordinates box = cleaning_box;
             box.translate(0.f, writer.y() - cleaning_box.ld.y() + m_perimeter_width);
-            toolchange_Unload(writer, box , m_filpar[m_current_tool].material, m_filpar[m_current_tool].first_layer_temperature, m_filpar[tools[idx_tool + 1]].first_layer_temperature);
+            toolchange_Unload(writer, box , m_filpar[m_current_tool].material, m_filpar[m_current_tool].first_layer_temperature, m_filpar[tools[idx_tool + 1]].first_layer_temperature, int(tools[idx_tool + 1]));
             cleaning_box.translate(prime_section_width, 0.f);
             writer.travel(cleaning_box.ld, 7200);
         }
@@ -905,7 +911,8 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
     if (tool != (unsigned int)-1){ 			// This is not the last change.
         toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material,
                           (is_first_layer() ? m_filpar[m_current_tool].first_layer_temperature : m_filpar[m_current_tool].temperature),
-                          (is_first_layer() ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature));
+                          (is_first_layer() ? m_filpar[tool].first_layer_temperature : m_filpar[tool].temperature),
+                          int(tool));
         toolchange_Change(writer, tool, m_filpar[tool].material); // Change the tool, set a speed override for soluble and flex materials.
         toolchange_Load(writer, cleaning_box);
         if (has_semm_loading_move()) {
@@ -914,7 +921,7 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
         toolchange_Wipe(writer, cleaning_box, wipe_volume);     // Wipe the newly loaded filament until the end of the assigned wipe area.
         ++ m_num_tool_changes;
     } else
-        toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material, m_filpar[m_current_tool].temperature, m_filpar[m_current_tool].temperature);
+        toolchange_Unload(writer, cleaning_box, m_filpar[m_current_tool].material, m_filpar[m_current_tool].temperature, m_filpar[m_current_tool].temperature, -1);
 
     m_depth_traversed += wipe_area;
 
@@ -942,7 +949,8 @@ void WipeTower::toolchange_Unload(
 	const box_coordinates 	&cleaning_box,
 	const std::string&		 current_material,
     const int                old_temperature,
-	const int 				 new_temperature)
+	const int 				 new_temperature,
+	const int 				 new_tool)
 {
 	float xl = cleaning_box.ld.x() + 1.f * m_perimeter_width;
 	float xr = cleaning_box.rd.x() - 1.f * m_perimeter_width;
@@ -963,9 +971,13 @@ void WipeTower::toolchange_Unload(
     const bool do_ramming = m_semm || m_filpar[m_current_tool].multitool_ramming;
     const int ramming_temperature_delta = m_filpar[m_current_tool].ramming_temperature_delta;
 
+    // Only disable pressure advance if it is restored after the toolchange. See GH issue #11187.
+    const bool may_disable_pressure_advance =
+        new_tool >= 0 && m_filpar[new_tool].pressure_advance_restored_by_slicer;
+
     if (do_ramming) {
         writer.travel(ramming_start_pos); // move to starting position
-        if (!m_enable_pressure_advance_during_ramming)
+        if (!m_enable_pressure_advance_during_ramming && may_disable_pressure_advance)
             writer.disable_linear_advance();
         if (ramming_temperature_delta != 0)
             writer.set_extruder_temp(old_temperature + ramming_temperature_delta);
@@ -1075,7 +1087,7 @@ void WipeTower::toolchange_Unload(
 
         float speed_inc = (final_speed - initial_speed) / (2.f * number_of_cooling_moves - 1.f);
 
-        if (m_enable_pressure_advance_during_ramming)
+        if (m_enable_pressure_advance_during_ramming && may_disable_pressure_advance)
             writer.disable_linear_advance();
 
         writer.suppress_preview()

@@ -250,6 +250,7 @@ public:
 		float               filament_minimal_purge_on_wipe_tower = 0.f;
         int                 ramming_temperature_delta = 0;
         float               ramming_initial_delay = 0.0;
+        bool                pressure_advance_restored_by_slicer = false;
     };
 
 private:
@@ -398,7 +399,8 @@ private:
 		const box_coordinates  &cleaning_box, 
 		const std::string&	 	current_material,
 		const int 				old_temperature,
-		const int 				new_temperature);
+		const int 				new_temperature,
+		const int 				new_tool);   // -1 if no toolchange follows
 
 	void toolchange_Change(
 		WipeTowerWriter &writer,

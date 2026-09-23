@@ -596,6 +596,33 @@ TEST_CASE_METHOD(ApplyTestFixture, "Apply invalidates correct steps - GCode flav
     );
 }
 
+TEST_CASE_METHOD(
+    ApplyTestFixture,
+    "Apply invalidates correct steps - pressure advance",
+    "[PrintApply]"
+)
+{
+    apply_and_check(
+        *this,
+        [](TestConfig& c)
+        { c.filament.at(0).items.opt("pressure_advance").set(Domain::PressureAdvance::Enabled); },
+        {psWipeTower, psGCodeExport}
+    );
+}
+
+TEST_CASE_METHOD(
+    ApplyTestFixture,
+    "Apply invalidates correct steps - pressure advance value",
+    "[PrintApply]"
+)
+{
+    apply_and_check(
+        *this,
+        [](TestConfig& c) { c.filament.at(0).items.opt("pressure_advance_value").set(0.05); },
+        {psWipeTower, psGCodeExport}
+    );
+}
+
 TEST_CASE("Apply rejects invalid extruders", "[PrintApply]") {
     using Biz::Slicing::ApplyStatus::Status;
     using Biz::Slicing::ApplyStatus::InvalidData;

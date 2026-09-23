@@ -55,6 +55,7 @@ using Biz::Parser::PlaceholderParser;
 using Domain::ConfigPack;
 using Domain::ConfigPackFDM;
 using Domain::GCodeFlavor;
+using Domain::PressureAdvance;
 using Slic3r::Biz::Slicing::GeneratedSupportPoint;
 using Slic3r::Biz::Slicing::GeneratedSupportPointsSnapshot;
 using Slic3r::Biz::Slicing::IThumbnailImageGenerator;
@@ -832,6 +833,23 @@ DONE:;
                 );
             }
         }
+
+        // Filaments leaving pressure advance to the printer keep the value set by the previous filament.
+        const auto pressure_advance = m_config.get<std::vector<PressureAdvance>>("pressure_advance");
+        const bool set_by_slicer = std::any_of(
+            extruders.begin(), extruders.end(),
+            [&pressure_advance](unsigned int idx) {
+                return pressure_advance.at(idx) != PressureAdvance::Disabled;
+            }
+        );
+        const bool set_by_printer = std::any_of(
+            extruders.begin(), extruders.end(),
+            [&pressure_advance](unsigned int idx) {
+                return pressure_advance.at(idx) == PressureAdvance::Disabled;
+            }
+        );
+        if (set_by_slicer && set_by_printer)
+            warnings.emplace_back(Warning{WarningCode::WipeTowerPressureAdvanceDiffer});
 
         if (m_config.get<GCodeFlavor>("gcode_flavor") != GCodeFlavor::gcfRepRapSprinter
             && m_config.get<GCodeFlavor>("gcode_flavor") != GCodeFlavor::gcfRepRapFirmware

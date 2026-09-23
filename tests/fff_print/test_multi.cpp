@@ -415,3 +415,65 @@ TEST_CASE(
         );
     }
 }
+
+namespace {
+
+// Two extruders with a wipe tower, ramming on every toolchange.
+TestConfig make_ramming_wipe_tower_config()
+{
+    TestConfig config{2};
+
+    config.print.items.opt("wipe_tower").set(true);
+    config.print.items.opt("skirts").set(0);
+    config.print.items.opt("layer_height").set(0.2);
+    // required by the wipe tower
+    config.print.items.opt("support_material_extruder").set(0);
+    config.print.items.opt("support_material_interface_extruder").set(0);
+    config.printer.items.opt("gcode_flavor").set(Domain::GCodeFlavor::gcfKlipper);
+    config.printer.items.opt("use_relative_e_distances").set(true);
+
+    for (Domain::FilamentSettings& filament : config.filament) {
+        filament.items.opt("filament_multitool_ramming").set(true);
+    }
+
+    return config;
+}
+
+} // namespace
+
+TEST_CASE("Pressure advance is not disabled when the slicer cannot restore it", "[Multi]")
+{
+    TestConfig config{make_ramming_wipe_tower_config()};
+
+    for (Domain::FilamentSettings& filament : config.filament) {
+        filament.items.opt("pressure_advance").set(Domain::PressureAdvance::Disabled);
+    }
+
+    const std::string gcode{slice_two_cubes_with_different_extruders(config)};
+
+    REQUIRE(!gcode.empty());
+    REQUIRE(gcode.find("SET_PRESSURE_ADVANCE") == std::string::npos);
+}
+
+TEST_CASE("Pressure advance is disabled and restored when the slicer sets it", "[Multi]")
+{
+    TestConfig config{make_ramming_wipe_tower_config()};
+
+    for (Domain::FilamentSettings& filament : config.filament) {
+        filament.items.opt("pressure_advance").set(Domain::PressureAdvance::Enabled);
+        filament.items.opt("pressure_advance_value").set(0.05);
+    }
+
+    const std::string gcode{slice_two_cubes_with_different_extruders(config)};
+
+    REQUIRE(!gcode.empty());
+
+    // every disable must be followed by a restore
+    std::size_t disabled{gcode.find("SET_PRESSURE_ADVANCE ADVANCE=0\n")};
+    REQUIRE(disabled != std::string::npos);
+
+    while (disabled != std::string::npos) {
+        REQUIRE(gcode.find("SET_PRESSURE_ADVANCE ADVANCE=0.05\n", disabled) != std::string::npos);
+        disabled = gcode.find("SET_PRESSURE_ADVANCE ADVANCE=0\n", disabled + 1);
+    }
+}
