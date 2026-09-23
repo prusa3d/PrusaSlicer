@@ -266,7 +266,7 @@ TEST_CASE("MaterialPresetProjectView", "[preset]")
             }};
             if (preset_in_bundle) {
                 bundle.evaluated_presets["id1"].front().prints.front().materials.front().emplace_back(
-                    Domain::Preset::EvaluatedMaterialPreset::Preset{.id = "material1"}
+                    Domain::Preset::EvaluatedMaterialPreset::Preset{.id = "material1"}, Domain::Preset::MatDbMatchRule{}
                 );
             } else {
                 runtime.add_material({"id1", "printer1", "print1"}, hw_config, 0, {.id="material1"});
@@ -288,7 +288,8 @@ TEST_CASE("MaterialPresetProjectView", "[preset]")
             .prints = {Domain::Preset::EvaluatedPrintPreset{{.id = "print1"}, {{}}, {{}}}}
         }};
         bundle.evaluated_presets["id1"].front().prints.front().materials.front().emplace_back(
-            Domain::Preset::EvaluatedMaterialPreset::Preset{.id = "material1"}
+            Domain::Preset::EvaluatedMaterialPreset::Preset{.id = "material1"},
+            Domain::Preset::MatDbMatchRule{}
         );
         runtime.add_material({"id1", "printer1", "print1"}, hw_config, 0, {.id="material2"});
 

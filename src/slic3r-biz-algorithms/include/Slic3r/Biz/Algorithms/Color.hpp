@@ -3,6 +3,7 @@
 #include "Slic3r/Domain/Color.hpp"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Slic3r::Biz::Algorithms::Color {
@@ -19,10 +20,10 @@ Domain::ColorRGBA saturate(const Domain::ColorRGBA& color, float factor);
 Domain::ColorRGB opposite(const Domain::ColorRGB& color);
 Domain::ColorRGB opposite(const Domain::ColorRGB& a, const Domain::ColorRGB& b);
 
-bool can_decode_color(const std::string& color);
+bool can_decode_color(std::string_view color);
 
-bool decode_color(const std::string& color_in, Domain::ColorRGB& color_out);
-bool decode_color(const std::string& color_in, Domain::ColorRGBA& color_out);
+bool decode_color(std::string_view color_in, Domain::ColorRGB& color_out);
+bool decode_color(std::string_view color_in, Domain::ColorRGBA& color_out);
 
 bool decode_colors(const std::vector<std::string>& colors_in, std::vector<Domain::ColorRGB>& colors_out);
 bool decode_colors(const std::vector<std::string>& colors_in, std::vector<Domain::ColorRGBA>& colors_out);

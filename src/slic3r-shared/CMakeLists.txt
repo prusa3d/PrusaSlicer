@@ -1317,6 +1317,13 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/ObjectList/VolumeItem.cpp
         include/Slic3r/App/ObjectList/InstanceItem.hpp
         src/Slic3r/App/ObjectList/InstanceItem.cpp
+    
+        include/Slic3r/Biz/MatDb/MatDbClient.hpp
+        src/Slic3r/Biz/MatDb/MatDbClient.cpp
+        include/Slic3r/Biz/MatDb/MatDbInteractor.hpp
+        src/Slic3r/Biz/MatDb/MatDbInteractor.cpp
+        src/Slic3r/Biz/Preset/PresetMatchRuleFactor.hpp
+        src/Slic3r/Biz/Preset/PresetMatchRuleFactor.cpp
 )
 
 if (WIN32)
@@ -1669,6 +1676,7 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/Biz/UserAccount/UserAccountSessionTests.cpp
 
         test/Slic3r/App/CustomGCodeMigrationTests.cpp
+        test/Slic3r/Biz/MatDb/MatDbClientTests.cpp
     )
     target_include_directories(slic3r-shared-tests PRIVATE test src)
 

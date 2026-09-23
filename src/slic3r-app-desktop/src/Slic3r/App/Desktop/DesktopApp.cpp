@@ -501,6 +501,8 @@ void DesktopApp::finish_init()
         return;
     }
 
+    m_project_interactor->matdb_interactor().init_client();
+
     if (m_splash_screen)
         m_splash_screen->SetText(WX::_L("Initializing Prepare Mode") + dots);
 

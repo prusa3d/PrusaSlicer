@@ -31,6 +31,7 @@
 #include "Slic3r/Biz/IUndoProvider.hpp"
 #include "Slic3r/Biz/Connect/ConnectMessageHandler.hpp"
 #include "Slic3r/Biz/BackupStore.hpp"
+#include "Slic3r/Biz/MatDb/MatDbInteractor.hpp"
 
 namespace Slic3r::Domain {
 class Model;
@@ -101,6 +102,7 @@ public:
         m_preset_interactor(workbench, m_scene_interactor, m_backup_store),
         m_arrange_interactor(m_scene_interactor, workbench),
         m_clipboard_interactor(m_scene_interactor, m_arrange_interactor, workbench),
+        m_matdb_interactor(m_preset_interactor),
         m_project_settings_interactor(workbench, m_null_mdb),
         m_virtual_extruder_interactor(workbench),
         m_slicing_interactor(dispatcher, thumbnail_image_generator),
@@ -400,6 +402,11 @@ public:
     Biz::ClipboardInteractor& clipboard_interactor()
     {
         return m_clipboard_interactor;
+    }
+
+    MatDb::MatDbInteractor& matdb_interactor()
+    {
+        return m_matdb_interactor;
     }
 
     ProjectSettingsInteractor& project_settings_interactor()
@@ -708,6 +715,7 @@ private:
     Preset::PresetInteractor m_preset_interactor;
     ArrangeInteractor m_arrange_interactor;
     ClipboardInteractor m_clipboard_interactor;
+    MatDb::MatDbInteractor m_matdb_interactor;
     NullMdb m_null_mdb;
     ProjectSettingsInteractor m_project_settings_interactor;
     VirtualExtruderInteractor m_virtual_extruder_interactor;
