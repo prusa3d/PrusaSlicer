@@ -981,7 +981,7 @@ void SourceStore::merge_vendors(SourceEntry& entry, const std::vector<VendorRepo
         {
             // Work in flight, or a failure the user has not dealt with, outlives a re-check.
             vendor.install_state = previous_vendor->second.install_state;
-            vendor.error_text    = previous_vendor->second.error_text;
+            vendor.failure_reason = previous_vendor->second.failure_reason;
             vendor.removing      = previous_vendor->second.removing;
         }
 
@@ -1079,7 +1079,7 @@ void SourceStore::set_install_state(const std::vector<VendorKey>& keys, InstallS
             continue;
         }
         vendor->install_state = state;
-        vendor->error_text.clear();
+        vendor->failure_reason.reset();
     }
 }
 
@@ -1094,14 +1094,14 @@ void SourceStore::set_removing(const std::vector<VendorKey>& keys)
     }
 }
 
-void SourceStore::set_install_failed(const VendorKey& key, const std::string& error_text)
+void SourceStore::set_install_failed(const VendorKey& key, Biz::PresetUpdater::PresetUpdaterReason reason)
 {
     VendorEntry* vendor = find_vendor(key);
     if (vendor == nullptr) {
         return;
     }
     vendor->install_state = InstallState::Failed;
-    vendor->error_text    = error_text;
+    vendor->failure_reason = reason;
 }
 
 void SourceStore::set_install_done(const VendorKey& key)
@@ -1111,7 +1111,7 @@ void SourceStore::set_install_done(const VendorKey& key)
         return;
     }
     vendor->install_state = InstallState::Done;
-    vendor->error_text.clear();
+    vendor->failure_reason.reset();
 }
 
 void SourceStore::abandon_install(const std::vector<VendorKey>& keys, bool canceled)
@@ -1292,7 +1292,7 @@ bool SourceStore::publish_vendors(const SourceEntry& entry, bool install_locked)
         row.current_version     = vendor.current_version;
         row.recommended_version = vendor.recommended_version;
         row.install_state       = vendor.install_state;
-        row.error_text          = vendor.error_text;
+        row.failure_reason      = vendor.failure_reason;
         row.install_locked      = install_locked;
         row.skipped             = vendor.skipped;
         row.up_to_date          = vendor.up_to_date;
@@ -1509,16 +1509,39 @@ void PresetUpdaterController::on_online_allowed_changed()
     }
 
     Transaction transaction(*this);
-    if (!m_periodic.has_value()) {
+    if (!online_allowed()) {
+        if (m_periodic.has_value()) {
+            m_periodic->stop();
+        }
+        m_offline_check_pending = true;
+        check_offline_once_sources_settle();
         return;
     }
-    if (!online_allowed()) {
-        m_periodic->stop();
+    m_offline_check_pending = false;
+    if (!m_periodic.has_value()) {
         return;
     }
     if (m_periodic->start() && may_check_in_background()) {
         start_check(Biz::PresetUpdater::SourceListSync::Fetch, CheckReporting::Silent);
     }
+}
+
+void PresetUpdaterController::check_offline_once_sources_settle()
+{
+    if (!m_offline_check_pending || m_shut_down || sources_changing()) {
+        return;
+    }
+    m_offline_check_pending = false;
+    if (online_allowed() || activity() == ControllerActivity::Installing) {
+        return;
+    }
+    start_check(Biz::PresetUpdater::SourceListSync::UseStored, CheckReporting::Silent);
+}
+
+bool PresetUpdaterController::sources_changing() const
+{
+    return m_ledger.any_pending(JobKind::Listing) || m_ledger.any_pending(JobKind::Selection)
+        || m_ledger.any_pending(JobKind::AddSource) || m_ledger.any_pending(JobKind::RemoveSource);
 }
 
 void PresetUpdaterController::on_periodic_check_due()
@@ -1897,9 +1920,7 @@ ControllerActivity PresetUpdaterController::activity() const
     if (m_ledger.any_pending(JobKind::Check) || m_ledger.any_pending(JobKind::ForcedCheck)) {
         return ControllerActivity::Checking;
     }
-    if (m_ledger.any_pending(JobKind::Listing) || m_ledger.any_pending(JobKind::Selection)
-        || m_ledger.any_pending(JobKind::AddSource) || m_ledger.any_pending(JobKind::RemoveSource))
-    {
+    if (sources_changing()) {
         return ControllerActivity::ListingSources;
     }
     return ControllerActivity::None;
@@ -2041,7 +2062,7 @@ void PresetUpdaterController::on_preset_updater_error(
 
     if (record != nullptr && carries_vendor_keys(record->kind)) {
         for (const VendorKey& key : record->keys) {
-            m_store.set_install_failed(key, body);
+            m_store.set_install_failed(key, reason);
         }
     }
 
@@ -2150,7 +2171,7 @@ void PresetUpdaterController::on_preset_updater_reconfigurations_performed(
     for (const VendorKey& key : record->keys) {
         const auto failure = failure_of(key);
         if (failure != warnings.end()) {
-            m_store.set_install_failed(key, failure->text);
+            m_store.set_install_failed(key, failure->reason);
             continue;
         }
         succeeded.push_back(key);
@@ -2290,6 +2311,8 @@ void PresetUpdaterController::on_preset_updater_job_finished(
     if (kind == JobKind::Selection && m_committer.has_value()) {
         m_committer->on_commit_finished();
     }
+
+    check_offline_once_sources_settle();
 
     if (kind == JobKind::ForcedCheck && was_newest) {
         notify_forced_state(forced_mode());

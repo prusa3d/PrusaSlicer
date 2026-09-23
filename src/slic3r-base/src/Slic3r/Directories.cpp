@@ -246,23 +246,26 @@ static std::string get_platform_data_dir()
 }
 #endif
 
-std::string app_versioned_dir_name()
+namespace {
+std::string versioned_datadir_name()
 {
     Semver semver(::Slic3r::VERSION);
     bool is_alpha = semver.prerelease() && std::string{semver.prerelease()}.find("alpha") != std::string::npos;
     bool is_beta = semver.prerelease() && std::string{semver.prerelease()}.find("beta") != std::string::npos;
 
     auto datadir_name = std::string(::Slic3r::APP_NAME) + std::to_string(semver.maj());
-    if (is_alpha || is_beta)
+    if (is_alpha || is_beta) {
         datadir_name += "-dev";
+    }
 
     return datadir_name;
 }
+} // namespace
 
 std::string get_default_datadir()
 {
     const std::string config_dir = get_platform_data_dir();
-    std::string data_dir = (boost::filesystem::path(config_dir) / app_versioned_dir_name()).make_preferred().string();
+    std::string data_dir = (boost::filesystem::path(config_dir) / versioned_datadir_name()).make_preferred().string();
     return data_dir;
 }
 
@@ -484,7 +487,7 @@ std::string get_default_updater_cache_dir(bool datadir_overridden)
     if (datadir_overridden) {
         return (fs::path(data_dir()) / "cache").make_preferred().string();
     }
-    return (fs::path(platform_cache_root()) / app_versioned_dir_name()).make_preferred().string();
+    return (fs::path(platform_cache_root()) / versioned_datadir_name()).make_preferred().string();
 }
 
 static std::string g_updater_cache_dir;

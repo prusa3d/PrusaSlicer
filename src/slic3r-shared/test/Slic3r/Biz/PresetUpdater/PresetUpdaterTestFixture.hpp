@@ -585,6 +585,14 @@ struct Fixture
         return pump([&listener, count]() { return listener.finished_count() >= count; }, timeout);
     }
 
+    /// Pumps the dispatcher until the given job has reported a terminal state.
+    bool wait_for_job(
+        CaptureListener& listener, JobId job_id, std::chrono::seconds timeout = 20s
+    )
+    {
+        return pump([&listener, job_id]() { return listener.state_of(job_id).has_value(); }, timeout);
+    }
+
     bool pump(const std::function<bool()>& done, std::chrono::seconds timeout = 20s)
     {
         const auto start = std::chrono::high_resolution_clock::now();

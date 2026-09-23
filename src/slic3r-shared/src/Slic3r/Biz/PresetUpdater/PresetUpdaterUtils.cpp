@@ -64,60 +64,6 @@ FileOpResult safe_move(const boost::filesystem::path& source, const boost::files
     return {};
 }
 
-bool move_directory_contents(
-    const fs::path& source_dir, 
-    const fs::path& dest_dir, 
-    PresetUpdaterProcessStatus* process_status,
-    const char* caller_name) 
-{
-    boost::system::error_code ec;
-    for (const auto& entry : fs::recursive_directory_iterator(source_dir, ec)) {
-        if (!entry.is_regular_file(ec) || ec) {
-            continue;
-        }
-        const fs::path& source_path = entry.path();
-        fs::path relative_path      = fs::relative(source_path, source_dir);
-        fs::path dest_path          = dest_dir / relative_path;
-
-        if (!fs::create_directories(dest_path.parent_path(), ec) && ec) {
-            process_status->set_warning(
-                fmt::format(
-                    "Failed to create target directory {}: {}. Staging update has failed.",
-                    dest_path.parent_path().string(),
-                    ec.message()
-                )
-            , PresetUpdaterReason::LocalStorageFailed);
-            return false;
-        }
-
-        auto result = safe_move(source_path, dest_path);
-        if (!result) {
-            process_status->set_warning(
-                fmt::format(
-                    "Failed to move file {} to {}: {}",
-                    source_path.string(),
-                    dest_path.string(),
-                    result.error()
-                )
-            , PresetUpdaterReason::LocalStorageFailed);
-            return false;
-        }
-    }
-    
-    if (ec) {
-        std::string msg = fmt::format(
-            "{}: Error traversing directory {}: {}",
-            caller_name,
-            source_dir.string(),
-            ec.message()
-        );
-        SPDLOG_ERROR(msg);
-        process_status->set_warning(msg, PresetUpdaterReason::LocalStorageFailed);
-    }
-    
-    return true;
-}
-
 bool copy_file_wrapper(const fs::path& source, const fs::path& target, PresetUpdaterProcessStatus* process_status)
 {
     SPDLOG_INFO("PresetUpdater: Copying {} -> {}", source.string(), target.string());
@@ -256,6 +202,9 @@ void perform_removals(
             "Both paths below are built from these two names. An empty one addresses the presets"
             " directory itself, and the removal wipes every installed vendor."
         );
+        if (process_status->get_canceled()) {
+            return;
+        }
         SPDLOG_INFO("Deleting unusable bundle {}", removal.vendor_id);
 
         process_status->set_batch_position(++batch_position, batch_total);
@@ -385,6 +334,7 @@ void perform_updates(
 
         process_status->set_warning_target(update.vendor_repo_id, update.vendor_id);
         if (repo_it == repos.end()) {
+            process_status->set_step(PresetUpdaterStep::None, {});
             process_status->set_warning(
                 fmt::format(
                     "No source offers {} any more, so it cannot be installed.", update.vendor_id

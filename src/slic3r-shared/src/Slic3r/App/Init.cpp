@@ -106,7 +106,7 @@ namespace {
 bool can_rename_into_data_dir(const boost::filesystem::path& candidate)
 {
     boost::system::error_code ec;
-    boost::filesystem::create_directories(candidate, ec);
+    const bool created = boost::filesystem::create_directories(candidate, ec);
     if (ec) {
         return false;
     }
@@ -116,16 +116,19 @@ bool can_rename_into_data_dir(const boost::filesystem::path& candidate)
     const boost::filesystem::path source = candidate / probe_name;
     const boost::filesystem::path target = boost::filesystem::path(Slic3r::data_dir()) / probe_name;
 
+    bool probe_written = false;
     {
         boost::nowide::ofstream probe(source.string().c_str());
-        if (!probe) {
-            return false;
-        }
+        probe_written = static_cast<bool>(probe);
     }
 
-    const bool renamed = !Biz::Utils::rename_file(source.string(), target.string());
+    const bool renamed =
+        probe_written && !Biz::Utils::rename_file(source.string(), target.string());
     boost::filesystem::remove(source, ec);
     boost::filesystem::remove(target, ec);
+    if (!renamed && created) {
+        boost::filesystem::remove(candidate, ec);
+    }
     return renamed;
 }
 

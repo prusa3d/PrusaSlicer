@@ -438,7 +438,7 @@ TEST_CASE("PresetUpdaterController installs everything on offer", "[preset_updat
     CHECK(row.counts.pending() == 0);
     REQUIRE(row.vendors->size() == 1);
     CHECK(row.vendors->at(0).install_state == InstallState::Done);
-    CHECK(row.vendors->at(0).error_text.empty());
+    CHECK_FALSE(row.vendors->at(0).failure_reason.has_value());
 
     const fs::path installed_vendor_dir = fx.installed_path / k_repo_name / k_vendor_name;
     CHECK(fs::exists(installed_vendor_dir / "vendor.yaml"));

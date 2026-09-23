@@ -51,18 +51,40 @@ std::string activity_header(Activity activity)
 
 std::string vendor_subject(const Progress& progress)
 {
+    const bool in_batch = progress.total > 1;
     switch (progress.step) {
     case Step::Downloading:
-        // TRN Preset updater notification. {} is a vendor, {} the version being downloaded.
+        if (in_batch) {
+            return fmt::format(
+                // TRN Preset updater notification. Vendor, version, then its place among the vendors.
+                fmt::runtime(Biz::_u8L("Downloading {} {} ({} of {})")),
+                progress.vendor_id, progress.version, progress.index, progress.total
+            );
+        }
         return fmt::format(
+            // TRN Preset updater notification. {} is a vendor, {} the version being downloaded.
             fmt::runtime(Biz::_u8L("Downloading {} {}")), progress.vendor_id, progress.version
         );
     case Step::Installing:
-        // TRN Preset updater notification. {} is a vendor, {} the version being installed.
+        if (in_batch) {
+            return fmt::format(
+                // TRN Preset updater notification. Vendor, version, then its place among the vendors.
+                fmt::runtime(Biz::_u8L("Installing {} {} ({} of {})")),
+                progress.vendor_id, progress.version, progress.index, progress.total
+            );
+        }
         return fmt::format(
+            // TRN Preset updater notification. {} is a vendor, {} the version being installed.
             fmt::runtime(Biz::_u8L("Installing {} {}")), progress.vendor_id, progress.version
         );
     case Step::Removing:
+        if (in_batch) {
+            return fmt::format(
+                // TRN Preset updater notification. Vendor, then its place among the vendors.
+                fmt::runtime(Biz::_u8L("Removing {} ({} of {})")),
+                progress.vendor_id, progress.index, progress.total
+            );
+        }
         // TRN Preset updater notification. {} is the vendor whose presets are being deleted.
         return fmt::format(fmt::runtime(Biz::_u8L("Removing {}")), progress.vendor_id);
     case Step::None:
@@ -107,13 +129,7 @@ std::string activity_body(Activity activity, const Progress& progress)
     if (subject.empty()) {
         return waiting_body(activity);
     }
-    if (progress.total <= 1) {
-        return subject;
-    }
-    // TRN Preset updater notification. {} names the vendor, then its place in the batch.
-    return fmt::format(
-        fmt::runtime(Biz::_u8L("{}  ({} of {})")), subject, progress.index, progress.total
-    );
+    return subject;
 }
 
 } // namespace

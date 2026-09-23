@@ -13,6 +13,7 @@
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Semver.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterTestFixture.hpp"
 #include "Slic3r/Biz/PresetUpdater/TestPresetUpdaterListener.hpp"
 
 #include <boost/filesystem/operations.hpp>
@@ -47,28 +48,6 @@ bool wait_for_updater(
     }
 }
 
-
-/// Copies only the .idx files, keeping the directory layout they sit in.
-void copy_index_tree(const fs::path& from, const fs::path& to)
-{
-    ASSERT (fs::exists(from) && fs::is_directory(from));
-
-    boost::system::error_code ec;
-    for (fs::recursive_directory_iterator it(from);
-         it != fs::recursive_directory_iterator();
-         it.increment(ec))
-    {
-        ASSERT (!ec);
-        if (!fs::is_regular_file(it->status()) || it->path().extension() != ".idx") {
-            continue;
-        }
-        const fs::path dest_path = to / it->path().lexically_relative(from);
-        if (!fs::exists(dest_path.parent_path())) {
-            fs::create_directories(dest_path.parent_path());
-        }
-        fs::copy_file(it->path(), dest_path, fs::copy_options::overwrite_existing);
-    }
-}
 
 void copy_dir_content(const fs::path& from, const fs::path& to)
 {
@@ -641,7 +620,7 @@ TEST_CASE("PresetUpdater stage updates", "[preset_updater]")
         }
         if (!staged_version.empty()) {
             // update_sync records only what each source offers, so only the indices are staged.
-            copy_index_tree(resources_profile_path / ("resource" + staged_version), staged_path);
+            PresetUpdater::TestSupport::copy_index_tree(resources_profile_path / ("resource" + staged_version), staged_path);
         }
         if (!installed_version.empty()) {
             copy_dir_content(resources_profile_path / ("resource" + installed_version), installed_path);

@@ -4,6 +4,7 @@
 #include "Slic3r/Biz/ObservableList.hpp"
 #include "Slic3r/Biz/PresetUpdater/IPresetUpdaterResultListener.hpp"
 #include "Slic3r/Biz/PresetUpdater/PresetUpdaterInteractor.hpp"
+#include "Slic3r/Biz/PresetUpdater/PresetUpdaterReason.hpp"
 #include "Slic3r/Semver.hpp"
 
 #include <boost/filesystem/path.hpp>
@@ -68,7 +69,7 @@ struct VendorRowState
     Slic3r::Semver recommended_version;
 
     InstallState install_state{InstallState::Idle};
-    std::string error_text;
+    std::optional<Biz::PresetUpdater::PresetUpdaterReason> failure_reason;
 
     bool install_locked{false};
     bool skipped{false};
@@ -503,7 +504,7 @@ public:
     /// Marks what the job in flight is doing, so a finished or retried row reads as a deletion.
     void set_removing(const std::vector<VendorKey>& keys);
 
-    void set_install_failed(const VendorKey& key, const std::string& error_text);
+    void set_install_failed(const VendorKey& key, Biz::PresetUpdater::PresetUpdaterReason reason);
 
     void set_install_done(const VendorKey& key);
 
@@ -543,7 +544,7 @@ private:
         bool removing{false};
 
         InstallState install_state{InstallState::Idle};
-        std::string error_text;
+        std::optional<Biz::PresetUpdater::PresetUpdaterReason> failure_reason;
     };
 
     struct SourceEntry
@@ -738,6 +739,9 @@ public:
      *
      * Starts or stops the repeating background check, and checks at once when it has just been
      * switched on, so whoever switched it on is not left waiting a whole interval for an answer.
+     * Switching it off checks again from what the installation carries, so nothing offered
+     * still needs a download - once the sources being listed or selected have settled, and
+     * unless an install is running, as that job still carries the old setting.
      */
     void on_online_allowed_changed();
 
@@ -892,6 +896,10 @@ private:
 
     void on_periodic_check_due();
 
+    void check_offline_once_sources_settle();
+
+    bool sources_changing() const;
+
     /// Whether a check nobody asked for may start now without getting in the way of one that was.
     bool may_check_in_background() const;
 
@@ -921,6 +929,7 @@ private:
     size_t m_transaction_depth{0};
     std::optional<Snapshot> m_published;
     bool m_shut_down{false};
+    bool m_offline_check_pending{false};
 };
 
 } // namespace Slic3r::App::PresetUpdater

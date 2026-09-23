@@ -96,7 +96,6 @@ private:
     Yoga::LayoutButton* m_retry_button{nullptr};
     Yoga::Text* m_running_text{nullptr};
     Yoga::Text* m_done_text{nullptr};
-    Yoga::Text* m_failed_text{nullptr};
 };
 
 } // namespace Slic3r::App

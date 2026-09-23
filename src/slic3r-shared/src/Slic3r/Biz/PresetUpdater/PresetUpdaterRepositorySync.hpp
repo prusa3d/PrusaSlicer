@@ -36,8 +36,9 @@ public:
      * and most of it is never installed, so it is fetched by install_vendor instead, once the
      * user has asked for it.
      *
-     * @param online_allowed when false, online repositories are left untouched - whatever index
-     * is already staged for them stays, and nothing is fetched.
+     * @param online_allowed when false, nothing is fetched and what is staged for online
+     * repositories is replaced by the indices the installation carries, so an index an earlier
+     * online check staged cannot outlive it. Local repositories are staged as usual.
      */
     void sync_indices(
         const SharedRepositoryVector& repositories,

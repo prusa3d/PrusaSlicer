@@ -89,6 +89,55 @@ std::string running_label(bool removing)
     return Biz::_u8L("Installing...");
 }
 
+std::string failure_label(const std::optional<Biz::PresetUpdater::PresetUpdaterReason>& reason)
+{
+    using Biz::PresetUpdater::PresetUpdaterReason;
+    if (!reason) {
+        // TRN Preset updater vendor row. Line under the vendor name after a failure of unknown cause.
+        return Biz::_u8L("An unexpected error occurred.");
+    }
+    switch (*reason) {
+    case PresetUpdaterReason::NoUsableVersion:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The source offers no version of these presets usable by this application.");
+    case PresetUpdaterReason::SourceNotFound:
+    case PresetUpdaterReason::SourceDropped:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install or removal.
+        return Biz::_u8L("The preset source is no longer available.");
+    case PresetUpdaterReason::SourceListUnavailable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The list of preset sources could not be downloaded.");
+    case PresetUpdaterReason::ManifestUnusable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install or removal.
+        return Biz::_u8L("The list of preset sources on this computer could not be read.");
+    case PresetUpdaterReason::ArchiveInvalid:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The selected archive is not a usable preset source.");
+    case PresetUpdaterReason::IndexUnreadable:
+    case PresetUpdaterReason::DataUnreadable:
+    case PresetUpdaterReason::SourceUnreachable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The presets could not be downloaded.");
+    case PresetUpdaterReason::DataCorrupted:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The downloaded presets are damaged.");
+    case PresetUpdaterReason::DataInconsistent:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The downloaded presets are not the version that was offered.");
+    case PresetUpdaterReason::LocalStorageFailed:
+    case PresetUpdaterReason::DataDirUnusable:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install or removal.
+        return Biz::_u8L("The preset files on this computer could not be changed.");
+    case PresetUpdaterReason::InstallFailed:
+        // TRN Preset updater vendor row. Line under the vendor name after a failed install.
+        return Biz::_u8L("The presets were not installed. Nothing was changed.");
+    case PresetUpdaterReason::Internal:
+        break;
+    }
+    // TRN Preset updater vendor row. Line under the vendor name after a failure of unknown cause.
+    return Biz::_u8L("An unexpected error occurred.");
+}
+
 bool has_warning_icon(VendorReconfigurationState state)
 {
     return state == VendorReconfigurationState::ForcedUpdate
@@ -256,16 +305,10 @@ void PresetUpdaterVendorRow::build_action_slot(Item* header)
     failed->set_flex_grow(1);
     failed->set_orientation(Orientation::Horizontal);
     failed->set_align_items(YGAlignCenter);
-    failed->set_gap(4_fpx);
-    Icon* failed_icon = failed->emplace_back<Icon>(Render::Icon::ErrorMarker);
-    failed_icon->set_width(icon_size);
-    failed_icon->set_height(icon_size);
-    failed_icon->set_flex_shrink(0);
-    m_failed_text = add_elided_text(failed, std::string());
     // TRN Preset updater vendor row button. Runs a failed install again.
     m_retry_button = failed->emplace_back<LayoutButton>(Biz::_u8L("Retry"));
     apply_button_size(m_retry_button);
-    m_retry_button->set_flex_shrink(0);
+    m_retry_button->set_flex_grow(1);
     m_retry_button->callbacks().action = [this]()
     {
         const PresetUpdater::VendorRowState* row = state();
@@ -317,11 +360,21 @@ void PresetUpdaterVendorRow::on_data_update()
         return;
     }
 
-    m_state_icon->set_icon(row->skipped ? Render::Icon::ErrorMarker : Render::Icon::WarningMarker);
+    const bool failed    = row->install_state == PresetUpdater::InstallState::Failed;
+    const bool has_error = row->skipped || failed;
+    m_state_icon->set_icon(has_error ? Render::Icon::ErrorMarker : Render::Icon::WarningMarker);
     m_state_icon->set_tint(
-        row->skipped ? m_theme->color_imgui(Platform::Color::Error) : ImColor(1.0f, 1.0f, 1.0f)
+        has_error ? m_theme->color_imgui(Platform::Color::Error) : ImColor(1.0f, 1.0f, 1.0f)
     );
-    m_state_icon->set_visible(row->skipped || has_warning_icon(row->state));
+    m_state_icon->set_visible(has_error || has_warning_icon(row->state));
+
+    const std::string failure_text =
+        failed && !row->skipped ? failure_label(row->failure_reason) : std::string{};
+    m_comment->set_text_color(
+        !failure_text.empty()
+            ? m_theme->color_imgui(Platform::Color::Error)
+            : m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
+    );
 
     m_name->set_text(row->vendor_id);
 
@@ -370,10 +423,14 @@ void PresetUpdaterVendorRow::on_data_update()
         m_action_button->set_label(action_label(row->state));
     }
 
+    if (!failure_text.empty()) {
+        m_comment->set_text(failure_text);
+        m_comment->set_visible(true);
+    }
+
     m_running_text->set_text(running_label(row->removing));
     m_done_text->set_text(done_label(row->state, row->removing));
-    m_failed_text->set_text(row->error_text);
-    m_retry_button->set_tooltip(row->error_text);
+    m_retry_button->set_tooltip(failure_text);
     m_retry_button->set_visible(!row->install_locked);
 
     if (row->up_to_date && idle) {

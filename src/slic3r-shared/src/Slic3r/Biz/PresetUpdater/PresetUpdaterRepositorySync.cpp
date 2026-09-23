@@ -88,16 +88,22 @@ void warn_about_repo(
     process_status->clear_warning_target();
 }
 
-void remove_file(
-    const fs::path& path,
-    PresetUpdaterProcessStatus* process_status,
-    const char* func_name)
+/**
+ * @brief Removes a staging leftover (a downloaded zip or a staged vendor directory) and only logs
+ * a failure.
+ *
+ * By this point the vendor's install has already succeeded or failed on its own. A warning here
+ * would carry the vendor as its target, and the controller reads any warning naming a vendor as
+ * that vendor's install having failed, so a file briefly locked by e.g. a virus scanner would
+ * turn a finished install into a failed one. A leftover in staging is harmless.
+ */
+void discard_staging_leftover(const fs::path& path, const char* func_name)
 {
     boost::system::error_code ec;
-    bool failed = (!fs::remove(path, ec) && ec);
+    fs::remove_all(path, ec);
 
-    if (failed) {
-        process_status->set_warning(fmt::format("{}: Failed to remove file {}: {}", func_name, path.string(), ec.message()), PresetUpdaterReason::LocalStorageFailed);
+    if (ec) {
+        SPDLOG_WARN("{}: Failed to remove staging leftover {}: {}", func_name, path.string(), ec.message());
     }
 }
 
@@ -165,6 +171,19 @@ bool move_file(
     return true;
 }
 
+bool stays_inside_destination(const fs::path& entry_path)
+{
+    if (entry_path.empty() || entry_path.has_root_path()) {
+        return false;
+    }
+    for (const fs::path& component : entry_path) {
+        if (component == "..") {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool unzip_files_from_bundle_zip(
     const boost::filesystem::path& zip_file,
     const boost::filesystem::path& dest_dir,
@@ -201,7 +220,18 @@ bool unzip_files_from_bundle_zip(
             continue;
         }
 
-        fs::path target_path = dest_dir / stat.m_filename;
+        const fs::path entry_path(stat.m_filename);
+        if (!stays_inside_destination(entry_path)) {
+            std::string msg = fmt::format("Refusing to unzip {}: the entry points outside {}", stat.m_filename, dest_dir.string());
+            SPDLOG_ERROR(msg);
+            if (process_status) {
+                process_status->set_warning(msg, PresetUpdaterReason::DataCorrupted);
+            }
+            success = false;
+            continue;
+        }
+
+        fs::path target_path = dest_dir / entry_path;
         boost::system::error_code ec;
 
         if (!fs::create_directories(target_path.parent_path(), ec) && ec) {
@@ -323,7 +353,7 @@ bool download_vendor_files(
         }
 
         const bool unzipped = unzip_files_from_bundle_zip(zip_path, repo_staging, process_status);
-        remove_file(zip_path, process_status, __FUNCTION__);
+        discard_staging_leftover(zip_path, __FUNCTION__);
 
         if (!unzipped) {
             std::string msg = fmt::format(
@@ -435,7 +465,13 @@ bool vendor_data_declares_version(
 {
     boost::system::error_code ec;
     if (!fs::is_regular_file(vendor_yaml, ec) || ec) {
-        return true;
+        process_status->set_warning(
+            fmt::format(
+                "Vendor data of {} failed its sanity check: {} is missing. Nothing was installed.",
+                vendor_id, vendor_yaml.string()
+            )
+        , PresetUpdaterReason::DataInconsistent);
+        return false;
     }
 
     Domain::Preset::VendorInfo info;
@@ -571,7 +607,8 @@ void PresetUpdaterRepositorySync::sync_indices(
         if (process_status->get_canceled()) {
             break;
         }
-        if (!repo->is_selected()) {
+        const bool resources_only = repo->is_online() && !online_allowed;
+        if (!repo->is_selected() || resources_only) {
             process_status->set_warning_target(repo->descriptor().id);
             remove_directory(update_sync_repo_path(repo->descriptor().id), process_status, __FUNCTION__);
             process_status->clear_warning_target();
@@ -773,7 +810,7 @@ bool PresetUpdaterRepositorySync::install_vendor(
         staging.vendor_path(repo->descriptor().id, vendor_id, target_version.to_string());
     const bool installed =
         download_and_install(repo, vendor_id, target_version, staging_dir, process_status);
-    remove_directory(staging_dir.parent_path(), process_status, __FUNCTION__);
+    discard_staging_leftover(staging_dir.parent_path(), __FUNCTION__);
     return installed;
 }
 
@@ -838,13 +875,16 @@ bool PresetUpdaterRepositorySync::install_from_resources(
 
     const fs::path staged_idx = update_sync_index_path(repo->descriptor().id, vendor_id);
     if (fs::is_regular_file(staged_idx, ec) && !ec) {
-        move_file(staged_idx, installed_idx, process_status, __FUNCTION__);
-    } else {
-        copy_file_wrapper(
-            resources_repo_path(repo->descriptor().id) / (vendor_id + ".idx"),
-            installed_idx,
-            process_status
-        );
+        if (!move_file(staged_idx, installed_idx, process_status, __FUNCTION__)) {
+            return false;
+        }
+    } else if (!copy_file_wrapper(
+                   resources_repo_path(repo->descriptor().id) / (vendor_id + ".idx"),
+                   installed_idx,
+                   process_status
+               ))
+    {
+        return false;
     }
     remove_empty_parents(staged_idx.parent_path(), update_sync_root());
 
@@ -926,6 +966,16 @@ bool PresetUpdaterRepositorySync::download_and_install(
             files_in_version_manifest, files_wanted, staging_dir, installed_dir, vendor_id, process_status
         ))
     {
+        return false;
+    }
+
+    if (!files_in_version_manifest.contains("vendor.yaml")) {
+        process_status->set_warning(
+            fmt::format(
+                "Version manifest of vendor {} does not list vendor.yaml. Nothing was installed.",
+                vendor_id
+            )
+        , PresetUpdaterReason::DataInconsistent);
         return false;
     }
 

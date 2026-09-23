@@ -42,10 +42,6 @@ const std::string& data_dir();
 
 std::string get_default_datadir();
 
-// Directory name this build uses under the platform config and cache roots,
-// e.g. "PrusaSlicer3", or "PrusaSlicer3-dev" for an alpha or beta.
-std::string app_versioned_dir_name();
-
 void set_cache_dir(const std::string& path);
 
 const std::string& cache_dir();

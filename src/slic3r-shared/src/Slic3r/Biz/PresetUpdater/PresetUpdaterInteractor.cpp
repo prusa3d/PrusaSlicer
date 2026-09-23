@@ -213,6 +213,11 @@ PresetUpdaterInteractor::make_status_callback(
     };
 }
 
+std::function<std::string()> PresetUpdaterInteractor::make_access_token_provider() const
+{
+    return [this] { return m_user_account_interactor.access_token(); };
+}
+
 JobId PresetUpdaterInteractor::check_forced_reconfigurations()
 {
     //Does not care about App config value - allways runs
@@ -229,9 +234,7 @@ JobId PresetUpdaterInteractor::check_forced_reconfigurations()
                 make_status_callback(job_id, progress_tracker, VerboseStyle::NoProgress),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token_provider(
-                [this] { return m_user_account_interactor.access_token(); }
-            );
+            process_status.set_access_token_provider(make_access_token_provider());
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
             if (process_status.has_error()) {
                 dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());
@@ -278,9 +281,7 @@ JobId PresetUpdaterInteractor::sync_indices_and_reconfiguration_check(
                 make_status_callback(job_id, progress_tracker, verbose),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token_provider(
-                [this] { return m_user_account_interactor.access_token(); }
-            );
+            process_status.set_access_token_provider(make_access_token_provider());
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
             PresetUpdaterRepositorySync archive_sync;
 
@@ -355,9 +356,7 @@ JobId PresetUpdaterInteractor::perform_reconfigurations(
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES,
                 ignore_hash
             );
-            process_status.set_access_token_provider(
-                [this] { return m_user_account_interactor.access_token(); }
-            );
+            process_status.set_access_token_provider(make_access_token_provider());
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
             if (process_status.has_error()) {
                 dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());
@@ -376,6 +375,8 @@ JobId PresetUpdaterInteractor::perform_reconfigurations(
                 dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());
                 return JobState::Failed;
             }
+            // Only shutdown() stops a running reconfiguration, so skipping the reload and the
+            // row updates for vendors already installed is intended: the app is closing.
             if (stop_token.stop_requested()) {
                 return JobState::Canceled;
             }
@@ -402,9 +403,7 @@ JobId PresetUpdaterInteractor::apply_repository_selection(
                 ),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token_provider(
-                [this] { return m_user_account_interactor.access_token(); }
-            );
+            process_status.set_access_token_provider(make_access_token_provider());
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
 
             if (process_status.has_error()) {
@@ -542,9 +541,7 @@ JobId PresetUpdaterInteractor::list_repositories(bool online_allowed, bool force
                 ),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token_provider(
-                [this] { return m_user_account_interactor.access_token(); }
-            );
+            process_status.set_access_token_provider(make_access_token_provider());
             PresetUpdaterRepositoryDatabase repo_database(&process_status);
 
             if (process_status.has_error()) {
@@ -581,9 +578,7 @@ JobId PresetUpdaterInteractor::cleanup_update_sync()
                 make_status_callback(job_id, progress_tracker, VerboseStyle::NoProgress),
                 PresetUpdaterProcessStatus::PresetUpdaterRetryPolicy::PURP_5_TRIES
             );
-            process_status.set_access_token_provider(
-                [this] { return m_user_account_interactor.access_token(); }
-            );
+            process_status.set_access_token_provider(make_access_token_provider());
             PresetUpdater::cleanup_update_sync(&process_status);
             if (process_status.has_error()) {
                 dispatch_error(job_id, process_status.get_error(), process_status.get_error_reason());

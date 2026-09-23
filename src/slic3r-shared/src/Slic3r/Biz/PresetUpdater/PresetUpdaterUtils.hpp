@@ -28,13 +28,6 @@ using FileOpResult = tl::expected<void, std::string>;
 
 FileOpResult safe_move(const boost::filesystem::path& source, const boost::filesystem::path& target);
 
-bool move_directory_contents(
-    const boost::filesystem::path& source_dir,
-    const boost::filesystem::path& dest_dir,
-    PresetUpdaterProcessStatus* process_status,
-    const char* caller_name
-);
-
 bool copy_file_wrapper(
     const boost::filesystem::path& source,
     const boost::filesystem::path& target,

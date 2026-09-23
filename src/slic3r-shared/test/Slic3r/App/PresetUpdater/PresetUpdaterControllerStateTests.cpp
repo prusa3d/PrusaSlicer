@@ -12,6 +12,7 @@ using Slic3r::Semver;
 using Slic3r::App::PresetUpdaterActivityReporter;
 using Slic3r::Biz::PresetUpdater::k_invalid_job_id;
 using Slic3r::Biz::PresetUpdater::PresetUpdaterReconfigurationList;
+using Slic3r::Biz::PresetUpdater::PresetUpdaterReason;
 using Slic3r::Biz::PresetUpdater::PresetUpdaterRepositoryDescriptor;
 using Slic3r::Biz::PresetUpdater::PresetUpdaterWarning;
 using Slic3r::Biz::PresetUpdater::SharedPresetUpdaterRepositoryInfo;
@@ -748,10 +749,10 @@ TEST_CASE("SourceStore carries an install through to its verdict", "[preset_upda
 
     SECTION("failure keeps the vendor offered and names the reason")
     {
-        store.set_install_failed(key, "disk full");
+        store.set_install_failed(key, PresetUpdaterReason::LocalStorageFailed);
         store.publish(SourceStore::Locks{});
         CHECK(vendor_row(store, 0).install_state == InstallState::Failed);
-        CHECK(vendor_row(store, 0).error_text == "disk full");
+        CHECK(vendor_row(store, 0).failure_reason == PresetUpdaterReason::LocalStorageFailed);
         CHECK(store.actionable_keys(false).size() == 1);
     }
 
@@ -796,13 +797,13 @@ TEST_CASE("SourceStore lets a re-check outlive what an install left behind", "[p
 
     SECTION("a failure the user has not dealt with survives")
     {
-        store.set_install_failed(key, "disk full");
+        store.set_install_failed(key, PresetUpdaterReason::LocalStorageFailed);
         store.begin_check();
         store.apply_check(outcome_of(list));
         store.publish(SourceStore::Locks{});
 
         CHECK(vendor_row(store, 0).install_state == InstallState::Failed);
-        CHECK(vendor_row(store, 0).error_text == "disk full");
+        CHECK(vendor_row(store, 0).failure_reason == PresetUpdaterReason::LocalStorageFailed);
     }
 
     SECTION("a vendor no longer offered keeps its confirmation")
@@ -858,7 +859,7 @@ TEST_CASE("SourceStore forgets a finished round but not a running one", "[preset
     SECTION("a failure the user has not dealt with goes with it")
     {
         run_check(store, list);
-        store.set_install_failed(key, "disk full");
+        store.set_install_failed(key, PresetUpdaterReason::LocalStorageFailed);
         store.forget_results();
         store.publish(SourceStore::Locks{});
 

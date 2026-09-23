@@ -632,6 +632,102 @@ TEST_CASE("PresetUpdater stays off the network when the app config forbids it", 
     CHECK(read_file(installed_vendor_dir / "vendor.yaml").find("1.0.0") != std::string::npos);
 }
 
+TEST_CASE("PresetUpdater performs a forced update from resources when the network is forbidden", "[preset_updater]")
+{
+    Fixture fx;
+    fx.put_installed("200");
+    fx.put_resources("201");
+    fx.put_server("201");
+
+    const fs::path staged_repo = fx.staged_path / k_repo_name;
+    fs::create_directories(staged_repo);
+    {
+        boost::nowide::ofstream file(staged_repo / (k_vendor_name + ".idx"));
+        file << "min_slic3r_version = 3.0.0-alpha0\n"
+                "2.0.2 Left over by an online check\n"
+                "2.0.1 Test\n"
+                "max_slic3r_version = 2.9.9-alpha0\n"
+                "min_slic3r_version = 2.9.9-alpha0\n"
+                "2.0.0 Initial release\n";
+    }
+    copy_index_tree(fx.resources_profile_path / "second_vendor", fx.staged_path);
+    REQUIRE(fs::exists(staged_repo / (k_second_vendor + ".idx")));
+
+    std::vector<std::string> requested;
+    std::mutex requested_mutex;
+    fx.set_mutator([&requested, &requested_mutex](const std::string& url, std::string&, unsigned&) {
+        std::lock_guard<std::mutex> lock(requested_mutex);
+        requested.push_back(url);
+    });
+
+    CaptureListener listener(fx.interactor());
+
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        false, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE_FALSE(listener.got_error());
+    CHECK(listener.warnings().empty());
+    REQUIRE(listener.reconfigurations().has_value());
+    REQUIRE(listener.reconfigurations()->forced_updates().size() == 1);
+    CHECK(
+        listener.reconfigurations()->forced_updates().front().recommended_version
+        == Slic3r::Semver{2, 0, 1}
+    );
+    CHECK(listener.reconfigurations()->new_vendors().empty());
+    CHECK_FALSE(fs::exists(staged_repo / (k_second_vendor + ".idx")));
+
+    const auto reconfigurations = *listener.reconfigurations();
+
+    listener.reset();
+    fx.interactor().perform_reconfigurations(reconfigurations, false);
+    REQUIRE(fx.wait(listener));
+    REQUIRE_FALSE(listener.got_error());
+    CHECK(listener.performed());
+    CHECK(listener.warnings().empty());
+
+    for (const auto& report : listener.vendor_progress()) {
+        CHECK(report.step == PresetUpdater::PresetUpdaterStep::Installing);
+    }
+
+    const fs::path installed_vendor_dir = fx.installed_path / k_repo_name / k_vendor_name;
+    REQUIRE(fs::exists(installed_vendor_dir / "vendor.yaml"));
+    CHECK(read_file(installed_vendor_dir / "vendor.yaml").find("2.0.1") != std::string::npos);
+
+    std::lock_guard<std::mutex> lock(requested_mutex);
+    CHECK(requested.empty());
+}
+
+TEST_CASE("PresetUpdater still checks local sources when the network is forbidden", "[preset_updater]")
+{
+    Fixture fx;
+
+    CaptureListener listener(fx.interactor());
+
+    const fs::path local_zip = fx.resources_profile_path / "local_repo.zip";
+    REQUIRE(fs::exists(local_zip));
+
+    fx.interactor().add_local_repository(local_zip);
+    REQUIRE(fx.wait(listener));
+    REQUIRE_FALSE(listener.got_error());
+
+    listener.reset();
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        false, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE_FALSE(listener.got_error());
+    REQUIRE(listener.reconfigurations().has_value());
+    CHECK(fs::exists(fx.staged_path / "local_test_repo" / (k_vendor_name + ".idx")));
+    CHECK(
+        std::any_of(
+            listener.reconfigurations()->new_vendors().begin(),
+            listener.reconfigurations()->new_vendors().end(),
+            [](const auto& reconf) { return reconf.vendor_repo_id == "local_test_repo"; }
+        )
+    );
+}
+
 TEST_CASE("PresetUpdater manages local sources when the app config forbids the network", "[preset_updater]")
 {
     Fixture fx;
@@ -769,7 +865,7 @@ TEST_CASE("PresetUpdater leaves no staged download behind when an install is can
     std::this_thread::sleep_for(100ms);
     fx.interactor().on_notification_cancel();
 
-    REQUIRE(fx.wait_for_finished(listener, 1));
+    REQUIRE(fx.wait_for_job(listener, canceled));
     CHECK(manifest_seen.load());
     CHECK(listener.state_of(canceled) == PresetUpdater::JobState::Canceled);
     CHECK_FALSE(fs::exists(fx.installed_path / k_repo_name / k_vendor_name / "vendor.yaml"));
@@ -953,8 +1049,9 @@ TEST_CASE("PresetUpdater remembers that a new vendor has been offered", "[preset
     CHECK_FALSE(listener.reconfigurations()->new_vendors().front().acknowledged);
 
     listener.reset();
-    fx.interactor().acknowledge_new_vendors({{k_repo_name, {k_vendor_name}}});
-    REQUIRE(fx.wait_for_finished(listener, 1));
+    const PresetUpdater::JobId acknowledge =
+        fx.interactor().acknowledge_new_vendors({{k_repo_name, {k_vendor_name}}});
+    REQUIRE(fx.wait_for_job(listener, acknowledge));
 
     const std::string manifest = read_file(fx.shared_runtime_path / "RepositoryManifest.json");
     CHECK(manifest.find("acknowledged_vendors") != std::string::npos);
