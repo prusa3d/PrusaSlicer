@@ -93,10 +93,22 @@ public:
     {}
     ~PrintRegion() = default;
 
-// Methods NOT modifying the PrintRegion's state:
 public:
-    const PrintRegionConfigView& config() const throw() { return m_config; }
-    void finalize_config() { m_config.finalize(); };
+    const PrintRegionConfigView& config() const throw()
+    {
+        return m_config;
+    }
+
+    void finalize_config()
+    {
+        m_config.finalize();
+    };
+
+    void add_config_override(const Domain::PartialConfig& config)
+    {
+        m_config.add_override(config);
+    };
+
     size_t                      config_hash() const throw() { return m_config_hash; }
     // Identifier of this PrintRegion in the list of Print::m_print_regions.
     int                         print_region_id() const throw() { return m_print_region_id; }
@@ -252,8 +264,7 @@ public:
     {
         Domain::LayerHeightRange            layer_height_range;
         // Config of the layer range, null if there is just a single range with no config override.
-        // Config is owned by the associated ModelObject.
-        Domain::PartialVolumeConfigFDMPtr   config;
+        Domain::PartialConfig config;
         // Volumes sorted by ModelVolume::id().
         std::vector<VolumeExtents>          volumes;
 

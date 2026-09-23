@@ -39,9 +39,6 @@ using Biz::Parser::PlaceholderParser;
 using Domain::FullConfigFDMPtr;
 using Domain::ModelWipeTower;
 using Domain::ObjectID;
-using Domain::PartialObjectConfigFDMPtr;
-using Domain::PartialVolumeConfigFDM;
-using Domain::PartialVolumeConfigFDMPtr;
 using Domain::VolumeSettings;
 using SlicingSync::AllOrSome;
 using SlicingSync::AllSteps;
@@ -161,8 +158,7 @@ class LayerRanges
 public:
     struct LayerRange {
         Domain::LayerHeightRange  layer_height_range;
-        // Config is owned by the associated ModelObject.
-        PartialVolumeConfigFDMPtr config;
+        Domain::PartialConfig config;
 
         bool operator<(const LayerRange &rhs) const throw() { return this->layer_height_range < rhs.layer_height_range; }
     };
@@ -194,22 +190,19 @@ public:
                     last_z = min_z;
                 }
                 if (range.first.second > last_z + EPSILON) {
-                    const auto cfg{prepare_slicing_volume_input(range.second, hw_config, hw_config.material_slot_count())};
                     m_ranges.push_back(
-                        {Domain::LayerHeightRange(last_z, range.first.second), cfg.value()}
-                    );
+                        {Domain::LayerHeightRange(last_z, range.first.second),
+                         Domain::PartialConfig{{range.second}, hw_config}});
                     last_z = range.first.second;
                 }
             }
         if (m_ranges.empty())
             m_ranges.push_back({ Domain::LayerHeightRange(0, DBL_MAX) });
-        else if (m_ranges.back().config == nullptr)
-            m_ranges.back().layer_height_range.second = DBL_MAX;
         else
             m_ranges.push_back({ Domain::LayerHeightRange(m_ranges.back().layer_height_range.second, DBL_MAX) });
     }
 
-    PartialVolumeConfigFDMPtr config(const Domain::LayerHeightRange &range) const {
+    const Domain::PartialConfig* config(const Domain::LayerHeightRange &range) const {
         auto it = std::lower_bound(m_ranges.begin(), m_ranges.end(), LayerRange{ { range.first - EPSILON, range.second - EPSILON } });
         // #ys_FIXME_COLOR
         // assert(it != m_ranges.end());
@@ -219,7 +212,7 @@ public:
             std::abs(it->layer_height_range.first - range.first) > EPSILON ||
             std::abs(it->layer_height_range.second - range.second) > EPSILON )
             return nullptr; // desired range doesn't found
-        return it == m_ranges.end() ? nullptr : it->config;
+        return it == m_ranges.end() ? nullptr : &it->config;
     }
 
     std::vector<LayerRange>::const_iterator begin() const { return m_ranges.cbegin(); }
@@ -496,13 +489,11 @@ PrintRegionConfigView create_mm_painted_region_config(
     volume_settings.overrides.set("solid_infill_extruder", painted_extruder_id);
 
     PrintRegionConfigView painted_region_cfg = parent_config;
-    const PartialVolumeConfigFDM squashed_volume_config{
-        volume_settings,
+    const Domain::PartialConfig squashed_volume_config{
+        {volume_settings},
         parent_config.hw_config()
     };
-    painted_region_cfg.add_override(
-        std::make_shared<PartialVolumeConfigFDM>(squashed_volume_config)
-    );
+    painted_region_cfg.add_override(squashed_volume_config);
 
     return painted_region_cfg;
 };
@@ -515,13 +506,11 @@ PrintRegionConfigView create_fuzzy_skin_painted_region_config(
     volume_settings.overrides.set("fuzzy_skin", Domain::FuzzySkinType::All);
 
     PrintRegionConfigView painted_region_cfg = parent_config;
-    const PartialVolumeConfigFDM squashed_volume_config{
-        volume_settings,
+    const Domain::PartialConfig squashed_volume_config{
+        {volume_settings},
         parent_config.hw_config()
     };
-    painted_region_cfg.add_override(
-        std::make_shared<PartialVolumeConfigFDM>(squashed_volume_config)
-    );
+    painted_region_cfg.add_override(squashed_volume_config);
 
     return painted_region_cfg;
 };
@@ -532,7 +521,7 @@ generate_print_object_regions(
     std::shared_ptr<PrintObjectRegions> print_object_regions_old,
     const Domain::ModelVolumePtrs& model_volumes,
     const LayerRanges& model_layer_ranges,
-    const PartialObjectConfigFDMPtr& new_object_settings,
+    const Domain::PartialConfig& new_object_settings,
     const FullConfigFDMPtr& new_full_config,
     const Transform3d& trafo,
     size_t num_physical_extruders,
@@ -598,25 +587,14 @@ generate_print_object_regions(
             for (PrintObjectRegions::LayerRangeRegions &layer_range : layer_ranges_regions)
                 if (const PrintObjectRegions::BoundingBox *bbox = find_volume_extents(layer_range, volume); bbox) {
                     if (volume.is_model_part()) {
-                        std::vector<PartialVolumeConfigFDMPtr> new_volume_settings;
-                        if (layer_range.config) {
-                            new_volume_settings.push_back(std::make_shared<const PartialVolumeConfigFDM>(*layer_range.config));
-                        }
-                        const auto squashed_settings{prepare_slicing_volume_input(
-                            volume.volume_settings,
-                            new_full_config->hw_config(),
-                            new_full_config->hw_config().material_slot_count()
-                        )};
-                        if (!squashed_settings.has_value()) {
-                            return tl::unexpected{squashed_settings.error()};
-                        }
-                        new_volume_settings.push_back(squashed_settings.value());
+                        std::vector<Domain::PartialConfig> new_volume_settings;
+                        new_volume_settings.push_back(layer_range.config);
+                        new_volume_settings.push_back(Domain::PartialConfig{
+                            {volume.volume_settings},
+                            new_full_config->hw_config()});
 
-                        const PrintRegionConfigView new_config{
-                            new_full_config,
-                            new_object_settings,
-                            new_volume_settings
-                        };
+                        const PrintRegionConfigView
+                            new_config{new_full_config, new_object_settings, new_volume_settings};
 
                         // Add a model volume, assign an existing region or generate a new one.
                         layer_range.volume_regions.push_back({
@@ -639,17 +617,10 @@ generate_print_object_regions(
                                 if (PrintObjectRegions::BoundingBox parent_bbox = find_modifier_volume_extents(layer_range, parent_region_id); parent_bbox.intersects(*bbox)) {
                                     PrintRegionConfigView new_config{parent_region.region->config()};
 
-                                    const auto squashed_settings{
-                                        prepare_slicing_volume_input(
-                                            volume.volume_settings,
-                                            new_full_config->hw_config(),
-                                            new_full_config->hw_config().material_slot_count()
-                                        )
-                                    };
-                                    if (!squashed_settings.has_value()) {
-                                        return tl::unexpected{squashed_settings.error()};
-                                    }
-                                    new_config.add_override(squashed_settings.value());
+                                    const Domain::PartialConfig squashed_settings{
+                                        {volume.volume_settings},
+                                        new_full_config->hw_config()};
+                                    new_config.add_override(squashed_settings);
                                     // Only create new region for a modifier, which actually modifies config of it's parent.
                                     if (new_config != parent_region.region->config()) {
                                         added = true;
@@ -1150,15 +1121,10 @@ tl::expected<PrintObjectsSyncResult, Errors> sync_print_objects(
             shrinkage_compensation
         );
 
-        const auto object_settings{prepare_slicing_object_input(
-            model_object->object_settings,
-            new_full_config->hw_config(),
-            new_full_config->hw_config().material_slot_count()
-        )};
-        if (!object_settings.has_value()) {
-            return tl::unexpected{object_settings.error()};
-        }
-        const PrintObjectConfigView new_config{new_full_config, object_settings.value()};
+        const Domain::PartialConfig
+            object_settings{{model_object->object_settings}, new_full_config->hw_config()};
+
+        const PrintObjectConfigView new_config{new_full_config, object_settings};
 
         for (PrintObjectTrafoAndInstances& new_instances : print_instances) {
             const auto current_instace_it{

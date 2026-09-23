@@ -1212,7 +1212,7 @@ const std::vector<unsigned>& SquashedConfig::extruder_candidates() const {
 
 ConfigView::ConfigView(
     FullConfigPtr full_config,
-    const std::vector<PartialConfigPtr>& partial_configs
+    const std::vector<PartialConfig>& partial_configs
 ) :
     m_full_config{full_config},
     m_partial_configs{partial_configs},
@@ -1220,9 +1220,8 @@ ConfigView::ConfigView(
 {
     std::vector<std::string> partial_config_keys;
     ASSERT(m_full_config);
-    for (const PartialConfigPtr& ptr : m_partial_configs) {
-        ASSERT(ptr);
-        for (const auto& [key, _] : ptr->m_values) {
+    for (const PartialConfig& config : m_partial_configs) {
+        for (const auto& [key, _] : config.values()) {
             partial_config_keys.push_back(key);
         }
     }
@@ -1282,8 +1281,8 @@ std::size_t ConfigView::hash() const
 {
     ASSERT(!m_finalized);
     std::size_t seed{m_full_config->hash()};
-    for (const PartialConfigPtr& partial_config : m_partial_configs) {
-        boost::hash_combine(seed, partial_config->hash());
+    for (const PartialConfig& partial_config : m_partial_configs) {
+        boost::hash_combine(seed, partial_config.hash());
     }
     return seed;
 }
@@ -1308,8 +1307,8 @@ ConfigValue ConfigView::resolve_value(const std::string& key) const
 {
     ASSERT(!m_finalized);
     for (auto rev_it = m_partial_configs.rbegin(); rev_it != m_partial_configs.rend(); ++rev_it) {
-        const PartialConfigPtr& partial_config{*rev_it};
-        if (auto result{partial_config->get_value(key)}) {
+        const PartialConfig& partial_config{*rev_it};
+        if (auto result{partial_config.get_value(key)}) {
             return *result;
         }
     }

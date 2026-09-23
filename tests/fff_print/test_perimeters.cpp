@@ -49,13 +49,11 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
 
     auto test = [&](const TestData &data, const TestConfig& config) {
         const auto full_config{std::make_shared<const FullConfigFDM>(config.get_full_config())};
-        Domain::PartialObjectConfigFDM object_config{ObjectSettings{}, full_config->hw_config()};
-        Domain::PartialVolumeConfigFDM volume_config{VolumeSettings{}, full_config->hw_config()};
-        PrintRegionConfigView region_config_view{
-            full_config,
-            std::make_shared<const Domain::PartialObjectConfigFDM>(std::move(object_config)),
-            {std::make_shared<const Domain::PartialVolumeConfigFDM>(std::move(volume_config))}
-        };
+        const ObjectSettings object_settings;
+        const VolumeSettings volume_settings;
+        const Domain::PartialConfig object_config{{object_settings}, full_config->hw_config()};
+        const Domain::PartialConfig volume_config{{volume_settings}, full_config->hw_config()};
+        PrintRegionConfigView region_config_view{full_config, object_config, {volume_config}};
         region_config_view.finalize();
 
         SurfaceCollection slices;

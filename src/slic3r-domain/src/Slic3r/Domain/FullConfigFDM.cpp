@@ -78,25 +78,4 @@ FullConfigFDM FullConfigFDM::defaults()
 
     return {ConfigPackFDM{}, {0}, hw_config};
 }
-
-PartialObjectConfigFDM::PartialObjectConfigFDM(
-    const ObjectSettings& object_settings,
-    const Preset::HwPrinterConfig& hw_config
-) :
-    PartialConfig{
-        {object_settings},
-        hw_config
-    }
-{}
-
-PartialVolumeConfigFDM::PartialVolumeConfigFDM(
-    const VolumeSettings& volume_settings,
-    const Preset::HwPrinterConfig& hw_config
-) :
-    PartialConfig{
-        {volume_settings},
-        hw_config
-    }
-{}
-
 } // namespace Slic3r::Domain

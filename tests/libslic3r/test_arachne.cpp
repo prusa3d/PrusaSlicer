@@ -48,19 +48,17 @@ PrintRegionConfigView get_region_config_view(const ObjectSettings& object_settin
         *prepare_slicing_input(Domain::ConfigPackFDM{}, {}, Test::create_dummy_hw_config())
     };
 
+    const VolumeSettings volume_settings{};
     PrintRegionConfigView result{
         full_config,
-        *prepare_slicing_object_input(
-            object_settings,
+        Domain::PartialConfig{
+            {object_settings},
             full_config->hw_config(),
-            full_config->hw_config().material_slot_count()
-        ),
-        {*prepare_slicing_volume_input(
-            VolumeSettings{},
+        },
+        {Domain::PartialConfig{
+            {volume_settings},
             full_config->hw_config(),
-            full_config->hw_config().material_slot_count()
-        )}
-    };
+        }}};
     result.finalize();
     return result;
 }

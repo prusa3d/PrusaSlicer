@@ -51,8 +51,7 @@ TEST_CASE_METHOD(
 
     ObjectSettings object_settings;
     object_settings.overrides.set("brim_width", 3.0);
-    auto partial_config{std::make_shared<
-        PartialObjectConfigFDM>(object_settings, hw_config)};
+    const PartialConfig partial_config{{object_settings}, hw_config};
 
     ConfigView config_view{std::make_shared<FullConfigFDM>(full_config), {partial_config}};
     config_view.finalize();
@@ -207,7 +206,7 @@ TEST_CASE_METHOD(
 
     ObjectSettings object_settings;
     object_settings.overrides.set("brim_separation", 30.0);
-    auto partial_config{std::make_shared<PartialObjectConfigFDM>(object_settings, hw_config)};
+    const PartialConfig partial_config{{object_settings}, hw_config};
 
     view = ConfigView{full_config, {partial_config}};
     view.finalize();
@@ -242,7 +241,7 @@ TEST_CASE_METHOD(
 
     ObjectSettings object_settings;
     object_settings.overrides.set("external_perimeter_speed", FloatOrPercentage{Percentage{75}});
-    auto partial_config{std::make_shared<PartialObjectConfigFDM>(object_settings, hw_config)};
+    const PartialConfig partial_config{{object_settings}, hw_config};
 
     view = ConfigView{full_config, {partial_config}};
     view.finalize();

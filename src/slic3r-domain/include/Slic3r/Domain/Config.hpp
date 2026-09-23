@@ -214,11 +214,15 @@ std::pair<ConfigValue, bool> apply_compatibility_rule(
 
 class SquashedConfig {
 public:
+    SquashedConfig() = default;
+
     SquashedConfig(
         const BoxOrBoxesVector& boxes,
         const std::vector<unsigned>& extruder_candidates,
         const Preset::HwPrinterConfig& hw_config
     );
+
+    virtual ~SquashedConfig() = default;
 
     const Preset::HwPrinterConfig& hw_config() const;
 
@@ -282,28 +286,23 @@ public:
         return std::nullopt;
     }
 
-    virtual ~PartialConfig() = default;
+    PartialConfig() = default;
 
-
-protected:
     PartialConfig(
         const BoxOrBoxesVector& input,
         const Preset::HwPrinterConfig& hw_config
     );
 
-private:
-    friend class ConfigView;
     std::optional<ConfigValue> get_value(const std::string& key) const;
 };
 
 
 using FullConfigPtr = std::shared_ptr<const FullConfig>;
-using PartialConfigPtr = std::shared_ptr<const PartialConfig>;
 
 class ConfigView
 {
 public:
-    ConfigView(FullConfigPtr full_config, const std::vector<PartialConfigPtr>& partial_configs);
+    ConfigView(FullConfigPtr full_config, const std::vector<PartialConfig>& partial_configs);
 
     template<class T>
     T get(const std::string& key) const {
@@ -328,7 +327,7 @@ public:
 protected:
     bool m_finalized{false};
     FullConfigPtr m_full_config;
-    std::vector<PartialConfigPtr> m_partial_configs;
+    std::vector<PartialConfig> m_partial_configs;
     std::vector<std::string> m_keys;
     std::map<std::string, ConfigValue> m_values;
     Domain::Preset::HwPrinterConfig m_hw_config;

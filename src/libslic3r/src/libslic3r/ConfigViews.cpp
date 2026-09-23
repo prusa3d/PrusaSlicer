@@ -1,6 +1,5 @@
 #include "libslic3r/ConfigViews.hpp"
 
-using Slic3r::Domain::PartialConfigPtr;
 using Slic3r::Domain::VirtualExtruder;
 
 namespace Slic3r {

@@ -739,13 +739,13 @@ PrintObjectsSyncResult sync_print_objects(
 
         const auto it{reuse_candidates.find(model_object->id())};
 
-        const auto object_settings_ptr{std::make_shared<PartialObjectConfigSLA>(
-            model_object->object_settings_sla,
+        const Domain::PartialConfig object_settings{
+            {model_object->object_settings_sla},
             new_full_config->hw_config()
-        )};
+        };
         const SLAPrintObjectConfigView new_config{
             new_full_config,
-            object_settings_ptr
+            object_settings
         };
 
         if (it == reuse_candidates.end()) {
