@@ -338,6 +338,15 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
         );
         break;
 
+    case WarningCode::WipeTowerPressureAdvanceDiffer:
+        message = _u8L(
+            "Some filaments set pressure advance and others leave it to the printer. "
+            "Filaments that leave it to the printer will keep the pressure advance of the "
+            "previously used filament. Either set pressure advance for all filaments, or set "
+            "it in the custom start G-code of the filaments that leave it to the printer."
+        );
+        break;
+
     case WarningCode::SupportNozzleDiameterDiffer:
         message = _u8L(
             "Printing supports with different nozzle diameters is experimental. "

@@ -431,8 +431,8 @@ const std::map<std::string, std::vector<Step>> invalidated_by{
     {"overhang_speed_1", all_steps()}, // TODO: maybe to harsh
     {"overhang_speed_2", all_steps()}, // TODO: maybe to harsh
     {"overhang_speed_3", all_steps()}, // TODO: maybe to harsh
-    {"pressure_advance", steps({propagate(psGCodeExport)})},
-    {"pressure_advance_value", steps({propagate(psGCodeExport)})},
+    {"pressure_advance", steps({propagate(psWipeTower)})},
+    {"pressure_advance_value", steps({propagate(psWipeTower)})},
     {"scarf_seam_entire_loop", steps({propagate(psGCodeExport)})},
     {"scarf_seam_length", steps({propagate(psGCodeExport)})},
     {"scarf_seam_max_segment_length", steps({propagate(psGCodeExport)})},
