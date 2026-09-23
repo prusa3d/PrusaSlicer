@@ -1131,6 +1131,11 @@ void PlaterRenderModule::on_status_cache_status_code_changed(const Domain::Slici
 
 void PlaterRenderModule::on_show_context_menu(ContextMenuType type, Domain::Vec2f mouse_position)
 {
+    if (type == ContextMenuType::None) {
+        close_all_menus();
+        return;
+    }
+
     Domain::Vec2f pos = mouse_position - m_top_bar->get_global_pos();
 
     Yoga::Menu* menu{nullptr};

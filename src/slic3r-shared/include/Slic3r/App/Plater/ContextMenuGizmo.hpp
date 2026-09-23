@@ -15,6 +15,7 @@ namespace Slic3r::App::Plater {
 
 enum class ContextMenuType
 {
+    None,
     Scene, //???
     Bed,
     Object,

@@ -1,8 +1,8 @@
 #include "Slic3r/App/Plater/ContextMenuGizmo.hpp"
+#include "Slic3r/App/Plater/GizmoTimeouts.hpp"
 #include "Slic3r/App/Scene/BedNodeTag.hpp"
 #include "Slic3r/App/Scene/SceneNodeTag.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
-#include "Slic3r/Biz/Algorithms/Point.hpp"
 #include "Slic3r/App/Scene/ISceneProvider.hpp"
 
 #include <tracy/Tracy.hpp>
@@ -79,7 +79,7 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
             // ButtonUp id postponed a bit from QuickSelectGizmo, so
             // we need to postpone its processing here slightly too to correct process selection before
             m_timer_id = timer_queue.set_timer(
-                std::chrono::milliseconds(150),
+                std::chrono::milliseconds(GIZMO_CONTEXT_MENU_TIMEOUT),
                 [this, pos]()
                 {
                     const Biz::Scene::ObjectSelection& selection =
@@ -108,6 +108,8 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
                                 pos
                             );
                         }
+                    } else {
+                        invoke_show_context_menu(ContextMenuType::None, pos);
                     }
                 }
             );
@@ -120,8 +122,9 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
 
 void ContextMenuGizmo::invoke_show_context_menu(ContextMenuType type, Domain::Vec2f mouse_position)
 {
-    invoke_listeners<IShowContextMenuListener>([&](IShowContextMenuListener* l)
-                                               { l->on_show_context_menu(type, mouse_position); });
+    invoke_listeners<IShowContextMenuListener>(
+        [&](IShowContextMenuListener* l) { l->on_show_context_menu(type, mouse_position); }
+    );
 }
 
 } // namespace Slic3r::App::Plater

@@ -1281,6 +1281,7 @@ set(SLIC3R_SHARED_FILES
 
         include/Slic3r/Biz/HwConfigMatchers.hpp
         src/Slic3r/Biz/HwConfigMatchers.cpp
+        include/Slic3r/App/Plater/GizmoTimeouts.hpp
 )
 
 if (WIN32)

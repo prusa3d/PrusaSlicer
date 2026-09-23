@@ -1,6 +1,7 @@
 ﻿#include "Slic3r/App/Plater/QuickSelectGizmo.hpp"
 
 #include "Slic3r/App/Plater/PlaterGizmosHelper.hpp"
+#include "Slic3r/App/Plater/GizmoTimeouts.hpp"
 #include "Slic3r/App/Render/Device.hpp"
 #include "Slic3r/App/Scene/Node.hpp"
 #include "Slic3r/App/Render/GeometryBuilder.hpp"
@@ -618,7 +619,7 @@ Scene::GizmoActivationState QuickSelectGizmo::on_mouse(Scene::GizmoEventContext&
             // There may be cases where, using a modifier, multiple objects are selected quickly
             // That is why a vector of timers is used instead of a single timer
             m_up_timer_ids.push_back(timer_queue.set_timer(
-                std::chrono::milliseconds(150),
+                std::chrono::milliseconds(GIZMO_SELECTION_TIMEOUT),
                 [this, node_id, is_modifier_pressed = modifier_pressed]()
                 {
                     on_mouse_up(node_id, is_modifier_pressed);
