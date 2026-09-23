@@ -32,8 +32,6 @@ void PopNotificationObservableList::upsert_notification(
         invoke_listeners<Biz::IListObserver<PopNotificationData>>(
             [index](auto* l) { l->on_updated({index}); }
         );
-        // To be removed when PopNotificationView items does call it correctly:
-        Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
     }
     reset_notification_timeout(it);
     // make sure the notification gets drawn

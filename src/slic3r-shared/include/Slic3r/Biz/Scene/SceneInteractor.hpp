@@ -425,6 +425,12 @@ public:
         const Domain::ConfigItem& item
     ) override;
 
+    /**
+     * @brief Whether a config key affects bed shape/size.
+     *        Shared with the App layer so it can react the same way.
+     */
+    static bool is_bed_related_preset_key(const std::string& name);
+
     const Domain::Project& selected_project() const;
     const Domain::Project::ConfigContainerList& selected_project_config_containers() const;
     const Domain::ModelInstanceList& unplaced_model_instances(const Domain::SelectionId project_id) const;

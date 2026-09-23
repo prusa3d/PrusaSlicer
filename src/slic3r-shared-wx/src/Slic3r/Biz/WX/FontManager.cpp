@@ -292,7 +292,11 @@ Domain::FontList FontManager::create_favorit()
     };
 
     auto is_invalid = [](const Domain::FontDescriptor& descriptor) {
-        // Check that exsit valid TrueType Font for wx font
+        // early filter out empty descriptor without trying to load it
+        if (descriptor.path.empty()) {
+            return true;
+        }
+        // Check that exists a valid TrueType Font for wx font
         return create_font_file(load_wxFont(descriptor.path)) == nullptr;
     };
 

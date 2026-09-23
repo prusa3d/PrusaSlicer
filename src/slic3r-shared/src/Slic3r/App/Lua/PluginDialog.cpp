@@ -245,7 +245,7 @@ void PluginDialog::emplace_float_param(
 )
 {
     auto& row     = emplace_row(param.label.c_str());
-    using Control = NumberControl<Yoga::IntValidator, int>;
+    using Control = NumberControl<Yoga::DoubleValidator, double>;
     auto [it, _]  = m_param_controls.emplace(
         param.name,
         std::make_unique<Control>(param, std::move(default_value))
@@ -259,7 +259,7 @@ void PluginDialog::emplace_int_param(
 )
 {
     auto& row     = emplace_row(param.label.c_str());
-    using Control = NumberControl<Yoga::DoubleValidator, double>;
+    using Control = NumberControl<Yoga::IntValidator, int>;
     auto [it, _]  = m_param_controls.emplace(
         param.name,
         std::make_unique<Control>(param, std::move(default_value))

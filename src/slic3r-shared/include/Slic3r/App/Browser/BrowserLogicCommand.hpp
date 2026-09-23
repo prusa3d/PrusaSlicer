@@ -19,6 +19,7 @@ enum class BrowserLogicCommandType
     AddUserScript,
     LoadResourcesPage,
     OpenExternalBrowser,
+    OpenExternalBrowserForced,
     RegisterPrusaSlicerURL,
     SetLoadDefaultURLOnErrorTrue,
     SetLoadDefaultURLOnErrorFalse,

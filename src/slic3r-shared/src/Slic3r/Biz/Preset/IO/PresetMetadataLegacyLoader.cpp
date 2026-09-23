@@ -178,6 +178,95 @@ load_legacy_preset_metadata(const LegacyPresetMetadata& legacy_preset, const Dom
     ret.print = create_preset_metadata(legacy_preset.print_settings_id);
     ret.tools = create_preset_metadatas(legacy_preset.print_settings_id, hw_config.tools.size());
     ret.materials = create_preset_metadatas(legacy_preset.material_settings_id);
+
+    // Now we need to synthesize conditions for all presets
+    // We can't use compatibility conditions as the variable names and values changed between
+    // Slicer 2.x and 3.x.
+    // But we have valid hw config, so we can pin individual preset types to hw components
+    auto pin_printer = [&hw_config](std::vector<std::string>& dest)
+    {
+        dest.push_back(
+            fmt::format(
+                R"(printer.model == "{}" and printer.base_model == "{}")",
+                hw_config.model.model,
+                hw_config.model.base_model
+            )
+        );
+
+        // pin feeder
+        if (hw_config.feeders.empty()) {
+            return;
+        }
+
+        ASSERT(hw_config.feeders.size() == 1);
+        const auto& feeder_model = hw_config.feeders.begin()->second.model;
+        dest.push_back(
+            fmt::format(
+                R"(feeder.model == "{}" and feeder.base_model == "{}")",
+                feeder_model.model,
+                feeder_model.base_model
+            )
+        );
+
+    };
+
+    auto pin_tool = [&hw_config](size_t idx, std::vector<std::string>& dest)
+    {
+        const auto& tool = hw_config.tools.at(idx);
+        if (auto it = tool.features.find("nozzle_diameter"); it != tool.features.end()) {
+            dest.push_back(fmt::format("tool.nozzle_diameter == {}", std::get<double>(it->second)));
+        }
+        if (auto it = tool.features.find("nozzle_high_flow"); it != tool.features.end()) {
+            bool val;
+            val = std::get<bool>(it->second);
+            if (val) {
+                dest.emplace_back("tool.nozzle_high_flow");
+            }
+        }
+    };
+
+    auto pin_layer_height = [&config](std::vector<std::string>& dest)
+    {
+         auto it = std::visit(
+            Domain::overloaded{
+                [](const Domain::ConfigPackFDM& config)
+                { return config.get_print().find("layer_height"); },
+                [](const Domain::ConfigPackSLA& config)
+                { return config.sla_print_settings.find("layer_height"); }
+            },
+            config
+        );
+        ASSERT(it.item);
+        auto layer_height = it.item->get<double>();
+        dest.push_back(fmt::format("print.layer_height == {}", layer_height));
+    };
+
+    const auto is_fdm = hw_config.technology == Domain::PrinterTechnology::FFF;
+    pin_printer(ret.printer.conditions);
+    pin_printer(ret.print.conditions);
+
+    for (size_t i = 0; i < ret.tools.size(); i++) {
+        auto& tool = ret.tools.at(i);
+        pin_printer(tool.conditions);
+        if (is_fdm) {
+            pin_tool(i, tool.conditions);
+        } else {
+            pin_layer_height(tool.conditions);
+        }
+    }
+
+    for (size_t i = 0; i < ret.materials.size(); i++) {
+        auto& mat = ret.materials.at(i);
+        pin_printer(mat.conditions);
+        if (is_fdm) {
+            auto tool_idx =
+                Domain::Preset::MaterialIterator::from_slot_index(hw_config, i).tool_index();
+            pin_tool(tool_idx, mat.conditions);
+        } else {
+            pin_layer_height(mat.conditions);
+        }
+    }
+
     return ret;
 }
 

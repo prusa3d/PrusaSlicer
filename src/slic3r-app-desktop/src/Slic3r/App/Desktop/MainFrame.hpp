@@ -125,6 +125,9 @@ private:
     void update_accel_table();
     void set_accel_table();
 
+    void update_min_size();
+    void on_scale_changed();
+
 #ifdef USE_NATIVE_MENU
     void setup_macos_native_menu_bar();
 #endif
@@ -142,6 +145,7 @@ private:
 
     TabsBarMenus m_tabs_bar_menus;
     LeftBar* m_left_bar{nullptr};
+    unsigned long m_dpi_signal_id{0}; //!< Only used on GTK, signal for notify::gtk-xft-dpi
 
     wxAcceleratorTable m_accel_table;
     wxWindow* m_accel_table_window{nullptr};

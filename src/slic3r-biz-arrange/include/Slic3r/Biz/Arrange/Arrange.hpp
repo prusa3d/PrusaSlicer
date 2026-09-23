@@ -42,13 +42,4 @@ InstanceTransforms arrange_instances(
     const Settings& settings
 );
 
-// Following helper is the easiest one to use,
-// but it does not call any listeners!
-void arrange_model_in_place(
-    Domain::Model& model,
-    const Domain::Points& bed_contour_scaled,
-    const Settings& settings
-);
-
-
 } // namespace Slic3r::Biz::Arrange

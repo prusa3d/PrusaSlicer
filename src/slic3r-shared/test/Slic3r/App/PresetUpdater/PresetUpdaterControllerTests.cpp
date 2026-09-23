@@ -137,6 +137,19 @@ struct ControllerFixture : Fixture
         return controller->online_sources().at(index);
     }
 
+    /// Vendor rows of the first online source, keyed by vendor id: the order in which the store
+    /// lists them is not part of the contract.
+    const Slic3r::App::PresetUpdater::VendorRowState& online_vendor(const std::string& vendor_id)
+    {
+        const Slic3r::App::PresetUpdater::VendorRowList& vendors = *online_row().vendors;
+        for (size_t index = 0; index < vendors.size(); ++index) {
+            if (vendors.at(index).vendor_id == vendor_id) {
+                return vendors.at(index);
+            }
+        }
+        throw std::runtime_error("vendor row not published: " + vendor_id);
+    }
+
     bool online{true};
     size_t dialog_requests{0};
     size_t install_reports{0};
@@ -417,8 +430,14 @@ TEST_CASE("PresetUpdaterController counts down what one source has left", "[pres
     fx.controller->on_dialog_opened();
     REQUIRE(fx.settle());
 
-    CHECK(fx.online_row().vendors->size() == 1);
+    // The installed vendor stays listed, now as up to date; only the other one still counts.
+    CHECK(fx.online_row().vendors->size() == 2);
+    CHECK(fx.online_vendor(k_vendor_name).up_to_date);
+    CHECK(fx.online_vendor(k_vendor_name).install_state == InstallState::Idle);
+    CHECK_FALSE(fx.online_vendor("SecondVendor").up_to_date);
+    CHECK(fx.online_vendor("SecondVendor").state == VendorReconfigurationState::NewVendor);
     CHECK(fx.online_row().counts.new_vendors == 1);
+    CHECK(fx.online_row().counts.pending() == 1);
 }
 
 TEST_CASE("PresetUpdaterController starts over when the dialog is reopened", "[preset_updater][controller]")
@@ -445,7 +464,13 @@ TEST_CASE("PresetUpdaterController starts over when the dialog is reopened", "[p
     CHECK(fx.controller->fully_checked());
     CHECK_FALSE(fx.controller->warned());
     CHECK(fx.online_row().update_state == SourceRowState::UpdateState::UpToDate);
-    CHECK(fx.online_row().vendors->size() == 0);
+    // The fresh check lists the installed vendor as up to date rather than dropping it.
+    REQUIRE(fx.online_row().vendors->size() == 1);
+    CHECK(fx.online_vendor(k_vendor_name).up_to_date);
+    CHECK(fx.online_vendor(k_vendor_name).install_state == InstallState::Idle);
+    CHECK(fx.online_vendor(k_vendor_name).current_version == Semver{1, 0, 0});
+    CHECK(fx.online_row().counts.pending() == 0);
+    CHECK_FALSE(fx.controller->has_actionable_updates());
 }
 
 TEST_CASE("PresetUpdaterController releases the application once the forced vendors are installed", "[preset_updater][controller]")

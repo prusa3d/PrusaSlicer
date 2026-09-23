@@ -7,6 +7,7 @@
 #include "Slic3r/App/WX/StringConversions.hpp"
 #include "Slic3r/App/Theme.hpp"
 #include "Slic3r/App/AppServices.hpp"
+#include "Slic3r/App/Platform/WX/DpiScale.hpp"
 
 #include <wx/window.h>
 #include <wx/toplevel.h>
@@ -236,6 +237,10 @@ int WidgetsConfig::em_unit(wxWindow* win) const
 {
     if (win)
     {
+#if defined(__WXGTK__)
+        // Under GTK we need to facilitate formula for fractional DPI global scale
+        return int(10 * Platform::WX::get_dpi_scale(win).dpi_scale);
+#else
         wxTopLevelWindow* toplevel = w_config()->find_toplevel_parent(win);
         float sf = toplevel->GetDPIScaleFactor();
 
@@ -243,6 +248,7 @@ int WidgetsConfig::em_unit(wxWindow* win) const
         float csf = toplevel->GetContentScaleFactor();
 
         return int(sf / csf * 10.);
+#endif
     }
     return m_em_unit;
 }

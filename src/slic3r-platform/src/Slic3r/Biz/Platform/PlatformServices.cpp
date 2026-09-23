@@ -21,6 +21,12 @@ void PlatformServices::set_render_request_handler(
     m_render_request_handler = render_request_handler;
 }
 
+IRenderRequestHandler& PlatformServices::render_request_handler()
+{
+    static NullRenderRequestHandler null_handler;
+    return m_render_request_handler != nullptr ? *m_render_request_handler : null_handler;
+}
+
 void PlatformServices::set_main_thread_dispatcher(
     std::unique_ptr<IMainThreadDispatcher>&& main_thread_dispatcher
 )

@@ -371,32 +371,4 @@ InstanceTransforms arrange_instances(
     return transforms;
 }
 
-
-
-void arrange_model_in_place(Domain::Model& model, const Points& bed_contour_scaled, const Settings& arrange_settings)
-{
-    std::vector<const Domain::ModelInstance*> instances;
-    for (const Domain::ModelObject* object : model.objects) {
-        for (const Domain::ModelInstance* instance : object->instances) {
-            instances.push_back(instance);
-        }
-    }
-    const auto transforms = arrange_instances(instances, bed_contour_scaled, arrange_settings);
-    for (Domain::ModelObject* object : model.objects) {
-        for (Domain::ModelInstance* instance : object->instances) {
-            if (auto it = std::find_if(transforms.cbegin(), transforms.cend(), [instance](const auto& trafo) {
-                return instance->get_object()->id().id == trafo.instance_ref.object_id
-                    && instance->id().id == trafo.instance_ref.instance_id;
-            }); it != transforms.cend()) {
-                Domain::Transform3d m{instance->get_transformation().get_matrix()};
-                m.translation().x() = it->absolute_offset.x();
-                m.translation().y() = it->absolute_offset.y();
-                auto rot{Domain::Transform3d::Identity()};
-                rot.rotate(Eigen::AngleAxisd(it->rotation_delta, Eigen::Vector3d::UnitZ()));
-                instance->set_transformation(Domain::Transformation{m * rot});
-            }
-        }
-    }
-}
-
 } // namespace Slic3r::Biz::Arrange

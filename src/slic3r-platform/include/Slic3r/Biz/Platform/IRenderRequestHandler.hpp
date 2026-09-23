@@ -9,4 +9,10 @@ public:
     virtual void request_render() = 0;
 };
 
+class NullRenderRequestHandler final : public IRenderRequestHandler
+{
+public:
+    void request_render() override {}
+};
+
 } // namespace Slic3r::Biz::Platform

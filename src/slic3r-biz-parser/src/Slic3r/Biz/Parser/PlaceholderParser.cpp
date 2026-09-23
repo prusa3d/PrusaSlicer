@@ -169,6 +169,12 @@ namespace client
         return os;
     }
 
+    enum class RoundingMethod
+    {
+        Round = 0,
+        Ceil = 1
+    };
+
     struct expr
     {
         expr() {}
@@ -363,7 +369,7 @@ namespace client
             return expr();
         }
 
-        expr round(const Iterator start_pos) const
+        expr round(const Iterator start_pos, RoundingMethod rounding) const
         { 
             switch (this->type()) {
             case TYPE_EMPTY:
@@ -372,7 +378,15 @@ namespace client
             case TYPE_INT:
                 return expr(this->i(), start_pos, this->it_range.end());
             case TYPE_DOUBLE:
-                return expr(static_cast<int>(std::round(this->d())), start_pos, this->it_range.end());
+                return expr(
+                    static_cast<int>(
+                        rounding == RoundingMethod::Ceil ?
+                            std::ceil(this->d()) :
+                            std::round(this->d())
+                    ),
+                    start_pos,
+                    this->it_range.end()
+                );
             default:
                 this->throw_exception("Cannot round a non-numeric value.");
             }
@@ -1918,7 +1932,9 @@ namespace client
         static void to_int(expr &value, expr &out)
                 { out = value.unary_integer(out.it_range.begin()); }
         static void round(expr &value, expr &out)
-                { out = value.round(out.it_range.begin()); }
+                { out = value.round(out.it_range.begin(), RoundingMethod::Round); }
+        static void ceil(expr &value, expr &out)
+            { out = value.round(out.it_range.begin(), RoundingMethod::Ceil); }
         // For indicating "no optional parameter".
         static void noexpr(expr &out) { out.reset(); }
     };
@@ -2167,6 +2183,7 @@ namespace client
                                                                     [ px::bind(&expr::digits<true>, _val, _2, _3) ]
                 |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
+                |   (kw["ceil"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::ceil,   _1, _val) ]
                 |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test, _r1, _1, _val)]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
                 |   (kw["empty"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_vector_empty, _r1, _1, _val)]
@@ -2227,6 +2244,7 @@ namespace client
 
             keywords.add
                 ("and")
+                ("ceil")
                 ("digits")
                 ("zdigits")
                 ("empty")

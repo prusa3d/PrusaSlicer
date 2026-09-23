@@ -20,7 +20,7 @@ class ConfigItemPreview;
 class PrintToolRowButton : public Yoga::RectangleButton
 {
 public:
-    PrintToolRowButton(Biz::IConfigBoxSetter& cb_setter);
+    explicit PrintToolRowButton(Biz::IConfigBoxSetter& cb_setter);
 
     void update_data(const Biz::PrintToolItem* print_tool_item);
 

@@ -400,8 +400,7 @@ void Scene::render_shadowsmap_pass(Render::Device& device, const Camera& camera,
     ZoneScoped;
 
     Shadows& shadows = s_graphics_settings.m_shadows;
-    if (shadows.light_cam.cam_projection().type() == CameraProjectionType::Perspective)
-        shadows.light_cam.switch_projection_type();
+    shadows.light_cam.set_projection_type(CameraProjectionType::Orthographic);
 
     if (shadows.framebuffer == nullptr)
         shadows.pending_framebuffer_size = shadows.DEFAULT_FRAMEBUFFER_SIZE;

@@ -28,7 +28,7 @@ std::vector<BrowserLogicCommand> BrowserLogicLogInRedirect::on_loaded_webview_ev
         return {
             {BrowserLogicCommandType::RegisterPrusaSlicerURL, std::string()},
             {BrowserLogicCommandType::LoadResourcesPage, "login_redirected"},
-            {BrowserLogicCommandType::OpenExternalBrowser, m_redirect_url}
+            {BrowserLogicCommandType::OpenExternalBrowserForced, m_redirect_url}
         };
     }
     return {};
@@ -40,7 +40,7 @@ std::vector<BrowserLogicCommand> BrowserLogicLogInRedirect::on_script_message_we
         nlohmann::json j = nlohmann::json::parse(message);
         if (j.contains("event") && j["event"].is_string() && j["event"].get<std::string>() == "reopenLogInBrowser")
         {
-            return {{BrowserLogicCommandType::OpenExternalBrowser, m_redirect_url}};
+            return {{BrowserLogicCommandType::OpenExternalBrowserForced, m_redirect_url}};
         }
         if (j.contains("event") && j["event"].is_string() && j["event"].get<std::string>() == "openLoginPage")
         {
@@ -77,7 +77,7 @@ BrowserLogicLogInRedirect::on_navigation_request_webview_event(const std::string
     {
         return {
             {BrowserLogicCommandType::RegisterPrusaSlicerURL, std::string()}, 
-            {BrowserLogicCommandType::OpenExternalBrowser, url}
+            {BrowserLogicCommandType::OpenExternalBrowserForced, url}
         };
     }
     return {};

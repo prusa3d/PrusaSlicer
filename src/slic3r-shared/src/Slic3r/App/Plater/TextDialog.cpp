@@ -557,9 +557,10 @@ void TextDialog::set_font(const Domain::FontDescriptor& font, bool set_as_defaul
     if (start_style_it != m_fonts.begin() || !starts_with(start_style_it->name, name))
         ++start_style_it;
 
-    auto end_style_it = font_it;
-    while (end_style_it != m_fonts.end() && starts_with((++end_style_it)->name, name))
-        ;
+    auto end_style_it = font_it + 1;
+    while (end_style_it != m_fonts.end() && starts_with(end_style_it->name, name)) {
+        ++end_style_it;
+    }
 
     m_font->set_current_index(start_style_it - m_fonts.begin());
     if (set_as_default)

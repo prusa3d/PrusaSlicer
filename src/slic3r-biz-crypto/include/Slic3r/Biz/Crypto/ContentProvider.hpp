@@ -12,7 +12,7 @@ class IContentProvider
 public:
     constexpr static size_t DEFAULT_BUFFER_SIZE = 256 * 1024;
 
-    using BytesView    = BytesView;
+    using BytesView    = Crypto::BytesView;
     using FileList     = std::vector<std::string>;
     using StreamKernel = std::function<void(BytesView window)>;
 

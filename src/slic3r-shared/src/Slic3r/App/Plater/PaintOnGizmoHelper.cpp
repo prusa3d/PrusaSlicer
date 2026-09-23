@@ -523,6 +523,7 @@ void CircleCursorRenderWrapper::init_cursor_node(
                                     .set_uniform("uniform_color", ColorRGBA{0.f, 1.f, 0.3f, 1.f});
 
     m_cursor_geometry = std::make_unique<Render::Geometry>(device);
+    m_cached_camera_zoom.reset();
 
     Scene::NodeBuilder circle_cursor_node_builder{scene};
     circle_cursor_node_builder.set_debug_name("PaintOnGizmoBase - Circle cursor node")
@@ -580,6 +581,8 @@ void HeightRangeCursorRenderWrapper::init_cursor_node(
             .set_uniform("offset", 0.00001f);
 
     m_cursor_geometry = std::make_unique<Render::Geometry>(device);
+    m_cached_cursor_position.reset();
+    m_cached_z_range.reset();
 
     Scene::NodeBuilder height_range_cursor_node_builder{scene};
     height_range_cursor_node_builder.set_debug_name("PaintOnGizmoBase - HeightRange cursor node")

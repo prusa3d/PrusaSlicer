@@ -42,7 +42,7 @@ public:
             m_data_items.begin() + index_range.to + 1
         );
 
-        this->template invoke_listeners<IListObserver<Data>>([this, index_range](auto* l) {
+        this->template invoke_listeners<IListObserver<Data>>([index_range](auto* l) {
             l->on_removed(index_range);
         });
     }

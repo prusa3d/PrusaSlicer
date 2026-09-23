@@ -25,6 +25,12 @@ class CommandBuffer;
 
 namespace Slic3r::App::Platform {
 
+class IInputTextFocusChangedListener
+{
+public:
+    virtual void on_input_text_focus_changed(bool focused) = 0;
+};
+
 /**
  * Abstract class for platform-specific render canvas.
  *
@@ -32,7 +38,10 @@ namespace Slic3r::App::Platform {
  * - facilitate rendering of render module
  * - translate platform specific events and push them the render module
  */
-class AbstractRenderCanvas : public Biz::Platform::IRenderRequestHandler, Biz::Platform::IMainWindowHandler
+class AbstractRenderCanvas :
+    public Biz::Platform::IRenderRequestHandler,
+    Biz::Platform::IMainWindowHandler,
+    public WithListeners<IInputTextFocusChangedListener>
 {
 public:
     AbstractRenderCanvas();
@@ -53,6 +62,8 @@ public:
     bool is_fullscreen() const override { return false; }
     void set_fullscreen(bool on) override {}
     void close_application() override {}
+
+    bool is_text_input_focused() const;
 
 protected:
     /**
@@ -120,6 +131,7 @@ private:
     std::unique_ptr<Render::ImguiRender> m_imgui_render;
     AnimationManager m_animation_manager;
     double m_last_time{0};
+    bool m_is_text_input_focused{false};
 };
 
 } // namespace Slic3r::App::Platform

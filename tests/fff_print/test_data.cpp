@@ -264,6 +264,35 @@ Domain::Preset::SelectedPresetMetadata create_dummy_selected_preset_metadata(
     return preset_metadata;
 }
 
+static void arrange_model_in_place(
+    Domain::Model& model,
+    const Points& bed_contour_scaled,
+    const Biz::Arrange::Settings& arrange_settings)
+{
+    std::vector<const Domain::ModelInstance*> instances;
+    for (const Domain::ModelObject* object : model.objects) {
+        for (const Domain::ModelInstance* instance : object->instances) {
+            instances.push_back(instance);
+        }
+    }
+    const auto transforms = arrange_instances(instances, bed_contour_scaled, arrange_settings);
+    for (Domain::ModelObject* object : model.objects) {
+        for (Domain::ModelInstance* instance : object->instances) {
+            if (auto it = std::find_if(transforms.cbegin(), transforms.cend(), [instance](const auto& trafo) {
+                return instance->get_object()->id().id == trafo.instance_ref.object_id
+                    && instance->id().id == trafo.instance_ref.instance_id;
+            }); it != transforms.cend()) {
+                Domain::Transform3d rot{Domain::Transform3d::Identity()};
+                rot.rotate(Eigen::AngleAxisd(it->rotation_delta, Eigen::Vector3d::UnitZ()));
+                Domain::Transform3d m{rot * instance->get_transformation().get_matrix()};
+                m.translation().x() = it->absolute_offset.x();
+                m.translation().y() = it->absolute_offset.y();
+                instance->set_transformation(Domain::Transformation{m});
+            }
+        }
+    }
+}
+
 void init_print(
     std::vector<TriangleMesh>&& meshes,
     Slic3r::Print& print,
@@ -296,7 +325,7 @@ void init_print(
         }
     }
 
-    Biz::Arrange::arrange_model_in_place(
+    arrange_model_in_place(
         model,
         pts_scaled,
         Biz::Arrange::Settings{

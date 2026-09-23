@@ -29,6 +29,19 @@ boost::filesystem::path AppConfigProvider::download_dir() const
     return dest_dir;
 }
 
+std::string AppConfigProvider::last_used_physical_printer() const
+{
+    return AppServices::instance().app_config().get<std::string>("last_used_physical_printer");
+}
+
+void AppConfigProvider::set_last_used_physical_printer(const std::string& uuid)
+{
+    AppServices::instance().app_config_interactor().set_item_value(
+        "last_used_physical_printer",
+        Domain::ConfigValue(uuid)
+    );
+}
+
 bool AppConfigProvider::get_show_step_import_parameters() const
 {
     return AppServices::instance().app_config().get<bool>("show_step_import_parameters");

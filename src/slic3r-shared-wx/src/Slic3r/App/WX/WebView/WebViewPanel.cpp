@@ -3,6 +3,7 @@
 #include "WebViewPlatformUtils.hpp"
 
 #include "Slic3r/App/WX/WebView/WebView.hpp"
+#include "Slic3r/App/WX/UrlProtocolRegistration.hpp"
 #include "Slic3r/App/WX/StringConversions.hpp"
 #include "Slic3r/App/WX/I18N.hpp"
 #include "Slic3r/Biz/Network/ServiceConfig.hpp"
@@ -603,12 +604,6 @@ bool WebViewPanel::handle_logic_command_LoadResourcesPage(const std::string& dat
         data,
         w_config()->dark_mode() ? "_dark" : ""
     ));
-    return true;
-}
-
-bool WebViewPanel::handle_logic_command_OpenExternalBrowser(const std::string& data)
-{
-    wxLaunchDefaultBrowser(from_u8(data), 0);
     return true;
 }
 

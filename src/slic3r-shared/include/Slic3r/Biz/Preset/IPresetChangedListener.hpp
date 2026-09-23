@@ -51,7 +51,20 @@ public:
     )
     {}
 
-    virtual void on_preset_bundles_loaded()
+    virtual void on_preset_bundles_loaded() {}
+
+    virtual void on_preset_discarded_changes(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        PresetItemType type
+    )
+    {}
+
+    virtual void on_preset_item_discarded_changes(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        const Domain::ConfigItem& item
+        )
     {}
 };
 

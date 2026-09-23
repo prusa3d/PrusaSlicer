@@ -47,7 +47,7 @@ public:
     /**
      * Tests connection to remote host. Most PrintHosts uses test during perform as well.
      */
-    virtual bool test(std::string& msg, RetryFn retry_fn) const = 0;
+    virtual bool test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const = 0;
 
     const PrintHostJobData& upload_data() const
     {

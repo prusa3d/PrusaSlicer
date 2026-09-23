@@ -189,6 +189,37 @@ void PrintToolRowItem::on_preset_selection_changed(
     }
 }
 
+void PrintToolRowItem::on_preset_discarded_changes(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    Biz::Preset::PresetItemType type
+)
+{
+    if (m_project_interactor.selected_project_id() == project_id
+        && m_project_interactor.selected_config_container_id() == config_container_id
+        && (type == Biz::Preset::PresetItemType::PrintPreset
+            || type == Biz::Preset::PresetItemType::ToolPrintPreset)
+        && m_initialized_type == InitializedType::PrintTool)
+    {
+        presort_overrides();
+    }
+}
+
+void PrintToolRowItem::on_preset_item_discarded_changes(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    const Domain::ConfigItem& item
+)
+{
+    if (m_project_interactor.selected_project_id() == project_id
+        && m_project_interactor.selected_config_container_id() == config_container_id
+        && m_state->contains_item(item)
+        && m_initialized_type == InitializedType::PrintTool)
+    {
+        presort_overrides();
+    }
+}
+
 void PrintToolRowItem::on_data_update()
 {
     const bool need_multiple =
@@ -307,8 +338,23 @@ void PrintToolRowItem::on_data_update()
 
         update_explanation();
 
+        // Check if any of the Groups has not all the same values
+        const bool need_presort = std::ranges::any_of(
+            m_tool_overrides,
+            [](const ToolRowOverrideGroup& group)
+            {
+                return std::ranges::adjacent_find(
+                           group.first,
+                           std::not_equal_to{},
+                           [](const ToolRowOverride* override) -> const Domain::ConfigValue&
+                           { return override->override_item->value(); }
+                       )
+                    != group.first.end();
+            }
+        );
+
         // we have not yet presorted overrides
-        if (m_tool_overrides.empty() && !m_overrides.empty()) {
+        if ((need_presort || m_tool_overrides.empty()) && !m_overrides.empty()) {
             presort_overrides();
         }
     }
@@ -379,7 +425,7 @@ void PrintToolRowItem::initialize()
 
         ToolRowFactory factory{
             m_cb_setter,
-            [this](size_t tool_index) { exclude_tool(tool_index); },
+            [this](size_t tool_index) { tool_clicked(tool_index); },
             [this](size_t dropped_tool_index, size_t index)
             { move_tool(dropped_tool_index, index); },
             !m_options.show_favorites
@@ -396,7 +442,7 @@ void PrintToolRowItem::initialize()
 
         m_tool_drop_area                           = m_content->emplace_back<ToolDropArea>();
         m_tool_drop_area->callbacks().dnd_accepted = [this](const DnDPayload& payload)
-        { exclude_tool(*payload.get<size_t>("tool_index")); };
+        { tool_clicked(*payload.get<size_t>("tool_index")); };
     }
 }
 
@@ -407,31 +453,64 @@ void PrintToolRowItem::update_explanation()
     }
 }
 
-void PrintToolRowItem::exclude_tool(size_t tool_index)
+void PrintToolRowItem::tool_clicked(size_t tool_index)
 {
-    const ToolRowOverridePtr& override = m_overrides.at(tool_index);
+    ToolRowOverridePtr& override = m_overrides.at(tool_index);
 
     ToolRowOverrideGroup* group = find_group(override);
-    if (!group || group->first.size() == 1) {
+    if (!group) {
         return;
     }
 
-    invoke_listeners<Biz::IListObserver<ToolRowOverrideGroup>>(
-        [](Biz::IListObserver<ToolRowOverrideGroup>* l) { l->on_will_be_reset(); }
-    );
+    if (group->first.size() == 1) {
+        // Merge tool
 
-    std::erase_if(
-        group->first,
-        [&](const ToolRowOverride* group_override) { return group_override == override.get(); }
-    );
+        // Try to find group which contains same value
+        std::optional<size_t> merge_group_index;
+        for (size_t group_index = 0; group_index < m_tool_overrides.size(); ++group_index) {
+            ToolRowOverrideGroup& group_i = m_tool_overrides.at(group_index);
+            if (group_i == *group) {
+                continue;
+            }
+            if (group_i.first.front()->override_item->value() == override->override_item->value()) {
+                merge_group_index = group_index;
+                break;
+            }
+        }
 
-    m_tool_overrides.emplace_back(ToolRowOverrideGroup{ToolRowOverrides{override.get()}, 0});
+        if (merge_group_index.has_value()) {
+            // We have target group
+            invoke_listeners<Biz::IListObserver<ToolRowOverrideGroup>>(
+                [](Biz::IListObserver<ToolRowOverrideGroup>* l) { l->on_will_be_reset(); }
+            );
+            m_tool_overrides.at(merge_group_index.value()).first.push_back(override.get());
+            std::erase_if(
+                m_tool_overrides,
+                [&](ToolRowOverrideGroup& group_i) { return group_i == *group; }
+            );
+            update_group_size();
+            sort_extruders_in_groups();
+            invoke_listeners<Biz::IListObserver<ToolRowOverrideGroup>>(
+                [](Biz::IListObserver<ToolRowOverrideGroup>* l) { l->on_reset(); }
+            );
+        }
+    } else {
+        // Exclude tool to new group
+        invoke_listeners<Biz::IListObserver<ToolRowOverrideGroup>>(
+            [](Biz::IListObserver<ToolRowOverrideGroup>* l) { l->on_will_be_reset(); }
+        );
+        std::erase_if(
+            group->first,
+            [&](const ToolRowOverride* group_override) { return group_override == override.get(); }
+        );
 
-    update_group_size();
-
-    invoke_listeners<Biz::IListObserver<ToolRowOverrideGroup>>(
-        [](Biz::IListObserver<ToolRowOverrideGroup>* l) { l->on_reset(); }
-    );
+        m_tool_overrides.emplace_back(ToolRowOverrideGroup{ToolRowOverrides{override.get()}, 0});
+        update_group_size();
+        sort_extruders_in_groups();
+        invoke_listeners<Biz::IListObserver<ToolRowOverrideGroup>>(
+            [](Biz::IListObserver<ToolRowOverrideGroup>* l) { l->on_reset(); }
+        );
+    }
 }
 
 void PrintToolRowItem::move_tool(size_t tool_index, size_t group_index)

@@ -86,9 +86,7 @@ private:
             for (const std::unique_ptr<R>& resource : m_resources | std::views::values) {
                 memsize += resource->memsize();
             }
-            const std::size_t kb{1024};
-            const std::size_t mb{1024 * kb};
-            SPDLOG_TRACE("The resource manager: {} uses {} mb", m_name, memsize / mb);
+            SPDLOG_TRACE("The resource manager: {} uses {} mb", m_name, memsize / (1024 * 1024));
         }
     }
 

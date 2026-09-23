@@ -66,6 +66,66 @@ features:
   feeder:
     single_mode:
       default: false
+printer_families:
+  - label: "Core ONE INDX"
+    base_model: COREONE_INDX
+    printer_configs_order:
+      - c1indx-4t
+      - c1indx-8t
+  - label: "Core ONE"
+    base_model: COREONE
+    printer_configs_order:
+      - c1
+      - c1mmu3
+      - c1l
+      - c1lmmu3
+      - c1oak
+  - label: "MK4"
+    base_model: MK4
+    printer_configs_order:
+      - mk4s
+      - mk4smmu3
+      - mk4
+      - mk4mmu3
+      - mk3.9s
+      - mk3.9smmu3
+      - mk3.9
+      - mk3.9mmu3
+  - label: "XL"
+    base_model: XL
+    printer_configs_order:
+      - xl+1t
+      - xl+2t
+      - xl+5t
+      - xl-1t
+      - xl-2t
+      - xl-5t
+  - label: "MK3.5"
+    base_model: MK3.5
+    printer_configs_order:
+      - mk3.5
+      - mk3.5mmu3
+  - label: "MK3"
+    base_model: MK3
+    printer_configs_order:
+      - mk3s
+      - mk3smmu3
+      - mk3smmu2s
+      - mk3
+  - label: MINI
+    base_model: MINI
+    printer_configs_order:
+      - mini
+  - label: "MK2.5"
+    base_model: MK2.5
+    printer_configs_order:
+      - mk2.5s
+      - mk2.5smmu2s
+      - mk2.5
+  - label: "MK2"
+    base_model: MK2
+    printer_configs_order:
+      - mk2s
 ---
 kind: printer
 technology: FFF

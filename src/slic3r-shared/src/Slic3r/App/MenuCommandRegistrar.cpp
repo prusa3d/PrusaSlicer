@@ -1843,6 +1843,9 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
                             .is_localized_url = true
                         }
                     );
+                },
+                UIItemCommandExtraOpts{
+                    .enabled = hyperlinks_allowed
                 }
             )
         )
@@ -1855,10 +1858,12 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
                 {
                     open_browser(
                         OpenBrowserParams{
-                            .url = "https://help.prusa3d.com/article/sample-g-codes_529630",
-                            .force_remember_choice = false
+                            .url = "https://help.prusa3d.com/article/sample-g-codes_529630"
                         }
                     );
+                },
+                UIItemCommandExtraOpts{
+                    .enabled = hyperlinks_allowed
                 }
             )
         )
@@ -1871,10 +1876,12 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
                 {
                     open_browser(
                         OpenBrowserParams{
-                            .url = "https://github.com/prusa3d/PrusaSlicer/releases",
-                            .force_remember_choice = false
+                            .url = "https://github.com/prusa3d/PrusaSlicer/releases"
                         }
                     );
+                },
+                UIItemCommandExtraOpts{
+                    .enabled = hyperlinks_allowed
                 }
             )
         )
@@ -1913,10 +1920,12 @@ void MenuCommandRegistrar::register_main_menu_help_commands()
                 {
                     open_browser(
                         OpenBrowserParams{
-                            .url                   = "https://github.com/prusa3d/slic3r/issues/new/choose",
-                            .force_remember_choice = false
+                            .url = "https://github.com/prusa3d/slic3r/issues/new/choose"
                         }
                     );
+                },
+                UIItemCommandExtraOpts{
+                    .enabled = hyperlinks_allowed
                 }
             )
         )
@@ -1984,9 +1993,7 @@ void MenuCommandRegistrar::register_undo_redo_commands()
                     .enabled =
                         [&]()
                     {
-                        if (auto plater_render_module{
-                                dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module)
-                            })
+                        if (dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module))
                         {
                             return m_project_interactor.undo_provider().is_undo_possible();
                         }
@@ -2014,9 +2021,7 @@ void MenuCommandRegistrar::register_undo_redo_commands()
                         },
                     .enabled = [&]()
                     {
-                        if (auto plater_render_module{
-                                dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module)
-                            })
+                        if (dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module))
                         {
                             return m_project_interactor.undo_provider().is_redo_possible();
                         }

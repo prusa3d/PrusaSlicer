@@ -17,6 +17,8 @@ public:
     virtual void on_project_loaded(Domain::SelectionId project_id) {}
     virtual void on_project_saved(Domain::SelectionId project_id) {}
     virtual void on_project_load_failed(const std::string& error) {}
+    virtual void on_file_load_started() {}
+    virtual void on_geometry_only_imported() {}
 };
 
 } // namespace Slic3r::Biz

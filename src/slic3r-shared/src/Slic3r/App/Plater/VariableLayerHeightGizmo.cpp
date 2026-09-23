@@ -114,10 +114,8 @@ static std::optional<VariableLayerHeightGizmo::SelectedObjectData> collect_selec
             continue;
         }
 
-        const Scene::AuxiliaryElementId volume_id{
-            Scene::AuxiliaryElementId::Type::Volume,
-            model_volume->id().id
-        };
+        const Scene::AuxiliaryElementId
+            volume_id{Scene::AuxiliaryElementId::Type::Volume, model_volume->id().id};
         const Scene::TriangleMesh* mesh = mesh_manager.get(volume_id);
         if (mesh == nullptr) {
             return std::nullopt;
@@ -343,9 +341,7 @@ void VariableLayerHeightGizmo::on_activated()
         m_project_interactor.scene_interactor().bed_selection().last_selected_bed()
     );
 
-    m_mouse_button_down = Button::None;
-    m_mouse_dragging    = false;
-
+    this->reset_layer_height_profile_stroke_state();
     this->perform_layer_height_profile_clamping();
     this->set_dialog_layer_heights_profile_parameters();
     this->update_side_panel_layer_height_profile();
@@ -361,6 +357,16 @@ void VariableLayerHeightGizmo::on_activated()
 }
 
 void VariableLayerHeightGizmo::on_deactivated()
+{
+    if (!m_baseline_layer_height_profile.empty()) {
+        this->finish_layer_height_profile_stroke();
+    }
+
+    this->reset_layer_height_profile_stroke_state();
+    this->release_gizmo_scene_state();
+}
+
+void VariableLayerHeightGizmo::release_gizmo_scene_state()
 {
     Scene::Scene& scene = m_scene_presenter.scene();
 
@@ -390,7 +396,9 @@ void VariableLayerHeightGizmo::on_project_activated(size_t new_project_id)
 
 void VariableLayerHeightGizmo::on_project_deactivated(size_t old_project_id)
 {
-    this->on_deactivated();
+    // The selected project has already changed, so the in-progress stroke can't be applied anymore.
+    this->reset_layer_height_profile_stroke_state();
+    this->release_gizmo_scene_state();
 }
 
 void VariableLayerHeightGizmo::on_node_added(Scene::Node* node)
@@ -438,10 +446,8 @@ void VariableLayerHeightGizmo::on_model_reloaded(SelectionId project_id)
     this->rebuild_gizmo_state();
 }
 
-void VariableLayerHeightGizmo::on_scene_selection_changed(
-    const SelectionId project_id,
-    const ObjectSelection& selection
-)
+void VariableLayerHeightGizmo::
+    on_scene_selection_changed(const SelectionId project_id, const ObjectSelection& selection)
 {
     this->rebuild_gizmo_state();
 }
@@ -471,8 +477,9 @@ VariableLayerHeightGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_acti
             .ctrl_down   = ctrl_down,
             .wheel_delta = mouse_event.wheel_delta_y()
         };
-        return this->process_gizmo_event(gizmo_event) ? GizmoActivationState::Done :
-                                                        GizmoActivationState::Inactive;
+        return this->process_gizmo_event(gizmo_event) ?
+            GizmoActivationState::Done :
+            GizmoActivationState::Inactive;
     }
 
     const VolumeHitPoint hit =
@@ -600,10 +607,8 @@ void VariableLayerHeightGizmo::init_mesh_nodes()
         *m_scene_presenter.model_geometry_provider();
 
     for (const SelectedObjectData::Volume& volume : m_selected_object_data.volumes) {
-        Scene::AuxiliaryElementId geometry_id = {
-            Scene::AuxiliaryElementId::Type::Volume,
-            volume.model_volume.id().id
-        };
+        Scene::AuxiliaryElementId geometry_id =
+            {Scene::AuxiliaryElementId::Type::Volume, volume.model_volume.id().id};
         const Render::Geometry* geometry = geometry_provider.geometry_manager.get(geometry_id);
 
         ASSERT(geometry != nullptr);
@@ -637,10 +642,8 @@ void VariableLayerHeightGizmo::update_variable_layer_height_texture()
         .first_object_layer_height_fixed = m_layer_height_params.first_object_layer_height_fixed
     };
 
-    const LayerZRanges color_layers = Algorithms::LayerHeight::generate_object_layers(
-        generate_layers_params,
-        m_layer_height_params.layer_height_profile
-    );
+    const LayerZRanges color_layers = Algorithms::LayerHeight::
+        generate_object_layers(generate_layers_params, m_layer_height_params.layer_height_profile);
 
     const ZHeightPairs& stripe_profile = m_baseline_layer_height_profile.empty() ?
         m_layer_height_params.layer_height_profile :
@@ -712,10 +715,8 @@ void VariableLayerHeightGizmo::perform_layer_height_profile_smoothing()
         .keep_min = m_lock_high_detail
     };
 
-    m_layer_height_params.layer_height_profile = Algorithms::LayerHeight::smooth_height_profile(
-        m_layer_height_params.layer_height_profile,
-        smooth_params
-    );
+    m_layer_height_params.layer_height_profile = Algorithms::LayerHeight::
+        smooth_height_profile(m_layer_height_params.layer_height_profile, smooth_params);
 
     this->update_variable_layer_height_texture();
     this->refresh_mesh_nodes_material();
@@ -767,13 +768,9 @@ void VariableLayerHeightGizmo::generate_adaptive_layer_height_profile()
         .first_object_layer_height_fixed = m_layer_height_params.first_object_layer_height_fixed,
     };
 
-    const ModelObject& model_object = *m_selected_object_data.model_object;
-    m_layer_height_params.layer_height_profile =
-        Algorithms::LayerHeight::layer_height_profile_adaptive(
-            adaptive_params,
-            model_object,
-            quality_factor
-        );
+    const ModelObject& model_object            = *m_selected_object_data.model_object;
+    m_layer_height_params.layer_height_profile = Algorithms::LayerHeight::
+        layer_height_profile_adaptive(adaptive_params, model_object, quality_factor);
 
     this->update_variable_layer_height_texture();
     this->refresh_mesh_nodes_material();
@@ -926,25 +923,15 @@ bool VariableLayerHeightGizmo::process_gizmo_event(const GizmoEvent& event)
         this->refresh_mesh_nodes_material();
         return true;
     } else if (event.type == GizmoEvent::Type::LeftUp || event.type == GizmoEvent::Type::RightUp) {
-        m_baseline_layer_height_profile.clear();
-
-        this->apply_layer_height_profile_to_model();
-        m_project_interactor.undo_provider().take_snapshot(
-            UndoSnapshotType::VariableLayerHeightStroke
-        );
-        this->update_variable_layer_height_texture();
-        this->set_cursor_z(std::nullopt);
-        this->refresh_mesh_nodes_material();
+        this->finish_layer_height_profile_stroke();
         return true;
     }
 
     return false;
 }
 
-VariableLayerHeightGizmo::VolumeHitPoint VariableLayerHeightGizmo::perform_raycast(
-    const Vec2d& mouse_position,
-    const Scene::Camera& camera
-) const
+VariableLayerHeightGizmo::VolumeHitPoint VariableLayerHeightGizmo::
+    perform_raycast(const Vec2d& mouse_position, const Scene::Camera& camera) const
 {
     VolumeHitPoint closest_hit          = {Vec3d::Zero(), -1};
     double closest_hit_squared_distance = std::numeric_limits<double>::max();
@@ -955,14 +942,8 @@ VariableLayerHeightGizmo::VolumeHitPoint VariableLayerHeightGizmo::perform_rayca
     for (const SelectedObjectData::Volume& volume : m_selected_object_data.volumes) {
         const size_t volume_idx = &volume - &m_selected_object_data.volumes.front();
 
-        const std::optional<MeshRaycaster::UnprojectResult> unproject_result =
-            MeshRaycaster::unproject_on_mesh(
-                volume.aabb_mesh,
-                ray,
-                volume.world_trafo,
-                std::nullopt,
-                false
-            );
+        const std::optional<MeshRaycaster::UnprojectResult> unproject_result = MeshRaycaster::
+            unproject_on_mesh(volume.aabb_mesh, ray, volume.world_trafo, std::nullopt, false);
 
         if (!unproject_result.has_value()) {
             continue;
@@ -991,6 +972,9 @@ void VariableLayerHeightGizmo::rebuild_gizmo_state()
     const MeshManager& mesh_manager         = m_scene_presenter.model_triangle_mesh_manager();
     Project& project                        = m_project_interactor.selected_project();
     Scene::Scene& scene                     = m_scene_presenter.scene();
+
+    // The layer height profile gets rebuilt from the model, so the in-progress stroke is discarded.
+    this->reset_layer_height_profile_stroke_state();
 
     // Restore the originally visible nodes.
     this->restore_visible_volumes();
@@ -1026,9 +1010,6 @@ void VariableLayerHeightGizmo::rebuild_gizmo_state()
         m_project_interactor.scene_interactor().bed_selection().last_selected_bed()
     );
 
-    m_mouse_button_down = Button::None;
-    m_mouse_dragging    = false;
-
     this->perform_layer_height_profile_clamping();
     this->set_dialog_layer_heights_profile_parameters();
     this->update_side_panel_layer_height_profile();
@@ -1036,6 +1017,25 @@ void VariableLayerHeightGizmo::rebuild_gizmo_state()
     this->hide_visible_volumes();
     this->init_main_nodes();
     this->init_mesh_nodes();
+}
+
+void VariableLayerHeightGizmo::finish_layer_height_profile_stroke()
+{
+    m_baseline_layer_height_profile.clear();
+
+    this->apply_layer_height_profile_to_model();
+    m_project_interactor.undo_provider().take_snapshot(UndoSnapshotType::VariableLayerHeightStroke);
+    this->update_variable_layer_height_texture();
+    this->set_cursor_z(std::nullopt);
+    this->refresh_mesh_nodes_material();
+}
+
+void VariableLayerHeightGizmo::reset_layer_height_profile_stroke_state()
+{
+    m_baseline_layer_height_profile.clear();
+    m_mouse_button_down = Button::None;
+    m_mouse_dragging    = false;
+    m_last_cursor_z     = std::nullopt;
 }
 
 } // namespace Slic3r::App::Plater

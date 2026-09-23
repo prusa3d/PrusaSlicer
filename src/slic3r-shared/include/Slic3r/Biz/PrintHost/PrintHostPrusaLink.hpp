@@ -24,7 +24,7 @@ public:
     bool perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
     const char* get_name() const override { return "PrusaLink"; }
-    bool test(std::string& msg, RetryFn retry_fn) const override;
+    bool test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const override;
 
 protected:
     virtual void set_http_post_header_args(Network::IHttp* http, PrintHostAfterUploadAction action) const;
@@ -35,10 +35,10 @@ protected:
     bool upload_inner_with_host(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const;
     bool put_inner(std::string url, const std::string& name, ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const;
     bool post_inner(std::string url, const std::string& name, ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const;
-    bool test_with_method_check(std::string& msg, bool& use_put, RetryFn retry_fn) const;
+    bool test_with_method_check(std::string& msg, bool& use_put, ProgressFn progress_fn, RetryFn retry_fn) const;
 #ifdef WIN32
     bool upload_inner_with_resolved_ip(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn, const boost::asio::ip::address& resolved_addr) const;
-    bool test_with_resolved_ip_and_method_check(std::string& msg, bool& use_put, RetryFn retry_fn) const;
+    bool test_with_resolved_ip_and_method_check(std::string& msg, bool& use_put, ProgressFn progress_fn, RetryFn retry_fn) const;
 #endif
 };
 

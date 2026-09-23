@@ -27,15 +27,15 @@ namespace Slic3r::App {
     }
 
     std::ostringstream stream;
-    stream.imbue(std::locale("")); // Locale from the user's environment
-    stream << std::put_time(local_time, "%x %T");
-
-    if (!stream) {
-        // failed to format date
-        return std::string{};
+    try {
+        stream.imbue(std::locale(std::locale::classic(), "", std::locale::time));
+    } catch (const std::runtime_error&) {
+        // Fall back to the classic locale if LC_TIME is unavailable.
     }
 
-    return stream.str();
+    stream << std::put_time(local_time, "%x %T");
+
+    return stream ? stream.str() : std::string{};
 }
 
 std::optional<std::string_view> extract_name(std::string_view s)

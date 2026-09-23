@@ -230,34 +230,6 @@ void SlicingInteractor::on_status(const StatusUpdate status_update, const Slicin
     }
 }
 
-void SlicingInteractor::on_exception(std::exception_ptr exception, Domain::SlicingId id) {
-    SPDLOG_ERROR("{}: unhandled exception", fmt::streamed(id));
-    if (!m_dispatcher.dispatch_on_main_thread([exception, id]() {
-            // If possible, obtain the message from the exception.
-            try {
-                std::rethrow_exception(exception);
-            } catch (const std::exception& exception) {
-                std::throw_with_nested(
-                    FatalSlicingError{fmt::format(
-                        "Slicing with id: {} raised unhandled exception: {}",
-                        fmt::streamed(id),
-                        exception.what()
-                    )}
-                );
-            } catch (...) {
-                std::throw_with_nested(
-                    FatalSlicingError{fmt::format(
-                        "Slicing with id: {} raised unknown unhandled exception!",
-                        fmt::streamed(id)
-                    )}
-                );
-            }
-        }))
-    {
-        SPDLOG_TRACE("{}: exception not dispatched", fmt::streamed(id));
-    }
-}
-
 void SlicingInteractor::on_fdm_result(FDMResult&& result, const SlicingId id)
 {
     SPDLOG_TRACE("{}: FDMResult{{moves_count: {}}}", fmt::streamed(id), result.const_moves()->size());

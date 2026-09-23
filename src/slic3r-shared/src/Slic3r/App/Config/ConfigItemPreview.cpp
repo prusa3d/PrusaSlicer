@@ -37,6 +37,7 @@ void ConfigItemPreview::set_data(
             remove(m_input_checkbox);
             m_input_checkbox = nullptr;
             break;
+        case Domain::ConfigItemDef::GUIType::unit_or_percentage:
         case Domain::ConfigItemDef::GUIType::textfield:
         case Domain::ConfigItemDef::GUIType::spinbox:
         case Domain::ConfigItemDef::GUIType::f_enum_open:

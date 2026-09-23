@@ -23,7 +23,7 @@ public:
     bool perform(ProgressFn progress_fn, RetryFn retry_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
     const char* get_name() const override { return "PrusaConnect"; }
-    bool test(std::string& msg, RetryFn retry_fn) const override;
+    bool test(std::string& msg, ProgressFn progress_fn, RetryFn retry_fn) const override;
 
 private:
     bool init_upload(const PrintHostJobData& upload_data, std::string& out, RetryFn retry_fn) const;

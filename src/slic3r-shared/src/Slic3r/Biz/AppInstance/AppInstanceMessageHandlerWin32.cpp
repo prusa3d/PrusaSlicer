@@ -11,6 +11,12 @@
 #include <windows.h>
 
 namespace Slic3r::Biz::AppInstance {
+
+constexpr wchar_t Instance_Hash_Major[] = L"Instance_Hash_Major";
+constexpr wchar_t Instance_Hash_Minor[] = L"Instance_Hash_Minor";
+constexpr wchar_t Instance_Is_Maximized[] = L"Instance_Is_Maximized";
+constexpr wchar_t Is_Prusa_Slicer[] = L"Is_Prusa_Slicer";
+
 namespace {
 void init_windows_properties(HWND window_handle, size_t instance_hash, bool maximized)
 {
@@ -20,17 +26,19 @@ void init_windows_properties(HWND window_handle, size_t instance_hash, bool maxi
     HANDLE handle_minor        = UIntToPtr(minor_hash);
     HANDLE handle_major        = UIntToPtr(major_hash);
     HANDLE handle_is_maximized = UIntToPtr(is_maximized);
-    SetProp(window_handle, L"Instance_Hash_Minor", handle_minor);
-    SetProp(window_handle, L"Instance_Hash_Major", handle_major);
-    SetProp(window_handle, L"Instance_Is_Maximized", handle_is_maximized);
+    SetPropW(window_handle, Instance_Hash_Minor, handle_minor);
+    SetPropW(window_handle, Instance_Hash_Major, handle_major);
+    SetPropW(window_handle, Instance_Is_Maximized, handle_is_maximized);
+    static int empty_marker;
+    SetPropW(window_handle, Is_Prusa_Slicer, &empty_marker);
 }
 
 void update_windows_properties(HWND window_handle, bool maximized)
 {
-    RemoveProp(window_handle, L"Instance_Is_Maximized");
+    RemovePropW(window_handle, Instance_Is_Maximized);
     size_t is_maximized        = maximized ? 1 : 0;
     HANDLE handle_is_maximized = UIntToPtr(is_maximized);
-    SetProp(window_handle, L"Instance_Is_Maximized", handle_is_maximized);
+    SetPropW(window_handle, Instance_Is_Maximized, handle_is_maximized);
 }
 
 std::string compose_message_json(const std::string& type, const std::string& data)
@@ -50,9 +58,10 @@ AppInstanceMessageHandlerWin32::~AppInstanceMessageHandlerWin32()
 {
     if (m_init) {
         ASSERT(m_window_handle != nullptr);
-        RemoveProp(m_window_handle, L"Instance_Hash_Minor");
-        RemoveProp(m_window_handle, L"Instance_Hash_Major");
-        RemoveProp(m_window_handle, L"Instance_Is_Maximized");
+        RemovePropW(m_window_handle, Instance_Hash_Major);
+        RemovePropW(m_window_handle, Instance_Hash_Minor);
+        RemovePropW(m_window_handle, Instance_Is_Maximized);
+        RemovePropW(m_window_handle, Is_Prusa_Slicer);
     }
 }
 
@@ -81,31 +90,25 @@ BOOL AppInstanceMessageSenderWin32::enum_windows_process_multicast(_In_ HWND hwn
         return TRUE; // Skip and continue enumeration.
     }
 
+    if (GetPropW(hwnd, Is_Prusa_Slicer) == nullptr) {
+        return TRUE; // Skip and continue enumeration.
+    }
+
     std::wstring classNameString(className);
     std::wstring wndTextString(wndText);
 
-    if (wndTextString.find(boost::nowide::widen(Slic3r::BUILD_ID).c_str()) != std::wstring::npos && classNameString == L"wxWindowNR")
+    // Multicast reaches all PrusaSlicer instances regardless of version, like on Linux/macOS.
+    if (wndTextString.find(boost::nowide::widen(Slic3r::APP_NAME).c_str()) != std::wstring::npos && classNameString == L"wxWindowNR")
     {
-        // Get the instance hash properties.
-        uint64_t other_instance_hash_minor = PtrToUint(GetProp(hwnd, L"Instance_Hash_Minor"));
-        uint64_t other_instance_hash_major = PtrToUint(GetProp(hwnd, L"Instance_Hash_Major"));
-        uint64_t other_instance_hash = (other_instance_hash_major << 32) | other_instance_hash_minor;
-
-        // Get the maximization state.
-        bool maximized = PtrToUint(GetProp(hwnd, L"Instance_Is_Maximized")) == 1;
-
-        ASSERT(m_instance_hash != 0);
-        if (m_instance_hash == other_instance_hash) {
-            // Send the multicast message.
-            ASSERT(!m_multicast_message.empty());
-            COPYDATASTRUCT data_to_send = {
-                1,
-                static_cast<DWORD>(sizeof(wchar_t) * (m_multicast_message.size() + 1)),
-                const_cast<wchar_t*>(m_multicast_message.c_str())
-            };
-            SendMessage(hwnd, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data_to_send));
-            return TRUE; // Continue enumeration.
-        }
+        // Send the multicast message.
+        ASSERT(!m_multicast_message.empty());
+        COPYDATASTRUCT data_to_send = {
+            1,
+            static_cast<DWORD>(sizeof(wchar_t) * (m_multicast_message.size() + 1)),
+            const_cast<wchar_t*>(m_multicast_message.c_str())
+        };
+        SendMessage(hwnd, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data_to_send));
+        return TRUE; // Continue enumeration.
     }
     return TRUE; // Continue enumeration.
 }
@@ -149,12 +152,12 @@ BOOL AppInstanceMessageSenderWin32::enum_windows_process_broadcast(_In_ HWND hwn
     if (wndTextString.find(boost::nowide::widen(Slic3r::BUILD_ID).c_str()) != std::wstring::npos && classNameString == L"wxWindowNR")
     {
         // Get the instance hash properties.
-        uint64_t other_instance_hash_minor = PtrToUint(GetProp(hwnd, L"Instance_Hash_Minor"));
-        uint64_t other_instance_hash_major = PtrToUint(GetProp(hwnd, L"Instance_Hash_Major"));
+        uint64_t other_instance_hash_major = PtrToUint(GetPropW(hwnd, Instance_Hash_Major));
+        uint64_t other_instance_hash_minor = PtrToUint(GetPropW(hwnd, Instance_Hash_Minor));
         uint64_t other_instance_hash = (other_instance_hash_major << 32) | other_instance_hash_minor;
 
         // Get the maximization state.
-        bool maximized = PtrToUint(GetProp(hwnd, L"Instance_Is_Maximized")) == 1;
+        bool maximized = PtrToUint(GetPropW(hwnd, L"Instance_Is_Maximized")) == 1;
 
         ASSERT(m_instance_hash != 0);
         if (m_instance_hash == other_instance_hash) {

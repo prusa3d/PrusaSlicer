@@ -240,6 +240,8 @@ void AbstractRenderLayout::init()
 
     m_layout_main.append(m_preset_updater_dialog.release());
     m_preset_updater_dialog->attach_to_center();
+
+    set_sidebars_visible(!AppServices::instance().app_config().get<bool>("hide_sidebars"));
 }
 
 void AbstractRenderLayout::init_left_column()

@@ -1,10 +1,13 @@
 #pragma once
 
+#include "Slic3r/App/AppConfigInteractor.hpp"
+#include "Slic3r/App/IAppConfigChangedListener.hpp"
 #include "Slic3r/App/PresetUpdater/PresetUpdaterController.hpp"
 #include "Slic3r/App/PresetUpdater/PresetUpdaterSourceRow.hpp"
 #include "Slic3r/App/Yoga/Dialog.hpp"
 #include "Slic3r/App/Yoga/ListView.hpp"
 #include "Slic3r/Biz/ObservableListSortFilter.hpp"
+#include "Slic3r/Biz/Platform/ListenerScope.hpp"
 
 namespace Slic3r::App {
 
@@ -18,7 +21,9 @@ class Text;
 
 
 /// One instance per render module, all bound to the single controller owned by AppServices.
-class PresetUpdaterDialog : public Yoga::Dialog, public PresetUpdater::IPresetUpdaterControllerListener
+class PresetUpdaterDialog : public Yoga::Dialog,
+                            public PresetUpdater::IPresetUpdaterControllerListener,
+                            public IAppConfigChangedListener
 {
 public:
     using SourceFactory = Yoga::ViewFactory<
@@ -34,6 +39,8 @@ public:
 
     void on_preset_updater_changed() override;
 
+    void on_app_config_changed(const std::string& key) override;
+
     void resize(const Yoga::SizeInfo& size_info) override;
 
 protected:
@@ -44,11 +51,15 @@ private:
     void build_footer(Yoga::Item* parent);
     void pick_zip_archive();
     bool source_visible(const PresetUpdater::SourceRowState& source) const;
+    void update_repo_link_enabled();
 
     void apply_size_limits(const Yoga::SizeInfo& size_info);
 
     PresetUpdater::PresetUpdaterController& m_controller;
     Navigator& m_navigator;
+
+    Biz::ListenerScope<IAppConfigChangedListener, AppConfigInteractor, PresetUpdaterDialog>
+        m_app_config_changed_listener_scope;
 
     SourceListView* m_online_list_view{nullptr};
     SourceListView* m_local_list_view{nullptr};

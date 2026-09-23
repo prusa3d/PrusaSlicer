@@ -148,6 +148,12 @@ bool AbstractRenderCanvas::begin_frame()
     assert_no_gl_error();
 
     ImGuiIO& io = ImGui::GetIO();
+    if (m_is_text_input_focused != io.WantTextInput) {
+        m_is_text_input_focused = io.WantTextInput;
+        invoke_listeners<IInputTextFocusChangedListener>(
+            [this](auto* L) { L->on_input_text_focus_changed(m_is_text_input_focused); }
+        );
+    }
 
     double current_time = platform_time();
     io.DeltaTime        = m_last_time > 0 ? float(current_time - m_last_time) : (1.0f / 60.0f);
@@ -187,7 +193,6 @@ void AbstractRenderCanvas::end_imgui_frame()
     end_imgui_frame_platform();
     // Rendering
     ImGui::Render();
-
 }
 
 void AbstractRenderCanvas::end_frame(Render::CommandBuffer& cmd_buffer)
@@ -318,6 +323,11 @@ void AbstractRenderCanvas::request_render()
 
     m_render_request_count = std::max<size_t>(m_render_request_count, 2);
     on_render_requested();
+}
+
+bool AbstractRenderCanvas::is_text_input_focused() const
+{
+    return m_is_text_input_focused;
 }
 
 bool AbstractRenderCanvas::get_and_reset_render_requested()

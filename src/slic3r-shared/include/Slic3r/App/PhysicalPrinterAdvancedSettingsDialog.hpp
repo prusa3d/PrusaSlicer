@@ -4,8 +4,10 @@
 #include "Slic3r/Biz/Platform/ListenerScope.hpp"
 #include "Slic3r/Domain/ConfigPhysical.hpp"
 
+#include "Slic3r/App/ThemeTypes.hpp"
 #include "Slic3r/App/Yoga/Dialog.hpp"
 
+#include <string>
 #include <vector>
 
 namespace Slic3r::Biz {
@@ -14,6 +16,7 @@ class ProjectInteractor;
 
 namespace Slic3r::Biz::PhysicalPrinter {
 class PhysicalPrinterInteractor;
+struct PrintHostTestResult;
 } // namespace Slic3r::Biz::PhysicalPrinter
 
 namespace Slic3r::App::Yoga {
@@ -22,6 +25,7 @@ class InputTextField;
 class ComboBox;
 class ToggleButton;
 class LayoutButton;
+class Text;
 } // namespace Slic3r::App::Yoga
 
 namespace Slic3r::App {
@@ -46,11 +50,21 @@ protected:
 
 private:
     void on_about_to_show() override;
+    void on_about_to_close() override;
 
     void build_form();
     void load_from_interactor();
     void commit_to_interactor();
+    void commit_edits();
+    void persist_coerced_auth_type();
     void update_field_visibility();
+    void update_test_button_state();
+
+    void on_connection_test_finished(Biz::PhysicalPrinter::PrintHostTestResult result);
+    void set_test_status(const std::string& text, const std::string& detail, Platform::Color color);
+    void clear_test_status();
+
+    void browse_ca_file();
 
     void rebuild_auth_type_options(Domain::PrintHostAuthType desired);
     Domain::PrintHostAuthType current_auth_type() const;
@@ -83,6 +97,12 @@ private:
     Yoga::Item* m_user_row{nullptr};
     Yoga::Item* m_password_row{nullptr};
 
+    Yoga::LayoutButton* m_ca_file_browse_button{nullptr};
+
+    Yoga::Item* m_test_status_row{nullptr};
+    Yoga::Text* m_test_status{nullptr};
+    Yoga::Text* m_test_status_detail{nullptr};
+    Yoga::LayoutButton* m_test_button{nullptr};
     Yoga::LayoutButton* m_save_button{nullptr};
     Yoga::LayoutButton* m_change_hw_button{nullptr};
 

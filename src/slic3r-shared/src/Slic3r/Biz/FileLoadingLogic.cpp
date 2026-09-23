@@ -10,6 +10,7 @@
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 #include "Slic3r/Biz/Algorithms/Geometry/ConvexHull.hpp"
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/ModelVolume.hpp"
 #include "Slic3r/Biz/Algorithms/Point.hpp"
 #include "Slic3r/Biz/Algorithms/VirtualExtruder.hpp"
 #include "Slic3r/Biz/Scene/Selection.hpp"
@@ -47,6 +48,7 @@ struct ReturnData
     boost::filesystem::path file_path;
     std::optional<Domain::TriangleMesh> mesh;
     std::optional<Domain::Model> model;
+    bool geometry_only_3mf = false;
 };
 
 struct FileLoadError
@@ -432,11 +434,18 @@ void fix_volume_transformation(ModelVolume& volume) {
     std::optional<Transform3d> &fix_opt = volume.emboss_shape->legacy_fix_3mf_tr;
     if (!fix_opt.has_value())
         return; // version without storing fix matrix (can't help)
-    
-    volume.set_transformation(volume.get_matrix() * fix_opt->inverse());
-    indexed_triangle_set its = volume.mesh_ptr()->its; // copy
-    its_transform(its, *fix_opt);
-    volume.set_mesh(Algorithms::TriangleMesh::construct(std::move(its)));
+
+    // The legacy fix expects a mesh centered at its bounding box center.
+    Transform3d mesh_trafo = *fix_opt;
+    mesh_trafo.translate(-Algorithms::BoundingBox::center(volume.mesh().bounding_box()));
+
+    TriangleMesh mesh = volume.mesh();
+    mesh.transform(mesh_trafo, true);
+
+    volume.set_transformation(volume.get_matrix() * mesh_trafo.inverse());
+    volume.set_mesh(std::move(mesh));
+    Algorithms::ModelVolume::calculate_convex_hull(volume);
+
     // data for fix transformation is not useable anymore
     fix_opt.reset();
 }
@@ -737,7 +746,8 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
                 );
             }
 
-            ret.model = loaded_3mf.model;
+            ret.model             = loaded_3mf.model;
+            ret.geometry_only_3mf = true;
             return ret;
         } catch (const Loaded3MFException& e) {
             return tl::make_unexpected(FileLoadError::error(
@@ -1085,7 +1095,7 @@ std::optional<ModelVolume::Source> volume_source_from_path(const boost::filesyst
 }
 } // namespace
 
-ElementRefs import_files_and_add_to_scene(
+ImportToSceneResult import_files_and_add_to_scene(
     const std::vector<boost::filesystem::path>& file_paths,
     int tool_count,
     Scene::SceneInteractor& scene_interactor,
@@ -1095,8 +1105,11 @@ ElementRefs import_files_and_add_to_scene(
 {
     auto data = Biz::FileLoadingLogic::import_files(file_paths, dialog_provider, tool_count);
 
-    ElementRefs added_instances;
+    ImportToSceneResult result;
+    ElementRefs& added_instances = result.instances;
     for (Biz::FileLoadingLogic::ReturnData& file_data : data) {
+        result.geometry_only_3mf |= file_data.geometry_only_3mf;
+
         Domain::BoundingBox3d bbox;
         ElementRefs new_instances;
         using namespace Biz::Algorithms;
@@ -1135,7 +1148,7 @@ ElementRefs import_files_and_add_to_scene(
         added_instances.insert(added_instances.end(), new_instances.begin(), new_instances.end());
     }
 
-    return added_instances;
+    return result;
 }
 
 /**

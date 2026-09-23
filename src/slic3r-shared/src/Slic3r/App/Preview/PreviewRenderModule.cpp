@@ -69,6 +69,16 @@ namespace CustomGCode = Domain::CustomGCode;
 using CommandName          = Platform::CommandName;
 using FuncCommandExtraOpts = Platform::FuncCommandExtraOpts;
 
+PreviewRenderModule::~PreviewRenderModule()
+{
+    // m_gizmo_manager lives in the RenderModuleBase base class, which is destroyed after this
+    // class's own members (including m_scene_presenter). Gizmos may unregister themselves from
+    // m_scene_presenter in their destructors, so it must be torn down here, while
+    // m_scene_presenter is still alive, instead of relying on implicit member/base destruction
+    // order. See PlaterRenderModule::~PlaterRenderModule() for the same fix.
+    m_gizmo_manager.reset();
+}
+
 void PreviewRenderModule::render_scene(Render::CommandBuffer& cmd_buffer)
 {
     Render::ScopedDebugGroup event_imgui_render("Preview Render", cmd_buffer);
@@ -285,20 +295,6 @@ void PreviewRenderModule::on_scene_mouse_event(const Platform::MouseEvent& e)
     m_gizmo_manager->on_scene_mouse_event(e, m_screen_info);
 }
 
-void PreviewRenderModule::on_scene_keyboard_event(const Platform::KeyboardEvent& e)
-{
-    if (!m_render_module_navigator->is_any_modal_dialog_opened()
-        && !m_gizmo_manager->on_scene_keyboard_event(e))
-    {
-        Platform::AbstractRenderModule::on_scene_keyboard_event(e);
-    }
-}
-
-void PreviewRenderModule::set_navigator(Navigator* navigator)
-{
-    m_render_module_navigator = navigator;
-}
-
 void PreviewRenderModule::on_selected_bed_instances_changed(
     Domain::SelectionId project_id,
     const Biz::Scene::BedSelection& selection
@@ -379,10 +375,12 @@ void PreviewRenderModule::on_bed_instance_updated(Domain::SelectionId project_id
     update_viewer();
 }
 
-void PreviewRenderModule::set_sidebars_visible(bool hide)
+void PreviewRenderModule::set_sidebars_visible(bool visible)
 {
-    m_layout->set_sidebars_visible(hide);
-    // request redraw
+    if (m_layout) {
+        m_layout->set_sidebars_visible(visible);
+    }
+
     request_render();
 }
 
@@ -404,11 +402,6 @@ void PreviewRenderModule::set_camera_synch_data(const Platform::CameraSynchData&
     m_scene_presenter->set_camera_synch_data(data);
 }
 
-void PreviewRenderModule::set_opened_dialog(Yoga::Dialog* opened_dialog)
-{
-    m_dialog_navigation.open_dialog(opened_dialog);
-}
-
 void PreviewRenderModule::set_modal_dialog(ModalDialog modal_dialog)
 {
     auto handle_dialog = [&](Yoga::Dialog* dialog, ModalDialog modal){
@@ -424,20 +417,6 @@ void PreviewRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
 
     request_render();
-}
-
-void PreviewRenderModule::open_invalid_data_dialog()
-{
-    if (m_invalid_data_dialog.get()) {
-        set_opened_dialog(m_invalid_data_dialog.get());
-    }
-}
-
-void PreviewRenderModule::set_object_list_collapsed(bool collapsed)
-{
-    if (m_object_list.get()) {
-        m_object_list->set_collapsed(collapsed);
-    }
 }
 
 void PreviewRenderModule::on_init(

@@ -69,7 +69,7 @@ void RootItem::for_each_popup_reconcile(F&& fn)
 
 void RootItem::root_render(const SizeInfo& size_info)
 {
-    if (size_info.viewport_size_y == 0 || size_info.viewport_size_y == 0) {
+    if (size_info.viewport_size_x == 0 || size_info.viewport_size_y == 0) {
         return;
     }
 

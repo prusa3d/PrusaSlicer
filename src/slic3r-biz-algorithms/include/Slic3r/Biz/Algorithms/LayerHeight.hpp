@@ -288,4 +288,11 @@ void clamp_layer_height_profile(
     double max_layer_height
 );
 
+/**
+ * @brief Check whether the layer height range satisfies 0 <= min <= max with finite bounds.
+ *
+ * Zero-height ranges are allowed.
+ */
+bool is_valid_layer_height_range(const Domain::LayerHeightRange& range);
+
 } // namespace Slic3r::Biz::Algorithms::LayerHeight

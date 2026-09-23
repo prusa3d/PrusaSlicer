@@ -21,13 +21,16 @@ protected:
     Biz::ProjectInteractor& m_project_interactor;
     std::vector<BrowserLogicCommand> handle_message(const std::string& message);
     std::vector<BrowserLogicCommand> resend_config();
+    std::string get_engine_check_script() const;
 
     // action callbacks stored in m_actions
     virtual std::vector<BrowserLogicCommand> on_connect_action_log(const std::string& message_data);
     virtual std::vector<BrowserLogicCommand> on_connect_action_error(const std::string& message_data);
+    virtual std::vector<BrowserLogicCommand> on_connect_action_unsupported_webview(const std::string& message_data);
     virtual std::vector<BrowserLogicCommand> on_connect_action_request_login(const std::string& message_data);
     virtual std::vector<BrowserLogicCommand> on_connect_action_request_config(const std::string& message_data);
     virtual std::vector<BrowserLogicCommand> on_connect_action_request_open_in_browser(const std::string& message_data);
+    virtual std::vector<BrowserLogicCommand> on_connect_action_open_connect_in_browser(const std::string& message_data);
     virtual std::vector<BrowserLogicCommand> on_connect_action_select_printer(const std::string& message_data) = 0;
     virtual std::vector<BrowserLogicCommand> on_connect_action_print(const std::string& message_data) = 0;
     virtual std::vector<BrowserLogicCommand> on_connect_action_webapp_ready(const std::string& message_data) = 0;

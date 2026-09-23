@@ -573,6 +573,7 @@ public:
         const Domain::Model& model,
         const Domain::FullConfigFDMPtr& new_full_config_ptr,
         const Domain::Preset::SelectedPresetMetadata& metadata,
+        const std::string& bed_name,
         const MetadataSerializeFn& serializer,
         const Domain::ModelWipeTower& wipe_tower,
         const std::optional<Domain::CustomGCode::Info>& custom_gcode,

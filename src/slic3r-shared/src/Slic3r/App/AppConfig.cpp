@@ -7,6 +7,7 @@
 #include "Slic3r/Biz/Config/ConfigLoad.hpp"
 #include "Slic3r/Biz/Config/ConfigSerialize.hpp"
 
+#include "Slic3r/App/Scene/Camera.hpp"
 #include "Slic3r/App/Theme.hpp"
 
 #include "Slic3r/Directories.hpp"
@@ -101,6 +102,21 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
             {int(MouseNavigationScheme::Fusion),
              "fusion",
              def->L_CONTEXT("Fusion", "Mouse navigation scheme")},
+        }
+    );
+
+    def               = defs.add("camera_projection_type", typeid(Domain::EnumWrapper));
+    def->location     = Domain::AppConfigLocation{};
+    def->label        = L("Camera projection");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_General;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
+    def->gui_type     = GUIType::combobox;
+    def->tooltip      = L("Default camera projection type");
+    def->init_fn      = Domain::init_with(
+        Scene::CameraProjectionType::Perspective,
+        {
+            {int(Scene::CameraProjectionType::Perspective), "perspective", def->L_CONTEXT("Perspective", "Camera projection")},
+            {int(Scene::CameraProjectionType::Orthographic), "orthographic", def->L_CONTEXT("Orthographic", "Camera projection")},
         }
     );
 
@@ -206,6 +222,11 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn = []() { return Domain::ConfigValue(std::string()); };
 
+    def = defs.add("last_used_physical_printer", typeid(std::string));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(std::string()); };
+
     // TODO: This option needs check after changed field in Preferences.
     def = defs.add("downloads_directory", typeid(std::string));
     def->location = Domain::AppConfigLocation{};
@@ -261,23 +282,27 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn = []() { return Domain::ConfigValue(1.); };
 
-    // Settings for open link in browser
-
-    def = defs.add("show_open_browser_warning_dialog", typeid(bool));
-    def->location = Domain::AppConfigLocation{};
-    def->category = Domain::ConfigItemDef::Category::AppConfig_Services;
+    def               = defs.add("open_hyperlink_policy", typeid(Domain::EnumWrapper));
+    def->location     = Domain::AppConfigLocation{};
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_Services;
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_General;
-    def->gui_type = GUIType::checkbox;
-    def->label = L("Show warning dialog before opening a link in default browser");
-    def->init_fn = []() { return Domain::ConfigValue(true); };
-
-    def = defs.add("suppress_hyperlinks", typeid(bool));
-    def->location = Domain::AppConfigLocation{};
-    def->category = Domain::ConfigItemDef::Category::AppConfig_Services;
-    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_Services_General;
-    def->gui_type = GUIType::checkbox;
-    def->label = L("Suppress opening hyperlinks in browser");
-    def->init_fn = []() { return Domain::ConfigValue(false); };
+    def->gui_type     = GUIType::combobox;
+    // TRN Label of a Preferences combobox choosing what happens when a hyperlink is clicked.
+    def->label        = L("Open hyperlinks in web browser");
+    // TRN Tooltip of the "Open hyperlinks in web browser" Preferences combobox.
+    def->tooltip      = L("Choose what happens when you click a link in PrusaSlicer: "
+                          "ask for confirmation, open it in your default web browser right away, or do nothing.");
+    def->init_fn      = Domain::init_with(
+        HyperlinkPolicy::Ask,
+        {
+            // TRN Value of the "Open hyperlinks in web browser" Preferences combobox.
+            {int(HyperlinkPolicy::Ask), "ask", L("Ask before opening")},
+            // TRN Value of the "Open hyperlinks in web browser" Preferences combobox.
+            {int(HyperlinkPolicy::AlwaysOpen), "always", L("Always open")},
+            // TRN Value of the "Open hyperlinks in web browser" Preferences combobox.
+            {int(HyperlinkPolicy::NeverOpen), "never", L("Never open")},
+        }
+    );
 
     def           = defs.add("favorite_params", typeid(std::vector<std::string>));
     def->location = Domain::AppConfigLocation{};
@@ -331,6 +356,11 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->location = Domain::AppConfigLocation{};
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn  = []() { return Domain::ConfigValue{false}; };
+
+    def           = defs.add("hide_sidebars", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue{false}; };
 }
 
 tl::expected<std::unique_ptr<AppConfig>, std::string> AppConfig::load_appconfig(const std::string& filename)
@@ -367,15 +397,6 @@ void AppConfig::handle_legacy_config(AppConfig& app_config)
     const boost::optional<Semver> semver{Semver::parse(app_config.get<std::string>("version"))};
     if (!semver.has_value()) {
         return;
-    }
-
-    const Semver version300_alpha9{3, 0, 0, nullptr, "alpha9"};
-    if (semver <= version300_alpha9) {
-        // reset font size to new default value
-        const Domain::ConfigItem* font_size_item =
-            app_config.get_config_box().items.find("font_size");
-        ASSERT(font_size_item);
-        app_config.set("font_size", font_size_item->def().init_fn());
     }
 }
 

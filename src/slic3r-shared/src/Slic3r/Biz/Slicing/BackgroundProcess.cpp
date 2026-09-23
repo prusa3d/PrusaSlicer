@@ -102,9 +102,6 @@ BackgroundProcess::BackgroundProcess(
     m_on_status{[call = std::reference_wrapper(callbacks), id](const StatusUpdate status) {
         call.get().on_status(status, id);
     }},
-    m_on_exception{[call = std::reference_wrapper(callbacks), id](std::exception_ptr exception) {
-        call.get().on_exception(exception, id);
-    }},
     m_get_status{[call = std::reference_wrapper(callbacks), id]() {
         return call.get().get_status(id);
     }},
@@ -270,12 +267,6 @@ void BackgroundProcess::slice(
                     slicing_error = exception.error();
                 } catch (CanceledException&) {
                     /* Intentionally pass. */
-                } catch (const std::exception& exception) {
-                    SPDLOG_CRITICAL("Unhandled exception on background thread: {}", exception.what());
-                    m_on_exception(std::current_exception());
-                } catch (...) {
-                    SPDLOG_CRITICAL("Unhandled exception on background thread!");
-                    m_on_exception(std::current_exception());
                 }
             },
             this->m_print.get()

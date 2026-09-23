@@ -18,9 +18,10 @@ LogicalPrinterSettingsButton::LogicalPrinterSettingsButton(
     FnIndexClicked on_clicked,
     FnIndexClicked on_cog_clicked,
     FnIndexClicked on_favorite_clicked,
-    const Biz::Preset::PresetInteractor& preset_interactor
+    Biz::Preset::PresetInteractor& preset_interactor
 ) :
     Biz::DataObserver<Biz::Preset::PresetItem>(index, logical_printer),
+    m_list_selection_changed_listener_scope(preset_interactor.printer_presets(), *this),
     m_on_clicked(on_clicked),
     m_on_cog_clicked(on_cog_clicked),
     m_on_favorite_clicked(on_favorite_clicked),
@@ -78,6 +79,7 @@ void LogicalPrinterSettingsButton::on_data_update()
     }
 
     update_favorite_state();
+    update_selected();
 }
 
 void LogicalPrinterSettingsButton::update_btns_visibility()
@@ -102,6 +104,24 @@ bool LogicalPrinterSettingsButton::is_favorited() const
         .app_config()
         .app_settings_advanced()
         .contains_printer_favorite_preset(m_state->id, m_state->hw_printer_config_id);
+}
+
+void LogicalPrinterSettingsButton::update_selected()
+{
+    const Biz::Preset::PresetItem& selected_preset =
+        m_preset_interactor.printer_presets().items().at(
+            m_preset_interactor.printer_presets().selected_index()
+        );
+
+    set_checked(
+        selected_preset.id == m_state->id
+        && selected_preset.hw_printer_config_id == m_state->hw_printer_config_id
+    );
+}
+
+void LogicalPrinterSettingsButton::on_list_selection_changed(Domain::SelectionId new_selection)
+{
+    update_selected();
 }
 
 } // namespace Slic3r::App

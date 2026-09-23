@@ -69,7 +69,7 @@ public:
         return m_username;
     }
 
-    void cancel_ongoing_session_action()
+    void cancel_ongoing_session_action() override
     {
         m_session.cancel_ongoing_session_action();
     }

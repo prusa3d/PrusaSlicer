@@ -889,7 +889,12 @@ void ProcessorImpl::process_G1(const std::array<std::optional<float>, 4>& axes, 
         Vec3f curr_pos = get_position_xyz(m_end_position);
         Vec3f new_pos = m_result.const_moves()->back().position - m_config.extruders.offsets[m_extruder_id];
         set_end_position_xyz(new_pos + m_config.z_offset * Vec3f::UnitZ());
-        store_move(MoveType::Seam);
+
+        // Flush moves only inherit the extrusion role and must not produce seam markers.
+        if (m_result.const_moves()->back().type != MoveType::Flush) {
+            store_move(MoveType::Seam);
+        }
+
         set_end_position_xyz(curr_pos);
         m_seams_detection_enabled = false;
     }

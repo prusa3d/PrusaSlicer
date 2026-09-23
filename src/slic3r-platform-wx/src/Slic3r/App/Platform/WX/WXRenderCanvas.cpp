@@ -6,10 +6,13 @@
 #include <wx/frame.h>
 #include <wx/dcclient.h>
 #include <wx/clipbrd.h>
+#include <wx/toplevel.h>
 #include <imgui/imgui.h>
 #include <imgui/backends/imgui_impl_opengl3.h>
 
+#include <Slic3r/App/Platform/WX/DpiScale.hpp>
 #include <Slic3r/Biz/Platform/Termination.hpp>
+#include <Slic3r/Biz/Platform/PlatformServices.hpp>
 #include <Slic3r/App/Platform/PlatformError.hpp>
 #include <Slic3r/App/Render/Init.hpp>
 #include <Slic3r/App/Render/Context.hpp>
@@ -417,6 +420,10 @@ WXRenderCanvas::WXRenderCanvas(wxWindow* parent, int id) :
 
 WXRenderCanvas::~WXRenderCanvas()
 {
+    auto& platform_services = Biz::Platform::PlatformServices::instance();
+    if (&platform_services.render_request_handler() == this) {
+        platform_services.set_render_request_handler(nullptr);
+    }
     ImGui_ImplWX_Shutdown();
     Render::shutdown_render();
 }
@@ -834,7 +841,17 @@ void WXRenderCanvas::on_keyboard(wxKeyEvent& evt)
             enqueue_keyboard(platform_event);
         }
     }
-    repaint();
+
+    request_render();
+}
+
+int WXRenderCanvas::to_dip(int coord)
+{
+#if defined(__WXGTK__)
+    return int(coord / get_dpi_scale(this).dpi_scale);
+#else
+    return ToDIP(coord);
+#endif
 }
 
 void WXRenderCanvas::on_mouse_enter(wxMouseEvent& event)
@@ -863,8 +880,8 @@ void WXRenderCanvas::on_mouse_enter(wxMouseEvent& event)
     }
 #endif
 
-    int mouse_x = ToDIP(event.GetX());
-    int mouse_y = ToDIP(event.GetY());
+    int mouse_x = to_dip(event.GetX());
+    int mouse_y = to_dip(event.GetY());
 
     MouseEvent platform_event{
         MouseEvent::Type::Enter,
@@ -886,8 +903,8 @@ void WXRenderCanvas::on_mouse_leave(wxMouseEvent& event)
         return;
     }
 
-    int mouse_x = ToDIP(event.GetX());
-    int mouse_y = ToDIP(event.GetY());
+    int mouse_x = to_dip(event.GetX());
+    int mouse_y = to_dip(event.GetY());
 
     MouseEvent platform_event{
         MouseEvent::Type::Leave,
@@ -909,11 +926,20 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
         return;
     }
 
-    // Dirty hack, which will shift focus onto ImGui and let it pass keyboard events
-    SetFocus();
+    // Dirty hack, which will shift focus onto ImGui and let it pass keyboard events.
+    // Only do this while our own application is already the active one and the canvas
+    // doesn't already have the focus - calling SetFocus() unconditionally on every
+    // mouse-move (including plain hover) can implicitly activate/raise our top-level
+    // window on Windows, which must never happen while another application is in the
+    // foreground (e.g. right after FreeConsole() briefly leaves no foreground window).
+    wxTopLevelWindow* top = wxDynamicCast(wxGetTopLevelParent(this), wxTopLevelWindow);
+    if (top != nullptr && top->IsActive())
+    {
+        SetFocus();
+    }
 
-    const int mouse_x = ToDIP(evt.GetX());
-    const int mouse_y = ToDIP(evt.GetY());
+    const int mouse_x = to_dip(evt.GetX());
+    const int mouse_y = to_dip(evt.GetY());
     m_mouse_x   = mouse_x;
     m_mouse_y   = mouse_y;
     // int mouse_x = evt.GetX();
@@ -983,12 +1009,20 @@ void WXRenderCanvas::on_mouse(wxMouseEvent& evt)
     io.MouseDoubleClicked[0] = evt.LeftDClick();
     io.MouseDoubleClicked[1] = evt.RightDClick();
     io.MouseDoubleClicked[2] = evt.MiddleDClick();
-    float wheel_delta        = static_cast<float>(evt.GetWheelDelta());
-    if (wheel_delta != 0.0f)
-        io.MouseWheel = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
+    float wheel_delta = static_cast<float>(evt.GetWheelDelta());
+    if (!Domain::fuzzy_compare(wheel_delta, 0.0f)) {
+        // Accumulate rather than overwrite: several wheel events can arrive between
+        // two ImGui::NewFrame() calls, and NewFrame() only zeroes MouseWheel(H) once
+        // per frame, so overwriting drops earlier events in the same frame window.
+        float wheel_ticks = static_cast<float>(evt.GetWheelRotation()) / wheel_delta;
+        if (evt.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL) {
+            io.MouseWheelH += wheel_ticks;
+        } else {
+            io.MouseWheel += wheel_ticks;
+        }
+    }
 
-
-    repaint();
+    request_render();
 }
 
 void WXRenderCanvas::on_idle(wxIdleEvent& event)
@@ -1048,12 +1082,22 @@ bool WXRenderCanvas::begin_frame_platform()
     // Setup display size (every frame to accommodate for window resizing)
     int w, h;
     GetClientSize(&w, &h);
+#if defined(__WXGTK__)
+    const DpiScale dpi_scale = get_dpi_scale(this);
+    const float scale_factor = dpi_scale.total();
+#else
     const float scale_factor = wxWindow::GetDPIScaleFactor();
+#endif
 #if WIN32
     size_t display_w = w;
     size_t display_h = h;
     w /= scale_factor;
     h /= scale_factor;
+#elif defined(__WXGTK__)
+    size_t display_w = w * dpi_scale.buffer_scale;
+    size_t display_h = h * dpi_scale.buffer_scale;
+    w /= dpi_scale.dpi_scale;
+    h /= dpi_scale.dpi_scale;
 #else
     size_t display_w = ToPhys(w);
     size_t display_h = ToPhys(h);
@@ -1071,7 +1115,12 @@ bool WXRenderCanvas::begin_frame_platform()
     style.FontScaleMain = 1; // We are scaling whole canvas, no need for ImGui scaling
     style.FontSizeBase  = font_size_px;
 
-    set_screen_size({display_w, display_h, scale_factor, GetDPI().x, font_size_px, font_size_pt});
+#if defined(__WXGTK__)
+    const int dpi = int(96.0f * scale_factor + 0.5f);
+#else
+    const int dpi = GetDPI().x;
+#endif
+    set_screen_size({display_w, display_h, scale_factor, dpi, font_size_px, font_size_pt});
     io.DisplayFramebufferScale =
         ImVec2(scale_factor, scale_factor);
 

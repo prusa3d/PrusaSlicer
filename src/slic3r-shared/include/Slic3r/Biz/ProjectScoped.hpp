@@ -73,6 +73,16 @@ public:
         return ids;
     }
 
+    auto projects()
+    {
+        return std::views::values(m_projects);
+    }
+
+    auto projects() const
+    {
+        return std::views::values(m_projects);
+    }
+
 protected:
     T factory() { return {}; }
 private:

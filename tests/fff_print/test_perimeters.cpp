@@ -543,6 +543,7 @@ SCENARIO("Perimeters3", "[Perimeters]")
     config.print.items.opt("skirts").set(0);
     config.print.items.opt("perimeters").set(3);
     config.print.items.opt("layer_height").set(0.15);
+    config.print.items.opt("first_layer_height").set(FloatOrPercentage{0.35});
     config.print.items.opt("bridge_speed").set(99.0);
     config.print.items.opt("enable_dynamic_overhang_speeds").set(false);
             // to prevent bridging over sparse infill

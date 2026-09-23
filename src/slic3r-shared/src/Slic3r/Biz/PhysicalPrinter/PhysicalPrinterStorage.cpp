@@ -80,6 +80,10 @@ void PhysicalPrinterStorage::load_all()
             SPDLOG_ERROR("Physical printer configuration was not loaded due missing uuid: {}", entry.path().string());
             continue;
         }
+        if (is_reserved_uuid(printer->uuid)) {
+            SPDLOG_ERROR("Physical printer configuration uses a reserved uuid and will be deleted: {}", entry.path().string());
+            continue;
+        }
 
         const std::string uuid = printer->uuid;
         m_map[uuid] = std::move(printer.value());
