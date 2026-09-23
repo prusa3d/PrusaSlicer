@@ -31,3 +31,8 @@ add_subdirectory(thumbnails)
 add_subdirectory(libslic3r)
 add_subdirectory(fff_print)
 add_subdirectory(sla_print)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Reading mountinfo is how a mount point is resolved to a device node there.
+    add_subdirectory(removable_drive)
+endif ()

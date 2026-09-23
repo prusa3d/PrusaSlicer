@@ -1313,6 +1313,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
             src/Slic3r/Biz/AppInstance/AppInstanceMessageHandlerFactoryLinux.cpp
             include/Slic3r/Biz/AppInstance/SingleInstanceCheckerLock.hpp
             src/Slic3r/Biz/AppInstance/SingleInstanceCheckerLock.cpp
+            src/Slic3r/Biz/RemovableDrive/MountInfoLinux.hpp
             src/Slic3r/Biz/RemovableDrive/RemovableDriveServiceLinux.cpp
             src/Slic3r/Biz/RemovableDrive/RemovableDriveMonitorLinux.hpp
             src/Slic3r/Biz/RemovableDrive/RemovableDriveMonitorLinux.cpp
