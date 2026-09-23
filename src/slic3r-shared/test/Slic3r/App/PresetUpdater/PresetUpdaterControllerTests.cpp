@@ -100,7 +100,10 @@ bool updates_notification_shown()
 /// Member order matters: the controller is destroyed before the services it reports through.
 struct ControllerFixture : Fixture
 {
-    explicit ControllerFixture(bool with_timer_queue = false) :
+    explicit ControllerFixture(
+        bool with_timer_queue                             = false,
+        std::chrono::milliseconds periodic_check_interval = std::chrono::hours{6}
+    ) :
         Fixture("controller"),
         notification_center(project_interactor)
     {
@@ -109,9 +112,10 @@ struct ControllerFixture : Fixture
         }
 
         ControllerEnvironment environment;
-        environment.timer_queue    = timer_queue.has_value() ? &*timer_queue : nullptr;
-        environment.online_allowed = [this]() { return online; };
-        environment.request_render = [this]() { ++render_requests; };
+        environment.timer_queue             = timer_queue.has_value() ? &*timer_queue : nullptr;
+        environment.online_allowed          = [this]() { return online; };
+        environment.request_render          = [this]() { ++render_requests; };
+        environment.periodic_check_interval = periodic_check_interval;
 
         controller.emplace(interactor(), std::move(environment));
         controller->add_listener<IPresetUpdaterControllerListener>(&counter);
@@ -237,6 +241,38 @@ TEST_CASE("PresetUpdaterController announces a new vendor only until the dialog 
 
     CHECK_FALSE(updates_notification_shown());
     CHECK(fx.online_row().counts.new_vendors == 1);
+}
+
+TEST_CASE("PresetUpdaterController checks again once the interval has passed", "[preset_updater][controller]")
+{
+    ControllerFixture fx(true, 50ms);
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+
+    REQUIRE(fx.pump([&fx]() { return fx.controller->activity() == ControllerActivity::Checking; }));
+}
+
+TEST_CASE("PresetUpdaterController checks periodically only while it may work online", "[preset_updater][controller]")
+{
+    ControllerFixture fx(true, 50ms);
+    fx.online = false;
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+
+    const auto checking = [&fx]()
+    { return fx.controller->activity() == ControllerActivity::Checking; };
+    CHECK_FALSE(fx.pump(checking, 1s));
+
+    fx.online = true;
+    fx.controller->on_online_allowed_changed();
+    REQUIRE(checking());
+
+    REQUIRE(fx.settle());
+    REQUIRE(fx.pump(checking));
 }
 
 TEST_CASE("PresetUpdaterController narrates a check the user asked for", "[preset_updater][controller]")

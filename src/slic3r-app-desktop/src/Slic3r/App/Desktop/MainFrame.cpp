@@ -11,6 +11,7 @@
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/IDialogManager.hpp"
+#include "Slic3r/App/PresetUpdater/PresetUpdaterController.hpp"
 #include "Slic3r/App/ProjectSaver.hpp"
 #include <Slic3r/App/WX/WidgetsConfig.hpp>
 #include <Slic3r/App/WX/StringConversions.hpp>
@@ -354,6 +355,12 @@ void MainFrame::on_app_config_changed(const std::string& key)
             acc_enabled != m_project_interactor.user_account_interactor().is_enabled())
         {
             m_project_interactor.user_account_interactor().init(acc_enabled);
+        }
+    }
+
+    if (key == "enable_preset_update") {
+        if (AppServices::instance().has_preset_updater_controller()) {
+            AppServices::instance().preset_updater_controller().on_online_allowed_changed();
         }
     }
 

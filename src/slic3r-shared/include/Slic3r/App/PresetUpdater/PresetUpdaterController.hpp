@@ -8,6 +8,7 @@
 
 #include <boost/filesystem/path.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -301,6 +302,51 @@ private:
     uint64_t m_generation{0};
     bool m_armed{false};
     bool m_dirty{false};
+    bool m_running{false};
+};
+
+// ---------------------------------------------------------------------------------------------
+// Periodic check
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * @brief Repeats the background check for as long as it is wanted.
+ *
+ * Owns the whole schedule: the next tick is armed before the current one is delivered, so a tick
+ * the controller decides to skip does not stop the one after it from coming. A queued timer holds
+ * a weak reference and is recognised as stale by its generation, so the schedule may be stopped,
+ * or destroyed, while a timer is still on its way.
+ */
+class PeriodicCheckTimer
+{
+public:
+    using TickFn = std::function<void()>;
+
+    PeriodicCheckTimer(
+        Biz::Platform::TimerQueue& timer_queue, std::chrono::milliseconds interval, TickFn tick
+    );
+    ~PeriodicCheckTimer();
+
+    PeriodicCheckTimer(const PeriodicCheckTimer&)            = delete;
+    PeriodicCheckTimer& operator=(const PeriodicCheckTimer&) = delete;
+
+    /// Arms the schedule. @return false when it was already ticking, so nothing has changed.
+    bool start();
+
+    /// Delivers no further tick. One already on its way is ignored when it arrives.
+    void stop();
+
+    bool running() const;
+
+private:
+    void arm();
+
+    Biz::Platform::TimerQueue& m_timer_queue;
+    std::chrono::milliseconds m_interval;
+    TickFn m_tick;
+
+    std::shared_ptr<int> m_life{std::make_shared<int>(0)};
+    uint64_t m_generation{0};
     bool m_running{false};
 };
 
@@ -627,6 +673,8 @@ struct ControllerEnvironment
     std::function<bool()> online_allowed;
     /// The application draws on demand, so a change made outside a frame has to ask for one.
     std::function<void()> request_render;
+    /// How long between two background checks. The application asks for six hours.
+    std::chrono::milliseconds periodic_check_interval{std::chrono::hours{6}};
 };
 
 /**
@@ -684,6 +732,14 @@ public:
 
     /// Starts the check for updates. Reports what it finds, never that it is running.
     void start_background_check();
+
+    /**
+     * @brief The application's answer to whether the preset updater may work online has changed.
+     *
+     * Starts or stops the repeating background check, and checks at once when it has just been
+     * switched on, so whoever switched it on is not left waiting a whole interval for an answer.
+     */
+    void on_online_allowed_changed();
 
     void set_show_dialog_callback(std::function<void()> callback);
     void set_presets_installed_callback(std::function<void()> callback);
@@ -834,6 +890,11 @@ private:
     void notify_forced_state(bool has_forced);
     void show_dialog();
 
+    void on_periodic_check_due();
+
+    /// Whether a check nobody asked for may start now without getting in the way of one that was.
+    bool may_check_in_background() const;
+
     /// Records the new vendors of a check the user has just been shown, so they are announced once.
     void acknowledge_new_vendors(
         const Biz::PresetUpdater::PresetUpdaterReconfigurationList& reconfigurations
@@ -847,6 +908,7 @@ private:
     JobLedger m_ledger;
     ForcedReconfigurations m_forced;
     std::optional<SelectionCommitter> m_committer;
+    std::optional<PeriodicCheckTimer> m_periodic;
 
     std::vector<Biz::PresetUpdater::PresetUpdaterWarning> m_warnings;
     bool m_operation_failed{false};

@@ -341,6 +341,58 @@ void SelectionCommitter::fire()
 }
 
 // =============================================================================================
+// PeriodicCheckTimer
+// =============================================================================================
+
+PeriodicCheckTimer::PeriodicCheckTimer(
+    Biz::Platform::TimerQueue& timer_queue, std::chrono::milliseconds interval, TickFn tick
+) :
+    m_timer_queue(timer_queue),
+    m_interval(interval),
+    m_tick(std::move(tick))
+{}
+
+PeriodicCheckTimer::~PeriodicCheckTimer() = default;
+
+bool PeriodicCheckTimer::start()
+{
+    if (m_running) {
+        return false;
+    }
+    m_running = true;
+    arm();
+    return true;
+}
+
+void PeriodicCheckTimer::stop()
+{
+    ++m_generation;
+    m_running = false;
+}
+
+bool PeriodicCheckTimer::running() const
+{
+    return m_running;
+}
+
+void PeriodicCheckTimer::arm()
+{
+    const uint64_t generation = ++m_generation;
+
+    m_timer_queue.set_timer(
+        m_interval,
+        [this, generation, life = std::weak_ptr<int>(m_life)]()
+        {
+            if (life.expired() || generation != m_generation) {
+                return;
+            }
+            arm();
+            m_tick();
+        }
+    );
+}
+
+// =============================================================================================
 // SourceStore
 // =============================================================================================
 
@@ -1365,6 +1417,11 @@ PresetUpdaterController::PresetUpdaterController(
 {
     if (m_environment.timer_queue != nullptr) {
         m_committer.emplace(*m_environment.timer_queue, [this]() { commit_selection(); });
+        m_periodic.emplace(
+            *m_environment.timer_queue,
+            m_environment.periodic_check_interval,
+            [this]() { on_periodic_check_due(); }
+        );
     }
     m_interactor.add_listener<Biz::PresetUpdater::IPresetUpdaterResultListener>(this);
 }
@@ -1383,6 +1440,9 @@ void PresetUpdaterController::shutdown()
 
     if (m_committer.has_value()) {
         m_committer->cancel();
+    }
+    if (m_periodic.has_value()) {
+        m_periodic->stop();
     }
 
     m_activity_reporter.reset();
@@ -1436,6 +1496,44 @@ void PresetUpdaterController::start_background_check()
 
     Transaction transaction(*this);
     start_check(Biz::PresetUpdater::SourceListSync::Fetch, CheckReporting::Silent);
+
+    if (m_periodic.has_value() && online_allowed()) {
+        m_periodic->start();
+    }
+}
+
+void PresetUpdaterController::on_online_allowed_changed()
+{
+    if (m_shut_down) {
+        return;
+    }
+
+    Transaction transaction(*this);
+    if (!m_periodic.has_value()) {
+        return;
+    }
+    if (!online_allowed()) {
+        m_periodic->stop();
+        return;
+    }
+    if (m_periodic->start() && may_check_in_background()) {
+        start_check(Biz::PresetUpdater::SourceListSync::Fetch, CheckReporting::Silent);
+    }
+}
+
+void PresetUpdaterController::on_periodic_check_due()
+{
+    if (m_shut_down || !online_allowed() || !may_check_in_background()) {
+        return;
+    }
+
+    Transaction transaction(*this);
+    start_check(Biz::PresetUpdater::SourceListSync::Fetch, CheckReporting::Silent);
+}
+
+bool PresetUpdaterController::may_check_in_background() const
+{
+    return !dialog_open() && !forced_mode() && !busy();
 }
 
 void PresetUpdaterController::set_show_dialog_callback(std::function<void()> callback)
