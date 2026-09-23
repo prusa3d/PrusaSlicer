@@ -1,4 +1,3 @@
-
 #include "Slic3r/Biz/Utils/CutUtils.hpp"
 
 #include <Slic3r/Log.hpp>
@@ -34,14 +33,16 @@ static void apply_tolerance(Domain::ModelVolume* vol)
     if (!cut_info.is_processed)
         return;
 
+    const bool is_dowel = cut_info.connector_type == Domain::CutConnectorType::Dowel;
+
     Vec3d sf = vol->get_scaling_factor();
 
     // make a "hole" wider
-    sf[X] += double(cut_info.radius_tolerance);
-    sf[Y] += double(cut_info.radius_tolerance);
+    sf[X] += cut_info.radius_tolerance;
+    sf[Y] += cut_info.radius_tolerance;
 
     // make a "hole" dipper
-    sf[Z] += double(cut_info.height_tolerance);
+    sf[Z] += cut_info.height_tolerance * (is_dowel ? 2. : 1.);
 
     vol->set_scaling_factor(sf);
 
@@ -50,10 +51,8 @@ static void apply_tolerance(Domain::ModelVolume* vol)
     if (rot_norm.norm() != 0.0)
         rot_norm.normalize();
 
-    double z_offset = 0.5 * static_cast<double>(cut_info.height_tolerance);
-    if (cut_info.connector_type == Domain::CutConnectorType::Plug ||
-        cut_info.connector_type == Domain::CutConnectorType::Snap)
-        z_offset -= 0.05; // add small Z offset to better preview
+    double z_offset = is_dowel ? -cut_info.height_tolerance : // center the dowel
+                                 -0.05; // add small Z offset to better preview
 
     vol->set_offset(vol->get_offset() + rot_norm * z_offset);
 }
