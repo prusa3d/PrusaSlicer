@@ -219,11 +219,6 @@ public:
     virtual void on_bed_instance_updated(Domain::SelectionId project_id, const Domain::BedRefs& instances) {};
     virtual void on_bed_instance_removed(Domain::SelectionId project_id, const Domain::BedRefs& instances) {};
     virtual void on_bed_instance_transformed(Domain::SelectionId project_id, const Domain::BedRefs& instances, TransformState state) {};
-    virtual void on_bed_instance_extruder_candidates_changed(
-        Domain::SelectionId project_id,
-        Domain::BedRef instance,
-        const std::vector<unsigned>& extruder_candidates
-    ) {};
 
     /**
      * @brief Called when the virtual bed preview for a project is shown, moved, or hidden.
@@ -242,7 +237,6 @@ class SceneInteractor final :
     public ISelectedConfigContainerChangedListener,
     public Preset::IPresetChangedListener,
     public Slicing::IWipeTowerGeometryListener,
-    public Slicing::IExtruderCandidatesListener,
     public WithListeners<
         ISceneSelectionChangedListener,
         ISceneChangedListener,
@@ -638,8 +632,6 @@ public:
 
     void update_selection_bounding_box(const std::optional<SelectionExtents>& bounding_box = std::nullopt);
     const std::optional<SelectionExtents> selection_bounding_box() const;
-
-    void on_extruder_candidates_changed(std::vector<unsigned>, const Domain::SlicingId) override;
 
     Domain::ElementRefs
     add_object_to_active_bed(const indexed_triangle_set& its, const std::string& name);

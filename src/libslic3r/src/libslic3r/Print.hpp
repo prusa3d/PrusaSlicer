@@ -544,7 +544,6 @@ public:
     Print(
         const OnFdmResult& on_fdm_result,
         const OnWipeTowerGeometry& on_wipe_tower_geometry,
-        const OnExtruderCandidates& on_extruder_candidates,
         const OnGeneratedSupportPoints& on_generated_support_points
     );
     virtual ~Print();
@@ -561,7 +560,7 @@ public:
     // List of existing PrintObject IDs, to remove notifications for non-existent IDs.
     std::vector<Domain::ObjectID> print_object_ids() const override;
 
-    virtual Biz::Slicing::ApplyStatus::Status update(
+    virtual Biz::Slicing::UpdateResult update(
         Domain::Model& model,
         const Domain::ConfigPack& config,
         const Domain::BedInstance& bed,
@@ -569,7 +568,7 @@ public:
         const MetadataSerializeFn& serializer
     ) override;
 
-    Biz::Slicing::ApplyStatus::Status apply(
+    Biz::Slicing::UpdateResult apply(
         const Domain::Model& model,
         const Domain::FullConfigFDMPtr& new_full_config_ptr,
         const Domain::Preset::SelectedPresetMetadata& metadata,
@@ -704,7 +703,6 @@ public:
 
     OnFdmResult m_on_fdm_result;
     OnWipeTowerGeometry m_on_wipe_tower_geometry;
-    OnExtruderCandidates m_on_extruder_candidates;
     OnGeneratedSupportPoints m_on_generated_support_points;
 
     PrintConfigView m_config;

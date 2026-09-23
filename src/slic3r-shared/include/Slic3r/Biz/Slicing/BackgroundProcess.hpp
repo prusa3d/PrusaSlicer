@@ -10,8 +10,10 @@
 #include "Slic3r/Domain/GCodeMetadata.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/SlicingId.hpp"
+#include "Slic3r/Biz/Slicing/BackgroundProcessState.hpp"
 
 #include <jthread/JThread.hpp>
+
 
 namespace Slic3r::Biz::Slicing::Sla {
 struct Object;
@@ -77,12 +79,15 @@ public:
 
     std::string get_hw_printer_id() const;
 
+    const BackgroundProcessState& state() const;
+
 private:
     std::string m_hw_config_id;
     std::unique_ptr<Biz::Slicing::IPrint> m_print;
     std::function<void(StatusUpdate)> m_on_status;
     std::function<StatusCode()> m_get_status;
     Domain::SlicingId m_id;
+    BackgroundProcessState m_state;
 
     JThread::JThread m_thread;
     JThread::JThread m_helper_thread;

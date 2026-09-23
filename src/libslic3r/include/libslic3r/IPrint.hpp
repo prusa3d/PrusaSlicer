@@ -51,6 +51,12 @@ struct SliceUntilStep
     bool operator==(const SliceUntilStep&) const = default;
 };
 
+struct UpdateResult
+{
+    ApplyStatus::Status status;
+    std::vector<unsigned> extruder_candidates;
+};
+
 class IPrint
 {
 public:
@@ -58,11 +64,13 @@ public:
         std::variant<Domain::PrintStatistics, Domain::SLA::PrintStatistics>;
     using MetadataSerializeFn = std::function<SerializedConfig(const UniversalPrintStatistics&)>;
 
-    virtual ApplyStatus::Status update(Domain::Model& model,
-                                       const Domain::ConfigPack& config,
-                                       const Domain::BedInstance& bed,
-                                       const Domain::Preset::SelectedPresetMetadata& metadata,
-                                       const MetadataSerializeFn& serializer) = 0;
+    virtual UpdateResult update(
+        Domain::Model& model,
+        const Domain::ConfigPack& config,
+        const Domain::BedInstance& bed,
+        const Domain::Preset::SelectedPresetMetadata& metadata,
+        const MetadataSerializeFn& serializer) = 0;
+
     virtual void slice(
         Domain::SlicingId,
         Slicing::IThumbnailImageGenerator&,

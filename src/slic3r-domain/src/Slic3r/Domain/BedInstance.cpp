@@ -32,7 +32,6 @@ std::unique_ptr<BedInstance> BedInstance::copy(
     bed_instance->print_volume_enabled  = print_volume_enabled;
     bed_instance->wipe_tower            = wipe_tower;
     bed_instance->custom_gcode          = custom_gcode;
-    bed_instance->extruder_candidates   = extruder_candidates;
     bed_instance->wipe_tower_is_outside = wipe_tower_is_outside;
 
     bed_instance->set_index(index());

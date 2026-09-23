@@ -187,14 +187,14 @@ std::string slice_model(Domain::Model &model, const TestConfig &config)
         Test::create_dummy_hw_config(config.tool.size())
     );
     auto metadata = Biz::Slicing::build_gcode_metadata({}, preset_metadata, config);
-    auto status{print.update(
+    auto result{print.update(
         model,
         config,
         bed_instance,
         preset_metadata,
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config)
     )};
-    REQUIRE(std::holds_alternative<Biz::Slicing::ApplyStatus::Changed>(status));
+    REQUIRE(std::holds_alternative<Biz::Slicing::ApplyStatus::Changed>(result.status));
     print.validate();
     return Test::gcode(print);
 }

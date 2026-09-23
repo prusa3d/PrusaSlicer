@@ -1536,7 +1536,7 @@ InvalidatedSteps invalidate_for_virtual_extruders_change(const PrintObjectPtrs& 
     return result;
 }
 
-Biz::Slicing::ApplyStatus::Status Print::apply(
+Biz::Slicing::UpdateResult Print::apply(
     const Domain::Model& model,
     const FullConfigFDMPtr& new_full_config_ptr,
     const Domain::Preset::SelectedPresetMetadata& metadata,
@@ -1602,7 +1602,8 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
         num_extruders_changed
     )};
     if (!model_sync_result) {
-        return Biz::Slicing::ApplyStatus::InvalidData{model_sync_result.error()};
+        m_extruder_candidates.clear();
+        return {Biz::Slicing::ApplyStatus::InvalidData{model_sync_result.error()}};
     }
 
     m_extruder_candidates = extruder_candidates;
@@ -1726,10 +1727,10 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
 
     if (changed) {
         this->cleanup();
-        return Biz::Slicing::ApplyStatus::Changed{warnings};
+        return {Biz::Slicing::ApplyStatus::Changed{warnings}, m_extruder_candidates};
     }
 
-    return Biz::Slicing::ApplyStatus::Unchanged{};
+    return {Biz::Slicing::ApplyStatus::Unchanged{}, m_extruder_candidates};
 }
 
 void Print::cleanup()

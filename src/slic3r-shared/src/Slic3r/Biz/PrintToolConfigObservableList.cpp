@@ -8,12 +8,15 @@ namespace Slic3r::Biz {
 
 PrintToolConfigObservableList::PrintToolConfigObservableList(
     const Domain::Workbench& workbench,
-    Scene::SceneInteractor& scene_interactor
+    Scene::SceneInteractor& scene_interactor,
+    Slicing::SlicingInteractor& slicing_interactor
 ) :
     m_workbench(workbench),
     m_scene_interactor(scene_interactor),
     m_scene_bed_changed_listener_scope(scene_interactor, *this),
     m_selected_bed_changed_listener_scope(scene_interactor, *this),
+    m_slicing_interactor(slicing_interactor),
+    m_process_state_listener_scope(slicing_interactor, *this),
     m_print_tool_shared_context{false, m_extruder_candidates}
 {}
 
@@ -174,20 +177,6 @@ PrintToolConfigObservableList::find_tool_value(const std::string& name, size_t i
     return found_item ? &found_item->value() : nullptr;
 }
 
-void PrintToolConfigObservableList::on_bed_instance_extruder_candidates_changed(
-    Domain::SelectionId project_id,
-    Domain::BedRef instance,
-    const std::vector<unsigned int>& extruder_candidates
-)
-{
-    if (m_selected_project_id == project_id
-        && instance.config_container_id == m_selected_container_id
-        && m_scene_interactor.bed_selection().last_selected_bed() == instance)
-    {
-        update_extruders();
-    }
-}
-
 void PrintToolConfigObservableList::on_selected_bed_instances_changed(
     Domain::SelectionId project_id,
     const Scene::BedSelection& bed_selection
@@ -198,6 +187,16 @@ void PrintToolConfigObservableList::on_selected_bed_instances_changed(
     {
         update_extruders();
     }
+}
+
+void PrintToolConfigObservableList::on_background_process_state_changed(
+    const Domain::SlicingId slicing_id)
+{
+    if (slicing_id.project_id != m_selected_project_id) {
+        return;
+    }
+
+    update_extruders();
 }
 
 void PrintToolConfigObservableList::set_favorites(const std::vector<std::string>& favorites)
@@ -320,17 +319,26 @@ PrintToolConfigObservableList::PrintToolItems::iterator PrintToolConfigObservabl
 
 void PrintToolConfigObservableList::update_extruders()
 {
-    const std::vector<unsigned> extruder_candidates =
-        m_workbench.project(m_selected_project_id)
-            .find_bed_instance_by_id(
-                m_scene_interactor.bed_selection().last_selected_bed().instance_id
-            )
-            ->extruder_candidates;
+    static const std::vector<unsigned> no_extruder_candidates;
+    static const std::vector<unsigned> single_extruder_candidate{0};
 
-    const std::set<unsigned> extruder_candidates_set{
-        extruder_candidates.cbegin(),
-        extruder_candidates.cend()
-    };
+    const std::vector<unsigned>* extruder_candidates{&no_extruder_candidates};
+    if (!m_print_tool_shared_context.has_multiple_extruders) {
+        extruder_candidates = &single_extruder_candidate;
+    } else {
+        const Slicing::BackgroundProcessState* process_state{
+            m_slicing_interactor.find_process_state(Domain::SlicingId{
+                m_selected_project_id,
+                m_scene_interactor.bed_selection().last_selected_bed().instance_id,
+            })};
+        if (process_state != nullptr) {
+            extruder_candidates = &process_state->extruder_candidates;
+        }
+    }
+
+    std::set<unsigned>
+        extruder_candidates_set{extruder_candidates->cbegin(), extruder_candidates->cend()};
+
     if (m_extruder_candidates != extruder_candidates_set) {
         m_extruder_candidates = extruder_candidates_set;
         update_items();

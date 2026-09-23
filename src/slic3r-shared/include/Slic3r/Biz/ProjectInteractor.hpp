@@ -104,13 +104,13 @@ public:
         m_workbench(workbench),
         m_scene_interactor(workbench),
         m_backup_store(*this),
-        m_preset_interactor(workbench, m_scene_interactor, m_backup_store),
+        m_slicing_interactor(dispatcher, thumbnail_image_generator),
+        m_preset_interactor(workbench, m_scene_interactor, m_backup_store, m_slicing_interactor),
         m_arrange_interactor(m_scene_interactor, workbench),
         m_clipboard_interactor(m_scene_interactor, m_arrange_interactor, workbench),
         m_matdb_interactor(m_workbench, *this),
         m_project_settings_interactor(workbench, m_matdb_interactor),
         m_virtual_extruder_interactor(workbench),
-        m_slicing_interactor(dispatcher, thumbnail_image_generator),
         m_result_export_interactor(dispatcher),
         m_user_account_interactor(dispatcher),
         m_preset_updater_interactor(dispatcher, m_user_account_interactor),
@@ -145,7 +145,6 @@ public:
         );
         m_slicing_interactor.add_listener<Slicing::IStatusListener>(&m_status_cache);
         m_slicing_interactor.add_listener<Slicing::IWipeTowerGeometryListener>(&m_scene_interactor);
-        m_slicing_interactor.add_listener<Slicing::IExtruderCandidatesListener>(&m_scene_interactor);
         m_user_account_interactor.add_listener<UserAccount::IUserAccountListener>(this);
         Platform::PlatformServices::instance()
             .app_instance_message_handler()
@@ -360,6 +359,11 @@ public:
     }
 
     Slicing::SlicingInteractor& slicing_interactor()
+    {
+        return m_slicing_interactor;
+    }
+
+    const Slicing::SlicingInteractor& slicing_interactor() const
     {
         return m_slicing_interactor;
     }
@@ -722,13 +726,13 @@ private:
 
     Scene::SceneInteractor m_scene_interactor;
     BackupStore m_backup_store;
+    Slicing::SlicingInteractor m_slicing_interactor;
     Preset::PresetInteractor m_preset_interactor;
     ArrangeInteractor m_arrange_interactor;
     ClipboardInteractor m_clipboard_interactor;
     MatDb::MatDbInteractor m_matdb_interactor;
     ProjectSettingsInteractor m_project_settings_interactor;
     VirtualExtruderInteractor m_virtual_extruder_interactor;
-    Slicing::SlicingInteractor m_slicing_interactor;
     FDMResultCache m_fdm_result_cache;
     SLAResultCache m_sla_result_cache;
     SLAObjectCache m_sla_object_cache;

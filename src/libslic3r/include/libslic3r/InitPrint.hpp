@@ -18,7 +18,6 @@ public:
     virtual void on_sla_object(const Domain::SlicingId&, Sla::Object&&) = 0;
     virtual void on_status(const StatusUpdate, Domain::SlicingId) = 0;
     virtual void on_wipe_tower_geometry(OptWipeTowerGeometry&&, Domain::SlicingId) = 0;
-    virtual void on_extruder_candidates(std::vector<unsigned>&& extruder_candidates, Domain::SlicingId) = 0;
     virtual void
     on_generated_support_points(GeneratedSupportPointsSnapshot&&, Domain::SlicingId) = 0;
     virtual StatusCode get_status(const Domain::SlicingId) const = 0;

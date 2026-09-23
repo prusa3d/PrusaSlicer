@@ -911,7 +911,7 @@ InstanceTrafos get_instance_trafos(const SLAPrintObject& object) {
     return instance_trafos;
 }
 
-Biz::Slicing::ApplyStatus::Status SLAPrint::update(
+Biz::Slicing::UpdateResult SLAPrint::update(
     Domain::Model& model,
     const ConfigPack& config,
     const Domain::BedInstance& bed,
@@ -946,7 +946,7 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     });
     const bool changed{!invalidated_steps.empty()};
     if (!changed) {
-        return empty ? ApplyStatus::Status{ApplyStatus::Empty{}} : ApplyStatus::Unchanged{};
+        return Biz::Slicing::UpdateResult{empty ? ApplyStatus::Status{ApplyStatus::Empty{}} : ApplyStatus::Unchanged{}};
     }
 
     m_on_sla_result({});
@@ -972,9 +972,9 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     }
 
     if (empty) {
-        return ApplyStatus::Empty{};
+        return Biz::Slicing::UpdateResult{ApplyStatus::Empty{}};
     }
-    return ApplyStatus::Changed{};
+    return Biz::Slicing::UpdateResult{ApplyStatus::Changed{}};
 }
 
 InvalidatedSteps SLAPrint::apply(

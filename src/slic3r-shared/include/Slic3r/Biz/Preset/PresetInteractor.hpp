@@ -27,6 +27,10 @@ namespace Slic3r::Biz {
 class BackupStore;
 } // namespace Slic3r::Biz
 
+namespace Slic3r::Biz::Slicing {
+class SlicingInteractor;
+} // namespace Slic3r::Biz::Slicing
+
 namespace Slic3r::Biz::Preset {
 
 // Minimal interface used by NameValidator to query existing preset names.
@@ -104,7 +108,8 @@ public:
     PresetInteractor(
         Domain::Workbench& workbench,
         Scene::SceneInteractor& scene_interactor,
-        BackupStore& backup_store
+        BackupStore& backup_store,
+        Slicing::SlicingInteractor& slicing_interactor
     );
 
     PresetInteractor(PresetInteractor&&) = default;

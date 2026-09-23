@@ -17,12 +17,14 @@ namespace Slic3r::Biz {
 class PrintToolConfigObservableList :
     public IObservableList<PrintToolItem>,
     public Scene::ISceneBedInstanceChangedListener,
-    public ISelectedBedInstancesChangedListener
+    public ISelectedBedInstancesChangedListener,
+    public Slicing::IBackgroundProcessStateListener
 {
 public:
     explicit PrintToolConfigObservableList(
         const Domain::Workbench& workbench,
-        Scene::SceneInteractor& scene_interactor
+        Scene::SceneInteractor& scene_interactor,
+        Slicing::SlicingInteractor& slicing_interactor
     );
 
     const PrintToolItem& at(size_t index) const override;
@@ -56,16 +58,12 @@ public:
 
     const Domain::ConfigValue* find_tool_value(const std::string& name, size_t index) const;
 
-    void on_bed_instance_extruder_candidates_changed(
-        Domain::SelectionId project_id,
-        Domain::BedRef instance,
-        const std::vector<unsigned int>& extruder_candidates
-    ) override;
-
     void on_selected_bed_instances_changed(
         Domain::SelectionId project_id,
         const Scene::BedSelection& bed_selection
     ) override;
+
+    void on_background_process_state_changed(const Domain::SlicingId slicing_id) override;
 
     void set_favorites(const std::vector<std::string>& favorites);
 
@@ -147,6 +145,13 @@ private:
         Scene::SceneInteractor,
         PrintToolConfigObservableList>
         m_selected_bed_changed_listener_scope;
+
+    Slicing::SlicingInteractor& m_slicing_interactor;
+    ListenerScope<
+        Slicing::IBackgroundProcessStateListener,
+        Slicing::SlicingInteractor,
+        PrintToolConfigObservableList>
+        m_process_state_listener_scope;
 
     Domain::SelectionId m_selected_project_id   = Domain::INVALID_ID;
     Domain::SelectionId m_selected_container_id = Domain::INVALID_ID;

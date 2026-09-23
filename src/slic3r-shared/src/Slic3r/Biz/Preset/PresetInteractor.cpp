@@ -163,7 +163,8 @@ std::string PresetItem::ui_hw_config_name() const
 PresetInteractor::PresetInteractor(
     Domain::Workbench& workbench,
     Scene::SceneInteractor& scene_interactor,
-    BackupStore& backup_store
+    BackupStore& backup_store,
+    Slicing::SlicingInteractor& slicing_interactor
 ) :
     m_workbench(workbench),
     m_backup_store(backup_store),
@@ -173,7 +174,7 @@ PresetInteractor::PresetInteractor(
         scene_interactor,
         *this
     ),
-    m_print_tool_cbi(m_workbench, scene_interactor, m_print_tool_cbi_accessor)
+    m_print_tool_cbi(m_workbench, scene_interactor, slicing_interactor, m_print_tool_cbi_accessor)
 {
     m_printer_cbi = ConfigBoxInteractor(m_printer_cbi_accessor);
 
