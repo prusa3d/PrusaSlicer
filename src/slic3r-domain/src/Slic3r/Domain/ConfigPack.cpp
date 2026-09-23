@@ -47,6 +47,12 @@ void ConfigPackFDM::resize_tool_parity_items(int extruder_count, bool ensure_dow
                     for (Domain::MutBoxRef& box : boxes) {
                         ensure_tool_parity(box, extruder_count, ensure_down_size_only);
                     }
+                },
+                [&](Domain::MutNamedBoxRefs& boxes)
+                {
+                    for (auto& [_, box] : boxes) {
+                        ensure_tool_parity(box, extruder_count, ensure_down_size_only);
+                    }
                 }
             },
             box_or_boxes
@@ -63,6 +69,7 @@ bool ConfigPackFDM::operator==(const ConfigPackFDM& other) const
         && tool == other.tool
         && filament == other.filament
         && project == other.project
+        && macro_overrides == other.macro_overrides
         && virtual_extruders == other.virtual_extruders;
 }
 

@@ -582,6 +582,7 @@ public:
     Biz::Slicing::UpdateResult apply(
         const Domain::Model& model,
         const Domain::FullConfigFDMPtr& new_full_config_ptr,
+        const Domain::PartialConfig& macro_overrides,
         const Domain::Preset::SelectedPresetMetadata& metadata,
         const std::string& bed_name,
         const MetadataSerializeFn& serializer,

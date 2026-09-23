@@ -182,11 +182,17 @@ protected:
 
 using BoxRef = std::reference_wrapper<const ConfigBox>;
 using BoxRefs = std::vector<BoxRef>;
-using BoxOrBoxesVector = std::vector<std::variant<BoxRef, BoxRefs>>;
+/// Boxes identified by a name (e.g. macro override layers). Squashed like individual boxes,
+/// serialized as an object keyed by the name.
+using NamedBoxRef = std::pair<std::string, BoxRef>;
+using NamedBoxRefs = std::vector<NamedBoxRef>;
+using BoxOrBoxesVector = std::vector<std::variant<BoxRef, BoxRefs, NamedBoxRefs>>;
 
 using MutBoxRef = std::reference_wrapper<ConfigBox>;
 using MutBoxRefs = std::vector<MutBoxRef>;
-using MutBoxOrBoxesVector = std::vector<std::variant<MutBoxRef, MutBoxRefs>>;
+using MutNamedBoxRef = std::pair<std::string, MutBoxRef>;
+using MutNamedBoxRefs = std::vector<MutNamedBoxRef>;
+using MutBoxOrBoxesVector = std::vector<std::variant<MutBoxRef, MutBoxRefs, MutNamedBoxRefs>>;
 
 /* @param default_value: Used if any of the items is nullptr. Might be nullptr,
  *     but then all the item values need to be specified.

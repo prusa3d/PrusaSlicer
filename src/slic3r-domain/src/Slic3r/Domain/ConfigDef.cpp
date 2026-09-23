@@ -351,6 +351,8 @@ std::string get_location_name(const ConfigLocation& location)
                     return "object_settings";
                 case FDMConfigLocation::Volume:
                     return "volume_settings";
+                case FDMConfigLocation::MacroOverrides:
+                    return "macro_overrides";
                 default:
                     PANIC("Unknown location");
                 }
@@ -368,6 +370,8 @@ std::string get_location_name(const ConfigLocation& location)
                     return "sla_object_settings";
                 case SLAConfigLocation::Project:
                     return "sla_project_settings";
+                case SLAConfigLocation::MacroOverrides:
+                    return "macro_overrides";
                 default:
                     PANIC("Unknown location");
                 }

@@ -281,12 +281,33 @@ load_fdm(const ordered_json& json, const Domain::Preset::HwPrinterConfig& hw_con
     ProjectSettings project_settings;
     const auto project_issues = load_box(json[project_location_name], project_settings);
 
+    // Optional. An object keyed by the layer name, each value being a box of overrides.
+    const std::string macro_overrides_location_name{
+        get_location_name(FDMConfigLocation::MacroOverrides)};
+    Domain::MacroOverridesMapFDM macro_overrides;
+    BoxIssues macro_overrides_issues;
+    if (is_object(macro_overrides_location_name, json)) {
+        for (const auto& [name, layer_json] : json[macro_overrides_location_name].items()) {
+            const std::optional<Domain::MacroOverridesLayerFDM> layer{
+                Domain::macro_overrides_layer_fdm_from_string(name)};
+            if (!layer.has_value() || !layer_json.is_object()) {
+                macro_overrides_issues[name] = {ItemParsingIssueType::ExtraKey};
+                continue;
+            }
+            Domain::MacroOverridesFDM box;
+            BoxIssues issues{load_box(layer_json, box)};
+            macro_overrides_issues.merge(issues);
+            macro_overrides.insert_or_assign(*layer, std::move(box));
+        }
+    }
+
     ConfigPackFDM config;
     config.printer = printer_settings;
     config.tool = tool_load_result.settings;
     config.print = print_settings;
     config.filament = filament_load_result.settings;
     config.project = project_settings;
+    config.macro_overrides = std::move(macro_overrides);
 
     IssuesPerLocation issues;
     if (!printer_issues.empty()) {
@@ -303,6 +324,9 @@ load_fdm(const ordered_json& json, const Domain::Preset::HwPrinterConfig& hw_con
     }
     if (!project_issues.empty()) {
         issues.insert({FDMConfigLocation::Project, project_issues});
+    }
+    if (!macro_overrides_issues.empty()) {
+        issues.insert({FDMConfigLocation::MacroOverrides, macro_overrides_issues});
     }
 
     return LoadResult{.config = std::move(config), .issues = std::move(issues)};

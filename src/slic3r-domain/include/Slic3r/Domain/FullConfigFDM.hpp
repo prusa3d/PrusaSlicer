@@ -2,6 +2,7 @@
 
 #include "Slic3r/Domain/ConfigBoxesFDM.hpp"
 #include "Slic3r/Domain/ConfigPack.hpp"
+#include "Slic3r/Domain/MacroOverrides.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 #include "Slic3r/Uuid.hpp"
 

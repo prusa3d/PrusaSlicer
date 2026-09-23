@@ -177,7 +177,10 @@ SlicingParameters SlicingParameters::create_from_config(
         hw_config,
     };
 
-    const PrintObjectConfigView config_view{full_config_fdm.value(), partial_object_config_fdm};
+    const Domain::PartialConfig macro_overrides{Domain::to_refs(config.macro_overrides), hw_config};
+
+    const PrintObjectConfigView
+        config_view{full_config_fdm.value(), partial_object_config_fdm, macro_overrides};
     return create_from_config(config_view, object_height, object_extruders, shrinkage);
 }
 

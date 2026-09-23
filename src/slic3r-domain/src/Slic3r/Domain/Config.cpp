@@ -333,26 +333,26 @@ spread_feeders(const BoxOrBoxesVector& boxes, const Preset::HwPrinterConfig& hw_
 {
     BoxOrBoxesVector result;
     for (const auto& box_or_boxes : boxes) {
-        if (std::holds_alternative<BoxRef>(box_or_boxes)) {
+        if (!std::holds_alternative<BoxRefs>(box_or_boxes)) {
             result.push_back(box_or_boxes);
-        } else {
-            ASSERT(std::holds_alternative<BoxRefs>(box_or_boxes));
-            const BoxRefs& boxes{std::get<BoxRefs>(box_or_boxes)};
-            if (boxes.size() == hw_config.material_slot_count()) {
-                result.push_back(box_or_boxes);
-                continue;
-            }
-
-            ASSERT(boxes.size() == hw_config.tools.size());
-
-            BoxRefs spread_boxes;
-            const std::vector<std::size_t> tool_slot_counts{get_tool_slot_counts(hw_config)};
-            for (std::size_t tool_index{}; tool_index < hw_config.tools.size(); ++tool_index) {
-                const BoxRef box_ref{boxes.at(tool_index)};
-                spread_boxes.resize(spread_boxes.size() + tool_slot_counts.at(tool_index), box_ref);
-            }
-            result.push_back(spread_boxes);
+            continue;
         }
+
+        const BoxRefs& boxes{std::get<BoxRefs>(box_or_boxes)};
+        if (boxes.size() == hw_config.material_slot_count()) {
+            result.push_back(box_or_boxes);
+            continue;
+        }
+
+        ASSERT(boxes.size() == hw_config.tools.size());
+
+        BoxRefs spread_boxes;
+        const std::vector<std::size_t> tool_slot_counts{get_tool_slot_counts(hw_config)};
+        for (std::size_t tool_index{}; tool_index < hw_config.tools.size(); ++tool_index) {
+            const BoxRef box_ref{boxes.at(tool_index)};
+            spread_boxes.resize(spread_boxes.size() + tool_slot_counts.at(tool_index), box_ref);
+        }
+        result.push_back(spread_boxes);
     }
     return result;
 }
@@ -460,27 +460,39 @@ static std::map<std::string, ConfigValueAndDef>
 squash_boxes(const BoxOrBoxesVector& boxes, std::size_t material_slot_count)
 {
     std::map<std::string, ConfigValueAndDef> result;
+
+    const auto squash_box = [&](const ConfigBox& box)
+    {
+        for (const auto& item : box.items.all_items()) {
+            const auto [it, inserted]{
+                result.insert({item.def().name, normalize(item, material_slot_count)})};
+            it->second.original_value = item.value();
+            ASSERT(inserted);
+        }
+
+        for (const auto& item : box.overrides.overridden_items()) {
+            const std::string& name{item.get().name()};
+            auto it{result.find(name)};
+            const ConfigValueAndDef value{normalize(item.get(), material_slot_count)};
+            if (it == result.end()) {
+                result[name] = value;
+            } else {
+                const std::optional<ConfigValue> original_value{
+                    it->second.original_value};
+                it->second = value;
+                it->second.original_value = original_value;
+            }
+        }
+    };
+
     for (const auto& box_or_boxes : boxes) {
         std::visit(
             Domain::overloaded{
-                [&](const BoxRef& box)
+                [&](const BoxRef& box) { squash_box(box.get()); },
+                [&](const NamedBoxRefs& boxes)
                 {
-                    for (const auto& item : box.get().items.all_items()) {
-                        const auto [it, inserted]{
-                            result.insert({item.def().name, normalize(item, material_slot_count)})};
-                        it->second.original_value = item.value();
-                        ASSERT(inserted);
-                    }
-
-                    for (const auto& item : box.get().overrides.overridden_items()) {
-                        const std::string& name{item.get().name()};
-                        auto it{result.find(name)};
-                        const ConfigValueAndDef value{normalize(item.get(), material_slot_count)};
-                        if (it == result.end()) {
-                            result[name] = value;
-                        } else {
-                            it->second = value;
-                        }
+                    for (const auto& [_, box] : boxes) {
+                        squash_box(box.get());
                     }
                 },
                 [&](const BoxRefs& boxes)
@@ -1006,6 +1018,7 @@ SquashedConfig::SquashedConfig(
         std::visit(
             overloaded{
                 [](const BoxRef&) {},
+                [](const NamedBoxRefs&) {},
                 [&](const BoxRefs& box_refs) { ASSERT(box_refs.size() == material_slot_count); },
             },
             box_or_boxes);

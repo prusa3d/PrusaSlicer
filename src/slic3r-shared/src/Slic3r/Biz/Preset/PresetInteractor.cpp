@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 
+#include "Slic3r/Domain/ConfigDefsFDM.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Assert.hpp"
@@ -1335,6 +1336,15 @@ Domain::Preset::SelectedPreset& PresetInteractor::mutable_selected_printer_prese
 
 namespace {
 
+/// An empty macro overrides map holding the alternative of the given technology.
+Domain::MacroOverridesMap empty_macro_overrides(const Domain::PrinterTechnology technology)
+{
+    if (technology == Domain::PrinterTechnology::SLA) {
+        return Domain::MacroOverridesMapSLA{};
+    }
+    return Domain::MacroOverridesMapFDM{};
+}
+
 void update_hw_config_tools_and_materials_features_from_preset(
     Domain::Preset::SelectedPreset& preset
 )
@@ -1429,6 +1439,10 @@ void PresetInteractor::fill_config_container_with_selected_preset(
             get_printer_preset(printer_hw_config_id, printer_preset_id).first.get();
         selected_preset.hw_config = hw_config;
         selected_preset.printer   = printer_preset;
+        if (selected_preset.macro_overrides.index()
+            != empty_macro_overrides(hw_config.technology).index()) {
+            selected_preset.macro_overrides = empty_macro_overrides(hw_config.technology);
+        }
 
         resize_tool_dependant_presets(hw_config, selected_preset.tools);
         resize_tool_dependant_presets(hw_config, selected_preset.materials);
@@ -1503,7 +1517,8 @@ void PresetInteractor::fill_config_container_with_selected_preset(
         .print     = reloaded_print,
         .tools     = std::move(tools),
         .materials = std::move(materials),
-        .material_matdb_uuids = Domain::Preset::MatDbUuids{mat_size}
+        .material_matdb_uuids = Domain::Preset::MatDbUuids{mat_size},
+        .macro_overrides = empty_macro_overrides(hw_config.technology),
     };
 
     // Set transfered values after switch to new selected preset
@@ -2717,6 +2732,25 @@ void PresetInteractor::set_item_value(
         [&]() { m_print_tool_cbi_accessor.set_tool_value(name, indexes, value); },
         [&]() { m_object_settings_interactor_accessor.set_value(name, value); }
     );
+
+    if (name == "spiral_vase") {
+        auto& selected_preset = mutable_selected_printer_preset();
+        auto& fdm_macro_overrides{std::get<
+            std::map<Domain::MacroOverridesLayerFDM, Domain::MacroOverridesFDM>>(
+            selected_preset.macro_overrides)};
+        if (value.get<bool>()) {
+            auto& spiral_vase{fdm_macro_overrides[Domain::MacroOverridesLayerFDM::SpiralVase]};
+            spiral_vase.overrides.set("perimeters", 1);
+            spiral_vase.overrides.set("top_solid_layers", 0);
+            spiral_vase.overrides.set("fill_density", Domain::Percentage{0});
+            spiral_vase.overrides.set("support_material", Domain::SupportMode::None);
+            spiral_vase.overrides.set("support_material_enforce_layers", 0);
+            spiral_vase.overrides.set("thin_walls", false);
+        } else {
+            fdm_macro_overrides.erase(Domain::MacroOverridesLayerFDM::SpiralVase);
+        }
+    }
+
     m_backup_store.invalidate_backup(m_selected_project_id);
     invoke_on_preset_value_changed(item);
     invoke_slicing_input_changed();

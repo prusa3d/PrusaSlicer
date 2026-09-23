@@ -55,9 +55,10 @@ class PrintObjectConfigView : public Domain::ConfigView
 public:
     PrintObjectConfigView(
         const Domain::FullConfigFDMPtr& full_config,
-        const Domain::PartialConfig& object_settings
+        const Domain::PartialConfig& object_settings,
+        const Domain::PartialConfig& macro_overrides
     ):
-        ConfigView{full_config, {object_settings}}, m_object_settings{object_settings}
+        ConfigView{full_config, {object_settings, macro_overrides}}, m_object_settings{object_settings}
     {
         finalize();
     }

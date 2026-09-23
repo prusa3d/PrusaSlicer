@@ -25,6 +25,7 @@ enum class FDMConfigLocation
     Project,
     Object,
     Volume,
+    MacroOverrides
 };
 
 enum class SLAConfigLocation
@@ -35,6 +36,7 @@ enum class SLAConfigLocation
     Print,
     Object,
     Project,
+    MacroOverrides
 };
 
 enum class CompatibilityRule

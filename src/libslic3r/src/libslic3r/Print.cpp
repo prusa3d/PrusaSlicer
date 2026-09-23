@@ -438,9 +438,11 @@ Biz::Slicing::UpdateResult Print::update(
             return;
         }
 
-        const auto slicing_input{
-            prepare_slicing_input(config_fdm, extruder_candidates, metadata.hw_config)
-        };
+        const auto slicing_input{prepare_slicing_input(
+            config_fdm,
+            extruder_candidates,
+            metadata.hw_config)};
+
         if (!slicing_input.has_value()) {
             m_invalid = true;
             m_extruder_candidates.clear();
@@ -452,6 +454,7 @@ Biz::Slicing::UpdateResult Print::update(
         result = this->apply(
             model,
             slicing_input.value(),
+            Domain::PartialConfig{Domain::to_refs(config_fdm.macro_overrides), metadata.hw_config},
             metadata,
             bed.name(),
             serializer,

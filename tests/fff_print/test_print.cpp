@@ -371,6 +371,7 @@ TEST_CASE("Changing all config values works", "[PrintApply]")
     auto apply_status{print.apply(
         model,
         full_config,
+        Domain::PartialConfig{},
         preset_metadata,
         "bed1",
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config),
@@ -410,6 +411,7 @@ TEST_CASE("Changing all config values works", "[PrintApply]")
     apply_status = print.apply(
         model,
         full_config,
+        Domain::PartialConfig{},
         preset_metadata,
         "bed1",
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, config),
@@ -509,6 +511,7 @@ void apply_and_check(
     const auto apply_status{context.print.apply(
         context.model,
         full_config,
+        Domain::PartialConfig{},
         preset_metadata,
         "bed1",
         Biz::Slicing::build_metadata_serializer(metadata, preset_metadata, context.config),

@@ -107,6 +107,18 @@ void to_json(
             std::string location_name;
             if constexpr(std::is_same_v<ValueType, BoxRef>) {
                 location_name = get_location_name(box_or_boxes.get().location);
+            } else if constexpr(std::is_same_v<ValueType, NamedBoxRefs>) {
+                // Serialized as an object keyed by the box name. Nothing to write when empty.
+                if (box_or_boxes.empty()) {
+                    return;
+                }
+                location_name = get_location_name(box_or_boxes.front().second.get().location);
+                nlohmann::ordered_json named_boxes = nlohmann::ordered_json::object();
+                for (const auto& [name, box] : box_or_boxes) {
+                    named_boxes[name] = box.get();
+                }
+                json_value[location_name] = std::move(named_boxes);
+                return;
             } else {
                 location_name = get_location_name(box_or_boxes.front().get().location);
             }

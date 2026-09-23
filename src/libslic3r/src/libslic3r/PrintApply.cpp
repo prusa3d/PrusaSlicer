@@ -523,6 +523,7 @@ generate_print_object_regions(
     const LayerRanges& model_layer_ranges,
     const Domain::PartialConfig& new_object_settings,
     const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides,
     const Transform3d& trafo,
     size_t num_physical_extruders,
     const VirtualExtruders& virtual_extruders,
@@ -751,6 +752,7 @@ generate_print_object_regions(
     }
 
     for (std::unique_ptr<PrintRegion>& region : all_regions) {
+        region->add_config_override(macro_overrides);
         region->finalize_config();
     }
 
@@ -1108,6 +1110,7 @@ tl::expected<PrintObjectsSyncResult, Errors> sync_print_objects(
     const Domain::ModelObjectPtrs& model_objects,
     const std::map<PrintObjectUniqueId, PrintObject*>& reuse_candidates,
     const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides,
     const std::size_t num_extruders,
     const Vec3d& shrinkage_compensation,
     Print* print
@@ -1124,7 +1127,7 @@ tl::expected<PrintObjectsSyncResult, Errors> sync_print_objects(
         const Domain::PartialConfig
             object_settings{{model_object->object_settings}, new_full_config->hw_config()};
 
-        const PrintObjectConfigView new_config{new_full_config, object_settings};
+        const PrintObjectConfigView new_config{new_full_config, object_settings, macro_overrides};
 
         for (PrintObjectTrafoAndInstances& new_instances : print_instances) {
             const auto current_instace_it{
@@ -1167,7 +1170,8 @@ tl::expected<RegionsSyncResult, Errors> sync_regions(
     const PrintObjectPtrs& print_objects,
     const std::size_t num_extruders,
     const VirtualExtruders& virtual_extruders,
-    const FullConfigFDMPtr& new_full_config
+    const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides
 )
 {
     RegionsSyncResult result;
@@ -1187,6 +1191,7 @@ tl::expected<RegionsSyncResult, Errors> sync_regions(
             LayerRanges(print_object.model_object()->layer_config_ranges, new_full_config->hw_config()),
             print_object.config().object_settings(),
             new_full_config,
+            macro_overrides,
             print_object.trafo(),
             num_extruders,
             virtual_extruders,
@@ -1293,6 +1298,7 @@ tl::expected<ModelSyncResult, Errors> sync_model(
     const Domain::Model& new_model,
     const PrintObjectPtrs& current_objects,
     const FullConfigFDMPtr& new_full_config,
+    const Domain::PartialConfig& macro_overrides,
 
     // TODO: Get rid of all these arguments. This is madness.
     Print* print,
@@ -1329,6 +1335,7 @@ tl::expected<ModelSyncResult, Errors> sync_model(
         model_objects_sync_result.objects,
         reuse_candidates,
         new_full_config,
+        macro_overrides,
         num_extruders,
         shrinkage_compensation,
         print
@@ -1337,9 +1344,12 @@ tl::expected<ModelSyncResult, Errors> sync_model(
         return tl::unexpected{print_objects_sync_result.error()};
     }
 
-    const auto regions_sync_result{
-        sync_regions(print_objects_sync_result->objects, num_extruders, virtual_extruders, new_full_config)
-    };
+    const auto regions_sync_result{sync_regions(
+        print_objects_sync_result->objects,
+        num_extruders,
+        virtual_extruders,
+        new_full_config,
+        macro_overrides)};
     if (!regions_sync_result) {
         return tl::unexpected{regions_sync_result.error()};
     }
@@ -1505,6 +1515,7 @@ InvalidatedSteps invalidate_for_virtual_extruders_change(const PrintObjectPtrs& 
 Biz::Slicing::UpdateResult Print::apply(
     const Domain::Model& model,
     const FullConfigFDMPtr& new_full_config_ptr,
+    const Domain::PartialConfig& macro_overrides,
     const Domain::Preset::SelectedPresetMetadata& metadata,
     const std::string& bed_name,
     const MetadataSerializeFn& serializer,
@@ -1561,6 +1572,7 @@ Biz::Slicing::UpdateResult Print::apply(
         model,
         m_objects,
         new_full_config_ptr,
+        macro_overrides,
         this,
         shrinkage_compensation,
         num_extruders,

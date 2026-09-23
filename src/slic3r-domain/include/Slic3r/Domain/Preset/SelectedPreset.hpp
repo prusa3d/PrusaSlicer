@@ -1,6 +1,7 @@
 #pragma once
 #include "Slic3r/Domain/Config.hpp"
 #include "Slic3r/Domain/ConfigPack.hpp"
+#include "Slic3r/Domain/MacroOverrides.hpp"
 #include "Slic3r/Domain/Preset/EvaluatedPreset.hpp"
 
 namespace Slic3r::Domain::Preset {
@@ -26,7 +27,7 @@ struct SelectedPreset
     std::vector<EvaluatedToolPrintPreset::Preset> tools;
     std::vector<EvaluatedMaterialPreset::Preset> materials;
     MatDbUuids material_matdb_uuids;
-
+    MacroOverridesMap macro_overrides;
 
     PrinterTechnology technology() const
     {

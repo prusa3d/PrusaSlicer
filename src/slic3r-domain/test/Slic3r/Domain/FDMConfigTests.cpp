@@ -280,6 +280,16 @@ TEST_CASE_METHOD(
                         }
                     }
                 },
+                [](const MutNamedBoxRefs& boxes)
+                {
+                    for (const auto& [_, box] : boxes) {
+                        for (ConfigItem& item : box.get().items.all_items()) {
+                            if (item.holds_alternative<FloatOrPercentage>()) {
+                                item.set(FloatOrPercentage{Percentage{50}});
+                            }
+                        }
+                    }
+                },
             },
             box_or_boxes);
     }

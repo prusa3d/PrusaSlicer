@@ -3,6 +3,7 @@
 #include "Slic3r/Domain/IConfigPackFDMViewer.hpp"
 #include "Slic3r/Domain/ConfigBoxesFDM.hpp"
 #include "Slic3r/Domain/ConfigBoxesSLA.hpp"
+#include "Slic3r/Domain/MacroOverrides.hpp"
 #include "Slic3r/Domain/VirtualExtruder.hpp"
 
 namespace Slic3r::Domain {
@@ -18,6 +19,7 @@ struct ConfigPackFDM : public IConfigPackFDMViewer
     std::vector<Domain::FilamentSettings> filament;
     Domain::ProjectSettings project;
     Domain::VirtualExtruders virtual_extruders;
+    Domain::MacroOverridesMapFDM macro_overrides;
 
     bool operator==(const ConfigPackFDM& other) const;
 
@@ -39,6 +41,7 @@ struct ConfigPackSLA
     Domain::SLAMaterialSettings sla_material_settings;
     Domain::SLAPrintSettings sla_print_settings;
     Domain::SLAProjectSettings sla_project_settings;
+    Domain::MacroOverridesMapSLA macro_overrides;
 
     bool operator==(const ConfigPackSLA&) const = default;
 
