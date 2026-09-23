@@ -1,14 +1,14 @@
-#include "Slic3r/App/MaterialSelectionDialog.hpp"
+#include "Slic3r/App/Material/MaterialSelectionDialog.hpp"
 
 #include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/App/Yoga/InputText.hpp"
 #include "Slic3r/App/Yoga/Separator.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
+#include "Slic3r/App/Yoga/StackLayout.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/AppServices.hpp"
-#include "Slic3r/App/Search.hpp"
 #include "Slic3r/App/Navigator.hpp"
-#include "Slic3r/App/MaterialSettingsDialog.hpp"
+#include "Slic3r/App/Material/MaterialSettingsDialog.hpp"
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/PrinterSearchFunction.hpp"
 
@@ -62,7 +62,7 @@ MaterialSelectionDialog::MaterialSelectionDialog(
     Biz::ProjectInteractor& project_interactor,
     Navigator& navigator
 ) :
-    Yoga::Dialog({"Material"}, "MaterialSelectionDialog"),
+    Yoga::Dialog({Biz::_u8L("Profiles"), Biz::_u8L("Materials")}, "MaterialSelectionDialog"),
     m_project_interactor(project_interactor),
     m_navigator(navigator),
     m_material_presets(m_project_interactor.preset_interactor().material_presets()),
@@ -80,14 +80,132 @@ MaterialSelectionDialog::MaterialSelectionDialog(
         this
     );
 
-    content_item()->set_width(350);
+    content_item()->set_width(350_fpx);
 
     content()->set_orientation(Orientation::Vertical);
-    content()->set_gap(5);
+    content()->set_gap(5_fpx);
 
-    Item* filters_wrap = content()->emplace_back<Item>();
+    m_stack_layout = content()->emplace_back<StackLayout>();
+    m_stack_layout->set_flex_grow(1);
+    m_stack_layout->set_orientation(Orientation::Vertical);
+
+    m_page_presets = m_stack_layout->emplace_back<Item>();
+    m_page_presets->set_orientation(Orientation::Vertical);
+    m_page_presets->set_gap(5_fpx);
+
+    create_page_presets();
+
+    m_page_materials = m_stack_layout->emplace_back<Item>();
+    m_page_materials->set_orientation(Orientation::Vertical);
+    m_page_materials->set_gap(5_fpx);
+
+    create_page_materials();
+
+    set_current_tab(
+        AppServices::instance().app_config().get<int>("last_material_selection_dialog_tab")
+    );
+}
+
+MaterialSelectionDialog::~MaterialSelectionDialog()
+{
+    m_material_presets.remove_listener<Biz::IListObserver<Biz::Preset::PresetItemObservableList>>(
+        this
+    );
+}
+
+MaterialSelectionDialog::Callbacks& MaterialSelectionDialog::material_selection_callbacks()
+{
+    return m_callbacks;
+}
+
+void MaterialSelectionDialog::set_material_index(size_t material_index)
+{
+    if (m_material_index == material_index) {
+        return;
+    }
+
+    m_material_index = material_index;
+
+    update_preset_list();
+
+    m_project_interactor.matdb_interactor().query_first(m_material_index);
+}
+
+void MaterialSelectionDialog::on_list_selection_changed(Domain::SelectionId new_selection)
+{
+    const Biz::Preset::PresetItem& selected_preset_item = m_preset_list->items().at(new_selection);
+
+    for (size_t index = 0; index < m_selection_row_list_view->list_item_count(); ++index) {
+        AbstractButton* button =
+            dynamic_cast<AbstractButton*>(m_selection_row_list_view->item_at(index));
+        ASSERT(button);
+        if (m_material_searcher->at(index).id == selected_preset_item.id) {
+            button->set_checked(true);
+            m_selection_row_list_view->scroll_at_item(m_selection_row_list_view->item_at(index));
+        } else {
+            button->set_checked(false);
+        }
+    }
+}
+
+void MaterialSelectionDialog::on_will_be_reset(std::optional<size_t> new_size)
+{
+    if (m_preset_list) {
+        m_preset_list->remove_listener<Biz::IListSelectionChangedListener>(this);
+        m_preset_list = nullptr;
+    }
+
+    m_material_filter->set_source_model(nullptr);
+}
+
+void MaterialSelectionDialog::on_reset()
+{
+    m_material_index = m_material_presets.size() ?
+        std::clamp(m_material_index, std::size_t{0}, m_material_presets.size() - 1) :
+        Domain::INVALID_ID;
+
+    update_current_context();
+    update_preset_list();
+}
+
+void MaterialSelectionDialog::close_action()
+{
+    m_navigator.set_opened_dialog(nullptr);
+}
+
+void MaterialSelectionDialog::on_tab_selected(int current_index)
+{
+    m_stack_layout->set_current_index(current_index);
+
+    AppServices::instance().app_config_interactor().set_item_value(
+        "last_material_selection_dialog_tab",
+        Domain::ConfigValue{current_index}
+    );
+}
+
+void MaterialSelectionDialog::update_preset_list()
+{
+    if (m_preset_list) {
+        m_preset_list->remove_listener<Biz::IListSelectionChangedListener>(this);
+        m_preset_list = nullptr;
+    }
+
+    if (m_material_index == Domain::INVALID_ID) {
+        return;
+    }
+
+    m_preset_list = &m_material_presets.at(m_material_index);
+    m_preset_list->add_listener<Biz::IListSelectionChangedListener>(this);
+
+    m_material_filter->set_source_model(&m_preset_list->items());
+    on_list_selection_changed(m_preset_list->selected_index());
+}
+
+void MaterialSelectionDialog::create_page_presets()
+{
+    Item* filters_wrap = m_page_presets->emplace_back<Item>();
     filters_wrap->set_orientation(Orientation::Horizontal);
-    filters_wrap->set_gap(5.f);
+    filters_wrap->set_gap(5_fpx);
     filters_wrap->set_flex_grow(1.f);
 
     for (const std::string& filter_btn_name :
@@ -137,26 +255,26 @@ MaterialSelectionDialog::MaterialSelectionDialog(
         }
     );
 
-    content()->emplace_back<Separator>(Orientation::Horizontal);
+    m_page_presets->emplace_back<Separator>(Orientation::Horizontal);
 
-    Item* search_row = content()->emplace_back<Item>();
-    search_row->set_gap(5);
+    Item* search_row = m_page_presets->emplace_back<Item>();
+    search_row->set_gap(5_fpx);
     Icon* icon = search_row->emplace_back<Icon>(Render::Icon::Search);
-    icon->set_width(16);
+    icon->set_width(16_fpx);
     icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
-    m_input_text_search = search_row->emplace_back<InputText>();
-    m_input_text_search->set_hint(_u8L("Search..."));
-    m_input_text_search->set_flex_grow(1);
-    m_input_text_search->callbacks().text_changed = [this]()
-    { m_material_searcher->set_search_text(m_input_text_search->text()); };
+    m_input_text_search_presets = search_row->emplace_back<InputText>();
+    m_input_text_search_presets->set_hint(_u8L("Search..."));
+    m_input_text_search_presets->set_flex_grow(1);
+    m_input_text_search_presets->callbacks().text_changed = [this]()
+    { m_material_searcher->set_search_text(m_input_text_search_presets->text()); };
 
     m_only_favorites_button = search_row->emplace_back<LayoutButton>(
         std::string(),
         Render::Icon::Star,
         Biz::_u8L("Only favorites")
     );
-    m_only_favorites_button->set_width(24);
-    m_only_favorites_button->set_height(24);
+    m_only_favorites_button->set_width(24_fpx);
+    m_only_favorites_button->set_height(24_fpx);
     m_only_favorites_button->set_checkable(true);
     m_only_favorites_button->set_self_align(YGAlignCenter);
     m_only_favorites_button->callbacks().checked_changed = [this](bool checked)
@@ -174,12 +292,12 @@ MaterialSelectionDialog::MaterialSelectionDialog(
     };
     on_app_config_changed("materials_only_favorites");
 
-    content()->emplace_back<Separator>(Orientation::Horizontal);
+    m_page_presets->emplace_back<Separator>(Orientation::Horizontal);
 
-    Item* scroll_area = content()->emplace_back<Item>();
+    Item* scroll_area = m_page_presets->emplace_back<Item>();
     scroll_area->set_orientation(Orientation::Vertical);
-    scroll_area->set_min_height(200);
-    scroll_area->set_max_height(300);
+    scroll_area->set_min_height(200_fpx);
+    scroll_area->set_max_height(300_fpx);
 
     m_selection_row_list_view =
         scroll_area->emplace_back<SelectionRowListView>(SelectionRowListViewFactory{
@@ -212,9 +330,9 @@ MaterialSelectionDialog::MaterialSelectionDialog(
             m_project_interactor.preset_interactor()
         });
     m_selection_row_list_view->set_orientation(Orientation::Vertical);
-    m_selection_row_list_view->set_gap(5);
-    m_selection_row_list_view->set_margin({0.f, 0.f, -10.f, 0.f});
-    m_selection_row_list_view->set_padding({0.f, 0.f, 15.f, 0.f});
+    m_selection_row_list_view->set_gap(5_fpx);
+    m_selection_row_list_view->set_margin({0.f, 0.f, -10_fpx, 0.f});
+    m_selection_row_list_view->set_padding({0.f, 0.f, 15_fpx, 0.f});
     m_selection_row_list_view->set_source_list(m_material_searcher.get());
 
     m_material_searcher->set_source_model(m_material_filter.get());
@@ -232,87 +350,61 @@ MaterialSelectionDialog::MaterialSelectionDialog(
     set_material_index(0);
 }
 
-MaterialSelectionDialog::~MaterialSelectionDialog()
+void MaterialSelectionDialog::create_page_materials()
 {
-    m_material_presets.remove_listener<Biz::IListObserver<Biz::Preset::PresetItemObservableList>>(
-        this
+    Item* filters_wrap = m_page_materials->emplace_back<Item>();
+    filters_wrap->set_orientation(Orientation::Horizontal);
+    filters_wrap->set_gap(5_fpx);
+    filters_wrap->set_flex_grow(1.f);
+
+    m_page_materials->emplace_back<Separator>(Orientation::Horizontal);
+
+    Item* search_row = m_page_materials->emplace_back<Item>();
+    search_row->set_gap(5_fpx);
+    Icon* icon = search_row->emplace_back<Icon>(Render::Icon::Search);
+    icon->set_width(16_fpx);
+    icon->set_fill_mode(Icon::FillMode::PreservedAspectCentered);
+    m_input_text_search_materials = search_row->emplace_back<InputText>();
+    m_input_text_search_materials->set_hint(_u8L("Search..."));
+    m_input_text_search_materials->set_flex_grow(1);
+    m_input_text_search_materials->callbacks().text_changed = [this]()
+    {
+        m_project_interactor.matdb_interactor().query_by_name(
+            m_material_index,
+            m_input_text_search_materials->text()
+        );
+    };
+
+    m_page_materials->emplace_back<Separator>(Orientation::Horizontal);
+
+    Item* scroll_area = m_page_materials->emplace_back<Item>();
+    scroll_area->set_orientation(Orientation::Vertical);
+    scroll_area->set_min_height(200_fpx);
+    scroll_area->set_max_height(300_fpx);
+
+    m_spool_selection_row_list_view =
+        scroll_area->emplace_back<SpoolSelectionRowListView>(SpoolSelectionRowListViewFactory{
+            m_project_interactor.matdb_interactor(),
+            m_material_index,
+            [this](size_t checked_index)
+            {
+                for (size_t i = 0; i < m_spool_selection_row_list_view->list_item_count(); ++i) {
+                    if (i == checked_index) {
+                        continue;
+                    }
+                    m_spool_selection_row_list_view->item_at(i)->set_checked(false);
+                }
+            }
+        });
+    m_spool_selection_row_list_view->set_orientation(Orientation::Vertical);
+    m_spool_selection_row_list_view->set_gap(5_fpx);
+    m_spool_selection_row_list_view->set_margin({0.f, 0.f, -10_fpx, 0.f});
+    m_spool_selection_row_list_view->set_padding({0.f, 0.f, 15_fpx, 0.f});
+    m_spool_selection_row_list_view->set_source_list(
+        &m_project_interactor.matdb_interactor().result()
     );
-}
 
-MaterialSelectionDialog::Callbacks& MaterialSelectionDialog::material_selection_callbacks()
-{
-    return m_callbacks;
-}
-
-void MaterialSelectionDialog::set_material_index(size_t material_index)
-{
-    if (m_material_index == material_index) {
-        return;
-    }
-
-    m_material_index = material_index;
-
-    update_preset_list();
-}
-
-void MaterialSelectionDialog::on_list_selection_changed(Domain::SelectionId new_selection)
-{
-    const Biz::Preset::PresetItem& selected_preset_item = m_preset_list->items().at(new_selection);
-
-    for (size_t index = 0; index < m_selection_row_list_view->list_item_count(); ++index) {
-        AbstractButton* button =
-            dynamic_cast<AbstractButton*>(m_selection_row_list_view->item_at(index));
-        ASSERT(button);
-        if (m_material_searcher->at(index).id == selected_preset_item.id) {
-            button->set_checked(true);
-            m_selection_row_list_view->scroll_at_item(m_selection_row_list_view->item_at(index));
-        } else {
-            button->set_checked(false);
-        }
-    }
-}
-
-void MaterialSelectionDialog::on_will_be_reset(std::optional<size_t> new_size)
-{
-    if (m_preset_list) {
-        m_preset_list->remove_listener<Biz::IListSelectionChangedListener>(this);
-        m_preset_list = nullptr;
-    }
-
-    m_material_filter->set_source_model(nullptr);
-}
-
-void MaterialSelectionDialog::on_reset()
-{
-    m_material_index = m_material_presets.size() ?
-        std::clamp(m_material_index, std::size_t{0}, m_material_presets.size() - 1) :
-        Domain::INVALID_ID;
-
-    update_current_context();
-    update_preset_list();
-}
-
-void MaterialSelectionDialog::close_action()
-{
-    m_navigator.set_opened_dialog(nullptr);
-}
-
-void MaterialSelectionDialog::update_preset_list()
-{
-    if (m_preset_list) {
-        m_preset_list->remove_listener<Biz::IListSelectionChangedListener>(this);
-        m_preset_list = nullptr;
-    }
-
-    if (m_material_index == Domain::INVALID_ID) {
-        return;
-    }
-
-    m_preset_list = &m_material_presets.at(m_material_index);
-    m_preset_list->add_listener<Biz::IListSelectionChangedListener>(this);
-
-    m_material_filter->set_source_model(&m_preset_list->items());
-    on_list_selection_changed(m_preset_list->selected_index());
+    m_project_interactor.matdb_interactor().query_first(m_material_index);
 }
 
 MaterialSettingsDialog& MaterialSelectionDialog::material_settings_dialog()

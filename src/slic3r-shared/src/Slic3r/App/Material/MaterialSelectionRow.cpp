@@ -1,4 +1,4 @@
-#include "Slic3r/App/MaterialSelectionRow.hpp"
+#include "Slic3r/App/Material/MaterialSelectionRow.hpp"
 
 #include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"

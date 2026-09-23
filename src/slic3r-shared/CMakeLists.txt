@@ -210,8 +210,6 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/DirtyCategoryList.hpp
         include/Slic3r/App/PrintSettingsDialog.hpp
         src/Slic3r/App/PrintSettingsDialog.cpp
-        include/Slic3r/App/MaterialSettingsDialog.hpp
-        src/Slic3r/App/MaterialSettingsDialog.cpp
         include/Slic3r/App/LogicalPrinterSettingsDialog.hpp
         src/Slic3r/App/LogicalPrinterSettingsDialog.cpp
         include/Slic3r/App/PrinterAdvancedSettingsDialog.hpp
@@ -262,10 +260,6 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/SidebarToolHeadRow.cpp
         include/Slic3r/App/PrinterNozzleRow.hpp
         src/Slic3r/App/PrinterNozzleRow.cpp
-        src/Slic3r/App/MaterialSelectionDialog.cpp
-        include/Slic3r/App/MaterialSelectionDialog.hpp
-        include/Slic3r/App/MaterialSelectionRow.hpp
-        src/Slic3r/App/MaterialSelectionRow.cpp
         include/Slic3r/App/Search.hpp
         src/Slic3r/App/Search.cpp
         include/Slic3r/App/OverrideItemRow.hpp
@@ -335,6 +329,15 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/PageEntryButton.cpp
         src/Slic3r/App/ProjectButton.cpp
         include/Slic3r/App/ProjectButton.hpp
+
+        include/Slic3r/App/Material/MaterialSettingsDialog.hpp
+        src/Slic3r/App/Material/MaterialSettingsDialog.cpp
+        src/Slic3r/App/Material/MaterialSelectionDialog.cpp
+        include/Slic3r/App/Material/MaterialSelectionDialog.hpp
+        include/Slic3r/App/Material/MaterialSelectionRow.hpp
+        src/Slic3r/App/Material/MaterialSelectionRow.cpp
+        include/Slic3r/App/Material/MaterialSpoolSelectionRow.hpp
+        src/Slic3r/App/Material/MaterialSpoolSelectionRow.cpp
 
         include/Slic3r/App/Config/ConfigItemTextField.hpp
         src/Slic3r/App/Config/ConfigItemTextField.cpp

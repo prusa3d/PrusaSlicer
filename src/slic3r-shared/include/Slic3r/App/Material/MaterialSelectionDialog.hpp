@@ -3,10 +3,11 @@
 #include "Slic3r/App/Yoga/Dialog.hpp"
 #include "Slic3r/App/Yoga/ListView.hpp"
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
-#include "Slic3r/App/MaterialSelectionRow.hpp"
 #include "Slic3r/App/Yoga/Validator.hpp"
 #include "Slic3r/App/Yoga/ButtonGroup.hpp"
 #include "Slic3r/App/IAppConfigChangedListener.hpp"
+#include "Slic3r/App/Material/MaterialSelectionRow.hpp"
+#include "Slic3r/App/Material/MaterialSpoolSelectionRow.hpp"
 
 #include "Slic3r/Biz/ObservableListSortFilter.hpp"
 #include "Slic3r/Biz/ObservableListSearcher.hpp"
@@ -21,6 +22,7 @@ namespace Slic3r::App::Yoga {
 class InputText;
 class LayoutButton;
 class ScrollArea;
+class StackLayout;
 } // namespace Slic3r::App::Yoga
 
 namespace Slic3r::App {
@@ -54,12 +56,17 @@ public:
 
     MaterialSettingsDialog& material_settings_dialog();
 
-    void on_app_config_changed(const std::string &key) override;
+    void on_app_config_changed(const std::string& key) override;
 
 protected:
     void close_action() override;
 
+    void on_tab_selected(int current_index) override;
+
     void update_preset_list();
+
+    void create_page_presets();
+    void create_page_materials();
 
 private:
     struct ProjectContext;
@@ -83,31 +90,50 @@ private:
         SelectionRowListViewFactory,
         Yoga::ScrollArea>;
 
+    using SpoolSelectionRowListViewFactory = Yoga::ViewFactory<
+        MaterialSpoolSelectionRow,
+        Biz::MatDb::MatDbItem,
+        Biz::MatDb::MatDbInteractor&,
+        size_t&,
+        MaterialSpoolSelectionRow::CheckedFn>;
+    using SpoolSelectionRowListView = Yoga::ListView<
+        MaterialSpoolSelectionRow,
+        Biz::MatDb::MatDbItem,
+        SpoolSelectionRowListViewFactory,
+        Yoga::ScrollArea>;
+
     Callbacks m_callbacks;
 
     Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;
+
+    // ----------- Page presets ------------
     Biz::Preset::PresetItemCompoundObservableList& m_material_presets;
     Biz::UnsharedPointer<Biz::ObservableListSortFilter<Biz::Preset::PresetItem>> m_material_filter;
     Biz::UnsharedPointer<Biz::ObservableListSearcher<Biz::Preset::PresetItem>> m_material_searcher;
-
     size_t m_material_index = Domain::INVALID_ID;
     Yoga::ButtonGroup m_material_type_button_group;
     std::map<std::string, Yoga::LayoutButton*> m_type_filter_buttons;
-    Yoga::InputText* m_input_text_search                 = nullptr;
+
+    Yoga::StackLayout* m_stack_layout = nullptr;
+
+    Yoga::Item* m_page_presets                           = nullptr;
+    Yoga::InputText* m_input_text_search_presets         = nullptr;
     Yoga::LayoutButton* m_only_favorites_button          = nullptr;
     SelectionRowListView* m_selection_row_list_view      = nullptr;
     Biz::Preset::PresetItemObservableList* m_preset_list = nullptr;
     MaterialSettingsDialog* m_material_settings_dialog   = nullptr;
 
+    // ----------- Page materials ----------
+    Yoga::Item* m_page_materials                               = nullptr;
+    Yoga::InputText* m_input_text_search_materials             = nullptr;
+    SpoolSelectionRowListView* m_spool_selection_row_list_view = nullptr;
+
     struct ProjectContext
     {
-        std::string type_filter = std::string();
+        std::string type_filter;
 
-        bool operator==(const ProjectContext& other) const
-        {
-            return type_filter == other.type_filter;
-        }
+        bool operator==(const ProjectContext& other) const = default;
     } m_current_context;
 
     std::unique_ptr<Biz::ProjectScoped<ProjectContext>> m_project_contexts;
