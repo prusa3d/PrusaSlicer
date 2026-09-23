@@ -26,6 +26,8 @@ class WipeTower
 public:
     static const std::string never_skip_tag() { return "_GCODE_WIPE_TOWER_NEVER_SKIP_TAG"; }
 	static std::vector<std::vector<float>> extract_wipe_volumes(const PrintConfigView& config);
+    static float toolchange_wipe_volume(const PrintConfigView& config,
+        const std::vector<std::vector<float>>& volumes, unsigned from, unsigned to);
 
     struct Extrusion
     {
@@ -269,6 +271,7 @@ private:
 
 
 	bool   m_semm               = true; // Are we using a single extruder multimaterial printer?
+    bool   m_orca_type2_minimum = false;
     bool   m_switch_filament_monitoring = false;
     bool   m_enable_pressure_advance_during_ramming = false;
     Domain::Vec2f m_wipe_tower_pos; 			// Left front corner of the wipe tower in mm.

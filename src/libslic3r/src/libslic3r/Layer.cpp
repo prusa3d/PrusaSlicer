@@ -656,6 +656,10 @@ inline bool has_compatible_dynamic_overhang_speed(
             && overhang_speed_equal("overhang_speed_1")
             && overhang_speed_equal("overhang_speed_2")
             && overhang_speed_equal("overhang_speed_3");
+        for (const auto* key : {"orca_perimeter_speed_compatibility", "slowdown_for_curled_perimeters"})
+            dynamic_overhang_speed_compatibility = dynamic_overhang_speed_compatibility
+                && config.get<std::vector<bool>>(key).at(extruder_id)
+                    == other_config.get<std::vector<bool>>(key).at(extruder_id);
     }
 
     return dynamic_overhang_speed_compatibility;

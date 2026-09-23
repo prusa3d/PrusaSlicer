@@ -38,6 +38,7 @@ public:
     struct PrinterFamily
     {
         std::string label;
+        std::string vendor_name;
         std::string base_model;
         std::vector<PrinterEntry> printers;
     };
@@ -57,7 +58,6 @@ private:
     std::function<void(const Printer&)> m_add_printer;
     std::string m_search_text;
     std::optional<std::string> m_selected_vendor;
-    std::string m_vendor_name;
     std::vector<PrinterFamily> m_printer_families;
 
     Yoga::ButtonGroup m_vendor_button_group;
@@ -75,6 +75,10 @@ private:
     void reload();
     void reload_vendor_buttons(const Domain::Preset::Bundle& preset_bundle);
     void rebuild_printer_families();
+    void append_vendor_printer_families(
+        const Domain::Preset::Bundle& preset_bundle,
+        const Domain::Preset::VendorBundle& vendor_bundle
+    );
     void rebuild_printer_view();
     void clear_printer_items();
 };

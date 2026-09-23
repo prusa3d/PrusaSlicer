@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Slic3r/Biz/libpgcode/ToolChangeTiming.hpp"
+
 #include "Slic3r/Biz/libpgcode/Processor.hpp"
 #include "Slic3r/Biz/GCodeReader/GCodeReader.hpp"
 #include "TimeProcessor.hpp"
@@ -94,6 +96,7 @@ private:
     GCodeReader::GCodeReader m_parser;
     FeedMultiply m_feed_multiply;
     ProcessorConfig m_config;
+    ToolChangeTiming m_toolchange_timing;
     ProcessorResult m_result;
     TimeProcessor m_time_processor;
     UsedFilaments m_used_filaments;

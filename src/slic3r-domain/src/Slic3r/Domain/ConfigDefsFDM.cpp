@@ -401,6 +401,26 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->init_fn = init_with(false);
 
+    def = defs.add("orca_perimeter_speed_compatibility", typeid(bool));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Object, Volume };
+    def->label = L("Use Orca perimeter speed rules");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Speed_DynamicOverhangSpeed;
+    def->category = ConfigItemDef::Category::Print_Speed;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use Orca's overhang overlap curve and outer-wall reference for small-perimeter speeds. Enabled for imported Orca profiles.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("slowdown_for_curled_perimeters", typeid(bool));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Object, Volume };
+    def->label = L("Slow down for curled perimeters");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Speed_DynamicOverhangSpeed;
+    def->category = ConfigItemDef::Category::Print_Speed;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("When dynamic overhang speeds are enabled, also slow down near predicted curled edges.");
+    def->init_fn = init_with(true);
+
     // TRN PrintSettings : "Dynamic overhang speed"
     auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
                         "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
@@ -2861,6 +2881,15 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
                    "(and thus any ooze will be probably invisible).");
     def->init_fn = init_with(false);
 
+    def = defs.add("retract_before_perimeters", typeid(bool));
+    def->location = Print;
+    def->label = L("Keep retraction before perimeters");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Infill_Advanced;
+    def->category = ConfigItemDef::Category::Print_Infill;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("When reducing retractions inside infill, still retract before travel to a perimeter if the minimum travel distance is reached. Enabled for imported Orca profiles.");
+    def->init_fn = init_with(false);
+
     def = defs.add("ooze_prevention", typeid(bool));
     def->location = Print;
     def->label = L("Enable");
@@ -2870,6 +2899,29 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     // TRN PrintSettings: Enable ooze prevention
     def->tooltip = L("This option will drop the temperature of the inactive extruders to prevent oozing.");
     def->init_fn = init_with(false);
+
+    def = defs.add("preheat_time", typeid(double));
+    def->location = Print;
+    def->label = L("Preheat time");
+    def->gui_type = ConfigItemDef::GUIType::spinbox;
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_OozePrevention;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->tooltip = L("How many seconds before a tool change to start preheating the next tool. Zero disables advance preheating.");
+    def->units = {"s"};
+    def->min = 0;
+    def->max = 120;
+    def->init_fn = init_with(120.0);
+
+    def = defs.add("preheat_steps", typeid(int));
+    def->location = Print;
+    def->label = L("Preheat steps");
+    def->gui_type = ConfigItemDef::GUIType::spinbox;
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_OozePrevention;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->tooltip = L("Number of advance temperature commands for printers supporting scheduled preheating. Other printers use one command.");
+    def->min = 1;
+    def->max = 10;
+    def->init_fn = init_with(10);
 
     def = defs.add("overhangs", typeid(bool));
     def->location = Print;
@@ -3209,6 +3261,62 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("With bowden extruders, it may be wise to do some amount of quick retract "
                    "before doing the wipe movement.");
     def->units = {L("%")};
+    def->init_fn = init_with(Percentage{0.});
+
+    def = defs.add("orca_wipe_compatibility", typeid(bool));
+    def->location = Print;
+    def->label = L("Use Orca wipe rules");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use a configured wipe distance and distribute retraction before, during and after wiping. Enabled for imported Orca profiles.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("role_based_wipe_speed", typeid(bool));
+    def->location = Print;
+    def->label = L("Use extrusion speed for wiping");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("With Orca wipe rules enabled, use the preceding extrusion speed for the wipe, with a minimum of 10 mm/s.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("wipe_speed", typeid(FloatOrPercentage));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool };
+    def->label = L("Wipe speed");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::unit_or_percentage;
+    def->tooltip = L("Wipe speed when Orca wipe rules are enabled and extrusion-based wiping speed is disabled. A percentage is relative to travel speed.");
+    def->ratio_over = "travel_speed";
+    def->units = {L("mm/s"), L("%")};
+    def->min = 0;
+    def->init_fn = init_with(FloatOrPercentage{Percentage{80.}});
+
+    def = defs.add("wipe_distance", typeid(double));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Filament };
+    def->label = L("Wipe distance");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Maximum distance to wipe with Orca wipe rules enabled. Zero disables wiping for this tool.");
+    def->units = {L("mm")};
+    def->min = 0;
+    def->init_fn = init_with(2.);
+
+    def = defs.add("retract_after_wipe", typeid(Percentage));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Filament };
+    def->label = L("Retract amount after wipe");
+    def->option_group = ConfigItemDef::OptionGroup::Print_ExtrusionRetraction_Retraction;
+    def->category = ConfigItemDef::Category::Print_ExtrusionRetraction;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Retraction reserved until after the wipe when Orca wipe rules are enabled.");
+    def->units = {L("%")};
+    def->min = 0;
+    def->max = 100;
     def->init_fn = init_with(Percentage{0.});
 
     def = defs.add("retract_layer_change", typeid(bool));
@@ -3617,13 +3725,25 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->category = ConfigItemDef::Category::Print_Speed;
     def->order = 2;
     def->gui_type = ConfigItemDef::GUIType::unit_or_percentage;
-    def->tooltip = L("This separate setting will affect the speed of perimeters having radius <= 6.5mm "
+    def->tooltip = L("This separate setting will affect the speed of perimeters within the small perimeter threshold "
                    "(usually holes). If expressed as percentage (for example: 80%) it will be calculated "
                    "on the perimeters speed setting above. Set to zero for auto.");
     def->units = {L("mm/s"), L("%")};
     def->min = 0;
     def->init_fn = init_with(FloatOrPercentage{15.});
     def->ratio_over = "perimeter_speed";
+
+    def = defs.add("small_perimeter_threshold", typeid(double));
+    def->location = Print;
+    def->overrides_in = Locations{ Tool, Object, Volume };
+    def->label = L("Small perimeter threshold");
+    def->option_group = ConfigItemDef::OptionGroup::Print_Speed_MainStructure;
+    def->category = ConfigItemDef::Category::Print_Speed;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Apply the small perimeter speed to loops with a circumference no greater than a circle of this radius. Zero disables the small perimeter slowdown.");
+    def->units = {L("mm")};
+    def->min = 0;
+    def->init_fn = init_with(6.5);
 
     def = defs.add("solid_infill_below_area", typeid(double));
     def->location = Print;
@@ -4698,6 +4818,78 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("Multi material printers may need to prime or purge extruders on tool changes. "
                    "Extrude the excess material into the wipe tower.");
     def->init_fn = init_with(false);
+
+    def = defs.add("orca_fixed_prime_volume", typeid(bool));
+    def->location = Print;
+    def->label = L("Use fixed prime volume");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use the imported Orca process prime volume on each tool change, without allocating it to infill. The filament minimum remains a separate limit.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("orca_toolchange_timing", typeid(bool));
+    def->location = Print;
+    def->label = L("Separate filament and tool timing");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Estimate initial loading, filament swaps, physical tool changes and final unloading separately for imported Orca profiles.");
+    def->init_fn = init_with(false);
+
+    for (const auto* key : {"orca_filament_load_time", "orca_filament_unload_time"}) {
+        def = defs.add(key, typeid(double));
+        def->location = Print;
+        def->label = std::string_view(key) == "orca_filament_load_time" ? L("Filament loading time") : L("Filament unloading time");
+        def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+        def->category = ConfigItemDef::Category::Print_MultiMaterial;
+        def->gui_type = ConfigItemDef::GUIType::textfield;
+        def->tooltip = L("Additional time for this operation when separate filament and tool timing is enabled.");
+        def->units = {L("s")};
+        def->min = 0;
+        def->init_fn = init_with(0.);
+    }
+
+    def = defs.add("orca_matrix_flush", typeid(bool));
+    def->location = Print;
+    def->label = L("Use Orca matrix flushing");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::checkbox;
+    def->tooltip = L("Use the saved purge matrix for imported Orca type-2 shared-nozzle towers. Apply the flush multiplier before reserving filament minima and allocating infill purge.");
+    def->init_fn = init_with(false);
+
+    def = defs.add("orca_matrix_flush_multiplier", typeid(double));
+    def->location = Print;
+    def->label = L("Matrix flush multiplier");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Scale the saved matrix for each tool change with Orca matrix flushing enabled. Initial priming and the saved matrix remain unchanged. Zero retains the independent filament minimum.");
+    def->min = 0;
+    def->init_fn = init_with(1.);
+
+    def = defs.add("wipe_tower_max_purge_speed", typeid(double));
+    def->location = Print;
+    def->label = L("Maximum imported tower speed");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Maximum purge and structural extrusion speed for imported Orca type-2 towers. The first layer uses first-layer perimeter speed. Native tower behavior is unchanged.");
+    def->units = {L("mm/s")};
+    def->min = 10;
+    def->init_fn = init_with(90.);
+
+    def = defs.add("prime_volume", typeid(double));
+    def->location = Print;
+    def->label = L("Prime volume");
+    def->option_group = ConfigItemDef::OptionGroup::Print_MultiMaterial_WipeTower;
+    def->category = ConfigItemDef::Category::Print_MultiMaterial;
+    def->gui_type = ConfigItemDef::GUIType::textfield;
+    def->tooltip = L("Requested volume per tool change when fixed prime volume is enabled. Tower perimeter extrusion can count towards this volume; the filament minimum still applies. Zero does not disable the tower.");
+    def->units = {L("mm³")};
+    def->min = 0;
+    def->init_fn = init_with(0.);
 
     def = defs.add("wiping_volumes_matrix", typeid(std::vector<double>));
     def->location = Project;

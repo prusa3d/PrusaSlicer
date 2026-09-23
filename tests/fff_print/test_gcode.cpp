@@ -13,6 +13,8 @@
 #include <vector>
 
 #include "Slic3r/Biz/Algorithms/Polygon.hpp"
+#include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "libslic3r/GCode.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 #include "test_data.hpp"
@@ -27,6 +29,172 @@ using Domain::Percentage;
 using Biz::GCodeReader::GCodeReader;
 
 constexpr bool debug_files = false;
+
+TEST_CASE("Imported short towers omit unsupported final purge", "[GCode][Orca]") {
+    for (const bool imported : {false, true}) {
+        TestConfig config{2};
+        config.print.items.opt("wipe_tower").set(true);
+        config.print.items.opt("orca_fixed_prime_volume").set(imported);
+        config.print.items.opt("prime_volume").set(36.);
+        config.printer.items.opt("single_extruder_multi_material").set(false);
+        config.printer.items.opt("use_relative_e_distances").set(true);
+        config.printer.items.opt("layer_gcode").set(std::string{"G92 E0\n"});
+        config.print.items.opt("support_material_extruder").set(0);
+        config.print.items.opt("support_material_interface_extruder").set(0);
+        for (auto& filament : config.filament)
+            filament.items.opt("filament_multitool_ramming").set(true);
+        Domain::Model model;
+        for (int i = 0; i < 2; ++i) {
+            auto* object = model.add_object();
+            Biz::Algorithms::ModelObject::add_volume(object,
+                Biz::Algorithms::TriangleMesh::make_cube(10., 10., i == 0 ? 6. : 2.));
+            object->add_instance();
+            for (const auto* key : {"perimeter_extruder", "infill_extruder", "solid_infill_extruder"})
+                object->object_settings.overrides.set(key, i + 1);
+        }
+        Print print;
+        Test::init_print(std::vector<Domain::TriangleMesh>{}, print, model, config);
+        print.process();
+        REQUIRE(print.wipe_tower_data().has_value());
+        REQUIRE(print.tool_ordering().back().wipe_tower_partitions == 0);
+        CHECK(print.wipe_tower_data()->final_purge->gcode.empty() == imported);
+        const std::string gcode = Test::gcode(print);
+        const auto last_layer = gcode.rfind("\n;LAYER_CHANGE\n");
+        REQUIRE(last_layer != std::string::npos);
+        CHECK((gcode.find("; CP TOOLCHANGE UNLOAD", last_layer) == std::string::npos) == imported);
+    }
+}
+
+TEST_CASE("Imported small perimeter speeds use outer wall percentages", "[GCode][Orca]") {
+    for (const bool imported : {false, true}) {
+        for (const double threshold : {0., 100.}) {
+            TestConfig config;
+            config.print.items.opt("orca_perimeter_speed_compatibility").set(imported);
+            config.print.items.opt("small_perimeter_threshold").set(threshold);
+            config.print.items.opt("small_perimeter_speed").set(FloatOrPercentage{Percentage{50.}});
+            config.print.items.opt("perimeter_speed").set(100.);
+            config.print.items.opt("external_perimeter_speed").set(FloatOrPercentage{40.});
+            config.print.items.opt("enable_dynamic_overhang_speeds").set(false);
+            config.print.items.opt("gcode_comments").set(true);
+            config.filament[0].items.opt("slowdown_below_layer_time").set(0);
+            config.filament[0].items.opt("filament_max_volumetric_speed").set(0.);
+            // The cube's loops fit the positive threshold. Skip first-layer limits
+            // and inspect actual wall extrusion feedrates after postprocessing.
+            const double expected = threshold == 0. ? 40. : (imported ? 20. : 50.);
+            unsigned checked = 0;
+            bool external_perimeter = false;
+            GCodeReader parser;
+            parser.parse_buffer(Slic3r::Test::slice({TestMesh::cube_20x20x20}, config),
+                [&](GCodeReader& self, const GCodeReader::GCodeLine& line) {
+                    if (line.raw().starts_with(";TYPE:"))
+                        external_perimeter = line.raw() == ";TYPE:External perimeter";
+                    if (self.z() > 1. && line.extruding(self) && line.dist_XY(self) > 0.
+                        && external_perimeter) {
+                        CAPTURE(imported, threshold);
+                        CHECK(line.new_F(self) / 60. == Approx(expected).margin(0.02));
+                        ++checked;
+                    }
+                });
+            REQUIRE(checked > 0);
+        }
+    }
+}
+
+TEST_CASE("Imported wipe distance speed and retraction budgets", "[GCode][Orca]") {
+    struct Case { double distance; bool role_speed; double before; double after; bool volumetric; };
+    for (const auto test : {Case{2., true, 0., 0., false}, Case{2., false, 0., 0., false},
+             Case{0., true, 0., 0., false}, Case{2., true, 100., 0., false},
+             Case{2., true, 0., 100., false}, Case{2., false, 25., 25., true}}) {
+        TestConfig config;
+        config.print.items.opt("orca_wipe_compatibility").set(true);
+        config.print.items.opt("wipe").set(true);
+        config.print.items.opt("wipe_distance").set(test.distance);
+        config.print.items.opt("role_based_wipe_speed").set(test.role_speed);
+        config.print.items.opt("wipe_speed").set(FloatOrPercentage{Percentage{50.}});
+        config.print.items.opt("travel_speed").set(200.);
+        config.print.items.opt("retract_speed").set(20.);
+        config.print.items.opt("retract_length").set(0.8);
+        config.print.items.opt("retract_before_wipe").set(Percentage{test.before});
+        config.print.items.opt("retract_after_wipe").set(Percentage{test.after});
+        config.print.items.opt("enable_dynamic_overhang_speeds").set(false);
+        config.print.items.opt("gcode_comments").set(true);
+        config.filament[0].items.opt("slowdown_below_layer_time").set(0);
+        config.filament[0].items.opt("filament_max_volumetric_speed").set(0.);
+        config.printer.items.opt("use_volumetric_e").set(test.volumetric);
+        const double diameter = config.filament[0].items.opt("filament_diameter").get<double>();
+        const double area = test.volumetric ? diameter * diameter * PI / 4. : 1.;
+        unsigned wipes = 0;
+        bool in_wipe = false;
+        double distance = 0., retracted = 0., seconds = 0., last_print_f = 0., expected_f = 0.;
+        GCodeReader parser;
+        parser.parse_buffer(Slic3r::Test::slice({TestMesh::cube_20x20x20}, config),
+            [&](GCodeReader& self, const GCodeReader::GCodeLine& line) {
+                if (line.raw() == ";WIPE_START") {
+                    in_wipe = true;
+                    distance = retracted = seconds = 0.;
+                    expected_f = test.role_speed ? std::max(600., last_print_f) : 6000.;
+                } else if (line.raw() == ";WIPE_END") {
+                    CAPTURE(test.distance, test.role_speed, test.before, test.after, test.volumetric);
+                    CHECK(distance > 0.);
+                    CHECK(distance <= test.distance + 0.002);
+                    CHECK(retracted >= -0.00001);
+                    CHECK(retracted / area <= 0.8 * std::max(0., 1. - (test.before + test.after) / 100.) + 0.0002);
+                    CHECK(retracted / area <= 20. * seconds + 0.0002);
+                    ++wipes;
+                    in_wipe = false;
+                } else if (in_wipe && line.cmd_is("G1") && line.dist_XY(self) > 0.) {
+                    CHECK(line.new_F(self) == Approx(expected_f).margin(0.02));
+                    distance += line.dist_XY(self);
+                    retracted -= line.dist_E(self);
+                    seconds += 60. * line.dist_XY(self) / line.new_F(self);
+                } else if (!in_wipe && line.extruding(self) && line.dist_XY(self) > 0.) {
+                    last_print_f = line.new_F(self);
+                }
+            });
+        if (test.distance == 0.) REQUIRE(wipes == 0);
+        else REQUIRE(wipes > 0);
+    }
+}
+
+TEST_CASE("Imported wall departures retain retraction", "[GCode][Orca]") {
+    for (bool imported : {false, true}) {
+        TestConfig config;
+        config.print.items.opt("retract_before_perimeters").set(imported);
+        config.print.items.opt("only_retract_when_crossing_perimeters").set(true);
+        config.print.items.opt("perimeters").set(1);
+        config.print.items.opt("wipe").set(false);
+        config.print.items.opt("retract_before_travel").set(1.);
+        config.print.items.opt("retract_length").set(0.8);
+        config.print.items.opt("gcode_comments").set(true);
+        bool departed = false, retracted = false;
+        double distance = 0.;
+        unsigned protected_departures = 0, unprotected_departures = 0;
+        std::string role, preceding_role;
+        GCodeReader parser;
+        parser.parse_buffer(Slic3r::Test::slice({TestMesh::cube_20x20x20}, config),
+            [&](GCodeReader& self, const GCodeReader::GCodeLine& line) {
+                if (line.raw().starts_with(";TYPE:")) role = line.raw().substr(6);
+                if (!line.cmd_is("G1")) return;
+                if (line.dist_E(self) < 0.) retracted = true;
+                if (line.extruding(self) && line.dist_XY(self) > 0.) {
+                    if (departed && preceding_role == "External perimeter" && distance >= 1.001) {
+                        if (retracted) ++protected_departures;
+                        else ++unprotected_departures;
+                    }
+                    preceding_role = role;
+                    departed = retracted = false;
+                    distance = 0.;
+                } else if (line.dist_XY(self) > 0.) {
+                    departed = true;
+                    distance += line.dist_XY(self);
+                }
+            });
+        CAPTURE(imported, protected_departures, unprotected_departures);
+        REQUIRE(protected_departures > 0);
+        if (imported) REQUIRE(unprotected_departures == 0);
+        else REQUIRE(unprotected_departures > 0);
+    }
+}
 
 TEST_CASE("Origin manipulation", "[GCode]") {
     Print print;

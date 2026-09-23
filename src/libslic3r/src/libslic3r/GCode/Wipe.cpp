@@ -23,12 +23,23 @@ void Wipe::init(const PrintConfigView &config, const std::vector<unsigned int> &
 {
     this->reset_path();
 
+    // Firmware retraction owns its own E motion; retain the native path there.
+    m_orca_rules = config.get<bool>("orca_wipe_compatibility") && !config.get<bool>("use_firmware_retraction");
+    m_role_based_speed = config.get<bool>("role_based_wipe_speed");
+    m_wipe_speed = config.get<std::vector<Domain::FloatOrPercentage>>("wipe_speed");
+    m_wipe_distance = config.get<std::vector<double>>("wipe_distance");
+    m_retract_after_wipe = config.get<std::vector<Domain::Percentage>>("retract_after_wipe");
+
     // Calculate maximum wipe length to accumulate by the wipe cache.
     // Paths longer than wipe_xy should never be needed for the wipe move.
     double wipe_xy = 0;
     const bool multimaterial = extruders.size() > 1;
     for (auto id : extruders)
         if (config.get<std::vector<bool>>("wipe").at(id)) {
+            if (m_orca_rules) {
+                wipe_xy = std::max(wipe_xy, m_wipe_distance.at(id));
+                continue;
+            }
             // Wipe length to extrusion ratio.
             const double xy_to_e = this->calc_xy_to_e_ratio(
                 config.get<std::vector<double>>("retract_speed"),
@@ -72,6 +83,82 @@ void Wipe::set_path(SmoothPath &&path) {
     assert(m_path.empty() || m_path.size() > 1);
 }
 
+std::string Wipe::wipe_orca(
+    GCodeGenerator& gcodegen, const std::vector<double>& retract_speed, double travel_speed, bool toolchange)
+{
+    auto& writer = gcodegen.writer();
+    const auto& extruder = *writer.extruder();
+    const auto id = extruder.id();
+    const double limit = m_wipe_distance.at(id);
+    if (!has_path() || limit <= EPSILON) {
+        reset_path();
+        return {};
+    }
+
+    // Orca wipes a polyline from the actual nozzle position. Linearize cached
+    // arcs within 0.01 mm, then clip the quantized XY path to the requested length.
+    std::vector<Vec2d> points{gcodegen.point_to_gcode_quantized(*gcodegen.last_position)};
+    double length = 0.;
+    const auto append = [&](const Point& point) {
+        const Vec2d previous = points.back();
+        Vec2d next = gcodegen.point_to_gcode_quantized(point + m_offset);
+        const double distance = (next - previous).norm();
+        if (distance <= EPSILON) return false;
+        const bool done = distance >= limit - length;
+        if (done)
+            next = GCodeFormatter::quantize(Vec2d(previous + (next - previous) * ((limit - length) / distance)));
+        if (next != previous) {
+            length += (next - previous).norm();
+            points.push_back(next);
+        }
+        return done;
+    };
+    bool done = false;
+    for (size_t i = 1; i < m_path.size() && !done; ++i) {
+        if (m_path[i].linear()) done = append(m_path[i].point);
+        else {
+            const auto arc = Geometry::ArcWelder::arc_discretize(m_path[i-1].point, m_path[i].point,
+                m_path[i].radius, m_path[i].ccw(), scaled<double>(0.01));
+            for (auto it = std::next(arc.begin()); it != arc.end() && !done; ++it) done = append(*it);
+        }
+    }
+    if (points.size() < 2 || length <= EPSILON) {
+        reset_path();
+        return {};
+    }
+
+    const double speed = std::max(10., m_role_based_speed ? writer.current_speed() / 60.
+        : m_wipe_speed.at(id).get_abs_value(travel_speed));
+    const double area = writer.config.use_volumetric_e
+        ? extruder.filament_diameter() * extruder.filament_diameter() * M_PI / 4. : 1.;
+    const double target = std::max(0., toolchange ? extruder.retract_length_toolchange() : extruder.retract_length());
+    double before = target * std::clamp(extruder.retract_before_wipe(), 0., 1.);
+    const double after = std::min(target - before,
+        target * std::clamp(m_retract_after_wipe.at(id).get_abs_value(1.), 0., 1.));
+    double during = std::min(std::max(0., target - std::max(before, extruder.retracted() / area) - after),
+        std::max(0., retract_speed.at(id)) * length / speed);
+    // Move any retract amount that cannot fit within the wipe to the start,
+    // without taking the configured after-wipe reserve.
+    before = std::max(before, target - after - during);
+    std::string gcode = writer.retract_to_length(before, toolchange);
+    during = std::min(during, std::max(0., target - extruder.retracted() / area - after));
+    const double total_e = GCodeFormatter::quantize_e(during * area);
+    gcode += ";" + std::string{Biz::libpgcode::reserved_tag(Biz::libpgcode::Tags::Wipe_Start)} + "\n";
+    gcode += writer.set_speed(speed * 60., {}, gcodegen.enable_cooling_markers() ? ";_WIPE"sv : ""sv);
+    double travelled = 0., emitted_e = 0.;
+    for (size_t i = 1; i < points.size(); ++i) {
+        travelled += (points[i] - points[i-1]).norm();
+        const double cumulative_e = i + 1 == points.size() ? total_e
+            : GCodeFormatter::quantize_e(total_e * travelled / length);
+        gcode += writer.extrude_to_xy(points[i], -(cumulative_e - emitted_e), "wipe and retract");
+        emitted_e = cumulative_e;
+    }
+    gcode += ";" + std::string{Biz::libpgcode::reserved_tag(Biz::libpgcode::Tags::Wipe_End)} + "\n";
+    gcodegen.last_position = gcodegen.gcode_to_point(points.back());
+    reset_path();
+    return gcode;
+}
+
 std::string Wipe::wipe(
     GCodeGenerator& gcodegen,
     const std::vector<double>& retract_speed,
@@ -79,6 +166,7 @@ std::string Wipe::wipe(
     bool toolchange
 )
 {
+    if (m_orca_rules) return wipe_orca(gcodegen, retract_speed, travel_speed, toolchange);
     std::string gcode;
     const Extruder &extruder = *gcodegen.writer().extruder();
     static constexpr const std::string_view wipe_retract_comment = "wipe and retract"sv;

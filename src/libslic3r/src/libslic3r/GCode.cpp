@@ -577,6 +577,14 @@ namespace DoExport {
             "supports_tool_preheating"
         )};
         processor_config.do_M104_backtrace = supports_tool_preheating && *supports_tool_preheating;
+        processor_config.tool_preheating_m104 = Domain::Preset::get_feature<bool>(
+            hw_printer_config.features, "tool_preheating_m104").value_or(false);
+        processor_config.preheat_time = static_cast<float>(config.get<double>("preheat_time"));
+        processor_config.preheat_steps = static_cast<unsigned int>(config.get<int>("preheat_steps"));
+        processor_config.do_M104_backtrace = processor_config.do_M104_backtrace && processor_config.preheat_time > 0;
+        if (processor_config.tool_preheating_m104)
+            processor_config.do_M104_backtrace = processor_config.do_M104_backtrace
+                && config.get<bool>("ooze_prevention") && !config.get<bool>("single_extruder_multi_material");
         processor_config.extruders.count = config.hw_config().material_slot_count();
 
         std::vector<Vec2f> out_bed_shape;
@@ -650,6 +658,9 @@ namespace DoExport {
         // As of now the fields are shown at the UI dialog in the same combo box as the ramming values, so they
         // are considered to be active for the single extruder multi-material printers only.
         processor_config.filament_change_time = (float) config.get<double>("filament_change_time");
+        processor_config.orca_toolchange_timing = config.get<bool>("orca_toolchange_timing");
+        processor_config.orca_filament_load_time = static_cast<float>(config.get<double>("orca_filament_load_time"));
+        processor_config.orca_filament_unload_time = static_cast<float>(config.get<double>("orca_filament_unload_time"));
 
         processor_config.extruders.str_colors = config.get<std::vector<std::string>>("extruder_colour");
 
@@ -661,6 +672,11 @@ namespace DoExport {
     }
 
 } // namespace DoExport
+
+Biz::libpgcode::ProcessorConfig make_gcode_processor_config(const PrintConfigView& config)
+{
+    return DoExport::populate_processor_config(config, config.hw_config());
+}
 
 GCodeGenerator::GCodeGenerator(const Print* print) :
     m_origin(Vec2d::Zero()),
@@ -728,8 +744,10 @@ Biz::libpgcode::ProcessorResult GCodeGenerator::do_export(
     if (! m_placeholder_parser_integration.failed_templates.empty()) {
         // G-code export proceeded, but some of the PlaceholderParser substitutions failed.
         std::vector<std::string> failed_config_keys;
-        for (const auto& [name, error] : m_placeholder_parser_integration.failed_templates)
+        for (const auto& [name, error] : m_placeholder_parser_integration.failed_templates) {
+            SPDLOG_ERROR("Custom G-code error in {}: {}", name, error);
             failed_config_keys.emplace_back(name);
+        }
         throw Biz::Slicing::Exception{
             Biz::Slicing::Error{
                 Biz::Slicing::ErrorCode::PlaceholderParser,
@@ -1188,6 +1206,14 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
     // Let the start-up script prime the 1st printing tool.
     this->placeholder_parser().set("initial_tool", static_cast<int>(initial_extruder_id));
     this->placeholder_parser().set("initial_extruder", static_cast<int>(initial_extruder_id));
+    unsigned int initial_non_support = initial_extruder_id;
+    for (const auto tool : tool_ordering.all_extruders()) {
+        if (!print.config().get<std::vector<bool>>("filament_soluble").at(tool)) {
+            initial_non_support = tool;
+            break;
+        }
+    }
+    this->placeholder_parser().set("initial_no_support_extruder", static_cast<int>(initial_non_support));
     this->placeholder_parser().set("current_extruder", static_cast<int>(initial_extruder_id));
     //Set variable for total layer count so it can be used in custom gcode.
     this->placeholder_parser().set("total_layer_count", static_cast<int>(m_layer_count));
@@ -1222,6 +1248,10 @@ Domain::ExtraPrintStatistics GCodeGenerator::_do_export(
         this->placeholder_parser().set("first_layer_print_min",  std::vector<double>{ bbox.min.x(), bbox.min.y() });
         this->placeholder_parser().set("first_layer_print_max",  std::vector<double>{ bbox.max.x(), bbox.max.y() });
         this->placeholder_parser().set("first_layer_print_size", std::vector<double>{ BB::sizes(bbox).x(), BB::sizes(bbox).y() });
+        const auto islands_bounds = get_extents(print.first_layer_islands());
+        const auto islands_center = BB::center(islands_bounds);
+        this->placeholder_parser().set("first_layer_center_no_wipe_tower", std::vector<double>{unscale<double>(islands_center.x()), unscale<double>(islands_center.y())});
+        this->placeholder_parser().set("num_extruders", int(print.config().hw_config().material_slot_count()));
         // PlaceholderParser currently substitues non-existent vector values with the zero'th value, which is harmful in the case of "is_extruder_used[]"
         // as Slicer may lie about availability of such non-existent extruder.
         // We rather sacrifice 256B of memory before we change the behavior of the PlaceholderParser, which should really only fill in the non-existent
@@ -3259,16 +3289,23 @@ std::string GCodeGenerator::extrude_perimeters(
     for (const GCode::ExtrusionOrder::Perimeter &perimeter : perimeters) {
         double speed{-1};
         // Apply the small perimeter speed.
-        if (perimeter.extrusion_entity->length() <= SMALL_PERIMETER_LENGTH)
-            speed = region
-                        .extruder_config_value<Domain::FloatOrPercentage>(
-                            "small_perimeter_speed",
-                            FlowRole::frExternalPerimeter
-                        )
-                        .get_abs_value(region.extruder_config_value<double>(
-                            "perimeter_speed",
-                            FlowRole::frExternalPerimeter
-                        ));
+        const auto tool = m_writer.extruder()->id();
+        const bool orca = config.orca_perimeter_speed_compatibility.at(tool);
+        const double small_perimeter_threshold = orca
+            ? region.config().get<std::vector<double>>("small_perimeter_threshold").at(tool)
+            : region.extruder_config_value<double>("small_perimeter_threshold", FlowRole::frExternalPerimeter);
+        if (small_perimeter_threshold > 0
+            && (!orca || perimeter.extrusion_entity->is_loop())
+            && perimeter.extrusion_entity->length() <= (small_perimeter_threshold / SCALING_FACTOR) * 2 * PI)
+        {
+            const double reference = orca
+                ? config.external_perimeter_speed.at(tool).get_abs_value(config.perimeter_speed.at(tool))
+                : region.extruder_config_value<double>("perimeter_speed", FlowRole::frExternalPerimeter);
+            const auto requested = orca
+                ? region.config().get<std::vector<Domain::FloatOrPercentage>>("small_perimeter_speed").at(tool)
+                : region.extruder_config_value<Domain::FloatOrPercentage>("small_perimeter_speed", FlowRole::frExternalPerimeter);
+            speed = orca && requested.is_zero() ? reference * 0.5 : requested.get_abs_value(reference);
+        }
         gcode += this->extrude_smooth_path(
             perimeter.smooth_path,
             perimeter.extrusion_entity->is_loop(),
@@ -3549,6 +3586,9 @@ std::string GCodeGenerator::_extrude(
 
     using Domain::FloatOrPercentage;
     const auto perimeter_speed = config.perimeter_speed.at(extruder_id);
+    const bool orca_perimeter_speeds = config.orca_perimeter_speed_compatibility.at(extruder_id);
+    // Orca never applies the loop's small-perimeter speed to bridge wall paths.
+    if (orca_perimeter_speeds && path_attr.role.is_perimeter() && path_attr.role.is_bridge()) speed = -1;
     const auto infill_speed = config.infill_speed.at(extruder_id);
     const auto solid_infill_speed = config.solid_infill_speed
                                         .at(extruder_id)
@@ -3616,6 +3656,8 @@ std::string GCodeGenerator::_extrude(
             config.external_perimeter_speed
                 .at(extruder_id)
                 .get_abs_value(perimeter_speed);
+        if (orca_perimeter_speeds && !path_attr.role.is_external_perimeter())
+            external_perimeter_reference_speed = perimeter_speed;
         if (external_perimeter_reference_speed == 0) {
             external_perimeter_reference_speed = m_volumetric_speed.at(extruder_id) / path_attr.mm3_per_mm;
         }
@@ -3849,6 +3891,13 @@ bool GCodeGenerator::needs_retraction(
         return false;
     }
 
+    // Orca also protects departures from visible walls, even when the next
+    // extrusion is infill and the travel remains inside an internal region.
+    if (config.retract_before_perimeters
+        && (m_last_processor_extrusion_role == GCodeExtrusionRole::ExternalPerimeter
+            || m_last_processor_extrusion_role == GCodeExtrusionRole::OverhangPerimeter))
+        return true;
+
     if (role == ExtrusionRole::SupportMaterial)
         if (const SupportLayer *support_layer = dynamic_cast<const SupportLayer*>(m_layer);
             support_layer != nullptr && ! support_layer->support_islands_bboxes.empty()) {
@@ -3871,6 +3920,8 @@ bool GCodeGenerator::needs_retraction(
         }
 
     if (config.only_retract_when_crossing_perimeters
+        // Orca's reduction applies to infill travel, never travel to a wall.
+        && (!config.retract_before_perimeters || !role.is_perimeter())
         && m_layer != nullptr
         && config.fill_density.at(extruder_id)
             > Domain::Percentage{0}
@@ -4032,7 +4083,8 @@ std::string GCodeGenerator::retract_and_wipe(
 
     // wipe (if it's enabled for this extruder and we have a stored wipe path)
     if (m_wipe_enabled.at(m_writer.extruder()->id()) && m_wipe.has_path()) {
-        gcode += toolchange ? m_writer.retract_for_toolchange(true) : m_writer.retract(true);
+        if (!m_wipe.uses_orca_rules())
+            gcode += toolchange ? m_writer.retract_for_toolchange(true) : m_writer.retract(true);
         gcode += m_wipe.wipe(*this, retract_speed, travel_speed, toolchange);
     }
 
@@ -4051,6 +4103,11 @@ std::string GCodeGenerator::retract_and_wipe(
 
 std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_z, const Domain::ConfigView& config)
 {
+    const double toolchange_time = config.get<bool>("orca_toolchange_timing")
+        ? m_toolchange_timing.select(extruder_id, config.get<bool>("single_extruder_multi_material"),
+            config.get<double>("orca_filament_load_time"), config.get<double>("orca_filament_unload_time"),
+            config.get<double>("filament_change_time"))
+        : config.get<double>("filament_change_time");
     if (!m_writer.need_toolchange(extruder_id))
         return "";
 
@@ -4156,7 +4213,6 @@ std::string GCodeGenerator::set_extruder(unsigned int extruder_id, double print_
     }
 
     // Emit toolchange time annotation for CoolingBuffer.
-    const double toolchange_time = config.get<double>("filament_change_time");
     if (toolchange_time > 0.) {
         gcode += ";_TOOLCHANGE_TIME" + std::to_string(toolchange_time) + "\n";
     }

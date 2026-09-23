@@ -62,6 +62,7 @@ public:
     std::string toolchange_prefix() const;
     std::string toolchange(unsigned int extruder_id);
     std::string set_speed(double F, const std::string_view comment = {}, const std::string_view cooling_marker = {}) const;
+    double current_speed() const { return m_current_speed; }
 
     /**
      * @brief Return gcode to travel to the specified point.
@@ -105,6 +106,7 @@ public:
 
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
+    std::string retract_to_length(double length, bool toolchange);
     std::string unretract();
 
     // Current position of the printer, in G-code coordinates.
@@ -143,6 +145,7 @@ private:
     unsigned int    m_last_bed_temperature;
     bool            m_last_bed_temperature_reached;
     Domain::Vec3d   m_pos = Domain::Vec3d::Zero();
+    mutable double m_current_speed = 0.; // Last explicitly selected extrusion/wipe feedrate, mm/min.
 
     enum class Acceleration {
         Travel,

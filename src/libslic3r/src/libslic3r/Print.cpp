@@ -2092,15 +2092,19 @@ std::optional<WipeTowerData> Print::generate_wipe_tower_data()
                 const bool first_layer{&layer_tools == &m_tool_ordering.front()};
                 const unsigned last_extruder_id{m_tool_ordering.all_extruders().back()};
                 if (is_toolchange_required(first_layer, last_extruder_id, extruder_id, current_extruder_id)) {
-                    float volume_to_wipe = wipe_volumes[current_extruder_id][extruder_id];             // total volume to wipe after this toolchange
-                    // Not all of that can be used for infill purging:
-                    volume_to_wipe -= (float)m_config.get<std::vector<double>>("filament_minimal_purge_on_wipe_tower").at(extruder_id);
+                    const bool fixed_prime = m_config.get<bool>("orca_fixed_prime_volume");
+                    float volume_to_wipe = WipeTower::toolchange_wipe_volume(
+                        m_config, wipe_volumes, current_extruder_id, extruder_id);
+                    if (!fixed_prime) {
+                        // Not all of that can be used for infill purging:
+                        volume_to_wipe -= (float)m_config.get<std::vector<double>>("filament_minimal_purge_on_wipe_tower").at(extruder_id);
 
-                    // try to assign some infills/objects for the wiping:
-                    volume_to_wipe = layer_tools.wiping_extrusions_nonconst().mark_wiping_extrusions(*this, layer_tools, current_extruder_id, extruder_id, volume_to_wipe);
+                        // Try to assign infills/objects for matrix-based wiping.
+                        volume_to_wipe = layer_tools.wiping_extrusions_nonconst().mark_wiping_extrusions(*this, layer_tools, current_extruder_id, extruder_id, volume_to_wipe);
 
-                    // add back the minimal amount toforce on the wipe tower:
-                    volume_to_wipe += (float)m_config.get<std::vector<double>>("filament_minimal_purge_on_wipe_tower").at(extruder_id);
+                        // Add back the minimum reserved on the tower.
+                        volume_to_wipe += (float)m_config.get<std::vector<double>>("filament_minimal_purge_on_wipe_tower").at(extruder_id);
+                    }
 
                     // request a toolchange at the wipe tower with at least volume_to_wipe purging amount
                     wipe_tower.plan_toolchange((float)layer_tools.print_z, (float)layer_tools.wipe_tower_layer_height,
@@ -2124,6 +2128,8 @@ std::optional<WipeTowerData> Print::generate_wipe_tower_data()
 
     // Unload the current filament over the purge tower.
     double layer_height = m_objects.front()->config().get<double>("layer_height");
+    const bool skip_final_purge = m_tool_ordering.back().wipe_tower_partitions == 0
+        && (config().get<bool>("orca_fixed_prime_volume") || config().get<bool>("orca_matrix_flush"));
     if (m_tool_ordering.back().wipe_tower_partitions > 0) {
         // The wipe tower goes up to the last layer of the print.
         if (wipe_tower.layer_finished()) {
@@ -2138,8 +2144,11 @@ std::optional<WipeTowerData> Print::generate_wipe_tower_data()
         assert(m_tool_ordering.back().wipe_tower_partitions == 0);
         wipe_tower.set_layer(float(m_tool_ordering.back().print_z), float(layer_height));
     }
-    result.final_purge = std::make_unique<WipeTower::ToolChangeResult>(
-        wipe_tower.tool_change((unsigned int)(-1)));
+    // Imported type-2 towers that end below the print have no surface for
+    // the final ram at print height. Match the source's omitted final purge.
+    result.final_purge = skip_final_purge
+        ? std::make_unique<WipeTower::ToolChangeResult>()
+        : std::make_unique<WipeTower::ToolChangeResult>(wipe_tower.tool_change((unsigned int)(-1)));
 
     result.used_filament_until_layer = wipe_tower.get_used_filament_until_layer();
     result.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();

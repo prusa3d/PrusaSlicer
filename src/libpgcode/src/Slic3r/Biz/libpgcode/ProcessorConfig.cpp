@@ -143,6 +143,9 @@ void ProcessorConfig::reset()
     spiral_vase_enabled = false;
     sequential_print = false;
     single_extruder_multi_material = false;
+    orca_toolchange_timing = false;
+    orca_filament_load_time = 0.0f;
+    orca_filament_unload_time = 0.0f;
     z_offset = 0.0f;
     max_print_height = 0.0f;
     first_layer_height = 0.0f;

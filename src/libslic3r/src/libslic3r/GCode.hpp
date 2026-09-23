@@ -2,6 +2,7 @@
 #define slic3r_GCode_hpp_
 
 #include "Slic3r/Biz/libpgcode/Processor.hpp"
+#include "Slic3r/Biz/libpgcode/ToolChangeTiming.hpp"
 #include "libslic3r/GCode/ExtrusionOrder.hpp"
 #include "libslic3r/GCode/ExtrusionProcessor.hpp"
 #include "libslic3r/JumpPointSearch.hpp"
@@ -428,6 +429,7 @@ private:
     bool                                m_enable_extrusion_role_markers;
     // Keeps track of the last extrusion role passed to the processor
     Slic3r::Domain::GCodeExtrusionRole m_last_processor_extrusion_role;
+    Biz::libpgcode::ToolChangeTiming m_toolchange_timing;
     // How many times will change_layer() be called?
     // change_layer() will update the progress bar.
     unsigned int                        m_layer_count;

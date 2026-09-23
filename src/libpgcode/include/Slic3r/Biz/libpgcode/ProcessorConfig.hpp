@@ -85,6 +85,9 @@ struct ProcessorConfig
     bool spiral_vase_enabled{ false };
     bool sequential_print{ false };
     bool do_M104_backtrace{ false };
+    bool tool_preheating_m104{ false };
+    float preheat_time{ 120.0f };
+    unsigned int preheat_steps{ 10 };
     bool single_extruder_multi_material{ false };
     float z_offset{ 0.0f };
     float max_print_height{ 0.0f };
@@ -93,6 +96,9 @@ struct ProcessorConfig
     float extra_loading_move{ 0.0f };
     float kisslicer_toolchange_time_correction{ 0.0f };
     float filament_change_time{ 0.0f };
+    bool orca_toolchange_timing{ false };
+    float orca_filament_load_time{ 0.0f };
+    float orca_filament_unload_time{ 0.0f };
     std::string color_change_gcode;
     std::string pause_print_gcode;
     std::string template_custom_gcode;

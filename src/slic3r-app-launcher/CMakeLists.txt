@@ -16,6 +16,12 @@ if (MSVC AND SLIC3R_RELEASE_DEBUG_SYMBOLS)
     target_link_options(slic3r-app-launcher PRIVATE "$<$<CONFIG:RELEASE>:/DEBUG>")
 endif()
 
+if (MSVC)
+    # Do not reuse incremental LTCG code across processor/configuration layout changes.
+    # Keep optimization enabled, but make the application's Release link self-contained.
+    target_link_options(slic3r-app-launcher PRIVATE "$<$<CONFIG:Release>:/LTCG>")
+endif()
+
 find_package(CLI11 CONFIG REQUIRED)
 
 target_include_directories(slic3r-app-launcher PRIVATE src)
@@ -71,6 +77,7 @@ if (MSVC)
 endif ()
 
 slic3r_link_resources(slic3r-app-launcher ${SLIC3R_RESOURCES_DIR})
+add_dependencies(slic3r-app-launcher orca_profiles)
 slic3r_app_extract_symbols(slic3r-app-launcher)
 
 if (WIN32)

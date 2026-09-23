@@ -29,3 +29,6 @@ CMakeUserPresets.json
 .aider*
 /src/slic3r-shared/imgui.ini
 /cmake-build-*/
+# Local task and handoff notes do not belong on this feature branch.
+/[Tt][Oo][Dd][Oo].[Mm][Dd]
+/[Rr][Ee][Ss][Uu][Mm][Ee].[Mm][Dd]

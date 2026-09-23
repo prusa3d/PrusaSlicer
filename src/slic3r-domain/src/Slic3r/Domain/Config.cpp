@@ -813,6 +813,15 @@ static void resolve_float_or_percentages(
             [&](std::vector<FloatOrPercentage>& value)
             {
                 for (std::size_t tool_index{}; tool_index < value.size(); ++tool_index) {
+                    // Orca resolves these percentages at extrusion time: the
+                    // reference depends on wall role and its volumetric cap.
+                    // Resolving them here against PS3's fixed ratio_over would
+                    // irreversibly lose that information (50% of 300 vs 200).
+                    if (key == "small_perimeter_speed" || key.starts_with("overhang_speed_")) {
+                        const auto mode = values.find("orca_perimeter_speed_compatibility");
+                        if (mode != values.end() && mode->second.holds_alternative<std::vector<bool>>()
+                            && mode->second.get<std::vector<bool>>().at(tool_index)) continue;
+                    }
                     value[tool_index] = resolve_float_or_percentage_for_tool(
                         key,
                         ConfigValue{value},

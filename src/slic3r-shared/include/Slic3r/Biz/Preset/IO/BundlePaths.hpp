@@ -1,5 +1,7 @@
 #pragma once
 #include <string>
+#include <map>
+#include <set>
 #include <boost/filesystem/path.hpp>
 
 namespace Slic3r::Biz::Preset::IO {
@@ -20,6 +22,9 @@ struct BundlePaths
     std::string local_bundle_path;
 
     bool populate_local_bundle = false;
+
+    // Only these Orca printers need slicing presets; the rest remain catalog entries.
+    std::map<std::string, std::set<std::string>> orca_selected_printers;
 
     /**
      * @brief Path to a user saved presets

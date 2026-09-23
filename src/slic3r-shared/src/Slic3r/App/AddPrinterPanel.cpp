@@ -236,28 +236,19 @@ void AddPrinterPanel::reload_vendor_buttons(const Domain::Preset::Bundle& preset
         return;
     }
 
-    const bool selection_valid{
-        m_selected_vendor.has_value() && vendor_bundles.contains(*m_selected_vendor)};
-    if (!selection_valid) {
-        m_selected_vendor.reset();
-        for (const auto& [vendor_id, vendor_bundle] : vendor_bundles) {
-            if (!vendor_bundle.printer_configs.empty()) {
-                m_selected_vendor = vendor_id;
-                break;
-            }
-        }
-        if (!m_selected_vendor.has_value()) {
-            m_selected_vendor = vendor_bundles.begin()->first;
-        }
+    // An empty vendor ID selects all vendors, including cross-vendor search.
+    if (!m_selected_vendor || (!m_selected_vendor->empty() && !vendor_bundles.contains(*m_selected_vendor))) {
+        m_selected_vendor = std::string{};
     }
 
     LayoutButton* selected_button{nullptr};
     std::vector<LayoutButton*> unselected_buttons;
-    for (const auto& [vendor_id, vendor_bundle] : vendor_bundles) {
-        auto button{m_left_bar->emplace_back<LayoutButton>(vendor_bundle.vendor_data.info.name)};
+    const auto add_vendor_button = [&](const std::string& vendor_id, const std::string& name) {
+        auto button{m_left_bar->emplace_back<LayoutButton>(name)};
         button->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
         button->set_rounding(0);
         button->set_checkable(true);
+        button->set_flex_shrink(0);
         button->set_content_justify_content(YGJustifyFlexStart);
         m_button_vendors.emplace(button, vendor_id);
 
@@ -266,6 +257,10 @@ void AddPrinterPanel::reload_vendor_buttons(const Domain::Preset::Bundle& preset
         } else {
             unselected_buttons.push_back(button);
         }
+    };
+    add_vendor_button({}, Biz::_u8L("All vendors"));
+    for (const auto& [vendor_id, vendor_bundle] : vendor_bundles) {
+        add_vendor_button(vendor_id, vendor_bundle.vendor_data.info.name);
     }
 
     if (selected_button != nullptr) {
@@ -280,21 +275,25 @@ void AddPrinterPanel::reload_vendor_buttons(const Domain::Preset::Bundle& preset
 void AddPrinterPanel::rebuild_printer_families()
 {
     m_printer_families.clear();
-    m_vendor_name.clear();
 
     const Domain::Preset::Bundle& preset_bundle{m_project_interactor.workbench().preset_bundle()};
     if (!m_selected_vendor.has_value()) {
         return;
     }
 
-    const auto vendor_it{preset_bundle.vendor_bundles.find(*m_selected_vendor)};
-    if (vendor_it == preset_bundle.vendor_bundles.end()) {
-        return;
+    for (const auto& [vendor_id, vendor_bundle] : preset_bundle.vendor_bundles) {
+        if (m_selected_vendor->empty() || *m_selected_vendor == vendor_id) {
+            append_vendor_printer_families(preset_bundle, vendor_bundle);
+        }
     }
+}
 
-    const Domain::Preset::VendorBundle& vendor_bundle{vendor_it->second};
-    m_vendor_name = vendor_bundle.vendor_data.info.name;
-
+void AddPrinterPanel::append_vendor_printer_families(
+    const Domain::Preset::Bundle& preset_bundle,
+    const Domain::Preset::VendorBundle& vendor_bundle
+)
+{
+    std::vector<PrinterFamily> families;
     for (const Domain::Preset::HwPrinterConfig& config : vendor_bundle.printer_configs) {
         const auto evaluated_it{preset_bundle.evaluated_presets.find(config.id)};
         if (evaluated_it == preset_bundle.evaluated_presets.end()) {
@@ -317,12 +316,13 @@ void AddPrinterPanel::rebuild_printer_families()
             };
 
             const auto family_it{
-                std::ranges::find_if(m_printer_families,
+                std::ranges::find_if(families,
                                      [&](const PrinterFamily& family)
                                      { return family.base_model == config.model.base_model; })};
 
-            if (family_it == m_printer_families.end()) {
-                m_printer_families.push_back(PrinterFamily{
+            if (family_it == families.end()) {
+                families.push_back(PrinterFamily{
+                    .vendor_name = vendor_bundle.vendor_data.info.name,
                     .base_model = config.model.base_model,
                     .printers   = {entry}
                 });
@@ -334,20 +334,17 @@ void AddPrinterPanel::rebuild_printer_families()
 
     const std::vector<Domain::Preset::PrinterFamilyInfo>& order{
         vendor_bundle.vendor_data.info.printer_families};
-    if (order.empty()) {
-        return;
-    }
 
     std::vector<PrinterFamily> ordered_families;
-    std::vector<bool> family_used(m_printer_families.size(), false);
+    std::vector<bool> family_used(families.size(), false);
     for (const Domain::Preset::PrinterFamilyInfo& order_entry : order) {
-        for (size_t fi{}; fi < m_printer_families.size(); ++fi) {
-            if (family_used[fi] || m_printer_families[fi].base_model != order_entry.base_model) {
+        for (size_t fi{}; fi < families.size(); ++fi) {
+            if (family_used[fi] || families[fi].base_model != order_entry.base_model) {
                 continue;
             }
 
             family_used[fi] = true;
-            PrinterFamily& family{m_printer_families[fi]};
+            PrinterFamily& family{families[fi]};
 
             std::vector<PrinterEntry> ordered_printers;
             std::vector<bool> printer_used(family.printers.size(), false);
@@ -371,12 +368,14 @@ void AddPrinterPanel::rebuild_printer_families()
             ordered_families.push_back(std::move(family));
         }
     }
-    for (size_t fi{}; fi < m_printer_families.size(); ++fi) {
+    for (size_t fi{}; fi < families.size(); ++fi) {
         if (!family_used[fi]) {
-            ordered_families.push_back(std::move(m_printer_families[fi]));
+            ordered_families.push_back(std::move(families[fi]));
         }
     }
-    m_printer_families = std::move(ordered_families);
+    for (PrinterFamily& family : ordered_families) {
+        m_printer_families.push_back(std::move(family));
+    }
 }
 
 void AddPrinterPanel::rebuild_printer_view()
@@ -389,7 +388,7 @@ void AddPrinterPanel::rebuild_printer_view()
     for (const PrinterFamily& family : m_printer_families) {
         std::vector<const PrinterEntry*> matched_printers;
         for (const PrinterEntry& entry : family.printers) {
-            if (matches_search(entry, m_vendor_name, m_search_text)) {
+            if (matches_search(entry, family.vendor_name, m_search_text)) {
                 matched_printers.push_back(&entry);
             }
         }
