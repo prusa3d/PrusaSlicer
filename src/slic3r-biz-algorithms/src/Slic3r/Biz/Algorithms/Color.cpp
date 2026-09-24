@@ -209,7 +209,13 @@ Domain::ColorRGB opposite(const Domain::ColorRGB& a, const Domain::ColorRGB& b)
 
 bool can_decode_color(std::string_view color)
 {
-    return color.size() == 7 && color.front() == '#';
+    auto is_valid_hex_char = [](char ch)
+    {
+        return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F');
+    };
+    return color.size() == 7
+        && color.front() == '#'
+        && std::ranges::all_of(color.begin() + 1, color.end(), is_valid_hex_char);
 }
 
 static int hex_digit_to_int(const char c) {
@@ -249,7 +255,7 @@ bool decode_color(std::string_view color_in, Domain::ColorRGBA& color_out)
     if (color_in.length() == 9) {
         // the alpha is encoded there
         const int digit1 = hex_digit_to_int(color_in.at(7));
-        const int digit2 = hex_digit_to_int(color_in.at(7));
+        const int digit2 = hex_digit_to_int(color_in.at(8));
         if (digit1 != -1 && digit2 != -1) {
             a = float(digit1 * 16 + digit2) * INV_255;
         }

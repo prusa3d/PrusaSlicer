@@ -56,6 +56,8 @@ struct Index
 {
     std::vector<BrandIndex> brands;
     std::vector<MaterialIndex> materials;
+
+    void clear();
 };
 
 } // namespace Slic3r::Domain::MatDb

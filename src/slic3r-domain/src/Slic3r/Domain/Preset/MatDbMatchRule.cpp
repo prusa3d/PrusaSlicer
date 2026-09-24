@@ -20,13 +20,6 @@ void count(size_t& rank, const T& v) {
     }
 };
 
-template <typename T, typename ... ArgsT>
-void count(size_t& rank, const T& val, const ArgsT &... args)
-{
-    count(rank, val);
-    count(rank, std::move(args)...);
-}
-
 bool match_eq(const std::string& a, const OptString& b)
 {
     return b.has_value() && a == b.value();

@@ -4,10 +4,9 @@
 #include <boost/algorithm/string/find.hpp>
 #include <nlohmann/json.hpp>
 
+#include "Slic3r/Log.hpp"
 #include "Slic3r/Biz/MatDb/MatDbClient.hpp"
 #include "Slic3r/Biz/Algorithms/Color.hpp"
-
-#include <spdlog/spdlog.h>
 
 namespace nlohmann {
 
@@ -174,7 +173,12 @@ bool MatDbClient::open(const std::string& path)
         SPDLOG_ERROR("Cannot open {}", path);
         return false;
     }
-    return load_index();
+    bool success = load_index();
+    if (!success) {
+        m_index.clear();
+        m_content = nullptr;
+    }
+    return success;
 }
 
 SearchResult MatDbClient::query_by_name(const std::string& search_what, size_t count, size_t offset)

@@ -32,7 +32,7 @@ Domain::Preset::MatDbMatchRule make_match_rule(const Domain::Preset::FeatureValu
                 const auto* arr = std::get_if<Domain::JsonArray>(&it->second);
                 if (arr != nullptr) {
                     T parsed_val;
-                    parsed_val.resize(arr->size());
+                    parsed_val.reserve(arr->size());
                     for (const auto& v : *arr) {
                         const typename T::value_type* parsed_el = std::get_if<typename T::value_type>(&v);
                         if (parsed_el == nullptr) {
@@ -70,7 +70,7 @@ Domain::Preset::MatDbMatchRule make_match_rule(const Domain::Preset::FeatureValu
     try_append(tags, "$.tags");
     for (const auto& tag: tags) {
         (is_required_tag(tag) ? rule.required_tags : rule.optional_tags).push_back(tag);
-    }
+   }
     return rule;
 }
 
