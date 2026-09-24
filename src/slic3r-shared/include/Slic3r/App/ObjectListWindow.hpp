@@ -29,7 +29,6 @@ class ScrollArea;
 } // namespace Yoga
 
 class ObjectList;
-class Navigator;
 
 class ObjectListWindow : public Yoga::CollapsibleWindow
 {
@@ -52,8 +51,14 @@ private:
 
     Yoga::Rectangle* m_sliced_info{nullptr};
 
-    Yoga::Text* m_used_material_label{nullptr};
-    Yoga::Text* m_used_material{nullptr};
+    Yoga::Text* m_used_material_total{nullptr};
+    Yoga::Item* m_used_material_for_objects_row{nullptr};
+    Yoga::Text* m_used_material_for_objects{nullptr};
+    Yoga::Item* m_used_material_for_wipe_tower_row{nullptr};
+    Yoga::Text* m_used_material_for_wipe_tower{nullptr};
+    Yoga::Item* m_used_material_for_flush_row{nullptr};
+    Yoga::Text* m_used_material_for_flush{nullptr};
+
     Yoga::Text* m_material_cost{nullptr};
     Yoga::Text* m_first_layer_time{nullptr};
     Yoga::Text* m_estimated_time{nullptr};
