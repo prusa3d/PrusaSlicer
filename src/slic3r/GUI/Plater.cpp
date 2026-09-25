@@ -3583,7 +3583,8 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
                        "generated tool path that replaces this placeholder when the G-code is written, "
                        "so the preview shown here is NOT what prints.\n\n"
                        "Export the G-code, then open the exported file in the G-code viewer to see the "
-                       "actual pattern (anchor bars, the per-PA lines, ticks and value labels)."),
+                       "actual pattern (anchor bars, the per-PA lines, ticks, and the PA value labels "
+                       "or line stubs)."),
                     _L("Pressure Advance Line test — export to view the real pattern"),
                     wxOK | wxICON_INFORMATION);
                 dlg.ShowCheckBox(_L("Don't show this again"));

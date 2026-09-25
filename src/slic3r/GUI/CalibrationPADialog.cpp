@@ -111,6 +111,19 @@ CalibrationPADialog::CalibrationPADialog(wxWindow* parent)
     m_brim->SetValue(false);
     sizer->Add(m_brim, 0, wxLEFT | wxRIGHT | wxBOTTOM, 15);
 
+    // Line style only. The 7-segment digits print as small loose pieces beside the
+    // (one-piece) frame; unticked, short stubs welded to the right bar mark every Nth
+    // line instead, and the test gets narrower.
+    m_labels = new wxCheckBox(this, wxID_ANY, _L("Print PA value labels"));
+    m_labels->SetValue(true);
+    m_labels->SetToolTip(_L("Line style only. The digits print as small separate pieces. "
+                            "Untick to mark every few lines with a short stub past the right "
+                            "bar instead (count lines from the front: PA = start PA + n x step)."));
+    sizer->Add(m_labels, 0, wxLEFT | wxRIGHT | wxBOTTOM, 15);
+    auto sync_labels = [this]() { m_labels->Enable(m_mode->GetSelection() == 1); };
+    m_mode->Bind(wxEVT_CHOICE, [sync_labels](wxCommandEvent& e) { sync_labels(); e.Skip(); });
+    sync_labels();
+
     // OK / Cancel
     auto* btns = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
     sizer->Add(btns, 0, wxEXPAND | wxALL, 10);
@@ -332,18 +345,21 @@ bool CalibrationPADialog::generate_tower()
     // preset tab will both show the ⟲ revert affordance), but a banner
     // makes it obvious what was changed and why.
     if (auto* nm = wxGetApp().notification_manager()) {
-        char buf[256];
-        std::snprintf(buf, sizeof(buf),
-            "PA calibration applied temporary overrides:\n"
-            "  Print preset — perimeter / infill / gap-fill speeds → %.0f mm/s\n"
-            "  Filament preset — cooling slowdown disabled, min_print_speed → %.0f mm/s\n"
-            "Revert via the ⟲ buttons on the Print and Filament preset tabs "
-            "before slicing other models.",
-            test_speed, test_speed);
+        // Built as a std::string: the text is longer than any sensible fixed buffer (a
+        // 256-byte snprintf always truncated it, sometimes mid UTF-8 sequence).
+        char speed[32];
+        std::snprintf(speed, sizeof(speed), "%.0f", test_speed);
+        const std::string text =
+            std::string("PA calibration applied temporary overrides:\n"
+                        "  Print preset — perimeter / infill / gap-fill speeds → ") +
+            speed + " mm/s\n  Filament preset — cooling slowdown disabled, min_print_speed → " +
+            speed + " mm/s\nBefore slicing other models, revert them: re-select the Print and "
+                    "Filament presets and choose Discard (the ⟲ buttons only reset the page "
+                    "you are on).";
         nm->push_notification(
             NotificationType::CustomNotification,
             NotificationManager::NotificationLevel::WarningNotificationLevel,
-            buf);
+            text);
     }
 
     apply_calibration_filename_prefix("PressureAdvance");
@@ -356,10 +372,13 @@ bool CalibrationPADialog::generate_tower()
 // ---------------------------------------------------------------------------
 // The line method is a DELIBERATE toolpath, not a sliceable shape: an anchor
 // frame (left + right bars) plus one constant-Y pass per PA value, each printed
-// slow→fast→slow with the firmware PA command set just before it, all welded
-// into one peelable piece (lift the whole test off the plate by a bar). We build
-// that toolpath here and splice it over a sliced placeholder's body via
-// CalibrationPALinePostProcessor.
+// slow→fast→slow with the firmware PA command set just before it. The lines cross
+// both bars, so frame + lines are one peelable piece (lift it by a bar). The two
+// reference ticks above the frame and the 7-segment PA labels right of it are NOT
+// joined to it: they print as small separate pieces. With labels off (m_labels), a
+// short stub continuing every Nth line past the right bar replaces them, welded to
+// the frame. We build that toolpath here and splice it over a sliced placeholder's
+// body via CalibrationPALinePostProcessor.
 bool CalibrationPADialog::generate_line_pattern()
 {
     const double start_pa = m_start_pa->GetValue();
@@ -488,32 +507,103 @@ bool CalibrationPADialog::generate_line_pattern()
         return false;
     }
 
-    // --- Pattern geometry, centred on the bed ---
+    // --- Pattern geometry ---
     const double slow_len = 25.0, fast_len = 100.0, end_len = 25.0;
     const double line_len = slow_len + fast_len + end_len;   // 150 mm
     const double spacing  = 4.0;
     const double bead     = std::max(0.6, nozzle_d);
+    const double bar_ext  = 2.0;                               // bars run past the outer lines
     const double tick_len = 8.0, tick_gap = 3.0;
+    const double col_h    = (num_lines - 1) * spacing;
 
-    const BoundingBoxf bed   = plater->build_volume().bounding_volume2d();
-    const Vec2d        bed_c = bed.center();
-    const double col_h  = (num_lines - 1) * spacing;
-    const double need_x = line_len + bead + 4.0 + 26.0;   // +26 for the right-hand number labels
-    const double need_y = col_h + 4.0 + tick_gap + tick_len + 4.0;
-    if (need_x > bed.size().x() - 10.0 || need_y > bed.size().y() - 10.0) {
+    // --- Right-hand annotations: PA value labels, or short stubs when labels are off ---
+    // Digits are 7-segment strokes of single ~nozzle-width beads, so they need to be
+    // large enough that the segments and the gaps between them resolve at this nozzle
+    // size (3 x 6 mm reads cleanly on a 0.4–0.6 nozzle).
+    const bool   print_labels = m_labels == nullptr || m_labels->GetValue();
+    const double cw = 3.0, cht = 6.0, csp = cw + 1.0, dotw = cw * 0.45 + 0.5;
+    const double label_gap       = 2.0;         // clear gap between the right bar and a label
+    const double min_label_pitch = cht + 2.0;   // glyph height + a gap
+    const double stub_len        = 5.0;         // labels off: line extension past the bar
+    auto fmt3 = [](double v){ std::ostringstream s; s.imbue(std::locale::classic()); s<<std::fixed<<std::setprecision(3)<<v; return s.str(); };
+    auto advance = [&](char ch) { return ch == '.' ? dotw : csp; };
+    // Label about every 0.01, but never closer than min_label_pitch, so the taller
+    // digits don't collide with the next label.
+    const int label_every = std::max({ 1, (int) std::lround(0.01 / step),
+                                       (int) std::ceil(min_label_pitch / spacing) });
+    // Labelled rows: every label_every-th line from the front, plus the last line so
+    // the end of the sweep is named. If the last line is closer than min_label_pitch
+    // to the previous labelled row, their labels would overlap, so that row gives way,
+    // unless it is row 0 (the start PA, e.g. a 2-line sweep): then the last line
+    // goes unlabelled instead.
+    std::vector<int> label_rows;
+    for (int i = 0; i < num_lines; i += label_every)
+        label_rows.push_back(i);
+    if (const int last = num_lines - 1; label_rows.back() != last) {
+        if ((last - label_rows.back()) * spacing >= min_label_pitch - 1e-9)
+            label_rows.push_back(last);
+        else if (label_rows.back() != 0)
+            label_rows.back() = last;
+    }
+
+    // --- Footprint, centred on the bed ---
+    // The extent actually printed, relative to the front line's start (xL, y0): the
+    // left bar's outer pass, the rightmost label (or stub), the lowest label (row 0's
+    // label is centred on the front line, so it reaches below the bars) and the tick
+    // tops, each widened by half a deposited bead (e_rate's nozzle_d x lh section with
+    // rounded sides). The whole footprint, not just the lines, is centred on the bed
+    // and must sit inside the bed inset by `margin`.
+    const double half_bead = 0.5 * (nozzle_d + lh * (1.0 - M_PI / 4.0));
+    double fp_x1 = print_labels ? line_len : line_len + stub_len;
+    double fp_y0 = -bar_ext;
+    double fp_y1 = col_h + bar_ext + tick_gap + tick_len;
+    if (print_labels) {
+        for (int i : label_rows) {
+            const std::string txt   = fmt3(start_pa + i * step);
+            double            width = cw;   // the last character is a digit ("%.3f")
+            for (size_t k = 0; k + 1 < txt.size(); ++k)
+                width += advance(txt[k]);
+            fp_x1 = std::max(fp_x1, line_len + label_gap + width);
+            fp_y0 = std::min(fp_y0, i * spacing - cht / 2.0);
+            fp_y1 = std::max(fp_y1, i * spacing + cht / 2.0);
+        }
+    }
+    const double fp_x0 = -half_bead;
+    fp_x1 += half_bead;
+    fp_y0 -= half_bead;
+    fp_y1 += half_bead;
+
+    const BoundingBoxf bed    = plater->build_volume().bounding_volume2d();
+    const Vec2d        bed_c  = bed.center();
+    const double       margin = 5.0;
+    const double xL  = bed_c.x() - (fp_x0 + fp_x1) / 2.0;
+    const double y0  = bed_c.y() - (fp_y0 + fp_y1) / 2.0;   // start-PA line at the front
+    if (xL + fp_x0 < bed.min.x() + margin - 1e-6 || xL + fp_x1 > bed.max.x() - margin + 1e-6) {
+        // The width is fixed by the line lengths and the right-hand annotations; the
+        // PA range and step only change the depth, so they cannot help here.
+        wxString msg = wxString::Format(
+            _L("The bed is too narrow for the PA line test: it needs %.1f mm, but the bed "
+               "leaves %.1f mm (with a %.0f mm margin on each side)."),
+            fp_x1 - fp_x0, bed.size().x() - 2.0 * margin, margin);
+        msg += "\n\n";
+        msg += print_labels ? _L("Untick \"Print PA value labels\" to make the test narrower, "
+                                 "or use the Chevron tower style.")
+                            : _L("Use the Chevron tower style on this printer.");
+        wxMessageBox(msg, _L("Error"), wxOK | wxICON_ERROR, this);
+        return false;
+    }
+    if (y0 + fp_y0 < bed.min.y() + margin - 1e-6 || y0 + fp_y1 > bed.max.y() - margin + 1e-6) {
         wxMessageBox(wxString::Format(
             _L("This PA sweep (%d lines) does not fit on the bed. Use a larger PA "
                "step (fewer lines) or a narrower PA range."), num_lines),
             _L("Error"), wxOK | wxICON_ERROR, this);
         return false;
     }
-    const double xL  = bed_c.x() - line_len / 2.0;
     const double xR  = xL + line_len;
     const double xB1 = xL + slow_len;             // slow→fast boundary (tick)
     const double xB2 = xL + slow_len + fast_len;  // fast→slow boundary (tick)
-    const double y0  = bed_c.y() - col_h / 2.0;   // start-PA line at the front
-    const double bar_yB = y0 - 2.0;
-    const double bar_yT = y0 + col_h + 2.0;
+    const double bar_yB = y0 - bar_ext;
+    const double bar_yT = y0 + col_h + bar_ext;
     const double tick_yB = bar_yT + tick_gap;
     const double tick_yT = tick_yB + tick_len;
 
@@ -565,7 +655,6 @@ bool CalibrationPADialog::generate_line_pattern()
     // --- Number-label glyphs (drawn as strokes in the clear area right of the
     // pattern). A flat travel (no Z-hop) is fine there since nothing is in the
     // way; one Z-hop carries the nozzle over the pattern into the label column. ---
-    auto fmt3 = [](double v){ std::ostringstream s; s.imbue(std::locale::classic()); s<<std::fixed<<std::setprecision(3)<<v; return s.str(); };
     auto travel_flat = [&](double x, double y){
         tp << "G1 X" << fc(x) << " Y" << fc(y) << " F" << travF << " ; travel\n";
     };
@@ -626,6 +715,9 @@ bool CalibrationPADialog::generate_line_pattern()
         accel(500, 500);
         do_retract();
     }
+    // Back to PA 0 before anything else prints: the ticks and labels are not measured,
+    // and would otherwise print at the sweep's highest PA (up to 2.0 on a Bowden range).
+    tp << pa_cmd(0.0) << " ; reset Pressure Advance\n";
 
     tp << ";\n; reference ticks at the slow/fast boundaries\n;\n";
     for (double xt : { xB1, xB2 }) {
@@ -635,35 +727,39 @@ bool CalibrationPADialog::generate_line_pattern()
         do_retract();
     }
 
-    // --- PA value labels, right of the right bar (~every 0.01, plus the last) ---
-    tp << ";\n; PA value labels\n;\n";
-    {
-        // Digits are 7-segment strokes of single ~nozzle-width beads, so they need
-        // to be large enough that the segments and the gaps between them resolve at
-        // this nozzle size (3 x 6 mm reads cleanly on a 0.4–0.6 nozzle).
-        const double cw = 3.0, cht = 6.0, csp = cw + 1.0, dotw = cw * 0.45 + 0.5;
-        // Label about every 0.01, but never closer than the glyph height + a gap,
-        // so the taller digits don't collide with the next label.
-        const int    label_every = std::max({ 1, (int) std::lround(0.01 / step),
-                                              (int) std::ceil((cht + 2.0) / spacing) });
-        const double lx0 = xR + 3.0;
+    if (print_labels) {
+        // --- PA value labels, right of the right bar (label_rows, see above) ---
+        // Each glyph segment is its own stroke, so the labels are loose pieces.
+        tp << ";\n; PA value labels\n;\n";
+        const double lx0 = xR + label_gap;
         // One Z-hop carries the nozzle over the pattern into the clear label column.
         tp << "G1 Z" << fz(zhi) << " F720 ; lift\n";
         tp << "G1 X" << fc(lx0) << " Y" << fc(y0) << " F" << travF << " ; to labels\n";
         tp << "G1 Z" << fz(lh + z_offset) << " F720 ; lower\n";
-        for (int i = 0; i < num_lines; ++i) {
-            if (i % label_every != 0 && i != num_lines - 1)
-                continue;
+        for (int i : label_rows) {
             const double pa = start_pa + i * step;
             const double oy = (y0 + i * spacing) - cht / 2.0;
             double lx = lx0;
             for (char ch : fmt3(pa)) {
                 glyph(ch, lx, oy, cw, cht);
-                lx += (ch == '.') ? dotw : csp;
+                lx += advance(ch);
             }
         }
+    } else {
+        // --- Labels off: a short stub continues every label_every-th line, counting
+        // from the front one, past the right bar as a major tick for counting lines.
+        // It starts on the bar's outer pass, so it is welded to the frame. Unlike the
+        // labels, the last line gets no extra stub: the back line needs no marker, and
+        // an extra one would break the every-Nth rhythm.
+        tp << ";\n; line stubs (every " << label_every << " lines from the front)\n;\n";
+        for (int i = 0; i < num_lines; i += label_every) {
+            const double y = y0 + i * spacing;
+            travel(xR, y);
+            unretract();
+            seg(xR + stub_len, y, stub_len, slowF);
+            do_retract();
+        }
     }
-    tp << pa_cmd(0.0) << " ; reset Pressure Advance\n";
 
     // --- Write the toolpath body to a unique temp file ---
     // Unique per run so a stale body from an earlier run (or another PrusaSlicer
@@ -795,16 +891,31 @@ bool CalibrationPADialog::generate_line_pattern()
     }
     plater->changed_objects(loaded);
     plater->set_pa_line_export_reminder(true);   // remind, after slicing, that the preview is a placeholder
-    BOOST_LOG_TRIVIAL(info) << "PA line calibration: " << num_lines << " lines, toolpath " << body_path.string();
+    BOOST_LOG_TRIVIAL(info) << "PA line calibration: " << num_lines << " lines, labels "
+                            << (print_labels ? "on" : "off") << ", footprint "
+                            << (fp_x1 - fp_x0) << " x " << (fp_y1 - fp_y0) << " mm, toolpath "
+                            << body_path.string();
 
     if (auto* nm = wxGetApp().notification_manager()) {
-        nm->push_notification(NotificationType::CustomNotification,
-            NotificationManager::NotificationLevel::WarningNotificationLevel,
+        std::string text =
             "PA line (K-factor) test: a generated toolpath replaces the placeholder when you "
-            "slice. Lines run front = start PA -> back = end PA, welded to side anchor bars "
-            "(peel the whole test off by a bar). The on-screen preview shows the placeholder; "
-            "EXPORT the G-code to see the real pattern. These overrides are temporary - revert "
-            "via the revert buttons on the Print AND Printer tabs before slicing other models.");
+            "slice. Lines run front = start PA -> back = end PA, one PA step apart. ";
+        if (print_labels)
+            text += "The lines and side anchor bars print as one piece (peel it off by a bar); "
+                    "the PA value labels and the two reference ticks print as small separate "
+                    "pieces. ";
+        else
+            text += "A short stub past the right bar marks the front line and then every " +
+                    std::to_string(label_every) +
+                    " lines (count from the front: PA = start PA + n x step). The lines, bars "
+                    "and stubs print as one piece (peel it off by a bar); the two reference "
+                    "ticks are separate. ";
+        text += "The on-screen preview shows the placeholder; EXPORT the G-code to see the real "
+                "pattern. These overrides are temporary - before slicing other models, re-select "
+                "the Print AND Printer presets and choose Discard (the revert buttons only "
+                "reset the page you are on).";
+        nm->push_notification(NotificationType::CustomNotification,
+            NotificationManager::NotificationLevel::WarningNotificationLevel, text);
     }
     apply_calibration_filename_prefix("PressureAdvance");
     return true;

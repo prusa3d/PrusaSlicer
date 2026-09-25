@@ -10,14 +10,16 @@
 namespace Slic3r {
 
 // In-process post-processor for the *Line* (garethky / K-factor) Pressure
-// Advance test. Unlike the Pattern test (a sliced zigzag), the line method is a
+// Advance test. Unlike the Chevron tower (a sliced shape), the line method is a
 // DELIBERATE TOOLPATH — one anchor frame plus one constant-Y pass per PA value,
-// each printed slow→fast→slow with the firmware PA command set just before it,
-// all welded into a single peelable piece. PrusaSlicer's slicer cannot produce
-// that, so the dialog generates the toolpath itself and this post-processor
-// splices it in: it keeps the sliced placeholder's header/start G-code and end
-// G-code, and REPLACES the placeholder's body (between the first post-marker
-// "; printing object" / "; stop printing object" pair) with the generated body.
+// each printed slow→fast→slow with the firmware PA command set just before it
+// (frame + lines weld into one peelable piece), followed by reference ticks and
+// optional PA value labels, which print as separate small pieces. PrusaSlicer's
+// slicer cannot produce that, so the dialog generates the toolpath itself and
+// this post-processor splices it in: it keeps the sliced placeholder's
+// header/start G-code and end G-code, and REPLACES the placeholder's body
+// (between the first post-marker "; printing object" / "; stop printing object"
+// pair) with the generated body.
 //
 // Runs only on a G-code carrying the job-scoped calibration marker
 // (calibration_pa_marker); a pass-through no-op otherwise. The dialog forces
