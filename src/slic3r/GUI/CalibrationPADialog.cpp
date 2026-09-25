@@ -194,13 +194,6 @@ bool CalibrationPADialog::generate_tower()
     // Total layers = levels × layers_per_level
     int total_layers = num_levels * PA_LAYERS_PER_LEVEL;
 
-    // Format PA values for G-code comments
-    auto fmt = [](double v) -> std::string {
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%.4f", v);
-        return buf;
-    };
-
     BOOST_LOG_TRIVIAL(info) << "Generating PA pattern: start=" << start_pa
                             << " end=" << end_pa << " step=" << step
                             << " levels=" << num_levels
@@ -293,12 +286,7 @@ bool CalibrationPADialog::generate_tower()
     const PACalibrationCommand pa_cmd_kind = select_pa_command(flavor, printer_notes);
 
     auto make_pa_gcode = [&](double pa_val) -> std::string {
-        std::string val_str = fmt(pa_val);
-        switch (pa_cmd_kind) {
-        case PACalibrationCommand::Klipper: return "SET_PRESSURE_ADVANCE ADVANCE=" + val_str + "\n";
-        case PACalibrationCommand::M900:    return "M900 K" + val_str + "\n";
-        default:                            return "M572 S" + val_str + "\n";
-        }
+        return format_pa_command(pa_cmd_kind, pa_val) + "\n";
     };
 
     // Insert per-layer PA commands.
@@ -489,16 +477,7 @@ bool CalibrationPADialog::generate_line_pattern()
     if (const auto* no = printer_p.config.option<ConfigOptionString>("printer_notes"))
         printer_notes = no->value;
     const PACalibrationCommand cmd = select_pa_command(flavor, printer_notes);
-    auto pa_cmd = [&](double pa) {
-        std::ostringstream s; s.imbue(std::locale::classic());
-        s << std::fixed << std::setprecision(4);
-        switch (cmd) {
-        case PACalibrationCommand::Klipper: s << "SET_PRESSURE_ADVANCE ADVANCE=" << pa; break;
-        case PACalibrationCommand::M900:    s << "M900 K" << pa; break;
-        default:                            s << "M572 S" << pa; break;
-        }
-        return s.str();
-    };
+    auto pa_cmd = [&](double pa) { return format_pa_command(cmd, pa); };
 
     if (plater->build_volume().type() != BuildVolume::Type::Rectangle) {
         wxMessageBox(_L("The flat PA line test needs a rectangular bed. "

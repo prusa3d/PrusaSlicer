@@ -29,6 +29,7 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "libslic3r/GCode/GCodeWriter.hpp"
 #include "libslic3r/GCode/Thumbnails.hpp"
+#include "libslic3r/GCode/CalibrationPAPostProcessor.hpp"
 #include "libslic3r/CustomParametersHandling.hpp"
 
 #include "slic3r/Utils/Http.hpp"
@@ -3819,6 +3820,18 @@ static void apply_filamentdb_calibration(double nozzle_diameter)
         if (!cal.found)
             return;
 
+        // PA goes into start_filament_gcode with the command the printer being loaded
+        // understands (M572 / M900 K / SET_PRESSURE_ADVANCE), chosen the same way as in the
+        // PA calibration tools.
+        const DynamicPrintConfig &printer_cfg = bundle->printers.get_edited_preset().config;
+        GCodeFlavor               flavor      = gcfRepRapFirmware;
+        std::string               printer_notes;
+        if (const auto *fo = printer_cfg.option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor"))
+            flavor = fo->value;
+        if (const auto *no = printer_cfg.option<ConfigOptionString>("printer_notes"))
+            printer_notes = no->value;
+        const PACalibrationCommand pa_cmd = select_pa_command(flavor, printer_notes);
+
         // Helper: apply a calibration value to a DynamicPrintConfig
         auto apply_cal = [&](DynamicPrintConfig &cfg) {
             if (cal.max_volumetric_speed >= 0)
@@ -3838,19 +3851,9 @@ static void apply_filamentdb_calibration(double nozzle_diameter)
                     new ConfigOptionFloatsNullable({cal.retract_lift}));
             if (cal.pressure_advance >= 0) {
                 auto *gcode_opt = cfg.option<ConfigOptionStrings>("start_filament_gcode");
-                if (gcode_opt && !gcode_opt->values.empty()) {
-                    std::string &gcode = gcode_opt->values[0];
-                    std::string pa_cmd = "M572 S" + std::to_string(cal.pressure_advance);
-                    auto pos = gcode.find("M572 S");
-                    if (pos != std::string::npos) {
-                        auto end = gcode.find_first_of("\n\\", pos);
-                        gcode.replace(pos, (end == std::string::npos ? gcode.size() : end) - pos, pa_cmd);
-                    } else if (!gcode.empty()) {
-                        gcode += "\\n" + pa_cmd;
-                    } else {
-                        gcode = pa_cmd;
-                    }
-                }
+                if (gcode_opt && !gcode_opt->values.empty())
+                    gcode_opt->values[0] = apply_pressure_advance_to_start_gcode(
+                        gcode_opt->values[0], pa_cmd, cal.pressure_advance);
             }
         };
 
