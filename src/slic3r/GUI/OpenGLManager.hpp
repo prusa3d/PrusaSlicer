@@ -101,6 +101,10 @@ private:
 
     bool m_gl_initialized{ false };
     wxGLContext* m_context{ nullptr };
+    // Set by init_glcontext() when no usable OpenGL context could be created (only detected on
+    // Linux/GTK, where the X server may refuse the context, see GH #60).
+    bool m_context_failed{ false };
+    std::string m_context_failure_reason;
     bool m_debug_enabled{ false };
     GLShadersManager m_shaders_manager;
     static GLInfo s_gl_info;
@@ -124,6 +128,10 @@ public:
 #else
     wxGLContext* init_glcontext(wxGLCanvas& canvas, const std::pair<int, int>& required_opengl_version, bool enable_compatibility_profile, bool enable_debug);
 #endif // SLIC3R_OPENGL_ES
+    // True if init_glcontext() gave up without a usable OpenGL context: the application cannot run.
+    bool context_failed() const { return m_context_failed; }
+    // Technical reason of the failure (not translated), empty unless context_failed().
+    const std::string& context_failure_reason() const { return m_context_failure_reason; }
 
     GLShaderProgram* get_shader(const std::string& shader_name) { return m_shaders_manager.get_shader(shader_name); }
     GLShaderProgram* get_current_shader() { return m_shaders_manager.get_current_shader(); }

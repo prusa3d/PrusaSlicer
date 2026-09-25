@@ -31,6 +31,10 @@
 #include "../Utils/MacDarkMode.hpp"
 #endif // __APPLE__
 
+#ifdef __WXGTK__
+#include "X11ErrorTrap.hpp"
+#endif // __WXGTK__
+
 namespace Slic3r {
 namespace GUI {
 
@@ -436,6 +440,46 @@ bool OpenGLManager::init_gl()
     return true;
 }
 
+// Outside Linux/GTK the OpenGL ES build keeps its unchecked context creation, don't define an
+// unused function there (-Wunused-function).
+#if !SLIC3R_OPENGL_ES || defined(__WXGTK__)
+namespace {
+
+// Creates an OpenGL context for the canvas. Returns nullptr if the context is not usable.
+wxGLContext* create_glcontext(wxGLCanvas& canvas, const wxGLContextAttrs& attrs,
+                              std::string& x11_error)
+{
+#ifdef __WXGTK__
+    // The X server may refuse the context (GH #60). wxGLContext traps the X errors of only a part
+    // of its constructor and GTK's error handler calls _exit(1) on the others, so create the
+    // context under an X11ErrorTrap. A caught X error fails the attempt even if IsOK() is true:
+    // the context may not exist on the server side.
+    X11ErrorTrap trap;
+    wxGLContext* context = new wxGLContext(&canvas, nullptr, &attrs);
+    const bool x11_error_caught = trap.sync_and_check();
+    if (!x11_error_caught && context->IsOK())
+        return context;
+    if (x11_error_caught) {
+        x11_error = trap.error();
+        BOOST_LOG_TRIVIAL(warning) << "X error while creating an OpenGL context: " << x11_error;
+    }
+    // Still inside the trap: ~wxGLContext() calls glXDestroyContext(), which raises GLXBadContext
+    // for a context the X server did not create.
+    delete context;
+    return nullptr;
+#else
+    wxGLContext* context = new wxGLContext(&canvas, nullptr, &attrs);
+    if (!context->IsOK()) {
+        delete context;
+        context = nullptr;
+    }
+    return context;
+#endif // __WXGTK__
+}
+
+} // namespace
+#endif // !SLIC3R_OPENGL_ES || defined(__WXGTK__)
+
 #if SLIC3R_OPENGL_ES
 wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas)
 #else
@@ -443,11 +487,23 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<i
     bool enable_debug)
 #endif // SLIC3R_OPENGL_ES
 {
+#ifdef __WXGTK__
+    if (m_context_failed)
+        // Creating the context already failed for the first canvas, don't try it all again.
+        return nullptr;
+#endif // __WXGTK__
+
     if (m_context == nullptr) {
+        // Text of the last X error caught while creating the context (Linux/GTK only).
+        std::string x11_error;
 #if SLIC3R_OPENGL_ES
         wxGLContextAttrs attrs;
         attrs.PlatformDefaults().ES2().MajorVersion(2).EndList();
+#ifdef __WXGTK__
+        m_context = create_glcontext(canvas, attrs, x11_error);
+#else
         m_context = new wxGLContext(&canvas, nullptr, &attrs);
+#endif // __WXGTK__
 #else
         m_debug_enabled = enable_debug;
 
@@ -466,13 +522,9 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<i
                 if (m_debug_enabled)
                     attrs.DebugCtx();
                 attrs.EndList();
-                m_context = new wxGLContext(&canvas, nullptr, &attrs);
-                if (m_context->IsOK())
+                m_context = create_glcontext(canvas, attrs, x11_error);
+                if (m_context != nullptr)
                     break;
-                else {
-                    delete m_context;
-                    m_context = nullptr;
-                }
             }
         }
 
@@ -486,11 +538,7 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<i
                 if (m_debug_enabled)
                     attrs.DebugCtx();
                 attrs.EndList();
-                m_context = new wxGLContext(&canvas, nullptr, &attrs);
-                if (!m_context->IsOK()) {
-                    delete m_context;
-                    m_context = nullptr;
-                }
+                m_context = create_glcontext(canvas, attrs, x11_error);
             }
             // search for requested core profile version 
             else if (supports_core_profile) {
@@ -501,11 +549,7 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<i
                 if (m_debug_enabled)
                     attrs.DebugCtx();
                 attrs.EndList();
-                m_context = new wxGLContext(&canvas, nullptr, &attrs);
-                if (!m_context->IsOK()) {
-                    delete m_context;
-                    m_context = nullptr;
-                }
+                m_context = create_glcontext(canvas, attrs, x11_error);
             }
         }
 
@@ -516,9 +560,29 @@ wxGLContext* OpenGLManager::init_glcontext(wxGLCanvas& canvas, const std::pair<i
                 attrs.DebugCtx();
             attrs.EndList();
             // if no valid context was created use the default one
+#ifdef __WXGTK__
+            // On Linux a failed default context is not usable either, it is reported below.
+            wxLogNull logNo;
+            m_context = create_glcontext(canvas, attrs, x11_error);
+#else
             m_context = new wxGLContext(&canvas, nullptr, &attrs);
+#endif // __WXGTK__
         }
 #endif // SLIC3R_OPENGL_ES
+
+#ifdef __WXGTK__
+        if (m_context == nullptr) {
+            // Every attempt failed. Going on would leave a window with an empty 3D scene (OpenGL is
+            // never initialized without a context), so record the failure for
+            // GUI_App::on_init_inner(), which reports it and exits.
+            m_context_failed = true;
+            m_context_failure_reason = x11_error.empty() ?
+                std::string("the graphics driver did not return a valid OpenGL context") :
+                "X Window System error while creating the OpenGL (GLX) context: " + x11_error;
+            BOOST_LOG_TRIVIAL(error) << "Unable to create an OpenGL context: "
+                                     << m_context_failure_reason;
+        }
+#endif // __WXGTK__
 
 #ifdef __APPLE__ 
         // Part of hack to remove crash when closing the application on OSX 10.9.5 when building against newer wxWidgets

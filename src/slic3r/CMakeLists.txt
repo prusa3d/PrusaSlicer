@@ -471,6 +471,8 @@ elseif (WIN32)
 else() # Linux
     list(APPEND SLIC3R_GUI_SOURCES
             GUI/WebViewPlatformUtilsLinux.cpp
+            GUI/X11ErrorTrap.hpp
+            GUI/X11ErrorTrap.cpp
     )
 endif ()
 

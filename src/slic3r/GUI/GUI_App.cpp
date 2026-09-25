@@ -1627,6 +1627,40 @@ bool GUI_App::on_init_inner()
         show_error(nullptr, delayed_error_load_presets);
 
     mainframe = new MainFrame(get_app_font_pt_size(app_config));
+#ifdef __WXGTK__
+    // The OpenGL context is created while the MainFrame builds the 3D scene and preview canvases.
+    // If no usable context could be created (GH #60: the X server refused it), explain it and quit
+    // instead of running with an empty 3D scene.
+    if (m_opengl_mgr.context_failed()) {
+        BOOST_LOG_TRIVIAL(error) << "No usable OpenGL context, exiting: "
+                                 << m_opengl_mgr.context_failure_reason();
+        // Close the splash screen, so that it does not stay on the screen with the message. Look it
+        // up among the live top level windows rather than trusting `scrn`: the splash screen closes
+        // itself once its timeout elapses, which may have happened while an error was shown above.
+        for (wxWindow* tlw : wxTopLevelWindows)
+            if (dynamic_cast<SplashScreen*>(tlw) != nullptr) {
+                tlw->Hide();
+                tlw->Destroy();
+            }
+        const wxString app_name = is_editor() ? wxString(SLIC3R_APP_NAME) :
+                                                wxString(GCODEVIEWER_APP_NAME);
+        // TRN %1% is the application name, %2% a technical description of the error (in English).
+        const wxString message = format_wxstr(
+            _L("%1% could not create an OpenGL context and cannot start.\n\n"
+               "This usually means that the installed graphics driver libraries do not match the "
+               "running kernel (restart the computer after a graphics driver or kernel update), "
+               "or that direct rendering is not available.\n"
+               "Run \"glxinfo -B\" (from the mesa-utils or glx-utils package) in a terminal to "
+               "check the OpenGL setup.\n\n"
+               "Details: %2%"),
+            app_name, m_opengl_mgr.context_failure_reason());
+        wxMessageBox(message, app_name + " - " + _L("OpenGL error"), wxOK | wxICON_ERROR);
+        // Returning false skips the main loop. wxWidgets then deletes the MainFrame, which was
+        // never shown: ~MainFrame() runs shutdown(), and as no canvas was ever initialized (there
+        // is no context), no OpenGL call is made while it is torn down.
+        return false;
+    }
+#endif // __WXGTK__
     // hide settings tabs after first Layout
     if (is_editor())
         mainframe->select_tab(size_t(0));
