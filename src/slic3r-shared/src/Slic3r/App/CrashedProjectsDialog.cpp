@@ -63,11 +63,13 @@ public:
         set_orientation(Orientation::Horizontal);
         set_padding({10_fpx, 5_fpx});
         set_gap(5_fpx);
+        set_flex_shrink(0);
 
         Item* switch_cell = emplace_back<Item>();
         switch_cell->set_width(70_fpx);
         switch_cell->set_justify_content(YGJustifyCenter);
         switch_cell->set_align_items(YGAlignCenter);
+        switch_cell->set_flex_shrink(0);
         m_recover_switch = switch_cell->emplace_back<ToggleButton>(
             std::string{},
             Biz::_u8L("If turned on, this project will be attempted to be recovered")
@@ -153,7 +155,8 @@ CrashedProjectsDialog::CrashedProjectsDialog(
     m_scroll_area->set_orientation(Orientation::Vertical);
     m_scroll_area->set_gap(5_fpx);
     m_scroll_area->set_height(325_fpx);
-    m_scroll_area->set_padding(Paddings{0, 0, 12, 0});
+    m_scroll_area->set_padding(Paddings{0, 0, 12_fpx, 12_fpx});
+    m_scroll_area->set_window_flags(ImGuiWindowFlags_HorizontalScrollbar);
 
     add_separator();
 
