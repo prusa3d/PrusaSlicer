@@ -11,14 +11,16 @@ struct PrinterToAdd;
 
 class PrinterScreen;
 class LogInScreen;
+class Navigator;
 
 class WelcomeDialog : public Yoga::Popup
 {
 public:
-    WelcomeDialog(Biz::ProjectInteractor& project_interactor);
+    WelcomeDialog(Biz::ProjectInteractor& project_interactor, Navigator& navigator);
 
 private:
     Biz::ProjectInteractor& m_project_interactor;
+    Navigator& m_navigator;
 
     Yoga::Item* m_top_bar{nullptr};
     Yoga::Item* m_content{nullptr};

@@ -15,6 +15,7 @@
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/AddPrinterPanel.hpp"
 #include "Slic3r/App/WarningPanel.hpp"
+#include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/Preset/HwConfigEvaluator.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
@@ -1346,8 +1347,8 @@ private:
     std::function<void()> m_go_to_next;
 };
 
-WelcomeDialog::WelcomeDialog(Biz::ProjectInteractor& project_interactor) :
-    m_project_interactor{project_interactor}
+WelcomeDialog::WelcomeDialog(Biz::ProjectInteractor& project_interactor, Navigator& navigator) :
+    m_project_interactor{project_interactor}, m_navigator(navigator)
 {
     WindowPtr window{std::make_unique<Window>("Welcome dialog")};
     window->set_orientation(Orientation::Vertical);
@@ -1504,7 +1505,7 @@ void WelcomeDialog::finalize(const std::vector<PrinterToAdd>& printers)
     sync_config();
     app_config_interactor.set_item_value("initialized", Domain::ConfigValue{true});
     AppServices::instance().app_config().save();
-    close();
+    m_navigator.set_modal_dialog(ModalDialog::None);
 }
 
 void WelcomeDialog::reload_top_bar()

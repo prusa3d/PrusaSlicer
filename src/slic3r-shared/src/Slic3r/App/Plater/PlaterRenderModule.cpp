@@ -341,7 +341,7 @@ void PlaterRenderModule::on_init(
     update_object_selection();
 
     if (!AppServices::instance().app_config().get<bool>("initialized")) {
-        m_welcome_dialog->open();
+        m_render_module_navigator->set_modal_dialog(ModalDialog::Welcome);
     }
 }
 
@@ -544,7 +544,7 @@ void PlaterRenderModule::init_scene_layout()
         *m_render_module_navigator
     );
 
-    m_welcome_dialog = std::make_unique<WelcomeDialog>(m_project_interactor);
+    m_welcome_dialog = std::make_unique<WelcomeDialog>(m_project_interactor, *m_render_module_navigator);
 
     m_invalid_data_dialog = std::make_unique<InvalidDataDialog>(
         m_project_interactor,
