@@ -5,6 +5,6 @@
 
 namespace Slic3r::Biz::Preset {
 
-Domain::Preset::MatDbMatchRule make_match_rule(const Domain::Preset::FeatureValueMap& features);
+std::optional<Domain::Preset::MatDbMatchRule> make_match_rule(const Domain::Preset::FeatureValueMap& features);
 
 }

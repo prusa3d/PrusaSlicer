@@ -128,7 +128,7 @@ void MaterialSelectionDialog::set_material_index(size_t material_index)
 
     update_preset_list();
 
-    m_project_interactor.matdb_interactor().query_first(m_material_index);
+    m_project_interactor.matdb_interactor().query(m_material_index, "", std::nullopt);
 }
 
 void MaterialSelectionDialog::on_list_selection_changed(Domain::SelectionId new_selection)
@@ -369,9 +369,10 @@ void MaterialSelectionDialog::create_page_materials()
     m_input_text_search_materials->set_flex_grow(1);
     m_input_text_search_materials->callbacks().text_changed = [this]()
     {
-        m_project_interactor.matdb_interactor().query_by_name(
+        m_project_interactor.matdb_interactor().query(
             m_material_index,
-            m_input_text_search_materials->text()
+            m_input_text_search_materials->text(),
+            std::nullopt
         );
     };
 
@@ -404,7 +405,7 @@ void MaterialSelectionDialog::create_page_materials()
         &m_project_interactor.matdb_interactor().result()
     );
 
-    m_project_interactor.matdb_interactor().query_first(m_material_index);
+    m_project_interactor.matdb_interactor().query(m_material_index, "", std::nullopt);
 }
 
 MaterialSettingsDialog& MaterialSelectionDialog::material_settings_dialog()

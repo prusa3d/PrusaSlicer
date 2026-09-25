@@ -102,7 +102,7 @@ public:
         m_preset_interactor(workbench, m_scene_interactor, m_backup_store),
         m_arrange_interactor(m_scene_interactor, workbench),
         m_clipboard_interactor(m_scene_interactor, m_arrange_interactor, workbench),
-        m_matdb_interactor(m_preset_interactor),
+        m_matdb_interactor(m_workbench, *this),
         m_project_settings_interactor(workbench, m_null_mdb),
         m_virtual_extruder_interactor(workbench),
         m_slicing_interactor(dispatcher, thumbnail_image_generator),

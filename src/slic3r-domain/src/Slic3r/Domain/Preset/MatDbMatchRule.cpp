@@ -71,27 +71,43 @@ size_t MatDbMatchRule::match(const MatDb::Material& mat) const
     Strings exclude_tags;
      */
     size_t rank{0};
-#define MATCH_MATERIAL_IF(N) if (match_eq(mat.N, N)) rank++;
-#define MATCH_MATERIAL_IF2(N, N2) if (match_eq(mat.N, N2)) rank++;
-#define MATCH_BRAND_IF(N) if (match_eq(mat.brand.N, brand_##N)) rank++;
+#define MATCH_MATERIAL_IF(N, R) if (match_eq(mat.N, N)) rank += (R);
+#define MATCH_MATERIAL_IF_REQUIRED(N, R)\
+    if (match_eq(mat.N, N)) {           \
+        rank += (R);                    \
+    } else if ((N).has_value()) {       \
+        return 0;                       \
+    }
+#define MATCH_BRAND_IF(N, R) if (match_eq(mat.brand.N, brand_##N)) rank += (R);
+#define MATCH_BRAND_IF_REQUIRED(N, R)       \
+    if (match_eq(mat.brand.N, brand_##N)) { \
+        rank += (R);                        \
+    } else if ((brand_##N).has_value()) {   \
+        return 0;                           \
+    }
 
-    MATCH_MATERIAL_IF(uuid)
-    MATCH_BRAND_IF(slug)
-    MATCH_MATERIAL_IF(slug)
-    MATCH_MATERIAL_IF(name)
-    MATCH_MATERIAL_IF(klass)
-    MATCH_MATERIAL_IF(type)
-    MATCH_MATERIAL_IF(abbreviation)
+    constexpr size_t RANK_OPT{1};
+    constexpr size_t RANK_REQ{2};
+
+    MATCH_MATERIAL_IF(uuid, RANK_OPT)
+    MATCH_BRAND_IF_REQUIRED(slug, RANK_REQ)
+    MATCH_MATERIAL_IF(slug, RANK_OPT)
+    MATCH_MATERIAL_IF(name, RANK_OPT)
+    MATCH_MATERIAL_IF(klass, RANK_OPT)
+    MATCH_MATERIAL_IF(type, RANK_OPT)
+    MATCH_MATERIAL_IF_REQUIRED(abbreviation, RANK_REQ)
 
 #undef MATCH_MATERIAL_IF
+#undef MATCH_MATERIAL_IF_REQUIRED
 #undef MATCH_BRAND_IF
+#undef MATCH_BRAND_IF_REQUIRED
 
     if (!match_includes(mat.tags, required_tags)) {
         return 0;
     }
-    rank += required_tags.size();
+    rank += required_tags.size() * RANK_REQ;
 
-    rank += match_includes_count(mat.tags, optional_tags);
+    rank += match_includes_count(mat.tags, optional_tags) * RANK_OPT;
 
     if (!match_excludes(mat.tags, exclude_tags)) {
         return 0;

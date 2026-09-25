@@ -1,6 +1,8 @@
 #pragma once
 
 #include <optional>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -54,8 +56,10 @@ struct BrandIndex
 
 struct Index
 {
-    std::vector<BrandIndex> brands;
+    std::map<std::string, BrandIndex> brands;
     std::vector<MaterialIndex> materials;
+
+    std::set<std::string> types;
 
     void clear();
 };

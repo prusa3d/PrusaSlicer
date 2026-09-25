@@ -15,9 +15,17 @@ using SearchResult = std::vector<Domain::MatDb::Material>;
 class MatDbClient
 {
 public:
+    struct Query
+    {
+        std::string name_search;
+        std::vector<std::string> types;
+    };
+
     bool open(const std::string& path);
-    SearchResult query_by_name(const std::string& search_what, size_t count, size_t offset);
-    SearchResult query_by_type(const std::string& search_what, size_t count, size_t offset);
+    SearchResult query(const Query& q, size_t count, size_t offset);
+
+    const std::set<std::string>& types() const;
+
 private:
     bool load_index();
     const Domain::MatDb::BrandData& get(const std::string& brand_slug);

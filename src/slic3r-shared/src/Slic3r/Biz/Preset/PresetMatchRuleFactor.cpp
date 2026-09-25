@@ -14,17 +14,19 @@ bool is_required_tag(const std::string& tag)
 
 }
 
-Domain::Preset::MatDbMatchRule make_match_rule(const Domain::Preset::FeatureValueMap& features)
+std::optional<Domain::Preset::MatDbMatchRule> make_match_rule(const Domain::Preset::FeatureValueMap& features)
 {
     Domain::Preset::MatDbMatchRule rule = {};
 
-    auto try_append = [&features]<typename T>(T& dest, const char* key) {
+    bool inited = false;
+    auto try_append = [&features, &inited]<typename T>(T& dest, const char* key) {
         if (auto it = features.find(key); it != features.end()) {
             if constexpr (Domain::is_std_optional_v<T>){
                 using VT = T::value_type;
                 const auto* val = std::get_if<VT>(&it->second);
                 if (val != nullptr) {
                     dest = *val;
+                    inited = true;
                 } else {
                     SPDLOG_ERROR("Expected type for {} is {}, but wasn't found", key, type_name<T>());
                 }
@@ -46,6 +48,7 @@ Domain::Preset::MatDbMatchRule make_match_rule(const Domain::Preset::FeatureValu
                         parsed_val.emplace_back(std::move(*parsed_el));
                     }
                     dest = std::move(parsed_val);
+                    inited = true;
                 } else {
                     SPDLOG_ERROR(
                         "Expected type for {} elements is {}, but wasn't found",
@@ -71,7 +74,11 @@ Domain::Preset::MatDbMatchRule make_match_rule(const Domain::Preset::FeatureValu
     for (const auto& tag: tags) {
         (is_required_tag(tag) ? rule.required_tags : rule.optional_tags).push_back(tag);
    }
-    return rule;
+
+    if (inited) {
+        return rule;
+    }
+    return std::nullopt;
 }
 
 } // namespace Slic3r::Biz::Preset

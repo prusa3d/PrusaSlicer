@@ -1,3 +1,5 @@
+#include "Slic3r/Biz/MatDb/MatDbClient.hpp"
+
 #include <ranges>
 #include <set>
 
@@ -54,8 +56,19 @@ struct adl_serializer<Slic3r::Domain::MatDb::Index>
 {
     static void from_json(const json& j, Slic3r::Domain::MatDb::Index& v)
     {
-        adl_serializer<decltype(v.brands)>::from_json(j.at("brands"), v.brands);
+        std::vector<Slic3r::Domain::MatDb::BrandIndex> brands;
+        adl_serializer<decltype(brands)>::from_json(j.at("brands"), brands);
+        std::ranges::transform(
+            brands,
+            std::inserter(v.brands, v.brands.end()),
+            [](const auto& b) { return std::make_pair(b.slug, b); }
+        );
         adl_serializer<decltype(v.materials)>::from_json(j.at("materials"), v.materials);
+        std::ranges::transform(
+            v.materials | std::views::filter([](const auto& m) { return m.type.has_value(); }),
+            std::inserter(v.types, v.types.end()),
+            [](const auto& m) { return m.type.value(); }
+        );
     }
 };
 
@@ -109,9 +122,11 @@ struct adl_serializer<Slic3r::Domain::MatDb::BrandData>
 namespace Slic3r::Biz::MatDb {
 
 namespace {
-bool contains(std::string_view text, std::string_view search)
+bool contains(std::string_view text, const std::set<std::string_view>& search)
 {
-    return boost::ifind_first(text, search);
+    return search.empty()
+        || std::ranges::
+            any_of(search, [&text](const auto& s) -> bool { return boost::ifind_first(text, s); });
 }
 
 std::optional<Domain::MatDb::Color> color_from_storage(const std::string& s)
@@ -164,7 +179,43 @@ Domain::MatDb::Material from_storage(const Domain::MatDb::BrandStorage& brand, c
     };
 }
 
+auto match_query(const MatDbClient::Query& q, const Domain::MatDb::Index& index)
+{
+    std::set<std::string_view> tokens;
+    std::string_view sv{q.name_search};
+    std::ranges::copy(
+        sv
+            | std::views::split(' ')
+            | std::views::
+                transform([](const auto& r) -> std::string_view { return {r.begin(), r.end()}; })
+            | std::views::filter([](const auto& s) { return !s.empty(); }),
+        std::inserter(tokens, tokens.end())
+    );
+    return [&q, tokens, &index](const Domain::MatDb::MaterialIndex& mat_idx)
+    {
+        bool ret = true;
+        if (!tokens.empty()) {
+            ret = contains(mat_idx.name, tokens)
+                || (mat_idx.type.has_value() && contains(mat_idx.type.value(), tokens));
+            if (!ret) {
+                auto brand_it = index.brands.find(mat_idx.brand_slug);
+                if (brand_it != index.brands.end()) {
+                    ret = contains(brand_it->second.name, tokens);
+                }
+            }
+        }
+        if (!q.types.empty()) {
+            ret = ret
+                && std::ranges::any_of(
+                      q.types,
+                      [&](const auto& t) { return mat_idx.type.has_value() && mat_idx.type == t; }
+                );
+        }
+        return ret;
+    };
 }
+
+} // namespace
 
 bool MatDbClient::open(const std::string& path)
 {
@@ -181,14 +232,12 @@ bool MatDbClient::open(const std::string& path)
     return success;
 }
 
-SearchResult MatDbClient::query_by_name(const std::string& search_what, size_t count, size_t offset)
+SearchResult MatDbClient::query(const Query& q, size_t count, size_t offset)
 {
     SearchResult ret;
     if (m_content) {
         auto range = m_index.materials
-            | std::views::filter(
-                [&search_what](const auto& idx) -> bool { return contains(idx.name, search_what); }
-            )
+            | std::views::filter(match_query(q, m_index))
             | std::views::drop(offset)
             | std::views::take(count);
         std::ranges::transform(
@@ -202,6 +251,11 @@ SearchResult MatDbClient::query_by_name(const std::string& search_what, size_t c
         );
     }
     return ret;
+}
+
+const std::set<std::string>& MatDbClient::types() const
+{
+    return m_index.types;
 }
 
 bool MatDbClient::load_index()

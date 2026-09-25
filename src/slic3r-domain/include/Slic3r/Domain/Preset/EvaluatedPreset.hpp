@@ -180,8 +180,9 @@ using AllToolsEvaluatedToolPrintPresets = std::vector<SingleToolEvaluatedToolPri
 struct EvaluatedMaterialPreset
 {
     using Preset = EvaluatedPreset<FilamentSettings, SLAMaterialSettings>;
+    using OptMatchRule = std::optional<MatDbMatchRule>;
     Preset preset;
-    MatDbMatchRule mat_db_match_rule;
+    OptMatchRule mat_db_match_rule;
 
     EvaluatedMaterialPreset()                                   = default;
     EvaluatedMaterialPreset(const EvaluatedMaterialPreset&)     = default;
@@ -190,7 +191,7 @@ struct EvaluatedMaterialPreset
     EvaluatedMaterialPreset& operator=(const EvaluatedMaterialPreset&) = default;
     EvaluatedMaterialPreset& operator=(EvaluatedMaterialPreset&&) noexcept = default;
 
-    EvaluatedMaterialPreset(Preset&& preset, MatDbMatchRule&& match_rule) :
+    EvaluatedMaterialPreset(Preset&& preset, OptMatchRule&& match_rule) :
         preset(std::move(preset)),
         mat_db_match_rule(std::move(match_rule))
     {}

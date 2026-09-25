@@ -1,14 +1,24 @@
 #pragma once
+#include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
+#include "Slic3r/Domain/SelectionId.hpp"
 #include "Slic3r/Biz/ObservableList.hpp"
 
 #include "Slic3r/Biz/MatDb/MatDbClient.hpp"
-#include "Slic3r/Biz/Preset/PresetInteractor.hpp"
+#include "Slic3r/Domain/Workbench.hpp"
+#include "Slic3r/Domain/Preset/SelectedPreset.hpp"
 
+namespace Slic3r::Biz {
+class ProjectInteractor;
+}
+namespace Slic3r::Biz::Preset {
+class PresetInteractor;
+}
 namespace Slic3r::Biz::MatDb {
 
 struct PresetMatch
 {
     std::string preset_id;
+    std::string preset_name;
     size_t rank{0};
 };
 
@@ -20,17 +30,26 @@ struct MatDbItem
     PresetMatches preset_matches;
 };
 
-class MatDbInteractor
+struct MatDbInteractorProjectContexts;
+
+
+class MatDbInteractor final : public ISelectedConfigContainerChangedListener
 {
 public:
-    explicit MatDbInteractor(Preset::PresetInteractor& preset_interactor);
+    MatDbInteractor(Domain::Workbench& workbench, ProjectInteractor& project_interactor);
+    ~MatDbInteractor() final;
 
     void init_client();
 
-    void query_by_name(size_t tool_index, const std::string& q);
-    void query_by_type(size_t tool_index, const std::string& type);
-    void query_first(size_t tool_index);
-    void select_material_preset(size_t tool_index, const Domain::MatDb::Material& mat, const std::string& preset_id);
+    const std::set<std::string>& types() const;
+    void query(size_t material_index, const std::string& q, const std::optional<std::string>& type);
+
+    void select_material_preset(
+        size_t material_index,
+        const Domain::MatDb::Material& mat,
+        const std::string& preset_id
+    );
+
 
     ObservableList<MatDbItem>& result()
     {
@@ -41,10 +60,21 @@ public:
     {
         return m_result;
     }
+
+    void on_selected_config_container_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId container_id
+    ) override;
 private:
+    const Domain::Preset::SelectedPreset& selected_preset() const;
+
+private:
+    Domain::Workbench& m_workbench;
     Preset::PresetInteractor& m_preset_interactor;
+    std::unique_ptr<MatDbInteractorProjectContexts> m_projects;
     MatDbClient m_client;
     ObservableList<MatDbItem> m_result;
+    Domain::SelectionId m_selected_project{Domain::INVALID_ID};
 };
 
 }
