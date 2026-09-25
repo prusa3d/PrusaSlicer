@@ -19,6 +19,8 @@ using Slic3r::Domain::BoxRefs;
 using Slic3r::Domain::BoxOrBoxesVector;
 using Slic3r::Domain::EnumValueDefs;
 using Slic3r::Domain::EnumWrapper;
+using Slic3r::Domain::EffectiveValueMap;
+using Slic3r::Domain::EffectiveValue;
 
 using Slic3r::Domain::FDMConfigLocation::Print;
 using Slic3r::Domain::FDMConfigLocation::Filament;
@@ -234,4 +236,80 @@ TEST_CASE("Parial config works as expected", "[Config]")
     CHECK(!partial_config.get<int>("print_config_item_with_filament_override"));
     CHECK(!partial_config.get<int>("filament_config_item"));
     CHECK(!partial_config.get<TestEnum>("print_enum_config_items_with_filament_override"));
+}
+
+TEST_CASE("Filament overrides are recorded in effective values", "[Config]") {
+    TestPrintSettings print_settings;
+    print_settings.items.opt("print_config_item_with_filament_override").set(22);
+
+    std::vector<TestFilamentSettings> filament_settings(3);
+    filament_settings.at(0).overrides.set("print_config_item_with_filament_override", -10);
+    filament_settings.at(2).overrides.set("print_config_item_with_filament_override", -20);
+
+    const TestFullConfig full_config{print_settings, filament_settings};
+    const EffectiveValueMap& effective_values{full_config.effective_values()};
+
+    REQUIRE(effective_values.contains("print_config_item_with_filament_override"));
+    const EffectiveValue& effective_value{effective_values.at("print_config_item_with_filament_override")};
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{Print},
+            ConfigValue{22},
+        },
+        {
+            EffectiveValue::OverriddenBy{Filament},
+            ConfigValue{
+                std::vector<int>{-10, 22, -20},
+            },
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}
+
+TEST_CASE("Filament settings are recorded in effective values", "[Config]") {
+    TestPrintSettings print_settings;
+    std::vector<TestFilamentSettings> filament_settings(3);
+    filament_settings.at(0).items.opt("filament_config_item").set(1);
+    filament_settings.at(1).items.opt("filament_config_item").set(2);
+    filament_settings.at(2).items.opt("filament_config_item").set(3);
+
+    const TestFullConfig full_config{print_settings, filament_settings};
+    const EffectiveValueMap& effective_values{full_config.effective_values()};
+
+    REQUIRE(effective_values.contains("filament_config_item"));
+    const EffectiveValue& effective_value{effective_values.at("filament_config_item")};
+    REQUIRE(effective_value.modifications.size() == 1);
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{Filament},
+            ConfigValue{std::vector<int>{1, 2, 3}},
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}
+
+
+TEST_CASE("Partial config effective values record object overrides", "[Config]")
+{
+    TestObjectSettings object_settings;
+    object_settings.overrides.set("print_config_item_with_object_override", 12);
+    const TestPartialConfig partial_config{object_settings};
+    const EffectiveValueMap& effective_values{partial_config.effective_values()};
+
+    REQUIRE(effective_values.contains("print_config_item_with_object_override"));
+    const EffectiveValue& effective_value{effective_values.at("print_config_item_with_object_override")};
+    REQUIRE(effective_value.modifications.size() == 1);
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::OverriddenBy{Object},
+            ConfigValue{12},
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
 }

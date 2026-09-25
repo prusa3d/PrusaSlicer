@@ -971,6 +971,7 @@ set(SLIC3R_SHARED_FILES
 
         include/Slic3r/Biz/Slicing/BackgroundProcess.hpp
         include/Slic3r/Biz/Slicing/BackgroundProcessState.hpp
+        include/Slic3r/Biz/Slicing/IBackgroundProcessStateListener.hpp
         include/Slic3r/Biz/Slicing/SlicingInteractor.hpp
         src/Slic3r/Biz/Slicing/BackgroundProcess.cpp
         src/Slic3r/Biz/Slicing/SlicingInteractor.cpp

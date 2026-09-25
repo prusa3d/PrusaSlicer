@@ -55,6 +55,7 @@ struct UpdateResult
 {
     ApplyStatus::Status status;
     std::vector<unsigned> extruder_candidates;
+    Domain::EffectiveValues effective_values;
 };
 
 class IPrint

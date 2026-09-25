@@ -204,7 +204,8 @@ void BackgroundProcess::update(
         build_metadata_serializer(metadata, preset_metadata, config));
 
     apply_status = update_result.status;
-    m_state.extruder_candidates = std::move(update_result.extruder_candidates);
+    m_state.extruder_candidates = update_result.extruder_candidates;
+    m_state.effective_values = update_result.effective_values;
 }
 
 void BackgroundProcess::slice(

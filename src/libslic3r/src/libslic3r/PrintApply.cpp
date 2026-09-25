@@ -1512,6 +1512,50 @@ InvalidatedSteps invalidate_for_virtual_extruders_change(const PrintObjectPtrs& 
     return result;
 }
 
+static void erase_trivial_entries(Domain::EffectiveValueMap& effective_values)
+{
+    std::erase_if(
+        effective_values,
+        [](const auto& pair)
+        {
+            const Domain::EffectiveValue& value{pair.second};
+            return value.modifications.size() == 1
+                && std::holds_alternative<Domain::EffectiveValue::SetBy>(
+                       value.modifications.front().payload);
+        });
+}
+
+static Domain::EffectiveValues collect_effective_values(
+    const PrintConfigView& print_config,
+    const PrintObjectPtrs& objects,
+    const FullConfigFDMPtr& full_config,
+    const Domain::PartialConfig& macro_overrides)
+{
+    Domain::EffectiveValues out;
+    out.print = print_config.effective_values();
+    erase_trivial_entries(out.print);
+
+    for (const PrintObject* object : objects) {
+        const auto it{
+            out.objects.emplace(object->model_object()->id(), object->config().effective_values())
+                .first};
+        erase_trivial_entries(it->second);
+
+        for (const Domain::ModelVolume* volume : object->model_object()->volumes) {
+            const Domain::PartialConfig
+                volume_partial{{volume->volume_settings}, full_config->hw_config()};
+            PrintRegionConfigView
+                view{full_config, object->config().object_settings(), {volume_partial}};
+            view.add_override(macro_overrides);
+            view.finalize();
+            const auto it{out.volumes.emplace(volume->id(), view.effective_values()).first};
+            erase_trivial_entries(it->second);
+        }
+    }
+
+    return out;
+}
+
 Biz::Slicing::UpdateResult Print::apply(
     const Domain::Model& model,
     const FullConfigFDMPtr& new_full_config_ptr,
@@ -1703,12 +1747,15 @@ Biz::Slicing::UpdateResult Print::apply(
         object->update_slicing_parameters();
     }
 
+    const Domain::EffectiveValues effective_values{
+        collect_effective_values(m_config, m_objects, new_full_config_ptr, macro_overrides)};
+
     if (changed) {
         this->cleanup();
-        return {Biz::Slicing::ApplyStatus::Changed{warnings}, m_extruder_candidates};
+        return {Biz::Slicing::ApplyStatus::Changed{warnings}, m_extruder_candidates, effective_values};
     }
 
-    return {Biz::Slicing::ApplyStatus::Unchanged{}, m_extruder_candidates};
+    return {Biz::Slicing::ApplyStatus::Unchanged{}, m_extruder_candidates, effective_values};
 }
 
 void Print::cleanup()

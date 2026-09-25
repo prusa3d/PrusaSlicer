@@ -349,3 +349,214 @@ TEST_CASE_METHOD(
     CHECK(result[0].float_value() == Catch::Approx(25));
     CHECK(result[1].float_value() == Catch::Approx(100));
 }
+
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Parameter expansion is recorded in effective values",
+    "[FDMConfig]")
+{
+    config_pack.print.items.opt("first_layer_speed").set(FloatOrPercentage{Percentage{75}});
+    config_pack.tool.at(0).overrides.set("first_layer_speed", FloatOrPercentage{Percentage{50}});
+
+    const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
+    const EffectiveValueMap& effective_values{full_config.effective_values()};
+
+    REQUIRE(effective_values.contains("first_layer_external_perimeter_speed"));
+    const EffectiveValue& effective_value{effective_values.at("first_layer_external_perimeter_speed")};
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{FDMConfigLocation::Print},
+            ConfigValue{FloatOrPercentage{0.0}},
+        },
+        {
+            EffectiveValue::ExpandedFrom{"first_layer_speed"},
+            ConfigValue{std::vector<FloatOrPercentage>{Percentage{50}, Percentage{75}, Percentage{75}}},
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Compatibility rule after overrides is recorded in effective values",
+    "[FDMConfig]")
+{
+    config_pack.print.items.opt("seam_position").set(SeamPosition::spRandom);
+    config_pack.tool.at(0).overrides.set("seam_position", SeamPosition::spRear);
+    config_pack.tool.at(2).overrides.set("seam_position", SeamPosition::spAligned);
+
+    const ConfigValue random{config_pack.print.items.opt("seam_position").value()};
+
+    auto full_config{
+        std::make_shared<const FullConfigFDM>(config_pack, extruder_candidates, hw_config)};
+    ConfigView view{full_config, {}};
+    view.finalize();
+
+    const EffectiveValueMap& effective_values{view.effective_values()};
+
+    REQUIRE(effective_values.contains("seam_position"));
+    const EffectiveValue& effective_value{effective_values.at("seam_position")};
+
+    const EnumValueDefs& enum_def{
+        config_pack.print.items.opt("seam_position").get<EnumWrapper>().def()};
+
+    const EnumVectorWrapper expected_after_override{
+        std::vector<
+            SeamPosition>{SeamPosition::spRear, SeamPosition::spRandom, SeamPosition::spAligned},
+        &enum_def};
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{FDMConfigLocation::Print},
+            random,
+        },
+        {
+            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool},
+            ConfigValue{expected_after_override},
+        },
+        {
+            EffectiveValue::CompatibilityRuleApplied{CompatibilityRule::IgnoreOverrides, true},
+            random,
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Float or percentage resolution is recorded in effective values",
+    "[FDMConfig]")
+{
+    config_pack.print.items
+        .opt("automatic_infill_combination_max_layer_height")
+        .set(FloatOrPercentage{Percentage{50}});
+
+    auto full_config{std::make_shared<const FullConfigFDM>(
+        config_pack, extruder_candidates, hw_config)};
+    ConfigView view{full_config, {}};
+    view.finalize();
+
+    const EffectiveValueMap& effective_values{view.effective_values()};
+
+    REQUIRE(effective_values.contains("automatic_infill_combination_max_layer_height"));
+    const EffectiveValue& effective_value{
+        effective_values.at("automatic_infill_combination_max_layer_height")};
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{FDMConfigLocation::Print},
+            ConfigValue{FloatOrPercentage{Percentage{50}}},
+        },
+        {
+            EffectiveValue::ResolvedFloatOrPercentage{"nozzle_diameter"},
+            ConfigValue{std::vector<FloatOrPercentage>{0.2, 0.2, 0.2}},
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Float or percentage resolution is not recorded in effective values if the value is not percentage",
+    "[FDMConfig]")
+{
+    config_pack.print.items.opt("external_perimeter_extrusion_width").set(FloatOrPercentage{10.0});
+
+    auto full_config{
+        std::make_shared<const FullConfigFDM>(config_pack, extruder_candidates, hw_config)};
+    ConfigView view{full_config, {}};
+    view.finalize();
+
+    const EffectiveValueMap& effective_values{view.effective_values()};
+
+    REQUIRE(effective_values.contains("external_perimeter_extrusion_width"));
+    const EffectiveValue& effective_value{
+        effective_values.at("external_perimeter_extrusion_width")};
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{FDMConfigLocation::Print},
+            ConfigValue{FloatOrPercentage{10}},
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Object overrides are recorded in efective values",
+    "[FDMConfig]")
+{
+    config_pack.print.items.opt("bridge_speed").set(10.0);
+    config_pack.tool.at(2).overrides.set("bridge_speed", 20.0);
+
+    auto full_config{std::make_shared<const FullConfigFDM>(
+        config_pack, extruder_candidates, hw_config)};
+
+    ObjectSettings object_settings;
+    object_settings.overrides.set("bridge_speed", 30.0);
+    const PartialConfig partial_config{{object_settings}, hw_config};
+
+    ConfigView view{full_config, {partial_config}};
+    view.finalize();
+
+    const EffectiveValueMap& effective_values{view.effective_values()};
+    REQUIRE(effective_values.contains("bridge_speed"));
+    const EffectiveValue& effective_value{effective_values.at("bridge_speed")};
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{FDMConfigLocation::Print},
+            ConfigValue{10.0},
+        },
+        {
+            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool},
+            ConfigValue{std::vector<double>{10.0, 10.0, 20.0}},
+        },
+        {
+            EffectiveValue::OverriddenBy{FDMConfigLocation::Object},
+            ConfigValue{30.0},
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}
+
+TEST_CASE_METHOD(
+    FullConfigFDMFixture,
+    "Macro overrides are recorded in effective values",
+    "[FDMConfig]")
+{
+    config_pack.print.items.opt("perimeters").set(3);
+    config_pack.tool.at(0).overrides.set("perimeters", 2);
+    config_pack.macro_overrides[MacroOverridesLayerFDM::SpiralVase].overrides.set("perimeters", 1);
+
+    const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
+    const EffectiveValueMap& effective_values{full_config.effective_values()};
+
+    REQUIRE(effective_values.contains("perimeters"));
+    const EffectiveValue& effective_value{effective_values.at("perimeters")};
+
+    const EffectiveValue expected_value{{
+        {
+            EffectiveValue::SetBy{FDMConfigLocation::Print},
+            ConfigValue{3},
+        },
+        {
+            EffectiveValue::OverriddenBy{FDMConfigLocation::Tool},
+            ConfigValue{std::vector<int>{2, 3, 3}},
+        },
+        {
+            EffectiveValue::OverriddenBy{FDMConfigLocation::MacroOverrides},
+            ConfigValue{1},
+        },
+    }};
+
+    CHECK(effective_value == expected_value);
+}

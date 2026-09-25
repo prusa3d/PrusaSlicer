@@ -12,6 +12,7 @@
 
 #include "Slic3r/Domain/ConfigValue.hpp"
 #include "Slic3r/Domain/ConfigDef.hpp"
+#include "Slic3r/Domain/EffectiveValues.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 
 namespace Slic3r::Domain {
@@ -249,12 +250,13 @@ public:
 
     std::size_t hash() const;
 
-    const std::map<std::string, ConfigValue>& original_values() const;
+    const EffectiveValueMap& effective_values() const;
     const std::vector<unsigned>& extruder_candidates() const;
 
 protected:
     std::map<std::string, ConfigValue> m_values;
-    std::map<std::string, ConfigValue> m_original_values;
+    EffectiveValueMap m_effective_values;
+
     Preset::HwPrinterConfig m_hw_config;
     std::vector<unsigned> m_extruder_candidates;
 };
@@ -324,6 +326,8 @@ public:
 
     const std::map<std::string, ConfigValue>& values() const;
 
+    const EffectiveValueMap& effective_values() const;
+
     std::size_t hash() const;
 
     std::vector<std::string> diff_keys(const ConfigView& other) const;
@@ -336,6 +340,7 @@ protected:
     std::vector<PartialConfig> m_partial_configs;
     std::vector<std::string> m_keys;
     std::map<std::string, ConfigValue> m_values;
+    EffectiveValueMap m_effective_values;
     Domain::Preset::HwPrinterConfig m_hw_config;
 
     ConfigValue resolve_value(const std::string& key) const;
