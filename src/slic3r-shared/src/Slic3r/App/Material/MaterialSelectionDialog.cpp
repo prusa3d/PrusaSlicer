@@ -5,6 +5,7 @@
 #include "Slic3r/App/Yoga/Separator.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/StackLayout.hpp"
+#include "Slic3r/App/Yoga/ComboBox.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/Navigator.hpp"
@@ -58,6 +59,16 @@ void MaterialSelectionDialog::update_current_context()
     }
 }
 
+void MaterialSelectionDialog::update_material_filter()
+{
+    const std::optional<std::string> material = m_combobox_material_type->current_index() == 0 ?
+        std::nullopt :
+        std::optional<std::string>{m_combobox_material_type->current_label()};
+
+    m_project_interactor.matdb_interactor()
+        .query(m_material_index, m_input_text_search_materials->text(), material);
+}
+
 MaterialSelectionDialog::MaterialSelectionDialog(
     Biz::ProjectInteractor& project_interactor,
     Navigator& navigator
@@ -101,6 +112,8 @@ MaterialSelectionDialog::MaterialSelectionDialog(
 
     create_page_materials();
 
+    set_material_index(0);
+
     set_current_tab(
         AppServices::instance().app_config().get<int>("last_material_selection_dialog_tab")
     );
@@ -128,7 +141,8 @@ void MaterialSelectionDialog::set_material_index(size_t material_index)
 
     update_preset_list();
 
-    m_project_interactor.matdb_interactor().query(m_material_index, "", std::nullopt);
+    m_project_interactor.matdb_interactor()
+        .query(m_material_index, m_input_text_search_materials->text(), std::nullopt);
 }
 
 void MaterialSelectionDialog::on_list_selection_changed(Domain::SelectionId new_selection)
@@ -346,8 +360,6 @@ void MaterialSelectionDialog::create_page_presets()
             m_callbacks.advanced_settings_tab_opened(current_index);
         }
     };
-
-    set_material_index(0);
 }
 
 void MaterialSelectionDialog::create_page_materials()
@@ -356,6 +368,15 @@ void MaterialSelectionDialog::create_page_materials()
     filters_wrap->set_orientation(Orientation::Horizontal);
     filters_wrap->set_gap(5_fpx);
     filters_wrap->set_flex_grow(1.f);
+
+    m_combobox_material_type = filters_wrap->emplace_back<ComboBox>("ComboBoxMaterialType");
+    m_combobox_material_type->set_width(140_fpx);
+    std::vector<std::string> types{Biz::_u8L("Any Material")};
+    types.reserve(m_project_interactor.matdb_interactor().types().size() + 1);
+    std::ranges::copy(m_project_interactor.matdb_interactor().types(), std::back_inserter(types));
+    m_combobox_material_type->set_items(types);
+    m_combobox_material_type->callbacks().selection_changed = [this](int)
+    { update_material_filter(); };
 
     m_page_materials->emplace_back<Separator>(Orientation::Horizontal);
 
@@ -368,13 +389,7 @@ void MaterialSelectionDialog::create_page_materials()
     m_input_text_search_materials->set_hint(_u8L("Search..."));
     m_input_text_search_materials->set_flex_grow(1);
     m_input_text_search_materials->callbacks().text_changed = [this]()
-    {
-        m_project_interactor.matdb_interactor().query(
-            m_material_index,
-            m_input_text_search_materials->text(),
-            std::nullopt
-        );
-    };
+    { update_material_filter(); };
 
     m_page_materials->emplace_back<Separator>(Orientation::Horizontal);
 
@@ -404,8 +419,6 @@ void MaterialSelectionDialog::create_page_materials()
     m_spool_selection_row_list_view->set_source_list(
         &m_project_interactor.matdb_interactor().result()
     );
-
-    m_project_interactor.matdb_interactor().query(m_material_index, "", std::nullopt);
 }
 
 MaterialSettingsDialog& MaterialSelectionDialog::material_settings_dialog()

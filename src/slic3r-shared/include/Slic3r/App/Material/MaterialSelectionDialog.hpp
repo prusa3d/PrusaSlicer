@@ -73,6 +73,7 @@ private:
     ProjectContext& context();
     const ProjectContext& context() const;
     void update_current_context();
+    void update_material_filter();
 
 private:
     using SelectionRowListViewFactory = Yoga::ViewFactory<
@@ -128,6 +129,7 @@ private:
     Yoga::Item* m_page_materials                               = nullptr;
     Yoga::InputText* m_input_text_search_materials             = nullptr;
     SpoolSelectionRowListView* m_spool_selection_row_list_view = nullptr;
+    Yoga::ComboBox* m_combobox_material_type                   = nullptr;
 
     struct ProjectContext
     {
