@@ -2628,10 +2628,13 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
     });
 
     // initialize layout
+    // The tab panel is added to this sizer later (MainFrame::update_layout()), so it is still
+    // empty here. Don't SetSizeHints()/Fit() it: fitting an empty sizer sizes the window to its
+    // decorations only, which on X11 WMs reporting zero side frame extents becomes
+    // gtk_window_resize(1, 0) ("assertion 'height > 0' failed"). The explicit
+    // SetMinSize()/SetSize() below sets the real size.
     auto sizer = new wxBoxSizer(wxVERTICAL);
-    sizer->SetSizeHints(this);
     SetSizer(sizer);
-    Fit();
 
     const wxSize min_size = wxSize(85 * em_unit(), 50 * em_unit());
 #ifdef __APPLE__

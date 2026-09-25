@@ -149,10 +149,20 @@ void load_tokens_linux(UserAccountCommunication::StoreData& result)
         boost::system::error_code ec;
         bool delete_after_read = false;
         if (!boost::filesystem::exists(source, ec) || ec) {
+            const boost::system::error_code primary_ec = ec;
             source = boost::filesystem::path(Slic3r::data_dir()) / "UserAcountData.dat";
             ec.clear();            
             if (!boost::filesystem::exists(source, ec) || ec) {
-                BOOST_LOG_TRIVIAL(error) << "UserAccount: Failed to read token - no datafile found.";
+                if (primary_ec || ec) {
+                    // A datafile could not even be examined (permissions, I/O error).
+                    BOOST_LOG_TRIVIAL(error)
+                        << "UserAccount: Failed to read token - cannot access datafile: "
+                        << (primary_ec ? primary_ec : ec).message();
+                } else {
+                    // No datafile simply means the user is not logged in - not an error.
+                    BOOST_LOG_TRIVIAL(info)
+                        << "UserAccount: Failed to read token - no datafile found.";
+                }
                 return;
             }
             delete_after_read = true;
