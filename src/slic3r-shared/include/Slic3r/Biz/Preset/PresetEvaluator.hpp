@@ -21,8 +21,12 @@ public:
     using EvaluatedPrinterPreset = Domain::Preset::EvaluatedPrinterPreset;
     using EvaluatedPrinterPresets = std::vector<EvaluatedPrinterPreset>;
 
-    explicit PresetEvaluator(const Domain::Preset::PresetCollection& presets)
-        : m_presets(presets)
+    PresetEvaluator(
+        const Domain::Preset::PresetCollection& presets,
+        const Domain::Preset::VendorInfo& vendor_info
+    ) :
+        m_presets(presets),
+        m_vendor_info(vendor_info)
     {
         build_named_presets();
     }
@@ -88,6 +92,7 @@ private:
 
 private:
     const Domain::Preset::PresetCollection& m_presets;
+    const Domain::Preset::VendorInfo& m_vendor_info;
     IdentifiedPresetsCollection m_preset_ids;
     Expr::Eval m_eval;
 };

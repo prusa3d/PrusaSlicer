@@ -547,6 +547,14 @@ PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrint
         );
         update_printer_preset_from_hw_config(hw_config, ep.preset.config_box());
 
+        auto printer_preset_eval_values = printer_tools_values;
+        for (auto& v : printer_preset_eval_values) {
+            // propagate printer preset features
+            append_printer_preset_feature_values(v, ep.preset.features, m_vendor_info);
+        }
+        // also propagate features to printer_values (are reused for tool/material preset evals)
+        append_printer_preset_feature_values(printer_values, ep.preset.features, m_vendor_info);
+
         // 2. Print preset
         PresetKind print_kind = Domain::Preset::print_kind(hw_config.technology);
         auto prints_it        = m_presets.find(print_kind);
@@ -555,7 +563,7 @@ PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrint
 
         PresetCollectionEvaluator
             print_eval(prints_it->second, print_names_it->second, m_eval, {}, hw_config.name);
-        auto print_presets = print_eval.eval_preset(printer_tools_values);
+        auto print_presets = print_eval.eval_preset(printer_preset_eval_values);
 
         // 3. Tool print presets
         // for each tool
@@ -573,9 +581,21 @@ PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrint
             Domain::Preset::AllToolsEvaluatedToolPrintPresets tools;
 
             Expr::ValueMap print_values = printer_values;
-            std::visit([&print_values](const auto& v) {
-                append_print_values(print_values, v);
-            }, evaluated_print_preset.values);
+            append_print_preset_feature_values(
+                print_values,
+                evaluated_print_preset.features,
+                m_vendor_info
+            );
+            std::visit(
+                [&print_values](const auto& v)
+                {
+                    append_print_values(
+                        print_values,
+                        v
+                    );
+                },
+                evaluated_print_preset.values
+            );
 
             if (hw_config.technology == Domain::PrinterTechnology::FFF) {
                 PresetCollectionEvaluator

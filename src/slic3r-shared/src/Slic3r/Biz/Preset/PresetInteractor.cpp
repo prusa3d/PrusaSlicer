@@ -230,7 +230,7 @@ void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bu
     const auto& vendor_bundle = mut_vendor_bundle;
 
     // Update presets for global hw configs
-    PresetEvaluator preset_evaluator{vendor_bundle.presets};
+    PresetEvaluator preset_evaluator{vendor_bundle.presets, vendor_bundle.vendor_data.info};
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, vendor_bundle.printer_configs.size()),
         [&](const tbb::blocked_range<size_t>& r) {
@@ -954,7 +954,8 @@ bool PresetInteractor::update_changed_printer_configs(
             for (std::size_t index{range.begin()}; index < range.end(); ++index) {
                 const Domain::Preset::HwPrinterConfig& hw_config{hw_configs[index]};
                 const auto& vendor_bundle{preset_bundle.vendor_bundles.at(hw_config.vendor_id)};
-                PresetEvaluator preset_evaluator{vendor_bundle.presets};
+                PresetEvaluator
+                    preset_evaluator{vendor_bundle.presets, vendor_bundle.vendor_data.info};
                 PresetEvaluator::EvaluatedPrinterPresets& evaluated_printer_presets{
                     evaluated_presets.at(index)};
                 try {
@@ -1030,7 +1031,7 @@ bool PresetInteractor::update_changed_selected_preset_hw_config(Domain::Preset::
     std::string selected_printer_preset_id;
     auto& preset_bundle = m_workbench.preset_bundle();
     auto& vendor_bundle = preset_bundle.vendor_bundles.at(hw_config.vendor_id);
-    PresetEvaluator preset_evaluator{vendor_bundle.presets};
+    PresetEvaluator preset_evaluator{vendor_bundle.presets, vendor_bundle.vendor_data.info};
     PresetEvaluator::EvaluatedPrinterPresets epps;
     try {
         epps = preset_evaluator.evaluate(hw_config);
@@ -3571,7 +3572,7 @@ tl::expected<void, std::string>  PresetInteractor::load_selected_preset_from_3mf
         auto vb_it = preset_bundle.vendor_bundles.find(selected_preset.hw_config.vendor_id);
         if (vb_it != preset_bundle.vendor_bundles.end()) {
             const auto& vendor_bundle = vb_it->second;
-            PresetEvaluator preset_evaluator{vendor_bundle.presets};
+            PresetEvaluator preset_evaluator{vendor_bundle.presets, vendor_bundle.vendor_data.info};
             try {
                 auto epps             = preset_evaluator.evaluate(selected_preset.hw_config);
                 const auto& hw_config = selected_preset.hw_config;

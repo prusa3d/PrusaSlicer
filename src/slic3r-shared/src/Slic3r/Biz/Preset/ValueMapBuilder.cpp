@@ -36,11 +36,36 @@ void append_printer_values(Expr::ValueMap& values, const Domain::Preset::HwPrint
     append_sheet_values(values, printer.sheet);
 }
 
-void append_print_values(Expr::ValueMap& values, const Domain::ConfigBox& print_preset)
+void append_printer_preset_feature_values(
+    Expr::ValueMap& values,
+    const Domain::Preset::FeatureValueMap& features,
+    const Domain::Preset::VendorInfo& vendor_info
+)
 {
-    auto it = print_preset.find("layer_height");
-    if (it.item)
+    auto feats = Domain::Preset::build_features(vendor_info.features.presets.printer);
+    Domain::Preset::override_features(feats, features);
+    append_values(values, "printer.", feats);
+}
+
+void append_print_values(
+    Expr::ValueMap& values,
+    const Domain::ConfigBox& print_preset
+)
+{
+    if (auto it = print_preset.find("layer_height"); it.item) {
         append_value(values, "print.layer_height", it.item->value().get<double>());
+    }
+}
+
+void append_print_preset_feature_values(
+    Expr::ValueMap& values,
+    const Domain::Preset::FeatureValueMap& features,
+    const Domain::Preset::VendorInfo& vendor_info
+)
+{
+    auto feats = Domain::Preset::build_features(vendor_info.features.presets.print);
+    Domain::Preset::override_features(feats, features);
+    append_values(values, "print.", feats);
 }
 
 void append_tool_values(Expr::ValueMap& values, const Domain::Preset::HwToolConfig& tool)

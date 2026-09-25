@@ -313,13 +313,21 @@ struct HwPrinterConfigTemplate
 
 using HwPrinterConfigTemplates = std::vector<HwPrinterConfigTemplate>;
 
+struct PresetFeatures
+{
+    FeatureDefs printer;
+    FeatureDefs print;
+    FeatureDefs toolprint;
+    FeatureDefs material;
+};
+
 struct VendorFeatures
 {
     FeatureDefs printer;
     FeatureDefs tool;
     FeatureDefs feeder;
     FeatureDefs sheet;
-
+    PresetFeatures presets;
 };
 
 struct PrinterFamilyInfo

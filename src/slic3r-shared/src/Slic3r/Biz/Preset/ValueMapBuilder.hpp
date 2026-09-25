@@ -143,7 +143,23 @@ void append_values(
 
 void append_printer_values(Expr::ValueMap& values, const Domain::Preset::HwPrinterConfig& printer);
 
-void append_print_values(Expr::ValueMap& values, const Domain::ConfigBox& print_preset);
+void append_printer_preset_feature_values(
+    Expr::ValueMap& values,
+    const Domain::Preset::FeatureValueMap& features,
+    const Domain::Preset::VendorInfo& vendor_info
+);
+
+
+void append_print_values(
+    Expr::ValueMap& values,
+    const Domain::ConfigBox& print_preset
+);
+
+void append_print_preset_feature_values(
+    Expr::ValueMap& values,
+    const Domain::Preset::FeatureValueMap& features,
+    const Domain::Preset::VendorInfo& vendor_info
+);
 
 void append_tool_values(Expr::ValueMap& values, const Domain::Preset::HwToolConfig& tool);
 

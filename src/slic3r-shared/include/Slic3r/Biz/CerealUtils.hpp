@@ -474,9 +474,15 @@ void serialize(Archive& archive, Slic3r::Domain::Preset::HwPrinterConfigTemplate
 }
 
 template <class Archive>
+void serialize(Archive& archive, Slic3r::Domain::Preset::PresetFeatures& features)
+{
+    archive(features.printer, features.print, features.toolprint, features.material);
+}
+
+template <class Archive>
 void serialize(Archive& archive, Slic3r::Domain::Preset::VendorFeatures& features)
 {
-    archive(features.printer, features.tool, features.feeder, features.sheet);
+    archive(features.printer, features.tool, features.feeder, features.sheet, features.presets);
 }
 
 template <class Archive>

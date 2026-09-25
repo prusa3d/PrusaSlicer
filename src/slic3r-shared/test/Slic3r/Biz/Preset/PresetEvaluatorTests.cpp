@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "Slic3r/Biz/Preset/PresetEvaluator.hpp"
+#include "Slic3r/Biz/Preset/IO/HwConfigLoader.hpp"
 #include "Slic3r/Biz/Preset/IO/PresetLoader.hpp"
 #include "Slic3r/Biz/Yaml/Yaml.hpp"
 #include "Slic3r/TestUtils/TestData.hpp"
@@ -24,7 +25,8 @@ TEST_CASE("Preset Evaluator", "[preset]")
         FAIL();
     }
 
-    PresetEvaluator eval(loader.presets());
+    VendorInfo vendor_info;
+    PresetEvaluator eval(loader.presets(), vendor_info);
 
     HwPrinterConfig hw_config = {
         .technology = Slic3r::Domain::PrinterTechnology::FFF,
@@ -73,7 +75,8 @@ TEST_CASE("Material cache produces same results as uncached evaluation", "[prese
         FAIL();
     }
 
-    PresetEvaluator eval(loader.presets());
+    VendorInfo vendor_info;
+    PresetEvaluator eval(loader.presets(), vendor_info);
 
     // Multi-tool config where all tools share the same id/features.
     // This exercises the material cache — tools after the first reuse cached results.
@@ -127,6 +130,95 @@ TEST_CASE("Material cache produces same results as uncached evaluation", "[prese
                     REQUIRE(c_print.materials[t][i].preset.has_same_values(
                         u_print.materials[t][i].preset));
                 }
+            }
+        }
+    }
+}
+
+TEST_CASE("Preset Eval feature propagation", "[preset]")
+{
+    using namespace Slic3r::Domain::Preset;
+    using namespace Slic3r::Biz::Preset;
+    using namespace Slic3r::Biz::Preset::IO;
+    namespace Yaml = Slic3r::Biz::Yaml;
+
+    PresetLoader loader;
+    HwConfigLoader cfg_loader;
+    VendorData vendor_data;
+    try {
+        const std::string path = Tests::get_datadir().string() + "/presets-extra/feature-prop";
+        loader.load_dir(path);
+        vendor_data = cfg_loader.load(path + "/vendor.yaml");
+    } catch (const Yaml::ParseError& e) {
+        std::cout << e.what() << std::endl;
+        FAIL();
+    }
+
+
+    PresetEvaluator eval(loader.presets(), vendor_data.info);
+    HwPrinterConfig hw_config = {
+        .technology = Slic3r::Domain::PrinterTechnology::FFF,
+        .model      = {.model = "COREONE", .base_model = "COREONE"},
+        .tool_count = 1,
+        .features   = {},
+        .tools      = {
+                {.features = {
+                    std::make_pair("nozzle_diameter", FeatureValue{0.4}),
+                    std::make_pair("nozzle_high_flow", FeatureValue{false}),
+                }}
+        }
+    };
+
+    auto printer_presets = eval.evaluate(hw_config);
+    REQUIRE(printer_presets.size() == 2);
+
+    //  printer_no_feat
+    //      print_no_feat: filament_no_req, filament_forb_printer_feat, filament_forb_print_feat
+    //  printer_with_feat
+    //      print_feat: filament_no_req, filament_req_printer_feat, filament_req_print_feat
+    struct ExpectedResultKey
+    {
+        const std::string_view printer;
+        const std::string_view print;
+
+        bool operator<(const ExpectedResultKey& rhs) const
+        {
+            return printer < rhs.printer || (printer == rhs.printer && print < rhs.print);
+        }
+    };
+
+    struct ExpectedResult
+    {
+        std::vector<std::string_view> materials;
+    };
+
+    std::map<ExpectedResultKey, ExpectedResult> expected_results = {
+        {ExpectedResultKey{"printer_no_feat", "print_no_feat"},
+         ExpectedResult{
+             {"filament_no_req", "filament_forb_printer_feat", "filament_forb_print_feat"}
+         }},
+        {ExpectedResultKey{"printer_with_feat", "print_feat"},
+         ExpectedResult{
+             {"filament_no_req", "filament_req_printer_feat", "filament_req_print_feat"}
+         }},
+        {ExpectedResultKey{"printer_with_feat", "print_no_feat"},
+         ExpectedResult{
+             {"filament_no_req", "filament_req_printer_feat", "filament_forb_print_feat"}
+         }}
+    };
+    for (const auto& printer : printer_presets) {
+        for (const auto& print : printer.prints) {
+            auto it = expected_results.find({printer.preset.id, print.preset.id});
+            INFO("Printer: "  << printer.preset.id << " Print: " << print.preset.id);
+            REQUIRE(it != expected_results.end());
+            for (const auto& exp_mat_id : it->second.materials) {
+                INFO(exp_mat_id);
+                REQUIRE(
+                    std::ranges::any_of(
+                        print.materials.at(0),
+                        [&exp_mat_id](const auto& mat) { return mat.preset.id == exp_mat_id; }
+                    )
+                );
             }
         }
     }
