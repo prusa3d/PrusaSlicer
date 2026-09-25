@@ -228,6 +228,8 @@ std::string ConfigItemDef::translate_option_group(OptionGroup option_group)
         return L("Corrections");
     case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_Exposure:
         return L("Exposure");
+    case ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_CostWeight:
+        return L("Cost & Weight");
     case ConfigItemDef::OptionGroup::Filament_ExtrusionCalibration_ExtrusionCalibration:
         return L("Extrusion & Calibration");
     case ConfigItemDef::OptionGroup::Filament_ExtrusionCalibration_Compensation:

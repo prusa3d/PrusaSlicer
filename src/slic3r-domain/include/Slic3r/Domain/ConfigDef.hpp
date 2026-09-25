@@ -261,10 +261,11 @@ struct ConfigItemDef
         ///////////////// Filament //////////////////
 
         Filament_MaterialTemperatures_MaterialProperty      = 5000,
-        Filament_MaterialTemperatures_BedChamberTemperature = 5001,
-        Filament_MaterialTemperatures_NozzleTemperature     = 5002,
+        Filament_MaterialTemperatures_NozzleTemperature     = 5001,
+        Filament_MaterialTemperatures_BedChamberTemperature = 5002,
         Filament_MaterialTemperatures_Corrections           = 5003,
         Filament_MaterialTemperatures_Exposure              = 5004,
+        Filament_MaterialTemperatures_CostWeight            = 5005,
 
         Filament_ExtrusionCalibration_ExtrusionCalibration = 5100,
         Filament_ExtrusionCalibration_Compensation         = 5101,

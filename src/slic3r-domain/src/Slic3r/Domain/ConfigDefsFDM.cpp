@@ -1421,9 +1421,9 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def = defs.add("filament_density", typeid(double));
     def->location = Filament;
     def->label = L("Density");
-    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty;
+    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_CostWeight;
     def->category = ConfigItemDef::Category::Filament_MaterialTemperatures;
-    def->order = 5;
+    def->order = 1;
     def->gui_type = ConfigItemDef::GUIType::textfield;
     def->tooltip = L("Enter your filament density here. This is only for statistical information. "
                    "A decent way is to weigh a known length of filament and compute the ratio "
@@ -1469,7 +1469,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("Soluble material");
     def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty;
     def->category = ConfigItemDef::Category::Filament_MaterialTemperatures;
-    def->order = 3;
+    def->order = 2;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("Soluble material is most likely used for a soluble support.");
     def->init_fn = init_with(false);
@@ -1479,7 +1479,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->label = L("Abrasive material");
     def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty;
     def->category = ConfigItemDef::Category::Filament_MaterialTemperatures;
-    def->order = 2;
+    def->order = 1;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("This flag means that the material is abrasive and requires a hardened nozzle. The value is used by the printer to check it.");
     def->init_fn = init_with(false);
@@ -1487,9 +1487,9 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def = defs.add("filament_cost", typeid(double));
     def->location = Filament;
     def->label = L("Cost");
-    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty;
+    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_CostWeight;
     def->category = ConfigItemDef::Category::Filament_MaterialTemperatures;
-    def->order = 4;
+    def->order = 0;
     def->gui_type = ConfigItemDef::GUIType::textfield;
     def->tooltip = L("Enter your filament cost per kg here. This is only for statistical information.");
     def->units = {L("money/kg")};
@@ -1499,9 +1499,9 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def = defs.add("filament_spool_weight", typeid(double));
     def->location = Filament;
     def->label = L("Spool weight");
-    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty;
+    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_CostWeight;
     def->category = ConfigItemDef::Category::Filament_MaterialTemperatures;
-    def->order = 6;
+    def->order = 2;
     def->gui_type = ConfigItemDef::GUIType::textfield;
     def->tooltip = L("Enter weight of the empty filament spool. "
                      "One may weigh a partially consumed filament spool before printing and one may compare the measured weight "
