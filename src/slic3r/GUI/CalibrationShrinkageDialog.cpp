@@ -60,14 +60,13 @@ CalibrationShrinkageDialog::CalibrationShrinkageDialog(wxWindow* parent)
     m_brim->SetValue(false);
     sizer->Add(m_brim, 0, wxLEFT | wxRIGHT | wxBOTTOM, 15);
 
-    wxGetApp().UpdateDarkUI(m_length);
-    wxGetApp().UpdateDarkUI(m_brim);
-
     // OK / Cancel
     auto* btns = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
-    wxGetApp().UpdateDarkUI(FindWindowById(wxID_OK, this));
-    wxGetApp().UpdateDarkUI(FindWindowById(wxID_CANCEL, this));
     sizer->Add(btns, 0, wxEXPAND | wxALL, 10);
+
+    // MSW dark mode: theme every child now that all of them, the buttons
+    // included, exist. No-op on other platforms.
+    wxGetApp().UpdateDlgDarkUI(this);
 
     SetSizer(sizer);
     sizer->SetSizeHints(this);

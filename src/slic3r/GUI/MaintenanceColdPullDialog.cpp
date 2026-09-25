@@ -125,6 +125,10 @@ MaintenanceColdPullPreflightDialog::MaintenanceColdPullPreflightDialog(wxWindow*
 
     update_continue_enabled();
 
+    // MSW dark mode: theme every child now that all of them, the buttons
+    // included, exist. No-op on other platforms.
+    wxGetApp().UpdateDlgDarkUI(this);
+
     SetSizerAndFit(top);
     CenterOnParent();
 }
@@ -172,28 +176,39 @@ MaintenanceColdPullDialog::MaintenanceColdPullDialog(wxWindow* parent,
     // progress and a Cancel that restores printer state. With nothing detected
     // the entry is disabled -- selecting it could only fail -- and the G-code
     // file route becomes the default.
-    wxArrayString choices;
-    choices.Add(_L("Save G-code file (run it from a USB drive)"));
-    if (m_upload_available)
-        choices.Add(_L("Upload G-code to the printer"));
-    choices.Add(m_serial_available
-                    ? _L("Run over USB serial from here")
-                    : _L("Run over USB serial from here (no printer detected)"));
+    //
+    // A group of wxRadioButtons rather than a wxRadioBox: on MSW the radio box
+    // items are plain themed BUTTON windows that ignore the text colour, so in
+    // dark mode their labels would stay black on the dark background (the
+    // same family of bug as #53). wxRadioButton is owner-drawn once coloured,
+    // so it follows the theme.
+    auto* delivery_box = new wxStaticBoxSizer(wxVERTICAL, this, _L("How to run it"));
 
-    m_delivery = new wxRadioBox(this, wxID_ANY, _L("How to run it"),
-                                wxDefaultPosition, wxDefaultSize,
-                                choices, 1, wxRA_SPECIFY_COLS);
+    m_rb_save = new wxRadioButton(this, wxID_ANY,
+                                  _L("Save G-code file (run it from a USB drive)"),
+                                  wxDefaultPosition, wxDefaultSize, wxRB_GROUP);
+    delivery_box->Add(m_rb_save, 0, wxLEFT | wxRIGHT | wxTOP, 8);
 
-    // Serial is always the last entry; "Upload" is only present when a print
-    // host is configured, so derive the index rather than hard-coding it.
-    const int serial_index = m_delivery->GetCount() - 1;
-    if (m_serial_available) {
-        m_delivery->SetSelection(serial_index);
-    } else {
-        m_delivery->Enable(serial_index, false);
-        m_delivery->SetSelection(0);
+    // "Upload" is only offered when a print host is configured.
+    if (m_upload_available) {
+        m_rb_upload = new wxRadioButton(this, wxID_ANY, _L("Upload G-code to the printer"));
+        delivery_box->Add(m_rb_upload, 0, wxLEFT | wxRIGHT | wxTOP, 8);
     }
-    top->Add(m_delivery, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+
+    const wxString serial_label =
+        m_serial_available ? _L("Run over USB serial from here")
+                           : _L("Run over USB serial from here (no printer detected)");
+    m_rb_serial = new wxRadioButton(this, wxID_ANY, serial_label);
+    delivery_box->Add(m_rb_serial, 0, wxLEFT | wxRIGHT | wxTOP, 8);
+    delivery_box->AddSpacer(8);
+
+    if (m_serial_available) {
+        m_rb_serial->SetValue(true);
+    } else {
+        m_rb_serial->Enable(false);
+        m_rb_save->SetValue(true);
+    }
+    top->Add(delivery_box, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
 
     auto* delivery_hint = new wxStaticText(this, wxID_ANY,
         m_serial_available
@@ -263,20 +278,24 @@ MaintenanceColdPullDialog::MaintenanceColdPullDialog(wxWindow* parent,
         ok->SetLabel(_L("Start"));
     top->Add(buttons, 0, wxEXPAND | wxALL, 10);
 
+    // MSW dark mode: theme every child now that all of them, the buttons
+    // included, exist. No-op on other platforms.
+    wxGetApp().UpdateDlgDarkUI(this);
+
     SetSizerAndFit(top);
     CenterOnParent();
 }
 
 ColdPullDelivery MaintenanceColdPullDialog::delivery() const
 {
-    // "Upload" is only present in the list when a print host is configured, so
-    // map by position rather than by a fixed index.
-    const int sel = m_delivery->GetSelection();
-    if (sel == 0)
-        return ColdPullDelivery::SaveGcode;
-    if (m_upload_available && sel == 1)
+    // Map by which button is checked, not by position: "Upload" exists only
+    // when a print host is configured. Exactly one button of the group is
+    // checked; the non-destructive file route is the fallback.
+    if (m_rb_serial->GetValue())
+        return ColdPullDelivery::Serial;
+    if (m_rb_upload != nullptr && m_rb_upload->GetValue())
         return ColdPullDelivery::UploadGcode;
-    return ColdPullDelivery::Serial;
+    return ColdPullDelivery::SaveGcode;
 }
 
 // The spinner shows the nozzle number printed on the machine (1–8); the

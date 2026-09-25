@@ -82,16 +82,15 @@ CalibrationFlowDialog::CalibrationFlowDialog(wxWindow* parent)
     m_brim->SetValue(true);
     sizer->Add(m_brim, 0, wxLEFT | wxRIGHT | wxBOTTOM, 15);
 
-    wxGetApp().UpdateDarkUI(m_start_flow);
-    wxGetApp().UpdateDarkUI(m_end_flow);
-    wxGetApp().UpdateDarkUI(m_flow_step);
-    wxGetApp().UpdateDarkUI(m_brim);
-
     // OK / Cancel
     auto* btns = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
-    wxGetApp().UpdateDarkUI(FindWindowById(wxID_OK, this));
-    wxGetApp().UpdateDarkUI(FindWindowById(wxID_CANCEL, this));
     sizer->Add(btns, 0, wxEXPAND | wxALL, 10);
+
+    // MSW dark mode: theme every child now that all of them, the buttons
+    // included, exist. It recurses into the generic wxSpinCtrlDouble's inner
+    // text field, which a per-control UpdateDarkUI() never reaches (#53).
+    // No-op on other platforms.
+    wxGetApp().UpdateDlgDarkUI(this);
 
     SetSizer(sizer);
     sizer->SetSizeHints(this);

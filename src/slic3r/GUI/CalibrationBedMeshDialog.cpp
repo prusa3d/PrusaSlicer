@@ -119,6 +119,10 @@ CalibrationBedMeshDialog::CalibrationBedMeshDialog(wxWindow* parent, int extrude
         ok->SetLabel(_L("Start probing"));
     top->Add(buttons, 0, wxALL | wxALIGN_RIGHT, 10);
 
+    // MSW dark mode: theme every child now that all of them, the buttons
+    // included, exist. No-op on other platforms.
+    wxGetApp().UpdateDlgDarkUI(this);
+
     SetSizerAndFit(top);
     CenterOnParent();
 }

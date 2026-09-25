@@ -7,7 +7,7 @@
 
 #include <wx/dialog.h>
 #include <wx/checkbox.h>
-#include <wx/radiobox.h>
+#include <wx/radiobut.h>
 #include <wx/spinctrl.h>
 
 #include <vector>
@@ -73,7 +73,12 @@ public:
     int pull_temp_c()  const;
 
 private:
-    wxRadioBox* m_delivery{nullptr};
+    // Delivery-route radio group. m_rb_upload stays null when no print host is
+    // configured; m_rb_serial is disabled when no printer was detected.
+    wxRadioButton* m_rb_save{nullptr};
+    wxRadioButton* m_rb_upload{nullptr};
+    wxRadioButton* m_rb_serial{nullptr};
+
     wxSpinCtrl* m_tool{nullptr};
     wxSpinCtrl* m_flush_temp{nullptr};
     wxSpinCtrl* m_pull_temp{nullptr};

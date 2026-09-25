@@ -96,10 +96,6 @@ CalibrationTempDialog::CalibrationTempDialog(wxWindow* parent)
                                  wxSP_ARROW_KEYS, 1, 50, 5);
     grid->Add(m_temp_step, 0, wxEXPAND);
 
-    wxGetApp().UpdateDarkUI(m_start_temp);
-    wxGetApp().UpdateDarkUI(m_end_temp);
-    wxGetApp().UpdateDarkUI(m_temp_step);
-
     sizer->Add(grid, 0, wxALL | wxEXPAND, 15);
 
     m_brim = new wxCheckBox(this, wxID_ANY, _L("Add 5 mm brim"));
@@ -108,9 +104,11 @@ CalibrationTempDialog::CalibrationTempDialog(wxWindow* parent)
 
     // OK / Cancel
     auto* btns = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
-    wxGetApp().UpdateDarkUI(FindWindowById(wxID_OK, this));
-    wxGetApp().UpdateDarkUI(FindWindowById(wxID_CANCEL, this));
     sizer->Add(btns, 0, wxEXPAND | wxALL, 10);
+
+    // MSW dark mode: theme every child now that all of them, the buttons
+    // included, exist. No-op on other platforms.
+    wxGetApp().UpdateDlgDarkUI(this);
 
     SetSizer(sizer);
     sizer->SetSizeHints(this);
