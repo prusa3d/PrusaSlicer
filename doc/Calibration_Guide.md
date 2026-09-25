@@ -15,10 +15,41 @@ Run the calibrations in this order — each one builds on the results of the pre
 | 5 | Max Volumetric Flow Rate | Calibration → **Max FlowRate** |
 | 6 | Fan Speed | Calibration → **Fan Speed** |
 | 7 | Dimensional Accuracy | Calibration → **Dimensional Accuracy** → *XYZ Shrinkage Gauge* / *Califlower* |
-| — | XY Skew Correction | Printer Settings → General (a one-time printer setting, §8) |
+| — | XY Skew Correction | Printers → General (a one-time printer setting, §8) |
 | — | Bed Mesh | Calibration → **Bed Mesh** (diagnostic, §9) |
 
 > **About the screenshots:** example images live in `doc/images/` and are referenced as `![…](images/cal_*.png)`. If an image is missing, generate that test, frame the bed, and save a screenshot to the indicated path.
+
+---
+
+## Applying a result — where each value goes
+
+Each test section ends with an **Apply the result** step that names the exact setting to change. The table below collects them. Paths read *tab → page → group*, using the tab names shown in the top bar: **Print Settings**, **Filaments** and **Printers**.
+
+> **Before you apply a result**
+>
+> - **The tests change your presets.** Every test in §1–§7a temporarily changes the **Print Settings** preset (brim, speeds, layer height, …). YOLO, PA Line and Retraction also change the **Printers** preset (for example *Supports binary G-code* off and *Use relative E distances* on). Fan, PA Tower and Retraction also change the **Filaments** preset (fan, slowdown and retraction settings). All of these show up as unsaved changes.
+> - **Revert the test changes before you save.** In each changed tab, select the same preset again from its drop-down and choose **Discard**. If no dialog appears, PrusaSlicer is applying a choice you told it to remember, which may keep or even save the test changes: turn on Preferences → *Ask for unsaved changes in presets when selecting new preset* first. The orange back-arrow at the top of a tab only resets the page you are looking at, not the whole tab. If a test change was saved by mistake, set it back and save again. Watch for *Supports binary G-code*: if it was saved switched off, every later print is written as ASCII G-code.
+> - **Save each result before you start the next test.** Starting a test discards unsaved changes. Every test discards unsaved Print Settings edits. PA Tower and Retraction also discard unsaved Filaments edits, and YOLO and Retraction discard unsaved Printers edits. The safe order is: revert the test changes → enter the result → save → run the next test.
+> - **Some settings only appear in Advanced or Expert mode.** The *Mode* column below says which mode shows each one. Switch modes with the button at the top right of the window. It reads *Beginner mode*, *Normal mode* or *Expert mode*, which this guide calls Simple, Advanced and Expert.
+> - **System presets are read-only.** Saving changes to a system preset (for example a Prusament filament) asks for a new name and creates a user preset. Keep that user preset selected from then on.
+> - **To find a setting by name,** use the search box in the top bar or **Edit → Search** (Ctrl+F, or ⌘F on macOS).
+> - **If you use FilamentDB:** the per-nozzle values FilamentDB stores for a filament (extrusion multiplier, pressure advance, max volumetric speed and retraction) are re-applied whenever a printer preset loads, and they replace what you entered. Saving a filament preset also sends it to FilamentDB, and a notification on the Plater says whether that worked. Make sure FilamentDB ends up with the new values too, or the old ones come back. Check pressure advance in particular, and any retraction length you set on the Printers tab: it is not part of the filament preset, so saving the filament does not send it, and FilamentDB's stored retraction overrides it.
+
+| Test | Setting to change | Where to find it | Mode |
+|------|-------------------|------------------|------|
+| [1. Temperature Tower](#1-temperature-tower) | **Other layers** (optionally **First layer**) | Filaments → Filament → Temperature → *Nozzle* row | Simple |
+| [2. Flow Ratio](#2-flow-ratio) (YOLO or vase cube) | **Extrusion multiplier** | Filaments → Filament → Filament | Advanced |
+| [3. Pressure Advance](#3-pressure-advance) | The PA command in **Start G-code** | Filaments → Custom G-code → Start G-code | Expert |
+| [4. Retraction](#4-retraction), per filament (recommended) | **Retraction length** (tick its checkbox) | Filaments → Filament Overrides → Retraction | Simple |
+| [4. Retraction](#4-retraction), default for every filament | **Retraction length** | Printers → Extruder 1 → Retraction | Simple |
+| [5. Max Volumetric Flow Rate](#5-max-volumetric-flow-rate) | **Max volumetric speed** | Filaments → Advanced → Print speed override | Advanced |
+| [6. Fan Speed](#6-fan-speed) | **Keep fan always on** | Filaments → Cooling → Enable | Simple |
+| [6. Fan Speed](#6-fan-speed) | **Min** and **Max** (*Fan speed* row), **Bridges fan speed** | Filaments → Cooling → Fan settings | Expert |
+| [7a. XYZ Shrinkage Gauge](#7a-xyz-shrinkage-gauge) | **Shrinkage compensation XY** and **Shrinkage compensation Z** | Filaments → Advanced → Shrinkage compensation | Advanced |
+| [7b. Califlower](#7b-califlower) | Depends on the correction (see §7b) | — | — |
+| [8. XY Skew Correction](#8-xy-skew-correction) | **XY Skew Correction** | Printers → General → Skew Correction | Expert |
+| [9. Bed Mesh](#9-bed-mesh-visualization) | Nothing: the bed mesh is diagnostic only | — | — |
 
 ---
 
@@ -48,7 +79,9 @@ Examine each tier for:
 - **Layer adhesion**: Try snapping a tier off. If layers separate easily, the temperature is too low.
 - **Surface quality**: Check the flat surfaces and the protrusion bar. Rough or blobby surfaces suggest too-high temperature.
 
-Choose the tier that shows the best overall balance and set your filament temperature to that value.
+Choose the tier that shows the best overall balance.
+
+**Apply the result:** set Filaments → Filament → Temperature → *Nozzle* row → **Other layers** to the winning tier's temperature. **First layer**, on the same row, is usually set to the same value or a few degrees higher. Save the preset.
 
 ---
 
@@ -79,7 +112,7 @@ Flow ratio (a.k.a. the extrusion multiplier) sets how much plastic the printer l
    - **Too much flow** (positive pads): material buildup at the inner spiral, ridged surface
    - **Correct flow**: smooth, flat, uniform top surface with clean spiral arcs
 2. Run your finger across the pads — the correct one feels smoothest.
-3. Add the winning pad's modifier to your current extrusion multiplier. For example, if `.02` looks best and your current multiplier is 0.98, set it to 1.00.
+3. Note the winning pad's modifier, which is the number on its label tab (`.02` means +2 %).
 
 **Why the pads can look similar — and how the flow is actually changed:**
 
@@ -87,6 +120,14 @@ Flow ratio (a.k.a. the extrusion multiplier) sets how much plastic the printer l
 - With the default **1% step**, neighbouring pads differ by only 1% of flow, which on a well-tuned filament can be genuinely hard to distinguish by eye. Compare the **extremes first** (`-.05` vs `+.05`) to find the direction, then narrow in. If you want larger, more obvious differences between pads, raise the **step percentage**.
 
 > Note: in PrusaSlicer Filament Edition **1.7.x** a bug made every pad print at identical flow; this was fixed in **1.8.0**. If you are on an older build, update before running this test.
+
+**Apply the result:** each pad's flow is your current extrusion multiplier scaled by (1 + modifier), so:
+
+```
+new_multiplier = current_multiplier × (1 + modifier)
+```
+
+For example, if `.02` looks best and your current multiplier is 0.98, the new value is 0.98 × 1.02 ≈ 1.00. Simply adding the modifier to the current multiplier gives almost the same number. Enter the new value in Filaments → Filament → Filament → **Extrusion multiplier** (Advanced mode). Save the preset.
 
 ### 2b. Extrusion Multiplier (vase cube)
 
@@ -111,7 +152,11 @@ Flow ratio (a.k.a. the extrusion multiplier) sets how much plastic the printer l
 new_multiplier = expected_width / measured_width × current_multiplier
 ```
 
-4. Update the extrusion multiplier in your filament profile and re-print to verify.
+`expected_width` is the wall width the slicer planned. Slice the cube, open the **Preview**, switch the legend's view to **Width (mm)** and read the wall's width at mid-height. For the exact value of one move, use the **Show properties** button on the tool-position bar at the bottom of the Preview (the bar appears once you drag the horizontal slider back from its end). The configured value lives in Print Settings → Advanced → Extrusion width → **External perimeters**, but that field can be 0 (automatic) or a percentage, so the Preview is the more reliable source.
+
+4. Apply the new multiplier (below) and re-print to verify.
+
+**Apply the result:** enter `new_multiplier` in Filaments → Filament → Filament → **Extrusion multiplier** (Advanced mode). This is the same field as in §2a. Save the preset.
 
 ---
 
@@ -135,9 +180,9 @@ new_multiplier = expected_width / measured_width × current_multiplier
    - For direct drive extruders, try 0.0 to 0.1 with a step of 0.005.
    - For Bowden extruders, try 0.0 to 2.0 with a step of 0.05.
 3. Set the **Test Speed** (default 100 mm/s). PA differences only become visible at high print speeds because the corner pressure spike scales with extrusion rate. The dialog overrides the print preset's perimeter / infill / gap-fill speeds to this value, and the filament preset's `slowdown_below_layer_time` is set to 0 so PrusaSlicer's cooling logic doesn't slow the thin chevron layers down. Without these overrides, every PA value tends to produce indistinguishably blurry corners.
-4. Optionally enable the 5 mm brim for better bed adhesion.
+4. Optionally enable the 5 mm brim for better bed adhesion (Chevron tower only — the Line style prints its own anchor bars and always turns the brim off).
 5. Click OK. The test geometry appears on the bed with the PA commands wired up (auto-detected for your firmware).
-6. After slicing, **verify the actual speed** in the G-code preview's per-layer info — confirm the perimeters report at or near your test speed and the layer time is short. If the slicer reports something far below your test speed, your printer profile's `max_print_speed` or volumetric flow limits are the cap; raise them or pick a more compatible filament.
+6. After slicing, **verify the actual speed** in the G-code preview's per-layer info — confirm the perimeters report at or near your test speed and the layer time is short. If the slicer reports something far below your test speed, a volumetric flow limit is capping it — **Filaments → Advanced → Print speed override → Max volumetric speed** or **Print Settings → Speed → Autospeed (advanced) → Max volumetric speed** (the lower one wins); raise it or pick a more compatible filament. (`max_print_speed` only affects autospeed and does not cap the test's explicit speeds.)
 7. Print.
 
 **How to evaluate:**
@@ -154,11 +199,32 @@ Note the height of the best-looking layer, then calculate the PA value:
 PA = start_PA + (layer_number / layers_per_level) × step
 ```
 
-The layer count for each level (default 4 layers) is printed from bottom to top. Set the optimal PA value in your printer firmware configuration.
+The layer count for each level (default 4 layers) is printed from bottom to top. To use the value, see **Apply the result** at the end of this section.
 
-> **Note:** The PA command is auto-detected from your printer profile: `M572 S` for Prusa printers (except MINI), `M900 K` for MINI and Marlin firmware, and `SET_PRESSURE_ADVANCE` for Klipper.
+> **Note:** The test picks the PA command from your printer profile's G-code flavor and printer notes. It uses `M572 S` with Prusa's input-shaper printer profiles (MK4 and XL *Input Shaper*, MK4S, MK3.9, MK3.5, MINI *Input Shaper*, Core One) and on RepRapFirmware and the other non-Marlin flavors. It uses `M900 K` on the MK3S, the MINI, the older non-input-shaper MK4 and XL profiles and other Marlin printers, and `SET_PRESSURE_ADVANCE ADVANCE=` on Klipper.
 
 **Evaluating the Line style:** lines run front-to-back (start PA at the front, end PA at the back). Each line is printed slow → fast → slow, with the PA value printed beside it and the two ticks marking the slow/fast boundaries. At the correct PA the bead width stays uniform through the speed transitions; too little PA bulges just after the transition, too much leaves a gap. Pick the line that reads most uniform and use its printed PA.
+
+**Apply the result:** PrusaSlicer has no pressure-advance setting of its own. PA is set by a firmware command in the filament's **Start G-code**. That G-code runs at the start of every print and overrides whatever value the firmware holds, so a PA stored only in the printer's firmware configuration is overwritten on the next print. To change it:
+
+1. Switch to Expert mode and open Filaments → Custom G-code → **Start G-code**.
+2. Find the PA command. It is the same command the test used (see the note above):
+
+   | Printer / firmware | PA command |
+   |--------------------|------------|
+   | Prusa MK4 and XL *Input Shaper*, MK4S, MK3.9, MK3.5, MINI *Input Shaper*, Core One | `M572 S<value>` |
+   | Prusa MK3S / MK3S+, MINI, older non-input-shaper MK4 and XL profiles, other Marlin printers | `M900 K<value>` |
+   | Klipper | `SET_PRESSURE_ADVANCE ADVANCE=<value>` (a `pressure_advance` value in the `[extruder]` section of `printer.cfg` also works, but a Start G-code command overrides it) |
+   | RepRapFirmware (Duet) and other flavors | `M572 S<value>`, which is what the test emits. RepRapFirmware also accepts the extruder-specific form `M572 D0 S<value>`. |
+
+3. Prusa's own filament profiles usually don't hold a single number. They pick one per printer and per nozzle size, so change only the number for **your** printer and nozzle. The Start G-code has one of these shapes:
+   - A single `M572 S…` or `M900 K…` line, used on every printer the profile supports.
+   - Two branches: `{if printer_notes!~/.*(MK4IS|XLIS|MK4S|MK3.9S|COREONE).*/}` holds an `M900 K…` line for older printers, and the `{else}` branch holds an `M572 S…` line for the MK4 and XL *Input Shaper* profiles, MK4S, MK3.9 and Core One.
+   - An `M900 K…` block for the MK3S and MINI, followed by a separate `{if printer_notes=~/.*MINIIS.*/}` block and, in most of these profiles, a separate `{if printer_notes=~/.*MK3.5.*/}` block, each with its own `M572 S…` line.
+
+   Inside your printer's line, each `{if …}` or `{elsif …}` condition is followed by the value used when it matches, and `{else}` by the value used when nothing matches. Change the value whose condition matches your nozzle, for example the `0.036` in `…==0.4}0.036{elsif…` for a 0.4 mm nozzle. On `M900` lines the condition can also name the printer model (`PRINTER_MODEL_MINI`). If your nozzle has no condition of its own, change the value after that line's `{else}`. Some profiles also carry a second `M900 K…` line commented `LA 1.0`, which holds values for old Linear Advance 1.0 firmware; edit the line commented `LA 1.5` instead. Leave the other branches alone, so the preset still works on your other printers.
+4. If the Start G-code has no PA line at all, add one on its own line, for example `M572 S0.045` (use your firmware's command). Without one, the printer keeps whatever value its firmware currently has.
+5. Save the preset.
 
 ---
 
@@ -193,6 +259,13 @@ Each Z band corresponds to a known retraction distance (start at the bottom, end
 >
 > Because that rewrite runs at export/upload time, the **in-app G-code preview shows the same retraction everywhere** — this is expected and does **not** mean the test is broken. To confirm the gradient, open the **exported** `.gcode` file and look at the `G1 E-…` retraction values: they step up band by band. You will not find any `M207` commands.
 
+**Apply the result:** this test sets both retraction-length fields below to its end value and turns wipe off, so revert its changes first (see [Before you apply a result](#applying-a-result--where-each-value-goes)). Then:
+
+- **Per filament (recommended, since retraction depends on the material):** Filaments → Filament Overrides → Retraction → tick the checkbox next to **Retraction length** and enter the value.
+- **As the default for every filament:** Printers → Extruder 1 → Retraction → **Retraction length**. A ticked filament override still takes precedence over this value. The test dialog centres its default range on this printer value, not on a filament override.
+
+Save the preset.
+
 ---
 
 ## 5. Max Volumetric Flow Rate
@@ -223,13 +296,15 @@ Watch the print in progress and examine the result:
 max_flow = start_flow + (z_height / level_height) × step
 ```
 
-Set your maximum volumetric flow rate in the filament profile to slightly below this value (e.g., 90% of the measured maximum) for a safety margin.
+Use a value slightly below this (e.g., 90% of the measured maximum) for a safety margin.
 
 **Tips:**
 
 - Print at the temperature you determined from the temperature tower test.
 - The result is specific to each filament/hotend/temperature combination.
 - Higher temperatures generally allow higher flow rates but may reduce print quality.
+
+**Apply the result:** set Filaments → Advanced → Print speed override → **Max volumetric speed** (Advanced mode) to about 90 % of the measured maximum. There is also a print-wide cap at Print Settings → Speed → Autospeed (advanced) → **Max volumetric speed** (Expert mode). When both are set (non-zero), the lower one wins. Save the preset.
 
 ---
 
@@ -261,7 +336,18 @@ At each level, examine:
 
 Find the level with the best balance of bridge quality, overhang sharpness, and layer adhesion. That's your optimal fan speed for this filament.
 
-> **Note:** The fan speed test disables PrusaSlicer's automatic cooling system (including bridge fan speed) so that only the calibration M106 commands control the fan. Your filament's fan settings will be restored when you discard changes or switch presets.
+> **Note:** The fan speed test disables PrusaSlicer's automatic cooling system (including bridge fan speed) so that only the calibration M106 commands control the fan. Your filament's fan settings come back when you revert the test's changes, as described below.
+
+**Apply the result:** revert the test's changes first (see [Before you apply a result](#applying-a-result--where-each-value-goes)), because the test turned off auto cooling, *Keep fan always on*, the bridge fan and dynamic fan speeds, zeroed *Disable fan for the first* and *Full fan speed at layer*, and set Min and Max to 0. Then, in Expert mode, under Filaments → Cooling:
+
+- Enable → tick **Keep fan always on**, so the fan never drops below Min (except on the first layers, where *Disable fan for the first* and *Full fan speed at layer* hold it lower).
+- Fan settings → *Fan speed* row → **Min** = the winning level's fan speed.
+- Fan settings → *Fan speed* row → **Max** at least as high as Min. Max is used on short layers when **Enable auto cooling** is on.
+- Fan settings → **Bridges fan speed** at least as high as Min, for example the level whose bridge shelves looked best. A bridge fan speed lower than the current fan speed is ignored.
+- If the overhang wedges looked best at a different level, use the **Dynamic fan speeds** group (**Enable dynamic fan speeds** and the per-overlap speeds) to set the fan by overhang size.
+- Leave **Enable auto cooling** as your profile had it. The test turned it off only to take control of the fan.
+
+Save the preset.
 
 ---
 
@@ -303,7 +389,7 @@ For example, if a 100 mm arm measures 99.5 mm:
 shrinkage = (1 - 99.5 / 100) × 100 = 0.5%
 ```
 
-5. Apply compensation in your slicer's XY size compensation setting, or scale the model by `100 / (100 - shrinkage)`.
+5. Apply the result as described below.
 
 **Tips:**
 
@@ -311,6 +397,19 @@ shrinkage = (1 - 99.5 / 100) × 100 = 0.5%
 - X and Y shrinkage may differ if your belt tensions are unequal.
 - Z shrinkage is usually minimal on well-calibrated printers.
 - The through-holes give inside-dimension measurements; the arm endpoints give outside-dimension measurements. Compare both.
+
+**Apply the result:** enter the percentages in Filaments → Advanced → Shrinkage compensation (Advanced mode):
+
+- **Shrinkage compensation XY**: the average of your X and Y results.
+- **Shrinkage compensation Z**: your Z result.
+
+The slicer scales the model by exactly `100 / (100 - value)`, which is the correction your measurement calls for.
+
+- Print the gauge with both fields at 0 % so the formula above applies directly. If the filament already had a value when you printed the gauge, use `new % = 100 - (100 - old %) × measured_length / target_length` instead.
+- The compensation is only applied when every extruder used in the print has identical shrinkage values. On an XL or other multi-tool printer, filaments used together need the same values, or none is applied.
+- Don't use *XY Size Compensation* for this. That setting grows or shrinks every contour by a fixed distance in mm; it is not a percentage scale.
+
+Save the preset.
 
 ### 7b. Califlower
 
@@ -324,6 +423,15 @@ shrinkage = (1 - 99.5 / 100) × 100 = 0.5%
 
 Slice and print it, then read the result per the Califlower author's instructions.
 
+**Apply the result:** Califlower's own instructions say what to measure. These are the PrusaSlicer settings its common corrections map to:
+
+- Shrinkage (X/Y/Z %) → Filaments → Advanced → Shrinkage compensation → **Shrinkage compensation XY** / **Shrinkage compensation Z** (Advanced mode; see §7a).
+- XY skew → Printers → General → Skew Correction → **XY Skew Correction** (Expert mode; see §8 for the sign convention).
+- Elephant's foot → Print Settings → Advanced → Slicing → **Elephant foot compensation** (Advanced mode).
+- Hole or outer-contour size → Print Settings → Advanced → Slicing → **XY Size Compensation** (Expert mode). This is a fixed offset in mm; negative values shrink the part and enlarge holes.
+
+Save the preset (each one you changed).
+
 ---
 
 ## 8. XY Skew Correction
@@ -334,7 +442,7 @@ The transform is: `x' = x + (y - y_ref) × tan(angle)`, where `y_ref` is the cen
 
 **How to measure skew:**
 
-1. Print a large square (e.g., 150×150 mm) using the Dimensional Accuracy gauge or a simple cube.
+1. Print a large square (e.g., 150×150 mm, a few layers tall), such as a simple box scaled to that size. The Dimensional Accuracy gauge is an XYZ cross, not a square, so it has no diagonals to measure.
 2. Measure both diagonals (AC and BD) and one side length (AD) with calipers.
 3. Calculate the skew angle:
 
@@ -352,8 +460,8 @@ angle = arctan(0.001884) = 0.108°
 
 **How to apply:**
 
-1. Go to **Printer Settings → General → Skew Correction** (Expert mode).
-2. Enter the calculated angle in the **XY Skew Correction** field (in degrees).
+1. Go to **Printers → General → Skew Correction** (Expert mode).
+2. Enter the calculated angle in the **XY Skew Correction** field (in degrees), then save the preset.
    - Use the sign that corrects the skew: if your diagonals show the frame is leaning right, use a negative value.
 3. All subsequent sliced G-code will have the correction applied automatically.
 4. Re-print the square and verify the diagonals are now equal.
@@ -506,6 +614,7 @@ Debug output (serial chatter, phase timings, mesh parsing) is routed through Boo
 
 - **Recommended calibration order**: Temperature (§1) → Flow Ratio (§2 — YOLO or Extrusion Multiplier) → Pressure Advance (§3) → Retraction (§4) → Max Flow Rate (§5) → Fan Speed (§6) → Dimensional Accuracy (§7 — XYZ Gauge or Califlower) → Skew Correction (§8) → Bed Mesh (§9, diagnostic).
 - **One variable at a time**: Only change the setting you are calibrating. Use your established values for everything else.
+- **Revert calibration overrides before saving; save each result before starting the next test.** Every test changes your presets temporarily, and starting a test discards unsaved changes. See [Applying a result](#applying-a-result--where-each-value-goes).
 - **Re-calibrate when changing**: filament brand/type, nozzle size, hotend, or extruder.
 - **Document your results**: Note the optimal values for each filament so you don't need to re-test.
 - **Brim**: Use the brim checkbox for filaments with poor bed adhesion (e.g., PETG, TPU). Disable it for PLA on a clean textured sheet.
