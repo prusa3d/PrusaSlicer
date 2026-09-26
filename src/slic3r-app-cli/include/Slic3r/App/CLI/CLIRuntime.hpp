@@ -34,8 +34,8 @@ public:
 
 private:
     const Domain::Workbench* m_workbench{nullptr};
-    Biz::Slicing::ThumbnailImageResults generate(
-        const Biz::Slicing::ThumbnailImageRequests& requests) const;
+    Biz::Slicing::ThumbnailImageResults
+    generate(const Biz::Slicing::ThumbnailImageRequests& requests) const;
 };
 
 struct ExportFinishedJobManagerStatusListener final :

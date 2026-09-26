@@ -1,7 +1,7 @@
 #include "Slic3r/App/CLI/CLIRuntime.hpp"
 
 #include "Slic3r/App/Init.hpp"
-#include "CLIThumbnailRenderer.hpp"
+#include "Slic3r/App/CLI/Thumbnails/ThumbnailRenderer.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
@@ -42,12 +42,11 @@ CLIThumbnailImageGenerator::CLIThumbnailImageGenerator(const Domain::Workbench& 
     m_workbench(&workbench)
 {}
 
-std::future<ThumbnailImageResults> CLIThumbnailImageGenerator::enqueue_thumbnail_requests(
-    const ThumbnailImageRequests& requests
-)
+std::future<ThumbnailImageResults>
+CLIThumbnailImageGenerator::enqueue_thumbnail_requests(const ThumbnailImageRequests& requests)
 {
     auto promise = std::make_shared<std::promise<ThumbnailImageResults>>();
-    auto future = promise->get_future();
+    auto future  = promise->get_future();
     if (!m_workbench || requests.empty()) {
         promise->set_value({});
         return future;
@@ -56,57 +55,68 @@ std::future<ThumbnailImageResults> CLIThumbnailImageGenerator::enqueue_thumbnail
     // Access the live project and create/use/destroy its GL context on the CLI
     // main thread. Slicing workers only wait for the resulting images.
     if (!PlatformServices::instance().main_thread_dispatcher().dispatch_on_main_thread(
-            [this, requests, promise]() {
+            [this, requests, promise]()
+            {
                 try {
                     promise->set_value(generate(requests));
                 } catch (const std::exception& error) {
                     SPDLOG_WARN("CLI thumbnails skipped: {}", error.what());
                     promise->set_value({});
                 }
-            })) {
+            }
+        ))
+    {
         promise->set_value({});
     }
     return future;
 }
 
-ThumbnailImageResults CLIThumbnailImageGenerator::generate(
-    const ThumbnailImageRequests& requests
-) const
+ThumbnailImageResults
+CLIThumbnailImageGenerator::generate(const ThumbnailImageRequests& requests) const
 {
     ThumbnailImageResults results;
     for (const auto& request : requests) {
         if (request.params.sizes.empty()
             || request.params.pixel_format != Domain::PixelFormat::RGBA8
-            || request.type == Biz::ThumbnailType::Object) continue;
+            || request.type == Biz::ThumbnailType::Object)
+            continue;
         const auto* project = m_workbench->find_project_by_id(request.params.project_id);
-        if (!project) continue;
+        if (!project)
+            continue;
         if (request.type != Biz::ThumbnailType::Scene
-            && !project->find_bed_instance_by_id(request.params.bed_instance_id)) continue;
+            && !project->find_bed_instance_by_id(request.params.bed_instance_id))
+            continue;
 
         Domain::Images images;
         const std::string filename = project->loaded_file_path().string();
-        size_t bed_count = 0;
+        size_t bed_count           = 0;
         for (const auto& config : project->config_containers())
             bed_count += config->bed_instances().size();
 
         // A stored scene preview cannot represent an individual bed in a
         // multi-bed project. Render that bed instead of reusing the scene.
         if (boost::iends_with(filename, ".3mf")
-            && (request.type == Biz::ThumbnailType::Scene || bed_count == 1)) {
+            && (request.type == Biz::ThumbnailType::Scene || bed_count == 1))
+        {
             images = get_thumbnail_images_from_3mf(filename, request.params.sizes);
         }
         bool valid = images.size() == request.params.sizes.size();
         for (size_t i = 0; valid && i < images.size(); ++i) {
-            valid = images[i].width() > 0 && images[i].height() > 0
+            valid = images[i].width() > 0
+                && images[i].height() > 0
                 && images[i].width() == request.params.sizes[i].width
                 && images[i].height() == request.params.sizes[i].height;
         }
         if (!valid) {
-            images = CLIThumbnails::render_thumbnails(*project, request, resources_dir());
+            images = Thumbnails::render_thumbnails(*project, request, resources_dir());
         }
         if (!images.empty()) {
-            results.push_back({request.type, request.params.project_id,
-                               request.params.bed_instance_id, std::move(images)});
+            results.push_back(
+                {request.type,
+                 request.params.project_id,
+                 request.params.bed_instance_id,
+                 std::move(images)}
+            );
         }
     }
     return results;
@@ -156,8 +166,7 @@ bool ProjectLoadResultListener::finished() const
     return loaded_project_id.has_value() || load_error.has_value();
 }
 
-CLIRuntime::CLIRuntime(const InitParams& init_params) :
-    m_thumbnail_image_generator{m_workbench}
+CLIRuntime::CLIRuntime(const InitParams& init_params) : m_thumbnail_image_generator{m_workbench}
 {
     PlatformServices& platform_services = PlatformServices::instance();
     platform_services.set_secret_store(std::make_unique<SecretStoreDummy>());
@@ -168,7 +177,8 @@ CLIRuntime::CLIRuntime(const InitParams& init_params) :
         std::make_unique<JobManager>(platform_services.main_thread_dispatcher())
     );
     platform_services.set_app_instance_message_handler(
-        Biz::AppInstance::create_app_instance_message_handler(platform_services.main_thread_dispatcher())
+        Biz::AppInstance::
+            create_app_instance_message_handler(platform_services.main_thread_dispatcher())
     );
 
     m_project_interactor.emplace(

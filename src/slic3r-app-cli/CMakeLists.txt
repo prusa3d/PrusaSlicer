@@ -18,15 +18,47 @@ set(SLIC3R_APP_CLI_FILES
 )
 
 
+set(CLI_THUMBNAILS_DIR src/Slic3r/App/CLI/Thumbnails)
+if(EMSCRIPTEN)
+    list(APPEND SLIC3R_APP_CLI_FILES ${CLI_THUMBNAILS_DIR}/ThumbnailRenderer_Stub.cpp)
+else()
+    list(APPEND SLIC3R_APP_CLI_FILES ${CLI_THUMBNAILS_DIR}/ThumbnailRenderer.cpp)
+    if(APPLE)
+        list(APPEND SLIC3R_APP_CLI_FILES ${CLI_THUMBNAILS_DIR}/OffscreenGLContext_CGL.cpp)
+    elseif(WIN32)
+        list(APPEND SLIC3R_APP_CLI_FILES ${CLI_THUMBNAILS_DIR}/OffscreenGLContext_WGL.cpp)
+    elseif(UNIX)
+        list(APPEND SLIC3R_APP_CLI_FILES ${CLI_THUMBNAILS_DIR}/OffscreenGLContext_EGL.cpp)
+    else()
+        list(APPEND SLIC3R_APP_CLI_FILES ${CLI_THUMBNAILS_DIR}/OffscreenGLContext_Stub.cpp)
+    endif()
+endif()
+
 add_library(slic3r-app-cli ${SLIC3R_APP_CLI_FILES})
 
 target_link_libraries(slic3r-app-cli PUBLIC
         slic3r-shared
         slic3r-biz-arrange
-        libslic3r_cli_thumbnails
 )
 
-target_include_directories(slic3r-app-cli PUBLIC include)
+target_include_directories(slic3r-app-cli PUBLIC include PRIVATE src)
+
+if(NOT EMSCRIPTEN)
+    target_link_libraries(slic3r-app-cli PRIVATE PlatformGL)
+    if(APPLE)
+        set_source_files_properties(${CLI_THUMBNAILS_DIR}/OffscreenGLContext_CGL.cpp
+                PROPERTIES COMPILE_OPTIONS -Wno-deprecated-declarations)
+    elseif(WIN32)
+        target_link_libraries(slic3r-app-cli PRIVATE gdi32 user32)
+    elseif(UNIX)
+        find_package(OpenGL COMPONENTS EGL)
+        if(TARGET OpenGL::EGL)
+            target_link_libraries(slic3r-app-cli PRIVATE OpenGL::EGL)
+        else()
+            target_link_libraries(slic3r-app-cli PRIVATE EGL)
+        endif()
+    endif()
+endif()
 
 # TODO: This temporarily allows using private header files from libslic3r in CLI.
 target_include_directories(slic3r-app-cli PUBLIC "$<TARGET_PROPERTY:libslic3r,SOURCE_DIR>/src")

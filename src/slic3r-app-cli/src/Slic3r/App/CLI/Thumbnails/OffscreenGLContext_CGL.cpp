@@ -4,7 +4,7 @@
 ///|/
 #ifdef __APPLE__
 
-#include "OffscreenGLContext.hpp"
+#include "Slic3r/App/CLI/Thumbnails/OffscreenGLContext.hpp"
 
 #include "Slic3r/Log.hpp"
 
@@ -15,15 +15,13 @@
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
 
-namespace Slic3r {
-namespace CLIThumbnails {
+namespace Slic3r::App::CLI::Thumbnails {
 namespace {
 
 class OffscreenGLContextCGL final : public OffscreenGLContext
 {
 public:
-    OffscreenGLContextCGL(int w, int h, CGLContextObj ctx)
-        : OffscreenGLContext(w, h), m_ctx(ctx) {}
+    OffscreenGLContextCGL(int w, int h, CGLContextObj ctx) : OffscreenGLContext(w, h), m_ctx(ctx) {}
 
     ~OffscreenGLContextCGL() override
     {
@@ -36,7 +34,8 @@ public:
 
     bool make_current() override
     {
-        if (!m_ctx) return false;
+        if (!m_ctx)
+            return false;
         const CGLError err = ::CGLSetCurrentContext(m_ctx);
         if (err != kCGLNoError) {
             SPDLOG_ERROR("CGLSetCurrentContext failed: {}", ::CGLErrorString(err));
@@ -50,7 +49,10 @@ public:
         ::CGLSetCurrentContext(nullptr);
     }
 
-    const char *backend_name() const override { return "CGL"; }
+    const char* backend_name() const override
+    {
+        return "CGL";
+    }
 
 private:
     CGLContextObj m_ctx = nullptr;
@@ -59,43 +61,49 @@ private:
 } // namespace
 
 std::unique_ptr<OffscreenGLContext>
-OffscreenGLContext::create(int width, int height, std::string *error_out)
+OffscreenGLContext::create(int width, int height, std::string* error_out)
 {
     // FBOs don't require a drawable, so we don't ask for PBuffer attributes
     // (which are deprecated on macOS since 10.7). We just need a context with
     // accelerated rendering and reasonable color/depth/stencil sizes.
     const CGLPixelFormatAttribute attrs[] = {
         kCGLPFAAccelerated,
-        kCGLPFAOpenGLProfile, (CGLPixelFormatAttribute)kCGLOGLPVersion_3_2_Core,
-        kCGLPFAColorSize,   (CGLPixelFormatAttribute)24,
-        kCGLPFAAlphaSize,   (CGLPixelFormatAttribute)8,
-        kCGLPFADepthSize,   (CGLPixelFormatAttribute)24,
-        kCGLPFAStencilSize, (CGLPixelFormatAttribute)8,
-        (CGLPixelFormatAttribute)0,
+        kCGLPFAOpenGLProfile,
+        (CGLPixelFormatAttribute) kCGLOGLPVersion_3_2_Core,
+        kCGLPFAColorSize,
+        (CGLPixelFormatAttribute) 24,
+        kCGLPFAAlphaSize,
+        (CGLPixelFormatAttribute) 8,
+        kCGLPFADepthSize,
+        (CGLPixelFormatAttribute) 24,
+        kCGLPFAStencilSize,
+        (CGLPixelFormatAttribute) 8,
+        (CGLPixelFormatAttribute) 0,
     };
 
-    CGLPixelFormatObj pix = nullptr;
+    CGLPixelFormatObj pix     = nullptr;
     GLint num_virtual_screens = 0;
-    CGLError err = ::CGLChoosePixelFormat(attrs, &pix, &num_virtual_screens);
+    CGLError err              = ::CGLChoosePixelFormat(attrs, &pix, &num_virtual_screens);
     if (err != kCGLNoError || pix == nullptr) {
-        const char *msg = ::CGLErrorString(err);
-        if (error_out) *error_out = std::string("CGLChoosePixelFormat: ") + (msg ? msg : "unknown");
+        const char* msg = ::CGLErrorString(err);
+        if (error_out)
+            *error_out = std::string("CGLChoosePixelFormat: ") + (msg ? msg : "unknown");
         return nullptr;
     }
 
     CGLContextObj ctx = nullptr;
-    err = ::CGLCreateContext(pix, nullptr, &ctx);
+    err               = ::CGLCreateContext(pix, nullptr, &ctx);
     ::CGLDestroyPixelFormat(pix);
     if (err != kCGLNoError || ctx == nullptr) {
-        const char *msg = ::CGLErrorString(err);
-        if (error_out) *error_out = std::string("CGLCreateContext: ") + (msg ? msg : "unknown");
+        const char* msg = ::CGLErrorString(err);
+        if (error_out)
+            *error_out = std::string("CGLCreateContext: ") + (msg ? msg : "unknown");
         return nullptr;
     }
 
     return std::make_unique<OffscreenGLContextCGL>(width, height, ctx);
 }
 
-} // namespace CLIThumbnails
-} // namespace Slic3r
+} // namespace Slic3r::App::CLI::Thumbnails
 
 #endif // __APPLE__

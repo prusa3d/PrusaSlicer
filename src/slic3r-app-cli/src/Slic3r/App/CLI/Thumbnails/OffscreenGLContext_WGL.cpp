@@ -4,7 +4,7 @@
 ///|/
 #if defined(_WIN32)
 
-#include "OffscreenGLContext.hpp"
+#include "Slic3r/App/CLI/Thumbnails/OffscreenGLContext.hpp"
 
 #include "Slic3r/Log.hpp"
 
@@ -23,17 +23,30 @@
 #define WGL_CONTEXT_CORE_PROFILE_BIT_ARB         0x00000001
 #endif
 
-namespace Slic3r {
-namespace CLIThumbnails {
+namespace Slic3r::App::CLI::Thumbnails {
 namespace {
 
-using PFNWGLCREATECONTEXTATTRIBSARBPROC = HGLRC (WINAPI *)(HDC, HGLRC, const int *);
+using PFNWGLCREATECONTEXTATTRIBSARBPROC = HGLRC(WINAPI*)(HDC, HGLRC, const int*);
 
 class OffscreenGLContextWGL final : public OffscreenGLContext
 {
 public:
-    OffscreenGLContextWGL(int w, int h, HWND hwnd, HDC hdc, HGLRC hglrc, ATOM atom, HINSTANCE hinst)
-        : OffscreenGLContext(w, h), m_hwnd(hwnd), m_hdc(hdc), m_hglrc(hglrc), m_atom(atom), m_hinst(hinst) {}
+    OffscreenGLContextWGL(
+        int w,
+        int h,
+        HWND hwnd,
+        HDC hdc,
+        HGLRC hglrc,
+        ATOM atom,
+        HINSTANCE hinst
+    ) :
+        OffscreenGLContext(w, h),
+        m_hwnd(hwnd),
+        m_hdc(hdc),
+        m_hglrc(hglrc),
+        m_atom(atom),
+        m_hinst(hinst)
+    {}
 
     ~OffscreenGLContextWGL() override
     {
@@ -60,63 +73,82 @@ public:
         wglMakeCurrent(nullptr, nullptr);
     }
 
-    const char *backend_name() const override { return "WGL"; }
+    const char* backend_name() const override
+    {
+        return "WGL";
+    }
 
 private:
-    HWND      m_hwnd  = nullptr;
-    HDC       m_hdc   = nullptr;
-    HGLRC     m_hglrc = nullptr;
-    ATOM      m_atom  = 0;
+    HWND m_hwnd       = nullptr;
+    HDC m_hdc         = nullptr;
+    HGLRC m_hglrc     = nullptr;
+    ATOM m_atom       = 0;
     HINSTANCE m_hinst = nullptr;
 };
 
 } // namespace
 
 std::unique_ptr<OffscreenGLContext>
-OffscreenGLContext::create(int width, int height, std::string *error_out)
+OffscreenGLContext::create(int width, int height, std::string* error_out)
 {
     HINSTANCE hinst = GetModuleHandleW(nullptr);
 
-    WNDCLASSW wc = {};
+    WNDCLASSW wc     = {};
     wc.style         = CS_OWNDC;
     wc.lpfnWndProc   = DefWindowProcW;
     wc.hInstance     = hinst;
     wc.lpszClassName = L"PrusaSlicerCLIThumbWnd";
-    const ATOM atom = RegisterClassW(&wc);
+    const ATOM atom  = RegisterClassW(&wc);
     if (!atom) {
-        if (error_out) *error_out = "RegisterClassW failed";
+        if (error_out)
+            *error_out = "RegisterClassW failed";
         return nullptr;
     }
 
-    HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"", WS_POPUP,
-                                0, 0, 1, 1, nullptr, nullptr, hinst, nullptr);
+    HWND hwnd = CreateWindowExW(
+        0,
+        wc.lpszClassName,
+        L"",
+        WS_POPUP,
+        0,
+        0,
+        1,
+        1,
+        nullptr,
+        nullptr,
+        hinst,
+        nullptr
+    );
     if (!hwnd) {
-        if (error_out) *error_out = "CreateWindowExW failed";
+        if (error_out)
+            *error_out = "CreateWindowExW failed";
         UnregisterClassW(wc.lpszClassName, hinst);
         return nullptr;
     }
 
     HDC hdc = GetDC(hwnd);
     if (!hdc) {
-        if (error_out) *error_out = "GetDC failed";
+        if (error_out)
+            *error_out = "GetDC failed";
         DestroyWindow(hwnd);
         UnregisterClassW(wc.lpszClassName, hinst);
         return nullptr;
     }
 
     PIXELFORMATDESCRIPTOR pfd = {};
-    pfd.nSize        = sizeof(pfd);
-    pfd.nVersion     = 1;
-    pfd.dwFlags      = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-    pfd.iPixelType   = PFD_TYPE_RGBA;
-    pfd.cColorBits   = 32;
-    pfd.cDepthBits   = 24;
-    pfd.cStencilBits = 8;
-    pfd.iLayerType   = PFD_MAIN_PLANE;
+    pfd.nSize                 = sizeof(pfd);
+    pfd.nVersion              = 1;
+    pfd.dwFlags               = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pfd.iPixelType            = PFD_TYPE_RGBA;
+    pfd.cColorBits            = 32;
+    pfd.cDepthBits            = 24;
+    pfd.cStencilBits          = 8;
+    pfd.iLayerType            = PFD_MAIN_PLANE;
 
     const int pf = ChoosePixelFormat(hdc, &pfd);
     if (!pf || !SetPixelFormat(hdc, pf, &pfd)) {
-        if (error_out) *error_out = "ChoosePixelFormat/SetPixelFormat failed";
+        if (error_out)
+            *error_out = "ChoosePixelFormat/SetPixelFormat failed";
         ReleaseDC(hwnd, hdc);
         DestroyWindow(hwnd);
         UnregisterClassW(wc.lpszClassName, hinst);
@@ -126,7 +158,8 @@ OffscreenGLContext::create(int width, int height, std::string *error_out)
     // Bootstrap a legacy context so we can query wglCreateContextAttribsARB.
     HGLRC legacy = wglCreateContext(hdc);
     if (!legacy) {
-        if (error_out) *error_out = "wglCreateContext (legacy) failed";
+        if (error_out)
+            *error_out = "wglCreateContext (legacy) failed";
         ReleaseDC(hwnd, hdc);
         DestroyWindow(hwnd);
         UnregisterClassW(wc.lpszClassName, hinst);
@@ -135,14 +168,18 @@ OffscreenGLContext::create(int width, int height, std::string *error_out)
     wglMakeCurrent(hdc, legacy);
 
     auto wgl_create_context_attribs = reinterpret_cast<PFNWGLCREATECONTEXTATTRIBSARBPROC>(
-        wglGetProcAddress("wglCreateContextAttribsARB"));
+        wglGetProcAddress("wglCreateContextAttribsARB")
+    );
 
     HGLRC final_ctx = nullptr;
     if (wgl_create_context_attribs) {
         const int attribs[] = {
-            WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-            WGL_CONTEXT_MINOR_VERSION_ARB, 2,
-            WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+            WGL_CONTEXT_MAJOR_VERSION_ARB,
+            3,
+            WGL_CONTEXT_MINOR_VERSION_ARB,
+            2,
+            WGL_CONTEXT_PROFILE_MASK_ARB,
+            WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
             0
         };
         final_ctx = wgl_create_context_attribs(hdc, nullptr, attribs);
@@ -159,12 +196,13 @@ OffscreenGLContext::create(int width, int height, std::string *error_out)
     }
 
     wglMakeCurrent(hdc, final_ctx);
-    (void)width; (void)height;  // window size irrelevant — we render to FBOs.
+    (void) width;
+    (void) height; // window size irrelevant — we render to FBOs.
 
-    return std::make_unique<OffscreenGLContextWGL>(width, height, hwnd, hdc, final_ctx, atom, hinst);
+    return std::make_unique<
+        OffscreenGLContextWGL>(width, height, hwnd, hdc, final_ctx, atom, hinst);
 }
 
-} // namespace CLIThumbnails
-} // namespace Slic3r
+} // namespace Slic3r::App::CLI::Thumbnails
 
 #endif // _WIN32

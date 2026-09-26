@@ -30,7 +30,6 @@ endif ()
 if (SLIC3R_GUI)
     # TODO: The following two are GUI only for now, before we can build these
     # targets without GUI dependencies. It requires splitting slic3r-shared first.
-    add_subdirectory(libslic3r_cli_thumbnails)
     add_subdirectory(slic3r-app-cli)      
     add_subdirectory(slic3r-app-launcher) 
 
