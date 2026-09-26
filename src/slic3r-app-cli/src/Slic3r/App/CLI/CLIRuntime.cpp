@@ -1,6 +1,9 @@
 #include "Slic3r/App/CLI/CLIRuntime.hpp"
 
 #include "Slic3r/App/Init.hpp"
+#include "CLIThumbnailRenderer.hpp"
+#include "Slic3r/Directories.hpp"
+#include "Slic3r/Log.hpp"
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/AppInstance/AppInstanceMessageHandlerFactory.hpp"
 #include "Slic3r/Biz/Format/3mf.hpp"
@@ -35,79 +38,62 @@ using Slic3r::Domain::Size;
 
 namespace Slic3r::App::CLI {
 
-CLIThumbnailImageGenerator::CLIThumbnailImageGenerator(const std::vector<std::string>& input_files)
-{
-    if (input_files.size() == 1 && boost::iends_with(input_files[0], ".3mf")) {
-        m_input_3mf_filename = input_files[0];
-    }
-}
+CLIThumbnailImageGenerator::CLIThumbnailImageGenerator(const Domain::Workbench& workbench) :
+    m_workbench(&workbench)
+{}
 
 std::future<ThumbnailImageResults> CLIThumbnailImageGenerator::enqueue_thumbnail_requests(
-    const ThumbnailImageRequests& thumbnail_requests
+    const ThumbnailImageRequests& requests
 )
 {
-    std::promise<ThumbnailImageResults> promise;
-    std::future<ThumbnailImageResults> result{promise.get_future()};
-    if (m_input_3mf_filename.empty()) {
-        promise.set_value(ThumbnailImageResults{});
-        return result;
+    auto promise = std::make_shared<std::promise<ThumbnailImageResults>>();
+    auto future = promise->get_future();
+    if (!m_workbench || requests.empty()) {
+        promise->set_value({});
+        return future;
     }
 
-    // Create a list of all sizes that we need to generate.
-    std::vector<Size> requested_sizes;
-    for (const ThumbnailImageRequest& thumbnail_request : thumbnail_requests) {
-        for (const Size& requested_size : thumbnail_request.params.sizes) {
-            requested_sizes.emplace_back(requested_size);
-        }
+    // Access the live project and create/use/destroy its GL context on the CLI
+    // main thread. Slicing workers only wait for the resulting images.
+    if (!PlatformServices::instance().main_thread_dispatcher().dispatch_on_main_thread(
+            [this, requests, promise]() {
+                try {
+                    promise->set_value(generate(requests));
+                } catch (const std::exception& error) {
+                    SPDLOG_WARN("CLI thumbnails skipped: {}", error.what());
+                    promise->set_value({});
+                }
+            })) {
+        promise->set_value({});
     }
-
-    // Now actually generate the thumbnails:
-    std::vector<Image> source_images =
-        get_thumbnail_images_from_3mf(m_input_3mf_filename, requested_sizes);
-
-    if (source_images.empty()
-        || source_images.size() != requested_sizes.size()
-        || std::any_of(
-            source_images.begin(),
-            source_images.end(),
-            [](const Image& image) { return image.width() == 0 || image.height() == 0; }
-        ))
-    {
-        promise.set_value(ThumbnailImageResults{});
-        return result;
-    }
-
-    ThumbnailImageResults thumbnail_results;
-    size_t source_image_index = 0;
-    for (const ThumbnailImageRequest& thumbnail_request : thumbnail_requests) {
-        ThumbnailImageResult thumbnail_result;
-        thumbnail_result.type            = thumbnail_request.type;
-        thumbnail_result.project_id      = thumbnail_request.params.project_id;
-        thumbnail_result.bed_instance_id = thumbnail_request.params.bed_instance_id;
-
-        for (size_t size_index = 0; size_index < thumbnail_request.params.sizes.size();
-             ++size_index)
-        {
-            thumbnail_result.images.push_back(source_images[source_image_index++]);
-            ASSERT(
-                thumbnail_result.images.back().width()
-                == thumbnail_request.params.sizes[size_index].width
-            );
-            ASSERT(
-                thumbnail_result.images.back().height()
-                == thumbnail_request.params.sizes[size_index].height
-            );
-        }
-
-        thumbnail_results.push_back(std::move(thumbnail_result));
-    }
-
-    ASSERT(source_image_index == source_images.size());
-    promise.set_value(std::move(thumbnail_results));
-
-    return result;
+    return future;
 }
 
+ThumbnailImageResults CLIThumbnailImageGenerator::generate(
+    const ThumbnailImageRequests& requests
+) const
+{
+    ThumbnailImageResults results;
+    for (const auto& request : requests) {
+        if (request.params.sizes.empty()) continue;
+        const auto* project = m_workbench->find_project_by_id(request.params.project_id);
+        if (!project) continue;
+        Domain::Images images;
+        const std::string filename = project->loaded_file_path().string();
+        if (boost::iends_with(filename, ".3mf")) {
+            images = get_thumbnail_images_from_3mf(filename, request.params.sizes);
+        } else {
+            images = CLIThumbnails::render_thumbnails(*project, request, resources_dir());
+        }
+        if (!images.empty()) {
+            results.push_back({request.type, request.params.project_id,
+                               request.params.bed_instance_id, std::move(images)});
+        }
+    }
+    return results;
+}
+
+// Requests are handled by the dispatcher serviced by CLIRuntime::wait_until.
 void CLIThumbnailImageGenerator::handle_enqueued_requests() {}
 
 void ExportFinishedJobManagerStatusListener::on_job_manager_status_changed(
@@ -152,7 +138,7 @@ bool ProjectLoadResultListener::finished() const
 }
 
 CLIRuntime::CLIRuntime(const InitParams& init_params) :
-    m_thumbnail_image_generator{init_params.input.input_files}
+    m_thumbnail_image_generator{m_workbench}
 {
     PlatformServices& platform_services = PlatformServices::instance();
     platform_services.set_secret_store(std::make_unique<SecretStoreDummy>());
