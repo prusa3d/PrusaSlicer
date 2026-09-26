@@ -43,6 +43,7 @@ struct ThumbnailFixture
     {
         auto& services = Platform::PlatformServices::instance();
         services.set_job_manager(nullptr);
+        services.set_app_instance_message_handler(nullptr);
         services.set_main_thread_dispatcher(
             std::make_unique<App::Platform::StdMainThreadDispatcher>()
         );
