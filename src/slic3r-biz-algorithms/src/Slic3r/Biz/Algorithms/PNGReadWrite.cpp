@@ -1,3 +1,4 @@
+#include "Slic3r/Utils.hpp"
 #include "Slic3r/Biz/Algorithms/PNGReadWrite.hpp"
 
 #include <png.h>
@@ -193,19 +194,18 @@ bool decode_png(const std::string& png_data, std::vector<unsigned char>& image_d
     if (!png_image_begin_read_from_memory(&image, png_data.data(), png_data.size()))
         return false;
 
+    ScopeGuard free_image([&image]() { png_image_free(&image); });
     image.format = PNG_FORMAT_RGBA;
 
     // Allocate memory for the image data
     image_data.resize(PNG_IMAGE_SIZE(image));
     if (!png_image_finish_read(&image, nullptr, image_data.data(), 0, nullptr)) {
-        png_image_free(&image);
         return false;
     }
 
     width = image.width;
     height = image.height;
 
-    png_image_free(&image);
     return true;
 }
 

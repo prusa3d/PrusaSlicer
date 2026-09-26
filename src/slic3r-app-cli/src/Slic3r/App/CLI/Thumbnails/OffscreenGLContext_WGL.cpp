@@ -185,17 +185,17 @@ OffscreenGLContext::create(int width, int height, std::string* error_out)
         final_ctx = wgl_create_context_attribs(hdc, nullptr, attribs);
     }
 
-    if (final_ctx) {
-        wglMakeCurrent(nullptr, nullptr);
-        wglDeleteContext(legacy);
-    } else {
-        // Fall back to the legacy context. Most drivers give at least 2.1 here,
-        // which is below PrusaSlicer's minimum (3.2), but we try anyway and let
-        // the renderer detect that and skip gracefully.
-        final_ctx = legacy;
+    wglMakeCurrent(nullptr, nullptr);
+    wglDeleteContext(legacy);
+    if (!final_ctx) {
+        if (error_out)
+            *error_out = "OpenGL 3.2 context creation failed";
+        ReleaseDC(hwnd, hdc);
+        DestroyWindow(hwnd);
+        UnregisterClassW(wc.lpszClassName, hinst);
+        return nullptr;
     }
 
-    wglMakeCurrent(hdc, final_ctx);
     (void) width;
     (void) height; // window size irrelevant — we render to FBOs.
 

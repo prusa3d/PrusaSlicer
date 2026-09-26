@@ -13,6 +13,9 @@
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Domain/ModelInstance.hpp"
 #include "Slic3r/Domain/ModelObject.hpp"
+#include "Slic3r/Domain/ModelVolume.hpp"
+#include <qoi.h>
+#include <cstdlib>
 #include "Slic3r/Domain/Workbench.hpp"
 
 #include <chrono>
@@ -139,7 +142,9 @@ void check_images(
         CHECK(image.width() == request.params.sizes[i].width);
         CHECK(image.height() == request.params.sizes[i].height);
         CHECK(image.format() == PixelFormat::RGBA8);
-        bool opaque = false, transparent = false, lit = false;
+        bool opaque      = false;
+        bool transparent = false;
+        bool lit         = false;
         for (size_t p = 0; p < image.pixels.size(); p += 4) {
             opaque |= image.pixels[p + 3] == 255;
             transparent |= image.pixels[p + 3] == 0;
@@ -269,6 +274,12 @@ TEST_CASE(
     params.misc.output       = project_path.string();
     REQUIRE(App::CLI::run(params) == EXIT_SUCCESS);
 
+    // Keep this an actual fallback test if CLI project export later grows previews.
+    Algorithms::MZ_Archive archive;
+    REQUIRE(Algorithms::open_zip_reader(&archive.arch, project_path.string()));
+    CHECK(mz_zip_reader_locate_file(&archive.arch, "Metadata/thumbnail.png", nullptr, 0) < 0);
+    REQUIRE(Algorithms::close_zip_reader(&archive.arch));
+
     auto slice = [&](const std::string& thumbnails, const char* name)
     {
         App::InitParams slice_params;
@@ -298,7 +309,8 @@ TEST_CASE(
         const auto begin = enabled.find("; " + tag + " begin " + size + " ");
         REQUIRE(begin != std::string::npos);
         std::istringstream lines(enabled.substr(enabled.find('\n', begin) + 1));
-        std::string line, encoded;
+        std::string line;
+        std::string encoded;
         while (std::getline(lines, line) && line != "; " + tag + " end") {
             REQUIRE(line.starts_with("; "));
             encoded += line.substr(2);
@@ -311,12 +323,27 @@ TEST_CASE(
     };
     const auto qoi = payload("thumbnail_QOI", "16x16");
     REQUIRE(qoi.size() > 22);
-    CHECK(qoi.substr(0, 4) == "qoif");
-    CHECK(qoi.substr(4, 8) == std::string("\0\0\0\x10\0\0\0\x10", 8));
-    CHECK(qoi.substr(qoi.size() - 8) == std::string("\0\0\0\0\0\0\0\1", 8));
+    qoi_desc descriptor{};
+    const std::unique_ptr<void, decltype(&std::free)> qoi_pixels(
+        qoi_decode(qoi.data(), static_cast<int>(qoi.size()), &descriptor, 4),
+        &std::free
+    );
+    REQUIRE(qoi_pixels != nullptr);
+    CHECK(descriptor.width == 16);
+    CHECK(descriptor.height == 16);
+    const auto* rgba = static_cast<const uint8_t*>(qoi_pixels.get());
+    bool opaque      = false;
+    bool transparent = false;
+    for (size_t i = 0; i < descriptor.width * descriptor.height * 4; i += 4) {
+        opaque |= rgba[i + 3] == 255;
+        transparent |= rgba[i + 3] == 0;
+    }
+    CHECK(opaque);
+    CHECK(transparent);
     const auto decoded = payload("thumbnail", "64x48");
     std::vector<unsigned char> pixels;
-    unsigned width = 0, height = 0;
+    unsigned width  = 0;
+    unsigned height = 0;
     REQUIRE(png::decode_png(decoded, pixels, width, height));
     CHECK(width == 64);
     CHECK(height == 48);
@@ -336,4 +363,70 @@ TEST_CASE(
     const auto without_commands = commands(disabled);
     REQUIRE(!without_commands.empty());
     CHECK(commands(enabled) == without_commands);
+}
+
+TEST_CASE("CLI thumbnail visibility matches printable model parts", "[.cli-thumbnail-gl]")
+{
+    ThumbnailFixture fixture;
+    auto request   = fixture.request();
+    auto* instance = fixture.bed->model_instances.front();
+    SECTION("outside bed")
+    {
+        instance->print_volume_state           = ModelInstancePVS_Fully_Outside;
+        request.type                           = ThumbnailType::SceneBed;
+        request.params.bed_instance_with_error = true;
+        check_images(fixture.generate({request}), request);
+    }
+    SECTION("partly outside bed")
+    {
+        instance->print_volume_state = ModelInstancePVS_Partly_Outside;
+        check_images(fixture.generate({request}), request);
+    }
+    SECTION("not printable")
+    {
+        instance->printable = false;
+        CHECK(fixture.generate({request}).empty());
+    }
+    SECTION("modifier")
+    {
+        instance->get_object()->volumes.front()->set_type(ModelVolumeType::PARAMETER_MODIFIER);
+        CHECK(fixture.generate({request}).empty());
+    }
+}
+
+TEST_CASE("CLI thumbnail futures settle when the dispatcher closes", "[cli][thumbnails]")
+{
+    ThumbnailFixture fixture;
+    fixture.archive(fixture.preview_png());
+    auto& dispatcher = Platform::PlatformServices::instance().main_thread_dispatcher();
+    auto pending     = fixture.generator.enqueue_thumbnail_requests({fixture.request()});
+    dispatcher.close();
+    REQUIRE(pending.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    CHECK(pending.get().size() == 1);
+    auto rejected = fixture.generator.enqueue_thumbnail_requests({fixture.request()});
+    REQUIRE(rejected.wait_for(std::chrono::seconds(5)) == std::future_status::ready);
+    CHECK(rejected.get().empty());
+}
+
+TEST_CASE("CLI falls back for oversized ZIP preview metadata", "[.cli-thumbnail-gl]")
+{
+    ThumbnailFixture fixture;
+    fixture.archive("not a PNG");
+    const auto filename = fixture.project.loaded_file_path().string();
+    std::ifstream input(filename, std::ios::binary);
+    std::string bytes{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+    input.close();
+    const auto directory = bytes.find(std::string("PK\1\2", 4));
+    REQUIRE(directory != std::string::npos);
+    // 2 GiB in the central directory used to narrow to a negative int and throw.
+    bytes.replace(directory + 24, 4, std::string("\0\0\0\x80", 4));
+    {
+        std::ofstream output(filename, std::ios::binary);
+        output.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    }
+    const auto request = fixture.request();
+    const auto results = fixture.generate({request, request});
+    REQUIRE(results.size() == 2);
+    check_images({results[0]}, request);
+    check_images({results[1]}, request);
 }

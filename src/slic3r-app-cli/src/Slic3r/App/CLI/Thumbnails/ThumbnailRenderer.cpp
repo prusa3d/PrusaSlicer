@@ -1,11 +1,8 @@
 ///|/ Copyright (c) Prusa Research 2026 — CLI thumbnail renderer
 ///|/
-///|/ The render logic below mirrors what the GUI does in
-///|/ GLCanvas3D::_render_thumbnail_internal(): pick a scene-fitting ortho
-///|/ camera, bind gouraud_light, and draw each printable ModelVolume with its
-///|/ world transform. We reuse PrusaSlicer's stock `gouraud_light` shaders
-///|/ (version 140) rather than introducing a new one so output matches the GUI
-///|/ as closely as practical for a CLI path.
+///|/ A dedicated offscreen rendering path for CLI project and bed previews.
+///|/ Reuses the scene's shaders, lighting, volume colors and camera math.
+///|/ Native context creation is based on the renderer introduced in #15355.
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
@@ -36,6 +33,7 @@
 #include "Slic3r/Biz/Algorithms/Color.hpp"
 #include "Slic3r/App/Scene/VolumeColor.hpp"
 #include "Slic3r/App/Scene/Lights.hpp"
+#include "Slic3r/App/Render/MathUtils.hpp"
 
 namespace Slic3r::App::CLI::Thumbnails {
 using namespace Domain;
@@ -206,40 +204,6 @@ MeshBuffers upload_mesh(const TriangleMesh& mesh, GLuint prog)
     return mb;
 }
 
-Transform3d look_at(const Vec3d& eye, const Vec3d& target, const Vec3d& up_hint)
-{
-    const Vec3d f = (target - eye).normalized();
-    const Vec3d r = f.cross(up_hint).normalized();
-    const Vec3d u = r.cross(f);
-
-    Transform3d m = Transform3d::Identity();
-    m(0, 0)       = r.x();
-    m(0, 1)       = r.y();
-    m(0, 2)       = r.z();
-    m(0, 3)       = -r.dot(eye);
-    m(1, 0)       = u.x();
-    m(1, 1)       = u.y();
-    m(1, 2)       = u.z();
-    m(1, 3)       = -u.dot(eye);
-    m(2, 0)       = -f.x();
-    m(2, 1)       = -f.y();
-    m(2, 2)       = -f.z();
-    m(2, 3)       = f.dot(eye);
-    return m;
-}
-
-Transform3d ortho(double l, double r, double b, double t, double n, double fa)
-{
-    Transform3d m = Transform3d::Identity();
-    m(0, 0)       = 2.0 / (r - l);
-    m(1, 1)       = 2.0 / (t - b);
-    m(2, 2)       = -2.0 / (fa - n);
-    m(0, 3)       = -(r + l) / (r - l);
-    m(1, 3)       = -(t + b) / (t - b);
-    m(2, 3)       = -(fa + n) / (fa - n);
-    return m;
-}
-
 } // namespace
 
 Images render_thumbnails(
@@ -254,7 +218,8 @@ Images render_thumbnails(
     if (params.sizes.empty())
         return {};
 
-    int max_w = 0, max_h = 0;
+    int max_w = 0;
+    int max_h = 0;
     for (const Size& s : params.sizes) {
         max_w = std::max(max_w, s.width);
         max_h = std::max(max_h, s.height);
@@ -276,16 +241,14 @@ Images render_thumbnails(
 
     glewExperimental = GL_TRUE;
     const GLenum ge  = glewInit();
-    // GLEW returns a non-OK error on EGL core-profile contexts because
-    // glGetString(GL_EXTENSIONS) is removed in core profiles; despite the
-    // error, glewExperimental causes GLEW to load function pointers via
-    // glGetStringi(). We verify that by checking a core 3.2 function pointer
-    // we actually use, and only bail if it's genuinely unavailable.
+    // EGL can load the required entry points even when GLEW reports a GLX
+    // initialization error. Conversely, GLEW_OK alone accepts legacy GL 1.1.
+    // Its version flags also check that the entry points in each group loaded.
     while (glGetError() != GL_NO_ERROR) { /* drain glewInit-spurious error */
     }
-    if (ge != GLEW_OK && glCreateShader == nullptr) {
+    if (!GLEW_VERSION_1_5 || !GLEW_VERSION_2_0 || !GLEW_VERSION_3_0 || !GLEW_VERSION_3_2) {
         SPDLOG_WARN(
-            "CLI thumbnails skipped: glewInit failed and core GL not usable: {}",
+            "CLI thumbnails skipped: OpenGL 3.2 entry points are unavailable ({})",
             reinterpret_cast<const char*>(glewGetErrorString(ge))
         );
         return {};
@@ -330,7 +293,7 @@ Images render_thumbnails(
             if (request.type != Biz::ThumbnailType::Scene && bed->id().id != params.bed_instance_id)
                 continue;
             for (const ModelInstance* inst : bed->model_instances) {
-                if (!inst || !inst->is_printable())
+                if (!inst || !inst->printable)
                     continue;
                 for (const ModelVolume* vol : inst->get_object()->volumes) {
                     if (!vol || !vol->is_model_part())
@@ -373,7 +336,7 @@ Images render_thumbnails(
     const double radius    = std::max(1.0, 0.5 * BBox::sizes(scene_box).norm());
     const Vec3d eye_dir    = Vec3d(1.0, -1.0, 1.0).normalized();
     const Vec3d eye        = center + eye_dir * (radius * 4.0);
-    const Transform3d view = look_at(eye, center, Vec3d(0, 0, 1));
+    const Transform3d view = Transform3d{Render::look_at(eye, center, Vec3d(0, 0, 1))};
 
     // Project the 8 scene bbox corners through the view matrix to get the
     // actual 2D extents of the content in view space. Fitting against this
@@ -400,7 +363,9 @@ Images render_thumbnails(
     const double content_cx     = 0.5 * (content_min_x + content_max_x);
     const double content_cy     = 0.5 * (content_min_y + content_max_y);
 
-    GLuint fbo = 0, color_rb = 0, depth_rb = 0;
+    GLuint fbo      = 0;
+    GLuint color_rb = 0;
+    GLuint depth_rb = 0;
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glGenRenderbuffers(1, &color_rb);
@@ -461,7 +426,8 @@ Images render_thumbnails(
         // portrait and landscape aspects both cover the whole model.
         const double margin = 1.1;
         const double aspect = static_cast<double>(w) / static_cast<double>(h);
-        double half_w, half_h;
+        double half_w;
+        double half_h;
         if (content_half_h <= 0.0 || content_half_w / content_half_h > aspect) {
             // Content is wider than the viewport — fit width.
             half_w = content_half_w * margin;
@@ -471,16 +437,16 @@ Images render_thumbnails(
             half_h = content_half_h * margin;
             half_w = half_h * aspect;
         }
-        const double near_z    = 0.1;
-        const double far_z     = radius * 16.0;
-        const Transform3d proj = ortho(
+        const double near_z = 0.1;
+        const double far_z  = radius * 16.0;
+        const Transform3d proj{Render::ortho(
             content_cx - half_w,
             content_cx + half_w,
             content_cy - half_h,
             content_cy + half_h,
             near_z,
             far_z
-        );
+        )};
 
         glClearColor(0.4f, 0.4f, 0.4f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

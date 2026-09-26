@@ -75,7 +75,7 @@ if (SLIC3R_BUILD_TESTS)
     )
 
     target_include_directories(slic3r-app-cli-tests PRIVATE test src)
-    target_link_libraries(slic3r-app-cli-tests PRIVATE slic3r-app-cli Catch2::Catch2)
+    target_link_libraries(slic3r-app-cli-tests PRIVATE slic3r-app-cli Catch2::Catch2 qoi)
 
     # The tests run the CLI against the real preset bundle from the repository.
     set(CLI_TEST_RESOURCES_DIR ${CMAKE_SOURCE_DIR}/resources)

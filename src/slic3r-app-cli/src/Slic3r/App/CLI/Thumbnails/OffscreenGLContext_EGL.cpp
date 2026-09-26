@@ -270,7 +270,10 @@ OffscreenGLContext::create(int width, int height, std::string* error_out)
     if (EGLDisplay sd = try_surfaceless_display(); sd != EGL_NO_DISPLAY) {
         if (auto ctx = try_initialize(sd, /*surfaceless=*/true, width, height, &err_surfaceless))
             return ctx;
-        SPDLOG_INFO("EGL surfaceless path unavailable ({}{}", err_surfaceless, ")); falling back to default display.";
+        SPDLOG_INFO(
+            "EGL surfaceless path unavailable ({}); falling back to default display.",
+            err_surfaceless
+        );
     }
 
     std::string err_default;

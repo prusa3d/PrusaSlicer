@@ -23,7 +23,6 @@ namespace Slic3r::App::CLI {
 class CLIThumbnailImageGenerator final : public Biz::Slicing::IThumbnailImageGenerator
 {
 public:
-    CLIThumbnailImageGenerator() = default;
     explicit CLIThumbnailImageGenerator(const Domain::Workbench& workbench);
 
     std::future<Biz::Slicing::ThumbnailImageResults> enqueue_thumbnail_requests(
@@ -33,7 +32,7 @@ public:
     void handle_enqueued_requests() override;
 
 private:
-    const Domain::Workbench* m_workbench{nullptr};
+    const Domain::Workbench& m_workbench;
     Biz::Slicing::ThumbnailImageResults
     generate(const Biz::Slicing::ThumbnailImageRequests& requests) const;
 };

@@ -39,7 +39,7 @@ using Slic3r::Domain::Size;
 namespace Slic3r::App::CLI {
 
 CLIThumbnailImageGenerator::CLIThumbnailImageGenerator(const Domain::Workbench& workbench) :
-    m_workbench(&workbench)
+    m_workbench(workbench)
 {}
 
 std::future<ThumbnailImageResults>
@@ -47,7 +47,7 @@ CLIThumbnailImageGenerator::enqueue_thumbnail_requests(const ThumbnailImageReque
 {
     auto promise = std::make_shared<std::promise<ThumbnailImageResults>>();
     auto future  = promise->get_future();
-    if (!m_workbench || requests.empty()) {
+    if (requests.empty()) {
         promise->set_value({});
         return future;
     }
@@ -80,7 +80,7 @@ CLIThumbnailImageGenerator::generate(const ThumbnailImageRequests& requests) con
             || request.params.pixel_format != Domain::PixelFormat::RGBA8
             || request.type == Biz::ThumbnailType::Object)
             continue;
-        const auto* project = m_workbench->find_project_by_id(request.params.project_id);
+        const auto* project = m_workbench.find_project_by_id(request.params.project_id);
         if (!project)
             continue;
         if (request.type != Biz::ThumbnailType::Scene
@@ -98,7 +98,11 @@ CLIThumbnailImageGenerator::generate(const ThumbnailImageRequests& requests) con
         if (boost::iends_with(filename, ".3mf")
             && (request.type == Biz::ThumbnailType::Scene || bed_count == 1))
         {
-            images = get_thumbnail_images_from_3mf(filename, request.params.sizes);
+            try {
+                images = get_thumbnail_images_from_3mf(filename, request.params.sizes);
+            } catch (const std::exception& error) {
+                SPDLOG_WARN("CLI stored preview unavailable: {}", error.what());
+            }
         }
         bool valid = images.size() == request.params.sizes.size();
         for (size_t i = 0; valid && i < images.size(); ++i) {
