@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/Format/3mf.hpp"
 
 #include <memory>
+#include <limits>
 #include <set>
 
 #include <boost/algorithm/string/predicate.hpp> // iends_with
@@ -897,22 +898,25 @@ std::vector<Domain::Image> get_thumbnail_images_from_3mf(const std::string& inpu
     if (!open_zip_reader(&archive, input_file))
         return {};
 
+    ScopeGuard close_archive([&archive]() { close_zip_reader(&archive); });
+
     int index = mz_zip_reader_locate_file(&archive, "Metadata/thumbnail.png", nullptr, 0);
     if (index < 0) {
-        close_zip_reader(&archive);
         return {};
     }
 
     mz_zip_archive_file_stat stat;
     if (!mz_zip_reader_file_stat(&archive, index, &stat)) {
-        close_zip_reader(&archive);
         return {};
     }
 
+    // Preserve the supported size range without narrowing untrusted ZIP metadata.
+    if (stat.m_uncomp_size > static_cast<mz_uint64>(std::numeric_limits<int>::max()))
+        return {};
+
     std::string buffer;
-    buffer.resize(int(stat.m_uncomp_size));
-    mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, buffer.data(), (size_t)stat.m_uncomp_size, 0);
-    close_zip_reader(&archive);
+    buffer.resize(static_cast<size_t>(stat.m_uncomp_size));
+    mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, buffer.data(), buffer.size(), 0);
 
     if (res == 0)
         return {};
@@ -920,7 +924,7 @@ std::vector<Domain::Image> get_thumbnail_images_from_3mf(const std::string& inpu
     std::vector<unsigned char> data;
     unsigned width = 0;
     unsigned height = 0;
-    if (!png::decode_png(buffer, data, width, height))
+    if (!png::decode_png(buffer, data, width, height) || width == 0 || height == 0)
         return {};
 
     std::vector<Domain::Image> results;

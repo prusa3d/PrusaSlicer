@@ -23,8 +23,7 @@ namespace Slic3r::App::CLI {
 class CLIThumbnailImageGenerator final : public Biz::Slicing::IThumbnailImageGenerator
 {
 public:
-    CLIThumbnailImageGenerator() = default;
-    explicit CLIThumbnailImageGenerator(const std::vector<std::string>& input_files);
+    explicit CLIThumbnailImageGenerator(const Domain::Workbench& workbench);
 
     std::future<Biz::Slicing::ThumbnailImageResults> enqueue_thumbnail_requests(
         const Biz::Slicing::ThumbnailImageRequests& thumbnail_requests
@@ -33,7 +32,9 @@ public:
     void handle_enqueued_requests() override;
 
 private:
-    std::string m_input_3mf_filename;
+    const Domain::Workbench& m_workbench;
+    Biz::Slicing::ThumbnailImageResults
+    generate(const Biz::Slicing::ThumbnailImageRequests& requests) const;
 };
 
 struct ExportFinishedJobManagerStatusListener final :
@@ -77,8 +78,8 @@ public:
     void wait_until(const std::function<bool()>& predicate);
 
 private:
-    CLIThumbnailImageGenerator m_thumbnail_image_generator;
     Domain::Workbench m_workbench;
+    CLIThumbnailImageGenerator m_thumbnail_image_generator;
     std::optional<Biz::ProjectInteractor> m_project_interactor;
 };
 

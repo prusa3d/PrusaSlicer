@@ -124,7 +124,7 @@ const std::vector<TestProfileSet>& resolved_profile_sets()
         std::vector<TestProfileSet> result;
         {
             Workbench workbench;
-            CLIThumbnailImageGenerator thumbnail_image_generator;
+            CLIThumbnailImageGenerator thumbnail_image_generator{workbench};
             ProjectInteractor project_interactor(
                 workbench,
                 platform_services.main_thread_dispatcher(),
