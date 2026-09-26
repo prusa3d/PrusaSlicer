@@ -75,14 +75,33 @@ ThumbnailImageResults CLIThumbnailImageGenerator::generate(
 {
     ThumbnailImageResults results;
     for (const auto& request : requests) {
-        if (request.params.sizes.empty()) continue;
+        if (request.params.sizes.empty()
+            || request.params.pixel_format != Domain::PixelFormat::RGBA8
+            || request.type == Biz::ThumbnailType::Object) continue;
         const auto* project = m_workbench->find_project_by_id(request.params.project_id);
         if (!project) continue;
+        if (request.type != Biz::ThumbnailType::Scene
+            && !project->find_bed_instance_by_id(request.params.bed_instance_id)) continue;
+
         Domain::Images images;
         const std::string filename = project->loaded_file_path().string();
-        if (boost::iends_with(filename, ".3mf")) {
+        size_t bed_count = 0;
+        for (const auto& config : project->config_containers())
+            bed_count += config->bed_instances().size();
+
+        // A stored scene preview cannot represent an individual bed in a
+        // multi-bed project. Render that bed instead of reusing the scene.
+        if (boost::iends_with(filename, ".3mf")
+            && (request.type == Biz::ThumbnailType::Scene || bed_count == 1)) {
             images = get_thumbnail_images_from_3mf(filename, request.params.sizes);
-        } else {
+        }
+        bool valid = images.size() == request.params.sizes.size();
+        for (size_t i = 0; valid && i < images.size(); ++i) {
+            valid = images[i].width() > 0 && images[i].height() > 0
+                && images[i].width() == request.params.sizes[i].width
+                && images[i].height() == request.params.sizes[i].height;
+        }
+        if (!valid) {
             images = CLIThumbnails::render_thumbnails(*project, request, resources_dir());
         }
         if (!images.empty()) {

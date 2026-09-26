@@ -920,7 +920,7 @@ std::vector<Domain::Image> get_thumbnail_images_from_3mf(const std::string& inpu
     std::vector<unsigned char> data;
     unsigned width = 0;
     unsigned height = 0;
-    if (!png::decode_png(buffer, data, width, height))
+    if (!png::decode_png(buffer, data, width, height) || width == 0 || height == 0)
         return {};
 
     std::vector<Domain::Image> results;

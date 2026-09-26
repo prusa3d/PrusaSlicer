@@ -38,6 +38,7 @@ if (SLIC3R_BUILD_TESTS)
             test/main.cpp
             test/Slic3r/App/CLI/CLITestUtils.hpp
             test/Slic3r/App/CLI/CLITestUtils.cpp
+            test/Slic3r/App/CLI/CLIThumbnailTests.cpp
             test/Slic3r/App/CLI/CLISliceTests.cpp
     )
 
