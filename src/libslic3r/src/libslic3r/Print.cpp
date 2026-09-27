@@ -445,6 +445,11 @@ Biz::Slicing::ApplyStatus::Status Print::update(
                 result = ApplyStatus::InvalidData{std::move(validation_result.errors)};
                 return;
             }
+
+            if (std::holds_alternative<ApplyStatus::Unchanged>(result)) {
+                result = ApplyStatus::Changed{};
+            }
+
             for (const Biz::Slicing::Warning& warning : validation_result.warnings) {
                 std::get<ApplyStatus::Changed>(result).warrnings.push_back(warning);
             }
