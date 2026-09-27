@@ -46,16 +46,29 @@ void populate_local_bundle(const BundlePaths& bundle_paths)
                     fs::remove_all(dest_path);
                 }
                 fs::create_directories(dest_path);
-                fs::copy(
-                    src_path,
-                    dest_path,
-                    fs::copy_options::recursive | fs::copy_options::overwrite_existing
-                );
+                // Do not use fs::copy() here: it replicates the permissions of
+                // the source tree onto the copy. When the bundled presets are
+                // installed on a read-only medium -- such as the Nix store, where
+                // every directory is r-xr-xr-x -- fs::copy creates the destination
+                // directories read-only and then aborts with EACCES on the first
+                // file it tries to write into them, which nothing catches. Copy
+                // by hand instead, so the user's own copy stays writable.
+                for (const auto& copied : fs::recursive_directory_iterator(src_path)) {
+                    const fs::path target = dest_path / fs::relative(copied.path(), src_path);
+                    if (copied.is_directory()) {
+                        fs::create_directories(target);
+                        continue;
+                    }
+                    fs::create_directories(target.parent_path());
+                    fs::copy_file(copied.path(), target, fs::copy_options::overwrite_existing);
+                    fs::permissions(target, fs::add_perms | fs::owner_write);
+                }
                 fs::copy_file(
                     src_path.string() + ".idx",
                     dest_path.string() + ".idx",
                     fs::copy_options::overwrite_existing
                 );
+                fs::permissions(dest_path.string() + ".idx", fs::add_perms | fs::owner_write);
             }
         }
     }
