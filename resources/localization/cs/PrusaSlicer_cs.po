@@ -63,10 +63,10 @@ msgstr "0 (rozpustné)"
 #, c-format, boost-format
 msgid "%1$d backward edge"
 msgid_plural "%1$d backward edges"
-msgstr[0] "‪%1$d‬ zpětná hrana"
-msgstr[1] "‪%1$d‬ zpětných hran"
-msgstr[2] "‪%1$d‬ zpětných hran"
-msgstr[3] "‪%1$d‬ zpětných hran"
+msgstr[0] "%1$d zpětná hrana"
+msgstr[1] "%1$d zpětných hran"
+msgstr[2] "%1$d zpětných hran"
+msgstr[3] "%1$d zpětných hran"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2917
 #, c-format, boost-format
@@ -101,10 +101,10 @@ msgstr[3] "%1$d degenerovaných faset"
 #, c-format, boost-format
 msgid "%1$d edge fixed"
 msgid_plural "%1$d edges fixed"
-msgstr[0] "Opraveno ‪%1$d‬ hrana"
-msgstr[1] "Opraveno ‪%1$d‬ hran"
-msgstr[2] "Opraveno ‪%1$d‬ hran"
-msgstr[3] "Opraveno ‪%1$d‬ hran"
+msgstr[0] "Opraveno %1$d hrana"
+msgstr[1] "Opraveno %1$d hran"
+msgstr[2] "Opraveno %1$d hran"
+msgstr[3] "Opraveno %1$d hran"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:469
 #, c-format, boost-format

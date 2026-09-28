@@ -63,10 +63,10 @@ msgstr "0 (rozpuszczalne)"
 #, c-format, boost-format
 msgid "%1$d backward edge"
 msgid_plural "%1$d backward edges"
-msgstr[0] "‪%1$d‬ odwrócona krawędź"
-msgstr[1] "‪%1$d‬ odwrócone krawędzie"
-msgstr[2] "‪%1$d‬ odwróconych krawędzi"
-msgstr[3] "‪%1$d‬ odwróconych krawędzi"
+msgstr[0] "%1$d odwrócona krawędź"
+msgstr[1] "%1$d odwrócone krawędzie"
+msgstr[2] "%1$d odwróconych krawędzi"
+msgstr[3] "%1$d odwróconych krawędzi"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2917
 #, c-format, boost-format
@@ -92,19 +92,19 @@ msgstr[4] "%1$d łączników poza obiektem"
 #, c-format, boost-format
 msgid "%1$d degenerate facet"
 msgid_plural "%1$d degenerate facets"
-msgstr[0] "‪%1$d‬ uszkodzona płaszczyzna"
-msgstr[1] "‪%1$d‬ uszkodzone płaszczyzny"
-msgstr[2] "‪%1$d‬ uszkodzonych płaszczyzn"
-msgstr[3] "‪%1$d‬ uszkodzonych płaszczyzn"
+msgstr[0] "%1$d uszkodzona płaszczyzna"
+msgstr[1] "%1$d uszkodzone płaszczyzny"
+msgstr[2] "%1$d uszkodzonych płaszczyzn"
+msgstr[3] "%1$d uszkodzonych płaszczyzn"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:467
 #, c-format, boost-format
 msgid "%1$d edge fixed"
 msgid_plural "%1$d edges fixed"
-msgstr[0] "Naprawiono ‪%1$d‬ krawędź"
-msgstr[1] "Naprawiono ‪%1$d‬ krawędzie"
-msgstr[2] "Naprawiono ‪%1$d‬ krawędzi"
-msgstr[3] "Naprawiono ‪%1$d‬ krawędzi"
+msgstr[0] "Naprawiono %1$d krawędź"
+msgstr[1] "Naprawiono %1$d krawędzie"
+msgstr[2] "Naprawiono %1$d krawędzi"
+msgstr[3] "Naprawiono %1$d krawędzi"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:469
 #, c-format, boost-format
@@ -119,10 +119,10 @@ msgstr[3] "Usunięto %1$d płaszczyzn"
 #, c-format, boost-format
 msgid "%1$d facet reversed"
 msgid_plural "%1$d facets reversed"
-msgstr[0] "Odwrócono ‪%1$d‬ płaszczyznę"
-msgstr[1] "Odwrócono ‪%1$d‬ płaszczyzny"
-msgstr[2] "Odwrócono ‪%1$d‬ płaszczyzn"
-msgstr[3] "Odwrócono ‪%1$d‬ płaszczyzn"
+msgstr[0] "Odwrócono %1$d płaszczyznę"
+msgstr[1] "Odwrócono %1$d płaszczyzny"
+msgstr[2] "Odwrócono %1$d płaszczyzn"
+msgstr[3] "Odwrócono %1$d płaszczyzn"
 
 #: src/slic3r/GUI/NotificationManager.cpp:1663
 #, c-format, boost-format
@@ -138,10 +138,10 @@ msgstr[4] "%1$d obiektów zostały załadowanych jako część przeciętego obie
 #, c-format, boost-format
 msgid "%1$d object was loaded with custom seam."
 msgid_plural "%1$d objects were loaded with custom seam."
-msgstr[0] "Załadowano %1$d‬ model z niestandardowym szwem."
-msgstr[1] "Załadowano %1$d‬ modele z niestandardowym szwem."
-msgstr[2] "Załadowano %1$d‬ modeli z niestandardowym szwem."
-msgstr[3] "Załadowano %1$d‬ modeli z niestandardowym szwem."
+msgstr[0] "Załadowano %1$d model z niestandardowym szwem."
+msgstr[1] "Załadowano %1$d modele z niestandardowym szwem."
+msgstr[2] "Załadowano %1$d modeli z niestandardowym szwem."
+msgstr[3] "Załadowano %1$d modeli z niestandardowym szwem."
 
 #: src/slic3r/GUI/NotificationManager.cpp:1658
 #, c-format, boost-format
@@ -183,10 +183,10 @@ msgstr[3] "%1$d obiektów załadowano ze zmienną wysokością warstwy"
 #, c-format, boost-format
 msgid "%1$d open edge"
 msgid_plural "%1$d open edges"
-msgstr[0] "‪%1$d‬ otwarta krawędź"
-msgstr[1] "‪%1$d‬ otwarte krawędzie"
-msgstr[2] "‪%1$d‬ otwartych krawędzi"
-msgstr[3] "‪%1$d‬ otwartych krawędzi"
+msgstr[0] "%1$d otwarta krawędź"
+msgstr[1] "%1$d otwarte krawędzie"
+msgstr[2] "%1$d otwartych krawędzi"
+msgstr[3] "%1$d otwartych krawędzi"
 
 #: src/libslic3r/PrintConfig.cpp:1754 src/libslic3r/PrintConfig.cpp:1777
 msgid "1000 (unlimited)"
@@ -11181,16 +11181,16 @@ msgid_plural ""
 "Objects size from file %s appears to be zero.\n"
 "These objects have been removed from the model"
 msgstr[0] ""
-"Rozmiar obiektu z pliku ‪%s‬ wydaje się mieć wartość zero.\n"
+"Rozmiar obiektu z pliku %s wydaje się mieć wartość zero.\n"
 "Ten obiekt został usunięty z modelu."
 msgstr[1] ""
-"Rozmiary obiektów z pliku ‪%s‬ wydają się mieć wartość zero.\n"
+"Rozmiary obiektów z pliku %s wydają się mieć wartość zero.\n"
 "Te obiekty zostały usunięte z modelu."
 msgstr[2] ""
-"Rozmiary obiektów z pliku ‪%s‬ wydają się mieć wartość zero.\n"
+"Rozmiary obiektów z pliku %s wydają się mieć wartość zero.\n"
 "Te obiekty zostały usunięte z modelu."
 msgstr[3] ""
-"Rozmiary obiektów z pliku ‪%s‬ wydają się mieć wartość zero.\n"
+"Rozmiary obiektów z pliku %s wydają się mieć wartość zero.\n"
 "Te obiekty zostały usunięte z modelu."
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:212
@@ -19826,7 +19826,7 @@ msgstr "Prześlij i symuluj"
 #, c-format, boost-format
 msgid "Upload filename doesn't end with \"%s\". Do you wish to continue?"
 msgstr ""
-"Przesyłana nazwa pliku nie kończy się z \"‪%s‬\". Czy chcesz kontynuować?"
+"Przesyłana nazwa pliku nie kończy się z \"%s\". Czy chcesz kontynuować?"
 
 #. TRN %1% = host
 #: src/slic3r/Utils/OctoPrint.cpp:793
