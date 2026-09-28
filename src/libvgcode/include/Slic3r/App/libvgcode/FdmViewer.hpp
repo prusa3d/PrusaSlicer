@@ -50,6 +50,10 @@ public:
      */
     void init(Render::Device& device, Scene::Scene& scene, Scene::GeometryDataFactory& data_factory) override;
 
+    void set_options_visibility_from_settings(
+        const std::array<bool, Biz::libpgcode::OPTION_TYPES_COUNT>& options_visibility
+    );
+
     void set_scene(Scene::Scene& scene) override;
     void clear_scene() override;
 

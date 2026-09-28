@@ -259,6 +259,62 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Category::Hidden;
     def->init_fn = []() { return Domain::ConfigValue(false); };
 
+    // Preview options visibility (Slic3r::App::libvgcode::Settings::options_visibility)
+    def = defs.add("show_travels_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_wipes_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_retractions_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_unretractions_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_seams_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_tool_changes_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_color_changes_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_pause_prints_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_custom_gcodes_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_center_of_gravity_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(false); };
+
+    def = defs.add("show_tool_marker_in_preview", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Category::Hidden;
+    def->init_fn = []() { return Domain::ConfigValue(true); };
+
     def = defs.add("use_default_colors_in_dbl_slider", typeid(bool));
     def->location = Domain::AppConfigLocation{};
     def->category = Category::Hidden;

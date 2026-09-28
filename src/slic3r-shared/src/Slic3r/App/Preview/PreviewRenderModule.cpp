@@ -69,6 +69,26 @@ namespace CustomGCode = Domain::CustomGCode;
 using CommandName          = Platform::CommandName;
 using FuncCommandExtraOpts = Platform::FuncCommandExtraOpts;
 
+// Maps an OptionType to the AppConfig key used to persist its visibility
+// (Slic3r::App::libvgcode::Settings::options_visibility).
+static const char* option_visibility_app_config_key(OptionType type)
+{
+    switch (type) {
+    case OptionType::Travels:          return "show_travels_in_preview";
+    case OptionType::Wipes:            return "show_wipes_in_preview";
+    case OptionType::Retractions:      return "show_retractions_in_preview";
+    case OptionType::Unretractions:    return "show_unretractions_in_preview";
+    case OptionType::Seams:            return "show_seams_in_preview";
+    case OptionType::ToolChanges:      return "show_tool_changes_in_preview";
+    case OptionType::ColorChanges:     return "show_color_changes_in_preview";
+    case OptionType::PausePrints:      return "show_pause_prints_in_preview";
+    case OptionType::CustomGCodes:     return "show_custom_gcodes_in_preview";
+    case OptionType::CenterOfGravity:  return "show_center_of_gravity_in_preview";
+    case OptionType::ToolMarker:       return "show_tool_marker_in_preview";
+    default:                           ASSERT(false); return "";
+    }
+}
+
 PreviewRenderModule::~PreviewRenderModule()
 {
     // m_gizmo_manager lives in the RenderModuleBase base class, which is destroyed after this
@@ -650,6 +670,10 @@ void PreviewRenderModule::register_commands()
                 [this, option_type]()
                 {
                     m_fdm_viewer.toggle_option_visibility(option_type);
+                    AppServices::instance().app_config().set(
+                        option_visibility_app_config_key(option_type),
+                        m_fdm_viewer.is_option_visible(option_type)
+                    );
                     if (option_type == OptionType::ToolMarker) {
                         update_scene_aabb();
                     }
@@ -769,6 +793,10 @@ void PreviewRenderModule::init_viewers(Render::Device& device)
     settings.mode                             = mode;
     settings.slider_layers_use_default_colors = app_config.get<bool>("use_default_colors_in_dbl_slider");
     settings.seq_top_layer_only               = app_config.get<bool>("seq_top_layer_only");
+    for (size_t i = 0; i < settings.options_visibility.size(); ++i) {
+        settings.options_visibility[i] =
+            app_config.get<bool>(option_visibility_app_config_key(OptionType(i)));
+    }
     // set wrapper callbacks
     settings.cb_invalidate_slice = std::bind(&PreviewRenderModule::on_invalidate_slice, this);
     settings.cb_update_layers_slider =
@@ -1030,7 +1058,7 @@ void PreviewRenderModule::update_toolbar_visibility()
     m_button_tool_marker->set_visible(fdm_has_gcode);
     m_button_shells
         ->set_visible(fdm_has_gcode /*m_fdm_viewer.mode() != FdmViewerWrapperMode::GCodeViewer*/);
-    m_button_wipes->set_visible(fdm_has_gcode);
+    m_button_wipes->set_visible(fdm_has_gcode && fdm_has_option(OptionType::Wipes));
 
     // m_button_gcode_inspect
 }

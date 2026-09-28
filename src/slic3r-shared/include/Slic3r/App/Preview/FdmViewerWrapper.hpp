@@ -16,6 +16,8 @@
 #include "ActualSpeedPlotter.hpp"
 #include "Slic3r/Biz/Units.hpp"
 
+#include <array>
+
 namespace Slic3r::Biz::libpgcode {
 struct ProcessorResult;
 }
@@ -37,6 +39,22 @@ struct FdmViewerWrapperSettings : public ViewerWrapperBaseSettings
     bool slider_layers_use_default_colors{ false };
     bool seq_top_layer_only{ false };
     Navigator* navigator{ nullptr };
+    // Mirrors Slic3r::App::libvgcode::Settings::options_visibility (default values included).
+    // Duplicated here, rather than referenced, because this settings struct is built and
+    // populated from AppConfig before the viewer (and its internal libvgcode::Settings) exists.
+    std::array<bool, Biz::libpgcode::OPTION_TYPES_COUNT> options_visibility{
+        false, // Travels
+        false, // Wipes
+        false, // Retractions
+        false, // Unretractions
+        false, // Seams
+        false, // ToolChanges
+        false, // ColorChanges
+        false, // PausePrints
+        false, // CustomGCodes
+        false, // CenterOfGravity
+        true   // ToolMarker
+    };
 
     //
     // wrapper callbacks

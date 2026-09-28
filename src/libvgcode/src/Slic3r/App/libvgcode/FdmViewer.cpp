@@ -1702,6 +1702,15 @@ void FdmViewer::render_tool_marker(Scene::Node* node)
     node->set_local_transform(xtrafo);
 }
 
+void FdmViewer::set_options_visibility_from_settings(
+    const std::array<bool, Biz::libpgcode::OPTION_TYPES_COUNT>& options_visibility
+)
+{
+    for (size_t i = 0; i < options_visibility.size(); ++i) {
+        m_settings.options_visibility[i] = options_visibility[i];
+    }
+}
+
 bool FdmViewer::has_gcode_events_to_show() const
 {
     if (used_extruders_count() > 1)

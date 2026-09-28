@@ -86,6 +86,8 @@ bool FdmViewerWrapper::set_settings(const FdmViewerWrapperSettings& settings)
         if (m_viewer.is_top_layer_only_view_range() != settings.seq_top_layer_only)
             m_viewer.toggle_top_layer_only_view_range();
 
+        m_viewer.set_options_visibility_from_settings(settings.options_visibility);
+
         m_legend = Yoga::Passthrough<LegendWindow>(std::make_unique<LegendWindow>(&m_viewer, this));
         m_legend->callbacks().cb_extrusion_role_visibility_changed = std::bind(&FdmViewerWrapper::on_extrusion_role_visibility_changed, this);
         m_legend->callbacks().cb_view_type_changed = m_settings.cb_gcode_view_type_changed;
