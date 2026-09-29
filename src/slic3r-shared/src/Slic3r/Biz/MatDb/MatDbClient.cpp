@@ -122,11 +122,19 @@ struct adl_serializer<Slic3r::Domain::MatDb::BrandData>
 namespace Slic3r::Biz::MatDb {
 
 namespace {
-bool contains(std::string_view text, const std::set<std::string_view>& search)
+bool contains(std::string_view text, const std::set<std::string_view>& search, std::set<std::string_view>& hit)
 {
-    return search.empty()
-        || std::ranges::
-            any_of(search, [&text](const auto& s) -> bool { return boost::ifind_first(text, s); });
+    if (search.empty()) {
+        return true;
+    }
+    bool found = false;
+    for (const auto s : search) {
+        if (boost::ifind_first(text, s)) {
+            found = true;
+            hit.insert(s);
+        }
+    }
+    return found;
 }
 
 std::optional<Domain::MatDb::Color> color_from_storage(const std::string& s)
@@ -193,16 +201,18 @@ auto match_query(const MatDbClient::Query& q, const Domain::MatDb::Index& index)
     );
     return [&q, tokens, &index](const Domain::MatDb::MaterialIndex& mat_idx)
     {
+        decltype(tokens) hit;
         bool ret = true;
         if (!tokens.empty()) {
-            ret = contains(mat_idx.name, tokens)
-                || (mat_idx.type.has_value() && contains(mat_idx.type.value(), tokens));
-            if (!ret) {
-                auto brand_it = index.brands.find(mat_idx.brand_slug);
-                if (brand_it != index.brands.end()) {
-                    ret = contains(brand_it->second.name, tokens);
-                }
+            const auto name_hit = contains(mat_idx.name, tokens, hit);
+            const auto type_hit = mat_idx.type.has_value() && contains(mat_idx.type.value(), tokens, hit);
+            auto brand_hit = false;
+            if (const auto brand_it = index.brands.find(mat_idx.brand_slug);
+                brand_it != index.brands.end())
+            {
+                brand_hit = contains(brand_it->second.name, tokens, hit);
             }
+            ret = name_hit || type_hit || brand_hit;
         }
         if (!q.types.empty()) {
             ret = ret
@@ -211,7 +221,7 @@ auto match_query(const MatDbClient::Query& q, const Domain::MatDb::Index& index)
                       [&](const auto& t) { return mat_idx.type.has_value() && mat_idx.type == t; }
                 );
         }
-        return ret;
+        return ret && tokens.size() == hit.size();
     };
 }
 

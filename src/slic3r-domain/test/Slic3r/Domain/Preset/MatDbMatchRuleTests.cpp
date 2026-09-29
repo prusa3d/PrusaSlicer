@@ -36,19 +36,19 @@ TEST_CASE("MatDbMatchRule tests", "[preset][matdb]")
     // Strings include_tags;
     // Strings exclude_tags;
 
-    SECTION_MATCH_MAT_ATTR(uuid, 1)
-    SECTION_MATCH_BRAND_ATTR(slug, 2)
-    SECTION_MATCH_MAT_ATTR(slug, 1)
-    SECTION_MATCH_MAT_ATTR(name, 1)
-    SECTION_MATCH_MAT_ATTR(klass, 1)
-    SECTION_MATCH_MAT_ATTR(type, 1)
-    SECTION_MATCH_MAT_ATTR(abbreviation, 2)
+    SECTION_MATCH_MAT_ATTR(uuid, Preset::MatDbMatchRule::RANK_ATTR_RANGE)
+    SECTION_MATCH_BRAND_ATTR(slug, Preset::MatDbMatchRule::RANK_ATTR_RANGE)
+    SECTION_MATCH_MAT_ATTR(slug, Preset::MatDbMatchRule::RANK_ATTR_RANGE)
+    SECTION_MATCH_MAT_ATTR(name, Preset::MatDbMatchRule::RANK_ATTR_RANGE)
+    SECTION_MATCH_MAT_ATTR(klass, Preset::MatDbMatchRule::RANK_ATTR_RANGE)
+    SECTION_MATCH_MAT_ATTR(type, Preset::MatDbMatchRule::RANK_ATTR_RANGE)
+    SECTION_MATCH_MAT_ATTR(abbreviation, Preset::MatDbMatchRule::RANK_ATTR_RANGE)
 
     SECTION("required_tags")
     {
         mat.tags = {"a", "b"};
         Preset::MatDbMatchRule rule{.required_tags = {"a"}};
-        REQUIRE(rule.match(mat) == 2);
+        REQUIRE(rule.match(mat) == Preset::MatDbMatchRule::RANK_ATTR_RANGE);
         mat.tags = {"c", "d"};
         REQUIRE(rule.match(mat) == 0);
     }
@@ -57,9 +57,9 @@ TEST_CASE("MatDbMatchRule tests", "[preset][matdb]")
     {
         mat.tags = {"a", "b"};
         Preset::MatDbMatchRule rule{.optional_tags = {"a", "b", "c"}};
-        REQUIRE(rule.match(mat) == 2);
+        REQUIRE(rule.match(mat) == Preset::MatDbMatchRule::RANK_ATTR_RANGE * 2 / 3);
         mat.tags = {"c", "d"};
-        REQUIRE(rule.match(mat) == 1);
+        REQUIRE(rule.match(mat) == Preset::MatDbMatchRule::RANK_ATTR_RANGE * 1 / 3);
         mat.tags = {"d"};
         REQUIRE(rule.match(mat) == 0);
     }
@@ -70,7 +70,7 @@ TEST_CASE("MatDbMatchRule tests", "[preset][matdb]")
         Preset::MatDbMatchRule rule{.optional_tags = {"c"}, .exclude_tags = {"a"}};
         REQUIRE(rule.match(mat) == 0);
         mat.tags = {"c", "d"};
-        REQUIRE(rule.match(mat) == 1);
+        REQUIRE(rule.match(mat) == Preset::MatDbMatchRule::RANK_ATTR_RANGE * 2);
     }
 
 }

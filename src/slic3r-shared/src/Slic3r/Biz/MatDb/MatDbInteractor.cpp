@@ -49,7 +49,11 @@ const std::set<std::string>& MatDbInteractor::types() const
 
 void MatDbInteractor::query(size_t material_index, const std::string& q, const std::optional<std::string>& type)
 {
-    auto result = m_client.query({q}, 64, 0);
+    MatDbClient::Query query = {q};
+    if (type.has_value()) {
+        query.types.push_back(type.value());
+    }
+    auto result = m_client.query(query, 64, 0);
     std::vector<MatDbItem> items;
     auto resolve_preset = [this, material_index](const Domain::MatDb::Material& mat) -> PresetMatches
     {
@@ -61,13 +65,29 @@ void MatDbInteractor::query(size_t material_index, const std::string& q, const s
             sp.print.id,
             material_index
         );
+        SPDLOG_DEBUG("=================================================");
+        SPDLOG_DEBUG("Resolve presets for MatDB Item {}", mat.slug);
         PresetMatches ret;
         for (const auto& [preset, mr] : mpv.match_rules()) {
             if (auto rank = mr.match(mat); rank > 0) {
+                SPDLOG_DEBUG(
+                    "Match ranked {} with {} ({}:{}:{})",
+                    rank,
+                    preset.short_name(),
+                    preset.last_node_location.file,
+                    preset.last_node_location.line,
+                    preset.last_node_location.column
+                );
+                SPDLOG_DEBUG("Rule: {}", to_string(mr));
                 ret.emplace_back(preset.id, std::string{preset.short_name()}, rank);
             }
         }
+        SPDLOG_DEBUG("----Sorted results-------------------------------");
         std::ranges::sort(ret, std::ranges::greater(), [](const auto& v) { return v.rank; });
+        for (const auto& r : ret) {
+            SPDLOG_DEBUG("{}: {}", r.rank, r.preset_name);
+        }
+        SPDLOG_DEBUG("=================================================");
         return ret;
     };
     std::ranges::copy(

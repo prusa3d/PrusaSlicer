@@ -1,4 +1,4 @@
-#include <utility>
+#include <sstream>
 
 #include "Slic3r/Domain/Preset/MatDbMatchRule.hpp"
 
@@ -86,15 +86,12 @@ size_t MatDbMatchRule::match(const MatDb::Material& mat) const
         return 0;                           \
     }
 
-    constexpr size_t RANK_OPT{1};
-    constexpr size_t RANK_REQ{2};
-
     MATCH_MATERIAL_IF(uuid, RANK_OPT)
     MATCH_BRAND_IF_REQUIRED(slug, RANK_REQ)
     MATCH_MATERIAL_IF(slug, RANK_OPT)
     MATCH_MATERIAL_IF(name, RANK_OPT)
     MATCH_MATERIAL_IF(klass, RANK_OPT)
-    MATCH_MATERIAL_IF(type, RANK_OPT)
+    MATCH_MATERIAL_IF_REQUIRED(type, RANK_REQ)
     MATCH_MATERIAL_IF_REQUIRED(abbreviation, RANK_REQ)
 
 #undef MATCH_MATERIAL_IF
@@ -104,15 +101,75 @@ size_t MatDbMatchRule::match(const MatDb::Material& mat) const
 
     if (!match_includes(mat.tags, required_tags)) {
         return 0;
+    } else if (!required_tags.empty()) {
+        rank += RANK_ATTR_RANGE;
     }
-    rank += required_tags.size() * RANK_REQ;
 
-    rank += match_includes_count(mat.tags, optional_tags) * RANK_OPT;
+    if (!optional_tags.empty()) {
+        rank += RANK_ATTR_RANGE * match_includes_count(mat.tags, optional_tags) / optional_tags.size();
+    }
 
     if (!match_excludes(mat.tags, exclude_tags)) {
         return 0;
+    } else if (!exclude_tags.empty()) {
+        rank += RANK_ATTR_RANGE;
     }
     return rank;
+}
+
+std::string to_string(const MatDbMatchRule& r)
+{
+    std::ostringstream os;
+
+#define DUMP_FIELD_STR(field)                   \
+    if (r.field.has_value()) {                  \
+        os << " " #field "=" << r.field.value();\
+    }
+#define DUMP_FIELD_STRS(field)                  \
+    if (!r.field.empty()) {                     \
+        os << " " #field "=(";                  \
+        bool first = true;                      \
+        for (const auto& f : r.field ) {        \
+            if (first) {                        \
+                first = false;                  \
+            } else {                            \
+                os << ", ";                     \
+            }                                   \
+            os << f;                            \
+        }                                       \
+        os << ")";                              \
+    }
+
+    // OptString uuid;
+    // OptString brand_slug;
+    // OptString slug;
+    // OptString name;
+    // OptString klass;
+    // OptString type;
+    // OptString abbreviation;
+    // Strings required_tags;
+    // Strings optional_tags;
+    // Strings exclude_tags;
+
+    os << "[Rule";
+
+    DUMP_FIELD_STR(uuid)
+    DUMP_FIELD_STR(brand_slug)
+    DUMP_FIELD_STR(slug)
+    DUMP_FIELD_STR(name)
+    DUMP_FIELD_STR(klass)
+    DUMP_FIELD_STR(type)
+    DUMP_FIELD_STR(abbreviation)
+    DUMP_FIELD_STRS(required_tags)
+    DUMP_FIELD_STRS(optional_tags)
+    DUMP_FIELD_STRS(exclude_tags)
+
+    os << "]";
+
+#undef DUMP_FIELD_STR
+#undef DUMP_FIELD_STRS
+
+    return os.str();
 }
 
 } // namespace Slic3r::Domain::Preset

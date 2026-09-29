@@ -11,6 +11,10 @@ using OptString = std::optional<std::string>;
 
 struct MatDbMatchRule
 {
+    constexpr static size_t RANK_ATTR_RANGE{16};
+    constexpr static size_t RANK_OPT{1 * RANK_ATTR_RANGE};
+    constexpr static size_t RANK_REQ{1 * RANK_ATTR_RANGE};
+
     OptString uuid;
     OptString brand_slug;
     OptString slug;
@@ -25,6 +29,8 @@ struct MatDbMatchRule
 
     size_t match(const MatDb::Material& mat) const;
 };
+
+std::string to_string(const MatDbMatchRule& r);
 
 
 }

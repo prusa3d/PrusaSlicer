@@ -77,7 +77,7 @@ void MaterialSpoolSelectionRow::on_data_update()
     std::ranges::transform(
         m_state->preset_matches,
         std::back_inserter(presets),
-        [](const Biz::MatDb::PresetMatch& preset) { return preset.preset_id; }
+        [](const Biz::MatDb::PresetMatch& preset) { return preset.preset_name; }
     );
     m_preset_combobox->set_items(presets);
 }
