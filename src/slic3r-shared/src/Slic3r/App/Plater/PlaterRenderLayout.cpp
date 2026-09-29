@@ -1,6 +1,7 @@
 #include "Slic3r/App/Plater/PlaterRenderLayout.hpp"
 #include "Slic3r/App/Lua/PluginDialog.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
+#include "Slic3r/App/EffectiveValuesDialog.hpp"
 #include <Yoga.h>
 
 namespace Slic3r::App::Plater {
@@ -19,6 +20,7 @@ PlaterRenderLayout::PlaterRenderLayout(
     std::unique_ptr<History> history,
     std::unique_ptr<WelcomeDialog> welcome_dialog,
     std::unique_ptr<InvalidDataDialog> invalid_data_dialog,
+    std::unique_ptr<EffectiveValuesDialog> effective_values_dialog,
     std::unique_ptr<Lua::PluginDialog> plugin_dialog,
     std::unique_ptr<CrashedProjectsDialog> crashed_projects_dialog,
     std::unique_ptr<PresetUpdaterDialog> preset_updater_dialog
@@ -40,6 +42,7 @@ PlaterRenderLayout::PlaterRenderLayout(
     m_history(std::move(history)),
     m_welcome_dialog(std::move(welcome_dialog)),
     m_invalid_data_dialog(std::move(invalid_data_dialog)),
+    m_effective_values_dialog(std::move(effective_values_dialog)),
     m_plugin_dialog(std::move(plugin_dialog))
 {}
 
@@ -51,6 +54,8 @@ void PlaterRenderLayout::init()
     m_welcome_dialog->attach_to_center();
     m_layout_main.append(m_invalid_data_dialog.release());
     m_invalid_data_dialog->attach_to_center();
+    m_layout_main.append(m_effective_values_dialog.release());
+    m_effective_values_dialog->attach_to_center();
     m_layout_main.append(m_plugin_dialog.release());
     m_plugin_dialog->attach_to_center();
 }

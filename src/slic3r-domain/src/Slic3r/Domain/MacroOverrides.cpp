@@ -2,6 +2,7 @@
 
 #include "Slic3r/Domain/ConfigDefsFDM.hpp"
 #include "Slic3r/Domain/ConfigDefsSLA.hpp"
+#include "Slic3r/Domain/Percentage.hpp"
 #include "Slic3r/Assert.hpp"
 
 namespace Slic3r::Domain {
@@ -34,6 +35,19 @@ std::optional<MacroOverridesLayerFDM> macro_overrides_layer_fdm_from_string(std:
         return MacroOverridesLayerFDM::SpiralVase;
     }
     return std::nullopt;
+}
+
+MacroOverridesFDM make_vase_mode_overrides()
+{
+    MacroOverridesFDM overrides;
+    overrides.overrides.set("spiral_vase", true);
+    overrides.overrides.set("perimeters", 1);
+    overrides.overrides.set("top_solid_layers", 0);
+    overrides.overrides.set("fill_density", Percentage{0});
+    overrides.overrides.set("support_material", SupportMode::None);
+    overrides.overrides.set("support_material_enforce_layers", 0);
+    overrides.overrides.set("thin_walls", false);
+    return overrides;
 }
 
 } // namespace Slic3r::Domain

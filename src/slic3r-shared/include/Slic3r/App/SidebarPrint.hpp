@@ -15,6 +15,7 @@ namespace Slic3r::App {
 
 class PrintSettingsDialog;
 class ToolToFeatureDialog;
+class PrintModeDialog;
 class PrintToolFavoritesItem;
 class Navigator;
 
@@ -32,6 +33,7 @@ public:
 
     PrintSettingsDialog& print_settings_dialog();
     ToolToFeatureDialog* tool_to_feature_dialog();
+    PrintModeDialog& print_mode_dialog();
 
     void on_preset_selection_changed(
         Domain::SelectionId project_id,
@@ -82,6 +84,7 @@ private:
     Navigator& m_navigator;
 
     Yoga::LayoutButton* m_settings_set_btn{nullptr};
+    Yoga::LayoutButton* m_print_mode_btn{nullptr};
     Yoga::ScrollArea* m_content_area{nullptr};
     ToolToFeatureDialog* m_tool_to_feature_dialog{nullptr};
     Yoga::Item* m_tool_to_feature_row{nullptr};
@@ -91,6 +94,7 @@ private:
     ToolHeadListView* m_tool_head_list_view{nullptr};
 
     PrintSettingsDialog* m_print_settings_dialog{nullptr};
+    PrintModeDialog* m_print_mode_dialog{nullptr};
 
     int m_last_selected_index{-1};
 };

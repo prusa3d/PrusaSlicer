@@ -13,6 +13,7 @@
 #include "Slic3r/Biz/Preset/PresetInteractorProjectContext.hpp"
 #include "Slic3r/Biz/Preset/PresetDiffOperation.hpp"
 #include "Slic3r/Biz/Preset/IPresetDialogManager.hpp"
+#include "Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IO/BundlePaths.hpp"
 #include "Slic3r/Biz/ConfigBoxInteractor.hpp"
 #include "Slic3r/Biz/PrintToolConfigBoxInteractor.hpp"
@@ -99,7 +100,8 @@ class PresetInteractor final :
     public ISelectedConfigContainerChangedListener,
     public WithListeners<
         IPresetChangedListener,
-        ISlicingInputChangedListener>,
+        ISlicingInputChangedListener,
+        IMacroOverridesChangedListener>,
     public IPresetNameProvider,
     public IConfigBoxSetter,
     public IPresetVisualGetter
@@ -304,6 +306,11 @@ public:
     ) override;
 
     void set_item_override(const Domain::ConfigItem& item, bool enable, size_t index = 0) override;
+
+    void set_macro_overrides(
+        Domain::MacroOverridesLayerFDM layer,
+        std::optional<Domain::MacroOverridesFDM> overrides
+    );
 
     template <typename T>
     using ConstRefBoolPair = std::pair<std::reference_wrapper<const T>, bool>;
@@ -1002,6 +1009,8 @@ private:
     using SetAccessorMap = std::map<const OverridableConfigBoxInteractor*, OverridableConfigBoxInteractor::SetAccessor>;
 
     Domain::Workbench& m_workbench;
+    Scene::SceneInteractor& m_scene_interactor;
+    Slicing::SlicingInteractor& m_slicing_interactor;
     BackupStore& m_backup_store;
     IO::BundlePaths m_bundle_paths;
 

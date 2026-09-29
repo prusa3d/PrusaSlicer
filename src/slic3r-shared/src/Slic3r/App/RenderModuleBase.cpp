@@ -4,6 +4,7 @@
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/ObjectListWindow.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
+#include "Slic3r/App/EffectiveValuesDialog.hpp"
 #include "Slic3r/App/Scene/GizmoManager.hpp"
 #include "Slic3r/App/Scene/Scene.hpp"
 #include "Slic3r/App/AppServices.hpp"
@@ -59,6 +60,12 @@ void RenderModuleBase::set_opened_dialog(Yoga::Dialog* opened_dialog)
     m_dialog_navigation.open_dialog(opened_dialog);
 }
 
+void RenderModuleBase::set_effective_values_key(std::optional<std::string> key)
+{
+    if (m_effective_values_dialog.get()) {
+        m_effective_values_dialog->set_key(key);
+    }
+}
 void RenderModuleBase::set_object_list_collapsed(bool collapsed)
 {
     if (m_object_list.get()) {

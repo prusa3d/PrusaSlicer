@@ -79,6 +79,7 @@ void OverridableConfigRowItem::on_data_update()
         );
         m_config_row_item->set_enabled_control(m_state->overriden.value());
     }
+    m_config_row_item->set_effective_value_status(m_state->effective_value_status);
     m_config_row_item->set_state(*m_state->config_item);
 }
 

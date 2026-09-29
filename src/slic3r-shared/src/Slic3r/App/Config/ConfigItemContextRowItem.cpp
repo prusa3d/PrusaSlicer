@@ -49,6 +49,7 @@ void ConfigItemContextRowItem::clear_navigation()
 
 void ConfigItemContextRowItem::on_data_update()
 {
+    m_config_row_item->set_effective_value_status(m_state->effective_value_status);
     m_config_row_item->set_state(*m_state->config_item);
 }
 

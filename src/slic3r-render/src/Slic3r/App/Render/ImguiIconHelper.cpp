@@ -16,6 +16,7 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
     {Icon::SliderFloatEditBtnIcon, "edit_button"},
     {Icon::SliderFloatEditBtnPressedIcon, "edit_button_pressed"},
     {Icon::RevertButton, "undo"},
+    {Icon::EffectiveValueInfo, "effective_value_info"},
     {Icon::PlugMarker, "plug"},
     {Icon::DowelMarker, "dowel"},
     {Icon::SnapMarker, "snap"},

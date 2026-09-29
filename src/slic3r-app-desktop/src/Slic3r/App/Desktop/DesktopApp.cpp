@@ -376,6 +376,10 @@ bool DesktopApp::OnInit()
         std::make_shared<App::ThumbnailStoreUpdater>(*m_thumbnail_image_generator, m_thumbnail_store);
 
     app_services.set_dialog_manager(std::make_unique<WX::DialogManager>());
+
+    app_services.set_navigator(std::make_unique<Navigator>());
+    Navigator& navigator{app_services.navigator()};
+
     app_services.set_pop_notification_center(
         std::make_unique<PopNotification::PopNotificationCenter>(*m_project_interactor.get())
     );
@@ -441,10 +445,10 @@ bool DesktopApp::OnInit()
         [this](bool has_forced) { on_preset_updater_forced_state(has_forced); }
     );
     preset_updater_controller.set_show_dialog_callback(
-        [this]()
+        [this, &navigator]()
         {
             if (m_init_completed) {
-                m_navigator.set_modal_dialog(ModalDialog::PresetUpdater);
+                navigator.set_modal_dialog(ModalDialog::PresetUpdater);
             } else {
                 m_loading_module->set_opened_preset_updater(true);
             }
@@ -464,11 +468,11 @@ bool DesktopApp::OnInit()
     );
 
     m_loading_module =
-        std::make_unique<LoadingRenderModule>(preset_updater_controller, m_navigator);
+        std::make_unique<LoadingRenderModule>(preset_updater_controller, navigator);
 
     m_project_saver = std::make_shared<ProjectSaver>(*m_project_interactor, *m_thumbnail_store);
 
-    m_main_frame = new MainFrame(m_workbench, *m_project_interactor, m_navigator, m_project_saver);
+    m_main_frame = new MainFrame(m_workbench, *m_project_interactor, navigator, m_project_saver);
     platform_services.app_instance_message_handler().init(m_main_frame->GetHandle());
     Platform::WX::WXRenderCanvas& canvas = m_main_frame->get_render_canvas();
     m_gl_context                         = canvas.release_context();
@@ -478,7 +482,7 @@ bool DesktopApp::OnInit()
     // which only exists now, and nothing preset related has been touched yet.
     preset_updater_controller.start();
 
-    m_navigator.set_canvas(canvas);
+    navigator.set_canvas(canvas);
 
     canvas.set_render_module(m_loading_module.get());
 
@@ -609,7 +613,8 @@ void DesktopApp::finish_init()
 
     Platform::WX::WXRenderCanvas& canvas = m_main_frame->get_render_canvas();
 
-    m_navigator.on_init(*m_plater_module, *m_preview_module, canvas, m_project_interactor.get());
+    Navigator& navigator{AppServices::instance().navigator()};
+    navigator.on_init(*m_plater_module, *m_preview_module, canvas, m_project_interactor.get());
 
     // Closed before the module goes, so the model stops counting it as an open dialog.
     m_loading_module->set_opened_preset_updater(false);
@@ -624,8 +629,8 @@ void DesktopApp::finish_init()
 
     // The main frame was shown while the preset updater module was the active one, so the
     // shortcuts of the plater have to be picked up now.
-    if (m_navigator.callbacks().render_module_switched) {
-        m_navigator.callbacks().render_module_switched();
+    if (navigator.callbacks().render_module_switched) {
+        navigator.callbacks().render_module_switched();
     }
 
     m_project_interactor->user_account_interactor()
@@ -649,7 +654,7 @@ void DesktopApp::finish_init()
         )
     );
     app_services.pop_notification_center().set_open_invalid_data_dialog_fn(
-        [this]() { m_navigator.set_modal_dialog(ModalDialog::InvalidData); }
+        [&navigator]() { navigator.set_modal_dialog(ModalDialog::InvalidData); }
     );
 
     m_plater_module->plugin_system().add_listener<Lua::IPluginInstallationListener>(
@@ -698,6 +703,7 @@ DesktopApp::~DesktopApp()
     AppServices& app_services = AppServices::instance();
     if (app_services.has_preset_updater_controller()) {
         app_services.preset_updater_controller().shutdown();
+        app_services.navigator().shutdown();
     }
 
     Biz::Platform::close();

@@ -4,6 +4,7 @@
 
 #include "Slic3r/App/Undo/Store.hpp"
 #include "Slic3r/App/InvalidDataDialog.hpp"
+#include "Slic3r/App/EffectiveValuesDialog.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ISelectedProjectChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"

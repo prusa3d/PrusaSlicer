@@ -82,7 +82,6 @@ private:
     std::unique_ptr<Preview::PreviewRenderModule> m_preview_module;
     Domain::Workbench m_workbench;
     InitParams m_init_params;
-    Navigator m_navigator;
     std::unique_ptr<PrintHost::PrusaLinkStorageListener> m_prusalink_storage_listener;
     std::unique_ptr<IMouse3DBackend> m_mouse_3d_backend;
 

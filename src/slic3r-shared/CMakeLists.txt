@@ -220,6 +220,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/DirtyCategoryList.hpp
         include/Slic3r/App/PrintSettingsDialog.hpp
         src/Slic3r/App/PrintSettingsDialog.cpp
+        include/Slic3r/App/PrintModeDialog.hpp
+        src/Slic3r/App/PrintModeDialog.cpp
         include/Slic3r/App/LogicalPrinterSettingsDialog.hpp
         src/Slic3r/App/LogicalPrinterSettingsDialog.cpp
         include/Slic3r/App/PrinterAdvancedSettingsDialog.hpp
@@ -313,6 +315,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Mouse3D/Mouse3DController.cpp
         include/Slic3r/App/InvalidDataDialog.hpp
         src/Slic3r/App/InvalidDataDialog.cpp
+        include/Slic3r/App/EffectiveValuesDialog.hpp
+        src/Slic3r/App/EffectiveValuesDialog.cpp
         include/Slic3r/App/SidebarStackLayout.hpp
         src/Slic3r/App/SidebarStackLayout.cpp
         include/Slic3r/App/CurrentPresetLabel.hpp
@@ -427,6 +431,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Config/ConfigSubcategoryListView.cpp
         include/Slic3r/App/Config/ConfigSubcategoryItem.hpp
         src/Slic3r/App/Config/ConfigSubcategoryItem.cpp
+        include/Slic3r/App/Config/ConfigRowItemLabel.hpp
+        src/Slic3r/App/Config/ConfigRowItemLabel.cpp
         include/Slic3r/App/Config/ConfigRowItem.hpp
         src/Slic3r/App/Config/ConfigRowItem.cpp
         include/Slic3r/App/Config/ConfigItemContextRowItem.hpp
@@ -639,6 +645,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Yoga/Dialog.cpp
         src/Slic3r/App/Yoga/Separator.cpp
         include/Slic3r/App/Yoga/Separator.hpp
+        include/Slic3r/App/Yoga/StrikethroughText.hpp
+        src/Slic3r/App/Yoga/StrikethroughText.cpp
         src/Slic3r/App/Yoga/Oval.cpp
         include/Slic3r/App/Yoga/Oval.hpp
         src/Slic3r/App/Yoga/Circle.cpp
@@ -816,6 +824,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/ObservableList.hpp
         include/Slic3r/Biz/IListObserver.hpp
         include/Slic3r/Biz/DataObserver.hpp
+        include/Slic3r/Biz/EffectiveValueStatus.hpp
+        src/Slic3r/Biz/EffectiveValueStatus.cpp
         include/Slic3r/Biz/ConfigBoxObservableList.hpp
         include/Slic3r/Biz/OverridableCBIObservableList.hpp
         src/Slic3r/Biz/OverridableCBIObservableList.cpp
@@ -869,6 +879,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/IConfigBoxSetter.hpp
 
         include/Slic3r/Biz/Preset/IPresetChangedListener.hpp
+        include/Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp
         include/Slic3r/Biz/Preset/IConfigInteractor.hpp
         include/Slic3r/Biz/Preset/IPresetVisualGetter.hpp
         src/Slic3r/Biz/Preset/PresetInteractor.cpp

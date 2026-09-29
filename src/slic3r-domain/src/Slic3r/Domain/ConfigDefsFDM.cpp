@@ -3792,8 +3792,7 @@ void fdm_config_init_fn(ConfigDefinitions& defs)
     def->location = Print;
     def->overrides_in = Locations{ MacroOverrides };
     def->label = L("Spiral vase");
-    def->option_group = ConfigItemDef::OptionGroup::Print_PrecisionSlicing_SlicingStrategy;
-    def->category = ConfigItemDef::Category::Print_PrecisionSlicing;
+    def->category = ConfigItemDef::Category::Hidden;
     def->order = 1;
     def->gui_type = ConfigItemDef::GUIType::checkbox;
     def->tooltip = L("This feature will raise Z gradually while printing a single-walled object "

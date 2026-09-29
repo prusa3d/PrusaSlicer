@@ -2,6 +2,7 @@
 
 #include <string>
 #include <optional>
+#include "Slic3r/Biz/EffectiveValueStatus.hpp"
 #include "Slic3r/Domain/Config.hpp"
 
 namespace Slic3r::Biz {
@@ -17,6 +18,7 @@ struct OverrideItem
 
     std::optional<bool> original_overridden        = std::nullopt;
     const Domain::ConfigItem* original_config_item = nullptr;
+    EffectiveValueStatus effective_value_status;
 
     inline bool is_override() const
     {

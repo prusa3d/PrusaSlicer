@@ -219,6 +219,8 @@ std::pair<ConfigValue, bool> apply_compatibility_rule(
     const std::set<unsigned>& extruder_candidates
 );
 
+const ConfigItemDef* find_def(const std::string& key, PrinterTechnology printer_technology);
+
 class SquashedConfig {
 public:
     SquashedConfig() = default;

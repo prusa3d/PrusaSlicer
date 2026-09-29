@@ -4,6 +4,7 @@
 
 #include <string>
 #include <set>
+#include "Slic3r/Biz/EffectiveValueStatus.hpp"
 
 namespace Slic3r::Domain {
 struct ConfigBox;
@@ -37,6 +38,7 @@ struct PrintToolItem
     std::pair<Domain::ConfigValue, bool> value;
     const SharedContext& shared_context;
     bool is_favorite{false};
+    EffectiveValueStatus effective_value_status;
 
     const Domain::ConfigValue& tool_value(size_t index) const;
 

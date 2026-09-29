@@ -186,6 +186,8 @@ void PrintToolConfigObservableList::on_selected_bed_instances_changed(
         && m_selected_container_id == bed_selection.last_selected_bed().config_container_id)
     {
         update_extruders();
+        update_effective_value_statuses(
+            {project_id, bed_selection.last_selected_bed().instance_id});
     }
 }
 
@@ -197,6 +199,30 @@ void PrintToolConfigObservableList::on_background_process_state_changed(
     }
 
     update_extruders();
+    update_effective_value_statuses(slicing_id);
+}
+
+void
+PrintToolConfigObservableList::update_effective_value_statuses(const Domain::SlicingId slicing_id)
+{
+    const Slicing::BackgroundProcessState* state{
+        m_slicing_interactor.find_process_state(slicing_id)};
+
+    if (!state) {
+        return;
+    }
+
+    for (size_t index{}; index < m_items.size(); ++index) {
+        const EffectiveValueStatus status{get_effective_value_status(
+            m_items[index].name,
+            Domain::FDMConfigLocation::Print,
+            state->effective_values)};
+        if (m_items[index].effective_value_status != status) {
+            m_items[index].effective_value_status = status;
+            invoke_listeners<IListObserver<PrintToolItem>>(
+                [index](IListObserver<PrintToolItem>* l) { l->on_updated(index); });
+        }
+    }
 }
 
 void PrintToolConfigObservableList::set_favorites(const std::vector<std::string>& favorites)

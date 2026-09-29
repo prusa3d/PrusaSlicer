@@ -42,4 +42,7 @@ Domain::BoxOrBoxesVector to_refs(const Domain::MacroOverridesMapFDM& macro_overr
 std::string to_string(MacroOverridesLayerFDM layer);
 std::optional<MacroOverridesLayerFDM> macro_overrides_layer_fdm_from_string(std::string_view name);
 
+/// The overrides applied by the SpiralVase layer (vase mode).
+MacroOverridesFDM make_vase_mode_overrides();
+
 } // namespace Slic3r::Domain

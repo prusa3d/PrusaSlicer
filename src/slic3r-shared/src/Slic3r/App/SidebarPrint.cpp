@@ -9,6 +9,7 @@
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/PrintSettingsDialog.hpp"
+#include "Slic3r/App/PrintModeDialog.hpp"
 
 #include "Slic3r/App/Config/PrintToolFavoritesItem.hpp"
 #include "Slic3r/App/Config/ToolToFeatureDialog.hpp"
@@ -35,6 +36,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
 {
     set_transparent(true);
     m_print_settings_dialog = emplace_back<PrintSettingsDialog>(project_interactor, m_navigator);
+    m_print_mode_dialog     = emplace_back<PrintModeDialog>(project_interactor, m_navigator);
 
     m_tool_to_feature_dialog = emplace_back<ToolToFeatureDialog>(m_project_interactor);
 
@@ -126,6 +128,26 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     refresh_tools_comboboxes_label_colors();
 
     m_tool_to_feature_dialog->attach_to_item(this, Position::Left, 20_fpx);
+    m_print_mode_btn = m_content_area->emplace_back<LayoutButton>(Biz::_u8L("Print mode"));
+    m_print_mode_btn->set_self_align(YGAlignCenter);
+    m_print_mode_btn->set_flex_shrink(0);
+    m_print_mode_btn->set_content_padding({1.25_rem, 0.25_rem});
+    m_print_mode_btn->set_checkable(true);
+    m_print_mode_btn->callbacks().action = [this]
+    {
+        m_navigator.set_opened_dialog(m_print_mode_dialog->opened() ? nullptr : m_print_mode_dialog);
+    };
+
+    m_print_mode_dialog->attach_to_item(this, Position::Left, 20);
+    m_print_mode_dialog->callbacks().opened = [this] { m_print_mode_btn->set_checked(true); };
+    m_print_mode_dialog->callbacks().closed = [this] { m_print_mode_btn->set_checked(false); };
+    m_print_mode_dialog->mode_active_changed = [this](bool active)
+    {
+        m_print_mode_btn->set_label_color(m_theme->color_imgui(
+            active ? Platform::Color::AccentTertiary : Platform::Color::Text
+        ));
+    };
+    m_print_mode_dialog->mode_active_changed(m_print_mode_dialog->is_mode_active());
 
     add_separator();
 
@@ -220,6 +242,11 @@ void SidebarPrint::refresh_tools_comboboxes_label_colors()
                 is_modified_preset ? Platform::Color::AccentTertiary : Platform::Color::Text
             ));
     }
+}
+
+PrintModeDialog& SidebarPrint::print_mode_dialog()
+{
+    return *m_print_mode_dialog;
 }
 
 PrintSettingsDialog& SidebarPrint::print_settings_dialog()

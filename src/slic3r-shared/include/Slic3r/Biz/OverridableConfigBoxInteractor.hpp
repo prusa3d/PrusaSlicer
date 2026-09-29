@@ -13,6 +13,14 @@ struct ConfigValue;
 
 namespace Slic3r::Biz {
 
+namespace Scene {
+class SceneInteractor;
+} // namespace Scene
+
+namespace Slicing {
+class SlicingInteractor;
+} // namespace Slicing
+
 class OverridableConfigBoxObservableList;
 
 class OverridableConfigBoxInteractor
@@ -44,10 +52,11 @@ public:
     };
 
     explicit OverridableConfigBoxInteractor(
+        Scene::SceneInteractor& scene_interctor,
+        Slicing::SlicingInteractor& slicing_interactor,
         SetAccessor& set_accessor,
         const ConfigBoxes& config_boxes
     );
-    OverridableConfigBoxInteractor();
 
     const Domain::ConfigValue* find(const std::string& name) const;
 

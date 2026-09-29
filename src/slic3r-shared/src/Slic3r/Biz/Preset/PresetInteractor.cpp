@@ -168,6 +168,8 @@ PresetInteractor::PresetInteractor(
     Slicing::SlicingInteractor& slicing_interactor
 ) :
     m_workbench(workbench),
+    m_scene_interactor(scene_interactor),
+    m_slicing_interactor(slicing_interactor),
     m_backup_store(backup_store),
     m_object_settings_interactor(
         m_object_settings_interactor_accessor,
@@ -175,9 +177,9 @@ PresetInteractor::PresetInteractor(
         scene_interactor,
         *this
     ),
+    m_printer_cbi(&scene_interactor, &slicing_interactor, m_printer_cbi_accessor),
     m_print_tool_cbi(m_workbench, scene_interactor, slicing_interactor, m_print_tool_cbi_accessor)
 {
-    m_printer_cbi = ConfigBoxInteractor(m_printer_cbi_accessor);
 
     add_listener<IPresetChangedListener>(&m_object_settings_interactor);
 }
@@ -1987,7 +1989,8 @@ void PresetInteractor::fill_selected_material_cbis(
         }
     );
 
-    SetAccessorMap accessors = m_material_cbi_list.set_items(material_cbs);
+    SetAccessorMap accessors =
+        m_material_cbi_list.set_items(m_scene_interactor, m_slicing_interactor, material_cbs);
     m_material_accessors.insert(accessors.begin(), accessors.end());
 }
 
@@ -2732,25 +2735,6 @@ void PresetInteractor::set_item_value(
         [&]() { m_print_tool_cbi_accessor.set_tool_value(name, indexes, value); },
         [&]() { m_object_settings_interactor_accessor.set_value(name, value); }
     );
-
-    if (name == "spiral_vase") {
-        auto& selected_preset = mutable_selected_printer_preset();
-        auto& fdm_macro_overrides{std::get<
-            std::map<Domain::MacroOverridesLayerFDM, Domain::MacroOverridesFDM>>(
-            selected_preset.macro_overrides)};
-        if (value.get<bool>()) {
-            auto& spiral_vase{fdm_macro_overrides[Domain::MacroOverridesLayerFDM::SpiralVase]};
-            spiral_vase.overrides.set("perimeters", 1);
-            spiral_vase.overrides.set("top_solid_layers", 0);
-            spiral_vase.overrides.set("fill_density", Domain::Percentage{0});
-            spiral_vase.overrides.set("support_material", Domain::SupportMode::None);
-            spiral_vase.overrides.set("support_material_enforce_layers", 0);
-            spiral_vase.overrides.set("thin_walls", false);
-        } else {
-            fdm_macro_overrides.erase(Domain::MacroOverridesLayerFDM::SpiralVase);
-        }
-    }
-
     m_backup_store.invalidate_backup(m_selected_project_id);
     invoke_on_preset_value_changed(item);
     invoke_slicing_input_changed();
@@ -2790,6 +2774,28 @@ void PresetInteractor::set_item_override(const Domain::ConfigItem& item, bool en
 
     m_backup_store.invalidate_backup(m_selected_project_id);
     invoke_on_preset_value_changed(item);
+    invoke_slicing_input_changed();
+}
+
+void PresetInteractor::set_macro_overrides(
+    Domain::MacroOverridesLayerFDM layer,
+    std::optional<Domain::MacroOverridesFDM> overrides
+)
+{
+    Domain::Preset::SelectedPreset& selected_preset{mutable_selected_printer_preset()};
+    auto* fdm_overrides{std::get_if<Domain::MacroOverridesMapFDM>(&selected_preset.macro_overrides)};
+    ASSERT(fdm_overrides != nullptr);
+
+    if (overrides.has_value()) {
+        fdm_overrides->insert_or_assign(layer, std::move(*overrides));
+    } else {
+        fdm_overrides->erase(layer);
+    }
+
+    m_backup_store.invalidate_backup(m_selected_project_id);
+    invoke_listeners<IMacroOverridesChangedListener>(
+        [](auto* listener) { listener->on_macro_overrides_changed(); }
+    );
     invoke_slicing_input_changed();
 }
 

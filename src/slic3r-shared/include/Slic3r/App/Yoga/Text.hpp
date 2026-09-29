@@ -48,6 +48,9 @@ protected:
 
     Vec2f get_item_size() override;
 
+    ImRect taken_rect(const Vec2f& size) const;
+    const std::string& rendered_text() const;
+
     float available_width() const;
     float available_height() const;
 

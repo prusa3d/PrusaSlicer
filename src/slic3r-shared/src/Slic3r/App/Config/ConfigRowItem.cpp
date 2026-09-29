@@ -1,10 +1,14 @@
 #include "Slic3r/App/Config/ConfigRowItem.hpp"
 
+#include "Slic3r/App/Navigator.hpp"
+#include "Slic3r/App/Yoga/StrikethroughText.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/ToggleButton.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Config/ConfigItemControl.hpp"
 #include "Slic3r/App/Config/ConfigItemSpinBox.hpp"
+#include "Slic3r/App/Config/ConfigRowItemLabel.hpp"
+#include "Slic3r/App/AppServices.hpp"
 
 #include "Slic3r/Biz/IConfigBoxSetter.hpp"
 #include <Slic3r/Biz/I18N/I18N.hpp>
@@ -34,11 +38,13 @@ ConfigRowItem::ConfigRowItem(
     set_gap(5.f);
 
     m_left_side = emplace_back<Item>();
+    m_left_side->set_gap(5_fpx);
 
-    m_label = m_left_side->emplace_back<Text>(m_force_label.value_or(Biz::_u8(data.def().label)));
+    m_label = m_left_side->emplace_back<ConfigRowItemLabel>(
+        m_force_label.value_or(Biz::_u8(data.def().label)));
     m_label->set_height(40);
-    m_label->set_wrap_mode(Text::WrapMode::WrapElide);
-    m_label->set_align({AlignH::Left, AlignV::Center});
+    m_label->callbacks().action = [name{data.def().name}]()
+    { AppServices::instance().navigator().open_effective_values_dialog(name); };
 
     m_revert_button = m_left_side->emplace_back<LayoutButton>(
         std::string{},
@@ -63,12 +69,17 @@ ConfigRowItem::ConfigRowItem(
 
 void ConfigRowItem::set_label_text_color(const ImColor& color)
 {
-    m_label->set_text_color(color);
+    m_label->label_object()->set_text_color(color);
 }
 
 void ConfigRowItem::set_enabled_control(bool enabled)
 {
     m_input->set_enabled(enabled);
+}
+
+void ConfigRowItem::set_effective_value_status(Biz::EffectiveValueStatus status)
+{
+    m_effective_value_status = status;
 }
 
 void ConfigRowItem::on_data_update()
@@ -94,7 +105,7 @@ void ConfigRowItem::on_data_update()
         ASSERT(m_input, "ConfigItem needs to derive from Yoga::Item");
         m_input->set_flex_grow(1);
         m_input->set_max_width(200_fpx);
-        m_input->set_width(150_fpx);
+        m_input->set_width(130_fpx);
 
         if (m_state->def().gui_type == Slic3r::Domain::ConfigItemDef::GUIType::spinbox) {
             m_config_item_spin_box = dynamic_cast<ConfigItemSpinBox*>(m_input);
@@ -110,7 +121,7 @@ void ConfigRowItem::on_data_update()
         } else {
             set_orientation(Orientation::Horizontal);
             set_align_items(YGAlign::YGAlignCenter);
-            m_input->set_width(150_fpx);
+            m_input->set_width(130_fpx);
             m_input->set_max_width(200_fpx);
         }
         m_last_full_width = m_state->def().full_width;
@@ -143,7 +154,7 @@ void ConfigRowItem::on_data_update()
         }
     }
 
-    m_label->set_text(m_force_label.value_or(Biz::_u8(m_state->def().label)));
+    m_label->label_object()->set_text(m_force_label.value_or(Biz::_u8(m_state->def().label)));
 
     if (*m_state->def().type == typeid(std::optional<int>)) {
         std::optional<int> value = m_state->value().get<std::optional<int>>();
@@ -154,9 +165,12 @@ void ConfigRowItem::on_data_update()
 
     const bool can_revert = m_enable_revert();
     m_revert_button->set_visible(can_revert);
-    m_label->set_text_color(
+    m_label->set_label_color(
         m_theme->color_imgui(can_revert ? Platform::Color::AccentTertiary : Platform::Color::Text)
     );
+
+    m_label->label_object()->set_strikethrough(
+        m_effective_value_status == Biz::EffectiveValueStatus::Overriden);
 }
 
 void ConfigRowItem::navigate_to_item(const Domain::ConfigItem* config_item)

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <string>
+
 #include "Slic3r/Biz/ProjectScoped.hpp"
 #include "Slic3r/Biz/ISelectedProjectChangedListener.hpp"
 
@@ -71,6 +74,8 @@ public:
         Biz::ProjectInteractor* project_interactor
     );
 
+    void shutdown();
+
     void navigate_to_module_type(Render::ModuleType type);
 
     void on_selected_project_changed(size_t index) override;
@@ -80,6 +85,8 @@ public:
     void navigate_to_item(const Domain::ConfigItem* config_item);
 
     void request_search();
+
+    void open_effective_values_dialog(std::optional<std::string> key);
 
     void set_modal_dialog(ModalDialog dialog);
     ModalDialog current_modal_dialog() const;

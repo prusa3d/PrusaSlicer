@@ -205,6 +205,16 @@ Vec2f Text::get_item_size()
     return min_size;
 }
 
+ImRect Text::taken_rect(const Vec2f& size) const
+{
+    return align_rectangle(to_im(size), m_taken_size, m_align);
+}
+
+const std::string& Text::rendered_text() const
+{
+    return m_rendered_text;
+}
+
 float Text::available_width() const
 {
     // There may be a hidden bug, it can happen that if we query
