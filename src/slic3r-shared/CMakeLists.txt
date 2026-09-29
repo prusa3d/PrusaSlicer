@@ -1109,7 +1109,6 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/UserAccount/UserAccountTokenLog.hpp
         include/Slic3r/Biz/UserAccount/UserAccountCodeChallengeGenerator.hpp
         include/Slic3r/Biz/UserAccount/ConnectUtils.hpp
-        include/Slic3r/Biz/UserAccount/ConnectPrinterStateMonitor.hpp
         src/Slic3r/Biz/UserAccount/UserAccountInteractor.cpp
         src/Slic3r/Biz/UserAccount/UserAccountCommunication.cpp
         src/Slic3r/Biz/UserAccount/UserAccountSession.cpp
@@ -1119,11 +1118,15 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/UserAccount/UserAccountTokenStore.cpp
         src/Slic3r/Biz/UserAccount/UserAccountCodeChallengeGenerator.cpp
         src/Slic3r/Biz/UserAccount/ConnectUtils.cpp
-        src/Slic3r/Biz/UserAccount/ConnectPrinterStateMonitor.cpp
 
         include/Slic3r/Biz/Connect/IConnectHandlerListener.hpp
         include/Slic3r/Biz/Connect/ConnectMessageHandler.hpp
         src/Slic3r/Biz/Connect/ConnectMessageHandler.cpp
+
+        include/Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp
+        src/Slic3r/Biz/ConnectPrinter/ConnectPrinter.cpp
+        include/Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp
+        src/Slic3r/Biz/ConnectPrinter/ConnectPrinterService.cpp
 
         include/Slic3r/Biz/SHA256.hpp
 

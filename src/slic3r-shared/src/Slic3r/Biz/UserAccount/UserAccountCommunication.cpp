@@ -176,17 +176,6 @@ void UserAccountCommunication::request_printables_secret_token()
     wakeup_session_thread();
 }
 
-void UserAccountCommunication::enqueue_connect_printer_states_action()
-{
-    ASSERT(m_session.is_initialized());
-    ActionQueueData action{
-        UserAccountActionID::ConnectPrinterStates
-    };
-    m_session.enqueue_action(std::move(action));
-
-    wakeup_session_thread();
-}
-
 void UserAccountCommunication::enqueue_connect_printers_data_action(std::function<void(const std::string&)> succ_fn)
 {
     ActionQueueData action {

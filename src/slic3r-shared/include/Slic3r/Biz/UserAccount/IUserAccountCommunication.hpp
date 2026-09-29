@@ -43,7 +43,6 @@ public:
     virtual std::string email() const = 0;
     virtual void on_email(const std::string& data) = 0;
     virtual void request_printables_secret_token() = 0;
-    virtual void enqueue_connect_printer_states_action() = 0;
     virtual void enqueue_connect_printers_data_action(std::function<void(const std::string&)> succ_fn) = 0;
 };
 

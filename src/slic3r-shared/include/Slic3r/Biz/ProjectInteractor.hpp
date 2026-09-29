@@ -30,6 +30,7 @@
 #include "Slic3r/Biz/FileDownloader/FileDownloaderInteractor.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 #include "Slic3r/Biz/IUndoProvider.hpp"
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/Connect/ConnectMessageHandler.hpp"
 #include "Slic3r/Biz/BackupStore.hpp"
 #include "Slic3r/Biz/MatDb/MatDbInteractor.hpp"
@@ -120,8 +121,9 @@ public:
         m_removable_drive_service(dispatcher),
         m_file_downloader_interactor(dispatcher),
         m_file_opening_interactor(*this),
+        m_connect_printer_service(dispatcher, m_user_account_interactor),
         m_physical_printer_interactor(dispatcher, m_preset_interactor, m_user_account_interactor, m_removable_drive_service),
-        m_connect_message_handler(dispatcher, m_preset_interactor, m_user_account_interactor, m_physical_printer_interactor),
+        m_connect_message_handler(dispatcher, m_preset_interactor, m_connect_printer_service, m_physical_printer_interactor),
         m_project_list(*this),
         m_undo_provider(std::make_unique<NoopUndoProvider>())
     {
@@ -152,6 +154,7 @@ public:
         m_slicing_interactor.add_listener<Slicing::IStatusListener>(&m_status_cache);
         m_slicing_interactor.add_listener<Slicing::IWipeTowerGeometryListener>(&m_scene_interactor);
         m_user_account_interactor.add_listener<UserAccount::IUserAccountListener>(this);
+        m_user_account_interactor.add_listener<UserAccount::IUserAccountListener>(&m_connect_printer_service);
         Platform::PlatformServices::instance()
             .app_instance_message_handler()
             .add_listener<Platform::IAppInstanceMessageContentListener>(this);
@@ -691,6 +694,11 @@ public:
         return m_connect_message_handler;
     }
 
+    ConnectPrinter::ConnectPrinterService& connect_printer_service()
+    {
+        return m_connect_printer_service;
+    }
+
 private:
     /**
      * @brief Wires SceneInteractor's owned ObjectListInteractor to this ProjectInteractor (and
@@ -769,6 +777,7 @@ private:
     RemovableDrive::RemovableDriveService m_removable_drive_service;
     FileDownloader::FileDownloaderInteractor m_file_downloader_interactor;
     FileOpen::FileOpeningInteractor m_file_opening_interactor;
+    ConnectPrinter::ConnectPrinterService m_connect_printer_service;
     PhysicalPrinter::PhysicalPrinterInteractor m_physical_printer_interactor;
     Connect::ConnectMessageHandler m_connect_message_handler;
 

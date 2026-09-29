@@ -11,7 +11,6 @@ enum class ActionSuccessType
     UserIDAfterToken,
     ConnectPrinterModels,
     Avatar,
-    ConnectPrinterStates,
     PrinterData,
 };
 enum class ActionFailType

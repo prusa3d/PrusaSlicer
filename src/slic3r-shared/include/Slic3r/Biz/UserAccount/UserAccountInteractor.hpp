@@ -3,7 +3,6 @@
 #include "Slic3r/Biz/UserAccount/IUserAccountListener.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountCommunication.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountSessionListener.hpp"
-#include "Slic3r/Biz/UserAccount/ConnectPrinterStateMonitor.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 #include "Slic3r/Biz/Platform/IMainThreadDispatcher.hpp"
 
@@ -133,6 +132,8 @@ public:
     std::string
     wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token = {});
 
+    std::string user_id() const;
+
     void request_printables_secret_token();
 
 private:
@@ -149,7 +150,6 @@ private:
      * idle, and the few possible replacements make the leak bounded.
      */
     std::vector<std::unique_ptr<IUserAccountCommunication>> m_retired_communications;
-    ConnectPrinterStateMonitor m_connect_printer_state_monitor;
 
     std::map<std::string, std::string> m_account_user_data;
 

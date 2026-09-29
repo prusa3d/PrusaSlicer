@@ -28,7 +28,6 @@ public:
         m_actions[UserAccountActionID::Avatar] = std::make_unique<UserAccountActionGetWithEvent>("AVATAR", std::string(), ActionSuccessType::Avatar, ActionFailType::Fail, false);
         m_actions[UserAccountActionID::ConnectPrinterModels] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_PRINTER_MODELS", sc.connect_printer_list_url(), ActionSuccessType::ConnectPrinterModels, ActionFailType::Fail);
         m_actions[UserAccountActionID::ConnectDataFromUuid] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_DATA_FROM_UUID", sc.connect_printers_url(), ActionSuccessType::PrinterData, ActionFailType::PrinterData);
-        m_actions[UserAccountActionID::ConnectPrinterStates] = std::make_unique<UserAccountActionGetWithEvent>("CONNECT_DATA_FROM_UUID", sc.connect_status_url(), ActionSuccessType::ConnectPrinterStates, ActionFailType::Fail);
 	}
 	~UserAccountActionStore() = default;
 

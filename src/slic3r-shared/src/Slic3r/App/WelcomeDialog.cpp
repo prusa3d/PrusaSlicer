@@ -861,13 +861,7 @@ public:
             }
         };
 
-        const std::string url{Biz::Network::ServiceConfig::instance().connect_printer_list_url()};
-        const std::string access_token{
-            m_project_interactor.user_account_interactor().access_token()};
-
-        m_project_interactor.connect_message_handler().fetch_printer_data_async(
-            url,
-            access_token,
+        m_project_interactor.connect_printer_service().fetch_printer_list(
             [handle_error, this](const std::string& body)
             {
                 Biz::Platform::PlatformServices::instance()

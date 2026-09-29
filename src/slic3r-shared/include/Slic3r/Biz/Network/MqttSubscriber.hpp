@@ -25,6 +25,9 @@ public:
     // Unsubscribe from a given topic.
     void unsubscribe(const std::string& topic);
 
+    // Reconnect with new credentials and restore all subscriptions. Returns false if reconnecting failed.
+    bool update_credentials(const std::string& username, const std::string& password);
+
     ~Subscriber();
     
 

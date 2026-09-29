@@ -2,7 +2,7 @@
 
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
-#include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/HwConfigMatchers.hpp"
 
 #include "Slic3r/Log.hpp"
@@ -14,12 +14,12 @@ namespace Slic3r::Biz::Connect {
 ConnectMessageHandler::ConnectMessageHandler(
         Platform::IMainThreadDispatcher& dispatcher,
         Preset::PresetInteractor& preset_interactor,
-        UserAccount::UserAccountInteractor& user_account_interactor,
+        ConnectPrinter::ConnectPrinterService& connect_printer_service,
     PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor
     ) :
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
-    m_user_account_interactor(user_account_interactor),
+    m_connect_printer_service(connect_printer_service),
     m_physical_printer_interactor(physical_printer_interactor)
 {}
 
@@ -90,68 +90,7 @@ void ConnectMessageHandler::handle_select_printer_message(
         this->dispatch_error(error_msg);
     };
 
-    fetch_printer_data_async(
-        Network::ServiceConfig::instance().connect_printer_list_url(),
-        m_user_account_interactor.access_token(), 
-        std::move(succ_fn),
-        std::move(fail_fn)
-    );
-}
-
-void ConnectMessageHandler::fetch_printer_data_async(
-    const std::string& url,
-    const std::string& access_token,
-    std::function<void(const std::string&)> success_fn,
-    std::function<void(const std::string&)> fail_fn,
-    std::function<void(Network::IHttp::Retry, bool&)> retry_fn,
-    std::function<void(Network::IHttp::Progress, bool&)> progress_fn
-) const
-{
-    std::thread(
-        [url,
-         access_token,
-         success_fn  = std::move(success_fn),
-         fail_fn     = std::move(fail_fn),
-         retry_fn    = std::move(retry_fn),
-         progress_fn = std::move(progress_fn)]() mutable
-        {
-            std::unique_ptr<Network::IHttp> http =
-                Network::IHttp::create(Network::IHttp::RequestMethod::Get, url, retry_fn);
-
-            if (!access_token.empty()) {
-                http->header("Authorization", "Bearer " + access_token);
-            }
-
-            http->on_complete(
-                [success_fn = std::move(success_fn)](std::string body, unsigned status)
-                {
-                    if (success_fn) {
-                        success_fn(body);
-                    }
-                });
-
-            http->on_error(
-                [fail_fn = std::move(fail_fn)](std::string body, std::string error, unsigned status)
-                {
-                    SPDLOG_ERROR("Connect HTTP request failed. Status: {}, Error: {}",
-                                 status,
-                                 error);
-                    if (fail_fn) {
-                        fail_fn("Connect HTTP request failed: " + error);
-                    }
-                });
-            http->on_progress(
-                [progress_fn = std::move(progress_fn)](Network::IHttp::Progress progress,
-                                                       bool& cancel)
-                {
-                    if (progress_fn) {
-                        progress_fn(progress, cancel);
-                    }
-                });
-
-            http->perform_sync(Network::HttpRetryOpt::default_retry());
-        })
-        .detach();
+    m_connect_printer_service.fetch_printer_list(std::move(succ_fn), std::move(fail_fn));
 }
 
 namespace {

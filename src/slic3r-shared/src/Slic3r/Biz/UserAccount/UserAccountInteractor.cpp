@@ -143,6 +143,12 @@ std::string UserAccountInteractor::wait_for_access_token(
     return communication->wait_for_access_token(timeout, stop_token);
 }
 
+std::string UserAccountInteractor::user_id() const
+{
+    std::lock_guard<std::mutex> lock(m_communication_mutex);
+    return m_communication->user_id();
+}
+
 void UserAccountInteractor::request_printables_secret_token()
 {
     m_communication->request_printables_secret_token();
@@ -187,9 +193,6 @@ void UserAccountInteractor::on_action_success(ActionSuccessType success_type, st
             update_menu_callback(true);
         }
         invoke_listeners<IUserAccountListener>([](auto* l) { l->on_avatar_downloaded(); });
-        break;
-    case Slic3r::Biz::UserAccount::ActionSuccessType::ConnectPrinterStates:
-        m_connect_printer_state_monitor.on_full_printer_states(body, m_communication->user_id(), m_communication->access_token());
         break;
     case Slic3r::Biz::UserAccount::ActionSuccessType::PrinterData:
         break;
@@ -247,7 +250,6 @@ void UserAccountInteractor::on_logged_out(bool notify_owner, bool was_logged_in)
     if (!was_logged_in) {
         return;
     }
-    m_connect_printer_state_monitor.on_logged_out();
     invoke_listeners<IUserAccountListener>(
         [](auto* listener) { listener->on_user_account_logged_out(); }
     );
@@ -318,10 +320,6 @@ void UserAccountInteractor::on_user_id(const std::string& body)
         m_communication->on_avatar_url(m_account_user_data["avatar_small"]);
     } else {
         SPDLOG_ERROR("User ID message from PrusaAuth did not contain avatar info.");
-    }
-   
-    if (!was_logged) {
-        m_communication->enqueue_connect_printer_states_action();
     }
 
     invoke_listeners<IUserAccountListener>(
