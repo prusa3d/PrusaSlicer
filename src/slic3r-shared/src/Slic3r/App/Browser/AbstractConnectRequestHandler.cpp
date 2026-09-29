@@ -7,6 +7,7 @@
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/LegacyFormat.hpp"
+#include "Slic3r/Version.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -143,7 +144,7 @@ std::vector<BrowserLogicCommand> AbstractConnectRequestHandler::on_connect_actio
 
     const std::string init_options = format(
         "{\"accessToken\": \"%4%\",\"clientVersion\": \"%1%\", \"colorMode\": \"%2%\", \"language\": \"%3%\"}",
-        /*SLIC3R_VERSION*/ "2.9.2",
+        SLIC3R_VERSION,
         theme,
         lang_app_conf,
         m_project_interactor.user_account_interactor().access_token()
