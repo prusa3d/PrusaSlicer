@@ -70,6 +70,7 @@ private:
     void subscribe(const std::string& uuid);
     void unsubscribe(const std::string& uuid);
     void on_mqtt_message(size_t generation, const std::string& topic, const std::string& payload);
+    void request_printer_list_refresh();
 
     void apply_printer_list(std::vector<ConnectPrinter> printers);
     void apply_state(const std::string& uuid, ConnectPrinterState state);
@@ -83,6 +84,8 @@ private:
     std::unique_ptr<Network::Mqtt::Subscriber> m_mqtt_subscriber;
     std::string m_mqtt_access_token;
     size_t m_session_generation{0};
+    bool m_refresh_in_flight{false};
+    bool m_refresh_pending{false};
 };
 
 } // namespace Slic3r::Biz::ConnectPrinter

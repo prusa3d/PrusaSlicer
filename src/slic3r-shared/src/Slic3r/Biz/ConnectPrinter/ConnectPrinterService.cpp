@@ -34,6 +34,19 @@ std::string uuid_from_state_topic(std::string_view topic)
         topic.size() - STATE_TOPIC_PREFIX.size() - STATE_TOPIC_SUFFIX.size()
     ));
 }
+
+constexpr std::string_view MPI_CHANGED_TOPIC_SUFFIX = "/data/tools/+/mpi/changed";
+constexpr std::string_view MPI_CHANGED_TOPIC_END    = "/mpi/changed";
+
+std::string mpi_changed_topic(const std::string& uuid)
+{
+    return std::string(STATE_TOPIC_PREFIX) + uuid + std::string(MPI_CHANGED_TOPIC_SUFFIX);
+}
+
+bool is_mpi_changed_topic(std::string_view topic)
+{
+    return topic.starts_with(STATE_TOPIC_PREFIX) && topic.ends_with(MPI_CHANGED_TOPIC_END);
+}
 } // namespace
 
 ConnectPrinterService::ConnectPrinterService(
@@ -150,6 +163,8 @@ void ConnectPrinterService::on_user_account_id_success(bool is_refresh, const st
 void ConnectPrinterService::on_user_account_logged_out()
 {
     ++m_session_generation;
+    m_refresh_in_flight = false;
+    m_refresh_pending   = false;
     m_mqtt_subscriber.reset();
     m_mqtt_access_token.clear();
     if (m_observable_list.size() > 0) {
@@ -195,6 +210,7 @@ void ConnectPrinterService::subscribe(const std::string& uuid)
 {
     if (m_mqtt_subscriber) {
         m_mqtt_subscriber->subscribe(state_topic(uuid));
+        m_mqtt_subscriber->subscribe(mpi_changed_topic(uuid));
     }
 }
 
@@ -202,12 +218,49 @@ void ConnectPrinterService::unsubscribe(const std::string& uuid)
 {
     if (m_mqtt_subscriber) {
         m_mqtt_subscriber->unsubscribe(state_topic(uuid));
+        m_mqtt_subscriber->unsubscribe(mpi_changed_topic(uuid));
     }
+}
+
+void ConnectPrinterService::request_printer_list_refresh()
+{
+    if (m_refresh_in_flight) {
+        m_refresh_pending = true;
+        return;
+    }
+    m_refresh_in_flight = true;
+
+    auto done = [this, generation = m_session_generation](const std::string&)
+    {
+        m_dispatcher.dispatch_on_main_thread(
+            [this, generation]()
+            {
+                if (generation != m_session_generation) {
+                    return;
+                }
+                m_refresh_in_flight = false;
+                if (m_refresh_pending) {
+                    m_refresh_pending = false;
+                    request_printer_list_refresh();
+                }
+            });
+    };
+    fetch_printer_list(done, done);
 }
 
 void ConnectPrinterService::on_mqtt_message(size_t generation, const std::string& topic, const std::string& payload)
 {
     SPDLOG_DEBUG("MQTT: {} - {}", topic, payload);
+    if (is_mpi_changed_topic(topic)) {
+        m_dispatcher.dispatch_on_main_thread(
+            [this, generation]()
+            {
+                if (generation == m_session_generation) {
+                    request_printer_list_refresh();
+                }
+            });
+        return;
+    }
     std::string uuid = uuid_from_state_topic(topic);
     if (uuid.empty()) {
         SPDLOG_ERROR("Failed to extract uuid from mqtt topic {}", topic);
