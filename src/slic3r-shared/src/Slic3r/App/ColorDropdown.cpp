@@ -12,6 +12,7 @@ using Slic3r::Domain::ColorRGB;
 using Slic3r::Domain::ColorRGBA;
 using Slic3r::Domain::SelectionId;
 using Slic3r::Domain::VirtualExtruder;
+using Slic3r::Domain::Preset::SelectedPreset;
 
 using Slic3r::Biz::Algorithms::VirtualExtruder::effective_color;
 
@@ -262,6 +263,20 @@ static std::vector<std::pair<ColorRGBA, std::string>> get_material_colors(
     return result;
 }
 
+static std::string get_virtual_extruder_name(
+    const SelectedPreset& selected_preset,
+    const VirtualExtruder& virtual_extruder
+)
+{
+    const bool is_gradient         = virtual_extruder.type() == VirtualExtruder::Type::Gradient;
+    const unsigned int extruder_id = is_gradient ?
+        virtual_extruder.gradient->stops.front().extruder_id :
+        virtual_extruder.components.front().extruder_id;
+
+    ASSERT(extruder_id >= 1 && extruder_id <= selected_preset.materials.size());
+    return "[V] " + std::string{selected_preset.materials[extruder_id - 1].short_name()};
+}
+
 ColorDropdown::ColorDropdown(
     ProjectInteractor& project_interactor,
     bool with_default,
@@ -400,7 +415,10 @@ void ColorDropdown::reload_items()
 
             items.emplace_back(
                 ColorRGBA{color.r(), color.g(), color.b(), 1.f},
-                "[V] " + Biz::_u8L("Extruder") + " " + std::to_string(virtual_extruder.id)
+                get_virtual_extruder_name(
+                    m_project_interactor.preset_interactor().selected_printer_preset(),
+                    virtual_extruder
+                )
             );
             m_extruder_ids.push_back(static_cast<int>(virtual_extruder.id));
         }

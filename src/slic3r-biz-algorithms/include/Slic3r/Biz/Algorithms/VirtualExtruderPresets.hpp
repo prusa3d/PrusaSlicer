@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,7 +10,6 @@ struct PhysicalExtruderSlot
 {
     std::string hex_color;
     std::string filament_type;
-    bool enabled{true};
 };
 
 using PhysicalExtruderSlots = std::vector<PhysicalExtruderSlot>;
@@ -28,26 +28,37 @@ struct BlendPreset
 
 using BlendPresets = std::vector<BlendPreset>;
 
-struct BlendPresetGroups
+/**
+ * @brief Perceptual color of a recipe.
+ */
+struct PerceptualColor
 {
-    BlendPresets two_color;
-    BlendPresets three_color;
+    double lightness{0.0};
+    double a{0.0};
+    double b{0.0};
 };
 
 /**
- * @brief Build the blend recipes offered for the given slots.
+ * @brief Build every blend candidate the slots can form, without deduplication.
  *
- * Pairs and triples of enabled slots that share the same non-empty filament type, in the
+ * Pairs and triples of slots that share the same non-empty filament type, in the
  * ratios 50/50, 75/25 and 25/75 for pairs, and for triples the balanced 33/33/34 plus
- * 50/25/25 with each component dominant in turn.
- * Recipes whose predicted color is perceptually indistinguishable from one already in the
- * offer are dropped, and each section is sorted so that it reads as a palette: by hue and
- * then by lightness, with the achromatic ones last.
+ * 50/25/25 with each component dominant in turn. Pairs come first.
  *
  * @param slots Physical extruder slots, 0-based.
- * @return The deduplicated and sorted offer.
  */
-BlendPresetGroups build_blend_presets(const PhysicalExtruderSlots& slots);
+BlendPresets build_blend_candidates(const PhysicalExtruderSlots& slots);
+
+/**
+ * @brief Perceptual color of the mixed recipe, or std::nullopt when it cannot be mixed.
+ */
+std::optional<PerceptualColor>
+preset_perceptual_color(const BlendPreset& preset, const PhysicalExtruderSlots& slots);
+
+/**
+ * @brief Perceptual difference of two colors.
+ */
+double perceptual_distance(const PerceptualColor& lhs, const PerceptualColor& rhs);
 
 /**
  * @brief Predicted color of the mixed recipe.

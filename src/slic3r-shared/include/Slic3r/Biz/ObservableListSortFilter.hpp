@@ -93,7 +93,7 @@ public:
 
     IObservableList<Data>* source_model() const
     {
-        return m_source_model;
+        return m_source_model.get();
     }
 
     void set_source_model(IObservableList<Data>* source_model)

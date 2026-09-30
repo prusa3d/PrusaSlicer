@@ -1,35 +1,46 @@
 #pragma once
 
-#include "Slic3r/App/Yoga/AbstractButton.hpp"
-#include "Slic3r/App/Yoga/Item.hpp"
+#include "Slic3r/App/Yoga/RectangleButton.hpp"
+#include "Slic3r/Biz/DataObserver.hpp"
+
+#include <functional>
+
+namespace Slic3r::App::Yoga {
+class LambdaItem;
+class Rectangle;
+class Text;
+} // namespace Slic3r::App::Yoga
 
 namespace Slic3r::App::ColorMix {
+
+struct ExtruderFilterData
+{
+    unsigned int extruder_id_1based{1};
+    ImColor color{0x80, 0x80, 0x80};
+    bool enabled{true};
+};
 
 /**
  * @brief Toggle button of one physical extruder that filters which blends are offered.
  */
-class ExtruderFilterButton : public Yoga::AbstractButton
+class ExtruderFilterButton :
+    public Yoga::RectangleButton,
+    public Biz::DataObserver<ExtruderFilterData>
 {
 public:
-    ExtruderFilterButton(unsigned int extruder_id_1based, const ImColor& color);
+    using FnIndexClicked = std::function<void(size_t)>;
 
-    void render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size) override;
+    ExtruderFilterButton(size_t index, const ExtruderFilterData& data, FnIndexClicked on_clicked);
+
+protected:
+    void on_data_update() override;
 
 private:
-    void size_info_changed(const Yoga::SizeInfo& info_size) override;
+    Yoga::Rectangle* m_swatch{nullptr};
+    Yoga::Text* m_label{nullptr};
+    Yoga::LambdaItem* m_cross{nullptr};
 
-    unsigned int m_extruder_id_1based{1};
-    ImColor m_color{0x80, 0x80, 0x80};
-
-    Yoga::EvaluatedUnit m_swatch_inset;
-    Yoga::EvaluatedUnit m_swatch_rounding;
-    Yoga::EvaluatedUnit m_cross_inset;
-    Yoga::EvaluatedUnit m_cross_thickness;
-    Yoga::EvaluatedUnit m_border_thickness;
-    Yoga::EvaluatedUnit m_dash_length;
-    Yoga::EvaluatedUnit m_dash_gap;
-    Yoga::EvaluatedUnit m_hover_ring_inset;
-    Yoga::EvaluatedUnit m_hover_ring_thickness;
+    FnIndexClicked m_on_clicked;
 };
 
 } // namespace Slic3r::App::ColorMix

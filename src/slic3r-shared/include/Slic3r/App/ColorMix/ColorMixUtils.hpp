@@ -7,10 +7,6 @@
 #include <string>
 #include <vector>
 
-namespace Slic3r::App::Yoga {
-class Item;
-} // namespace Slic3r::App::Yoga
-
 namespace Slic3r::App::ColorMix {
 
 /**
@@ -35,7 +31,5 @@ std::string effective_color_hex(
 );
 
 std::string recipe_title(const Domain::VirtualExtruder& virtual_extruder);
-
-void clear_children_later(Yoga::Item* container);
 
 } // namespace Slic3r::App::ColorMix

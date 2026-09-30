@@ -107,6 +107,8 @@ protected:
     ) override;
 
 private:
+    void update_painting_tools_and_geometry();
+
     Yoga::Passthrough<MultiMaterialPaintingDialog> m_dialog;
 
     size_t m_first_brush_color_idx  = 0;
