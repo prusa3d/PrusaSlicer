@@ -22,9 +22,10 @@ static bool has_same_shrinkage_compensations(
         config.get<std::vector<Domain::Percentage>>("filament_shrinkage_compensation_z")
     };
 
+    const unsigned int first_extruder{extruders.front()};
     for (unsigned int extruder : extruders) {
-        if (compensation_xy.front() != compensation_xy.at(extruder)
-            || compensation_z.front() != compensation_z.at(extruder))
+        if (compensation_xy.at(first_extruder) != compensation_xy.at(extruder)
+            || compensation_z.at(first_extruder) != compensation_z.at(extruder))
         {
             return false;
         }
