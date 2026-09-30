@@ -392,12 +392,23 @@ void ConnectMessageHandler::do_select_printer_from_connect(
 
 std::string ConnectMessageHandler::uuid_for_upload()
 {
-    if (m_last_printer_json.empty()) {
+    const auto& selected = m_physical_printer_interactor.selected_physical_printer_data();
+    const auto* upload = std::get_if<PhysicalPrinter::ConnectUpload>(&selected.payload);
+    if (upload && !upload->printer_uuid.empty()) {
+        const ConnectPrinter::ConnectPrinter* printer = m_connect_printer_service.find(upload->printer_uuid);
+        return printer ? uuid_if_compatible(printer->json) : std::string{};
+    }
+    return uuid_if_compatible(m_last_printer_json);
+}
+
+std::string ConnectMessageHandler::uuid_if_compatible(const std::string& printer_json)
+{
+    if (printer_json.empty()) {
         return {};
     }
 
     try {
-        nlohmann::json j = nlohmann::json::parse(m_last_printer_json);
+        nlohmann::json j = nlohmann::json::parse(printer_json);
         const auto& current_config = m_preset_interactor.current_printer_config();
 
         std::string j_model        = j.value("model", "");

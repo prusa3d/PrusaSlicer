@@ -46,6 +46,8 @@ private:
 
     void dispatch_error(std::string msg);
 
+    std::string uuid_if_compatible(const std::string& printer_json);
+
 private:
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;
