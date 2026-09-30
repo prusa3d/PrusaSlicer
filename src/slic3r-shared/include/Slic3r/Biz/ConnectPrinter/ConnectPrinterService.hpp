@@ -40,6 +40,10 @@ public:
 
     const ObservableList<ConnectPrinter>& observable_list() const;
 
+    void add_printer_list_observer(IListObserver<ConnectPrinter>* observer);
+
+    void remove_printer_list_observer(IListObserver<ConnectPrinter>* observer);
+
     const ConnectPrinter* find(const std::string& uuid) const;
 
     /// Fetches the printer list and applies it to the service. All callbacks run on a worker thread.

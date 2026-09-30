@@ -24,6 +24,7 @@ namespace Slic3r::Biz::PhysicalPrinter {
 namespace {
 
 constexpr const char* CONNECTION_TEST_JOB_NAME = "physical_printer_connection_test";
+constexpr size_t CONNECT_PRINTERS_OFFSET = 3;
 
 bool auth_type_supported_by_host(Domain::PrintHostType type, Domain::PrintHostAuthType auth_type)
 {
@@ -44,16 +45,19 @@ PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
     m_user_account_interactor(user_account_interactor),
-    m_removable_drive_service(removable_drive_service)
+    m_removable_drive_service(removable_drive_service),
+    m_connect_printer_service(dispatcher, user_account_interactor)
 {
     read_storage();
     m_selected_uuid = m_observable_list.at(0).uuid;
     m_selected_index = 0;
     restore_last_used_selection();
+    m_connect_printer_service.add_printer_list_observer(this);
 }
 
 PhysicalPrinterInteractor::~PhysicalPrinterInteractor()
 {
+    m_connect_printer_service.remove_printer_list_observer(this);
     ASSERT(
         m_dispatcher.is_closed(),
         "There must be no queued events (not even in the future),"
@@ -190,6 +194,7 @@ void PhysicalPrinterInteractor::remove_uuid(const std::string& uuid)
 {
     ASSERT(!is_reserved_uuid(uuid));
     size_t index = index_of(uuid);
+    ASSERT(!is_connect_printer_index(index));
     bool was_selected = (uuid == m_selected_uuid);
 
     m_storage.remove_one(uuid);
@@ -307,6 +312,69 @@ ObservableList<PhysicalPrinterConfig>&  PhysicalPrinterInteractor::observable_li
 const ObservableList<PhysicalPrinterConfig>&  PhysicalPrinterInteractor::observable_list() const
 {
     return m_observable_list;
+}
+
+ConnectPrinter::ConnectPrinterService& PhysicalPrinterInteractor::connect_printer_service()
+{
+    return m_connect_printer_service;
+}
+
+bool PhysicalPrinterInteractor::is_connect_printer_index(size_t index) const
+{
+    return index >= CONNECT_PRINTERS_OFFSET && index < CONNECT_PRINTERS_OFFSET + m_connect_printer_count;
+}
+
+void PhysicalPrinterInteractor::sync_selection()
+{
+    if (std::optional<size_t> index = find_index(m_selected_uuid)) {
+        m_selected_index = *index;
+        return;
+    }
+    select_default();
+}
+
+void PhysicalPrinterInteractor::on_inserted(const ConnectPrinter::ConnectPrinter& printer, size_t index)
+{
+    m_observable_list.insert(connect_printer_config(printer), CONNECT_PRINTERS_OFFSET + index);
+    ++m_connect_printer_count;
+    sync_selection();
+
+    if (!m_explicit_selection && printer.uuid == m_last_used_uuid && m_selected_uuid != printer.uuid) {
+        apply_selection(printer.uuid);
+    }
+}
+
+void PhysicalPrinterInteractor::on_removed(const IndexRange& index_range)
+{
+    for (size_t i = index_range.from; i <= index_range.to; ++i) {
+        const std::string& uuid = m_observable_list.at(CONNECT_PRINTERS_OFFSET + i).uuid;
+        std::erase_if(m_container_to_printer_uuid_map, [&uuid](const auto& entry) { return entry.second == uuid; });
+    }
+    m_observable_list.remove({CONNECT_PRINTERS_OFFSET + index_range.from, CONNECT_PRINTERS_OFFSET + index_range.to});
+    m_connect_printer_count -= index_range.to - index_range.from + 1;
+    sync_selection();
+}
+
+void PhysicalPrinterInteractor::on_updated(const IndexRange& index_range)
+{
+    const auto& connect_printers = m_connect_printer_service.observable_list();
+    for (size_t i = index_range.from; i <= index_range.to; ++i) {
+        PhysicalPrinterConfig config = connect_printer_config(connect_printers.at(i));
+        if (config.name != m_observable_list.at(CONNECT_PRINTERS_OFFSET + i).name) {
+            m_observable_list.set(std::move(config), CONNECT_PRINTERS_OFFSET + i);
+        }
+    }
+}
+
+void PhysicalPrinterInteractor::on_reset()
+{
+    if (m_connect_printer_count > 0) {
+        on_removed({0, m_connect_printer_count - 1});
+    }
+    const auto& connect_printers = m_connect_printer_service.observable_list();
+    for (size_t i = 0; i < connect_printers.size(); ++i) {
+        on_inserted(connect_printers.at(i), i);
+    }
 }
 
 size_t PhysicalPrinterInteractor::index_of(const std::string& uuid) const

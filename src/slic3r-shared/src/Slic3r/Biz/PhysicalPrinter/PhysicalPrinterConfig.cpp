@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterConfig.hpp"
 
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 #include "Slic3r/Domain/ConfigPhysical.hpp"
 
 namespace Slic3r::Biz::PhysicalPrinter {
@@ -49,6 +50,18 @@ PhysicalPrinterConfig connect_upload_generic()
         {},
         _u8L("Prusa Connect"),
         std::string(PRUSA_CONNECT_UUID),
+    };
+}
+
+PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer)
+{
+    ConnectUpload upload;
+    upload.printer_uuid = printer.uuid;
+    return {
+        std::move(upload),
+        {},
+        printer.name.empty() ? printer.model : printer.name,
+        printer.uuid,
     };
 }
 

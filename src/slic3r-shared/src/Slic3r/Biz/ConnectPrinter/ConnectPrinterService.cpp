@@ -51,6 +51,16 @@ const ObservableList<ConnectPrinter>& ConnectPrinterService::observable_list() c
     return m_observable_list;
 }
 
+void ConnectPrinterService::add_printer_list_observer(IListObserver<ConnectPrinter>* observer)
+{
+    m_observable_list.add_listener<IListObserver<ConnectPrinter>>(observer);
+}
+
+void ConnectPrinterService::remove_printer_list_observer(IListObserver<ConnectPrinter>* observer)
+{
+    m_observable_list.remove_listener<IListObserver<ConnectPrinter>>(observer);
+}
+
 const ConnectPrinter* ConnectPrinterService::find(const std::string& uuid) const
 {
     if (std::optional<size_t> index = find_index(uuid)) {

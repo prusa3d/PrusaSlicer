@@ -6,6 +6,8 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterStorage.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp"
 #include "Slic3r/Biz/ObservableList.hpp"
+#include "Slic3r/Biz/IListObserver.hpp"
+#include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
 #include "Slic3r/Biz/RemovableDrive/IRemovableDriveStatusListener.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
@@ -45,7 +47,8 @@ struct PrintHostTestResult
 class PhysicalPrinterInteractor :
     public WithListeners<IPhysicalPrinterChangedListener>,
     public ISelectedConfigContainerChangedListener,
-    public RemovableDrive::IRemovableDriveStatusListener
+    public RemovableDrive::IRemovableDriveStatusListener,
+    public IListObserver<ConnectPrinter::ConnectPrinter>
 {
 public:
     PhysicalPrinterInteractor(
@@ -59,6 +62,8 @@ public:
     ObservableList<PhysicalPrinterConfig>& observable_list();
 
     const ObservableList<PhysicalPrinterConfig>& observable_list() const;
+
+    ConnectPrinter::ConnectPrinterService& connect_printer_service();
 
     /// True if the destination may be selected (Connect needs a login, Removable Drive needs a drive).
     bool can_be_selected(const std::string& uuid) const;
@@ -135,6 +140,11 @@ public:
         RemovableDrive::RemovableDriveStatus status
     ) override;
 
+    void on_inserted(const ConnectPrinter::ConnectPrinter& printer, size_t index) override;
+    void on_removed(const IndexRange& index_range) override;
+    void on_updated(const IndexRange& index_range) override;
+    void on_reset() override;
+
 private:
     /// Rebuilds the list from the synthetic entries plus the stored printers.
     void read_storage();
@@ -149,13 +159,18 @@ private:
 
     void finish_connection_test(size_t generation, PrintHostTestResult result);
 
+    bool is_connect_printer_index(size_t index) const;
+    void sync_selection();
+
 private:
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;
     UserAccount::UserAccountInteractor& m_user_account_interactor;
     RemovableDrive::RemovableDriveService& m_removable_drive_service;
     PhysicalPrinterStorage m_storage;
+    ConnectPrinter::ConnectPrinterService m_connect_printer_service;
     ObservableList<PhysicalPrinterConfig> m_observable_list;
+    size_t m_connect_printer_count{0};
 
     using ContainerKey = std::pair<Domain::SelectionId, Domain::SelectionId>;
     ContainerKey m_current_container{0, 0};

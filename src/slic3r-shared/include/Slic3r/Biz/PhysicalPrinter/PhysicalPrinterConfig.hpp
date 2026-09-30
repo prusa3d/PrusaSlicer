@@ -8,6 +8,10 @@
 
 #include <string_view>
 
+namespace Slic3r::Biz::ConnectPrinter {
+struct ConnectPrinter;
+} // namespace Slic3r::Biz::ConnectPrinter
+
 namespace Slic3r::Biz::PhysicalPrinter {
 
 inline constexpr std::string_view LOCAL_DRIVE_UUID     = "00000000-0000-0000-0000-000000000001";
@@ -46,6 +50,7 @@ struct PhysicalPrinterConfig {
 PhysicalPrinterConfig filesystem_export_local();
 PhysicalPrinterConfig filesystem_export_removable();
 PhysicalPrinterConfig connect_upload_generic();
+PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer);
 
 /// True for the fixed uuids of the synthetic entries above; a stored printer must never use them.
 bool is_reserved_uuid(const std::string& uuid);
