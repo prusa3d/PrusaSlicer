@@ -25,6 +25,7 @@ enum class PopNotificationType
     LoadError,
     ArrangeEvent,
     ConnectError,
+    PrinterPresetMismatch,
     FileExplorerError,
     PresetUpdaterStatus,
     PresetUpdaterInstalled,

@@ -40,10 +40,6 @@ public:
 private:
     void do_select_printer_from_connect(const std::string& uuid, const std::string& printer_json);
 
-    void select_printer_tools_from_connect(const nlohmann::json& j);
-
-    void select_printer_materials_from_connect(const nlohmann::json& j);
-
     void dispatch_error(std::string msg);
 
     std::string uuid_if_compatible(const std::string& printer_json);

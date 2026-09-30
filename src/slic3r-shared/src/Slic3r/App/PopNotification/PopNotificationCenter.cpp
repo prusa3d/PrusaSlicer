@@ -1447,6 +1447,24 @@ void PopNotificationCenter::on_connect_handler_error(const std::string& msg)
     );
 }
 
+void PopNotificationCenter::on_printer_preset_selection_warning(const std::string& msg)
+{
+    m_notification_list.close_notifications_of_type(PopNotificationType::PrinterPresetMismatch);
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::PrinterPresetMismatch,
+            PopNotificationLevel::Warning,
+            30s,
+            PopNotificationLayoutHeaderText{
+                // TRN Notification header: presets for a picked printer did not fully match.
+                _u8L("Printer profile"),
+                msg
+            }
+        },
+        never_equal_matcher
+    );
+}
+
 void PopNotificationCenter::on_file_explorer_error(
     const boost::filesystem::path& path,
     Platform::FileExplorerError reason

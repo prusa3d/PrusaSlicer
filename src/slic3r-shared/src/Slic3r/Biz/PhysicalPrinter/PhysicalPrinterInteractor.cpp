@@ -13,6 +13,7 @@
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 
 #include "Slic3r/Log.hpp"
+#include "nlohmann/json.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -46,7 +47,8 @@ PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     m_preset_interactor(preset_interactor),
     m_user_account_interactor(user_account_interactor),
     m_removable_drive_service(removable_drive_service),
-    m_connect_printer_service(dispatcher, user_account_interactor)
+    m_connect_printer_service(dispatcher, user_account_interactor),
+    m_printer_preset_selector(preset_interactor)
 {
     read_storage();
     m_selected_uuid = m_observable_list.at(0).uuid;
@@ -152,6 +154,32 @@ void PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
 {
     apply_selection(uuid);
     m_explicit_selection = true;
+}
+
+void PhysicalPrinterInteractor::select_uuid_with_presets(const std::string& uuid)
+{
+    select_uuid(uuid);
+
+    const PhysicalPrinterConfig& printer = selected_physical_printer_data();
+    if (const auto* upload = std::get_if<ConnectUpload>(&printer.payload)) {
+        if (upload->printer_uuid.empty()) {
+            return;
+        }
+        const ConnectPrinter::ConnectPrinter* connect_printer =
+            m_connect_printer_service.find(upload->printer_uuid);
+        if (!connect_printer) {
+            return;
+        }
+        try {
+            m_printer_preset_selector.select_for_connect_printer(
+                nlohmann::json::parse(connect_printer->json)
+            );
+        } catch (const nlohmann::json::exception& e) {
+            SPDLOG_ERROR("Failed to parse Connect printer json: {}", e.what());
+        }
+    } else if (std::holds_alternative<PrinterUpload>(printer.payload) && !printer.hw_config.id.empty()) {
+        m_printer_preset_selector.select_for_hw_config(printer.hw_config);
+    }
 }
 
 void PhysicalPrinterInteractor::select_default()
@@ -317,6 +345,11 @@ const ObservableList<PhysicalPrinterConfig>&  PhysicalPrinterInteractor::observa
 ConnectPrinter::ConnectPrinterService& PhysicalPrinterInteractor::connect_printer_service()
 {
     return m_connect_printer_service;
+}
+
+Preset::PrinterPresetSelector& PhysicalPrinterInteractor::printer_preset_selector()
+{
+    return m_printer_preset_selector;
 }
 
 bool PhysicalPrinterInteractor::is_connect_printer_index(size_t index) const

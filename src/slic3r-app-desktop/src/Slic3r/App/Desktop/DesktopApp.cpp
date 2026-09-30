@@ -430,6 +430,11 @@ bool DesktopApp::OnInit()
         .add_listener<Biz::Connect::IConnectHandlerListener>(
             &app_services.pop_notification_center()
         );
+    m_project_interactor->physical_printer_interactor()
+        .printer_preset_selector()
+        .add_listener<Biz::Preset::IPrinterPresetSelectorListener>(
+            &app_services.pop_notification_center()
+        );
     PresetUpdater::ControllerEnvironment preset_updater_environment;
     preset_updater_environment.timer_queue = &platform_services.timer_queue();
     preset_updater_environment.online_allowed =

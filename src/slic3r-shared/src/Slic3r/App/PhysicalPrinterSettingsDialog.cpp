@@ -143,7 +143,7 @@ void PhysicalPrinterSettingsDialog::create_page_list()
         [this](size_t index)
         {
             auto* button = static_cast<PhysicalPrinterSettingsButton*>(m_printer_list_view->get_item(index));
-            m_physical_printer_interactor.select_uuid(button->uuid());
+            m_physical_printer_interactor.select_uuid_with_presets(button->uuid());
             check_printer_button(button->uuid());
             close_action();
         },

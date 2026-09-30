@@ -894,6 +894,9 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Preset/PresetInteractorConfigContainerContext.cpp
         include/Slic3r/Biz/Preset/PresetSelectionCheck.hpp
         src/Slic3r/Biz/Preset/PresetSelectionCheck.cpp
+        include/Slic3r/Biz/Preset/PrinterPresetSelector.hpp
+        src/Slic3r/Biz/Preset/PrinterPresetSelector.cpp
+        include/Slic3r/Biz/Preset/IPrinterPresetSelectorListener.hpp
         include/Slic3r/Biz/Preset/PresetSelectionNames.hpp
         include/Slic3r/Biz/Preset/PresetDiffOperation.hpp
         include/Slic3r/Biz/Preset/IPresetDialogManager.hpp

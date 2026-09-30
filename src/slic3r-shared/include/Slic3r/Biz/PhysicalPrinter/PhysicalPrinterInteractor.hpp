@@ -8,6 +8,7 @@
 #include "Slic3r/Biz/ObservableList.hpp"
 #include "Slic3r/Biz/IListObserver.hpp"
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
+#include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
 #include "Slic3r/Biz/RemovableDrive/IRemovableDriveStatusListener.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
@@ -65,11 +66,16 @@ public:
 
     ConnectPrinter::ConnectPrinterService& connect_printer_service();
 
+    Preset::PrinterPresetSelector& printer_preset_selector();
+
     /// True if the destination may be selected (Connect needs a login, Removable Drive needs a drive).
     bool can_be_selected(const std::string& uuid) const;
 
     /// Explicit user selection for this session.
     void select_uuid(const std::string& uuid);
+
+    /// Explicit user selection that also selects the presets matching the printer.
+    void select_uuid_with_presets(const std::string& uuid);
 
     /// Automatic fallback to the first entry.
     void select_default();
@@ -169,6 +175,7 @@ private:
     RemovableDrive::RemovableDriveService& m_removable_drive_service;
     PhysicalPrinterStorage m_storage;
     ConnectPrinter::ConnectPrinterService m_connect_printer_service;
+    Preset::PrinterPresetSelector m_printer_preset_selector;
     ObservableList<PhysicalPrinterConfig> m_observable_list;
     size_t m_connect_printer_count{0};
 
