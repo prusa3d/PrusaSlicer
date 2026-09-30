@@ -410,7 +410,8 @@ void MaterialSelectionDialog::create_page_materials()
                     }
                     m_spool_selection_row_list_view->item_at(i)->set_checked(false);
                 }
-            }
+            },
+            [this] { close_action(); }
         });
     m_spool_selection_row_list_view->set_orientation(Orientation::Vertical);
     m_spool_selection_row_list_view->set_gap(5_fpx);

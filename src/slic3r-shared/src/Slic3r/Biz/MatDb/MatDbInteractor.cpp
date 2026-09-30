@@ -122,6 +122,13 @@ std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) c
     return std::string{color.substr(0, 7)};
 }
 
+std::optional<Domain::MatDb::Material> MatDbInteractor::get_material_by_uuid(
+    const std::string& uuid
+) const
+{
+    return m_client.get_by_uuid(uuid);
+}
+
 void MatDbInteractor::on_selected_config_container_changed(
     Domain::SelectionId project_id,
     Domain::SelectionId container_id

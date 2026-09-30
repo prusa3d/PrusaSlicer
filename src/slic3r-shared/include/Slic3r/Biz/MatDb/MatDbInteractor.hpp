@@ -64,6 +64,8 @@ public:
 
     std::optional<std::string> get_color(const std::string& uuid) const override;
 
+    std::optional<Domain::MatDb::Material> get_material_by_uuid(const std::string& uuid) const;
+
     void on_selected_config_container_changed(
         Domain::SelectionId project_id,
         Domain::SelectionId container_id

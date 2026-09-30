@@ -1,8 +1,11 @@
 #include "Slic3r/App/Material/MaterialSpoolSelectionRow.hpp"
 
+#include "Slic3r/Biz/I18N/I18N.hpp"
+
 #include "Slic3r/App/Yoga/Icon.hpp"
 #include "Slic3r/App/Yoga/ComboBox.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
+#include "Slic3r/App/Yoga/LayoutButton.hpp"
 
 using namespace Slic3r::App::Yoga;
 
@@ -13,20 +16,24 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
     const Biz::MatDb::MatDbItem& data,
     Biz::MatDb::MatDbInteractor& matdb_interactor,
     const size_t& material_index,
-    CheckedFn checked_fn
+    CheckedFn checked_fn,
+    CloseFn close_fn
 ) :
     Biz::DataObserver<Biz::MatDb::MatDbItem>(index, data),
     RectangleButton(),
     m_matdb_interactor(matdb_interactor),
     m_material_index(material_index),
-    m_checked_fn(checked_fn)
+    m_checked_fn(checked_fn),
+    m_close_fn(close_fn)
 {
     set_object_name("MaterialSpoolSelectionRow");
     set_content_gap(5_fpx);
     set_content_orientation(Orientation::Vertical);
     set_flex_shrink(0);
+    set_content_padding({7_fpx, 4_fpx});
     set_checkable(true);
-    set_background_color_checked(Platform::Color::AccentSecondary);
+    set_background_color_checked(m_theme->color_imgui(Platform::Color::Button));
+    set_background_color_border(m_theme->color_imgui(Platform::Color::AccentSecondary));
     set_allow_overlap(true);
 
     Item* top_row = emplace_back<Item>();
@@ -47,10 +54,31 @@ MaterialSpoolSelectionRow::MaterialSpoolSelectionRow(
     m_bottom_row->set_visible(false);
     m_bottom_row->set_align_items(YGAlignCenter);
 
-    m_bottom_row->emplace_back<Text>("Preset");
+    Text* preset = m_bottom_row->emplace_back<Text>("Preset");
+    preset->set_font_type(Render::ImguiFontType::Italic);
 
     m_preset_combobox = m_bottom_row->emplace_back<ComboBox>("MaterialPresetCombobox");
     m_preset_combobox->set_flex_grow(1);
+
+    m_confirm_button = m_bottom_row->emplace_back<LayoutButton>(
+        std::string{},
+        Render::Icon::CaretRight,
+        Biz::_u8L("Confirm material")
+    );
+    m_confirm_button->callbacks().action = [this]
+    {
+        if (!m_state->preset_matches.empty()) {
+            m_matdb_interactor.select_material_preset(
+                m_material_index,
+                m_state->material,
+                m_state->preset_matches.at(m_preset_combobox->current_index()).preset_id
+            );
+        }
+        m_close_fn();
+    };
+    m_confirm_button->set_self_align(YGAlignStretch);
+    m_confirm_button->set_checked(true);
+    m_confirm_button->set_aspect_ratio(1);
 
     on_data_update();
 }
@@ -71,7 +99,7 @@ void MaterialSpoolSelectionRow::on_data_update()
     }
 
     m_spool_icon->set_tint(color);
-    m_spool_name->set_text(m_state->material.name);
+    m_spool_name->set_text(m_state->material.brand.name + " " + m_state->material.name);
 
     std::vector<std::string> presets;
     std::ranges::transform(
@@ -86,19 +114,13 @@ void MaterialSpoolSelectionRow::checked_updated_internal()
 {
     RectangleButton::checked_updated_internal();
     m_bottom_row->set_visible(checked());
-    if (checked()) {
-        m_checked_fn(m_index);
-    }
+    set_background_border_width(checked() ? 2 : 0);
 }
 
 void MaterialSpoolSelectionRow::action_internal()
 {
-    if (!checked() && !m_state->preset_matches.empty()) {
-        m_matdb_interactor.select_material_preset(
-            m_material_index,
-            m_state->material,
-            m_state->preset_matches.at(m_preset_combobox->current_index()).preset_id
-        );
+    if (checked()) {
+        m_checked_fn(m_index);
     }
 }
 

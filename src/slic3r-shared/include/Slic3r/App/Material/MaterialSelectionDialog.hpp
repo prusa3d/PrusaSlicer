@@ -96,7 +96,8 @@ private:
         Biz::MatDb::MatDbItem,
         Biz::MatDb::MatDbInteractor&,
         size_t&,
-        MaterialSpoolSelectionRow::CheckedFn>;
+        MaterialSpoolSelectionRow::CheckedFn,
+        MaterialSpoolSelectionRow::CloseFn>;
     using SpoolSelectionRowListView = Yoga::ListView<
         MaterialSpoolSelectionRow,
         Biz::MatDb::MatDbItem,

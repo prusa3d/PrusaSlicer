@@ -88,6 +88,7 @@ private:
         m_colors_changed_listener_scope;
 
     ColorPickerButton* m_color_marker{nullptr};
+    Text* m_spool_name{nullptr};
     Text* m_material_name{nullptr};
     LayoutButton* m_cog_btn{nullptr};
     LayoutButton* m_nozzle_btn{nullptr};
