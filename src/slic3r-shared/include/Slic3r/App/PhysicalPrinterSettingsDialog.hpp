@@ -16,7 +16,6 @@
 #include "Slic3r/Biz/ObservableListSortFilter.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountListener.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
-#include "Slic3r/Biz/RemovableDrive/IRemovableDriveStatusListener.hpp"
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
@@ -46,8 +45,7 @@ class PhysicalPrinterSettingsDialog :
     public Yoga::Dialog,
     public Biz::PhysicalPrinter::IPhysicalPrinterChangedListener,
     public Biz::Preset::IPresetChangedListener,
-    public Biz::UserAccount::IUserAccountListener,
-    public Biz::RemovableDrive::IRemovableDriveStatusListener
+    public Biz::UserAccount::IUserAccountListener
 {
 public:
     PhysicalPrinterSettingsDialog(
@@ -68,11 +66,6 @@ public:
 
     void on_user_account_id_success(bool is_refresh, const std::string& username) override;
     void on_user_account_logged_out() override;
-
-    void on_removable_drive_status_changed(
-        const boost::filesystem::path& drive_path,
-        Biz::RemovableDrive::RemovableDriveStatus status
-    ) override;
 
 protected:
     void close_action() override;

@@ -5,6 +5,7 @@
 #include "Slic3r/App/Navigator.hpp"
 
 #include "Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp"
+#include "Slic3r/Biz/ExportDestination/IExportDestinationChangedListener.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Biz/Platform/ListenerScope.hpp"
 #include <string>
@@ -23,10 +24,12 @@ class PhysicalPrinterSettingsDialog;
 class PrinterAddDialog;
 class PhysicalPrinterAdvancedSettingsDialog;
 class PhysicalPrinterSettingsButton;
+class ExportDestinationButton;
 
 class SidebarActionButtons :
     public Yoga::Window,
     public Biz::PhysicalPrinter::IPhysicalPrinterChangedListener,
+    public Biz::ExportDestination::IExportDestinationChangedListener,
     public Biz::Preset::IPresetChangedListener
 {
 public:
@@ -37,6 +40,8 @@ public:
 
     void on_printer_data_changed() override;
     void on_selected_physical_printer_changed() override;
+
+    void on_export_destination_changed() override;
 
     PhysicalPrinterSettingsDialog& physical_printer_settings_dialog();
     PhysicalPrinterAdvancedSettingsDialog& physical_printer_advanced_settings_dialog();
@@ -76,6 +81,7 @@ protected:
 
     Yoga::Item* m_buttons_layout{nullptr};
     PhysicalPrinterSettingsButton* m_physical_printer_button{nullptr};
+    ExportDestinationButton* m_export_destination_button{nullptr};
     PrinterAddDialog* m_printer_add_dialog{nullptr};
     PhysicalPrinterSettingsDialog* m_physical_printer_settings_dialog{nullptr};
     PhysicalPrinterAdvancedSettingsDialog* m_physical_printer_advanced_settings_dialog{nullptr};

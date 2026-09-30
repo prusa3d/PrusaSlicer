@@ -24,7 +24,7 @@ PhysicalPrinterSettingsDialog::PhysicalPrinterSettingsDialog(
     Navigator& navigator,
     PhysicalPrinterAdvancedSettingsDialog* advanced_dialog
 ) :
-    Dialog({"Destination"}, "PhysicalPrinterSettingsDialog"),
+    Dialog({"Printer"}, "PhysicalPrinterSettingsDialog"),
     m_physical_printer_changed_listener_scope(project_interactor.physical_printer_interactor(), *this),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
     m_user_account_listener_scope(project_interactor.user_account_interactor(), *this),
@@ -33,8 +33,6 @@ PhysicalPrinterSettingsDialog::PhysicalPrinterSettingsDialog(
     m_navigator(navigator),
     m_physical_printer_advanced_settings_dialog(advanced_dialog)
 {
-    m_project_interactor.removable_drive_service().add_status_listener(this);
-
     m_filtered_printers.set_source_model(&m_physical_printer_interactor.observable_list());
     
     auto eval_printer = [this](const PhysicalPrinterConfig& item) -> bool
@@ -49,27 +47,20 @@ PhysicalPrinterSettingsDialog::PhysicalPrinterSettingsDialog(
         }
     };
 
-    auto eval_fs = [this](const Biz::PhysicalPrinter::FileSystemExport& payload) -> bool
+    auto eval_connect = [this]() -> bool
     {
-        return payload.prefer_removable ?
-            m_project_interactor.removable_drive_service().has_removable_drives() :
-            true;
+        return m_project_interactor.user_account_interactor().is_logged_in();
     };
 
-    auto eval_connect = [this]() -> bool 
-    { 
-        return m_project_interactor.user_account_interactor().is_logged_in(); 
-    };
-
-    m_filtered_printers.set_filter_fn([eval_printer, eval_fs, eval_connect](const PhysicalPrinterConfig& item) {
+    m_filtered_printers.set_filter_fn([eval_printer, eval_connect](const PhysicalPrinterConfig& item) {
         return std::visit([&](const auto& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::ConnectUpload>) {
                 return eval_connect();
             } else if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::PrinterUpload>) {
-                return eval_printer(item); 
-            } else if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::FileSystemExport>) {
-                return eval_fs(arg);
+                return eval_printer(item);
+            } else if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::NoPrinter>) {
+                return true;
             }
             return false;
         }, item.payload);
@@ -91,7 +82,6 @@ PhysicalPrinterSettingsDialog::PhysicalPrinterSettingsDialog(
 
 PhysicalPrinterSettingsDialog::~PhysicalPrinterSettingsDialog()
 {
-    m_project_interactor.removable_drive_service().remove_status_listener(this);
     if (m_printer_list_view) {
         m_printer_list_view->set_source_list(nullptr, true);
     }
@@ -291,14 +281,6 @@ void PhysicalPrinterSettingsDialog::on_user_account_id_success(
 }
 
 void PhysicalPrinterSettingsDialog::on_user_account_logged_out()
-{
-    filter_printer_buttons(m_selected_mode);
-}
-
-void PhysicalPrinterSettingsDialog::on_removable_drive_status_changed(
-    const boost::filesystem::path& drive_path,
-    Biz::RemovableDrive::RemovableDriveStatus status
-)
 {
     filter_printer_buttons(m_selected_mode);
 }

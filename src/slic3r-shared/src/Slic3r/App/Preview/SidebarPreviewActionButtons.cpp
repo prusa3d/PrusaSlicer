@@ -140,25 +140,27 @@ void SidebarPreviewActionButtons::update_buttons()
     } break;
     case StatusCode::Finished: {
         m_primary_button->set_enabled(true);
-        if (m_project_interactor->physical_printer_interactor().is_filesystem_export_selected()) {
-            const auto& phys_printer = m_project_interactor->physical_printer_interactor().selected_physical_printer_data();
-            const auto* payload = std::get_if<Slic3r::Biz::PhysicalPrinter::FileSystemExport>(&phys_printer.payload);
-            ASSERT(payload);
+        using Biz::ExportDestination::ExportDestination;
+        const ExportDestination destination = m_project_interactor->export_destination_interactor().selected();
+        switch (destination) {
+        case ExportDestination::LocalDrive:
+        case ExportDestination::RemovableDrive:
             m_primary_button->set_label(Biz::_u8L("Export"));
             m_primary_button->set_tooltip(export_tooltip);
-            m_primary_button->callbacks().action = payload->prefer_removable ? 
+            m_primary_button->callbacks().action = destination == ExportDestination::RemovableDrive ?
                 ExportActions::export_gcode_to_flash(*m_project_interactor) :
                 ExportActions::export_gcode(*m_project_interactor);
-        } else if (m_project_interactor->physical_printer_interactor().is_connect_upload_selected()) {
+            break;
+        case ExportDestination::Connect:
             m_primary_button->set_label(Biz::_u8L("Send to Connect"));
             m_primary_button->set_tooltip("Send to Connect");
             m_primary_button->callbacks().action = ExportActions::send_gcode_to_connect(*m_project_interactor);
-        } else if (m_project_interactor->physical_printer_interactor().is_printer_upload_selected()) {
+            break;
+        case ExportDestination::PrintHost:
             m_primary_button->set_label(Biz::_u8L("Send to printer"));
             m_primary_button->set_tooltip(Biz::_u8L("Send to printer"));
             m_primary_button->callbacks().action = ExportActions::upload_gcode_to_print_host(*m_project_interactor);
-        } else {
-            PANIC("Unreachable!");
+            break;
         }
     } break;
     case StatusCode::Modified: {

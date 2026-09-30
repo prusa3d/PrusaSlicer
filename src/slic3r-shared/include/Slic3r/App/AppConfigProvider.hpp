@@ -9,6 +9,8 @@ public:
     boost::filesystem::path download_dir() const override;
     std::string last_used_physical_printer() const override;
     void set_last_used_physical_printer(const std::string& uuid) override;
+    std::string last_used_export_destination() const override;
+    void set_last_used_export_destination(const std::string& destination) override;
     bool get_show_step_import_parameters() const override;
     void set_show_step_import_parameters(bool show) override;
     double get_step_linear_precision() const override;

@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/Connect/ConnectMessageHandler.hpp"
 
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterInteractor.hpp"
+#include "Slic3r/Biz/ExportDestination/ExportDestinationInteractor.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
@@ -15,12 +16,14 @@ ConnectMessageHandler::ConnectMessageHandler(
         Platform::IMainThreadDispatcher& dispatcher,
         Preset::PresetInteractor& preset_interactor,
         ConnectPrinter::ConnectPrinterService& connect_printer_service,
-    PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor
+    PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor,
+    ExportDestination::ExportDestinationInteractor& export_destination_interactor
     ) :
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
     m_connect_printer_service(connect_printer_service),
-    m_physical_printer_interactor(physical_printer_interactor)
+    m_physical_printer_interactor(physical_printer_interactor),
+    m_export_destination_interactor(export_destination_interactor)
 {}
 
 void ConnectMessageHandler::dispatch_error(std::string msg)
@@ -110,7 +113,8 @@ void ConnectMessageHandler::do_select_printer_from_connect(
     if (m_connect_printer_service.find(uuid)) {
         m_physical_printer_interactor.select_uuid_with_presets(uuid);
     } else if (m_physical_printer_interactor.printer_preset_selector().select_for_connect_printer(parsed_printer_json)) {
-        m_physical_printer_interactor.select_connect_upload();
+        m_physical_printer_interactor.select_default();
+        m_export_destination_interactor.select(ExportDestination::ExportDestination::Connect);
     } else {
         return;
     }

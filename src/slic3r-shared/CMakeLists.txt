@@ -1305,6 +1305,14 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/PhysicalPrinter/PhysicalPrinterStorage.cpp
         include/Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp
 
+        include/Slic3r/Biz/ExportDestination/ExportDestination.hpp
+        src/Slic3r/Biz/ExportDestination/ExportDestination.cpp
+        include/Slic3r/Biz/ExportDestination/ExportDestinationInteractor.hpp
+        src/Slic3r/Biz/ExportDestination/ExportDestinationInteractor.cpp
+        include/Slic3r/Biz/ExportDestination/IExportDestinationChangedListener.hpp
+        include/Slic3r/App/ExportDestinationButton.hpp
+        src/Slic3r/App/ExportDestinationButton.cpp
+
         include/Slic3r/App/Undo/Store.hpp
         src/Slic3r/App/Undo/Store.cpp
         include/Slic3r/App/Undo/BedSelectionState.hpp

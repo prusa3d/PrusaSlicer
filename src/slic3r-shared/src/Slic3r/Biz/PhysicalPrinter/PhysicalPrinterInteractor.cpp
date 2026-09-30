@@ -2,7 +2,6 @@
 
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountInteractor.hpp"
-#include "Slic3r/Biz/RemovableDrive/RemovableDriveService.hpp"
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/Platform/IAppConfigProvider.hpp"
 #include "Slic3r/Biz/PrintHost/IPrintHost.hpp"
@@ -25,7 +24,7 @@ namespace Slic3r::Biz::PhysicalPrinter {
 namespace {
 
 constexpr const char* CONNECTION_TEST_JOB_NAME = "physical_printer_connection_test";
-constexpr size_t CONNECT_PRINTERS_OFFSET = 3;
+constexpr size_t CONNECT_PRINTERS_OFFSET = 1;
 
 bool auth_type_supported_by_host(Domain::PrintHostType type, Domain::PrintHostAuthType auth_type)
 {
@@ -40,13 +39,11 @@ bool auth_type_supported_by_host(Domain::PrintHostType type, Domain::PrintHostAu
 PhysicalPrinterInteractor::PhysicalPrinterInteractor(
     Platform::IMainThreadDispatcher& dispatcher,
     Preset::PresetInteractor& preset_interactor,
-    UserAccount::UserAccountInteractor& user_account_interactor,
-    RemovableDrive::RemovableDriveService& removable_drive_service
+    UserAccount::UserAccountInteractor& user_account_interactor
 ) :
     m_dispatcher(dispatcher),
     m_preset_interactor(preset_interactor),
     m_user_account_interactor(user_account_interactor),
-    m_removable_drive_service(removable_drive_service),
     m_connect_printer_service(dispatcher, user_account_interactor),
     m_printer_preset_selector(preset_interactor)
 {
@@ -70,11 +67,9 @@ PhysicalPrinterInteractor::~PhysicalPrinterInteractor()
 void PhysicalPrinterInteractor::read_storage()
 {
     std::vector<PhysicalPrinterConfig> printers;
-    printers.reserve(m_storage.all_printers().size() + 3);
+    printers.reserve(m_storage.all_printers().size() + 1);
 
-    printers.push_back(PhysicalPrinter::filesystem_export_local());
-    printers.push_back(PhysicalPrinter::filesystem_export_removable());
-    printers.push_back(PhysicalPrinter::connect_upload_generic());
+    printers.push_back(PhysicalPrinter::no_printer());
 
     for (const auto& [uuid, printer] : m_storage.all_printers()) {
         printers.push_back(printer);
@@ -112,7 +107,7 @@ void PhysicalPrinterInteractor::set_last_used(const std::string& uuid)
     }
 }
 
-void PhysicalPrinterInteractor::remember_used_destination(const std::string& uuid)
+void PhysicalPrinterInteractor::remember_used_printer(const std::string& uuid)
 {
     if (!find_index(uuid)) {
         return;
@@ -130,9 +125,6 @@ bool PhysicalPrinterInteractor::can_be_selected_at(size_t index) const
     const auto& printer = m_observable_list.at(index);
     if (std::holds_alternative<ConnectUpload>(printer.payload)) {
         return m_user_account_interactor.is_logged_in();
-    }
-    if (const auto* fs = std::get_if<FileSystemExport>(&printer.payload); fs && fs->prefer_removable) {
-        return m_removable_drive_service.has_removable_drives();
     }
     return true;
 }
@@ -154,6 +146,12 @@ void PhysicalPrinterInteractor::select_uuid(const std::string& uuid)
 {
     apply_selection(uuid);
     m_explicit_selection = true;
+
+    this->invoke_listeners<IPhysicalPrinterChangedListener>(
+        [](auto* listener) {
+            listener->on_physical_printer_picked();
+        }
+    );
 }
 
 void PhysicalPrinterInteractor::select_uuid_with_presets(const std::string& uuid)
@@ -189,33 +187,6 @@ void PhysicalPrinterInteractor::select_default()
     }
     apply_selection(m_observable_list.at(0).uuid);
     m_explicit_selection = false;
-}
-
-void PhysicalPrinterInteractor::select_connect_upload()
-{
-    select_uuid(std::string(PRUSA_CONNECT_UUID));
-}
-
-void PhysicalPrinterInteractor::select_connect_upload_if_default()
-{
-    if (m_selected_index != 0 || m_explicit_selection) {
-        return;
-    }
-    apply_selection(std::string(PRUSA_CONNECT_UUID));
-}
-
-void PhysicalPrinterInteractor::on_removable_drive_status_changed(
-    const boost::filesystem::path& /* drive_path */,
-    RemovableDrive::RemovableDriveStatus status
-)
-{
-    if (status != RemovableDrive::RemovableDriveStatus::Inserted) {
-        return;
-    }
-    if (m_explicit_selection || m_last_used_uuid != REMOVABLE_DRIVE_UUID || m_selected_uuid == REMOVABLE_DRIVE_UUID) {
-        return;
-    }
-    apply_selection(m_last_used_uuid);
 }
 
 void PhysicalPrinterInteractor::remove_uuid(const std::string& uuid)
@@ -302,7 +273,7 @@ bool PhysicalPrinterInteractor::selected_hw_matches_current() const
 
 void PhysicalPrinterInteractor::save_new_printer()
 {
-    ASSERT(is_filesystem_export_selected());
+    ASSERT(is_no_printer_selected());
     const Domain::Preset::HwPrinterConfig& current_printer_config = m_preset_interactor.current_printer_config();
 
     std::string uuid = m_storage.create_from_dummy(current_printer_config);
@@ -317,9 +288,9 @@ void PhysicalPrinterInteractor::on_dialog_button_add_new()
     select_default();
 }
 
-bool PhysicalPrinterInteractor::is_filesystem_export_selected() const
+bool PhysicalPrinterInteractor::is_no_printer_selected() const
 {
-    return std::holds_alternative<FileSystemExport>(m_observable_list.at(m_selected_index).payload);
+    return std::holds_alternative<NoPrinter>(m_observable_list.at(m_selected_index).payload);
 }
 
 bool PhysicalPrinterInteractor::is_printer_upload_selected() const
@@ -327,7 +298,7 @@ bool PhysicalPrinterInteractor::is_printer_upload_selected() const
     return std::holds_alternative<PrinterUpload>(m_observable_list.at(m_selected_index).payload);
 }
 
-bool PhysicalPrinterInteractor::is_connect_upload_selected() const
+bool PhysicalPrinterInteractor::is_connect_printer_selected() const
 {
     return std::holds_alternative<ConnectUpload>(m_observable_list.at(m_selected_index).payload);
 }
@@ -437,7 +408,7 @@ bool PhysicalPrinterInteractor::is_printer_compatible(const std::string& uuid, c
 {
     const auto& printer = m_observable_list.at(index_of(uuid));
 
-    if (std::holds_alternative<FileSystemExport>(printer.payload)
+    if (std::holds_alternative<NoPrinter>(printer.payload)
         || std::holds_alternative<ConnectUpload>(printer.payload)) {
         return true;
     }

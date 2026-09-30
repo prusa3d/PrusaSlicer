@@ -23,33 +23,14 @@ std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data)
     );
 }
 
-PhysicalPrinterConfig filesystem_export_local()
+PhysicalPrinterConfig no_printer()
 {
     return {
-        FileSystemExport{false},
+        NoPrinter{},
         {},
-        _u8L("Local drive"),
-        std::string(LOCAL_DRIVE_UUID),
-    };
-}
-
-PhysicalPrinterConfig filesystem_export_removable()
-{
-    return {
-        FileSystemExport{true},
-        {},
-        _u8L("Removable drive"),
-        std::string(REMOVABLE_DRIVE_UUID),
-    };
-}
-
-PhysicalPrinterConfig connect_upload_generic()
-{
-    return {
-        ConnectUpload{},
-        {},
-        _u8L("Prusa Connect"),
-        std::string(PRUSA_CONNECT_UUID),
+        // TRN Physical printer list entry: no specific printer selected.
+        _u8L("No printer"),
+        std::string(NO_PRINTER_UUID),
     };
 }
 
@@ -68,7 +49,7 @@ PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinte
 
 bool is_reserved_uuid(const std::string& uuid)
 {
-    return uuid == LOCAL_DRIVE_UUID || uuid == REMOVABLE_DRIVE_UUID || uuid == PRUSA_CONNECT_UUID;
+    return uuid == NO_PRINTER_UUID;
 }
 
 bool is_physical_printer_compatible(

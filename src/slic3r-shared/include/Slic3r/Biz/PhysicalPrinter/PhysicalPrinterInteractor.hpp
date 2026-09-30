@@ -10,7 +10,6 @@
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp"
 #include "Slic3r/Biz/Preset/PrinterPresetSelector.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
-#include "Slic3r/Biz/RemovableDrive/IRemovableDriveStatusListener.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
 
 #include <vector>
@@ -31,10 +30,6 @@ namespace Slic3r::Biz::UserAccount {
 class UserAccountInteractor;
 } // namespace Slic3r::Biz::UserAccount
 
-namespace Slic3r::Biz::RemovableDrive {
-class RemovableDriveService;
-} // namespace Slic3r::Biz::RemovableDrive
-
 namespace Slic3r::Biz::PhysicalPrinter {
 
 struct PrintHostTestResult
@@ -44,19 +39,17 @@ struct PrintHostTestResult
     std::string error_message;
 };
 
-/// Owns the selectable upload destinations, the current selection, and the last used destination.
+/// Owns the selectable printers, the current selection, and the last used printer.
 class PhysicalPrinterInteractor :
     public WithListeners<IPhysicalPrinterChangedListener>,
     public ISelectedConfigContainerChangedListener,
-    public RemovableDrive::IRemovableDriveStatusListener,
     public IListObserver<ConnectPrinter::ConnectPrinter>
 {
 public:
     PhysicalPrinterInteractor(
         Platform::IMainThreadDispatcher& dispatcher,
         Preset::PresetInteractor& preset_interactor,
-        UserAccount::UserAccountInteractor& user_account_interactor,
-        RemovableDrive::RemovableDriveService& removable_drive_service
+        UserAccount::UserAccountInteractor& user_account_interactor
     );
     ~PhysicalPrinterInteractor();
 
@@ -68,7 +61,7 @@ public:
 
     Preset::PrinterPresetSelector& printer_preset_selector();
 
-    /// True if the destination may be selected (Connect needs a login, Removable Drive needs a drive).
+    /// True if the printer may be selected (a Connect printer needs a login).
     bool can_be_selected(const std::string& uuid) const;
 
     /// Explicit user selection for this session.
@@ -80,14 +73,8 @@ public:
     /// Automatic fallback to the first entry.
     void select_default();
 
-    /// Explicit selection of Prusa Connect.
-    void select_connect_upload();
-
-    /// Switches to Prusa Connect unless the current selection is the user's explicit choice.
-    void select_connect_upload_if_default();
-
-    /// Persists the destination restored on the next start.
-    void remember_used_destination(const std::string& uuid);
+    /// Persists the printer restored on the next start.
+    void remember_used_printer(const std::string& uuid);
 
     void remove_uuid(const std::string& uuid);
 
@@ -96,9 +83,9 @@ public:
         return m_selected_uuid;
     }
 
-    bool is_filesystem_export_selected() const;
+    bool is_no_printer_selected() const;
     bool is_printer_upload_selected() const;
-    bool is_connect_upload_selected() const;
+    bool is_connect_printer_selected() const;
 
     const PhysicalPrinterConfig& selected_physical_printer_data();
 
@@ -140,12 +127,6 @@ public:
         Domain::SelectionId container_id
     ) override;
 
-    /// Restores a last used Removable Drive once a drive appears, unless the user already chose otherwise.
-    void on_removable_drive_status_changed(
-        const boost::filesystem::path& drive_path,
-        RemovableDrive::RemovableDriveStatus status
-    ) override;
-
     void on_inserted(const ConnectPrinter::ConnectPrinter& printer, size_t index) override;
     void on_removed(const IndexRange& index_range) override;
     void on_updated(const IndexRange& index_range) override;
@@ -172,7 +153,6 @@ private:
     Platform::IMainThreadDispatcher& m_dispatcher;
     Preset::PresetInteractor& m_preset_interactor;
     UserAccount::UserAccountInteractor& m_user_account_interactor;
-    RemovableDrive::RemovableDriveService& m_removable_drive_service;
     PhysicalPrinterStorage m_storage;
     ConnectPrinter::ConnectPrinterService m_connect_printer_service;
     Preset::PrinterPresetSelector m_printer_preset_selector;

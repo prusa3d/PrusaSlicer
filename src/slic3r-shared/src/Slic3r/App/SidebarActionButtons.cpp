@@ -6,6 +6,7 @@
 #include "Slic3r/App/PhysicalPrinterSettingsDialog.hpp"
 #include "Slic3r/App/PhysicalPrinterAdvancedSettingsDialog.hpp"
 #include "Slic3r/App/PhysicalPrinterSettingsButton.hpp"
+#include "Slic3r/App/ExportDestinationButton.hpp"
 
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
@@ -44,6 +45,8 @@ SidebarActionButtons::~SidebarActionButtons() {
     if (m_project_interactor) {
         m_project_interactor->physical_printer_interactor()
             .remove_listener<Biz::PhysicalPrinter::IPhysicalPrinterChangedListener>(this);
+        m_project_interactor->export_destination_interactor()
+            .remove_listener<Biz::ExportDestination::IExportDestinationChangedListener>(this);
         m_project_interactor->preset_interactor().remove_listener<Biz::Preset::IPresetChangedListener>(this);
     }
 }
@@ -52,6 +55,8 @@ void SidebarActionButtons::init_physical_printer_ui()
 {
     m_project_interactor->physical_printer_interactor()
         .add_listener<Biz::PhysicalPrinter::IPhysicalPrinterChangedListener>(this);
+    m_project_interactor->export_destination_interactor()
+        .add_listener<Biz::ExportDestination::IExportDestinationChangedListener>(this);
     m_project_interactor->preset_interactor().add_listener<Biz::Preset::IPresetChangedListener>(this);
     
     m_physical_printer_advanced_settings_dialog = emplace_back<PhysicalPrinterAdvancedSettingsDialog>(
@@ -75,7 +80,8 @@ void SidebarActionButtons::init_physical_printer_ui()
     m_buttons_layout->set_gap(10.0f);
     m_buttons_layout->set_flex_grow(1);
 
-    m_buttons_layout->emplace_back<Yoga::Text>(Biz::_u8L("Select destination"));
+    // TRN Sidebar label above the physical printer selection.
+    m_buttons_layout->emplace_back<Yoga::Text>(Biz::_u8L("Printer"));
 
     m_physical_printer_button = m_buttons_layout->emplace_back<PhysicalPrinterSettingsButton>(
         0,
@@ -118,6 +124,14 @@ void SidebarActionButtons::init_physical_printer_ui()
             m_render_module_navigator->set_opened_dialog(m_physical_printer_advanced_settings_dialog);
         }
     };
+
+    // TRN Sidebar label above the export destination selection.
+    m_buttons_layout->emplace_back<Yoga::Text>(Biz::_u8L("Export to"));
+
+    m_export_destination_button = m_buttons_layout->emplace_back<ExportDestinationButton>(
+        m_project_interactor->export_destination_interactor()
+    );
+    m_export_destination_button->set_self_align(YGAlignStretch);
 
     update_physical_printer_compatibility();
 }
@@ -195,6 +209,11 @@ void SidebarActionButtons::on_printer_data_changed()
 void SidebarActionButtons::on_selected_physical_printer_changed()
 {
     refresh_physical_printer_button();
+}
+
+void SidebarActionButtons::on_export_destination_changed()
+{
+    update_buttons();
 }
 
 void SidebarActionButtons::on_preset_selection_changed(

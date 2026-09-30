@@ -342,7 +342,7 @@ void PhysicalPrinterAdvancedSettingsDialog::load_from_interactor()
 
     update_field_visibility();
     update_test_button_state();
-    m_save_button->set_visible(m_physical_printer_interactor.is_filesystem_export_selected());
+    m_save_button->set_visible(m_physical_printer_interactor.is_no_printer_selected());
     m_change_hw_button->set_visible(
         m_physical_printer_interactor.is_printer_upload_selected()
         && !m_physical_printer_interactor.selected_hw_matches_current()

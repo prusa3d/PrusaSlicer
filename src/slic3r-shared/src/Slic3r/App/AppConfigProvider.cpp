@@ -42,6 +42,19 @@ void AppConfigProvider::set_last_used_physical_printer(const std::string& uuid)
     );
 }
 
+std::string AppConfigProvider::last_used_export_destination() const
+{
+    return AppServices::instance().app_config().get<std::string>("last_used_export_destination");
+}
+
+void AppConfigProvider::set_last_used_export_destination(const std::string& destination)
+{
+    AppServices::instance().app_config_interactor().set_item_value(
+        "last_used_export_destination",
+        Domain::ConfigValue(destination)
+    );
+}
+
 bool AppConfigProvider::get_show_step_import_parameters() const
 {
     return AppServices::instance().app_config().get<bool>("show_step_import_parameters");

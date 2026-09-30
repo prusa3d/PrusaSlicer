@@ -17,6 +17,10 @@ namespace Slic3r::Biz::PhysicalPrinter {
 class PhysicalPrinterInteractor;
 } // namespace Slic3r::Biz::PhysicalPrinter
 
+namespace Slic3r::Biz::ExportDestination {
+class ExportDestinationInteractor;
+} // namespace Slic3r::Biz::ExportDestination
+
 namespace Slic3r::Biz::ConnectPrinter {
 class ConnectPrinterService;
 } // namespace Slic3r::Biz::ConnectPrinter
@@ -30,7 +34,8 @@ public:
         Platform::IMainThreadDispatcher& dispatcher,
         Preset::PresetInteractor& preset_interactor,
         ConnectPrinter::ConnectPrinterService& connect_printer_service,
-        PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor
+        PhysicalPrinter::PhysicalPrinterInteractor& physical_printer_interactor,
+        ExportDestination::ExportDestinationInteractor& export_destination_interactor
     );
 
     void handle_select_printer_message(const std::string& message_json);
@@ -49,6 +54,7 @@ private:
     Preset::PresetInteractor& m_preset_interactor;
     ConnectPrinter::ConnectPrinterService& m_connect_printer_service;
     PhysicalPrinter::PhysicalPrinterInteractor& m_physical_printer_interactor;
+    ExportDestination::ExportDestinationInteractor& m_export_destination_interactor;
 
     std::string m_last_printer_json;
 };
