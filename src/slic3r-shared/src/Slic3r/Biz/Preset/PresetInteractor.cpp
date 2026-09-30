@@ -1430,6 +1430,7 @@ void PresetInteractor::fill_config_container_with_selected_preset(
 
         resize_tool_dependant_presets(hw_config, selected_preset.tools);
         resize_tool_dependant_presets(hw_config, selected_preset.materials);
+        resize_tool_dependant_presets(hw_config, selected_preset.material_matdb_uuids);
 
         // Set transferred values after switch to new selected preset
         process_operation_from_unsaved_changes(selected_preset, PresetDiffOperation::Transfer, bag, kind);

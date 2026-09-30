@@ -26,10 +26,13 @@ MatDbInteractor::MatDbInteractor(
     m_preset_interactor(project_interactor.preset_interactor()),
     m_projects(std::make_unique<MatDbInteractorProjectContexts>(project_interactor))
 {
-    project_interactor.add_listener<ISelectedConfigContainerChangedListener>(this);
+    m_preset_interactor.add_listener<IPresetChangedListener>(this);
 }
 
-MatDbInteractor::~MatDbInteractor() = default;
+MatDbInteractor::~MatDbInteractor()
+{
+    m_preset_interactor.remove_listener<IPresetChangedListener>(this);
+}
 
 void MatDbInteractor::init_client()
 {
@@ -53,6 +56,89 @@ void MatDbInteractor::query(size_t material_index, const std::string& q, const s
     if (type.has_value()) {
         query.types.push_back(type.value());
     }
+    m_query = {query, material_index};
+    run_query();
+}
+
+void MatDbInteractor::select_material_preset(
+    size_t material_index,
+    const Domain::MatDb::Material& mat,
+    const std::string& preset_id
+)
+{
+    m_preset_interactor.set_material_matdb_uuid(material_index, mat.uuid);
+    m_preset_interactor.select_material_preset(material_index, preset_id, true);
+}
+
+std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) const
+{
+    const auto mat = m_client.get_by_uuid(uuid);
+    if (!mat.has_value() || !mat.value().primary_color.has_value()) {
+        return std::nullopt;
+    }
+    const auto& color = mat.value().primary_color.value().color_rgba;
+    ASSERT(color.size() == 7 || color.size() == 9);
+    return std::string{color.substr(0, 7)};
+}
+
+std::optional<Domain::MatDb::Material> MatDbInteractor::get_material_by_uuid(
+    const std::string& uuid
+) const
+{
+    return m_client.get_by_uuid(uuid);
+}
+
+const Domain::Preset::SelectedPreset& MatDbInteractor::selected_preset() const
+{
+    auto cc_id = m_projects->selected().selected_config_container_id;
+    auto* cc = m_workbench.project(m_projects->selected_project_id()).find_config_container(cc_id);
+    ASSERT(cc != nullptr);
+    return cc->selected_preset();
+}
+
+void MatDbInteractor::
+    run_query_if_active(Domain::SelectionId project_id, Domain::SelectionId config_container_id)
+{
+    if (project_id == m_projects->selected_project_id()
+        && m_projects->project(project_id).selected_config_container_id == config_container_id)
+    {
+        run_query();
+    }
+}
+
+void MatDbInteractor::on_preset_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    Preset::PresetItemType type
+)
+{
+    if (type == Preset::PresetItemType::PrintPreset) {
+        run_query_if_active(project_id, config_container_id);
+    }
+}
+
+void MatDbInteractor::on_config_container_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+)
+{
+    m_projects->project(project_id).selected_config_container_id = config_container_id;
+    run_query_if_active(project_id, config_container_id);
+}
+
+void MatDbInteractor::on_preset_bundles_loaded()
+{
+    run_query();
+}
+
+void MatDbInteractor::run_query()
+{
+    if (!m_query.has_value()) {
+        return;
+    }
+
+    const auto& query = m_query->query;
+    const auto material_index = m_query->slot_index;
     auto result = m_client.query(query, 64, 0);
     std::vector<MatDbItem> items;
     auto resolve_preset = [this, material_index](const Domain::MatDb::Material& mat) -> PresetMatches
@@ -99,51 +185,7 @@ void MatDbInteractor::query(size_t material_index, const std::string& q, const s
         std::back_inserter(items)
     );
     m_result.reset(std::move(items));
-}
 
-void MatDbInteractor::select_material_preset(
-    size_t material_index,
-    const Domain::MatDb::Material& mat,
-    const std::string& preset_id
-)
-{
-    m_preset_interactor.set_material_matdb_uuid(material_index, mat.uuid);
-    m_preset_interactor.select_material_preset(material_index, preset_id, true);
 }
-
-std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) const
-{
-    const auto mat = m_client.get_by_uuid(uuid);
-    if (!mat.has_value() || !mat.value().primary_color.has_value()) {
-        return std::nullopt;
-    }
-    const auto& color = mat.value().primary_color.value().color_rgba;
-    ASSERT(color.size() == 7 || color.size() == 9);
-    return std::string{color.substr(0, 7)};
-}
-
-std::optional<Domain::MatDb::Material> MatDbInteractor::get_material_by_uuid(
-    const std::string& uuid
-) const
-{
-    return m_client.get_by_uuid(uuid);
-}
-
-void MatDbInteractor::on_selected_config_container_changed(
-    Domain::SelectionId project_id,
-    Domain::SelectionId container_id
-)
-{
-    m_projects->project(project_id).selected_config_container_id = container_id;
-}
-
-const Domain::Preset::SelectedPreset& MatDbInteractor::selected_preset() const
-{
-    auto cc_id = m_projects->selected().selected_config_container_id;
-    auto* cc = m_workbench.project(m_projects->selected_project_id()).find_config_container(cc_id);
-    ASSERT(cc != nullptr);
-    return cc->selected_preset();
-}
-
 
 } // namespace Slic3r::Biz::MatDb

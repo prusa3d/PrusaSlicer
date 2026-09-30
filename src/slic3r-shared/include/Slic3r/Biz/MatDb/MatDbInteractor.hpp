@@ -5,6 +5,7 @@
 #include "Slic3r/Biz/ObservableList.hpp"
 
 #include "Slic3r/Biz/MatDb/MatDbClient.hpp"
+#include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Domain/Workbench.hpp"
 #include "Slic3r/Domain/Preset/SelectedPreset.hpp"
 
@@ -33,8 +34,9 @@ struct MatDbItem
 
 struct MatDbInteractorProjectContexts;
 
-
-class MatDbInteractor final : public ISelectedConfigContainerChangedListener, public IMdb
+class MatDbInteractor final :
+    public Preset::IPresetChangedListener,
+    public IMdb
 {
 public:
     MatDbInteractor(Domain::Workbench& workbench, ProjectInteractor& project_interactor);
@@ -66,20 +68,37 @@ public:
 
     std::optional<Domain::MatDb::Material> get_material_by_uuid(const std::string& uuid) const;
 
-    void on_selected_config_container_changed(
+    void
+    run_query_if_active(Domain::SelectionId project_id, Domain::SelectionId config_container_id);
+
+    void on_preset_selection_changed(
         Domain::SelectionId project_id,
-        Domain::SelectionId container_id
+        Domain::SelectionId config_container_id,
+        Preset::PresetItemType type
     ) override;
+    void on_config_container_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    ) override;
+    void on_preset_bundles_loaded() override;
 
 private:
     const Domain::Preset::SelectedPreset& selected_preset() const;
+    void run_query();
 
 private:
+    struct QueryState
+    {
+        MatDbClient::Query query;
+        size_t slot_index;
+    };
+
     Domain::Workbench& m_workbench;
     Preset::PresetInteractor& m_preset_interactor;
     std::unique_ptr<MatDbInteractorProjectContexts> m_projects;
     mutable MatDbClient m_client;
     ObservableList<MatDbItem> m_result;
+    std::optional<QueryState> m_query;
 };
 
 }

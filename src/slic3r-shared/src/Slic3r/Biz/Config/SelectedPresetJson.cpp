@@ -51,6 +51,9 @@ void to_json(nlohmann::ordered_json& j, const SelectedPresetMetadata& v)
     j["print"]     = v.print;
     j["tools"]     = v.tools;
     j["materials"] = v.materials;
+    if (!v.material_matdb_uuids.empty()) {
+        j["material_matdb_uuids"] = v.material_matdb_uuids;
+    }
 }
 
 } // namespace Slic3r::Domain::Preset
@@ -64,6 +67,17 @@ tl::expected<Domain::Preset::EvaluatedPresetMetadata, std::string> load_evaluate
     try {
         return j.get<Domain::Preset::EvaluatedPresetMetadata>();
     } catch (const Biz::Expr::ParseError& e) {
+        return tl::unexpected{e.what()};
+    }
+}
+
+tl::expected<std::vector<std::string>, std::string> load_strings(
+    const nlohmann::ordered_json& j
+)
+{
+    try {
+        return j.get<std::vector<std::string>>();
+    } catch (const nlohmann::json::exception& e) {
         return tl::unexpected{e.what()};
     }
 }
@@ -104,6 +118,14 @@ tl::expected<Domain::Preset::SelectedPresetMetadata, std::string> load_preset_me
             return tl::unexpected{res.error()};
         } else {
             ret.materials.emplace_back(std::move(res.value()));
+        }
+    }
+
+    if (j.contains("material_matdb_uuids")) {
+        if (auto res = load_strings(j.at("material_matdb_uuids")); !res) {
+            return tl::unexpected{res.error()};
+        } else {
+            ret.material_matdb_uuids = std::move(res.value());
         }
     }
     return ret;
