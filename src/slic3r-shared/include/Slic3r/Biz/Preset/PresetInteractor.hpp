@@ -252,6 +252,8 @@ public:
      */
     bool select_printer_sheet(const std::string& id, bool user = false);
 
+    void set_material_matdb_uuid(size_t material_index, const std::string& uuid);
+
     using ConfigItemModifyFn = std::function<void(Domain::ConfigItem&)>;
 
     void set_preset_value(

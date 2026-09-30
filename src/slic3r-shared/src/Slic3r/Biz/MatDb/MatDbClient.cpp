@@ -46,6 +46,7 @@ struct adl_serializer<Slic3r::Domain::MatDb::MaterialIndex>
         j.at("n").get_to(v.name);
         j.at("t").get_to(v.type);
         j.at("bs").get_to(v.brand_slug);
+        j.at("id").get_to(v.uuid);
         j.at("i").get_to(v.index);
     }
 };
@@ -237,6 +238,8 @@ bool MatDbClient::open(const std::string& path)
     bool success = load_index();
     if (!success) {
         m_index.clear();
+        m_uuid_lookup.clear();
+        m_types.clear();
         m_content = nullptr;
     }
     return success;
@@ -268,6 +271,19 @@ const std::set<std::string>& MatDbClient::types() const
     return m_index.types;
 }
 
+std::optional<Domain::MatDb::Material> MatDbClient::get_by_uuid(const std::string& uuid)
+{
+    const auto it = m_uuid_lookup.find(uuid);
+    if (it == m_uuid_lookup.end()) {
+        return std:: nullopt;
+    }
+
+    const auto& [brand_slug, material_index] = it->second;
+    const auto& [brand, materials] = get(std::string{brand_slug});
+    const auto& mat = materials.at(material_index);
+    return from_storage(brand, mat);
+}
+
 bool MatDbClient::load_index()
 {
     if (m_content == nullptr) {
@@ -294,6 +310,15 @@ bool MatDbClient::load_index()
         std::inserter(types, types.end())
     );
     std::ranges::copy(types, std::back_inserter(m_types));
+
+    std::ranges::copy(
+        m_index.materials
+            | std::views::transform(
+                [](const auto& m) -> decltype(m_uuid_lookup)::value_type
+                { return {m.uuid, {m.brand_slug, m.index}}; }
+            ),
+        std::inserter(m_uuid_lookup, m_uuid_lookup.end())
+    );
 
     return true;
 }

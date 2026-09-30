@@ -1,4 +1,5 @@
 #pragma once
+#include "Slic3r/Biz/IMdb.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
 #include "Slic3r/Biz/ObservableList.hpp"
@@ -33,7 +34,7 @@ struct MatDbItem
 struct MatDbInteractorProjectContexts;
 
 
-class MatDbInteractor final : public ISelectedConfigContainerChangedListener
+class MatDbInteractor final : public ISelectedConfigContainerChangedListener, public IMdb
 {
 public:
     MatDbInteractor(Domain::Workbench& workbench, ProjectInteractor& project_interactor);
@@ -61,10 +62,13 @@ public:
         return m_result;
     }
 
+    std::optional<std::string> get_color(const std::string& uuid) const override;
+
     void on_selected_config_container_changed(
         Domain::SelectionId project_id,
         Domain::SelectionId container_id
     ) override;
+
 private:
     const Domain::Preset::SelectedPreset& selected_preset() const;
 
@@ -72,9 +76,8 @@ private:
     Domain::Workbench& m_workbench;
     Preset::PresetInteractor& m_preset_interactor;
     std::unique_ptr<MatDbInteractorProjectContexts> m_projects;
-    MatDbClient m_client;
+    mutable MatDbClient m_client;
     ObservableList<MatDbItem> m_result;
-    Domain::SelectionId m_selected_project{Domain::INVALID_ID};
 };
 
 }

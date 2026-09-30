@@ -43,6 +43,7 @@ struct MaterialIndex
 {
     std::string name;
     std::optional<std::string> type;
+    std::string uuid;
     std::string brand_slug;
     size_t index;
 };

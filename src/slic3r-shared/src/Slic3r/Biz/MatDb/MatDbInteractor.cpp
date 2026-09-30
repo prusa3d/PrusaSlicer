@@ -107,8 +107,19 @@ void MatDbInteractor::select_material_preset(
     const std::string& preset_id
 )
 {
+    m_preset_interactor.set_material_matdb_uuid(material_index, mat.uuid);
     m_preset_interactor.select_material_preset(material_index, preset_id, true);
-    // TODO: write metadata from mat to selected preset
+}
+
+std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) const
+{
+    const auto mat = m_client.get_by_uuid(uuid);
+    if (!mat.has_value() || !mat.value().primary_color.has_value()) {
+        return std::nullopt;
+    }
+    const auto& color = mat.value().primary_color.value().color_rgba;
+    ASSERT(color.size() == 7 || color.size() == 9);
+    return std::string{color.substr(0, 7)};
 }
 
 void MatDbInteractor::on_selected_config_container_changed(

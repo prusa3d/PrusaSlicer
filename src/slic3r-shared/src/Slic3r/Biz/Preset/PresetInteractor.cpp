@@ -1493,13 +1493,15 @@ void PresetInteractor::fill_config_container_with_selected_preset(
     // we need to get fresh print preset reference, as the eventual save may invalidate `print`
     const auto& reloaded_print =
         get_print_preset(printer_hw_config_id, printer_preset_id, print_id).first.get();
+    const auto mat_size = materials.size();
     selected_preset = Domain::Preset::SelectedPreset{
         .hw_config = hw_config,
         .printer   = reloaded_printer_preset,
         .print     = reloaded_print,
         .tools     = std::move(tools),
-        .materials = std::move(materials)
-};
+        .materials = std::move(materials),
+        .material_matdb_uuids = Domain::Preset::MatDbUuids{mat_size}
+    };
 
     // Set transfered values after switch to new selected preset
     process_operation_from_unsaved_changes(selected_preset, PresetDiffOperation::Transfer, bag);
@@ -2332,6 +2334,22 @@ bool PresetInteractor::select_printer_sheet(const std::string& id, bool user)
     }
 
     return successfully_changed;
+}
+
+void PresetInteractor::set_material_matdb_uuid(size_t material_index, const std::string& uuid)
+{
+    mutable_selected_printer_preset().set_material_matdb_uuid(material_index, uuid);
+    const auto cc_id = m_project_contexts.at(m_selected_project_id).selected_config_container_id;
+    invoke_listeners<IPresetChangedListener>(
+        [&](auto* l)
+        {
+            l->on_preset_selection_changed(
+                m_selected_project_id,
+                cc_id,
+                PresetItemType::MaterialPreset
+            );
+        }
+    );
 }
 
 bool PresetInteractor::change_hw_config_and_validate(

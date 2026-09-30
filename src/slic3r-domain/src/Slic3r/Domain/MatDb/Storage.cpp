@@ -6,6 +6,7 @@ void Index::clear()
 {
     brands.clear();
     materials.clear();
+    types.clear();
 }
 
 } // namespace Slic3r::Domain::MatDb
