@@ -758,47 +758,55 @@ static tl::expected<ReturnData, FileLoadError> read_data_from_file(
             ));
         }
     } else if (is_step) {
-        Biz::Platform::IAppConfigProvider& app_config = Platform::PlatformServices::instance().app_config_provider();
-        double linear_precision = app_config.get_step_linear_precision();
-        double angle_precision = app_config.get_step_angle_precision();
-        bool show_dialog = app_config.get_show_step_import_parameters();
+        Platform::PlatformServices& platform_services = Platform::PlatformServices::instance();
 
-        // Check if we should skip the dialog because "Apply to all" was clicked on a previous file
-        if (step_loading_multiple && step_loading_multiple->dismiss) {
-            linear_precision = step_loading_multiple->linear_precision;
-            angle_precision = step_loading_multiple->angle_precision;
-            show_dialog = false;
+        std::optional<std::pair<double, double>> step_linear_and_angle_deflections;
+        if (platform_services.has_app_config_provider()) {
+            Biz::Platform::IAppConfigProvider& app_config = platform_services.app_config_provider();
+            double linear_precision = app_config.get_step_linear_precision();
+            double angle_precision = app_config.get_step_angle_precision();
+            bool show_dialog = app_config.get_show_step_import_parameters();
+
+            // Check if we should skip the dialog because "Apply to all" was clicked on a previous file
+            if (step_loading_multiple && step_loading_multiple->dismiss) {
+                linear_precision = step_loading_multiple->linear_precision;
+                angle_precision = step_loading_multiple->angle_precision;
+                show_dialog = false;
+            }
+
+            if (show_dialog && dialog_provider != nullptr) {
+                auto dialog_result = dialog_provider->show_load_step_dialog(
+                    input_file_path.filename().string(),
+                    linear_precision,
+                    angle_precision,
+                    step_loading_multiple != nullptr  // Show "Apply to all" button only when loading multiple files
+                );
+                if (!dialog_result)
+                {
+                    // User cancelled the dialog
+                    return tl::make_unexpected(FileLoadError::cancelled());
+                }
+
+                linear_precision = dialog_result->linear_precision;
+                angle_precision = dialog_result->angle_precision;
+                if (dialog_result->do_not_show_again) {
+                    app_config.set_show_step_import_parameters(false);
+                }
+                app_config.set_step_linear_precision(linear_precision);
+                app_config.set_step_angle_precision(angle_precision);
+
+                // If "Apply to all" was clicked, store the values and suppress dialog for remaining files
+                if (dialog_result->apply_to_all && step_loading_multiple) {
+                    step_loading_multiple->linear_precision = linear_precision;
+                    step_loading_multiple->angle_precision = angle_precision;
+                    step_loading_multiple->dismiss = true;
+                }
+            }
+
+            step_linear_and_angle_deflections = std::make_pair(linear_precision, angle_precision);
         }
 
-        if (show_dialog && dialog_provider != nullptr) {
-            auto dialog_result = dialog_provider->show_load_step_dialog(
-                input_file_path.filename().string(),
-                linear_precision,
-                angle_precision,
-                step_loading_multiple != nullptr  // Show "Apply to all" button only when loading multiple files
-            );
-            if (!dialog_result)
-            {
-                // User cancelled the dialog
-                return tl::make_unexpected(FileLoadError::cancelled());
-            }
-
-            linear_precision = dialog_result->linear_precision;
-            angle_precision = dialog_result->angle_precision;
-            if (dialog_result->do_not_show_again) {
-                app_config.set_show_step_import_parameters(false);
-            }
-            app_config.set_step_linear_precision(linear_precision);
-            app_config.set_step_angle_precision(angle_precision);
-
-            // If "Apply to all" was clicked, store the values and suppress dialog for remaining files
-            if (dialog_result->apply_to_all && step_loading_multiple) {
-                step_loading_multiple->linear_precision = linear_precision;
-                step_loading_multiple->angle_precision = angle_precision;
-                step_loading_multiple->dismiss = true;
-            }
-        }
-        auto out = load_step(input_file_path.string(), std::make_pair(linear_precision, angle_precision));
+        auto out = load_step(input_file_path.string(), step_linear_and_angle_deflections);
         if (out) {
             ret.model = std::move(out.value());
             return ret;
