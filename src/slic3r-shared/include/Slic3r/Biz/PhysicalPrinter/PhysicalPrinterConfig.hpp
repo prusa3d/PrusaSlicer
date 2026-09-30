@@ -22,6 +22,7 @@ struct ConnectUpload {
     std::string team_id;
     std::string printer_uuid;
     std::string access_token; // needs to be filled before upload
+    std::string state;
 };
 
 struct PrinterUpload {

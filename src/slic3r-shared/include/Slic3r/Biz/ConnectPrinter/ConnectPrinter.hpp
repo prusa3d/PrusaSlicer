@@ -35,6 +35,8 @@ struct ConnectPrinter
 
 std::optional<ConnectPrinterState> parse_connect_printer_state(std::string_view state);
 
+std::string connect_printer_state_to_string(ConnectPrinterState state);
+
 std::optional<std::vector<ConnectPrinter>> parse_connect_printer_list(const std::string& body);
 
 } // namespace Slic3r::Biz::ConnectPrinter

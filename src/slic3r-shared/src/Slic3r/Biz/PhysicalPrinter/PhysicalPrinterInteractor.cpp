@@ -360,7 +360,10 @@ void PhysicalPrinterInteractor::on_updated(const IndexRange& index_range)
     const auto& connect_printers = m_connect_printer_service.observable_list();
     for (size_t i = index_range.from; i <= index_range.to; ++i) {
         PhysicalPrinterConfig config = connect_printer_config(connect_printers.at(i));
-        if (config.name != m_observable_list.at(CONNECT_PRINTERS_OFFSET + i).name) {
+        const PhysicalPrinterConfig& current = m_observable_list.at(CONNECT_PRINTERS_OFFSET + i);
+        if (config.name != current.name
+            || std::get<ConnectUpload>(config.payload).state != std::get<ConnectUpload>(current.payload).state)
+        {
             m_observable_list.set(std::move(config), CONNECT_PRINTERS_OFFSET + i);
         }
     }

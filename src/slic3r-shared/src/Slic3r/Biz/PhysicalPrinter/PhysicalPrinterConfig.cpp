@@ -57,6 +57,7 @@ PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinte
 {
     ConnectUpload upload;
     upload.printer_uuid = printer.uuid;
+    upload.state        = ConnectPrinter::connect_printer_state_to_string(printer.state);
     return {
         std::move(upload),
         {},

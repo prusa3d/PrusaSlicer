@@ -28,6 +28,24 @@ std::optional<ConnectPrinterState> parse_connect_printer_state(std::string_view 
     return std::nullopt;
 }
 
+std::string connect_printer_state_to_string(ConnectPrinterState state)
+{
+    switch (state) {
+    case ConnectPrinterState::Unknown:   return "Unknown";
+    case ConnectPrinterState::Offline:   return "Offline";
+    case ConnectPrinterState::Printing:  return "Printing";
+    case ConnectPrinterState::Paused:    return "Paused";
+    case ConnectPrinterState::Stopped:   return "Stopped";
+    case ConnectPrinterState::Idle:      return "Idle";
+    case ConnectPrinterState::Finished:  return "Finished";
+    case ConnectPrinterState::Ready:     return "Ready";
+    case ConnectPrinterState::Attention: return "Attention";
+    case ConnectPrinterState::Busy:      return "Busy";
+    case ConnectPrinterState::Error:     return "Error";
+    }
+    return {};
+}
+
 namespace {
 std::string string_field(const nlohmann::json& j, const char* key)
 {

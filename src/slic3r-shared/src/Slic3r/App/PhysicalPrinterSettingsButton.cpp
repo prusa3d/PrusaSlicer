@@ -83,8 +83,8 @@ void PhysicalPrinterSettingsButton::update()
         {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::ConnectUpload>) {
-                set_preset_name({});
-                m_preset_name->set_visible(false);
+                set_preset_name(arg.state);
+                m_preset_name->set_visible(!arg.state.empty());
                 set_icon(Render::Icon::ConnectUpload);
                 set_visible_cog(false);
                 set_visible_bin(false);
