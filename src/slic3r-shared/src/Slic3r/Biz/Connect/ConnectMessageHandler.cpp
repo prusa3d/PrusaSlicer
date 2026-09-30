@@ -79,8 +79,8 @@ void ConnectMessageHandler::handle_select_printer_message(
             return;
         }
 
-        m_dispatcher.dispatch_on_main_thread([this, printer_json = std::move(printer_json)]() {
-            this->do_select_printer_from_connect(printer_json);
+        m_dispatcher.dispatch_on_main_thread([this, uuid, printer_json = std::move(printer_json)]() {
+            this->do_select_printer_from_connect(uuid, printer_json);
         });
     };
 
@@ -345,6 +345,7 @@ void ConnectMessageHandler::select_printer_materials_from_connect(const nlohmann
 }
 
 void ConnectMessageHandler::do_select_printer_from_connect(
+    const std::string& uuid,
     const std::string& printer_json
 )
 {
@@ -378,7 +379,11 @@ void ConnectMessageHandler::do_select_printer_from_connect(
     }
 
     m_preset_interactor.select_printer_preset(config->id, item->id, true);
-    m_physical_printer_interactor.select_connect_upload();
+    if (m_connect_printer_service.find(uuid)) {
+        m_physical_printer_interactor.select_uuid(uuid);
+    } else {
+        m_physical_printer_interactor.select_connect_upload();
+    }
     select_printer_tools_from_connect(parsed_printer_json);
     select_printer_materials_from_connect(parsed_printer_json);
 

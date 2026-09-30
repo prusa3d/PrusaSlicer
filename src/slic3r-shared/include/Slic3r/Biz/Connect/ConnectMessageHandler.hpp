@@ -38,7 +38,7 @@ public:
     std::string uuid_for_upload();
 
 private:
-    void do_select_printer_from_connect(const std::string& printer_json);
+    void do_select_printer_from_connect(const std::string& uuid, const std::string& printer_json);
 
     void select_printer_tools_from_connect(const nlohmann::json& j);
 
