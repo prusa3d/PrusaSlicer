@@ -134,7 +134,9 @@ void to_json(
         {"printer_favorite_presets", app_settings_advanced.printer_favorite_presets},
         {"material_favorite_presets", app_settings_advanced.material_favorite_presets},
         {"recent_projects", app_settings_advanced.recent_projects},
-        {"pinned_dialogs", pinned_dialogs_to_json(app_settings_advanced.pinned_dialogs)}
+        {"pinned_dialogs", pinned_dialogs_to_json(app_settings_advanced.pinned_dialogs)},
+        {"printer_material_selections", app_settings_advanced.printer_material_selections},
+        {"last_printer_preset_id", app_settings_advanced.last_printer_preset_id}
     };
 }
 
@@ -156,6 +158,23 @@ void from_json(
             SPDLOG_WARN("Dropping invalid pinned_dialogs: {}", e.what());
         }
     }
+    if (json_value.contains("printer_material_selections")) {
+        const auto& selections = json_value.at("printer_material_selections");
+        for (const auto& [key, value] : selections.items()) {
+            if (value.is_array()) {
+                value.get_to(app_settings_advanced.printer_material_selections[key]);
+            } else {
+                // Older versions nested selections under a transient hardware-config ID.
+                for (const auto& [printer_preset_id, material_ids] : value.items()) {
+                    material_ids.get_to(
+                        app_settings_advanced.printer_material_selections[printer_preset_id]
+                    );
+                }
+            }
+        }
+    }
+    if (json_value.contains("last_printer_preset_id"))
+        json_value.at("last_printer_preset_id").get_to(app_settings_advanced.last_printer_preset_id);
 
     // validate recent_projects
     std::erase_if(

@@ -185,6 +185,23 @@ PresetInteractor::PresetInteractor(
     add_listener<IPresetChangedListener>(&m_object_settings_interactor);
 }
 
+// Install callbacks for reading and saving material IDs associated with a printer preset.
+void PresetInteractor::set_material_selection_persistence(
+    MaterialSelectionLoadCallback load_callback,
+    MaterialSelectionSaveCallback save_callback)
+{
+    m_material_selection_load_callback = std::move(load_callback);
+    m_material_selection_save_callback = std::move(save_callback);
+}
+
+
+// Install the callback used to persist an explicitly chosen printer preset.
+void PresetInteractor::set_printer_selection_persistence(
+    std::function<void(const std::string&)> save_callback)
+{
+    m_printer_selection_save_callback = std::move(save_callback);
+}
+
 void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bundle& preset_bundle, const std::string& vendor_id)
 {
     spdlog::stopwatch sw;
@@ -305,6 +322,8 @@ void PresetInteractor::update_vendor_presets(std::mutex& mut, Domain::Preset::Bu
 
 void PresetInteractor::load_preset_bundle(const IO::BundlePaths& bundle_paths)
 {
+    m_material_selection_cache.clear();
+
     std::optional<Domain::Preset::Bundle> preset_bundle_opt;
 #if !defined(NDEBUG) && !DEBUG_CONDITION_EVAL && SLIC3R_DEBUG_PRESET_CACHE
     namespace fs = boost::filesystem;
@@ -2549,6 +2568,76 @@ std::string PresetInteractor::printer_preset_id_for_hw_config(
     return (*it).first.get().id;
 }
 
+void PresetInteractor::cache_selected_materials(
+    const Domain::Preset::SelectedPreset& selected_preset,
+    bool persist
+)
+{
+    const auto& ccc = selected_config_container_context();
+    auto& cached_materials = m_material_selection_cache[{
+        m_selected_project_id,
+        ccc.config_container_id,
+        selected_preset.hw_config.id,
+        selected_preset.printer.id
+    }];
+    cached_materials.clear();
+    cached_materials.reserve(selected_preset.materials.size());
+    for (const auto& material : selected_preset.materials)
+        cached_materials.emplace_back(material.id);
+
+    if (persist
+        && m_material_selection_save_callback
+        && selected_preset.printer.origin != Domain::Preset::PresetOrigin::Runtime)
+    {
+        m_material_selection_save_callback(
+            selected_preset.printer.id,
+            cached_materials
+        );
+    }
+}
+
+void PresetInteractor::restore_cached_materials(
+    Domain::Preset::SelectedPreset& selected_preset)
+{
+    const auto& ccc = selected_config_container_context();
+    const auto cache_it = m_material_selection_cache.find({
+        m_selected_project_id,
+        ccc.config_container_id,
+        selected_preset.hw_config.id,
+        selected_preset.printer.id
+    });
+    std::vector<std::string> cached_materials;
+    if (cache_it != m_material_selection_cache.end()) {
+        cached_materials = cache_it->second;
+    } else if (m_material_selection_load_callback) {
+        const auto persisted = m_material_selection_load_callback(
+            selected_preset.printer.id
+        );
+        if (!persisted.has_value())
+            return;
+        cached_materials = *persisted;
+    } else {
+        return;
+    }
+
+    for (size_t slot_index = 0;
+         slot_index < std::min(cached_materials.size(), selected_preset.materials.size());
+         ++slot_index)
+    {
+        const auto& material_id = cached_materials[slot_index];
+        const auto material_and_runtime = get_material_preset_unsafe(
+            m_selected_project_id,
+            selected_preset.hw_config.id,
+            selected_preset.printer.id,
+            selected_preset.print.id,
+            slot_index,
+            material_id
+        );
+        const auto* material = material_and_runtime.first;
+        if (material != nullptr)
+            selected_preset.materials[slot_index] = *material;
+    }
+}
 
 void PresetInteractor::select_printer_preset_internal(
     const std::string& printer_hw_config_id,
@@ -2563,6 +2652,8 @@ void PresetInteractor::select_printer_preset_internal(
     auto* cc        = project.find_config_container(ccc.config_container_id);
     ASSERT(cc != nullptr, ccc.config_container_id);
     get_or_fail_project_context(m_selected_project_id).invalid_hw_config = std::nullopt;
+
+    cache_selected_materials(cc->selected_preset());
 
     if (!no_data_update) {
         fill_config_container_with_selected_preset(*cc, printer_hw_config_id, printer_preset_id, true, bag);
@@ -2590,6 +2681,7 @@ void PresetInteractor::select_printer_preset_internal(
 
     fill_print_presets(selected_preset, no_data_update, bag);
     fill_tools_presets(selected_preset, no_data_update, bag);
+    restore_cached_materials(selected_preset);
     fill_materials_presets(selected_preset, no_data_update, bag, material_types);
 
     update_print_tool_cbi(selected_preset, ccc.config_container_id);
@@ -2620,6 +2712,13 @@ void PresetInteractor::select_printer_preset(
 {
     ListenerInvokeLaterBag bag;
     select_printer_preset_internal(printer_hw_config_id, printer_preset_id, false, bag);
+    const auto& selected_preset = selected_printer_preset();
+    if (user
+        && m_printer_selection_save_callback
+        && selected_preset.printer.origin != Domain::Preset::PresetOrigin::Runtime)
+    {
+        m_printer_selection_save_callback(selected_preset.printer.id);
+    }
     bag.add([this] { invoke_slicing_input_changed(); });
 
     if (user) {
@@ -2813,6 +2912,7 @@ void PresetInteractor::select_material_preset(size_t material_index, const std::
 {
     ListenerInvokeLaterBag bag;
     select_material_preset_internal(material_index, id, false, matdb_uuid, bag);
+    cache_selected_materials(selected_printer_preset(), user);
     bag.add([this] { invoke_slicing_input_changed(); });
 
     if (user) {
