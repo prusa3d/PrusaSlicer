@@ -141,6 +141,37 @@ void load_request(wxWebView* web_view, const std::string& address, const std::st
     webkit_web_view_load_request(native_backend, request);
 }
 
+extern "C" {
+static void run_script_finished(GObject* source, GAsyncResult* res, gpointer)
+{
+    GError* err = nullptr;
+    wxGCC_WARNING_SUPPRESS(deprecated-declarations)
+    WebKitJavascriptResult* js_result = webkit_web_view_run_javascript_finish(WEBKIT_WEB_VIEW(source), res, &err);
+    wxGCC_WARNING_RESTORE(deprecated-declarations)
+    if (!js_result) {
+        // A JavaScript exception arrives here as WEBKIT_JAVASCRIPT_ERROR carrying the exception text.
+        SPDLOG_ERROR("WebView script failed: {}", err ? err->message : "unknown error");
+        g_clear_error(&err);
+        return;
+    }
+    webkit_javascript_result_unref(js_result);
+}
+}
+
+void run_script(wxWebView* web_view, const std::string& javascript)
+{
+    WebKitWebView* native_backend = static_cast<WebKitWebView*>(web_view->GetNativeBackend());
+    if (!native_backend) {
+        SPDLOG_ERROR("{} Failed: Native WebKitWebView is null.", __FUNCTION__);
+        return;
+    }
+    // Same call wx makes, minus its eval("...") wrapper. Deprecated since WebKitGTK 2.40
+    // in favour of webkit_web_view_evaluate_javascript(); wx still uses this one too.
+    wxGCC_WARNING_SUPPRESS(deprecated-declarations)
+    webkit_web_view_run_javascript(native_backend, javascript.c_str(), nullptr, run_script_finished, nullptr);
+    wxGCC_WARNING_RESTORE(deprecated-declarations)
+}
+
 void setup_webview_devtools(wxWebView* web_view)
 {
     web_view->EnableContextMenu();

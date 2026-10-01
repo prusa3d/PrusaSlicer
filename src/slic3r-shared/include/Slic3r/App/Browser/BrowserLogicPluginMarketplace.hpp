@@ -29,6 +29,10 @@ public:
      */
     std::vector<BrowserLogicCommand> on_user_account_logged_out(const std::string& current_url) override;
 
+    std::vector<BrowserLogicCommand> on_webview_created() override;
+
+    bool requires_native_script_run() const override;
+
 private:
     /**
      * @brief Answer REQUEST_CONFIG / REQUEST_ACCESS_TOKEN. Stays silent while a token

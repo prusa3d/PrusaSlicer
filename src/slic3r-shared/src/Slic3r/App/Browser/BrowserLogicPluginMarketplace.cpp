@@ -37,7 +37,7 @@ std::string BrowserLogicPluginMarketplace::init_script(const std::string& access
     }
     // The web app registers _pluginMarketplace_v1 on load; guard so an unsolicited
     // push (token refresh) before that cannot throw inside the webview.
-    return "window._pluginMarketplace_v1 && window._pluginMarketplace_v1.init(" + options.dump() + ")";
+    return "if (window._pluginMarketplace_v1) { window._pluginMarketplace_v1.init(" + options.dump() + "); console.log('PM init sent'); }";
 }
 
 std::string BrowserLogicPluginMarketplace::installed_plugins_script(
@@ -174,6 +174,16 @@ std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_user_account_
         {BrowserLogicCommandType::RunScript,
          "window._pluginMarketplace_v1 && window._pluginMarketplace_v1.logout()"}
     };
+}
+
+std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::on_webview_created()
+{
+    return {{BrowserLogicCommandType::DeleteCookies, m_url}};
+}
+
+bool BrowserLogicPluginMarketplace::requires_native_script_run() const
+{
+    return true;
 }
 
 std::vector<BrowserLogicCommand> BrowserLogicPluginMarketplace::

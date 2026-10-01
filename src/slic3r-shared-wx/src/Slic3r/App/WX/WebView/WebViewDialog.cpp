@@ -135,6 +135,12 @@ WebViewDialog::WebViewDialog(std::unique_ptr<App::Browser::AbstractBrowserLogic>
 
     Bind(wxEVT_SHOW, &WebViewDialog::on_show, this);
     Bind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED, &WebViewDialog::on_script_message, this, web_view->GetId());
+    Bind(wxEVT_WEBVIEW_SCRIPT_RESULT, [](wxWebViewEvent& e)
+    {
+        if (e.IsError()) {
+            SPDLOG_ERROR("WebView Script Error: {}", into_u8(e.GetString()));
+        }
+    }, web_view->GetId());
 
     // Connect the webview events
     Bind(wxEVT_WEBVIEW_ERROR, &WebViewDialog::on_error, this, web_view->GetId());
@@ -461,7 +467,11 @@ void WebViewDialog::run_script(const wxString& javascript)
         return;
 
     //SPDLOG_INFO("RunScript {}\n", into_u8(javascript));
-    web_view->RunScriptAsync(javascript);
+    if (m_logic->requires_native_script_run()) {
+        WebView::run_script(web_view, into_u8(javascript));
+    } else {
+        web_view->RunScriptAsync(javascript);
+    }
 }
 
 void WebViewDialog::EndModal(int retCode)

@@ -31,6 +31,7 @@ public:
     std::string loading_html() const { return m_loading_html; }
     std::string error_html() const { return m_error_html; }
 
+    virtual bool requires_native_script_run() const { return false; }
     virtual std::pair<int,int> size(int em_unit) const {return std::pair<int,int>(100*em_unit, 100*em_unit); }
     virtual std::pair<int,int> min_size(int em_unit) const {return std::pair<int,int>(40*em_unit, 40*em_unit); }
     virtual std::string access_token() { return {}; }

@@ -58,7 +58,7 @@ ServiceConfig::ServiceConfig() :
     m_media_url("https://media.printables.com"),
     m_preset_repo_url("https://preset-repo-api.prusa3d.com"),
     m_printables_url("https://www.printables.com"),
-    m_plugin_marketplace_url("https://plugin-marketplace.prusa3d.dev")
+    m_plugin_marketplace_url("https://plugin-marketplace.prusa3d.com?webview=1")
 {
 #ifdef SLIC3R_REPO_URL
     m_preset_repo_url = SLIC3R_REPO_URL;
