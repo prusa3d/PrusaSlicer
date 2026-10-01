@@ -194,8 +194,6 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/MultiSelections.cpp
         include/Slic3r/App/ObjectListWindow.hpp
         src/Slic3r/App/ObjectListWindow.cpp
-        include/Slic3r/App/ObjectList.hpp
-        src/Slic3r/App/ObjectList.cpp
         include/Slic3r/App/CubeView.hpp
         src/Slic3r/App/CubeView.cpp
         include/Slic3r/App/SidebarBed.hpp
@@ -907,6 +905,19 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Preset/JsonUtils.hpp
         src/Slic3r/Biz/Preset/JsonUtils.cpp
 
+        include/Slic3r/Biz/ObjectList/ConfigContainerObservableList.hpp
+        src/Slic3r/Biz/ObjectList/ConfigContainerObservableList.cpp
+        include/Slic3r/Biz/ObjectList/ConfigContainerBedObservableList.hpp
+        src/Slic3r/Biz/ObjectList/ConfigContainerBedObservableList.cpp
+        include/Slic3r/Biz/ObjectList/ObjectObservableList.hpp
+        src/Slic3r/Biz/ObjectList/ObjectObservableList.cpp
+        include/Slic3r/Biz/ObjectList/VolumeObservableList.hpp
+        src/Slic3r/Biz/ObjectList/VolumeObservableList.cpp
+        include/Slic3r/Biz/ObjectList/InstanceObservableList.hpp
+        src/Slic3r/Biz/ObjectList/InstanceObservableList.cpp
+        include/Slic3r/Biz/ObjectList/ObjectListInteractor.hpp
+        src/Slic3r/Biz/ObjectList/ObjectListInteractor.cpp
+
         include/Slic3r/Biz/Expr/Parser.hpp
         src/Slic3r/Biz/Expr/Parser.cpp
         include/Slic3r/Biz/Expr/Eval.hpp
@@ -918,6 +929,7 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/ISelectedBedInstanceChangedListener.hpp
         include/Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp
         include/Slic3r/Biz/ISelectedProjectChangedListener.hpp
+        include/Slic3r/Biz/IConfigContainerListChangedListener.hpp
         src/Slic3r/Biz/ProjectInteractor.cpp
         include/Slic3r/Biz/ProjectInteractor.hpp
         include/Slic3r/Biz/ProjectScoped.hpp
@@ -1286,6 +1298,22 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/Biz/HwConfigMatchers.hpp
         src/Slic3r/Biz/HwConfigMatchers.cpp
         include/Slic3r/App/Plater/GizmoTimeouts.hpp
+        include/Slic3r/App/ObjectListItem.hpp
+        src/Slic3r/App/ObjectListItem.cpp
+        include/Slic3r/App/ObjectList/PrinterGroupItem.hpp
+        src/Slic3r/App/ObjectList/PrinterGroupItem.cpp
+        include/Slic3r/App/ObjectList/ConfigContainerBedItem.hpp
+        src/Slic3r/App/ObjectList/ConfigContainerBedItem.cpp
+        include/Slic3r/App/ObjectList/TreeNodeButton.hpp
+        src/Slic3r/App/ObjectList/TreeNodeButton.cpp
+        include/Slic3r/App/ObjectList/ExtruderMarkerReactor.hpp
+        src/Slic3r/App/ObjectList/ExtruderMarkerReactor.cpp
+        include/Slic3r/App/ObjectList/ObjectItem.hpp
+        src/Slic3r/App/ObjectList/ObjectItem.cpp
+        include/Slic3r/App/ObjectList/VolumeItem.hpp
+        src/Slic3r/App/ObjectList/VolumeItem.cpp
+        include/Slic3r/App/ObjectList/InstanceItem.hpp
+        src/Slic3r/App/ObjectList/InstanceItem.cpp
 )
 
 if (WIN32)

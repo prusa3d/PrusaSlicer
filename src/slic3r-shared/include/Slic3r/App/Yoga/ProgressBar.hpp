@@ -18,9 +18,11 @@ public:
 
     const ImColor& progress_fill() const;
     const ImColor& overlay_color() const;
+    float progress_rounding() const;
 
     void set_progress_fill(const ImColor& fill);
     void set_overlay_color(const ImColor& color) const;
+    void set_progress_rounding(float rounding);
 
     void on_resized() override;
 

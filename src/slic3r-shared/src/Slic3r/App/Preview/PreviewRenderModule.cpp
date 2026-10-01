@@ -876,7 +876,7 @@ void PreviewRenderModule::init_scene_layout()
         m_plugin_system
     );
 
-    m_object_list = Passthrough(std::make_unique<ObjectListWindow>(&m_project_interactor, false));
+    m_object_list = Passthrough(std::make_unique<ObjectListWindow>(m_project_interactor, false));
     m_object_list->set_collapsed(m_render_module_navigator->object_list_collapsed());
 
     m_cube_view   = std::make_unique<CubeView>();

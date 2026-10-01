@@ -563,7 +563,7 @@ void PlaterRenderModule::init_scene_layout()
         &m_plugin_system
     );
 
-    m_object_list = Passthrough(std::make_unique<ObjectListWindow>(&m_project_interactor, true));
+    m_object_list = Passthrough(std::make_unique<ObjectListWindow>(m_project_interactor, true));
     m_object_list->set_gizmo_controller(m_gizmo_manager.get());
     m_object_list->on_config_container_added = [this]()
     {

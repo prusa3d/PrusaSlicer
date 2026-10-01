@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Slic3r/App/Yoga/CollapsibleWindow.hpp"
-#include "Slic3r/Domain/SelectionId.hpp"
 #include <functional>
 
 namespace Slic3r::Biz {
@@ -23,17 +22,15 @@ namespace Yoga {
 class Text;
 class Rectangle;
 class LayoutButton;
-class Menu;
-class MenuItem;
 class ScrollArea;
 } // namespace Yoga
 
-class ObjectList;
+class ObjectListItem;
 
 class ObjectListWindow : public Yoga::CollapsibleWindow
 {
 public:
-    ObjectListWindow(Biz::ProjectInteractor* project_interactor, bool for_plater);
+    explicit ObjectListWindow(Biz::ProjectInteractor& project_interactor, bool for_plater);
     void update_sliced_info();
 
     void set_bed_instance_icons(const Plater::BedThumbnailTextures& icons);
@@ -42,12 +39,8 @@ public:
     std::function<void()> on_config_container_added{nullptr};
 
 private:
-    void init_cc_context_menu();
-
-private:
     Yoga::LayoutButton* m_add_container_button{nullptr};
-    Yoga::ScrollArea* m_scroll_area{nullptr};
-    ObjectList* m_object_list{nullptr};
+    ObjectListItem* m_object_list{nullptr};
 
     Yoga::Rectangle* m_sliced_info{nullptr};
 
@@ -66,12 +59,10 @@ private:
     Yoga::Item* m_material_cost_row{nullptr};
     Yoga::Item* m_first_layer_time_row{nullptr};
 
-    Biz::ProjectInteractor* m_project_interactor{nullptr};
+    Biz::ProjectInteractor& m_project_interactor;
 
-    // context menu for config containers
-    Yoga::Menu* m_cc_context_menu{nullptr};
-    Yoga::MenuItem* m_delete_cc_menu_item{nullptr};
-    Domain::SelectionId m_selected_config_container_id{Domain::INVALID_ID};
+    // Not yet consumed by ObjectListItem; stored for when gizmo-triggering rows are ported.
+    Scene::IGizmoController* m_gizmo_controller{nullptr};
 };
 
 } // namespace Slic3r::App

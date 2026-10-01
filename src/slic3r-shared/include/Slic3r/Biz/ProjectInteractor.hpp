@@ -42,6 +42,7 @@ namespace Slic3r::Biz {
 
 class ISelectedProjectChangedListener;
 class ISelectedConfigContainerChangedListener;
+class IConfigContainerListChangedListener;
 class IProjectsChangedListener;
 class IMessageDialogProvider;
 
@@ -86,7 +87,11 @@ class ProjectInteractor final :
     public UserAccount::IUserAccountListener,
     public Platform::IAppInstanceMessageContentListener,
     public FileDownloader::IFileDownloaderListener,
-    public WithListeners<ISelectedProjectChangedListener, IProjectsChangedListener, ISelectedConfigContainerChangedListener>
+    public WithListeners<
+        ISelectedProjectChangedListener,
+        IProjectsChangedListener,
+        ISelectedConfigContainerChangedListener,
+        IConfigContainerListChangedListener>
 {
 public:
     ProjectInteractor(Domain::Workbench& workbench, Platform::IMainThreadDispatcher& dispatcher, Biz::Slicing::IThumbnailImageGenerator& thumbnail_image_generator) :
@@ -141,6 +146,7 @@ public:
         add_listener<ISelectedConfigContainerChangedListener>(
             &m_preset_interactor.object_settings_interactor()
         );
+        wire_object_list_interactor();
         add_listener<ISelectedConfigContainerChangedListener>(&m_physical_printer_interactor);
         m_removable_drive_service.add_status_listener(&m_physical_printer_interactor);
     }
@@ -640,6 +646,12 @@ public:
     }
 
 private:
+    /**
+     * @brief Wires SceneInteractor's owned ObjectListInteractor to this ProjectInteractor (and
+     * transitively to preset_interactor()/status_cache()).
+     */
+    void wire_object_list_interactor();
+
     void on_slicing_input_changed(const Domain::BedRef& bed_instance) override;
     void on_slicing_input_removed(const Domain::BedRef& bed_instance) override;
     void on_colors_changed(

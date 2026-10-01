@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 
@@ -13,6 +14,7 @@
 #include "Slic3r/Biz/Scene/SceneInteractorProjectContext.hpp"
 #include "Slic3r/Biz/ISelectedProjectChangedListener.hpp"
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
+#include "Slic3r/Biz/IConfigContainerListChangedListener.hpp"
 #include "Slic3r/Biz/Scene/BedPlacement.hpp"
 #include "Slic3r/Biz/Platform/ListenerList.hpp"
 #include "Slic3r/Domain/ElementRef.hpp"
@@ -31,6 +33,7 @@ namespace Slic3r::Biz {
 class ISelectedBedInstancesChangedListener;
 struct BedTrackingChanges;
 namespace Arrange {struct InstanceTransform2D; }
+namespace ObjectList { class ObjectListInteractor; }
 } // namespace Slic3r::Biz
 
 namespace Slic3r::Biz::Scene {
@@ -146,6 +149,17 @@ public:
     )
     {}
 
+    /**
+     * @brief Called whenever an object's or volume's display name is changed via edit_name.
+     * @param project_id Project the element belongs to
+     * @param id The renamed element (id.has_volume() == false means the object itself was renamed)
+     */
+    virtual void on_element_renamed(
+        Domain::SelectionId project_id,
+        const Domain::ElementRef& id
+    )
+    {}
+
     virtual void on_wipe_tower_changed(Domain::SlicingId slicing_id, const Slicing::WipeTowerGeometry& wipe_tower) {}
     virtual void on_wipe_tower_moved(Domain::SlicingId slicing_id) {}
     virtual void on_wipe_tower_removed(Domain::SlicingId slicing_id) {}
@@ -206,6 +220,7 @@ class SceneInteractor final :
         ISceneChangedListener,
         ISceneBedInstanceChangedListener,
         ISelectedBedInstancesChangedListener,
+        IConfigContainerListChangedListener,
         ISlicingInputChangedListener
     >
 {
@@ -213,10 +228,16 @@ public:
     using Transform = Domain::SquareMatrix4d;
 
     explicit SceneInteractor(Domain::Workbench& workbench);
+    ~SceneInteractor() override;
 
     void set_preset_visual_getter(Preset::IPresetVisualGetter* preset_visual_getter)
     {
         m_preset_visual_getter = preset_visual_getter;
+    }
+
+    ObjectList::ObjectListInteractor& object_list_interactor()
+    {
+        return *m_object_list_interactor;
     }
 
     void on_selected_project_changed(size_t index) override;
@@ -634,6 +655,8 @@ private:
     BedPlacement m_bed_placement;
     BedTracking m_bed_tracking;
     IUndoProvider *m_undo_provider{nullptr};
+
+    std::unique_ptr<ObjectList::ObjectListInteractor> m_object_list_interactor;
 };
 
 struct TransformMemento

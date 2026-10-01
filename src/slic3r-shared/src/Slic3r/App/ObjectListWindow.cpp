@@ -9,11 +9,9 @@
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/Rectangle.hpp"
 #include "Slic3r/App/Yoga/ToggleButton.hpp"
-#include "Slic3r/App/Yoga/Menu.hpp"
-#include "Slic3r/App/Yoga/MenuItem.hpp"
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
 
-#include "Slic3r/App/ObjectList.hpp"
+#include "Slic3r/App/ObjectListItem.hpp"
 
 #include "Slic3r/App/Plater/BedThumbnailTexture.hpp"
 
@@ -29,13 +27,14 @@ namespace Slic3r::App {
 
 using namespace Yoga;
 
-ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor* project_interactor, bool for_plater) :
+ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor& project_interactor, bool for_plater) :
     CollapsibleWindow(_u8L("Object list"), "ObjectListWindow"),
     m_project_interactor(project_interactor)
 {
     content()->set_padding(0.f);
-    const ObjectList::Mode mode = for_plater ? ObjectList::Mode::Plater : ObjectList::Mode::Preview;
-    if (mode == ObjectList::Mode::Plater) {
+    const ObjectListItem::Mode mode =
+        for_plater ? ObjectListItem::Mode::Plater : ObjectListItem::Mode::Preview;
+    if (mode == ObjectListItem::Mode::Plater) {
         m_add_container_button = content()->emplace_back<Yoga::LayoutButton>(
             _u8L("Add Printer Group"),
             Render::Icon::ConfigContainer
@@ -44,33 +43,17 @@ ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor* project_interactor, b
         m_add_container_button->set_padding({20.f, 5.f});
         m_add_container_button->callbacks().action = [this]()
         {
-            m_project_interactor->add_config_container();
+            m_project_interactor.add_config_container();
             if (on_config_container_added != nullptr) {
                 on_config_container_added();
-                m_project_interactor->undo_provider().take_snapshot(
-                    Biz::UndoSnapshotType::AddConfigContainer
-                );
+                m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::AddConfigContainer);
             }
         };
     }
 
-    m_scroll_area = content()->emplace_back<ScrollArea>();
-    m_scroll_area->set_min_height(100);
+    m_object_list = content()->emplace_back<ObjectListItem>(project_interactor, mode);
 
-    m_object_list = m_scroll_area->emplace_back<ObjectList>(project_interactor, mode);
-    m_object_list->set_flex_shrink(0.f);
-    m_object_list->set_horizontal_padding(15.f);
-
-    init_cc_context_menu();
-
-    if (mode == ObjectList::Mode::Plater) {
-        return; // temporary hide unused button
-        LayoutButton* show_details_button =
-            emplace_into_header<LayoutButton>("", Render::Icon::Details, _u8L("Show item details"));
-        show_details_button->set_checkable(true);
-        show_details_button->callbacks().checked_changed = [this](bool checked)
-        { m_object_list->selected_project_context().show_details = checked; };
-    } else {
+    if (mode == ObjectListItem::Mode::Preview) {
         m_sliced_info = content()->emplace_back<Rectangle>();
         m_sliced_info->set_orientation(Orientation::Vertical);
         m_sliced_info->set_fill(m_theme->color_imgui(Platform::Color::WindowBgAlternate));
@@ -135,10 +118,9 @@ format_used_material(const float weight_g, const float length_mm, const float vo
 
 void ObjectListWindow::update_sliced_info()
 {
-    const Domain::SlicingId id = m_project_interactor->selected_bed_slicing_id();
+    const Domain::SlicingId id = m_project_interactor.selected_bed_slicing_id();
     const std::optional<Biz::Slicing::Status> status{
-        m_project_interactor->status_cache().get_status(id)
-    };
+        m_project_interactor.status_cache().get_status(id) };
 
     const bool is_finished = status && status->code == Biz::Slicing::StatusCode::Finished;
     m_sliced_info->set_visible(is_finished);
@@ -147,9 +129,7 @@ void ObjectListWindow::update_sliced_info()
         return;
     }
 
-    const std::optional<Biz::FDMResultRef> fdm_result{
-        m_project_interactor->fdm_result_cache().get_result(id)
-    };
+    const std::optional<Biz::FDMResultRef> fdm_result{ m_project_interactor.fdm_result_cache().get_result(id) };
     if (fdm_result) {
         const auto* print_statistics_ptr =
             std::get_if<Domain::FullPrintStatistics>(&fdm_result->get().print_statistics);
@@ -207,9 +187,7 @@ void ObjectListWindow::update_sliced_info()
         return;
     }
 
-    const std::optional<Biz::SLAResultRef> sla_result{
-        m_project_interactor->sla_result_cache().get_result(id)
-    };
+    const std::optional<Biz::SLAResultRef> sla_result{ m_project_interactor.sla_result_cache().get_result(id) };
     if (!sla_result || !sla_result->get().export_data->print_statistics)
         return;
 
@@ -240,49 +218,8 @@ void ObjectListWindow::set_bed_instance_icons(const Plater::BedThumbnailTextures
 
 void ObjectListWindow::set_gizmo_controller(Scene::IGizmoController* controller)
 {
-    m_object_list->set_gizmo_controller(controller);
-}
-
-void ObjectListWindow::init_cc_context_menu()
-{
-    // Create context menu
-
-    m_cc_context_menu = content()->emplace_back<Yoga::Menu>("cc_context_menu", Yoga::Position::Top);
-
-    m_delete_cc_menu_item =
-        m_cc_context_menu->append_item(_u8L("Delete"), Render::Icon::DeleteBtnIcon);
-    m_delete_cc_menu_item->callbacks().action = [this]()
-    {
-        m_project_interactor->remove_config_container(m_selected_config_container_id);
-        m_project_interactor->undo_provider().take_snapshot(
-            Biz::UndoSnapshotType::DeleteConfigContainer
-        );
-    };
-
-    m_cc_context_menu->append_item(_u8L("Duplicate"), Render::Icon::CopyForGizmo)
-        ->callbacks()
-        .action = [this]()
-    {
-        m_project_interactor->duplicate_config_container(m_selected_config_container_id);
-        m_project_interactor->undo_provider().take_snapshot(
-            Biz::UndoSnapshotType::DuplicateConfigContainer
-        );
-    };
-
-    // Process callback for show context menu
-
-    m_object_list->callbacks().show_context_menu =
-        [&](Domain::Vec2f open_pos, Domain::SelectionId config_container_id)
-    {
-        ASSERT(config_container_id != Domain::INVALID_ID);
-        // Don't allow to delete last config container
-        const size_t containers_cnt =
-            m_project_interactor->scene_interactor().selected_project_config_containers().size();
-        m_delete_cc_menu_item->set_enabled(containers_cnt > 1);
-
-        m_selected_config_container_id = config_container_id;
-        m_cc_context_menu->open(open_pos - content()->get_global_pos());
-    };
+    // Not yet consumed by ObjectListItem; stored for when gizmo-triggering rows are ported.
+    m_gizmo_controller = controller;
 }
 
 } // namespace Slic3r::App

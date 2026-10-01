@@ -8,7 +8,10 @@
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/Preset/SelectedPreset.hpp"
 
+#include "Slic3r/Biz/ObjectList/ObjectListInteractor.hpp"
+
 #include "Slic3r/Biz/ISelectedProjectChangedListener.hpp"
+#include "Slic3r/Biz/IConfigContainerListChangedListener.hpp"
 #include "Slic3r/Biz/IProjectsChangedListener.hpp"
 #include "Slic3r/Biz/IMessageDialogProvider.hpp"
 #include "Slic3r/Biz/UserAccount/ConnectUtils.hpp"
@@ -51,6 +54,18 @@ using Slic3r::Domain::TriangleSelector::TRIANGLE_STATE_TYPE_COUNT;
 using Slic3r::Domain::TriangleSelector::TriangleStateType;
 
 namespace Slic3r::Biz {
+
+void ProjectInteractor::wire_object_list_interactor()
+{
+    ObjectList::ObjectListInteractor& oli =
+    m_scene_interactor.object_list_interactor();
+
+    add_listener<IProjectsChangedListener>(&oli);
+    add_listener<IConfigContainerListChangedListener>(&oli);
+
+    oli.bind_project_interactor(*this);
+}
+
 Domain::SelectionId ProjectInteractor::Selection::config_container_id() const
 {
     if (project_id == Domain::INVALID_ID)
@@ -1193,6 +1208,12 @@ Domain::SelectionId ProjectInteractor::add_config_container()
     initialize_bed(m_selection.project_id, id, p.bed_container());
 
     select_config_container(id);
+
+    invoke_listeners<IConfigContainerListChangedListener>(
+        [project_id = m_selection.project_id](auto* l)
+        { l->on_config_container_list_changed(project_id); }
+    );
+
     return id;
 }
 
@@ -1208,6 +1229,12 @@ Domain::SelectionId ProjectInteractor::insert_config_container(
         p.config_containers().begin() + position,
         std::move(config_container)
     )};
+
+    invoke_listeners<IConfigContainerListChangedListener>(
+        [project_id = m_selection.project_id](auto* l)
+        { l->on_config_container_list_changed(project_id); }
+    );
+
     auto& cc = **it;
     auto id = cc.id().id;
 
@@ -1250,6 +1277,11 @@ void ProjectInteractor::remove_config_container(Domain::SelectionId config_conta
 
     it = ccs.erase(it);
     scene_interactor().on_removed_config_container(project);
+
+    invoke_listeners<IConfigContainerListChangedListener>(
+        [project_id = m_selection.project_id](auto* l)
+        { l->on_config_container_list_changed(project_id); }
+    );
 }
 
 void ProjectInteractor::select_config_container(Domain::SelectionId container_id)

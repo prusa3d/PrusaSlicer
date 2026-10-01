@@ -1,5 +1,7 @@
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 
+#include "Slic3r/Biz/ObjectList/ObjectListInteractor.hpp"
+
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Exception.hpp"
 #include "Slic3r/Biz/Arrange/Arrange.hpp"
@@ -289,7 +291,12 @@ void transform_selection_volume_mode(const SceneInteractorProjectContext& proj, 
 
 } // namespace
 
-SceneInteractor::SceneInteractor(Domain::Workbench& workbench) : m_workbench(workbench) {}
+SceneInteractor::SceneInteractor(Domain::Workbench& workbench) :
+    m_workbench(workbench),
+    m_object_list_interactor(std::make_unique<ObjectList::ObjectListInteractor>(*this))
+{}
+
+SceneInteractor::~SceneInteractor() = default;
 
 void SceneInteractor::on_selected_project_changed(size_t index)
 {
@@ -357,7 +364,7 @@ void SceneInteractor::set_object_selection(
     normalize_object_selection(selection);
 
     auto& project_context = it->second;
-    ObjectSelection sel{.mode = selection.mode};
+    ObjectSelection sel{.mode = selection.mode, .anchor = selection.anchor};
     for (const auto& e : selection.elements) {
         if (e.has_instance() || e.is_wipe_tower()) {
             sel.elements.push_back(e);
@@ -604,6 +611,11 @@ void SceneInteractor::normalize_object_selection(ObjectSelection& selection) con
             const auto object = it->second.project.find_object_by_id(selection.elements.front().object_id);
             if (object->volumes.size() == selection.elements.size())
                 requires_instance_mode = true;
+            else if (inst_id == 0) {
+                for (auto& e : selection.elements) {
+                    e.instance_id = object->instances.front()->id().id;
+                }
+            }
         }
     }
 
@@ -1357,6 +1369,10 @@ void SceneInteractor::edit_name(const Domain::ElementRef& id, const std::string&
         project.find_object_by_id(id.object_id)->name = new_name;
     else
         project.find_volume_by_id(id.object_id, id.volume_id)->name = new_name;
+
+    invoke_listeners<ISceneChangedListener>(
+        [&](auto* l) { l->on_element_renamed(m_selected_project_id, id); }
+    );
 }
 
 void SceneInteractor::set_printable(const Domain::ElementRef& id, bool is_printable)
@@ -2092,6 +2108,12 @@ Domain::BedInstance& SceneInteractor::add_bed_instance(size_t config_container_i
     for (const auto& bed_ref : changes.updated_beds)
         invoke_slicing_input_changed(bed_ref);
 
+    invoke_listeners<IConfigContainerListChangedListener>([&](auto* l)
+    {
+        l->on_config_container_bed_list_changed(m_selected_project_id, config_container_id);
+    }
+    );
+
     invoke_listeners<ISceneBedInstanceChangedListener>(
         [&](auto* l) { l->on_bed_instance_updated(m_selected_project_id, {updated}); }
     );
@@ -2204,6 +2226,10 @@ void SceneInteractor::insert_bed_instance(
 
     invoke_listeners<ISceneBedInstanceChangedListener>(
         [&](auto* l) { l->on_bed_instance_updated(project_id, {bed_ref}); }
+    );
+
+    invoke_listeners<IConfigContainerListChangedListener>([&](auto* l)
+        { l->on_config_container_bed_list_changed(m_selected_project_id, config_container_id); }
     );
 }
 
@@ -2357,6 +2383,16 @@ SceneInteractor::erase_bed_instance(Domain::SelectionId project_id, const Domain
     invoke_listeners<ISceneBedInstanceChangedListener>(
         [&](auto* l) { l->on_bed_instance_removed(m_selected_project_id, {bed_ref}); }
     );
+
+    invoke_listeners<IConfigContainerListChangedListener>(
+        [&](auto* l)
+        {
+            l->on_config_container_bed_list_changed(
+                m_selected_project_id,
+                config_container->id().id
+            );
+        }
+    );
 }
 
 void SceneInteractor::remove_bed_instance(const Domain::BedRef& instance, bool allow_to_remove_last_one)
@@ -2453,6 +2489,16 @@ void SceneInteractor::remove_bed_instance(const Domain::BedRef& instance, bool a
 
     if (!allow_to_remove_last_one && cc->bed_instances().empty()) {
         add_bed_instance(cc->id().id);
+    } else {
+        invoke_listeners<IConfigContainerListChangedListener>(
+            [&](auto* l)
+            {
+                l->on_config_container_bed_list_changed(
+                    m_selected_project_id,
+                    instance.config_container_id
+                );
+            }
+        );
     }
 
     // temporary object selection containing model instances to be removed
@@ -3711,7 +3757,8 @@ void SceneInteractor::add_volume_to_active_object(
 )
 {
     const Biz::Scene::ObjectSelection& selection = object_selection();
-    ASSERT(selection.mode == Biz::Scene::SelectionMode::Instance && selection.only_single_object());
+    ASSERT(selection.mode == Biz::Scene::SelectionMode::Instance);
+    ASSERT(selection.only_single_object());
     const Domain::ElementRef& element = selection.elements.front();
 
     const auto& project = m_workbench.project(m_selected_project_id);

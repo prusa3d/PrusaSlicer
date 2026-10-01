@@ -1,4 +1,3 @@
-
 #include "Slic3r/App/Yoga/ProgressBar.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/Log.hpp"
@@ -9,6 +8,7 @@ namespace Slic3r::App::Yoga {
 ProgressBar::ProgressBar() : Rectangle()
 {
     set_object_name("ProgressBar");
+    set_orientation(Orientation::Vertical);
     set_fill(IM_COL32_BLACK_TRANS);
     set_border_color(m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled));
     set_border_width(1.f);
@@ -21,8 +21,9 @@ ProgressBar::ProgressBar() : Rectangle()
         m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
     );
     m_progress_area->set_border_width(1.f);
-    m_progress_area->set_disabled_fill(m_theme->color_imgui(Platform::Color::Button, Platform::ColorGroup::Disabled));
-    m_progress_area->set_justify_content(YGJustifyFlexEnd);
+    m_progress_area->set_disabled_fill(
+        m_theme->color_imgui(Platform::Color::Button, Platform::ColorGroup::Disabled)
+    );
     m_progress_area->set_fill(
         m_theme->color_imgui(Platform::Color::Button, Platform::ColorGroup::Active)
     );
@@ -31,6 +32,7 @@ ProgressBar::ProgressBar() : Rectangle()
     m_overlay->set_font_type(Render::ImguiFontType::Bold);
     m_overlay->set_position_type(YGPositionTypeAbsolute);
     m_overlay->set_self_align(YGAlignCenter);
+    m_overlay->set_flex_grow(1.f);
     m_overlay->set_text_color(
         m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)
     );
@@ -46,7 +48,7 @@ void ProgressBar::set_progress(int progress, const std::string& overlay)
     if (m_value != progress) {
         // update value
         m_value = std::clamp(progress, 0, 100);
-        m_progress_area->set_width(std::lerp(height(), width(), 0.01 * m_value));
+        update_area_width();
         if (m_show_overlay) {
             m_overlay->set_text(overlay);
         }
@@ -73,6 +75,11 @@ const ImColor& ProgressBar::overlay_color() const
     return m_overlay->text_color();
 }
 
+float ProgressBar::progress_rounding() const
+{
+    return m_progress_area->rounding();
+}
+
 void ProgressBar::set_progress_fill(const ImColor& fill)
 {
     m_progress_area->set_fill(fill);
@@ -83,12 +90,22 @@ void ProgressBar::set_overlay_color(const ImColor& color) const
     m_overlay->set_text_color(color);
 }
 
-void ProgressBar::update_area_width() {}
+void ProgressBar::set_progress_rounding(float rounding)
+{
+    m_progress_area->set_rounding(rounding);
+}
+
+void ProgressBar::update_area_width()
+{
+    m_progress_area->set_width(
+        std::lerp(std::min(2.f * m_progress_area->rounding(), height()), width(), 0.01 * m_value)
+    );
+}
 
 void ProgressBar::on_resized()
 {
     if (!m_progress_set_on_resized && width() > 0) {
-        m_progress_area->set_width(std::lerp(height(), width(), 0.01 * m_value));
+        update_area_width();
         m_progress_set_on_resized = true;
     }
 }
