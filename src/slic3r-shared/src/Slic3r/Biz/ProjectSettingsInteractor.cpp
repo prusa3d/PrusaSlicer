@@ -115,6 +115,48 @@ ProjectSettingsInteractor::ProjectSettingsInteractor(
     m_mdb(mdb)
 {}
 
+void ProjectSettingsInteractor::set_color_persistence(
+    ColorLoadCallback load_callback,
+    ColorSaveCallback save_callback
+)
+{
+    m_color_load_callback = std::move(load_callback);
+    m_color_save_callback = std::move(save_callback);
+}
+
+void ProjectSettingsInteractor::restore_persisted_colors(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+)
+{
+    if (!m_color_load_callback)
+        return;
+
+    Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc || !is_fff(*cc))
+        return;
+
+    const auto persisted_colors = m_color_load_callback(cc->selected_preset().printer.id);
+
+    std::vector<std::string> colors = stored_colors(*cc);
+    colors.resize(material_slot_count(*cc));
+
+    for (size_t slot = 0; slot < colors.size(); ++slot) {
+        if (persisted_colors && slot < persisted_colors->size()
+            && !(*persisted_colors)[slot].empty())
+            colors[slot] = (*persisted_colors)[slot];
+        else
+            colors[slot] = resolve_auto_color(
+                project_id,
+                config_container_id,
+                slot,
+                cc->selected_preset().material_matdb_uuid(slot)
+            );
+    }
+
+    store_and_notify(project_id, config_container_id, std::move(colors));
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -189,6 +231,7 @@ void ProjectSettingsInteractor::set_color_from_user(
     ASSERT(!color.empty());
     colors[slot] = std::move(color);
     store_and_notify(project_id, config_container_id, std::move(colors));
+    persist_colors(project_id, config_container_id);
 }
 
 void ProjectSettingsInteractor::reset_color_to_auto(
@@ -230,6 +273,7 @@ void ProjectSettingsInteractor::set_colors_from_connect(
     }
 
     store_and_notify(project_id, config_container_id, std::move(colors));
+    persist_colors(project_id, config_container_id);
 }
 
 WipingVolumesData ProjectSettingsInteractor::get_wiping_volumes_data(
@@ -361,9 +405,17 @@ void ProjectSettingsInteractor::on_preset_selection_changed(
     Preset::PresetItemType type
 )
 {
-    if (type != Preset::PresetItemType::MaterialPreset)
-        return;
     if (project_id == Domain::INVALID_ID || config_container_id == Domain::INVALID_ID)
+        return;
+
+    if (type == Preset::PresetItemType::PrinterPreset) {
+        if (m_color_load_callback)
+            restore_persisted_colors(project_id, config_container_id);
+        else
+            load_and_reconcile(project_id, config_container_id);
+        return;
+    }
+    if (type != Preset::PresetItemType::MaterialPreset)
         return;
 
     load_and_reconcile(project_id, config_container_id);
@@ -466,6 +518,16 @@ void ProjectSettingsInteractor::
     std::vector<std::string> colors = stored_colors(*cc);
 
     colors.resize(material_slot_count(*cc));
+    if (m_color_load_callback && is_fff(*cc)) {
+        const auto persisted_colors = m_color_load_callback(cc->selected_preset().printer.id);
+        if (persisted_colors) {
+            const size_t count = std::min(colors.size(), persisted_colors->size());
+            for (size_t slot = 0; slot < count; ++slot) {
+                if (colors[slot].empty() && !(*persisted_colors)[slot].empty())
+                    colors[slot] = (*persisted_colors)[slot];
+            }
+        }
+    }
     // Only fill empty slots. This runs on every container switch and material preset change,
     // so it must not overwrite colors chosen by the user, loaded from 3MF or synced from
     // Connect. Explicit color overrides (e.g. MDB material selection) go through
@@ -485,6 +547,21 @@ void ProjectSettingsInteractor::
     // UI listeners rely on this notification as their sole source of color
     // updates (e.g. after preset switches or 3MF loading).
     store_and_notify(project_id, config_container_id, std::move(colors));
+}
+
+void ProjectSettingsInteractor::persist_colors(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+)
+{
+    if (!m_color_save_callback)
+        return;
+
+    const Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc || !is_fff(*cc))
+        return;
+
+    m_color_save_callback(cc->selected_preset().printer.id, stored_colors(*cc));
 }
 
 void ProjectSettingsInteractor::store_and_notify(

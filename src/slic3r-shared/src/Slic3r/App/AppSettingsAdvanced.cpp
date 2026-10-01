@@ -136,6 +136,7 @@ void to_json(
         {"recent_projects", app_settings_advanced.recent_projects},
         {"pinned_dialogs", pinned_dialogs_to_json(app_settings_advanced.pinned_dialogs)},
         {"printer_material_selections", app_settings_advanced.printer_material_selections},
+        {"printer_material_colors", app_settings_advanced.printer_material_colors},
         {"last_printer_preset_id", app_settings_advanced.last_printer_preset_id}
     };
 }
@@ -175,6 +176,8 @@ void from_json(
     }
     if (json_value.contains("last_printer_preset_id"))
         json_value.at("last_printer_preset_id").get_to(app_settings_advanced.last_printer_preset_id);
+    if (json_value.contains("printer_material_colors"))
+        json_value.at("printer_material_colors").get_to(app_settings_advanced.printer_material_colors);
 
     // validate recent_projects
     std::erase_if(

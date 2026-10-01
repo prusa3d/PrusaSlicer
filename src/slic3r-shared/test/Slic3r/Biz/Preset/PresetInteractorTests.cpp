@@ -526,11 +526,16 @@ TEST_CASE_METHOD(
         == first_material_id
     );
 
-    const nlohmann::ordered_json settings_json = app_settings;
-    auto reloaded_settings = settings_json.get<Slic3r::App::AppSettingsAdvanced>();
+    app_settings.printer_material_colors[first_printer->id] = {"#ABCDEF"};
+    const nlohmann::ordered_json settings_json_with_colors = app_settings;
+    auto reloaded_settings = settings_json_with_colors.get<Slic3r::App::AppSettingsAdvanced>();
     CHECK(
         reloaded_settings.printer_material_selections
         == app_settings.printer_material_selections
+    );
+    CHECK(
+        reloaded_settings.printer_material_colors
+        == app_settings.printer_material_colors
     );
     CHECK(reloaded_settings.last_printer_preset_id == first_printer->id);
     const auto restored_printer = std::find_if(
@@ -545,7 +550,7 @@ TEST_CASE_METHOD(
     );
     CHECK(preset_interactor.selected_printer_preset().printer.id == first_printer->id);
 
-    auto legacy_settings_json = settings_json;
+    auto legacy_settings_json = settings_json_with_colors;
     legacy_settings_json["printer_material_selections"] = {
         {"old-hw-config-id", {{first_printer->id, {first_material_id}}}}
     };

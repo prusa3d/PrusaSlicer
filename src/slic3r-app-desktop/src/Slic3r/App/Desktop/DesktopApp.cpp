@@ -438,6 +438,26 @@ bool DesktopApp::OnInit()
                 SPDLOG_ERROR("Failed to save the last selected printer preset");
         }
     );
+    auto& printer_material_colors = app_config.app_settings_advanced().printer_material_colors;
+    m_project_interactor->project_settings_interactor().set_color_persistence(
+        [&printer_material_colors](const std::string& printer_preset_id)
+            -> std::optional<std::vector<std::string>>
+        {
+            const auto printer_it = printer_material_colors.find(printer_preset_id);
+            if (printer_it == printer_material_colors.end())
+                return std::nullopt;
+            return printer_it->second;
+        },
+        [&app_config, &printer_material_colors](
+            const std::string& printer_preset_id,
+            const std::vector<std::string>& colors
+        )
+        {
+            printer_material_colors[printer_preset_id] = colors;
+            if (!app_config.save())
+                SPDLOG_ERROR("Failed to save printer material colors to application settings");
+        }
+    );
 
     m_account_service_switcher = std::make_unique<AccountServiceSwitcher>(
         app_services.app_config(),
@@ -714,6 +734,10 @@ void DesktopApp::finish_init()
     m_project_interactor->new_project();
 
     select_startup_printer_preset(preset_interactor);
+    m_project_interactor->project_settings_interactor().restore_persisted_colors(
+        m_project_interactor->selected_project_id(),
+        m_project_interactor->selected_config_container_id()
+    );
 
     handle_previous_crash_recovery(app_services.app_config());
 
