@@ -2357,21 +2357,6 @@ void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem&
         m_menu_manager.register_menu_separator_item({MenuItemName::Plugins});
     }
     m_menu_manager.register_menu_item(
-        {MenuItemName::Plugins, MenuItemName::PluginRescan},
-        std::make_unique<UIItemCommand>(
-            CommandName::PluginRescan,
-            [&plugin_system]
-            {
-                // as on Win/Linux this callback is triggered within render loop showing menu items,
-                // we are going to recreate, we need to dispatch this action outside render loop
-                // to prevent rendering disposed menu items
-                Biz::Platform::PlatformServices::instance()
-                    .main_thread_dispatcher()
-                    .dispatch_on_main_thread([&plugin_system] { plugin_system.rescan(); });
-            }
-        )
-    );
-    m_menu_manager.register_menu_item(
         {MenuItemName::Plugins, MenuItemName::PluginMarketplace},
         std::make_unique<UIItemCommand>(
             CommandName::PluginMarketplace,
@@ -2391,6 +2376,22 @@ void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem&
                             );
                         }
                     );
+            }
+        )
+    );
+    m_menu_manager.register_menu_separator_item({MenuItemName::Plugins});
+    m_menu_manager.register_menu_item(
+        {MenuItemName::Plugins, MenuItemName::PluginRescan},
+        std::make_unique<UIItemCommand>(
+            CommandName::PluginRescan,
+            [&plugin_system]
+            {
+                // as on Win/Linux this callback is triggered within render loop showing menu items,
+                // we are going to recreate, we need to dispatch this action outside render loop
+                // to prevent rendering disposed menu items
+                Biz::Platform::PlatformServices::instance()
+                    .main_thread_dispatcher()
+                    .dispatch_on_main_thread([&plugin_system] { plugin_system.rescan(); });
             }
         )
     );
