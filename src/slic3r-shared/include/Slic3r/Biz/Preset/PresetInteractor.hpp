@@ -240,7 +240,7 @@ public:
      * @param user - set this to true if action came from user (e.g. clicking a button)
      * so this would invalidate Project in a BackupStore
      */
-    void select_material_preset(size_t material_index, const std::string& id, bool user = false);
+    void select_material_preset(size_t material_index, const std::string& id, bool user = false, const std::optional<std::string>& matdb_uuid = std::nullopt);
     /**
      * @param user - set this to true if action came from user (e.g. clicking a button)
      * so this would invalidate Project in a BackupStore
@@ -932,6 +932,7 @@ private:
         size_t material_index,
         const std::string id,
         bool no_data_update,
+        const std::optional<std::string>& matdb_uuid,
         ListenerInvokeLaterBag& bag
     );
 

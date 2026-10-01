@@ -45,7 +45,7 @@ MaterialSelectionRow::MaterialSelectionRow(
                 m_state->id
             ))
         {
-            m_preset_interactor.select_material_preset(m_material_index, m_state->id, true);
+            m_preset_interactor.select_material_preset(m_material_index, m_state->id, true, "");
             return true;
         }
         return false;

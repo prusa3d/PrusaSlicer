@@ -66,8 +66,7 @@ void MatDbInteractor::select_material_preset(
     const std::string& preset_id
 )
 {
-    m_preset_interactor.set_material_matdb_uuid(material_index, mat.uuid);
-    m_preset_interactor.select_material_preset(material_index, preset_id, true);
+    m_preset_interactor.select_material_preset(material_index, preset_id, true, mat.uuid);
 }
 
 std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) const

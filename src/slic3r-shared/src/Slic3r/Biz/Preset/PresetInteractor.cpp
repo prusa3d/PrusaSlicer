@@ -1835,7 +1835,7 @@ void PresetInteractor::fill_materials_presets(
         const auto& item             = material_presets.items().at(
             changed_selected_index.value_or(material_presets.selected_index())
         );
-        select_material_preset_internal(slot_index, item.id, no_data_update, bag);
+        select_material_preset_internal(slot_index, item.id, no_data_update, std::nullopt, bag);
     }
 }
 
@@ -2161,6 +2161,7 @@ void PresetInteractor::select_material_preset_internal(
     size_t material_index,
     const std::string id, // intentionally copied
     bool no_data_update,
+    const std::optional<std::string>& matdb_uuid,
     ListenerInvokeLaterBag& bag
 )
 {
@@ -2187,6 +2188,11 @@ void PresetInteractor::select_material_preset_internal(
         material_index,
         selected_preset.materials[material_index].id
     );
+
+    if (matdb_uuid.has_value()) {
+        mutable_selected_printer_preset()
+            .set_material_matdb_uuid(material_index, matdb_uuid.value());
+    }
 
     m_material_accessors.at(&m_material_cbi_list.at(material_index))
         .set_config_box(
@@ -2218,10 +2224,10 @@ void PresetInteractor::select_material_preset_internal(
     });
 }
 
-void PresetInteractor::select_material_preset(size_t material_index, const std::string& id, bool user)
+void PresetInteractor::select_material_preset(size_t material_index, const std::string& id, bool user, const std::optional<std::string>& matdb_uuid)
 {
     ListenerInvokeLaterBag bag;
-    select_material_preset_internal(material_index, id, false, bag);
+    select_material_preset_internal(material_index, id, false, matdb_uuid, bag);
     bag.add([this] { invoke_slicing_input_changed(); });
 
     if (user) {
