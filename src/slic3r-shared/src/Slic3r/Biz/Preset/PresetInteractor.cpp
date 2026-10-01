@@ -194,6 +194,25 @@ void PresetInteractor::set_material_selection_persistence(
     m_material_selection_save_callback = std::move(save_callback);
 }
 
+// Report whether a printer preset has any saved material slots to restore.
+bool PresetInteractor::has_persisted_material_selection(
+    const std::string& printer_preset_id
+) const
+{
+    if (!m_material_selection_load_callback)
+        return false;
+    const auto selection = m_material_selection_load_callback(printer_preset_id);
+    return selection.has_value() && !selection->empty();
+}
+
+// Store whether this 3MF project should use saved per-printer materials over its embedded choices.
+void PresetInteractor::set_restore_persisted_material_selections(
+    Domain::SelectionId project_id,
+    bool restore
+)
+{
+    get_or_create_project_context(project_id).restore_saved_material_selections = restore;
+}
 
 // Install the callback used to persist an explicitly chosen printer preset.
 void PresetInteractor::set_printer_selection_persistence(
@@ -985,6 +1004,8 @@ void PresetInteractor::on_selected_config_container_changed(
 
     fill_print_presets(selected_preset, true, bag);
     fill_tools_presets(selected_preset, true, bag);
+    if (!p.loaded_from_3mf || p.restore_saved_material_selections)
+        restore_cached_materials(selected_preset);
     fill_materials_presets(selected_preset, true, bag);
 
     update_print_tool_cbi(selected_preset, container_id);
@@ -4131,6 +4152,7 @@ tl::expected<void, std::string>  PresetInteractor::load_selected_preset_from_3mf
     using Domain::Preset::PresetOrigin;
 
     auto& pc              = get_or_create_project_context(project_id);
+    pc.loaded_from_3mf = true;
     auto& runtime_presets = pc.runtime_presets;
 
     bool runtime_presets_evaluation_required = false;

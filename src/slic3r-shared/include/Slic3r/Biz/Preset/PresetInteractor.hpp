@@ -143,6 +143,11 @@ public:
         MaterialSelectionLoadCallback load_callback,
         MaterialSelectionSaveCallback save_callback
     );
+    bool has_persisted_material_selection(const std::string& printer_preset_id) const;
+    void set_restore_persisted_material_selections(
+        Domain::SelectionId project_id,
+        bool restore
+    );
     void set_printer_selection_persistence(std::function<void(const std::string&)> save_callback);
     void save_user_preset(
         Domain::Preset::PresetKind kind,
