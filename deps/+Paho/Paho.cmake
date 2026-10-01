@@ -10,8 +10,8 @@ endif()
 
 add_cmake_project(Paho
     # 1.3.13
-    URL https://github.com/eclipse/paho.mqtt.c/archive/07a875788d8cc6f5833b12581d6e3e349b34d719.zip
-    URL_HASH SHA256=4548f8d52b12e0917daa9a502e991840469bc39b3a87b23b6f70bd3283f1ef7c
+    URL https://github.com/eclipse-paho/paho.mqtt.c/archive/refs/tags/v1.3.16.zip
+    URL_HASH SHA256=dfecd4d29b164db267dc642d35fb1590c96edb88157992260948cbd7d8de41b0
     
     CMAKE_ARGS
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5
