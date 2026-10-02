@@ -373,6 +373,14 @@ std::string to_display_string(Biz::Slicing::Warning warning, const Domain::Proje
         );
         break;
 
+    case WarningCode::VirtualExtruderMixesFilamentTypes:
+        message = _u8L(
+            "A virtual extruder used in the print mixes different filament types. "
+            "Different materials usually need different temperatures and may not stick to each "
+            "other, so the print may fail."
+        );
+        break;
+
     case WarningCode::None:
         message = _u8L("Warning: unspecified issue detected.");
         break;

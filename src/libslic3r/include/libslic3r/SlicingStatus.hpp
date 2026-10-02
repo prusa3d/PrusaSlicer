@@ -143,7 +143,8 @@ enum class WarningCode
     ToolpathOutsideBuildVolume,
     GCodeConflict,
     XYSizeCompensationIgnoredMultiMaterialPainting,
-    XYSizeCompensationIgnoredFuzzySkinPainting
+    XYSizeCompensationIgnoredFuzzySkinPainting,
+    VirtualExtruderMixesFilamentTypes
 };
 
 struct StabilityWarningPayload {

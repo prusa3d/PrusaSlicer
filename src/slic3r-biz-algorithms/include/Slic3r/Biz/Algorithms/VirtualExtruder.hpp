@@ -186,4 +186,16 @@ void remap_virtual_extruders_on_import(
     unsigned int source_physical_count
 );
 
+/**
+ * @brief Collect the different filament types a virtual extruder mixes.
+ *
+ * @param virtual_extruder      Virtual extruder to check.
+ * @param filament_types_0based 0-based filament type per physical extruder.
+ * @return Filament types, or empty if fewer than two are known.
+ */
+std::vector<std::string> mixed_filament_types(
+    const Domain::VirtualExtruder& virtual_extruder,
+    const std::vector<std::string>& filament_types_0based
+);
+
 } // namespace Slic3r::Biz::Algorithms::VirtualExtruder
