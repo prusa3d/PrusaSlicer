@@ -60,6 +60,7 @@ using Slic3r::Domain::VirtualExtruderComponent;
 using Slic3r::Domain::VirtualExtruders;
 using Slic3r::Domain::Preset::SelectedPresetConfigPack;
 
+using Slic3r::Biz::Algorithms::Color::encode_color;
 using Slic3r::Biz::Algorithms::VirtualExtruder::mixed_filament_types;
 
 using namespace Slic3r::App::Yoga;
@@ -555,45 +556,17 @@ void ColorMixDialog::create_editor_pane(Item* pane)
     editor_content->set_gap(PANEL_GAP);
     editor_content->set_flex_shrink(0);
 
-    m_editor_title =
-        editor_content->emplace_back<Text>(_u8L("Virtual Extruder"), Render::ImguiFontType::Bold);
+    Item* title_row = editor_content->emplace_back<Item>();
+    title_row->set_orientation(Orientation::Horizontal);
+    title_row->set_align_items(YGAlignCenter);
+    title_row->set_gap(PANEL_GAP);
 
-    m_editor_description = editor_content->emplace_back<Text>(std::string{});
-    m_editor_description->set_wrap_mode(Text::WrapMode::Wrap);
-    m_editor_description->set_text_color(m_theme->color_imgui(Color::Text, ColorGroup::Disabled));
-
-    m_editor_stack = editor_content->emplace_back<StackLayout>();
-    m_editor_stack->set_orientation(Orientation::Vertical);
-
-    this->create_two_component_editor(m_editor_stack->emplace_back<Item>());
-    this->create_three_component_editor(m_editor_stack->emplace_back<Item>());
-    m_editor_stack->set_current_index(0);
-
-    m_filament_types_warning = editor_content->emplace_back<WarningPanel>(Color::Warning);
-    m_filament_types_warning->set_flex_shrink(0);
-    m_filament_types_warning->set_visible(false);
-
-    m_add_component_button = editor_content->emplace_back<LayoutButton>(_u8L("Add component"));
-    m_add_component_button->set_content_padding({10_fpx, 5_fpx});
-    m_add_component_button->set_self_align(YGAlignFlexStart);
-    m_add_component_button->callbacks().action = [this]()
-    { this->on_add_or_remove_component_clicked(); };
-
-    Item* color_block = editor_content->emplace_back<Item>();
-    color_block->set_orientation(Orientation::Vertical);
-    color_block->set_gap(6_fpx);
-
-    Text* color_label = color_block->emplace_back<Text>(_u8L("Display color"));
-    color_label->set_text_color(m_theme->color_imgui(Color::Text, ColorGroup::Disabled));
-
-    Item* color_row = color_block->emplace_back<Item>();
-    color_row->set_orientation(Orientation::Horizontal);
-    color_row->set_align_items(YGAlignCenter);
-    color_row->set_gap(PANEL_GAP);
-
-    m_color_picker_button = color_row->emplace_back<ColorPickerButton>();
-    m_color_picker_button->set_width(100_fpx);
+    m_color_picker_button = title_row->emplace_back<ColorPickerButton>();
+    m_color_picker_button->set_width(28_fpx);
     m_color_picker_button->set_height(28_fpx);
+    m_color_picker_button->set_rounding(6.f);
+    m_color_picker_button->set_flex_shrink(0);
+    m_color_picker_button->set_background_border_width(1.f);
     m_color_picker_button->set_background_color_border(
         m_theme->color_imgui(Color::Text, ColorGroup::Disabled),
         m_theme->color_imgui(Color::Text, ColorGroup::Disabled)
@@ -610,19 +583,49 @@ void ColorMixDialog::create_editor_pane(Item* pane)
         }
 
         m_working_virtual_extruders.at(selection).color =
-            Algorithms::Color::encode_color(ColorRGB(color.Value.x, color.Value.y, color.Value.z));
+            encode_color(ColorRGB(color.Value.x, color.Value.y, color.Value.z));
         this->update_preview_and_validation();
     };
 
-    m_reset_display_color_button = color_row->emplace_back<LayoutButton>(_u8L("Reset to blended"));
-    m_reset_display_color_button->set_content_padding({8_fpx, 4_fpx});
+    m_reset_display_color_button = title_row->emplace_back<
+        LayoutButton>(std::string{}, Render::Icon::UndoGizmo, _u8L("Reset to the blended color"));
+    m_reset_display_color_button->set_width(20_fpx);
+    m_reset_display_color_button->set_height(20_fpx);
+    m_reset_display_color_button->set_content_padding({3_fpx});
+    m_reset_display_color_button->set_flex_shrink(0);
     m_reset_display_color_button->set_background_color(Color::ButtonTransparent);
+    m_reset_display_color_button->set_icon_tint(m_theme->color_imgui(Color::AccentTertiary));
     m_reset_display_color_button->set_visible(false);
     m_reset_display_color_button->callbacks().action = [this]()
     {
         this->clear_color_override();
         this->update_preview_and_validation();
     };
+
+    m_editor_title =
+        title_row->emplace_back<Text>(_u8L("Virtual Extruder"), Render::ImguiFontType::Bold);
+    m_editor_title->set_flex_grow(1.f);
+
+    m_add_component_button = title_row->emplace_back<LayoutButton>(_u8L("Add component"));
+    m_add_component_button->set_content_padding({10_fpx, 5_fpx});
+    m_add_component_button->set_flex_shrink(0);
+    m_add_component_button->callbacks().action = [this]()
+    { this->on_add_or_remove_component_clicked(); };
+
+    m_editor_description = editor_content->emplace_back<Text>(std::string{});
+    m_editor_description->set_wrap_mode(Text::WrapMode::Wrap);
+    m_editor_description->set_text_color(m_theme->color_imgui(Color::Text, ColorGroup::Disabled));
+
+    m_editor_stack = editor_content->emplace_back<StackLayout>();
+    m_editor_stack->set_orientation(Orientation::Vertical);
+
+    this->create_two_component_editor(m_editor_stack->emplace_back<Item>());
+    this->create_three_component_editor(m_editor_stack->emplace_back<Item>());
+    m_editor_stack->set_current_index(0);
+
+    m_filament_types_warning = editor_content->emplace_back<WarningPanel>(Color::Warning);
+    m_filament_types_warning->set_flex_shrink(0);
+    m_filament_types_warning->set_visible(false);
 
     Text* sequence_title = editor_content->emplace_back<Text>(_u8L("Layer sequence preview"));
     sequence_title->set_text_color(m_theme->color_imgui(Color::Text, ColorGroup::Disabled));
