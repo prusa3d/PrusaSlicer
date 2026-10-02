@@ -11,11 +11,14 @@
 #include "Slic3r/Biz/ProjectSettingsInteractor.hpp"
 #include "Slic3r/Biz/SecretStoreDummy.hpp"
 #include "Slic3r/Directories.hpp"
+#include "Slic3r/Domain/ConfigContainer.hpp"
 #include "Slic3r/TestUtils/AppInstanceMessageHandlerScope.hpp"
 #include "Slic3r/TestUtils/JobManagerScope.hpp"
 #include "Slic3r/TestUtils/TestData.hpp"
 
 #include <boost/nowide/filesystem.hpp>
+
+#include <map>
 
 namespace Slic3r::Biz::Mock {
 
@@ -157,6 +160,130 @@ TEST_CASE_METHOD(
     REQUIRE(!after_unlock.empty());
     // The color must differ from the user-chosen value (it's auto-resolved).
     REQUIRE(after_unlock[0] != custom_color);
+}
+
+TEST_CASE_METHOD(
+    ProjectSettingsInteractorFixture,
+    "Persisted colors override startup defaults per printer",
+    "[ProjectSettingsInteractor]"
+)
+{
+    using namespace Slic3r::Biz;
+
+    std::map<std::string, std::vector<std::string>> saved_colors;
+    auto& psi = project_interactor.project_settings_interactor();
+    psi.set_color_persistence(
+        [&saved_colors](const std::string& printer_preset_id)
+            -> std::optional<std::vector<std::string>>
+        {
+            const auto it = saved_colors.find(printer_preset_id);
+            if (it == saved_colors.end())
+                return std::nullopt;
+            return it->second;
+        },
+        [&saved_colors](
+            const std::string& printer_preset_id,
+            const std::vector<std::string>& colors
+        ) { saved_colors[printer_preset_id] = colors; }
+    );
+
+    const Domain::SelectionId project_id = project_interactor.new_project();
+    const Domain::SelectionId cc_id = project_interactor.selected_config_container_id();
+    auto* cc = workbench.project(project_id).find_config_container(cc_id);
+    REQUIRE(cc != nullptr);
+
+    const std::string printer_preset_id = cc->selected_preset().printer.id;
+    const auto startup_colors =
+        cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+    REQUIRE(!startup_colors.empty());
+
+    const std::string custom_hex = "#ABCDEF";
+    psi.set_color_from_user(cc_id, 0, custom_hex);
+    REQUIRE(saved_colors.contains(printer_preset_id));
+    REQUIRE(saved_colors.at(printer_preset_id).at(0) == custom_hex);
+
+    cc->project_settings().items.opt("extruder_colour").set(startup_colors);
+    psi.restore_persisted_colors(cc_id);
+
+    Domain::ColorRGB expected_color;
+    REQUIRE(Biz::Algorithms::Color::decode_color(custom_hex, expected_color));
+    CHECK(psi.get_colors(cc_id).at(0) == expected_color);
+}
+
+TEST_CASE_METHOD(
+    ProjectSettingsInteractorFixture,
+    "First filament color remains per printer when switching",
+    "[ProjectSettingsInteractor]"
+)
+{
+    using namespace Slic3r::Biz;
+
+    std::map<std::string, std::vector<std::string>> saved_colors;
+    auto& psi = project_interactor.project_settings_interactor();
+    psi.set_color_persistence(
+        [&saved_colors](const std::string& printer_preset_id)
+            -> std::optional<std::vector<std::string>>
+        {
+            const auto it = saved_colors.find(printer_preset_id);
+            if (it == saved_colors.end())
+                return std::nullopt;
+            return it->second;
+        },
+        [&saved_colors](
+            const std::string& printer_preset_id,
+            const std::vector<std::string>& colors
+        )
+        {
+            saved_colors[printer_preset_id] = colors;
+        }
+    );
+
+    const Domain::SelectionId project_id = project_interactor.new_project();
+    const Domain::SelectionId cc_id = project_interactor.selected_config_container_id();
+    REQUIRE(cc_id != Domain::INVALID_ID);
+    Domain::ConfigContainer* config_container =
+        workbench.project(project_id).find_config_container(cc_id);
+    REQUIRE(config_container != nullptr);
+    std::string& selected_printer_id =
+        config_container->mutable_selected_preset().printer.id;
+    const std::string original_printer_id = selected_printer_id;
+    const std::string other_printer_id = "other-printer-preset";
+
+    psi.set_color_from_user(cc_id, 0, "#ABCDEF");
+
+    selected_printer_id = other_printer_id;
+    psi.on_preset_selection_changed(
+        project_id,
+        cc_id,
+        Preset::PresetItemType::PrinterPreset
+    );
+
+    Domain::ColorRGB expected_color;
+    REQUIRE(Biz::Algorithms::Color::decode_color("#ABCDEF", expected_color));
+    CHECK(psi.get_colors(cc_id).at(0) != expected_color);
+
+    psi.set_color_from_user(cc_id, 0, "#123456");
+    Domain::ColorRGB other_expected_color;
+    REQUIRE(Biz::Algorithms::Color::decode_color("#123456", other_expected_color));
+    REQUIRE(psi.get_colors(cc_id).at(0) == other_expected_color);
+
+    selected_printer_id = original_printer_id;
+    psi.on_preset_selection_changed(
+        project_id,
+        cc_id,
+        Preset::PresetItemType::PrinterPreset
+    );
+
+    REQUIRE(psi.get_colors(cc_id).at(0) == expected_color);
+
+    selected_printer_id = other_printer_id;
+    psi.on_preset_selection_changed(
+        project_id,
+        cc_id,
+        Preset::PresetItemType::PrinterPreset
+    );
+
+    REQUIRE(psi.get_colors(cc_id).at(0) == other_expected_color);
 }
 
 TEST_CASE_METHOD(

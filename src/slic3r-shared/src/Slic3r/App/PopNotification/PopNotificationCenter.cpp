@@ -1234,6 +1234,7 @@ void PopNotificationCenter::on_file_load_started()
     m_notification_list.close_notifications_of_type(PopNotificationType::GeometryOnlyImport);
 }
 
+// Shown when a 3MF is opened or imported but contains no PrusaSlicer printer configuration.
 void PopNotificationCenter::on_geometry_only_imported()
 {
     upsert_notification(
@@ -1242,10 +1243,10 @@ void PopNotificationCenter::on_geometry_only_imported()
             PopNotificationLevel::Regular,
             10s,
             PopNotificationLayoutHeaderText{
-                // TRN Notification header: only geometry was taken from a 3MF added to a project.
+                // TRN Notification header: only geometry was loaded from a 3MF.
                 _u8L("Imported geometry only."),
-                // TRN Notification body: settings of a 3MF added to a project were not applied.
-                _u8L("3MF settings ignored to preserve your project.")
+                // TRN Notification body: a 3MF with no PrusaSlicer settings was loaded.
+                _u8L("No PrusaSlicer settings were found in the 3MF. Only geometry was loaded.")
             }
         },
         never_equal_matcher

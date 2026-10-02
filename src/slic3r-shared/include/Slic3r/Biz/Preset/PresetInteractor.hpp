@@ -1,6 +1,11 @@
 #pragma once
 
+#include <functional>
+#include <map>
+#include <optional>
+#include <tuple>
 #include <unordered_map>
+#include <vector>
 
 #include <tl/expected.hpp>
 
@@ -110,6 +115,22 @@ public:
     PresetInteractor(PresetInteractor&&) = default;
 
     void load_preset_bundle(const IO::BundlePaths& paths);
+    using MaterialSelectionLoadCallback =
+        std::function<std::optional<std::vector<std::string>>(const std::string&)>;
+    using MaterialSelectionSaveCallback = std::function<void(
+        const std::string&,
+        const std::vector<std::string>&
+    )>;
+    void set_material_selection_persistence(
+        MaterialSelectionLoadCallback load_callback,
+        MaterialSelectionSaveCallback save_callback
+    );
+    bool has_persisted_material_selection(const std::string& printer_preset_id) const;
+    void set_restore_persisted_material_selections(
+        Domain::SelectionId project_id,
+        bool restore
+    );
+    void set_printer_selection_persistence(std::function<void(const std::string&)> save_callback);
     void save_user_preset(
         Domain::Preset::PresetKind kind,
         size_t slot_index
@@ -961,6 +982,11 @@ private:
         Domain::Preset::SelectedPreset& selected_preset,
         bool force_fill_originals=false
     );
+    void cache_selected_materials(
+        const Domain::Preset::SelectedPreset& selected_preset,
+        bool persist = false
+    );
+    void restore_cached_materials(Domain::Preset::SelectedPreset& selected_preset);
     void update_print_tool_cbi(
         Domain::Preset::SelectedPreset& selected_preset,
         Domain::SelectionId config_container_id
@@ -1020,6 +1046,12 @@ private:
     SetAccessorMap m_material_accessors; ///< Contains All SetAccessors currently in use
 
     Domain::SelectionId m_selected_project_id{Domain::INVALID_ID};
+    using MaterialSelectionCacheKey =
+        std::tuple<Domain::SelectionId, Domain::SelectionId, std::string, std::string>;
+    std::map<MaterialSelectionCacheKey, std::vector<std::string>> m_material_selection_cache;
+    MaterialSelectionLoadCallback m_material_selection_load_callback;
+    MaterialSelectionSaveCallback m_material_selection_save_callback;
+    std::function<void(const std::string&)> m_printer_selection_save_callback;
 
     IPresetDialogManager* m_dialog_manager{ nullptr };
     PresetsSwitchStates m_unsaved_changes;

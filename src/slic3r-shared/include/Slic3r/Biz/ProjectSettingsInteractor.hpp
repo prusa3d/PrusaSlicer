@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,6 +32,14 @@ class ProjectSettingsInteractor :
 {
 public:
     ProjectSettingsInteractor(Domain::Workbench& workbench, const IMdb& mdb);
+
+    using ColorLoadCallback =
+        std::function<std::optional<std::vector<std::string>>(const std::string&)>;
+    using ColorSaveCallback =
+        std::function<void(const std::string&, const std::vector<std::string>&)>;
+
+    void set_color_persistence(ColorLoadCallback load_callback, ColorSaveCallback save_callback);
+    void restore_persisted_colors(Domain::SelectionId config_container_id);
 
     /**
      * @brief Returns current colors for the given container (for initial UI population).
@@ -126,6 +136,8 @@ private:
         int slot
     ) const;
 
+    void persist_colors(Domain::SelectionId config_container_id);
+
     /**
      * @brief Return the number of extruder slots for the given config container.
      * @return 0 if not found or not FDM.
@@ -156,6 +168,8 @@ private:
 
     Domain::Workbench& m_workbench;
     const IMdb& m_mdb;
+    ColorLoadCallback m_color_load_callback;
+    ColorSaveCallback m_color_save_callback;
 };
 
 } // namespace Slic3r::Biz

@@ -1,4 +1,6 @@
 #include <optional>
+#include <vector>
+#include <algorithm>
 
 #include <catch2/catch_test_macros.hpp>
 #include <boost/filesystem/path.hpp>
@@ -13,6 +15,9 @@
 #include "Slic3r/Biz/Preset/PresetSelectionCheck.hpp"
 #include "Slic3r/Biz/Preset/IO/PresetSaver.hpp"
 #include "Slic3r/Biz/Slicing/TestUtils.hpp"
+#include "Slic3r/App/AppSettingsAdvanced.hpp"
+
+#include <nlohmann/json.hpp>
 
 namespace fs = boost::filesystem;
 
@@ -281,8 +286,8 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Preset Interactor Tests", "[Pr
     // Switch print to 0.20mm
     switch_print_and_verify("0.20mm");
 
-    // Switch printer to Prusa CORE One 0.6 HF
     switch_printer_and_verify("Prusa CORE One 0.6 HF");
+    switch_printer_and_verify("Prusa CORE One 0.4 HF");
 
     // Verify that printer preset stays 0.20mm
     {
@@ -342,3 +347,158 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Preset Interactor Tests", "[Pr
     }
 }
 
+TEST_CASE_METHOD(
+    LoadedProjectInteractorFixture,
+    "Preset Interactor preserves material selections across printer changes",
+    "[PresetInteractor][preset]"
+)
+{
+    project_interactor.new_project();
+    auto& preset_interactor = project_interactor.preset_interactor();
+    const auto& printer_items = preset_interactor.printer_presets();
+    Slic3r::App::AppSettingsAdvanced app_settings;
+    auto& saved_selections = app_settings.printer_material_selections;
+    preset_interactor.set_material_selection_persistence(
+        [&saved_selections](const std::string& printer_preset_id)
+            -> std::optional<std::vector<std::string>>
+        {
+            const auto printer_it = saved_selections.find(printer_preset_id);
+            if (printer_it == saved_selections.end())
+                return std::nullopt;
+            return printer_it->second;
+        },
+        [&saved_selections](
+            const std::string& printer_preset_id,
+            const std::vector<std::string>& material_ids
+        ) { saved_selections[printer_preset_id] = material_ids; }
+    );
+    preset_interactor.set_printer_selection_persistence(
+        [&app_settings](const std::string& printer_preset_id)
+        { app_settings.last_printer_preset_id = printer_preset_id; }
+    );
+
+    std::vector<Slic3r::Biz::Preset::PresetItem> printer_candidates;
+    printer_candidates.reserve(printer_items.items().size());
+    for (size_t i = 0; i < printer_items.items().size(); ++i)
+        printer_candidates.push_back(printer_items.items().at(i));
+
+    std::optional<Slic3r::Biz::Preset::PresetItem> first_printer;
+    std::string first_material_id;
+    for (const auto& candidate : printer_candidates) {
+        preset_interactor.select_printer_preset(candidate.hw_printer_config_id, candidate.id);
+        if (preset_interactor.material_presets().size() == 0
+            || preset_interactor.material_presets().at(0).items().size() < 2)
+        {
+            continue;
+        }
+        first_printer = candidate;
+        first_material_id = preset_interactor.material_presets().at(0).items().at(1).id;
+        preset_interactor.select_material_preset(0, first_material_id, true);
+        break;
+    }
+    REQUIRE(first_printer.has_value());
+    CHECK(preset_interactor.has_persisted_material_selection(first_printer->id));
+    CHECK_FALSE(preset_interactor.has_persisted_material_selection("missing-printer-preset"));
+    preset_interactor.select_printer_preset(
+        first_printer->hw_printer_config_id,
+        first_printer->id,
+        true
+    );
+    CHECK(app_settings.last_printer_preset_id == first_printer->id);
+
+    std::optional<Slic3r::Biz::Preset::PresetItem> second_printer;
+    std::string second_material_id;
+    for (const auto& candidate : printer_candidates) {
+        if (candidate.hw_printer_config_id == first_printer->hw_printer_config_id
+            && candidate.id == first_printer->id)
+        {
+            continue;
+        }
+        preset_interactor.select_printer_preset(candidate.hw_printer_config_id, candidate.id);
+        if (preset_interactor.material_presets().size() == 0)
+            continue;
+        const auto& materials = preset_interactor.material_presets().at(0);
+        const auto alternative = find_if<Slic3r::Biz::Preset::PresetItem>(
+            materials.items(),
+            [&](const auto& item) { return item.id != first_material_id; }
+        );
+        if (alternative == nullptr)
+            continue;
+        second_printer = candidate;
+        second_material_id = alternative->id;
+        preset_interactor.select_material_preset(0, second_material_id, true);
+        break;
+    }
+    REQUIRE(second_printer.has_value());
+
+    preset_interactor.select_printer_preset(first_printer->hw_printer_config_id, first_printer->id);
+    const auto& restored_materials = preset_interactor.material_presets().at(0);
+    REQUIRE(
+        restored_materials.items().at(restored_materials.selected_index()).id
+        == first_material_id
+    );
+
+    app_settings.printer_material_colors[first_printer->id] = {"#ABCDEF"};
+    const nlohmann::ordered_json settings_json_with_colors = app_settings;
+    auto reloaded_settings = settings_json_with_colors.get<Slic3r::App::AppSettingsAdvanced>();
+    CHECK(
+        reloaded_settings.printer_material_selections
+        == app_settings.printer_material_selections
+    );
+    CHECK(
+        reloaded_settings.printer_material_colors
+        == app_settings.printer_material_colors
+    );
+    CHECK(reloaded_settings.last_printer_preset_id == first_printer->id);
+    const auto restored_printer = std::find_if(
+        printer_candidates.begin(),
+        printer_candidates.end(),
+        [&](const auto& item) { return item.id == reloaded_settings.last_printer_preset_id; }
+    );
+    REQUIRE(restored_printer != printer_candidates.end());
+    preset_interactor.select_printer_preset(
+        restored_printer->hw_printer_config_id,
+        restored_printer->id
+    );
+    CHECK(preset_interactor.selected_printer_preset().printer.id == first_printer->id);
+
+    auto legacy_settings_json = settings_json_with_colors;
+    legacy_settings_json["printer_material_selections"] = {
+        {"old-hw-config-id", {{first_printer->id, {first_material_id}}}}
+    };
+    const auto legacy_settings = legacy_settings_json.get<Slic3r::App::AppSettingsAdvanced>();
+    CHECK(legacy_settings.printer_material_selections.at(first_printer->id)
+          == std::vector<std::string>{first_material_id});
+    legacy_settings_json.erase("last_printer_preset_id");
+    const auto old_settings = legacy_settings_json.get<Slic3r::App::AppSettingsAdvanced>();
+    CHECK(old_settings.last_printer_preset_id.empty());
+
+    auto& reloaded_selections = reloaded_settings.printer_material_selections;
+    preset_interactor.set_material_selection_persistence(
+        [&reloaded_selections](const std::string& printer_preset_id)
+            -> std::optional<std::vector<std::string>>
+        {
+            const auto it = reloaded_selections.find(printer_preset_id);
+            if (it == reloaded_selections.end())
+                return std::nullopt;
+            return it->second;
+        },
+        [&reloaded_selections](
+            const std::string& printer_preset_id,
+            const std::vector<std::string>& material_ids
+        ) { reloaded_selections[printer_preset_id] = material_ids; }
+    );
+
+    preset_interactor.load_preset_bundle(bundle_paths);
+    preset_interactor.select_printer_preset(
+        second_printer->hw_printer_config_id,
+        second_printer->id
+    );
+    const auto& restored_second_materials = preset_interactor.material_presets().at(0);
+    REQUIRE(
+        restored_second_materials.items()
+            .at(restored_second_materials.selected_index())
+            .id
+        == second_material_id
+    );
+}

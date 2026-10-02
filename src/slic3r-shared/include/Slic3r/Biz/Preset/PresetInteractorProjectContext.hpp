@@ -74,6 +74,10 @@ struct PresetInteractorProjectContext
 
     Domain::SelectionId project_id;
     Domain::SelectionId selected_config_container_id{Domain::INVALID_ID};
+    // Marks projects loaded with 3MF presets so their embedded material choices stay authoritative by default.
+    bool loaded_from_3mf{false};
+    // Set when the user opts to replace embedded 3MF material choices with saved per-printer selections.
+    bool restore_saved_material_selections{false};
     // TODO: Selected Object / Volume with ModelConfigObject
     RuntimePresets runtime_presets;
 

@@ -7,6 +7,9 @@
 #include "AppInstanceCheck.hpp"
 #include "SecretStoreFactory.hpp"
 
+#include <optional>
+#include <vector>
+
 #include <Slic3r/Log.hpp>
 #include <Slic3r/App/Platform/WX/WXMainThreadDispatcher.hpp>
 #include <Slic3r/App/WX/WidgetsConfig.hpp>
@@ -196,34 +199,46 @@ int run(const Slic3r::App::InitParams& init_params, AppServices& app_services)
     return wxEntry(argc, argv);
 }
 
-// Temporary workaround, to select a favorite printer on application start.
-// DELETE this once it is not needed.
-static void select_favorite_preset(
+// Resolve the saved preset ID against the current printer list after new_project() initializes it.
+// In favorites-only mode, restore it only if it remains a favorite; otherwise use a favorite fallback.
+static void select_startup_printer_preset(
     Biz::Preset::PresetInteractor& preset_interactor
 )
 {
     const auto& app_services{AppServices::instance()};
     const AppConfig& app_config{app_services.app_config()};
+    const std::string& last_printer_preset_id{
+        app_config.app_settings_advanced().last_printer_preset_id
+    };
     const AppSettingsAdvanced::PrinterFavoritePresets& printer_favorite_presets{
         app_config.app_settings_advanced().printer_favorite_presets
     };
+    const bool favorites_only{app_config.get<bool>("printers_only_favorites")};
 
-    if (printer_favorite_presets.size() > 0 && app_config.get<bool>("printers_only_favorites")) {
-        const std::string& preset_id{*printer_favorite_presets.begin()};
-
-        auto printer_list{preset_interactor.printer_presets().items()};
-
-        std::string hw_config_id;
-        for (std::size_t i{}; i < printer_list.size(); ++i) {
-            const Slic3r::Biz::Preset::PresetItem& preset{printer_list.at(i)};
-            if (preset.id == preset_id) {
-                hw_config_id = preset.hw_printer_config_id;
-                break;
-            }
+    // Resolve the stable saved ID to the current-session hardware-config ID required for selection.
+    const auto& printer_list = preset_interactor.printer_presets().items();
+    for (std::size_t i{}; i < printer_list.size(); ++i) {
+        const auto& preset{printer_list.at(i)};
+        if (!last_printer_preset_id.empty()
+            && preset.id == last_printer_preset_id
+            && (!favorites_only || printer_favorite_presets.contains(last_printer_preset_id)))
+        {
+            preset_interactor.select_printer_preset(preset.hw_printer_config_id, preset.id);
+            return;
         }
+    }
 
-        if (!hw_config_id.empty()) {
-            preset_interactor.select_printer_preset(hw_config_id, preset_id);
+    if (!printer_favorite_presets.empty() && favorites_only) {
+        const std::string& preset_id{*printer_favorite_presets.begin()};
+        for (std::size_t i{}; i < printer_list.size(); ++i) {
+            const auto& preset{printer_list.at(i)};
+            if (preset.id == preset_id) {
+                preset_interactor.select_printer_preset(
+                    preset.hw_printer_config_id,
+                    preset.id
+                );
+                return;
+            }
         }
     }
 }
@@ -318,6 +333,60 @@ bool DesktopApp::OnInit()
         m_workbench,
         platform_services.main_thread_dispatcher(),
         *m_thumbnail_image_generator
+    );
+    auto& app_config = app_services.app_config();
+    // Store each printer's per-slot material IDs under its stable preset ID, not its transient hardware-config ID.
+    auto& printer_material_selections =
+        app_config.app_settings_advanced().printer_material_selections;
+    m_project_interactor->preset_interactor().set_material_selection_persistence(
+        // No saved entry means the printer's normal default material selection remains in effect.
+        [&printer_material_selections](const std::string& printer_preset_id)
+            -> std::optional<std::vector<std::string>>
+        {
+            const auto printer_it = printer_material_selections.find(printer_preset_id);
+            if (printer_it == printer_material_selections.end())
+                return std::nullopt;
+            return printer_it->second;
+        },
+        // User-selected material IDs are saved by slot and persisted immediately for the next launch.
+        [&app_config, &printer_material_selections](
+            const std::string& printer_preset_id,
+            const std::vector<std::string>& material_preset_ids
+        )
+        {
+            printer_material_selections[printer_preset_id] = material_preset_ids;
+            if (!app_config.save())
+                SPDLOG_ERROR("Failed to save printer material selections to application settings");
+        }
+    );
+    // Save explicit printer choices so the startup selection can restore them next launch.
+    m_project_interactor->preset_interactor().set_printer_selection_persistence(
+        [&app_config](const std::string& printer_preset_id)
+        {
+            app_config.app_settings_advanced().last_printer_preset_id = printer_preset_id;
+            if (!app_config.save())
+                SPDLOG_ERROR("Failed to save the last selected printer preset");
+        }
+    );
+    auto& printer_material_colors = app_config.app_settings_advanced().printer_material_colors;
+    m_project_interactor->project_settings_interactor().set_color_persistence(
+        [&printer_material_colors](const std::string& printer_preset_id)
+            -> std::optional<std::vector<std::string>>
+        {
+            const auto printer_it = printer_material_colors.find(printer_preset_id);
+            if (printer_it == printer_material_colors.end())
+                return std::nullopt;
+            return printer_it->second;
+        },
+        [&app_config, &printer_material_colors](
+            const std::string& printer_preset_id,
+            const std::vector<std::string>& colors
+        )
+        {
+            printer_material_colors[printer_preset_id] = colors;
+            if (!app_config.save())
+                SPDLOG_ERROR("Failed to save printer material colors to application settings");
+        }
     );
 
     auto undo_store_ptr{std::make_unique<Undo::Store>(*m_project_interactor)};
@@ -506,7 +575,10 @@ void DesktopApp::finish_init()
 
     m_project_interactor->new_project();
 
-    select_favorite_preset(preset_interactor);
+    select_startup_printer_preset(preset_interactor);
+    m_project_interactor->project_settings_interactor().restore_persisted_colors(
+        m_project_interactor->selected_config_container_id()
+    );
 
     handle_previous_crash_recovery(app_services.app_config());
 

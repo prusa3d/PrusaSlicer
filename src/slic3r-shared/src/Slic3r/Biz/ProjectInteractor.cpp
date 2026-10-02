@@ -30,6 +30,7 @@
 #include "Slic3r/Directories.hpp"
 
 #include <Slic3r/Biz/I18N/I18N.hpp> // translations
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem/path.hpp>
 #include <tracy/Tracy.hpp>
 
@@ -171,11 +172,16 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
     }
 
     SelectionId project_id;
+    bool geometry_only_3mf = false;
     {
         InvokeLaterBag bag;
         const SelectionId original_project_id = m_selection.project_id;
         project_id                            = this->add_project(std::move(project), bag);
         Project& added_project{m_workbench.project(project_id)};
+        const bool has_3mf_presets = !added_project.config_containers().empty();
+        geometry_only_3mf = project_file_path.has_value()
+            && boost::algorithm::iends_with(project_file_path->string(), ".3mf")
+            && !has_3mf_presets;
 
         for (std::unique_ptr<ConfigContainer>& config_container : added_project.config_containers())
         {
@@ -198,6 +204,37 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
             added_project.config_containers().emplace_back(std::make_unique<ConfigContainer>());
             ConfigContainer* config_container = added_project.config_containers().back().get();
             m_preset_interactor.initialize_config_container_with_default(*config_container);
+        }
+
+        const bool has_saved_material_selection =
+            has_3mf_presets
+            && std::any_of(
+                added_project.config_containers().begin(),
+                added_project.config_containers().end(),
+                [this](const std::unique_ptr<ConfigContainer>& config_container)
+                {
+                    const auto& selected_preset = config_container->selected_preset();
+                    return !selected_preset.materials.empty()
+                        && m_preset_interactor.has_persisted_material_selection(
+                            selected_preset.printer.id
+                        );
+                }
+            );
+        if (has_saved_material_selection && m_dialog_provider != nullptr) {
+            bool use_3mf_material_selections = true;
+            m_dialog_provider->show_yesno_dialog(
+                Biz::_u8L("Filament selections"),
+                Biz::_u8L(
+                    "Use the filament selections saved in this 3MF?\n"
+                    "Choose No to use your saved selections for this printer instead."
+                ),
+                [&use_3mf_material_selections](bool answer)
+                { use_3mf_material_selections = answer; }
+            );
+            m_preset_interactor.set_restore_persisted_material_selections(
+                project_id,
+                !use_3mf_material_selections
+            );
         }
 
         for (std::unique_ptr<ConfigContainer>& config_container : added_project.config_containers())
@@ -229,6 +266,11 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
 
     invoke_listeners<IProjectsChangedListener>([project_id](auto* l)
                                                { l->on_project_loaded(project_id); });
+    if (geometry_only_3mf) {
+        invoke_listeners<IProjectsChangedListener>(
+            [](IProjectsChangedListener* l) { l->on_geometry_only_imported(); }
+        );
+    }
 
     return project_id;
 }
