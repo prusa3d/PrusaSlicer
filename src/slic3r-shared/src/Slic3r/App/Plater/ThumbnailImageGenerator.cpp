@@ -42,11 +42,7 @@ std::future<ThumbnailImageResults> ThumbnailImageGenerator::enqueue_thumbnail_re
     };
 
     if (!dispatcher.dispatch_on_main_thread([this, requests, _promise = std::move(promise)]() mutable {
-            Item item{.requests = requests, .promise = std::move(_promise)};
-
-            if (std::ranges::find(m_queue, item) == m_queue.end()) {
-                m_queue.push_back(std::move(item));
-            }
+            m_queue.push_back(Item{.requests = requests, .promise = std::move(_promise)});
 
             Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
         }))

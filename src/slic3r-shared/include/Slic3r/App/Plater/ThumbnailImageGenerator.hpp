@@ -41,11 +41,6 @@ private:
     {
         Biz::Slicing::ThumbnailImageRequests requests;
         std::promise<Biz::Slicing::ThumbnailImageResults> promise;
-
-        bool operator==(const Item& other) const
-        {
-            return requests == other.requests;
-        }
     };
 
     const Domain::Workbench* m_workbench{nullptr};
