@@ -13,6 +13,7 @@
 #include "Slic3r/App/IDialogManager.hpp"
 #include "Slic3r/App/LogicalPrinterSettingsDialog.hpp"
 #include "Slic3r/App/Navigator.hpp"
+#include "Slic3r/App/WarningPanel.hpp"
 #include "Slic3r/App/Yoga/ColorPickerButton.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/RectangleButton.hpp"
@@ -32,6 +33,7 @@
 #include "Slic3r/Log.hpp"
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <algorithm>
 #include <map>
@@ -57,6 +59,8 @@ using Slic3r::Domain::VirtualExtruder;
 using Slic3r::Domain::VirtualExtruderComponent;
 using Slic3r::Domain::VirtualExtruders;
 using Slic3r::Domain::Preset::SelectedPresetConfigPack;
+
+using Slic3r::Biz::Algorithms::VirtualExtruder::mixed_filament_types;
 
 using namespace Slic3r::App::Yoga;
 using namespace Slic3r::Biz;
@@ -336,7 +340,11 @@ void ColorMixDialog::update_physical_colors()
 
     for (size_t i = 0; i < m_recipe_rows->size() && i < m_working_virtual_extruders.size(); ++i) {
         m_recipe_rows->set(
-            ColorMixRecipeRow::make_row_data(m_working_virtual_extruders.at(i), m_physical_colors),
+            ColorMixRecipeRow::make_row_data(
+                m_working_virtual_extruders.at(i),
+                m_physical_colors,
+                m_physical_types
+            ),
             i
         );
     }
@@ -560,6 +568,10 @@ void ColorMixDialog::create_editor_pane(Item* pane)
     this->create_two_component_editor(m_editor_stack->emplace_back<Item>());
     this->create_three_component_editor(m_editor_stack->emplace_back<Item>());
     m_editor_stack->set_current_index(0);
+
+    m_filament_types_warning = editor_content->emplace_back<WarningPanel>(Color::Warning);
+    m_filament_types_warning->set_flex_shrink(0);
+    m_filament_types_warning->set_visible(false);
 
     m_add_component_button = editor_content->emplace_back<LayoutButton>(_u8L("Add component"));
     m_add_component_button->set_content_padding({10_fpx, 5_fpx});
@@ -1088,6 +1100,23 @@ void ColorMixDialog::update_preview_and_validation()
     m_color_picker_button->set_color(display_color);
     m_color_picker_button->set_background_color(display_color, display_color);
     m_reset_display_color_button->set_visible(virtual_extruder.color.has_value());
+
+    const std::vector<std::string> mixed_types =
+        mixed_filament_types(virtual_extruder, m_physical_types);
+    m_filament_types_warning->set_visible(!mixed_types.empty());
+    if (!mixed_types.empty()) {
+        m_filament_types_warning->set_warning(
+            _u8L("Mixed filament types"),
+            fmt::format(
+                // TRN {} is a list of filament types, e.g. "PLA + PETG"
+                fmt::runtime(_u8L(
+                    "This blend mixes {}. Different materials usually need different "
+                    "temperatures and may not stick to each other, so the print may fail."
+                )),
+                fmt::join(mixed_types, " + ")
+            )
+        );
+    }
 }
 
 void ColorMixDialog::update_selected_list_row()
@@ -1098,8 +1127,11 @@ void ColorMixDialog::update_selected_list_row()
     }
 
     m_recipe_rows->set(
-        ColorMixRecipeRow::
-            make_row_data(m_working_virtual_extruders.at(selection), m_physical_colors),
+        ColorMixRecipeRow::make_row_data(
+            m_working_virtual_extruders.at(selection),
+            m_physical_colors,
+            m_physical_types
+        ),
         selection
     );
 }
@@ -1117,7 +1149,8 @@ void ColorMixDialog::on_add_blend_clicked()
     m_working_virtual_extruders.push_back(std::move(virtual_extruder));
 
     m_recipe_rows->append(
-        ColorMixRecipeRow::make_row_data(m_working_virtual_extruders.back(), m_physical_colors)
+        ColorMixRecipeRow::
+            make_row_data(m_working_virtual_extruders.back(), m_physical_colors, m_physical_types)
     );
     this->select_row(static_cast<int>(m_working_virtual_extruders.size()) - 1);
 }
@@ -1224,7 +1257,9 @@ void ColorMixDialog::reset_recipe_rows()
     std::vector<RecipeRowData> rows;
     rows.reserve(m_working_virtual_extruders.size());
     for (const VirtualExtruder& virtual_extruder : std::as_const(m_working_virtual_extruders)) {
-        rows.push_back(ColorMixRecipeRow::make_row_data(virtual_extruder, m_physical_colors));
+        rows.push_back(
+            ColorMixRecipeRow::make_row_data(virtual_extruder, m_physical_colors, m_physical_types)
+        );
     }
 
     m_recipe_rows->reset(std::move(rows));
@@ -1310,7 +1345,8 @@ void ColorMixDialog::on_preset_clicked(const BlendPreset& preset)
     m_working_virtual_extruders.push_back(std::move(virtual_extruder));
 
     m_recipe_rows->append(
-        ColorMixRecipeRow::make_row_data(m_working_virtual_extruders.back(), m_physical_colors)
+        ColorMixRecipeRow::
+            make_row_data(m_working_virtual_extruders.back(), m_physical_colors, m_physical_types)
     );
     this->select_row(-1);
 }

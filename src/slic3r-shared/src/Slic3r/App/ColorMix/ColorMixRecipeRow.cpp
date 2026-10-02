@@ -7,10 +7,12 @@
 #include "Slic3r/App/Yoga/Rectangle.hpp"
 #include "Slic3r/App/Yoga/RectangleButton.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
+#include "Slic3r/Biz/Algorithms/VirtualExtruder.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Domain/VirtualExtruder.hpp"
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 using Slic3r::App::Platform::Color;
 using Slic3r::App::Platform::ColorGroup;
@@ -19,6 +21,8 @@ using Slic3r::App::Render::ImguiFontType;
 using Slic3r::Domain::VirtualExtruder;
 using Slic3r::Domain::VirtualExtruderComponent;
 using Slic3r::Domain::VirtualExtruderGradientStop;
+
+using Slic3r::Biz::Algorithms::VirtualExtruder::mixed_filament_types;
 
 using namespace Slic3r::App::Yoga;
 using namespace Slic3r::Biz;
@@ -89,12 +93,23 @@ void BadgeView::on_data_update()
 
 RecipeRowData ColorMixRecipeRow::make_row_data(
     const VirtualExtruder& virtual_extruder,
-    const std::vector<std::string>& physical_colors
+    const std::vector<std::string>& physical_colors,
+    const std::vector<std::string>& physical_types
 )
 {
     RecipeRowData row_data;
     row_data.title        = recipe_title(virtual_extruder);
     row_data.swatch_color = parse_hex_color(effective_color_hex(virtual_extruder, physical_colors));
+
+    const std::vector<std::string> mixed_types =
+        mixed_filament_types(virtual_extruder, physical_types);
+    if (!mixed_types.empty()) {
+        row_data.warning = fmt::format(
+            // TRN {} is a list of filament types, e.g. "PLA + PETG"
+            fmt::runtime(_u8L("Mixes different filament types: {}.")),
+            fmt::join(mixed_types, " + ")
+        );
+    }
 
     if (virtual_extruder.type() == VirtualExtruder::Type::Gradient) {
         row_data.subtitle_prefix = _u8L("Gradient");
@@ -182,6 +197,18 @@ ColorMixRecipeRow::ColorMixRecipeRow(
     m_badge_list_view->set_gap(6_fpx);
     m_badge_list_view->set_source_list(m_badges.get());
 
+    const ImColor transparent_color = m_theme->color_imgui(Color::Transparent);
+    m_warning_button =
+        m_main_button->emplace_back<LayoutButton>(std::string{}, Render::Icon::ExclamationTriangle);
+    m_warning_button->set_width(22_fpx);
+    m_warning_button->set_height(22_fpx);
+    m_warning_button->set_self_align(YGAlignCenter);
+    m_warning_button->set_flex_shrink(0);
+    m_warning_button->set_margin({4_fpx, 0, 0, 0});
+    m_warning_button->set_background_color(transparent_color, transparent_color);
+    m_warning_button->set_icon_tint(m_theme->color_imgui(Color::Warning));
+    m_warning_button->callbacks().action = [this]() -> void { m_on_selected(m_index); };
+
     m_remove_button = m_main_button->emplace_back<LayoutButton>(
         std::string{},
         Render::Icon::DeleteBtnIcon,
@@ -217,6 +244,9 @@ void ColorMixRecipeRow::on_data_update()
     m_subtitle_text->set_visible(!subtitle_text.empty());
 
     m_badge_list_view->set_visible(!m_state->badges.empty());
+
+    m_warning_button->set_tooltip(m_state->warning);
+    m_warning_button->set_visible(!m_state->warning.empty());
 
     if (badges_differ(m_badges, m_state->badges)) {
         m_badges->reset(m_state->badges);
