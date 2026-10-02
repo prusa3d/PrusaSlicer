@@ -223,7 +223,7 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 
   # Exclude the libraries which have no problem to link to Debug builds in
   # Release mode (mostly C libraries)
-  set(DEP_DEBUG_EXCLUDES GMP MPFR OpenSSL NanoSVG TIFF JPEG ZLIB PNG heatshrink)
+  set(DEP_DEBUG_EXCLUDES GMP MPFR OpenSSL NanoSVG TIFF JPEG ZLIB PNG heatshrink matdb)
   if (UNIX)
     # Making a separate debug build on Unix of wx is a nightmare
     list(APPEND DEP_DEBUG_EXCLUDES wxWidgets)

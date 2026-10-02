@@ -91,6 +91,24 @@ if (SLIC3R_STATIC)
 endif ()
 set(SLIC3R_RESOURCES_DIR ${CMAKE_SOURCE_DIR}/resources)
 
+# The material database is downloaded by the deps build (deps/+matdb) and installed
+# into <deps prefix>/share/matdb. Copy it into the resources dir so the install step
+# and the application pick it up like any other resource.
+set(SLIC3R_MATDB_DIR "")
+foreach (_prefix ${CMAKE_PREFIX_PATH})
+    # CMAKE_PREFIX_PATH may be relative to the build directory.
+    get_filename_component(_prefix "${_prefix}" ABSOLUTE BASE_DIR "${CMAKE_BINARY_DIR}")
+    if (IS_DIRECTORY "${_prefix}/share/matdb")
+        set(SLIC3R_MATDB_DIR "${_prefix}/share/matdb")
+        break()
+    endif ()
+endforeach ()
+if (NOT SLIC3R_MATDB_DIR)
+    message(FATAL_ERROR "Material database not found in CMAKE_PREFIX_PATH (<prefix>/share/matdb). Rebuild the dependencies in deps/.")
+endif ()
+file(REMOVE_RECURSE "${SLIC3R_RESOURCES_DIR}/matdb")
+file(COPY "${SLIC3R_MATDB_DIR}" DESTINATION "${SLIC3R_RESOURCES_DIR}")
+
 include("version.inc")
 include(GNUInstallDirs)
 include(CMakeDependentOption)

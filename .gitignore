@@ -29,3 +29,6 @@ CMakeUserPresets.json
 .aider*
 /src/slic3r-shared/imgui.ini
 /cmake-build-*/
+
+# Copied from the deps install prefix at configure time
+/resources/matdb/
