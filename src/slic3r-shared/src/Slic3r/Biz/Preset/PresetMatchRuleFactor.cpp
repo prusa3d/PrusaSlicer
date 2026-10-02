@@ -22,13 +22,17 @@ std::optional<Domain::Preset::MatDbMatchRule> make_match_rule(const Domain::Pres
     auto try_append = [&features, &inited]<typename T>(T& dest, const char* key) {
         if (auto it = features.find(key); it != features.end()) {
             if constexpr (Domain::is_std_optional_v<T>){
-                using VT = T::value_type;
-                const auto* val = std::get_if<VT>(&it->second);
-                if (val != nullptr) {
-                    dest = *val;
-                    inited = true;
+                if (std::holds_alternative<std::nullptr_t>(it->second)) {
+                    dest = std::nullopt;
                 } else {
-                    SPDLOG_ERROR("Expected type for {} is {}, but wasn't found", key, type_name<T>());
+                    using VT = T::value_type;
+                    const auto* val = std::get_if<VT>(&it->second);
+                    if (val != nullptr) {
+                        dest = *val;
+                        inited = true;
+                    } else {
+                        SPDLOG_ERROR("Expected type for {} is {}, but wasn't found", key, type_name<T>());
+                    }
                 }
             } else if constexpr (Domain::is_std_vector_v<T>) {
                 const auto* arr = std::get_if<Domain::JsonArray>(&it->second);
