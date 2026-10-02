@@ -6,6 +6,16 @@
 
 #include <boost/filesystem/path.hpp>
 
+#ifndef MATDB_PRESET_MATCH_DEBUG
+#define MATDB_PRESET_MATCH_DEBUG 0
+#endif
+
+#if MATDB_PRESET_MATCH_DEBUG
+#define MATDB_PRESET_MATCH_LOG(...) SPDLOG_DEBUG(__VA_ARGS__)
+#else
+#define MATDB_PRESET_MATCH_LOG(...)
+#endif
+
 namespace Slic3r::Biz::MatDb {
 
 struct MatDbInteractorProjectContext
@@ -150,12 +160,12 @@ void MatDbInteractor::run_query()
             sp.print.id,
             material_index
         );
-        SPDLOG_DEBUG("=================================================");
-        SPDLOG_DEBUG("Resolve presets for MatDB Item {}", mat.slug);
+        MATDB_PRESET_MATCH_LOG("=================================================");
+        MATDB_PRESET_MATCH_LOG("Resolve presets for MatDB Item {}", mat.slug);
         PresetMatches ret;
         for (const auto& [preset, mr] : mpv.match_rules()) {
             if (auto rank = mr.match(mat); rank > 0) {
-                SPDLOG_DEBUG(
+                MATDB_PRESET_MATCH_LOG(
                     "Match ranked {} with {} ({}:{}:{})",
                     rank,
                     preset.short_name(),
@@ -163,16 +173,18 @@ void MatDbInteractor::run_query()
                     preset.last_node_location.line,
                     preset.last_node_location.column
                 );
-                SPDLOG_DEBUG("Rule: {}", to_string(mr));
+                MATDB_PRESET_MATCH_LOG("Rule: {}", to_string(mr));
                 ret.emplace_back(preset.id, std::string{preset.short_name()}, rank);
             }
         }
-        SPDLOG_DEBUG("----Sorted results-------------------------------");
+        MATDB_PRESET_MATCH_LOG("----Sorted results-------------------------------");
         std::ranges::sort(ret, std::ranges::greater(), [](const auto& v) { return v.rank; });
+#if MATDB_PRESET_MATCH_DEBUG
         for (const auto& r : ret) {
-            SPDLOG_DEBUG("{}: {}", r.rank, r.preset_name);
+            MATDB_PRESET_MATCH_LOG("{}: {}", r.rank, r.preset_name);
         }
-        SPDLOG_DEBUG("=================================================");
+#endif
+        MATDB_PRESET_MATCH_LOG("=================================================");
         return ret;
     };
     std::ranges::copy(
