@@ -118,7 +118,7 @@ SelectedPreset SelectedPreset::make(const SelectedPresetMetadata& metadata, cons
                     ),
                     .print = EvaluatedPrintPreset::Preset::make(
                         PresetKind::SlaPrint,
-                        metadata.printer,
+                        metadata.print,
                         typed_config.sla_print_settings
                     ),
                     .materials = {{EvaluatedMaterialPreset::Preset::make(
