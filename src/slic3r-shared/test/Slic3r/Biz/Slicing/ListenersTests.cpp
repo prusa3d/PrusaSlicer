@@ -354,3 +354,58 @@ TEST_CASE_METHOD(SlicingFixture, "Update reinitializes the process if printer te
     CHECK(result_listener.result_recieved);
     CHECK(object_listener.object_recieved);
 }
+
+TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed reslices it with the other technology", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    // One bed with one model; only the selected preset (and so the technology) changes.
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::FFF)};
+    const ModelOnBed fff_settings{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::FFF)};
+    const ModelOnBed sla_settings{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    const SelectionId bed_id{bed.bed_instance.id().id};
+
+    ResultListener fdm_result_listener;
+    SLAResultListener sla_result_listener;
+    slicing.set_listener<IFDMResultListener>(&fdm_result_listener);
+    slicing.set_listener<ISLAResultListener>(&sla_result_listener);
+
+    const auto slice_with = [&](const ModelOnBed& settings) {
+        fdm_result_listener.gcodes.clear();
+        sla_result_listener = SLAResultListener{};
+        status_listener.status_events.clear();
+
+        slicing.update_process(
+            bed.model,
+            bed.project_metadata,
+            settings.preset_metadata,
+            settings.config,
+            bed.bed_instance
+        );
+        slicing.slice_all();
+
+        REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+            return !events.empty() && events.back().status_code == StatusCode::Finished;
+        }));
+    };
+
+    const auto has_gcode = [&]() {
+        const auto it = fdm_result_listener.gcodes.find(bed_id);
+        return it != fdm_result_listener.gcodes.end() && it->second && !it->second->str().empty();
+    };
+    const auto has_sla_slices = [&]() {
+        return sla_result_listener.result_recieved
+            && sla_result_listener.result.type != ResultType::None;
+    };
+
+    slice_with(fff_settings);
+    CHECK(has_gcode());
+    CHECK_FALSE(has_sla_slices());
+
+    slice_with(sla_settings);
+    CHECK(has_sla_slices());
+    CHECK_FALSE(has_gcode());
+
+    slice_with(fff_settings);
+    CHECK(has_gcode());
+    CHECK_FALSE(has_sla_slices());
+}
