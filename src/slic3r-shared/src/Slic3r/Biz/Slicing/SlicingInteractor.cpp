@@ -408,6 +408,10 @@ void SlicingInteractor::process_update_requests()
 
         if (process.get_hw_printer_id() != request.preset_metadata.hw_config.id) {
             m_processes.erase(id);
+            // The new process may be of the other technology and would never replace the result
+            // of the old one. Dispatched, so that it comes after any result still in the queue.
+            on_fdm_result({}, id);
+            on_sla_result(id, {});
             create_process(
                 request.model.get(),
                 request.project_metadata,

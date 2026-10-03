@@ -10,6 +10,8 @@
 #include "Slic3r/TestUtils/TestData.hpp"
 
 #include "libslic3r/SLAResult.hpp"
+#include "Slic3r/Biz/FDMResultCache.hpp"
+#include "Slic3r/Biz/SLAResultCache.hpp"
 
 using namespace Catch;
 using Catch::Matchers::Equals;
@@ -408,4 +410,48 @@ TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed resl
     slice_with(fff_settings);
     CHECK(has_gcode());
     CHECK_FALSE(has_sla_slices());
+}
+
+TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed clears the result of the old technology", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    // The result caches the UI reads from must not keep the result of the old technology.
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::FFF)};
+    const ModelOnBed fff_settings{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::FFF)};
+    const ModelOnBed sla_settings{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+
+    Slic3r::Biz::FDMResultCache fdm_cache;
+    Slic3r::Biz::SLAResultCache sla_cache;
+    slicing.set_listener<IFDMResultListener>(&fdm_cache);
+    slicing.set_listener<ISLAResultListener>(&sla_cache);
+
+    const auto slice_with = [&](const ModelOnBed& settings) {
+        status_listener.status_events.clear();
+
+        slicing.update_process(
+            bed.model,
+            bed.project_metadata,
+            settings.preset_metadata,
+            settings.config,
+            bed.bed_instance
+        );
+        slicing.slice_all();
+
+        REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+            return !events.empty() && events.back().status_code == StatusCode::Finished;
+        }));
+        return status_listener.status_events.back().slicing_id;
+    };
+
+    const SlicingId id{slice_with(fff_settings)};
+    CHECK(fdm_cache.get_result(id));
+    CHECK_FALSE(sla_cache.get_result(id));
+
+    CHECK(slice_with(sla_settings) == id);
+    CHECK(sla_cache.get_result(id));
+    CHECK_FALSE(fdm_cache.get_result(id));
+
+    CHECK(slice_with(fff_settings) == id);
+    CHECK(fdm_cache.get_result(id));
+    CHECK_FALSE(sla_cache.get_result(id));
 }
