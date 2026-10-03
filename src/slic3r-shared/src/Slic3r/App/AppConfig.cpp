@@ -381,14 +381,22 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn  = []()
     {
+        // One list for both technologies, the sidebar shows the ones of the selected printer.
         return Domain::ConfigValue(
             std::vector<std::string>{
+                // FFF
                 "perimeters",
                 "fill_pattern",
                 "fill_density",
                 "brim_type",
                 "support_material",
-                "support_material_style"
+                "support_material_style",
+                // SLA
+                "supports_enable",
+                "support_tree_type",
+                "support_points_density_relative",
+                "pad_enable",
+                "hollowing_enable"
             }
         );
     };
