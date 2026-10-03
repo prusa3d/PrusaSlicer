@@ -455,3 +455,26 @@ TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed clea
     CHECK(fdm_cache.get_result(id));
     CHECK_FALSE(sla_cache.get_result(id));
 }
+
+TEST_CASE_METHOD(SlicingFixture, "SLA bed with a pad but no supports ends as invalid data", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    // A pad needs supports (no pad can be generated without them); it must not crash.
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    ConfigPackSLA& config{std::get<ConfigPackSLA>(bed.config)};
+    config.sla_print_settings.items.opt("supports_enable").set(false);
+    REQUIRE(config.sla_print_settings.items.opt("pad_enable").get<bool>());
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+    slicing.slice_all();
+
+    CHECK(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        return !events.empty() && events.back().status_code == StatusCode::InvalidData;
+    }));
+}

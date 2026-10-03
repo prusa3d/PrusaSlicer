@@ -970,7 +970,10 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject& po)
     // AABBMesh is created in the previous step(support_points)
     po.m_supportable_mesh->pad_cfg = pcfg;
 
-    const indexed_triangle_set& tree_its = po.m_preview->support_structure->its;
+    // There is no support structure when supports are disabled.
+    static const indexed_triangle_set no_support_its;
+    const indexed_triangle_set& tree_its =
+        po.m_preview->support_structure ? po.m_preview->support_structure->its : no_support_its;
     indexed_triangle_set its = sla::create_pad(*po.m_supportable_mesh, tree_its, ctl);
     if (!validate_pad(its, po.m_supportable_mesh->pad_cfg)) {
         throw Biz::Slicing::Exception{
@@ -999,7 +1002,10 @@ void SLAPrint::Steps::slice_supports(SLAPrintObject &po) {
     ctl.stopcondition = [this]() { return canceled(); };
     ctl.cancelfn = [this]() { throw_if_canceled(); };
 
-    const indexed_triangle_set& tree_its = po.m_preview->support_structure->its;
+    // There is no support structure when supports are disabled.
+    static const indexed_triangle_set no_support_its;
+    const indexed_triangle_set& tree_its =
+        po.m_preview->support_structure ? po.m_preview->support_structure->its : no_support_its;
     const indexed_triangle_set& pad_its = po.m_preview->pad ? po.m_preview->pad->its : indexed_triangle_set{};
     float closing_radius = float(po.config().get<double>("slice_closing_radius"));
     po.m_support_slices = sla::slice(tree_its, pad_its, heights, closing_radius, ctl);
