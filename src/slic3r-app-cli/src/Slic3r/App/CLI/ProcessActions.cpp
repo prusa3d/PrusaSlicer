@@ -762,12 +762,12 @@ static bool perform_slicing_exports(
             project_interactor.selected_config_container().selected_preset().technology();
         if (action.export_gcode && printer_technology == PrinterTechnology::SLA) {
             boost::nowide::cerr
-                << "Error: Cannot export G-code for an FFF configuration."
+                << "Error: Cannot export G-code for an SLA configuration."
                 << std::endl;
             return false;
         } else if (action.export_sla && printer_technology == PrinterTechnology::FFF) {
             boost::nowide::cerr
-                << "error: Cannot export SLA slices for a SLA configuration."
+                << "Error: Cannot export SLA slices for an FFF configuration."
                 << std::endl;
             return false;
         }
