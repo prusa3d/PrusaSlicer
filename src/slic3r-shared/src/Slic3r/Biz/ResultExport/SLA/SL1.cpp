@@ -192,7 +192,11 @@ static void write_thumbnail(Zipper &zipper, const Domain::Image &data)
 }
 }
 
-void store_sl1(const std::string& file_path, const Slicing::SLAResultData& data)
+void store_sl1(
+    const std::string& file_path,
+    const std::string& job_name,
+    const Slicing::SLAResultData& data
+)
 {
     std::string layer_extension = ".png";
     Zipper::e_compression compression = Zipper::FAST_COMPRESSION;
@@ -202,9 +206,9 @@ void store_sl1(const std::string& file_path, const Slicing::SLAResultData& data)
     }
 
     Zipper zipper{file_path, compression};
-    std::string project = data.project_name.empty() ?
-        boost::filesystem::path(zipper.get_filename()).stem().string() :
-        data.project_name;
+    std::string project = !job_name.empty() ? job_name :
+        !data.project_name.empty()           ? data.project_name :
+                                               boost::filesystem::path(zipper.get_filename()).stem().string();
 
     const auto& stats = *data.print_statistics;
 

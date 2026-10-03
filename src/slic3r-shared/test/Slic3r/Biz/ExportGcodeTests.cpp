@@ -11,6 +11,8 @@
 #include "Slic3r/Biz/Slicing/TestUtils.hpp"
 #include "Slic3r/Biz/Slicing/GCodeUtils.hpp"
 
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
+
 #include "Slic3r/App/Plater/ThumbnailImageGenerator.hpp"
 #include "Slic3r/App/Platform/StdMainThreadDispatcher.hpp"
 
@@ -29,6 +31,29 @@ using Slic3r::Test::is_gcode_sane;
 using namespace Slic3r::Biz;
 using namespace trompeloeil;
 namespace fs = boost::filesystem;
+
+namespace {
+
+std::optional<std::string> read_zip_entry(const fs::path& archive_path, const std::string& entry_name)
+{
+    using Slic3r::Biz::Algorithms::ZipArchive;
+    ZipArchive archive = ZipArchive::open(archive_path.string(), ZipArchive::Mode::Read);
+    if (!archive.is_open()) {
+        return std::nullopt;
+    }
+    const int index = archive.locate_file(entry_name);
+    mz_zip_archive_file_stat stat;
+    if (index < 0 || !archive.stat_file(index, stat)) {
+        return std::nullopt;
+    }
+    std::string content(static_cast<size_t>(stat.m_uncomp_size), '\0');
+    if (!archive.extract_entry_to(static_cast<mz_uint>(index), content.data(), content.size())) {
+        return std::nullopt;
+    }
+    return content;
+}
+
+} // namespace
 
 struct SlicingStatusListener : public Slic3r::Biz::Slicing::IStatusListener
 {
@@ -307,6 +332,40 @@ TEST_CASE_METHOD(ExportGcodeFixture, "Export gcode", "[export][timeout]")
             }
         }
     }
+}
+
+TEST_CASE_METHOD(ExportGcodeFixture, "Exported sla archive is named after the output file", "[export][timeout]")
+{
+    using namespace std::chrono_literals;
+
+    SlicingStatusListener slicing_listener{project_interactor, false};
+    project_interactor.slicing_interactor().add_listener<Slic3r::Biz::Slicing::IStatusListener>(&slicing_listener);
+    Tests::ScopedThreadDispatcher thread_dispatcher_guard{dispatcher};
+
+    project_interactor.new_project();
+    Slic3r::Test::ModelOnBed model_on_bed{Slic3r::Test::generate_cubes(1, 5), Slic3r::Domain::ConfigPackSLA{}};
+    const Slic3r::Domain::SlicingId id{0, model_on_bed.bed_instance.id().id};
+    const TargetPathGuard output{fs::path(Slic3r::data_dir()) / "my_print.sl1"};
+    slicing_listener.add_export(id, output.path());
+
+    project_interactor.slicing_interactor().update_process(
+        model_on_bed.model,
+        model_on_bed.project_metadata,
+        model_on_bed.preset_metadata,
+        model_on_bed.config,
+        model_on_bed.bed_instance
+    );
+    project_interactor.slicing_interactor().slice_all();
+
+    REQUIRE(wait_for_status_count(1, job_listener.status_counter, 30s, dispatcher));
+    REQUIRE(fs::exists(output.path()));
+
+    // The archive is written into a temporary file first; the job must still carry the
+    // name of the final file, which is what the printer shows.
+    const std::optional<std::string> config_ini = read_zip_entry(output.path(), "config.ini");
+    REQUIRE(config_ini.has_value());
+    CHECK(config_ini->find("jobDir = my_print\n") != std::string::npos);
+    CHECK(read_zip_entry(output.path(), "my_print00000.png").has_value());
 }
 
 TEST_CASE_METHOD(ExportGcodeFixture, "Export sla", "[export][timeout]")
