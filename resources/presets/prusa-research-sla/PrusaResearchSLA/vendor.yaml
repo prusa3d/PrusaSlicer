@@ -43,11 +43,6 @@ technology: SLA
 name: SLA default
 id: sla_default
 ---
-kind: sheet
-name: SLA default
-id: sla_default
-type: ''
----
 kind: printer_config
 id: sl1s
 printer: sl1s
@@ -55,7 +50,6 @@ name: SL1S
 legacy_printer_model: [SL1S]
 tools:
 - tool: sla_default
-sheet: sla_default
 ---
 kind: printer_config
 id: sl1
@@ -64,4 +58,3 @@ name: SL1
 legacy_printer_model: [SL1]
 tools:
 - tool: sla_default
-sheet: sla_default
