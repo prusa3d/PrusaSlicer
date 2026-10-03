@@ -359,7 +359,13 @@ slice_and_export_selected_bed(CLIRuntime& runtime, const std::optional<std::stri
         dest_path = export_path.string();
     }
 
-    project_interactor.do_result_export(slicing_id, export_path);
+    // The result is exported under export_path and renamed to the requested output below. Formats
+    // storing their own name inside (SL1) get the one of the requested output, not export_path's.
+    std::string job_name;
+    if (output_path.has_value() && !boost::filesystem::is_directory(output_path.value())) {
+        job_name = boost::filesystem::path(output_path.value()).stem().string();
+    }
+    project_interactor.do_result_export(slicing_id, export_path, job_name);
 
     runtime.wait_until([&export_finished_listener]()
                        { return export_finished_listener.export_finished; });

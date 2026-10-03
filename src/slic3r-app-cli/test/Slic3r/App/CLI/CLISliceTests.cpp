@@ -203,6 +203,9 @@ TEST_CASE("CLI slices an SLA 3MF project", "[cli][sla][timeout]")
     const std::optional<std::string> config_ini = read_zip_entry(archive_path, "config.ini");
     REQUIRE(config_ini.has_value());
     CHECK(config_ini->find("layerHeight = 0.05\n") != std::string::npos);
+    // The job is named after the requested output, not after the output filename format.
+    CHECK(config_ini->find("jobDir = print\n") != std::string::npos);
+    CHECK(read_zip_entry(archive_path, "print00000.png").has_value());
 }
 
 TEST_CASE("CLI does not export G-code for an SLA printer", "[cli][sla]")

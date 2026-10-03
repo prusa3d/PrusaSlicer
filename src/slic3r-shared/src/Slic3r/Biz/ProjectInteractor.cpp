@@ -954,7 +954,11 @@ void ProjectInteractor::do_result_export_inner(const Domain::SlicingId id, Physi
     }
 }
 
-void ProjectInteractor::do_result_export(const Domain::SlicingId id, const boost::filesystem::path& dest_path)
+void ProjectInteractor::do_result_export(
+    const Domain::SlicingId id,
+    const boost::filesystem::path& dest_path,
+    const std::string& job_name
+)
 {
     set_output_dir(id.project_id, dest_path);
     set_output_extension(id.project_id, dest_path.extension().string());
@@ -970,6 +974,7 @@ void ProjectInteractor::do_result_export(const Domain::SlicingId id, const boost
         dest_path,
         PrintHost::get_export_format_from_extension(dest_path.extension().string())
     };
+    data.job_name = job_name;
     do_result_export_inner(id, std::move(config), std::move(data));
 }
 
