@@ -3,6 +3,7 @@
 #include "Slic3r/App/Render/ScopedDebugGroup.hpp"
 #include "Slic3r/App/Scene/BedNodeTag.hpp"
 #include "Slic3r/App/Scene/SceneNodeTag.hpp"
+#include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/Domain/TemplateUtils.hpp"
 // DEBUG ONLY: for MEASURE_GIZMO_DEBUG
 #include "Slic3r/App/Plater/MeasureGizmo.hpp"
@@ -37,6 +38,7 @@ GizmoManager::GizmoManager(
     m_project_changed_listener_scope(project_interactor, *this),
     m_selected_project_changed_listener_scope(project_interactor, *this),
     m_scene_selection_changed_listener_scope(project_interactor.scene_interactor(), *this),
+    m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
     m_projects(project_interactor),
     m_scene_provider(scene_provider),
     m_project_interactor(project_interactor),
@@ -46,6 +48,8 @@ GizmoManager::GizmoManager(
 {
     GizmoManager::on_selected_project_changed(m_project_interactor.selected_project_id());
 }
+
+GizmoManager::~GizmoManager() = default;
 
 namespace {
 std::vector<IGizmo*> get_active_gizmos(
@@ -254,6 +258,34 @@ void GizmoManager::on_scene_selection_changed(
     Domain::SelectionId project_id,
     const Biz::Scene::ObjectSelection& selection
 ) {
+    deactivate_current_tool_if_disabled();
+}
+
+void GizmoManager::on_config_container_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+)
+{
+    if (project_id == m_project_interactor.selected_project_id()) {
+        deactivate_current_tool_if_disabled();
+    }
+}
+
+void GizmoManager::on_preset_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    Biz::Preset::PresetItemType type
+)
+{
+    if (type == Biz::Preset::PresetItemType::PrinterPreset
+        && project_id == m_project_interactor.selected_project_id())
+    {
+        deactivate_current_tool_if_disabled();
+    }
+}
+
+void GizmoManager::deactivate_current_tool_if_disabled()
+{
     for (const IToolGizmoPtr& tool_gizmo : m_tool_gizmos) {
         if (current_tool_type() == tool_gizmo->type()
             && !tool_gizmo->enabled())
