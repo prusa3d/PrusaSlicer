@@ -1,0 +1,66 @@
+id: Prusament Resin Flex80 Transparent Clear
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Flexible
+  material_colour: '#F3F6F4'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: kdwfblzyRu6VmG4h3DWFBQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Flex80 Transparent Clear @SL1 0.025
+    id: OvsSORKQS8ytvA7DMnwugA
+    values:
+      exposure_time: 10
+      initial_exposure_time: 30
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Flex80 Transparent Clear @SL1 0.05
+    id: ERwLTfNmTrmKWLzUcdbTUg
+    values:
+      exposure_time: 15
+      initial_exposure_time: 30
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Flex80 Transparent Clear @SL1 0.1
+    id: XIGmmK4kQFyJsJ+vNi5NPQ
+    values:
+      exposure_time: 20
+      initial_exposure_time: 30
+## SL1S
+- condition: printer.model == "SL1S"
+  id: QXYEE2dCRMinkTcH+7onTg
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [1, 10]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Flex80 Transparent Clear @SL1S 0.025
+    id: uoh6RSIxQSycaSQekU4hGg
+    values:
+      exposure_time: 4
+      initial_exposure_time: 12
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Flex80 Transparent Clear @SL1S 0.05
+    id: t47j6hAVSYaKDJyda9Bltw
+    values:
+      exposure_time: 5
+      initial_exposure_time: 15
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Flex80 Transparent Clear @SL1S 0.1
+    id: QOSyOZ++TB67imqec86OcA
+    values:
+      exposure_time: 6
+      initial_exposure_time: 18

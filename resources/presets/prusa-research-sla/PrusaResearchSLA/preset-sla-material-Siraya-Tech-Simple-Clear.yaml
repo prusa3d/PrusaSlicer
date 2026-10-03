@@ -1,0 +1,42 @@
+id: Siraya Tech Simple Clear
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Siraya Tech
+  material_type: Tough
+  material_colour: '#F8F8F8'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: amJ7BidZQL61fvJ3eD42mA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Siraya Tech Simple Clear @SL1 0.025
+    id: dRYhnPfMQHWiiockSTwA2Q
+    values:
+      exposure_time: 8
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Siraya Tech Simple Clear @SL1 0.05
+    id: pZnHFwczQqOZCIWdyh2nng
+    values:
+      exposure_time: 10
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: sd1SWtBKRVa1XS1SGTF9DQ
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Siraya Tech Simple Clear @SL1S 0.05
+    id: jw/A4sJlSAq5Fkqgq/o3CA
+    values:
+      exposure_time: 3.3
+      initial_exposure_time: 28

@@ -1,0 +1,33 @@
+id: ALTANA Cubic Ink High Performance 4-2800 VP-ESD black
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Altana
+  material_type: Engineering
+  material_colour: '#595959'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: 2AAtxB98RviqruYKhYn2HQ
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: ALTANA Cubic Ink High Performance 4-2800 VP-ESD black @SL1S 0.05
+    id: Se5A+1r4Sci79v4fhpYZ3g
+    values:
+      exposure_time: 10
+      initial_exposure_time: 25
+      material_correction_x: 1.01
+      material_correction_y: 1.01
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: ALTANA Cubic Ink High Performance 4-2800 VP-ESD black @SL1S 0.1
+    id: JrHdSqm9SEmnoptprZ17bQ
+    values:
+      exposure_time: 11
+      initial_exposure_time: 25
+      material_correction_x: 1.01
+      material_correction_y: 1.01

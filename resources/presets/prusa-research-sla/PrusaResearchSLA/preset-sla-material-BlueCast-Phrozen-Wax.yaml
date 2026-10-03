@@ -1,0 +1,42 @@
+id: BlueCast Phrozen Wax
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: BlueCast
+  material_type: Tough
+  material_colour: '#007EFD'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: uVipeDAjQaa1FUohXSwrxQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: BlueCast Phrozen Wax @SL1 0.025
+    id: +DnQ0HkfQ2emvPGKOi5wAg
+    values:
+      exposure_time: 15
+      initial_exposure_time: 50
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast Phrozen Wax @SL1 0.05
+    id: Gs/3YhHWQ4qLF2yrHXqL+A
+    values:
+      exposure_time: 16
+      initial_exposure_time: 50
+## SL1S
+- condition: printer.model == "SL1S"
+  id: SmXTDa1uS1iws9PF2BSeaA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast Phrozen Wax @SL1S 0.05
+    id: PqqTJp+fS9uBW8J44hM8Fw
+    values:
+      exposure_time: 5.3
+      initial_exposure_time: 40

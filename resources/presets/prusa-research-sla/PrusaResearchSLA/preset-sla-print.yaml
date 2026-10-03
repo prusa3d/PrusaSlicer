@@ -1,0 +1,100 @@
+id: '*common*'
+kind: sla_print
+# name: '*common*'
+values:
+  layer_height: 0.05
+  pad_enable: 1.0
+  pad_max_merge_distance: 50.0
+  pad_wall_height: 0.0
+  pad_wall_slope: 45.0
+  pad_wall_thickness: 1.0
+  slice_closing_radius: 0.005
+  support_base_diameter: 3.0
+  support_base_height: 1.0
+  support_critical_angle: 45.0
+  support_head_front_diameter: 0.4
+  support_head_penetration: 0.4
+  support_head_width: 3.0
+  support_max_bridge_length: 10.0
+  support_object_elevation: 5.0
+  support_pillar_connection_mode: zigzag
+  support_pillar_diameter: 1.0
+  support_pillar_widening_factor: 0.0
+  support_small_pillar_diameter_percent: 60%
+  supports_enable: 1.0
+---
+id: 8jnFV3YHTHib7DMnjRF4wQ
+kind: sla_print
+inherits:
+- '*common*'
+values:
+  pad_enable: 1.0
+  pad_max_merge_distance: 50.0
+  pad_wall_height: 0.0
+  pad_wall_slope: 45.0
+  pad_wall_thickness: 1.0
+  slice_closing_radius: 0.005
+  support_base_diameter: 3.0
+  support_base_height: 1.0
+  support_critical_angle: 45.0
+  support_max_bridge_length: 10.0
+  support_object_elevation: 5.0
+  support_pillar_connection_mode: zigzag
+  support_pillar_widening_factor: 0.0
+  support_small_pillar_diameter_percent: 60%
+  supports_enable: 1.0
+variants:
+- condition: printer.model == "SL1S"
+  id: IdItpdybTTePdpmeokr4GA
+  values:
+    output_filename_format: '[input_filename_base].sl1s'
+    support_head_width: 3.0
+    support_pillar_diameter: 1.0
+  variants:
+  - name: 0.025 UltraDetail @SL1S
+    id: OQq4+PW4RJqsjZZNnYR/LQ
+    values:
+      layer_height: 0.025
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+  - name: 0.05 Normal @SL1S
+    id: zL255WhoTUaFYT/BWPALjQ
+    values:
+      layer_height: 0.05
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+  - name: 0.1 Fast @SL1S
+    id: g3aU9KKmTwKlbIpFuCqk7g
+    values:
+      layer_height: 0.1
+      support_head_front_diameter: 0.6
+      support_head_penetration: 0.6
+- condition: printer.model == "SL1"
+  id: yZiqkeQuT7GazO+VZCiEog
+  values:
+    output_filename_format: '[input_filename_base].sl1'
+  variants:
+  - name: 0.025 UltraDetail
+    id: oYAkF4FZRcW7dnvNqvTPWA
+    values:
+      layer_height: 0.025
+      support_head_front_diameter: 0.4
+      support_head_penetration: 0.4
+      support_head_width: 2.0
+      support_pillar_diameter: 1.0
+  - name: 0.05 Normal
+    id: MpQ1nq13RBmNeeaW0ZQJCQ
+    values:
+      layer_height: 0.05
+      support_head_front_diameter: 0.4
+      support_head_penetration: 0.4
+      support_head_width: 3.0
+      support_pillar_diameter: 1.0
+  - name: 0.1 Fast
+    id: MvLA7/slQrKppjVWixYrzg
+    values:
+      layer_height: 0.1
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+      support_head_width: 3.0
+      support_pillar_diameter: 1.3

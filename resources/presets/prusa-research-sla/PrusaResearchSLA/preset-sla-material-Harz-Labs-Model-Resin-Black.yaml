@@ -1,0 +1,42 @@
+id: Harz Labs Model Resin Black
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Harz Labs
+  material_type: Tough
+  material_colour: '#595959'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: X/8vhP7CRh2NTbqpSH08Tw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Harz Labs Model Resin Black @SL1 0.025
+    id: 30xGSMLlTy2Pz7ztBM/Zdw
+    values:
+      exposure_time: 10
+      initial_exposure_time: 20
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Harz Labs Model Resin Black @SL1 0.05
+    id: wLZTlMZmTmyipuU6BCo2Jw
+    values:
+      exposure_time: 13
+      initial_exposure_time: 20
+## SL1S
+- condition: printer.model == "SL1S"
+  id: h2MdWG5lQE+kVMTkcWqygg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Harz Labs Model Resin Black @SL1S 0.05
+    id: CAZEjrJpRqGFL3FVbw8knQ
+    values:
+      exposure_time: 4.3
+      initial_exposure_time: 16

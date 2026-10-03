@@ -1,0 +1,29 @@
+id: LOCTITE 3D PRO476
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Henkel
+  material_type: Engineering
+  material_colour: '#595959'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: XuRGk93PRRmqGTb8xzzwsQ
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: LOCTITE 3D PRO476 @SL1S 0.05
+    id: IUZ9RUEcTICqTarY66oPrg
+    values:
+      exposure_time: 7
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: LOCTITE 3D PRO476 @SL1S 0.1
+    id: sVO8xQZlSNCl1/9iiWP5dA
+    values:
+      exposure_time: 9
+      initial_exposure_time: 25

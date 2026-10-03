@@ -1,0 +1,35 @@
+id: 3DM-XPRO White
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: 3DM
+  material_type: Engineering
+  material_colour: '#FFFFFF'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: AbzHW07CRUey2pcSmcYcrQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-XPRO White @SL1 0.05
+    id: B44Pxay0Sfi9/3sRc94t9g
+    values:
+      exposure_time: 9
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: 6yG/C3/lRnOJcqQ0eGhONA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-XPRO White @SL1S 0.05
+    id: 29ETXj7qSMisyvehQ9EXig
+    values:
+      exposure_time: 3
+      initial_exposure_time: 28

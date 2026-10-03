@@ -1,0 +1,42 @@
+id: Harz Labs Model Resin Cherry
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Harz Labs
+  material_type: Tough
+  material_colour: '#EC0000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: ixvuEQMSRkuaps9VhNCkOw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Harz Labs Model Resin Cherry @SL1 0.025
+    id: AWuk9zG0RqCZgxUZUSW6TA
+    values:
+      exposure_time: 10
+      initial_exposure_time: 20
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Harz Labs Model Resin Cherry @SL1 0.05
+    id: ufUAIYNWRU+NrnOcYntr3w
+    values:
+      exposure_time: 13
+      initial_exposure_time: 20
+## SL1S
+- condition: printer.model == "SL1S"
+  id: iw1h7RW1SFqmrOQuYjle5Q
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Harz Labs Model Resin Cherry @SL1S 0.05
+    id: ueHGvxeKTmKhj+5eTRtD1g
+    values:
+      exposure_time: 4.3
+      initial_exposure_time: 16

@@ -1,0 +1,36 @@
+id: DruckWege Type D Dental Model
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: DruckWege
+  material_type: Medical
+  material_colour: '#FFEEE6'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: JfAg0jvERyOk1UvEzA0lUg
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: DruckWege Type D Dental Model @SL1S 0.025
+    id: nWdMcGlQSP25wiNRKMEyPQ
+    values:
+      exposure_time: 1.2
+      initial_exposure_time: 15
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: DruckWege Type D Dental Model @SL1S 0.05
+    id: NfIUlUnZQeOnBxFglQH9rQ
+    values:
+      exposure_time: 1.4
+      initial_exposure_time: 15
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: DruckWege Type D Dental Model @SL1S 0.1
+    id: p/ZZnssWTSigAvKeQPp7jQ
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 15

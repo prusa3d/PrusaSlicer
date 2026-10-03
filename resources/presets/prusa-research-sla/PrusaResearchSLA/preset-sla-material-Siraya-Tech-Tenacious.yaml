@@ -1,0 +1,42 @@
+id: Siraya Tech Tenacious
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Siraya Tech
+  material_type: Tough
+  material_colour: '#F8F8F8'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: fvMlb7GIQF27fKxEZbiztg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Siraya Tech Tenacious @SL1 0.025
+    id: lZAGVrKgQ7OLQKdjaldzQg
+    values:
+      exposure_time: 6
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Siraya Tech Tenacious @SL1 0.05
+    id: lBw2fkdiS3ynscjrlggqRQ
+    values:
+      exposure_time: 8
+      initial_exposure_time: 35
+## SL1S
+- condition: printer.model == "SL1S"
+  id: jKxdhBMHQAq4vK/k4TFGQg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Siraya Tech Tenacious @SL1S 0.05
+    id: 3iy14dlPSZmk77oceIjyHw
+    values:
+      exposure_time: 2.7
+      initial_exposure_time: 28

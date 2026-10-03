@@ -1,0 +1,41 @@
+id: Liqcreate Dental Model Pro Beige
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Liqcreate
+  material_type: Medical
+  material_colour: '#BF9C87'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: iLfWdMenSNazaPVjeh7T2w
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Liqcreate Dental Model Pro Beige @SL1S 0.05
+    id: KwM7hdcYSDmAVEg60F9KeQ
+    values:
+      exposure_time: 4.5
+      initial_exposure_time: 20
+      material_correction_x: 1.0073
+      material_correction_y: 1.0073
+      support_pillar_diameter: 1
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+      support_head_width: 3
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Liqcreate Dental Model Pro Beige @SL1S 0.1
+    id: OzWpJm9oT8itQowLXfl5KA
+    values:
+      exposure_time: 5.5
+      initial_exposure_time: 25
+      material_correction_x: 1.0073
+      material_correction_y: 1.0073
+      support_pillar_diameter: 1
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+      support_head_width: 3

@@ -1,0 +1,39 @@
+id: Prusament Resin Flex Anatomic Red
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Medical
+  material_colour: '#AD4F54'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: H4F5x8fURW64aCyzyTaObQ
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [3, 15]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Flex Anatomic Red @SL1S 0.025
+    id: Vwl4+Bz7QjORE4bUCph8jA
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 9
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Flex Anatomic Red @SL1S 0.05
+    id: 1wZa9TZ5Tyy90O/s9hh/Ow
+    values:
+      exposure_time: 3
+      initial_exposure_time: 9
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Flex Anatomic Red @SL1S 0.1
+    id: te11MgMJReyv8+mBagMuuw
+    values:
+      exposure_time: 3.5
+      initial_exposure_time: 12

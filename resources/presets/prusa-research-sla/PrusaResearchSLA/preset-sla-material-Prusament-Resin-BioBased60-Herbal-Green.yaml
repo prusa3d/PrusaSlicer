@@ -1,0 +1,66 @@
+id: Prusament Resin BioBased60 Herbal Green
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Tough
+  material_colour: '#3AD200'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: TGREsNqLQ+2zA5v6p2USGg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Herbal Green @SL1 0.025
+    id: gjlC1Y9pTxqzARw0zzu2PA
+    values:
+      exposure_time: 7
+      initial_exposure_time: 30
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Herbal Green @SL1 0.05
+    id: oao9nS9XS4yzMSqZ36WpjQ
+    values:
+      exposure_time: 8
+      initial_exposure_time: 30
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Herbal Green @SL1 0.1
+    id: 4bBiNAeLTN23wAmJ1SVUUw
+    values:
+      exposure_time: 13
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: ayoc90Q7TT2c29odAcyWtQ
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [2, 15]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Herbal Green @SL1S 0.025
+    id: PSORwST6RCmOVJh8GaOVnQ
+    values:
+      exposure_time: 3.7
+      initial_exposure_time: 12
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Herbal Green @SL1S 0.05
+    id: lR1Hcz5wQ4inFogiPCYm8Q
+    values:
+      exposure_time: 4.2
+      initial_exposure_time: 12
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Herbal Green @SL1S 0.1
+    id: cMlp/29HQ66Uw9Fcgqr9Dw
+    values:
+      exposure_time: 5.3
+      initial_exposure_time: 16

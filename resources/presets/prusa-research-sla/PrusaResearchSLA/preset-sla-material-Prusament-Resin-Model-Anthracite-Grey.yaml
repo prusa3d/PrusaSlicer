@@ -1,0 +1,45 @@
+id: Prusament Resin Model Anthracite Grey
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Model
+  material_colour: '#808080'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: hC+4R6UOTwGqrbtg0jWgZA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [1, 10]
+    tilt_down_initial_speed: [layer1750, layer1750]
+    tilt_down_offset_steps: [0, 1200]
+    tilt_down_finish_speed: [move8000, move5120]
+    tilt_up_initial_speed: [move8000, move8000]
+    tilt_up_offset_steps: [600, 600]
+    tilt_up_finish_speed: [layer1750, layer1750]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin Model Anthracite Grey @SL1S 0.025
+    id: YRvFNzOGRQO3T1/zeGubjg
+    values:
+      exposure_time: 2
+      initial_exposure_time: 5
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin Model Anthracite Grey @SL1S 0.05
+    id: 6Yx+pR+KRQ+87QyU/q/bbw
+    values:
+      exposure_time: 2.2
+      initial_exposure_time: 6
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin Model Anthracite Grey @SL1S 0.1
+    id: 90eo9WldTBOJySopv1Zzpg
+    values:
+      exposure_time: 2.9
+      initial_exposure_time: 8

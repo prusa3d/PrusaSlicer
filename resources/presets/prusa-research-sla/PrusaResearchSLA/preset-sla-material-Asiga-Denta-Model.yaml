@@ -1,0 +1,35 @@
+id: Asiga Denta Model
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Asiga
+  material_type: Medical
+  material_colour: '#FFEEE6'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: DeqJhK6hStik54SgPOp/tQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Asiga Denta Model @SL1 0.05
+    id: se3eNM+uSfCg8ODArsN2hw
+    values:
+      exposure_time: 15
+      initial_exposure_time: 30
+## SL1S
+- condition: printer.model == "SL1S"
+  id: nhOnCoqnR6u7tKPrWvRKgw
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Asiga Denta Model @SL1S 0.05
+    id: OnxhVwRgRiiuNIk7ms9HIQ
+    values:
+      exposure_time: 5
+      initial_exposure_time: 24

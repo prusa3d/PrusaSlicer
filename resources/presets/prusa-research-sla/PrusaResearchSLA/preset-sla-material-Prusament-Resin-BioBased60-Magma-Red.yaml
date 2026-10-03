@@ -1,0 +1,66 @@
+id: pkanEek1RN6nEQoqcIzyMQ
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Prusa Polymers
+  material_type: Tough
+  material_colour: '#D20202'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: dXp1xDHKTwq7VHAhxXkQTw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Magma Red @SL1 0.025
+    id: iPkcHf9PTMyar9OJXz18Cw
+    values:
+      exposure_time: 7
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Magma Red @SL1 0.05
+    id: H9N6/3yHRbuHPb/ihmAWOw
+    values:
+      exposure_time: 8
+      initial_exposure_time: 35
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Magma Red @SL1 0.1
+    id: 8j2blcUTTliHbjpxGub9NA
+    values:
+      exposure_time: 13
+      initial_exposure_time: 45
+## SL1S
+- condition: printer.model == "SL1S"
+  id: bcDw4t0kTxyLysoKtidVRA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  values:
+    area_fill: 20
+    delay_before_exposure: [2, 15]
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Prusament Resin BioBased60 Magma Red @SL1S 0.025
+    id: vwp4rCcOTdGIAeWaL+gmUw
+    values:
+      exposure_time: 3.7
+      initial_exposure_time: 12
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Prusament Resin BioBased60 Magma Red @SL1S 0.05
+    id: dTM+i0KTSsq1ewQfScw07Q
+    values:
+      exposure_time: 4.2
+      initial_exposure_time: 12
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Prusament Resin BioBased60 Magma Red @SL1S 0.1
+    id: CN1EA2jSQWa6FeTuVzoRUA
+    values:
+      exposure_time: 5.3
+      initial_exposure_time: 16

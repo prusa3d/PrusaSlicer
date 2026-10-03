@@ -1,0 +1,22 @@
+id: NextDent Crown Bridge
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: NextDent
+  material_type: Medical
+  material_colour: '#FFFFFF'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: 85gKszBfS4OYURKSq5UCzA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: NextDent Crown Bridge @SL1 0.05
+    id: TD4K/WKvQM+R2lS5AH2P/Q
+    values:
+      exposure_time: 11
+      initial_exposure_time: 35

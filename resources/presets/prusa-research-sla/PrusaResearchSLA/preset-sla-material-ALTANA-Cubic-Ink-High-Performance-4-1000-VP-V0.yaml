@@ -1,0 +1,33 @@
+id: ALTANA Cubic Ink High Performance 4-1000 VP-V0
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Altana
+  material_type: Engineering
+  material_colour: '#595959'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: Pn3rIXziSfGRH///IvXkBA
+  unconditional_inherits:
+  - '*sl1s_slow*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: ALTANA Cubic Ink High Performance 4-1000 VP-V0 @SL1S 0.05
+    id: gdqV0iHdQDONjH0VqkZrYg
+    values:
+      exposure_time: 11
+      initial_exposure_time: 20
+      material_correction_x: 1.005
+      material_correction_y: 1.005
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: ALTANA Cubic Ink High Performance 4-1000 VP-V0 @SL1S 0.1
+    id: zNeaUQIOTmWEJgw/kS81dg
+    values:
+      exposure_time: 12
+      initial_exposure_time: 20
+      material_correction_x: 1.008
+      material_correction_y: 1.008

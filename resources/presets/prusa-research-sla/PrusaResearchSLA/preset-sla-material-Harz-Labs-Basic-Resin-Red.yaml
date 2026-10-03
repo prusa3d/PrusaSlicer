@@ -1,0 +1,42 @@
+id: Harz Labs Basic Resin Red
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Harz Labs
+  material_type: Tough
+  material_colour: '#EC0000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: j9+aUvpBRw2bW2am2Pt1OQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Harz Labs Basic Resin Red @SL1 0.025
+    id: MAwi/LWpQ/ujIHhDvXo4Sg
+    values:
+      exposure_time: 10
+      initial_exposure_time: 20
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Harz Labs Basic Resin Red @SL1 0.05
+    id: WAUnJrbATjKc4VlOfdLSgQ
+    values:
+      exposure_time: 13
+      initial_exposure_time: 20
+## SL1S
+- condition: printer.model == "SL1S"
+  id: 7BLTIqR1QY2LTTLYOECoeg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Harz Labs Basic Resin Red @SL1S 0.05
+    id: OGkZoEnfSkKEG4vkAOL9oA
+    values:
+      exposure_time: 4.3
+      initial_exposure_time: 16

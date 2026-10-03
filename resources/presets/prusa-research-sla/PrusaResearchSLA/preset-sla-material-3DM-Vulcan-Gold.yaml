@@ -1,0 +1,42 @@
+id: 3DM-Vulcan Gold
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: 3DM
+  material_type: Casting
+  material_colour: '#B0B000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: QhKYHoPBS0a9oI0WtUCEQg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: 3DM-Vulcan Gold @SL1 0.025
+    id: TvVgJuTpSCuCOwrmE2xo1w
+    values:
+      exposure_time: 12
+      initial_exposure_time: 30
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-Vulcan Gold @SL1 0.05
+    id: 9CLFJDasQ5iP4PxzaE4csQ
+    values:
+      exposure_time: 15
+      initial_exposure_time: 30
+## SL1S
+- condition: printer.model == "SL1S"
+  id: JG+nOkNlTweR8Y6BonpJ6Q
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-Vulcan Gold @SL1S 0.05
+    id: pjyb4GH4S5qOx67q29PjfQ
+    values:
+      exposure_time: 5
+      initial_exposure_time: 24

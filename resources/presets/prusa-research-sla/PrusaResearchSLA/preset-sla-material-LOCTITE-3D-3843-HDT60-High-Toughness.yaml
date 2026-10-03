@@ -1,0 +1,29 @@
+id: pOzWn7vBTEClCLhGD1Z57Q
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Henkel
+  material_type: Engineering
+  material_colour: '#595959'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: H8Av5OVeSdmHgJ+0u2cElQ
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: LOCTITE 3D 3843 HDT60 High Toughness @SL1S 0.05
+    id: PR+6VucZShe9zMAFsKksKw
+    values:
+      exposure_time: 13
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: LOCTITE 3D 3843 HDT60 High Toughness @SL1S 0.1
+    id: gB7ebFqSQfuLSFPyqYJffw
+    values:
+      exposure_time: 18
+      initial_exposure_time: 25

@@ -1,0 +1,35 @@
+id: Monocure 3D Grey Rapid Resin
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Monocure
+  material_type: Tough
+  material_colour: '#C0C0C0'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: 41mAo9ZYQaOeOm0KDAnNyQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Monocure 3D Grey Rapid Resin @SL1 0.05
+    id: reekjjpNS82deb6C78YP4g
+    values:
+      exposure_time: 10
+      initial_exposure_time: 30
+## SL1S
+- condition: printer.model == "SL1S"
+  id: 4CU/2b0gS66+nfHOaF2Bdw
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Monocure 3D Grey Rapid Resin @SL1S 0.05
+    id: M+PIIkVeSw+liFyNxTIVcQ
+    values:
+      exposure_time: 3.3
+      initial_exposure_time: 25

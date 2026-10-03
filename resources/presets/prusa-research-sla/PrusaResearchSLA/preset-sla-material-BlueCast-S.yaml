@@ -1,0 +1,22 @@
+id: BlueCast S+
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: BlueCast
+  material_type: Tough
+  material_colour: '#00B900'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: qfxOQhImTMCnK3JjKU6YRg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast S+ @SL1 0.05
+    id: zT+zmXYTRV2mnr4T/dSYzg
+    values:
+      exposure_time: 9
+      initial_exposure_time: 45

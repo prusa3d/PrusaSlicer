@@ -1,0 +1,29 @@
+id: LOCTITE 3D IND475
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Henkel
+  material_type: Flexible
+  material_colour: '#FFFFFF'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: futdQ56PSX6NYQ4p+2JRZg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: LOCTITE 3D IND475 @SL1S 0.05
+    id: SPzTPLUFSWeUDiOrSkEHng
+    values:
+      exposure_time: 4
+      initial_exposure_time: 15
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: LOCTITE 3D IND475 @SL1S 0.1
+    id: tVyZjCX/SgigM2/Fii/v0Q
+    values:
+      exposure_time: 6.5
+      initial_exposure_time: 15

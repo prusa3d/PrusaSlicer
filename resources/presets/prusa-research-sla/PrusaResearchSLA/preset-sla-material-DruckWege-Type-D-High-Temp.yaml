@@ -1,0 +1,29 @@
+id: DruckWege Type D High Temp
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: DruckWege
+  material_type: Tough
+  material_colour: '#E800E8'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: UnjGWMIGRcqOBNzsTU2qFg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: DruckWege Type D High Temp @SL1 0.025
+    id: wtT5HWI6QdW+rgmLcPiJ1Q
+    values:
+      exposure_time: 6
+      initial_exposure_time: 20
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: DruckWege Type D High Temp @SL1 0.05
+    id: B5b7M382R6CUGnK1NPJGjQ
+    values:
+      exposure_time: 10
+      initial_exposure_time: 20

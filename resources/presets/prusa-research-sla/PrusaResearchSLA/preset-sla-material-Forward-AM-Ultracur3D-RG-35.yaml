@@ -1,0 +1,36 @@
+id: Forward AM Ultracur3D RG 35
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Forward AM
+  material_type: Engineering
+  material_colour: '#FFEEE6'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: M/sg7Z7nTIKf8YP0SaL9Hw
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: Forward AM Ultracur3D RG 35 @SL1S 0.025
+    id: ioBJjnYzQvmP+dYapBTfYA
+    values:
+      exposure_time: 4
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Forward AM Ultracur3D RG 35 @SL1S 0.05
+    id: zrTM1qyYR6S5KIzuGr8Oyw
+    values:
+      exposure_time: 4.5
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Forward AM Ultracur3D RG 35 @SL1S 0.1
+    id: si8gf7lSTv2Av+r5SEN3qg
+    values:
+      exposure_time: 10
+      initial_exposure_time: 25

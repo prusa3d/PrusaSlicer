@@ -1,0 +1,41 @@
+id: Liqcreate Dental Model Pro Grey
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Liqcreate
+  material_type: Medical
+  material_colour: '#808080'
+variants:
+## SL1S
+- condition: printer.model == "SL1S"
+  id: 0zGgrXMcQxSwLD97npt1fw
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Liqcreate Dental Model Pro Grey @SL1S 0.05
+    id: drfUCBxtQq298kehL28Meg
+    values:
+      exposure_time: 4.5
+      initial_exposure_time: 20
+      material_correction_x: 1.0073
+      material_correction_y: 1.0073
+      support_pillar_diameter: 1
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+      support_head_width: 3
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: Liqcreate Dental Model Pro Grey @SL1S 0.1
+    id: 4cxx/htyROuD6LvNXK7LMg
+    values:
+      exposure_time: 5.5
+      initial_exposure_time: 25
+      material_correction_x: 1.0073
+      material_correction_y: 1.0073
+      support_pillar_diameter: 1
+      support_head_front_diameter: 0.5
+      support_head_penetration: 0.5
+      support_head_width: 3

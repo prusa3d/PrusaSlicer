@@ -1,0 +1,29 @@
+id: MakerJuice Labs Standard Red
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: MakerJuice Labs
+  material_type: Tough
+  material_colour: '#EC0000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: xPN9L05wSD2YfvVpKB6DkA
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: MakerJuice Labs Standard Red @SL1 0.025
+    id: z1Dufsg4RsWOAn83ezRriA
+    values:
+      exposure_time: 9
+      initial_exposure_time: 35
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: MakerJuice Labs Standard Red @SL1 0.05
+    id: 5Zk7cne6Q/+5QLsayDnkEg
+    values:
+      exposure_time: 10
+      initial_exposure_time: 35

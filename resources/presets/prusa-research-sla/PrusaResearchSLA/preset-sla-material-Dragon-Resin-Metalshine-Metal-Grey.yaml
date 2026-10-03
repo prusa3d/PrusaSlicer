@@ -1,0 +1,35 @@
+id: Dragon Resin Metalshine Metal Grey
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Dragon Resin
+  material_type: Tough
+  material_colour: '#808080'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: +KXa8q94Qsed70r7DKpI5Q
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Dragon Resin Metalshine Metal Grey @SL1 0.05
+    id: yrN1bma/SUmWWidp/leRVA
+    values:
+      exposure_time: 30
+      initial_exposure_time: 50
+## SL1S
+- condition: printer.model == "SL1S"
+  id: G/FBEP71RDyUKnl1qJODYg
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Dragon Resin Metalshine Metal Grey @SL1S 0.05
+    id: 29LT451TRhyZlppNBRfyLw
+    values:
+      exposure_time: 10
+      initial_exposure_time: 40

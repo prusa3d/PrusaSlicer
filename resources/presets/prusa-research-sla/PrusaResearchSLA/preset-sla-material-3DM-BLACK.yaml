@@ -1,0 +1,22 @@
+id: 3DM-BLACK
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: 3DM
+  material_type: Tough
+  material_colour: '#595959'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: OiZYq7oLRueRn3+l1hQlgQ
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-BLACK @SL1 0.05
+    id: AFtLSNAVS8yHP/zMb+3yWg
+    values:
+      exposure_time: 20
+      initial_exposure_time: 40

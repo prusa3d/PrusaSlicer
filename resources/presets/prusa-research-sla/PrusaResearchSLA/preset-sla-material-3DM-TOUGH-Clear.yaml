@@ -1,0 +1,56 @@
+id: 3DM-TOUGH Clear
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: 3DM
+  material_type: Tough
+  material_colour: '#F8F8F8'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: P0jS5haORdiSyTJNJOwzEw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: 3DM-TOUGH Clear @SL1 0.025
+    id: vF0PzhiXTzaDsgptcu3mIw
+    values:
+      exposure_time: 9
+      initial_exposure_time: 30
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-TOUGH Clear @SL1 0.05
+    id: iH8xcW5PSJSI12vKyXfPHA
+    values:
+      exposure_time: 15
+      initial_exposure_time: 30
+## SL1S
+- condition: printer.model == "SL1S"
+  id: 4nSMm1YEQTigPXIbWwAYxA
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: 3DM-TOUGH Clear @SL1S 0.025
+    id: yrJCIGW2SMmhQFhui0QGPw
+    values:
+      exposure_time: 1.8
+      initial_exposure_time: 25
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: 3DM-TOUGH Clear @SL1S 0.05
+    id: S7kVfWHCQO2x4pc+0wuJYQ
+    values:
+      exposure_time: 2.6
+      initial_exposure_time: 25
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: 3DM-TOUGH Clear @SL1S 0.1
+    id: VDNys1vnRUS/KaxRMK6d5A
+    values:
+      exposure_time: 3
+      initial_exposure_time: 25

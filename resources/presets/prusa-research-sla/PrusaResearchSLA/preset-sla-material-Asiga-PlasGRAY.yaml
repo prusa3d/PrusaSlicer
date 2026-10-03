@@ -1,0 +1,35 @@
+id: Asiga PlasGRAY
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: Asiga
+  material_type: Tough
+  material_colour: '#C0C0C0'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: kM9HmQi1QsWp8aypkec8cg
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Asiga PlasGRAY @SL1 0.05
+    id: yeaMt6ajSwGW7Rclxr2PIA
+    values:
+      exposure_time: 29
+      initial_exposure_time: 60
+## SL1S
+- condition: printer.model == "SL1S"
+  id: qliyWduSTbGwWTR8TbuV6w
+  unconditional_inherits:
+  - '*sl1s_fast*'
+  variants:
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: Asiga PlasGRAY @SL1S 0.05
+    id: kSPuD3D/Q8aS6WLCbc4C7w
+    values:
+      exposure_time: 9.7
+      initial_exposure_time: 48

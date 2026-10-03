@@ -1,0 +1,36 @@
+id: BlueCast Kera Master Dental
+kind: sla_material
+inherits:
+- '*common*'
+values:
+  material_vendor: BlueCast
+  material_type: Medical
+  material_colour: '#B0B000'
+variants:
+## SL1
+- condition: printer.model == "SL1"
+  id: gaJfcA+pSiy7h+lwXoYmNw
+  unconditional_inherits:
+  - '*sl1_fast*'
+  variants:
+# 0.025
+  - condition: print.layer_height == 0.025
+    name: BlueCast Kera Master Dental @SL1 0.025
+    id: 61f3vakST+C/pu4FamDeHQ
+    values:
+      exposure_time: 6
+      initial_exposure_time: 45
+# 0.05
+  - condition: print.layer_height == 0.05
+    name: BlueCast Kera Master Dental @SL1 0.05
+    id: f/E6C0E6SYedxxhtBfaM0A
+    values:
+      exposure_time: 7
+      initial_exposure_time: 50
+# 0.1
+  - condition: print.layer_height == 0.1
+    name: BlueCast Kera Master Dental @SL1 0.1
+    id: p8pwo1NPTWObuNEQ7+VW3Q
+    values:
+      exposure_time: 13
+      initial_exposure_time: 50
