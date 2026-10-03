@@ -228,3 +228,42 @@ TEST_CASE("3MF dual-write: version-2 MM segmentation is not dual-written for the
     // (version 2 data can't be dual-written) the legacy importer must find no MM painting at all.
     CHECK(legacy_model.objects[0]->volumes.front()->mm_segmentation_facets.empty());
 }
+
+TEST_CASE("3MF round trip restores the per-object settings of both technologies", "[3mf]")
+{
+    Project project;
+    project.model() = Test::generate_cubes(1, 1);
+
+    Domain::ModelObject& object = *project.model().objects.front();
+    object.object_settings.overrides.set("fill_density", Domain::Percentage{42.});
+    object.object_settings_sla.overrides.set("pad_enable", false);
+    object.object_settings_sla.overrides.set("support_object_elevation", 7.5);
+
+    const fs::path temp_dir =
+        fs::temp_directory_path() / fs::unique_path("slic3r-3mf-test-%%%%-%%%%");
+    fs::create_directories(temp_dir);
+    const fs::path file_path = temp_dir / "object_settings_round_trip.3mf";
+    store_3mf(file_path.string(), project);
+
+    const Loaded3MF loaded = load_3mf(file_path.string());
+    boost::system::error_code cleanup_error;
+    fs::remove_all(temp_dir, cleanup_error);
+
+    REQUIRE(loaded.model.objects.size() == 1);
+    const Domain::ModelObject& loaded_object = *loaded.model.objects.front();
+
+    const std::optional<Domain::ConfigItem> fill_density{
+        loaded_object.object_settings.overrides.get("fill_density")};
+    REQUIRE(fill_density);
+    CHECK(fill_density->get<Domain::Percentage>() == Domain::Percentage{42.});
+
+    CHECK(loaded_object.object_settings_sla.overrides.size() == 2);
+    const std::optional<Domain::ConfigItem> pad_enable{
+        loaded_object.object_settings_sla.overrides.get("pad_enable")};
+    REQUIRE(pad_enable);
+    CHECK_FALSE(pad_enable->get<bool>());
+    const std::optional<Domain::ConfigItem> elevation{
+        loaded_object.object_settings_sla.overrides.get("support_object_elevation")};
+    REQUIRE(elevation);
+    CHECK(elevation->get<double>() == 7.5);
+}

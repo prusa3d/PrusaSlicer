@@ -20,6 +20,7 @@
 #include "Slic3r/Biz/Config/SelectedPresetJson.hpp"
 #include "Slic3r/Biz/Emboss/NSVGUtils.hpp" // open content of svg file
 #include "Slic3r/Domain/ConfigBoxesFDM.hpp"
+#include "Slic3r/Domain/ConfigBoxesSLA.hpp"
 #include "Slic3r/Domain/FullConfigFDM.hpp"
 #include "Slic3r/Domain/FullConfigSLA.hpp"
 #include "Slic3r/Domain/ConfigContainer.hpp"
@@ -1399,13 +1400,14 @@ constexpr std::string_view OBJECT_UUID        = "object_uuid";    // Universally
 constexpr std::string_view VOLUMES            = "volumes";        // List of volume settings
 constexpr std::string_view INSTANCES          = "instances";      
 constexpr std::string_view OBJECT_SETTINGS    = "object_settings";
+constexpr std::string_view OBJECT_SETTINGS_SLA = "object_settings_sla";
 constexpr std::string_view LAYER_HEIGHT_PROFILE="layerHeightProfile";
 constexpr std::string_view RANGES             = "ranges";         // layer ranges configurations
 constexpr std::string_view CUT_OBJECT_ID      = "cutId";          // more in CutSerialization
 constexpr std::string_view SLA_SUPPORT_POINTS = "slaSupportPoints";
 constexpr std::string_view SLA_DRAIN_HOLES    = "slaDrainHoles";
 
-const NamesType OBJECT_NAMES{{ID, OBJECT_UUID, VOLUMES, INSTANCES, RANGES, CUT_OBJECT_ID, OBJECT_SETTINGS, 
+const NamesType OBJECT_NAMES{{ID, OBJECT_UUID, VOLUMES, INSTANCES, RANGES, CUT_OBJECT_ID, OBJECT_SETTINGS, OBJECT_SETTINGS_SLA,
                               LAYER_HEIGHT_PROFILE, SLA_SUPPORT_POINTS, SLA_DRAIN_HOLES}};
 
 json object_to_json(const ModelObject &object, const StoredStructure &stored_structure) {
@@ -1429,6 +1431,7 @@ json object_to_json(const ModelObject &object, const StoredStructure &stored_str
     if (object.is_cut())
         add(object_json, CUT_OBJECT_ID, CutSerialization::cut_to_json(object.cut_id));
     add(object_json, OBJECT_SETTINGS, object.object_settings);
+    add(object_json, OBJECT_SETTINGS_SLA, object.object_settings_sla);
     if (const Domain::ZHeightPairs &layer_height_profile = object.layer_height_profile.get();
         !layer_height_profile.empty())
         add(object_json, LAYER_HEIGHT_PROFILE, LayerHeightProfileSerialization::to_json(layer_height_profile));
@@ -1507,6 +1510,18 @@ void load_objects(
             Domain::ObjectSettings object_settings;
             auto issues = Biz::Config::load_box(object_json[OBJECT_SETTINGS], object_settings);
             mo_ptr->object_settings = object_settings;
+            if (! issues.empty()) {
+                // TODO Handle errors.
+                // RT issue = RT::project_object_configuration_issue;
+            }
+        }
+
+        for (ModelObject* mo_ptr : mos) {
+            if (! object_json.contains(OBJECT_SETTINGS_SLA) || ! object_json[OBJECT_SETTINGS_SLA].is_object())
+                continue;
+            Domain::SLAObjectSettings object_settings_sla;
+            auto issues = Biz::Config::load_box(object_json[OBJECT_SETTINGS_SLA], object_settings_sla);
+            mo_ptr->object_settings_sla = object_settings_sla;
             if (! issues.empty()) {
                 // TODO Handle errors.
                 // RT issue = RT::project_object_configuration_issue;
