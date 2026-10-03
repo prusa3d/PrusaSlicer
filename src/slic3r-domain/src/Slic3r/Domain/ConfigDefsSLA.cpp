@@ -1274,6 +1274,7 @@ void sla_config_init_fn(ConfigDefinitions& defs)
         def->location = Print;
         def->overrides_in = Locations{ Object };
         def->row_group = L("Object elevation");
+        def->option_group = ConfigItemDef::OptionGroup::Print_Supports_SupportPillar;
         def->category = ConfigItemDef::Category::Print_Supports;
         def->gui_type = ConfigItemDef::GUIType::textfield;
         def->tooltip = L("How much the supports should lift up the supported object. "
