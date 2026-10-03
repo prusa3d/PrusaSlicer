@@ -401,3 +401,31 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Unsaved SLA material changes a
     ));
     CHECK(preset_dialog_manager.unsaved_changes_dialog_calls == 1);
 }
+
+TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Switching to an SLA printer clears the sheet selection", "[PresetInteractor][preset]")
+{
+    project_interactor.new_project();
+    auto& preset_interactor = project_interactor.preset_interactor();
+
+    // The default printer is an FFF one with print sheets.
+    REQUIRE(preset_interactor.selected_printer_preset().technology() == Slic3r::Domain::PrinterTechnology::FFF);
+    REQUIRE(preset_interactor.sheet_items().items().size() > 0);
+    REQUIRE(preset_interactor.sheet_items().selected_index() != Slic3r::Domain::INVALID_ID);
+
+    const auto& printer_items = preset_interactor.printer_presets().items();
+    const Slic3r::Biz::Preset::PresetItem* sla_printer = nullptr;
+    for (size_t i = 0, n = printer_items.size(); i < n; ++i) {
+        const auto& item = printer_items.at(i);
+        const auto& hw_config = workbench.preset_bundle().printer_configs.at(item.hw_printer_config_id);
+        if (hw_config.technology == Slic3r::Domain::PrinterTechnology::SLA) {
+            sla_printer = &item;
+            break;
+        }
+    }
+    REQUIRE(sla_printer != nullptr);
+    preset_interactor.select_printer_preset(sla_printer->hw_printer_config_id, sla_printer->id);
+
+    // SLA printers have no sheets, so nothing may stay selected (a view created now reads it).
+    CHECK(preset_interactor.sheet_items().items().size() == 0);
+    CHECK(preset_interactor.sheet_items().selected_index() == Slic3r::Domain::INVALID_ID);
+}

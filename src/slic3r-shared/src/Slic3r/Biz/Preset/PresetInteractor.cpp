@@ -1932,9 +1932,8 @@ void PresetInteractor::fill_sheet_items(const Domain::Preset::HwPrinterConfig& h
 {
     const auto [items, selected_index]{get_sheet_items(hw_config)};
     m_sheet_items.items().set_items(items);
-    if (!items.empty()) { // SLA doesn't yet have sheets specified
-        m_sheet_items.set_selected_index(selected_index);
-    }
+    // SLA printers have no sheets; do not keep the selection of the previous printer's sheets.
+    m_sheet_items.set_selected_index(items.empty() ? Domain::INVALID_ID : selected_index);
 }
 
 void PresetInteractor::fill_selected_material_cbis(
