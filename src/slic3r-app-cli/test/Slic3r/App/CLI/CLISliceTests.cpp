@@ -144,3 +144,81 @@ TEST_CASE("CLI centers a loaded STL on the bed", "[cli][timeout]")
     CHECK(original_instance_center.x() == Catch::Approx(cube_size / 2.).margin(1e-3));
     CHECK(original_instance_center.y() == Catch::Approx(cube_size / 2.).margin(1e-3));
 }
+
+TEST_CASE("CLI exports an SLA archive for every SLA printer", "[cli][sla][timeout]")
+{
+    const ScopedTempDir temp_dir;
+    const fs::path cube_stl_path = write_cube_stl(temp_dir.path(), "cube.stl", 20.);
+
+    for (const TestProfileSet& profile_set : resolved_sla_profile_sets()) {
+        INFO(profile_set.printer_profile_name);
+        const fs::path output_dir = temp_dir.path() / "out";
+        fs::remove_all(output_dir);
+        fs::create_directories(output_dir);
+
+        App::InitParams slice_params = make_params(profile_set);
+        slice_params.input.input_files.push_back(cube_stl_path.string());
+        slice_params.action.export_sla = true;
+        slice_params.misc.output       = output_dir.string();
+
+        REQUIRE(App::CLI::run(slice_params) == EXIT_SUCCESS);
+
+        const std::vector<fs::path> archives = find_sla_archives(output_dir);
+        REQUIRE(archives.size() == 1);
+        const std::string job_name = archives.front().stem().string();
+
+        const std::optional<std::string> config_ini = read_zip_entry(archives.front(), "config.ini");
+        REQUIRE(config_ini.has_value());
+        CHECK(config_ini->find("jobDir = " + job_name + "\n") != std::string::npos);
+        CHECK(config_ini->find("layerHeight = 0.05\n") != std::string::npos);
+        // The first layer and some layer inside the 20 mm tall cube (plus support elevation and pad).
+        CHECK(read_zip_entry(archives.front(), job_name + "00000.png").has_value());
+        CHECK(read_zip_entry(archives.front(), job_name + "00400.png").has_value());
+    }
+}
+
+TEST_CASE("CLI slices an SLA 3MF project", "[cli][sla][timeout]")
+{
+    const ScopedTempDir temp_dir;
+    const fs::path cube_stl_path     = write_cube_stl(temp_dir.path(), "cube.stl", 20.);
+    const fs::path exported_3mf_path = temp_dir.path() / "cube.3mf";
+    const fs::path archive_path      = temp_dir.path() / "print.sl1";
+
+    App::InitParams export_params = make_params(resolved_sla_profile_sets().front());
+    export_params.input.input_files.push_back(cube_stl_path.string());
+    export_params.action.export_3mf = true;
+    export_params.misc.output       = exported_3mf_path.string();
+
+    REQUIRE(App::CLI::run(export_params) == EXIT_SUCCESS);
+    REQUIRE(fs::exists(exported_3mf_path));
+
+    // No profiles given: everything has to come from the 3MF.
+    App::InitParams slice_params;
+    slice_params.input.input_files.push_back(exported_3mf_path.string());
+    slice_params.action.export_sla = true;
+    slice_params.misc.output       = archive_path.string();
+
+    REQUIRE(App::CLI::run(slice_params) == EXIT_SUCCESS);
+    REQUIRE(fs::exists(archive_path));
+    const std::optional<std::string> config_ini = read_zip_entry(archive_path, "config.ini");
+    REQUIRE(config_ini.has_value());
+    CHECK(config_ini->find("layerHeight = 0.05\n") != std::string::npos);
+}
+
+TEST_CASE("CLI does not export G-code for an SLA printer", "[cli][sla]")
+{
+    const ScopedTempDir temp_dir;
+    const fs::path cube_stl_path = write_cube_stl(temp_dir.path(), "cube.stl", 20.);
+    const fs::path gcode_path    = temp_dir.path() / "print.gcode";
+
+    App::InitParams slice_params = make_params(resolved_sla_profile_sets().front());
+    slice_params.input.input_files.push_back(cube_stl_path.string());
+    slice_params.action.export_gcode = true;
+    slice_params.misc.output         = gcode_path.string();
+
+    // Note: the CLI currently reports the error but still exits with EXIT_SUCCESS.
+    App::CLI::run(slice_params);
+    CHECK_FALSE(fs::exists(gcode_path));
+    CHECK(count_gcode_files(temp_dir.path()) == 0);
+    CHECK(find_sla_archives(temp_dir.path()).empty());
+}
