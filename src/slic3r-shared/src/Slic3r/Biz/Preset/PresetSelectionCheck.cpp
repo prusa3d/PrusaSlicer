@@ -216,9 +216,7 @@ static std::vector<std::string> dirty_options_in_selected_preset(
         ignore_tool_print
             || preset_interactor.selected_printer_preset().technology()
                 == Domain::PrinterTechnology::SLA,
-        ignore_tool_material
-            || preset_interactor.selected_printer_preset().technology()
-                == Domain::PrinterTechnology::SLA,
+        ignore_tool_material,
         index
     );
     diff_keys = config_pack_diff(config_initial, config_selected);

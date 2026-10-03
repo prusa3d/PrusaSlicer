@@ -59,6 +59,7 @@ public:
         bool new_printer_has_multiple_extruders = false
     ) override
     {
+        ++unsaved_changes_dialog_calls;
         PresetsSwitchStates ret;
         std::visit(
             Slic3r::Domain::overloaded{
@@ -164,6 +165,7 @@ public:
     }
 
     Slic3r::Biz::Preset::PresetDiffOperation operation = Slic3r::Biz::Preset::PresetDiffOperation::Save;
+    size_t unsaved_changes_dialog_calls{0};
     std::string new_name{"test"};
     NamesPerKindMap new_print_tool_names = {
         {Slic3r::Domain::Preset::PresetKind::FdmPrint, {"print_test"}},
@@ -342,3 +344,60 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Preset Interactor Tests", "[Pr
     }
 }
 
+
+TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Unsaved SLA material changes are not lost when switching material", "[PresetInteractor][preset]")
+{
+    project_interactor.new_project();
+    auto& preset_interactor = project_interactor.preset_interactor();
+    preset_dialog_manager.operation = Slic3r::Biz::Preset::PresetDiffOperation::Discard;
+
+    const auto& printer_items = preset_interactor.printer_presets().items();
+    const Slic3r::Biz::Preset::PresetItem* sla_printer = nullptr;
+    for (size_t i = 0, n = printer_items.size(); i < n; ++i) {
+        const auto& item = printer_items.at(i);
+        const auto& hw_config = workbench.preset_bundle().printer_configs.at(item.hw_printer_config_id);
+        if (hw_config.technology == Slic3r::Domain::PrinterTechnology::SLA) {
+            sla_printer = &item;
+            break;
+        }
+    }
+    REQUIRE(sla_printer != nullptr);
+    preset_interactor.select_printer_preset(sla_printer->hw_printer_config_id, sla_printer->id);
+    REQUIRE(preset_interactor.selected_printer_preset().technology() == Slic3r::Domain::PrinterTechnology::SLA);
+
+    const auto& selected_preset = preset_interactor.selected_printer_preset();
+    REQUIRE(selected_preset.materials.size() == 1);
+    const std::string selected_material_id = selected_preset.materials.front().id;
+
+    std::string other_material_id;
+    const auto& material_items = preset_interactor.material_presets().at(0).items();
+    for (size_t i = 0, n = material_items.size(); i < n; ++i) {
+        if (material_items.at(i).id != selected_material_id) {
+            other_material_id = material_items.at(i).id;
+            break;
+        }
+    }
+    REQUIRE(!other_material_id.empty());
+
+    // Without modifications, switching the material does not need to ask anything.
+    REQUIRE(Slic3r::Biz::Preset::PresetSelectionCheck::can_select_material_preset(
+        preset_interactor, 0, other_material_id
+    ));
+    REQUIRE(preset_dialog_manager.unsaved_changes_dialog_calls == 0);
+
+    const double exposure_time = std::get<Slic3r::Domain::SLAMaterialSettings>(
+        selected_preset.materials.front().values
+    ).items.opt("exposure_time").get<double>();
+    preset_interactor.set_preset_value(
+        Slic3r::Domain::SLAConfigLocation::Material,
+        0,
+        "exposure_time",
+        [exposure_time](auto& item) { item.set(exposure_time + 1.0); }
+    );
+
+    // The modified material must be offered to the user instead of being silently dropped.
+    REQUIRE(Slic3r::Biz::Preset::PresetSelectionCheck::can_select_material_preset(
+        preset_interactor, 0, other_material_id
+    ));
+    CHECK(preset_dialog_manager.unsaved_changes_dialog_calls == 1);
+}
