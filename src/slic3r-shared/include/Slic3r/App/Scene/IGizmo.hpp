@@ -153,6 +153,7 @@ enum class ToolType : uint8_t
     VariableLayerHeightGizmo,
     HeightRangeGizmo,
     SlaSupportPointsGizmo,
+    SlaHollowGizmo,
     // add as needed, no printer type variants (use two distinct IToolGizmos with same type instead)
 };
 

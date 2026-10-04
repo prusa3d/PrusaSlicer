@@ -277,6 +277,18 @@ static std::string to_string(Biz::UndoSnapshotType type)
         return _u8L("Support points edit");
     case Type::SlaSupportPointsAutoGenerate:
         return _u8L("Autogenerate support points");
+    case Type::SlaDrainHolesAdd:
+        return _u8L("Add drainage hole");
+    case Type::SlaDrainHolesDelete:
+        return _u8L("Delete drainage holes");
+    case Type::SlaDrainHolesMove:
+        return _u8L("Move drainage hole");
+    case Type::SlaDrainHolesSize:
+        return _u8L("Change drainage hole size");
+    case Type::SlaDrainHolesRemoveAll:
+        return _u8L("Remove all drainage holes");
+    case Type::SlaDrainHolesApply:
+        return _u8L("Drainage holes edit");
     case Type::ExecutePlugin:
         return _u8L("Execute plugin");
     case Type::ReplaceWithStl:

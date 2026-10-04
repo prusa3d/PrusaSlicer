@@ -37,6 +37,7 @@
 #include "Slic3r/App/Plater/SimplifyNotification.hpp"
 #include "Slic3r/App/Plater/PaintOnSupportsGizmo.hpp"
 #include "Slic3r/App/Plater/PaintOnSupportsDialog.hpp"
+#include "Slic3r/App/Plater/SlaHollowGizmo.hpp"
 #include "Slic3r/App/Plater/SlaSupportPointsGizmo.hpp"
 #include "Slic3r/App/Plater/PaintOnSeamsGizmo.hpp"
 #include "Slic3r/App/Plater/PaintOnSeamsDialog.hpp"
@@ -701,6 +702,12 @@ void PlaterRenderModule::init_scene_layout()
         tool_name(Scene::ToolType::SlaSupportPointsGizmo)
     );
 
+    m_toolbar_sla_hollow = m_layout->add_toolbar_item(
+        ToolbarID::ToolRight,
+        tool_icon(Scene::ToolType::SlaHollowGizmo),
+        tool_name(Scene::ToolType::SlaHollowGizmo)
+    );
+
     m_toolbar_paint_on_seams = m_layout->add_toolbar_item(
         ToolbarID::ToolRight,
         tool_icon(Scene::ToolType::PaintOnSeamsGizmo),
@@ -837,6 +844,7 @@ void PlaterRenderModule::init_dialog_navigation()
         Scene::ToolType::SlaSupportPointsGizmo,
         m_sla_support_points_gizmo->release_ui_window()
     );
+    init_gizmo_dialog(Scene::ToolType::SlaHollowGizmo, m_sla_hollow_gizmo->release_ui_window());
     init_gizmo_dialog(
         Scene::ToolType::PaintOnSeamsGizmo,
         m_paint_on_seams_gizmo->release_ui_window()
@@ -1020,6 +1028,11 @@ void PlaterRenderModule::init_gizmos()
         m_project_interactor,
         *m_scene_presenter
     );
+    m_sla_hollow_gizmo = &m_gizmo_manager->add_tool_gizmo<SlaHollowGizmo>(
+        *m_device,
+        m_project_interactor,
+        *m_scene_presenter
+    );
     m_paint_on_seams_gizmo = &m_gizmo_manager->add_tool_gizmo<PaintOnSeamsGizmo>(
         *m_device,
         m_gizmo_manager->data_factory(),
@@ -1101,6 +1114,8 @@ ToolBarButton* PlaterRenderModule::get_toolbar_button(Scene::ToolType tool_type)
         return m_toolbar_paint_on_supports;
     case Scene::ToolType::SlaSupportPointsGizmo:
         return m_toolbar_sla_support_points;
+    case Scene::ToolType::SlaHollowGizmo:
+        return m_toolbar_sla_hollow;
     case Scene::ToolType::PaintOnSeamsGizmo:
         return m_toolbar_paint_on_seams;
     case Scene::ToolType::PaintOnFuzzySkinGizmo:

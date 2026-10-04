@@ -76,6 +76,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Plater/SlaSupportPointsGizmo.cpp
         include/Slic3r/App/Plater/SlaSupportPointsDialog.hpp
         src/Slic3r/App/Plater/SlaSupportPointsDialog.cpp
+        include/Slic3r/App/Plater/SlaHollowGizmo.hpp
+        src/Slic3r/App/Plater/SlaHollowGizmo.cpp
+        include/Slic3r/App/Plater/SlaHollowDialog.hpp
+        src/Slic3r/App/Plater/SlaHollowDialog.cpp
         include/Slic3r/App/Plater/PaintOnSeamsGizmo.hpp
         src/Slic3r/App/Plater/PaintOnSeamsGizmo.cpp
         include/Slic3r/App/Plater/PaintOnSeamsDialog.hpp

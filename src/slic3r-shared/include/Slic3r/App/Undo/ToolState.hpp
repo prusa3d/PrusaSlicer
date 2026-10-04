@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Slic3r/Domain/LayerHeightProfile.hpp"
+#include "Slic3r/Domain/SLA/DrainHole.hpp"
 #include "Slic3r/Domain/SLA/SupportPoint.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Biz/Utils/CutUtils.hpp"
@@ -53,7 +54,22 @@ struct SlaSupportPointsGizmoState
     bool dirty{false};
 };
 
-using ToolState  = std::variant<CutGizmoState, HeightRangeGizmoState, SlaSupportPointsGizmoState>;
+struct SlaHollowGizmoState
+{
+    struct Hole
+    {
+        Domain::SLA::DrainHole hole; // model object coordinates
+        bool selected{false};
+    };
+
+    size_t object_id{0};
+    std::vector<Hole> holes;
+    // Holes edited, but not written into the model yet.
+    bool dirty{false};
+};
+
+using ToolState = std::
+    variant<CutGizmoState, HeightRangeGizmoState, SlaSupportPointsGizmoState, SlaHollowGizmoState>;
 using ToolsState = std::vector<ToolState>;
 
 } // namespace Slic3r::App::Undo
