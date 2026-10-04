@@ -12,6 +12,7 @@
 #include "libslic3r/SLAResult.hpp"
 #include "Slic3r/Biz/FDMResultCache.hpp"
 #include "Slic3r/Biz/SLAResultCache.hpp"
+#include "Slic3r/Biz/SLAObjectCache.hpp"
 
 using namespace Catch;
 using Catch::Matchers::Equals;
@@ -477,4 +478,51 @@ TEST_CASE_METHOD(SlicingFixture, "SLA bed with a pad but no supports ends as inv
     CHECK(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
         return !events.empty() && events.back().status_code == StatusCode::InvalidData;
     }));
+}
+
+TEST_CASE_METHOD(SlicingFixture, "SLA slicing uses the user modified support points as they are", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+    using Slic3r::Domain::SLA::PointsStatus;
+    using Slic3r::Domain::SLA::SupportPoint;
+    using Slic3r::Domain::SLA::SupportPointType;
+    using Slic3r::Domain::Vec3f;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    ModelObject& object{*bed.model.objects.front()};
+    const float radius{0.123f};
+    object.sla_support_points = {
+        SupportPoint{Vec3f{10.f, 10.f, 0.f}, radius, SupportPointType::island},
+        SupportPoint{Vec3f{0.f, 10.f, 10.f}, radius, SupportPointType::slope},
+        SupportPoint{Vec3f{5.f, 5.f, 0.f}, radius, SupportPointType::manual_add},
+    };
+    object.sla_points_status = PointsStatus::UserModified;
+
+    Slic3r::Biz::SLAObjectCache object_cache;
+    slicing.set_listener<ISLAObjectListener>(&object_cache);
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+    slicing.slice_all();
+
+    REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        return !events.empty() && events.back().status_code == StatusCode::Finished;
+    }));
+
+    const SlicingId id{status_listener.status_events.back().slicing_id};
+    const auto sla_object{object_cache.get_instance({id, object.id()})};
+    REQUIRE(sla_object);
+    REQUIRE(sla_object->get().support_points);
+
+    // No points are generated, the user ones are only transformed into the print object.
+    const Slic3r::Domain::SLA::SupportPoints& points{*sla_object->get().support_points};
+    REQUIRE(points.size() == object.sla_support_points.size());
+    for (size_t i{0}; i < points.size(); ++i) {
+        CHECK(points[i].head_front_radius == radius);
+        CHECK(points[i].type == object.sla_support_points[i].type);
+    }
 }

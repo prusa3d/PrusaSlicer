@@ -802,6 +802,16 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
 
 
     po.m_supportable_mesh->zoffset = csgmesh_positive_bb(po.m_mesh_to_slice).min.z();
+
+    if (po.model_object()->sla_points_status == Domain::SLA::PointsStatus::UserModified) {
+        // There are either some points on the front-end, or the user
+        // removed them on purpose. No calculation will be done.
+        po.m_preview->support_points =
+            std::make_shared<const SupportPoints>(po.transformed_support_points());
+        po.m_supportable_mesh->pts = po.m_preview->support_points;
+        return;
+    }
+
     // Unless the user modified the points or we already did the calculation,
     // we will do the autoplacement. Otherwise we will just blindly copy the
     // frontend data into the backend cache.
