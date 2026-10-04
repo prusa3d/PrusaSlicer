@@ -70,6 +70,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Plater/PaintOnSupportsGizmo.cpp
         include/Slic3r/App/Plater/PaintOnSupportsDialog.hpp
         src/Slic3r/App/Plater/PaintOnSupportsDialog.cpp
+        include/Slic3r/App/Plater/SlaGizmoBase.hpp
+        src/Slic3r/App/Plater/SlaGizmoBase.cpp
         include/Slic3r/App/Plater/SlaSupportPointsGizmo.hpp
         src/Slic3r/App/Plater/SlaSupportPointsGizmo.cpp
         include/Slic3r/App/Plater/SlaSupportPointsDialog.hpp

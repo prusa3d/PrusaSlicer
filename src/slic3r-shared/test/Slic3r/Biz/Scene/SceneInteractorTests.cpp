@@ -766,7 +766,7 @@ TEST_CASE_METHOD(SceneInteractorFixture, "Modifying SLA support points changes t
 
     {
         REQUIRE_CALL(slicing_input_changed_listener, on_slicing_input_changed(_)).WITH(_1.instance_id == bi1_id);
-        scene_interactor.modify_sla_support_points(
+        scene_interactor.modify_sla_object_data(
             Domain::ElementRef{object.id().id},
             [](Domain::ModelObject& model_object) {
                 model_object.sla_support_points = {SupportPoint{Domain::Vec3f{10.f, 10.f, 0.f}, 0.2f}};
