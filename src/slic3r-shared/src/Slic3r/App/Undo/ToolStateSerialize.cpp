@@ -57,6 +57,21 @@ void serialize(Archive& ar, Slic3r::App::Undo::HeightRangeGizmoState& tool_state
     ar(tool_state.selected_height_range);
 }
 
+template <class Archive>
+void serialize(Archive& ar, Slic3r::App::Undo::SlaSupportPointsGizmoState::Point& point)
+{
+    ar(point.support_point.pos,
+       point.support_point.head_front_radius,
+       point.support_point.type,
+       point.selected);
+}
+
+template <class Archive>
+void serialize(Archive& ar, Slic3r::App::Undo::SlaSupportPointsGizmoState& tool_state)
+{
+    ar(tool_state.object_id, tool_state.points, tool_state.dirty);
+}
+
 } // namespace cereal
 
 namespace Slic3r::App::Undo {

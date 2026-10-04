@@ -67,6 +67,7 @@ public:
     void take_snapshot(Biz::UndoSnapshotType snapshot_type) override;
     bool is_undo_possible() const override;
     bool is_redo_possible() const override;
+    bool is_restoring_snapshot() const override;
 
     void select_snapshot(
         Biz::UndoSnapshotSelection::Variant snapshot_variant

@@ -412,6 +412,7 @@ static ToolType tool_state_to_tool_type(const Undo::ToolState& tool_state)
         Domain::overloaded{
             [](const Undo::HeightRangeGizmoState& state) { return ToolType::HeightRangeGizmo; },
             [](const Undo::CutGizmoState&) { return ToolType::CutGizmo; },
+            [](const Undo::SlaSupportPointsGizmoState&) { return ToolType::SlaSupportPointsGizmo; },
         },
         tool_state
     );

@@ -263,6 +263,20 @@ static std::string to_string(Biz::UndoSnapshotType type)
         return _u8L("Paste height range settings");
     case Type::HeightRangeLayerHeightOverride:
         return _u8L("Add layer height override");
+    case Type::SlaSupportPointsAdd:
+        return _u8L("Add support point");
+    case Type::SlaSupportPointsDelete:
+        return _u8L("Delete support points");
+    case Type::SlaSupportPointsMove:
+        return _u8L("Move support point");
+    case Type::SlaSupportPointsHeadDiameter:
+        return _u8L("Change point head diameter");
+    case Type::SlaSupportPointsRemoveAll:
+        return _u8L("Remove all support points");
+    case Type::SlaSupportPointsApply:
+        return _u8L("Support points edit");
+    case Type::SlaSupportPointsAutoGenerate:
+        return _u8L("Autogenerate support points");
     case Type::ExecutePlugin:
         return _u8L("Execute plugin");
     case Type::ReplaceWithStl:
@@ -377,6 +391,11 @@ void Store::take_snapshot(Biz::UndoSnapshotType snapshot_type)
         // Only invalidate non-empty projects
         m_project_interactor.backup_store().invalidate_backup(project_id);
     }
+}
+
+bool Store::is_restoring_snapshot() const
+{
+    return !m_snapshotting_enabled;
 }
 
 bool Store::is_undo_possible() const

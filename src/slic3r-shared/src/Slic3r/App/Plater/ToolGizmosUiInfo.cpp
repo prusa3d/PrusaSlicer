@@ -87,6 +87,12 @@ static const std::unordered_map<Scene::ToolType, ToolGizmoUiInfo> tool_gizmos_ui
       Platform::CommandName::HeightRangeGizmo,
       Platform::KeyCode::W,
       Render::Icon::HeightRange}},
+    // Same key as the paint-on supports, only one of them is enabled for a printer technology.
+    {Scene::ToolType::SlaSupportPointsGizmo,
+     {Biz::L("SLA support points"),
+      Platform::CommandName::SlaSupportPointsGizmo,
+      Platform::KeyCode::L,
+      Render::Icon::Support}},
 };
 
 std::string tool_name(Scene::ToolType tool)

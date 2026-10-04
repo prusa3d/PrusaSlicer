@@ -1,11 +1,13 @@
 #pragma once
 
 #include "Slic3r/Domain/LayerHeightProfile.hpp"
+#include "Slic3r/Domain/SLA/SupportPoint.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Biz/Utils/CutUtils.hpp"
 
 #include <optional>
 #include <variant>
+#include <vector>
 
 namespace Slic3r::App::Undo {
 
@@ -37,7 +39,21 @@ struct HeightRangeGizmoState
     std::optional<Domain::LayerHeightRange> selected_height_range;
 };
 
-using ToolState  = std::variant<CutGizmoState, HeightRangeGizmoState>;
+struct SlaSupportPointsGizmoState
+{
+    struct Point
+    {
+        Domain::SLA::SupportPoint support_point; // model object coordinates
+        bool selected{false};
+    };
+
+    size_t object_id{0};
+    std::vector<Point> points;
+    // Points edited, but not written into the model yet.
+    bool dirty{false};
+};
+
+using ToolState  = std::variant<CutGizmoState, HeightRangeGizmoState, SlaSupportPointsGizmoState>;
 using ToolsState = std::vector<ToolState>;
 
 } // namespace Slic3r::App::Undo

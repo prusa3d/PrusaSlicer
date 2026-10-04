@@ -70,6 +70,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Plater/PaintOnSupportsGizmo.cpp
         include/Slic3r/App/Plater/PaintOnSupportsDialog.hpp
         src/Slic3r/App/Plater/PaintOnSupportsDialog.cpp
+        include/Slic3r/App/Plater/SlaSupportPointsGizmo.hpp
+        src/Slic3r/App/Plater/SlaSupportPointsGizmo.cpp
+        include/Slic3r/App/Plater/SlaSupportPointsDialog.hpp
+        src/Slic3r/App/Plater/SlaSupportPointsDialog.cpp
         include/Slic3r/App/Plater/PaintOnSeamsGizmo.hpp
         src/Slic3r/App/Plater/PaintOnSeamsGizmo.cpp
         include/Slic3r/App/Plater/PaintOnSeamsDialog.hpp
@@ -1599,6 +1603,8 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/App/DialogNavigationTests.cpp
 
             test/Slic3r/App/Config/CategoryUtilsTests.cpp
+
+            test/Slic3r/App/Undo/ToolStateSerializeTests.cpp
 
             test/Slic3r/App/Scene/Node.cpp
             test/Slic3r/App/Scene/Ray.cpp

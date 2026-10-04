@@ -68,6 +68,11 @@ class NoopUndoProvider : public IUndoProvider
     {
         return false;
     }
+
+    bool is_restoring_snapshot() const
+    {
+        return false;
+    }
 };
 
 /**
