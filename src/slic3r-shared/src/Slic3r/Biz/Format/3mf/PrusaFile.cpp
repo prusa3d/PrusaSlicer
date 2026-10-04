@@ -1545,8 +1545,13 @@ void load_objects(
         if (auto sla_points_json = object_json.find(SLA_SUPPORT_POINTS);
             sla_points_json != object_json.end()) {
             SlaSupportPointsSerialization::load(*sla_points_json, mo.sla_support_points, collected_issues);
-            for (auto mo_ : mos_) // copy into other objects
+            // Only user modified points are stored, the generated ones stay in the backend.
+            if (!mo.sla_support_points.empty())
+                mo.sla_points_status = Domain::SLA::PointsStatus::UserModified;
+            for (auto mo_ : mos_) { // copy into other objects
                 mo_->sla_support_points = mo.sla_support_points;
+                mo_->sla_points_status = mo.sla_points_status;
+            }
         }
         if (auto sla_holes_json = object_json.find(SLA_DRAIN_HOLES);
             sla_holes_json != object_json.end()) {
