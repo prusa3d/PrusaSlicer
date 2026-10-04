@@ -43,8 +43,16 @@ public:
 
     /**
      * @brief Starts the request. It may complete (and call the callback) before returning.
+     * @param use_cache Whether an object already in the cache completes the request. Pass false
+     * right after changing the model: the change reaches the cache only later (it is dispatched),
+     * so the cached object may still be the old one.
      */
-    void start(Domain::SlicingId slicing_id, Domain::ObjectID model_object_id, SLAPrintObjectStep step);
+    void start(
+        Domain::SlicingId slicing_id,
+        Domain::ObjectID model_object_id,
+        SLAPrintObjectStep step,
+        bool use_cache = true
+    );
     void cancel();
     [[nodiscard]] bool running() const;
 

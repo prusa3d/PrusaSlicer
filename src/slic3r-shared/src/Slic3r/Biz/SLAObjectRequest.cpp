@@ -26,7 +26,8 @@ SLAObjectRequest::~SLAObjectRequest()
 void SLAObjectRequest::start(
     const SlicingId slicing_id,
     const ObjectID model_object_id,
-    const SLAPrintObjectStep step
+    const SLAPrintObjectStep step,
+    const bool use_cache
 )
 {
     this->cancel();
@@ -38,7 +39,8 @@ void SLAObjectRequest::start(
     m_object_cache.add_listener<ISLAObjectCacheChangedListener>(this);
     m_status_cache.add_listener<IStatusCacheChangedListener>(this);
 
-    if (const SLAObjectOptRef object{this->cached_object()}; object && this->is_complete(*object)) {
+    if (const SLAObjectOptRef object{this->cached_object()};
+        use_cache && object && this->is_complete(*object)) {
         this->complete(object);
         return;
     }

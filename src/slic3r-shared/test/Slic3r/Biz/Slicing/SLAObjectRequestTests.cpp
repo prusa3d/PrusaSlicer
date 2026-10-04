@@ -137,3 +137,31 @@ TEST_CASE_METHOD(SLAObjectRequestFixture, "Canceled SLA object request doesn't c
     }));
     CHECK(completed_count == 0);
 }
+
+TEST_CASE_METHOD(SLAObjectRequestFixture, "SLA object request can ignore an object not updated yet", "[slicing][sla-object-request][timeout]")
+{
+    update_process();
+    start(Slic3r::slaposSupportPoints);
+    REQUIRE(wait_for_completion());
+    REQUIRE(completed_object);
+    REQUIRE(completed_object->support_points);
+    const auto old_points{completed_object->support_points};
+
+    // The change of the support points reaches the cache only when dispatched.
+    ConfigPackSLA& config{std::get<ConfigPackSLA>(bed.config)};
+    config.sla_print_settings.items.opt("support_points_density_relative").set(150);
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+
+    request.start(id, bed.model.objects.front()->id(), Slic3r::slaposSupportPoints, false);
+    CHECK(completed_count == 1);
+    REQUIRE(wait_for_completion());
+    REQUIRE(completed_object);
+    REQUIRE(completed_object->support_points);
+    CHECK(completed_object->support_points != old_points);
+}
