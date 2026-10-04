@@ -1054,6 +1054,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/SLAResultCache.cpp
         include/Slic3r/Biz/SLAObjectCache.hpp
         src/Slic3r/Biz/SLAObjectCache.cpp
+        include/Slic3r/Biz/SLAObjectRequest.hpp
+        src/Slic3r/Biz/SLAObjectRequest.cpp
 
         include/Slic3r/Biz/UserAccount/IUserAccountListener.hpp
         include/Slic3r/Biz/UserAccount/IUserAccountSessionListener.hpp
@@ -1663,6 +1665,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/Slicing/GCodeUtils.cpp
             test/Slic3r/Biz/Slicing/ActionsTests.cpp
             test/Slic3r/Biz/Slicing/ListenersTests.cpp
+            test/Slic3r/Biz/Slicing/SLAObjectRequestTests.cpp
             test/Slic3r/Biz/Slicing/ThumbnailsTests.cpp
 
             test/Slic3r/Biz/Config/ConfigLegacyTests.cpp
