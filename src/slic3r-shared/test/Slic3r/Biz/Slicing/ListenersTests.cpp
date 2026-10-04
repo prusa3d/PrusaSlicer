@@ -457,6 +457,86 @@ TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed clea
     CHECK_FALSE(sla_cache.get_result(id));
 }
 
+namespace {
+
+// Remembers the last notification of what a bed process produces besides the results.
+struct BedOutputsListener : public IWipeTowerGeometryListener,
+                            public Slic3r::Biz::Slicing::IGeneratedSupportPointsListener,
+                            public Slic3r::Biz::Slicing::IExtruderCandidatesListener
+{
+    void on_wipe_tower_geometry_changed(OptWipeTowerGeometry geometry, const SlicingId) override
+    {
+        wipe_tower = std::move(geometry);
+        wipe_tower_notified = true;
+    }
+
+    void on_generated_support_points_changed(
+        Slic3r::Biz::Slicing::GeneratedSupportPointsSnapshot&& points,
+        const SlicingId
+    ) override
+    {
+        support_points          = std::move(points);
+        support_points_notified = true;
+    }
+
+    void on_extruder_candidates_changed(std::vector<unsigned> candidates, const SlicingId) override
+    {
+        extruder_candidates          = std::move(candidates);
+        extruder_candidates_notified = true;
+    }
+
+    void reset() { *this = BedOutputsListener{}; }
+
+    OptWipeTowerGeometry wipe_tower;
+    Slic3r::Biz::Slicing::GeneratedSupportPointsSnapshot support_points;
+    std::vector<unsigned> extruder_candidates;
+    bool wipe_tower_notified{false};
+    bool support_points_notified{false};
+    bool extruder_candidates_notified{false};
+};
+
+} // namespace
+
+TEST_CASE_METHOD(SlicingFixture, "Switching the printer technology of a bed clears the other outputs of the old process", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::FFF)};
+    const ModelOnBed fff_settings{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::FFF)};
+    const ModelOnBed sla_settings{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+
+    BedOutputsListener listener;
+    slicing.add_listener<IWipeTowerGeometryListener>(&listener);
+    slicing.set_listener<Slic3r::Biz::Slicing::IGeneratedSupportPointsListener>(&listener);
+    slicing.add_listener<Slic3r::Biz::Slicing::IExtruderCandidatesListener>(&listener);
+
+    const auto slice_with = [&](const ModelOnBed& settings) {
+        status_listener.status_events.clear();
+        slicing.update_process(
+            bed.model,
+            bed.project_metadata,
+            settings.preset_metadata,
+            settings.config,
+            bed.bed_instance
+        );
+        slicing.slice_all();
+        REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+            return !events.empty() && events.back().status_code == StatusCode::Finished;
+        }));
+    };
+
+    slice_with(fff_settings);
+
+    // An SLA process never reports these, so only the switch itself can clear what the FFF one did.
+    listener.reset();
+    slice_with(sla_settings);
+    CHECK(listener.wipe_tower_notified);
+    CHECK_FALSE(listener.wipe_tower.has_value());
+    CHECK(listener.support_points_notified);
+    CHECK(listener.support_points.empty());
+    CHECK(listener.extruder_candidates_notified);
+    CHECK(listener.extruder_candidates.empty());
+}
+
 TEST_CASE_METHOD(SlicingFixture, "SLA bed with a pad but no supports ends as invalid data", "[slicing][slicing-interactor][timeout]") {
     using namespace std::chrono_literals;
 
@@ -643,4 +723,57 @@ TEST_CASE_METHOD(SlicingFixture, "SLA object keeps the valid part of a partial s
         CHECK(cached_object()->get().mesh);
         CHECK_FALSE(cached_object()->get().support_points);
     }
+}
+
+struct SLAObjectCacheChanges : public Slic3r::Biz::ISLAObjectCacheChangedListener {
+    void on_sla_object_cache_changed(const SlicingId&, Slic3r::Domain::ObjectID object_id) override
+    {
+        changed_objects.push_back(object_id);
+    }
+    std::vector<Slic3r::Domain::ObjectID> changed_objects;
+};
+
+TEST_CASE_METHOD(SlicingFixture, "SLA objects are dropped when a bed gets a process of another printer", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    const Slic3r::Domain::ObjectID object_id{bed.model.objects.front()->id()};
+
+    Slic3r::Biz::SLAObjectCache object_cache;
+    slicing.set_listener<ISLAObjectListener>(&object_cache);
+    SLAObjectCacheChanges changes;
+    object_cache.add_listener<Slic3r::Biz::ISLAObjectCacheChangedListener>(&changes);
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+    slicing.slice_all();
+
+    REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        return !events.empty() && events.back().status_code == StatusCode::Finished;
+    }));
+    const SlicingId id{status_listener.status_events.back().slicing_id};
+    REQUIRE(object_cache.get_instance({id, object_id}));
+
+    // Another SLA printer: its process never sends anything about the objects of the old one.
+    Slic3r::Domain::Preset::SelectedPresetMetadata other_printer{bed.preset_metadata};
+    other_printer.hw_config.id = "other SLA printer";
+    changes.changed_objects.clear();
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        other_printer,
+        bed.config,
+        bed.bed_instance
+    );
+    dispatcher.dispatch_enqueued();
+
+    CHECK_FALSE(object_cache.get_instance({id, object_id}));
+    CHECK_THAT(changes.changed_objects, Equals(std::vector{object_id}));
+
+    object_cache.remove_listener<Slic3r::Biz::ISLAObjectCacheChangedListener>(&changes);
 }

@@ -105,6 +105,11 @@ void SlicingInteractor::remove_bed(const Domain::SelectionId bed_instance_id)
     }
     process_slicing_queue();
 
+    notify_bed_outputs_cleared(id);
+}
+
+void SlicingInteractor::notify_bed_outputs_cleared(const SlicingId& id)
+{
     invoke_listener<IFDMResultListener>([&id](auto* listener) {
         listener->on_fdm_result_changed({}, id);
     });
@@ -408,10 +413,13 @@ void SlicingInteractor::process_update_requests()
 
         if (process.get_hw_printer_id() != request.preset_metadata.hw_config.id) {
             m_processes.erase(id);
-            // The new process may be of the other technology and would never replace the result
-            // of the old one. Dispatched, so that it comes after any result still in the queue.
-            on_fdm_result({}, id);
-            on_sla_result(id, {});
+            // The new process may be of the other technology and would never replace what the old
+            // one produced. Dispatched, so that it comes after any result still in the queue.
+            if (!m_dispatcher.dispatch_on_main_thread([this, id]() { notify_bed_outputs_cleared(id); })) {
+                SPDLOG_TRACE("{}: clearing of the bed outputs not dispatched", fmt::streamed(id));
+            }
+            // Not a part of the removal, where the bed is going away.
+            on_extruder_candidates({}, id);
             create_process(
                 request.model.get(),
                 request.project_metadata,

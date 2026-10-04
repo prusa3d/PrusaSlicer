@@ -56,5 +56,11 @@ void SLAObjectCache::on_sla_object_changed(const Domain::SlicingId& id, Object&&
 }
 
 void SLAObjectCache::on_remove_bed(const Domain::SlicingId& id) {
+    const std::vector<Domain::ObjectID> object_ids{this->get_object_ids(id)};
     std::erase_if(m_objects, [&id](const auto& pair) { return pair.first.first == id; });
+    for (const Domain::ObjectID object_id : object_ids) {
+        invoke_listeners<ISLAObjectCacheChangedListener>([&id, object_id](auto* listener) {
+            listener->on_sla_object_cache_changed(id, object_id);
+        });
+    }
 }
