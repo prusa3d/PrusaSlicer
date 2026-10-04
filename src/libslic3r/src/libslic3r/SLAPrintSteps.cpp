@@ -508,6 +508,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject& po, SLAPrintObjectStep st
     po.m_preview = Biz::Slicing::Sla::Object {
         .object_id = po.m_model_object->id(),
         .instance_trafos = get_instance_trafos(po),
+        .object_trafo = po.trafo(),
         .mesh = std::make_shared<const TriangleMesh>(std::move(m), std::move(stats)),
         .issues = std::move(issues)
     };

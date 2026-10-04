@@ -526,3 +526,52 @@ TEST_CASE_METHOD(SlicingFixture, "SLA slicing uses the user modified support poi
         CHECK(points[i].type == object.sla_support_points[i].type);
     }
 }
+
+TEST_CASE_METHOD(SlicingFixture, "SLA object brings the transformation of its support points into the model", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+    using Slic3r::Domain::SLA::PointsStatus;
+    using Slic3r::Domain::SLA::SupportPoint;
+    using Slic3r::Domain::SLA::SupportPointType;
+    using Slic3r::Domain::Vec3f;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    ModelObject& object{*bed.model.objects.front()};
+    ModelInstance& instance{*object.instances.front()};
+    instance.set_scaling_factor(Vec3d{1.5, 1.5, 1.5});
+    instance.set_rotation(Vec3d{0., 0., 0.5});
+    object.sla_support_points = {
+        SupportPoint{Vec3f{10.f, 10.f, 0.f}, 0.2f, SupportPointType::manual_add},
+        SupportPoint{Vec3f{0.f, 10.f, 10.f}, 0.2f, SupportPointType::manual_add},
+    };
+    object.sla_points_status = PointsStatus::UserModified;
+
+    Slic3r::Biz::SLAObjectCache object_cache;
+    slicing.set_listener<ISLAObjectListener>(&object_cache);
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+    slicing.slice_all();
+
+    REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        return !events.empty() && events.back().status_code == StatusCode::Finished;
+    }));
+
+    const SlicingId id{status_listener.status_events.back().slicing_id};
+    const auto sla_object{object_cache.get_instance({id, object.id()})};
+    REQUIRE(sla_object);
+    REQUIRE(sla_object->get().support_points);
+
+    const Slic3r::Domain::Transform3d to_model{sla_object->get().object_trafo.inverse()};
+    CHECK_FALSE(to_model.isApprox(Slic3r::Domain::Transform3d::Identity()));
+    const Slic3r::Domain::SLA::SupportPoints& points{*sla_object->get().support_points};
+    REQUIRE(points.size() == object.sla_support_points.size());
+    for (size_t i{0}; i < points.size(); ++i) {
+        const Vec3d model_position{to_model * points[i].pos.cast<double>()};
+        CHECK(model_position.isApprox(object.sla_support_points[i].pos.cast<double>(), 1e-5));
+    }
+}

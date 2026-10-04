@@ -63,6 +63,10 @@ struct Object{
                         //
     InstanceTrafos instance_trafos;
 
+    // Transforms model object coordinates into the print object coordinates of the meshes and
+    // the support points below (instance scaling and rotation, shrinkage correction, mirroring).
+    Domain::Transform3d object_trafo{Domain::Transform3d::Identity()};
+
     // Holds the preview of the object to be printed
     // (holes, cavities, negatives and positive volumes unified)
     // Essentially this should be a m_mesh_to_slice after the CSG operations
