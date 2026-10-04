@@ -1347,6 +1347,14 @@ void SceneInteractor::modify_layer_height_profile(
     this->modify_object_and_update_beds(object_ref, modifier);
 }
 
+void SceneInteractor::modify_sla_support_points(
+    const Domain::ElementRef& object_ref,
+    const std::function<void(ModelObject&)>& modifier
+)
+{
+    this->modify_object_and_update_beds(object_ref, modifier);
+}
+
 void SceneInteractor::modify_layer_config_ranges(
     const Domain::ElementRef& object_ref,
     const std::function<void(ModelObject&)>& modifier

@@ -749,3 +749,32 @@ TEST_CASE_METHOD(
     CHECK(offset.y() == Catch::Approx(20.0));
     CHECK(offset.z() == Catch::Approx(offset_z_before));
 }
+
+TEST_CASE_METHOD(SceneInteractorFixture, "Modifying SLA support points changes the slicing input of the bed", "[SceneInteractor]")
+{
+    using Domain::SLA::PointsStatus;
+    using Domain::SLA::SupportPoint;
+
+    const auto& p     = project_interactor.selected_project();
+    const auto bi1_id = p.config_containers().front()->bed_instances()[0]->id().id;
+
+    {
+        REQUIRE_CALL(slicing_input_changed_listener, on_slicing_input_changed(_)).WITH(_1.instance_id == bi1_id);
+        scene_interactor.new_object_from_mesh(Domain::TriangleMesh{TriMesh::make_cube(20, 20, 20)});
+    }
+    const Domain::ModelObject& object = *p.model().objects.front();
+
+    {
+        REQUIRE_CALL(slicing_input_changed_listener, on_slicing_input_changed(_)).WITH(_1.instance_id == bi1_id);
+        scene_interactor.modify_sla_support_points(
+            Domain::ElementRef{object.id().id},
+            [](Domain::ModelObject& model_object) {
+                model_object.sla_support_points = {SupportPoint{Domain::Vec3f{10.f, 10.f, 0.f}, 0.2f}};
+                model_object.sla_points_status = PointsStatus::UserModified;
+            }
+        );
+    }
+
+    CHECK(object.sla_points_status == PointsStatus::UserModified);
+    CHECK(object.sla_support_points.size() == 1);
+}

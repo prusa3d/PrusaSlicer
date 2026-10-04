@@ -354,6 +354,16 @@ public:
         const std::function<void(Domain::ModelObject&)>& modifier
     );
 
+    /**
+     * @brief Modify the SLA support points (and their status) of the given object.
+     * @param object_ref Reference to the object to modify (only object_id is used).
+     * @param modifier Called with the ModelObject to perform modification of the support points.
+     */
+    void modify_sla_support_points(
+        const Domain::ElementRef& object_ref,
+        const std::function<void(Domain::ModelObject&)>& modifier
+    );
+
     void edit_name(const Domain::ElementRef& id, const std::string& new_name);
 
     /**
