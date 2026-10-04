@@ -109,7 +109,7 @@ sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfigView& c)
         double pillar_r = 0.5 * c.get<double>("branchingsupport_pillar_diameter");
         scfg.head_back_radius_mm = pillar_r;
         scfg.head_fallback_radius_mm =
-            0.01 * c.get<double>("branchingsupport_small_pillar_diameter_percent") * pillar_r;
+            c.get<Percentage>("branchingsupport_small_pillar_diameter_percent").get_abs_value(1.0) * pillar_r;
         scfg.head_penetration_mm = c.get<double>("branchingsupport_head_penetration");
         scfg.head_width_mm = c.get<double>("branchingsupport_head_width");
         scfg.object_elevation_mm = is_zero_elevation(c) ?

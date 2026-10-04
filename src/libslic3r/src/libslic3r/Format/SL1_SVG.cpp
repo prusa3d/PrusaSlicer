@@ -8,6 +8,7 @@
 
 #include "Slic3r/Biz/Algorithms/ExPolygon.hpp"
 #include "libslic3r/SLA/RasterBase.hpp"
+#include "Slic3r/Domain/ConfigDefsSLA.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Point.hpp"
 #include "libslic3r/Polygon.hpp"
@@ -229,8 +230,8 @@ public:
         mirror[X] = cfg.get<bool>("display_mirror_x");
         mirror[Y] = cfg.get<bool>("display_mirror_y");
 
-        auto ro = cfg.get<int>("display_orientation");
-        sla::RasterBase::Orientation orientation = ro == sla::RasterBase::roPortrait
+        auto ro = cfg.get<Domain::SLADisplayOrientation>("display_orientation");
+        sla::RasterBase::Orientation orientation = ro == Domain::SLADisplayOrientation::sladoPortrait
             ? sla::RasterBase::roPortrait
             : sla::RasterBase::roLandscape;
 

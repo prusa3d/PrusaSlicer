@@ -877,3 +877,30 @@ TEST_CASE_METHOD(SlicingFixture, "Changing an SLA object setting rasterizes the 
     REQUIRE(result_listener.result.export_data);
     CHECK_FALSE(result_listener.result.export_data->files.data.empty());
 }
+
+TEST_CASE_METHOD(SlicingFixture, "SLA slicing reads the options of every support tree type and archive format", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    ConfigPackSLA& config{std::get<ConfigPackSLA>(bed.config)};
+
+    SECTION("Branching supports") {
+        config.sla_print_settings.items.opt("support_tree_type").set(std::string("branching"));
+    }
+    SECTION("SL1 SVG archive") {
+        config.sla_printer_settings.items.opt("sla_archive_format").set(std::string("SL1SVG"));
+    }
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+    slicing.slice_all();
+
+    CHECK(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        return !events.empty() && events.back().status_code == StatusCode::Finished;
+    }));
+}
