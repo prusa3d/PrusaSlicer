@@ -778,6 +778,69 @@ TEST_CASE_METHOD(SlicingFixture, "SLA objects are dropped when a bed gets a proc
     object_cache.remove_listener<Slic3r::Biz::ISLAObjectCacheChangedListener>(&changes);
 }
 
+TEST_CASE_METHOD(SlicingFixture, "Changing user modified SLA support points reslices the supports", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+    using Slic3r::Domain::SLA::PointsStatus;
+    using Slic3r::Domain::SLA::SupportPoint;
+    using Slic3r::Domain::SLA::SupportPointType;
+    using Slic3r::Domain::Vec3f;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    ModelObject& object{*bed.model.objects.front()};
+    object.sla_support_points = {
+        SupportPoint{Vec3f{5.f, 5.f, 0.f}, 0.2f, SupportPointType::manual_add},
+        SupportPoint{Vec3f{15.f, 15.f, 0.f}, 0.2f, SupportPointType::manual_add},
+    };
+    object.sla_points_status = PointsStatus::UserModified;
+
+    Slic3r::Biz::SLAObjectCache object_cache;
+    slicing.set_listener<ISLAObjectListener>(&object_cache);
+    SLAResultListener result_listener;
+    slicing.set_listener<ISLAResultListener>(&result_listener);
+
+    const auto slice = [&]() {
+        status_listener.status_events.clear();
+        slicing.update_process(
+            bed.model,
+            bed.project_metadata,
+            bed.preset_metadata,
+            bed.config,
+            bed.bed_instance
+        );
+        slicing.slice_all();
+        REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+            return !events.empty() && events.back().status_code == StatusCode::Finished;
+        }));
+        return status_listener.status_events.back().slicing_id;
+    };
+
+    const SlicingId id{slice()};
+    const auto first{object_cache.get_instance({id, object.id()})};
+    REQUIRE(first);
+    REQUIRE(first->get().support_structure);
+    const auto first_tree{first->get().support_structure};
+    REQUIRE(result_listener.result.export_data);
+    REQUIRE_FALSE(result_listener.result.export_data->files.data.empty());
+
+    // The user adds a point (as the support points gizmo does on Apply).
+    object.sla_support_points.push_back(
+        SupportPoint{Vec3f{5.f, 15.f, 0.f}, 0.2f, SupportPointType::manual_add}
+    );
+    result_listener.result_recieved = false;
+    result_listener.result          = {};
+    CHECK(slice() == id);
+
+    const auto second{object_cache.get_instance({id, object.id()})};
+    REQUIRE(second);
+    REQUIRE(second->get().support_points);
+    CHECK(second->get().support_points->size() == 3);
+    REQUIRE(second->get().support_structure);
+    CHECK(second->get().support_structure != first_tree);
+    // The archive is made again too.
+    REQUIRE(result_listener.result.export_data);
+    CHECK_FALSE(result_listener.result.export_data->files.data.empty());
+}
+
 TEST_CASE_METHOD(SlicingFixture, "Changing an SLA object setting rasterizes the slices again", "[slicing][slicing-interactor][timeout]") {
     using namespace std::chrono_literals;
 

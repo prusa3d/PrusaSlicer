@@ -247,7 +247,13 @@ std::vector<Domain::ObjectID> SLAPrint::print_object_ids() const
 
 namespace {
 
-using StepsPerModelObjectId = std::map<ObjectID, std::set<SLAPrintObjectStep>>;
+using Step = std::variant<SLAPrintStep, SLAPrintObjectStep>;
+
+// The steps invalidated by a change of the step, including those depending on it.
+std::vector<Step> propagate(Step step);
+PrintAndObjectSteps split_steps(const std::set<Step>& steps);
+
+using StepsPerModelObjectId = std::map<ObjectID, PrintAndObjectSteps>;
 
 template <typename Set>
 AllOrSome<Set> merge (const AllOrSome<Set>& a, const AllOrSome<Set>& b) {
@@ -344,7 +350,11 @@ ModelObjectsSyncResult sync_model_objects(
             continue;
         }
 
-        std::set<SLAPrintObjectStep> invalidated_steps;
+        std::set<Step> invalidated_steps;
+        const auto invalidate = [&invalidated_steps](const SLAPrintObjectStep step) {
+            const std::vector<Step> steps{propagate(step)};
+            invalidated_steps.insert(steps.begin(), steps.end());
+        };
 
         const bool old_user_modified = model_object->sla_points_status
             == PointsStatus::UserModified;
@@ -361,19 +371,19 @@ ModelObjectsSyncResult sync_model_objects(
         if (switching_to_auto_from_man
             || switching_to_man_from_auto
             || (new_user_modified && !supports_equal)) {
-            invalidated_steps.insert(slaposSupportPoints);
+            invalidate(slaposSupportPoints);
         }
 
         // Invalidate hollowing if drain holes have changed
         if (model_object->sla_drain_holes != model_object_new->sla_drain_holes)
         {
-            invalidated_steps.insert(slaposDrillHoles);
+            invalidate(slaposDrillHoles);
         }
 
         model_object->assign_copy(*model_object_new);
 
         objects.push_back(model_object);
-        reused_objects.insert({model_object->id(), invalidated_steps});
+        reused_objects.insert({model_object->id(), split_steps(invalidated_steps)});
     }
 
     ModelObjectsSyncResult result;
@@ -385,7 +395,9 @@ ModelObjectsSyncResult sync_model_objects(
         };
 
         if (reused_model_object_it != reused_objects.end()) {
-            result.invalidated_steps.object[print_object] = reused_model_object_it->second;
+            const auto& [print_steps, object_steps] = reused_model_object_it->second;
+            result.invalidated_steps.print = merge(result.invalidated_steps.print, print_steps);
+            result.invalidated_steps.object[print_object] = object_steps;
             result.reuse_candidates.insert({print_object->model_object()->id(), print_object});
         }
     }
@@ -404,8 +416,6 @@ void delete_old_model_objects(const Domain::ModelObjectPtrs& old_objects, const 
         }
     }
 }
-
-using Step = std::variant<SLAPrintStep, SLAPrintObjectStep>;
 
 std::vector<Step> propagate_steps(Step step)
 {
@@ -671,7 +681,11 @@ PrintAndObjectSteps diff_to_invalidated_steps(
         const std::vector<Step>& invalidated_steps{invalidated_by.at(opt_key)};
         steps.insert(invalidated_steps.begin(), invalidated_steps.end());
     }
+    return split_steps(steps);
+}
 
+PrintAndObjectSteps split_steps(const std::set<Step>& steps)
+{
     std::set<SLAPrintStep> print_steps;
     std::set<SLAPrintObjectStep> print_object_steps;
     for (const Step& step : steps) {
