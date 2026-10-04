@@ -4,6 +4,8 @@
 #include "Slic3r/App/Scene/ClipperPresenterHelper.hpp"
 #include "Slic3r/Domain/Model.hpp"
 
+#include <memory>
+
 namespace Slic3r::Domain {
 class ModelVolume;
 class ModelObject;
@@ -43,11 +45,17 @@ public:
     ) const;
     bool has_valid_contour() const;
 
+    /**
+     * @param sla_mesh The mesh of the object the SLA backend made (hollowed, drilled), to be cut
+     * instead of the model volumes. sla_mesh_trafo transforms it into model object coordinates.
+     */
     void update(
         const Domain::ModelObject* selected_object,
         const Domain::ModelInstance* selected_instance,
-        double sla_shift                = 0.,
-        bool force_clipper_regeneration = false
+        double sla_shift                                   = 0.,
+        bool force_clipper_regeneration                    = false,
+        std::shared_ptr<const Domain::TriangleMesh> sla_mesh = nullptr,
+        const Domain::Transformation& sla_mesh_trafo       = {}
     );
     void release();
     void recalculate_object_clippers();
@@ -66,6 +74,8 @@ public:
 
 private:
     std::vector<const Domain::TriangleMesh*> m_old_meshes;
+    // The clippers keep only a pointer to the mesh.
+    std::shared_ptr<const Domain::TriangleMesh> m_sla_mesh;
     // std::unique_ptr<MeshClipper> m_supports_clipper;
     // std::unique_ptr<MeshClipper> m_pad_clipper;
     std::unique_ptr<Biz::ClippingPlane> m_clp;

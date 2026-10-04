@@ -35,12 +35,15 @@ public:
     ClipperPresenter() {};
     ClipperPresenter(Clipper* clipper, Render::Device* device, ISceneProvider* scene_provider);
 
+    // See Clipper::update() for sla_mesh.
     void activate(
         const Domain::ModelObject* selected_object,
         const Domain::ModelInstance* selected_instance,
         Node* parent_node,
-        double sla_shift                           = 0.,
-        BuildMeshesNodes should_build_meshes_nodes = BuildMeshesNodes::Yes
+        double sla_shift                                     = 0.,
+        BuildMeshesNodes should_build_meshes_nodes           = BuildMeshesNodes::Yes,
+        std::shared_ptr<const Domain::TriangleMesh> sla_mesh = nullptr,
+        const Domain::Transformation& sla_mesh_trafo         = {}
     );
     void deactivate(bool force_enabled_scene_nodes = true);
     void reset();

@@ -304,14 +304,16 @@ void SlaGizmoBase::init_scene()
 
 void SlaGizmoBase::activate_clipper()
 {
-    // The clipper cuts the model meshes, they have to be elevated as the backend object is.
+    // The clipper cuts the backend mesh as the gizmo shows it (the model before it is there).
     const double position = m_clipper.get_position();
     m_clipper_presenter.activate(
         this->model_object(),
         this->model_instance(),
         m_clipper_node,
         m_elevation,
-        Scene::BuildMeshesNodes::No
+        Scene::BuildMeshesNodes::No,
+        m_backend_trimesh != nullptr ? m_backend_mesh : nullptr,
+        Domain::Transformation{m_object_trafo.inverse()}
     );
     m_clipper_presenter.set_behavior(true, true, 0.);
     m_clipper_presenter.set_position_by_ratio(position, true);
@@ -495,7 +497,8 @@ void SlaGizmoBase::load_backend_object()
 
     const std::shared_ptr<const Domain::TriangleMesh> mesh =
         object != nullptr ? object->mesh : nullptr;
-    if (mesh != m_backend_mesh) {
+    const bool mesh_changed = mesh != m_backend_mesh;
+    if (mesh_changed) {
         m_backend_mesh = mesh;
         m_backend_trimesh.reset();
         m_backend_geometry.reset();
@@ -511,7 +514,7 @@ void SlaGizmoBase::load_backend_object()
     }
 
     const double elevation = object != nullptr ? m_instance_trafo.translation().z() : 0.;
-    if (elevation != m_elevation) {
+    if (mesh_changed || elevation != m_elevation) {
         m_elevation = elevation;
         this->activate_clipper();
     }
