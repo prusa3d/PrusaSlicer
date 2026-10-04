@@ -575,3 +575,72 @@ TEST_CASE_METHOD(SlicingFixture, "SLA object brings the transformation of its su
         CHECK(model_position.isApprox(object.sla_support_points[i].pos.cast<double>(), 1e-5));
     }
 }
+
+TEST_CASE_METHOD(SlicingFixture, "SLA object keeps the valid part of a partial slice after an update", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+    using Slic3r::Biz::Slicing::SliceUntilStep;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    ConfigPackSLA& config{std::get<ConfigPackSLA>(bed.config)};
+    const Slic3r::Domain::ObjectID object_id{bed.model.objects.front()->id()};
+
+    Slic3r::Biz::SLAObjectCache object_cache;
+    slicing.set_listener<ISLAObjectListener>(&object_cache);
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+
+    const SlicingId id{0, bed.bed_instance.id().id};
+    slicing.slice_bed(id, SliceUntilStep{Slic3r::slaposSupportPoints, object_id});
+
+    REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        const bool was_running = std::ranges::any_of(events, [](const StatusEvent& event) {
+            return event.status_code == StatusCode::Running;
+        });
+        return was_running && events.back().status_code == StatusCode::Modified;
+    }));
+
+    const auto cached_object = [&]() { return object_cache.get_instance({id, object_id}); };
+    REQUIRE(cached_object());
+    REQUIRE(cached_object()->get().mesh);
+    REQUIRE(cached_object()->get().support_points);
+    CHECK_FALSE(cached_object()->get().support_structure);
+
+    const auto update_with = [&](const ConfigPackSLA& new_config) {
+        slicing.update_process(
+            bed.model,
+            bed.project_metadata,
+            bed.preset_metadata,
+            new_config,
+            bed.bed_instance
+        );
+        dispatcher.dispatch_enqueued();
+    };
+
+    SECTION("A change of a later print step keeps the object") {
+        // The finished steps don't run again, so nothing would send the object later.
+        ConfigPackSLA new_config{config};
+        Slic3r::Domain::ConfigItem& exposure_time{new_config.sla_material_settings.items.opt("exposure_time")};
+        exposure_time.set(exposure_time.get<double>() + 1.);
+        update_with(new_config);
+
+        REQUIRE(cached_object());
+        CHECK(cached_object()->get().mesh);
+        CHECK(cached_object()->get().support_points);
+    }
+
+    SECTION("A change of the support points keeps only the mesh") {
+        ConfigPackSLA new_config{config};
+        new_config.sla_print_settings.items.opt("support_points_density_relative").set(150);
+        update_with(new_config);
+
+        REQUIRE(cached_object());
+        CHECK(cached_object()->get().mesh);
+        CHECK_FALSE(cached_object()->get().support_points);
+    }
+}

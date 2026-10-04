@@ -909,23 +909,16 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
 
     this->invalidate_object_steps(invalidated_steps);
 
-    std::vector<const SLAPrintObject*> objects_to_keep;
-    for (const SLAPrintObject* object : m_objects) {
-        if (object->all_steps_done()) {
-            objects_to_keep.push_back(object);
-        }
-    }
-
     for (const ObjectID id: old_ids) {
-        const auto it{std::ranges::find_if(objects_to_keep, [&](const SLAPrintObject* object) {
+        const auto it{std::ranges::find_if(m_objects, [&](const SLAPrintObject* object) {
             return object->model_object()->id() == id;
         })};
-        if (it != objects_to_keep.end()) {
-            Biz::Slicing::Sla::Object slicing_object{};
-            slicing_object.object_id = id;
-            slicing_object.instance_trafos = get_instance_trafos(**it);
-            // Sending just trafos means the object was not invalidated.
-            m_on_sla_object(slicing_object);
+        if (it != m_objects.end() && (*it)->drop_invalidated_preview()) {
+            // Send what is still valid, even of an object that was only sliced partially.
+            // Its steps that are done won't run again, so they wouldn't send it.
+            Biz::Slicing::Sla::Object& preview{*(*it)->m_preview};
+            preview.instance_trafos = get_instance_trafos(**it);
+            m_on_sla_object(preview);
         } else {
             Biz::Slicing::Sla::Object slicing_object{};
             slicing_object.object_id = id;
@@ -1269,6 +1262,29 @@ SLAPrintObject::SLAPrintObject(
     : Inherited(print, model_object),
     m_config(config)
 {}
+
+bool SLAPrintObject::drop_invalidated_preview()
+{
+    // The preview mesh is replaced by each of these steps.
+    if (!m_preview.has_value()
+        || !m_preview->mesh
+        || !is_step_done(slaposAssembly)
+        || !is_step_done(slaposHollowing)
+        || !is_step_done(slaposDrillHoles)) {
+        return false;
+    }
+
+    if (!is_step_done(slaposSupportPoints)) {
+        m_preview->support_points = nullptr;
+    }
+    if (!is_step_done(slaposSupportTree)) {
+        m_preview->support_structure = nullptr;
+    }
+    if (!is_step_done(slaposPad)) {
+        m_preview->pad = nullptr;
+    }
+    return true;
+}
 
 bool SLAPrintObject::invalidate_all_steps()
 {
