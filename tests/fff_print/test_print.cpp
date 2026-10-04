@@ -837,7 +837,8 @@ TEST_CASE_METHOD(
          slaposSupportTree,
          slaposPad,
          slaposSliceSupports,
-         slapsMergeSlicesAndEval}
+         slapsMergeSlicesAndEval,
+         slapsRasterize}
     );
 }
 
@@ -888,7 +889,7 @@ TEST_CASE_METHOD(
         *this,
         [](ConfigPackSLA& c)
         { c.sla_print_settings.items.opt("branchingsupport_base_diameter").set<double>(5.0); },
-        {slaposSupportTree, slaposPad, slaposSliceSupports, slapsMergeSlicesAndEval}
+        {slaposSupportTree, slaposPad, slaposSliceSupports, slapsMergeSlicesAndEval, slapsRasterize}
     );
 }
 

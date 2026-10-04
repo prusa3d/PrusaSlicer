@@ -777,3 +777,40 @@ TEST_CASE_METHOD(SlicingFixture, "SLA objects are dropped when a bed gets a proc
 
     object_cache.remove_listener<Slic3r::Biz::ISLAObjectCacheChangedListener>(&changes);
 }
+
+TEST_CASE_METHOD(SlicingFixture, "Changing an SLA object setting rasterizes the slices again", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    SLAResultListener result_listener;
+    slicing.set_listener<ISLAResultListener>(&result_listener);
+
+    const auto slice = [&]() {
+        status_listener.status_events.clear();
+        result_listener.result = {};
+        slicing.update_process(
+            bed.model,
+            bed.project_metadata,
+            bed.preset_metadata,
+            bed.config,
+            bed.bed_instance
+        );
+        slicing.slice_all();
+        REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+            return !events.empty() && events.back().status_code == StatusCode::Finished;
+        }));
+    };
+
+    slice();
+    REQUIRE(result_listener.result.export_data);
+    REQUIRE_FALSE(result_listener.result.export_data->files.data.empty());
+
+    // A change of the supports makes new slices, which have to be rasterized for the archive.
+    Slic3r::Domain::ConfigItem& pillar_diameter{
+        std::get<ConfigPackSLA>(bed.config).sla_print_settings.items.opt("support_pillar_diameter")
+    };
+    pillar_diameter.set(pillar_diameter.get<double>() + 0.2);
+    slice();
+    REQUIRE(result_listener.result.export_data);
+    CHECK_FALSE(result_listener.result.export_data->files.data.empty());
+}

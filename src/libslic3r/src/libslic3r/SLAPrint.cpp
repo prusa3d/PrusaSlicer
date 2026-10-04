@@ -407,7 +407,7 @@ void delete_old_model_objects(const Domain::ModelObjectPtrs& old_objects, const 
 
 using Step = std::variant<SLAPrintStep, SLAPrintObjectStep>;
 
-std::vector<Step> propagate(Step step)
+std::vector<Step> propagate_steps(Step step)
 {
     return std::visit(
         Domain::overloaded{
@@ -487,6 +487,26 @@ std::vector<Step> propagate(Step step)
         step
     );
 };
+
+std::vector<Step> propagate(Step step)
+{
+    std::vector<Step> result{propagate_steps(step)};
+
+    // The object steps list only the first print step they invalidate, the print steps depending
+    // on it have to go too (e.g. new slices have to be rasterized again).
+    for (size_t i = 0; i < result.size(); ++i) {
+        if (std::holds_alternative<SLAPrintStep>(result[i])) {
+            // A copy, the loop below appends to the result.
+            const SLAPrintStep print_step{std::get<SLAPrintStep>(result[i])};
+            for (const Step& dependent : propagate_steps(print_step)) {
+                if (std::ranges::find(result, dependent) == result.end()) {
+                    result.push_back(dependent);
+                }
+            }
+        }
+    }
+    return result;
+}
 
 std::vector<Step> steps(const std::vector<std::vector<Step>>& steps)
 {
