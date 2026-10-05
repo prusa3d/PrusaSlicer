@@ -2163,7 +2163,8 @@ TEST_CASE("Non-planar voronoi diagram", "[VoronoiNonPlanar]")
     dump_voronoi_to_svg(debug_out_path("voronoi-non-planar-out.svg").c_str(), vd, Points(), lines);
 #endif
 
-    REQUIRE(vd.is_valid());
+    REQUIRE(CGAL::Algorithms::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(vd));
+    REQUIRE(vd.get_state() == VD::State::REPAIR_SUCCESSFUL);
 }
 
 // This case is extracted from SPE-1729, where several ExPolygon with very thin lines

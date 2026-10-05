@@ -55,7 +55,7 @@ public:
         NO_ISSUE_DETECTED,
         FINITE_EDGE_WITH_NON_FINITE_VERTEX,
         MISSING_VORONOI_VERTEX,
-        NON_PLANAR_VORONOI_DIAGRAM,
+        VORONOI_VERTEX_VIOLATING_EMPTY_CIRCLE_PROPERTY,
         VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT,
         PARABOLIC_VORONOI_EDGE_WITHOUT_FOCUS_POINT,
         UNKNOWN                                     // Repairs are disabled in the constructor.
@@ -176,6 +176,39 @@ private:
     // The first type of issue that can be detected is a finite Voronoi edge with a non-finite vertex.
     // The second type of issue that can be detected is a parabolic Voronoi edge without a focus point (produced by two segments).
     static IssueType detect_known_voronoi_edge_issues(const VoronoiDiagram &voronoi_diagram);
+
+    /**
+     * @brief Detect issues related to Voronoi vertices, or that can be detected by iterating over Voronoi vertices.
+     * The first type of issue that can be detected is a Voronoi vertex violating the empty-circle property.
+     */
+    template <typename SegmentIterator>
+    static typename boost::polygon::enable_if<
+        typename boost::polygon::gtl_if<
+            typename boost::polygon::is_segment_concept<typename boost::polygon::geometry_concept<
+                typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+        IssueType>::type
+    detect_known_voronoi_vertex_issues(
+        const VoronoiDiagram& voronoi_diagram,
+        SegmentIterator segment_begin,
+        SegmentIterator segment_end
+    );
+
+    /**
+     * @brief Check whether some Voronoi vertex violates the empty-circle property. That happens when the vertex isn't
+     * equidistant from the sources of its incident cells, or when another input segment is closer to it than those sources.
+     * Boost.Polygon produces such vertices for nearly degenerate inputs, and the Voronoi edges then cross each other.
+     */
+    template <typename SegmentIterator>
+    static typename boost::polygon::enable_if<
+        typename boost::polygon::gtl_if<
+            typename boost::polygon::is_segment_concept<typename boost::polygon::geometry_concept<
+                typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+        bool>::type
+    has_voronoi_vertex_violating_empty_circle_property(
+        const VoronoiDiagram& voronoi_diagram,
+        SegmentIterator segment_begin,
+        SegmentIterator segment_end
+    );
 
     voronoi_diagram_type  m_voronoi_diagram;
     vertex_container_type m_vertices;
