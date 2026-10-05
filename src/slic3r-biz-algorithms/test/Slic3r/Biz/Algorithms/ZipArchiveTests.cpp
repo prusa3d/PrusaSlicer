@@ -354,3 +354,65 @@ TEST_CASE("ZipArchive last_error reports why opening a missing file failed", "[a
     CHECK_FALSE(reader.is_open());
     CHECK(reader.last_error() != MZ_ZIP_NO_ERROR);
 }
+
+TEST_CASE("ZipArchive get_filename_from_extra prefers the Unicode Path extra field", "[algorithms][algorithms-zip-archive]") {
+    const std::string path = temp_zip_path();
+    const std::string legacy_name = "d\x8eklo.stl";
+    const std::string utf8_name   = "d\xC5\xBEklo.stl";
+
+    std::string extra;
+    const auto put_u16 = [&extra](uint16_t v) {
+        extra.push_back(static_cast<char>(v & 0xff));
+        extra.push_back(static_cast<char>(v >> 8));
+    };
+    put_u16(0x7075);
+    put_u16(static_cast<uint16_t>(5 + utf8_name.size()));
+    extra.push_back('\x01');
+    const uint32_t crc = static_cast<uint32_t>(mz_crc32(
+        MZ_CRC32_INIT,
+        reinterpret_cast<const unsigned char*>(legacy_name.data()),
+        legacy_name.size()
+    ));
+    for (int shift = 0; shift < 32; shift += 8)
+        extra.push_back(static_cast<char>((crc >> shift) & 0xff));
+    extra += utf8_name;
+
+    {
+        ZipArchive writer = ZipArchive::open(path, ZipArchive::Mode::Write);
+        REQUIRE(writer.is_open());
+        REQUIRE(mz_zip_writer_add_mem_ex_v2(
+            writer.raw_archive(),
+            legacy_name.c_str(),
+            "x",
+            1,
+            nullptr,
+            0,
+            0,
+            0,
+            0,
+            nullptr,
+            extra.data(),
+            static_cast<mz_uint>(extra.size()),
+            extra.data(),
+            static_cast<mz_uint>(extra.size())
+        ));
+        CHECK(writer.add_entry("plain.stl", "x", 1));
+    }
+
+    ZipArchive reader = ZipArchive::open(path, ZipArchive::Mode::Read);
+    REQUIRE(reader.is_open());
+
+    std::string filename;
+    REQUIRE(reader.get_filename_from_extra(reader.locate_file(legacy_name), filename));
+    CHECK(filename == utf8_name);
+    REQUIRE(reader.get_filename(reader.locate_file(legacy_name), filename));
+    CHECK(filename == legacy_name);
+
+    REQUIRE(reader.get_filename_from_extra(reader.locate_file("plain.stl"), filename));
+    CHECK(filename == "plain.stl");
+
+    CHECK_FALSE(reader.get_filename_from_extra(-1, filename));
+
+    reader.close();
+    boost::filesystem::remove(path);
+}

@@ -609,6 +609,10 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/Navigator.hpp
         include/Slic3r/App/MsgBoxHandler.hpp
         src/Slic3r/App/MsgBoxHandler.cpp
+        include/Slic3r/App/OpenFiles/OpenFilesDialogModel.hpp
+        src/Slic3r/App/OpenFiles/OpenFilesDialogModel.cpp
+        include/Slic3r/App/OpenFiles/OpenFilesDialog.hpp
+        src/Slic3r/App/OpenFiles/OpenFilesDialog.cpp
         include/Slic3r/App/IMsgBoxProvider.hpp
 
         include/Slic3r/App/Yoga/Namespace.hpp
@@ -1182,6 +1186,9 @@ set(SLIC3R_SHARED_FILES
 
         include/Slic3r/Biz/FileLoadingLogic.hpp
         src/Slic3r/Biz/FileLoadingLogic.cpp
+        include/Slic3r/Biz/FileOpen/ArchiveEntry.hpp
+        include/Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp
+        src/Slic3r/Biz/FileOpen/FileOpeningInteractor.cpp
         include/Slic3r/Biz/MeshExportLogic.hpp
         src/Slic3r/Biz/MeshExportLogic.cpp
         include/Slic3r/Biz/VolumeReloadLogic.hpp
@@ -1628,6 +1635,7 @@ if(SLIC3R_BUILD_TESTS)
             test/main.cpp
 
             test/Slic3r/App/DialogNavigationTests.cpp
+            test/Slic3r/App/OpenFiles/OpenFilesDialogModelTests.cpp
 
             test/Slic3r/App/Config/CategoryUtilsTests.cpp
 
@@ -1728,6 +1736,10 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/Format/STEPTests.cpp
 
             test/Slic3r/Biz/BundleCacheTests.cpp
+
+            test/Slic3r/Biz/FileOpen/ArchiveTestUtils.hpp
+            test/Slic3r/Biz/FileOpen/ArchiveExtractionTests.cpp
+            test/Slic3r/Biz/FileOpen/FileOpeningInteractorTests.cpp
 
         test/Slic3r/Biz/UserAccount/UserAccountSessionTests.cpp
 

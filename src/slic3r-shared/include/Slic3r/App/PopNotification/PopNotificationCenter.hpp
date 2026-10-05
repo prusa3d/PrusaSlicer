@@ -9,6 +9,7 @@
 #include "Slic3r/Biz/StatusCache.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountListener.hpp"
 #include "Slic3r/Biz/IProjectsChangedListener.hpp"
+#include "Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp"
 #include "Slic3r/Biz/PrintHost/PrintHostJobInfoTag.hpp"
 #include "Slic3r/Biz/Connect/IConnectHandlerListener.hpp"
 #include "Slic3r/App/Platform/IFileExplorerErrorListener.hpp"
@@ -29,6 +30,7 @@ class PopNotificationCenter :
     public Biz::RemovableDrive::IRemovableDriveStatusListener,
     public Biz::UserAccount::IUserAccountListener,
     public Biz::IProjectsChangedListener,
+    public Biz::FileOpen::IFileOpenEventListener,
     public Biz::IArrangeEventsListener,
     public Biz::Connect::IConnectHandlerListener,
     public Platform::IFileExplorerErrorListener,
@@ -73,6 +75,14 @@ public:
     void on_project_will_be_removed(Domain::SelectionId project_id) override;
     void on_file_load_started() override;
     void on_geometry_only_imported() override;
+
+    // File open
+    void on_archive_files_skipped(std::size_t count) override;
+    void on_archive_open_failed(const std::string& message) override;
+    void on_archive_postponed(
+        const std::vector<boost::filesystem::path>& archives,
+        Biz::FileOpen::OpenFilesOptions options
+    ) override;
 
     // Arrange
     void on_elements_not_arranged(

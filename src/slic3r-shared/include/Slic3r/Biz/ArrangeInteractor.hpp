@@ -67,6 +67,11 @@ public:
         UndoSnapshotType snapshot_type
     );
 
+    /**
+     * @brief Calls @p fn once no arrange_added_instances() operation is pending, immediately if none is.
+     */
+    void run_when_added_arranged(std::function<void()> fn);
+
 private:
     Scene::SceneInteractor& m_scene_interactor;
     const Domain::Workbench& m_workbench;
@@ -80,8 +85,10 @@ private:
     };
 
     std::queue<PendingArrange> m_added_arrange_queue;
+    std::vector<std::function<void()>> m_added_arranged_waiters;
 
     void process_added_arrange_queue();
+    void notify_added_arranged();
 
     void apply_local_arrange_result(
         const Domain::SelectionId project_id,

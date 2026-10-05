@@ -15,10 +15,7 @@ class Navigator;
 namespace Slic3r::App::Desktop {
 
 /**
- * wxWidgets adapter that receives OS file drop events and routes them to the
- * appropriate ProjectInteractor method:
- *   - single project file (.3mf) → load_project()
- *   - everything else (model files)   → load_models_to_project()
+ * wxWidgets adapter passing dropped files to ProjectInteractor::open_files().
  * Unsupported file types are silently filtered out.
  *
  * @param can_accept Predicate called on each drop; returning false ignores the

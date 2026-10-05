@@ -901,7 +901,7 @@ static std::vector<ReturnData> import_files(
         // the files are intended for multi-tool printers.
         bool can_convert_to_multipart = input_file_paths.size() > 1 && tool_count > 1;
         for (const auto& path : input_file_paths) {
-            if (path.extension().string() == "3mf") {
+            if (boost::algorithm::iequals(path.extension().string(), ".3mf")) {
                 // To avoid mishmash we don't allow to any changes,
                 // if we load some 3mf during multiple files import
                 can_convert_to_multipart = false;
@@ -1124,6 +1124,23 @@ std::optional<ModelVolume::Source> volume_source_from_file_data(const ReturnData
         .is_converted_from_meters = file_data.is_converted_from_meters
     };
 }
+
+void forget_source_paths(ReturnData& file_data)
+{
+    file_data.file_path.clear();
+    if (!file_data.model) {
+        return;
+    }
+    for (Domain::ModelObject* object : file_data.model->objects) {
+        object->input_file.clear();
+        for (Domain::ModelVolume* volume : object->volumes) {
+            volume->source.input_file.clear();
+            if (volume->emboss_shape && volume->emboss_shape->svg_file) {
+                volume->emboss_shape->svg_file->path.clear();
+            }
+        }
+    }
+}
 } // namespace
 
 ImportToSceneResult import_files_and_add_to_scene(
@@ -1131,7 +1148,8 @@ ImportToSceneResult import_files_and_add_to_scene(
     int tool_count,
     Scene::SceneInteractor& scene_interactor,
     const Domain::Vec2d& bed_center,
-    IMessageDialogProvider* dialog_provider
+    IMessageDialogProvider* dialog_provider,
+    const ImportOptions& options
 )
 {
     auto data = Biz::FileLoadingLogic::import_files(file_paths, dialog_provider, tool_count);
@@ -1140,6 +1158,9 @@ ImportToSceneResult import_files_and_add_to_scene(
     ElementRefs& added_instances = result.instances;
     for (Biz::FileLoadingLogic::ReturnData& file_data : data) {
         result.geometry_only_3mf |= file_data.geometry_only_3mf;
+        if (options.temporary_sources) {
+            forget_source_paths(file_data);
+        }
 
         Domain::BoundingBox3d bbox;
         ElementRefs new_instances;
@@ -1295,6 +1316,11 @@ bool is_supported_file(const std::string& input_file)
             return true;
     }
     return false;
+}
+
+bool is_archive_file(const std::string& input_file)
+{
+    return boost::algorithm::iends_with(input_file, ".zip");
 }
 
 } // namespace Slic3r::Biz::FileLoadingLogic

@@ -77,6 +77,8 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                     return Biz::_u8L("Import");
                 case MenuItemName::ImportGeometry:
                     return Biz::_u8L("Import STL/3MF");
+                case MenuItemName::ImportZip:
+                    return Biz::_u8L("Import ZIP archive");
                 case MenuItemName::JumpToValue:
                     return Biz::_u8L("Jump to height");
                 case MenuItemName::ShapeGallery:
@@ -311,6 +313,7 @@ Render::Icon MenuBuilder::item_icon(UniversalMenuItemName menu_item_name)
     case MenuItemName::SaveProjectAs:
         return Render::Icon::TobBarSave;
     case MenuItemName::ImportGeometry:
+    case MenuItemName::ImportZip:
         return Render::Icon::AddObject;
     case MenuItemName::ShapeGallery:
     case MenuItemName::AddObjectShape:

@@ -390,6 +390,7 @@ void PresetUpdaterDialog::on_preset_updater_changed()
 
     if (forced_state_cleared) {
         close();
+        m_navigator.set_modal_dialog(ModalDialog::None);
     }
 }
 

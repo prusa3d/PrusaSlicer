@@ -94,6 +94,7 @@ struct CommandName
     static constexpr const char* FlashPrinterFirmware = "flash-printer-firmware";
 
     static constexpr const char* ImportGeometry = "import-geometry";
+    static constexpr const char* ImportZip      = "import-zip";
 
     static constexpr const char* ExportGcode        = "export-gcode";
     static constexpr const char* SendGcode          = "send-gcode";

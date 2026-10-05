@@ -251,7 +251,9 @@ tl::expected<SelectionId, std::string> ProjectInteractor::do_load_project(
 
 void ProjectInteractor::load_project(
     const boost::filesystem::path& file_path,
-    EmptyProjectAction empty_project_action
+    EmptyProjectAction empty_project_action,
+    bool temporary_file,
+    std::function<void()> on_done
 )
 {
     invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
@@ -267,20 +269,37 @@ void ProjectInteractor::load_project(
         }
     };
 
-    auto on_result{[this, file_path, empty_project_action](Project&& project)
+    auto on_result{[this, file_path, empty_project_action, temporary_file, on_done, report_error](Project&& project)
     {
-        const SelectionId previous_project_id = m_selection.project_id;
-        const bool replace_previous_project = empty_project_action == EmptyProjectAction::Replace
-            && selected_project_is_empty();
+        try {
+            const SelectionId previous_project_id = m_selection.project_id;
+            const bool replace_previous_project = empty_project_action == EmptyProjectAction::Replace
+                && selected_project_is_empty();
 
-        if (this->do_load_project(std::move(project), file_path).has_value()
-            && replace_previous_project)
-        {
-            this->remove_project(previous_project_id);
+            if (temporary_file) {
+                const std::string name = project.file_name();
+                project.set_file_path({});
+                project.set_file_name(name);
+            }
+
+            const tl::expected<SelectionId, std::string> loaded = this->do_load_project(
+                std::move(project),
+                temporary_file ? std::nullopt : std::make_optional(file_path)
+            );
+            if (loaded.has_value()) {
+                if (replace_previous_project) {
+                    this->remove_project(previous_project_id);
+                }
+            }
+        } catch (const std::exception& e) {
+            report_error(fmt::format("Loading file failed: {}", e.what()));
+        }
+        if (on_done) {
+            on_done();
         }
     }};
 
-    auto on_error{[report_error](std::exception_ptr eptr)
+    auto on_error{[report_error, on_done](std::exception_ptr eptr)
                   {
                       std::string description = "Unknown error";
                       try {
@@ -292,6 +311,9 @@ void ProjectInteractor::load_project(
                       } catch (...) {
                       }
                       report_error(description);
+                      if (on_done) {
+                          on_done();
+                      }
                   }};
 
     Platform::PlatformServices::instance()
@@ -1039,39 +1061,10 @@ void ProjectInteractor::download_model_from_printables_tab(FileDownloader::FileD
     m_file_downloader_interactor.init_multi_job(std::move(data));
 }
 
-void ProjectInteractor::open_downloaded_file(const boost::filesystem::path& path, bool in_new_project)
-{
-    if (in_new_project) {
-        // file path could have locale dependent characters, do not use tolower
-        const std::string ext = path.extension().string();
-        const bool is_3mf     = ext == ".3mf" || ext == ".3MF";
-        // A single 3MF opened as a new project loads its full content (geometry + print,
-        // filament and printer settings). Other files start an empty project and add geometry.
-        if (is_3mf) {
-            load_project(path);
-            return;
-        }
-        new_project();
-    }
-    load_models_to_project({path});
-}
-
 void ProjectInteractor::on_model_downloaded(const std::vector<boost::filesystem::path>& paths, bool in_new_project)
 {
     ASSERT(!paths.empty());
-    boost::filesystem::path file_path = paths.front();
-    std::string ext_str = file_path.extension().string();
-    // file path could have locale dependent characters, do not use tolower
-    bool load_as_single_project = paths.size() ==1 && (ext_str == ".3mf" || ext_str == ".3MF");
-    if (in_new_project && load_as_single_project) {
-        load_project(paths.front(), EmptyProjectAction::Replace);
-        return;
-    }
-
-    if (in_new_project && !selected_project_is_empty()) {
-        new_project();
-    }
-    load_models_to_project(paths);
+    m_file_opening_interactor.open(paths, {.new_project = in_new_project, .as_geometry = !in_new_project});
 }
 
 std::string ProjectInteractor::get_project_name(Domain::SelectionId project_id) const
@@ -1153,7 +1146,7 @@ void ProjectInteractor::set_output_extension(Domain::SelectionId project_id, con
     it->second.directory_storage().set_output_extension(extension);
 }
 
-void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::path> paths)
+void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::path> paths, bool temporary_sources)
 {
     invoke_listeners<IProjectsChangedListener>([](IProjectsChangedListener* l) {
         l->on_file_load_started();
@@ -1170,14 +1163,17 @@ void ProjectInteractor::load_models_to_project(std::vector<boost::filesystem::pa
         slot_count,
         scene_interactor(),
         cc->bed().center() + Biz::Algorithms::Point::to_2d(inst.transformation.get_offset()),
-        m_dialog_provider
+        m_dialog_provider,
+        FileLoadingLogic::ImportOptions{.temporary_sources = temporary_sources}
     );
 
     if (import_result.instances.empty()) {
         return;
     }
 
-    set_project_dir(selected_project_id(), paths.front());
+    if (!temporary_sources) {
+        set_project_dir(selected_project_id(), paths.front());
+    }
 
     arrange_interactor().arrange_added_instances(
         selected_project_id(),

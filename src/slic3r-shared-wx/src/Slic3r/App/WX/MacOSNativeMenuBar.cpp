@@ -343,7 +343,7 @@ void MacOSNativeMenuBar::update_recent_projects()
 
         m_recent_project_menu->Bind(
             wxEVT_MENU,
-            [this, filepath](wxCommandEvent&) { m_project_interactor.load_project(filepath); },
+            [this, filepath](wxCommandEvent&) { m_project_interactor.file_opening_interactor().open({filepath}); },
             id
         );
     }

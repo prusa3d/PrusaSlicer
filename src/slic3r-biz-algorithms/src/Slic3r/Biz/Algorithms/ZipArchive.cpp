@@ -143,6 +143,29 @@ bool ZipArchive::get_filename(int file_index, std::string& filename) const
     return true;
 }
 
+bool ZipArchive::get_filename_from_extra(int file_index, std::string& filename) const
+{
+    if (file_index < 0) {
+        filename.clear();
+        return false;
+    }
+
+    std::string extra_name(1024, '\0');
+    const mz_uint length = mz_zip_reader_get_filename_from_extra(
+        m_archive.get(),
+        static_cast<mz_uint>(file_index),
+        extra_name.data(),
+        static_cast<mz_uint>(extra_name.size())
+    );
+    if (length > 0) {
+        extra_name.resize(length);
+        filename = std::move(extra_name);
+        return true;
+    } else {
+        return get_filename(file_index, filename);
+    }
+}
+
 bool ZipArchive::extract_to_file(int file_index, const std::string& target_filename)
 {
     mz_zip_archive_file_stat stat;

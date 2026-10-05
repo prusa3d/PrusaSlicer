@@ -87,6 +87,8 @@ private:
 
     void load_object(Wildcards::TypeFlag specific_type = Wildcards::TypeFlag::None);
 
+    void load_archive();
+
     void load_volume(
         Domain::ModelVolumeType type,
         Wildcards::TypeFlag specific_type = Wildcards::TypeFlag::None

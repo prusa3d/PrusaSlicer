@@ -30,6 +30,7 @@ PopNotificationCenter::PopNotificationCenter(Biz::ProjectInteractor& project_int
 {
     m_project_interactor.status_cache().add_listener<Biz::IStatusCacheChangedListener>(this);
     m_project_interactor.add_listener<Biz::IProjectsChangedListener>(this);
+    m_project_interactor.file_opening_interactor().add_listener<Biz::FileOpen::IFileOpenEventListener>(this);
     m_project_interactor.arrange_interactor().add_listener<Biz::IArrangeEventsListener>(this);
     m_list_sort_filter.set_source_model(&m_notification_list);
 
@@ -313,14 +314,14 @@ PopNotificationLayout PopNotificationCenter::download_finished_layout(
             {{_u8L("Load"),
               [this, dest_path]()
               {
-                  m_project_interactor.open_downloaded_file(dest_path, false);
+                  m_project_interactor.file_opening_interactor().open({dest_path}, {.as_geometry = true});
                   return true;
               }},
              // TRN Button on a finished download notification: load the file into a new project.
              {_u8L("Load as New Project"),
               [this, dest_path]()
               {
-                  m_project_interactor.open_downloaded_file(dest_path, true);
+                  m_project_interactor.file_opening_interactor().open({dest_path}, {.new_project = true});
                   return true;
               }}},
             Render::Icon::Printables
@@ -1246,6 +1247,75 @@ void PopNotificationCenter::on_geometry_only_imported()
                 _u8L("Imported geometry only."),
                 // TRN Notification body: settings of a 3MF added to a project were not applied.
                 _u8L("3MF settings ignored to preserve your project.")
+            }
+        },
+        never_equal_matcher
+    );
+}
+
+void PopNotificationCenter::on_archive_files_skipped(std::size_t count)
+{
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::ArchiveFilesSkipped,
+            PopNotificationLevel::Regular,
+            10s,
+            PopNotificationLayoutHeaderText{
+                // TRN Notification header: some files inside a ZIP archive were not opened.
+                _u8L("Some files from the archive were skipped."),
+                fmt::format(
+                    // TRN Notification body: {} is the number of files inside a ZIP archive which were not opened.
+                    fmt::runtime(_L_PLURAL_u8(
+                        "{} file is not supported or could be unsafe.",
+                        "{} files are not supported or could be unsafe.",
+                        static_cast<int>(count)
+                    )),
+                    count
+                )
+            }
+        },
+        never_equal_matcher
+    );
+}
+
+void PopNotificationCenter::on_archive_open_failed(const std::string& message)
+{
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::LoadError,
+            PopNotificationLevel::Warning,
+            0s,
+            PopNotificationLayoutText{message}
+        },
+        never_equal_matcher
+    );
+}
+
+void PopNotificationCenter::on_archive_postponed(
+    const std::vector<boost::filesystem::path>& archives,
+    Biz::FileOpen::OpenFilesOptions options
+)
+{
+    std::string names;
+    for (const boost::filesystem::path& archive : archives) {
+        names += (names.empty() ? "" : "\n") + archive.filename().string();
+    }
+    upsert_notification(
+        PopNotificationData{
+            PopNotificationType::ArchiveOpenPostponed,
+            PopNotificationLevel::Regular,
+            0s,
+            PopNotificationLayoutHeaderTextButtons{
+                // TRN Notification header: a ZIP archive was not opened because another dialog was opened.
+                _u8L("Archive was not opened"),
+                names,
+                // TRN Button on a notification: open the ZIP archive which was not opened.
+                {{_u8L("Open"),
+                  [this, archives, options]()
+                  {
+                      m_project_interactor.file_opening_interactor().open(archives, options);
+                      return true;
+                  }}}
             }
         },
         never_equal_matcher

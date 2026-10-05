@@ -43,6 +43,10 @@ struct ImportToSceneResult {
     bool geometry_only_3mf = false;
 };
 
+struct ImportOptions {
+    bool temporary_sources = false; ///< Imported objects keep no source path, reload from disk is disabled.
+};
+
 /**
  * Load meshes (e.g., STL, OBJ) and complex models (e.g., 3MF) from multiple source files
  * and insert them into the scene graph.
@@ -52,7 +56,8 @@ ImportToSceneResult import_files_and_add_to_scene(
     int tool_count,
     Scene::SceneInteractor& scene_interactor,
     const Domain::Vec2d& bed_center,
-    IMessageDialogProvider* dialog_provider
+    IMessageDialogProvider* dialog_provider,
+    const ImportOptions& options = {}
 );
 
 /**
@@ -119,5 +124,7 @@ bool is_project_file(const std::string& input_file);
  * @return True if the file can be loaded by the slicer, false otherwise.
  */
 bool is_supported_file(const std::string& input_file);
+
+bool is_archive_file(const std::string& input_file);
 
 } // namespace Slic3r::Biz::FileLoadingLogic

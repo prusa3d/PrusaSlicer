@@ -33,7 +33,9 @@ enum class PopNotificationType
     PresetUpdaterError,
     PluginInstallationError,
     PluginInstallationSuccess,
-    GeometryOnlyImport
+    GeometryOnlyImport,
+    ArchiveFilesSkipped,
+    ArchiveOpenPostponed
 };
 
 /*

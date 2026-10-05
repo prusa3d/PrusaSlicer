@@ -49,6 +49,10 @@ public:
     bool stat_file(int file_index, mz_zip_archive_file_stat& stat) const;
     int get_num_files() const;
     bool get_filename(int file_index, std::string& filename) const;
+    /**
+     * @brief UTF-8 name from the Info-ZIP Unicode Path extra field, get_filename() when missing.
+     */
+    bool get_filename_from_extra(int file_index, std::string& filename) const;
     bool extract_to_file(int file_index, const std::string& target_filename);
     bool is_file_directory(int file_index) const;
 

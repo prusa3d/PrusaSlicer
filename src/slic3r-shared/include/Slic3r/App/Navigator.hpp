@@ -10,9 +10,18 @@
 #include "Slic3r/App/ModalDialog.hpp"
 #include "Slic3r/App/IMsgBoxProvider.hpp"
 
+#include <optional>
+#include <vector>
+
 namespace Slic3r::Biz {
 class ProjectInteractor;
 } // namespace Slic3r::Biz
+
+namespace Slic3r::Biz::FileOpen {
+struct ArchiveFile;
+struct ArchiveSelection;
+struct OpenFilesOptions;
+} // namespace Slic3r::Biz::FileOpen
 
 namespace Slic3r::App {
 
@@ -133,6 +142,15 @@ public:
         FnCancelled fn_cancelled            = nullptr,
         DialogButtons buttons               = AcceptCancelButtons
     ) override;
+
+    /**
+     * @return false when another modal dialog is opened, the dialog is not shown then.
+     */
+    bool confirm_open_files(
+        std::vector<Biz::FileOpen::ArchiveFile> files,
+        Biz::FileOpen::OpenFilesOptions options,
+        std::function<void(std::optional<Biz::FileOpen::ArchiveSelection>)> done
+    );
 
     bool has_fullscreen() const;
     bool is_fullscreen() const;

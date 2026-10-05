@@ -9,6 +9,7 @@
 #include "Slic3r/App/Yoga/InputTextField.hpp"
 #include "Slic3r/App/Yoga/RootItem.hpp"
 #include "Slic3r/App/NumberEntryDialog.hpp"
+#include "Slic3r/App/OpenFiles/OpenFilesDialog.hpp"
 
 using namespace Slic3r::App::Yoga;
 
@@ -304,6 +305,21 @@ void MsgBoxHandler::yes_no_cancel(
         fn_rejected,
         fn_cancelled,
         buttons,
+        m_navigator
+    );
+}
+
+void MsgBoxHandler::confirm_open_files(
+    std::vector<Biz::FileOpen::ArchiveFile> files,
+    Biz::FileOpen::OpenFilesOptions options,
+    std::function<void(std::optional<Biz::FileOpen::ArchiveSelection>)> done
+)
+{
+    ASSERT(!m_current_modal, "There is already modal window opened");
+    m_current_modal = m_root_item.emplace_back<OpenFilesDialog>(
+        std::move(files),
+        options,
+        std::move(done),
         m_navigator
     );
 }

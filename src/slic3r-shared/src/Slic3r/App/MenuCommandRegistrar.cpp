@@ -1145,7 +1145,7 @@ void MenuCommandRegistrar::load_project()
         [this](bool success, const std::vector<boost::filesystem::path>& file_paths)
     {
         if (success) {
-            m_project_interactor.load_project(file_paths.front());
+            m_project_interactor.file_opening_interactor().open({file_paths.front()});
         }
     };
 
@@ -1197,7 +1197,7 @@ void MenuCommandRegistrar::load_object(Wildcards::TypeFlag specific_type)
         [this](bool success, const std::vector<boost::filesystem::path>& file_paths)
     {
         if (success) {
-            m_project_interactor.load_models_to_project(file_paths);
+            m_project_interactor.file_opening_interactor().open(file_paths, {.as_geometry = true});
             if (m_render_module.has_command(CommandName::SvgGizmo)
                 && m_render_module.command(CommandName::SvgGizmo).enabled())
             {
@@ -1219,6 +1219,28 @@ void MenuCommandRegistrar::load_object(Wildcards::TypeFlag specific_type)
                                                          Wildcards::TypeFlag::AllImportFiles
                                                      ) :
                                                      Wildcards::generate_wildcards(specific_type),
+        callback
+    );
+}
+
+void MenuCommandRegistrar::load_archive()
+{
+    IDialogManager::FileCallback callback =
+        [this](bool success, const std::vector<boost::filesystem::path>& file_paths)
+    {
+        if (success) {
+            m_project_interactor.file_opening_interactor().open(file_paths);
+            m_navigator.navigate_to_module_type(App::Render::ModuleType::Plater);
+        }
+    };
+
+    auto& dlg_manager = App::AppServices::instance().dialog_manager();
+    dlg_manager.show_file_dialog(
+        FileDialogType::OpenMultiple,
+        _u8L("Import ZIP archive"),
+        this->default_dialog_folder(),
+        "",
+        Wildcards::generate_wildcards(Wildcards::TypeFlag::Zip),
         callback
     );
 }
@@ -2108,6 +2130,23 @@ void MenuCommandRegistrar::register_file_menu_import_commands()
                         Platform::KeyModifiers(Platform::KeyModifier::Ctrl),
                         Platform::KeyCode::I
                     }},
+                    .enabled = [&]()
+                    {
+                        auto plater_render_module{
+                                dynamic_cast<Plater::PlaterRenderModule*>(&m_render_module)
+                            };
+                        return plater_render_module != nullptr;
+                    }
+                }
+            )
+        )
+        // File -> Import -> Import ZIP archive
+        .register_menu_item(
+            {MenuItemName::FileMenu, MenuItemName::Import, MenuItemName::ImportZip},
+            std::make_unique<UIItemCommand>(
+                CommandName::ImportZip,
+                [this]() { load_archive(); },
+                UIItemCommandExtraOpts{
                     .enabled = [&]()
                     {
                         auto plater_render_module{

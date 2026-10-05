@@ -44,6 +44,7 @@
 #include <Slic3r/Biz/UserAccount/UserAccountTokenStore.hpp>
 #include <Slic3r/Biz/AppInstance/AppInstanceMessageHandlerFactory.hpp>
 #include <Slic3r/Biz/AppInstance/AppInstanceUtils.hpp>
+#include <Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp>
 #include "Slic3r/Biz/WX/FontManager.hpp"
 
 #include "Slic3r/Biz/Scene/BedGeometry.hpp"
@@ -415,6 +416,12 @@ bool DesktopApp::OnInit()
             [](Biz::JThread::StopToken) { prune_stale_webview_data_dirs(); }
         )
         .start();
+    platform_services.job_manager()
+        .create_job(
+            "prune_archive_workspaces",
+            [](Biz::JThread::StopToken) { Biz::FileOpen::remove_stale_extractions(); }
+        )
+        .start();
     m_project_interactor->user_account_interactor()
         .add_listener<Biz::UserAccount::IUserAccountListener>(
             &app_services.pop_notification_center()
@@ -615,6 +622,13 @@ void DesktopApp::finish_init()
 
     Navigator& navigator{AppServices::instance().navigator()};
     navigator.on_init(*m_plater_module, *m_preview_module, canvas, m_project_interactor.get());
+    m_project_interactor->file_opening_interactor().set_archive_dialog(
+        [&navigator](
+            std::vector<Biz::FileOpen::ArchiveFile> files,
+            Biz::FileOpen::OpenFilesOptions options,
+            Biz::FileOpen::ArchiveSelectionDone done
+        ) { return navigator.confirm_open_files(std::move(files), options, std::move(done)); }
+    );
 
     // Closed before the module goes, so the model stops counting it as an open dialog.
     m_loading_module->set_opened_preset_updater(false);
@@ -704,6 +718,9 @@ DesktopApp::~DesktopApp()
     if (app_services.has_preset_updater_controller()) {
         app_services.preset_updater_controller().shutdown();
         app_services.navigator().shutdown();
+    }
+    if (m_project_interactor) {
+        m_project_interactor->file_opening_interactor().set_archive_dialog(nullptr);
     }
 
     Biz::Platform::close();

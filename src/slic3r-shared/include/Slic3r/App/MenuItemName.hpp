@@ -70,6 +70,7 @@ enum class MenuItemName
 
     Import,
     ImportGeometry,
+    ImportZip,
 
     Export,
     ExportGcode,

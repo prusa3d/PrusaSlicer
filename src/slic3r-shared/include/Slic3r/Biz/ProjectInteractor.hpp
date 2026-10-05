@@ -33,6 +33,7 @@
 #include "Slic3r/Biz/Connect/ConnectMessageHandler.hpp"
 #include "Slic3r/Biz/BackupStore.hpp"
 #include "Slic3r/Biz/MatDb/MatDbInteractor.hpp"
+#include "Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp"
 
 namespace Slic3r::Domain {
 class Model;
@@ -118,6 +119,7 @@ public:
         m_preset_updater_interactor(dispatcher, m_user_account_interactor),
         m_removable_drive_service(dispatcher),
         m_file_downloader_interactor(dispatcher),
+        m_file_opening_interactor(*this),
         m_physical_printer_interactor(dispatcher, m_preset_interactor, m_user_account_interactor, m_removable_drive_service),
         m_connect_message_handler(dispatcher, m_preset_interactor, m_user_account_interactor, m_physical_printer_interactor),
         m_project_list(*this),
@@ -198,12 +200,17 @@ public:
      */
     /**
      * @brief Load project from the file
+     * @note Files opened by the user go through file_opening_interactor().open().
      * @param empty_project_action Replace takes over the selected project instead of adding a new
      * one, when that project is still empty once the file is loaded.
+     * @param temporary_file The project is loaded without a path to the file and stays unmodified.
+     * @param on_done Called on the main thread after the project is loaded or failed.
      */
     void load_project(
         const boost::filesystem::path& file_path,
-        EmptyProjectAction empty_project_action = EmptyProjectAction::Keep
+        EmptyProjectAction empty_project_action = EmptyProjectAction::Keep,
+        bool temporary_file                     = false,
+        std::function<void()> on_done           = {}
     );
     /**
      * @brief Load projects from files
@@ -413,6 +420,11 @@ public:
         return m_status_cache;
     }
 
+    FileOpen::FileOpeningInteractor& file_opening_interactor()
+    {
+        return m_file_opening_interactor;
+    }
+
     Biz::ArrangeInteractor& arrange_interactor()
     {
         return m_arrange_interactor;
@@ -548,14 +560,18 @@ public:
         );
     }
 
-    void load_models_to_project(std::vector<boost::filesystem::path> paths);
+    /**
+     * @note Files opened by the user go through file_opening_interactor().open().
+     * @param temporary_sources Imported objects keep no source path, reload from disk is disabled.
+     */
+    void load_models_to_project(std::vector<boost::filesystem::path> paths, bool temporary_sources = false);
 
     /**
      * @brief Callback from AppInstanceMessageHandler.
      */
     void on_open_models(const std::vector<boost::filesystem::path>& paths) override
     {
-        load_models_to_project(paths);
+        m_file_opening_interactor.open(paths, {.as_geometry = true});
     }
 
     /**
@@ -569,8 +585,6 @@ public:
      * @brief Callback from FileDownloader.
      */
     void on_model_downloaded(const std::vector<boost::filesystem::path>& paths, bool in_new_project) override;
-
-    void open_downloaded_file(const boost::filesystem::path& path, bool in_new_project);
 
     /**
      * @brief Callback from AppInstanceMessageHandler.
@@ -754,6 +768,7 @@ private:
     PresetUpdater::PresetUpdaterInteractor m_preset_updater_interactor;
     RemovableDrive::RemovableDriveService m_removable_drive_service;
     FileDownloader::FileDownloaderInteractor m_file_downloader_interactor;
+    FileOpen::FileOpeningInteractor m_file_opening_interactor;
     PhysicalPrinter::PhysicalPrinterInteractor m_physical_printer_interactor;
     Connect::ConnectMessageHandler m_connect_message_handler;
 

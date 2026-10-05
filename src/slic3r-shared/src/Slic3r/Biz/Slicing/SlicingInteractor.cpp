@@ -256,7 +256,7 @@ void SlicingInteractor::on_fdm_result(FDMResult&& result, const SlicingId id)
         });
     }))
     {
-        SPDLOG_TRACE("{}: fdm result not dispatched", fmt::streamed(id), result.const_moves()->size());
+        SPDLOG_TRACE("{}: fdm result not dispatched", fmt::streamed(id));
     }
 }
 

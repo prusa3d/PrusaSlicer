@@ -5,6 +5,7 @@
 #include "Slic3r/App/Platform/AbstractRenderCanvas.hpp"
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/AppConfigInteractor.hpp"
+#include "Slic3r/Biz/FileOpen/FileOpeningInteractor.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 
 #include "Slic3r/Log.hpp"
@@ -168,6 +169,7 @@ void Navigator::set_modal_dialog(ModalDialog modal_dialog)
     if (!has_modules()) {
         return;
     }
+    m_current_modal_dialog = modal_dialog;
     current_render_module()->set_modal_dialog(modal_dialog);
     m_current_modal_dialog = modal_dialog;
 
@@ -272,6 +274,24 @@ void Navigator::input_number(
         buttons
     );
     set_modal_dialog(ModalDialog::MsgBox);
+}
+
+bool Navigator::confirm_open_files(
+    std::vector<Biz::FileOpen::ArchiveFile> files,
+    Biz::FileOpen::OpenFilesOptions options,
+    std::function<void(std::optional<Biz::FileOpen::ArchiveSelection>)> done
+)
+{
+    if (is_any_modal_dialog_opened()) {
+        return false;
+    }
+    current_render_module()->msg_box_handler()->confirm_open_files(
+        std::move(files),
+        options,
+        std::move(done)
+    );
+    set_modal_dialog(ModalDialog::MsgBox);
+    return true;
 }
 
 bool Navigator::has_fullscreen() const

@@ -21,24 +21,27 @@ MainFrameDropTarget::MainFrameDropTarget(
 
 bool MainFrameDropTarget::OnDropFiles(wxCoord /*x*/, wxCoord /*y*/, const wxArrayString& filenames)
 {
-    if (!m_can_accept())
+    if (!m_can_accept()) {
         return false;
+    }
 
     std::vector<boost::filesystem::path> paths;
     paths.reserve(filenames.size());
     for (const wxString& fn : filenames) {
         boost::filesystem::path p{WX::into_u8(fn)};
-        if (Biz::FileLoadingLogic::is_supported_file(p.string()))
+        if (Biz::FileLoadingLogic::is_supported_file(p.string())
+            || Biz::FileLoadingLogic::is_archive_file(p.string()))
             paths.push_back(std::move(p));
     }
 
-    if (paths.empty())
+    if (paths.empty()) {
         return false;
+    }
 
-    if (paths.size() == 1 && Biz::FileLoadingLogic::is_project_file(paths.front().string()))
-        m_project_interactor.load_project(paths.front());
-    else {
-        m_project_interactor.load_models_to_project(std::move(paths));
+    const bool single_project =
+        paths.size() == 1 && Biz::FileLoadingLogic::is_project_file(paths.front().string());
+    m_project_interactor.file_opening_interactor().open(std::move(paths));
+    if (!single_project) {
         m_navigator.navigate_to_module_type(App::Render::ModuleType::Plater);
     }
 

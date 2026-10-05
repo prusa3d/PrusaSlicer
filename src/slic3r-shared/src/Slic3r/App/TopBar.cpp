@@ -457,7 +457,7 @@ void TopBar::update_recent_projects()
         Yoga::MenuItem* recent_project_item =
             m_recent_projects_item->append_sub_menu_item(recent_project);
         recent_project_item->callbacks().action = [this, recent_project]
-        { m_project_interactor.load_project(recent_project); };
+        { m_project_interactor.file_opening_interactor().open({recent_project}); };
     }
 
     m_recent_projects_item->set_enabled(!recent_projects.empty());

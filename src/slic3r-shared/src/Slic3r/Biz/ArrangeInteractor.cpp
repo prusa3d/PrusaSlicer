@@ -846,6 +846,7 @@ void ArrangeInteractor::process_added_arrange_queue()
     };
 
     if (m_added_arrange_queue.empty()) {
+        notify_added_arranged();
         return;
     }
 
@@ -908,12 +909,31 @@ void ArrangeInteractor::process_added_arrange_queue()
             m_added_arrange_queue.pop();
             if (m_added_arrange_queue.empty()) {
                 m_scene_interactor.undo_provider().take_snapshot(snapshot_type);
+                notify_added_arranged();
             } else {
                 this->process_added_arrange_queue();
             }
         },
         "partial_arrange"
     );
+}
+
+void ArrangeInteractor::run_when_added_arranged(std::function<void()> fn)
+{
+    if (m_added_arrange_queue.empty()) {
+        fn();
+    } else {
+        m_added_arranged_waiters.push_back(std::move(fn));
+    }
+}
+
+void ArrangeInteractor::notify_added_arranged()
+{
+    while (m_added_arrange_queue.empty() && !m_added_arranged_waiters.empty()) {
+        std::function<void()> waiter = std::move(m_added_arranged_waiters.front());
+        m_added_arranged_waiters.erase(m_added_arranged_waiters.begin());
+        waiter();
+    }
 }
 
 } // namespace Slic3r::Biz

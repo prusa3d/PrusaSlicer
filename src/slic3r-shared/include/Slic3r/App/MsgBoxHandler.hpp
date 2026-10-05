@@ -2,6 +2,15 @@
 
 #include "Slic3r/App/IMsgBoxProvider.hpp"
 
+#include <optional>
+#include <vector>
+
+namespace Slic3r::Biz::FileOpen {
+struct ArchiveFile;
+struct ArchiveSelection;
+struct OpenFilesOptions;
+} // namespace Slic3r::Biz::FileOpen
+
 namespace Slic3r::App::Yoga {
 class RootItem;
 class Popup;
@@ -57,6 +66,12 @@ public:
         FnCancelled fn_cancelled = nullptr,
         DialogButtons buttons    = AcceptRejectCancelButtons
     ) override;
+
+    void confirm_open_files(
+        std::vector<Biz::FileOpen::ArchiveFile> files,
+        Biz::FileOpen::OpenFilesOptions options,
+        std::function<void(std::optional<Biz::FileOpen::ArchiveSelection>)> done
+    );
 
     void open_modal();
     void close_modal();
