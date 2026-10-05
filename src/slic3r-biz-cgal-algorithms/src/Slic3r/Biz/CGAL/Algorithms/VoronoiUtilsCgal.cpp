@@ -298,7 +298,7 @@ check_if_three_edges_are_ccw(const VD::edge_type  &edge_first,
         // So we need to check if test_pt is between them.
         ::CGAL::Orientation orientation1 = orientation_of_two_edges(edge_first, edge_third, segment_begin, segment_end);
         ::CGAL::Orientation orientation2 = orientation_of_two_edges(edge_second, edge_third, segment_begin, segment_end);
-        return (orientation1 == ::CGAL::Orientation::RIGHT_TURN || orientation2 == ::CGAL::Orientation::LEFT_TURN);
+        return (orientation1 == ::CGAL::Orientation::RIGHT_TURN && orientation2 == ::CGAL::Orientation::LEFT_TURN);
     }
 }
 
