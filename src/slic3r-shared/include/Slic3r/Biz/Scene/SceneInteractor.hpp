@@ -612,6 +612,12 @@ public:
     BedInstances selected_bed_instances() const;
 
 private:
+    // Lets the modifier change the object, then updates the bed placement of its instances and
+    // invalidates the slicing of the beds affected.
+    void modify_object_and_update_beds(
+        const Domain::ElementRef& object_ref,
+        const std::function<void(Domain::ModelObject&)>& modifier
+    );
     void layout_after_project_load(Domain::Project& added_project);
     void notify_listener_on_objects(const std::vector<Domain::ModelObject*>& objects);
     void notify_listener_on_objects(const Domain::Project& project);
