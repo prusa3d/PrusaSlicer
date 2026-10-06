@@ -309,7 +309,10 @@ PaintingPalette MultiMaterialPaintingGizmo::create_painting_colors() const
     const SelectionId config_container_id = m_project_interactor.selected_config_container_id();
 
     const std::vector<ColorRGB> physical_colors =
-        m_project_interactor.project_settings_interactor().get_colors(config_container_id);
+        m_project_interactor.project_settings_interactor().get_colors(
+            m_project_interactor.selected_project_id(),
+            config_container_id
+        );
 
     PaintingPalette palette;
     for (size_t i = 0; i < physical_colors.size(); ++i) {

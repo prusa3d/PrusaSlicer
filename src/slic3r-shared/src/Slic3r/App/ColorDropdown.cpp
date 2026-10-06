@@ -315,7 +315,10 @@ void ColorDropdown::reload_items()
     const SelectionId container_id = m_project_interactor.selected_config_container_id();
 
     const std::vector<ColorRGB> slot_colors =
-        m_project_interactor.project_settings_interactor().get_colors(container_id);
+        m_project_interactor.project_settings_interactor().get_colors(
+            m_project_interactor.selected_project_id(),
+            container_id
+        );
 
     std::vector<std::pair<ColorRGBA, std::string>> items =
         get_material_colors(m_project_interactor, slot_colors);

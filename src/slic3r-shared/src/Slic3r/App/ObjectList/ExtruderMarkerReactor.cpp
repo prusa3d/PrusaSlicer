@@ -112,7 +112,8 @@ void ExtruderMarkerReactor::refresh()
     }
 
     const std::vector<Domain::ColorRGB> extruder_colors =
-        m_project_interactor->project_settings_interactor().get_colors(*m_config_container_id);
+        m_project_interactor->project_settings_interactor()
+            .get_colors(m_project_interactor->selected_project_id(), *m_config_container_id);
 
     Result result;
     result.visible = true;

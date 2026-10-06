@@ -128,7 +128,6 @@ TEST_CASE_METHOD(
     using namespace Slic3r::Biz;
 
     const Domain::SelectionId project_id = project_interactor.new_project();
-    (void)project_id;
 
     const Domain::SelectionId cc_id =
         project_interactor.selected_config_container_id();
@@ -137,23 +136,23 @@ TEST_CASE_METHOD(
     auto& psi = project_interactor.project_settings_interactor();
 
     // Get initial colors.
-    std::vector<Domain::ColorRGB> initial_colors = psi.get_colors(cc_id);
+    std::vector<Domain::ColorRGB> initial_colors = psi.get_colors(project_id, cc_id);
     REQUIRE(!initial_colors.empty());
 
     // Lock slot 0 with a custom color.
     const std::string custom_hex = "#ABCDEF";
     Domain::ColorRGB custom_color;
     Biz::Algorithms::Color::decode_color(custom_hex, custom_color);
-    psi.set_color_from_user(cc_id, 0, custom_hex);
+    psi.set_color_from_user(project_id, cc_id, 0, custom_hex);
 
-    const std::vector<Domain::ColorRGB> after_lock = psi.get_colors(cc_id);
+    const std::vector<Domain::ColorRGB> after_lock = psi.get_colors(project_id, cc_id);
     REQUIRE(!after_lock.empty());
     REQUIRE(after_lock[0] == custom_color);
 
     // Unlock slot 0 by passing empty string -> should restore auto color.
-    psi.set_color_from_user(cc_id, 0, "");
+    psi.set_color_from_user(project_id, cc_id, 0, "");
 
-    const std::vector<Domain::ColorRGB> after_unlock = psi.get_colors(cc_id);
+    const std::vector<Domain::ColorRGB> after_unlock = psi.get_colors(project_id, cc_id);
     REQUIRE(!after_unlock.empty());
     // The color must differ from the user-chosen value (it's auto-resolved).
     REQUIRE(after_unlock[0] != custom_color);
@@ -167,7 +166,7 @@ TEST_CASE_METHOD(
 {
     using namespace Slic3r::Biz;
 
-    project_interactor.new_project();
+    const Domain::SelectionId project_id = project_interactor.new_project();
 
     auto& psi = project_interactor.project_settings_interactor();
     const Domain::SelectionId cc0_id = project_interactor.selected_config_container_id();
@@ -175,7 +174,7 @@ TEST_CASE_METHOD(
 
     // Set a custom color on the first container's slot 0.
     const std::string custom_hex = "#112233";
-    psi.set_color_from_user(cc0_id, 0, custom_hex);
+    psi.set_color_from_user(project_id, cc0_id, 0, custom_hex);
 
     // Add a second config container.
     const Domain::SelectionId cc1_id = project_interactor.add_config_container();
@@ -183,7 +182,7 @@ TEST_CASE_METHOD(
     REQUIRE(cc1_id != cc0_id);
 
     // The second container should have its own colors (auto-resolved, not the custom one).
-    const auto colors_cc1 = psi.get_colors(cc1_id);
+    const auto colors_cc1 = psi.get_colors(project_id, cc1_id);
     REQUIRE(!colors_cc1.empty());
 
     Domain::ColorRGB custom_color;
@@ -191,7 +190,7 @@ TEST_CASE_METHOD(
     REQUIRE(colors_cc1[0] != custom_color);
 
     // The first container should still have the custom color.
-    const auto colors_cc0 = psi.get_colors(cc0_id);
+    const auto colors_cc0 = psi.get_colors(project_id, cc0_id);
     REQUIRE(!colors_cc0.empty());
     REQUIRE(colors_cc0[0] == custom_color);
 }

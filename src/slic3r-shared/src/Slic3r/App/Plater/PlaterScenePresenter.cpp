@@ -660,6 +660,7 @@ void PlaterScenePresenter::update_volume_materials()
 
                     const std::vector<ColorRGB> slot_colors =
                         m_project_interactor.project_settings_interactor().get_colors(
+                            m_project_interactor.selected_project_id(),
                             config_container->id().id
                         );
                     const ModelObject* obj = proj.find_object_by_id(tag->object_id);

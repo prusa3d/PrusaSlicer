@@ -104,7 +104,10 @@ ColorMixDialogInput collect_color_mix_dialog_input(ProjectInteractor& project_in
     input.virtual_extruders = config_container.virtual_extruders();
 
     const std::vector<ColorRGB> slot_colors =
-        project_interactor.project_settings_interactor().get_colors(config_container_id);
+        project_interactor.project_settings_interactor().get_colors(
+            project_interactor.selected_project_id(),
+            config_container_id
+        );
     const SelectedPresetConfigPack preset_config_pack(config_container.selected_preset());
 
     input.physical_colors.reserve(input.physical_extruder_count);

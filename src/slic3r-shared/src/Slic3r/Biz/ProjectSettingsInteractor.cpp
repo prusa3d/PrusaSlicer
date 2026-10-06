@@ -62,83 +62,77 @@ ProjectSettingsInteractor::ProjectSettingsInteractor(
 // ---------------------------------------------------------------------------
 
 std::vector<Domain::ColorRGB> ProjectSettingsInteractor::get_colors(
+    Domain::SelectionId project_id,
     Domain::SelectionId config_container_id
 ) const
 {
-    for (const auto& [proj_id, project] : m_workbench.projects()) {
-        const Domain::ConfigContainer* cc = project.find_config_container(config_container_id);
-        if (!cc)
-            continue;
+    const Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc)
+        return {};
 
-        const Domain::ConfigItem* hex_colors_item =
-            cc->project_settings().items.find("extruder_colour");
+    const Domain::ConfigItem* hex_colors_item =
+        cc->project_settings().items.find("extruder_colour");
 
-        return hex_colors_item ?
-            hex_colors_to_rgb(hex_colors_item->value().get<std::vector<std::string>>()) :
-            std::vector<Domain::ColorRGB>{};
-    }
-    return {};
+    return hex_colors_item ?
+        hex_colors_to_rgb(hex_colors_item->value().get<std::vector<std::string>>()) :
+        std::vector<Domain::ColorRGB>{};
 }
 
 void ProjectSettingsInteractor::set_color_from_user(
+    Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
     int slot,
     std::string color
 )
 {
-    for (auto& [proj_id, project] : m_workbench.projects()) {
-        Domain::ConfigContainer* cc = project.find_config_container(config_container_id);
-        if (!cc)
-            continue;
+    Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc)
+        return;
 
-        if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
-            return;
-        }
-
-        auto colors =
-            cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
-
-        if (slot < 0 || slot >= static_cast<int>(colors.size()))
-            return;
-
-        if (color.empty()) {
-            color = resolve_auto_color(proj_id, config_container_id, slot);
-        }
-
-        ASSERT(!color.empty());
-        colors[slot] = std::move(color);
-        store_and_notify(config_container_id, std::move(colors));
+    if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
         return;
     }
+
+    auto colors =
+        cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+
+    if (slot < 0 || slot >= static_cast<int>(colors.size()))
+        return;
+
+    if (color.empty()) {
+        color = resolve_auto_color(project_id, config_container_id, slot);
+    }
+
+    ASSERT(!color.empty());
+    colors[slot] = std::move(color);
+    store_and_notify(project_id, config_container_id, std::move(colors));
 }
 
 void ProjectSettingsInteractor::set_colors_from_connect(
+    Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
     std::vector<std::string> incoming_colors
 )
 {
-    for (auto& [proj_id, project] : m_workbench.projects()) {
-        Domain::ConfigContainer* cc = project.find_config_container(config_container_id);
-        if (!cc)
-            continue;
+    Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc)
+        return;
 
-        if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
-            return;
-        }
-
-        auto colors =
-            cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
-
-        const size_t count = std::min(colors.size(), incoming_colors.size());
-        for (size_t i = 0; i < count; ++i) {
-            if (incoming_colors[i].empty())
-                continue;
-            colors[i] = incoming_colors[i];
-        }
-
-        store_and_notify(config_container_id, std::move(colors));
+    if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
         return;
     }
+
+    auto colors =
+        cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+
+    const size_t count = std::min(colors.size(), incoming_colors.size());
+    for (size_t i = 0; i < count; ++i) {
+        if (incoming_colors[i].empty())
+            continue;
+        colors[i] = incoming_colors[i];
+    }
+
+    store_and_notify(project_id, config_container_id, std::move(colors));
 }
 
 WipingVolumesData ProjectSettingsInteractor::get_wiping_volumes_data(
@@ -152,22 +146,29 @@ WipingVolumesData ProjectSettingsInteractor::get_wiping_volumes_data(
     if (!cc)
         return data;
 
-    data.extruder_colours = get_colors(config_container_id);
+    const Domain::ConfigItem* hex_colors_item =
+        cc->project_settings().items.find("extruder_colour");
+    data.extruder_colours = hex_colors_item ?
+        hex_colors_to_rgb(hex_colors_item->value().get<std::vector<std::string>>()) :
+        std::vector<Domain::ColorRGB>{};
     data.use_custom_matrix =
         cc->project_settings().items.opt("wiping_volumes_use_custom_matrix").get<bool>();
 
     if (cc->print_technology() != Domain::PrinterTechnology::FFF)
         return data;
 
+    const size_t num_extruders = data.extruder_colours.size();
+
     // Resolve the selected preset pack once; it feeds both the printer purging volume and the
     // per-filament multipliers below, and (if needed) the matrix reconciliation.
     Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc->selected_preset());
+    ASSERT(preset_config_pack.filament_size() == num_extruders);
 
     data.printer_purging_volume =
         preset_config_pack.get_printer().items.opt("multimaterial_purging").get<double>();
 
-    data.filament_purging_multipliers.reserve(preset_config_pack.filament_size());
-    for (size_t i = 0; i < preset_config_pack.filament_size(); ++i) {
+    data.filament_purging_multipliers.reserve(num_extruders);
+    for (size_t i = 0; i < num_extruders; ++i) {
         data.filament_purging_multipliers.push_back(
             preset_config_pack.get_filament(i)
                 .items.opt("filament_purge_multiplier")
@@ -182,7 +183,6 @@ WipingVolumesData ProjectSettingsInteractor::get_wiping_volumes_data(
     // Verify if wiping_volumes_matrix has proper size
     // (it is used to deduce number of extruders in wipe tower generator):
     const size_t old_num_extruders = size_t(std::sqrt(old_matrix.size()) + Domain::EPSILON);
-    const size_t num_extruders     = data.extruder_colours.size();
     if (num_extruders == old_num_extruders) {
         data.matrix = old_matrix;
         return data;
@@ -198,9 +198,9 @@ WipingVolumesData ProjectSettingsInteractor::get_wiping_volumes_data(
                 data.matrix.push_back(old_matrix[i * old_num_extruders + j]);
             else
                 data.matrix.push_back(
-                    i == j ? 0. :
-                              data.printer_purging_volume * data.filament_purging_multipliers[j]
-                                  / 100.
+                    i == j ?
+                        0. :
+                        data.printer_purging_volume * data.filament_purging_multipliers[j] / 100.
                 );
         }
     }
@@ -216,9 +216,7 @@ void ProjectSettingsInteractor::set_wiping_volumes_data(
 {
     if (Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id)) {
         cc->project_settings().items.opt("wiping_volumes_matrix").set(std::move(matrix));
-        cc->project_settings()
-            .items.opt("wiping_volumes_use_custom_matrix")
-            .set(use_custom_matrix);
+        cc->project_settings().items.opt("wiping_volumes_use_custom_matrix").set(use_custom_matrix);
 
         for (const auto& instance : cc->bed_instances()) {
             Domain::BedRef bed(cc->id().id, instance->id().id);
@@ -229,10 +227,8 @@ void ProjectSettingsInteractor::set_wiping_volumes_data(
     }
 }
 
-Domain::ConfigContainer* ProjectSettingsInteractor::find_config_container(
-    Domain::SelectionId project_id,
-    Domain::SelectionId config_container_id
-)
+Domain::ConfigContainer* ProjectSettingsInteractor::
+    find_config_container(Domain::SelectionId project_id, Domain::SelectionId config_container_id)
 {
     Domain::Project* project = m_workbench.find_project_by_id(project_id);
     return project ? project->find_config_container(config_container_id) : nullptr;
@@ -332,7 +328,8 @@ std::string ProjectSettingsInteractor::preset_color(
         return {};
 
     if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
-        return 0;
+        PANIC("Invalid print technology");
+        return {};
     }
     Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc->selected_preset());
 
@@ -342,10 +339,8 @@ std::string ProjectSettingsInteractor::preset_color(
     return preset_config_pack.get_filament(slot).items.opt("filament_colour").get<std::string>();
 }
 
-int ProjectSettingsInteractor::extruder_count(
-    Domain::SelectionId project_id,
-    Domain::SelectionId config_container_id
-) const
+int ProjectSettingsInteractor::
+    extruder_count(Domain::SelectionId project_id, Domain::SelectionId config_container_id) const
 {
     const Domain::ConfigContainer* cc =
         m_workbench.project(project_id).find_config_container(config_container_id);
@@ -360,10 +355,8 @@ int ProjectSettingsInteractor::extruder_count(
     return static_cast<int>(preset_config_pack.filament_size());
 }
 
-void ProjectSettingsInteractor::load_and_reconcile(
-    Domain::SelectionId project_id,
-    Domain::SelectionId config_container_id
-)
+void ProjectSettingsInteractor::
+    load_and_reconcile(Domain::SelectionId project_id, Domain::SelectionId config_container_id)
 {
     Domain::ConfigContainer* cc =
         m_workbench.project(project_id).find_config_container(config_container_id);
@@ -389,29 +382,27 @@ void ProjectSettingsInteractor::load_and_reconcile(
     // Always store and notify, even if colors haven't changed.
     // UI listeners rely on this notification as their sole source of color
     // updates (e.g. after preset switches or 3MF loading).
-    store_and_notify(config_container_id, std::move(colors));
+    store_and_notify(project_id, config_container_id, std::move(colors));
 }
 
 void ProjectSettingsInteractor::store_and_notify(
+    Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
     std::vector<std::string> colors
 )
 {
-    for (auto& [proj_id, project] : m_workbench.projects()) {
-        Domain::ConfigContainer* cc = project.find_config_container(config_container_id);
-        if (!cc)
-            continue;
+    Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
+    if (!cc)
+        return;
 
-        cc->project_settings().items.opt("extruder_colour").set(colors);
+    cc->project_settings().items.opt("extruder_colour").set(colors);
 
     const auto rgb_colors = hex_colors_to_rgb(colors);
 
-        invoke_listeners<IColorsChangedListener>(
-            [&](auto* listener)
-            { listener->on_colors_changed(proj_id, config_container_id, rgb_colors); }
-        );
-        return;
-    }
+    invoke_listeners<IColorsChangedListener>(
+        [&](auto* listener)
+        { listener->on_colors_changed(project_id, config_container_id, rgb_colors); }
+    );
 }
 
 } // namespace Slic3r::Biz

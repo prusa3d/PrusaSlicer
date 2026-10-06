@@ -59,6 +59,7 @@ MaterialSettingsButton::MaterialSettingsButton(
     m_color_marker->callbacks().color_edited = [this](const ImColor& color)
     {
         m_project_interactor.project_settings_interactor().set_color_from_user(
+            m_project_interactor.selected_project_id(),
             m_project_interactor.selected_config_container_id(),
             m_index,
             Biz::Algorithms::Color::encode_color({color.Value.x, color.Value.y, color.Value.z})
@@ -159,6 +160,7 @@ void MaterialSettingsButton::on_list_selection_changed(Domain::SelectionId new_s
 
     const std::vector<Domain::ColorRGB> colors =
         m_project_interactor.project_settings_interactor().get_colors(
+            m_project_interactor.selected_project_id(),
             m_project_interactor.selected_config_container_id()
         );
     if (m_index < colors.size()) {

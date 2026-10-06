@@ -212,6 +212,7 @@ void PreviewScenePresenter::add_shells()
                                 const ConfigContainer& config_container = *cc_it->second;
                                 const auto& slot_colors =
                                     m_project_interactor.project_settings_interactor().get_colors(
+                                        m_selected_project_id,
                                         config_container.id().id
                                     );
 

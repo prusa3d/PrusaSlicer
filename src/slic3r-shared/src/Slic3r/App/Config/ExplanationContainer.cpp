@@ -158,6 +158,7 @@ void ExplanationContainer::update_explanation(const Biz::PrintToolItem& print_to
 
             const std::vector<Domain::ColorRGB> colors =
                 m_project_interactor.project_settings_interactor().get_colors(
+                    m_project_interactor.selected_project_id(),
                     m_project_interactor.selected_config_container_id()
                 );
 

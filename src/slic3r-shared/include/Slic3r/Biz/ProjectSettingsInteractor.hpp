@@ -48,19 +48,24 @@ public:
      * @brief Returns current colors for the given container (for initial UI population).
      * @return Empty vector if the container is not found or is not FDM.
      */
-    std::vector<Domain::ColorRGB> get_colors(Domain::SelectionId config_container_id) const;
+    std::vector<Domain::ColorRGB> get_colors(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id
+    ) const;
 
     /**
      * @brief User explicitly picked a color for a slot.
      *
-     * Stores the color in ProjectSettings. Passing an empty string 
+     * Stores the color in ProjectSettings. Passing an empty string
      * re-runs the priority chain.
      *
+     * @param project_id          Project containing the config container.
      * @param config_container_id Container to update.
      * @param slot                0-based extruder slot index.
      * @param color               Hex color string (e.g. "#FF8000"), or empty.
      */
     void set_color_from_user(
+        Domain::SelectionId project_id,
         Domain::SelectionId config_container_id,
         int slot,
         std::string color
@@ -69,10 +74,12 @@ public:
     /**
      * @brief Connect sync — updates each slot.
      *
+     * @param project_id          Project containing the config container.
      * @param config_container_id Container to update.
      * @param colors              New colors for all slots. Must not contain empty strings.
      */
     void set_colors_from_connect(
+        Domain::SelectionId project_id,
         Domain::SelectionId config_container_id,
         std::vector<std::string> colors
     );
@@ -193,7 +200,11 @@ private:
      *        the config container and notify listeners.
 
      */
-    void store_and_notify(Domain::SelectionId config_container_id, std::vector<std::string> colors);
+    void store_and_notify(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        std::vector<std::string> colors
+    );
 
     Domain::Workbench& m_workbench;
     const IMdb& m_mdb;
