@@ -16,6 +16,13 @@ bool PickerFrustum::intersects_precise(const Eigen::AlignedBox3d& box) const
     }
 
     Domain::Polygon ss_box_convex_hull = Biz::Algorithms::Geometry::convex_hull(ss_box_corners);
+    if (ss_box_convex_hull.size() < 3) {
+        // When the box is small or seen edge-on, its projected corners can collapse (after rounding to
+        // pixels) into a point or a segment, and the convex hull degenerates.
+        // Return the fast test result. A false positive is fine, final decision is on the render
+        // pass. This will at worst add the degenerate case in the list of candidates.
+        return this->intersects_fast(box);
+    }
     return Biz::Algorithms::Geometry::convex_polygons_intersect(ss_box_convex_hull, m_ss_rectangle);
 }
 

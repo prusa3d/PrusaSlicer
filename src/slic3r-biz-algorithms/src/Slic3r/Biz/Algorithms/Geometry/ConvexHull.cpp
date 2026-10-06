@@ -273,6 +273,9 @@ void visit_antipodals(Idx& ia, Idx& ib, Fn&& fn)
 
 bool convex_polygons_intersect(const Polygon& A, const Polygon& B)
 {
+    if (A.size() < 3 || B.size() < 3)
+        return false;
+
     using namespace rotcalip;
 
     // Establish starting antipodals as extremes in XY plane. Use the
