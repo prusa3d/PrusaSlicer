@@ -145,7 +145,21 @@ bool can_be_instance(const Transform3d& tr1, const Transform3d& tr2)
     return true;
 }
 
-ModelMap add_build_instances(Slic3r::Domain::Model& model, const CT_Items& items)
+double unit_to_conversion_factor_to_mm(ST_Unit unit)
+{
+    switch (unit) {
+        case ST_Unit::millimeter : return 1.;
+        case ST_Unit::micron :     return 0.001;
+        case ST_Unit::meter :      return 1000.;
+        case ST_Unit::inch  :      return 25.4;
+        case ST_Unit::foot :       return 304.8;
+        case ST_Unit::centimeter : return 10.;
+    }
+    UNREACHABLE();
+    return 1.;
+}
+
+ModelMap add_build_instances(Slic3r::Domain::Model& model, const CT_Items& items, ST_Unit unit)
 {
     ModelMap model_map;
     model_map.instances = InstanceMap(items.size(), {nullptr});
@@ -162,6 +176,9 @@ ModelMap add_build_instances(Slic3r::Domain::Model& model, const CT_Items& items
             // Addresing to another file!
             path_id.path = item.path; // copy
 
+        Domain::Transform3d item_trafo = item.transform;
+        item_trafo.translation() *= unit_to_conversion_factor_to_mm(unit);
+
         ModelObject* model_object = nullptr;
         auto it                   = build_map.find(path_id);
         if (it != build_map.end()) {
@@ -169,7 +186,7 @@ ModelMap add_build_instances(Slic3r::Domain::Model& model, const CT_Items& items
             // it depends on transformation matrices
             for (ModelObject* mo : it->second) {
                 const Transform3d& mi_tr = mo->instances.front()->get_matrix();
-                if (can_be_instance(mi_tr, item.transform)) {
+                if (can_be_instance(mi_tr, item_trafo)) {
                     model_object = mo;
                     break;
                 }
@@ -196,7 +213,7 @@ ModelMap add_build_instances(Slic3r::Domain::Model& model, const CT_Items& items
         }
 
         ModelInstance* instance_ptr = model_object->add_instance();
-        instance_ptr->set_transformation(Domain::Transformation(item.transform));
+        instance_ptr->set_transformation(Domain::Transformation(item_trafo));
         model_map.instances[&item - &items.front()] = instance_ptr;
     }
     return model_map;
@@ -226,6 +243,7 @@ using ObjectMap = std::unordered_map<Slic3r::PathId, ObjectCompose>;
 
 bool process_object_with_components(
     const CT_Object& object_3mf,
+    ST_Unit unit,
     ObjectMap& object_map,
     Domain::Model& temp_model,
     const std::string* filepath = nullptr // set only when it is not root model
@@ -283,7 +301,9 @@ bool process_object_with_components(
             volume_traces.push_back({path_id_c});
             if (mv->type() != ModelVolumeType::MODEL_PART)
                 mv->set_type(ModelVolumeType::MODEL_PART);
-            mv->set_transformation(component.transform);
+            Domain::Transform3d trafo = component.transform;
+            trafo.translation() *= unit_to_conversion_factor_to_mm(unit);
+            mv->set_transformation(trafo);
             continue;
         }
 
@@ -295,7 +315,9 @@ bool process_object_with_components(
             // same object can be referenced by multiple components, give this copy its own id
             mv->set_new_unique_id();
             // transform by current transformation
-            mv->set_transformation(component_volume->get_matrix() * component.transform);
+            Domain::Transform3d comp_trafo = component.transform;
+            comp_trafo.translation() *= unit_to_conversion_factor_to_mm(unit);
+            mv->set_transformation(component_volume->get_matrix() * comp_trafo);
             if (!compose.object->name.empty())
                 mv->name = mv->name.empty() ? compose.object->name :
                                               (compose.object->name + " | " + mv->name);
@@ -312,7 +334,7 @@ bool process_object_with_components(
 }
 
 // Return true when processed otherwise false
-bool move_mesh(CT_Object& object_3mf, ModelObject& temp_object, ObjectMap& object_map, const std::string* path)
+bool move_mesh(CT_Object& object_3mf, ST_Unit unit, ModelObject& temp_object, ObjectMap& object_map, const std::string* path)
 {
     // By 3mf core spec CT_Object should contain mesh OR components
     if (object_3mf.mesh.its.empty() && object_3mf.components.empty())
@@ -334,10 +356,16 @@ bool move_mesh(CT_Object& object_3mf, ModelObject& temp_object, ObjectMap& objec
             }
         }
 
+        if (unit != ST_Unit::millimeter) {
+            float mult = float(unit_to_conversion_factor_to_mm(unit));
+            for (Domain::Vec3f& pt : its.vertices)
+                pt = mult * pt;
+        }
+
         Domain::TriangleMeshStats stats = Biz::Algorithms::TriangleMesh::calculate_stats(
-            object_3mf.mesh.its
+            its
         );
-        Domain::TriangleMesh tm(std::move(object_3mf.mesh.its), std::move(stats));
+        Domain::TriangleMesh tm(std::move(its), std::move(stats));
         
         ModelVolume* vol = Biz::Algorithms::ModelObject::add_volume(
             &temp_object,
@@ -362,11 +390,13 @@ bool move_mesh(CT_Object& object_3mf, ModelObject& temp_object, ObjectMap& objec
 /// NOTE: objects_3mf is not const because mesh(indexed_triangle_set) is moved into temp_model!
 /// </summary>
 /// <param name="objects_3mf">Source object</param>
+/// <param name="unit">Unit loaded from 3MF</param>
 /// <param name="temp_model">Temporary storage for object</param>
 /// <param name="object_map">Conversion from object_3mf to Slic3r::ModelObject</param>
 /// <param name="path">For root .model it is null otherwise it contains .model path</param>
 /// <returns>Indices of not moved objects - not core 3mf</returns>
 std::vector<size_t> move_objects(/*const*/ CT_Objects& objects_3mf,
+                                 ST_Unit unit,
                                  Domain::Model& temp_model,
                                  ObjectMap& object_map,
                                  const std::string* path = nullptr)
@@ -382,11 +412,11 @@ std::vector<size_t> move_objects(/*const*/ CT_Objects& objects_3mf,
 
     for (CT_Object& object_3mf : objects_3mf) {
         // contain Object mesh?
-        if (move_mesh(object_3mf, temp_object, object_map, path))
+        if (move_mesh(object_3mf, unit, temp_object, object_map, path))
             continue;
 
         // contain Object componnets?
-        if (!process_object_with_components(object_3mf, object_map, temp_model, path)) {
+        if (!process_object_with_components(object_3mf, unit, object_map, temp_model, path)) {
             // component with unknown object yet - set to process next loop
             queue_objects.push_back(&object_3mf - &objects_3mf.front());
         }
@@ -550,6 +580,7 @@ ModelMap move_model(/*const*/ LoadedModel& from,
         for (auto& [path, sub_model] : from.sub_models) {
             std::vector<size_t> not_processed_objects = move_objects(
                 sub_model.resource.objects,
+                sub_model.unit,
                 temp_model,
                 object_map,
                 &path
@@ -562,6 +593,7 @@ ModelMap move_model(/*const*/ LoadedModel& from,
     }
     std::vector<size_t> not_processed_objects = move_objects(
         from_root.resource.objects,
+        from_root.unit,
         temp_model,
         object_map
     );
@@ -571,7 +603,7 @@ ModelMap move_model(/*const*/ LoadedModel& from,
         );
 
     // fill build and instances
-    ModelMap model_map = add_build_instances(to, from_root.build.items);
+    ModelMap model_map = add_build_instances(to, from_root.build.items, from_root.unit);
 
     // fill build objects by object_map from temp_model
     model_map.volumes = fill_build_objects(model_map.build, object_map);
