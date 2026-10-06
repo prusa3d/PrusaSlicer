@@ -30,6 +30,7 @@ ExtruderIcon::ExtruderIcon()
 void ExtruderIcon::set_extruder_color(const ImColor& color)
 {
     set_colors({color});
+    m_fill_collor = color;
     m_label->set_text_color(Imgui::contrast_color(color));
     update_color();
 }
@@ -39,6 +40,7 @@ void ExtruderIcon::set_extruders_colors(const std::vector<ImColor>& colors)
     set_colors(colors);
     set_deflate(0.f);
     set_border_width(0);
+    m_label->set_text_color(Imgui::contrast_color(colors.front()));
     m_label->set_visible(m_extruder_index_visible && colors.size() == 1);
 }
 
