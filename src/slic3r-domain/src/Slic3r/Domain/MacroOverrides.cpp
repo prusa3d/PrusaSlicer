@@ -47,6 +47,8 @@ MacroOverridesFDM make_vase_mode_overrides()
     overrides.overrides.set("support_material", SupportMode::None);
     overrides.overrides.set("support_material_enforce_layers", 0);
     overrides.overrides.set("thin_walls", false);
+    overrides.overrides.set("retract_layer_change", false);
+    overrides.overrides.set("avoid_crossing_perimeters", false);
     return overrides;
 }
 

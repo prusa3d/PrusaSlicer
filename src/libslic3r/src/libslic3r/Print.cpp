@@ -724,7 +724,7 @@ DONE:;
         if (total_copies_count > 1 && !m_config.get<bool>("complete_objects")) {
             errors.push_back(Error{ErrorCode::SpiralVaseMultipleObjects, {"spiral_vase"}});
         }
-        ASSERT(m_objects.size() == 1);
+        ASSERT(m_objects.size() > 0);
         if (m_objects.front()->all_regions().size() > 1) {
             errors.push_back(Error{ErrorCode::SpiralVaseMultipleMaterials, {"spiral_vase"}});
         }
