@@ -30,6 +30,9 @@ public:
     void set_rounding(float rounding);
     void set_flags(ImDrawFlags flags);
 
+    bool apply_window_alpha() const;
+    void set_apply_window_alpha(bool apply_window_alpha);
+
 protected:
     Vec2f get_item_size() override;
 
@@ -43,6 +46,7 @@ private:
     float m_border_dash_length = 0.f;
     float m_border_gap_length  = 0.f;
     float m_rounding = 5.f;
+    bool m_apply_window_alpha{false};
     ImDrawFlags m_flags = ImDrawFlags_RoundCornersAll;
 };
 

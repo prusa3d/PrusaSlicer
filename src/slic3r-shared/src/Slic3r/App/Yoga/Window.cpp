@@ -4,7 +4,7 @@
 
 namespace Slic3r::App::Yoga {
 
-Window::Window(const std::string& window_name) : Item(), m_alpha(GImGui->Style.Alpha)
+Window::Window(const std::string& window_name) : Item()
 {
     set_object_name(window_name.empty() ? "Window" : window_name);
     set_padding(20_fpx);
@@ -38,7 +38,7 @@ void Window::set_flags(int flags)
 
 float Window::alpha() const
 {
-    return m_alpha;
+    return m_is_transparent ? m_theme->transparent_window_alpha() : m_alpha;
 }
 
 void Window::set_alpha(float alpha)
@@ -90,7 +90,7 @@ void Window::render(const Vec2f& pos, const Vec2f& size)
     }
 
     ImGui::SetNextWindowSize(sz);
-    ImGui::SetNextWindowBgAlpha(m_alpha);
+    ImGui::SetNextWindowBgAlpha(alpha());
     ImGui::SetNextWindowPos(next_pos);
 
     // Discard current paddings and spacing of the window to corect apply of sizer's margins
@@ -216,6 +216,16 @@ bool Window::is_modal() const
 void Window::set_modal(bool is_modal)
 {
     m_is_modal = is_modal;
+}
+
+bool Window::is_transparent() const
+{
+    return m_is_transparent;
+}
+
+void Window::set_transparent(bool is_transparent)
+{
+    m_is_transparent = is_transparent;
 }
 
 } // namespace Slic3r::App::Yoga

@@ -29,6 +29,7 @@ SidebarActionButtons::SidebarActionButtons(
     m_render_module_navigator(render_module_navigator),
     m_type(type)
 {
+    set_transparent(true);
     ASSERT(type != RMType::Undef);
 
     m_navigator_name    = m_type == RMType::Plater ? ">" : "<";

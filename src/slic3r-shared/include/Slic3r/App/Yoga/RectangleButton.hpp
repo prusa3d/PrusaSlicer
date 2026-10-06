@@ -64,6 +64,9 @@ public:
     YGDirection content_direction() const;
     void set_content_direction(YGDirection direction);
 
+    bool content_apply_window_alpha() const;
+    void set_content_apply_window_alpha(bool apply_window_alpha);
+
     float rounding() const;
     void set_rounding(float rounding);
 

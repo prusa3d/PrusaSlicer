@@ -12,6 +12,7 @@ using Biz::Slicing::SlicingInteractor;
 SidebarAutoReslice::SidebarAutoReslice(ProjectInteractor& project_interactor) :
     Window("SidebarAutoReslice")
 {
+    set_transparent(true);
     set_min_width(220);
 
     Item* row = emplace_back<Yoga::Item>();

@@ -236,6 +236,7 @@ SidebarObject::SidebarObject(Biz::ProjectInteractor& project_interactor) :
         *this
     )
 {
+    set_transparent(true);
     m_override_settings_dialog = emplace_back<OverrideSettingsDialog>(m_project_interactor);
 
     set_orientation(Orientation::Vertical);

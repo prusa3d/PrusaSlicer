@@ -33,6 +33,9 @@ public:
 
     void initialize_imgui_style();
 
+    float transparent_window_alpha() const;
+    void set_transparent_window_alpha(float alpha);
+
 private:
     struct ColorEntry
     {
@@ -68,6 +71,7 @@ private:
 private:
     Style m_style{Style::Dark};
     std::unordered_map<Platform::Color, ColorEntry> m_colors;
+    float m_transparent_window_alpha{1.f};
 };
 
 } // namespace Slic3r::App

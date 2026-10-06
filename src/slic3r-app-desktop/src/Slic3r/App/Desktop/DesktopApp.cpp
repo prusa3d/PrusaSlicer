@@ -235,6 +235,9 @@ bool DesktopApp::OnInit()
     Theme::Style style = app_services.app_config().get<Theme::Style>("theme");
 
     app_services.set_theme(std::make_unique<Theme>(style));
+    app_services.theme().set_transparent_window_alpha(
+        app_services.app_config().get<double>("transparent_window_alpha")
+    );
 
     const AppearanceResult result = SetAppearance(
         style == Theme::Style::Dark ? wxAppBase::Appearance::Dark : wxAppBase::Appearance::Light

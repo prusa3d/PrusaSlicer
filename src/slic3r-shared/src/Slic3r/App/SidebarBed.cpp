@@ -27,6 +27,7 @@ SidebarBed::SidebarBed(Biz::ProjectInteractor& project_interactor, Navigator& na
     m_project_interactor(project_interactor),
     m_navigator(navigator)
 {
+    set_transparent(true);
     m_printer_add_dialog              = emplace_back<PrinterAddDialog>(m_project_interactor);
     m_logical_printer_settings_dialog = emplace_back<
         LogicalPrinterSettingsDialog>(project_interactor, m_printer_add_dialog, m_navigator);

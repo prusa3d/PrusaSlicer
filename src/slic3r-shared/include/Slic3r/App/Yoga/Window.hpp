@@ -48,6 +48,9 @@ public:
     bool is_modal() const;
     void set_modal(bool is_modal);
 
+    bool is_transparent() const;
+    void set_transparent(bool is_transparent);
+
 private:
     Callbacks m_callbacks;
 
@@ -69,6 +72,7 @@ private:
     bool m_requested_bring_to_front = false;
 
     bool m_is_modal{ false };
+    bool m_is_transparent{false};
 };
 
 } // namespace Slic3r::App::Yoga

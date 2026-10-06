@@ -25,8 +25,8 @@ ActionButton::ActionButton(Render::Icon icon, const std::string& tooltip) :
     set_min_width(18_fpx);
     set_min_height(18_fpx);
     set_content_padding(0);
+    set_content_apply_window_alpha(true);
     set_background_color(Platform::Color::ButtonTransparent);
-    set_background_color_checked(Platform::Color::ButtonTransparent);
     set_background_color_checked(
         m_theme->color_imgui(Platform::Color::ButtonTransparent),
         m_theme->color_imgui(Platform::Color::ButtonTransparent)
@@ -40,6 +40,8 @@ TreeNodeButton::TreeNodeButton(NodeLevel level, CollapsibleArea* collapsible_ite
 {
     set_content_justify_content(YGJustifyFlexStart);
     set_content_align_items(YGAlignCenter);
+    set_content_apply_window_alpha(true);
+    set_background_color(Platform::Color::ButtonTransparent);
     set_allow_overlap(true);
     set_flex_shrink(0);
     set_rounding(0.f);
@@ -95,6 +97,8 @@ LeafButton::LeafButton(NodeLevel level) : RectangleButton()
 {
     set_content_justify_content(YGJustifyFlexStart);
     set_content_align_items(YGAlignCenter);
+    set_content_apply_window_alpha(true);
+    set_background_color(Platform::Color::ButtonTransparent);
     set_flex_shrink(0);
     set_rounding(0.f);
 

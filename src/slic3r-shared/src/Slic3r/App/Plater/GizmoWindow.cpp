@@ -32,6 +32,7 @@ static LayoutButton* add_button(Item* parent, Render::Icon icon)
 
 GizmoWindow::GizmoWindow() : Window("GizmoWindow")
 {
+    set_transparent(true);
     set_orientation(Orientation::Horizontal);
     set_gap(0);
     set_padding(0);

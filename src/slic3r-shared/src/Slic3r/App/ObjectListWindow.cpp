@@ -31,6 +31,7 @@ ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor& project_interactor, b
     CollapsibleWindow(_u8L("Object list"), "ObjectListWindow"),
     m_project_interactor(project_interactor)
 {
+    set_transparent(true);
     content()->set_padding(0.f);
     const ObjectListItem::Mode mode =
         for_plater ? ObjectListItem::Mode::Plater : ObjectListItem::Mode::Preview;

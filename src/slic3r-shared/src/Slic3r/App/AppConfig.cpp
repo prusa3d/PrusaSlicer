@@ -105,6 +105,22 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
         }
     );
 
+    def               = defs.add("transparent_window_alpha", typeid(double));
+    def->location     = Domain::AppConfigLocation{};
+    def->label        = L("Sidebars transparency");
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_General;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
+    def->gui_type     = Domain::ConfigItemDef::GUIType::f_enum_open;
+    def->tooltip      = L(
+        "Sidebar windows transparency. Select from the predefined values or input the needed value.\n"
+             "Allowed alpha range is [0.5; 1.0]."
+    );
+    def->min = 0.5;
+    def->max = 1.;
+    def->choices =
+        {{1., L("Solid")}, {0.85, L("Subtle")}, {0.7, L("Balanced")}, {0.55, L("Glass")}};
+    def->init_fn = Domain::init_with(1.);
+
     def               = defs.add("camera_projection_type", typeid(Domain::EnumWrapper));
     def->location     = Domain::AppConfigLocation{};
     def->label        = L("Camera projection");

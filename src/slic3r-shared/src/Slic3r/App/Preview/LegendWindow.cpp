@@ -21,6 +21,7 @@ using namespace Slic3r::Biz;
 LegendWindow::LegendWindow(libvgcode::FdmViewer* viewer, FdmViewerWrapper* wrapper)
     : CollapsibleWindow(_u8L("Legend"), "LegendWindow")
 {
+    set_transparent(true);
     content()->set_padding(0.f);
     Item* scroll_area = content()->emplace_back<ScrollArea>();
     scroll_area->set_orientation(Orientation::Vertical);

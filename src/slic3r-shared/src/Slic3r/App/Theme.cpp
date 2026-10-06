@@ -417,6 +417,16 @@ void Theme::initialize_imgui_style()
     }
 }
 
+float Theme::transparent_window_alpha() const
+{
+    return m_transparent_window_alpha;
+}
+
+void Theme::set_transparent_window_alpha(float alpha)
+{
+    m_transparent_window_alpha = std::clamp(alpha, 0.5f, 1.f);
+}
+
 Theme::ColorEntry Theme::auto_entry(const ImColor& color) const
 {
     return {

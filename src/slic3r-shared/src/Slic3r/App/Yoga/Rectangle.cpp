@@ -23,6 +23,10 @@ void Rectangle::render(const Vec2f& pos, const Vec2f& size)
     ImColor fill_color =
         enabled() ? m_fill : (m_disabled_fill.has_value() ? m_disabled_fill.value() : m_fill);
 
+    if (m_apply_window_alpha) {
+        fill_color.Value.w *= m_theme->transparent_window_alpha();
+    }
+
     draw_list->AddRectFilled(rect.Min, rect.Max, fill_color, m_rounding, m_flags);
     if (m_border_width > 0) {
         if (m_border_dash_length > 0) {
@@ -129,6 +133,16 @@ void Rectangle::set_rounding(float rounding)
 void Rectangle::set_flags(ImDrawFlags flags)
 {
     m_flags = flags;
+}
+
+bool Rectangle::apply_window_alpha() const
+{
+    return m_apply_window_alpha;
+}
+
+void Rectangle::set_apply_window_alpha(bool apply_window_alpha)
+{
+    m_apply_window_alpha = apply_window_alpha;
 }
 
 Vec2f Rectangle::get_item_size()

@@ -46,6 +46,7 @@ void GCodeWindowData::resize_range(Range& range, uint32_t lines_count, uint32_t 
 GCodeWindow::GCodeWindow(libvgcode::FdmViewer* viewer, GCodeWindowData* data) :
     Yoga::CollapsibleWindow(Biz::_u8L("G-code viewer"), "GCodeWindow")
 {
+    set_transparent(true);
     set_flex_grow(1.);
     content()->set_flex_grow(1);
     m_gcode = content()->emplace_back<GCodeDisplay>(viewer, data);

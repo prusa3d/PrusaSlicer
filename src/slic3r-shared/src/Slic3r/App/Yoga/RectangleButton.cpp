@@ -181,6 +181,16 @@ void RectangleButton::set_content_direction(YGDirection direction)
     m_background->set_direction(direction);
 }
 
+bool RectangleButton::content_apply_window_alpha() const
+{
+    return m_background->apply_window_alpha();
+}
+
+void RectangleButton::set_content_apply_window_alpha(bool apply_window_alpha)
+{
+    m_background->set_apply_window_alpha(apply_window_alpha);
+}
+
 float RectangleButton::background_border_width() const
 {
     return m_background->border_width();

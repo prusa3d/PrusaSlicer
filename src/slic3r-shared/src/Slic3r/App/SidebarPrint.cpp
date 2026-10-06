@@ -34,6 +34,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     m_project_interactor(project_interactor),
     m_navigator(navigator)
 {
+    set_transparent(true);
     m_print_settings_dialog = emplace_back<PrintSettingsDialog>(project_interactor, m_navigator);
 
     set_orientation(Orientation::Vertical);

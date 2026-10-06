@@ -21,6 +21,7 @@
 #include <Slic3r/App/WX/WebView/WebViewFactory.hpp>
 
 #include <Slic3r/App/Localization.hpp>
+#include "Slic3r/App/AbstractRenderLayout.hpp"
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/MenuManager.hpp"
 #include "Slic3r/App/Browser/BrowserLogicPrintables.hpp"
@@ -366,6 +367,8 @@ void MainFrame::on_app_config_changed(const std::string& key)
 
     if (key == "graphics_quality") {
         update_graphics_settings();
+    } else if (key == "transparent_window_alpha") {
+        AppServices::instance().theme().set_transparent_window_alpha(app_config.get<double>(key));
     }
     else if (key == "translation_language") {
         if (const std::string new_language = app_config.get<std::string>("translation_language");
