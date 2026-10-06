@@ -317,7 +317,7 @@ bool process_object_with_components(
             // transform by current transformation
             Domain::Transform3d comp_trafo = component.transform;
             comp_trafo.translation() *= unit_to_conversion_factor_to_mm(unit);
-            mv->set_transformation(component_volume->get_matrix() * comp_trafo);
+            mv->set_transformation(comp_trafo * component_volume->get_matrix());
             if (!compose.object->name.empty())
                 mv->name = mv->name.empty() ? compose.object->name :
                                               (compose.object->name + " | " + mv->name);
