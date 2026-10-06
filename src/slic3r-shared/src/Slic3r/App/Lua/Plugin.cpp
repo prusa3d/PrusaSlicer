@@ -91,7 +91,7 @@ private:
 };
 
 Plugin::ParseResult
-Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std::string& path)
+Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& bundle_id, const std::string& path)
 {
     auto& state = lua.state();
     if (!state["info"].is<sol::table>()) {
@@ -100,7 +100,7 @@ Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std:
 
     sol::table info = state["info"];
     PluginMeta meta;
-    meta.id = id_prefix + info["id"].get<std::string>();
+    meta.id = bundle_id + "." + info["id"].get<std::string>();
     auto type_result = parse_plugin_type(info["type"].get<std::string>());
     if (!type_result.has_value()) {
         return tl::unexpected{type_result.error()};
@@ -124,8 +124,15 @@ Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std:
             auto name = p.get<std::string>("name");
             auto label = p.get_or<std::string>("label", name);
             auto type = p.get<std::string>("type");
-            auto value = p.get<PluginParamValue>("default");
-            meta.params.emplace_back(name, label, type, value);
+            std::optional<PluginParamValue> value;
+            if (p["default"].valid()) {
+                value = p.get<PluginParamValue>("default");
+            }
+            std::vector<std::string> allowed_values;
+            if (auto in_vals = p["allowed_values"]; in_vals.valid()) {
+                allowed_values = in_vals.get<std::vector<std::string>>();
+            }
+            meta.params.emplace_back(name, label, type, value, allowed_values);
         });
     }
 
@@ -144,10 +151,13 @@ Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std:
         return tl::unexpected{"Missing execute() function"};
     }
 
-    return Plugin{path, meta};
+    return Plugin{path, bundle_id, meta};
 }
 
-Plugin::Plugin(std::string path, PluginMeta meta) : m_path(std::move(path)), m_meta(std::move(meta))
+Plugin::Plugin(std::string path, std::string bundle_id, PluginMeta meta) :
+    m_path(std::move(path)),
+    m_bundle_id(std::move(bundle_id)),
+    m_meta(std::move(meta))
 {}
 
 sol::object Plugin::execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap& params) const

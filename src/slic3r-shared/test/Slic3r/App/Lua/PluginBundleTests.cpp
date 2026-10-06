@@ -151,7 +151,7 @@ TEST_CASE("Scanning records each bundle's id and version", "[plugin][marketplace
     {
         boost::nowide::ofstream manifest{bundle_dir / "manifest.json"};
         manifest << R"({"id":"com.test.scan","version":"1.2.3","author":"tester","name":"Test scan",)"
-                 << R"("license":"MIT","min_slicer_version":"3.0.0",)"
+                 << R"("license":"MIT","min_slicer_version":"3.0.0-alpha0",)"
                  << R"("plugin_api_version":"1.0.0", "required_apis": {"project.plugin": "1.0.0"}})";
     }
 

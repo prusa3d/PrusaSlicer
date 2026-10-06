@@ -2318,13 +2318,28 @@ void MenuCommandRegistrar::update_main_menu_plugin_commands(Lua::PluginSystem& p
 
 void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem& plugin_system)
 {
-    bool any_plugin = false;
-    for (auto& plugin : plugin_system.plugins() | std::views::values) {
-        if (plugin.meta().type == Lua::PluginType::PrintMode) {
-            continue;
-        }
+    // sort plugins by its menu path
+    std::vector<std::tuple<std::string, std::vector<std::string>>> entries;
+    std::ranges::transform(
+        plugin_system.plugins()
+            | std::views::values
+            | std::views::filter(
+                [](const auto& plugin) { return plugin.meta().type != Lua::PluginType::PrintMode; }
+            ),
+        std::back_inserter(entries),
+        [](const auto& p) -> std::tuple<std::string, std::vector<std::string>>
+        { return std::make_tuple(p.meta().id, p.meta().menu); }
+    );
+    std::ranges::sort(entries, {}, [](const auto& p) { return std::get<1>(p); });
+    auto plugin_range =
+        entries
+        | std::views::transform(
+            [&plugin_system](const auto& p) -> const Lua::Plugin&
+            { return plugin_system.plugins().at(std::get<0>(p)); }
+        );
 
-        any_plugin = true;
+    // register menu items of plugin entries
+    for (auto& plugin : plugin_range) {
         std::vector<UniversalMenuItemName> path;
         if (plugin.meta().menu.empty()) {
             path = {
@@ -2353,7 +2368,9 @@ void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem&
             )
         );
     }
-    if (any_plugin) {
+
+    // register other plugin related menu items
+    if (!entries.empty()) {
         m_menu_manager.register_menu_separator_item({MenuItemName::Plugins});
     }
     m_menu_manager.register_menu_item(

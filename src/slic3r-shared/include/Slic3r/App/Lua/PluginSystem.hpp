@@ -81,6 +81,7 @@ private:
     std::vector<std::string> m_plugin_paths;
     Biz::ProjectInteractor& m_project_interactor;
     Biz::Emboss::IFontManager& m_font_manager;
+    Domain::FontList m_fav_fonts;
     std::optional<PluginData> m_current_plugin_data, m_last_plugin_data;
     Yoga::Passthrough<PluginDialog> m_dialog;
     MarketplaceClient m_marketplace_client;

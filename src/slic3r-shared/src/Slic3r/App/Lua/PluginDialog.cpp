@@ -1,6 +1,9 @@
+#include <utility>
+
 #include "Slic3r/App/Lua/PluginDialog.hpp"
 
 #include "Slic3r/App/Imgui/DoubleSlider.hpp"
+#include "Slic3r/App/Yoga/ComboBox.hpp"
 #include "Slic3r/App/Yoga/InputTextField.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
@@ -112,7 +115,11 @@ public:
     {
         std::string s_val;
         if (m_init_value.has_value()) {
-            s_val = std::to_string(std::get<NumType>(m_init_value.value()));
+            if (auto* v = std::get_if<double>(&m_init_value.value())) {
+                s_val = std::to_string(*v);
+            } else if (auto* v = std::get_if<int>(&m_init_value.value())) {
+                s_val = std::to_string(*v);
+            }
         } else {
             s_val = std::visit(
                 []<typename T>(const T& val) -> std::string
@@ -141,10 +148,62 @@ private:
     Yoga::InputTextField* m_textfield{nullptr};
 };
 
-}
+template <typename ValueT>
+class ComboBoxControl : public Details::IParamControl
+{
+public:
+    using Labels = std::vector<std::string>;
+    using Values = std::vector<ValueT>;
 
-PluginDialog::PluginDialog(ProcessFunction process_function)
-    : m_process_function(std::move(process_function))
+    ComboBoxControl(
+        const PluginParamDef& param_def,
+        Values  allowed_values,
+        Labels labels,
+        const std::optional<PluginParamValue>& init_value
+    ) :
+        m_param_def(param_def),
+        m_values(std::move(allowed_values)),
+        m_labels(std::move(labels))
+    {
+        std::optional<PluginParamValue> val = init_value.has_value() ? init_value.value() : param_def.default_value;
+        if (val.has_value()) {
+            if (auto it = std::ranges::find(m_values, std::get<ValueT>(val.value())); it != m_values.end()) {
+                m_init_index = std::distance(m_values.begin(), it);
+            }
+        }
+    }
+
+    PluginParamValue value() const override
+    {
+        return m_values.at(m_combobox->current_index());
+    }
+
+    Yoga::Item& emplace_control(Yoga::Item& parent) override
+    {
+        m_combobox = parent.emplace_back<Yoga::ComboBox>(m_labels);
+        if (m_init_index.has_value()) {
+            m_combobox->set_current_index(m_init_index.value());
+        }
+        return *m_combobox;
+    }
+private:
+    const PluginParamDef& m_param_def;
+    std::optional<size_t> m_init_index;
+    Values m_values;
+    Labels m_labels;
+    Yoga::ComboBox* m_combobox{nullptr};
+};
+
+} // namespace
+
+PluginDialog::PluginDialog(
+    ProcessFunction process_function,
+    const Domain::FontList& fonts,
+    const std::string& default_font_name
+) :
+    m_process_function(std::move(process_function)),
+    m_fonts(fonts),
+    m_default_font_name(default_font_name)
 {
     append_tab("");
 
@@ -177,7 +236,7 @@ PluginDialog::show_plugin(const PluginMeta& plugin_meta, const PluginParamValueM
     for (const auto& param : plugin_meta.params) {
         auto init_it = param_values.find(param.name);
         auto init_value =
-            init_it == param_values.end() ? std::nullopt : std::make_optional(init_it->second);
+            init_it == param_values.end() ? param.default_value : std::make_optional(init_it->second);
         if (param.type == "string") {
             emplace_string_param(param, init_value);
         } else if (param.type == "float") {
@@ -186,6 +245,25 @@ PluginDialog::show_plugin(const PluginMeta& plugin_meta, const PluginParamValueM
             emplace_int_param(param, init_value);
         } else if (param.type == "bool") {
             emplace_bool_param(param, init_value);
+        } else if (param.type == "combobox") {
+            emplace_combobox_param(param, param.allowed_values, init_value);
+        } else if (param.type == "font") {
+            std::string font_name;
+            if (!init_value.has_value()) {
+                font_name = m_default_font_name;
+            } else if (auto* val = std::get_if<std::string>(&init_value.value())) {
+                font_name = *val;
+            }
+            if (!font_name.empty()) {
+                auto it = std::ranges::find_if(
+                    m_fonts,
+                    [&font_name](const auto& f) { return f.name == font_name || f.path == font_name; }
+                );
+                if (it != m_fonts.end()) {
+                    init_value = *it;
+                }
+            }
+            emplace_combobox_param(param, m_fonts, init_value);
         } else {
             PANIC("Unsupported param type");
         }
@@ -279,6 +357,42 @@ void PluginDialog::emplace_bool_param(
     );
     style_control(it->second->emplace_control(row));
 }
+
+void PluginDialog::emplace_combobox_param(
+    const PluginParamDef& param,
+    const std::vector<std::string>& allowed_values,
+    const std::optional<PluginParamValue>& default_value
+)
+{
+    auto& row = emplace_row();
+    auto [it, _] = m_param_controls.emplace(
+        param.name,
+        std::make_unique<ComboBoxControl<std::string>>(param, allowed_values, allowed_values, default_value)
+    );
+    style_control(it->second->emplace_control(row));
+
+}
+
+void PluginDialog::emplace_combobox_param(
+    const PluginParamDef& param,
+    const std::vector<Domain::FontDescriptor>& allowed_values,
+    const std::optional<PluginParamValue>& default_value
+)
+{
+    auto& row = emplace_row();
+    using CBC = ComboBoxControl<Domain::FontDescriptor>;
+    CBC::Labels labels;
+    std::ranges::transform(allowed_values, std::back_inserter(labels), [](const auto& f) { return f.name; });
+
+    auto [it, _] = m_param_controls.emplace(
+        param.name,
+        std::make_unique<CBC>(param, allowed_values, labels, default_value)
+    );
+    style_control(it->second->emplace_control(row));
+
+}
+
+
 
 Yoga::Item& PluginDialog::emplace_row(const char* label)
 {

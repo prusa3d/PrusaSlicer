@@ -1,5 +1,6 @@
 #include "Slic3r/App/Lua/PluginRegistry.hpp"
 
+#include "Slic3r/Version.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Assert.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
@@ -42,6 +43,8 @@ void PluginRegistry::scan(const std::string& path)
         return;
     }
 
+    auto slicer_ver = Semver::parse(VERSION);
+
     for (const auto& entry : fs::directory_iterator{p}) {
         if (!entry.is_directory()) {
             if (entry.path().extension() == ".lua") {
@@ -67,27 +70,68 @@ void PluginRegistry::scan(const std::string& path)
             continue;;
         }
 
-        auto plugins = bundle.load_plugins();
-        for (auto& plugin : plugins) {
-            // make copy of metadata before moving plugin
-            const auto plugin_id = plugin.meta().id;
-            const auto plugin_path = plugin.path();
-            auto [it, inserted] = m_plugins.emplace(plugin_id, std::move(plugin));
-            if (!inserted) {
-                SPDLOG_ERROR(
-                    "Plugin ID: {} of {} already registered by {}",
-                    plugin_id,
-                    plugin_path,
-                    it->second.path()
+        if (bundle.meta().min_slicer_version > slicer_ver) {
+            SPDLOG_INFO(
+                "Plugin Bundle {} requires minimal version of Slicer {}, but current version is {}, skipping",
+                bundle_path,
+                bundle.meta().min_slicer_version.to_string(),
+                slicer_ver->to_string()
+            );
+            continue;
+        }
+        if (bundle.meta().max_slicer_version.has_value()
+            && bundle.meta().max_slicer_version.value() < slicer_ver)
+        {
+            SPDLOG_INFO(
+                "Plugin Bundle {} requires max version of Slicer {}, but current version is {}, skipping",
+                bundle_path,
+                bundle.meta().max_slicer_version.value().to_string(),
+                slicer_ver->to_string()
+            );
+            continue;
+        }
+
+        if (auto it = std::ranges::find_if(m_bundles, [bundle_id = bundle.meta().id](const auto& pb) { return pb.meta().id == bundle_id; }); it != m_bundles.end())
+        {
+            const auto inserted_version  = it->meta().version;
+            const auto to_insert_version = bundle.meta().version;
+            if (to_insert_version <= inserted_version) {
+                SPDLOG_INFO(
+                    "Skipping loading bundle {} in {}, as its version {} is older than the installed {}",
+                    bundle.meta().id,
+                    bundle_path,
+                    to_insert_version.to_string(),
+                    inserted_version.to_string()
                 );
-            } else if (it->second.meta().type == PluginType::ProjectPlugin
-                       && !it->second.meta().menu.empty()) {
-                auto menu_item = fmt::to_string(fmt::join(it->second.meta().menu, "/"));
-                plugin_menu_items[menu_item].emplace_back(bundle.meta().id, &it->second);
+                continue;
             }
         }
 
-        m_bundles.emplace_back(std::move(bundle));
+        try {
+            auto plugins = bundle.load_plugins();
+            for (auto& plugin : plugins) {
+                // make copy of metadata before moving plugin
+                const auto plugin_id = plugin.meta().id;
+                const auto plugin_path = plugin.path();
+                auto [it, inserted] = m_plugins.emplace(plugin_id, std::move(plugin));
+                if (!inserted) {
+                    SPDLOG_ERROR(
+                        "Plugin ID: {} of {} already registered by {}",
+                        plugin_id,
+                        plugin_path,
+                        it->second.path()
+                    );
+                } else if (it->second.meta().type == PluginType::ProjectPlugin
+                       && !it->second.meta().menu.empty()) {
+                    auto menu_item = fmt::to_string(fmt::join(it->second.meta().menu, "/"));
+                    plugin_menu_items[menu_item].emplace_back(bundle.meta().id, &it->second);
+                }
+            }
+
+            m_bundles.emplace_back(std::move(bundle));
+        } catch (std::exception& e) {
+            SPDLOG_ERROR("Loading plugin bundle {} failed with error: {}", bundle_path, e.what());
+        }
     }
 
     for (auto& [menu_item, conflicting_plugins] : plugin_menu_items) {

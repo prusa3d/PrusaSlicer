@@ -54,7 +54,14 @@ sol::object to_lua(sol::state& lua, const Domain::ConfigValue& value)
 Domain::PrintModeParamValue default_value(const PluginParamDef& def)
 {
     if (def.default_value) {
-        return *def.default_value;
+        return std::visit(
+            Domain::overloaded{
+                [](const Domain::FontDescriptor& v) -> Domain::PrintModeParamValue
+                { PANIC("Unsupported"); },
+                []<typename T>(const T& v) -> Domain::PrintModeParamValue { return v; }
+            },
+            *def.default_value
+        );
     }
     if (def.type == "bool") {
         return false;
@@ -101,7 +108,10 @@ PluginParamValueMap param_values(const Domain::PrintModeParams& params)
     PluginParamValueMap result;
     for (const auto& [name, param] : params) {
         // PluginParamValue and Domain::PrintModeParamValue are the same variant.
-        result.insert_or_assign(name, param.value);
+        result.insert_or_assign(
+            name,
+            std::visit([]<typename T>(const T& v) -> PluginParamValue { return v; }, param.value)
+        );
     }
     return result;
 }

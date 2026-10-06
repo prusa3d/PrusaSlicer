@@ -299,7 +299,6 @@ PluginBundle::Plugins PluginBundle::load_plugins()
     Plugins plugins;
 
     const auto files = m_content_provider->list_files();
-    const std::string id_prefix = m_meta.id + ".";
     for (const auto& f : files) {
         if (f.ends_with(".lua")) {
             Biz::Lua::LuaEngine lua;
@@ -314,7 +313,7 @@ PluginBundle::Plugins PluginBundle::load_plugins()
                 sol::error err = ret;
                 SPDLOG_ERROR("Failed loading plugin {}: {}", entry_path.string(), err.what());
             }
-            if (auto result = Plugin::parse(lua, id_prefix, entry_path.string())) {
+            if (auto result = Plugin::parse(lua, m_meta.id, entry_path.string())) {
                 auto&& plugin = result.value();
 
                 plugins.emplace_back(std::move(plugin));

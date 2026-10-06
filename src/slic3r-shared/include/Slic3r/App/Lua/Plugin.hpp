@@ -10,6 +10,7 @@
 
 #include "Slic3r/Biz/Lua/LuaEngine.hpp"
 #include "Slic3r/Domain/Expr/ExprAst.hpp"
+#include "Slic3r/Domain/TextConfiguration.hpp"
 
 namespace Slic3r::App::Lua {
 
@@ -21,7 +22,7 @@ enum class PluginType
 
 tl::expected<PluginType, std::string> parse_plugin_type(std::string_view s);
 
-using PluginParamValue = std::variant<bool, int, double, std::string>;
+using PluginParamValue = std::variant<bool, int, double, std::string, Domain::FontDescriptor>;
 using PluginParamValueMap = std::map<std::string, PluginParamValue>;
 
 struct PluginParamDef
@@ -30,6 +31,7 @@ struct PluginParamDef
     std::string label;
     std::string type;
     std::optional<PluginParamValue> default_value;
+    std::vector<std::string> allowed_values;
 };
 
 using PluginParamDefs = std::vector<PluginParamDef>;
@@ -53,18 +55,20 @@ public:
     const PluginMeta& meta() const { return m_meta; }
     PluginMeta& meta() { return m_meta; }
     const std::string& path() const { return m_path; }
+    const std::string& bundle_id() const { return m_bundle_id; }
 
     sol::object execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap& params) const;
 
     using ParseResult = tl::expected<Plugin, std::string>;
     static ParseResult
-    parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std::string& path);
+    parse(Biz::Lua::LuaEngine& lua, const std::string& bundle_id, const std::string& path);
 
 private:
-    Plugin(std::string  path, PluginMeta  meta);
+    Plugin(std::string  path, std::string bundle_id, PluginMeta  meta);
 
 private:
     std::string m_path;
+    std::string m_bundle_id;
     PluginMeta m_meta;
 };
 

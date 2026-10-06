@@ -1,5 +1,6 @@
 #include "Slic3r/App/Lua/PluginCliOps.hpp"
 
+#include "Slic3r/Version.hpp"
 #include "Slic3r/Directories.hpp"
 #include "Slic3r/Log.hpp"
 #include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
@@ -390,7 +391,8 @@ void plugin_init(PluginInitActionParams& params)
                 {"name", json_escape(params.name.value())},
                 {"license", json_escape(params.license.value())},
                 {"description", json_escape(params.description.value_or("A plugin description"))},
-                {"author", json_escape(params.author.value())}
+                {"author", json_escape(params.author.value())},
+                {"slicer_version", json_escape(VERSION)}
             }
             // clang-format on
         );

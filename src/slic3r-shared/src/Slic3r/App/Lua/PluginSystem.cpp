@@ -93,7 +93,8 @@ PluginSystem::PluginSystem(
 ) :
     m_plugin_paths(plugin_paths),
     m_project_interactor(project_interactor),
-    m_font_manager(font_manager)
+    m_font_manager(font_manager),
+    m_fav_fonts(font_manager.create_favorit())
 {
     m_marketplace_client.add_listener<IMarketplaceClientListener>(this);
 }
@@ -188,7 +189,7 @@ Yoga::Passthrough<PluginDialog>& PluginSystem::init_dialog()
     {
         m_current_plugin_data = std::make_optional<PluginData>(meta, params);
         finalize_run();
-    });
+    }, m_font_manager.get_fonts(), m_fav_fonts.front().path);
     return m_dialog;
 }
 
@@ -244,20 +245,24 @@ void PluginSystem::execute_plugin(const std::string& id)
     }
     const auto& plugin = it->second;
     ASSERT(m_dialog.get() != nullptr);
-    m_dialog->show_plugin(
-        plugin.meta(),
-        m_last_plugin_data.has_value() && m_last_plugin_data->meta.id == id ?
-            m_last_plugin_data->param_values :
-            PluginParamValueMap{}
-    );
-    Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
+    try {
+        m_dialog->show_plugin(
+            plugin.meta(),
+            m_last_plugin_data.has_value() && m_last_plugin_data->meta.id == id ?
+                m_last_plugin_data->param_values :
+                PluginParamValueMap{}
+        );
+        Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
+    } catch (std::exception& e) {
+        SPDLOG_ERROR("Executin plugin {} failed with error: {}", plugin.path(), e.what());
+    }
 }
 
 void PluginSystem::finalize_run()
 {
     ASSERT(m_current_plugin_data.has_value());
 
-    ProjectApi project_api(m_project_interactor, m_font_manager);
+    ProjectApi project_api(m_project_interactor, m_font_manager, m_fav_fonts);
     Biz::Lua::LuaEngine lua;
     lua.open_registry([&project_api](auto& lua) { project_api.register_api(lua); });
     PackageRegistry package_registry;

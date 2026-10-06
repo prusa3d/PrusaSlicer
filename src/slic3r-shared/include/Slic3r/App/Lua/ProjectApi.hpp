@@ -13,7 +13,8 @@ class ProjectApi
 public:
     ProjectApi(
         Biz::ProjectInteractor& project_interactor,
-        Biz::Emboss::IFontManager& font_manager
+        Biz::Emboss::IFontManager& font_manager,
+        const Domain::FontList& m_fav_fonts
     );
 
     void register_api(Biz::Lua::LuaEngine& lua);
