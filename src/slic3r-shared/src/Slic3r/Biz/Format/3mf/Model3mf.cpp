@@ -1416,8 +1416,13 @@ void add_transformation(std::stringstream &stream, const Domain::Transform3d &tr
     }
 
     // The matrix SHOULD NOT be singular or nearly singular.
-    // NonSingular is also known as invertible matrix and have non zero determinant
-    assert(!is_approx(tr.matrix().determinant(), 0.));
+    // NonSingular is also known as invertible matrix and have non zero determinant.
+    // The determinant is normalized by the lengths of the basis vectors, so that the check
+    // is scale invariant (heavily downscaled objects have tiny, but valid, determinant).
+    const auto linear = tr.linear();
+    const double basis_volume = linear.col(0).norm() * linear.col(1).norm() * linear.col(2).norm();
+    ASSERT(basis_volume > 0. && std::abs(linear.determinant()) / basis_volume > Domain::EPSILON,
+        "Transformation matrix is singular or nearly singular.");
 
     // After applying all transforms to an object,
     // the model SHOULD have positive volume 
