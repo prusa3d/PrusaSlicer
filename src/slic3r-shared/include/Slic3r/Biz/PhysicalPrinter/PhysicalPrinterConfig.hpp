@@ -4,28 +4,22 @@
 #include "Slic3r/Biz/ObservableListWithSelection.hpp"
 #include "Slic3r/Domain/Preset/HwConfig.hpp"
 
-#include "Slic3r/Biz/I18N/I18N.hpp"
-
-#include <string_view>
-
 namespace Slic3r::Biz::ConnectPrinter {
 struct ConnectPrinter;
 } // namespace Slic3r::Biz::ConnectPrinter
 
 namespace Slic3r::Biz::PhysicalPrinter {
 
-inline constexpr std::string_view NO_PRINTER_UUID = "00000000-0000-0000-0000-000000000001";
-
-struct NoPrinter {};
-
-struct ConnectUpload {
+struct ConnectUpload
+{
     std::string team_id;
     std::string printer_uuid;
     std::string access_token; // needs to be filled before upload
     std::string state;
 };
 
-struct PrinterUpload {
+struct PrinterUpload
+{
     Domain::PrintHostType type;
     std::string api_key;
     std::string username;
@@ -36,28 +30,29 @@ struct PrinterUpload {
     bool ssl_revoke_best_effort{false};
 };
 
-struct FileSystemExport {
+struct FileSystemExport
+{
     bool prefer_removable;
 };
 
-struct PhysicalPrinterConfig {
-    std::variant<NoPrinter, FileSystemExport, ConnectUpload, PrinterUpload> payload;
+struct PhysicalPrinterConfig
+{
+    std::variant<FileSystemExport, ConnectUpload, PrinterUpload> payload;
     std::string host;
     std::string name;
     std::string uuid;
     Domain::Preset::HwPrinterConfig hw_config;
 };
 
-PhysicalPrinterConfig no_printer();
 PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer);
-
-/// True for the fixed uuid of the synthetic entry above; a stored printer must never use it.
-bool is_reserved_uuid(const std::string& uuid);
 
 std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data);
 
-bool is_physical_printer_compatible(const PhysicalPrinterConfig& physical_config, const Domain::Preset::HwPrinterConfig& hw_config);
+bool is_physical_printer_compatible(
+    const PhysicalPrinterConfig& physical_config,
+    const Domain::Preset::HwPrinterConfig& hw_config
+);
 
 using PhysicalPrinterObservableList = ObservableListWithSelection<PhysicalPrinterConfig>;
 
-} //namespace Slic3r::Biz::PhysicalPrinter
+} // namespace Slic3r::Biz::PhysicalPrinter

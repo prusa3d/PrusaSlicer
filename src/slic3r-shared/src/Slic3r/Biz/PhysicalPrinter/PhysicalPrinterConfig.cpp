@@ -1,7 +1,6 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterConfig.hpp"
 
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
-#include "Slic3r/Domain/ConfigPhysical.hpp"
 
 namespace Slic3r::Biz::PhysicalPrinter {
 
@@ -23,17 +22,6 @@ std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data)
     );
 }
 
-PhysicalPrinterConfig no_printer()
-{
-    return {
-        NoPrinter{},
-        {},
-        // TRN Physical printer list entry: no specific printer selected.
-        _u8L("No printer"),
-        std::string(NO_PRINTER_UUID),
-    };
-}
-
 PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer)
 {
     ConnectUpload upload;
@@ -45,11 +33,6 @@ PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinte
         printer.name.empty() ? printer.model : printer.name,
         printer.uuid,
     };
-}
-
-bool is_reserved_uuid(const std::string& uuid)
-{
-    return uuid == NO_PRINTER_UUID;
 }
 
 bool is_physical_printer_compatible(

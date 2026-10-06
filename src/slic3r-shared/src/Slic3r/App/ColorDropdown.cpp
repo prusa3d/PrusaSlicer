@@ -4,6 +4,7 @@
 #include "Slic3r/Biz/Algorithms/VirtualExtruder.hpp"
 #include "Slic3r/App/Yoga/ImGuiUtils.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include <algorithm>
 #include <imgui_internal.h>

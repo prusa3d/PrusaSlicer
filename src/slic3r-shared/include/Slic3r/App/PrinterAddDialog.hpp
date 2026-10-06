@@ -9,23 +9,16 @@ class ProjectInteractor;
 namespace Slic3r::App {
 
 class AddPrinterPanel;
+class Navigator;
 
 class PrinterAddDialog : public Yoga::Dialog
 {
 public:
-    struct Callbacks
-    {
-        std::function<void()> printer_added{nullptr};
-    };
-
-    explicit PrinterAddDialog(Biz::ProjectInteractor& project_interactor);
-
-    Callbacks& callbacks();
+    explicit PrinterAddDialog(Biz::ProjectInteractor& project_interactor, Navigator& navigator);
 
 private:
     Biz::ProjectInteractor& m_project_interactor;
-
-    Callbacks m_callbacks;
+    Navigator& m_navigator;
 
     AddPrinterPanel* m_add_printer_panel{nullptr};
 };

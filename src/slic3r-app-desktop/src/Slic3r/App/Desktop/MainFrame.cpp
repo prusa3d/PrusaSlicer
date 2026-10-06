@@ -765,13 +765,15 @@ void MainFrame::on_user_account_logged_out()
     }
 }
 
-void MainFrame::on_selected_physical_printer_changed() 
+void MainFrame::on_selected_physical_printer_changed(
+    const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer
+)
 {
     ASSERT(m_left_bar);
 
+    bool show_physicial_printer_page =
+        m_project_interactor.physical_printer_interactor().is_printer_upload_selected();
 
-    bool show_physicial_printer_page = m_project_interactor.physical_printer_interactor().is_printer_upload_selected();
-    
     if (m_physical_printer_page_added) {
         remove_left_bar_page(LeftBarTabs::PhysicalPrinter);
         m_physical_printer_page_added = false;

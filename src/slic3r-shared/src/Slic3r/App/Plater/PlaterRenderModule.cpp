@@ -1,8 +1,6 @@
 #include "Slic3r/App/Plater/PlaterRenderModule.hpp"
 
 #include "Slic3r/Directories.hpp"
-#include "Slic3r/Domain/Bed.hpp"
-#include "Slic3r/Domain/BedInstance.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Domain/Image.hpp"
 
@@ -10,7 +8,6 @@
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include "Slic3r/App/Scene/NodeBuilder.hpp"
-#include "Slic3r/App/Scene/NodeVisitor.hpp"
 #include "Slic3r/App/Scene/LightingHelper.hpp"
 #include "Slic3r/App/Scene/MouseDragDetector.hpp"
 #include "Slic3r/App/Scene/BedMaterials.hpp"
@@ -18,13 +15,8 @@
 #include "Slic3r/App/Render/Device.hpp"
 #include "Slic3r/App/Render/ScopedDebugGroup.hpp"
 #include "Slic3r/App/Render/GeometryBuilder.hpp"
-#include "Slic3r/Domain/Image.hpp"
 #include "Slic3r/App/Plater/PlaterCameraGizmo.hpp"
-#include "Slic3r/App/Scene/SceneNodeTag.hpp"
-#include "Slic3r/App/Plater/GizmoNodeTag.hpp"
-#include "Slic3r/App/Scene/BedNodeTag.hpp"
 #include "Slic3r/App/Scene/BedMaterials.hpp"
-#include "Slic3r/App/Scene/BedRenderHelper.hpp"
 #include "Slic3r/App/Scene/EmbossCreate.hpp"
 #include "Slic3r/App/Plater/QuickSelectGizmo.hpp"
 #include "Slic3r/App/Plater/QuickDragGizmo.hpp"
@@ -88,9 +80,8 @@
 #include "Slic3r/App/InvalidDataDialog.hpp"
 #include "Slic3r/App/SidebarStackLayout.hpp"
 #include "Slic3r/App/ColorMix/ColorMixDialog.hpp"
-#include "Slic3r/App/LogicalPrinterSettingsDialog.hpp"
-#include "Slic3r/App/PhysicalPrinterSettingsDialog.hpp"
-#include "Slic3r/App/PhysicalPrinterAdvancedSettingsDialog.hpp"
+#include "Slic3r/App/PrinterSettingsDialog.hpp"
+#include "Slic3r/App/PhysicalPrinterForm.hpp"
 #include "Slic3r/App/PrinterAdvancedSettingsDialog.hpp"
 #include "Slic3r/App/Material/MaterialSelectionDialog.hpp"
 #include "Slic3r/App/Material/MaterialSettingsDialog.hpp"
@@ -214,9 +205,7 @@ Lua::PluginSystem& PlaterRenderModule::plugin_system()
 
 void PlaterRenderModule::navigate_to_item(const Domain::ConfigItem* config_item)
 {
-    m_sidebar_bed->logical_printer_settings_dialog()
-        .printer_advanced_settings_dialog()
-        .clear_navigation();
+    m_sidebar_bed->printer_advanced_settings_dialog().clear_navigation();
     m_sidebar_print->print_settings_dialog().clear_navigation();
     m_sidebar_bed->material_selection_dialog().material_settings_dialog().clear_navigation();
     m_sidebar_print->print_settings_dialog().clear_navigation();
@@ -232,8 +221,7 @@ void PlaterRenderModule::navigate_to_item(const Domain::ConfigItem* config_item)
             if constexpr (std::is_same_v<T, Domain::FDMConfigLocation>) {
                 switch (location) {
                 case Domain::FDMConfigLocation::Printer:
-                    dialog_to_open = &m_sidebar_bed->logical_printer_settings_dialog()
-                                          .printer_advanced_settings_dialog();
+                    dialog_to_open = &m_sidebar_bed->printer_advanced_settings_dialog();
                     break;
                 case Domain::FDMConfigLocation::Print:
                     dialog_to_open = &m_sidebar_print->print_settings_dialog();
@@ -251,8 +239,7 @@ void PlaterRenderModule::navigate_to_item(const Domain::ConfigItem* config_item)
             } else if constexpr (std::is_same_v<T, Domain::SLAConfigLocation>) {
                 switch (location) {
                 case Domain::SLAConfigLocation::Printer:
-                    dialog_to_open = &m_sidebar_bed->logical_printer_settings_dialog()
-                                          .printer_advanced_settings_dialog();
+                    dialog_to_open = &m_sidebar_bed->printer_advanced_settings_dialog();
                     break;
                 case Domain::SLAConfigLocation::Print:
                     dialog_to_open = &m_sidebar_print->print_settings_dialog();
@@ -822,14 +809,8 @@ void PlaterRenderModule::init_dialog_navigation()
         &m_sidebar_bed->printer_add_dialog(),
         &m_sidebar_bed->logical_printer_settings_dialog()
     );
-    m_dialog_navigation.insert_dialog(
-        &m_sidebar_bed->logical_printer_settings_dialog().printer_advanced_settings_dialog(),
-        &m_sidebar_bed->logical_printer_settings_dialog()
-    );
-    m_dialog_navigation.insert_dialog(
-        &m_sidebar_bed->logical_printer_settings_dialog().color_mix_dialog(),
-        &m_sidebar_bed->logical_printer_settings_dialog()
-    );
+    m_dialog_navigation.insert_dialog(&m_sidebar_bed->printer_advanced_settings_dialog());
+    m_dialog_navigation.insert_dialog(&m_sidebar_bed->color_mix_dialog());
 
     m_dialog_navigation.insert_dialog(&m_sidebar_bed->material_selection_dialog());
     m_dialog_navigation.insert_dialog(
@@ -843,12 +824,6 @@ void PlaterRenderModule::init_dialog_navigation()
     m_dialog_navigation.insert_dialog(m_preferences_dialog.get());
     m_dialog_navigation.insert_dialog(m_invalid_data_dialog.get());
     m_dialog_navigation.insert_dialog(m_effective_values_dialog.get());
-
-    m_dialog_navigation.insert_dialog(&m_sidebar_action_buttons->physical_printer_settings_dialog());
-    m_dialog_navigation.insert_dialog(
-        &m_sidebar_action_buttons->physical_printer_advanced_settings_dialog(),
-        &m_sidebar_action_buttons->physical_printer_settings_dialog()
-    );
 
     // Init gizmos dialogs
     auto init_gizmo_dialog = [this](Scene::ToolType tool_type, GizmoWindowPtr dialog)

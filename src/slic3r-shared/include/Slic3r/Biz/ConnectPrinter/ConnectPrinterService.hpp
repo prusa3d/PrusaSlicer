@@ -24,7 +24,9 @@ class UserAccountInteractor;
 namespace Slic3r::Biz::ConnectPrinter {
 
 /// Owns the current Prusa Connect printers, kept up to date from the printer list endpoint and MQTT. Main thread only.
-class ConnectPrinterService final : public UserAccount::IUserAccountListener
+class ConnectPrinterService final :
+    public UserAccount::IUserAccountListener,
+    public IObservableList<ConnectPrinter>
 {
 public:
     ConnectPrinterService(
@@ -33,16 +35,13 @@ public:
     );
     ~ConnectPrinterService();
 
+    const ConnectPrinter& at(size_t index) const override;
+    size_t size() const override;
+
     ConnectPrinterService(const ConnectPrinterService&)            = delete;
     ConnectPrinterService(ConnectPrinterService&&)                 = delete;
     ConnectPrinterService& operator=(const ConnectPrinterService&) = delete;
     ConnectPrinterService& operator=(ConnectPrinterService&&)      = delete;
-
-    const ObservableList<ConnectPrinter>& observable_list() const;
-
-    void add_printer_list_observer(IListObserver<ConnectPrinter>* observer);
-
-    void remove_printer_list_observer(IListObserver<ConnectPrinter>* observer);
 
     const ConnectPrinter* find(const std::string& uuid) const;
 
@@ -53,9 +52,11 @@ public:
         std::function<void(Network::IHttp::Retry, bool&)> retry_fn =
             [](Network::IHttp::Retry retry, bool& cancel)
         {
-            SPDLOG_INFO("Retry attempt {}: {} ms to next attempt",
-                        retry.attempt,
-                        retry.ms_to_next_attempt);
+            SPDLOG_INFO(
+                "Retry attempt {}: {} ms to next attempt",
+                retry.attempt,
+                retry.ms_to_next_attempt
+            );
         },
         std::function<void(Network::IHttp::Progress, bool&)> progress_fn =
             [](Network::IHttp::Progress, bool&) {}
@@ -72,15 +73,15 @@ private:
     void on_mqtt_message(size_t generation, const std::string& topic, const std::string& payload);
     void request_printer_list_refresh();
 
-    void apply_printer_list(std::vector<ConnectPrinter> printers);
+    void apply_printer_list(std::vector<ConnectPrinter> new_printers);
     void apply_state(const std::string& uuid, ConnectPrinterState state);
 
     std::optional<size_t> find_index(const std::string& uuid) const;
 
     Platform::IMainThreadDispatcher& m_dispatcher;
     UserAccount::UserAccountInteractor& m_user_account_interactor;
-    ObservableList<ConnectPrinter> m_observable_list;
 
+    std::vector<ConnectPrinter> m_printers;
     std::unique_ptr<Network::Mqtt::Subscriber> m_mqtt_subscriber;
     std::string m_mqtt_access_token;
     size_t m_session_generation{0};

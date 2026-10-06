@@ -125,7 +125,9 @@ void ExportDestinationInteractor::on_removable_drive_status_changed(
     apply(ExportDestination::RemovableDrive);
 }
 
-void ExportDestinationInteractor::on_selected_physical_printer_changed()
+void ExportDestinationInteractor::on_selected_physical_printer_changed(
+    const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer
+)
 {
     ensure_valid();
 }

@@ -21,9 +21,8 @@
 #include "Slic3r/App/RenderModuleHelper.hpp"
 #include "Slic3r/App/SidebarStackLayout.hpp"
 #include "Slic3r/App/ColorMix/ColorMixDialog.hpp"
-#include "Slic3r/App/LogicalPrinterSettingsDialog.hpp"
-#include "Slic3r/App/PhysicalPrinterSettingsDialog.hpp"
-#include "Slic3r/App/PhysicalPrinterAdvancedSettingsDialog.hpp"
+#include "Slic3r/App/PrinterSettingsDialog.hpp"
+#include "Slic3r/App/PhysicalPrinterForm.hpp"
 #include "Slic3r/App/PrinterAdvancedSettingsDialog.hpp"
 #include "Slic3r/App/PrinterAddDialog.hpp"
 #include "Slic3r/App/PrintSettingsDialog.hpp"
@@ -1083,14 +1082,8 @@ void PreviewRenderModule::init_dialog_navigation()
         &m_sidebar_bed->printer_add_dialog(),
         &m_sidebar_bed->logical_printer_settings_dialog()
     );
-    m_dialog_navigation.insert_dialog(
-        &m_sidebar_bed->logical_printer_settings_dialog().printer_advanced_settings_dialog(),
-        &m_sidebar_bed->logical_printer_settings_dialog()
-    );
-    m_dialog_navigation.insert_dialog(
-        &m_sidebar_bed->logical_printer_settings_dialog().color_mix_dialog(),
-        &m_sidebar_bed->logical_printer_settings_dialog()
-    );
+    m_dialog_navigation.insert_dialog(&m_sidebar_bed->printer_advanced_settings_dialog());
+    m_dialog_navigation.insert_dialog(&m_sidebar_bed->color_mix_dialog());
 
     m_dialog_navigation.insert_dialog(&m_sidebar_bed->material_selection_dialog());
     m_dialog_navigation.insert_dialog(
@@ -1104,12 +1097,6 @@ void PreviewRenderModule::init_dialog_navigation()
     m_dialog_navigation.insert_dialog(m_invalid_data_dialog.get());
     m_dialog_navigation.insert_dialog(m_effective_values_dialog.get());
     m_dialog_navigation.insert_dialog(m_preset_updater_dialog.get());
-
-    m_dialog_navigation.insert_dialog(&m_sidebar_action_buttons->physical_printer_settings_dialog());
-    m_dialog_navigation.insert_dialog(
-        &m_sidebar_action_buttons->physical_printer_advanced_settings_dialog(),
-        &m_sidebar_action_buttons->physical_printer_settings_dialog()
-    );
 }
 
 void PreviewRenderModule::update_fdm_viewer_data(const Domain::SlicingId id)

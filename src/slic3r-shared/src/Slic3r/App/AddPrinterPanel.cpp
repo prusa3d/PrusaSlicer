@@ -1,11 +1,15 @@
 #include "Slic3r/App/AddPrinterPanel.hpp"
 
+#include "Slic3r/Biz/ProjectInteractor.hpp"
+
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/ScrollArea.hpp"
 #include "Slic3r/App/Yoga/Text.hpp"
 #include "Slic3r/App/Yoga/Rectangle.hpp"
 #include "Slic3r/App/Yoga/InputTextField.hpp"
 #include "Slic3r/App/Yoga/Icon.hpp"
+#include "Slic3r/App/Yoga/StackLayout.hpp"
+#include "Slic3r/App/PhysicalPrinterForm.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include <algorithm>
@@ -46,28 +50,33 @@ static bool matches_search(
         return true;
     }
 
-    const Domain::Preset::HwPrinterConfig& config{entry.printer.default_config};
+    const Domain::Preset::HwPrinterConfig& config{entry.printer_config};
     const std::string needle{to_lower(search_text)};
     const auto contains = [&needle](const std::string& text)
     { return to_lower(text).find(needle) != std::string::npos; };
 
-    return contains(entry.preset_name) || contains(config.name) || contains(config.short_name)
-        || contains(config.model.base_model) || contains(vendor_name);
+    return contains(entry.preset_name)
+        || contains(config.name)
+        || contains(config.short_name)
+        || contains(config.model.base_model)
+        || contains(vendor_name);
 }
 
-static bool has_template_id(const AddPrinterPanel::PrinterEntry& entry, const std::string& template_id)
+static bool
+has_template_id(const AddPrinterPanel::PrinterEntry& entry, const std::string& template_id)
 {
-    const std::optional<std::string>& config_template_id{entry.printer.default_config.template_id};
+    const std::optional<std::string>& config_template_id{entry.printer_config.template_id};
     return config_template_id.has_value() && *config_template_id == template_id;
 }
 
 AddPrinterPanel::AddPrinterPanel(
     Biz::ProjectInteractor& project_interactor,
     std::function<void()> close,
-    std::function<void(const Printer&)> add_printer
+    std::function<void(const Biz::PhysicalPrinter::PhysicalPrinterConfig&)> add_printer
 ) :
     m_project_interactor{project_interactor},
-    m_add_printer{add_printer}
+    m_add_printer{add_printer},
+    m_preset_changed_listener_scope(m_project_interactor.preset_interactor(), *this)
 {
     const ImColor secondary_color{m_theme->color_imgui(Platform::Color::WindowBgAlternate)};
 
@@ -94,7 +103,105 @@ AddPrinterPanel::AddPrinterPanel(
         close_button->callbacks().action = close;
     }
 
-    auto search_row{emplace_back<Item>()};
+    m_stack_layout = emplace_back<StackLayout>();
+    m_stack_layout->set_orientation(Orientation::Vertical);
+
+    create_page_search();
+
+    create_page_details();
+}
+
+ItemPtr AddPrinterPanel::create_printer_family(
+    const PrinterFamily& printer_family,
+    const std::vector<const PrinterEntry*>& printers
+)
+{
+    auto result{std::make_unique<Item>()};
+    result->set_orientation(Orientation::Vertical);
+    result->set_gap(20_fpx);
+    result->set_flex_shrink(0);
+
+    auto title_item{result->emplace_back<Text>(
+        printer_family.label.empty() ? printer_family.base_model : printer_family.label
+    )};
+    title_item->set_font_type(Render::ImguiFontType::Bold);
+    title_item->set_font_size(16_fpx);
+    title_item->set_flex_shrink(0);
+
+    auto printer_section{result->emplace_back<Item>()};
+    printer_section->set_gap(20_fpx);
+    printer_section->set_flex_wrap(YGWrapWrap);
+    printer_section->set_flex_shrink(0);
+
+    for (const PrinterEntry* entry : printers) {
+        auto printer{printer_section->emplace_back<RectangleButton>()};
+        printer->set_flex_shrink(0);
+        printer->set_content_padding(0);
+        printer->callbacks().action = [this, entry]()
+        {
+            m_physical_printer_form->set_printer_config(
+                Biz::PhysicalPrinter::PhysicalPrinterConfig{
+                    Biz::PhysicalPrinter::FileSystemExport{},
+                    std::string{},
+                    entry->preset_name,
+                    std::string{},
+                    entry->printer_config
+                }
+            );
+            m_printer_image->set_image(get_thumbnail(entry->printer_config));
+            m_printer_name->set_text(entry->preset_name);
+            m_stack_layout->set_current_index(1);
+            // AddPrinterPanel::Printer printer{entry->printer};
+            // m_add_printer(printer);
+        };
+
+        auto printer_content{printer->emplace_back<Item>()};
+        printer_content->set_padding({20_fpx, 15_fpx, 20_fpx, 15_fpx});
+        printer_content->set_width(160_fpx);
+        printer_content->set_height(140_fpx);
+        printer_content->set_orientation(Orientation::Vertical);
+        printer_content->set_gap(15_fpx);
+        printer_content->set_flex_shrink(0);
+        printer_content->set_align_items(YGAlignCenter);
+
+        auto image{printer_content->emplace_back<Icon>(Render::Icon::None)};
+        image->set_image(get_thumbnail(entry->printer_config));
+        image->set_height(80_fpx);
+        image->set_aspect_ratio(1.0);
+        image->set_flex_shrink(0);
+        m_shown_thumbnails.push_back(image);
+
+        printer_content->emplace_back<Text>(entry->printer_config.short_name);
+    }
+    return result;
+}
+
+void AddPrinterPanel::emplace_vendor_button(const std::string& name, const std::string& id)
+{
+    auto button{m_left_bar->emplace_back<LayoutButton>(name)};
+    button->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
+    button->set_rounding(0);
+    button->set_checkable(true);
+    button->set_content_justify_content(YGJustifyFlexStart);
+    button->set_flex_shrink(0);
+    m_button_vendors.emplace(button, id);
+
+    if (m_selected_vendor == id) {
+        button->set_checked(true);
+        m_vendor_button_group.insert_button(button);
+    } else {
+        m_vendor_button_group.insert_button(button);
+    }
+}
+
+void AddPrinterPanel::create_page_search()
+{
+    const ImColor secondary_color{m_theme->color_imgui(Platform::Color::WindowBgAlternate)};
+
+    Item* page_search = m_stack_layout->emplace_back<Item>();
+    page_search->set_orientation(Orientation::Vertical);
+
+    auto search_row{page_search->emplace_back<Item>()};
     search_row->set_gap(14_fpx);
     search_row->set_align_items(YGAlignCenter);
     search_row->set_padding({38_fpx, 6_fpx, 6_fpx, 6_fpx});
@@ -116,12 +223,12 @@ AddPrinterPanel::AddPrinterPanel(
         rebuild_printer_view();
     };
 
-    auto separator{emplace_back<Rectangle>()};
+    auto separator{page_search->emplace_back<Rectangle>()};
     separator->set_fill(secondary_color);
     separator->set_height(1_px);
     separator->set_flex_shrink(0);
 
-    auto content{emplace_back<Item>()};
+    auto content{page_search->emplace_back<Item>()};
     content->set_flex_grow(1);
     content->set_align_items(YGAlignStretch);
 
@@ -145,96 +252,57 @@ AddPrinterPanel::AddPrinterPanel(
     m_detail->set_visible(false);
     m_printers->set_flex_grow(1);
 
-    m_project_interactor.preset_interactor().add_listener<Biz::Preset::IPresetChangedListener>(this);
-
     m_vendor_button_group.callbacks().checked_changed =
         [this](Yoga::AbstractButton* current_checked, Yoga::AbstractButton* /*last_checked*/)
-        {
-            const auto vendor_it{m_button_vendors.find(current_checked)};
-            if (vendor_it == m_button_vendors.end() || m_selected_vendor == vendor_it->second) {
-                return;
-            }
-            m_selected_vendor = vendor_it->second;
-            rebuild_printer_families();
-            rebuild_printer_view();
-        };
+    {
+        const auto vendor_it{m_button_vendors.find(current_checked)};
+        if (vendor_it == m_button_vendors.end() || m_selected_vendor == vendor_it->second) {
+            return;
+        }
+        m_selected_vendor = vendor_it->second;
+        rebuild_printer_families();
+        rebuild_printer_view();
+    };
 
     reload();
 }
 
-AddPrinterPanel::~AddPrinterPanel()
+void AddPrinterPanel::create_page_details()
 {
-    m_project_interactor.preset_interactor().remove_listener<Biz::Preset::IPresetChangedListener>(this);
-}
+    ScrollArea* page_details = m_stack_layout->emplace_back<ScrollArea>();
+    page_details->set_orientation(Orientation::Vertical);
+    page_details->set_gap(5_fpx);
+    page_details->set_padding(Paddings{0, 0, 10_fpx, 0});
 
-ItemPtr AddPrinterPanel::create_printer_family(
-    const PrinterFamily& printer_family,
-    const std::vector<const PrinterEntry*>& printers
-)
-{
-    auto result{std::make_unique<Item>()};
-    result->set_orientation(Orientation::Vertical);
-    result->set_gap(20_fpx);
-    result->set_flex_shrink(0);
+    Item* row = page_details->emplace_back<Item>();
+    row->set_gap(5_fpx);
+    row->set_flex_shrink(0);
 
-    auto title_item{result->emplace_back<Text>(
-        printer_family.label.empty() ? printer_family.base_model : printer_family.label)};
-    title_item->set_font_type(Render::ImguiFontType::Bold);
-    title_item->set_font_size(16_fpx);
-    title_item->set_flex_shrink(0);
+    Item* left_column = row->emplace_back<Item>();
+    left_column->set_orientation(Orientation::Vertical);
+    left_column->set_gap(5_fpx);
 
-    auto printer_section{result->emplace_back<Item>()};
-    printer_section->set_gap(20_fpx);
-    printer_section->set_flex_wrap(YGWrapWrap);
-    printer_section->set_flex_shrink(0);
+    m_printer_name = left_column->emplace_back<Text>(std::string{});
+    m_printer_name->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_printer_name->set_width_percent(100);
+    m_printer_name->set_align({AlignH::Center, AlignV::Center});
 
-    for (const PrinterEntry* entry : printers) {
-        auto printer{printer_section->emplace_back<RectangleButton>()};
-        printer->set_flex_shrink(0);
-        printer->set_content_padding(0);
-        printer->callbacks().action = [this, entry]()
-        {
-            AddPrinterPanel::Printer printer{entry->printer};
+    m_printer_image = left_column->emplace_back<Icon>(Render::Icon::None);
+    m_printer_image->set_width(200_fpx);
+    m_printer_image->set_aspect_ratio(1.0);
+    m_printer_image->set_flex_shrink(0);
+
+    m_physical_printer_form = row->emplace_back<PhysicalPrinterForm>(m_project_interactor);
+    m_physical_printer_form->set_flex_grow(1);
+    m_physical_printer_form->set_flex_shrink(0);
+    m_physical_printer_form->set_max_width(400_fpx);
+    m_physical_printer_form->callbacks().printer_saved =
+        [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
+    {
+        if (m_add_printer) {
             m_add_printer(printer);
-        };
-
-        auto printer_content{printer->emplace_back<Item>()};
-        printer_content->set_padding({20_fpx, 15_fpx, 20_fpx, 15_fpx});
-        printer_content->set_width(160_fpx);
-        printer_content->set_height(140_fpx);
-        printer_content->set_orientation(Orientation::Vertical);
-        printer_content->set_gap(15_fpx);
-        printer_content->set_flex_shrink(0);
-        printer_content->set_align_items(YGAlignCenter);
-
-        auto image{printer_content->emplace_back<Icon>(Render::Icon::None)};
-        image->set_image(get_thumbnail(entry->printer.default_config));
-        image->set_height(80_fpx);
-        image->set_aspect_ratio(1.0);
-        image->set_flex_shrink(0);
-        m_shown_thumbnails.push_back(image);
-
-        printer_content->emplace_back<Text>(entry->printer.default_config.short_name);
-    }
-    return result;
-}
-
-void AddPrinterPanel::emplace_vendor_button(const std::string& name, const std::string& id)
-{
-    auto button{m_left_bar->emplace_back<LayoutButton>(name)};
-    button->set_content_padding({20_fpx, 10_fpx, 20_fpx, 10_fpx});
-    button->set_rounding(0);
-    button->set_checkable(true);
-    button->set_content_justify_content(YGJustifyFlexStart);
-    button->set_flex_shrink(0);
-    m_button_vendors.emplace(button, id);
-
-    if (m_selected_vendor == id) {
-        button->set_checked(true);
-        m_vendor_button_group.insert_button(button);
-    } else {
-        m_vendor_button_group.insert_button(button);
-    }
+        }
+    };
 }
 
 void AddPrinterPanel::reload_vendor_buttons(const Domain::Preset::Bundle& preset_bundle)
@@ -256,7 +324,8 @@ void AddPrinterPanel::reload_vendor_buttons(const Domain::Preset::Bundle& preset
     }
 
     const bool selection_valid{
-        m_selected_vendor.has_value() && vendor_bundles.contains(*m_selected_vendor)};
+        m_selected_vendor.has_value() && vendor_bundles.contains(*m_selected_vendor)
+    };
     if (!selection_valid) {
         m_selected_vendor.reset();
         for (const auto& [vendor_id, vendor_bundle] : vendor_bundles) {
@@ -314,25 +383,26 @@ void AddPrinterPanel::rebuild_printer_families()
             }
 
             const PrinterEntry entry{
-                .printer = Printer{
-                    .preset_item_id = evaluated.preset.id,
-                    .default_config = config,
-                    .tools          = m_project_interactor.preset_interactor().get_tool_items(config),
-                    .sheets         = m_project_interactor.preset_interactor().get_sheet_items(config)
-                },
-                .preset_name = evaluated.preset.name
+                // .printer = Printer{
+                // .preset_item_id = evaluated.preset.id,
+                // .default_config = config,
+                // .tools          = m_project_interactor.preset_interactor().get_tool_items(config),
+                // .sheets         = m_project_interactor.preset_interactor().get_sheet_items(config)
+                // },
+                .printer_config = config,
+                .preset_name    = evaluated.preset.name
             };
 
-            const auto family_it{
-                std::ranges::find_if(m_printer_families,
-                                     [&](const PrinterFamily& family)
-                                     { return family.base_model == config.model.base_model; })};
+            const auto family_it{std::ranges::find_if(
+                m_printer_families,
+                [&](const PrinterFamily& family)
+                { return family.base_model == config.model.base_model; }
+            )};
 
             if (family_it == m_printer_families.end()) {
-                m_printer_families.push_back(PrinterFamily{
-                    .base_model = config.model.base_model,
-                    .printers   = {entry}
-                });
+                m_printer_families.push_back(
+                    PrinterFamily{.base_model = config.model.base_model, .printers = {entry}}
+                );
             } else {
                 family_it->printers.push_back(entry);
             }
@@ -340,7 +410,8 @@ void AddPrinterPanel::rebuild_printer_families()
     }
 
     const std::vector<Domain::Preset::PrinterFamilyInfo>& order{
-        vendor_bundle.vendor_data.info.printer_families};
+        vendor_bundle.vendor_data.info.printer_families
+    };
     if (order.empty()) {
         return;
     }
@@ -373,7 +444,7 @@ void AddPrinterPanel::rebuild_printer_families()
                 }
             }
             family.printers = std::move(ordered_printers);
-            family.label = order_entry.label;
+            family.label    = order_entry.label;
 
             ordered_families.push_back(std::move(family));
         }

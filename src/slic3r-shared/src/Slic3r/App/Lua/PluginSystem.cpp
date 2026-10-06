@@ -2,6 +2,7 @@
 #include "Slic3r/App/Lua/PluginDialog.hpp"
 #include "Slic3r/App/Lua/ProjectApi.hpp"
 #include "Slic3r/Biz/Lua/LuaException.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include <boost/nowide/config.hpp>
 #include <boost/nowide/fstream.hpp>

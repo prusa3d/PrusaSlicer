@@ -2,6 +2,7 @@
 
 #include "Slic3r/Biz/Platform/IMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
+#include "Slic3r/Biz/Platform/ListenerScope.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterConfig.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterStorage.hpp"
 #include "Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp"
@@ -12,7 +13,6 @@
 #include "Slic3r/Biz/ISelectedConfigContainerChangedListener.hpp"
 #include "Slic3r/Domain/SelectionId.hpp"
 
-#include <vector>
 #include <string>
 #include <map>
 #include <functional>
@@ -83,35 +83,24 @@ public:
         return m_selected_uuid;
     }
 
-    bool is_no_printer_selected() const;
     bool is_printer_upload_selected() const;
     bool is_connect_printer_selected() const;
 
-    const PhysicalPrinterConfig& selected_physical_printer_data();
+    /**
+     * @note Also selects this printer
+     */
+    void create_or_save_physical_printer(const PhysicalPrinterConfig& printer);
 
-    /// The printer shown in the editor: the selected printer, or the dummy when adding a new one.
-    const PhysicalPrinterConfig& edited_printer() const;
+    const PhysicalPrinterConfig& selected_physical_printer_data() const;
 
-    /// Applies editor changes: persists an existing printer, or updates the new-printer dummy.
-    void set_edited_printer(const PhysicalPrinterConfig& edited);
-
-    /// Re-links the selected existing printer's hardware config to the currently selected logical printer.
-    void update_selected_hw_config();
-
-    /// True when the selected printer's hardware config already matches the current logical printer.
-    bool selected_hw_matches_current() const;
-
-    /// Commits the dummy as a new persisted printer and selects it.
-    void save_new_printer();
-
-    /// Prepares the editor to add a new printer.
-    void on_dialog_button_add_new();
-
-    bool is_connection_testable() const;
+    bool is_connection_testable(const PhysicalPrinterConfig& printer) const;
 
     bool is_connection_test_in_flight() const;
 
-    void test_edited_printer_connection(std::function<void(PrintHostTestResult)> callback);
+    void test_printer_connection(
+        const PhysicalPrinterConfig& printer,
+        std::function<void(PrintHostTestResult)> callback
+    );
 
     /// Discards the running test's result so a new one may start at once. Safe to call repeatedly.
     void cancel_edited_printer_connection_test();
@@ -155,6 +144,11 @@ private:
     UserAccount::UserAccountInteractor& m_user_account_interactor;
     PhysicalPrinterStorage m_storage;
     ConnectPrinter::ConnectPrinterService m_connect_printer_service;
+    Biz::ListenerScope<
+        IListObserver<ConnectPrinter::ConnectPrinter>,
+        ConnectPrinter::ConnectPrinterService,
+        PhysicalPrinterInteractor>
+        m_listener_scope_connect_printer;
     Preset::PrinterPresetSelector m_printer_preset_selector;
     ObservableList<PhysicalPrinterConfig> m_observable_list;
     size_t m_connect_printer_count{0};

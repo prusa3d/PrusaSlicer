@@ -222,12 +222,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/PrintSettingsDialog.cpp
         include/Slic3r/App/PrintModeDialog.hpp
         src/Slic3r/App/PrintModeDialog.cpp
-        include/Slic3r/App/LogicalPrinterSettingsDialog.hpp
-        src/Slic3r/App/LogicalPrinterSettingsDialog.cpp
+        include/Slic3r/App/PrinterSettingsDialog.hpp
+        src/Slic3r/App/PrinterSettingsDialog.cpp
         include/Slic3r/App/PrinterAdvancedSettingsDialog.hpp
         src/Slic3r/App/PrinterAdvancedSettingsDialog.cpp
-        include/Slic3r/App/PhysicalPrinterSettingsDialog.hpp
-        src/Slic3r/App/PhysicalPrinterSettingsDialog.cpp
         include/Slic3r/App/PhysicalPrinterSettingsButton.hpp
         src/Slic3r/App/PhysicalPrinterSettingsButton.cpp
         include/Slic3r/App/LogicalPrinterSettingsButton.hpp
@@ -329,8 +327,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Theme.cpp
         include/Slic3r/App/ExtruderIcon.hpp
         src/Slic3r/App/ExtruderIcon.cpp
-        include/Slic3r/App/PhysicalPrinterAdvancedSettingsDialog.hpp
-        src/Slic3r/App/PhysicalPrinterAdvancedSettingsDialog.cpp
+        include/Slic3r/App/PhysicalPrinterForm.hpp
+        src/Slic3r/App/PhysicalPrinterForm.cpp
         include/Slic3r/App/WelcomeDialog.hpp
         src/Slic3r/App/WelcomeDialog.cpp
         src/Slic3r/App/WarningPanel.cpp

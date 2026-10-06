@@ -23,6 +23,7 @@
 #include "Slic3r/Biz/ObservableListWithSelection.hpp"
 #include "Slic3r/Biz/Preset/ProjectPresetView.hpp"
 #include "Slic3r/Biz/IConfigBoxSetter.hpp"
+#include "Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp"
 
 namespace Slic3r::Biz {
 class BackupStore;
@@ -98,6 +99,7 @@ struct SelectedPresetIds
 class PresetInteractor final :
     public ISelectedProjectChangedListener,
     public ISelectedConfigContainerChangedListener,
+    public PhysicalPrinter::IPhysicalPrinterChangedListener,
     public WithListeners<
         IPresetChangedListener,
         ISlicingInputChangedListener,
@@ -288,6 +290,10 @@ public:
     void on_selected_config_container_changed(
         Domain::SelectionId project_id,
         Domain::SelectionId container_id
+    ) override;
+
+    void on_selected_physical_printer_changed(
+        const PhysicalPrinter::PhysicalPrinterConfig& printer
     ) override;
 
     ConfigBoxInteractor& printer_cbi();

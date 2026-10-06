@@ -952,6 +952,11 @@ void PresetInteractor::on_selected_config_container_changed(
     bag.add([this] { invoke_slicing_input_changed(); });
 }
 
+void PresetInteractor::on_selected_physical_printer_changed(const PhysicalPrinter::PhysicalPrinterConfig &printer)
+{
+    // @barzto: Here is the entry point from Physical printer, printer.hw_config is your POI
+}
+
 bool PresetInteractor::update_changed_printer_configs(
     const std::vector<Domain::Preset::HwPrinterConfig>& hw_configs)
 {

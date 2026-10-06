@@ -605,30 +605,27 @@ public:
         m_dialog = emplace_back<AddPrinterPanel>(
             project_interactor,
             [this]() { show_dialog(false); },
-            [this](const AddPrinterPanel::Printer& printer)
+            [this](const Biz::PhysicalPrinter::PhysicalPrinterConfig& printer)
             {
-                const Domain::Preset::VendorData& vendor_data{
-                    m_project_interactor.workbench()
-                        .preset_bundle()
-                        .vendor_bundles.at(printer.default_config.vendor_id)
-                        .vendor_data};
+                // const Domain::Preset::VendorData& vendor_data{
+                //     m_project_interactor.workbench()
+                //         .preset_bundle()
+                //         .vendor_bundles.at(printer.default_config.vendor_id)
+                //         .vendor_data};
 
-                Domain::Preset::HwPrinterConfig config{printer.default_config};
-                // SLA printers have no print sheets.
-                if (!printer.sheets.sheet_defs.empty()) {
-                    config.sheet = Biz::Preset::from_def(
-                        vendor_data,
-                        printer.sheets.sheet_defs.at(printer.sheets.selected_sheet));
-                }
-                config.tools.clear();
-                for (std::size_t selected_tool : printer.tools.selected_tools) {
-                    config.tools.push_back(
-                        Biz::Preset::from_def(vendor_data,
-                                              printer.tools.tool_defs.at(selected_tool)));
-                }
+                // Domain::Preset::HwPrinterConfig config{printer.default_config};
+                // config.sheet = Biz::Preset::from_def(
+                //     vendor_data,
+                //     printer.sheets.sheet_defs.at(printer.sheets.selected_sheet));
+                // config.tools.clear();
+                // for (std::size_t selected_tool : printer.tools.selected_tools) {
+                //     config.tools.push_back(
+                //         Biz::Preset::from_def(vendor_data,
+                //                               printer.tools.tool_defs.at(selected_tool)));
+                // }
 
-                add_printer(PrinterToAdd{config, printer.preset_item_id});
-                show_dialog(false);
+                // add_printer(PrinterToAdd{config, printer.preset_item_id});
+                // show_dialog(false);
             });
         m_dialog->set_visible(false);
     }

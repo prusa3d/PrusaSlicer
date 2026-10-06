@@ -50,6 +50,28 @@ public:
         m_ptr(m_weak_ptr->lock().get())
     {}
 
+
+    template <class>
+    friend class WeakerPointer;
+
+    template <class Derived>
+        requires std::derived_from<Derived, Data>
+    WeakerPointer(const WeakerPointer<Derived>& other)
+    {
+        if (other.m_weak_ptr.has_value()) {
+            // Preserve weak ownership tracking when converting.
+            m_weak_ptr.emplace(*other.m_weak_ptr);
+            m_ptr = m_weak_ptr->lock().get();
+        } else {
+            m_ptr = other.m_ptr;
+        }
+    }
+
+    explicit operator bool() const
+    {
+        return is_valid();
+    }
+
     inline bool operator==(Data* other) const
     {
         return get() == other;
@@ -77,7 +99,7 @@ public:
 
     Data* get() const
     {
-        return m_ptr;
+        return is_valid() ? m_ptr : nullptr;
     }
 
     /**

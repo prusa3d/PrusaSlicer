@@ -168,6 +168,7 @@ public:
         m_removable_drive_service.add_status_listener(&m_export_destination_interactor);
         m_user_account_interactor.add_listener<UserAccount::IUserAccountListener>(&m_export_destination_interactor);
         m_physical_printer_interactor.add_listener<PhysicalPrinter::IPhysicalPrinterChangedListener>(&m_export_destination_interactor);
+        m_physical_printer_interactor.add_listener<PhysicalPrinter::IPhysicalPrinterChangedListener>(&m_preset_interactor);
     }
 
     const Domain::Workbench& workbench() const
