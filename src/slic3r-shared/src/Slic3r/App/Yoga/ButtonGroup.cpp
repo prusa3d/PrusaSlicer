@@ -137,7 +137,7 @@ void ButtonGroup::check_one_button(AbstractButton* button)
     }
 
     // Special unchecked state
-    if (!m_always_checked && button->checked() == false) {
+    if (!m_always_checked && (button == nullptr || button->checked() == false)) {
         button = nullptr;
     }
 

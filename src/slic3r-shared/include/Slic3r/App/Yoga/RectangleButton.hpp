@@ -28,6 +28,7 @@ public:
     void set_background_color(const ImColor& color, const ImColor& color_hover);
 
     const ImColor& background_color_checked() const;
+    const ImColor& background_color_checked_hover() const;
     void set_background_color_checked(Platform::Color color);
     void set_background_color_checked(const ImColor& background_color_checked);
     void set_background_color_checked(

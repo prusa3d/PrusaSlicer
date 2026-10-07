@@ -222,6 +222,7 @@ enum class Icon : wchar_t
     PhysicalPrinterIcon,
     CheckMark,
     Robot,
+    Primary,
 
     // PNGs
     SpoolBig,

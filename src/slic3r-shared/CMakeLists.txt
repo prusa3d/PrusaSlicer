@@ -613,6 +613,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Yoga/RectangleButton.cpp
         include/Slic3r/App/Yoga/LayoutButton.hpp
         src/Slic3r/App/Yoga/LayoutButton.cpp
+        include/Slic3r/App/Yoga/CircleBorderedButton.hpp
+        src/Slic3r/App/Yoga/CircleBorderedButton.cpp
         include/Slic3r/App/Yoga/Tooltip.hpp
         src/Slic3r/App/Yoga/Tooltip.cpp
         include/Slic3r/App/Yoga/Rectangle.hpp
@@ -1320,13 +1322,21 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/ObjectList/VolumeItem.cpp
         include/Slic3r/App/ObjectList/InstanceItem.hpp
         src/Slic3r/App/ObjectList/InstanceItem.cpp
-    
+
         include/Slic3r/Biz/MatDb/MatDbClient.hpp
         src/Slic3r/Biz/MatDb/MatDbClient.cpp
         include/Slic3r/Biz/MatDb/MatDbInteractor.hpp
         src/Slic3r/Biz/MatDb/MatDbInteractor.cpp
         src/Slic3r/Biz/Preset/PresetMatchRuleFactor.hpp
         src/Slic3r/Biz/Preset/PresetMatchRuleFactor.cpp
+        include/Slic3r/App/Config/ToolToFeatureDialog.hpp
+        src/Slic3r/App/Config/ToolToFeatureDialog.cpp
+        include/Slic3r/App/Config/ToolToFeatureDialogHeader.hpp
+        src/Slic3r/App/Config/ToolToFeatureDialogHeader.cpp
+        include/Slic3r/App/Config/ToolToFeatureExtruderButton.hpp
+        src/Slic3r/App/Config/ToolToFeatureExtruderButton.cpp
+        include/Slic3r/App/Config/ExtruderIdButtonGroup.hpp
+        src/Slic3r/App/Config/ExtruderIdButtonGroup.cpp
 )
 
 if (WIN32)

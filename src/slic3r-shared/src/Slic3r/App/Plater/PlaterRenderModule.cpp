@@ -99,6 +99,7 @@
 #include "Slic3r/App/MenuBuilder.hpp"
 #include "Slic3r/App/AppConfig.hpp"
 #include "Slic3r/App/Config/ConfigItemControl.hpp"
+#include "Slic3r/App/Config/ToolToFeatureDialog.hpp"
 #include "Slic3r/App/Lua/PluginDialog.hpp"
 #include "Slic3r/App/CrashedProjectsDialog.hpp"
 
@@ -791,6 +792,7 @@ void PlaterRenderModule::init_dialog_navigation()
     );
 
     m_dialog_navigation.insert_dialog(&m_sidebar_print->print_settings_dialog());
+    m_dialog_navigation.insert_dialog(m_sidebar_print->tool_to_feature_dialog());
     m_dialog_navigation.insert_dialog(m_preferences_dialog.get());
     m_dialog_navigation.insert_dialog(m_invalid_data_dialog.get());
 

@@ -14,6 +14,7 @@ class ProjectInteractor;
 namespace Slic3r::App {
 
 class PrintSettingsDialog;
+class ToolToFeatureDialog;
 class PrintToolFavoritesItem;
 class Navigator;
 
@@ -30,6 +31,7 @@ public:
     explicit SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator& navigator);
 
     PrintSettingsDialog& print_settings_dialog();
+    ToolToFeatureDialog* tool_to_feature_dialog();
 
     void on_preset_selection_changed(
         Domain::SelectionId project_id,
@@ -53,9 +55,11 @@ public:
 private:
     void add_separator();
 
+    void create_tool_to_feature_row();
     void create_favorite_params();
 
     void update_tools_visibility();
+    void update_tool_to_feature_row_visibility();
     void refresh_print_combobox_label_color();
     void refresh_tools_comboboxes_label_colors();
 
@@ -79,6 +83,8 @@ private:
 
     Yoga::LayoutButton* m_settings_set_btn{nullptr};
     Yoga::ScrollArea* m_content_area{nullptr};
+    ToolToFeatureDialog* m_tool_to_feature_dialog{nullptr};
+    Yoga::Item* m_tool_to_feature_row{nullptr};
     PrintToolFavoritesItem* m_favorite_params{nullptr};
 
     Yoga::ComboBoxListViewSelection<Biz::Preset::PresetItem>* m_combo_print{nullptr};

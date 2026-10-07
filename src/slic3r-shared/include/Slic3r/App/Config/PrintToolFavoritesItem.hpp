@@ -23,15 +23,17 @@ class PrintToolFavoritesItem : public Yoga::Item
     using ObservableFavoritesCategorizer =
         Biz::ObservableListSortFilter<Biz::PrintToolItem, Domain::ConfigItemDef::Category>;
 
-    using PrintToolFavoritesOptionGroupListViewFactory = Yoga::
-        ViewFactory<PrintToolFavoritesOptionGroup, Biz::PrintToolItem, Biz::ProjectInteractor&>;
+    using PrintToolFavoritesOptionGroupListViewFactory = Yoga::ViewFactory<
+        PrintToolFavoritesOptionGroup,
+        Biz::PrintToolItem,
+        Biz::ProjectInteractor&>;
     using PrintToolFavoritesOptionGroupListView = Yoga::ListView<
         PrintToolFavoritesOptionGroup,
         Biz::PrintToolItem,
         PrintToolFavoritesOptionGroupListViewFactory>;
 
 public:
-    PrintToolFavoritesItem(Biz::ProjectInteractor& project_interactor);
+    explicit PrintToolFavoritesItem(Biz::ProjectInteractor& project_interactor);
 
 private:
     Biz::UnsharedPointer<ObservableFavoritesCategorizer> m_favorites_categorizer;

@@ -70,6 +70,11 @@ const ImColor& RectangleButton::background_color_checked() const
     return m_background_color_checked;
 }
 
+const ImColor& RectangleButton::background_color_checked_hover() const
+{
+    return m_background_color_checked_hover;
+}
+
 void RectangleButton::set_background_color_checked(Platform::Color color)
 {
     m_background_color_checked       = m_theme->color_imgui(color, Platform::ColorGroup::Active);

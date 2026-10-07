@@ -251,6 +251,7 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
     {Icon::Filter, "filter"},
     {Icon::Robot, "robot"},
     {Icon::SpoolBig, "spool_big"},
+    {Icon::Primary, "primary"},
 };
 
 static const std::unordered_set<Icon> ICON_PNG = {Icon::SpoolBig};

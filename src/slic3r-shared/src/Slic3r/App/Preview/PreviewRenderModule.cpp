@@ -32,6 +32,7 @@
 #include "Slic3r/App/InvalidDataDialog.hpp"
 #include "Slic3r/App/UIItemCommand.hpp"
 #include "Slic3r/App/AppConfig.hpp"
+#include "Slic3r/App/Config/ToolToFeatureDialog.hpp"
 
 #include "Slic3r/Domain/TriangleMesh.hpp"
 
@@ -1086,6 +1087,7 @@ void PreviewRenderModule::init_dialog_navigation()
     );
 
     m_dialog_navigation.insert_dialog(&m_sidebar_print->print_settings_dialog());
+    m_dialog_navigation.insert_dialog(m_sidebar_print->tool_to_feature_dialog());
     m_dialog_navigation.insert_dialog(m_invalid_data_dialog.get());
     m_dialog_navigation.insert_dialog(m_preset_updater_dialog.get());
 
