@@ -22,7 +22,6 @@ PreviewRenderLayout::PreviewRenderLayout(
     std::unique_ptr<PopNotification::PopNotificationListView> pop_notification_list_view,
     std::unique_ptr<SidebarBed> sidebar_bed,
     std::unique_ptr<SidebarPrint> sidebar_print,
-    std::unique_ptr<SidebarObject> sidebar_object,
     std::unique_ptr<SidebarPreviewActionButtons> sidebar_action_buttons,
     std::unique_ptr<GCodeWindow> m_gcode_window,
     std::unique_ptr<LegendWindow> legend,
@@ -43,7 +42,7 @@ PreviewRenderLayout::PreviewRenderLayout(
         std::move(pop_notification_list_view),
         std::move(sidebar_bed),
         std::move(sidebar_print),
-        std::move(sidebar_object),
+        nullptr,
         std::move(crashed_projects_dialog),
         std::move(preset_updater_dialog)
     ),

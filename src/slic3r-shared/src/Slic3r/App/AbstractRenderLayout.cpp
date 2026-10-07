@@ -347,10 +347,12 @@ void AbstractRenderLayout::init_right_column()
         std::move(sidebar_bed_print)
     );
 
-    m_layout_sidebar_stack_layout->insert_item(
-        SidebarStackLayout::ItemType::Object,
-        m_sidebar_object.release()
-    );
+    if (m_sidebar_object.get() != nullptr) {
+        m_layout_sidebar_stack_layout->insert_item(
+            SidebarStackLayout::ItemType::Object,
+            m_sidebar_object.release()
+        );
+    }
 }
 
 void AbstractRenderLayout::init_toolbar_row()

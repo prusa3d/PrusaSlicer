@@ -53,6 +53,7 @@ public:
         std::unique_ptr<PopNotification::PopNotificationListView> pop_notification_list_view,
         std::unique_ptr<SidebarBed> sidebar_bed,
         std::unique_ptr<SidebarPrint> sidebar_print,
+        // Does not exist in preview.
         std::unique_ptr<SidebarObject> sidebar_object,
         std::unique_ptr<CrashedProjectsDialog> crashed_projects_dialog,
         std::unique_ptr<PresetUpdaterDialog> preset_updater_dialog
