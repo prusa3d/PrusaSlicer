@@ -17,34 +17,34 @@ static std::shared_ptr<spdlog::sinks::msvc_sink_mt> msvc_sink;
 #endif
 static std::shared_ptr<spdlog::sinks::rotating_file_sink_mt> file_logger;
 
-static spdlog::level::level_enum log_level_to_spdlog(unsigned int level)
+static spdlog::level::level_enum log_level_to_spdlog(LogLevel level)
 {
     switch (level) {
-    // Report fatal errors only.
-    case 0:
+    // Report critical errors only.
+    case LogLevel::Critical:
         return spdlog::level::critical;
-    // Report fatal errors and errors.
-    case 1:
+    // Report critical errors and errors.
+    case LogLevel::Error:
         return spdlog::level::err;
-    // Report fatal errors, errors and warnings.
-    case 2:
+    // Report critical errors, errors and warnings.
+    case LogLevel::Warning:
         return spdlog::level::warn;
     // Report all errors, warnings and infos.
-    case 3:
+    case LogLevel::Info:
         return spdlog::level::info;
     // Report all errors, warnings, infos and debugging.
-    case 4:
+    case LogLevel::Debug:
         return spdlog::level::debug;
     // Report everything including fine level tracing information.
-    default:
+    case LogLevel::Trace:
         return spdlog::level::trace;
+    default:
+        return spdlog::level::info;
     }
 }
 
 void init_logging()
 {
-    // TODO: add optional logging to file here
-
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
     msvc_sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
     spdlog::apply_all([&](std::shared_ptr<spdlog::logger> l) { l->sinks().push_back(msvc_sink); });
@@ -56,21 +56,25 @@ void init_logging()
 #else
         const std::string& os_specific_path = file_log_config.log_file;
 #endif
-        file_logger = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            os_specific_path,
-            file_log_config.log_file_size,
-            1
-        );
-        spdlog::apply_all([&](std::shared_ptr<spdlog::logger> l)
-                          { l->sinks().push_back(file_logger); });
+        try {
+            file_logger = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+                os_specific_path,
+                file_log_config.log_file_size,
+                1
+            );
+            spdlog::apply_all(
+                [&](std::shared_ptr<spdlog::logger> l) { l->sinks().push_back(file_logger); }
+            );
+        } catch (const std::exception& e) {
+            SPDLOG_ERROR(e.what());
+        }
     }
 }
 
-void set_log_level(unsigned level)
+void set_log_level(LogLevel level)
 {
-    auto lvl            = log_level_to_spdlog(level);
-    s_current_log_level = lvl;
-    spdlog::set_level(lvl);
+    s_current_log_level = log_level_to_spdlog(level);
+    spdlog::set_level(s_current_log_level);
 }
 
 const FileLogConfig& get_file_log_config()

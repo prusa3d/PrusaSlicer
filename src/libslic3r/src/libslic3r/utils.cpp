@@ -78,7 +78,7 @@ namespace Slic3r {
 // This is used ot disable logging for unit and integration tests.
 static struct RunOnInit {
     RunOnInit() {
-        set_log_level(1);
+        set_log_level(LogLevel::Error);
     }
 } g_RunOnInit;
 

@@ -39,5 +39,5 @@ Integrates the [spdlog library](https://github.com/gabime/spdlog) and provides l
 
 **Note:**
 - the `SPDLOG_TRACE`, `SPDLOG_DEBUG`, `SPDLOG_INFO`, `SPDLOG_ERROR`, etc. macros
-  - are compile-time enabled by `SPDLOG_ACTIVE_LEVEL` macro, you may override in your target to increase verbosity.
+  - are compile-time enabled by `SPDLOG_ACTIVE_LEVEL` macro, you may override in your target to reduce verbosity.
   - you can use [fmt](https://github.com/fmtlib/fmt) string format API

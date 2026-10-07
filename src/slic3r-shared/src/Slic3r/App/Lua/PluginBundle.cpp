@@ -1,6 +1,7 @@
 #include "Slic3r/App/Lua/PluginBundle.hpp"
 #include "Slic3r/Biz/Crypto//Checksum.hpp"
 #include <Slic3r/Assert.hpp>
+#include <Slic3r/Log.hpp>
 
 #include <ranges>
 
@@ -11,7 +12,6 @@
 #include <tl/expected.hpp>
 
 #include <fmt/format.h>
-#include <spdlog/spdlog.h>
 
 namespace fs = boost::filesystem;
 

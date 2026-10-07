@@ -802,8 +802,8 @@ static void perform_preset_updater_actions(
     const MiscParams& misc
 )
 {
-    if (!misc.loglevel) {
-        Slic3r::set_log_level(0);
+    if (!misc.loglevel && !log_level_from_env()) {
+        Slic3r::set_log_level(Slic3r::LogLevel::Critical);
     }
 
     const std::string additional_data =

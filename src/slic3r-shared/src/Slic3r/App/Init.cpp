@@ -7,6 +7,9 @@
 #include "Slic3r/Platform.hpp"
 #include "Slic3r/Log.hpp"
 
+#include <charconv>
+#include <string_view>
+
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -17,21 +20,58 @@
 
 namespace Slic3r::App {
 
+const constexpr std::size_t log_file_max_size = 1 * 1024 * 1024;
+
+constexpr bool is_debug_build =
+#ifdef NDEBUG
+    false;
+#else
+    true;
+#endif
+
 InitParams::InitParams(const int argc, char** argv) : argc(argc), argv(argv) {}
+
+static LogLevel default_log_level()
+{
+    return is_debug_build ? LogLevel::Trace : LogLevel::Info;
+}
+
+std::optional<LogLevel> log_level_from_env()
+{
+    const char* log_level_text = boost::nowide::getenv("SLIC3R_LOGLEVEL");
+    if (log_level_text == nullptr) {
+        return std::nullopt;
+    }
+
+    const std::string_view text{log_level_text};
+    unsigned log_level = 0;
+    const std::from_chars_result result =
+        std::from_chars(text.data(), text.data() + text.size(), log_level);
+    if (result.ec != std::errc{}
+        || result.ptr != text.data() + text.size()
+        || log_level > static_cast<unsigned>(LogLevel::Trace))
+    {
+        SPDLOG_ERROR("Invalid SLIC3R_LOGLEVEL environment variable: {}", text);
+        return std::nullopt;
+    }
+
+    return static_cast<LogLevel>(log_level);
+}
 
 void init_common()
 {
-    {
-        Slic3r::set_log_level(1);
-        const char* loglevel = boost::nowide::getenv("SLIC3R_LOGLEVEL");
-        if (loglevel != nullptr) {
-            if (loglevel[0] >= '0' && loglevel[0] <= '9' && loglevel[1] == 0) {
-                Slic3r::set_log_level(loglevel[0] - '0');
-            } else {
-                SPDLOG_ERROR("Invalid SLIC3R_LOGLEVEL environment variable: {}", loglevel);
-            }
-        }
-    }
+#ifdef _WIN32
+    // nowide_filesystem calls std::locale("") which may throw on Linux
+    // with unsupported locale, we should call this just on Windows.
+    boost::nowide::nowide_filesystem();
+#endif
+
+    const boost::filesystem::path log_path =
+        boost::filesystem::path{Slic3r::get_default_datadir()} / "shared_runtime" / "log.txt";
+    Slic3r::set_file_log_config(FileLogConfig{log_path.string(), log_file_max_size});
+    Slic3r::init_logging();
+
+    Slic3r::set_log_level(log_level_from_env().value_or(default_log_level()));
 
     // Detect the operating system flavor after SLIC3R_LOGLEVEL is set.
     Slic3r::detect_platform();
@@ -58,12 +98,6 @@ void init_common()
 #ifdef __EMSCRIPTEN__
     boost::filesystem::path path_resources = "/resources";
 #else
-#ifdef _WIN32
-    // nowide_filesystem calls std::locale("") which may throw on Linux
-    // with unsupported locale, we should call this just on Windows
-    boost::nowide::nowide_filesystem();
-#endif
-
     // See Invoking prusa-slicer from $PATH environment variable crashes #5542
     // boost::filesystem::path path_to_binary = boost::filesystem::system_complete(argv[0]);
     boost::filesystem::path path_to_binary = boost::dll::program_location();

@@ -303,11 +303,16 @@ void add_misc_options(CLI::App& app, App::InitParams& params)
     app.add_option(
            "--loglevel",
            params.misc.loglevel,
-           "Sets logging sensitivity. 0:fatal, 1:error, 2:warning, 3:info, 4:debug, 5:trace "
-           "For example. loglevel=2 logs fatal, error and warning level messages."
+           "Sets logging sensitivity. 0:critical, 1:error, 2:warning, 3:info, 4:debug, "
+           "5:trace. For example, --loglevel=2 logs critical, error and warning messages."
     )
         ->type_name("N")
-        ->check(CLI::Range(0, 5));
+        ->check(
+            CLI::Range(
+                static_cast<int>(Slic3r::LogLevel::Critical),
+                static_cast<int>(Slic3r::LogLevel::Trace)
+            )
+        );
 
     app.add_flag(
         "--opengl-aa",

@@ -1,8 +1,9 @@
 #include "Slic3r/Biz/Preset/PresetCollectionEvaluator.hpp"
-#include <nlohmann/json.hpp>
-#include <spdlog/sinks/basic_file_sink.h>
-#include "Slic3r/Biz/Preset/JsonUtils.hpp"
 
+#include <Slic3r/Biz/Preset/JsonUtils.hpp>
+#include <Slic3r/Log.hpp>
+
+#include <nlohmann/json.hpp>
 
 // Xcode 15 has not finished ranges support we need here
 #include <version>
@@ -21,8 +22,6 @@
 #endif
 
 #include <fmt/format.h>
-
-#include <Slic3r/Log.hpp>
 
 namespace Slic3r::Biz::Preset {
 

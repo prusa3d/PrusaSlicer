@@ -10,7 +10,7 @@
 int main(int argc, char* argv[])
 {
     Slic3r::init_logging();
-    Slic3r::set_log_level(0);
+    Slic3r::set_log_level(Slic3r::LogLevel::Critical);
     boost::nowide::nowide_filesystem();
 
     // The CLI loads the preset bundle from resources_dir()/presets.

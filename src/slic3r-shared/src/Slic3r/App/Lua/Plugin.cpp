@@ -2,10 +2,10 @@
 
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/Lua/LuaException.hpp"
+#include "Slic3r/Log.hpp"
 
 #include <fmt/format.h>
 #include <ranges>
-#include <spdlog/spdlog.h>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 
