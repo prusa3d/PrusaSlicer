@@ -195,4 +195,92 @@ TEST_CASE_METHOD(
     REQUIRE(colors_cc0[0] == custom_color);
 }
 
+TEST_CASE_METHOD(
+    ProjectSettingsInteractorFixture,
+    "User color survives config container switch",
+    "[ProjectSettingsInteractor]"
+)
+{
+    using namespace Slic3r::Biz;
+
+    const Domain::SelectionId project_id = project_interactor.new_project();
+
+    auto& psi = project_interactor.project_settings_interactor();
+    const Domain::SelectionId cc0_id = project_interactor.selected_config_container_id();
+    REQUIRE(cc0_id != Domain::INVALID_ID);
+
+    const std::string custom_hex = "#123456";
+    psi.set_color_from_user(project_id, cc0_id, 0, custom_hex);
+
+    const Domain::SelectionId cc1_id = project_interactor.add_config_container();
+    REQUIRE(cc1_id != Domain::INVALID_ID);
+    project_interactor.select_config_container(cc1_id);
+    project_interactor.select_config_container(cc0_id);
+    REQUIRE(project_interactor.selected_config_container_id() == cc0_id);
+
+    Domain::ColorRGB custom_color;
+    Biz::Algorithms::Color::decode_color(custom_hex, custom_color);
+    const auto colors = psi.get_colors(project_id, cc0_id);
+    REQUIRE(!colors.empty());
+    REQUIRE(colors[0] == custom_color);
+}
+
+TEST_CASE_METHOD(
+    ProjectSettingsInteractorFixture,
+    "User color survives material preset selection",
+    "[ProjectSettingsInteractor]"
+)
+{
+    using namespace Slic3r::Biz;
+
+    const Domain::SelectionId project_id = project_interactor.new_project();
+
+    auto& psi = project_interactor.project_settings_interactor();
+    const Domain::SelectionId cc_id = project_interactor.selected_config_container_id();
+    REQUIRE(cc_id != Domain::INVALID_ID);
+
+    const std::string custom_hex = "#654321";
+    psi.set_color_from_user(project_id, cc_id, 0, custom_hex);
+
+    const Domain::ConfigContainer* cc =
+        project_interactor.project(project_id).find_config_container(cc_id);
+    REQUIRE(cc != nullptr);
+    const std::string material_id = cc->selected_preset().materials.at(0).id;
+
+    // Triggers the reconcile step, which must not overwrite non-empty colors.
+    project_interactor.preset_interactor().select_material_preset(0, material_id);
+
+    Domain::ColorRGB custom_color;
+    Biz::Algorithms::Color::decode_color(custom_hex, custom_color);
+    const auto colors = psi.get_colors(project_id, cc_id);
+    REQUIRE(!colors.empty());
+    REQUIRE(colors[0] == custom_color);
+}
+
+TEST_CASE_METHOD(
+    ProjectSettingsInteractorFixture,
+    "reset_color_to_auto replaces the user color",
+    "[ProjectSettingsInteractor]"
+)
+{
+    using namespace Slic3r::Biz;
+
+    const Domain::SelectionId project_id = project_interactor.new_project();
+
+    auto& psi = project_interactor.project_settings_interactor();
+    const Domain::SelectionId cc_id = project_interactor.selected_config_container_id();
+    REQUIRE(cc_id != Domain::INVALID_ID);
+
+    const auto initial_colors = psi.get_colors(project_id, cc_id);
+    REQUIRE(!initial_colors.empty());
+
+    const std::string custom_hex = "#ABCDEF";
+    psi.set_color_from_user(project_id, cc_id, 0, custom_hex);
+    psi.reset_color_to_auto(project_id, cc_id, 0);
+
+    const auto colors = psi.get_colors(project_id, cc_id);
+    REQUIRE(!colors.empty());
+    REQUIRE(colors[0] == initial_colors[0]);
+}
+
 } // namespace Slic3r

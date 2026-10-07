@@ -94,6 +94,7 @@ private:
     };
 
     Domain::Workbench& m_workbench;
+    ProjectInteractor& m_project_interactor;
     Preset::PresetInteractor& m_preset_interactor;
     std::unique_ptr<MatDbInteractorProjectContexts> m_projects;
     mutable MatDbClient m_client;

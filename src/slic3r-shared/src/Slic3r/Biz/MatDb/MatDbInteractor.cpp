@@ -33,6 +33,7 @@ MatDbInteractor::MatDbInteractor(
     ProjectInteractor& project_interactor
 ) :
     m_workbench(workbench),
+    m_project_interactor(project_interactor),
     m_preset_interactor(project_interactor.preset_interactor()),
     m_projects(std::make_unique<MatDbInteractorProjectContexts>(project_interactor))
 {
@@ -77,6 +78,16 @@ void MatDbInteractor::select_material_preset(
 )
 {
     m_preset_interactor.select_material_preset(material_index, preset_id, true, mat.uuid);
+
+    // The material from MDB carries its own color, which should replace the current one.
+    // The reconcile step triggered by the preset change only fills empty slots, so the color
+    // has to be reset explicitly. Note that ProjectSettingsInteractor is constructed after
+    // this object, so it must not be accessed from the constructor.
+    m_project_interactor.project_settings_interactor().reset_color_to_auto(
+        m_project_interactor.selected_project_id(),
+        m_project_interactor.selected_config_container_id(),
+        static_cast<int>(material_index)
+    );
 }
 
 std::optional<std::string> MatDbInteractor::get_color(const std::string& uuid) const

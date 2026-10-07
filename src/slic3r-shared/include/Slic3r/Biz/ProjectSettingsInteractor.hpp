@@ -72,6 +72,24 @@ public:
     );
 
     /**
+     * @brief Re-resolves the color of a slot via the priority chain
+     *        (MDB → filament_colour preset → palette), discarding the current color.
+     *
+     * Use when the slot's material changed in a way that should override its current color,
+     * e.g. when a material is selected from MDB. Unlike the reconcile step, which only fills
+     * empty slots, this always overwrites the given slot.
+     *
+     * @param project_id          Project containing the config container.
+     * @param config_container_id Container to update.
+     * @param slot                0-based extruder slot index.
+     */
+    void reset_color_to_auto(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        int slot
+    );
+
+    /**
      * @brief Connect sync — updates each slot.
      *
      * @param project_id          Project containing the config container.

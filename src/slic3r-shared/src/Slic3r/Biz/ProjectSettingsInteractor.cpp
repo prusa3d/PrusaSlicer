@@ -113,6 +113,21 @@ void ProjectSettingsInteractor::set_color_from_user(
     store_and_notify(project_id, config_container_id, std::move(colors));
 }
 
+void ProjectSettingsInteractor::reset_color_to_auto(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id,
+    int slot
+)
+{
+    // NOTE: This deliberately (ab)uses set_color_from_user even though the user did not pick
+    // any color. Passing an empty color makes set_color_from_user re-resolve the slot via
+    // resolve_auto_color, which is exactly what we want here. The misuse is kept private to
+    // this class so that callers outside express their actual intent; if set_color_from_user
+    // ever starts treating "from user" specially (e.g. locking the slot), this must be
+    // reimplemented without it.
+    set_color_from_user(project_id, config_container_id, slot, {});
+}
+
 void ProjectSettingsInteractor::set_colors_from_connect(
     Domain::SelectionId project_id,
     Domain::SelectionId config_container_id,
@@ -378,13 +393,19 @@ void ProjectSettingsInteractor::
     Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc->selected_preset());
 
     colors.resize(preset_config_pack.filament_size());
+    // Only fill empty slots. This runs on every container switch and material preset change,
+    // so it must not overwrite colors chosen by the user, loaded from 3MF or synced from
+    // Connect. Explicit color overrides (e.g. MDB material selection) go through
+    // reset_color_to_auto.
     for (size_t slot = 0; slot < colors.size(); ++slot) {
-        colors[slot] = resolve_auto_color(
-            project_id,
-            config_container_id,
-            slot,
-            cc->selected_preset().material_matdb_uuid(slot)
-        );
+        if (colors[slot].empty()) {
+            colors[slot] = resolve_auto_color(
+                project_id,
+                config_container_id,
+                slot,
+                cc->selected_preset().material_matdb_uuid(slot)
+            );
+        }
     }
 
     // Always store and notify, even if colors haven't changed.
