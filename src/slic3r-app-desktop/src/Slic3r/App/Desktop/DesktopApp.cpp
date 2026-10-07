@@ -590,7 +590,7 @@ void DesktopApp::finish_init()
         )
     );
     app_services.pop_notification_center().set_open_invalid_data_dialog_fn(
-        std::bind(&Navigator::open_invalid_data_dialog, &m_navigator)
+        [this]() { m_navigator.set_modal_dialog(ModalDialog::InvalidData); }
     );
 
     m_plater_module->plugin_system().add_listener<Lua::IPluginInstallationListener>(

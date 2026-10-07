@@ -42,7 +42,6 @@ public:
     bool is_gizmo_manager_completed() const override;
 
     void set_opened_dialog(Yoga::Dialog* opened_dialog);
-    void open_invalid_data_dialog();
     void set_object_list_collapsed(bool collapsed);
 
     virtual void set_modal_dialog(ModalDialog dialog);

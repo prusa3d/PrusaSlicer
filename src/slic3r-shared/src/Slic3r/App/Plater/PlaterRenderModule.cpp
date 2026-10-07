@@ -176,6 +176,7 @@ void PlaterRenderModule::set_modal_dialog(ModalDialog modal_dialog)
     handle_dialog(m_welcome_dialog.get(), ModalDialog::Welcome);
     handle_dialog(m_crashed_projects_dialog.get(), ModalDialog::CrashedProjects);
     handle_dialog(m_preset_updater_dialog.get(), ModalDialog::PresetUpdater);
+    handle_dialog(m_invalid_data_dialog.get(), ModalDialog::InvalidData);
     if (modal_dialog == ModalDialog::MsgBox) {
         msg_box_handler()->open_modal();
     } else {

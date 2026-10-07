@@ -82,7 +82,7 @@ void InvalidDataDialog::on_selected_project_changed(size_t)
 
 void InvalidDataDialog::close_action()
 {
-    m_navigator.set_opened_dialog(nullptr);
+    m_navigator.set_modal_dialog(ModalDialog::None);
 }
 
 static bool contains(const std::string& string, const std::string& substring) {
@@ -231,6 +231,8 @@ public:
             }
         } else {
             auto text{emplace_back<Yoga::Text>(to_display_string(error, project))};
+            text->set_wrap_mode(Yoga::Text::WrapMode::Wrap);
+            text->set_flex_grow(1.f);
             text->set_flex_shrink(0);
         }
     }

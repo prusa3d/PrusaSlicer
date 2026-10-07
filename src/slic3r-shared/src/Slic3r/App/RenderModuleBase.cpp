@@ -46,13 +46,6 @@ void RenderModuleBase::set_opened_dialog(Yoga::Dialog* opened_dialog)
     m_dialog_navigation.open_dialog(opened_dialog);
 }
 
-void RenderModuleBase::open_invalid_data_dialog()
-{
-    if (m_invalid_data_dialog.get()) {
-        set_opened_dialog(m_invalid_data_dialog.get());
-    }
-}
-
 void RenderModuleBase::set_object_list_collapsed(bool collapsed)
 {
     if (m_object_list.get()) {

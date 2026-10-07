@@ -81,8 +81,6 @@ public:
 
     void request_search();
 
-    void open_invalid_data_dialog();
-
     void set_modal_dialog(ModalDialog dialog);
     ModalDialog current_modal_dialog() const;
     bool is_any_modal_dialog_opened() const;

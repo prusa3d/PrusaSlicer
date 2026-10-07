@@ -150,21 +150,6 @@ void Navigator::request_search()
     m_plater_module->open_search();
 }
 
-void Navigator::open_invalid_data_dialog()
-{
-    ProjectContext& context = m_project_contexts->selected();
-    switch (context.type) {
-    case Render::ModuleType::Plater:
-        m_plater_module->open_invalid_data_dialog();
-        break;
-    case Render::ModuleType::Preview:
-        m_preview_module->open_invalid_data_dialog();
-        break;
-    case Render::ModuleType::Undef:
-        break;
-    }
-}
-
 void Navigator::set_modal_dialog(ModalDialog modal_dialog)
 {
     if (!has_modules()) {

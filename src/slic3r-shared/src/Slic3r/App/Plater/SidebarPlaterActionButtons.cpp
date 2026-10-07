@@ -166,7 +166,7 @@ void SidebarPlaterActionButtons::update_slice_button(const BedSelection& selecti
 
         m_button_slice->callbacks().action = [this]() {
             if (m_render_module_navigator) {
-                m_render_module_navigator->open_invalid_data_dialog();
+                m_render_module_navigator->set_modal_dialog(ModalDialog::InvalidData);
             }
         };
     } else if (any_running) {
