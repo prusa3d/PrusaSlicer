@@ -472,6 +472,7 @@ Scene::GizmoActivationState RotationGizmo::on_mouse(Scene::GizmoEventContext& ct
             memento.forced_volume_mode = true;
             m_scene_interactor
                 .transform_selection(Domain::SquareMatrix4d::Identity(), memento, true);
+            m_scene_interactor.finalize_transform_selection(memento, false);
         }
         on_stop_dragging();
 
