@@ -47,6 +47,41 @@ std::vector<Domain::ColorRGB> hex_colors_to_rgb(const std::vector<std::string>& 
     return result;
 }
 
+// The technology specific part of the colors. They are handled as one color per material slot;
+// each technology stores them in its own project settings.
+
+bool has_colors(const Domain::ConfigContainer& cc)
+{
+    return cc.print_technology() == Domain::PrinterTechnology::FFF;
+}
+
+std::vector<std::string> stored_colors(const Domain::ConfigContainer& cc)
+{
+    ASSERT(has_colors(cc));
+    return cc.project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+}
+
+void set_stored_colors(Domain::ConfigContainer& cc, std::vector<std::string> colors)
+{
+    ASSERT(has_colors(cc));
+    cc.project_settings().items.opt("extruder_colour").set(std::move(colors));
+}
+
+size_t material_slot_count(const Domain::ConfigContainer& cc)
+{
+    ASSERT(has_colors(cc));
+    const Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc.selected_preset());
+    return preset_config_pack.filament_size();
+}
+
+// The color of the material preset in the slot, which must exist.
+std::string preset_material_color(const Domain::ConfigContainer& cc, size_t slot)
+{
+    ASSERT(has_colors(cc));
+    const Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc.selected_preset());
+    return preset_config_pack.get_filament(slot).items.opt("filament_colour").get<std::string>();
+}
+
 } // namespace
 
 ProjectSettingsInteractor::ProjectSettingsInteractor(
@@ -89,12 +124,11 @@ void ProjectSettingsInteractor::set_color_from_user(
     if (!cc)
         return;
 
-    if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
+    if (!has_colors(*cc)) {
         return;
     }
 
-    auto colors =
-        cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+    std::vector<std::string> colors = stored_colors(*cc);
 
     if (slot < 0 || slot >= static_cast<int>(colors.size()))
         return;
@@ -138,12 +172,11 @@ void ProjectSettingsInteractor::set_colors_from_connect(
     if (!cc)
         return;
 
-    if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
+    if (!has_colors(*cc)) {
         return;
     }
 
-    auto colors =
-        cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+    std::vector<std::string> colors = stored_colors(*cc);
 
     const size_t count = std::min(colors.size(), incoming_colors.size());
     for (size_t i = 0; i < count; ++i) {
@@ -347,16 +380,15 @@ std::string ProjectSettingsInteractor::preset_color(
     if (!cc)
         return {};
 
-    if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
+    if (!has_colors(*cc)) {
         PANIC("Invalid print technology");
         return {};
     }
-    Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc->selected_preset());
 
-    if (slot < 0 || slot >= static_cast<int>(preset_config_pack.filament_size()))
+    if (slot < 0 || slot >= static_cast<int>(material_slot_count(*cc)))
         return {};
 
-    return preset_config_pack.get_filament(slot).items.opt("filament_colour").get<std::string>();
+    return preset_material_color(*cc, slot);
 }
 
 int ProjectSettingsInteractor::
@@ -383,16 +415,13 @@ void ProjectSettingsInteractor::
     if (!cc)
         return;
 
-    if (cc->print_technology() != Domain::PrinterTechnology::FFF) {
+    if (!has_colors(*cc)) {
         return;
     }
 
-    auto colors =
-        cc->project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+    std::vector<std::string> colors = stored_colors(*cc);
 
-    Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc->selected_preset());
-
-    colors.resize(preset_config_pack.filament_size());
+    colors.resize(material_slot_count(*cc));
     // Only fill empty slots. This runs on every container switch and material preset change,
     // so it must not overwrite colors chosen by the user, loaded from 3MF or synced from
     // Connect. Explicit color overrides (e.g. MDB material selection) go through
@@ -424,7 +453,7 @@ void ProjectSettingsInteractor::store_and_notify(
     if (!cc)
         return;
 
-    cc->project_settings().items.opt("extruder_colour").set(colors);
+    set_stored_colors(*cc, colors);
 
     const auto rgb_colors = hex_colors_to_rgb(colors);
 
