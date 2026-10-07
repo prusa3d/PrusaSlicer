@@ -283,9 +283,26 @@ void serialize(Archive& archive, Slic3r::Domain::Preset::EvaluatedToolPrintPrese
 }
 
 template <class Archive>
+void serialize(Archive& archive, Slic3r::Domain::Preset::MatDbMatchRule& match_rule)
+{
+    archive(
+        match_rule.uuid,
+        match_rule.brand_slug,
+        match_rule.slug,
+        match_rule.name,
+        match_rule.klass,
+        match_rule.type,
+        match_rule.abbreviation,
+        match_rule.required_tags,
+        match_rule.optional_tags,
+        match_rule.exclude_tags
+    );
+}
+
+template <class Archive>
 void serialize(Archive& archive, Slic3r::Domain::Preset::EvaluatedMaterialPreset& preset)
 {
-    archive(preset.preset);
+    archive(preset.preset, preset.mat_db_match_rule);
 }
 
 template <class Archive>

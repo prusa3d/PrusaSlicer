@@ -183,6 +183,15 @@ add_library(slic3r-domain STATIC
 
     include/Slic3r/Domain/VirtualExtruder.hpp
     src/Slic3r/Domain/VirtualExtruder.cpp
+    
+    include/Slic3r/Domain/MatDb/Material.hpp
+    include/Slic3r/Domain/MatDb/Types.hpp
+    include/Slic3r/Domain/MatDb/Storage.hpp
+    src/Slic3r/Domain/MatDb/Material.cpp
+    src/Slic3r/Domain/MatDb/Storage.cpp
+
+    include/Slic3r/Domain/Preset/MatDbMatchRule.hpp
+    src/Slic3r/Domain/Preset/MatDbMatchRule.cpp
 )
 
 target_include_directories(slic3r-domain PUBLIC include)
@@ -222,6 +231,7 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/Domain/Preset/PresetTreeTests.cpp
         test/Slic3r/Domain/Preset/HwConfigTests.cpp
         test/Slic3r/Domain/SizeTests.cpp
+        test/Slic3r/Domain/Preset/MatDbMatchRuleTests.cpp
     )
     target_include_directories(slic3r-domain-tests PRIVATE test)
 

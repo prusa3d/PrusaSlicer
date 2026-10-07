@@ -9,10 +9,7 @@
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Algorithms/Color.hpp"
-
 #include "Slic3r/Biz/OverridableConfigBoxObservableList.hpp"
-
-#include "Slic3r/LegacyFormat.hpp"
 
 using namespace Slic3r::Biz;
 
@@ -34,14 +31,17 @@ MaterialSettingsButton::MaterialSettingsButton(
     m_on_nozzle_clicked(on_nozzle_clicked),
     m_project_interactor(project_interactor)
 {
-    Unit height = 1.5_rem;
+    set_object_name("MaterialSettingsButton");
+
+    constexpr Unit height = 26_fpx;
+
     set_checkable(true);
-    set_height(height);
     set_flex_shrink(0);
     set_allow_overlap(true);
+    set_min_height(height);
 
     // invalidate vertical padding to use whole button height for separators
-    set_content_padding({5.f, 0.f, 0.f, 0.f});
+    set_content_padding({5_fpx, 0.f, 0.f, 0.f});
 
     Item* text_index = emplace_back<Text>(std::to_string(index + 1));
     text_index->set_self_align(YGAlignCenter);
@@ -50,8 +50,8 @@ MaterialSettingsButton::MaterialSettingsButton(
         ->set_fill(m_theme->color_imgui(Platform::Color::WindowBg));
 
     m_color_marker = emplace_back<ColorPickerButton>();
-    m_color_marker->set_height(16);
-    m_color_marker->set_width(16);
+    m_color_marker->set_height(16_fpx);
+    m_color_marker->set_width(16_fpx);
     m_color_marker->set_rounding(8);
     m_color_marker->set_background_border_width(1);
     m_color_marker->set_self_align(YGAlignCenter);
@@ -66,10 +66,20 @@ MaterialSettingsButton::MaterialSettingsButton(
         );
     };
 
-    m_material_name = emplace_back<Text>(std::string{});
-    m_material_name->set_flex_grow(1.f);
-    m_material_name->set_self_align(YGAlignCenter);
+    Item* name_column = emplace_back<Item>();
+    name_column->set_flex_grow(1);
+    name_column->set_gap(5_fpx);
+    name_column->set_orientation(Orientation::Vertical);
+    name_column->set_justify_content(YGJustifyCenter);
+    name_column->set_padding(Paddings{4_fpx, 2_fpx});
+
+    m_spool_name = name_column->emplace_back<Text>(std::string{});
+    m_spool_name->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_spool_name->set_width_percent(100);
+
+    m_material_name = name_column->emplace_back<Text>(std::string{});
     m_material_name->set_wrap_mode(Text::WrapMode::WrapElide);
+    m_material_name->set_width_percent(100);
 
     m_cog_btn = emplace_back<LayoutButton>(
         std::string{},
@@ -77,7 +87,7 @@ MaterialSettingsButton::MaterialSettingsButton(
         Biz::_u8L("Show material settings")
     );
     m_cog_btn->set_self_align(YGAlignCenter);
-    m_cog_btn->set_margin(-2.f);
+    m_cog_btn->set_margin(-2_fpx);
     m_cog_btn->set_width(height);
     m_cog_btn->set_height(height);
     m_cog_btn->set_background_color(m_theme->color_imgui(Platform::Color::Transparent));
@@ -97,11 +107,10 @@ MaterialSettingsButton::MaterialSettingsButton(
 
     m_nozzle_btn =
         emplace_back<LayoutButton>(std::string{}, Render::Icon::None, _u8L("Change nozzle size"));
-    m_nozzle_btn->set_self_align(YGAlignCenter);
     m_nozzle_btn->set_margin({-content_gap(), 0, 0, 0});
     m_nozzle_btn->set_draw_flags(ImDrawFlags_RoundCornersRight);
-    m_nozzle_btn->set_height(height);
-    m_nozzle_btn->set_content_padding({5.f, 0.f});
+    m_nozzle_btn->set_content_padding({5_fpx, 0.f});
+    m_nozzle_btn->set_content_align_items(YGAlignCenter);
     m_nozzle_btn->callbacks().action = [this]()
     {
         if (m_on_nozzle_clicked) {
@@ -146,8 +155,8 @@ void MaterialSettingsButton::on_list_selection_changed(Domain::SelectionId new_s
     const Biz::Preset::PresetItem& preset_item = m_state->items().at(new_selection);
 
     const auto& preset_interactor = m_project_interactor.preset_interactor();
-    auto& selected_preset = preset_interactor.selected_printer_preset();
-    bool is_modified_preset = preset_interactor.is_tool_material_preset_selected_and_dirty(
+    auto& selected_preset         = preset_interactor.selected_printer_preset();
+    bool is_modified_preset       = preset_interactor.is_tool_material_preset_selected_and_dirty(
         preset_item.hw_printer_config_id,
         selected_preset.printer.id,
         selected_preset.print.id,
@@ -157,6 +166,14 @@ void MaterialSettingsButton::on_list_selection_changed(Domain::SelectionId new_s
 
     m_material_preset_name = preset_item.ui_preset_name();
     set_material_name(m_material_preset_name, is_modified_preset);
+
+    const std::string spool_uuid{selected_preset.material_matdb_uuid(m_index)};
+    std::optional<Domain::MatDb::Material> material =
+        m_project_interactor.matdb_interactor().get_material_by_uuid(spool_uuid);
+    if (material.has_value()) {
+        m_spool_name->set_text(material->brand.name + " " + material->name);
+    }
+    m_spool_name->set_visible(material.has_value());
 
     const std::vector<Domain::ColorRGB> colors =
         m_project_interactor.project_settings_interactor().get_colors(
@@ -274,13 +291,12 @@ void MaterialSettingsButton::on_preset_value_changed(
 )
 {
     if (std::holds_alternative<Domain::FDMConfigLocation>(item.location())) {
-        const auto location{ std::get<Domain::FDMConfigLocation>(item.location()) };
+        const auto location{std::get<Domain::FDMConfigLocation>(item.location())};
         if (location != Domain::FDMConfigLocation::Filament) {
             return;
         }
-    }
-    else if (std::holds_alternative<Domain::SLAConfigLocation>(item.location())) {
-        const auto location{ std::get<Domain::SLAConfigLocation>(item.location()) };
+    } else if (std::holds_alternative<Domain::SLAConfigLocation>(item.location())) {
+        const auto location{std::get<Domain::SLAConfigLocation>(item.location())};
         if (location != Domain::SLAConfigLocation::Material) {
             return;
         }

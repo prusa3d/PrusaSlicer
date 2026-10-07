@@ -100,7 +100,12 @@ void ProjectSettingsInteractor::set_color_from_user(
         return;
 
     if (color.empty()) {
-        color = resolve_auto_color(project_id, config_container_id, slot);
+        color = resolve_auto_color(
+            project_id,
+            config_container_id,
+            slot,
+            cc->selected_preset().material_matdb_uuid(slot)
+        );
     }
 
     ASSERT(!color.empty());
@@ -374,9 +379,12 @@ void ProjectSettingsInteractor::
 
     colors.resize(preset_config_pack.filament_size());
     for (size_t slot = 0; slot < colors.size(); ++slot) {
-        if (colors[slot].empty()) {
-            colors[slot] = resolve_auto_color(project_id, config_container_id, slot);
-        }
+        colors[slot] = resolve_auto_color(
+            project_id,
+            config_container_id,
+            slot,
+            cc->selected_preset().material_matdb_uuid(slot)
+        );
     }
 
     // Always store and notify, even if colors haven't changed.

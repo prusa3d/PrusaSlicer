@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MatDbMatchRule.hpp"
 
 #include <vector>
 #include <set>
@@ -179,7 +180,9 @@ using AllToolsEvaluatedToolPrintPresets = std::vector<SingleToolEvaluatedToolPri
 struct EvaluatedMaterialPreset
 {
     using Preset = EvaluatedPreset<FilamentSettings, SLAMaterialSettings>;
+    using OptMatchRule = std::optional<MatDbMatchRule>;
     Preset preset;
+    OptMatchRule mat_db_match_rule;
 
     EvaluatedMaterialPreset()                                   = default;
     EvaluatedMaterialPreset(const EvaluatedMaterialPreset&)     = default;
@@ -188,7 +191,10 @@ struct EvaluatedMaterialPreset
     EvaluatedMaterialPreset& operator=(const EvaluatedMaterialPreset&) = default;
     EvaluatedMaterialPreset& operator=(EvaluatedMaterialPreset&&) noexcept = default;
 
-    explicit EvaluatedMaterialPreset(Preset&& preset) : preset(std::move(preset)) {}
+    EvaluatedMaterialPreset(Preset&& preset, OptMatchRule&& match_rule) :
+        preset(std::move(preset)),
+        mat_db_match_rule(std::move(match_rule))
+    {}
 
 };
 

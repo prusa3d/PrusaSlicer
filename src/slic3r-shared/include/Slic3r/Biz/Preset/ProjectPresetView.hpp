@@ -4,6 +4,7 @@
 #include <utility>
 #include <range/v3/view/concat.hpp>
 #include <range/v3/view/map.hpp>
+#include <range/v3/view/filter.hpp>
 #include <range/v3/view/transform.hpp>
 #include <range/v3/algorithm/find_if.hpp>
 
@@ -346,6 +347,35 @@ public:
             bundle_view | Details::view_pack_as_pair<Value, false>(),
             runtime_span | Details::view_pack_as_pair<Value, true>()
         );
+    }
+
+    /**
+     * @brief Get iterator-like view over material MatDbMatchRules (pair of preset_id and the rule).
+     * @return For-range interable of `std::pair<std::string, Domain::Preset::MatDbMatchRule>` where
+     * `first` is material preset_id that matches matdb record with rule returned as `second`.
+     */
+    [[nodiscard]] auto match_rules() const
+    {
+        const auto bundle_printer = m_bundle.find_printer_preset(m_hw_config_id, m_printer_id);
+        const auto bundle_print =
+            bundle_printer ? bundle_printer->find_print_preset_by_id(m_print_id) : nullptr;
+        const auto bundle_span = bundle_print == nullptr ?
+            std::span<const ValueParent>{} :
+            bundle_print->materials.at(m_slot_index);
+        return bundle_span
+            | ranges::views::
+                filter([](const ValueParent& material_preset)
+                       { return material_preset.mat_db_match_rule.has_value(); })
+            | ranges::views::transform(
+                   [](const ValueParent& material_preset)
+                       -> std::pair<const Value&, const Domain::Preset::MatDbMatchRule&>
+                   {
+                       return {
+                           material_preset.preset,
+                           material_preset.mat_db_match_rule.value()
+                       };
+                   }
+            );
     }
 
     [[nodiscard]] const Value* find_with_same_values(const Value& v) const

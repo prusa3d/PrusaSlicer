@@ -417,6 +417,11 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->location = Domain::AppConfigLocation{};
     def->category = Domain::ConfigItemDef::Category::Hidden;
     def->init_fn  = []() { return Domain::ConfigValue{false}; };
+
+    def = defs.add("last_material_selection_dialog_tab", typeid(int));
+    def->location = Domain::AppConfigLocation{};
+    def->category = Domain::ConfigItemDef::Category::Hidden;
+    def->init_fn  = []() { return Domain::ConfigValue{0}; };
 }
 
 tl::expected<std::unique_ptr<AppConfig>, std::string> AppConfig::load_appconfig(const std::string& filename)

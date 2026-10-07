@@ -157,7 +157,7 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
     {Icon::PlusModifier, "plus_modifier"},
 
     // Physical printer
-    {Icon::ExportToSD, "export_to_sd"},    
+    {Icon::ExportToSD, "export_to_sd"},
     {Icon::ConnectUpload, "connect_gcode"},
     {Icon::ExportToLocal, "save"},
 
@@ -250,9 +250,10 @@ static const std::unordered_map<Icon, const char*> ICON_FILENAMES = {
     {Icon::ArrowRight, "arrow_right"},
     {Icon::Filter, "filter"},
     {Icon::Robot, "robot"},
+    {Icon::SpoolBig, "spool_big"},
 };
 
-static const std::unordered_set<Icon> ICON_PNG = {};
+static const std::unordered_set<Icon> ICON_PNG = {Icon::SpoolBig};
 
 std::string ImguiIconHelper::icon_path(Icon icon)
 {

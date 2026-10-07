@@ -1,4 +1,4 @@
-#include "Slic3r/App/MaterialSettingsDialog.hpp"
+#include "Slic3r/App/Material/MaterialSettingsDialog.hpp"
 
 #include "Slic3r/Biz/OverridableConfigBoxInteractor.hpp"
 #include "Slic3r/Biz/OverridableConfigBoxObservableList.hpp"
@@ -10,8 +10,8 @@
 #include "Slic3r/App/Navigator.hpp"
 #include "Slic3r/App/CurrentPresetLabel.hpp"
 #include "Slic3r/App/Yoga/Separator.hpp"
-#include "Slic3r/App/MaterialSelectionDialog.hpp"
 #include "Slic3r/App/Yoga/StackLayout.hpp"
+#include "Slic3r/App/Material/MaterialSelectionDialog.hpp"
 #include "Slic3r/App/AppServices.hpp"
 #include "Slic3r/App/IDialogManager.hpp"
 

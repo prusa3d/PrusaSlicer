@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <boost/lexical_cast.hpp>
 
 const constexpr float INV_255 = 1.f / 255.f;
 
@@ -206,19 +207,27 @@ Domain::ColorRGB opposite(const Domain::ColorRGB& a, const Domain::ColorRGB& b)
     return {out_r, out_g, out_b};
 }
 
-bool can_decode_color(const std::string& color)
+bool can_decode_color(std::string_view color)
 {
-    return color.size() == 7 && color.front() == '#';
+    auto is_valid_hex_char = [](char ch)
+    {
+        return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F');
+    };
+    return color.size() == 7
+        && color.front() == '#'
+        && std::ranges::all_of(color.begin() + 1, color.end(), is_valid_hex_char);
 }
 
-bool decode_color(const std::string& color_in, Domain::ColorRGB& color_out)
+static int hex_digit_to_int(const char c) {
+    return
+        (c >= '0' && c <= '9') ? int(c - '0') :
+        (c >= 'A' && c <= 'F') ? int(c - 'A') + 10 :
+        (c >= 'a' && c <= 'f') ? int(c - 'a') + 10 : -1;
+};
+
+
+bool decode_color(std::string_view color_in, Domain::ColorRGB& color_out)
 {
-    auto hex_digit_to_int = [](const char c) {
-        return
-            (c >= '0' && c <= '9') ? int(c - '0') :
-            (c >= 'A' && c <= 'F') ? int(c - 'A') + 10 :
-            (c >= 'a' && c <= 'f') ? int(c - 'a') + 10 : -1;
-    };
 
     color_out = Domain::ColorRGB::BLACK();
     if (can_decode_color(color_in)) {
@@ -239,13 +248,24 @@ bool decode_color(const std::string& color_in, Domain::ColorRGB& color_out)
     return true;
 }
 
-bool decode_color(const std::string& color_in, Domain::ColorRGBA& color_out)
+bool decode_color(std::string_view color_in, Domain::ColorRGBA& color_out)
 {
     Domain::ColorRGB rgb;
+    float a = color_out.a();
+    if (color_in.length() == 9) {
+        // the alpha is encoded there
+        const int digit1 = hex_digit_to_int(color_in.at(7));
+        const int digit2 = hex_digit_to_int(color_in.at(8));
+        if (digit1 != -1 && digit2 != -1) {
+            a = float(digit1 * 16 + digit2) * INV_255;
+        }
+        color_in = color_in.substr(0, 7);
+    }
+
     if (!decode_color(color_in, rgb))
         return false;
 
-    color_out = to_rgba(rgb, color_out.a());
+    color_out = to_rgba(rgb, a);
     return true;
 }
 

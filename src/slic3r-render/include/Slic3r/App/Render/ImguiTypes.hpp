@@ -223,6 +223,9 @@ enum class Icon : wchar_t
     CheckMark,
     Robot,
 
+    // PNGs
+    SpoolBig,
+
     // FontIconS
     // DO NOT TOUCH, DO NOT CHANGE ORDER
     // This has to be in sync with the icon font file

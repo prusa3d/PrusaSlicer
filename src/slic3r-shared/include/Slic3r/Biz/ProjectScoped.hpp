@@ -54,6 +54,11 @@ public:
         return it->second;
     }
 
+    Domain::SelectionId selected_project_id() const
+    {
+        return m_project_interactor.selected_project_id();
+    }
+
     T& selected()
     {
         return project(m_project_interactor.selected_project_id());

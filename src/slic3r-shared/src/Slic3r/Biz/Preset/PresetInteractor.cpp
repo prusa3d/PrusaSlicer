@@ -1430,6 +1430,7 @@ void PresetInteractor::fill_config_container_with_selected_preset(
 
         resize_tool_dependant_presets(hw_config, selected_preset.tools);
         resize_tool_dependant_presets(hw_config, selected_preset.materials);
+        resize_tool_dependant_presets(hw_config, selected_preset.material_matdb_uuids);
 
         // Set transferred values after switch to new selected preset
         process_operation_from_unsaved_changes(selected_preset, PresetDiffOperation::Transfer, bag, kind);
@@ -1493,13 +1494,15 @@ void PresetInteractor::fill_config_container_with_selected_preset(
     // we need to get fresh print preset reference, as the eventual save may invalidate `print`
     const auto& reloaded_print =
         get_print_preset(printer_hw_config_id, printer_preset_id, print_id).first.get();
+    const auto mat_size = materials.size();
     selected_preset = Domain::Preset::SelectedPreset{
         .hw_config = hw_config,
         .printer   = reloaded_printer_preset,
         .print     = reloaded_print,
         .tools     = std::move(tools),
-        .materials = std::move(materials)
-};
+        .materials = std::move(materials),
+        .material_matdb_uuids = Domain::Preset::MatDbUuids{mat_size}
+    };
 
     // Set transfered values after switch to new selected preset
     process_operation_from_unsaved_changes(selected_preset, PresetDiffOperation::Transfer, bag);
@@ -1832,7 +1835,7 @@ void PresetInteractor::fill_materials_presets(
         const auto& item             = material_presets.items().at(
             changed_selected_index.value_or(material_presets.selected_index())
         );
-        select_material_preset_internal(slot_index, item.id, no_data_update, bag);
+        select_material_preset_internal(slot_index, item.id, no_data_update, std::nullopt, bag);
     }
 }
 
@@ -2158,6 +2161,7 @@ void PresetInteractor::select_material_preset_internal(
     size_t material_index,
     const std::string id, // intentionally copied
     bool no_data_update,
+    const std::optional<std::string>& matdb_uuid,
     ListenerInvokeLaterBag& bag
 )
 {
@@ -2184,6 +2188,11 @@ void PresetInteractor::select_material_preset_internal(
         material_index,
         selected_preset.materials[material_index].id
     );
+
+    if (matdb_uuid.has_value()) {
+        mutable_selected_printer_preset()
+            .set_material_matdb_uuid(material_index, matdb_uuid.value());
+    }
 
     m_material_accessors.at(&m_material_cbi_list.at(material_index))
         .set_config_box(
@@ -2215,10 +2224,10 @@ void PresetInteractor::select_material_preset_internal(
     });
 }
 
-void PresetInteractor::select_material_preset(size_t material_index, const std::string& id, bool user)
+void PresetInteractor::select_material_preset(size_t material_index, const std::string& id, bool user, const std::optional<std::string>& matdb_uuid)
 {
     ListenerInvokeLaterBag bag;
-    select_material_preset_internal(material_index, id, false, bag);
+    select_material_preset_internal(material_index, id, false, matdb_uuid, bag);
     bag.add([this] { invoke_slicing_input_changed(); });
 
     if (user) {
@@ -2332,6 +2341,22 @@ bool PresetInteractor::select_printer_sheet(const std::string& id, bool user)
     }
 
     return successfully_changed;
+}
+
+void PresetInteractor::set_material_matdb_uuid(size_t material_index, const std::string& uuid)
+{
+    mutable_selected_printer_preset().set_material_matdb_uuid(material_index, uuid);
+    const auto cc_id = m_project_contexts.at(m_selected_project_id).selected_config_container_id;
+    invoke_listeners<IPresetChangedListener>(
+        [&](auto* l)
+        {
+            l->on_preset_selection_changed(
+                m_selected_project_id,
+                cc_id,
+                PresetItemType::MaterialPreset
+            );
+        }
+    );
 }
 
 bool PresetInteractor::change_hw_config_and_validate(

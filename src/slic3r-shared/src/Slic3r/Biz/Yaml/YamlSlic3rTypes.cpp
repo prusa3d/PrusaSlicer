@@ -12,6 +12,8 @@ Result<Domain::JsonValue> parse_json_value(const YamlAdapter::NodeRef& node)
     case NodeType::Mapping:
         return TypeTraits<Domain::JsonObject>::parse(node);
     case NodeType::Scalar:
+        if (node.is_null())
+            return nullptr;
         if (auto v = TypeTraits<bool>::parse(node); v.has_value())
             return v;
         if (auto v = TypeTraits<double>::parse(node); v.has_value())

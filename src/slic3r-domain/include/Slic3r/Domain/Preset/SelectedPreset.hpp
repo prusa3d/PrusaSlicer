@@ -6,6 +6,8 @@
 namespace Slic3r::Domain::Preset {
 
 using EvaluatedPresetMetadatas = std::vector<EvaluatedPresetMetadata>;
+using MatDbUuids = std::vector<std::string>;
+
 struct SelectedPresetMetadata
 {
     HwPrinterConfig hw_config;
@@ -13,6 +15,7 @@ struct SelectedPresetMetadata
     EvaluatedPresetMetadata print;
     EvaluatedPresetMetadatas tools;
     EvaluatedPresetMetadatas materials;
+    MatDbUuids material_matdb_uuids;
 };
 
 struct SelectedPreset
@@ -22,6 +25,8 @@ struct SelectedPreset
     EvaluatedPrintPreset::Preset print;
     std::vector<EvaluatedToolPrintPreset::Preset> tools;
     std::vector<EvaluatedMaterialPreset::Preset> materials;
+    MatDbUuids material_matdb_uuids;
+
 
     PrinterTechnology technology() const
     {
@@ -32,6 +37,9 @@ struct SelectedPreset
     [[nodiscard]] std::string bed_texture() const;
 
     ConfigPack config() const;
+
+    void set_material_matdb_uuid(size_t slot_index, std::string_view material_matdb_uuid);
+    std::string_view material_matdb_uuid(size_t slot_index) const;
 
     static SelectedPreset make(const SelectedPresetMetadata& metadata, const ConfigPack& config);
     SelectedPresetMetadata metadata() const;

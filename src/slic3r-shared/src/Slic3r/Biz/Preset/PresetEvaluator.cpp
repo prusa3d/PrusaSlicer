@@ -1,4 +1,7 @@
 #include "Slic3r/Biz/Preset/PresetEvaluator.hpp"
+
+#include "PresetMatchRuleFactor.hpp"
+
 #include <fmt/ranges.h>
 #include "Slic3r/Biz/Preset/PresetCollectionEvaluator.hpp"
 #include "Slic3r/Biz/Preset/ValueMapBuilder.hpp"
@@ -655,7 +658,8 @@ PresetEvaluator::EvaluatedPrinterPresets PresetEvaluator::evaluate(const HwPrint
                             hw_config,
                             mat_kind,
                             mat
-                        )
+                        ),
+                        make_match_rule(mat.features)
                     );
                 }
                 if (use_material_cache) {
