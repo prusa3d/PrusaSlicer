@@ -50,36 +50,59 @@ std::vector<Domain::ColorRGB> hex_colors_to_rgb(const std::vector<std::string>& 
 // The technology specific part of the colors. They are handled as one color per material slot;
 // each technology stores them in its own project settings.
 
-bool has_colors(const Domain::ConfigContainer& cc)
+// FFF stores a color per extruder (extruder_colour), SLA the one resin color (resin_colour).
+
+bool is_fff(const Domain::ConfigContainer& cc)
 {
     return cc.print_technology() == Domain::PrinterTechnology::FFF;
+}
+
+bool has_colors(const Domain::ConfigContainer& cc)
+{
+    return is_fff(cc) || cc.print_technology() == Domain::PrinterTechnology::SLA;
 }
 
 std::vector<std::string> stored_colors(const Domain::ConfigContainer& cc)
 {
     ASSERT(has_colors(cc));
-    return cc.project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+    if (is_fff(cc)) {
+        return cc.project_settings().items.opt("extruder_colour").get<std::vector<std::string>>();
+    }
+    return {cc.sla_project_settings().items.opt("resin_colour").get<std::string>()};
 }
 
 void set_stored_colors(Domain::ConfigContainer& cc, std::vector<std::string> colors)
 {
     ASSERT(has_colors(cc));
-    cc.project_settings().items.opt("extruder_colour").set(std::move(colors));
+    if (is_fff(cc)) {
+        cc.project_settings().items.opt("extruder_colour").set(std::move(colors));
+        return;
+    }
+    ASSERT(colors.size() == 1);
+    cc.sla_project_settings().items.opt("resin_colour").set(std::move(colors.front()));
 }
 
 size_t material_slot_count(const Domain::ConfigContainer& cc)
 {
     ASSERT(has_colors(cc));
-    const Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc.selected_preset());
-    return preset_config_pack.filament_size();
+    if (is_fff(cc)) {
+        const Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc.selected_preset());
+        return preset_config_pack.filament_size();
+    }
+    return cc.selected_preset().materials.size();
 }
 
 // The color of the material preset in the slot, which must exist.
 std::string preset_material_color(const Domain::ConfigContainer& cc, size_t slot)
 {
     ASSERT(has_colors(cc));
-    const Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc.selected_preset());
-    return preset_config_pack.get_filament(slot).items.opt("filament_colour").get<std::string>();
+    if (is_fff(cc)) {
+        const Domain::Preset::SelectedPresetConfigPack preset_config_pack(cc.selected_preset());
+        return preset_config_pack.get_filament(slot).items.opt("filament_colour").get<std::string>();
+    }
+    return std::get<Domain::SLAMaterialSettings>(cc.selected_preset().materials.at(slot).values)
+        .items.opt("material_colour")
+        .get<std::string>();
 }
 
 } // namespace
@@ -102,15 +125,10 @@ std::vector<Domain::ColorRGB> ProjectSettingsInteractor::get_colors(
 ) const
 {
     const Domain::ConfigContainer* cc = find_config_container(project_id, config_container_id);
-    if (!cc)
+    if (!cc || !has_colors(*cc))
         return {};
 
-    const Domain::ConfigItem* hex_colors_item =
-        cc->project_settings().items.find("extruder_colour");
-
-    return hex_colors_item ?
-        hex_colors_to_rgb(hex_colors_item->value().get<std::vector<std::string>>()) :
-        std::vector<Domain::ColorRGB>{};
+    return hex_colors_to_rgb(stored_colors(*cc));
 }
 
 void ProjectSettingsInteractor::set_color_from_user(

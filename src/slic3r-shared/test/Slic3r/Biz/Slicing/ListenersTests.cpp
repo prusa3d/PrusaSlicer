@@ -904,3 +904,36 @@ TEST_CASE_METHOD(SlicingFixture, "SLA slicing reads the options of every support
         return !events.empty() && events.back().status_code == StatusCode::Finished;
     }));
 }
+
+TEST_CASE_METHOD(SlicingFixture, "Changing the resin color of an SLA bed doesn't need a reslice", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    SLAResultListener result_listener;
+    slicing.set_listener<ISLAResultListener>(&result_listener);
+
+    const auto update_and_slice = [&]() {
+        status_listener.status_events.clear();
+        slicing.update_process(
+            bed.model,
+            bed.project_metadata,
+            bed.preset_metadata,
+            bed.config,
+            bed.bed_instance
+        );
+        slicing.slice_all();
+        REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+            return !events.empty() && events.back().status_code == StatusCode::Finished;
+        }));
+    };
+
+    update_and_slice();
+    REQUIRE(result_listener.result.export_data);
+
+    // The color is not used for slicing, so the result stays valid.
+    std::get<ConfigPackSLA>(bed.config)
+        .sla_project_settings.items.opt("resin_colour")
+        .set(std::string{"#123456"});
+    update_and_slice();
+    CHECK(result_listener.result.export_data);
+}

@@ -278,6 +278,15 @@ void sla_config_init_fn(ConfigDefinitions& defs)
     def->tooltip = L("This is only used in the Slic3r interface as a visual help.");
     def->init_fn = init_with("#29B2B2");
 
+    // The color of the resin used in the project, the SLA twin of extruder_colour. Empty means
+    // not resolved yet (the material color is used then).
+    def = defs.add("resin_colour", typeid(std::string));
+    def->location = Project;
+    def->label = "Resin Color";
+    def->category = ConfigItemDef::Category::Hidden;
+    def->gui_type = ConfigItemDef::GUIType::color;
+    def->init_fn = init_with("");
+
     def = defs.add("material_type", typeid(std::string));
     def->location = Material;
     def->label = L("SLA material type");
