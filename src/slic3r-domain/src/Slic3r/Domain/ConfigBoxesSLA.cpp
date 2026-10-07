@@ -12,4 +12,6 @@ SLAPrinterSettings::SLAPrinterSettings() : ConfigBox(get_defs_sla(), SLAConfigLo
 
 SLAObjectSettings::SLAObjectSettings() : ConfigBox(get_defs_sla(), SLAConfigLocation::Object) {}
 
+SLAProjectSettings::SLAProjectSettings() : ConfigBox(get_defs_sla(), SLAConfigLocation::Project) {}
+
 } // namespace Slic3r::Domain

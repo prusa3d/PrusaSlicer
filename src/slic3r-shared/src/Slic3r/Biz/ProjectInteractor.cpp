@@ -40,6 +40,7 @@ using Slic3r::Domain::ConfigContainer;
 using Slic3r::Domain::ConfigItem;
 using Slic3r::Domain::ConfigPack;
 using Slic3r::Domain::ConfigPackFDM;
+using Slic3r::Domain::ConfigPackSLA;
 using Slic3r::Domain::ElementRefs;
 using Slic3r::Domain::ModelObject;
 using Slic3r::Domain::ModelVolume;
@@ -427,6 +428,8 @@ tl::expected<SelectionId, std::string> ProjectInteractor::new_project_with_prese
     config_container.mutable_selected_preset() = SelectedPreset::make(preset_metadata, config_pack);
     if (const ConfigPackFDM* config_pack_fdm = std::get_if<ConfigPackFDM>(&config_pack)) {
         config_container.project_settings() = config_pack_fdm->project;
+    } else if (const ConfigPackSLA* config_pack_sla = std::get_if<ConfigPackSLA>(&config_pack)) {
+        config_container.sla_project_settings() = config_pack_sla->sla_project_settings;
     }
 
     return do_load_project(std::move(project));

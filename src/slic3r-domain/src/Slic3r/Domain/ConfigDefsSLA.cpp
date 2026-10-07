@@ -20,9 +20,10 @@ using SLAConfigLocation::Printer;
 using SLAConfigLocation::Material;
 using SLAConfigLocation::Print;
 using SLAConfigLocation::Object;
+using SLAConfigLocation::Project;
 
 const ConfigDefinitions& get_defs_sla() {
-    static ConfigDefinitions defs_sla({Printer, Print, Material, Object}, sla_config_init_fn);
+    static ConfigDefinitions defs_sla({Printer, Print, Material, Object, Project}, sla_config_init_fn);
     return defs_sla;
 }
 

@@ -49,6 +49,16 @@ public:
         return m_project_settings;
     }
 
+    Domain::SLAProjectSettings& sla_project_settings()
+    {
+        return m_sla_project_settings;
+    }
+
+    const Domain::SLAProjectSettings& sla_project_settings() const
+    {
+        return m_sla_project_settings;
+    }
+
     VirtualExtruders& virtual_extruders()
     {
         return m_virtual_extruders;
@@ -101,6 +111,7 @@ public:
 private:
     Preset::SelectedPreset m_preset{};
     Domain::ProjectSettings m_project_settings;
+    Domain::SLAProjectSettings m_sla_project_settings;
     VirtualExtruders m_virtual_extruders;
 
     const Bed* m_bed{nullptr};

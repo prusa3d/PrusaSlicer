@@ -29,3 +29,17 @@ TEST_CASE("Default fdm config pack roundtrip", "[ConfigRoundtrip]")
     CHECK(load_result.issues.empty());
     CHECK(config == result_config_pack);
 }
+
+TEST_CASE("Default sla config pack roundtrip", "[ConfigRoundtrip]")
+{
+    const HwPrinterConfig hw_config{.technology = PrinterTechnology::SLA};
+    const ConfigPackSLA config;
+    const ordered_json json = as_boxes(config);
+    CHECK(json.contains("sla_project_settings"));
+    const auto result{load(json, hw_config)};
+    REQUIRE(result);
+    const LoadResult& load_result{result.value()};
+    const auto& result_config_pack{std::get<ConfigPackSLA>(load_result.config)};
+    CHECK(load_result.issues.empty());
+    CHECK(config == result_config_pack);
+}

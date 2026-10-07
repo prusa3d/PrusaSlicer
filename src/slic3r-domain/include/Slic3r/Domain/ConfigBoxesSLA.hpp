@@ -27,5 +27,10 @@ class SLAObjectSettings : public ConfigBox
 public:
     SLAObjectSettings();
 };
+class SLAProjectSettings : public ConfigBox
+{
+public:
+    SLAProjectSettings();
+};
 
 } // namespace Slic3r::Domain

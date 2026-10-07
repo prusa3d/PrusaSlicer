@@ -38,6 +38,7 @@ struct ConfigPackSLA
     Domain::SLAPrinterSettings sla_printer_settings;
     Domain::SLAMaterialSettings sla_material_settings;
     Domain::SLAPrintSettings sla_print_settings;
+    Domain::SLAProjectSettings sla_project_settings;
 
     bool operator==(const ConfigPackSLA&) const = default;
 

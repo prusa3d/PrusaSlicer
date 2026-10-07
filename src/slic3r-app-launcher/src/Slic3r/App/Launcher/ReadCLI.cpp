@@ -774,7 +774,8 @@ void add_sla_config_boxes_overrides(CLI::App& app, App::InitParams& params)
     const ConstConfigBoxRefs config_boxes = {
         sla_config_pack.sla_print_settings,
         sla_config_pack.sla_printer_settings,
-        sla_config_pack.sla_material_settings
+        sla_config_pack.sla_material_settings,
+        sla_config_pack.sla_project_settings
     };
 
     add_config_boxes_overrides(app, params, config_boxes);

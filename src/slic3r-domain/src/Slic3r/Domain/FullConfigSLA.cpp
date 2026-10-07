@@ -7,6 +7,7 @@ BoxOrBoxesVector as_boxes(const ConfigPackSLA& config_pack) {
     result.push_back(config_pack.sla_printer_settings);
     result.push_back(config_pack.sla_print_settings);
     result.push_back(config_pack.sla_material_settings);
+    result.push_back(config_pack.sla_project_settings);
     return result;
 }
 

@@ -394,6 +394,51 @@ TEST_CASE_METHOD(
 }
 
 TEST_CASE_METHOD(
+    ConfigLoadSLAFixture,
+    "Loading SLA config without project settings works",
+    "[ConfigLoad]"
+)
+{
+    // The fixture has no "sla_project_settings", as configurations saved before they existed.
+    const auto result{load(json, sla_hw_config)};
+    REQUIRE(result.has_value());
+    CHECK(
+        std::get<ConfigPackSLA>(result->config).sla_project_settings
+        == ConfigPackSLA{}.sla_project_settings
+    );
+    CHECK(!result->issues.contains(SLAConfigLocation::Project));
+}
+
+TEST_CASE_METHOD(
+    ConfigLoadSLAFixture,
+    "Loading SLA project settings reports their issues",
+    "[ConfigLoad]"
+)
+{
+    json["sla_project_settings"] = {{"unknown_key", 1}};
+
+    const auto result{load(json, sla_hw_config)};
+    REQUIRE(result.has_value());
+    CHECK(
+        get_issue(result->issues, SLAConfigLocation::Project, "unknown_key")
+        == ItemParsingIssueType::ExtraKey
+    );
+}
+
+TEST_CASE_METHOD(
+    ConfigLoadSLAFixture,
+    "Loading fails if SLA project settings are not an object",
+    "[ConfigLoad]"
+)
+{
+    json["sla_project_settings"] = ordered_json::array();
+
+    const auto result{load(json, sla_hw_config)};
+    REQUIRE(!result.has_value());
+    CHECK(result.error() == GlobalParsingIssue::InvalidSLAProjectSettings);
+}
+
+TEST_CASE_METHOD(
     ConfigLoadFDMFixture,
     "Tool count is determined based on the hw config",
     "[ConfigLoad]"

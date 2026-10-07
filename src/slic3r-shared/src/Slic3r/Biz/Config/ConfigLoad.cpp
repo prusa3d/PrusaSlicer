@@ -25,6 +25,7 @@ using Domain::SLAConfigLocation;
 using Domain::SLAMaterialSettings;
 using Domain::SLAPrinterSettings;
 using Domain::SLAPrintSettings;
+using Domain::SLAProjectSettings;
 using Domain::ToolPrintSettings;
 using nlohmann::ordered_json;
 using Domain::Vec2d;
@@ -330,6 +331,17 @@ tl::expected<LoadResult, GlobalParsingIssue> load_sla(const ordered_json& json)
     SLAPrintSettings print_settings;
     const auto print_issues = load_box(json[print_location_name], print_settings);
 
+    // Optional: SLA configurations saved before the SLA project settings existed don't have them.
+    const std::string project_location_name{get_location_name(SLAConfigLocation::Project)};
+    SLAProjectSettings project_settings;
+    BoxIssues project_issues;
+    if (json.contains(project_location_name)) {
+        if (!is_object(project_location_name, json)) {
+            return tl::unexpected{GlobalParsingIssue::InvalidSLAProjectSettings};
+        }
+        project_issues = load_box(json[project_location_name], project_settings);
+    }
+
     IssuesPerLocation issues;
     if (!printer_issues.empty()) {
         issues.insert({SLAConfigLocation::Printer, printer_issues});
@@ -340,6 +352,9 @@ tl::expected<LoadResult, GlobalParsingIssue> load_sla(const ordered_json& json)
     if (!print_issues.empty()) {
         issues.insert({SLAConfigLocation::Print, print_issues});
     }
+    if (!project_issues.empty()) {
+        issues.insert({SLAConfigLocation::Project, project_issues});
+    }
 
     return LoadResult{
         .config =
@@ -347,6 +362,7 @@ tl::expected<LoadResult, GlobalParsingIssue> load_sla(const ordered_json& json)
                 .sla_printer_settings = printer_settings,
                 .sla_material_settings = material_settings,
                 .sla_print_settings = print_settings,
+                .sla_project_settings = project_settings,
             },
         .issues = std::move(issues)
     };

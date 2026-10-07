@@ -34,6 +34,7 @@ enum class SLAConfigLocation
     Material,
     Print,
     Object,
+    Project,
 };
 
 enum class CompatibilityRule

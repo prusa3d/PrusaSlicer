@@ -198,9 +198,10 @@ static bool apply_preset_and_config(CLIRuntime& runtime, const PresetAndConfig& 
                 project_interactor.selected_config_container().project_settings() =
                     config_pack_fdm.project;
             },
-            [](const ConfigPackSLA&)
+            [&project_interactor](const ConfigPackSLA& config_pack_sla)
             {
-                // TODO: Copy the SLA project settings once ConfigPackSLA has them.
+                project_interactor.selected_config_container().sla_project_settings() =
+                    config_pack_sla.sla_project_settings;
             }
         },
         preset_and_config.config_pack
@@ -415,6 +416,13 @@ static bool apply_config_overrides(CLIRuntime& runtime, const InitParams& init_p
             }
 
             const SLAConfigLocation& sla_location = std::get<SLAConfigLocation>(location);
+            if (sla_location == SLAConfigLocation::Project) {
+                config_container.sla_project_settings()
+                    .items.opt(option_name)
+                    .set(config_item_override.value());
+                continue;
+            }
+
             if (sla_location != SLAConfigLocation::Printer
                 && sla_location != SLAConfigLocation::Print
                 && sla_location != SLAConfigLocation::Material)

@@ -1044,7 +1044,7 @@ static Project convert_to_project(Loaded3MF&& loaded_3mf, IMessageDialogProvider
                 );
             }
         } else if (const auto& sla_config_pack = std::get_if<Domain::ConfigPackSLA>(&cc_data.config_pack)) {
-            // TODO: cc.project_settings() = sla_config_pack->project;
+            cc.sla_project_settings() = sla_config_pack->sla_project_settings;
         } else {
             PANIC("Unhandled variant of config pack");
         }
