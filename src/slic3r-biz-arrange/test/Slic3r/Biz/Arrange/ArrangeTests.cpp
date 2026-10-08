@@ -341,3 +341,37 @@ TEST_CASE("Arrange works with segmented bed and pivot", "[Arrange][Integration]"
 
     CHECK(result->packed.at(0).get_translation() == Vec2crd{scaled(55.0), scaled(5.0)});
 }
+
+TEST_CASE("Invalid arrange items are reported as not packed", "[Arrange][Integration]")
+{
+    const Settings settings;
+
+    std::vector<InputShape> squares{get_square(scaled(10.0)), get_square(scaled(10.0))};
+    squares.front().element_ref = ElementRef{1, 2};
+    squares.back().element_ref  = ElementRef{3, 4};
+
+    // Degenerate shape: a sliver thinner than the simplification tolerance vanishes.
+    InputShape sliver{ElementRef{5, 6}, {{Vec2crd{0, 0}, Vec2crd{scaled(10.0), 0}, Vec2crd{0, 1}}}};
+    squares.insert(squares.begin() + 1, sliver);
+
+    const std::vector<ArrangeItem> arrange_items{to_arrange_items(squares, settings)};
+    REQUIRE(arrange_items.size() == 3);
+    CHECK(arrange_items.at(0).is_valid());
+    CHECK_FALSE(arrange_items.at(1).is_valid());
+    CHECK(arrange_items.at(2).is_valid());
+    CHECK(arrange_items.at(1).get_element_ref() == ElementRef{5, 6});
+
+    const BoundingBox2crd bed_bb{scaled(Vec2d{0.0, 0.0}), scaled(Vec2d{100.0, 100.0})};
+    const Points bed{get_rectangle_bed(bed_bb)};
+
+    const std::optional<ArrangeResult> result{arrange(bed, arrange_items, {}, settings, []() {
+        return false;
+    })};
+    REQUIRE(result);
+
+    CHECK(result->packed.size() == 2);
+    CHECK(is_collision_free(result->packed));
+    REQUIRE(result->not_packed.size() == 1);
+    CHECK_FALSE(result->not_packed.front().is_valid());
+    CHECK(result->not_packed.front().get_element_ref() == ElementRef{5, 6});
+}

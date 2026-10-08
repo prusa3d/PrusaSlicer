@@ -228,15 +228,31 @@ std::vector<ArrangeItem> to_arrange_items(const std::vector<InputShape>& items, 
 
 std::optional<ArrangeResult> arrange(
     const Domain::Points& bed_contour,
-    std::vector<ArrangeItem>& items,
+    const std::vector<ArrangeItem>& items,
     const std::vector<ArrangeItem>& fixed_items,
     const Settings& settings,
     StopCondition stop_condition
 )
 {
+    ArrangeResult result;
+    std::vector<ArrangeItem> valid_items;
+    for (const ArrangeItem& item : items) {
+        if (item.is_valid()) {
+            valid_items.push_back(item);
+        } else {
+            result.not_packed.push_back(item);
+        }
+    }
+    std::vector<ArrangeItem> valid_fixed_items;
+    for (const ArrangeItem& item : fixed_items) {
+        if (item.is_valid()) {
+            valid_fixed_items.push_back(item);
+        }
+    }
+
     const std::unique_ptr<IBed> bed{guess_bed(bed_contour, settings)};
     if (settings.allow_rotations) {
-        for (ArrangeItem& item : items) {
+        for (ArrangeItem& item : valid_items) {
             item.allow_rotations(*bed);
         }
     }
@@ -246,7 +262,7 @@ std::optional<ArrangeResult> arrange(
     {
         base_kernel = std::make_unique<Kernels::GravityKernel>();
     } else {
-        base_kernel = std::make_unique<Kernels::TMArrangeKernel>(items.size(), bed->area());
+        base_kernel = std::make_unique<Kernels::TMArrangeKernel>(valid_items.size(), bed->area());
     }
 
     std::unique_ptr<Kernels::IKernel> final_kernel;
@@ -256,7 +272,7 @@ std::optional<ArrangeResult> arrange(
     const bool use_overfit{
         settings.strategy == Strategy::Overfit
         && dynamic_cast<const RectangleBed*>(bed.get()) != nullptr
-        && fixed_items.empty()
+        && valid_fixed_items.empty()
     };
 
     if (use_overfit) {
@@ -270,11 +286,11 @@ std::optional<ArrangeResult> arrange(
         final_bed    = bed.get();
     }
 
-    const auto wipe_tower_it{std::ranges::find_if(items, [](const ArrangeItem& item){
+    const auto wipe_tower_it{std::ranges::find_if(valid_items, [](const ArrangeItem& item){
         return item.is_wipe_tower;
     })};
 
-    if (use_overfit && wipe_tower_it != items.end()) {
+    if (use_overfit && wipe_tower_it != valid_items.end()) {
         final_kernel =
             std::make_unique<Kernels::WipeTowerPositioningKernel>(std::move(final_kernel));
     }
@@ -294,12 +310,13 @@ std::optional<ArrangeResult> arrange(
         stop_condition
     };
 
-    ArrangeResult result;
     PackingContext context;
-    context.add_fixed_items(fixed_items);
-    for (std::size_t i{}; i < items.size(); ++i) {
-        ArrangeItem& item{items[i]};
-        const bool packed{packer.pack(*final_bed, item, context, std::span{items}.subspan(i + 1))};
+    context.add_fixed_items(valid_fixed_items);
+    for (std::size_t i{}; i < valid_items.size(); ++i) {
+        ArrangeItem& item{valid_items[i]};
+        const bool packed{
+            packer.pack(*final_bed, item, context, std::span{valid_items}.subspan(i + 1))
+        };
         if (packed) {
             context.add_packed_item(item);
             result.packed.push_back(item);

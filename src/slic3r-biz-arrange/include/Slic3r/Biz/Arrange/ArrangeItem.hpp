@@ -87,6 +87,8 @@ public:
 
     ArrangeItem(const InputShape& shape, const Settings& settings);
 
+    bool is_valid() const;
+
     void allow_rotations(const IBed& bed);
 
     const DecomposedShape& fixed_shape() const;

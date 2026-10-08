@@ -19,7 +19,7 @@ std::vector<ArrangeItem> to_arrange_items(const std::vector<InputShape>& items, 
 
 std::optional<ArrangeResult> arrange(
     const Domain::Points& bed_contour,
-    std::vector<ArrangeItem>& items,
+    const std::vector<ArrangeItem>& items,
     const std::vector<ArrangeItem>& fixed_items,
     const Settings& settings,
     StopCondition stop_condition

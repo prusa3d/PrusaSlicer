@@ -208,6 +208,7 @@ std::optional<double> get_fit_box_rotation(const ArrangeItem& itm, const Boundin
 } // namespace
 
 ArrangeItem::ArrangeItem(const InputShape& shape, const Settings& settings)
+    : m_element_ref{shape.element_ref}
 {
     using GeometryHandling::Arbitrary;
     using GeometryHandling::Convex;
@@ -217,6 +218,10 @@ ArrangeItem::ArrangeItem(const InputShape& shape, const Settings& settings)
     };
 
     offset_shape = simplify(offset_shape, settings.scaled_simplification_tolerance);
+
+    if (offset_shape.empty()) {
+        return;
+    }
 
     if (settings.fixed_geometry == Convex && settings.movable_geometry == Convex) {
         ConvexShape convex_shape{Algorithms::Geometry::convex_hull(offset_shape)};
@@ -232,12 +237,17 @@ ArrangeItem::ArrangeItem(const InputShape& shape, const Settings& settings)
     } else {
         PANIC("Arbitrary movable shaped geometry with convex fixed shape makes no sense!");
     }
+}
 
-    m_element_ref = shape.element_ref;
+bool ArrangeItem::is_valid() const
+{
+    ASSERT((m_fixed_shape == nullptr) == (m_movable_shape == nullptr));
+    return m_fixed_shape != nullptr;
 }
 
 void ArrangeItem::allow_rotations(const IBed& bed)
 {
+    ASSERT(is_valid());
     // Use the minimum bounding box rotation as a starting point.
     const double minbbr = get_min_area_bounding_box_rotation(*this);
     m_allowed_rotations = {
@@ -267,11 +277,13 @@ void ArrangeItem::allow_rotations(const IBed& bed)
 
 const DecomposedShape& ArrangeItem::fixed_shape() const
 {
+    ASSERT(is_valid());
     return *m_fixed_shape;
 }
 
 const DecomposedShape& ArrangeItem::movable_shape() const
 {
+    ASSERT(is_valid());
     return *m_movable_shape;
 }
 
@@ -282,11 +294,13 @@ const std::vector<double>& ArrangeItem::allowed_rotations() const
 
 const Domain::Vec2crd& ArrangeItem::get_translation() const
 {
+    ASSERT(is_valid());
     return m_fixed_shape->get_translation();
 }
 
 double ArrangeItem::get_rotation() const
 {
+    ASSERT(is_valid());
     return m_fixed_shape->get_rotation();
 }
 
@@ -297,18 +311,21 @@ Domain::ElementRef ArrangeItem::get_element_ref() const
 
 void ArrangeItem::set_translation(const Domain::Vec2crd& v)
 {
+    ASSERT(is_valid());
     m_fixed_shape->set_translation(v);
     m_movable_shape->set_translation(v);
 }
 
 void ArrangeItem::set_rotation(double v)
 {
+    ASSERT(is_valid());
     m_fixed_shape->set_rotation(v);
     m_movable_shape->set_rotation(v);
 }
 
 void ArrangeItem::update_caches() const
 {
+    ASSERT(is_valid());
     m_fixed_shape->reference_vertex();
     m_movable_shape->reference_vertex();
     m_fixed_shape->centroid();
@@ -384,6 +401,7 @@ ArbitraryShape ArrangeItem::calculate_nfp(
     StopCondition stopcond
 ) const
 {
+    ASSERT(is_valid());
     Domain::Polygons nfps = calculate_nfp_unnormalized(*this, packing_context.all_items(), stopcond);
 
     Domain::ExPolygons nfp_ex;
