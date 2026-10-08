@@ -13,6 +13,9 @@ namespace Slic3r::Domain {
 // for a threshold of a cross product of two non-normalized vectors etc.
 static constexpr double EPSILON = 1e-4;
 
+// Smallest layer height the slicer accepts; lower bound for `layer_height` and `min_layer_height`.
+static constexpr double MIN_LAYER_HEIGHT = 0.01;
+
 // TODO: this probably should not be here!
 template <typename Number>
 constexpr inline bool is_approx(Number value, Number test_value, Number precision = EPSILON)

@@ -1,6 +1,7 @@
 ﻿#include "Slic3r/Domain/ConfigCommon.hpp"
 
 #include "Slic3r/Domain/ConfigDef.hpp"
+#include "Slic3r/Domain/Constants.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Domain/ConfigDefUtils.hpp"
 
@@ -144,7 +145,7 @@ void init_common_fdm_sla_config_items(ConfigDefinitions& defs, const PrinterTech
     def->tooltip = L("This setting controls the height (and thus the total number) of the slices/layers. "
                    "Thinner layers give better accuracy but take more time to print.");
     def->units = {L("mm")};
-    def->min = 0;
+    def->min = (technology == FFF) ? MIN_LAYER_HEIGHT : 0.;
     def->init_fn = init_with(0.3);
 
     def = defs.add("max_print_height", typeid(double));

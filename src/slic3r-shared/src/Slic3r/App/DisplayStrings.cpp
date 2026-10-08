@@ -146,6 +146,8 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
         return _u8L("First layer height can't be greater than nozzle diameter");
     case ErrorCode::LayerHeightTooLarge:
         return _u8L("Layer height can't be greater than nozzle diameter");
+    case ErrorCode::LayerHeightTooSmall:
+        return _u8L("Layer height too small");
     case ErrorCode::MissingG92E0:
         return _u8L(
             "Relative extruder addressing requires resetting the extruder position at each layer "

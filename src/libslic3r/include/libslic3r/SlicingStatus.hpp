@@ -80,6 +80,7 @@ enum class ErrorCode
     OrganicSupportBranchDiameterSmallerThanTreeTip, // _u8L("Organic support branch diameter must not be smaller than support tree tip diameter.")
     FirstLayerHeightTooLarge, // _u8L("First layer height can't be greater than nozzle diameter")
     LayerHeightTooLarge, // _u8L("Layer height can't be greater than nozzle diameter")
+    LayerHeightTooSmall,
     MissingG92E0, // _u8L("Relative extruder addressing requires resetting the extruder position at each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to layer_gcode.")
     FoundG92E0InBeforeLayerGCode, // _u8L("\"G92 E0\" was found in before_layer_gcode, which is incompatible with absolute extruder addressing.")
     FoundG92E0InLayerGCode, // _u8L("\"G92 E0\" was found in layer_gcode, which is incompatible with absolute extruder addressing.")

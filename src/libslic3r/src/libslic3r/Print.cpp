@@ -1182,6 +1182,9 @@ DONE:;
             if (layer_height > min_nozzle_diameter) {
                 errors.push_back(Error{ErrorCode::LayerHeightTooLarge, {"layer_height"}});
             }
+            if (layer_height < Domain::MIN_LAYER_HEIGHT) {
+                errors.push_back(Error{ErrorCode::LayerHeightTooSmall, {"layer_height"}});
+            }
 
             const std::vector<double> nozzle_diameters{
                 Biz::Slicing::get_nozzle_diameters(config().hw_config())
