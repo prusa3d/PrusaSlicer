@@ -123,9 +123,9 @@ void MarketplaceClient::perform_verify_step(const BundleRequestConfig& config)
                 }
 
                 VerifiedBundleData data;
-                j.at("assetId").get_to(data.plugin_id);
+                j.at("plugin_id").get_to(data.plugin_id);
                 j.at("version").get_to(data.version);
-                j.at("publicKey").get_to(data.public_key);
+                j.at("public_key").get_to(data.public_key);
                 result = std::move(data);
             } catch (std::exception& e) {
                 result = tl::unexpected{fmt::format("cannot parse verify response: {}", e.what())};

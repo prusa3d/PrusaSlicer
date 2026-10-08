@@ -17,8 +17,8 @@
  * Pins the install contract between the plugin marketplace and PrusaSlicer.
  *
  * The fixtures are real signed bundles taken from the marketplace API
- * (GET /api/plugins/{id}/download) together with the author public key it hands
- * over from GET /api/plugins/{id}/verify:
+ * (GET /api/slicer/v1/plugins/{id}/download) together with the author public key it hands
+ * over from GET /api/slicer/v1/plugins/{id}/verify:
  *
  *   marketplace-bundle.zip     manifest.txt      + manifest.sig
  *   checksum-named-bundle.zip  checksum.sha256   + checksum.sha256.sign
@@ -118,8 +118,8 @@ TEST_CASE("INSTALL_PLUGIN payload parsing", "[plugin][marketplace]")
             "action": "INSTALL_PLUGIN",
             "pluginId": "com.prusa3d.slicer.calibration",
             "version": "1.1.0",
-            "downloadUrl": "http://localhost:4455/api/plugins/com.prusa3d.slicer.calibration/download?version=1.1.0",
-            "verifyUrl": "http://localhost:4455/api/plugins/com.prusa3d.slicer.calibration/verify?version=1.1.0",
+            "downloadUrl": "http://localhost:4455/api/slicer/v1/plugins/com.prusa3d.slicer.calibration/download?version=1.1.0",
+            "verifyUrl": "http://localhost:4455/api/slicer/v1/plugins/com.prusa3d.slicer.calibration/verify?version=1.1.0",
             "apiOrigin": "http://localhost:4455"
         })");
 

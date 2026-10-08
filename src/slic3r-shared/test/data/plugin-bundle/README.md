@@ -3,11 +3,11 @@
 Used by `test/Slic3r/App/Lua/PluginBundleTests.cpp` to check that a signed plugin
 bundle passes `PluginBundle::load_meta()` + `PluginBundle::verify()`.
 
-| file | what it is |
-|------|------------|
-| `marketplace-bundle.zip` | a real bundle from the plugin marketplace — `manifest.txt` + `manifest.sig` |
-| `checksum-named-bundle.zip` | the same bundle repacked as `checksum.sha256` + `checksum.sha256.sign` |
-| `public_key.pem` | SPKI public key the signature was made with (`GET /api/plugins/{id}/verify` hands this to the Slicer) |
+| file | what it is                                                                                                      |
+|------|-----------------------------------------------------------------------------------------------------------------|
+| `marketplace-bundle.zip` | a real bundle from the plugin marketplace — `manifest.txt` + `manifest.sig`                                     |
+| `checksum-named-bundle.zip` | the same bundle repacked as `checksum.sha256` + `checksum.sha256.sign`                                          |
+| `public_key.pem` | SPKI public key the signature was made with (`GET /api/slicer/v1/plugins/{id}/verify` hands this to the Slicer) |
 
 `public_key.pem` is the public half of a throwaway key; there is no private key here.
 The two zips differ only in the names of the checksum + signature entries — the
@@ -76,9 +76,9 @@ With the marketplace stack up (`make up && make seed` in `slicer-plugin-marketpl
 ```bash
 ID=com.prusa3d.slicer.calibration
 V=1.1.0
-curl -sL "http://localhost:4455/api/plugins/$ID/download?version=$V" -o marketplace-bundle.zip
-curl -s  "http://localhost:4455/api/plugins/$ID/verify?version=$V" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["publicKey"], end="")' > public_key.pem
+curl -sL "http://localhost:4455/api/slicer/v1/plugins/$ID/download?version=$V" -o marketplace-bundle.zip
+curl -s  "http://localhost:4455/api/slicer/v1/plugins/$ID/verify?version=$V" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["public_key"], end="")' > public_key.pem
 ```
 
 Then repack the second variant with the two entries renamed:

@@ -40,8 +40,8 @@ using Slic3r::Biz::Platform::JobManager::JobManager;
 
 namespace {
 
-constexpr auto VERIFY_URL   = "http://localhost:4455/api/plugins/com.test.plugin/verify?version=1.0.0";
-constexpr auto DOWNLOAD_URL = "http://localhost:4455/api/plugins/com.test.plugin/download?version=1.0.0";
+constexpr auto VERIFY_URL   = "http://localhost:4455/api/slicer/v1/plugins/com.test.plugin/verify?version=1.0.0";
+constexpr auto DOWNLOAD_URL = "http://localhost:4455/api/slicer/v1/plugins/com.test.plugin/download?version=1.0.0";
 constexpr auto ZIP_BODY     = "PK\x03\x04-not-a-real-zip-but-non-empty";
 
 BundleRequestConfig test_config()
@@ -83,7 +83,7 @@ struct Responses
 {
     unsigned verify_status{200};
     std::string verify_body{
-        R"({"assetId":"com.test.plugin","version":"1.0.0","ok":true,"publicKey":"-----BEGIN PUBLIC KEY-----\nstub\n-----END PUBLIC KEY-----\n"})"
+        R"({"plugin_id":"com.test.plugin","version":"1.0.0","ok":true,"public_key":"-----BEGIN PUBLIC KEY-----\nstub\n-----END PUBLIC KEY-----\n"})"
     };
     unsigned download_status{200};
     std::string download_body{ZIP_BODY};
@@ -223,7 +223,7 @@ TEST_CASE_METHOD(Fixture, "A 404 on download is reported with a usable message",
 TEST_CASE_METHOD(Fixture, "A refused signature stops before downloading", "[marketplace]")
 {
     Responses responses;
-    responses.verify_body = R"({"assetId":"com.test.plugin","version":"1.0.0","ok":false,"reason":"signing key revoked"})";
+    responses.verify_body = R"({"plugin_id":"com.test.plugin","version":"1.0.0","ok":false,"reason":"signing key revoked"})";
     arrange_http(responses);
 
     client.download_bundle(test_config());
