@@ -445,6 +445,9 @@ void fix_volume_transformation(ModelVolume& volume) {
     volume.set_transformation(volume.get_matrix() * mesh_trafo.inverse());
     volume.set_mesh(std::move(mesh));
     Algorithms::ModelVolume::calculate_convex_hull(volume);
+    // The SLA points and holes are in mesh coordinates.
+    Domain::SLA::transform(volume.sla_support_points, mesh_trafo);
+    Domain::SLA::transform(volume.sla_drain_holes, mesh_trafo);
 
     // data for fix transformation is not useable anymore
     fix_opt.reset();

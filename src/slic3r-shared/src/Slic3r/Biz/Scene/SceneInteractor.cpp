@@ -25,6 +25,7 @@
 #include "Slic3r/Biz/Algorithms/Point.hpp"
 #include "Slic3r/Biz/Algorithms/Polygon.hpp"
 #include "Slic3r/Biz/Algorithms/PolygonUtils.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Arrange/Arrange.hpp"
 #include "Slic3r/Biz/ISelectedBedInstanceChangedListener.hpp"
 #include "Slic3r/Biz/Scene/BedFactory.hpp"
@@ -879,6 +880,8 @@ void SceneInteractor::set_selected_volume_type(Domain::ModelVolumeType volume_ty
     }
     ASSERT(object->parts_count() > 0);
     Algorithms::ModelObject::sort_volumes(object);
+    // The SLA points of a volume which is no longer a part of the SLA geometry are not used.
+    Algorithms::SlaPoints::drop_user_status_without_points(*object);
 
     invoke_listeners<ISceneChangedListener>(
         [&](auto* l) { l->on_volume_type_changed(m_selected_project_id, volumes); }
@@ -1133,9 +1136,12 @@ ElementRefs SceneInteractor::change_volume_meshes(VolumeMeshReplacements&& repla
         volume.reset_extra_facets();
         volume.set_mesh(std::move(replacement.mesh));
 
+        const Domain::Transform3d old_matrix = volume.get_matrix();
         if (replacement.new_transformation.has_value()) {
             volume.set_transformation(replacement.new_transformation.value());
         }
+        // The SLA points and holes stay where they were and move onto the new surface.
+        Algorithms::SlaPoints::reproject_on_new_mesh(volume, old_matrix);
 
         if (replacement.new_source.has_value()) {
             volume.source = replacement.new_source.value();
@@ -2018,6 +2024,8 @@ std::optional<std::string> SceneInteractor::delete_selected_elements()
                 }
             }
         }
+        // The SLA points of the deleted volumes are gone.
+        Algorithms::SlaPoints::drop_user_status_without_points(*object);
 
 //        normalize_single_volume_object(*object);
 

@@ -5,6 +5,7 @@
 #include "Slic3r/Biz/Algorithms/Geometry/Geometry.hpp"
 #include "Slic3r/Biz/Algorithms/ModelInstance.hpp"
 #include "Slic3r/Biz/Algorithms/ModelVolume.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Exception.hpp"
@@ -505,6 +506,10 @@ void split(Domain::ModelObject* object, Domain::ModelObjectPtrs* new_objects)
         if (volume->type() != Domain::ModelVolumeType::MODEL_PART)
             continue;
 
+        // The new volumes get the SLA support points and drain holes on their part of the mesh.
+        std::vector<Domain::ModelVolume*> split_volumes;
+        std::vector<Domain::ModelObject*> split_objects;
+
         // splited volume should not be text object
         if (volume->text_configuration.has_value())
             volume->text_configuration.reset();
@@ -568,7 +573,15 @@ void split(Domain::ModelObject* object, Domain::ModelObjectPtrs* new_objects)
             new_vol->set_offset(Domain::Vec3d::Zero());
             // reset the source to disable reload from disk
             new_vol->source = Domain::ModelVolume::Source();
+            new_object->sla_points_status = object->sla_points_status;
+            split_volumes.push_back(new_vol);
+            split_objects.push_back(new_object);
             new_objects->emplace_back(new_object);
+        }
+
+        SlaPoints::distribute_to_parts(volume->sla_support_points, volume->sla_drain_holes, split_volumes);
+        for (Domain::ModelObject* split_object : split_objects) {
+            SlaPoints::drop_user_status_without_points(*split_object);
         }
     }
 }
@@ -609,10 +622,12 @@ Domain::ModelObject* merge(const std::vector<const Domain::ModelInstance*>& inst
     Domain::ModelObject* new_object       = model->add_object();
     Domain::ModelInstance* first_instance = new_object->add_instance();
     first_instance->printable             = false;
+    std::vector<Domain::SLA::PointsStatus> points_statuses;
 
     for (const Domain::ModelInstance* instance : instances) {
         Domain::ModelObject* object = instance->get_object();
         first_instance->printable |= instance->printable;
+        points_statuses.push_back(object->sla_points_status);
 
         // merge volumes
         for (const Domain::ModelVolume* volume : object->volumes) {
@@ -636,6 +651,13 @@ Domain::ModelObject* merge(const std::vector<const Domain::ModelInstance*>& inst
         // merge layers
         for (const auto& range : object->layer_config_ranges)
             new_object->layer_config_ranges.emplace(range);
+    }
+
+    // The SLA support points and drain holes came with the volumes. The manual points are used only
+    // if all the merged objects had them, otherwise parts would be left without supports.
+    new_object->sla_points_status = SlaPoints::merged_points_status(points_statuses);
+    if (new_object->sla_points_status != Domain::SLA::PointsStatus::UserModified) {
+        SlaPoints::clear_support_points(*new_object);
     }
 
     return new_object;

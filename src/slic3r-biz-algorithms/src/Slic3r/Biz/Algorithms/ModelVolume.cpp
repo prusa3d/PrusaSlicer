@@ -3,6 +3,7 @@
 #include "Slic3r/Biz/Algorithms/BoundingBox.hpp"
 #include "Slic3r/Biz/Algorithms/FacetsAnnotation.hpp"
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Domain/TriangleMesh.hpp"
 
@@ -135,6 +136,13 @@ size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
 
     volume->reset_extra_facets();
 
+    // The SLA support points and drain holes go to the parts they sit on.
+    const Domain::SLA::SupportPoints sla_support_points = std::move(volume->sla_support_points);
+    const Domain::SLA::DrainHoles    sla_drain_holes    = std::move(volume->sla_drain_holes);
+    volume->sla_support_points.clear();
+    volume->sla_drain_holes.clear();
+    std::vector<Domain::ModelVolume*> parts;
+
     Domain::ModelObject* object = volume->get_object();
 
     size_t idx = 0;
@@ -165,6 +173,7 @@ size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
         object->volumes[ivolume]->name = name + "_" + std::to_string(idx + 1);
         object->volumes[ivolume]->volume_settings.overrides.set("extruder", extruder_counter++);
         object->volumes[ivolume]->discard_splittable();
+        parts.push_back(object->volumes[ivolume]);
         ++idx;
         if (static_cast<unsigned int>(extruder_counter) == max_extruders)
             extruder_counter = 0;
@@ -175,12 +184,15 @@ size_t split(Domain::ModelVolume* volume, unsigned int max_extruders)
     while (i < object->volumes.size()) {
         const std::shared_ptr<const Domain::TriangleMesh>& hull = object->volumes[i]->get_convex_hull_shared_ptr();
         if (hull == nullptr || hull->its.vertices.empty() || hull->its.indices.empty()) {
+            std::erase(parts, object->volumes[i]);
             object->delete_volume(i);
             --idx;
             --i;
         }
         ++i;
     }
+
+    SlaPoints::distribute_to_parts(sla_support_points, sla_drain_holes, parts);
 
     return idx;
 }

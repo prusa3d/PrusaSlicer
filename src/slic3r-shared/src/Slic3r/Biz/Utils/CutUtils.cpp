@@ -11,6 +11,7 @@
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Biz/Algorithms/Geometry/Geometry.hpp"
 #include "Slic3r/Biz/Algorithms/ModelVolume.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Domain/Model.hpp"
 #include "Slic3r/Domain/ModelVolume.hpp"
 
@@ -296,6 +297,13 @@ void Cut::finalize(const Domain::ModelObjectPtrs& objects)
 {
     //clear model from temporarry objects
     m_model.clear_objects();
+
+    // The cut changes the geometry. The SLA support points and drain holes of the copied volumes are
+    // not kept, as their status (see ModelObject::clone_for_cut).
+    for (Domain::ModelObject* object : objects) {
+        Algorithms::SlaPoints::clear_support_points(*object);
+        Algorithms::SlaPoints::clear_drain_holes(*object);
+    }
 
     // add to model result objects
     m_model.objects = objects;
