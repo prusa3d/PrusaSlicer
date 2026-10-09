@@ -10,6 +10,7 @@
 #include "Slic3r/TestUtils/TestData.hpp"
 
 #include "libslic3r/SLAResult.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/FDMResultCache.hpp"
 #include "Slic3r/Biz/SLAResultCache.hpp"
 #include "Slic3r/Biz/SLAObjectCache.hpp"
@@ -570,7 +571,7 @@ TEST_CASE_METHOD(SlicingFixture, "SLA slicing uses the user modified support poi
     ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
     ModelObject& object{*bed.model.objects.front()};
     const float radius{0.123f};
-    object.sla_support_points = {
+    object.volumes.front()->sla_support_points = {
         SupportPoint{Vec3f{10.f, 10.f, 0.f}, radius, SupportPointType::island},
         SupportPoint{Vec3f{0.f, 10.f, 10.f}, radius, SupportPointType::slope},
         SupportPoint{Vec3f{5.f, 5.f, 0.f}, radius, SupportPointType::manual_add},
@@ -600,10 +601,10 @@ TEST_CASE_METHOD(SlicingFixture, "SLA slicing uses the user modified support poi
 
     // No points are generated, the user ones are only transformed into the print object.
     const Slic3r::Domain::SLA::SupportPoints& points{*sla_object->get().support_points};
-    REQUIRE(points.size() == object.sla_support_points.size());
+    REQUIRE(points.size() == object.volumes.front()->sla_support_points.size());
     for (size_t i{0}; i < points.size(); ++i) {
         CHECK(points[i].head_front_radius == radius);
-        CHECK(points[i].type == object.sla_support_points[i].type);
+        CHECK(points[i].type == object.volumes.front()->sla_support_points[i].type);
     }
 }
 
@@ -619,7 +620,7 @@ TEST_CASE_METHOD(SlicingFixture, "SLA object brings the transformation of its su
     ModelInstance& instance{*object.instances.front()};
     instance.set_scaling_factor(Vec3d{1.5, 1.5, 1.5});
     instance.set_rotation(Vec3d{0., 0., 0.5});
-    object.sla_support_points = {
+    object.volumes.front()->sla_support_points = {
         SupportPoint{Vec3f{10.f, 10.f, 0.f}, 0.2f, SupportPointType::manual_add},
         SupportPoint{Vec3f{0.f, 10.f, 10.f}, 0.2f, SupportPointType::manual_add},
     };
@@ -649,11 +650,62 @@ TEST_CASE_METHOD(SlicingFixture, "SLA object brings the transformation of its su
     const Slic3r::Domain::Transform3d to_model{sla_object->get().object_trafo.inverse()};
     CHECK_FALSE(to_model.isApprox(Slic3r::Domain::Transform3d::Identity()));
     const Slic3r::Domain::SLA::SupportPoints& points{*sla_object->get().support_points};
-    REQUIRE(points.size() == object.sla_support_points.size());
+    const Slic3r::Domain::SLA::SupportPoints in_object{
+        Slic3r::Biz::Algorithms::SlaPoints::support_points_in_object(object)
+    };
+    REQUIRE(points.size() == in_object.size());
     for (size_t i{0}; i < points.size(); ++i) {
         const Vec3d model_position{to_model * points[i].pos.cast<double>()};
-        CHECK(model_position.isApprox(object.sla_support_points[i].pos.cast<double>(), 1e-5));
+        CHECK(model_position.isApprox(in_object[i].pos.cast<double>(), 1e-5));
     }
+}
+
+TEST_CASE_METHOD(SlicingFixture, "SLA support points follow the transformation of their part", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+    using Slic3r::Domain::SLA::PointsStatus;
+    using Slic3r::Domain::SLA::SupportPoint;
+    using Slic3r::Domain::SLA::SupportPointType;
+    using Slic3r::Domain::Vec3f;
+
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    ModelObject& object{*bed.model.objects.front()};
+    Slic3r::Domain::ModelVolume& volume{*object.volumes.front()};
+    const Vec3d mesh_point{volume.mesh().bounding_box().max};
+    volume.sla_support_points = {
+        SupportPoint{mesh_point.cast<float>(), 0.2f, SupportPointType::manual_add},
+    };
+    object.sla_points_status = PointsStatus::UserModified;
+    // The new UI puts the object scale and tilt into its volumes.
+    volume.set_scaling_factor(Vec3d{2., 1.5, 1.});
+    volume.set_rotation(Vec3d{0.3, 0., 0.});
+
+    Slic3r::Biz::SLAObjectCache object_cache;
+    slicing.set_listener<ISLAObjectListener>(&object_cache);
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+    slicing.slice_all();
+
+    REQUIRE(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        return !events.empty() && events.back().status_code == StatusCode::Finished;
+    }));
+
+    const SlicingId id{status_listener.status_events.back().slicing_id};
+    const auto sla_object{object_cache.get_instance({id, object.id()})};
+    REQUIRE(sla_object);
+    REQUIRE(sla_object->get().support_points);
+    const Slic3r::Domain::SLA::SupportPoints& points{*sla_object->get().support_points};
+    REQUIRE(points.size() == 1);
+
+    // The point is still on the same corner of the scaled and tilted mesh.
+    const Vec3d model_position{sla_object->get().object_trafo.inverse() * points.front().pos.cast<double>()};
+    CHECK(model_position.isApprox(volume.get_matrix() * mesh_point, 1e-5));
+    CHECK_FALSE(model_position.isApprox(mesh_point, 1e-2));
 }
 
 TEST_CASE_METHOD(SlicingFixture, "SLA object keeps the valid part of a partial slice after an update", "[slicing][slicing-interactor][timeout]") {
@@ -787,7 +839,7 @@ TEST_CASE_METHOD(SlicingFixture, "Changing user modified SLA support points resl
 
     ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
     ModelObject& object{*bed.model.objects.front()};
-    object.sla_support_points = {
+    object.volumes.front()->sla_support_points = {
         SupportPoint{Vec3f{5.f, 5.f, 0.f}, 0.2f, SupportPointType::manual_add},
         SupportPoint{Vec3f{15.f, 15.f, 0.f}, 0.2f, SupportPointType::manual_add},
     };
@@ -823,7 +875,7 @@ TEST_CASE_METHOD(SlicingFixture, "Changing user modified SLA support points resl
     REQUIRE_FALSE(result_listener.result.export_data->files.data.empty());
 
     // The user adds a point (as the support points gizmo does on Apply).
-    object.sla_support_points.push_back(
+    object.volumes.front()->sla_support_points.push_back(
         SupportPoint{Vec3f{5.f, 15.f, 0.f}, 0.2f, SupportPointType::manual_add}
     );
     result_listener.result_recieved = false;

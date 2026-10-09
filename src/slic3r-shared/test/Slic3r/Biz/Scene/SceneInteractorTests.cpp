@@ -769,12 +769,12 @@ TEST_CASE_METHOD(SceneInteractorFixture, "Modifying SLA support points changes t
         scene_interactor.modify_sla_object_data(
             Domain::ElementRef{object.id().id},
             [](Domain::ModelObject& model_object) {
-                model_object.sla_support_points = {SupportPoint{Domain::Vec3f{10.f, 10.f, 0.f}, 0.2f}};
+                model_object.volumes.front()->sla_support_points = {SupportPoint{Domain::Vec3f{10.f, 10.f, 0.f}, 0.2f}};
                 model_object.sla_points_status = PointsStatus::UserModified;
             }
         );
     }
 
     CHECK(object.sla_points_status == PointsStatus::UserModified);
-    CHECK(object.sla_support_points.size() == 1);
+    CHECK(object.volumes.front()->sla_support_points.size() == 1);
 }

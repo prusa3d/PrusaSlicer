@@ -4,6 +4,7 @@
 #include "Slic3r/App/Render/GeometryBuilder.hpp"
 #include "Slic3r/App/Scene/TriangleMeshManager.hpp"
 #include "Slic3r/Assert.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/ObjectSettingsInteractor.hpp"
@@ -23,7 +24,9 @@ using Slic3r::Domain::ModelObject;
 using Slic3r::Domain::Transform3d;
 using Slic3r::Domain::Vec3d;
 using Slic3r::Domain::SLA::DrainHole;
+using Slic3r::Domain::SLA::DrainHoles;
 
+namespace SlaPoints = Slic3r::Biz::Algorithms::SlaPoints;
 namespace TriMesh = Slic3r::Biz::Algorithms::TriangleMesh;
 
 namespace Slic3r::App::Plater {
@@ -166,7 +169,7 @@ void SlaHollowGizmo::load_items(const Biz::Slicing::Sla::Object*)
 {
     m_holes.clear();
     if (const ModelObject* mo = this->model_object(); mo != nullptr) {
-        for (const DrainHole& hole : mo->sla_drain_holes) {
+        for (const DrainHole& hole : SlaPoints::drain_holes_in_object(*mo)) {
             m_holes.push_back(Hole{hole, false});
         }
     }
@@ -174,11 +177,12 @@ void SlaHollowGizmo::load_items(const Biz::Slicing::Sla::Object*)
 
 void SlaHollowGizmo::write_items(ModelObject& model_object) const
 {
-    model_object.sla_drain_holes.clear();
-    model_object.sla_drain_holes.reserve(m_holes.size());
+    DrainHoles holes;
+    holes.reserve(m_holes.size());
     for (const Hole& hole : m_holes) {
-        model_object.sla_drain_holes.push_back(hole.hole);
+        holes.push_back(hole.hole);
     }
+    SlaPoints::set_drain_holes_in_object(model_object, holes);
 }
 
 void SlaHollowGizmo::remember_item(const size_t index)

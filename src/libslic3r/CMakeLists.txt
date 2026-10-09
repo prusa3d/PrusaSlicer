@@ -338,7 +338,6 @@ set(SLIC3R_SOURCES
     src/libslic3r/SLA/RasterBase.hpp
     src/libslic3r/SLA/RasterToPolygons.cpp
     src/libslic3r/SLA/RasterToPolygons.hpp
-    src/libslic3r/SLA/ReprojectPointsOnMesh.hpp
     src/libslic3r/SLA/SpatIndex.cpp
     src/libslic3r/SLA/SpatIndex.hpp
     src/libslic3r/SLA/SupportIslands/SampleConfigFactory.cpp

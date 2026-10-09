@@ -26,4 +26,8 @@ struct DrainHole
 
 using DrainHoles = std::vector<DrainHole>;
 
+// Moves the holes by the transformation. The normal is transformed as a direction by the linear
+// part and normalized, the radius and height are physical sizes and stay.
+void transform(DrainHoles& holes, const Transform3d& trafo);
+
 }

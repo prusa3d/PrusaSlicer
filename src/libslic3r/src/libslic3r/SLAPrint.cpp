@@ -23,6 +23,7 @@
 #include <boost/algorithm/string.hpp>
 #include "Slic3r/Biz/Parser/PlaceholderParser.hpp"
 #include "Slic3r/Biz/Algorithms/Scaling.hpp"
+#include "Slic3r/Biz/Algorithms/SlaPoints.hpp"
 #include "Slic3r/Exception.hpp"
 #include "libslic3r/InstanceTransformations.hpp"
 
@@ -361,8 +362,11 @@ ModelObjectsSyncResult sync_model_objects(
         const bool new_user_modified = model_object_new->sla_points_status
             == PointsStatus::UserModified;
 
+        // The volumes and their transformations are the same, so the points in object
+        // coordinates differ only if the points of a volume differ.
         const bool supports_equal{
-            model_object->sla_support_points == model_object_new->sla_support_points
+            Biz::Algorithms::SlaPoints::support_points_in_object(*model_object)
+            == Biz::Algorithms::SlaPoints::support_points_in_object(*model_object_new)
         };
 
         const bool switching_to_auto_from_man{old_user_modified && !new_user_modified};
@@ -375,7 +379,8 @@ ModelObjectsSyncResult sync_model_objects(
         }
 
         // Invalidate hollowing if drain holes have changed
-        if (model_object->sla_drain_holes != model_object_new->sla_drain_holes)
+        if (Biz::Algorithms::SlaPoints::drain_holes_in_object(*model_object)
+            != Biz::Algorithms::SlaPoints::drain_holes_in_object(*model_object_new))
         {
             invalidate(slaposDrillHoles);
         }
@@ -1460,18 +1465,15 @@ SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
 Domain::SLA::SupportPoints SLAPrintObject::transformed_support_points() const
 {
     assert(model_object());
-    auto spts = model_object()->sla_support_points;
-    Transform3f tr = trafo().cast<float>();
-    for (Domain::SLA::SupportPoint &suppt : spts) {
-        suppt.pos = tr * suppt.pos;
-    }
+    Domain::SLA::SupportPoints spts = Biz::Algorithms::SlaPoints::support_points_in_object(*model_object());
+    Domain::SLA::transform(spts, trafo());
     return spts;
 }
 
 Domain::SLA::DrainHoles SLAPrintObject::transformed_drainhole_points() const
 {
     assert(model_object());
-    Domain::SLA::DrainHoles drainholes = model_object()->sla_drain_holes; // Copy the drainholes
+    Domain::SLA::DrainHoles drainholes = Biz::Algorithms::SlaPoints::drain_holes_in_object(*model_object());
     sla::transform_drainhole_points(drainholes, trafo());
     return drainholes;
 }

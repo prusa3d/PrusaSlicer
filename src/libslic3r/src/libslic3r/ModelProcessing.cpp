@@ -125,8 +125,6 @@ void convert_units(Domain::Model& model_to, Domain::ModelObject* object_from, Co
                  conv_type == ConversionType::CONV_FROM_METER ? 1000.f : conv_type == ConversionType::CONV_TO_METER ? 0.001f : 1.f;
 
     Domain::ModelObject* new_object = model_to.add_object(*object_from);
-    new_object->sla_support_points.clear();
-    new_object->sla_drain_holes.clear();
     new_object->sla_points_status = Domain::SLA::PointsStatus::NoPoints;
     new_object->clear_volumes();
     new_object->input_file.clear();

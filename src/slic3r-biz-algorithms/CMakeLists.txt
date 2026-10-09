@@ -65,6 +65,8 @@ add_library(slic3r-biz-algorithms STATIC
     include/Slic3r/Biz/Algorithms/ModelObject.hpp
     src/Slic3r/Biz/Algorithms/ModelVolume.cpp
     include/Slic3r/Biz/Algorithms/ModelVolume.hpp
+    src/Slic3r/Biz/Algorithms/SlaPoints.cpp
+    include/Slic3r/Biz/Algorithms/SlaPoints.hpp
     src/Slic3r/Biz/Algorithms/Color.cpp
     include/Slic3r/Biz/Algorithms/Color.hpp
     include/Slic3r/Biz/Algorithms/StringUtils.hpp
@@ -147,6 +149,7 @@ if(SLIC3R_BUILD_TESTS)
         test/Slic3r/Biz/Algorithms/BedContainmentTests.cpp
         test/Slic3r/Biz/Algorithms/OptimizersTests.cpp
         test/Slic3r/Biz/Algorithms/ZipArchiveTests.cpp
+        test/Slic3r/Biz/Algorithms/SlaPointsTests.cpp
 
     )
     target_include_directories(slic3r-biz-algorithms-tests PRIVATE test)

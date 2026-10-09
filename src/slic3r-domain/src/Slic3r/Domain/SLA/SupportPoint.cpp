@@ -9,4 +9,15 @@ bool SupportPoint::operator==(const SupportPoint& sp) const
 }
 
 bool SupportPoint::operator!=(const SupportPoint& sp) const { return !(sp == (*this)); }
+
+void transform(SupportPoints& points, const Transform3d& trafo)
+{
+    // Exactly as they are for the identity (common for single part objects), no rounding.
+    if (trafo.matrix() == Transform3d::Identity().matrix()) {
+        return;
+    }
+    for (SupportPoint& point : points) {
+        point.pos = (trafo * point.pos.cast<double>()).cast<float>();
+    }
+}
 } // namespace Slic3r::Domain::SLA
