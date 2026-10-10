@@ -319,6 +319,7 @@ void ProcessorImpl::process_gcode_line(const GCodeReader::GCodeLine& line)
                     case '1': { process_G21(line); break; } // Set Units to Millimeters
                     case '2': { process_G22(line); break; } // Firmware controlled retract
                     case '3': { process_G23(line); break; } // Firmware controlled unretract
+                    case '7': { process_G27(line); break; } // Park toolhead
                     case '8': { process_G28(line); break; } // Move to origin
                     default: break;
                     }
@@ -593,18 +594,7 @@ void ProcessorImpl::process_G1(const std::array<std::optional<float>, 4>& axes, 
 
     float volume_extruded_filament = filament_geo.area_cross_section * delta_pos[E];
 
-    if (volume_extruded_filament != 0.f && !m_exclude_e) {
-        if (m_flushing) {
-            m_used_filaments.update_flush_per_extruder(volume_extruded_filament, m_extruder_id);
-        } else {
-            m_used_filaments.increase_caches(
-                volume_extruded_filament,
-                m_extruder_id,
-                filament_geo.area_cross_section * m_config.parking_pos_retraction,
-                filament_geo.area_cross_section * m_config.extra_loading_move
-            );
-        }
-    }
+    this->update_used_filaments(volume_extruded_filament, filament_geo.area_cross_section);
 
     MoveType type = detect_move_type(delta_pos, m_wiping);
     if (type == MoveType::Extrude) {
@@ -1281,6 +1271,29 @@ void ProcessorImpl::process_G10(const GCodeReader::GCodeLine& line)
     }
 
     store_move(MoveType::Retract);
+}
+
+/**
+ * @brief Prusa Buddy firmware retracts R mm of the current filament while parking and never restores it.
+ */
+void ProcessorImpl::process_G27(const GCodeReader::GCodeLine& line)
+{
+    if (m_config.flavor != GCodeFlavor::gcfPrusaFirmwareBuddy) {
+        return;
+    }
+
+    float retract_distance_mm = 0.f;
+    if (!line.has_value('R', retract_distance_mm) || retract_distance_mm <= 0.f) {
+        return;
+    }
+
+    const FilamentGeometry filament_geometry = m_result.filament_geometry(m_extruder_id);
+
+    m_end_position[E] -= retract_distance_mm;
+    this->update_used_filaments(
+        -filament_geometry.area_cross_section * retract_distance_mm,
+        filament_geometry.area_cross_section
+    );
 }
 
 void ProcessorImpl::process_G28(const GCodeReader::GCodeLine& line)
@@ -2791,6 +2804,25 @@ void ProcessorImpl::update_basic_statistics()
         m_used_filaments.wipe_tower_volumes_per_extruder;
     basic_print_stats->flush_volumes_per_extruder = m_used_filaments.flush_volumes_per_extruder;
     basic_print_stats->used_filaments_per_role    = m_used_filaments.filaments_per_role;
+}
+
+void ProcessorImpl::
+    update_used_filaments(const float extruded_volume, const float filament_cross_section_area)
+{
+    if (extruded_volume == 0.f || m_exclude_e) {
+        return;
+    }
+
+    if (m_flushing) {
+        m_used_filaments.update_flush_per_extruder(extruded_volume, m_extruder_id);
+    } else {
+        m_used_filaments.increase_caches(
+            extruded_volume,
+            m_extruder_id,
+            filament_cross_section_area * m_config.parking_pos_retraction,
+            filament_cross_section_area * m_config.extra_loading_move
+        );
+    }
 }
 
 } // namespace Slic3r::Biz::libpgcode

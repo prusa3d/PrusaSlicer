@@ -131,6 +131,8 @@ private:
     void process_G22(const GCodeReader::GCodeReader::GCodeLine& line) { store_move(MoveType::Retract); }
     // Firmware controlled Unretract
     void process_G23(const GCodeReader::GCodeReader::GCodeLine& line) { store_move(MoveType::Unretract); }
+    // Park toolhead (Prusa Buddy: R retracts the current filament during parking)
+    void process_G27(const GCodeReader::GCodeReader::GCodeLine& line);
     // Move to origin
     void process_G28(const GCodeReader::GCodeReader::GCodeLine& line);
     // Save Current Position
@@ -222,6 +224,14 @@ private:
     void store_move(MoveType type, bool internal_only = false);
     void calculate_time(size_t keep_last_n_blocks = 0, float additional_time = 0.0f);
     void update_basic_statistics();
+
+    /**
+     * @brief Records the extruded volume of the current extruder in the filament usage statistics.
+     *        Volume inside EXCLUDE_E blocks is ignored, inside FLUSH blocks it is recorded as flush.
+     * @param extruded_volume Extruded volume in mm^3, negative for a retraction.
+     * @param filament_cross_section_area Cross section area of the current filament in mm^2.
+     */
+    void update_used_filaments(float extruded_volume, float filament_cross_section_area);
 };
 
 } // namespace Slic3r::Biz::libpgcode
