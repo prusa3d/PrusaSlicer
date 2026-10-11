@@ -64,10 +64,13 @@ void GLDeviceInternal::activate_texture_unit(uint8_t unit)
 
 void GLDeviceInternal::bind_texture(uint8_t unit, const Texture& t)
 {
+    // The texture's GL calls work on the active unit, so it is activated even if the texture is already bound.
+    activate_texture_unit(unit);
+
     const auto& tex = t.get_internal_as<GLTextureInternal>();
     if (m_bound_textures[unit] == tex.m_id)
         return;
-    activate_texture_unit(unit);
+
     glBindTexture(tex.m_target, tex.m_id);
     glCheck();
     m_bound_textures[unit] = tex.m_id;
