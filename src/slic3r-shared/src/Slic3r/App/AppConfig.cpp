@@ -157,6 +157,18 @@ void appconfig_config_init_fn(Domain::ConfigDefinitions& defs)
     def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
     def->init_fn = []() { return Domain::ConfigValue(false); };
 
+    def           = defs.add("use_free_camera", typeid(bool));
+    def->location = Domain::AppConfigLocation{};
+    def->gui_type = GUIType::checkbox;
+    def->label    = L("Use free camera");
+    def->tooltip  = L(
+        "If enabled, the mouse rotates the camera freely in all directions (trackball). "
+         "If not enabled, the camera keeps the Z axis pointing up (turntable)."
+    );
+    def->category     = Domain::ConfigItemDef::Category::AppConfig_General;
+    def->option_group = Domain::ConfigItemDef::OptionGroup::AppConfig_General_Application;
+    def->init_fn      = []() { return Domain::ConfigValue(false); };
+
     def               = defs.add("graphics_quality", typeid(Domain::EnumWrapper));
     def->location     = Domain::AppConfigLocation{};
     def->label        = L("Graphics quality");

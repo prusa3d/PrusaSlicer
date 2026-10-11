@@ -1616,8 +1616,9 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/App/Scene/Node.cpp
             test/Slic3r/App/Scene/Ray.cpp
+            test/Slic3r/App/Scene/CameraTrackballControllerTests.cpp
             test/Slic3r/App/Scene/ClipperTests.cpp
-        test/Slic3r/App/Scene/MouseBindingScheme.cpp
+            test/Slic3r/App/Scene/MouseBindingScheme.cpp
 
             test/Slic3r/App/Plater/SurfaceMesh.cpp
 

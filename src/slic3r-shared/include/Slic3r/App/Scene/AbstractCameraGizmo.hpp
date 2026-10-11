@@ -57,8 +57,10 @@ private:
      * @param delta_for_180_rotation The percentage of the screen that
      * must be traversed to rotate the camera by 180 degrees (PI radians).
      * This effectively adjusts the camera sensitivity.
+     * @param free_camera Rotate freely instead of keeping the Z axis pointing up.
      */
-    void update_rotation(float delta_x, float delta_y, float delta_for_180_rotation);
+    void
+    update_rotation(float delta_x, float delta_y, float delta_for_180_rotation, bool free_camera);
     void update_zoom(float wheel_delta_y);
 
     void look_at(const Domain::Vec3d& pos, double azimuth, double zenith);
