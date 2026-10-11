@@ -27,6 +27,12 @@ public:
 
 protected:
     void close_action() override;
+
+private:
+    void on_about_to_show() override;
+
+    // The config tab creates all pages, they can be removed only when the dialog is in the tree.
+    bool m_mouse_3d_page_visible{true};
 };
 
 } // namespace Slic3r::App

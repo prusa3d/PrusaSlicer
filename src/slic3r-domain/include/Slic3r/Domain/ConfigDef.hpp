@@ -175,6 +175,7 @@ struct ConfigItemDef
 
         AppConfig_General  = 600,
         AppConfig_Services = 601,
+        AppConfig_Mouse3D  = 602,
 
         PhysicalPrinter_General = 700,
     };
@@ -330,6 +331,10 @@ struct ConfigItemDef
 
         AppConfig_Services_General       = 15100,
         AppConfig_Services_ServicesSetup = 15101,
+
+        AppConfig_Mouse3D_Speed    = 15200,
+        AppConfig_Mouse3D_Deadzone = 15201,
+        AppConfig_Mouse3D_Options  = 15202,
     };
 
     static std::string translate_category(Category category, const PrinterTechnology pt);

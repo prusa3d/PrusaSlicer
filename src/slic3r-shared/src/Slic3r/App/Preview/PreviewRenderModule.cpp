@@ -316,6 +316,11 @@ void PreviewRenderModule::on_scene_mouse_event(const Platform::MouseEvent& e)
     m_gizmo_manager->on_scene_mouse_event(e, m_screen_info);
 }
 
+void PreviewRenderModule::on_frame_begin()
+{
+    this->apply_mouse_3d_input(m_scene_presenter->scene());
+}
+
 void PreviewRenderModule::on_selected_bed_instances_changed(
     Domain::SelectionId project_id,
     const Biz::Scene::BedSelection& selection

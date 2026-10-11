@@ -21,6 +21,8 @@
 #include <Slic3r/App/AppConfig.hpp>
 #include <Slic3r/App/AppConfigInteractor.hpp>
 #include <Slic3r/App/AppConfigProvider.hpp>
+#include <Slic3r/App/Desktop/Mouse3D/Mouse3DBackend.hpp>
+#include <Slic3r/App/Mouse3D/Mouse3DController.hpp>
 #include <Slic3r/App/WX/FileExplorerHandler.hpp>
 #include <Slic3r/App/Theme.hpp>
 #include <Slic3r/App/Plater/ThumbnailImageGenerator.hpp>
@@ -51,6 +53,9 @@
 
 #include <Slic3r/App/WX/format.hpp>
 #include <Slic3r/App/WX/I18N.hpp>
+
+#include <cstdint>
+#include <span>
 
 #ifdef WIN32
 #include <dbt.h>
@@ -123,6 +128,40 @@ void register_win32_device_notification_event()
                 break;
             }
             return true;
+        }
+    );
+
+    wxWindow::MSWRegisterMessageHandler(
+        WM_INPUT,
+        [](wxWindow* win, WXUINT /* nMsg */, WXWPARAM wParam, WXLPARAM lParam)
+        {
+            if (GET_RAWINPUT_CODE_WPARAM(wParam) == RIM_INPUT) {
+                RAWINPUT raw_input;
+                UINT raw_input_size    = sizeof(RAWINPUT);
+                const UINT copied_size = ::GetRawInputData(
+                    reinterpret_cast<HRAWINPUT>(lParam),
+                    RID_INPUT,
+                    &raw_input,
+                    &raw_input_size,
+                    sizeof(RAWINPUTHEADER)
+                );
+
+                AppServices& app_services = AppServices::instance();
+                if (copied_size != static_cast<UINT>(-1)
+                    && raw_input.header.dwType == RIM_TYPEHID
+                    && app_services.has_mouse_3d_controller())
+                {
+                    app_services.mouse_3d_controller().handle_hid_report(
+                        std::span<const std::uint8_t>(
+                            raw_input.data.hid.bRawData,
+                            raw_input.data.hid.dwSizeHid
+                        )
+                    );
+                }
+            }
+
+            // DefWindowProc must still be called to clean up after RIM_INPUT.
+            return false;
         }
     );
 
@@ -340,6 +379,23 @@ bool DesktopApp::OnInit()
     app_services.set_pop_notification_center(
         std::make_unique<PopNotification::PopNotificationCenter>(*m_project_interactor.get())
     );
+
+    app_services.set_mouse_3d_controller(
+        std::make_unique<Mouse3D::Mouse3DController>(
+            app_services.app_config(),
+            app_services.app_config_interactor(),
+            platform_services.main_thread_dispatcher()
+        )
+    );
+    Bind(
+        wxEVT_ACTIVATE_APP,
+        [](wxActivateEvent& event)
+        {
+            AppServices::instance().mouse_3d_controller().set_application_active(event.GetActive());
+            event.Skip();
+        }
+    );
+
     app_services.set_file_explorer_handler(std::make_unique<WX::FileExplorerHandler>());
     app_services.file_explorer_handler()
         .add_listener<Platform::IFileExplorerErrorListener>(
@@ -604,6 +660,11 @@ void DesktopApp::finish_init()
     m_main_frame->register_win32_callbacks();
 #endif
 
+    m_mouse_3d_backend = Mouse3DBackendFactory::create_mouse_3d_backend(
+        app_services.mouse_3d_controller(),
+        platform_services.main_thread_dispatcher()
+    );
+
     if (m_splash_screen)
         m_splash_screen->Destroy();
 
@@ -631,6 +692,8 @@ void DesktopApp::finish_init()
 
 DesktopApp::~DesktopApp()
 {
+    m_mouse_3d_backend.reset();
+
     // Before m_project_interactor, which owns the interactor the model listens to and calls into.
     AppServices& app_services = AppServices::instance();
     if (app_services.has_preset_updater_controller()) {
@@ -744,13 +807,34 @@ void DesktopApp::handle_app_instance_message(const std::string& message)
 
 void DesktopApp::handle_HID_device_detached_event(const std::string& message)
 {
-    // TODO: Add 3d mouse control
+    if (m_mouse_3d_backend != nullptr) {
+        m_mouse_3d_backend->handle_hid_device_detached(message);
+    }
 }
 
 void DesktopApp::handle_HID_device_attached_event(const std::string& message)
 {
-    // TODO: Add 3d mouse control
+    if (m_mouse_3d_backend != nullptr) {
+        m_mouse_3d_backend->handle_hid_device_attached(message);
+    }
 }
+
+#ifdef WIN32
+int DesktopApp::FilterEvent(wxEvent& event)
+{
+    // The 3Dconnexion driver sends mouse wheel events to the applications not registered at it,
+    // which would zoom the scene.
+    if (event.GetEventType() == wxEVT_MOUSEWHEEL
+        && dynamic_cast<Platform::WX::WXRenderCanvas*>(event.GetEventObject()) != nullptr
+        && AppServices::instance().has_mouse_3d_controller()
+        && AppServices::instance().mouse_3d_controller().consume_driver_mouse_wheel_event())
+    {
+        return Event_Ignore;
+    }
+
+    return wxApp::FilterEvent(event);
+}
+#endif
 
 void DesktopApp::handle_volumes_changed_event()
 {

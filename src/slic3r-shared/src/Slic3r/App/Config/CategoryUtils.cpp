@@ -96,6 +96,7 @@ Render::Icon category_render_icon(
         break;
     case Domain::ConfigItemDef::Category::AppConfig_General: [[fallthrough]];
     case Domain::ConfigItemDef::Category::AppConfig_Services: [[fallthrough]];
+    case Domain::ConfigItemDef::Category::AppConfig_Mouse3D: [[fallthrough]];
     case Domain::ConfigItemDef::Category::PhysicalPrinter_General :
         // No icon assigned on purpose.
         break;

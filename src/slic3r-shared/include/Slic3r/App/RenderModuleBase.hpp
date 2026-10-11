@@ -18,6 +18,7 @@ class MsgBoxHandler;
 
 namespace Scene {
 class GizmoManager;
+class Scene;
 } // namespace Scene
 
 /**
@@ -49,6 +50,8 @@ public:
     virtual MsgBoxHandler* msg_box_handler();
 
 protected:
+    void apply_mouse_3d_input(Scene::Scene& scene);
+
     Navigator* m_render_module_navigator{nullptr};
     std::unique_ptr<Scene::GizmoManager> m_gizmo_manager;
     DialogNavigation m_dialog_navigation;

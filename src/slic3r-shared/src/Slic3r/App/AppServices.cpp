@@ -7,6 +7,7 @@
 #include "Slic3r/App/AppConfigInteractor.hpp"
 #include "Slic3r/App/PresetUpdater/PresetUpdaterController.hpp"
 #include "Slic3r/App/Theme.hpp"
+#include "Slic3r/App/Mouse3D/Mouse3DController.hpp"
 
 namespace Slic3r::App {
 
@@ -57,6 +58,11 @@ void AppServices::set_theme(std::unique_ptr<Theme>&& theme)
     m_theme = std::move(theme);
 }
 
+void AppServices::set_mouse_3d_controller(std::unique_ptr<Mouse3D::Mouse3DController>&& controller)
+{
+    m_mouse_3d_controller = std::move(controller);
+}
+
 PopNotification::PopNotificationCenter& AppServices::pop_notification_center() const
 {
     ASSERT(m_pop_notification_center != nullptr);
@@ -102,6 +108,17 @@ Theme& AppServices::theme() const
 {
     ASSERT(m_theme);
     return *m_theme;
+}
+
+Mouse3D::Mouse3DController& AppServices::mouse_3d_controller() const
+{
+    ASSERT(m_mouse_3d_controller != nullptr);
+    return *m_mouse_3d_controller;
+}
+
+bool AppServices::has_mouse_3d_controller() const
+{
+    return m_mouse_3d_controller != nullptr;
 }
 
 } // namespace Slic3r::App

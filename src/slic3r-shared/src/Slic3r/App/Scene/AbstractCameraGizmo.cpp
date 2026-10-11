@@ -331,6 +331,11 @@ GizmoActivationState AbstractCameraGizmo::on_mouse(GizmoEventContext& ctx, bool 
         }
 
         const bool free_camera = AppServices::instance().app_config().get<bool>("use_free_camera");
+        if (!free_camera) {
+            // The 3D mouse tilts the horizon, the constrained navigation expects it level (#3816).
+            m_scene_provider.scene().camera_trackball().recover_from_free_rotation();
+        }
+
         if (m_state == State::Rotating)
             update_rotation(delta_x, delta_y, 0.25, free_camera);
         else if (m_state == State::Panning) {

@@ -28,6 +28,7 @@
 
 namespace Slic3r::App::Desktop {
 class MainFrame;
+class IMouse3DBackend;
 
 class DesktopApp : public wxApp
 {
@@ -49,6 +50,10 @@ public:
     void handle_HID_device_detached_event(const std::string& message);
     void handle_HID_device_attached_event(const std::string& message);
     void handle_volumes_changed_event();
+
+#ifdef WIN32
+    int FilterEvent(wxEvent& event) override;
+#endif
 
 #ifdef __APPLE__
     void MacOpenURL(const wxString& url) override;
@@ -79,6 +84,7 @@ private:
     InitParams m_init_params;
     Navigator m_navigator;
     std::unique_ptr<PrintHost::PrusaLinkStorageListener> m_prusalink_storage_listener;
+    std::unique_ptr<IMouse3DBackend> m_mouse_3d_backend;
 
     std::shared_ptr<Plater::ThumbnailImageGenerator> m_thumbnail_image_generator;
     std::shared_ptr<App::ThumbnailStore> m_thumbnail_store;
