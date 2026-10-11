@@ -637,10 +637,11 @@ bool PaintOnGizmoBase::
                 }
 
                 const VolumeHitPoint& hit = m_raycast_cache.hit;
-                TriangleSelectorRenderWrapper& triangle_selector_wrapper =
-                    m_triangle_selector_wrappers[hit.volume_idx];
-                TriangleSelector& triangle_selector = triangle_selector_wrapper.triangle_selector();
                 if (hit.volume_idx != -1) {
+                    TriangleSelectorRenderWrapper& triangle_selector_wrapper =
+                        m_triangle_selector_wrappers[hit.volume_idx];
+                    TriangleSelector& triangle_selector =
+                        triangle_selector_wrapper.triangle_selector();
                     const PaintableVolume& paintable_volume =
                         this->m_paintable_volumes[hit.volume_idx];
                     const Transform3d& trafo_matrix = paintable_volume.world_trafo;
