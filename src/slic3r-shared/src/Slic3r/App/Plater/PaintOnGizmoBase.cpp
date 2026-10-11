@@ -910,6 +910,12 @@ bool PaintOnGizmoBase::
                         for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers)
                         {
                             const size_t idx = &wrapper - m_triangle_selector_wrappers.data();
+
+                            // The hit volume is selected already.
+                            if (idx == static_cast<size_t>(volume_idx)) {
+                                continue;
+                            }
+
                             const Transform3d& volume_trafo_matrix =
                                 m_paintable_volumes[idx].world_trafo;
                             const TriangleSelector::ClippingPlane& volume_clp =
@@ -1017,6 +1023,12 @@ bool PaintOnGizmoBase::
             if (selected_state.has_value()) {
                 for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
                     const size_t idx = &wrapper - m_triangle_selector_wrappers.data();
+
+                    // The hit volume is selected already.
+                    if (idx == static_cast<size_t>(hit.volume_idx)) {
+                        continue;
+                    }
+
                     const Transform3d& volume_trafo_matrix = m_paintable_volumes[idx].world_trafo;
                     const TriangleSelector::ClippingPlane& volume_clp =
                         this->get_clipping_plane_in_volume_coordinates(volume_trafo_matrix);
