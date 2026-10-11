@@ -51,6 +51,12 @@ public:
     virtual void on_scene_mouse_event(const MouseEvent& e);
     virtual void on_scene_keyboard_event(const KeyboardEvent& e);
 
+    /**
+     * @brief Called by the canvas at the beginning of every rendered frame, before the queued input
+     * events are emitted.
+     */
+    virtual void on_frame_begin();
+
     void activate(Biz::Platform::IRenderRequestHandler* render_request_handler);
     void deactivate();
 
