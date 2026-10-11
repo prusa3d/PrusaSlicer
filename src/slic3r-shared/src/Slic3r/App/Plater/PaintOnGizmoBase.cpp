@@ -280,6 +280,11 @@ void PaintOnGizmoBase::
 
 void PaintOnGizmoBase::apply_painting_to_model() const
 {
+    this->apply_painting_to_model(this->get_undo_snapshot_type());
+}
+
+void PaintOnGizmoBase::apply_painting_to_model(const UndoSnapshotType snapshot_type) const
+{
     Domain::ElementRefs volume_refs;
     std::unordered_map<size_t, size_t> volume_id_to_idx;
     for (const PaintableVolume& paintable_volume : m_paintable_volumes) {
@@ -294,8 +299,11 @@ void PaintOnGizmoBase::apply_painting_to_model() const
         volume_id_to_idx[paintable_volume.model_volume.id().id] = volume_idx;
     }
 
+    bool any_volume_changed = false;
     const auto facets_annotations_modificator =
-        [this, &volume_id_to_idx](const Domain::ElementRef& ref, ModelVolume& volume) -> bool
+        [this,
+         &volume_id_to_idx,
+         &any_volume_changed](const Domain::ElementRef& ref, ModelVolume& volume) -> bool
     {
         const size_t volume_idx = volume_id_to_idx.at(ref.volume_id);
 
@@ -303,7 +311,10 @@ void PaintOnGizmoBase::apply_painting_to_model() const
             m_triangle_selector_wrappers[volume_idx];
         const TriangleSelector& triangle_selector = triangle_selector_wrapper.triangle_selector();
 
-        return this->set_facets_annotation(volume, triangle_selector);
+        const bool volume_changed = this->set_facets_annotation(volume, triangle_selector);
+        any_volume_changed |= volume_changed;
+
+        return volume_changed;
     };
 
     m_scene_interactor.modify_facets_annotations(
@@ -311,6 +322,11 @@ void PaintOnGizmoBase::apply_painting_to_model() const
         this->get_facets_annotation_kind(),
         facets_annotations_modificator
     );
+
+    // One undo step for all the volumes, none when nothing was painted.
+    if (any_volume_changed) {
+        m_project_interactor.undo_provider().take_snapshot(snapshot_type);
+    }
 }
 
 void PaintOnGizmoBase::init_main_nodes()
@@ -1584,7 +1600,6 @@ bool PaintOnGizmoBase::is_mesh_point_clipped(const Vec3d& point, const Transform
 void PaintOnGizmoBase::finish_painting_stroke()
 {
     this->apply_painting_to_model();
-    this->on_painting_stroke_applied();
     this->reset_painting_stroke_state();
 }
 

@@ -42,6 +42,8 @@ public:
     Domain::TriangleSelector::TriangleStateType get_right_button_state_type() const override;
 
 protected:
+    Biz::UndoSnapshotType get_undo_snapshot_type() const override;
+
     Domain::FacetsAnnotationKind get_facets_annotation_kind() const override;
     const Domain::FacetsAnnotation& get_facets_annotation(
         const Domain::ModelVolume& model_volume

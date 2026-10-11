@@ -10,7 +10,10 @@
 
 using namespace Slic3r::App::Yoga;
 
+using Slic3r::Biz::UndoSnapshotType;
+using Slic3r::Biz::Algorithms::TriangleSelector;
 using Slic3r::Domain::FacetsAnnotationKind;
+using Slic3r::Domain::ModelVolume;
 
 namespace Slic3r::App::Plater {
 
@@ -69,6 +72,11 @@ std::unique_ptr<GizmoWindow> PaintOnSeamsGizmo::release_ui_window()
     return m_dialog.release();
 }
 
+UndoSnapshotType PaintOnSeamsGizmo::get_undo_snapshot_type() const
+{
+    return UndoSnapshotType::PaintOnSeamsStroke;
+}
+
 FacetsAnnotationKind PaintOnSeamsGizmo::get_facets_annotation_kind() const
 {
     return FacetsAnnotationKind::Seam;
@@ -82,13 +90,11 @@ const Domain::FacetsAnnotation& PaintOnSeamsGizmo::get_facets_annotation(
 }
 
 bool PaintOnSeamsGizmo::set_facets_annotation(
-    Domain::ModelVolume& model_volume,
-    const Biz::Algorithms::TriangleSelector& triangle_selector
+    ModelVolume& model_volume,
+    const TriangleSelector& triangle_selector
 ) const
 {
-    const bool result{model_volume.seam_facets.set_data(triangle_selector.serialize())};
-    m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::PaintOnSeamsStroke);
-    return result;
+    return model_volume.seam_facets.set_data(triangle_selector.serialize());
 }
 
 Domain::TriangleSelector::TriangleStateType PaintOnSeamsGizmo::get_left_button_state_type() const

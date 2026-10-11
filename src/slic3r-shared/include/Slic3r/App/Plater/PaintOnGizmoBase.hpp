@@ -12,6 +12,7 @@
 #include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/Biz/Algorithms/Color.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleSelector.hpp"
+#include "Slic3r/Biz/IUndoProvider.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
 #include "Slic3r/Domain/FacetsAnnotation.hpp"
@@ -155,6 +156,11 @@ protected:
 
     PaintingPalette m_painting_colors;
 
+    /**
+     * @brief Undo snapshot type recorded for an applied painting stroke.
+     */
+    virtual Biz::UndoSnapshotType get_undo_snapshot_type() const = 0;
+
     virtual Domain::FacetsAnnotationKind get_facets_annotation_kind() const = 0;
     virtual const Domain::FacetsAnnotation&
     get_facets_annotation(const Domain::ModelVolume& model_volume) const = 0;
@@ -163,11 +169,6 @@ protected:
         const Biz::Algorithms::TriangleSelector& triangle_selector
     ) const = 0;
 
-    /**
-     * @brief Called after a finished painting stroke gets applied to the model.
-     */
-    virtual void on_painting_stroke_applied() {}
-
     void set_tool_type(ToolType tool_type);
     void set_cursor_type(Biz::Algorithms::TriangleSelector::CursorType cursor_type);
 
@@ -175,7 +176,15 @@ protected:
     void update_overhang_detection();
     void clear_all_paintings();
 
+    /**
+     * @brief Writes the painting into the model, one undo snapshot is taken when a volume changed.
+     */
     void apply_painting_to_model() const;
+
+    /**
+     * @brief Same as apply_painting_to_model(), but records the given undo snapshot type.
+     */
+    void apply_painting_to_model(Biz::UndoSnapshotType snapshot_type) const;
 
     virtual Domain::ColorRGBA
     create_default_painting_color(const Domain::ModelVolume& model_volume) const;

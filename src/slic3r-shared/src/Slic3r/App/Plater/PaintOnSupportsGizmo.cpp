@@ -303,11 +303,7 @@ PaintOnSupportsGizmo::PaintOnSupportsGizmo(
 
     m_dialog->callbacks().automatic_painting = [this]() { this->auto_generate_support_painting(); };
 
-    m_dialog->callbacks().painting_reset = [this]()
-    {
-        this->clear_all_paintings();
-        m_project_interactor.undo_provider().take_snapshot(UndoSnapshotType::PaintOnSupportsStroke);
-    };
+    m_dialog->callbacks().painting_reset = [this]() { this->clear_all_paintings(); };
 
     m_support_points_request->callbacks().completed =
         [this](const std::optional<ObjectSupportPointsRef> support_points)
@@ -320,7 +316,7 @@ void PaintOnSupportsGizmo::on_deactivated()
 {
     if (m_automatic_painting_slicing_id.has_value()) {
         m_support_points_request->cancel();
-        this->finish_automatic_painting(false);
+        this->finish_automatic_painting();
     }
 
     PaintOnGizmoBase::on_deactivated();
@@ -355,6 +351,11 @@ GizmoWindowPtr PaintOnSupportsGizmo::release_ui_window()
     return m_dialog.release();
 }
 
+UndoSnapshotType PaintOnSupportsGizmo::get_undo_snapshot_type() const
+{
+    return UndoSnapshotType::PaintOnSupportsStroke;
+}
+
 FacetsAnnotationKind PaintOnSupportsGizmo::get_facets_annotation_kind() const
 {
     return FacetsAnnotationKind::FdmSupports;
@@ -368,17 +369,11 @@ const Domain::FacetsAnnotation& PaintOnSupportsGizmo::get_facets_annotation(
 }
 
 bool PaintOnSupportsGizmo::set_facets_annotation(
-    Domain::ModelVolume& model_volume,
-    const Biz::Algorithms::TriangleSelector& triangle_selector
+    ModelVolume& model_volume,
+    const TriangleSelector& triangle_selector
 ) const
 {
-    const bool result{model_volume.supported_facets.set_data(triangle_selector.serialize())};
-    return result;
-}
-
-void PaintOnSupportsGizmo::on_painting_stroke_applied()
-{
-    m_project_interactor.undo_provider().take_snapshot(UndoSnapshotType::PaintOnSupportsStroke);
+    return model_volume.supported_facets.set_data(triangle_selector.serialize());
 }
 
 Domain::TriangleSelector::TriangleStateType PaintOnSupportsGizmo::get_left_button_state_type() const
@@ -444,7 +439,6 @@ void PaintOnSupportsGizmo::select_facets_by_angle(const float threshold_deg)
     }
 
     this->apply_painting_to_model();
-    m_project_interactor.undo_provider().take_snapshot(UndoSnapshotType::PaintOnSupportsStroke);
 }
 
 void PaintOnSupportsGizmo::auto_generate_support_painting()
@@ -531,19 +525,20 @@ void PaintOnSupportsGizmo::on_support_points_request_completed(
 
     const SlicingId slicing_id = *m_automatic_painting_slicing_id;
 
-    const bool applied =
-        support_points.has_value() && this->apply_generated_support_points(slicing_id);
+    if (support_points.has_value()) {
+        this->apply_generated_support_points(slicing_id);
+    }
 
     const std::optional<Slicing::Status> status =
         m_project_interactor.status_cache().get_status(slicing_id);
-    this->finish_automatic_painting(applied);
+    this->finish_automatic_painting();
 
     if (status.has_value() && status->code == Slicing::StatusCode::InvalidData) {
         this->show_invalid_print_setup_warning(slicing_id);
     }
 }
 
-bool PaintOnSupportsGizmo::apply_generated_support_points(const SlicingId slicing_id)
+void PaintOnSupportsGizmo::apply_generated_support_points(const SlicingId slicing_id)
 {
     const GeneratedSupportPointsCache& support_points_cache =
         m_project_interactor.generated_support_points_cache();
@@ -588,21 +583,13 @@ bool PaintOnSupportsGizmo::apply_generated_support_points(const SlicingId slicin
     }
 
     if (applied) {
-        this->apply_painting_to_model();
+        this->apply_painting_to_model(UndoSnapshotType::PaintOnSupportsAutomaticPainting);
     }
-
-    return applied;
 }
 
-void PaintOnSupportsGizmo::finish_automatic_painting(const bool applied_support_points)
+void PaintOnSupportsGizmo::finish_automatic_painting()
 {
     ASSERT(m_automatic_painting_slicing_id.has_value());
-    if (applied_support_points) {
-        m_project_interactor.undo_provider().take_snapshot(
-            UndoSnapshotType::PaintOnSupportsAutomaticPainting
-        );
-    }
-
     this->reset_automatic_painting_state();
 }
 
