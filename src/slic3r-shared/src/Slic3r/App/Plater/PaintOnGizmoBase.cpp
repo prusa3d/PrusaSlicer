@@ -1437,6 +1437,9 @@ std::vector<PaintOnGizmoBase::VolumeHitPoints> PaintOnGizmoBase::get_projected_m
         }
     }
 
+    // The loop left the cache at the last raycast position, the cursor is drawn at the current one.
+    m_raycast_cache = {mouse_position, volume_hit_points.front()};
+
     // Divide volume_hit_points into groups with the same volume_index. It may contain multiple groups with the same volume_index.
     std::vector<VolumeHitPoints> volume_hit_points_by_volume;
     for (size_t prev_hit_point = 0, curr_hit_point = 0; curr_hit_point < volume_hit_points.size();
