@@ -17,9 +17,11 @@ int Texture::height() const
     return m_height;
 }
 
-Texture::Texture(Device& device)
-    : WithInternal::WithInternal(InternalType<GL::GLTextureInternal>()), m_device(device)
+Texture::Texture(Device& device, TextureTarget target) :
+    WithInternal::WithInternal(InternalType<GL::GLTextureInternal>(), target),
+    m_device(device)
 {
+    DEBUG_ASSERT(target == TextureTarget::Texture2D || target == TextureTarget::Texture2DArray);
     glGenTextures(1, &get_internal_as<GL::GLTextureInternal>().m_id);
     glCheck();
 }
@@ -41,6 +43,8 @@ void Texture::set_data(Domain::PixelFormat format, int level, int w, int h, cons
     GLenum gl_format = GL::texture_format(format);
     GLenum gl_type = GL::texture_format_type(format);
     GLenum gl_target = get_internal_as<GL::GLTextureInternal>().m_target;
+    DEBUG_ASSERT(gl_target == GL_TEXTURE_2D);
+
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glCheck();
     if (GL::is_compressed(format))
@@ -73,6 +77,8 @@ void Texture::set_sub_data(
     auto& device = m_device.get_internal_as<GL::GLDeviceInternal>();
     device.bind_texture(0, *this);
     GLenum gl_target = get_internal_as<GL::GLTextureInternal>().m_target;
+    DEBUG_ASSERT(gl_target == GL_TEXTURE_2D);
+
     GLenum gl_format = GL::texture_format(format);
     GLenum gl_type   = GL::texture_format_type(format);
     if (unpack_row_length) {
@@ -85,6 +91,85 @@ void Texture::set_sub_data(
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
         glCheck();
     }
+}
+
+void Texture::set_layered_data(
+    const Domain::PixelFormat format,
+    const int level,
+    const int width,
+    const int height,
+    const int layer_count,
+    const void* data
+)
+{
+    DEBUG_ASSERT(!GL::is_compressed(format));
+
+    GL::GLDeviceInternal& device = m_device.get_internal_as<GL::GLDeviceInternal>();
+    device.bind_texture(0, *this);
+
+    const GLenum gl_internal_format = GL::texture_internal_format(format);
+    const GLenum gl_format          = GL::texture_format(format);
+    const GLenum gl_type            = GL::texture_format_type(format);
+    const GLenum gl_target          = get_internal_as<GL::GLTextureInternal>().m_target;
+    DEBUG_ASSERT(gl_target == GL_TEXTURE_2D_ARRAY);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glCheck();
+    glTexImage3D(
+        gl_target,
+        level,
+        GLint(gl_internal_format),
+        width,
+        height,
+        layer_count,
+        0,
+        gl_format,
+        gl_type,
+        data
+    );
+    glCheck();
+    glTexParameteri(gl_target, GL_TEXTURE_MAX_LEVEL, level);
+    glCheck();
+
+    if (level == 0) {
+        m_width  = width;
+        m_height = height;
+    }
+}
+
+void Texture::set_layer_sub_data(
+    const Domain::PixelFormat format,
+    const int level,
+    const int offset_x,
+    const int offset_y,
+    const int layer,
+    const int width,
+    const int height,
+    const void* data
+)
+{
+    GL::GLDeviceInternal& device = m_device.get_internal_as<GL::GLDeviceInternal>();
+    device.bind_texture(0, *this);
+
+    const GLenum gl_target = get_internal_as<GL::GLTextureInternal>().m_target;
+    const GLenum gl_format = GL::texture_format(format);
+    const GLenum gl_type   = GL::texture_format_type(format);
+    DEBUG_ASSERT(gl_target == GL_TEXTURE_2D_ARRAY);
+
+    glTexSubImage3D(
+        gl_target,
+        level,
+        offset_x,
+        offset_y,
+        layer,
+        width,
+        height,
+        1,
+        gl_format,
+        gl_type,
+        data
+    );
+    glCheck();
 }
 
 void Texture::set_filtering(TextureMinFilter min_filter, TextureMagFilter mag_filter)

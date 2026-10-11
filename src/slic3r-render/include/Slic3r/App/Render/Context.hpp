@@ -44,6 +44,16 @@ public:
     uint8_t max_texture_units() const { return m_max_texture_units; }
     size_t max_texture_size() const { return m_max_texture_size; }
 
+    /**
+     * @brief Maximum number of layers of a 2D array texture.
+     *
+     * @note OpenGL 3.0 requires it be at least 256.
+     */
+    size_t max_array_texture_layers() const
+    {
+        return m_max_array_texture_layers;
+    }
+
     bool is_core_profile() const { return m_core_profile; }
     void log_gl_info() const;
 
@@ -70,6 +80,7 @@ private:
     bool m_vao_available;
     uint8_t m_max_texture_units{0};
     size_t m_max_texture_size{ 0 };
+    size_t m_max_array_texture_layers{0};
 
     std::string m_gl_vendor_string;
     std::string m_gl_version_string;

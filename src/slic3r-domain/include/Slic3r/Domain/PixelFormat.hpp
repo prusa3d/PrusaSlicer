@@ -18,6 +18,7 @@ enum class PixelFormat
     DepthComponent,
     RGB_DXT1,
     RGBA_DXT5,
+    RGBA32UI,
 };
 
 std::size_t pixel_format_bytes_per_pixel(PixelFormat pf);

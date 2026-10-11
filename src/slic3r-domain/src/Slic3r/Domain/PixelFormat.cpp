@@ -25,6 +25,8 @@ std::size_t pixel_format_bytes_per_pixel(PixelFormat pf)
         return 12;
     case PixelFormat::DepthComponent:
         return 4;
+    case PixelFormat::RGBA32UI:
+        return 16;
     default:
         // unsupported format
         PANIC("Unsupported pixel format");

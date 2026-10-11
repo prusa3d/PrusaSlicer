@@ -35,7 +35,12 @@ public:
 
     void load_state();
 
-    std::unique_ptr<Texture> create_texture();
+    /**
+     * @brief Creates a texture, only 2D and 2D array targets are supported.
+     *
+     * @param target Texture2D or Texture2DArray, other targets are not supported.
+     */
+    std::unique_ptr<Texture> create_texture(TextureTarget target = TextureTarget::Texture2D);
     std::unique_ptr<VertexBuffer> create_vertex_buffer();
     std::unique_ptr<IndexBuffer> create_index_buffer();
 #ifdef SLIC3R_RENDER_TEXTURE_BUFFER_SUPPORTED

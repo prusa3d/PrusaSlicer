@@ -92,6 +92,11 @@ Context::Context()
     glCheck();
     m_max_texture_size = max_texture_size;
 
+    GLint max_array_texture_layers = 0;
+    glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &max_array_texture_layers);
+    glCheck();
+    m_max_array_texture_layers = max_array_texture_layers;
+
 #ifdef EMSCRIPTEN
     m_vao_available = GLEW_OES_vertex_array_object;
 #else
