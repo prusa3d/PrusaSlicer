@@ -1008,7 +1008,26 @@ find_param(std::map<std::string, ConfigValueAndDef>& squashed_boxes, const std::
     return &it->second;
 }
 
-static void expand_parameters(SquashResult& squashed_boxes)
+static void clamp_extruders_to_single_slot(SquashResult& squashed_boxes)
+{
+    for (const std::string& key :
+         {"perimeter_extruder",
+          "infill_extruder",
+          "solid_infill_extruder",
+          "support_material_extruder",
+          "support_material_interface_extruder"})
+    {
+        ConfigValueAndDef* extruder{find_param(squashed_boxes.squashed_values, key)};
+        if (!extruder || extruder->value == ConfigValue{1}) {
+            continue;
+        }
+        extruder->value = ConfigValue{1};
+        squashed_boxes.effective_values[key].modifications.push_back(
+            EffectiveValue::Modification{EffectiveValue::ClampedToSingleSlot{}, ConfigValue{1}});
+    }
+}
+
+static void expand_parameters(SquashResult& squashed_boxes, const std::size_t material_slot_count)
 {
     if (const ConfigValueAndDef* extruder{find_param(squashed_boxes.squashed_values, "extruder")}) {
         if (extruder->value != ConfigValue{0}) {
@@ -1037,6 +1056,10 @@ static void expand_parameters(SquashResult& squashed_boxes)
         }
         squashed_boxes.squashed_values.erase("extruder");
         squashed_boxes.effective_values.erase("extruder");
+    }
+
+    if (material_slot_count == 1) {
+        clamp_extruders_to_single_slot(squashed_boxes);
     }
 
     if (const ConfigValueAndDef* first_layer_speed{
@@ -1132,7 +1155,7 @@ SquashedConfig::SquashedConfig(
 
     ensure_slot_parity(squashed_boxes, hw_config.material_slot_count());
 
-    expand_parameters(squashed_boxes);
+    expand_parameters(squashed_boxes, material_slot_count);
 
     for (const auto& [key, item] : squashed_boxes.squashed_values) {
         m_values[key] = item.value;

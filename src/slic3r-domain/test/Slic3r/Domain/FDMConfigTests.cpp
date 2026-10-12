@@ -560,3 +560,28 @@ TEST_CASE_METHOD(
 
     CHECK(effective_value == expected_value);
 }
+
+TEST_CASE("Extruders are clamped on a single slot printer", "[FDMConfig]")
+{
+    const Preset::HwPrinterConfig hw_config{build_fff_printer_config(1, {})};
+    ConfigPackFDM config_pack{1};
+    config_pack.print.items.opt("support_material_extruder").set(2);
+    const FullConfigFDM full_config{config_pack, {0}, hw_config};
+    CHECK(full_config.get<int>("support_material_extruder") == 1);
+
+    ObjectSettings object_settings;
+    object_settings.items.opt("extruder").set(2);
+    object_settings.overrides.set("infill_extruder", 3);
+    const PartialConfig partial_config{{object_settings}, hw_config};
+    CHECK(partial_config.get<int>("perimeter_extruder") == 1);
+    CHECK(partial_config.get<int>("infill_extruder") == 1);
+    CHECK(partial_config.get<int>("solid_infill_extruder") == 1);
+    REQUIRE(partial_config.effective_values().contains("infill_extruder"));
+    CHECK(std::holds_alternative<EffectiveValue::ClampedToSingleSlot>(
+        partial_config.effective_values().at("infill_extruder").modifications.back().payload));
+
+    // Multi slot printers are not touched, invalid extruders are rejected elsewhere.
+    const Preset::HwPrinterConfig multi_hw_config{build_fff_printer_config(3, {})};
+    const PartialConfig multi_partial_config{{object_settings}, multi_hw_config};
+    CHECK(multi_partial_config.get<int>("infill_extruder") == 3);
+}

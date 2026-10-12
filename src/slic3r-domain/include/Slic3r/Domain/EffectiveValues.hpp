@@ -51,13 +51,20 @@ struct EffectiveValue
         bool operator==(const ResolvedFloatOrPercentage&) const = default;
     };
 
+    // Extruder assignment is meaningless on a single slot printer, the value is forced to 1.
+    struct ClampedToSingleSlot
+    {
+        bool operator==(const ClampedToSingleSlot&) const = default;
+    };
+
     using ModificationPayload = std::variant<
         SetBy,
         OverriddenBy,
         CompatibilityRuleApplied,
         SlotParityEnsured,
         ExpandedFrom,
-        ResolvedFloatOrPercentage>;
+        ResolvedFloatOrPercentage,
+        ClampedToSingleSlot>;
 
     struct Modification
     {

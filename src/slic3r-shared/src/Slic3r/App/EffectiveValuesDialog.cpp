@@ -228,6 +228,11 @@ std::string step_label(
                     fmt::runtime(Biz::_u8L("Percentage resolved against {}")),
                     def_label(resolved.ratio_over, technology));
             },
+            [&](const EffectiveValue::ClampedToSingleSlot&)
+            {
+                return Biz::_u8L(
+                    "Extruder does not make sense in this context, the first extruder is used");
+            },
         },
         modification.payload);
 }
