@@ -33,6 +33,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The [PrusaLinkMock] tests run against prusalink-mock, a PrusaLink server that answers like
+      # the printer firmware. After the main checkout, whose clean would remove it.
+      - name: Checkout prusalink-mock
+        uses: actions/checkout@v4
+        with:
+          repository: hyiger/prusalink-mock
+          ref: acb702c8157bf408f75208dfc78c919d611a3332
+          path: _prusalink-mock
+
+      - name: Set up Python
+        id: py
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Extract version
         id: version
         run: |
@@ -95,10 +110,27 @@ jobs:
         run: sccache --zero-stats
 
       - name: Configure (builds deps if not cached)
-        run: cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        run: >-
+          cmake --preset default -DPrusaSlicer_BUILD_DEPS=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DPRUSALINK_MOCK_DIR=${{ github.workspace }}/_prusalink-mock
+          -DPython3_EXECUTABLE=${{ steps.py.outputs.python-path }}
+          -DPRUSALINK_MOCK_REQUIRED=ON
 
       - name: Build
         run: cmake --build build-default -j$(nproc)
+
+      # Filament sync from the printer: its unit tests and the tests against prusalink-mock
+      - name: Test
+        run: ctest --test-dir build-default -L 'prusalink_mock|filament_sync' --no-tests=error --output-on-failure
+
+      - name: Upload prusalink-mock request log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prusalink-mock-log-${{ matrix.arch }}
+          path: build-default/tests/slic3rutils/prusalink-mock.jsonl
+          if-no-files-found: ignore
 
       - name: Install
         run: cmake --install build-default

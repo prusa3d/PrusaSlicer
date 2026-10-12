@@ -22,6 +22,8 @@ class wxArrayString;
 namespace Slic3r {
 
 class DynamicPrintConfig;
+struct PrinterToolsResult;
+struct PrinterToolsOptions;
 
 enum class PrintHostPostUploadAction {
     None,
@@ -75,6 +77,10 @@ public:
     // Support for PrusaLink uploading to different storage. Not supported by other print hosts.
     // Returns false if not supported or fail.
     virtual bool get_storage(wxArrayString& /*storage_path*/, wxArrayString& /*storage_name*/) const { return false; }
+    // The filament loaded in each tool (PrusaLink GET /api/v1/tools, printers with Filament Slots).
+    // Returns false if the host type can't report it (out.status is then Unsupported); otherwise
+    // the outcome, a printer without Filament Slots included, is in out. Needs no GUI app.
+    virtual bool get_tools(PrinterToolsResult &out, const PrinterToolsOptions &opts) const;
     virtual std::string get_unusable_symbols() const { return {}; }
 
     static PrintHost* get_print_host(DynamicPrintConfig *config);

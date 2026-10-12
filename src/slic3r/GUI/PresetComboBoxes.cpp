@@ -44,6 +44,7 @@
 #include "../Utils/UndoRedo.hpp"
 #include "BitmapCache.hpp"
 #include "PhysicalPrinterDialog.hpp"
+#include "FilamentSyncDialog.hpp"
 #include "MsgDialog.hpp"
 #include "UserAccount.hpp"
 
@@ -459,6 +460,11 @@ bool PresetComboBox::del_physical_printer(const wxString& note_string/* = wxEmpt
         return false;
 
     m_preset_bundle->physical_printers.delete_selected_printer();
+    if (Plater* plater = wxGetApp().plater()) {
+        plater->sidebar().update_filament_sync_button();
+        update_unavailable_extruders_warning();
+        update_filament_list_visibility();
+    }
 
     this->update();
 

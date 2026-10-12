@@ -1,0 +1,684 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <fstream>
+#include <iterator>
+
+#include <boost/filesystem.hpp>
+#include <boost/nowide/fstream.hpp>
+
+#include "libslic3r/AppConfig.hpp"
+#include "libslic3r/Preset.hpp"
+#include "libslic3r/PresetBundle.hpp"
+#include "libslic3r/Utils.hpp"
+#include "slic3r/Utils/FilamentSync.hpp"
+
+using namespace Slic3r;
+using namespace Slic3r::filament_sync;
+namespace fs = boost::filesystem;
+
+namespace {
+
+Candidate cand(const std::string &name, const std::string &vendor, const std::string &type, const std::string &colour = "")
+{
+    Candidate c;
+    c.name   = name;
+    c.vendor = vendor;
+    c.type   = type;
+    c.colour = colour;
+    return c;
+}
+
+Candidate sys(const std::string &name, const std::string &vendor, const std::string &type, const std::string &colour = "")
+{
+    Candidate c = cand(name, vendor, type, colour);
+    c.is_system = true;
+    if (const size_t at = name.find(" @"); at != std::string::npos)
+        c.alias = name.substr(0, at);
+    return c;
+}
+
+PrinterTool tool(int number, const std::string &vendor, const std::string &material, const std::string &color = "",
+                 const std::string &hex = "")
+{
+    PrinterTool t;
+    t.extruder_idx    = number - 1;
+    t.loaded          = true;
+    t.vendor          = vendor;
+    t.material        = material;
+    t.color           = color;
+    t.color_hex       = hex;
+    t.nozzle_diameter = 0.4;
+    t.high_flow       = true;
+    return t;
+}
+
+ExtruderState extruder(int idx, const std::vector<Candidate> &candidates, const std::string &selected = "")
+{
+    ExtruderState ex;
+    ex.idx             = idx;
+    ex.selected        = selected;
+    ex.nozzle_diameter = 0.4;
+    ex.high_flow       = true;
+    ex.candidates      = candidates;
+    return ex;
+}
+
+// One tool against one extruder
+ExtruderPlan plan_one(const PrinterTool &t, const std::vector<Candidate> &candidates, const std::string &selected = "",
+                      const std::set<std::string> &taken = {})
+{
+    std::vector<ExtruderState> exs;
+    for (int i = 0; i <= t.extruder_idx; ++i)
+        exs.push_back(extruder(i, candidates, i == t.extruder_idx ? selected : ""));
+    PrinterTools tools;
+    tools.tools = {t};
+    const Plan plan = make_plan(tools, exs, taken, "INDX");
+    REQUIRE(plan.extruders.size() == 1);
+    return plan.extruders.front();
+}
+
+} // namespace
+
+TEST_CASE("Vendor spellings fold together", "[FilamentSync]")
+{
+    CHECK(vendor_key("3D-Fuel") == vendor_key("3D Fuel"));
+    CHECK(vendor_key("eSun") == vendor_key("Esun"));
+    CHECK(vendor_key("colorFabb") == vendor_key("ColorFabb"));
+    CHECK(vendor_key("Sunlu") == vendor_key("SUNLU"));
+    CHECK(vendor_key("Bambu Lab") == vendor_key("BambuLab"));
+    CHECK(vendor_key("Prusament") == vendor_key("Prusa Polymers"));
+    CHECK(vendor_key("Overture") != vendor_key("Polymaker"));
+
+    for (const std::string v : {"", "  ", "VENDOR1", "vendor8"})
+        CHECK(is_placeholder_vendor(v));
+    for (const std::string v : {"VENDOR9", "Vendor", "Overture"})
+        CHECK_FALSE(is_placeholder_vendor(v));
+}
+
+TEST_CASE("Materials match by name, the flexible family and the printer's 7 characters", "[FilamentSync]")
+{
+    CHECK(same_material("PETG", "petg"));
+    CHECK_FALSE(same_material("PETG", "PET"));
+    CHECK_FALSE(same_material("PET", "PETG"));
+    CHECK(same_material("FLEX", "TPU"));
+    CHECK(same_material("TPU", "PEBA"));
+    CHECK(same_material("PPS-CF1", "PPS-CF10"));
+    CHECK(same_material("Woodfil", "Woodfill"));
+    CHECK_FALSE(same_material("PLA", "PLA-GF"));
+    CHECK_FALSE(same_material("", "PLA"));
+}
+
+TEST_CASE("The plain color preset wins over variants of it", "[FilamentSync]")
+{
+    // The user's Overture whites: none has the printer's exact #FFFFFF
+    const std::vector<Candidate> c = {cand("Overture PLA Matte White", "Overture", "PLA", "#E6DEDE"),
+                                      cand("Overture PLA White", "Overture", "PLA", "#FFFEFA"),
+                                      cand("Overture Silk PLA White", "Overture", "PLA", "#DDD4CA"),
+                                      cand("Overture PLA Black", "Overture", "PLA", "#000000")};
+    const ExtruderPlan p = plan_one(tool(1, "Overture", "PLA", "White", "#FFFFFF"), c, "Generic PLA");
+    CHECK(p.action == Action::Select);
+    CHECK(p.preset == "Overture PLA White");
+    CHECK(p.preset_colour == "#FFFEFA");
+}
+
+TEST_CASE("A new spool on the same tool selects its color's preset", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {cand("Overture PETG Black", "Overture", "PETG", "#000000"),
+                                      cand("Overture PETG Red", "Overture", "PETG", "#ff0000")};
+    CHECK(plan_one(tool(2, "Overture", "PETG", "Red", "#FF0000"), c, "Overture PETG Black").preset == "Overture PETG Red");
+    const ExtruderPlan kept = plan_one(tool(2, "Overture", "PETG", "Black", "#000000"), c, "Overture PETG Black");
+    CHECK(kept.action == Action::Keep);
+    CHECK(kept.preset_colour == "#000000");
+}
+
+TEST_CASE("A selected variant the printer can't tell apart is kept", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {cand("Overture PLA Matte White", "Overture", "PLA"), cand("Overture PLA White", "Overture", "PLA")};
+    CHECK(plan_one(tool(1, "Overture", "PLA", "White", "#FFFFFF"), c, "Overture PLA Matte White").action == Action::Keep);
+}
+
+TEST_CASE("Grey and gray are one color, and an exact hex counts as a match", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {cand("Overture PETG Grey", "Overture", "PETG", "#A0A0A0"),
+                                      cand("Overture PETG Black", "Overture", "PETG", "#000000")};
+    CHECK(plan_one(tool(1, "Overture", "PETG", "Gray", "#808080"), c).preset == "Overture PETG Grey");
+
+    const std::vector<Candidate> by_hex = {cand("Overture PETG Space", "Overture", "PETG", "#808080"),
+                                           cand("Overture PETG", "Overture", "PETG", "")};
+    CHECK(plan_one(tool(1, "Overture", "PETG", "COLOR3", "#808080"), by_hex).preset == "Overture PETG Space");
+}
+
+TEST_CASE("Prusament matches Prusa Polymers presets, plain before other colors", "[FilamentSync]")
+{
+    std::vector<Candidate> c = {sys("Prusament PETG @COREONEINDX HF0.4", "Prusa Polymers", "PETG", "#F0F0F0"),
+                                cand("Prusament PETG Prusa Galaxy Black", "Prusament", "PETG", "#494546")};
+    const PrinterTool orange = tool(5, "Prusament", "PETG", "Orange", "#F8651B");
+    CHECK(plan_one(orange, c).preset == "Prusament PETG @COREONEINDX HF0.4");
+
+    c.push_back(cand("Prusament PETG Prusa Orange", "Prusament", "PETG", "#EB5403"));
+    CHECK(plan_one(orange, c).preset == "Prusament PETG Prusa Orange");
+}
+
+TEST_CASE("A nozzle that isn't hardened avoids abrasive presets", "[FilamentSync]")
+{
+    Candidate cf = sys("Prusament PETG Carbon Fiber @COREONEINDX HF0.4", "Prusa Polymers", "PETG");
+    cf.is_abrasive = true;
+    const std::vector<Candidate> c = {cf, sys("Prusament PETG @COREONEINDX HF0.4", "Prusa Polymers", "PETG")};
+
+    const ExtruderPlan soft = plan_one(tool(1, "Prusament", "PETG"), c, cf.name);
+    CHECK(soft.action == Action::Select);
+    CHECK(soft.preset == "Prusament PETG @COREONEINDX HF0.4");
+
+    PrinterTool hard = tool(1, "Prusament", "PETG");
+    hard.hardened    = true;
+    CHECK(plan_one(hard, c, cf.name).action == Action::Keep);
+
+    // The only match is abrasive: picked, with a note
+    const ExtruderPlan only = plan_one(tool(1, "Prusament", "PETG"), {cf});
+    CHECK(only.preset == cf.name);
+    CHECK(only.notes.size() == 1);
+}
+
+TEST_CASE("Without a vendor the current preset is kept, else Generic", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {cand("Filatech Easy PA", "Filatech", "PA"), sys("Generic PA @SYNC", "Generic", "PA"),
+                                      cand("My PLA", "Acme", "PLA")};
+    PrinterTool pa = tool(5, "", "PA");
+    const ExtruderPlan kept = plan_one(pa, c, "Filatech Easy PA");
+    CHECK(kept.action == Action::Keep);
+    CHECK_FALSE(kept.notes.empty());
+
+    const ExtruderPlan generic = plan_one(pa, c, "My PLA");
+    CHECK(generic.action == Action::Select);
+    CHECK(generic.preset == "Generic PA @SYNC");
+
+    // An unnamed user vendor is no vendor
+    CHECK(plan_one(tool(1, "VENDOR2", "PA"), c, "My PLA").preset == "Generic PA @SYNC");
+    // ... and is never created
+    CHECK(plan_one(tool(1, "", "ASA"), c).action == Action::NoMatch);
+}
+
+TEST_CASE("Incompatible presets don't count", "[FilamentSync]")
+{
+    Candidate other = cand("Overture PETG Black", "Overture", "PETG");
+    other.is_compatible = false;
+    const ExtruderPlan p = plan_one(tool(1, "Overture", "PETG", "Black"), {other, sys("Generic PETG @SYNC", "Generic", "PETG")});
+    CHECK(p.action == Action::Create);
+    CHECK(p.template_preset == "Generic PETG @SYNC");
+}
+
+TEST_CASE("A system preset that isn't installed is installed", "[FilamentSync]")
+{
+    Candidate hidden = sys("Prusament PETG @SYNC", "Prusa Polymers", "PETG");
+    hidden.is_visible = false;
+    const ExtruderPlan p = plan_one(tool(1, "Prusament", "PETG"), {hidden, sys("Generic PETG @SYNC", "Generic", "PETG")});
+    CHECK(p.action == Action::Install);
+    CHECK(p.preset == "Prusament PETG @SYNC");
+}
+
+TEST_CASE("Missing presets are created per vendor, material and color", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {sys("Generic PETG @SYNC", "Generic", "PETG"), sys("Prusament PETG @SYNC", "Prusa Polymers", "PETG"),
+                                      cand("My PETG", "Acme", "PETG")};
+    PrinterTools tools;
+    tools.tools = {tool(1, "Polymaker", "PETG", "Black", "#000000"), tool(2, "Polymaker", "PETG", "Red", "#FF0000"),
+                   tool(3, "Polymaker", "PLA"), tool(4, "Polymaker", "PETG", "Black", "#000000"),
+                   tool(5, "Polymaker", "PETG", "COLOR3", "#123456"), tool(6, "Polymaker", "PETG")};
+    std::vector<ExtruderState> exs = {extruder(0, c, "My PETG")};
+    for (int i = 1; i < 6; ++i)
+        exs.push_back(extruder(i, c));
+    const Plan plan = make_plan(tools, exs, {}, "INDX");
+    REQUIRE(plan.extruders.size() == 6);
+    CHECK(plan.extruders[0].action == Action::Create);
+    CHECK(plan.extruders[0].preset == "Polymaker PETG Black");
+    CHECK(plan.extruders[0].vendor == "Polymaker");
+    CHECK(plan.extruders[0].preset_colour == "#000000");
+    // From the first tool's extruder: its own PETG preset
+    CHECK(plan.extruders[0].template_preset == "My PETG");
+    // Another color is another preset, here from Generic
+    CHECK(plan.extruders[1].preset == "Polymaker PETG Red");
+    CHECK(plan.extruders[1].template_preset == "Generic PETG @SYNC");
+    // No PLA preset to start from
+    CHECK(plan.extruders[2].action == Action::NoMatch);
+    CHECK(plan.extruders[2].notes.size() == 1);
+    // The same color shares the first one
+    CHECK(plan.extruders[3].preset == "Polymaker PETG Black");
+    CHECK(plan.extruders[3].template_preset == "My PETG");
+    // An unnamed user color goes by its hex; no color, no suffix
+    CHECK(plan.extruders[4].preset == "Polymaker PETG #123456");
+    CHECK(plan.extruders[5].preset == "Polymaker PETG");
+    // ... and shows PrusaSlicer's default filament color, which it gets
+    CHECK(plan.extruders[5].preset_colour == printer_tools_detail::normalize_color_hex(
+                                                 print_config_def.get("filament_colour")->default_value->serialize()));
+    CHECK_FALSE(plan.extruders[5].preset_colour.empty());
+}
+
+TEST_CASE("Colors without a hex are told apart by name", "[FilamentSync]")
+{
+    PrinterTools tools;
+    tools.tools = {tool(1, "Polymaker", "PETG", "Black"), tool(2, "Polymaker", "PETG", "Red"), tool(3, "Polymaker", "PETG", "Black")};
+    const std::vector<Candidate> c = {sys("Generic PETG @SYNC", "Generic", "PETG")};
+    const Plan plan = make_plan(tools, {extruder(0, c), extruder(1, c), extruder(2, c)}, {}, "INDX");
+    REQUIRE(plan.extruders.size() == 3);
+    CHECK(plan.extruders[0].preset == "Polymaker PETG Black");
+    CHECK(plan.extruders[1].preset == "Polymaker PETG Red");
+    CHECK(plan.extruders[2].preset == "Polymaker PETG Black");
+}
+
+TEST_CASE("Created presets avoid taken names", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {sys("Generic PETG @SYNC", "Generic", "PETG")};
+    const PrinterTool t = tool(1, "Sunlu", "PETG");
+    CHECK(plan_one(t, c, "", {"sunlu petg"}).preset == "Sunlu PETG @INDX");
+    CHECK(plan_one(t, c, "", {"sunlu petg", "sunlu petg @indx", "sunlu petg @indx 2"}).preset == "Sunlu PETG @INDX 3");
+
+    // A name that would sort before "- default -"
+    const ExtruderPlan bad = plan_one(tool(1, "&Co", "PETG"), c);
+    CHECK(bad.action == Action::NoMatch);
+}
+
+TEST_CASE("Abrasive templates aren't used for a nozzle that isn't hardened", "[FilamentSync]")
+{
+    Candidate cf = sys("Generic PETG CF @SYNC", "Generic", "PETG");
+    cf.is_abrasive = true;
+    CHECK(plan_one(tool(1, "Polymaker", "PETG"), {cf}).action == Action::NoMatch);
+    PrinterTool hard = tool(1, "Polymaker", "PETG");
+    hard.hardened = true;
+    CHECK(plan_one(hard, {cf}).action == Action::Create);
+}
+
+TEST_CASE("Empty tools, gaps and tools beyond the profile", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {sys("Generic PETG @SYNC", "Generic", "PETG")};
+    PrinterTools tools;
+    PrinterTool  empty = tool(1, "", "");
+    empty.loaded       = false;
+    tools.tools        = {empty, tool(3, "Generic", "PETG", "Red", "#FF0000"), tool(9, "Generic", "PETG")};
+    tools.warnings     = {"tool \"x\": not a tool number, skipped"};
+    const Plan plan    = make_plan(tools, {extruder(0, c), extruder(1, c), extruder(2, c, "Generic PETG @SYNC")}, {}, "INDX");
+    REQUIRE(plan.extruders.size() == 2);
+    CHECK(plan.extruders[0].action == Action::NotLoaded);
+    CHECK(plan.extruders[0].preset_colour.empty());
+    CHECK(plan.extruders[1].idx == 2);
+    CHECK(plan.extruders[1].action == Action::Keep);
+    // The preset has no filament color of its own here
+    CHECK(plan.extruders[1].preset_colour.empty());
+    // Tool 9 and the parse warning
+    CHECK(plan.notes.size() == 2);
+}
+
+TEST_CASE("Nozzle differences are noted", "[FilamentSync]")
+{
+    PrinterTool t     = tool(1, "Generic", "PETG");
+    t.nozzle_diameter = 0.6;
+    t.high_flow       = false;
+    const ExtruderPlan p = plan_one(t, {sys("Generic PETG @SYNC", "Generic", "PETG")});
+    CHECK(p.notes.size() == 2);
+}
+
+TEST_CASE("The plan names the filament color each extruder shows", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {cand("Overture PETG Red", "Overture", "PETG", "#ee1111"), sys("Generic PETG @SYNC", "Generic", "PETG")};
+    PrinterTools tools;
+    tools.tools     = {tool(1, "Overture", "PETG", "Red", "#FF0000"), tool(2, "Polymaker", "PETG", "Blue", "#0000FF"), tool(3, "", "PETG")};
+    const Plan plan = make_plan(tools, {extruder(0, c), extruder(1, c), extruder(2, c)}, {}, "INDX");
+    REQUIRE(plan.extruders.size() == 3);
+    // The selected preset's own color, uppercase
+    CHECK(plan.extruders[0].preset_colour == "#EE1111");
+    // A new preset takes the tool's color
+    CHECK(plan.extruders[1].action == Action::Create);
+    CHECK(plan.extruders[1].preset_colour == "#0000FF");
+    // A preset without a filament color
+    CHECK(plan.extruders[2].preset_colour.empty());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Applying a plan to a PresetBundle loaded from a temporary data folder
+
+namespace {
+
+class TempDataDir
+{
+public:
+    TempDataDir() : m_old(Slic3r::data_dir())
+    {
+        m_dir = fs::temp_directory_path() / fs::unique_path("fsync-%%%%-%%%%");
+        fs::create_directories(m_dir);
+        Slic3r::set_data_dir(m_dir.string());
+    }
+    ~TempDataDir()
+    {
+        Slic3r::set_data_dir(m_old);
+        boost::system::error_code ec;
+        fs::remove_all(m_dir, ec);
+    }
+    const fs::path &dir() const { return m_dir; }
+
+private:
+    std::string m_old;
+    fs::path    m_dir;
+};
+
+void write_file(const fs::path &path, const std::string &text)
+{
+    boost::nowide::ofstream f(path.string());
+    f << text;
+}
+
+const char *VENDOR_BUNDLE = R"([vendor]
+name = Sync Test
+config_version = 0.0.1
+
+[printer_model:SYNC2T]
+name = Sync 2T
+variants = 0.4
+technology = FFF
+family = SYNC
+
+[printer:Sync 2T]
+printer_technology = FFF
+printer_model = SYNC2T
+printer_variant = 0.4
+nozzle_diameter = 0.4,0.4
+extruder_colour = "";""
+
+[filament:Generic PETG @SYNC]
+filament_type = PETG
+filament_vendor = Generic
+filament_colour = #FF8000
+compatible_printers_condition = printer_model=="SYNC2T"
+
+[filament:Prusament PETG @SYNC]
+filament_type = PETG
+filament_vendor = Prusa Polymers
+compatible_printers_condition = printer_model=="SYNC2T"
+
+[filament:Generic PLA @SYNC]
+filament_type = PLA
+filament_vendor = Generic
+compatible_printers_condition = printer_model=="SYNC2T"
+)";
+
+struct Fixture
+{
+    TempDataDir  data;
+    AppConfig    app{AppConfig::EAppMode::Editor};
+    PresetBundle bundle;
+
+    Fixture()
+    {
+        bundle.setup_directories();
+        write_file(data.dir() / "vendor" / "SyncTest.ini", VENDOR_BUNDLE);
+        write_file(data.dir() / "filament" / "My PLA.ini", "filament_type = PLA\nfilament_vendor = Acme\nfilament_colour = #ffffff\n");
+        app.set("filamentdb_url", "");
+        app.set_variant("SyncTest", "SYNC2T", "0.4", true);
+        app.set(AppConfig::SECTION_FILAMENTS, "Generic PETG @SYNC", "1");
+        app.set(AppConfig::SECTION_FILAMENTS, "Generic PLA @SYNC", "1");
+        app.set("presets", "printer", "Sync 2T");
+        app.set("presets", "filament", "Generic PETG @SYNC");
+        app.set("presets", "filament_1", "My PLA");
+        bundle.load_presets(app, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+    }
+
+    Plan plan_for(const PrinterTools &tools) { return make_plan(tools, collect_extruder_states(bundle), taken_filament_names(bundle.filaments), printer_name_tag(bundle)); }
+};
+
+} // namespace
+
+TEST_CASE("The fixture loads the printer, its filaments and the selections", "[FilamentSync]")
+{
+    Fixture f;
+    REQUIRE(f.bundle.printers.get_selected_preset_name() == "Sync 2T");
+    REQUIRE(f.bundle.extruders_filaments.size() == 2);
+    CHECK(f.bundle.extruders_filaments[0].get_selected_preset_name() == "Generic PETG @SYNC");
+    CHECK(f.bundle.extruders_filaments[1].get_selected_preset_name() == "My PLA");
+    const Preset *hidden = f.bundle.filaments.find_preset("Prusament PETG @SYNC", false, false);
+    REQUIRE(hidden != nullptr);
+    CHECK_FALSE(hidden->is_visible);
+
+    const std::vector<ExtruderState> exs = f.bundle.extruders_filaments.empty() ? std::vector<ExtruderState>{} : collect_extruder_states(f.bundle);
+    REQUIRE(exs.size() == 2);
+    CHECK(exs[1].selected == "My PLA");
+    CHECK(exs[0].nozzle_diameter == 0.4);
+    CHECK(printer_name_tag(f.bundle) == "SYNC2T");
+    const std::set<std::string> taken = taken_filament_names(f.bundle.filaments);
+    CHECK(taken.count("my pla"));
+    CHECK(taken.count("generic petg"));   // an alias
+}
+
+TEST_CASE("Applying creates, installs and selects, and survives a restart", "[FilamentSync]")
+{
+    Fixture      f;
+    PrinterTools tools;
+    tools.tools = {tool(1, "Prusament", "PETG", "Orange", "#F8651B"), tool(2, "Polymaker", "PLA", "Red", "#FF0000")};
+    const Plan plan = f.plan_for(tools);
+    REQUIRE(plan.extruders.size() == 2);
+    REQUIRE(plan.extruders[0].action == Action::Install);
+    REQUIRE(plan.extruders[1].action == Action::Create);
+    CHECK(plan.extruders[1].preset == "Polymaker PLA Red");
+
+    const ApplyResult r = apply_presets(f.bundle, &f.app, plan, {true, true});
+    CHECK(r.errors.empty());
+    CHECK(r.installed == std::vector<std::string>{"Prusament PETG @SYNC"});
+    CHECK(r.created == std::vector<std::string>{"Polymaker PLA Red"});
+    CHECK(r.selected == std::vector<int>{0, 1});
+    CHECK(f.bundle.extruders_filaments[0].get_selected_preset_name() == "Prusament PETG @SYNC");
+    CHECK(f.bundle.extruders_filaments[1].get_selected_preset_name() == "Polymaker PLA Red");
+    CHECK(f.app.get(AppConfig::SECTION_FILAMENTS, "Prusament PETG @SYNC") == "1");
+
+    const Preset *created = f.bundle.filaments.find_preset("Polymaker PLA Red", false, false);
+    REQUIRE(created != nullptr);
+    CHECK_FALSE(created->is_system);
+    CHECK(created->vendor == nullptr);
+    CHECK(created->config.opt_string("filament_vendor") == "Polymaker");
+    CHECK(created->config.opt_string("filament_colour", 0u) == "#FF0000");
+    CHECK(created->config.opt_string("filament_type", 0u) == "PLA");
+    CHECK(created->config.opt_string("filamentdb_id").empty());
+    CHECK(fs::exists(created->file));
+
+    CHECK(plan.extruders[1].preset_colour == "#FF0000");
+
+    f.bundle.export_selections(f.app);
+    PresetBundle again;
+    again.load_presets(f.app, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
+    REQUIRE(again.extruders_filaments.size() == 2);
+    CHECK(again.extruders_filaments[0].get_selected_preset_name() == "Prusament PETG @SYNC");
+    CHECK(again.extruders_filaments[1].get_selected_preset_name() == "Polymaker PLA Red");
+    const Preset *reloaded = again.filaments.find_preset("Polymaker PLA Red", false, false);
+    REQUIRE(reloaded != nullptr);
+    CHECK(reloaded->config.opt_string("filament_vendor") == "Polymaker");
+}
+
+TEST_CASE("Rows that aren't accepted change nothing", "[FilamentSync]")
+{
+    Fixture      f;
+    PrinterTools tools;
+    tools.tools = {tool(1, "Prusament", "PETG"), tool(2, "Polymaker", "PLA")};
+    const Plan        plan = f.plan_for(tools);
+    const ApplyResult r    = apply_presets(f.bundle, &f.app, plan, {false, false});
+    CHECK(r.errors.empty());
+    CHECK(r.created.empty());
+    CHECK(r.selected.empty());
+    CHECK(f.bundle.filaments.find_preset("Polymaker PLA", false, false) == nullptr);
+    CHECK(f.bundle.extruders_filaments[1].get_selected_preset_name() == "My PLA");
+    CHECK(f.app.get(AppConfig::SECTION_FILAMENTS, "Prusament PETG @SYNC").empty());
+}
+
+TEST_CASE("Unsaved filament edits survive creating a preset", "[FilamentSync]")
+{
+    Fixture f;
+    f.bundle.filaments.get_edited_preset().config.set_key_value("filament_notes", new ConfigOptionStrings({"keep me"}));
+    f.bundle.filaments.update_dirty();
+    REQUIRE(f.bundle.filaments.current_is_dirty());
+
+    PrinterTools tools;
+    tools.tools       = {tool(2, "Polymaker", "PLA")};
+    const ApplyResult r = apply_presets(f.bundle, &f.app, f.plan_for(tools), {true});
+    CHECK(r.errors.empty());
+    CHECK(r.created.size() == 1);
+    CHECK(f.bundle.filaments.current_is_dirty());
+    CHECK(f.bundle.filaments.get_edited_preset().config.opt_string("filament_notes", 0u) == "keep me");
+}
+
+TEST_CASE("A name taken since the plan isn't overwritten", "[FilamentSync]")
+{
+    Fixture      f;
+    PrinterTools tools;
+    tools.tools     = {tool(2, "Polymaker", "PLA")};
+    const Plan plan = f.plan_for(tools);
+    REQUIRE(plan.extruders[0].action == Action::Create);
+    // Another program wrote the file meanwhile
+    write_file(f.data.dir() / "filament" / "polymaker pla.ini", "filament_type = PLA\n");
+
+    const ApplyResult r = apply_presets(f.bundle, &f.app, plan, {true});
+    CHECK(r.created.empty());
+    CHECK(r.errors.size() == 1);
+    CHECK(f.bundle.extruders_filaments[1].get_selected_preset_name() == "My PLA");
+}
+
+TEST_CASE("A tool without a color keeps a preset that names one", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {cand("Overture PETG Black", "Overture", "PETG", "#000000"),
+                                      cand("Overture PETG", "Overture", "PETG"), sys("Generic PETG @SYNC", "Generic", "PETG")};
+    // No vendor, no color: loaded by G-code
+    CHECK(plan_one(tool(1, "", "PETG"), c, "Overture PETG Black").action == Action::Keep);
+    // A vendor and no color
+    CHECK(plan_one(tool(1, "Overture", "PETG"), c, "Overture PETG Black").action == Action::Keep);
+    // A new pick still prefers the preset without a color
+    CHECK(plan_one(tool(1, "Overture", "PETG"), c, "Generic PETG @SYNC").preset == "Overture PETG");
+}
+
+TEST_CASE("A user color is named by its hex in notes", "[FilamentSync]")
+{
+    const ExtruderPlan p = plan_one(tool(1, "Overture", "PETG", "COLOR3", "#123456"), {cand("Overture PETG Black", "Overture", "PETG", "#000000")});
+    REQUIRE(p.notes.size() == 1);
+    CHECK(p.notes[0].find("#123456") != std::string::npos);
+}
+
+TEST_CASE("Tools share a new preset only when its template suits each extruder", "[FilamentSync]")
+{
+    // Extruder 1's template isn't compatible with extruder 2 (a different nozzle in the profile)
+    Candidate hf = sys("Generic PETG @SYNC HF", "Generic", "PETG");
+    Candidate sf = sys("Generic PETG @SYNC", "Generic", "PETG");
+    Candidate hf_off = hf, sf_off = sf;
+    hf_off.is_compatible = false;
+    sf_off.is_compatible = false;
+
+    PrinterTools tools;
+    tools.tools     = {tool(1, "Polymaker", "PETG"), tool(2, "Polymaker", "PETG"), tool(3, "Polymaker", "PETG")};
+    const Plan plan = make_plan(tools, {extruder(0, {hf, sf_off}), extruder(1, {hf_off, sf}), extruder(2, {hf, sf_off})}, {}, "INDX");
+    REQUIRE(plan.extruders.size() == 3);
+    for (const ExtruderPlan &row : plan.extruders)
+        REQUIRE(row.action == Action::Create);
+    CHECK(plan.extruders[0].template_preset == hf.name);
+    CHECK(plan.extruders[1].template_preset == sf.name);
+    CHECK(plan.extruders[0].preset != plan.extruders[1].preset);
+    // The third tool's extruder can use the first one's template: shared
+    CHECK(plan.extruders[2].preset == plan.extruders[0].preset);
+
+    // An abrasive template made for a hardened nozzle isn't shared with one that isn't
+    Candidate cf = sys("Generic PETG CF @SYNC", "Generic", "PETG");
+    cf.is_abrasive   = true;
+    PrinterTool hard = tool(1, "Polymaker", "PETG");
+    hard.hardened    = true;
+    PrinterTools mixed;
+    mixed.tools          = {hard, tool(2, "Polymaker", "PETG")};
+    const Plan plan2     = make_plan(mixed, {extruder(0, {cf}, cf.name), extruder(1, {cf, sf})}, {}, "INDX");
+    REQUIRE(plan2.extruders.size() == 2);
+    CHECK(plan2.extruders[0].template_preset == cf.name);
+    CHECK(plan2.extruders[1].template_preset == sf.name);
+    CHECK(plan2.extruders[0].preset != plan2.extruders[1].preset);
+}
+
+TEST_CASE("Empty tools and uncalibrated docks are unavailable, and a print using them is warned", "[FilamentSync]")
+{
+    PrinterTools tools;
+    PrinterTool  empty = tool(6, "", "");
+    empty.loaded       = false;
+    // Docks 1, 2, 3, 5 and 6 calibrated on an 8-extruder profile; tool 6 empty; tool 9 beyond it
+    tools.tools = {tool(1, "Overture", "PLA"), tool(2, "Overture", "PETG"), tool(3, "Overture", "ASA"), tool(5, "Prusament", "PETG"),
+                   empty, tool(9, "Overture", "PLA")};
+    const UnavailableExtruders u = unavailable_extruders(tools, 8);
+    CHECK(u.empty == std::vector<int>{5});
+    CHECK(u.uncalibrated == std::vector<int>{3, 6, 7});
+
+    CHECK(unavailable_extruders_warning(u, {0, 1, 4}, "Test", "17:05").empty());
+    CHECK(unavailable_extruders_warning(u, {0, 5}, "Test", "17:05") ==
+          "Test can't print with extruder 6 (empty), which this print uses (last sync at 17:05). "
+          "Load the filament, or move those parts to another extruder.");
+    const std::string both = unavailable_extruders_warning(u, {3, 5, 7}, "Test", "17:05");
+    CHECK(both.find("extruder 4 (dock not calibrated), extruder 6 (empty) or extruder 8 (dock not calibrated)") != std::string::npos);
+    // No dock calibrated: everything is unavailable
+    CHECK(unavailable_extruders({}, 2).uncalibrated == std::vector<int>{0, 1});
+}
+
+TEST_CASE("An unreadable tool isn't an uncalibrated dock", "[FilamentSync]")
+{
+    PrinterTools tools;
+    tools.tools      = {tool(1, "Overture", "PLA")};
+    tools.unreadable = {1};
+    const UnavailableExtruders u = unavailable_extruders(tools, 3);
+    CHECK(u.empty.empty());
+    CHECK(u.uncalibrated == std::vector<int>{2});
+}
+
+TEST_CASE("A preset that can't be written is taken out again", "[FilamentSync]")
+{
+    Fixture f;
+    f.bundle.filaments.get_edited_preset().config.set_key_value("filament_notes", new ConfigOptionStrings({"keep me"}));
+    f.bundle.filaments.update_dirty();
+
+    PrinterTools tools;
+    tools.tools     = {tool(2, "Polymaker", "PLA")};
+    const Plan plan = f.plan_for(tools);
+    REQUIRE(plan.extruders[0].action == Action::Create);
+
+    const fs::path dir = f.data.dir() / "filament";
+    fs::permissions(dir, fs::owner_read | fs::owner_exe);
+    const ApplyResult r = apply_presets(f.bundle, &f.app, plan, {true});
+    fs::permissions(dir, fs::owner_all);
+
+    CHECK(r.created.empty());
+    CHECK(r.errors.size() == 1);
+    CHECK(f.bundle.filaments.find_preset("Polymaker PLA", false, false) == nullptr);
+    CHECK(f.bundle.extruders_filaments[1].get_selected_preset_name() == "My PLA");
+    CHECK(f.bundle.filaments.current_is_dirty());
+    CHECK(f.bundle.filaments.get_edited_preset().config.opt_string("filament_notes", 0u) == "keep me");
+}
+
+TEST_CASE("A saved preset file is read back in full", "[FilamentSync]")
+{
+    TempDataDir data;
+    DynamicPrintConfig config;
+    config.set_deserialize_strict({{"filament_type", "PETG"}, {"filament_vendor", "Polymaker"}, {"filament_colour", "#0000FF"},
+                                   {"temperature", "245"}, {"filament_notes", "a note"}});
+    const std::string file = (data.dir() / "Polymaker PETG.ini").string();
+    config.save(file);
+    CHECK(saved_config_matches(file, config));
+
+    // A disk that filled up mid-write: the file stops short
+    std::string text;
+    {
+        boost::nowide::ifstream in(file);
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    write_file(file, text.substr(0, text.size() / 2));
+    CHECK_FALSE(saved_config_matches(file, config));
+    CHECK_FALSE(saved_config_matches((data.dir() / "missing.ini").string(), config));
+}
+
+TEST_CASE("A new preset without a color doesn't keep its template's", "[FilamentSync]")
+{
+    Fixture      f;
+    PrinterTools tools;
+    tools.tools     = {tool(2, "Polymaker", "PLA")};
+    const Plan plan = f.plan_for(tools);
+    REQUIRE(plan.extruders[0].action == Action::Create);
+    // My PLA, the template, is white
+    REQUIRE(plan.extruders[0].template_preset == "My PLA");
+    const ApplyResult r = apply_presets(f.bundle, &f.app, plan, {true});
+    REQUIRE(r.errors.empty());
+    const Preset *created = f.bundle.filaments.find_preset("Polymaker PLA", false, false);
+    REQUIRE(created != nullptr);
+    CHECK(created->config.opt_string("filament_colour", 0u) == print_config_def.get("filament_colour")->default_value->serialize());
+}

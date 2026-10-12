@@ -23,6 +23,7 @@
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Channel.hpp"
 #include "OctoPrint.hpp"
+#include "PrinterTools.hpp"
 #include "Duet.hpp"
 #include "FlashAir.hpp"
 #include "AstroBox.hpp"
@@ -40,6 +41,13 @@ namespace Slic3r {
 
 
 PrintHost::~PrintHost() {}
+
+bool PrintHost::get_tools(PrinterToolsResult &out, const PrinterToolsOptions & /* opts */) const
+{
+    out = {};
+    out.status = PrinterToolsStatus::Unsupported;
+    return false;
+}
 
 PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
 {

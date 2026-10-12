@@ -232,6 +232,24 @@ bool load_secret(const std::string& id, const std::string& opt, std::string& usr
 }
 }
 
+bool resolve_stored_printhost_password(const std::string& printer_name, DynamicPrintConfig& config)
+{
+    if (!config.has("printhost_password") || config.opt_string("printhost_password") != "stored")
+        return true;
+    std::string username;
+    std::string password;
+    if (load_secret(printer_name, "printhost_password", username, password)) {
+        if (!username.empty())
+            config.opt_string("printhost_user") = username;
+        if (!password.empty())
+            config.opt_string("printhost_password") = password;
+        return true;
+    }
+    config.opt_string("printhost_user") = std::string();
+    config.opt_string("printhost_password") = std::string();
+    return false;
+}
+
 
 //------------------------------------------
 //          PhysicalPrinterDialog
@@ -282,19 +300,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
         for (const std::string& preset_name : preset_names)
             m_presets.emplace_back(new PresetForPrinter(this, preset_name));
         // "stored" indicates data are stored secretly, load them from store.
-        if (m_printer.config.opt_string("printhost_password") == "stored" && m_printer.config.opt_string("printhost_password") == "stored") {
-            std::string username;
-            std::string password;
-            if (load_secret(m_printer.name, "printhost_password", username, password)) {
-                if (!username.empty())
-                    m_printer.config.opt_string("printhost_user") = username;
-                if (!password.empty())
-                    m_printer.config.opt_string("printhost_password") = password;
-            } else {
-                m_printer.config.opt_string("printhost_user") = std::string();
-                m_printer.config.opt_string("printhost_password") = std::string();
-            }
-        }
+        resolve_stored_printhost_password(m_printer.name, m_printer.config);
     }
 
     if (m_presets.size() == 1)

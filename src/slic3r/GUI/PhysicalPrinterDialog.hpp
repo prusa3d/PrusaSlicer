@@ -22,6 +22,11 @@ namespace Slic3r {
 
 namespace GUI {
 
+/// Puts the user and password a physical printer keeps in the system password store (its config
+/// says "stored") into the config. Returns false, with both cleared and an error shown, when they
+/// can't be loaded; true otherwise, also when nothing was stored.
+bool resolve_stored_printhost_password(const std::string& printer_name, DynamicPrintConfig& config);
+
 class PresetComboBox;
 
 //------------------------------------------

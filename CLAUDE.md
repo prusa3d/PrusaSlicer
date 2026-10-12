@@ -246,7 +246,7 @@ System-provided on macOS: OpenGL, ZLIB, CURL.
 
 ## CI
 
-GitHub Actions workflows in `.github/workflows/` (self-contained, no external action dependencies):
+GitHub Actions workflows in `.github/workflows/`. The Linux build also runs the filament sync tests (`ctest -L 'prusalink_mock|filament_sync'`) against a pinned checkout of hyiger/prusalink-mock:
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
@@ -350,6 +350,14 @@ Key files:
 - `src/slic3r/GUI/Tab.cpp` (`TabFilament::sync_to_filamentdb`) — orchestrates UI feedback (notification + manual-trigger modal)
 - `resources/icons/filament_db_sync.svg` — toolbar icon (16×16 grey arrow + orange ground bar)
 - `scripts/filamentdb_probe.sh` — curl-based decision-tree script for verifying a FilamentDB server's upsert behavior (reachability, pre-check 404, POST /name, PUT /name, POST /collection). Useful when bringing up a new server or diagnosing sync failures.
+
+**Sync Filaments from Printer**: Reads the filament in each tool of a CORE One INDX with Filament Slots firmware over PrusaLink (`GET /api/v1/tools`) and, after a preview, selects a matching filament preset per extruder (tool N = extruder N, gaps kept), installs or creates missing ones, and resets extruder colors to the filament colors (the presets carry the colors). Empty tools keep their presets: their sidebar filament lists are hidden and a print using one gets a warning (session state from the last sync). One way: nothing goes to the printer or Filament DB. Entry points: a sync icon next to the sidebar's Filament label (shown when a PrusaLink physical printer is selected) and Maintenance → Sync Filaments from Printer…. User guide: `doc/Filament_Sync_Guide.md`.
+
+Key files:
+- `src/slic3r/Utils/PrinterTools.cpp/hpp`: `fetch_printer_tools()` (builds the PrusaLink host from a physical printer config; wx-free), `PrintHost::get_tools` / `PrusaLink::get_tools`, the strict parser `printer_tools_detail::parse_tools_json`
+- `src/slic3r/Utils/FilamentSync.cpp/hpp`: `make_plan()` (vendor + material matching, ranking, create names) and `apply_presets()` (create/install/select on a `PresetBundle`, keeping unsaved filament edits), both wx-free
+- `src/slic3r/GUI/FilamentSyncDialog.cpp/hpp`: entry point, preview dialog, apply + refresh; `resolve_stored_printhost_password()` in `PhysicalPrinterDialog` is shared with uploads
+- Tests: `tests/slic3rutils/printer_tools_tests.cpp` `[PrinterTools]`, `filament_sync_tests.cpp` `[FilamentSync]`, `prusalink_mock_tests.cpp` `[.PrusaLinkMock]` (hidden; ctest runs them through prusalink-mock's `run` wrapper when CMake finds Python 3.10+ and the mock via `PRUSALINK_MOCK_DIR` or `../prusalink-mock`)
 
 ## Version
 

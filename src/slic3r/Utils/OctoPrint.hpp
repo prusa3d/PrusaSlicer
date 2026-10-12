@@ -76,6 +76,7 @@ public:
 
     // gets possible storage to be uploaded to. This allows different printer to have different storage. F.e. local vs sdcard vs usb.
     bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override;
+    bool get_tools(PrinterToolsResult& out, const PrinterToolsOptions& opts) const override;
 protected:
     bool test(wxString& curl_msg) const override;
     bool validate_version_text(const boost::optional<std::string>& version_text) const override;
@@ -118,6 +119,8 @@ public:
     PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint | PrintHostPostUploadAction::QueuePrint; }
     const char* get_name() const override { return "PrusaConnect"; }
     bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override { return false; }
+    // Connect isn't a printer's own PrusaLink; it doesn't serve /api/v1/tools.
+    bool get_tools(PrinterToolsResult& out, const PrinterToolsOptions& opts) const override { return PrintHost::get_tools(out, opts); }
     std::string get_unusable_symbols() const override { return "\\/:*?\"%<>¯°#ˇ|[]"; }
 protected:
     void set_http_post_header_args(Http& http, PrintHostPostUploadAction post_action) const override;
@@ -134,6 +137,7 @@ public:
     wxString get_test_ok_msg() const override;
     wxString get_test_failed_msg(wxString& msg) const override;
     PrintHostPostUploadActions get_post_upload_actions() const override { return {}; }
+    bool get_tools(PrinterToolsResult& out, const PrinterToolsOptions& opts) const override { return PrintHost::get_tools(out, opts); }
 
 protected:
     bool validate_version_text(const boost::optional<std::string>& version_text) const override;

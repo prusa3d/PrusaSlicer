@@ -26,6 +26,7 @@
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/format.hpp"
 #include "Http.hpp"
+#include "PrinterTools.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "Bonjour.hpp"
 #include "slic3r/GUI/BonjourDialog.hpp"
@@ -796,6 +797,62 @@ bool PrusaLink::get_storage(wxArrayString& storage_path, wxArrayString& storage_
     }
 
     return res;
+}
+
+bool PrusaLink::get_tools(PrinterToolsResult& out, const PrinterToolsOptions& opts) const
+{
+    namespace detail = printer_tools_detail;
+    const char* name = get_name();
+    out = {};
+    auto url = make_url("api/v1/tools");
+    BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get tools at: %2%") % name % url;
+
+    auto http = Http::get(std::move(url));
+    set_auth(http);
+    // Status pages then come as JSON, with a title and message to show
+    http.header("Accept", "application/json")
+        .timeout_connect(opts.timeout_connect_s)
+        .timeout_max(opts.timeout_max_s)
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error getting tools: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
+            out.http_status = status;
+            if (status == 0) {
+                // No answer, or one cut short: whatever arrived isn't parsed
+                out.status = PrinterToolsStatus::Transport;
+                out.message = error;
+            } else {
+                out.status = status == 401 ? PrinterToolsStatus::AuthFailed :
+                             status == 404 ? PrinterToolsStatus::Unsupported :
+                                             PrinterToolsStatus::PrinterError;
+                out.message = detail::status_page_summary(body, status);
+            }
+        })
+        .on_complete([&](std::string body, unsigned status) {
+            BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got tools: %2%") % name % body;
+            out.http_status = status;
+            if (status != 200) {
+                out.status = PrinterToolsStatus::PrinterError;
+                out.message = detail::status_page_summary(body, status);
+                return;
+            }
+            std::string error;
+            if (detail::parse_tools_json(body, out.tools, error)) {
+                out.status = PrinterToolsStatus::Ok;
+                // Entries that all failed to read aren't "no tools"
+                if (out.tools.tools.empty() && !out.tools.warnings.empty()) {
+                    out.status  = PrinterToolsStatus::Malformed;
+                    out.message = out.tools.warnings.front();
+                }
+            } else {
+                out.status = PrinterToolsStatus::Malformed;
+                out.message = error;
+            }
+        })
+#ifdef WIN32
+        .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
+#endif // WIN32
+        .perform_sync();
+    return true;
 }
 
 bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
