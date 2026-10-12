@@ -144,6 +144,8 @@ std::string to_display_string(Biz::Slicing::ErrorCode code)
         );
     case ErrorCode::FirstLayerHeightTooLarge:
         return _u8L("First layer height can't be greater than nozzle diameter");
+    case ErrorCode::FirstLayerHeightTooSmall:
+        return _u8L("First layer height too small");
     case ErrorCode::LayerHeightTooLarge:
         return _u8L("Layer height can't be greater than nozzle diameter");
     case ErrorCode::LayerHeightTooSmall:

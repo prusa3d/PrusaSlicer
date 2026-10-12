@@ -1177,6 +1177,10 @@ DONE:;
                     Error{ErrorCode::FirstLayerHeightTooLarge, {"first_layer_height"}}
                 );
             }
+            if (first_layer_height < Domain::MIN_LAYER_HEIGHT) {
+                errors.push_back(
+                    Error{ErrorCode::FirstLayerHeightTooSmall, {"first_layer_height"}});
+            }
 
             // validate layer_height
             if (layer_height > min_nozzle_diameter) {

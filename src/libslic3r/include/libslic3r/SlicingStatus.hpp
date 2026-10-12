@@ -79,6 +79,7 @@ enum class ErrorCode
     OrganicSupportBranchDiameterSmallerThanSupportMaterial, // _u8L("Organic support branch diameter must not be smaller than 2x support material extrusion width.")
     OrganicSupportBranchDiameterSmallerThanTreeTip, // _u8L("Organic support branch diameter must not be smaller than support tree tip diameter.")
     FirstLayerHeightTooLarge, // _u8L("First layer height can't be greater than nozzle diameter")
+    FirstLayerHeightTooSmall,
     LayerHeightTooLarge, // _u8L("Layer height can't be greater than nozzle diameter")
     LayerHeightTooSmall,
     MissingG92E0, // _u8L("Relative extruder addressing requires resetting the extruder position at each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to layer_gcode.")
