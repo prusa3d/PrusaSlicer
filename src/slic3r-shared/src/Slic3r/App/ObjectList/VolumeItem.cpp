@@ -18,6 +18,8 @@
 
 #include "libslic3r/ExtruderCandidates.hpp"
 
+#include <fmt/format.h>
+
 namespace Slic3r::App::ObjectList {
 
 using namespace Yoga;
@@ -34,12 +36,16 @@ VolumeButton::VolumeButton(
     Biz::ProjectInteractor& project_interactor
 ) :
     Biz::DataObserver<Biz::ObjectList::Volume>(index, state),
-    LeafButton(NodeLevel::SubObject)
+    LeafButton(NodeLevel::SubObject),
+    m_project_interactor(project_interactor),
+    m_drop_position(Biz::Scene::VolumeInsertPosition::Before)
 {
     Biz::Scene::SceneInteractor& scene_interactor = project_interactor.scene_interactor();
 
     set_object_name("VolumeButton");
     set_allow_overlap(true);
+    set_draggable(true);
+    set_droppable(true);
 
     Paddings paddings = content_padding().source;
     paddings.top = paddings.bottom = 0;
@@ -167,6 +173,85 @@ void VolumeButton::on_data_update()
     m_name->set_text(volume.name.empty() ? Biz::_u8L("Volume") : volume.name);
     m_extruder_marker_reactor.set_config_container(state()->config_container_id);
     set_checked(volume.selected);
+
+    // Volumes can be reordered only within the same object and the same volume type.
+    const std::string dnd_key =
+        fmt::format("Volume_{}_{}", volume.obj_id, static_cast<int>(volume.type));
+    set_dnd_payload(DnDPayload{.type{dnd_key}, .data{{"volume_id", volume.vol_id}}});
+    set_accepted_keys({dnd_key});
+}
+
+void VolumeButton::dnd_accepted_internal(const DnDPayload& dnd_payload)
+{
+    const size_t* dropped_volume_id = dnd_payload.get<size_t>("volume_id");
+    if (!dropped_volume_id || !can_drop_volume(*dropped_volume_id, m_drop_position)) {
+        return;
+    }
+
+    m_project_interactor.scene_interactor().reorder_volume(
+        Domain::ElementRef(state()->obj_id, 0, *dropped_volume_id),
+        Domain::ElementRef(state()->obj_id, 0, state()->vol_id),
+        m_drop_position
+    );
+    m_project_interactor.undo_provider().take_snapshot(Biz::UndoSnapshotType::ReorderVolumes);
+}
+
+void VolumeButton::dnd_could_accept_changed_internal(bool could_accept)
+{
+    m_drop_hovered = could_accept;
+    if (!could_accept) {
+        m_drop_line.reset();
+    }
+}
+
+void VolumeButton::render(const Vec2f& pos, const Vec2f& size)
+{
+    // Before the base render, which handles the drop - so the drop uses this frame's position.
+    update_drop_line(pos, size);
+    LeafButton::render(pos, size);
+}
+
+const std::optional<VolumeButton::DropLine>& VolumeButton::drop_line() const
+{
+    return m_drop_line;
+}
+
+bool VolumeButton::can_drop_volume(
+    size_t volume_id,
+    Biz::Scene::VolumeInsertPosition position
+) const
+{
+    return m_project_interactor.scene_interactor().can_reorder_volume(
+        Domain::ElementRef(state()->obj_id, 0, volume_id),
+        Domain::ElementRef(state()->obj_id, 0, state()->vol_id),
+        position
+    );
+}
+
+void VolumeButton::update_drop_line(const Vec2f& pos, const Vec2f& size)
+{
+    m_drop_line.reset();
+    if (!m_drop_hovered) {
+        return;
+    }
+
+    const bool upper_half = ImGui::GetMousePos().y < pos.y() + size.y() / 2.f;
+    m_drop_position       = upper_half ? Biz::Scene::VolumeInsertPosition::Before :
+                                         Biz::Scene::VolumeInsertPosition::After;
+
+    // No line where the drop would keep the order unchanged (e.g. over the dragged row itself).
+    const std::optional<DnDPayload>& payload = dragged_payload();
+    const size_t* dragged_volume_id = payload ? payload->get<size_t>("volume_id") : nullptr;
+    if (!dragged_volume_id || !can_drop_volume(*dragged_volume_id, m_drop_position)) {
+        return;
+    }
+
+    // On the boundary shared with the neighbouring row, starting at the content indent,
+    // so the line is aligned with the volume icons.
+    m_drop_line = DropLine{
+        .start = Vec2f(pos.x() + content_padding().left, upper_half ? pos.y() : pos.y() + size.y()),
+        .end_x = pos.x() + size.x()
+    };
 }
 
 VolumesItem::VolumesItem(Biz::ProjectInteractor& project_interactor) :
@@ -192,6 +277,38 @@ void VolumesItem::set_source_list(std::weak_ptr<Biz::ObjectList::VolumeObservabl
     m_volumes_list_view->set_source_list(volumes_list);
     m_volumes_button->update_state();
     set_visible(has_visible_content());
+}
+
+void VolumesItem::render(const Vec2f& pos, const Vec2f& size)
+{
+    Item::render(pos, size);
+
+    // Rows of a collapsed list are not rendered, so their drop lines are not up to date.
+    if (!m_volumes_list_view->is_visible()) {
+        return;
+    }
+
+    for (size_t i = 0; i < m_volumes_list_view->list_item_count(); ++i) {
+        if (const std::optional<VolumeButton::DropLine>& drop_line =
+                m_volumes_list_view->item_at(i)->drop_line())
+        {
+            render_drop_line(*drop_line);
+            return; // only the hovered row has a drop line
+        }
+    }
+}
+
+void VolumesItem::render_drop_line(const VolumeButton::DropLine& drop_line) const
+{
+    const float radius    = ImGui::GetFontSize() * 0.2f;
+    const float thickness = radius * 0.6f;
+    const ImU32 color     = m_theme->color_imgui(Platform::Color::AccentSecondary);
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ASSERT(draw_list);
+    const ImVec2 start = to_im(drop_line.start);
+    draw_list->AddCircleFilled(start, radius, color);
+    draw_list->AddLine(start, ImVec2(drop_line.end_x, start.y), color, thickness);
 }
 
 } // namespace Slic3r::App::ObjectList

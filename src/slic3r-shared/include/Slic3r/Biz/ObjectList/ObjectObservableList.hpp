@@ -83,6 +83,10 @@ public:
         Domain::SelectionId project_id,
         const Domain::ElementRefs& volumes
     ) override;
+    void on_volume_reordered(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes
+    ) override;
 
     // Scene::ISceneSelectionChangedListener
     void on_scene_selection_changed(

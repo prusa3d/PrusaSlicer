@@ -1368,6 +1368,72 @@ void SceneInteractor::edit_name(const Domain::ElementRef& id, const std::string&
     );
 }
 
+bool SceneInteractor::can_reorder_volume(
+    const Domain::ElementRef& volume,
+    const Domain::ElementRef& target,
+    VolumeInsertPosition position
+) const
+{
+    if (volume.object_id != target.object_id || volume.volume_id == target.volume_id) {
+        return false;
+    }
+
+    const Domain::Project& project   = m_workbench.project(m_selected_project_id);
+    const Domain::ModelObject* object = project.find_object_by_id(volume.object_id);
+    const Domain::ModelVolume* moved_volume =
+        project.find_volume_by_id(volume.object_id, volume.volume_id);
+    const Domain::ModelVolume* target_volume =
+        project.find_volume_by_id(target.object_id, target.volume_id);
+    if (!object || !moved_volume || !target_volume
+        || moved_volume->type() != target_volume->type())
+    {
+        return false;
+    }
+
+    // Dropping right before the following volume or right after the preceding one
+    // would keep the order unchanged.
+    const auto moved_it  = std::ranges::find(object->volumes, moved_volume);
+    const auto target_it = std::ranges::find(object->volumes, target_volume);
+    return position == VolumeInsertPosition::Before ? target_it != moved_it + 1 :
+                                                      target_it + 1 != moved_it;
+}
+
+void SceneInteractor::reorder_volume(
+    const Domain::ElementRef& volume,
+    const Domain::ElementRef& target,
+    VolumeInsertPosition position
+)
+{
+    if (!can_reorder_volume(volume, target, position)) {
+        return;
+    }
+
+    Domain::Project& project         = m_workbench.project(m_selected_project_id);
+    Domain::ModelObject* object      = project.find_object_by_id(volume.object_id);
+    Domain::ModelVolumePtrs& volumes = object->volumes;
+
+    Domain::ModelVolume* moved_volume =
+        project.find_volume_by_id(volume.object_id, volume.volume_id);
+    volumes.erase(std::ranges::find(volumes, moved_volume));
+
+    auto target_it =
+        std::ranges::find(volumes, project.find_volume_by_id(target.object_id, target.volume_id));
+    ASSERT(target_it != volumes.end());
+    if (position == VolumeInsertPosition::After) {
+        ++target_it;
+    }
+    volumes.insert(target_it, moved_volume);
+    ASSERT(Algorithms::ModelObject::are_volumes_sorted(object));
+
+    const Domain::ElementRefs reordered = {volume};
+    invoke_listeners<ISceneChangedListener>(
+        [&](auto* l) { l->on_volume_reordered(m_selected_project_id, reordered); }
+    );
+
+    // Volume order affects slicing (e.g. modifiers are applied in order).
+    update_elements_bed_placement(reordered, true);
+}
+
 void SceneInteractor::set_printable(const Domain::ElementRef& id, bool is_printable)
 {
     ASSERT(id.volume_id == 0);

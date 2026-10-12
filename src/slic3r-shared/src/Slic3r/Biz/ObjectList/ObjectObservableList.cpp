@@ -224,6 +224,14 @@ void ObjectObservableList::
     }
 }
 
+void ObjectObservableList::
+    on_volume_reordered(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+{
+    if (!volumes.empty()) {
+        update_volumes(project_id, volumes.front().object_id);
+    }
+}
+
 void ObjectObservableList::on_scene_selection_changed(
     Domain::SelectionId project_id,
     const Scene::ObjectSelection& /*selection*/

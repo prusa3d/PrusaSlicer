@@ -8,6 +8,13 @@ constexpr const char* AbstractButtonDnDType = "AbstractButtonDnDType";
 
 namespace Slic3r::App::Yoga {
 
+std::optional<DnDPayload> AbstractButton::s_dragged_payload;
+
+const std::optional<DnDPayload>& AbstractButton::dragged_payload()
+{
+    return s_dragged_payload;
+}
+
 AbstractButton::Callbacks& AbstractButton::callbacks()
 {
     return m_callbacks;
@@ -26,13 +33,9 @@ void AbstractButton::style_node()
     // and render apart from style_node is not called if Item is invisible
     bool accept_dnd_key = false;
     if (const ImGuiPayload* active_payload = ImGui::GetDragDropPayload()) {
-        if (active_payload->IsDataType(AbstractButtonDnDType)
-            && active_payload->DataSize == sizeof(DnDPayload))
-        {
-            const DnDPayload incoming = *static_cast<const DnDPayload*>(active_payload->Data);
-
+        if (active_payload->IsDataType(AbstractButtonDnDType) && s_dragged_payload.has_value()) {
             if (m_droppable) {
-                accept_dnd_key = m_accepted_keys.contains(incoming.type);
+                accept_dnd_key = m_accepted_keys.contains(s_dragged_payload->type);
             }
         }
     }
@@ -90,11 +93,12 @@ void AbstractButton::render(const Vec2f& pos, const Vec2f& size)
         {
             m_drag_source_active = true;
 
-            ImGui::SetDragDropPayload(
-                AbstractButtonDnDType,
-                &m_dnd_payload.value(),
-                sizeof(m_dnd_payload.value())
-            );
+            // Capture the payload once per drag, so that changes of m_dnd_payload during
+            // the drag (e.g. data updates of this button) do not affect the dragged payload.
+            if (!was_drag_source_active) {
+                s_dragged_payload = m_dnd_payload;
+            }
+            ImGui::SetDragDropPayload(AbstractButtonDnDType, nullptr, 0);
 
             // Render Dragged item
             was_rendered = true;
@@ -108,10 +112,11 @@ void AbstractButton::render(const Vec2f& pos, const Vec2f& size)
 
     if (enabled() && m_droppable && m_accept_dnd_key) {
         if (ImGui::BeginDragDropTarget()) {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(AbstractButtonDnDType)) {
-                IM_ASSERT(payload->DataSize == sizeof(DnDPayload));
-
-                const DnDPayload dropped = *static_cast<const DnDPayload*>(payload->Data);
+            if (ImGui::AcceptDragDropPayload(AbstractButtonDnDType)
+                && s_dragged_payload.has_value())
+            {
+                // Copy - the callbacks may start a new drag and replace s_dragged_payload.
+                const DnDPayload dropped = *s_dragged_payload;
 
                 if (m_droppable) {
                     dnd_accepted_internal(dropped);

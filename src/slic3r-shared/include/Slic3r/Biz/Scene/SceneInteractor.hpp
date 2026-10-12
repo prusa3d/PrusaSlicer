@@ -54,6 +54,12 @@ enum class TransformState
     Canceled    /* Transform was canceled (i.e. user pressed ESC key) */
 };
 
+enum class VolumeInsertPosition : int
+{
+    Before, /* Insert the volume right before the target volume */
+    After   /* Insert the volume right after the target volume */
+};
+
 class ISceneChangedListener
 {
 public:
@@ -133,6 +139,17 @@ public:
      * @param volumes List of volumes with changed type
      */
     virtual void on_volume_type_changed(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes
+    )
+    {}
+
+    /**
+     * @brief Called whenever volumes change their position within their object's volume list.
+     * @param project_id Project the volumes belong to
+     * @param volumes List of moved volumes
+     */
+    virtual void on_volume_reordered(
         Domain::SelectionId project_id,
         const Domain::ElementRefs& volumes
     )
@@ -338,6 +355,28 @@ public:
     );
 
     void edit_name(const Domain::ElementRef& id, const std::string& new_name);
+
+    /**
+     * @brief Whether moving @p volume before/after @p target changes the volume order.
+     * Both have to be volumes of the same object and of the same type,
+     * so the volumes stay grouped by type.
+     */
+    bool can_reorder_volume(
+        const Domain::ElementRef& volume,
+        const Domain::ElementRef& target,
+        VolumeInsertPosition position
+    ) const;
+
+    /**
+     * @brief Moves @p volume right before/after @p target within their object's volume list.
+     * No-op if can_reorder_volume() is false.
+     */
+    void reorder_volume(
+        const Domain::ElementRef& volume,
+        const Domain::ElementRef& target,
+        VolumeInsertPosition position
+    );
+
     void set_printable(const Domain::ElementRef& id, bool is_printable);
     void set_selected_instances_printable(bool is_printable);
     bool selected_instances_printable() const;

@@ -104,6 +104,13 @@ protected:
 
     Platform::ColorGroup button_color_group() const;
 
+    /**
+     * @return The payload currently being dragged (from any button), if any.
+     * @note Holds the last dragged payload also after the drag ends - check the drag is
+     * active (e.g. via dnd_could_accept_changed_internal) before using it.
+     */
+    static const std::optional<DnDPayload>& dragged_payload();
+
 private:
 
     void set_hovered(bool hovered);
@@ -129,6 +136,9 @@ private:
     bool m_drag_source_active = false;
     std::unordered_set<std::string> m_accepted_keys;
     std::optional<DnDPayload> m_dnd_payload;
+    /// Copy of the payload being dragged. ImGui copies its payload bytewise, which is not safe
+    /// for DnDPayload (owns heap memory), so ImGui only gets the payload type tag.
+    static std::optional<DnDPayload> s_dragged_payload;
 
     bool m_accept_dnd_key    = false;
     bool m_could_accept_drop = false;

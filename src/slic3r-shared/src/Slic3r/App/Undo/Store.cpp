@@ -271,6 +271,8 @@ static std::string to_string(Biz::UndoSnapshotType type)
         return _u8L("Reload from disk");
     case Type::EditVirtualExtruders:
         return _u8L("Edit virtual extruders");
+    case Type::ReorderVolumes:
+        return _u8L("Reorder volumes");
     case Type::RepairObjectMesh:
         return _u8L("Repair mesh");
     }

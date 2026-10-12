@@ -111,6 +111,7 @@ enum class UndoSnapshotType
     ReplaceWithStl,
     ReloadFromDisk,
     EditVirtualExtruders,
+    ReorderVolumes,
 };
 
 namespace UndoSnapshotSelection {
