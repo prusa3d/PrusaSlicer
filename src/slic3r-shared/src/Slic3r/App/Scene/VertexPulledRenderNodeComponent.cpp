@@ -48,7 +48,15 @@ void VertexPulledRenderNodeComponent::render(
     material.set_uniform(UNIFORM_VIEW_NORMAL_MATRIX, normal);
     material.set_uniform(UNIFORM_CAMERA_DOWN, camera_looking_down);
 
+    const bool left_handed = model.block<3, 3>(0, 0).determinant() < 0.f;
+    if (left_handed) {
+        cmd_buffer.set_cull_face_mode(Render::CullFaceMode::Front);
+    }
+
     cmd_buffer.bind_and_draw_vertex_pulled(m_pull_geometry, m_draw_command, material);
+    if (left_handed) {
+        cmd_buffer.set_cull_face_mode(Render::CullFaceMode::Back);
+    }
 }
 
 void VertexPulledRenderNodeComponent::set_total_vertex_count(std::size_t count)

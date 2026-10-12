@@ -172,6 +172,11 @@ protected:
     void set_tool_type(ToolType tool_type);
     void set_cursor_type(Biz::Algorithms::TriangleSelector::CursorType cursor_type);
 
+    /**
+     * @brief True for the tools highlighting the triangles selected by seed fill under the cursor.
+     */
+    bool uses_seed_fill_selection() const;
+
     void update_clipping_plane();
     void update_overhang_detection();
     void clear_all_paintings();

@@ -2,11 +2,20 @@
 
 #include "Slic3r/App/Plater/MMPaintingUtils.hpp"
 #include "Slic3r/App/Render/Device.hpp"
+#include "Slic3r/App/Render/LinearDataTexture.hpp"
 #include "Slic3r/App/Scene/GeometryDataFactory.hpp"
 #include "Slic3r/App/Scene/Node.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleSelector.hpp"
 #include "Slic3r/Domain/Color.hpp"
 #include "Slic3r/Domain/TriangleMesh.hpp"
+
+#include <array>
+#include <optional>
+#include <vector>
+
+namespace Slic3r::App::Scene {
+class VertexPulledRenderNodeComponent;
+} // namespace Slic3r::App::Scene
 
 namespace Slic3r::App::Plater {
 
@@ -39,12 +48,16 @@ public:
         const Domain::Transform3d& world_trafo
     );
 
-    void update_painted_mesh_geometry(
-        Render::Device& device,
-        const std::optional<Render::Material>& new_material = std::nullopt
-    );
-    void update_painted_contour_geometry(Render::Device& device);
-    void update_painted_geometry(Render::Device& device);
+    /**
+     * @brief Uploads the triangles and vertices of the triangle selector changed since the last
+     * upload and rebuilds the changed seed fill contour, only when it is shown.
+     */
+    void upload_changed_painting(Render::Device& device, bool seed_fill_contour_shown);
+
+    /**
+     * @brief Uploads the palette after the painting colors changed.
+     */
+    void update_painting_palette(Render::Device& device);
 
     void set_clipping_plane(const Domain::Vec4f& clipping_plane);
     void set_overhang_slope_normal(float angle_in_degrees);
@@ -53,6 +66,8 @@ public:
     Biz::Algorithms::TriangleSelector& triangle_selector();
 
 private:
+    void update_painted_contour_geometry(Render::Device& device);
+
     Biz::Algorithms::TriangleSelector m_triangle_selector;
     const AABBMesh& m_aabb_mesh;
     const PaintingPalette& m_colors;
@@ -60,11 +75,17 @@ private:
 
     Render::Material m_painted_mesh_base_material;
 
-    std::unique_ptr<Render::Geometry> m_painted_mesh_geometry;
+    std::unique_ptr<Render::LinearDataTexture> m_triangle_records;
+    std::unique_ptr<Render::LinearDataTexture> m_vertex_positions;
     std::unique_ptr<Render::Geometry> m_painted_contour_geometry;
 
-    Scene::Node* m_painted_mesh_node    = nullptr;
-    Scene::Node* m_painted_contour_node = nullptr;
+    // Kept to reuse its memory between the uploads.
+    std::vector<std::array<uint32_t, 4>> m_packed_triangle_records;
+    // The triangles changed since the contour was built.
+    bool m_painted_contour_outdated = false;
+
+    Scene::VertexPulledRenderNodeComponent* m_painted_mesh_render_component = nullptr;
+    Scene::Node* m_painted_contour_node                                     = nullptr;
 };
 
 class CursorRenderWrapper

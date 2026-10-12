@@ -91,9 +91,13 @@ std::pair<bool, std::string> ShaderManager::init()
     // used to render highlight contour around selected triangles inside the multi-material gizmo
     valid &= append_shader("mm_contour", {prefix + "mm_contour.vs", prefix + "mm_contour.fs"});
     auto platform_info = PlatformInfo::instance();
-    // Used to render painted triangles inside the multi-material gizmo. Triangle normals are
-    // computed inside fragment shader.
-    valid &= append_shader("mm_gouraud", { prefix + "mm_gouraud.vs", prefix + "mm_gouraud.fs" });
+    // Used to render painted triangles inside the painting gizmos. Triangles and vertices are pulled
+    // from data textures, triangle normals are computed in the vertex shader.
+    valid &= append_shader(
+        "mm_gouraud_pulled",
+        {prefix + "mm_gouraud_pulled.vs", prefix + "mm_gouraud_pulled.fs"},
+        {mm_palette_size}
+    );
     // used to render gcode toolpaths
     valid &= append_shader("segments", { prefix + "segments.vs", prefix + "segments.fs" });
     // used to render gcode options

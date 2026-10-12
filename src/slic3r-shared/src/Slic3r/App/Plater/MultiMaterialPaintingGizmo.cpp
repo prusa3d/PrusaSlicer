@@ -397,7 +397,7 @@ void MultiMaterialPaintingGizmo::update_painting_tools_and_geometry()
     this->update_painting_dialog_tools();
 
     for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
-        wrapper.update_painted_geometry(m_device);
+        wrapper.update_painting_palette(m_device);
     }
 }
 

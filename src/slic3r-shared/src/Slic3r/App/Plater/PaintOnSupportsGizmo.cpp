@@ -434,8 +434,6 @@ void PaintOnSupportsGizmo::select_facets_by_angle(const float threshold_deg)
                 );
             }
         }
-
-        triangle_selector_wrappers.update_painted_geometry(m_device);
     }
 
     this->apply_painting_to_model();
@@ -578,7 +576,6 @@ void PaintOnSupportsGizmo::apply_generated_support_points(const SlicingId slicin
             triangle_selector_painter.serialize(),
             true
         );
-        triangle_selector_wrapper.update_painted_geometry(m_device);
         applied = true;
     }
 

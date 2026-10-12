@@ -207,7 +207,6 @@ void PaintOnGizmoBase::seed_fill_unselect_all()
 {
     for (TriangleSelectorRenderWrapper& triangle_selector_wrapper : m_triangle_selector_wrappers) {
         triangle_selector_wrapper.triangle_selector().seed_fill_unselect_all_triangles();
-        triangle_selector_wrapper.update_painted_geometry(m_device);
     }
 
     m_seed_fill_last_mesh_id = -1;
@@ -444,6 +443,15 @@ void PaintOnGizmoBase::set_cursor_type(TriangleSelector::CursorType cursor_type)
     this->seed_fill_unselect_all();
 }
 
+bool PaintOnGizmoBase::uses_seed_fill_selection() const
+{
+    return m_tool_type == ToolType::SMART_FILL
+        || m_tool_type == ToolType::BUCKET_FILL
+        || m_tool_type == ToolType::COLOR_REPLACE
+        || (m_tool_type == ToolType::BRUSH
+            && m_cursor_type == TriangleSelector::CursorType::POINTER);
+}
+
 void PaintOnGizmoBase::update_clipping_plane()
 {
     const Vec4f clipping_plane = get_clipping_plane_data(m_clipping_plane_clipper);
@@ -471,7 +479,6 @@ void PaintOnGizmoBase::clear_all_paintings()
 {
     for (TriangleSelectorRenderWrapper& triangle_selector_wrapper : m_triangle_selector_wrappers) {
         triangle_selector_wrapper.triangle_selector().reset();
-        triangle_selector_wrapper.update_painted_geometry(m_device);
     }
 
     this->apply_painting_to_model();
@@ -691,7 +698,6 @@ bool PaintOnGizmoBase::
                         );
                     }
 
-                    triangle_selector_wrapper.update_painted_geometry(m_device);
                     m_seed_fill_last_mesh_id = hit.volume_idx;
                 }
 
@@ -945,27 +951,13 @@ bool PaintOnGizmoBase::
                 }
             }
 
-            if (m_tool_type == ToolType::COLOR_REPLACE) {
-                for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
-                    wrapper.update_painted_geometry(m_device);
-                }
-            } else {
-                triangle_selector_wrapper.update_painted_geometry(m_device);
-            }
-
             m_last_mouse_click = gizmo_event.mouse_position;
         }
 
         return true;
     }
 
-    if (gizmo_event.type == PaintOnGizmoEvent::Type::Moving
-        && (m_tool_type == ToolType::SMART_FILL
-            || m_tool_type == ToolType::BUCKET_FILL
-            || m_tool_type == ToolType::COLOR_REPLACE
-            || (m_tool_type == ToolType::BRUSH
-                && m_cursor_type == TriangleSelector::CursorType::POINTER)))
-    {
+    if (gizmo_event.type == PaintOnGizmoEvent::Type::Moving && this->uses_seed_fill_selection()) {
         if (m_triangle_selector_wrappers.empty()) {
             return false;
         }
@@ -1052,14 +1044,6 @@ bool PaintOnGizmoBase::
                         .select_triangles_by_state_type(selected_state.value(), volume_clp);
                 }
             }
-        }
-
-        if (m_tool_type == ToolType::COLOR_REPLACE) {
-            for (TriangleSelectorRenderWrapper& wrapper : m_triangle_selector_wrappers) {
-                wrapper.update_painted_geometry(m_device);
-            }
-        } else {
-            triangle_selector_wrapper.update_painted_geometry(m_device);
         }
 
         m_seed_fill_last_mesh_id = hit.volume_idx;
@@ -1377,6 +1361,11 @@ void PaintOnGizmoBase::prepare_scene_for_rendering()
 {
     if (m_main_node == nullptr) {
         return;
+    }
+
+    const bool seed_fill_contour_shown = this->uses_seed_fill_selection();
+    for (TriangleSelectorRenderWrapper& triangle_selector_wrapper : m_triangle_selector_wrappers) {
+        triangle_selector_wrapper.upload_changed_painting(m_device, seed_fill_contour_shown);
     }
 
     this->update_cursors();
