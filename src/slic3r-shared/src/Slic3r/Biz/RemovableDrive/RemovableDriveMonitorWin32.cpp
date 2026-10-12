@@ -8,6 +8,8 @@
 #include <windows.h>
 #include <shlwapi.h>
 #include <cwchar>
+#include <cwctype>
+#include <boost/filesystem.hpp>
 #include <boost/nowide/convert.hpp>
 
 namespace Slic3r::Biz::RemovableDrive {
@@ -61,6 +63,21 @@ std::vector<DriveData> search_for_removable_drives()
     return current_drives;
 }
 
+/**
+ * @brief Drives are stored as uppercase "X:\".
+ */
+boost::filesystem::path normalize_drive_letter(const boost::filesystem::path& path)
+{
+    std::wstring wpath = path.wstring();
+    if (wpath.compare(0, 4, L"\\\\?\\") == 0) {
+        wpath.erase(0, 4);
+    }
+    if (wpath.size() >= 2 && wpath[1] == L':') {
+        wpath[0] = static_cast<wchar_t>(std::towupper(wpath[0]));
+    }
+    return boost::filesystem::path(wpath).make_preferred();
+}
+
 } // namespace
 
 RemovableDriveMonitorWin32::RemovableDriveMonitorWin32(Platform::IMainThreadDispatcher& dispatcher) :
@@ -76,8 +93,9 @@ RemovableDriveMonitorWin32::RemovableDriveMonitorWin32(Platform::IMainThreadDisp
                 if (stop_token.stop_requested()) {
                     return;
                 }
-                this->update();
                 m_wakeup = false;
+                lck.unlock();
+                this->update();
                 if (stop_token.stop_requested()) {
                     return;
                 }
@@ -122,7 +140,8 @@ boost::filesystem::path RemovableDriveMonitorWin32::get_path_on_removable_drive(
 {
     boost::filesystem::path result = get_removable_drive_path_from_path(preferred_path);
     if (!result.empty()) {
-        return result;
+        boost::system::error_code ec;
+        return boost::filesystem::is_directory(preferred_path, ec) ? preferred_path : result;
     }
     {
         std::scoped_lock<std::mutex> lock(m_drives_mutex);
@@ -137,7 +156,7 @@ boost::filesystem::path RemovableDriveMonitorWin32::get_removable_drive_path_fro
 {
     {
         std::scoped_lock<std::mutex> lock(m_drives_mutex);
-        auto it_drive_data = find_drive(m_current_drives, path);
+        auto it_drive_data = find_drive(m_current_drives, normalize_drive_letter(path));
         if (it_drive_data != m_current_drives.end()) {
             return it_drive_data->path;
         } else {

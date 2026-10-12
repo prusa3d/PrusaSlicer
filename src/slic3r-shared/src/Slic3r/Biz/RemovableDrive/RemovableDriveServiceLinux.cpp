@@ -42,16 +42,18 @@ bool eject_inner(const boost::filesystem::path& path)
 
 void RemovableDriveService::eject_in_thread(const boost::filesystem::path& path)
 {
-    if (m_eject_thread.joinable()) {
-        m_eject_thread.request_stop();
-        m_eject_thread.join();
-    }
-
     m_eject_thread = JThread::JThread(
-        [this, path](JThread::StopToken stop_token)
+        [this, path, previous = std::move(m_eject_thread)](JThread::StopToken stop_token) mutable
         {
+            if (previous.joinable()) {
+                previous.request_stop();
+                previous.join();
+            }
+            if (stop_token.stop_requested()) {
+                return;
+            }
             bool res = eject_inner(path);
-            if (!res) {
+            if (!res && !stop_token.stop_requested()) {
                 dispatch_status_on_main_thread(path, RemovableDriveStatus::Failed);
             }
             // TODO: Dispatch Removed?

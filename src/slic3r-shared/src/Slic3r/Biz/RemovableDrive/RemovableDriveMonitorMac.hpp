@@ -26,13 +26,16 @@ public:
             " because they may remember the address of this instance!"
         );
         relase_observer();
-        relase_enumerator();
         if (m_thread.joinable()) {
-            m_thread.request_stop();
+            {
+                std::scoped_lock<std::mutex> lock(m_thread_stop_mutex);
+                m_thread.request_stop();
+            }
             m_thread_stop_condition.notify_all();
             // we don't want to destroy mutexes (member variables) if the thread can still run (and use them)
             m_thread.join();
         }
+        relase_enumerator();
     }
 
     /**
@@ -50,7 +53,10 @@ public:
      */
     void on_volumes_changed() override
     {
-        m_wakeup = true;
+        {
+            std::scoped_lock<std::mutex> lock(m_thread_stop_mutex);
+            m_wakeup = true;
+        }
         m_thread_stop_condition.notify_all();
     }
 

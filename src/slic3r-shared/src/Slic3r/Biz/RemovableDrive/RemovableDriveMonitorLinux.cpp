@@ -124,8 +124,8 @@ RemovableDriveMonitorLinux::RemovableDriveMonitorLinux(Platform::IMainThreadDisp
                 if (stop_token.stop_requested()) {
                     return;
                 }
-                this->update();
                 m_wakeup = false;
+                this->update();
             }
         }
     );
@@ -167,7 +167,8 @@ boost::filesystem::path RemovableDriveMonitorLinux::get_path_on_removable_drive(
 {
     boost::filesystem::path result = get_removable_drive_path_from_path(preferred_path);
     if (!result.empty()) {
-        return result;
+        boost::system::error_code ec;
+        return boost::filesystem::is_directory(preferred_path, ec) ? preferred_path : result;
     }
     {
         std::scoped_lock<std::mutex> lock(m_drives_mutex);
@@ -180,15 +181,17 @@ boost::filesystem::path RemovableDriveMonitorLinux::get_path_on_removable_drive(
 
 boost::filesystem::path RemovableDriveMonitorLinux::get_removable_drive_path_from_path(const boost::filesystem::path& path) const
 {
+    // Copy the drives, so that find_drive_by_device does not call stat() under the lock.
+    std::vector<DriveData> drives;
     {
         std::scoped_lock<std::mutex> lock(m_drives_mutex);
-        auto it_drive_data = find_drive(m_current_drives, path);
-        if (it_drive_data != m_current_drives.end()) {
-            return it_drive_data->path;
-        } else {
-            return {};
-        }
+        drives = m_current_drives;
     }
+    auto it_drive_data = find_drive(drives, path);
+    if (it_drive_data == drives.end() && platform_flavor() != PlatformFlavor::LinuxOnChromium) {
+        it_drive_data = find_drive_by_device(drives, path);
+    }
+    return it_drive_data != drives.end() ? it_drive_data->path : boost::filesystem::path();
 }
 
 size_t RemovableDriveMonitorLinux::removable_drives_count() const

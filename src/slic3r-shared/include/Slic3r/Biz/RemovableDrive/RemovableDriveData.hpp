@@ -4,6 +4,9 @@
 #include <vector>
 #include <algorithm>
 #include <boost/filesystem/path.hpp>
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
 
 namespace Slic3r::Biz::RemovableDrive {
 
@@ -56,17 +59,38 @@ find_drive(const std::vector<DriveData>& sorted_drives, const boost::filesystem:
     // Find a candidate by binary search (first before result).
     // Than confirm by is_ancestor() call.
     DriveData search_val;
-    search_val.path = p;
+    search_val.path = p.lexically_normal();
     auto it         = std::upper_bound(sorted_drives.begin(), sorted_drives.end(), search_val);
     if (it == sorted_drives.begin()) {
         return sorted_drives.end();
     }
     auto candidate = std::prev(it);
-    if (is_ancestor(candidate->path, p)) {
+    if (is_ancestor(candidate->path, search_val.path)) {
         return candidate;
     }
     return sorted_drives.end();
 }
+
+#ifndef _WIN32
+/**
+ * @brief Matches by device id of p or of its nearest existing ancestor.
+ */
+inline std::vector<DriveData>::const_iterator
+find_drive_by_device(const std::vector<DriveData>& drives, boost::filesystem::path p)
+{
+    struct stat buf;
+    while (!p.empty() && ::stat(p.c_str(), &buf) != 0) {
+        p = p.parent_path();
+    }
+    if (p.empty()) {
+        return drives.end();
+    }
+    return std::find_if(drives.begin(), drives.end(), [dev = buf.st_dev](const DriveData& drive) {
+        struct stat drive_buf;
+        return ::stat(drive.path.c_str(), &drive_buf) == 0 && drive_buf.st_dev == dev;
+    });
+}
+#endif
 
 /**
  * @brief Returns vector of added and vector of removed drives.

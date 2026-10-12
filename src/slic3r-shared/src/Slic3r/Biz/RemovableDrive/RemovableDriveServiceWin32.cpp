@@ -20,20 +20,16 @@ RemovableDriveService::RemovableDriveService(Platform::IMainThreadDispatcher& di
 {}
 
 namespace {
-bool eject_inner(const boost::filesystem::path& path)
+/**
+ * @brief Expects COM to be initialized.
+ */
+bool invoke_eject_verb(const boost::filesystem::path& path)
 {
-    ASSERT(!path.empty());
     std::wstring wpath = path.wstring();
-    HRESULT hr         = CoInitialize(nullptr);
-    if (!SUCCEEDED(hr)) {
-        SPDLOG_ERROR("Ejecting of {} has failed: Failed to initialize COM. Error code: {}", path.string(), hr);
-        return false;
-    }
     CComPtr<IShellDispatch> pShellDisp;
-    hr = pShellDisp.CoCreateInstance(CLSID_Shell, nullptr, CLSCTX_INPROC_SERVER);
+    HRESULT hr = pShellDisp.CoCreateInstance(CLSID_Shell, nullptr, CLSCTX_INPROC_SERVER);
     if (!SUCCEEDED(hr)) {
         SPDLOG_ERROR("Ejecting of {} has failed: Attempt to get Shell pointer has failed.", path.string());
-        CoUninitialize();
         return false;
     }
     CComPtr<Folder> pFolder;
@@ -44,14 +40,12 @@ bool eject_inner(const boost::filesystem::path& path)
     hr            = pShellDisp->NameSpace(vtDrives, &pFolder);
     if (!SUCCEEDED(hr)) {
         SPDLOG_ERROR("Ejecting of {} has failed: Attempt to create Namespace has failed.", path.string());
-        CoUninitialize();
         return false;
     }
     CComPtr<FolderItem> pItem;
     hr = pFolder->ParseName(static_cast<BSTR>(const_cast<wchar_t*>(wpath.c_str())), &pItem);
     if (!SUCCEEDED(hr)) {
         SPDLOG_ERROR("Ejecting of {} has failed: Attempt to Parse name has failed.", path.string());
-        CoUninitialize();
         return false;
     }
     VARIANT vtEject;
@@ -62,30 +56,69 @@ bool eject_inner(const boost::filesystem::path& path)
     if (!SUCCEEDED(hr)) {
         SPDLOG_ERROR("Ejecting of {} has failed: Attempt to Invoke Verb has failed.", path.string());
         VariantClear(&vtEject);
-        CoUninitialize();
         return false;
     }
 
-    Sleep(2'000);
-
     VariantClear(&vtEject);
-    CoUninitialize();
     return true;
+}
+
+bool is_volume_gone_error(DWORD error)
+{
+    return error == ERROR_NOT_READY || error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND
+        || error == ERROR_INVALID_DRIVE || error == ERROR_NO_SUCH_DEVICE || error == ERROR_DEVICE_NOT_CONNECTED;
+}
+
+/**
+ * @brief Success of the Eject verb does not mean the drive was ejected (e.g. a file is still open).
+ * Must run while the COM apartment is still alive, the Shell may finish the eject asynchronously.
+ */
+bool wait_for_volume_removal(const boost::filesystem::path& path, JThread::StopToken stop_token)
+{
+    std::wstring wpath = path.wstring();
+    for (int i = 0; i < 20; ++i) {
+        if (!::GetVolumeInformationW(wpath.c_str(), nullptr, 0, nullptr, nullptr, nullptr, nullptr, 0)
+            && is_volume_gone_error(::GetLastError()))
+        {
+            return true;
+        }
+        if (stop_token.stop_requested()) {
+            return false;
+        }
+        Sleep(500);
+    }
+    SPDLOG_ERROR("Ejecting of {} has failed: Volume is still present.", path.string());
+    return false;
+}
+
+bool eject_inner(const boost::filesystem::path& path, JThread::StopToken stop_token)
+{
+    ASSERT(!path.empty());
+    HRESULT hr = CoInitialize(nullptr);
+    if (!SUCCEEDED(hr)) {
+        SPDLOG_ERROR("Ejecting of {} has failed: Failed to initialize COM. Error code: {}", path.string(), hr);
+        return false;
+    }
+    bool res = invoke_eject_verb(path) && wait_for_volume_removal(path, stop_token);
+    CoUninitialize();
+    return res;
 }
 } // namespace
 
 void RemovableDriveService::eject_in_thread(const boost::filesystem::path& path)
 {
-    if (m_eject_thread.joinable()) {
-        m_eject_thread.request_stop();
-        m_eject_thread.join();
-    }
-
     m_eject_thread = JThread::JThread(
-        [this, path](JThread::StopToken stop_token)
+        [this, path, previous = std::move(m_eject_thread)](JThread::StopToken stop_token) mutable
         {
-            bool res = eject_inner(path);
-            if (!res) {
+            if (previous.joinable()) {
+                previous.request_stop();
+                previous.join();
+            }
+            if (stop_token.stop_requested()) {
+                return;
+            }
+            bool res = eject_inner(path, stop_token);
+            if (!res && !stop_token.stop_requested()) {
                 dispatch_status_on_main_thread(path, RemovableDriveStatus::Failed);
             }
             // Do not dispatch Removed here, it will be confirmed by system callback.
