@@ -1,0 +1,94 @@
+name: Codex review status
+
+# master requires the codex-review status, which Codex doesn't post itself. This posts it on a pull
+# request's head commit once Codex has reviewed that commit clean, so auto-merge can merge it.
+#
+# Codex says a review is clean with a comment ("Didn't find any major issues", naming the reviewed
+# commit), or with a thumbs-up. A thumbs-up doesn't say which commit it's for, so it counts only
+# when the latest "@codex review" request names the head commit, and only if it isn't older than
+# that request's last edit: editing a request to name a new commit doesn't carry an older one over.
+# GitHub sends no event for reactions, so a schedule looks for those. A push makes a new head
+# commit without the status, and open review threads still block the merge: master requires
+# conversations to be resolved.
+
+on:
+  issue_comment:
+    types: [created, edited]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: codex-review-status
+  cancel-in-progress: false
+
+jobs:
+  status:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const BOT = 'chatgpt-codex-connector[bot]';
+            const { owner, repo } = context.repo;
+
+            const prs = context.eventName === 'issue_comment'
+              ? [(await github.rest.pulls.get({ owner, repo, pull_number: context.issue.number })).data]
+              : await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base: 'master', per_page: 100 });
+
+            for (const pr of prs) {
+              if (pr.state !== 'open' || pr.base.ref !== 'master')
+                continue;
+              const head = pr.head.sha;
+
+              const { data: combined } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: head });
+              if (combined.statuses.some(s => s.context === 'codex-review' && s.state === 'success'))
+                continue;
+
+              const comments = await github.paginate(github.rest.issues.listComments,
+                { owner, repo, issue_number: pr.number, per_page: 100 });
+
+              // A clean review of exactly this commit
+              let clean = comments.some(c => {
+                if (c.user.login !== BOT || !/Didn't find any major issues/.test(c.body))
+                  return false;
+                const m = c.body.match(/Reviewed commit:\*\*\s*`([0-9a-f]{7,40})`/);
+                return m !== null && head.startsWith(m[1]);
+              });
+
+              // Or a thumbs-up after the latest review request, when that request names this commit
+              const requests = comments.filter(c => /@codex review/.test(c.body));
+              const latest = requests[requests.length - 1];
+              const names_head = latest !== undefined &&
+                (latest.body.match(/\b[0-9a-f]{7,40}\b/g) || []).some(sha => head.startsWith(sha));
+              if (!clean && names_head) {
+                // An edit bumps updated_at: an older thumbs-up can't vouch for what the request says now.
+                // Timestamps are whole seconds, so a reaction in the same second counts.
+                const after = new Date(latest.updated_at);
+                const reactions = [
+                  ...await github.paginate(github.rest.reactions.listForIssue,
+                    { owner, repo, issue_number: pr.number, per_page: 100 }),
+                  ...await github.paginate(github.rest.reactions.listForIssueComment,
+                    { owner, repo, comment_id: latest.id, per_page: 100 }),
+                ];
+                clean = reactions.some(r => r.user.login === BOT && r.content === '+1' && new Date(r.created_at) >= after);
+              }
+
+              if (!clean)
+                continue;
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha: head, state: 'success', context: 'codex-review',
+                description: 'Codex reviewed this commit clean',
+                target_url: pr.html_url,
+              });
+              core.info(`#${pr.number}: codex-review success on ${head}`);
+            }
