@@ -117,6 +117,7 @@ struct Wanted
     std::string              vendor_key;
     std::vector<std::string> colour;     // color words, may be empty
     std::set<std::string>    plain_words; // vendor, material and color words of the tool
+    std::string              material_key; // the material's letters and digits, lowercase
 
     explicit Wanted(const PrinterTool &t)
         : tool(t)
@@ -125,10 +126,45 @@ struct Wanted
         , colour(colour_words(t.color))
     {
         for (const auto &w : tokens(t.vendor)) plain_words.insert(w);
-        for (const auto &w : tokens(t.material)) plain_words.insert(w);
+        for (const auto &w : tokens(t.material)) {
+            plain_words.insert(w);
+            material_key += w;
+        }
         for (const auto &w : colour) plain_words.insert(w);
     }
 };
+
+// Whether a name is "<vendor> <material> <more words>", the vendor and material spelled any way
+// the candidates match ("BambuLab" for "Bambu Lab", "TPE" for "TPU")
+bool names_more_than_filament(const Wanted &want, const std::vector<std::string> &words)
+{
+    std::string vendor;
+    for (size_t i = 0; i + 2 < words.size(); ++i) {
+        vendor += words[i];
+        if (filament_sync::vendor_key(vendor) != want.vendor_key)
+            continue;
+        std::string material;
+        for (size_t j = i + 1; j + 1 < words.size(); ++j) {
+            material += words[j];
+            // The printer keeps 7 characters of a type's name, as in same_material()
+            const bool cut = want.tool.material.size() == 7 && material.size() > want.material_key.size() &&
+                             material.compare(0, want.material_key.size(), want.material_key) == 0;
+            if (same_material(want.material_key, material) || cut)
+                return true;
+        }
+    }
+    return false;
+}
+
+// The "#RRGGBB" in a name, as in the presets made for the printer's unnamed user colors
+std::string hex_in_name(const std::string &name)
+{
+    for (size_t at = name.find('#'); at != std::string::npos; at = name.find('#', at + 1))
+        if (at + 7 == name.size() || (at + 7 < name.size() && !std::isalnum((unsigned char) name[at + 7])))
+            if (std::string hex = printer_tools_detail::normalize_color_hex(name.substr(at, 7)); !hex.empty())
+                return hex;
+    return {};
+}
 
 // 0: the tool's color, by hex or by name. 1: no color in the name. 2: another color.
 int colour_tier(const Wanted &want, const Candidate &c)
@@ -136,12 +172,22 @@ int colour_tier(const Wanted &want, const Candidate &c)
     // A tool without a color says nothing against any preset
     if (want.colour.empty() && want.tool.color_hex.empty())
         return 1;
-    const std::vector<std::string> words = tokens(display_name(c));
+    const std::string              name  = display_name(c);
+    const std::vector<std::string> words = tokens(name);
+    // A hex in the name is the color, whatever the preset's own color was edited to since
+    if (const std::string named = hex_in_name(name); !named.empty() && !want.tool.color_hex.empty())
+        return named == printer_tools_detail::normalize_color_hex(want.tool.color_hex) ? 0 : 2;
     if ((!want.tool.color_hex.empty() && rgb_distance(c.colour, want.tool.color_hex) == 0) || contains_sequence(words, want.colour))
         return 0;
     for (const std::string &w : words)
         if (is_colour_word(w) && std::find(want.colour.begin(), want.colour.end(), w) == want.colour.end())
             return 2;
+    // "<vendor> <material> <color>", as new presets are named: what follows the material is a
+    // color even when the printer's list doesn't have it (a user color named "Clear"), and the
+    // preset's own color differs
+    if (want.vendor_known && !want.tool.color_hex.empty() && !printer_tools_detail::normalize_color_hex(c.colour).empty() &&
+        names_more_than_filament(want, words))
+        return 2;
     return 1;
 }
 
@@ -189,6 +235,11 @@ Rank rank(const Wanted &want, const Candidate &c)
 bool fits_as_well(const Rank &a, const Rank &b)
 {
     return std::get<0>(a) == std::get<0>(b) && std::get<1>(a) == std::get<1>(b);
+}
+
+bool fits_better(const Rank &a, const Rank &b)
+{
+    return std::make_pair(std::get<0>(a), std::get<1>(a)) < std::make_pair(std::get<0>(b), std::get<1>(b));
 }
 
 const Candidate *best_of(const Wanted &want, const std::vector<const Candidate *> &set)
@@ -349,12 +400,19 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
             const auto current = std::find_if(visible.begin(), visible.end(), [&](const Candidate *c) { return c->name == ex.selected; });
             if (current != visible.end() && fits_as_well(rank(want, **current), rank(want, *pick)))
                 pick = *current;
-            row.action = pick->name == ex.selected ? Action::Keep : Action::Select;
-            row.preset = pick->name;
-        } else if ((pick = best_of(want, invisible_system))) {
-            row.action = Action::Install;
-            row.preset = pick->name;
-        } else if (want.vendor_known) {
+        }
+        // A system preset that isn't installed, when nothing installed fits or only another color does
+        bool install = false;
+        if (const Candidate *hidden = best_of(want, invisible_system);
+            hidden && (!pick || (colour_tier(want, *pick) == 2 && fits_better(rank(want, *hidden), rank(want, *pick))))) {
+            pick    = hidden;
+            install = true;
+        }
+
+        // A known vendor's filament whose presets are all another color gets one of its own
+        const PendingCreate *create = nullptr;
+        std::string          failure;
+        if (want.vendor_known && (!pick || colour_tier(want, *pick) == 2)) {
             // The presets carry the colors, so tools with different colors don't share one: by hex,
             // else by color name
             std::string colour_key = tool.color_hex;
@@ -374,9 +432,9 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
             std::vector<PendingCreate> &pending = creates[key];
             const auto shared = std::find_if(pending.begin(), pending.end(),
                                              [&](const PendingCreate &p) { return usable_template(p.template_preset); });
-            const PendingCreate *create = shared != pending.end() ? &*shared : nullptr;
-            std::string          failure;
-            if (!create) {
+            if (shared != pending.end())
+                create = &*shared;
+            else {
                 // Start from a preset of the same material: the extruder's own, else Generic,
                 // Prusament, another vendor's, a user preset; installed ones first
                 std::vector<const Candidate *> templates;
@@ -423,18 +481,24 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
                     create = &pending.back();
                 }
             }
-            if (create) {
-                row.action          = Action::Create;
-                row.preset          = create->name;
-                row.template_preset = create->template_preset;
-                row.vendor          = tool.vendor;
-            } else {
-                row.action = Action::NoMatch;
+        }
+
+        if (create) {
+            row.action          = Action::Create;
+            row.preset          = create->name;
+            row.template_preset = create->template_preset;
+            row.vendor          = tool.vendor;
+            pick                = nullptr;
+        } else if (pick) {
+            row.action = install ? Action::Install : pick->name == ex.selected ? Action::Keep : Action::Select;
+            row.preset = pick->name;
+            // Only another color fits, and a preset of the tool's own couldn't be made
+            if (!failure.empty())
                 row.notes.emplace_back(failure);
-            }
         } else {
             row.action = Action::NoMatch;
-            row.notes.emplace_back((boost::format("No %1% preset fits this printer.") % tool.material).str());
+            row.notes.emplace_back(want.vendor_known ? failure :
+                                                       (boost::format("No %1% preset fits this printer.") % tool.material).str());
         }
 
         if (pick) {

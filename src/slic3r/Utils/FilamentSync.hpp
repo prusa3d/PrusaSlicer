@@ -67,7 +67,8 @@ enum class Action {
     Select,
     /// Select a system preset that isn't installed, and install it.
     Install,
-    /// Create a user preset from a template and select it.
+    /// Create a user preset from a template and select it: the tool names a vendor, and none of
+    /// its presets of that material fits, or only ones of another color do.
     Create,
     /// Nothing to select or start from; the notes say why.
     NoMatch,

@@ -550,9 +550,107 @@ TEST_CASE("A tool without a color keeps a preset that names one", "[FilamentSync
 
 TEST_CASE("A user color is named by its hex in notes", "[FilamentSync]")
 {
-    const ExtruderPlan p = plan_one(tool(1, "Overture", "PETG", "COLOR3", "#123456"), {cand("Overture PETG Black", "Overture", "PETG", "#000000")});
-    REQUIRE(p.notes.size() == 1);
-    CHECK(p.notes[0].find("#123456") != std::string::npos);
+    // Without a vendor nothing is created, so the closest color is picked
+    const ExtruderPlan p = plan_one(tool(1, "", "PETG", "COLOR3", "#123456"), {cand("Overture PETG Black", "Overture", "PETG", "#000000")});
+    CHECK(p.action == Action::Select);
+    CHECK(std::any_of(p.notes.begin(), p.notes.end(), [](const std::string &n) { return n.find("#123456") != std::string::npos; }));
+}
+
+TEST_CASE("A filament whose presets are all another color gets its own", "[FilamentSync]")
+{
+    // Made by an earlier sync
+    const std::vector<Candidate> c = {cand("Polymaker PETG Black", "Polymaker", "PETG", "#000000"), sys("Generic PETG @SYNC", "Generic", "PETG")};
+    const ExtruderPlan red = plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), c, "Polymaker PETG Black");
+    CHECK(red.action == Action::Create);
+    CHECK(red.preset == "Polymaker PETG Red");
+    // The extruder's own preset, with the settings the user tuned
+    CHECK(red.template_preset == "Polymaker PETG Black");
+    CHECK(red.preset_colour == "#FF0000");
+    CHECK(red.notes.empty());
+
+    CHECK(plan_one(tool(1, "Polymaker", "PETG", "Black", "#000000"), c, "Polymaker PETG Black").action == Action::Keep);
+    // A preset without a color in its name still fits
+    std::vector<Candidate> plain = c;
+    plain.push_back(cand("Polymaker PETG", "Polymaker", "PETG", "#000000"));
+    CHECK(plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), plain, "Polymaker PETG Black").preset == "Polymaker PETG");
+}
+
+TEST_CASE("A system preset in the tool's color beats an installed one in another", "[FilamentSync]")
+{
+    Candidate orange = sys("Prusament PETG Prusa Orange @SYNC", "Prusa Polymers", "PETG", "#EB5403");
+    orange.is_visible = false;
+    Candidate black   = sys("Prusament PETG Jet Black @SYNC", "Prusa Polymers", "PETG", "#000000");
+    black.is_visible  = false;
+    const Candidate galaxy = cand("Prusament PETG Prusa Galaxy Black", "Prusament", "PETG", "#494546");
+    const PrinterTool tool_orange = tool(1, "Prusament", "PETG", "Orange", "#F8651B");
+
+    const ExtruderPlan p = plan_one(tool_orange, {galaxy, orange, black});
+    CHECK(p.action == Action::Install);
+    CHECK(p.preset == orange.name);
+    // Another color either way: a preset of its own
+    const ExtruderPlan q = plan_one(tool_orange, {galaxy, black});
+    CHECK(q.action == Action::Create);
+    CHECK(q.preset == "Prusament PETG Orange");
+}
+
+TEST_CASE("Another color is picked when no preset of the tool's own can be made", "[FilamentSync]")
+{
+    Candidate cf = cand("Polymaker PETG CF Black", "Polymaker", "PETG", "#000000");
+    cf.is_abrasive = true;
+    const ExtruderPlan p = plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), {cf});
+    CHECK(p.action == Action::Select);
+    CHECK(p.preset == cf.name);
+    // Why nothing was made, abrasive, and the closest color
+    CHECK(p.notes.size() == 3);
+}
+
+TEST_CASE("A preset named by a hex is that color", "[FilamentSync]")
+{
+    const std::vector<Candidate> c = {cand("Polymaker PETG #123456", "Polymaker", "PETG", "#123456"), sys("Generic PETG @SYNC", "Generic", "PETG")};
+    CHECK(plan_one(tool(1, "Polymaker", "PETG", "COLOR3", "#123456"), c).preset == "Polymaker PETG #123456");
+    const ExtruderPlan other = plan_one(tool(1, "Polymaker", "PETG", "COLOR4", "#654321"), c);
+    CHECK(other.action == Action::Create);
+    CHECK(other.preset == "Polymaker PETG #654321");
+    CHECK(plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), c).preset == "Polymaker PETG Red");
+
+    // The name says the color even when the preset's filament color was edited since, so it beats
+    // a preset without a color in its name
+    const std::vector<Candidate> edited = {cand("Polymaker PETG #123456", "Polymaker", "PETG", "#111111"),
+                                           cand("Polymaker PETG", "Polymaker", "PETG", "#111111")};
+    CHECK(plan_one(tool(1, "Polymaker", "PETG", "COLOR3", "#123456"), edited).preset == "Polymaker PETG #123456");
+    // ... and doesn't take the color it was edited to as well
+    const ExtruderPlan to = plan_one(tool(1, "Polymaker", "PETG", "COLOR4", "#654321"), {cand("Polymaker PETG #123456", "Polymaker", "PETG", "#654321")});
+    CHECK(to.action == Action::Create);
+    CHECK(to.preset == "Polymaker PETG #654321");
+}
+
+TEST_CASE("A color the printer's list doesn't have is still another color", "[FilamentSync]")
+{
+    // An earlier sync made this for a user color the printer has named "Clear"
+    const std::vector<Candidate> c = {cand("Polymaker PETG Clear", "Polymaker", "PETG", "#F0F0F0"),
+                                      cand("Polymaker PETG", "Polymaker", "PETG"), sys("Generic PETG @SYNC", "Generic", "PETG")};
+    CHECK(plan_one(tool(1, "Polymaker", "PETG", "Clear", "#F0F0F0"), c, "Polymaker PETG Clear").action == Action::Keep);
+    const ExtruderPlan red = plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), c, "Polymaker PETG Clear");
+    CHECK(red.action == Action::Select);
+    // Not the clear one: the preset without a color in its name
+    CHECK(red.preset == "Polymaker PETG");
+
+    // The user's own name for a color
+    const std::vector<Candidate> space = {cand("Overture PETG Space", "Overture", "PETG", "#808080"), sys("Generic PETG @SYNC", "Generic", "PETG")};
+    const ExtruderPlan p = plan_one(tool(1, "Overture", "PETG", "Red", "#FF0000"), space, "Overture PETG Space");
+    CHECK(p.action == Action::Create);
+    CHECK(p.preset == "Overture PETG Red");
+    CHECK(p.template_preset == "Overture PETG Space");
+    // A preset without a filament color can't be told apart
+    CHECK(plan_one(tool(1, "Overture", "PETG", "Red", "#FF0000"), {cand("Overture PETG Space", "Overture", "PETG")}).action == Action::Select);
+
+    // The vendor and material as matching spells them
+    const ExtruderPlan bambu = plan_one(tool(1, "Bambu Lab", "PETG", "Red", "#FF0000"), {cand("BambuLab PETG Clear", "BambuLab", "PETG", "#F0F0F0")});
+    CHECK(bambu.action == Action::Create);
+    CHECK(bambu.preset == "Bambu Lab PETG Red");
+    const ExtruderPlan tpu = plan_one(tool(1, "Overture", "TPU", "Red", "#FF0000"), {cand("Overture TPE Clear", "Overture", "TPE", "#F0F0F0")});
+    CHECK(tpu.action == Action::Create);
+    CHECK(tpu.preset == "Overture TPU Red");
 }
 
 TEST_CASE("Tools share a new preset only when its template suits each extruder", "[FilamentSync]")
@@ -681,4 +779,27 @@ TEST_CASE("A new preset without a color doesn't keep its template's", "[Filament
     const Preset *created = f.bundle.filaments.find_preset("Polymaker PLA", false, false);
     REQUIRE(created != nullptr);
     CHECK(created->config.opt_string("filament_colour", 0u) == print_config_def.get("filament_colour")->default_value->serialize());
+}
+
+TEST_CASE("A new color of a synced filament gets its own preset", "[FilamentSync]")
+{
+    Fixture      f;
+    PrinterTools tools;
+    tools.tools = {tool(2, "Polymaker", "PLA", "Red", "#FF0000")};
+    REQUIRE(apply_presets(f.bundle, &f.app, f.plan_for(tools), {true}).errors.empty());
+    REQUIRE(f.bundle.extruders_filaments[1].get_selected_preset_name() == "Polymaker PLA Red");
+
+    // The next spool on that tool is blue
+    tools.tools     = {tool(2, "Polymaker", "PLA", "Blue", "#0000FF")};
+    const Plan plan = f.plan_for(tools);
+    REQUIRE(plan.extruders[0].action == Action::Create);
+    CHECK(plan.extruders[0].preset == "Polymaker PLA Blue");
+    CHECK(plan.extruders[0].template_preset == "Polymaker PLA Red");
+    REQUIRE(apply_presets(f.bundle, &f.app, plan, {true}).errors.empty());
+    const Preset *blue = f.bundle.filaments.find_preset("Polymaker PLA Blue", false, false);
+    REQUIRE(blue != nullptr);
+    CHECK(blue->config.opt_string("filament_colour", 0u) == "#0000FF");
+    CHECK(f.bundle.extruders_filaments[1].get_selected_preset_name() == "Polymaker PLA Blue");
+    // The red one stays for the next red spool
+    CHECK(f.bundle.filaments.find_preset("Polymaker PLA Red", false, false) != nullptr);
 }

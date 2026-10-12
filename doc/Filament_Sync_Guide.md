@@ -65,19 +65,29 @@ For each loaded tool, among the filament presets compatible with that extruder:
    - On a nozzle that isn't hardened, presets for abrasive filament (marked abrasive, or carbon or
      glass fiber by name) come last.
    - A preset named after the tool's color, or with exactly its color, comes first; then presets
-     without a color in their name; then other colors. `Gray` and `Grey` are the same color.
+     without a color in their name; then other colors. `Gray` and `Grey` are the same color, and
+     a preset named by a hex code (`Polymaker PETG #1A2B3C`) is that color. In a name that starts
+     with the tool's vendor and material (in any spelling that matches), as new presets' names
+     do, the words after the material are another color when the preset's filament color differs
+     from the tool's: for a red tool, `Overture PETG Space` and a `Polymaker PETG Clear` made for
+     a user color are other colors.
    - Then the preset whose name says the least beyond vendor, material and color:
      `Overture PLA White` before `Overture PLA Silk White`.
    - Then the closest filament color, then your own presets before system ones.
 4. **Not installed:** a matching system preset you haven't installed in the Configuration Wizard
-   is installed and selected.
-5. **Nothing matches:** a user preset is created, named `<vendor> <material> <color>` (for
-   example `Polymaker PETG Black`; a printer user color without a name goes by its hex, and a tool
+   is installed and selected when no installed preset fits, or when the installed ones are all
+   another color and it fits better.
+5. **Nothing matches, or only other colors:** when the printer names a vendor and none of its
+   presets of that material fits, or only ones in another color do (`Polymaker PETG Black` for a
+   red Polymaker PETG), a user preset is created, named `<vendor> <material> <color>` (for
+   example `Polymaker PETG Red`; a printer user color without a name goes by its hex, and a tool
    without a color gets no color in the name), copied from a preset of the same material that
    suits the extruder: the extruder's current one, else a Generic one, else Prusament. Its vendor
    and filament color come from the printer. If that name is taken, it gets ` @INDX`. Tools with
    the same vendor, material and color share one new preset.
-   It's saved with your other user presets; it isn't added to Filament DB.
+   It's saved with your other user presets; it isn't added to Filament DB. When no preset can be
+   made (nothing suits the extruder to start from), the closest color is selected instead, and
+   a note says why.
 
 When the printer reports no vendor (the filament was loaded by G-code, or the vendor was
 cleared), the current preset is kept if it's the right material, unless it's for abrasive
