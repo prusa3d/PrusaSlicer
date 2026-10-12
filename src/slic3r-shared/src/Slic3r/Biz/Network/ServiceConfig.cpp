@@ -46,6 +46,8 @@ void update_url_from_env(std::string& dest, const char* env_name, const std::vec
 
 ServiceConfig::ServiceConfig() :
     m_connect_url("https://connect.prusa3d.com"),
+    // TODO: switch to the production Connect API url.
+    m_connect_api_url("https://connect-api-dev.prusa3d.dev"),
     m_account_url("https://account.prusa3d.com"),
     m_account_client_id("oamhmhZez7opFosnwzElIgE2oGgI2iJORSkw587O"),
     m_media_url("https://media.printables.com"),
@@ -58,6 +60,7 @@ ServiceConfig::ServiceConfig() :
 
     const std::vector<std::string> all_domains = {"prusa.com", "prusa3d.com", "prusa.cz", "prusa3d.cz", "printables.com", "testprusaverse.com"};
     update_url_from_env(m_connect_url, "PRUSA_CONNECT_URL", all_domains);
+    update_url_from_env(m_connect_api_url, "PRUSA_CONNECT_API_URL", all_domains);
     update_url_from_env(m_account_url, "PRUSA_ACCOUNT_URL", all_domains);
     update_url_from_env(m_media_url, "PRUSA_MEDIA_URL", all_domains);
     update_url_from_env(m_preset_repo_url, "PRUSA_PRESET_REPO_URL", all_domains);

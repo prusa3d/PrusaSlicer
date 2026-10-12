@@ -1132,6 +1132,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/ConnectPrinter/ConnectPrinter.cpp
         include/Slic3r/Biz/ConnectPrinter/ConnectPrinterService.hpp
         src/Slic3r/Biz/ConnectPrinter/ConnectPrinterService.cpp
+        include/Slic3r/Biz/ConnectPrinter/ConnectFavoriteMaterials.hpp
+        src/Slic3r/Biz/ConnectPrinter/ConnectFavoriteMaterials.cpp
+        include/Slic3r/Biz/ConnectPrinter/ConnectFavoriteMaterialService.hpp
+        src/Slic3r/Biz/ConnectPrinter/ConnectFavoriteMaterialService.cpp
 
         include/Slic3r/Biz/SHA256.hpp
 

@@ -55,7 +55,8 @@ ConnectPrinterService::ConnectPrinterService(
     UserAccount::UserAccountInteractor& user_account_interactor
 ) :
     m_dispatcher(dispatcher),
-    m_user_account_interactor(user_account_interactor)
+    m_user_account_interactor(user_account_interactor),
+    m_favorite_material_service(dispatcher, user_account_interactor)
 {}
 
 ConnectPrinterService::~ConnectPrinterService() = default;
@@ -74,6 +75,16 @@ const ConnectPrinter* ConnectPrinterService::find(const std::string& uuid) const
 {
     std::optional<size_t> index = find_index(uuid);
     return index.has_value() ? &m_printers.at(index.value()) : nullptr;
+}
+
+ConnectFavoriteMaterialService& ConnectPrinterService::favorite_material_service()
+{
+    return m_favorite_material_service;
+}
+
+const ConnectFavoriteMaterialService& ConnectPrinterService::favorite_material_service() const
+{
+    return m_favorite_material_service;
 }
 
 std::optional<size_t> ConnectPrinterService::find_index(const std::string& uuid) const
@@ -171,6 +182,7 @@ void ConnectPrinterService::on_user_account_id_success(bool is_refresh, const st
 
     if (!is_refresh) {
         fetch_printer_list({}, {});
+        m_favorite_material_service.request_refresh();
     }
 }
 
@@ -181,6 +193,7 @@ void ConnectPrinterService::on_user_account_logged_out()
     m_refresh_pending   = false;
     m_mqtt_subscriber.reset();
     m_mqtt_access_token.clear();
+    m_favorite_material_service.on_logged_out();
 
     if (!m_printers.empty()) {
         invoke_listeners<IListObserver<ConnectPrinter>>([](IListObserver<ConnectPrinter>* l)

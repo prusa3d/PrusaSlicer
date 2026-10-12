@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Slic3r/Biz/ConnectPrinter/ConnectFavoriteMaterialService.hpp"
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
 #include "Slic3r/Biz/Platform/IMainThreadDispatcher.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountListener.hpp"
@@ -45,6 +46,9 @@ public:
 
     const ConnectPrinter* find(const std::string& uuid) const;
 
+    ConnectFavoriteMaterialService& favorite_material_service();
+    const ConnectFavoriteMaterialService& favorite_material_service() const;
+
     /// Fetches the printer list and applies it to the service. All callbacks run on a worker thread.
     void fetch_printer_list(
         std::function<void(const std::string&)> success_fn,
@@ -82,6 +86,7 @@ private:
     UserAccount::UserAccountInteractor& m_user_account_interactor;
 
     std::vector<ConnectPrinter> m_printers;
+    ConnectFavoriteMaterialService m_favorite_material_service;
     std::unique_ptr<Network::Mqtt::Subscriber> m_mqtt_subscriber;
     std::string m_mqtt_access_token;
     size_t m_session_generation{0};

@@ -702,6 +702,11 @@ public:
         return m_physical_printer_interactor.connect_printer_service();
     }
 
+    ConnectPrinter::ConnectFavoriteMaterialService& connect_favorite_material_service()
+    {
+        return connect_printer_service().favorite_material_service();
+    }
+
 private:
     /**
      * @brief Wires SceneInteractor's owned ObjectListInteractor to this ProjectInteractor (and
