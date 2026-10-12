@@ -110,7 +110,7 @@ public:
     ) override;
 
     Scene::GizmoActivationState on_mouse(Scene::GizmoEventContext& ctx, bool only_active) override;
-    void render_scene(Render::CommandBuffer& cmd_buffer) override;
+    void prepare_scene_for_rendering() override;
 
     virtual Domain::TriangleSelector::TriangleStateType get_left_button_state_type() const  = 0;
     virtual Domain::TriangleSelector::TriangleStateType get_right_button_state_type() const = 0;

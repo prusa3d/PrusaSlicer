@@ -193,6 +193,11 @@ public:
     virtual void render_imgui() {}
 
     /**
+     * @brief Updates the scene nodes of the active tool before the scene is rendered.
+     */
+    virtual void prepare_scene_for_rendering() {}
+
+    /**
      * @name Project activation and deactivation
      * @note Project deactivation of a tool gizmo happens when a project with active tool gizmo gets
      * switched from (i.e. project will disappear). And analogically project activation of a tool

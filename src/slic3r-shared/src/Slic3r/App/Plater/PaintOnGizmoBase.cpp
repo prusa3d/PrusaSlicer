@@ -1373,8 +1373,12 @@ void PaintOnGizmoBase::rebuild_paintable_geometry()
     this->update_overhang_detection();
 }
 
-void PaintOnGizmoBase::render_scene(Render::CommandBuffer& cmd_buffer)
+void PaintOnGizmoBase::prepare_scene_for_rendering()
 {
+    if (m_main_node == nullptr) {
+        return;
+    }
+
     this->update_cursors();
 }
 
