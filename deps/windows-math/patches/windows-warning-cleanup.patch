@@ -1,0 +1,264 @@
+diff --git a/gmp-6.2.1/gmp-h.in b/gmp-6.2.1/gmp-h.in
+--- a/gmp-6.2.1/gmp-h.in
++++ b/gmp-6.2.1/gmp-h.in
+@@ -373,5 +373,16 @@
+ #endif
+ 
++/* Clang cannot combine GNU extern inline definitions with dllimport.
++   Use local inline definitions, as for other compilers without that model;
++   non-inline functions and data retain their DLL import declarations. */
++#if defined (__clang__) && __GMP_LIBGMP_DLL && ! defined (__GMP_WITHIN_GMP) \
++    && ! defined (__GMP_WITHIN_CONFIGURE)
++#undef __GMP_EXTERN_INLINE
++#define __GMP_EXTERN_INLINE static __inline__
++#undef __GMP_INLINE_PROTOTYPES
++#define __GMP_INLINE_PROTOTYPES 0
++#endif
++
+ /* DEC C (eg. version 5.9) supports "static __inline foo()", even in -std1
+    strict ANSI mode.  Inlining is done even when not optimizing (ie. -O0
+    mode, which is the default), but an unnecessary local copy of foo is
+@@ -1783,5 +1793,5 @@
+ #if GMP_NAIL_BITS == 0 || defined (_LONG_LONG_LIMB)
+   /* limb==long and no nails, or limb==longlong, one limb is enough */
+-  return (__gmp_n != 0 ? __gmp_l : 0);
++  return (__gmp_n != 0 ? (unsigned long) __gmp_l : 0);
+ #else
+   /* limb==long and nails, need two limbs when available */
+@@ -2228,5 +2238,5 @@
+     }
+ 
+-  *__gmp_rp = (- *__gmp_up) & GMP_NUMB_MASK;
++  *__gmp_rp = ((mp_limb_t) 0 - *__gmp_up) & GMP_NUMB_MASK;
+ 
+   if (--__gmp_n) /* Higher limbs get complemented. */
+diff --git a/gmp-6.2.1/gmp-impl.h b/gmp-6.2.1/gmp-impl.h
+--- a/gmp-6.2.1/gmp-impl.h
++++ b/gmp-6.2.1/gmp-impl.h
+@@ -2457,6 +2457,6 @@
+ #define ASSERT_NOCARRY(expr)   ASSERT_ALWAYS ((expr) == 0)
+ #else
+-#define ASSERT_CARRY(expr)     (expr)
+-#define ASSERT_NOCARRY(expr)   (expr)
++#define ASSERT_CARRY(expr)     ((void) (expr))
++#define ASSERT_NOCARRY(expr)   ((void) (expr))
+ #endif
+ 
+diff --git a/gmp-6.2.1/mpz/cong_ui.c b/gmp-6.2.1/mpz/cong_ui.c
+--- a/gmp-6.2.1/mpz/cong_ui.c
++++ b/gmp-6.2.1/mpz/cong_ui.c
+@@ -60,5 +60,6 @@
+   /* For nails don't try to be clever if c or d is bigger than a limb, just
+      fake up some mpz_t's and go to the main mpz_congruent_p.  */
++#if GMP_NUMB_BITS < BITS_PER_ULONG
+   if (du > GMP_NUMB_MAX || cu > GMP_NUMB_MAX)
+     {
+       mp_limb_t  climbs[2], dlimbs[2];
+@@ -74,5 +75,6 @@
+       return mpz_congruent_p (a, cz, dz);
+     }
++#endif
+ 
+   /* NEG_MOD works on limbs, so convert ulong to limb */
+   c = cu;
+diff --git a/gmp-6.2.1/mpz/dive_ui.c b/gmp-6.2.1/mpz/dive_ui.c
+--- a/gmp-6.2.1/mpz/dive_ui.c
++++ b/gmp-6.2.1/mpz/dive_ui.c
+@@ -42,5 +42,6 @@
+   /* For nails don't try to be clever if d is bigger than a limb, just fake
+      up an mpz_t and go to the main mpz_divexact.  */
++#if GMP_NUMB_BITS < BITS_PER_ULONG
+   if (divisor > GMP_NUMB_MAX)
+     {
+       mp_limb_t  dlimbs[2];
+@@ -53,5 +54,6 @@
+       return;
+     }
++#endif
+ 
+   size = SIZ(src);
+   if (size == 0)
+diff --git a/gmp-6.2.1/mpz/divis_ui.c b/gmp-6.2.1/mpz/divis_ui.c
+--- a/gmp-6.2.1/mpz/divis_ui.c
++++ b/gmp-6.2.1/mpz/divis_ui.c
+@@ -49,5 +49,6 @@
+   /* For nails don't try to be clever if d is bigger than a limb, just fake
+      up an mpz_t and go to the main mpz_divisible_p.  */
++#if GMP_NUMB_BITS < BITS_PER_ULONG
+   if (d > GMP_NUMB_MAX)
+     {
+       mp_limb_t  dlimbs[2];
+@@ -59,5 +60,6 @@
+       return mpz_divisible_p (a, dz);
+     }
++#endif
+ 
+   ap = PTR(a);
+   asize = ABS(asize);  /* ignore sign of a */
+diff --git a/gmp-6.2.1/mpz/kronuz.c b/gmp-6.2.1/mpz/kronuz.c
+--- a/gmp-6.2.1/mpz/kronuz.c
++++ b/gmp-6.2.1/mpz/kronuz.c
+@@ -48,5 +48,6 @@
+   if (b_abs_size == 0)
+     return JACOBI_U0 (a);  /* (a/0) */
+ 
++#if GMP_NUMB_BITS < BITS_PER_ULONG
+   if (a > GMP_NUMB_MAX)
+     {
+@@ -59,5 +60,6 @@
+       return mpz_kronecker (az, b);
+     }
++#endif
+ 
+   b_ptr = PTR(b);
+   b_low = b_ptr[0];
+diff --git a/gmp-6.2.1/mpz/kronzu.c b/gmp-6.2.1/mpz/kronzu.c
+--- a/gmp-6.2.1/mpz/kronzu.c
++++ b/gmp-6.2.1/mpz/kronzu.c
+@@ -44,5 +44,6 @@
+   if (a_size == 0)
+     return JACOBI_0U (b);
+ 
++#if GMP_NUMB_BITS < BITS_PER_ULONG
+   if (b > GMP_NUMB_MAX)
+     {
+@@ -55,5 +56,6 @@
+       return mpz_kronecker (a, bz);
+     }
++#endif
+ 
+   a_ptr = PTR(a);
+   if ((b & 1) != 0)
+diff --git a/gmp-6.2.1/mpz/pprime_p.c b/gmp-6.2.1/mpz/pprime_p.c
+--- a/gmp-6.2.1/mpz/pprime_p.c
++++ b/gmp-6.2.1/mpz/pprime_p.c
+@@ -60,7 +60,7 @@
+ 	  int is_prime;
+ 	  unsigned long n0;
+ 	  n0 = mpz_get_ui (n);
+-	  is_prime = n0 & (n0 > 1) ? isprime (n0) : n0 == 2;
++	  is_prime = (n0 & (n0 > 1)) ? isprime (n0) : n0 == 2;
+ 	  return is_prime ? 2 : 0;
+ 	}
+       /* Negative number.  Negate and fall out.  */
+diff --git a/gmp-6.2.1/tests/mpn/t-div.c b/gmp-6.2.1/tests/mpn/t-div.c
+--- a/gmp-6.2.1/tests/mpn/t-div.c
++++ b/gmp-6.2.1/tests/mpn/t-div.c
+@@ -34,5 +34,5 @@
+       for (i = n - 1; i >= n - 4; i--)
+ 	{
+-	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
++	  gmp_printf ("%0*Mx", (int) (2 * sizeof (mp_limb_t)), p[i]);
+ 	  printf (" ");
+ 	}
+@@ -40,5 +40,5 @@
+       for (i = 3; i >= 0; i--)
+ 	{
+-	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
++	  gmp_printf ("%0*Mx", (int) (2 * sizeof (mp_limb_t)), p[i]);
+ 	  printf (i == 0 ? "" : " ");
+ 	}
+@@ -48,5 +48,5 @@
+       for (i = n - 1; i >= 0; i--)
+ 	{
+-	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
++	  gmp_printf ("%0*Mx", (int) (2 * sizeof (mp_limb_t)), p[i]);
+ 	  printf (i == 0 ? "" : " ");
+ 	}
+diff --git a/gmp-6.2.1/tests/mpn/t-bdiv.c b/gmp-6.2.1/tests/mpn/t-bdiv.c
+--- a/gmp-6.2.1/tests/mpn/t-bdiv.c
++++ b/gmp-6.2.1/tests/mpn/t-bdiv.c
+@@ -33,5 +33,5 @@
+       for (i = n - 1; i >= n - 4; i--)
+ 	{
+-	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
++	  gmp_printf ("%0*Mx", (int) (2 * sizeof (mp_limb_t)), p[i]);
+ 	  printf (" ");
+ 	}
+@@ -39,5 +39,5 @@
+       for (i = 3; i >= 0; i--)
+ 	{
+-	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
++	  gmp_printf ("%0*Mx", (int) (2 * sizeof (mp_limb_t)), p[i]);
+ 	  printf (i == 0 ? "" : " ");
+ 	}
+@@ -47,5 +47,5 @@
+       for (i = n - 1; i >= 0; i--)
+ 	{
+-	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
++	  gmp_printf ("%0*Mx", (int) (2 * sizeof (mp_limb_t)), p[i]);
+ 	  printf (i == 0 ? "" : " ");
+ 	}
+diff --git a/gmp-6.2.1/tests/mpz/t-gcd.c b/gmp-6.2.1/tests/mpz/t-gcd.c
+--- a/gmp-6.2.1/tests/mpz/t-gcd.c
++++ b/gmp-6.2.1/tests/mpz/t-gcd.c
+@@ -239,4 +239,6 @@
+   /* Testcase to exercise the u0 == u1 case in mpn_gcdext_lehmer_n. */
+-  mpz_set_ui (op2, GMP_NUMB_MAX); /* FIXME: Huge limb doesn't always fit */
++  mpz_set_ui (op2, 1);
++  mpz_mul_2exp (op2, op2, GMP_NUMB_BITS);
++  mpz_sub_ui (op2, op2, 1);
+   mpz_mul_2exp (op1, op2, 100);
+   mpz_add (op1, op1, op2);
+diff --git a/gmp-6.2.1/tests/mpz/t-fac_ui.c b/gmp-6.2.1/tests/mpz/t-fac_ui.c
+--- a/gmp-6.2.1/tests/mpz/t-fac_ui.c
++++ b/gmp-6.2.1/tests/mpz/t-fac_ui.c
+@@ -48,3 +48,5 @@
+   /* for small limb testing */
++#if GMP_LIMB_BITS < BITS_PER_ULONG
+   limit = MIN (limit, MP_LIMB_T_MAX);
++#endif
+ 
+@@ -85,4 +87,6 @@
+   n = 2097169; /* a prime = 1 mod 4*/
++#if GMP_LIMB_BITS < BITS_PER_ULONG
+   if (n / 2 > MP_LIMB_T_MAX)
+     n = 131041; /* a smaller prime :-) */
++#endif
+   mpz_fac_ui (f, n / 2); /* ((n-1)/2)! */
+diff --git a/gmp-6.2.1/tests/mpz/t-mfac_uiui.c b/gmp-6.2.1/tests/mpz/t-mfac_uiui.c
+--- a/gmp-6.2.1/tests/mpz/t-mfac_uiui.c
++++ b/gmp-6.2.1/tests/mpz/t-mfac_uiui.c
+@@ -50,3 +50,5 @@
+   /* for small limb testing */
++#if GMP_LIMB_BITS < BITS_PER_ULONG
+   limit = MIN (limit, MP_LIMB_T_MAX);
++#endif
+ 
+diff --git a/gmp-6.2.1/tests/mpz/t-primorial_ui.c b/gmp-6.2.1/tests/mpz/t-primorial_ui.c
+--- a/gmp-6.2.1/tests/mpz/t-primorial_ui.c
++++ b/gmp-6.2.1/tests/mpz/t-primorial_ui.c
+@@ -51,3 +51,5 @@
+   /* for small limb testing */
++#if GMP_LIMB_BITS < BITS_PER_ULONG
+   limit = MIN (limit, MP_LIMB_T_MAX);
++#endif
+ 
+diff --git a/mpfr-4.2.1/src/vasprintf.c b/mpfr-4.2.1/src/vasprintf.c
+--- a/mpfr-4.2.1/src/vasprintf.c
++++ b/mpfr-4.2.1/src/vasprintf.c
+@@ -1935,5 +1935,5 @@
+   do {                                                  \
+     MPFR_ASSERTD ((v) >= 0);                            \
+-    if (MPFR_UNLIKELY ((v) > MPFR_INTMAX_MAX))          \
++    if (MPFR_UNLIKELY ((mpfr_uintmax_t) (v) > MPFR_INTMAX_MAX)) \
+       goto error;                                       \
+     total += (v);                                       \
+diff --git a/mpfr-4.2.1/tests/tatan2u.c b/mpfr-4.2.1/tests/tatan2u.c
+--- a/mpfr-4.2.1/tests/tatan2u.c
++++ b/mpfr-4.2.1/tests/tatan2u.c
+@@ -530,11 +530,9 @@
+-  /* The "#if" makes sure that 64-bit constants are supported, avoiding
+-     a compilation failure. The "if" makes sure that the constant is
+-     representable in an unsigned long (this would not be the case with
+-     32-bit unsigned long and 64-bit limb). */
++  /* This test vector requires a 64-bit unsigned long, not just a
++     64-bit limb. It was already excluded at runtime on LLP64. */
+ 
+-#if GMP_NUMB_BITS >= 64 || MPFR_PREC_BITS >= 64
++#if ULONG_MAX > 0xffffffffUL
+   mpfr_t x, y, z;
+   unsigned long u = 13484982567905493265U;
+ 
+   if (u == 13484982567905493265U)
+     {
