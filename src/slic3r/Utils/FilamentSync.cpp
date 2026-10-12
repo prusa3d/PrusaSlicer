@@ -118,6 +118,9 @@ struct Wanted
     std::vector<std::string> colour;     // color words, may be empty
     std::set<std::string>    plain_words; // vendor, material and color words of the tool
     std::string              material_key; // the material's letters and digits, lowercase
+    // Words of the vendor's system presets of this material that name a variant after it
+    // ("Prusament PLA Blend"), see variant_names()
+    std::vector<std::vector<std::string>> variants;
 
     explicit Wanted(const PrinterTool &t)
         : tool(t)
@@ -156,6 +159,20 @@ bool names_more_than_filament(const Wanted &want, const std::vector<std::string>
     return false;
 }
 
+// A user preset named like one of these is a copy of the variant ("Prusament PLA Blend Tuned"),
+// while a new preset's name never continues a variant's: "<vendor> <material> <color>".
+std::vector<std::vector<std::string>> variant_names(const Wanted &want, const std::vector<Candidate> &candidates)
+{
+    std::vector<std::vector<std::string>> out;
+    if (!want.vendor_known)
+        return out;
+    for (const Candidate &c : candidates)
+        if (c.is_system && vendor_key(c.vendor) == want.vendor_key && same_material(want.tool.material, c.type))
+            if (std::vector<std::string> words = tokens(display_name(c)); names_more_than_filament(want, words))
+                out.emplace_back(std::move(words));
+    return out;
+}
+
 // The "#RRGGBB" in a name, as in the presets made for the printer's unnamed user colors
 std::string hex_in_name(const std::string &name)
 {
@@ -182,11 +199,17 @@ int colour_tier(const Wanted &want, const Candidate &c)
     for (const std::string &w : words)
         if (is_colour_word(w) && std::find(want.colour.begin(), want.colour.end(), w) == want.colour.end())
             return 2;
-    // "<vendor> <material> <color>", as new presets are named: what follows the material is a
-    // color even when the printer's list doesn't have it (a user color named "Clear"), and the
-    // preset's own color differs
-    if (want.vendor_known && !want.tool.color_hex.empty() && !printer_tools_detail::normalize_color_hex(c.colour).empty() &&
-        names_more_than_filament(want, words))
+    // A user preset named "<vendor> <material> <color>", as new presets are: what follows the
+    // material is a color even when the printer's list doesn't have it (a user color named
+    // "Clear"), and the preset's own color differs. In a system preset, or a copy of one, it
+    // names a variant ("Prusament PETG Carbon Fiber"), which the printer can't tell apart.
+    const auto copies_variant = [&] {
+        return std::any_of(want.variants.begin(), want.variants.end(), [&](const std::vector<std::string> &v) {
+            return words.size() >= v.size() && std::equal(v.begin(), v.end(), words.begin());
+        });
+    };
+    if (!c.is_system && want.vendor_known && !want.tool.color_hex.empty() &&
+        !printer_tools_detail::normalize_color_hex(c.colour).empty() && names_more_than_filament(want, words) && !copies_variant())
         return 2;
     return 1;
 }
@@ -374,8 +397,9 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
             continue;
         }
 
-        const Wanted want(tool);
-        const int    n = tool.extruder_idx + 1;
+        Wanted want(tool);
+        want.variants = variant_names(want, ex.candidates);
+        const int n = tool.extruder_idx + 1;
         if (!want.vendor_known)
             row.notes.emplace_back(tool.vendor.empty() ?
                 (boost::format("The printer reports no vendor for tool %1%.") % n).str() :

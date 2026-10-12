@@ -575,6 +575,33 @@ TEST_CASE("A filament whose presets are all another color gets its own", "[Filam
     CHECK(plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), plain, "Polymaker PETG Black").preset == "Polymaker PETG");
 }
 
+TEST_CASE("A system preset's variant name isn't a color", "[FilamentSync]")
+{
+    // Filament colors as in PrusaResearch.ini, none of them one of the printer's colors
+    Candidate cf = sys("Prusament PETG Carbon Fiber @SYNC", "Prusa Polymers", "PETG", "#BBBBBB");
+    cf.is_abrasive = true;
+    PrinterTool black = tool(1, "Prusament", "PETG", "Black", "#000000");
+    black.hardened    = true;
+    CHECK(plan_one(black, {cf, sys("Prusament PETG @SYNC", "Prusa Polymers", "PETG", "#F0F0F0")}, cf.name).action == Action::Keep);
+
+    const std::vector<Candidate> pla = {sys("Prusament PLA Blend @SYNC", "Prusa Polymers", "PLA", "#FF8000"),
+                                        sys("Prusament PLA @SYNC", "Prusa Polymers", "PLA", "#F0F0F0")};
+    CHECK(plan_one(tool(1, "Prusament", "PLA", "Gray", "#808080"), pla, "Prusament PLA Blend @SYNC").action == Action::Keep);
+    // ... and neither is it in the user's tuned copy of the preset
+    std::vector<Candidate> tuned = pla;
+    tuned.push_back(cand("Prusament PLA Blend Tuned", "Prusa Polymers", "PLA", "#FF8000"));
+    CHECK(plan_one(tool(1, "Prusament", "PLA", "Gray", "#808080"), tuned, "Prusament PLA Blend Tuned").action == Action::Keep);
+    // A preset of the user's own with a color the printer named is still another color: not kept
+    tuned.push_back(cand("Prusament PLA Clear", "Prusament", "PLA", "#F0F0F0"));
+    CHECK(plan_one(tool(1, "Prusament", "PLA", "Red", "#FF0000"), tuned, "Prusament PLA Clear").preset == "Prusament PLA @SYNC");
+
+    // The vendor's only flexible preset is selected, not replaced by a new one
+    const ExtruderPlan flex = plan_one(tool(1, "Prusament", "FLEX", "Black", "#000000"),
+                                       {sys("Prusament TPU 95A @SYNC", "Prusa Polymers", "FLEX", "#F9F3E5"), sys("Generic FLEX @SYNC", "Generic", "FLEX")});
+    CHECK(flex.action == Action::Select);
+    CHECK(flex.preset == "Prusament TPU 95A @SYNC");
+}
+
 TEST_CASE("A system preset in the tool's color beats an installed one in another", "[FilamentSync]")
 {
     Candidate orange = sys("Prusament PETG Prusa Orange @SYNC", "Prusa Polymers", "PETG", "#EB5403");
