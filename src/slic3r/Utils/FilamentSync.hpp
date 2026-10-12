@@ -33,6 +33,9 @@ struct Candidate
     std::string name;
     /// Display name of a system preset (its name before "@"); empty for user presets.
     std::string alias;
+    /// For a user preset saved from a system preset (its parent), the parent's display name;
+    /// empty otherwise.
+    std::string parent;
     /// filament_vendor
     std::string vendor;
     /// filament_type

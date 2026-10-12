@@ -72,7 +72,7 @@ For each loaded tool, among the filament presets compatible with that extruder:
      preset's filament color differs from the tool's: for a red tool, `Overture PETG Space` and a
      `Polymaker PETG Clear` made for a user color are other colors. In a system preset those
      words name a variant the printer can't tell apart (`Prusament PETG Carbon Fiber`), and so
-     they do in your copy of one (`Prusament PLA Blend Tuned`).
+     they do in a copy you saved from one under its name (`Prusament PLA Blend Tuned`).
    - Then the preset whose name says the least beyond vendor, material and color:
      `Overture PLA White` before `Overture PLA Silk White`.
    - Then the closest filament color, then your own presets before system ones.
