@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "gmp": {
+    "version": "6.2.1",
+    "url": "https://mirrors.kernel.org/gnu/gmp/gmp-6.2.1.tar.bz2",
+    "sha256": "eae9326beb4158c386e39a356818031bd28f3124cf915f8c5b1dc4c7a36b4d7c"
+  },
+  "mpfr": {
+    "version": "4.2.1",
+    "url": "https://www.mpfr.org/mpfr-4.2.1/mpfr-4.2.1.tar.bz2",
+    "sha256": "b9df93635b20e4089c29623b19420c4ac848a1b29df1cfd59f26cab0d2666aa0"
+  },
+  "llvm": {
+    "version": "20260922",
+    "sourceCommit": "0eca5ac93da14a74bc81c249e841356ececc5d95",
+    "arm64": {
+      "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260922/llvm-mingw-20260922-ucrt-aarch64.zip",
+      "sha256": "a317514a7a63badd692032c0c2b8e165f630bbaebbe7a3254348051f43a64949"
+    },
+    "x64": {
+      "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260922/llvm-mingw-20260922-ucrt-x86_64.zip",
+      "sha256": "e3ad77d117a4bea19a7a3b333341824d79a5a371004a10e25b8504e7b3047666"
+    }
+  },
+  "msys2": {
+    "url": "https://github.com/msys2/msys2-installer/releases/download/2025-06-22/msys2-base-x86_64-20250622.tar.xz",
+    "sha256": "b4d5942e09db397f96a6b678d8af109f7ae17db32f299951bdac4427c9ff1700"
+  },
+  "make": {
+    "url": "https://repo.msys2.org/msys/x86_64/make-4.4.1-2-x86_64.pkg.tar.zst",
+    "sha256": "2408af61717dae87b00c855b132769a125c708907fc94a46bb16dae076113e5c"
+  },
+  "m4": {
+    "url": "https://repo.msys2.org/msys/x86_64/m4-1.4.19-2-x86_64.pkg.tar.zst",
+    "sha256": "4a1d296571afa7b8837fd5e227e16c9cb7e26c0f31f03b364e11c1ae8ee2a913"
+  },
+  "diffutils": {
+    "url": "https://repo.msys2.org/msys/x86_64/diffutils-3.10-1-x86_64.pkg.tar.zst",
+    "sha256": "ed5084a37995377c0288050640363a0daf1c8ace774da26ca84ec305ba51c7ce"
+  }
+}
