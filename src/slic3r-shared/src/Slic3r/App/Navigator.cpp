@@ -156,6 +156,7 @@ void Navigator::set_modal_dialog(ModalDialog modal_dialog)
         return;
     }
     current_render_module()->set_modal_dialog(modal_dialog);
+    m_current_modal_dialog = modal_dialog;
 
     if (m_callbacks.modal_dialog_changed) {
         m_callbacks.modal_dialog_changed(modal_dialog);
