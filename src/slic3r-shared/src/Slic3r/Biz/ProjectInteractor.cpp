@@ -972,11 +972,7 @@ void ProjectInteractor::do_result_export(
     ));
     PhysicalPrinter::PhysicalPrinterConfig config;
     config.payload = PhysicalPrinter::FileSystemExport{};
-    PrintHost::PrintHostJobData data{
-        std::monostate{},
-        dest_path,
-        PrintHost::get_export_format_from_extension(dest_path.extension().string())
-    };
+    PrintHost::PrintHostJobData data{std::monostate{}, dest_path};
     data.job_name = job_name;
     do_result_export_inner(id, std::move(config), std::move(data));
 }
@@ -992,11 +988,7 @@ void ProjectInteractor::do_result_upload(
     m_physical_printer_interactor.remember_used_destination(print_host_config.uuid);
     PhysicalPrinter::PhysicalPrinterConfig config {print_host_config};
     boost::filesystem::path dest_path(filename);
-    PrintHost::PrintHostJobData data{
-        std::monostate{},
-        dest_path,
-        PrintHost::get_export_format_from_extension(dest_path.extension().string())
-    };
+    PrintHost::PrintHostJobData data{std::monostate{}, dest_path};
     data.post_action = post_action;
     do_result_export_inner(id, std::move(config), std::move(data));
 }
@@ -1026,11 +1018,7 @@ void ProjectInteractor::do_result_upload_connect(
 
     m_physical_printer_interactor.remember_used_destination(std::string(PhysicalPrinter::PRUSA_CONNECT_UUID));
     set_output_extension(id.project_id, boost::filesystem::path(filename).extension().string());
-    PrintHost::PrintHostJobData data{
-        std::monostate{},
-        filename,
-        PrintHost::get_export_format_from_extension(boost::filesystem::path(filename).extension().string())
-    };
+    PrintHost::PrintHostJobData data{std::monostate{}, filename};
     data.request_body_json = std::move(body_json);
     do_result_export_inner(id, std::move(config), std::move(data));
 }

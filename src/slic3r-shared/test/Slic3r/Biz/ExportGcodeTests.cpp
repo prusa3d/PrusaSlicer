@@ -84,11 +84,7 @@ struct SlicingStatusListener : public Slic3r::Biz::Slicing::IStatusListener
                     m_pi.set_output_dir(id.project_id, path);
                     PhysicalPrinter::PhysicalPrinterConfig config;
                     config.payload = PhysicalPrinter::FileSystemExport{};
-                    PrintHost::PrintHostJobData data{
-                        fdm_result.value().get().const_gcode(),
-                        path,
-                        PrintHost::get_export_format_from_extension(path.extension().string())
-                    };
+                    PrintHost::PrintHostJobData data{fdm_result.value().get().const_gcode(), path};
                     m_pi.result_export_interactor().perform(std::move(config), std::move(data));
                 } else {
                     const std::optional<SLAResultRef> sla_result{m_pi.sla_result_cache().get_result(id)};
@@ -96,11 +92,7 @@ struct SlicingStatusListener : public Slic3r::Biz::Slicing::IStatusListener
                     m_pi.set_output_dir(id.project_id, path);
                     PhysicalPrinter::PhysicalPrinterConfig config;
                     config.payload = PhysicalPrinter::FileSystemExport{};
-                    PrintHost::PrintHostJobData data{
-                        sla_result.value().get().export_data,
-                        path,
-                        PrintHost::get_export_format_from_extension(path.extension().string())
-                    };
+                    PrintHost::PrintHostJobData data{sla_result.value().get().export_data, path};
                     m_pi.result_export_interactor().perform(std::move(config), std::move(data));
                 }
                 

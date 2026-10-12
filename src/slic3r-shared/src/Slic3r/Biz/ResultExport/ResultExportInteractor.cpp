@@ -64,7 +64,7 @@ void ResultExportInteractor::upload_gcode_with_storage_choice(PhysicalPrinter::P
         .host    = config_ptr->host
     };
 
-    size_t id = m_print_host_job_manager.emplace_job(std::move(storage_config), {std::monostate{}, data_ptr->dest_path, PrintHost::PrintHostExportFormat::Undefined});
+    size_t id = m_print_host_job_manager.emplace_job(std::move(storage_config), {std::monostate{}, data_ptr->dest_path});
 
     m_storage_callbacks_map[id] = std::move(callback);
 }

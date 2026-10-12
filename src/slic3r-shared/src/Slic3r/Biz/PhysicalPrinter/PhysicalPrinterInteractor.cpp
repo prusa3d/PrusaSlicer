@@ -404,11 +404,7 @@ void PhysicalPrinterInteractor::test_edited_printer_connection(
     {
         std::unique_ptr<PrintHost::IPrintHost> host = PrintHost::create_print_host(
             std::move(printer),
-            PrintHost::PrintHostJobData{
-                std::monostate{},
-                {},
-                PrintHost::PrintHostExportFormat::Undefined
-            }
+            PrintHost::PrintHostJobData{std::monostate{}, {}}
         );
         if (!host) {
             // TRN Error shown when no print host implementation matches the printer settings.
