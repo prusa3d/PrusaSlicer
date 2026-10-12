@@ -541,11 +541,9 @@ void load(const json &es_json, EmbossShape &es, Read3mfIssues& collected_issues)
 
     from_json(es_json, SHAPE_SCALE, es.scale, collected_issues, RT::project_emboss_shape_scale_issue, true);
     
-    if(bool is_unhealed = false;
-        from_json(es_json, UNHEALED, is_unhealed, collected_issues, RT::project_emboss_shape_is_unhealed_issue)) {
-        assert(is_unhealed);
+    if (bool is_unhealed = false;
+        from_json(es_json, UNHEALED, is_unhealed, collected_issues, RT::project_emboss_shape_is_unhealed_issue) && is_unhealed)
         es.final_shape.is_healed = false;
-    }
 
     EmbossProjection &p = es.projection;
     from_json(es_json, DEPTH, p.depth, collected_issues, RT::project_emboss_shape_depth_issue, true);
