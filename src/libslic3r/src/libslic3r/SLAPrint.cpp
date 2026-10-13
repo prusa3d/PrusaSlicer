@@ -983,6 +983,8 @@ InvalidatedSteps SLAPrint::apply(
     )};
 
     m_model.objects = model_sync_result.model_objects;
+    // The copied ModelObjects still point to the source Model, make them point to our copy.
+    m_model.update_links_bottom_up_recursive();
     m_objects = model_sync_result.print_objects;
 
     if(m_objects.empty()) {

@@ -1649,6 +1649,8 @@ Biz::Slicing::ApplyStatus::Status Print::apply(
 
     delete_old_model_objects(m_model.objects, model_sync_result->model_objects);
     m_model.objects = model_sync_result->model_objects;
+    // The copied ModelObjects still point to the source Model, make them point to our copy.
+    m_model.update_links_bottom_up_recursive();
 
     const InvalidatedSteps deleted_objects_invalidated_steps{
         delete_old_print_objects(m_objects, model_sync_result->print_objects)
