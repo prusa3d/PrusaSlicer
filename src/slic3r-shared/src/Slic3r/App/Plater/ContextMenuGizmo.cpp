@@ -62,7 +62,7 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
         Domain::Vec2f pos{evt.x(), evt.y()};
 
         if (ctx.pick_results().empty()) {
-            invoke_show_context_menu(ContextMenuType::Scene, pos);
+            request_context_menu(ContextMenuType::Scene, pos);
             return Scene::GizmoActivationState::Inactive;
         }
 
@@ -71,7 +71,7 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
             const Domain::BedRef instance{bed_tag->config_container_id, bed_tag->instance_id};
 
             if (m_project_interactor.scene_interactor().bed_selection().is_selected(instance)) {
-                invoke_show_context_menu(ContextMenuType::Bed, pos);
+                request_context_menu(ContextMenuType::Bed, pos);
             }
         } else if (const Scene::SceneNodeTag* tag{node->tag_of_type<Scene::SceneNodeTag>()};
                    tag && !tag->is_wipe_tower())
@@ -82,35 +82,13 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
                 std::chrono::milliseconds(GIZMO_CONTEXT_MENU_TIMEOUT),
                 [this, pos]()
                 {
-                    const Biz::Scene::ObjectSelection& selection =
-                        m_project_interactor.scene_interactor().object_selection();
-                    if (!selection.empty()) {
-                        Domain::Project& project = m_project_interactor.selected_project();
-                        if (selection.mode == Slic3r::Biz::Scene::SelectionMode::Volume) {
-                            bool is_svg_or_text = selection.elements.size() == 1;
-                            if (is_svg_or_text) {
-                                Domain::ModelVolume* volume = project.find_volume_by_id(
-                                    selection.elements.front().object_id,
-                                    selection.elements.front().volume_id
-                                );
-                                is_svg_or_text = volume->is_text() || volume->is_svg();
-                            }
-
-                            invoke_show_context_menu(
-                                is_svg_or_text ? ContextMenuType::SvgOrText :
-                                                 ContextMenuType::Volume,
-                                pos
-                            );
-                        } else {
-                            invoke_show_context_menu(
-                                selection.only_single_object() ? ContextMenuType::Object :
-                                                                 ContextMenuType::MultiObjects,
-                                pos
-                            );
-                        }
-                    } else {
-                        invoke_show_context_menu(ContextMenuType::None, pos);
-                    }
+                    request_context_menu(
+                        context_menu_type(
+                            m_project_interactor.scene_interactor().object_selection(),
+                            m_project_interactor.selected_project()
+                        ),
+                        pos
+                    );
                 }
             );
             return Scene::GizmoActivationState::Inactive;
@@ -118,13 +96,6 @@ ContextMenuGizmo::on_mouse(Scene::GizmoEventContext& ctx, bool only_active)
     }
 
     return Scene::GizmoActivationState::Inactive;
-}
-
-void ContextMenuGizmo::invoke_show_context_menu(ContextMenuType type, Domain::Vec2f mouse_position)
-{
-    invoke_listeners<IShowContextMenuListener>(
-        [&](IShowContextMenuListener* l) { l->on_show_context_menu(type, mouse_position); }
-    );
 }
 
 } // namespace Slic3r::App::Plater

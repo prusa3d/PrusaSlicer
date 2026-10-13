@@ -4,6 +4,7 @@
 #include "Slic3r/App/Yoga/Icon.hpp"
 
 #include "Slic3r/App/ExtruderIcon.hpp"
+#include "Slic3r/App/ContextMenu.hpp"
 
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
@@ -331,6 +332,37 @@ select_elements(Biz::ProjectInteractor& project_interactor, Biz::Scene::ObjectSe
         selection.anchor = elements.front();
         scene_interactor.set_object_selection(selection);
     }
+}
+
+void request_context_menu(
+    Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester,
+    bool row_checked,
+    Biz::Scene::ObjectSelection selection
+)
+{
+    Biz::Scene::SceneInteractor& scene_interactor = project_interactor.scene_interactor();
+
+    // A checked row can also mean "a child of this row is selected" (e.g. a volume of the object),
+    // so the current selection is kept only when it is in the same mode as the row's selection.
+    const bool keep_selection =
+        row_checked && scene_interactor.object_selection().mode == selection.mode;
+    if (!keep_selection) {
+        if (selection.elements.empty()) {
+            return;
+        }
+        selection.anchor = selection.elements.front();
+        scene_interactor.set_object_selection(selection);
+    }
+
+    const ImVec2 mouse_pos = ImGui::GetMousePos();
+    context_menu_requester.request_context_menu(
+        context_menu_type(
+            scene_interactor.object_selection(),
+            project_interactor.selected_project()
+        ),
+        Domain::Vec2f(mouse_pos.x, mouse_pos.y)
+    );
 }
 
 } // namespace Slic3r::App::ObjectList

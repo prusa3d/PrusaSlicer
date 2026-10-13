@@ -236,4 +236,9 @@ void ObjectListWindow::set_gizmo_controller(Scene::IGizmoController* controller)
     m_gizmo_controller = controller;
 }
 
+void ObjectListWindow::add_context_menu_listener(IShowContextMenuListener* listener)
+{
+    m_object_list->add_context_menu_listener(listener);
+}
+
 } // namespace Slic3r::App

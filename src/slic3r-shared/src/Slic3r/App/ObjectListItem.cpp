@@ -16,7 +16,10 @@ using namespace Yoga;
 
 namespace ObjectList {
 
-OutOfBedsItem::OutOfBedsItem(Biz::ProjectInteractor& project_interactor)
+OutOfBedsItem::OutOfBedsItem(
+    Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester
+)
 {
     set_object_name("OutOfBedsItem");
     set_orientation(Orientation::Vertical);
@@ -28,7 +31,9 @@ OutOfBedsItem::OutOfBedsItem(Biz::ProjectInteractor& project_interactor)
     Text* label = label_wrapper->emplace_back<Text>(Biz::_u8L("Out of bed"));
     label->set_font_type(Render::ImguiFontType::Bold);
 
-    m_objects_list_view = emplace_back<ObjectListView>(ObjectListViewFactory(project_interactor));
+    m_objects_list_view = emplace_back<ObjectListView>(
+        ObjectListViewFactory(project_interactor, context_menu_requester)
+    );
     m_objects_list_view->set_object_name("OutOfBedObjectListView");
     m_objects_list_view->set_orientation(Orientation::Vertical);
 }
@@ -157,8 +162,9 @@ ObjectListItem::ObjectListItem(Biz::ProjectInteractor& project_interactor, Mode 
     set_min_height(100);
     set_padding(Paddings{0,0,0, 25_fpx});
 
-    m_printer_group_list_view =
-        emplace_back<PrinterGroupListView>(PrinterGroupListViewFactory(project_interactor, m_mode));
+    m_printer_group_list_view = emplace_back<PrinterGroupListView>(
+        PrinterGroupListViewFactory(project_interactor, m_context_menu_requester, m_mode)
+    );
     m_printer_group_list_view->set_object_name("PrinterGroups");
     m_printer_group_list_view->set_orientation(Yoga::Orientation::Vertical);
     m_printer_group_list_view->set_source_list(
@@ -167,7 +173,10 @@ ObjectListItem::ObjectListItem(Biz::ProjectInteractor& project_interactor, Mode 
     m_printer_group_list_view->set_flex_shrink(0);
 
     if (m_mode == Mode::Plater) {
-        m_out_of_beds_item = emplace_back<ObjectList::OutOfBedsItem>(project_interactor);
+        m_out_of_beds_item = emplace_back<ObjectList::OutOfBedsItem>(
+            project_interactor,
+            m_context_menu_requester
+        );
         m_out_of_beds_item->set_source_list(
             m_object_list_interactor.out_of_bed_objects(project_interactor.selected_project_id())
         );
@@ -197,6 +206,11 @@ void ObjectListItem::set_bed_instance_icons(const Plater::BedThumbnailTextures& 
             }
         }
     }
+}
+
+void ObjectListItem::add_context_menu_listener(IShowContextMenuListener* listener)
+{
+    m_context_menu_requester.add_listener<IShowContextMenuListener>(listener);
 }
 
 } // namespace Slic3r::App

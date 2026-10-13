@@ -4,6 +4,7 @@
 #include "Slic3r/App/Yoga/ListView.hpp"
 
 #include "Slic3r/App/ObjectList/PrinterGroupItem.hpp"
+#include "Slic3r/App/ContextMenu.hpp"
 
 #include "Slic3r/Biz/ObjectList/ConfigContainerObservableList.hpp"
 #include "Slic3r/Biz/ObjectList/ObjectListInteractor.hpp"
@@ -41,7 +42,10 @@ namespace ObjectList {
 class OutOfBedsItem : public Yoga::Item, public Biz::IListObserver<Biz::ObjectList::Object>
 {
 public:
-    OutOfBedsItem(Biz::ProjectInteractor& project_interactor);
+    OutOfBedsItem(
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
+    );
     ~OutOfBedsItem();
 
     void set_source_list(std::weak_ptr<Biz::ObjectList::ObjectObservableList> out_of_bed_objects);
@@ -54,7 +58,8 @@ private:
     using ObjectListViewFactory = Yoga::ViewFactory<
         ObjectItem,
         Biz::ObjectList::Object,
-        Biz::ProjectInteractor&>;
+        Biz::ProjectInteractor&,
+        ContextMenuRequester&>;
     using ObjectListView =
         Yoga::ListView<ObjectItem, Biz::ObjectList::Object, ObjectListViewFactory>;
 
@@ -96,6 +101,11 @@ public:
 
     void set_bed_instance_icons(const Plater::BedThumbnailTextures& icons);
 
+    /**
+     * @brief Adds a listener showing the context menus requested by right-clicks on the rows.
+     */
+    void add_context_menu_listener(IShowContextMenuListener* listener);
+
     void on_selected_project_changed(size_t index) override;
 
 private:
@@ -103,6 +113,7 @@ private:
         ObjectList::PrinterGroupItem,
         Biz::ObjectList::PrinterGroup,
         Biz::ProjectInteractor&,
+        ContextMenuRequester&,
         Mode>;
     using PrinterGroupListView = Yoga::ListView<
         ObjectList::PrinterGroupItem,
@@ -114,6 +125,9 @@ private:
     ObjectList::AllBedsItem* m_all_beds_item{nullptr};
 
     Biz::ObjectList::ObjectListInteractor& m_object_list_interactor;
+
+    /// Shared by all rows (passed through the view factories) to request their context menus.
+    ContextMenuRequester m_context_menu_requester;
 
     Mode m_mode;
     Biz::ProjectInteractor& m_project_interactor;

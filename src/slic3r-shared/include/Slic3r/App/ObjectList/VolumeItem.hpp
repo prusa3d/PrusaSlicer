@@ -28,6 +28,7 @@ class InputTextField;
 } // namespace Yoga
 
 class ExtruderIcon;
+class ContextMenuRequester;
 
 namespace ObjectList {
 
@@ -43,7 +44,8 @@ public:
     VolumeButton(
         size_t index,
         const Biz::ObjectList::Volume& state,
-        Biz::ProjectInteractor& project_interactor
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
     );
     void on_data_update() override;
 
@@ -97,7 +99,10 @@ private:
 class VolumesItem : public Yoga::Item
 {
 public:
-    VolumesItem(Biz::ProjectInteractor& project_interactor);
+    VolumesItem(
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
+    );
     bool has_visible_content() const;
 
     void set_source_list(std::weak_ptr<Biz::ObjectList::VolumeObservableList> volumes_list);
@@ -110,7 +115,8 @@ private:
     using VolumeListViewFactory = Yoga::ViewFactory<
         VolumeButton,
         Biz::ObjectList::Volume,
-        Biz::ProjectInteractor&>;
+        Biz::ProjectInteractor&,
+        ContextMenuRequester&>;
     using VolumeListView = Yoga::
         ListView<VolumeButton, Biz::ObjectList::Volume, VolumeListViewFactory, CollapsibleArea>;
 

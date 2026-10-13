@@ -74,6 +74,7 @@ PrinterGroupItem::PrinterGroupItem(
     size_t index,
     const Biz::ObjectList::PrinterGroup& state,
     Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester,
     Mode mode
 ) :
     Biz::DataObserver<Biz::ObjectList::PrinterGroup>(index, state),
@@ -96,6 +97,7 @@ PrinterGroupItem::PrinterGroupItem(
 
     m_beds_list_view = emplace_back<BedListView>(BedListViewFactory(
         project_interactor,
+        context_menu_requester,
         [this](size_t config_container_id, size_t bed_id)
         { remove_bed(config_container_id, bed_id); },
         m_mode

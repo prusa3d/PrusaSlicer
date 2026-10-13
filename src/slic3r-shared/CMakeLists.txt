@@ -771,6 +771,8 @@ set(SLIC3R_SHARED_FILES
         include/Slic3r/App/UIItemCommand.hpp
         include/Slic3r/App/MenuBuilder.hpp
         src/Slic3r/App/MenuBuilder.cpp
+        include/Slic3r/App/ContextMenu.hpp
+        src/Slic3r/App/ContextMenu.cpp
         include/Slic3r/App/IMenuUpdatedListener.hpp
         include/Slic3r/App/MenuManager.hpp
         src/Slic3r/App/MenuManager.cpp

@@ -33,7 +33,8 @@ VolumesButton::VolumesButton(CollapsibleArea* collapsible_item) :
 VolumeButton::VolumeButton(
     size_t index,
     const Biz::ObjectList::Volume& state,
-    Biz::ProjectInteractor& project_interactor
+    Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester
 ) :
     Biz::DataObserver<Biz::ObjectList::Volume>(index, state),
     LeafButton(NodeLevel::SubObject),
@@ -77,6 +78,16 @@ VolumeButton::VolumeButton(
 
     callbacks().action = [this, &project_interactor, get_selection]()
     { select_elements(project_interactor, get_selection()); };
+    callbacks().secondary_action =
+        [this, &project_interactor, &context_menu_requester, get_selection]()
+    {
+        request_context_menu(
+            project_interactor,
+            context_menu_requester,
+            checked(),
+            get_selection()
+        );
+    };
 
     m_extruder_icon = add_extruder_icon(this);
     on_data_update();
@@ -254,12 +265,17 @@ void VolumeButton::update_drop_line(const Vec2f& pos, const Vec2f& size)
     };
 }
 
-VolumesItem::VolumesItem(Biz::ProjectInteractor& project_interactor) :
+VolumesItem::VolumesItem(
+    Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester
+) :
     m_project_interactor(project_interactor)
 {
     set_orientation(Orientation::Vertical);
 
-    m_volumes_list_view = emplace_back<VolumeListView>(VolumeListViewFactory(project_interactor));
+    m_volumes_list_view = emplace_back<VolumeListView>(
+        VolumeListViewFactory(project_interactor, context_menu_requester)
+    );
     m_volumes_list_view->set_orientation(Orientation::Vertical);
     m_volumes_list_view->callbacks().has_content = [this]()
     { return m_volumes_list_view->list_item_count() > 0; };

@@ -62,6 +62,7 @@ public:
         size_t index,
         const Biz::ObjectList::PrinterGroup& state,
         Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester,
         Mode mode
     );
     ~PrinterGroupItem() override;
@@ -84,6 +85,7 @@ private:
         ConfigContainerBedItem,
         Biz::ObjectList::Bed,
         Biz::ProjectInteractor&,
+        ContextMenuRequester&,
         RemoveBedFn,
         Mode>;
     using BedListView =

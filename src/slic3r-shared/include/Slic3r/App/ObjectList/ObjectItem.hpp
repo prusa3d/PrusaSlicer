@@ -28,6 +28,7 @@ class InputTextField;
 } // namespace Yoga
 
 class ExtruderIcon;
+class ContextMenuRequester;
 
 namespace ObjectList {
 
@@ -40,6 +41,7 @@ public:
     void set_printable(bool printable);
     void set_callbacks(
         Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester,
         std::function<Biz::Scene::ObjectSelection()> get_selection
     );
     void set_selected(bool selected);
@@ -82,7 +84,8 @@ public:
     ObjectItem(
         size_t index,
         const Biz::ObjectList::Object& state,
-        Biz::ProjectInteractor& project_interactor
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
     );
 
 private:

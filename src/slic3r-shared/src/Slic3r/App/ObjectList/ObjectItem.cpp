@@ -97,6 +97,7 @@ void ObjectButton::set_printable(bool printable)
 
 void ObjectButton::set_callbacks(
     Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester,
     std::function<Biz::Scene::ObjectSelection()> get_selection
 )
 {
@@ -117,6 +118,16 @@ void ObjectButton::set_callbacks(
 
     callbacks().action = [&project_interactor, get_selection]()
     { select_elements(project_interactor, get_selection()); };
+    callbacks().secondary_action =
+        [this, &project_interactor, &context_menu_requester, get_selection]()
+    {
+        request_context_menu(
+            project_interactor,
+            context_menu_requester,
+            checked(),
+            get_selection()
+        );
+    };
 
     m_name->callbacks().hovered_changed = [this](bool) { update_printable_visibility(); };
 }
@@ -208,7 +219,8 @@ void ConnectorsButton::set_callbacks(
 ObjectItem::ObjectItem(
     size_t index,
     const Biz::ObjectList::Object& state,
-    Biz::ProjectInteractor& project_interactor
+    Biz::ProjectInteractor& project_interactor,
+    ContextMenuRequester& context_menu_requester
 ) :
     Biz::DataObserver<Biz::ObjectList::Object>(index, state),
     m_project_interactor(project_interactor)
@@ -237,13 +249,19 @@ ObjectItem::ObjectItem(
         }
     );
 
-    m_volumes   = m_collapsible_item->emplace_back<VolumesItem>(project_interactor);
-    m_instances = m_collapsible_item->emplace_back<InstancesItem>(state.id, project_interactor);
+    m_volumes =
+        m_collapsible_item->emplace_back<VolumesItem>(project_interactor, context_menu_requester);
+    m_instances = m_collapsible_item->emplace_back<InstancesItem>(
+        state.id,
+        project_interactor,
+        context_menu_requester
+    );
 
     m_object_button = emplace<ObjectButton>(0, m_collapsible_item, state.printable);
     m_object_button->set_name(state.name);
     m_object_button->set_callbacks(
         project_interactor,
+        context_menu_requester,
         [this]() -> Biz::Scene::ObjectSelection
         { return {Biz::Scene::SelectionMode::Instance, {Domain::ElementRef{this->state()->id}}}; }
     );

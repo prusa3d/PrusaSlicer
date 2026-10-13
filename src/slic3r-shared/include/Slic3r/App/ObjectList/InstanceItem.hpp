@@ -18,6 +18,8 @@ namespace Yoga {
 class Text;
 } // namespace Yoga
 
+class ContextMenuRequester;
+
 namespace ObjectList {
 
 class InstancesButton : public TreeNodeButton
@@ -36,7 +38,8 @@ public:
     InstanceButton(
         size_t index,
         const Biz::ObjectList::Instance& state,
-        Biz::ProjectInteractor& project_interactor
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
     );
 
     void on_data_update() override;
@@ -54,15 +57,19 @@ class InstancesItem : public Yoga::Item
 public:
     InstancesItem(
         size_t object_id,
-        Biz::ProjectInteractor& project_interactor
+        Biz::ProjectInteractor& project_interactor,
+        ContextMenuRequester& context_menu_requester
     );
     bool has_visible_content() const;
 
     void set_source_list(std::weak_ptr<Biz::ObjectList::InstanceObservableList> instance_list);
 
 private:
-    using InstanceListViewFactory =
-        Yoga::ViewFactory<InstanceButton, Biz::ObjectList::Instance, Biz::ProjectInteractor&>;
+    using InstanceListViewFactory = Yoga::ViewFactory<
+        InstanceButton,
+        Biz::ObjectList::Instance,
+        Biz::ProjectInteractor&,
+        ContextMenuRequester&>;
     using InstanceListView = Yoga::ListView<
         InstanceButton,
         Biz::ObjectList::Instance,
