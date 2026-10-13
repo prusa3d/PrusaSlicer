@@ -73,7 +73,7 @@ const constexpr Unit PANEL_GAP{8_fpx};
 const constexpr Unit LEFT_PANEL_WIDTH{330_fpx};
 const constexpr Unit EXTRUDER_DROPDOWN_WIDTH{150_fpx};
 const constexpr Unit PERCENT_FONT_SIZE{1.6_rem};
-const constexpr std::string FALLBACK_COLOR{"#808080"};
+const std::string FALLBACK_COLOR{"#808080"};
 
 struct ColorMixDialogInput
 {
