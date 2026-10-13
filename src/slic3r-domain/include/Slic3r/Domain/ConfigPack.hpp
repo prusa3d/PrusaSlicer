@@ -29,6 +29,7 @@ struct ConfigPackFDM : public IConfigPackFDMViewer
     const FilamentSettings& get_filament(size_t index) const override;
     const size_t tool_size() const override;
     const size_t filament_size() const override;
+    const MacroOverridesMapFDM& get_macro_overrides() const override;
 
     FindResult contains(const std::string& key, size_t slot);
     ConstFindResult contains(const std::string& key, size_t slot) const;

@@ -83,6 +83,11 @@ const PrintSettings& ConfigPackFDM::get_print() const
     return print;
 }
 
+const MacroOverridesMapFDM& ConfigPackFDM::get_macro_overrides() const
+{
+    return macro_overrides;
+}
+
 const ToolPrintSettings& ConfigPackFDM::get_tool(size_t index) const
 {
     return tool.at(index);

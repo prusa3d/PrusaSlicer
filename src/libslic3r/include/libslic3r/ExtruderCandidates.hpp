@@ -18,6 +18,7 @@ std::set<unsigned> get_volume_extruder_candidates(
     const Domain::VolumeSettings& volume_settings,
     const Domain::ObjectSettings& object_settings,
     const Domain::PrintSettings& print_settings,
+    const Domain::MacroOverridesMapFDM& macro_overrides,
     const Domain::VirtualExtruders& virtual_extruders
 );
 

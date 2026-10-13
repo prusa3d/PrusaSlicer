@@ -128,6 +128,7 @@ VolumeButton::VolumeButton(
                 volume->volume_settings,
                 object->object_settings,
                 config_pack_viewer.get_print(),
+                config_pack_viewer.get_macro_overrides(),
                 config_container->virtual_extruders()
             );
         },

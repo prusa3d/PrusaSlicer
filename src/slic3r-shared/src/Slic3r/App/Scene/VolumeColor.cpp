@@ -47,6 +47,8 @@ volume_extruder_color_idx(const ModelVolume& volume, const ConfigContainer& conf
             volume.volume_settings,
             object->object_settings,
             *print_settings,
+            std::get<Slic3r::Domain::MacroOverridesMapFDM>(
+                config_container.selected_preset().macro_overrides),
             config_container.virtual_extruders()
         );
 
