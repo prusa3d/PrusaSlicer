@@ -119,7 +119,8 @@ void InputText::render(const Vec2f& pos, const Vec2f& size)
         bool changed   = false;
 
         if (m_request_focus) {
-            m_request_focus = false;
+            m_request_focus   = false;
+            m_hide_nav_cursor = true;
             ImGui::SetKeyboardFocusHere();
         }
 
@@ -144,6 +145,14 @@ void InputText::render(const Vec2f& pos, const Vec2f& size)
         } else {
             changed =
                 YInputText(id.c_str(), m_hint.c_str(), &m_text, to_im(size), m_flags, {}, nullptr);
+        }
+        // ImGui activates the input focused by SetKeyboardFocusHere() as if it was reached by
+        // keyboard navigation and shows the nav cursor. It frames the input while editing, but
+        // afterwards it would stay visible and frame every next focused window (e.g. popup
+        // menus), so hide it once the input loses the focus.
+        if (m_hide_nav_cursor && ImGui::IsItemDeactivated()) {
+            m_hide_nav_cursor = false;
+            ImGui::SetNavCursorVisible(false);
         }
         if (ImGui::IsItemActivated() && m_validator) {
             m_text = m_validator->string_without_unit();

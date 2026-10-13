@@ -48,6 +48,25 @@ TEST_CASE_METHOD(YogaComponentFixture, "InputText: focus_gained fires after requ
     REQUIRE(focus_gained_count == 1);
 }
 
+TEST_CASE_METHOD(YogaComponentFixture, "InputText: nav cursor is hidden after focused editing")
+{
+    InputText* input_other          = make_input(*this);
+    InputText* input                = make_input(*this);
+    input->callbacks().text_entered = [input_other]() { input_other->request_focus(); };
+
+    render();
+    input->request_focus();
+    flush_focus();
+    REQUIRE(input->active());
+
+    key_tap(ImGuiKey_Enter);
+
+    flush_focus();
+
+    REQUIRE_FALSE(input->active());
+    REQUIRE_FALSE(ImGui::GetCurrentContext()->NavCursorVisible);
+}
+
 TEST_CASE_METHOD(YogaComponentFixture, "InputText: text_changed fires when characters are typed")
 {
     InputText* input = make_input(*this);
