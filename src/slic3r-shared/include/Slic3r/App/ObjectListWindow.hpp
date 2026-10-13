@@ -43,6 +43,12 @@ public:
      */
     void add_context_menu_listener(IShowContextMenuListener* listener);
 
+    /**
+     * @brief Shows the name editor on the row of the single selected object or volume. The window
+     * and the collapsed parents of the row are expanded, so the editor is visible.
+     */
+    void start_renaming_selected();
+
     std::function<void()> on_config_container_added{nullptr};
 
 private:

@@ -241,4 +241,10 @@ void ObjectListWindow::add_context_menu_listener(IShowContextMenuListener* liste
     m_object_list->add_context_menu_listener(listener);
 }
 
+void ObjectListWindow::start_renaming_selected()
+{
+    set_collapsed(false);
+    m_object_list->start_renaming_selected();
+}
+
 } // namespace Slic3r::App

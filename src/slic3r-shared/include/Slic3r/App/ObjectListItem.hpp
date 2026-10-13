@@ -18,6 +18,7 @@
 
 namespace Slic3r::Domain {
 class ConfigContainer;
+struct ElementRef;
 } // namespace Slic3r::Domain
 
 namespace Slic3r::Biz {
@@ -49,6 +50,12 @@ public:
     ~OutOfBedsItem();
 
     void set_source_list(std::weak_ptr<Biz::ObjectList::ObjectObservableList> out_of_bed_objects);
+
+    /**
+     * @brief Shows the name editor on the row of the object or volume @p element.
+     * @return true if a row of this section took it.
+     */
+    bool start_renaming(const Domain::ElementRef& element);
 
 private:
     void update_visibility();
@@ -105,6 +112,12 @@ public:
      * @brief Adds a listener showing the context menus requested by right-clicks on the rows.
      */
     void add_context_menu_listener(IShowContextMenuListener* listener);
+
+    /**
+     * @brief Shows the name editor on the row of the single selected object or volume. For an
+     * object listed on several beds, the first row in the list is used.
+     */
+    void start_renaming_selected();
 
     void on_selected_project_changed(size_t index) override;
 

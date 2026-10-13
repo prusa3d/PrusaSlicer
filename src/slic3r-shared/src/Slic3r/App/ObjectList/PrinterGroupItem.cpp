@@ -178,4 +178,14 @@ bool PrinterGroupItem::set_bed_thumbnail(size_t bed_id, Render::TexturePtr textu
     return false;
 }
 
+bool PrinterGroupItem::start_renaming(const Domain::ElementRef& element)
+{
+    for (size_t i = 0; i < m_beds_list_view->list_item_count(); ++i) {
+        if (m_beds_list_view->item_at(i)->start_renaming(element)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace Slic3r::App::ObjectList

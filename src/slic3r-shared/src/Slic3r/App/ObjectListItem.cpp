@@ -9,6 +9,7 @@
 
 #include "Slic3r/Domain/ConfigContainer.hpp"
 #include "Slic3r/Domain/BedInstance.hpp"
+#include "Slic3r/Domain/ElementRef.hpp"
 
 namespace Slic3r::App {
 
@@ -59,6 +60,16 @@ void OutOfBedsItem::set_source_list(
     m_objects_list->add_listener<Biz::IListObserver<Biz::ObjectList::Object>>(this);
 
     update_visibility();
+}
+
+bool OutOfBedsItem::start_renaming(const Domain::ElementRef& element)
+{
+    for (size_t i = 0; i < m_objects_list_view->list_item_count(); ++i) {
+        if (m_objects_list_view->item_at(i)->start_renaming(element)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void OutOfBedsItem::update_visibility()
@@ -211,6 +222,30 @@ void ObjectListItem::set_bed_instance_icons(const Plater::BedThumbnailTextures& 
 void ObjectListItem::add_context_menu_listener(IShowContextMenuListener* listener)
 {
     m_context_menu_requester.add_listener<IShowContextMenuListener>(listener);
+}
+
+void ObjectListItem::start_renaming_selected()
+{
+    const Biz::Scene::ObjectSelection& selection =
+        m_project_interactor.scene_interactor().object_selection();
+    if (selection.empty()) {
+        return;
+    }
+
+    // Object rows are identified by the object id only, volume rows also by the volume id.
+    const Domain::ElementRef& selected = selection.elements.front();
+    const Domain::ElementRef element = selection.mode == Biz::Scene::SelectionMode::Volume ?
+        Domain::ElementRef(selected.object_id, 0, selected.volume_id) :
+        Domain::ElementRef(selected.object_id);
+
+    for (size_t i = 0; i < m_printer_group_list_view->list_item_count(); ++i) {
+        if (m_printer_group_list_view->item_at(i)->start_renaming(element)) {
+            return;
+        }
+    }
+    if (m_out_of_beds_item) {
+        m_out_of_beds_item->start_renaming(element);
+    }
 }
 
 } // namespace Slic3r::App

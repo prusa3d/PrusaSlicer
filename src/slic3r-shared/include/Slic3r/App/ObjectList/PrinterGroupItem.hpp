@@ -74,6 +74,12 @@ public:
      */
     bool set_bed_thumbnail(size_t bed_id, Render::TexturePtr texture);
 
+    /**
+     * @brief Shows the name editor on the row of the object or volume @p element.
+     * @return true if a row of this group took it.
+     */
+    bool start_renaming(const Domain::ElementRef& element);
+
 private:
     void on_data_update() override;
     void remove_config_container();

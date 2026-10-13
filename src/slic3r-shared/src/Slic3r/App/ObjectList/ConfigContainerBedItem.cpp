@@ -337,4 +337,15 @@ void ConfigContainerBedItem::set_thumbnail(Render::TexturePtr texture)
     m_cc_bed_button->set_thumbnail(std::move(texture));
 }
 
+bool ConfigContainerBedItem::start_renaming(const Domain::ElementRef& element)
+{
+    for (size_t i = 0; i < m_objects_list_view->list_item_count(); ++i) {
+        if (m_objects_list_view->item_at(i)->start_renaming(element)) {
+            m_cc_bed_button->expand();
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace Slic3r::App::ObjectList

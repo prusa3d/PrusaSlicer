@@ -53,14 +53,24 @@ VolumeButton::VolumeButton(
     set_content_padding(paddings);
 
     m_icon = add_icon(this, Render::Icon::SolidPartVolume, 18_fpx);
-    m_name = emplace_back<InputTextField>("VolumeName");
-    m_name->set_color(Platform::Color::Transparent);
+    m_name = emplace_back<Text>(std::string{});
+    m_name->set_wrap_mode(Text::WrapMode::WrapElide);
     m_name->set_flex_grow(1.f);
-    m_name->callbacks().text_edited = [this, &scene_interactor]()
+
+    m_name_editing = emplace_back<InputTextField>("VolumeName");
+    m_name_editing->set_color(Platform::Color::Transparent);
+    m_name_editing->set_flex_grow(1.f);
+    m_name_editing->set_visible(false);
+    m_name_editing->callbacks().text_edited = [this, &scene_interactor]()
     {
-        scene_interactor
-            .edit_name({this->state()->obj_id, 0, this->state()->vol_id}, m_name->text());
+        if (m_name_editing->text() != m_name->text()) {
+            scene_interactor.edit_name(
+                {this->state()->obj_id, 0, this->state()->vol_id},
+                m_name_editing->text()
+            );
+        }
     };
+    m_name_editing->callbacks().focus_lost = [this]() { finish_renaming(); };
 
     auto get_selection = [this]() -> Biz::Scene::ObjectSelection
     {
@@ -68,12 +78,6 @@ VolumeButton::VolumeButton(
             Biz::Scene::SelectionMode::Volume,
             {{this->state()->obj_id, 0, this->state()->vol_id}}
         };
-    };
-    m_name->callbacks().active_changed = [this, &project_interactor, get_selection](bool active)
-    {
-        if (active) {
-            select_elements(project_interactor, get_selection());
-        }
     };
 
     callbacks().action = [this, &project_interactor, get_selection]()
@@ -227,6 +231,20 @@ const std::optional<VolumeButton::DropLine>& VolumeButton::drop_line() const
     return m_drop_line;
 }
 
+void VolumeButton::start_renaming()
+{
+    m_name_editing->set_text(m_name->text());
+    m_name->set_visible(false);
+    m_name_editing->set_visible(true);
+    m_name_editing->request_focus();
+}
+
+void VolumeButton::finish_renaming()
+{
+    m_name_editing->set_visible(false);
+    m_name->set_visible(true);
+}
+
 bool VolumeButton::can_drop_volume(
     size_t volume_id,
     Biz::Scene::VolumeInsertPosition position
@@ -293,6 +311,19 @@ void VolumesItem::set_source_list(std::weak_ptr<Biz::ObjectList::VolumeObservabl
     m_volumes_list_view->set_source_list(volumes_list);
     m_volumes_button->update_state();
     set_visible(has_visible_content());
+}
+
+bool VolumesItem::start_renaming(size_t volume_id)
+{
+    for (size_t i = 0; i < m_volumes_list_view->list_item_count(); ++i) {
+        VolumeButton* volume_button = m_volumes_list_view->item_at(i);
+        if (volume_button && volume_button->state()->vol_id == volume_id) {
+            volume_button->start_renaming();
+            m_volumes_button->expand();
+            return true;
+        }
+    }
+    return false;
 }
 
 void VolumesItem::render(const Vec2f& pos, const Vec2f& size)

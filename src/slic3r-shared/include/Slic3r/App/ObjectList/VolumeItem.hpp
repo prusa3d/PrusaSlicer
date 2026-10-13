@@ -24,6 +24,7 @@ namespace Slic3r::App {
 
 namespace Yoga {
 class Icon;
+class Text;
 class InputTextField;
 } // namespace Yoga
 
@@ -68,6 +69,11 @@ public:
      */
     const std::optional<DropLine>& drop_line() const;
 
+    /**
+     * @brief Replaces the name label by the name editor until the editing is finished.
+     */
+    void start_renaming();
+
 protected:
     void dnd_accepted_internal(const Yoga::DnDPayload& dnd_payload) override;
     void dnd_could_accept_changed_internal(bool could_accept) override;
@@ -85,9 +91,12 @@ private:
      */
     void update_drop_line(const Yoga::Vec2f& pos, const Yoga::Vec2f& size);
 
+    void finish_renaming();
+
     // type
     Yoga::Icon* m_icon{nullptr};
-    Yoga::InputTextField* m_name{nullptr};
+    Yoga::Text* m_name{nullptr};
+    Yoga::InputTextField* m_name_editing{nullptr};
     ExtruderIcon* m_extruder_icon{nullptr};
     ExtruderMarkerReactor m_extruder_marker_reactor;
     Biz::ProjectInteractor& m_project_interactor;
@@ -106,6 +115,12 @@ public:
     bool has_visible_content() const;
 
     void set_source_list(std::weak_ptr<Biz::ObjectList::VolumeObservableList> volumes_list);
+
+    /**
+     * @brief Shows the name editor on the row of the volume @p volume_id.
+     * @return true if the volume is listed here (the volumes are expanded then).
+     */
+    bool start_renaming(size_t volume_id);
 
     void render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size) override;
 

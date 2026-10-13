@@ -56,9 +56,14 @@ ObjectButton::ObjectButton(CollapsibleArea* collapsible_item, bool is_printable)
 
     add_icon(this, Render::Icon::ObjectIcon);
 
-    m_name = emplace_back<InputTextField>("Object name");
+    m_name = emplace_back<Text>(std::string{});
+    m_name->set_wrap_mode(Text::WrapMode::WrapElide);
     m_name->set_flex_grow(1.f);
-    m_name->set_color(Platform::Color::Transparent);
+
+    m_name_editing = emplace_back<InputTextField>("Object name");
+    m_name_editing->set_flex_grow(1.f);
+    m_name_editing->set_color(Platform::Color::Transparent);
+    m_name_editing->set_visible(false);
 
     Item* button_wrap = emplace_back<Item>();
     button_wrap->set_align_items(YGAlignCenter);
@@ -104,17 +109,23 @@ void ObjectButton::set_callbacks(
     Biz::Scene::SceneInteractor& scene_interactor = project_interactor.scene_interactor();
 
     m_on_printable_toggled = [&scene_interactor, get_selection, this](bool printable)
-    { scene_interactor.set_printable(get_selection().elements.front(), printable); };
-
-    m_name->callbacks().text_edited = [this, &scene_interactor, get_selection]()
-    { scene_interactor.edit_name(get_selection().elements.front(), m_name->text()); };
-
-    m_name->callbacks().active_changed = [this, &project_interactor, get_selection](bool active)
     {
-        if (active) {
-            select_elements(project_interactor, get_selection());
+        const Biz::Scene::ObjectSelection::ElementRefs& elements = get_selection().elements;
+        if (!elements.empty()) {
+            scene_interactor.set_printable(elements.front(), printable);
         }
     };
+
+    m_name_editing->callbacks().text_edited = [this, &scene_interactor, get_selection]()
+    {
+        if (m_name_editing->text() != m_name->text()) {
+            const Biz::Scene::ObjectSelection::ElementRefs& elements = get_selection().elements;
+            if (!elements.empty()) {
+                scene_interactor.edit_name(elements.front(), m_name_editing->text());
+            }
+        }
+    };
+    m_name_editing->callbacks().focus_lost = [this]() { finish_renaming(); };
 
     callbacks().action = [&project_interactor, get_selection]()
     { select_elements(project_interactor, get_selection()); };
@@ -129,7 +140,7 @@ void ObjectButton::set_callbacks(
         );
     };
 
-    m_name->callbacks().hovered_changed = [this](bool) { update_printable_visibility(); };
+    m_name_editing->callbacks().hovered_changed = [this](bool) { update_printable_visibility(); };
 }
 
 void ObjectButton::set_selected(bool selected)
@@ -187,9 +198,23 @@ void ObjectButton::update_printable_visibility()
     m_printable_button->set_visible(
         !m_printable_button->checked()
         || m_printable_button->hovered()
-        || m_name->hovered()
+        || m_name_editing->hovered()
         || hovered()
     );
+}
+
+void ObjectButton::start_renaming()
+{
+    m_name_editing->set_text(m_name->text());
+    m_name->set_visible(false);
+    m_name_editing->set_visible(true);
+    m_name_editing->request_focus();
+}
+
+void ObjectButton::finish_renaming()
+{
+    m_name_editing->set_visible(false);
+    m_name->set_visible(true);
 }
 
 ConnectorsButton::ConnectorsButton() : LeafButton(NodeLevel::Object)
@@ -273,6 +298,22 @@ ObjectItem::ObjectItem(
 
     m_object_button->set_selected(state.selected);
     m_connectors_button->set_selected(state.connectors_selected);
+}
+
+bool ObjectItem::start_renaming(const Domain::ElementRef& element)
+{
+    if (element.object_id != state()->id) {
+        return false;
+    }
+    if (element.has_volume()) {
+        if (!m_volumes->start_renaming(element.volume_id)) {
+            return false;
+        }
+        m_object_button->expand();
+        return true;
+    }
+    m_object_button->start_renaming();
+    return true;
 }
 
 void ObjectItem::on_data_update()

@@ -458,6 +458,29 @@ void PlaterRenderModule::register_commands()
                 }
             )
         )
+        // Command for renaming the selected object/volume in the object list
+        .register_command(
+            std::make_unique<UIItemCommand>(
+                CommandName::RenameSelected,
+                [this]() { m_object_list->start_renaming_selected(); },
+                UIItemCommandExtraOpts{
+                    .enabled =
+                        [this]()
+                    {
+                        const Biz::Scene::ObjectSelection& selection =
+                            m_project_interactor.scene_interactor().object_selection();
+                        if (selection.empty()) {
+                            return false;
+                        }
+                        if (selection.mode == Slic3r::Biz::Scene::SelectionMode::Volume) {
+                            return selection.elements.size() == 1;
+                        }
+                        return selection.mode == Slic3r::Biz::Scene::SelectionMode::Instance
+                            && selection.only_single_object();
+                    }
+                }
+            )
+        )
         .register_command(
             std::make_unique<UIItemCommand>(
                 CommandName::DeactivateCurrentGizmo,

@@ -10,6 +10,7 @@ struct CommandName
     static constexpr const char* DeleteSelected  = "delete-selected";
     static constexpr const char* CopyModelItems  = "copy-selected";
     static constexpr const char* PasteModelItems = "paste-model-items";
+    static constexpr const char* RenameSelected  = "rename-selected";
 
     static constexpr const char* NewProject    = "new-project";
     static constexpr const char* OpenProject   = "open-project";

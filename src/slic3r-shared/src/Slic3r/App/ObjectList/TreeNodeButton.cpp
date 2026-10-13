@@ -2,6 +2,7 @@
 
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/Icon.hpp"
+#include "Slic3r/App/Yoga/Namespace.hpp"
 
 #include "Slic3r/App/ExtruderIcon.hpp"
 #include "Slic3r/App/ContextMenu.hpp"
@@ -19,6 +20,10 @@
 namespace Slic3r::App::ObjectList {
 
 using namespace Yoga;
+
+namespace {
+const Unit default_height = 28_fpx;
+} // namespace
 
 ActionButton::ActionButton(Render::Icon icon, const std::string& tooltip) :
     LayoutButton(std::string{}, icon, tooltip)
@@ -46,6 +51,9 @@ TreeNodeButton::TreeNodeButton(NodeLevel level, CollapsibleArea* collapsible_ite
     set_allow_overlap(true);
     set_flex_shrink(0);
     set_rounding(0.f);
+    if (level != NodeLevel::Bed) {
+        set_height(default_height);
+    }
 
     const Unit left_padding = 20_fpx + static_cast<size_t>(m_level) * 10_fpx;
     set_content_padding(Paddings({left_padding, 5_fpx, 20_fpx, 5_fpx}));
@@ -94,6 +102,12 @@ void TreeNodeButton::update_state()
     }
 }
 
+void TreeNodeButton::expand()
+{
+    m_expanded = true;
+    update_state();
+}
+
 LeafButton::LeafButton(NodeLevel level) : RectangleButton()
 {
     set_content_justify_content(YGJustifyFlexStart);
@@ -107,6 +121,8 @@ LeafButton::LeafButton(NodeLevel level) : RectangleButton()
     const Unit left_padding = 45_fpx + static_cast<size_t>(level) * 10_fpx;
     set_content_padding(Paddings({left_padding, 5_fpx, 20_fpx, 5_fpx}));
     set_content_gap(5_fpx);
+
+    set_height(default_height);
 }
 
 ActionButton* add_printable_button(

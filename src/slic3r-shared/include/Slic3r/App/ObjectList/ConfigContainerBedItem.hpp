@@ -133,6 +133,12 @@ public:
 
     void set_thumbnail(Render::TexturePtr texture);
 
+    /**
+     * @brief Shows the name editor on the row of the object or volume @p element.
+     * @return true if a row of this bed took it (the bed is expanded then).
+     */
+    bool start_renaming(const Domain::ElementRef& element);
+
 private:
     void on_data_update() override;
     void refresh_from_state();

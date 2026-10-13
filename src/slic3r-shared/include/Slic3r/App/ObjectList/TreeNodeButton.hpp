@@ -64,6 +64,11 @@ class TreeNodeButton : public Yoga::RectangleButton
 public:
     void update_state();
 
+    /**
+     * @brief Expands the node (shows its collapsible area), as a click on the collapse button.
+     */
+    void expand();
+
 protected:
     TreeNodeButton(NodeLevel level, CollapsibleArea* collapsible_item);
 

@@ -115,6 +115,11 @@ bool InputTextField::hovered() const
     return m_input_text->hovered();
 }
 
+void InputTextField::request_focus()
+{
+    m_input_text->request_focus();
+}
+
 InputText* InputTextField::input_text() const
 {
     return m_input_text;

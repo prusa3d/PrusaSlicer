@@ -168,6 +168,9 @@ std::string MenuBuilder::item_name_translated(UniversalMenuItemName menu_item_na
                 case MenuItemName::DeleteSelectedSvgOrText:
                 case MenuItemName::DeleteSelectedVolume:
                     return Biz::_u8L("Delete");
+                case MenuItemName::RenameObject:
+                case MenuItemName::RenameVolume:
+                    return Biz::_u8L("Rename");
                 case MenuItemName::SetNumberOfInstances:
                 case MenuItemName::SetMultiObjectsNumberOfInstances:
                     return Biz::_u8L("Set Number Of Instances");

@@ -456,6 +456,7 @@ void MenuCommandRegistrar::register_object_menu_commands()
             }
         )
         .append_item_from_command(MenuItemName::DeleteSelectedObject, CommandName::DeleteSelected)
+        .append_item_from_command(MenuItemName::RenameObject, CommandName::RenameSelected)
         .append_separator()
         .append_item(
             MenuItemName::SetNumberOfInstances,
@@ -1069,6 +1070,7 @@ void MenuCommandRegistrar::register_volume_menu_commands()
 
     builder.push_path_level(MenuItemName::VolumeContextMenu)
         .append_item_from_command(MenuItemName::DeleteSelectedVolume, CommandName::DeleteSelected)
+        .append_item_from_command(MenuItemName::RenameVolume, CommandName::RenameSelected)
         .append_item_from_command(MenuItemName::CopyVolume, CommandName::CopyModelItems)
         .append_separator()
         .append_item_from_command(MenuItemName::ExportVolume, CommandName::ExportAsStl)
