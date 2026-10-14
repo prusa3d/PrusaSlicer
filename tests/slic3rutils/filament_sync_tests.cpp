@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iterator>
+#include <map>
 
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
@@ -397,6 +398,12 @@ compatible_printers_condition = printer_model=="SYNC2T"
 filament_type = PLA
 filament_vendor = Generic
 compatible_printers_condition = printer_model=="SYNC2T"
+
+[filament:Spectrum PETG Matt @SYNC]
+filament_type = PETG
+filament_vendor = Spectrum
+filament_colour = #000000
+compatible_printers_condition = printer_model=="ANOTHER"
 )";
 
 struct Fixture
@@ -405,17 +412,20 @@ struct Fixture
     AppConfig    app{AppConfig::EAppMode::Editor};
     PresetBundle bundle;
 
-    Fixture()
+    // user_filaments: more user filament presets, file contents by name; first: extruder 1's preset
+    explicit Fixture(const std::map<std::string, std::string> &user_filaments = {}, const std::string &first = "Generic PETG @SYNC")
     {
         bundle.setup_directories();
         write_file(data.dir() / "vendor" / "SyncTest.ini", VENDOR_BUNDLE);
         write_file(data.dir() / "filament" / "My PLA.ini", "filament_type = PLA\nfilament_vendor = Acme\nfilament_colour = #ffffff\n");
+        for (const auto &[name, text] : user_filaments)
+            write_file(data.dir() / "filament" / (name + ".ini"), text);
         app.set("filamentdb_url", "");
         app.set_variant("SyncTest", "SYNC2T", "0.4", true);
         app.set(AppConfig::SECTION_FILAMENTS, "Generic PETG @SYNC", "1");
         app.set(AppConfig::SECTION_FILAMENTS, "Generic PLA @SYNC", "1");
         app.set("presets", "printer", "Sync 2T");
-        app.set("presets", "filament", "Generic PETG @SYNC");
+        app.set("presets", "filament", first);
         app.set("presets", "filament_1", "My PLA");
         bundle.load_presets(app, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
     }
@@ -600,7 +610,7 @@ TEST_CASE("A system preset's variant name isn't a color", "[FilamentSync]")
     CHECK(plan_one(tool(1, "Prusament", "PLA", "Red", "#FF0000"), tuned, clear.name).preset == "Prusament PLA @SYNC");
 
     // A preset the sync made for a user color that starts like a variant's name ("Matt Olive",
-    // the variant for another printer) isn't a copy of it: it inherits its template
+    // the variant for another printer) isn't a copy of it: it doesn't inherit the variant
     Candidate matt = sys("Spectrum PETG Matt @SYNC", "Spectrum", "PETG", "#000000");
     matt.is_compatible = false;
     Candidate olive    = cand("Spectrum PETG Matt Olive", "Spectrum", "PETG", "#556B2F");
@@ -727,6 +737,41 @@ TEST_CASE("Tools share a new preset only when its template suits each extruder",
     CHECK(plan2.extruders[0].template_preset == cf.name);
     CHECK(plan2.extruders[1].template_preset == sf.name);
     CHECK(plan2.extruders[0].preset != plan2.extruders[1].preset);
+}
+
+TEST_CASE("A new color isn't started from a copy of a variant its name continues", "[FilamentSync]")
+{
+    // The user's preset saved from a Spectrum variant whose system presets are for other printers
+    Candidate matt     = sys("Spectrum PETG Matt @SYNC", "Spectrum", "PETG", "#000000");
+    matt.is_compatible = false;
+    Candidate black    = cand("Spectrum PETG Matt Black", "Spectrum", "PETG", "#000000");
+    black.parent       = "Spectrum PETG Matt";
+    const Candidate        generic = sys("Generic PETG @SYNC", "Generic", "PETG");
+    std::vector<Candidate> c       = {matt, black, generic};
+
+    // A user color "Matt Olive": started from the selected preset, the new one would inherit the
+    // variant and pass for a copy of it
+    const ExtruderPlan olive = plan_one(tool(1, "Spectrum", "PETG", "Matt Olive", "#556B2F"), c, black.name);
+    REQUIRE(olive.action == Action::Create);
+    CHECK(olive.preset == "Spectrum PETG Matt Olive");
+    CHECK(olive.template_preset == generic.name);
+
+    // Made from Generic, it's the olive color: the next sync with a red spool makes a red one,
+    // started from the olive one
+    Candidate made = cand(olive.preset, "Spectrum", "PETG", "#556B2F");
+    made.parent    = "Generic PETG";
+    c.push_back(made);
+    const ExtruderPlan red = plan_one(tool(1, "Spectrum", "PETG", "Red", "#FF0000"), c, made.name);
+    CHECK(red.action == Action::Create);
+    CHECK(red.preset == "Spectrum PETG Red");
+    CHECK(red.template_preset == made.name);
+
+    // A color that doesn't start like the variant's name still starts from the selected preset
+    const ExtruderPlan plain = plan_one(tool(1, "Spectrum", "PETG", "Olive", "#556B2F"), {matt, black, generic}, black.name);
+    CHECK(plain.preset == "Spectrum PETG Olive");
+    CHECK(plain.template_preset == black.name);
+    // ... and a copy of the variant is still a template when nothing else suits the extruder
+    CHECK(plan_one(tool(1, "Spectrum", "PETG", "Matt Olive", "#556B2F"), {matt, black}, black.name).template_preset == black.name);
 }
 
 TEST_CASE("Empty tools and uncalibrated docks are unavailable, and a print using them is warned", "[FilamentSync]")
@@ -873,4 +918,29 @@ TEST_CASE("A preset made from a system preset names it as its parent", "[Filamen
                                       [](const Candidate &c) { return c.name == "Generic PETG @SYNC"; });
     REQUIRE(generic != exs[0].candidates.end());
     CHECK(generic->parent.empty());
+}
+
+TEST_CASE("A preset made for a color that starts like a variant's name isn't a copy of the variant", "[FilamentSync]")
+{
+    // Saved from a variant the printer profile can't use, as Filament DB presets are
+    Fixture f({{"Spectrum PETG Matt Black",
+                "inherits = Spectrum PETG Matt @SYNC\nfilament_type = PETG\nfilament_vendor = Spectrum\nfilament_colour = #000000\n"}},
+              "Spectrum PETG Matt Black");
+    REQUIRE(f.bundle.extruders_filaments[0].get_selected_preset_name() == "Spectrum PETG Matt Black");
+
+    PrinterTools tools;
+    tools.tools = {tool(1, "Spectrum", "PETG", "Matt Olive", "#556B2F")};
+    Plan plan   = f.plan_for(tools);
+    REQUIRE(plan.extruders[0].action == Action::Create);
+    REQUIRE(plan.extruders[0].preset == "Spectrum PETG Matt Olive");
+    REQUIRE(apply_presets(f.bundle, &f.app, plan, {true}).errors.empty());
+    const Preset *olive = f.bundle.filaments.find_preset("Spectrum PETG Matt Olive", false, false);
+    REQUIRE(olive != nullptr);
+    CHECK(olive->inherits() == "Generic PETG @SYNC");
+
+    // A red spool on the next sync gets a red preset, not the olive one
+    tools.tools = {tool(1, "Spectrum", "PETG", "Red", "#FF0000")};
+    plan        = f.plan_for(tools);
+    CHECK(plan.extruders[0].action == Action::Create);
+    CHECK(plan.extruders[0].preset == "Spectrum PETG Red");
 }

@@ -156,6 +156,15 @@ bool names_more_than_filament(const Wanted &want, const std::vector<std::string>
     return false;
 }
 
+// Whether a user preset whose name has these words, inheriting the system preset shown as parent,
+// is a copy saved from a variant under its name ("Prusament PLA Blend Tuned" from "Prusament PLA
+// Blend"), so that the words after the material name the variant, not a color
+bool copies_variant(const Wanted &want, const std::vector<std::string> &words, const std::string &parent)
+{
+    const std::vector<std::string> p = tokens(parent);
+    return names_more_than_filament(want, p) && words.size() >= p.size() && std::equal(p.begin(), p.end(), words.begin());
+}
+
 // The "#RRGGBB" in a name, as in the presets made for the printer's unnamed user colors
 std::string hex_in_name(const std::string &name)
 {
@@ -186,15 +195,11 @@ int colour_tier(const Wanted &want, const Candidate &c)
     // material is a color even when the printer's list doesn't have it (a user color named
     // "Clear"), and the preset's own color differs. In a system preset it names a variant
     // ("Prusament PETG Carbon Fiber"), which the printer can't tell apart, and so it does in a
-    // copy saved from the variant under its name ("Prusament PLA Blend Tuned"). A new preset
-    // inherits its template, whose name its own doesn't continue.
-    const auto copies_variant = [&] {
-        const std::vector<std::string> parent = tokens(c.parent);
-        return names_more_than_filament(want, parent) && words.size() >= parent.size() &&
-               std::equal(parent.begin(), parent.end(), words.begin());
-    };
+    // copy saved from the variant under its name ("Prusament PLA Blend Tuned"). make_plan()
+    // starts a new preset from a template that doesn't make it look like such a copy.
     if (!c.is_system && want.vendor_known && !want.tool.color_hex.empty() &&
-        !printer_tools_detail::normalize_color_hex(c.colour).empty() && names_more_than_filament(want, words) && !copies_variant())
+        !printer_tools_detail::normalize_color_hex(c.colour).empty() && names_more_than_filament(want, words) &&
+        !copies_variant(want, words, c.parent))
         return 2;
     return 1;
 }
@@ -443,31 +448,6 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
             if (shared != pending.end())
                 create = &*shared;
             else {
-                // Start from a preset of the same material: the extruder's own, else Generic,
-                // Prusament, another vendor's, a user preset; installed ones first
-                std::vector<const Candidate *> templates;
-                bool                            abrasive_only = false;
-                for (bool visible_pass : {true, false}) {
-                    for (const Candidate &c : ex.candidates) {
-                        if (!c.is_compatible || !same_material(tool.material, c.type) || c.is_visible != visible_pass ||
-                            (!visible_pass && !c.is_system))
-                            continue;
-                        if (!tool.hardened && c.is_abrasive) {
-                            abrasive_only = true;
-                            continue;
-                        }
-                        templates.push_back(&c);
-                    }
-                    if (!templates.empty())
-                        break;
-                }
-                const auto template_rank = [&](const Candidate *c) {
-                    return std::make_tuple(c->name == ex.selected ? 0 : 1, vendor_preference(*c), c->name);
-                };
-                const Candidate *tmpl = templates.empty() ? nullptr :
-                    *std::min_element(templates.begin(), templates.end(),
-                                      [&](const Candidate *a, const Candidate *b) { return template_rank(a) < template_rank(b); });
-
                 // Named like a per-color preset: "Polymaker PETG Black"; an unnamed user color by its hex
                 const std::string colour = !want.colour.empty() ? tool.color : tool.color_hex;
                 const std::string base   = tool.vendor + " " + tool.material + (colour.empty() ? "" : " " + colour);
@@ -476,6 +456,34 @@ Plan make_plan(const PrinterTools &tools, const std::vector<ExtruderState> &extr
                     name += " @" + name_tag;
                 for (int i = 2; taken.count(lower(name)); ++i)
                     name = base + " @" + name_tag + " " + std::to_string(i);
+
+                // Start from a preset of the same material: the extruder's own, else Generic,
+                // Prusament, another vendor's, a user preset; installed ones first. The new preset
+                // inherits a system template, or what a user template inherits. Last come templates
+                // that would leave it inheriting a variant whose name its own continues: made from a
+                // copy of "Spectrum PETG Matt" for a user color "Matt Olive", "Spectrum PETG Matt
+                // Olive" would pass for a copy of the variant and never count as another color.
+                std::vector<const Candidate *> templates;
+                bool                            abrasive_only = false;
+                for (const Candidate &c : ex.candidates) {
+                    if (!c.is_compatible || !same_material(tool.material, c.type) || !(c.is_visible || c.is_system))
+                        continue;
+                    if (!tool.hardened && c.is_abrasive) {
+                        abrasive_only = true;
+                        continue;
+                    }
+                    templates.push_back(&c);
+                }
+                // The words of the new preset's name as colour_tier() reads them, without the "@"
+                const std::vector<std::string> new_words = tokens(name.substr(0, name.find('@')));
+                const auto                     template_rank = [&](const Candidate *c) {
+                    const bool variant = copies_variant(want, new_words, c->is_system ? display_name(*c) : c->parent);
+                    return std::make_tuple(variant ? 1 : 0, c->is_visible ? 0 : 1, c->name == ex.selected ? 0 : 1,
+                                           vendor_preference(*c), c->name);
+                };
+                const Candidate *tmpl = templates.empty() ? nullptr :
+                    *std::min_element(templates.begin(), templates.end(),
+                                      [&](const Candidate *a, const Candidate *b) { return template_rank(a) < template_rank(b); });
 
                 if (!tmpl) {
                     failure = abrasive_only ?

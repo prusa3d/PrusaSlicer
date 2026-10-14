@@ -87,9 +87,12 @@ For each loaded tool, among the filament presets compatible with that extruder:
    red Polymaker PETG), a user preset is created, named `<vendor> <material> <color>` (for
    example `Polymaker PETG Red`; a printer user color without a name goes by its hex, and a tool
    without a color gets no color in the name), copied from a preset of the same material that
-   suits the extruder: the extruder's current one, else a Generic one, else Prusament. Its vendor
-   and filament color come from the printer. If that name is taken, it gets ` @INDX`. Tools with
-   the same vendor, material and color share one new preset.
+   suits the extruder: the extruder's current one, else a Generic one, else Prusament. One saved
+   from a variant comes last when the new name starts with the variant's: for a user color
+   `Matt Olive`, a copy of `Spectrum PETG Matt Black` would make `Spectrum PETG Matt Olive` pass
+   for a copy of `Spectrum PETG Matt`, never another color. Its vendor and filament color come
+   from the printer. If that name is taken, it gets ` @INDX`. Tools with the same vendor, material
+   and color share one new preset.
    It's saved with your other user presets; it isn't added to Filament DB. When no preset can be
    made (nothing suits the extruder to start from), the closest color is selected instead, and
    a note says why.
