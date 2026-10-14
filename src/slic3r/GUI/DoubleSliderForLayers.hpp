@@ -111,6 +111,10 @@ public:
     void    set_callback_on_get_extruder_colors(std::function<std::vector<std::string>()> cb)
             { m_cb_get_extruder_colors = cb; }
 
+    /// Names a 1-based extruder in the menus and tooltips. An empty name, or no callback, gives "Extruder N".
+    void    set_callback_on_get_extruder_label(std::function<std::string(int)> cb)
+            { m_cb_get_extruder_label = cb; }
+
     void    set_callback_on_get_print (std::function<const Slic3r::Print& ()> cb)
             { m_cb_get_print = cb; }
 
@@ -172,6 +176,11 @@ private:
 
     std::string get_tooltip(int tick = -1);
 
+    // "2 Overture PETG Black", or "Extruder 2" without a filament name, for a menu item.
+    std::string get_extruder_label(int extruder) const;
+    // "2 Overture PETG Black", or "2", to follow "Extruder" in a sentence.
+    std::string get_extruder_number_and_filament(int extruder) const;
+
     void        update_draw_scroll_line_cb();
 
     // functions for extend rendering of m_ctrl
@@ -213,6 +222,7 @@ private:
 
     std::function<void()>                       m_cb_ticks_changed              { nullptr };
     std::function<std::vector<std::string>()>   m_cb_get_extruder_colors        { nullptr };
+    std::function<std::string(int)>             m_cb_get_extruder_label         { nullptr };
     std::function<const Slic3r::Print&()>       m_cb_get_print                  { nullptr };
     std::function<void(const std::string&, const std::string&)> m_cb_change_app_config  { nullptr };
 };

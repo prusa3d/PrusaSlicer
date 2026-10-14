@@ -464,6 +464,8 @@ private:
 class TabFilament : public Tab
 {
     BitmapComboBox* m_extruders_cb {nullptr};
+    // The filament colors of the swatches in m_extruders_cb
+    std::vector<std::string> m_extruders_cb_colors;
     int             m_active_extruder {0};
 	ogStaticText*	m_volumetric_speed_description_line {nullptr};
 	ogStaticText*	m_cooling_description_line {nullptr};
@@ -473,6 +475,8 @@ class TabFilament : public Tab
     void            add_filament_overrides_page();
     void            update_filament_overrides_page();
     void            create_extruder_combobox();
+    void            update_extruder_combobox_items(size_t extruder_cnt);
+    void            fit_extruder_combobox_width();
 	void 			update_volumetric_flow_preset_hints();
 
     std::map<std::string, wxWindow*> m_overrides_options;
@@ -496,6 +500,9 @@ public:
     bool        set_active_extruder(int new_selected_extruder);
     void        invalidate_active_extruder() { m_active_extruder = -1; }
     void        update_extruder_combobox();
+    // Names each extruder's filament and shows its color anew, after any of them changed.
+    // A new extruder count is for update_extruder_combobox().
+    void        update_extruder_combobox_labels();
     void        update_extruder_combobox_visibility();
     int         get_active_extruder() const { return m_active_extruder; }
 

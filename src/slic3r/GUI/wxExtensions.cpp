@@ -352,12 +352,14 @@ std::vector<std::string> get_filament_color_strings()
     Slic3r::GUI::Plater*     plater = Slic3r::GUI::wxGetApp().plater();
     std::vector<std::string> colors = plater->get_extruder_color_strings_from_plater_config();
 
-    // The physical extruders come first, then the virtual ones.
+    // The physical extruders come first, then the virtual ones. The presets are read directly, as the
+    // sidebar does: the plater's copy of their colors lags behind a change of the extruder count.
     const size_t physical_cnt = colors.size() - std::min(colors.size(), plater->model().virtual_extruders.size());
-    if (const auto* filament_colours = plater->config()->option<Slic3r::ConfigOptionStrings>("filament_colour")) {
-        for (size_t i = 0; i < std::min(physical_cnt, filament_colours->values.size()); ++i)
-            if (Slic3r::can_decode_color(filament_colours->values[i]))
-                colors[i] = filament_colours->values[i];
+    for (size_t i = 0; i < physical_cnt; ++i) {
+        const Slic3r::Preset* preset = Slic3r::GUI::extruder_filament_preset(unsigned(i + 1));
+        const auto* colour = preset != nullptr ? preset->config.option<Slic3r::ConfigOptionStrings>("filament_colour") : nullptr;
+        if (colour != nullptr && !colour->values.empty() && Slic3r::can_decode_color(colour->values.front()))
+            colors[i] = colour->values.front();
     }
 
     return colors;
@@ -380,7 +382,7 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
                              wxSize size/* = wxDefaultSize*/,
                              bool use_thin_icon/* = false*/)
 {
-    std::vector<wxBitmapBundle*> icons = get_extruder_color_icons(use_thin_icon);
+    std::vector<wxBitmapBundle*> icons = get_filament_color_icons(use_thin_icon);
 
     if (!*ctrl) {
         *ctrl = new Slic3r::GUI::BitmapComboBox(parent, wxID_ANY, wxEmptyString, pos, size, 0, nullptr, wxCB_READONLY);
@@ -401,7 +403,7 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
         return;
     }
 
-    // For ObjectList we use short extruder name (just a number)
+    // For ObjectList, virtual extruders go by their short name ("[V] 5")
     const bool use_full_item_name = dynamic_cast<Slic3r::GUI::ObjectList*>(parent) == nullptr;
 
     Slic3r::GUI::Plater* plater = Slic3r::GUI::wxGetApp().plater();
@@ -410,7 +412,7 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
         return;
     }
     const std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
-        Slic3r::GUI::build_extruder_dropdown(plater->model(), false, use_full_item_name);
+        Slic3r::GUI::build_extruder_dropdown(plater->model(), false, use_full_item_name, true);
 
     if (!first_item.empty()) {
         const int def_id = (!icons.empty()) ? 0 : -1;
@@ -421,6 +423,9 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
     {
         (*ctrl)->Append(entries[entry_idx].label, *icons[entry_idx]);
     }
+    // The filament names can be wider than the control. Set once there are items, which GTK needs to
+    // size the list.
+    (*ctrl)->GetDropDown().SetUseContentWidth(true);
 
     (*ctrl)->SetSelection(0);
 }
@@ -868,23 +873,20 @@ wxString make_virtual_label(unsigned int virtual_id, bool use_full_item_name)
     return "[V] " + make_physical_label(virtual_id, use_full_item_name);
 }
 
+const std::string& preset_display_name(const Preset& preset)
+{
+    // System presets go by their alias, as in the sidebar's filament lists.
+    return preset.alias.empty() || (preset.vendor && preset.vendor->templates_profile) ? preset.name : preset.alias;
+}
+
 wxString make_filament_label(unsigned int physical_id)
 {
-    // An SLA printer keeps the last FFF filament selection, which names nothing loaded.
-    const PresetBundle* bundle = wxGetApp().preset_bundle;
-    const Preset*       preset = bundle != nullptr && bundle->printers.get_edited_preset().printer_technology() == ptFFF &&
-                                     physical_id <= bundle->extruders_filaments.size() ?
-                                     bundle->extruders_filaments[physical_id - 1].get_selected_preset() :
-                                     nullptr;
+    const Preset* preset = extruder_filament_preset(physical_id);
     if (preset == nullptr) {
         return make_physical_label(physical_id, true);
     }
 
-    // System presets go by their alias, as in the sidebar's filament lists.
-    const std::string& name = preset->alias.empty() || (preset->vendor && preset->vendor->templates_profile) ?
-                                  preset->name :
-                                  preset->alias;
-    return wxString::Format("%u ", physical_id) + from_u8(name);
+    return wxString::Format("%u ", physical_id) + from_u8(preset_display_name(*preset));
 }
 
 } // namespace
@@ -902,6 +904,36 @@ format_extruder_label(int extruder_id_1based_or_0, const Model& model, bool use_
     }
 
     return make_physical_label(extruder_id, use_full_item_name);
+}
+
+const Preset* extruder_filament_preset(unsigned int extruder_id)
+{
+    // An SLA printer keeps the last FFF filament selection, which names nothing loaded.
+    const PresetBundle* bundle = wxGetApp().preset_bundle;
+    if (bundle == nullptr || bundle->printers.get_edited_preset().printer_technology() != ptFFF || extruder_id == 0 ||
+        extruder_id > bundle->extruders_filaments.size())
+        return nullptr;
+
+    const Preset* preset = bundle->extruders_filaments[extruder_id - 1].get_selected_preset();
+    return preset != nullptr && preset->is_dirty ? &bundle->filaments.get_edited_preset() : preset;
+}
+
+std::string extruder_filament_name(unsigned int extruder_id)
+{
+    const Preset* preset = extruder_filament_preset(extruder_id);
+    return preset != nullptr ? preset_display_name(*preset) : std::string();
+}
+
+wxString format_extruder_filament_label(unsigned int extruder_id)
+{
+    return make_filament_label(extruder_id);
+}
+
+std::string filament_display_name(const std::string& preset_name)
+{
+    const PresetBundle* bundle = wxGetApp().preset_bundle;
+    const Preset*       preset = bundle != nullptr ? bundle->filaments.find_preset(preset_name) : nullptr;
+    return preset != nullptr ? preset_display_name(*preset) : preset_name;
 }
 
 std::vector<ExtruderDropdownEntry>

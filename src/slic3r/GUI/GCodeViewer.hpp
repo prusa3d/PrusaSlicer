@@ -262,6 +262,8 @@ private:
     LegendResizer m_legend_resizer;
     PrintEstimatedStatistics m_print_statistics;
     GCodeProcessorResult::SettingsIds m_settings_ids;
+    // The name of each extruder's filament preset as the sidebar shows it, empty when unknown.
+    std::vector<std::string> m_filament_names;
 
     std::vector<CustomGCode::Item> m_custom_gcode_per_print_z;
 

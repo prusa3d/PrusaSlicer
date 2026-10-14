@@ -169,9 +169,12 @@ struct UnavailableExtruders
 UnavailableExtruders unavailable_extruders(const PrinterTools &tools, size_t extruder_count);
 
 /// A warning for a print that uses some of them (used: 0-based, as Print::extruders() gives
-/// them), or an empty string when it uses none.
+/// them), or an empty string when it uses none. It names each extruder's filament from
+/// filament_names (0-based, as the sidebar shows them); an extruder without one there goes by its
+/// number alone.
 std::string unavailable_extruders_warning(const UnavailableExtruders &unavailable, const std::vector<unsigned int> &used,
-                                          const std::string &printer_name, const std::string &sync_time);
+                                          const std::vector<std::string> &filament_names, const std::string &printer_name,
+                                          const std::string &sync_time);
 
 /// Whether the file holds every option of config, as config serializes it: ConfigBase::save()
 /// doesn't report a write that stopped short.

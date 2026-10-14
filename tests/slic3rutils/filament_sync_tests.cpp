@@ -741,12 +741,20 @@ TEST_CASE("Empty tools and uncalibrated docks are unavailable, and a print using
     CHECK(u.empty == std::vector<int>{5});
     CHECK(u.uncalibrated == std::vector<int>{3, 6, 7});
 
-    CHECK(unavailable_extruders_warning(u, {0, 1, 4}, "Test", "17:05").empty());
-    CHECK(unavailable_extruders_warning(u, {0, 5}, "Test", "17:05") ==
-          "Test can't print with extruder 6 (empty), which this print uses (last sync at 17:05). "
+    // The filament presets the print was sliced with; extruder 8 has none
+    const std::vector<std::string> names = {"Overture PLA Black",          "Overture PETG White", "Overture ASA Gray",
+                                            "Generic PETG",                "Prusament PETG Galaxy Black",
+                                            "Overture PETG Black",         "Overture PLA Red",    ""};
+    CHECK(unavailable_extruders_warning(u, {0, 1, 4}, names, "Test", "17:05").empty());
+    CHECK(unavailable_extruders_warning(u, {0, 5}, names, "Test", "17:05") ==
+          "Test can't print with extruder 6 (Overture PETG Black, not loaded), which this print uses (last sync at 17:05). "
           "Load the filament, or move those parts to another extruder.");
-    const std::string both = unavailable_extruders_warning(u, {3, 5, 7}, "Test", "17:05");
-    CHECK(both.find("extruder 4 (dock not calibrated), extruder 6 (empty) or extruder 8 (dock not calibrated)") != std::string::npos);
+    const std::string both = unavailable_extruders_warning(u, {3, 5, 7}, names, "Test", "17:05");
+    CHECK(both.find("extruder 4 (Generic PETG, dock not calibrated), extruder 6 (Overture PETG Black, not loaded) or "
+                    "extruder 8 (dock not calibrated)") != std::string::npos);
+    // No names passed: by number alone
+    CHECK(unavailable_extruders_warning(u, {5}, {}, "Test", "17:05").find("with extruder 6 (not loaded), which") !=
+          std::string::npos);
     // No dock calibrated: everything is unavailable
     CHECK(unavailable_extruders({}, 2).uncalibrated == std::vector<int>{0, 1});
 }

@@ -692,19 +692,23 @@ bool DSForLayers::render_multi_extruders_menu(bool switch_current_code/* = false
     if (extruders_cnt > 1) {
         const int tick = m_ctrl.GetActivePos();
 
+        const ImVec2 icon_size = ImVec2(14, 14) * m_scale;
+        auto icon_color = [&colors](int extruder) -> ImU32 {
+            std::array<float, 4> rgba = decode_color_to_float_array(colors[extruder - 1]);
+            return IM_COL32(rgba[0] * 255.0f, rgba[1] * 255.0f, rgba[2] * 255.0f, rgba[3] * 255.0f);
+        };
+
         if (m_mode == MultiAsSingle) {
             const std::string menu_name = switch_current_code ? _u8L("Switch code to Change extruder") : _u8L("Change extruder");
             if (ImGuiPureWrap::begin_menu(menu_name.c_str())) {
                 std::array<int, 2> active_extruders = m_ticks.get_active_extruders_for_tick(tick, m_mode);
                 for (int i = 1; i <= extruders_cnt; i++) {
                     const bool is_active_extruder = i == active_extruders[0] || i == active_extruders[1];
-                    std::string item_name = format(_u8L("Extruder %d"), i);
+                    std::string item_name = get_extruder_label(i);
                     if (is_active_extruder)
                         item_name += " (" + _u8L("active") + ")";
 
-                    std::array<float, 4> rgba = decode_color_to_float_array(colors[i - 1]);
-                    ImU32                icon_clr = IM_COL32(rgba[0] * 255.0f, rgba[1] * 255.0f, rgba[2] * 255.0f, rgba[3] * 255.0f);
-                    if (ImGuiPureWrap::menu_item_with_icon(item_name.c_str(), "", ImVec2(14, 14) * m_scale, icon_clr, false, !is_active_extruder)) {
+                    if (ImGuiPureWrap::menu_item_with_icon(item_name.c_str(), "", icon_size, icon_color(i), false, !is_active_extruder)) {
                         add_code_as_tick(ToolChange, i);
                         ret = true;
                     }
@@ -722,11 +726,11 @@ bool DSForLayers::render_multi_extruders_menu(bool switch_current_code/* = false
             for (int i = 1; i <= extruders_cnt; i++) {
                 const bool is_used_extruder = used_extruders_for_tick.empty() ? true : // #ys_FIXME till used_extruders_for_tick doesn't filled correct for mmMultiExtruder
                     used_extruders_for_tick.find(i) != used_extruders_for_tick.end();
-                std::string item_name = format(_u8L("Extruder %d"), i);
+                std::string item_name = get_extruder_label(i);
                 if (is_used_extruder)
                     item_name += " (" + _u8L("used") + ")";
 
-                if (ImGuiPureWrap::menu_item_with_icon(item_name.c_str(), "")) {
+                if (ImGuiPureWrap::menu_item_with_icon(item_name.c_str(), "", icon_size, icon_color(i))) {
                     add_code_as_tick(ColorChange, i);
                     ret = true;
                 }
@@ -1237,13 +1241,13 @@ std::string DSForLayers::get_tooltip(int tick/*=-1*/)
         	tick_code_it->type == ColorChange ?
         		(m_mode == SingleExtruder && tick_code_it->extruder==1 ?
                 	format(_u8L("Color change (\"%1%\")"), gcode(ColorChange)) :
-                    format(_u8L("Color change (\"%1%\") for Extruder %2%"), gcode(ColorChange), tick_code_it->extruder)) :
+                    format(_u8L("Color change (\"%1%\") for Extruder %2%"), gcode(ColorChange), get_extruder_number_and_filament(tick_code_it->extruder))) :
 	            tick_code_it->type == CustomGCode::PausePrint ?
 	                format(_u8L("Pause print (\"%1%\")"), gcode(CustomGCode::PausePrint)) :
 	            tick_code_it->type == Template ?
 	                format(_u8L("Custom template (\"%1%\")"), gcode(Template)) :
 		            tick_code_it->type == ToolChange ?
-		                format(_u8L("Extruder (tool) is changed to Extruder \"%1%\""), tick_code_it->extruder) :                
+		                format(_u8L("Extruder (tool) is changed to Extruder \"%1%\""), get_extruder_number_and_filament(tick_code_it->extruder)) :
 		                format_gcode(tick_code_it->extra);// tick_code_it->type == Custom
 
         // If tick is marked as a conflict (exclamation icon),
@@ -1276,6 +1280,25 @@ std::string DSForLayers::get_tooltip(int tick/*=-1*/)
     }
 
     return tooltip;
+}
+
+std::string DSForLayers::get_extruder_label(int extruder) const
+{
+    std::string label = get_extruder_number_and_filament(extruder);
+    if (label == std::to_string(extruder))
+        return format(_u8L("Extruder %d"), extruder);
+    // A menu item hides the text after "##".
+    boost::replace_all(label, "##", "# #");
+    return label;
+}
+
+std::string DSForLayers::get_extruder_number_and_filament(int extruder) const
+{
+    if (m_cb_get_extruder_label) {
+        if (std::string label = m_cb_get_extruder_label(extruder); !label.empty())
+            return label;
+    }
+    return std::to_string(extruder);
 }
 
 void DSForLayers::UseDefaultColors(bool def_colors_on)

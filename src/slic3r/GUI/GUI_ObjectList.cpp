@@ -1101,17 +1101,19 @@ void ObjectList::extruder_editing()
 
     apply_extruder_selector(&m_extruder_editor, this, L("default"), pos, size);
 
-    m_extruder_editor->SetSelection(m_objects_model->GetExtruderNumber(item));
+    // The selector's items, labeled as the cell shows them: by the extruder alone, without its filament.
+    const std::vector<ExtruderDropdownEntry> entries = build_extruder_dropdown(wxGetApp().plater()->model(), true, false);
+    m_extruder_editor->SetSelection(int(find_extruder_dropdown_position(m_objects_model->GetExtruderNumber(item), entries)));
     m_extruder_editor->Show();
 
-    auto set_extruder = [this]()
+    auto set_extruder = [this, entries]()
     {
         wxDataViewItem item = GetSelection();
         if (!item) return;
 
         const int selection = m_extruder_editor->GetSelection();
-        if (selection >= 0) 
-            m_objects_model->SetExtruder(m_extruder_editor->GetString(selection), item);
+        if (selection >= 0 && size_t(selection) < entries.size())
+            m_objects_model->SetExtruder(entries[selection].label, item);
 
         m_extruder_editor->Hide();
         update_extruder_in_config(item);
@@ -4812,6 +4814,8 @@ void ObjectList::ItemValueChanged(wxDataViewEvent &event)
         update_name_in_model(event.GetItem());
     else if (event.GetColumn() == colExtruder) {
         wxDataViewItem item = event.GetItem();
+        // The editor's swatch is the filament color; the cell's is the extruder color the scene is drawn in.
+        m_objects_model->UpdateExtruderBitmap(item);
         if (m_objects_model->GetItemType(item) == itObject)
             m_objects_model->UpdateVolumesExtruderBitmap(item);
         update_extruder_in_config(item);

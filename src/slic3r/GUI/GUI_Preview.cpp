@@ -25,6 +25,7 @@
 #include "MainFrame.hpp"
 #include "MsgDialog.hpp"
 #include "format.hpp"
+#include "wxExtensions.hpp"
 
 #include <wx/listbook.h>
 #include <wx/notebook.h>
@@ -418,6 +419,20 @@ void Preview::create_sliders()
             reload_print();
     });
 
+    m_layers_slider->set_callback_on_get_extruder_label([this](int extruder) -> std::string {
+        if (extruder < 1)
+            return "";
+        if (!wxGetApp().is_editor()) {
+            // The loaded presets have nothing to do with the G-code, which names its own.
+            const std::vector<std::string>& filaments = active_gcode_result()->settings_ids.filament;
+            return size_t(extruder) <= filaments.size() && !filaments[extruder - 1].empty() ?
+                       std::to_string(extruder) + " " + filament_display_name(filaments[extruder - 1]) : "";
+        }
+        // Virtual extruders keep "Extruder N".
+        const std::string name = extruder <= wxGetApp().extruders_edited_cnt() ? extruder_filament_name(unsigned(extruder)) : "";
+        return name.empty() ? "" : std::to_string(extruder) + " " + name;
+    });
+
     if (wxGetApp().is_editor()) {
         m_layers_slider->set_callback_on_ticks_changed([this]()                 -> void {
             Model& model = wxGetApp().plater()->model();
@@ -437,8 +452,9 @@ void Preview::create_sliders()
             GUI::wxGetApp().plater()->get_notification_manager()->push_notification(GUI::NotificationType::EmptyAutoColorChange);
         });
 
+        // The extruder menus name each extruder's filament, so their swatches show its color.
         m_layers_slider->set_callback_on_get_extruder_colors([]()               -> std::vector<std::string> {
-            return wxGetApp().plater()->get_extruder_color_strings_from_plater_config();
+            return get_filament_color_strings();
         });
 
         m_layers_slider->set_callback_on_get_print([]()                         -> const Print& {

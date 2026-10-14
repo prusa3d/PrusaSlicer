@@ -316,7 +316,7 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
     if (can_create_editor_ctrl && !can_create_editor_ctrl())
         return nullptr;
 
-    std::vector<wxBitmapBundle*> icons = get_extruder_color_icons();
+    std::vector<wxBitmapBundle*> icons = get_filament_color_icons();
     if (icons.empty())
         return nullptr;
 
@@ -333,7 +333,11 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
 
 #ifdef _WIN32
     Slic3r::GUI::wxGetApp().UpdateDarkUI(c_editor);
+    // The filament names don't fit the column.
+    c_editor->GetDropDown().SetUseContentWidth(true);
 #endif
+
+    m_editor_cell_texts.clear();
 
     Slic3r::GUI::Plater* plater = Slic3r::GUI::wxGetApp().plater();
     if (plater == nullptr) {
@@ -343,7 +347,7 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
     }
 
     const std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
-        Slic3r::GUI::build_extruder_dropdown(plater->model(), true, false);
+        Slic3r::GUI::build_extruder_dropdown(plater->model(), true, false, true);
 
     const int def_id = get_default_extruder_idx ? get_default_extruder_idx() : 0;
     for (size_t i = 0; i < entries.size(); ++i) {
@@ -356,6 +360,7 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
         }
 
         c_editor->Append(entries[i].label, bmp ? *bmp : wxNullBitmap);
+        m_editor_cell_texts.push_back(Slic3r::GUI::format_extruder_label(entries[i].extruder_id, plater->model()));
     }
 
     {
@@ -399,7 +404,7 @@ bool BitmapChoiceRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& val
    
     DataViewBitmapText bmpText;
 
-    bmpText.SetText(c->GetString(selection));
+    bmpText.SetText(size_t(selection) < m_editor_cell_texts.size() ? m_editor_cell_texts[selection] : c->GetString(selection));
     bmpText.SetBitmap(c->GetItemBitmap(selection));
 
     value << bmpText;

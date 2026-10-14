@@ -31,6 +31,7 @@
 #include <wx/bmpcbox.h>
 #include <wx/statbox.h>
 #include <wx/statbmp.h>
+#include <wx/dcclient.h>
 #include <wx/wupdlock.h> // IWYU pragma: keep
 #include "libslic3r/MultipleBeds.hpp"
 #include "wx/generic/stattextg.h"
@@ -873,10 +874,18 @@ void Sidebar::apply_filament_visibility()
     m_filaments_filtered = filter;
 }
 
+// The Filament Settings tab names each extruder's filament too.
+static void update_filament_tab_extruders()
+{
+    if (TabFilament* tab = dynamic_cast<TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT)))
+        tab->update_extruder_combobox_labels();
+}
+
 void Sidebar::update_all_filament_comboboxes()
 {
     for (PlaterPresetComboBox* cb : m_combos_filament)
         cb->update();
+    update_filament_tab_extruders();
 }
 
 void Sidebar::update_workflow_combobox_if_needed()
@@ -952,6 +961,7 @@ void Sidebar::update_presets(Preset::Type preset_type)
 
         for (size_t i = 0; i < filament_cnt; i++)
             m_combos_filament[i]->update();
+        update_filament_tab_extruders();
 
         break;
     }
@@ -1049,6 +1059,9 @@ void Sidebar::on_select_preset(wxCommandEvent& evt)
         // update plater with new config
         m_plater->on_config_change(wxGetApp().preset_bundle->full_config());
     }
+    if (preset_type == Preset::TYPE_FILAMENT)
+        // Once the plater has the new filament's color
+        update_filament_tab_extruders();
     if (preset_type == Preset::TYPE_PRINTER) {
         /* Settings list can be changed after printer preset changing, so
          * update all settings items for all item had it.
@@ -1431,7 +1444,11 @@ void Sidebar::update_sliced_info_sizer()
                         } else {
                             filament_weight = filament_vol * filament_density/* *2.4052f*/ * 0.001; // assumes 1.75mm filament diameter;
 
-                            new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament_id + 1);
+                            // A long filament name gets an ellipsis to keep its weight in view.
+                            wxClientDC dc(this);
+                            dc.SetFont(wxGetApp().small_font());
+                            new_label += "\n    - " + wxControl::Ellipsize(format_extruder_filament_label(unsigned(filament_id + 1)), dc,
+                                                                           wxELLIPSIZE_END, 20 * wxGetApp().em_unit(), wxELLIPSIZE_FLAGS_NONE);
                             info_text += wxString::Format("\n%.2f", filament_weight);
                         }
 

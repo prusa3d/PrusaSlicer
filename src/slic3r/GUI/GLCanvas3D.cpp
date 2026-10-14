@@ -1971,17 +1971,27 @@ ExtruderStatistics sum_extruder_statistics(
     return result;
 }
 
-void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, const float scale) {
+// Returns the table's width.
+float extruder_usage_table(const PerExtruderStatistics &extruder_statistics, const float scale) {
+    const float width_gap = 10.f * scale;
+    float total_width{ width_gap };
 
     ImGui::Text("%s", _u8L("Extruders usage breakdown").c_str());
     if (ImGui::BeginTable("extruder_usage_table", 3)) {
-        const float width_gap = 10.f * scale;
-        float width = width_gap + std::max<float>(ImGui::CalcTextSize(format(_u8L("Extruder %1%"), 1).c_str()).x, 
-                                                  ImGui::CalcTextSize(_u8L("Total").c_str()).x);
+        std::vector<std::string> labels;
+        labels.reserve(extruder_statistics.size());
+        float width = ImGui::CalcTextSize(_u8L("Total").c_str()).x;
+        for (const auto &[extruder_index, _] : extruder_statistics) {
+            labels.emplace_back(into_u8(format_extruder_filament_label(unsigned(extruder_index) + 1)));
+            width = std::max(width, ImGui::CalcTextSize(labels.back().c_str()).x);
+        }
+        width += width_gap;
+        total_width += width;
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width);
 
         std::string name = _u8L("Filament (g)");
         width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+        total_width += width;
         ImGui::TableSetupColumn(
             name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
@@ -1990,6 +2000,7 @@ void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, cons
 
         name = _u8L("Filament (m)");
         width = ImGui::CalcTextSize(name.c_str()).x + width_gap;
+        total_width += width;
         ImGui::TableSetupColumn(
             name.c_str(),
             ImGuiTableColumnFlags_WidthFixed,
@@ -1997,10 +2008,11 @@ void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, cons
         );
         ImGui::TableHeadersRow();
 
-        for (const auto &[extruder_index, statistics] : extruder_statistics) {
+        size_t row = 0;
+        for (const auto &[_, statistics] : extruder_statistics) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::Text("%s", format(_u8L("Extruder %1%"), extruder_index + 1).c_str());
+            ImGui::Text("%s", labels[row++].c_str());
             ImGui::TableNextColumn();
             ImGui::Text("%.2f", statistics.filament_weight);
             ImGui::TableNextColumn();
@@ -2022,6 +2034,8 @@ void extruder_usage_table(const PerExtruderStatistics &extruder_statistics, cons
 
         ImGui::EndTable();
     }
+
+    return total_width + 2.f * width_gap;
 }
 
 void begin_statistics(const char *window_name) {
@@ -2051,7 +2065,8 @@ void render_print_statistics(float scale) {
     const PerExtruderStatistics extruder_statistics{get_extruder_statistics()};
     if (extruder_statistics.size() > 1) {
         ImGui::NewLine();
-        extruder_usage_table(extruder_statistics, scale);
+        // Filament names can make this table the wider one.
+        content_size_x = std::max(content_size_x, extruder_usage_table(extruder_statistics, scale));
         ImGui::Separator();
     }
     ImGui::End();

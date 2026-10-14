@@ -6,6 +6,7 @@
 #define slic3r_GUI_ExtraRenderers_hpp_
 
 #include <functional>
+#include <vector>
 
 #include <wx/dataview.h>
 
@@ -162,6 +163,8 @@ private:
     DataViewBitmapText      m_value;
     std::function<bool()>   can_create_editor_ctrl  { nullptr };
     std::function<int()>    get_default_extruder_idx{ nullptr };
+    // The cell text for each item of the editor, which names the extruder without its filament.
+    std::vector<wxString>   m_editor_cell_texts;
 };
 
 

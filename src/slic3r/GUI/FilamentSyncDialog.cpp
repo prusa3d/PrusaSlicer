@@ -183,8 +183,9 @@ void apply_plan(wxWindow* parent, const std::string& printer_name, const Plan& p
         }
     }
 
-    app.sidebar().update_presets(Preset::TYPE_FILAMENT);
+    // The plater's filament colors first, so the lists the sidebar refreshes show the new ones.
     app.plater()->on_config_change(bundle.full_config());
+    app.sidebar().update_presets(Preset::TYPE_FILAMENT);
     bundle.export_selections(*app.app_config);
 
     size_t notes = plan.notes.size();
@@ -231,7 +232,10 @@ void update_unavailable_extruders_warning()
         if (print && !print->empty())
             append(used, print->extruders());
     sort_remove_duplicates(used);
-    const std::string text = unavailable_extruders_warning(unavailable_now(), used, s_last_sync->printer, s_last_sync->time);
+    std::vector<std::string> filament_names;
+    for (const ExtruderFilaments& ef : app.preset_bundle->extruders_filaments)
+        filament_names.push_back(filament_display_name(ef.get_selected_preset_name()));
+    const std::string text = unavailable_extruders_warning(unavailable_now(), used, filament_names, s_last_sync->printer, s_last_sync->time);
     if (!text.empty())
         nm->push_notification(NotificationType::FilamentSyncUnavailableExtruders,
                               NotificationManager::NotificationLevel::WarningNotificationLevel, text);

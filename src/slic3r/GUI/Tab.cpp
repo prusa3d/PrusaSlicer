@@ -2167,16 +2167,61 @@ void TabFilament::update_extruder_combobox_visibility()
     m_extruders_cb->Show(extruder_cnt > 1);
 }
 
+void TabFilament::update_extruder_combobox_items(size_t extruder_cnt)
+{
+    std::vector<wxString> labels;
+    labels.reserve(extruder_cnt);
+    for (size_t id = 1; id <= extruder_cnt; id++)
+        labels.emplace_back(format_extruder_filament_label(unsigned(id)));
+
+    std::vector<std::string> colors = get_filament_color_strings();
+    colors.resize(extruder_cnt);
+
+    bool unchanged = extruder_cnt == m_extruders_cb->GetCount() && colors == m_extruders_cb_colors;
+    for (size_t i = 0; unchanged && i < extruder_cnt; ++i)
+        unchanged = labels[i] == m_extruders_cb->GetString(unsigned(i));
+    if (unchanged)
+        return;
+
+    const int selection = m_extruders_cb->GetSelection();
+    const std::vector<wxBitmapBundle*> icons = get_filament_color_icons();
+    m_extruders_cb->Clear();
+    for (size_t i = 0; i < extruder_cnt; ++i)
+        m_extruders_cb->Append(labels[i], i < icons.size() ? *icons[i] : *get_empty_bmp_bundle(32, 16));
+    m_extruders_cb_colors = std::move(colors);
+
+    if (0 <= selection && selection < int(extruder_cnt))
+        m_extruders_cb->SetSelection(selection);
+
+    fit_extruder_combobox_width();
+}
+
+void TabFilament::fit_extruder_combobox_width()
+{
+    int text_width = 0;
+    for (unsigned int i = 0; i < m_extruders_cb->GetCount(); ++i)
+        text_width = std::max(text_width, m_extruders_cb->GetTextExtent(m_extruders_cb->GetString(i)).x);
+
+    // About 8 em for the swatch and the arrow. At most as wide as the preset combo: longer names get an ellipsis.
+    m_extruders_cb->SetMinSize(wxSize(std::clamp(text_width + 8 * m_em_unit, 12 * m_em_unit, 35 * m_em_unit), -1));
+    m_h_buttons_sizer->Layout();
+}
+
+void TabFilament::update_extruder_combobox_labels()
+{
+    if (m_preset_bundle->printers.get_selected_preset().printer_technology() != ptSLA)
+        update_extruder_combobox_items(m_extruders_cb->GetCount());
+}
+
 void TabFilament::update_extruder_combobox()
 {
-    const size_t extruder_cnt = m_preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA ? m_extruders_cb->GetCount() :
+    const bool   is_sla       = m_preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA;
+    const size_t extruder_cnt = is_sla ? m_extruders_cb->GetCount() :
                                 static_cast<const ConfigOptionFloats*>(m_preset_bundle->printers.get_edited_preset().config.option("nozzle_diameter"))->values.size();
 
-    if (extruder_cnt != m_extruders_cb->GetCount()) {
-        m_extruders_cb->Clear();
-        for (size_t id = 1; id <= extruder_cnt; id++)
-            m_extruders_cb->Append(format_wxstr("%1% %2%", _L("Extruder"), id), *get_bmp_bundle("funnel"));
-    }
+    // An SLA printer names no filaments, so the items of the last FFF one stay.
+    if (!is_sla)
+        update_extruder_combobox_items(extruder_cnt);
 
     if (m_active_extruder >= int(extruder_cnt)) {
         m_active_extruder = 0;
@@ -2523,8 +2568,11 @@ void TabFilament::update()
 
     m_update_cnt--;
 
-    if (m_update_cnt == 0 && wxGetApp().mainframe)
+    if (m_update_cnt == 0 && wxGetApp().mainframe) {
         wxGetApp().mainframe->on_config_changed(m_config);
+        // Only now the plater has the edited filament's color.
+        update_extruder_combobox_labels();
+    }
 }
 
 void TabFilament::clear_pages()
@@ -2544,6 +2592,7 @@ void TabFilament::msw_rescale()
         if (wxWindow* win = over_opt.second)
             win->SetInitialSize(win->GetBestSize());
     Tab::msw_rescale();
+    fit_extruder_combobox_width();
 }
 
 void TabFilament::sys_color_changed()

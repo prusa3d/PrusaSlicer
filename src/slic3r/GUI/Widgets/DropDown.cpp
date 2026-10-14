@@ -479,6 +479,11 @@ void DropDown::autoPosition()
             Position(pos, {0, GetParent()->GetSize().y + 12});
         }
     }
+    if (use_content_width && GetPosition().x < pos.x) {
+        // Too wide to open to the right, so Position() put it beside the control; keep it under it.
+        const int right = GetParent()->ClientToScreen(wxPoint(GetParent()->GetSize().x, 0)).x;
+        SetPosition({std::max(wxDisplay(GetParent()).GetGeometry().GetLeft(), right - GetSize().x), GetPosition().y});
+    }
     if (GetPosition().y > pos.y) {
         // may exceed
         auto drect = wxDisplay(GetParent()).GetGeometry();

@@ -745,15 +745,18 @@ UnavailableExtruders unavailable_extruders(const PrinterTools &tools, size_t ext
 }
 
 std::string unavailable_extruders_warning(const UnavailableExtruders &unavailable, const std::vector<unsigned int> &used,
-                                          const std::string &printer_name, const std::string &sync_time)
+                                          const std::vector<std::string> &filament_names, const std::string &printer_name,
+                                          const std::string &sync_time)
 {
     std::vector<std::string> items;
     for (const unsigned int e : used) {
-        const auto has = [e](const std::vector<int> &v) { return std::find(v.begin(), v.end(), int(e)) != v.end(); };
-        if (has(unavailable.empty))
-            items.push_back("extruder " + std::to_string(e + 1) + " (empty)");
-        else if (has(unavailable.uncalibrated))
-            items.push_back("extruder " + std::to_string(e + 1) + " (dock not calibrated)");
+        const auto  has   = [e](const std::vector<int> &v) { return std::find(v.begin(), v.end(), int(e)) != v.end(); };
+        const char *state = has(unavailable.empty) ? "not loaded" : has(unavailable.uncalibrated) ? "dock not calibrated" : nullptr;
+        if (state == nullptr)
+            continue;
+        // Not the pickers' "2 Overture PETG Black": in a sentence, that reads as a count
+        const std::string name = e < filament_names.size() ? filament_names[e] : std::string();
+        items.push_back("extruder " + std::to_string(e + 1) + " (" + (name.empty() ? "" : name + ", ") + state + ")");
     }
     if (items.empty())
         return {};

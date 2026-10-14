@@ -30,6 +30,7 @@
 #include "GUI_Preview.hpp"
 #include "GUI_ObjectManipulation.hpp"
 #include "MsgDialog.hpp"
+#include "wxExtensions.hpp"
 
 #include "libslic3r/MultipleBeds.hpp"
 
@@ -1163,6 +1164,13 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
         return;
 
     m_settings_ids = gcode_result.settings_ids;
+    // G-code sliced in the editor leaves the preset names out of its result, but the print's config has them.
+    const auto* print_filament_ids = wxGetApp().is_editor() ?
+        print.full_print_config().option<ConfigOptionStrings>("filament_settings_id") : nullptr;
+    const std::vector<std::string>& filament_ids = print_filament_ids != nullptr ? print_filament_ids->values : m_settings_ids.filament;
+    m_filament_names.clear();
+    for (const std::string& filament_id : filament_ids)
+        m_filament_names.emplace_back(filament_id.empty() ? std::string() : filament_display_name(filament_id));
     m_filament_diameters = gcode_result.filament_diameters;
     m_filament_densities = gcode_result.filament_densities;
 
@@ -2305,6 +2313,14 @@ void GCodeViewer::render_legend(float& legend_height)
         return ret;
     };
 
+    // Named as in the extruder pickers: "1 Generic PETG".
+    auto extruder_label = [this](size_t extruder_id) {
+        const std::string number = std::to_string(extruder_id + 1);
+        if (extruder_id < m_filament_names.size() && !m_filament_names[extruder_id].empty())
+            return number + " " + m_filament_names[extruder_id];
+        return _u8L("Extruder") + " " + number;
+    };
+
     auto upto_label = [](double z) {
         char buf[64];
         ::sprintf(buf, "%.2f", z);
@@ -2414,6 +2430,7 @@ void GCodeViewer::render_legend(float& legend_height)
         const size_t extruders_count = get_extruders_count();
         used_filaments_m = std::vector<double>(extruders_count, 0.0);
         used_filaments_g = std::vector<double>(extruders_count, 0.0);
+        labels = std::vector<std::string>(extruders_count);
         const std::vector<uint8_t>& used_extruders_ids = m_viewer.get_used_extruders_ids();
         for (uint8_t extruder_id : used_extruders_ids) {
             if (m_print_statistics.volumes_per_extruder.find(extruder_id) == m_print_statistics.volumes_per_extruder.end())
@@ -2423,6 +2440,7 @@ void GCodeViewer::render_legend(float& legend_height)
             auto [used_filament_m, used_filament_g] = get_used_filament_from_volume(volume, extruder_id);
             used_filaments_m[extruder_id] = used_filament_m;
             used_filaments_g[extruder_id] = used_filament_g;
+            labels[extruder_id] = extruder_label(extruder_id);
         }
 
         std::string longest_used_filament_string;
@@ -2551,7 +2569,7 @@ void GCodeViewer::render_legend(float& legend_height)
             const std::vector<uint8_t>& used_extruders_ids = m_viewer.get_used_extruders_ids();
             for (uint8_t extruder_id : used_extruders_ids) {
                 if (used_filaments_m[extruder_id] > 0.0 && used_filaments_g[extruder_id] > 0.0)
-                    append_item(EItemType::Rect, libvgcode::convert(m_viewer.get_tool_colors()[extruder_id]), _u8L("Extruder") + " " + std::to_string(extruder_id + 1),
+                    append_item(EItemType::Rect, libvgcode::convert(m_viewer.get_tool_colors()[extruder_id]), labels[extruder_id],
                     true, "", 0.0f, 0.0f, offsets, used_filaments_m[extruder_id], used_filaments_g[extruder_id]);
             }
             break;
@@ -2565,26 +2583,25 @@ void GCodeViewer::render_legend(float& legend_height)
 
             const bool need_scrollable = static_cast<float>(total_items) * icon_size + (static_cast<float>(total_items) - 1.0f) * ImGui::GetStyle().ItemSpacing.y > child_height;
 
-            // add scrollable region, if needed
-            if (need_scrollable)
-                ImGui::BeginChild("color_prints", { -1.0f, child_height }, false);
+            // Collected before they are shown: a scrollable region doesn't widen the legend to fit them.
+            std::vector<std::pair<ColorRGBA, std::string>> items;
             if (get_extruders_count() == 1) { // single extruder use case
                 const std::vector<std::pair<ColorRGBA, std::pair<double, double>>> cp_values = color_print_ranges(0, m_custom_gcode_per_print_z);
                 const int items_cnt = static_cast<int>(cp_values.size());
                 if (items_cnt == 0)  // There are no color changes, but there are some pause print or custom Gcode
-                    append_item(EItemType::Rect, libvgcode::convert(m_viewer.get_tool_colors().front()), _u8L("Default color"));
+                    items.emplace_back(libvgcode::convert(m_viewer.get_tool_colors().front()), _u8L("Default color"));
                 else {
                     for (int i = items_cnt; i >= 0; --i) {
                         // create label for color change item
                         if (i == 0) {
-                            append_item(EItemType::Rect, libvgcode::convert(m_viewer.get_tool_colors().front()), upto_label(cp_values.front().second.first));
+                            items.emplace_back(libvgcode::convert(m_viewer.get_tool_colors().front()), upto_label(cp_values.front().second.first));
                             break;
                         }
                         else if (i == items_cnt) {
-                            append_item(EItemType::Rect, cp_values[i - 1].first, above_label(cp_values[i - 1].second.second));
+                            items.emplace_back(cp_values[i - 1].first, above_label(cp_values[i - 1].second.second));
                             continue;
                         }
-                        append_item(EItemType::Rect, cp_values[i - 1].first, fromto_label(cp_values[i - 1].second.second, cp_values[i].second.first));
+                        items.emplace_back(cp_values[i - 1].first, fromto_label(cp_values[i - 1].second.second, cp_values[i].second.first));
                     }
                 }
             }
@@ -2596,29 +2613,39 @@ void GCodeViewer::render_legend(float& legend_height)
                     const int items_cnt = static_cast<int>(cp_values.size());
                     if (items_cnt == 0)
                         // There are no color changes, but there are some pause print or custom Gcode
-                        append_item(EItemType::Rect, libvgcode::convert(m_viewer.get_tool_colors()[extruder_id]), _u8L("Extruder") + " " +
-                            std::to_string(extruder_id + 1) + " " + _u8L("default color"));
+                        items.emplace_back(libvgcode::convert(m_viewer.get_tool_colors()[extruder_id]), extruder_label(extruder_id) + " " + _u8L("default color"));
                     else {
                         for (int j = items_cnt; j >= 0; --j) {
                             // create label for color change item
-                            std::string label = _u8L("Extruder") + " " + std::to_string(extruder_id + 1);
+                            std::string label = extruder_label(extruder_id);
                             if (j == 0) {
                                 label += " " + upto_label(cp_values.front().second.first);
-                                append_item(EItemType::Rect, libvgcode::convert(m_viewer.get_tool_colors()[extruder_id]), label);
+                                items.emplace_back(libvgcode::convert(m_viewer.get_tool_colors()[extruder_id]), label);
                                 break;
                             }
                             else if (j == items_cnt) {
                                 label += " " + above_label(cp_values[j - 1].second.second);
-                                append_item(EItemType::Rect, cp_values[j - 1].first, label);
+                                items.emplace_back(cp_values[j - 1].first, label);
                                 continue;
                             }
 
                             label += " " + fromto_label(cp_values[j - 1].second.second, cp_values[j].second.first);
-                            append_item(EItemType::Rect, cp_values[j - 1].first, label);
+                            items.emplace_back(cp_values[j - 1].first, label);
                         }
                     }
                 }
             }
+
+            // add scrollable region, if needed
+            if (need_scrollable) {
+                float items_width = 0.0f;
+                for (const auto& item : items)
+                    items_width = std::max(items_width, ImGui::CalcTextSize(item.second.c_str()).x);
+                items_width += icon_size + ImGui::GetStyle().ItemSpacing.x + ImGui::GetStyle().ScrollbarSize;
+                ImGui::BeginChild("color_prints", { std::max(items_width, ImGui::GetContentRegionAvail().x - 1.0f), child_height }, false);
+            }
+            for (const auto& [color, label] : items)
+                append_item(EItemType::Rect, color, label);
             if (need_scrollable)
                 ImGui::EndChild();
 

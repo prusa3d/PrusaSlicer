@@ -73,6 +73,7 @@ std::vector<wxBitmapBundle*> get_filament_color_icons(bool thin_icon = false);
 
 namespace Slic3r {
 class Model;
+class Preset;
 class ModelVolume;
 namespace FullSpectrum { struct VirtualExtruder; }
 namespace GUI {
@@ -98,6 +99,21 @@ std::vector<ExtruderDropdownEntry> build_extruder_dropdown(
     bool use_full_item_name = false,
     bool with_filament_name = false
 );
+
+/// The physical extruder's filament preset as the sidebar shows it: the edited one while it has
+/// unsaved changes. Null when it has none, as on an SLA printer.
+const Preset* extruder_filament_preset(unsigned int extruder_id);
+
+/// The name the sidebar shows for the physical extruder's filament preset; empty when it has none.
+std::string extruder_filament_name(unsigned int extruder_id);
+
+/// "1 Overture PLA Black": the physical extruder's number and the name of its filament preset, as
+/// the sidebar shows it. "Extruder 1" when it has none, as on an SLA printer.
+wxString format_extruder_filament_label(unsigned int extruder_id);
+
+/// The name the sidebar shows for the filament preset of this name: a system preset's alias, or the
+/// name itself, also when no such preset is loaded (as in the G-code viewer).
+std::string filament_display_name(const std::string& preset_name);
 
 size_t
 find_extruder_dropdown_position(int extruder_id, const std::vector<ExtruderDropdownEntry>& entries);

@@ -733,8 +733,9 @@ wxString GLGizmoMmuSegmentation::handle_snapshot_action_name(bool shift_down, GL
     if (shift_down)
         action_name = _L("Remove painted color");
     else {
-        size_t extruder_id = (button_down == Button::Left ? m_first_selected_extruder_idx : m_second_selected_extruder_idx) + 1;
-        action_name        = GUI::format(_L("Painted using: Extruder %1%"), extruder_id);
+        const size_t      extruder_id = (button_down == Button::Left ? m_first_selected_extruder_idx : m_second_selected_extruder_idx) + 1;
+        const std::string name        = extruder_id <= size_t(wxGetApp().extruders_edited_cnt()) ? extruder_filament_name(unsigned(extruder_id)) : "";
+        action_name = GUI::format_wxstr(_L("Painted using: Extruder %1%"), name.empty() ? std::to_string(extruder_id) : std::to_string(extruder_id) + " " + name);
     }
     return action_name;
 }
