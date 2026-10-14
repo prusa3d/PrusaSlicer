@@ -1,24 +1,30 @@
 #include "Slic3r/Biz/CGAL/Algorithms/Voronoi.hpp"
 
-#include <Slic3r/Log.hpp>
-#include <cassert>
 
 #include "Slic3r/Assert.hpp"
+#include "Slic3r/Biz/Algorithms/AABBTreeLines.hpp"
+#include "Slic3r/Biz/Algorithms/ColoredLine.hpp"
 #include "Slic3r/Biz/Algorithms/Geometry/Geometry.hpp"
-#include "Slic3r/Domain/Line.hpp"
+#include "Slic3r/Biz/Algorithms/Line.hpp"
+#include "Slic3r/Biz/Algorithms/PolygonsSegmentIndex.hpp"
 #include "Slic3r/Biz/CGAL/Algorithms/VoronoiUtils.hpp"
 #include "Slic3r/Domain/Line.hpp"
-#include "Slic3r/Biz/Algorithms/ColoredLine.hpp"
-#include "Slic3r/Biz/Algorithms/PolygonsSegmentIndex.hpp"
-#include "Slic3r/Biz/CGAL/Algorithms/VoronoiUtilsCgal.hpp"
+#include "Slic3r/Domain/Line.hpp"
+#include "Slic3r/Log.hpp"
 #include "Slic3r/Math.hpp"
 
-namespace Slic3r::Biz::CGAL::Algorithms {
+#include <algorithm>
+#include <cassert>
+#include <limits>
 
-using Domain::Lines;
-using Biz::Algorithms::PolygonsSegmentIndex;
-using Biz::Algorithms::ColoredLines;
+using Slic3r::Biz::Algorithms::ColoredLines;
+using Slic3r::Biz::Algorithms::PolygonsSegmentIndex;
 using Slic3r::Biz::Algorithms::Geometry::PI;
+using Slic3r::Domain::Line2d;
+using Slic3r::Domain::Lines;
+using Slic3r::Domain::Vec2d;
+
+namespace Slic3r::Biz::CGAL::Algorithms {
 
 using PolygonsSegmentIndexConstIt = std::vector<PolygonsSegmentIndex>::const_iterator;
 using LinesIt                     = Lines::iterator;
@@ -40,8 +46,8 @@ VoronoiDiagram::construct_voronoi(const SegmentIterator segment_begin, const Seg
         if (m_issue_type = detect_known_issues(*this, segment_begin, segment_end); m_issue_type != IssueType::NO_ISSUE_DETECTED) {
             if (m_issue_type == IssueType::MISSING_VORONOI_VERTEX) {
                 SPDLOG_WARN("Detected missing Voronoi vertex, input polygons will be rotated back and forth.");
-            } else if (m_issue_type == IssueType::NON_PLANAR_VORONOI_DIAGRAM) {
-                SPDLOG_WARN("Detected non-planar Voronoi diagram, input polygons will be rotated back and forth.");
+            } else if (m_issue_type == IssueType::VORONOI_VERTEX_VIOLATING_EMPTY_CIRCLE_PROPERTY) {
+                SPDLOG_WARN("Detected Voronoi vertex violating the empty-circle property, input polygons will be rotated back and forth.");
             } else if (m_issue_type == IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT) {
                 SPDLOG_WARN("Detected Voronoi edge intersecting input segment, input polygons will be rotated back and forth.");
             } else if (m_issue_type == IssueType::FINITE_EDGE_WITH_NON_FINITE_VERTEX) {
@@ -55,8 +61,8 @@ VoronoiDiagram::construct_voronoi(const SegmentIterator segment_begin, const Seg
             if (m_issue_type = try_to_repair_degenerated_voronoi_diagram(segment_begin, segment_end); m_issue_type != IssueType::NO_ISSUE_DETECTED) {
                 if (m_issue_type == IssueType::MISSING_VORONOI_VERTEX) {
                     SPDLOG_ERROR("Detected missing Voronoi vertex even after the rotation of input.");
-                } else if (m_issue_type == IssueType::NON_PLANAR_VORONOI_DIAGRAM) {
-                    SPDLOG_ERROR("Detected non-planar Voronoi diagram even after the rotation of input.");
+                } else if (m_issue_type == IssueType::VORONOI_VERTEX_VIOLATING_EMPTY_CIRCLE_PROPERTY) {
+                    SPDLOG_ERROR("Detected Voronoi vertex violating the empty-circle property even after the rotation of input.");
                 } else if (m_issue_type == IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT) {
                     SPDLOG_ERROR("Detected Voronoi edge intersecting input segment even after the rotation of input.");
                 } else if (m_issue_type == IssueType::FINITE_EDGE_WITH_NON_FINITE_VERTEX) {
@@ -167,20 +173,33 @@ void VoronoiDiagram::copy_to_local(voronoi_diagram_type &voronoi_diagram) {
     m_is_modified = true;
 }
 
-template<typename SegmentIterator>
+template <typename SegmentIterator>
 typename boost::polygon::enable_if<
-    typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
-        typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+    typename boost::polygon::gtl_if<
+        typename boost::polygon::is_segment_concept<typename boost::polygon::geometry_concept<
+            typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     VoronoiDiagram::IssueType>::type
-VoronoiDiagram::detect_known_issues(const VoronoiDiagram &voronoi_diagram, SegmentIterator segment_begin, SegmentIterator segment_end)
+VoronoiDiagram::detect_known_issues(
+    const VoronoiDiagram& voronoi_diagram,
+    SegmentIterator segment_begin,
+    SegmentIterator segment_end
+)
 {
-    if (const IssueType edge_issue_type = detect_known_voronoi_edge_issues(voronoi_diagram); edge_issue_type != IssueType::NO_ISSUE_DETECTED) {
+    if (const IssueType edge_issue_type = detect_known_voronoi_edge_issues(voronoi_diagram);
+        edge_issue_type != IssueType::NO_ISSUE_DETECTED)
+    {
         return edge_issue_type;
-    } else if (const IssueType cell_issue_type = detect_known_voronoi_cell_issues(voronoi_diagram, segment_begin, segment_end); cell_issue_type != IssueType::NO_ISSUE_DETECTED) {
+    } else if (const IssueType cell_issue_type =
+                   detect_known_voronoi_cell_issues(voronoi_diagram, segment_begin, segment_end);
+               cell_issue_type != IssueType::NO_ISSUE_DETECTED)
+    {
         return cell_issue_type;
-    } else if (!VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segment_begin, segment_end)) {
-        // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514 and #8446.
-        return IssueType::NON_PLANAR_VORONOI_DIAGRAM;
+    } else if (const IssueType vertex_issue_type =
+                   detect_known_voronoi_vertex_issues(voronoi_diagram, segment_begin, segment_end);
+               vertex_issue_type != IssueType::NO_ISSUE_DETECTED)
+    {
+        // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514, #8446 and #14421.
+        return vertex_issue_type;
     }
 
     return IssueType::NO_ISSUE_DETECTED;
@@ -247,6 +266,107 @@ VoronoiDiagram::IssueType VoronoiDiagram::detect_known_voronoi_edge_issues(const
     }
 
     return IssueType::NO_ISSUE_DETECTED;
+}
+
+template <typename SegmentIterator>
+typename boost::polygon::enable_if<
+    typename boost::polygon::gtl_if<
+        typename boost::polygon::is_segment_concept<typename boost::polygon::geometry_concept<
+            typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+    VoronoiDiagram::IssueType>::type
+VoronoiDiagram::detect_known_voronoi_vertex_issues(
+    const VoronoiDiagram& voronoi_diagram,
+    const SegmentIterator segment_begin,
+    const SegmentIterator segment_end
+)
+{
+    if (has_voronoi_vertex_violating_empty_circle_property(
+            voronoi_diagram,
+            segment_begin,
+            segment_end
+        ))
+    {
+        return IssueType::VORONOI_VERTEX_VIOLATING_EMPTY_CIRCLE_PROPERTY;
+    }
+
+    return IssueType::NO_ISSUE_DETECTED;
+}
+
+template <typename SegmentIterator>
+typename boost::polygon::enable_if<
+    typename boost::polygon::gtl_if<
+        typename boost::polygon::is_segment_concept<typename boost::polygon::geometry_concept<
+            typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
+    bool>::type
+VoronoiDiagram::has_voronoi_vertex_violating_empty_circle_property(
+    const VoronoiDiagram& voronoi_diagram,
+    const SegmentIterator segment_begin,
+    const SegmentIterator segment_end
+)
+{
+    using Segment = typename std::iterator_traits<SegmentIterator>::value_type;
+
+    auto to_line = [](const Segment& segment) -> Line2d
+    {
+        return {
+            boost::polygon::segment_traits<Segment>::get(segment, boost::polygon::LOW)
+                .template cast<double>(),
+            boost::polygon::segment_traits<Segment>::get(segment, boost::polygon::HIGH)
+                .template cast<double>()
+        };
+    };
+
+    auto distance_to_cell_source = [&](const cell_type& cell, const Vec2d& point) -> double
+    {
+        if (cell.contains_point()) {
+            return (VoronoiUtils::get_source_point(cell, segment_begin, segment_end)
+                        .template cast<double>()
+                    - point)
+                .norm();
+        }
+
+        const Line2d source_line =
+            to_line(VoronoiUtils::get_source_segment(cell, segment_begin, segment_end));
+        return Biz::Algorithms::Line::line_alg::distance_to(source_line, point);
+    };
+
+    std::vector<Line2d> source_lines;
+    source_lines.reserve(std::distance(segment_begin, segment_end));
+    std::ranges::transform(segment_begin, segment_end, std::back_inserter(source_lines), to_line);
+    const Biz::Algorithms::AABBTreeLines::LinesDistancer<Line2d> source_lines_distancer(
+        std::move(source_lines)
+    );
+
+    for (const vertex_type& vertex : voronoi_diagram.vertices()) {
+        if (!VoronoiUtils::is_finite(vertex)) {
+            continue;
+        }
+
+        const Vec2d vertex_point(vertex.x(), vertex.y());
+        double min_distance   = std::numeric_limits<double>::max();
+        double max_distance   = 0.;
+        const edge_type* edge = vertex.incident_edge();
+        do {
+            const double distance = distance_to_cell_source(*edge->cell(), vertex_point);
+            min_distance          = std::min(min_distance, distance);
+            max_distance          = std::max(max_distance, distance);
+        } while (edge = edge->rot_next(), edge != vertex.incident_edge());
+
+        if (max_distance - min_distance > Domain::SCALED_EPSILON) {
+            return true;
+        }
+
+        // All incident sources are at least min_distance away, so any input segment inside the circle shrunk by SCALED_EPSILON is another source.
+        if (min_distance > Domain::SCALED_EPSILON
+            && !source_lines_distancer
+                    .all_lines_in_radius(vertex_point, min_distance - Domain::SCALED_EPSILON)
+                    .empty())
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 template<typename SegmentIterator>

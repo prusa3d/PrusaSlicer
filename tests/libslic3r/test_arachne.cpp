@@ -3,9 +3,12 @@
 #include "Slic3r/TestUtils/HwConfigUtils.hpp"
 #include "libslic3r/Arachne/WallToolPaths.hpp"
 #include "libslic3r/ClipperUtils.hpp"
+#include "Slic3r/Biz/Algorithms/ExPolygon.hpp"
 #include "Slic3r/Biz/Algorithms/SVG.hpp"
 #include "libslic3r/SlicingInput.hpp"
 #include "libslic3r/Utils.hpp"
+
+#include <algorithm>
 
 using namespace Slic3r;
 using namespace Slic3r::Arachne;
@@ -556,6 +559,74 @@ TEST_CASE("Arachne - #8446 - Degenerated Voronoi diagram - Linear edges", "[Arac
 
     // Total extrusion length should be around 211.2mm when the part is ok and 212.1mm when it has perimeters in places where they shouldn't be.
     REQUIRE(total_extrusion_length <= scaled<int64_t>(211.5));
+}
+
+// This case is extracted from GH issue #8446, where Arachne generated perimeters in places where they shouldn't be.
+// Without the repair of the Voronoi diagram, some perimeters are generated outside of the input polygon.
+TEST_CASE(
+    "Arachne - #8446 - Degenerated Voronoi diagram - Perimeters outside of the input polygon",
+    "[ArachneDegeneratedDiagram8446PerimetersOutside]"
+)
+{
+    Polygons polygons{
+        Polygon{
+            {28641817, -31810029},  {16783179, -15488019},  {18098941, -13928796},
+            {19266221, -12259975},  {19828087, -11332706},  {20954186, -9056293},
+            {21187496, -8524843},   {22151917, -5556671},   {22236592, -5206546},
+            {22702465, -2486270},   {22792930, -1405888},   {22829495, 630357},
+            {22681513, 2665168},    {41869187, 8899620},    {39103950, 17410146},
+            {19916268, 11175694},   {18839928, 12908925},   {17750190, 14361887},
+            {16905209, 15355690},   {15088243, 17130081},   {14654922, 17516166},
+            {12130015, 19350631},   {11823235, 19539328},   {9380034, 20823027},
+            {8380476, 21242930},    {6455198, 21906927},    {4474249, 22394979},
+            {4474249, 42570094},    {-4474247, 42570094},   {-4474247, 22394979},
+            {-6455200, 21906925},   {-8380470, 21242930},   {-9380039, 20823023},
+            {-11629203, 19643225},  {-12130262, 19350447},  {-14655143, 17516010},
+            {-14929445, 17282524},  {-16905267, 15355630},  {-17613525, 14534713},
+            {-18839951, 12908885},  {-19916267, 11175694},  {-39103942, 17410146},
+            {-41869183, 8899620},   {-22681506, 2665168},   {-22829491, 630352},
+            {-22792925, -1405887},  {-22702459, -2486280},  {-22236586, -5206556},
+            {-22151911, -5556674},  {-21187404, -8525116},  {-21050103, -8858162},
+            {-19828076, -11332723}, {-19266218, -12259973}, {-18098937, -13928796},
+            {-16783179, -15488019}, {-28641812, -31810029}, {-21402329, -37069822},
+            {-9543694, -20747808},  {-7654198, -21517345},  {-5706315, -22111809},
+            {-4650842, -22359626},  {-1919753, -22757162},  {-1560608, -22784828},
+            {1560608, -22784828},   {1919765, -22757162},   {4650848, -22359625},
+            {5706326, -22111807},   {7654210, -21517342},   {9543696, -20747809},
+            {21402331, -37069822},
+        },
+    };
+
+    coord_t ext_perimeter_spacing = 398496;
+    coord_t perimeter_spacing     = 398496;
+    coord_t inset_count           = 2;
+
+    Arachne::WallToolPaths wall_tool_paths(
+        polygons,
+        ext_perimeter_spacing,
+        perimeter_spacing,
+        inset_count,
+        0,
+        0.24,
+        get_region_config_view({}),
+        0
+    );
+    wall_tool_paths.generate();
+    std::vector<Arachne::VariableWidthLines> perimeters = wall_tool_paths.getToolPaths();
+
+    const ExPolygons input_expolygons = union_ex(polygons);
+    size_t junctions_outside          = 0;
+    for (const Arachne::VariableWidthLines& perimeter : perimeters) {
+        for (const Arachne::ExtrusionLine& extrusion_line : perimeter) {
+            junctions_outside += std::ranges::count_if(
+                extrusion_line.junctions,
+                [&input_expolygons](const Arachne::ExtrusionJunction& junction)
+                { return !Biz::Algorithms::ExPolygon::contains(input_expolygons, junction.p); }
+            );
+        }
+    }
+
+    REQUIRE(junctions_outside == 0);
 }
 
 // This test case was distilled from GitHub issue #8846.

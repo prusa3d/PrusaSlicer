@@ -2,6 +2,7 @@
 #include <CGAL/Arr_segment_traits_2.h>
 #include <CGAL/Surface_sweep_2_algorithms.h>
 #include <boost/variant/get.hpp>
+#include <algorithm>
 #include <vector>
 #include <cassert>
 
@@ -156,7 +157,7 @@ inline Line2d make_linef(const VD::edge_type &edge)
     return {Vec2d(v0->x(), v0->y()), Vec2d(v1->x(), v1->y())};
 }
 
-[[maybe_unused]] inline bool is_equal(const VD::vertex_type &vertex_first, const VD::vertex_type &vertex_second) { return vertex_first.x() == vertex_second.x() && vertex_first.y() == vertex_second.y(); }
+inline bool is_equal(const VD::vertex_type &vertex_first, const VD::vertex_type &vertex_second) { return vertex_first.x() == vertex_second.x() && vertex_first.y() == vertex_second.y(); }
 
 // FIXME Lukas H.: Also includes parabolic segments.
 bool VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(const VD &voronoi_diagram)
@@ -167,6 +168,15 @@ bool VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(const VD &voronoi_
 
     assert(std::all_of(voronoi_diagram.edges().cbegin(), voronoi_diagram.edges().cend(),
                        [](const VD::edge_type &edge) { return edge.color() == 0; }));
+
+    if (std::ranges::any_of(
+            voronoi_diagram.edges(),
+            [](const VD::edge_type& edge)
+            { return edge.is_finite() && is_equal(*edge.vertex0(), *edge.vertex1()); }
+        ))
+    {
+        return false;
+    }
 
     std::vector<CGAL_E_Segment> segments;
     segments.reserve(voronoi_diagram.num_edges());
@@ -298,7 +308,7 @@ check_if_three_edges_are_ccw(const VD::edge_type  &edge_first,
         // So we need to check if test_pt is between them.
         ::CGAL::Orientation orientation1 = orientation_of_two_edges(edge_first, edge_third, segment_begin, segment_end);
         ::CGAL::Orientation orientation2 = orientation_of_two_edges(edge_second, edge_third, segment_begin, segment_end);
-        return (orientation1 == ::CGAL::Orientation::RIGHT_TURN || orientation2 == ::CGAL::Orientation::LEFT_TURN);
+        return (orientation1 == ::CGAL::Orientation::RIGHT_TURN && orientation2 == ::CGAL::Orientation::LEFT_TURN);
     }
 }
 
@@ -321,6 +331,15 @@ VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(const VD             &voronoi_
 
             edge = edge->rot_next();
         } while (edge != vertex.incident_edge());
+
+        if (std::ranges::any_of(
+                edges,
+                [](const VD::edge_type* finite_edge)
+                { return is_equal(*finite_edge->vertex0(), *finite_edge->vertex1()); }
+            ))
+        {
+            return false;
+        }
 
         // Checking for CCW make sense for three and more edges.
         if (edges.size() > 2) {
