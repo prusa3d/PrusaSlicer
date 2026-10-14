@@ -336,6 +336,10 @@ void TriangleSelector::set_triangle_division(
         return;
     }
 
+    if (sides_to_split > 0 && !triangle.is_split()) {
+        this->set_triangle_selected_by_seed_fill(triangle_idx, false);
+    }
+
     triangle.set_division(sides_to_split, special_side_idx);
     this->record_change_of_triangle_slot(triangle_idx);
 }
@@ -350,11 +354,48 @@ TriangleSelector::set_triangle_selected_by_seed_fill(const int triangle_idx, con
 
     if (selected) {
         triangle.select_by_seed_fill();
+
+        const int root_chunk_idx = triangle.source_triangle / SEED_FILL_ROOT_CHUNK_SIZE;
+        m_seed_fill_selected_root_chunks[root_chunk_idx] = true;
     } else {
         triangle.unselect_by_seed_fill();
     }
 
     this->record_change_of_triangle_slot(triangle_idx);
+}
+
+bool TriangleSelector::
+    seed_fill_apply_on_subtree(const int triangle_idx, const TriangleStateType new_state)
+{
+    const Triangle& triangle = m_triangles[triangle_idx];
+    if (!triangle.is_split()) {
+        if (!triangle.is_selected_by_seed_fill() || triangle.get_state() == new_state) {
+            return false;
+        }
+
+        this->set_triangle_state(triangle_idx, new_state);
+        return true;
+    }
+
+    bool state_changed = false;
+    for (int child_idx = 0; child_idx <= triangle.number_of_split_sides(); ++child_idx) {
+        state_changed |= this->seed_fill_apply_on_subtree(triangle.children[child_idx], new_state);
+    }
+
+    return state_changed;
+}
+
+void TriangleSelector::seed_fill_unselect_subtree(const int triangle_idx)
+{
+    const Triangle& triangle = m_triangles[triangle_idx];
+    if (!triangle.is_split()) {
+        this->set_triangle_selected_by_seed_fill(triangle_idx, false);
+        return;
+    }
+
+    for (int child_idx = 0; child_idx <= triangle.number_of_split_sides(); ++child_idx) {
+        this->seed_fill_unselect_subtree(triangle.children[child_idx]);
+    }
 }
 
 void TriangleSelector::seed_fill_select_triangles(const Vec3f &hit, int facet_start, const Transform3d& trafo_no_translate,
@@ -1553,6 +1594,9 @@ void TriangleSelector::reset()
     m_orig_size_indices  = static_cast<int>(m_triangles.size());
 
     this->record_change_of_all_slots();
+
+    m_seed_fill_selected_root_chunks
+        .assign(ceil_div(m_orig_size_indices, SEED_FILL_ROOT_CHUNK_SIZE), false);
 }
 
 void TriangleSelector::set_edge_limit(float edge_limit)
@@ -1886,13 +1930,37 @@ void TriangleSelector::get_facets_split_by_tjoints(const Index3 &vertices, const
     }
 }
 
-std::vector<Domain::Index2> TriangleSelector::get_seed_fill_contour() const {
-    std::vector<Domain::Index2> edges_out;
-    for (int facet_idx = 0; facet_idx < m_orig_size_indices; ++facet_idx) {
-        const Index3 neighbors = m_neighbors[facet_idx];
-        assert(this->verify_triangle_neighbors(m_triangles[facet_idx], neighbors));
-        this->get_seed_fill_contour_recursive(facet_idx, neighbors, neighbors, edges_out);
+template <std::invocable<int> Function>
+void TriangleSelector::for_each_root_of_seed_fill_selected_chunks(const Function& function) const
+{
+    for (int chunk_idx = 0; chunk_idx < static_cast<int>(m_seed_fill_selected_root_chunks.size());
+         ++chunk_idx)
+    {
+        if (!m_seed_fill_selected_root_chunks[chunk_idx]) {
+            continue;
+        }
+
+        const int first_root_idx = chunk_idx * SEED_FILL_ROOT_CHUNK_SIZE;
+        const int end_root_idx =
+            std::min(first_root_idx + SEED_FILL_ROOT_CHUNK_SIZE, m_orig_size_indices);
+
+        for (int root_idx = first_root_idx; root_idx < end_root_idx; ++root_idx) {
+            function(root_idx);
+        }
     }
+}
+
+std::vector<Domain::Index2> TriangleSelector::get_seed_fill_contour() const
+{
+    std::vector<Domain::Index2> edges_out;
+    this->for_each_root_of_seed_fill_selected_chunks(
+        [&](const int facet_idx)
+        {
+            const Index3 neighbors = m_neighbors[facet_idx];
+            assert(this->verify_triangle_neighbors(m_triangles[facet_idx], neighbors));
+            this->get_seed_fill_contour_recursive(facet_idx, neighbors, neighbors, edges_out);
+        }
+    );
 
     return edges_out;
 }
@@ -2207,11 +2275,10 @@ bool TriangleSelector::has_facets(const TriangleSplittingData &data, const Trian
 
 void TriangleSelector::seed_fill_unselect_all_triangles()
 {
-    for (int triangle_idx = 0; triangle_idx < int(m_triangles.size()); ++triangle_idx) {
-        if (!m_triangles[triangle_idx].is_split()) {
-            this->set_triangle_selected_by_seed_fill(triangle_idx, false);
-        }
-    }
+    this->for_each_root_of_seed_fill_selected_chunks(
+        [&](const int root_idx) { this->seed_fill_unselect_subtree(root_idx); }
+    );
+    m_seed_fill_selected_root_chunks.assign(m_seed_fill_selected_root_chunks.size(), false);
 }
 
 void TriangleSelector::seed_fill_unselect_triangle(const int facet_idx) {
@@ -2224,26 +2291,24 @@ void TriangleSelector::seed_fill_unselect_triangle(const int facet_idx) {
     }
 }
 
-void TriangleSelector::seed_fill_apply_on_triangles(TriangleStateType new_state) {
+void TriangleSelector::seed_fill_apply_on_triangles(TriangleStateType new_state)
+{
     if (m_triangle_selected_by_seed_fill != -1) {
         this->seed_fill_apply_on_single_triangle(new_state, m_triangle_selected_by_seed_fill);
         m_triangle_selected_by_seed_fill = -1;
         return;
     }
 
-    for (Triangle& triangle : m_triangles) {
-        if (!triangle.is_split() && triangle.is_selected_by_seed_fill()) {
-            const size_t facet_idx = &triangle - &m_triangles.front();
-            this->set_triangle_state(static_cast<int>(facet_idx), new_state);
+    this->for_each_root_of_seed_fill_selected_chunks(
+        [&](const int root_idx)
+        {
+            if (this->seed_fill_apply_on_subtree(root_idx, new_state)
+                && m_triangles[root_idx].is_split())
+            {
+                this->remove_useless_children(root_idx);
+            }
         }
-    }
-
-    for (Triangle& triangle : m_triangles) {
-        if (triangle.is_split() && triangle.valid()) {
-            const size_t facet_idx = &triangle - &m_triangles.front();
-            this->remove_useless_children(int(facet_idx));
-        }
-    }
+    );
 }
 
 void TriangleSelector::seed_fill_apply_on_single_triangle(TriangleStateType new_state, const int facet_idx) {

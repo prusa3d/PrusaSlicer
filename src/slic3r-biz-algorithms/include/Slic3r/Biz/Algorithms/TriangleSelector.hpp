@@ -6,6 +6,7 @@
 #include <cfloat>
 #include <algorithm>
 #include <array>
+#include <concepts>
 #include <map>
 #include <memory>
 #include <optional>
@@ -39,6 +40,12 @@ public:
      * @brief Number of consecutive slots whose change is recorded by one flag.
      */
     static constexpr int SLOT_CHANGE_CHUNK_SIZE = 1024;
+
+    /**
+     * @brief Number of consecutive original triangles whose seed fill selection is tracked by one
+     * flag, so the seed fill operations walk only the subtrees of the flagged chunks.
+     */
+    static constexpr int SEED_FILL_ROOT_CHUNK_SIZE = 256;
 
     class Triangle;
     struct Vertex;
@@ -716,6 +723,25 @@ private:
      */
     void set_triangle_selected_by_seed_fill(int triangle_idx, bool selected);
 
+    /**
+     * @brief Sets the state of the leaves of the subtree selected by seed fill.
+     *
+     * @return True when the state of a leaf changed.
+     */
+    bool seed_fill_apply_on_subtree(int triangle_idx, TriangleStateType new_state);
+
+    /**
+     * @brief Unselects the leaves of the subtree selected by seed fill.
+     */
+    void seed_fill_unselect_subtree(int triangle_idx);
+
+    /**
+     * @brief Calls the function with every original triangle of the chunks which may have a leaf
+     * selected by seed fill.
+     */
+    template <std::invocable<int> Function>
+    void for_each_root_of_seed_fill_selected_chunks(const Function& function) const;
+
     void seed_fill_fill_gaps(const std::vector<int> &gap_fill_candidate_facets, // Facet of the original mesh (unsplit), which needs to be checked if the surrounding gap can be filled (selected).
                              float                   seed_fill_gap_area);       // The maximal area that will be automatically selected when the surrounding triangles have already been selected.
 
@@ -743,6 +769,11 @@ private:
      * take_changed_vertex_slot_chunks().
      */
     std::vector<bool> m_changed_vertex_slot_chunks;
+
+    /**
+     * @brief Chunks of original triangles which may have a leaf selected by seed fill.
+     */
+    std::vector<bool> m_seed_fill_selected_root_chunks;
 };
 
 using TriangleSelectors = std::vector<TriangleSelector>;
