@@ -407,10 +407,18 @@ void SlicingInteractor::process_update_requests()
 
     SPDLOG_TRACE("update_requests: {}", m_update_requests.size());
 
-    std::set<SlicingId> to_remove;
-    for (auto& [id, request] : m_update_requests) {
-        BackgroundProcess& process{m_processes.at(id)};
+    // Listeners may queue new requests and re-enter, so iterate a detached copy. Requests
+    // postponed for an active thread go back, unless a newer one arrived meanwhile.
+    std::map<SlicingId, UpdateRequest> requests{std::move(m_update_requests)};
+    m_update_requests.clear();
+    for (auto& [id, request] : requests) {
+        const auto process_it{m_processes.find(id)};
+        if (process_it == m_processes.end()) {
+            continue;
+        }
+        BackgroundProcess& process{process_it->second};
         if (is_thread_active(get_status(id))) {
+            m_update_requests.try_emplace(id, std::move(request));
             continue;
         }
 
@@ -440,13 +448,7 @@ void SlicingInteractor::process_update_requests()
             );
             invoke_background_process_state_changed(id);
         }
-        to_remove.insert(id);
     }
-
-    std::erase_if(m_update_requests, [&](const auto& pair) {
-        const SlicingId id{pair.first};
-        return to_remove.contains(id);
-    });
 }
 
 void SlicingInteractor::update_status(const SlicingId id, const StatusCode status)
