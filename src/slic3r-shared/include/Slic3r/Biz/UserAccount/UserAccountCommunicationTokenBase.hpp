@@ -27,6 +27,12 @@ public:
 
     bool is_active() const override { return true; }
 
+    std::string
+    wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token) override
+    {
+        return m_session.wait_for_access_token(timeout, stop_token);
+    }
+
     /**
      *@brief Sets token timer to try refreshing tokens based on given input.
      * Latest refresh is 10 seconds before token expires.

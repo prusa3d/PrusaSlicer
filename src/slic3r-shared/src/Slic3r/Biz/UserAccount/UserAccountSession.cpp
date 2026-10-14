@@ -16,6 +16,9 @@ namespace Slic3r::Biz::UserAccount {
 
 namespace {
 
+/// A stop request cannot wake the wait (JThread has no stop callbacks), so it is polled.
+constexpr std::chrono::milliseconds k_stop_poll_interval{100};
+
 std::string oauth_error_code(const std::string& body)
 {
     try {
@@ -50,10 +53,43 @@ void UserAccountSession::set_tokens(const std::string& access_token, const std::
         m_shared_session_key = shared_session_key;
         m_next_token_timeout = /*std::time(nullptr) +*/ expires_in;
     }
+    m_credentials_cv.notify_all();
     if (!access_token.empty()) {
         long long exp = expires_in - std::time(nullptr);
         dispatch_new_refresh_time(exp);
     }
+}
+
+std::string UserAccountSession::wait_for_access_token(
+    std::chrono::milliseconds timeout,
+    JThread::StopToken stop_token
+)
+{
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    const auto settled  = [this]
+    {
+        if (m_shutting_down) {
+            return true;
+        }
+        if (m_access_token.empty()) {
+            return m_refresh_token.empty();
+        }
+        return m_next_token_timeout > std::time(nullptr);
+    };
+
+    std::unique_lock<std::mutex> lock(m_credentials_mutex);
+    ++m_token_waiters;
+    while (!settled() && !stop_token.stop_requested()) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= deadline) {
+            break;
+        }
+        m_credentials_cv.wait_until(lock, std::min(deadline, now + k_stop_poll_interval));
+    }
+    --m_token_waiters;
+    std::string access_token = m_access_token;
+    m_credentials_cv.notify_all();
+    return access_token;
 }
 
 void UserAccountSession::do_clear(bool notify_owner)
@@ -69,6 +105,7 @@ void UserAccountSession::do_clear(bool notify_owner)
         m_refresh_token.clear();
         m_shared_session_key.clear();
     }
+    m_credentials_cv.notify_all();
     {
         std::lock_guard<std::mutex> lock(m_session_mutex);
         m_processing_enabled = false;
@@ -85,6 +122,9 @@ void UserAccountSession::stop()
         std::lock_guard<std::mutex> lock(m_session_mutex);
         m_processing_enabled = false;
     }
+    std::unique_lock<std::mutex> lock(m_credentials_mutex);
+    m_credentials_cv.notify_all();
+    m_credentials_cv.wait(lock, [this] { return m_token_waiters == 0; });
 }
 
 void UserAccountSession::process_action_queue()
@@ -392,6 +432,7 @@ void UserAccountSession::token_success_callback(const std::string& body, uint64_
             m_shared_session_key = std::string();
             m_next_token_timeout = 0;
         }
+        m_credentials_cv.notify_all();
         dispatch_action_fail(ActionFailType::Reset, body);
         return;
     }
@@ -407,6 +448,7 @@ void UserAccountSession::token_success_callback(const std::string& body, uint64_
         m_next_token_timeout = std::time(nullptr) + expires_in;
         next_token_timeout   = m_next_token_timeout;
     }
+    m_credentials_cv.notify_all();
     TokenStore::save_tokens(
         {access_token,
          refresh_token,

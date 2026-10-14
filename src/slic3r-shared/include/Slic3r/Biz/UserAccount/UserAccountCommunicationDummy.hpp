@@ -9,6 +9,7 @@ class UserAccountCommunicationDummy final : public IUserAccountCommunication {
 public:
     void init() override {}
     bool is_active() const override { return false; }
+    std::string wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token) override { return {}; }
     void set_refresh_time(int seconds) override {}
     void on_username_changed(const std::string& username, bool store) override {}
     void on_race_lost(const std::string& body) override {}

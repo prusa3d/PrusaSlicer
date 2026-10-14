@@ -3,10 +3,14 @@
 #include "Slic3r/Biz/UserAccount/UserAccountActionStore.hpp"
 #include "Slic3r/Biz/UserAccount/UserAccountSessionDispatchBase.hpp"
 
+#include <jthread/JThread.hpp>
+
 #include <queue>
 #include <mutex>
 #include <deque>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 
 namespace Slic3r::Biz::UserAccount {
@@ -68,6 +72,17 @@ public:
         return m_access_token;
     }
 
+    /**
+     * @brief Returns the access token, waiting up to timeout until it is usable or the session
+     * is settled logged out. Every path a token episode can take - the startup test, a refresh,
+     * adopting the token another instance renewed, losing a refresh race, a logout - ends in a
+     * credential write, and each write wakes the waiters. A requested stop ends the wait early.
+     * On timeout returns whatever is current, possibly empty or expired, and the server stays
+     * the judge of that.
+     */
+    std::string
+    wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token = {});
+
     std::string get_refresh_token() const
     {
         std::lock_guard<std::mutex> lock(m_credentials_mutex);
@@ -123,7 +138,16 @@ private:
     std::string m_refresh_token;
     std::string m_shared_session_key;
     long long m_next_token_timeout{0};
+    /**
+     * @brief Threads blocked in wait_for_access_token. stop() waits until it reads zero, and
+     * destruction follows stop(), so a leaving waiter notifies while still holding the mutex
+     * and its last touch of this object is releasing it.
+     */
+    int m_token_waiters{0};
     // End of section guarded by m_credentials_mutex
+
+    /// Notified on every credential write and on stop().
+    std::condition_variable m_credentials_cv;
 
     std::atomic_bool m_global_cancel{false};
 

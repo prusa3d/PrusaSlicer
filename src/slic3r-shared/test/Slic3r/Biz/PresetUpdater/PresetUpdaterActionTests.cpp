@@ -1023,7 +1023,7 @@ TEST_CASE("PresetUpdaterProcessStatus reads the access token per request", "[pre
 
     CHECK(process_status.access_token().empty());
 
-    process_status.set_access_token_provider([&calls] {
+    process_status.set_access_token_provider([&calls](JThread::StopToken) {
         ++calls;
         return calls == 1 ? std::string{"first"} : std::string{"rotated"};
     });

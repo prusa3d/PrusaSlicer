@@ -196,7 +196,7 @@ private:
     std::function<void(const PresetUpdaterProgress&)> make_status_callback(
         JobId job_id, Platform::JobManager::ProgressTracker progress_tracker, VerboseStyle verbose
     );
-    std::function<std::string()> make_access_token_provider() const;
+    std::function<std::string(JThread::StopToken)> make_access_token_provider() const;
 
     std::deque<PendingJob> m_queue;
     std::optional<JobId> m_running;

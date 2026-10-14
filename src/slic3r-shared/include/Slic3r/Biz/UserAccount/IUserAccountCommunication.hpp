@@ -1,10 +1,13 @@
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <functional>
 #include <boost/filesystem/path.hpp>
-#include "Slic3r/Biz/UserAccount/IUserAccountActionCallbacks.hpp" 
+#include "Slic3r/Biz/UserAccount/IUserAccountActionCallbacks.hpp"
 #include "Slic3r/Biz/UserAccount/IUserAccountSessionListener.hpp"
+
+#include <jthread/JThread.hpp>
 
 namespace Slic3r::Biz::UserAccount {
 
@@ -15,6 +18,8 @@ public:
     // From UserAccountCommunicationTokenBase
     virtual void init() = 0;
     virtual bool is_active() const = 0;
+    virtual std::string
+    wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token) = 0;
     virtual void set_refresh_time(int seconds) = 0;
     virtual void on_username_changed(const std::string& username, bool store) = 0;
     virtual void on_race_lost(const std::string& body) = 0;

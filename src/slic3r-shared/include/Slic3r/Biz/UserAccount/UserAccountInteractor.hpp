@@ -6,9 +6,13 @@
 #include "Slic3r/Biz/Platform/WithListeners.hpp"
 #include "Slic3r/Biz/Platform/IMainThreadDispatcher.hpp"
 
+#include <jthread/JThread.hpp>
+
+#include <chrono>
 #include <functional>
 #include <mutex>
 #include <map>
+#include <vector>
 
 namespace Slic3r::Biz {
 class ProjectInteractor;
@@ -116,6 +120,18 @@ public:
 
     std::string access_token() const;
 
+    /**
+     * @brief Returns the access token, waiting up to timeout while a login or refresh is
+     * being resolved. Empty when logged out. Returns right away whenever the answer is
+     * already known, so only an expired or not yet loaded token waits. A requested stop
+     * ends the wait early.
+     *
+     * Blocks, so it must not be called on the main thread: the events that end the wait
+     * are delivered there.
+     */
+    std::string
+    wait_for_access_token(std::chrono::milliseconds timeout, JThread::StopToken stop_token = {});
+
     void request_printables_secret_token();
 
 private:
@@ -126,6 +142,12 @@ private:
     Platform::IMainThreadDispatcher& m_dispatcher;
     mutable std::mutex m_communication_mutex;
     std::unique_ptr<IUserAccountCommunication> m_communication;
+    /**
+     * @brief Replaced communications are parked here instead of being destroyed: a job thread
+     * may still be blocked inside one in wait_for_access_token(). They are all logged out and
+     * idle, and the few possible replacements make the leak bounded.
+     */
+    std::vector<std::unique_ptr<IUserAccountCommunication>> m_retired_communications;
 
     std::map<std::string, std::string> m_account_user_data;
 

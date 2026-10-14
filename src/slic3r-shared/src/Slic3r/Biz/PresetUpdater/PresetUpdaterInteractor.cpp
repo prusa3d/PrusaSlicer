@@ -9,6 +9,7 @@
 #include "Slic3r/Log.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <map>
 #include <set>
 #include <vector>
@@ -16,6 +17,8 @@
 namespace Slic3r::Biz::PresetUpdater {
 
 namespace {
+
+constexpr std::chrono::seconds k_access_token_wait{5};
 
 Platform::JobManager::JobManager* job_manager_or_null()
 {
@@ -213,9 +216,11 @@ PresetUpdaterInteractor::make_status_callback(
     };
 }
 
-std::function<std::string()> PresetUpdaterInteractor::make_access_token_provider() const
+std::function<std::string(JThread::StopToken)>
+PresetUpdaterInteractor::make_access_token_provider() const
 {
-    return [this] { return m_user_account_interactor.access_token(); };
+    return [this](JThread::StopToken stop_token)
+    { return m_user_account_interactor.wait_for_access_token(k_access_token_wait, stop_token); };
 }
 
 JobId PresetUpdaterInteractor::check_forced_reconfigurations()
