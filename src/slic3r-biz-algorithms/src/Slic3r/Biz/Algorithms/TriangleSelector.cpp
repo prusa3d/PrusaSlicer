@@ -684,16 +684,10 @@ void TriangleSelector::bucket_fill_select_triangles(const Vec3f &hit, int facet_
     assert(!m_triangles[start_facet_idx].is_split());
     TriangleStateType start_facet_state = m_triangles[start_facet_idx].get_state();
 
+    this->seed_fill_unselect_all_triangles();
     if (propagate == BucketFillPropagate::NO) {
-        if (m_triangle_selected_by_seed_fill != -1)
-            this->seed_fill_unselect_triangle(m_triangle_selected_by_seed_fill);
-
         this->set_triangle_selected_by_seed_fill(start_facet_idx, true);
-        m_triangle_selected_by_seed_fill = start_facet_idx;
         return;
-    } else {
-        m_triangle_selected_by_seed_fill = -1;
-        this->seed_fill_unselect_all_triangles();
     }
 
     const float facet_angle_limit = std::cos(deg2rad(bucket_fill_angle)) - EPSILON;
@@ -814,7 +808,6 @@ void TriangleSelector::select_triangles_by_state_type(
     const ClippingPlane& clp
 )
 {
-    m_triangle_selected_by_seed_fill = -1;
     this->seed_fill_unselect_all_triangles();
 
     for (Triangle& triangle : m_triangles) {
@@ -2281,24 +2274,8 @@ void TriangleSelector::seed_fill_unselect_all_triangles()
     m_seed_fill_selected_root_chunks.assign(m_seed_fill_selected_root_chunks.size(), false);
 }
 
-void TriangleSelector::seed_fill_unselect_triangle(const int facet_idx) {
-    assert(facet_idx > 0 && facet_idx < m_triangles.size());
-    Triangle &triangle = m_triangles[facet_idx];
-
-    assert(!triangle.is_split());
-    if (!triangle.is_split()) {
-        this->set_triangle_selected_by_seed_fill(facet_idx, false);
-    }
-}
-
 void TriangleSelector::seed_fill_apply_on_triangles(TriangleStateType new_state)
 {
-    if (m_triangle_selected_by_seed_fill != -1) {
-        this->seed_fill_apply_on_single_triangle(new_state, m_triangle_selected_by_seed_fill);
-        m_triangle_selected_by_seed_fill = -1;
-        return;
-    }
-
     this->for_each_root_of_seed_fill_selected_chunks(
         [&](const int root_idx)
         {
@@ -2309,15 +2286,6 @@ void TriangleSelector::seed_fill_apply_on_triangles(TriangleStateType new_state)
             }
         }
     );
-}
-
-void TriangleSelector::seed_fill_apply_on_single_triangle(TriangleStateType new_state, const int facet_idx) {
-    assert(facet_idx > 0 && facet_idx < m_triangles.size());
-
-    if (Triangle &triangle = m_triangles[facet_idx]; !triangle.is_split() && triangle.is_selected_by_seed_fill()) {
-        this->set_triangle_state(facet_idx, new_state);
-        remove_useless_children(triangle.source_triangle);
-    }
 }
 
 double TriangleSelector::get_triangle_area(const Triangle &triangle) const {

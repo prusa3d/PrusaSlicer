@@ -491,16 +491,9 @@ public:
     // For all triangles, remove the flag indicating that the triangle was selected by seed fill.
     void seed_fill_unselect_all_triangles();
 
-    // Remove the flag indicating that the triangle was selected by seed fill.
-    void seed_fill_unselect_triangle(int facet_idx);
-
     // For all triangles selected by seed fill, set new TriangleStateType and remove flag indicating that triangle was selected by seed fill.
     // The operation may merge split triangles if they are being assigned the same color.
     void seed_fill_apply_on_triangles(TriangleStateType new_state);
-
-    // For the triangle selected by seed fill, set a new TriangleStateType and remove the flag indicating that the triangle was selected by seed fill.
-    // The operation may merge a split triangle if it is being assigned the same color.
-    void seed_fill_apply_on_single_triangle(TriangleStateType new_state, int facet_idx);
 
     // Compute total area of the triangle.
     double get_triangle_area(const Triangle &triangle) const;
@@ -649,10 +642,6 @@ protected:
 
     std::unique_ptr<Cursor> m_cursor;
 
-    // Single triangle selected by seed fill. It is used to optimize painting using a single triangle brush.
-    int m_triangle_selected_by_seed_fill = -1;
-
-    // Private functions:
 private:
     bool select_triangle(int facet_idx, TriangleStateType type, bool triangle_splitting);
     bool select_triangle_recursive(int facet_idx, const Domain::Index3 &neighbors, TriangleStateType type, bool triangle_splitting);
