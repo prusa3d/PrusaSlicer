@@ -2,9 +2,12 @@
 
 This guide explains **Sync Filaments from Printer**: it reads the filament loaded in each tool of
 a CORE One INDX over PrusaLink, then selects a matching filament preset and sets the color for
-each extruder. Nothing changes until you click **Apply** in its preview.
+each extruder. Presets and extruder colors don't change until you click **Apply** in its preview.
 
 It's one way only. Nothing is sent to the printer or to Filament DB.
+
+For a short walkthrough with screenshots of the printer and slicer screens, see the
+[Filament Slots and Sync user guide](Filament_Slots_and_Sync_User_Guide.md).
 
 ---
 
