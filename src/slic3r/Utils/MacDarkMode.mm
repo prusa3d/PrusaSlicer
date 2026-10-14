@@ -1,6 +1,7 @@
 #import "MacDarkMode.hpp"
 
 #include "wx/osx/core/cfstring.h"
+#include <wx/menu.h>
 
 #import <algorithm>
 
@@ -34,6 +35,16 @@ double mac_max_scaling_factor()
 	    	scaling = std::max<double>(scaling, [[[NSScreen screens] objectAtIndex:0] backingScaleFactor]);
 	}
     return scaling;
+}
+
+void mac_show_menu_item_images(wxMenu* menu)
+{
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 270000
+    if (@available(macOS 27.0, *)) {
+        for (NSMenuItem* item in [(NSMenu*)menu->GetHMenu() itemArray])
+            item.preferredImageVisibility = NSMenuItemImageVisibilityVisible;
+    }
+#endif
 }
 
 void WKWebView_evaluateJavaScript(void * web, wxString const & script, void (*callback)(wxString const &))

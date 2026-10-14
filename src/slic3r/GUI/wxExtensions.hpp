@@ -66,6 +66,10 @@ wxBitmapBundle* get_empty_bmp_bundle(int width, int height);
 wxBitmapBundle* get_solid_bmp_bundle(int width, int height, const std::string& color);
 
 std::vector<wxBitmapBundle*> get_extruder_color_icons(bool thin_icon = false);
+/// The extruder colors, except that each physical extruder takes its filament's color when that is
+/// set, to go beside the filament's name. Extruder colors set in the printer settings can differ.
+std::vector<std::string> get_filament_color_strings();
+std::vector<wxBitmapBundle*> get_filament_color_icons(bool thin_icon = false);
 
 namespace Slic3r {
 class Model;
@@ -86,10 +90,13 @@ wxString format_extruder_label(
     bool use_full_item_name = false
 );
 
+/// @param with_filament_name labels each physical extruder with its number and the name of its
+/// filament preset, as the sidebar shows it ("1 Overture PLA Black").
 std::vector<ExtruderDropdownEntry> build_extruder_dropdown(
     const Model& model,
     bool include_default    = true,
-    bool use_full_item_name = false
+    bool use_full_item_name = false,
+    bool with_filament_name = false
 );
 
 size_t

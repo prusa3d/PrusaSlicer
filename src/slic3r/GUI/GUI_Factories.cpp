@@ -941,7 +941,7 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
             return;
     }
 
-    std::vector<wxBitmapBundle*> icons = get_extruder_color_icons(true);
+    std::vector<wxBitmapBundle*> icons = get_filament_color_icons(true);
     wxMenu* extruder_selection_menu = new wxMenu();
     const wxString& name = sels.Count() == 1 ? names[0] : names[1];
 
@@ -957,16 +957,25 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
     }
 
     const std::vector<ExtruderDropdownEntry> entries =
-        build_extruder_dropdown(p->model(), true, true);
+        build_extruder_dropdown(p->model(), true, true, true);
+
+    // The swatch of "default" is the extruder the items fall back to: the object's for a part, the
+    // first for an object. Modifiers, and items falling back to different extruders, get none.
+    int default_icon_idx = list_model()->GetDefaultExtruderIdx(sels[0]);
+    for (const wxDataViewItem& item : sels)
+        if (list_model()->GetDefaultExtruderIdx(item) != default_icon_idx)
+            default_icon_idx = -1;
 
     for (size_t i = 0; i < entries.size(); ++i) {
         const ExtruderDropdownEntry& entry = entries[i];
         const bool is_active_extruder      = entry.extruder_id == initial_extruder;
 
-        const wxString item_name =
-            entry.label + (is_active_extruder ? " (" + _L("active") + ")" : "");
+        wxString item_name = entry.label + (is_active_extruder ? " (" + _L("active") + ")" : "");
+        // Filament names may contain '&', which a menu label would take for a mnemonic.
+        item_name.Replace("&", "&&");
 
-        const size_t icon_idx = i == 0 ? 0 : std::min<size_t>(i - 1, icons.size() - 1);
+        const int       icon_idx = i == 0 ? default_icon_idx : int(i) - 1;
+        wxBitmapBundle* icon     = icon_idx >= 0 && size_t(icon_idx) < icons.size() ? icons[icon_idx] : nullptr;
 
         const int captured_id = entry.extruder_id;
         append_menu_item(
@@ -976,12 +985,17 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
             "",
             [captured_id](wxCommandEvent&)
             { obj_list()->set_extruder_for_selected_items(captured_id); },
-            icons[icon_idx],
+            icon,
             menu,
             [is_active_extruder]() { return !is_active_extruder; },
             m_parent
         );
     }
+
+#ifdef __APPLE__
+    // The swatches tell the filaments apart.
+    mac_show_menu_item_images(extruder_selection_menu);
+#endif
 
     append_submenu(menu, extruder_selection_menu, wxID_ANY, name, _L("Use another extruder"),
         "edit_uni"/* : "change_extruder"*/, []() {return true; }, m_parent);

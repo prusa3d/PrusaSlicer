@@ -67,23 +67,22 @@ bool GLGizmoMmuSegmentation::on_is_activable() const
 
 static std::vector<std::string> get_extruders_names()
 {
-    const size_t physical_extruders_cnt = wxGetApp().extruders_edited_cnt();
-    const size_t virtual_extruders_cnt  = wxGetApp().virtual_extruders_cnt();
-    const size_t total_extruders_cnt    = physical_extruders_cnt + virtual_extruders_cnt;
+    const std::vector<ExtruderDropdownEntry> entries = build_extruder_dropdown(wxGetApp().plater()->model(), false, true, true);
 
     std::vector<std::string> extruders_out;
-    extruders_out.reserve(physical_extruders_cnt + virtual_extruders_cnt);
-    for (size_t extruder_idx = 1; extruder_idx <= physical_extruders_cnt; ++extruder_idx) {
-        extruders_out.emplace_back(_u8L("Extruder") + " " + std::to_string(extruder_idx));
-    }
-
-    const FullSpectrum::VirtualExtruders& virtual_extruders =
-        wxGetApp().plater()->model().virtual_extruders;
-    for (const FullSpectrum::VirtualExtruder& ve : virtual_extruders) {
-        extruders_out.emplace_back("[V] " + _u8L("Extruder") + " " + std::to_string(ve.id));
+    extruders_out.reserve(entries.size());
+    for (const ExtruderDropdownEntry& entry : entries) {
+        extruders_out.emplace_back(into_u8(entry.label));
     }
 
     return extruders_out;
+}
+
+static std::vector<ColorRGBA> get_extruders_filament_colors()
+{
+    std::vector<ColorRGBA> colors;
+    decode_colors(get_filament_color_strings(), colors);
+    return colors;
 }
 
 static std::vector<int> get_extruder_id_for_volumes(const ModelObject &model_object)
@@ -105,6 +104,7 @@ void GLGizmoMmuSegmentation::init_extruders_data()
     m_original_extruders_names     = get_extruders_names();
     m_original_extruders_colors    = wxGetApp().plater()->get_extruder_colors_from_plater_config();
     m_modified_extruders_colors    = m_original_extruders_colors;
+    m_extruders_filament_colors    = get_extruders_filament_colors();
     m_first_selected_extruder_idx  = 0;
     m_second_selected_extruder_idx = 1;
 }
@@ -295,6 +295,12 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
 
     ImGuiPureWrap::begin(get_name(), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
+    // Another filament preset of the same color doesn't reload the scene, so read its name and color here.
+    if (std::vector<std::string> names = get_extruders_names(); names.size() == m_original_extruders_names.size())
+        m_original_extruders_names = std::move(names);
+    if (std::vector<ColorRGBA> colors = get_extruders_filament_colors(); colors.size() == m_extruders_filament_colors.size())
+        m_extruders_filament_colors = std::move(colors);
+
     // First calculate width of all the texts that are could possibly be shown. We will decide set the dialog width based on that:
     const float clipping_slider_left     = std::max(ImGuiPureWrap::calc_text_size(m_desc.at("clipping_of_view")).x,
                                                     ImGuiPureWrap::calc_text_size(m_desc.at("reset_direction")).x) + m_imgui->scaled(1.5f);
@@ -348,6 +354,13 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     window_width = std::max(window_width, tool_type_radio_max_width);
     window_width = std::max(window_width, 2.f * buttons_width + m_imgui->scaled(1.f));
 
+    // Room for the longest filament name in the combos, after the color swatch and before the arrow.
+    float extruder_name_max = 0.f;
+    for (size_t idx = 0; idx < std::min(m_original_extruders_names.size(), GLGizmoMmuSegmentation::EXTRUDERS_LIMIT); ++idx)
+        extruder_name_max = std::max(extruder_name_max, ImGuiPureWrap::calc_text_size(m_original_extruders_names[idx]).x);
+    const float combo_min_width = 1.5f * ImGui::GetTextLineHeight() + 3.f * ImGui::GetStyle().FramePadding.x + extruder_name_max + ImGui::GetFrameHeight();
+    window_width = std::max(window_width, combo_label_width + combo_min_width + color_button_width);
+
     auto draw_text_with_caption = [&caption_max](const std::string &caption, const std::string& text) {
         ImGuiPureWrap::text_colored(ImGuiPureWrap::COL_ORANGE_LIGHT, caption);
         ImGui::SameLine(caption_max);
@@ -369,7 +382,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImGuiPureWrap::text(m_desc.at("first_color"));
     ImGui::SameLine(combo_label_width);
     ImGui::PushItemWidth(window_width - combo_label_width - color_button_width);
-    render_extruders_combo("##first_color_combo", m_original_extruders_names, m_original_extruders_colors, m_first_selected_extruder_idx);
+    render_extruders_combo("##first_color_combo", m_original_extruders_names, m_extruders_filament_colors, m_first_selected_extruder_idx);
     ImGui::SameLine();
 
     const ColorRGBA& select_first_color = m_modified_extruders_colors[m_first_selected_extruder_idx];
@@ -386,7 +399,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImGuiPureWrap::text(m_desc.at("second_color"));
     ImGui::SameLine(combo_label_width);
     ImGui::PushItemWidth(window_width - combo_label_width - color_button_width);
-    render_extruders_combo("##second_color_combo", m_original_extruders_names, m_original_extruders_colors, m_second_selected_extruder_idx);
+    render_extruders_combo("##second_color_combo", m_original_extruders_names, m_extruders_filament_colors, m_second_selected_extruder_idx);
     ImGui::SameLine();
 
     const ColorRGBA& select_second_color = m_modified_extruders_colors[m_second_selected_extruder_idx];

@@ -130,6 +130,8 @@ protected:
     std::vector<std::string>          m_original_extruders_names;
     std::vector<ColorRGBA>            m_original_extruders_colors;
     std::vector<ColorRGBA>            m_modified_extruders_colors;
+    // The swatches beside the names: each filament's color, which the extruder colors may not be.
+    std::vector<ColorRGBA>            m_extruders_filament_colors;
     std::vector<int>                  m_original_volumes_extruder_idxs;
 
     static const constexpr float      CursorRadiusMin = 0.1f; // cannot be zero

@@ -29,6 +29,7 @@
 
 #include "libslic3r/Color.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/PresetBundle.hpp"
 
 #ifndef __linux__
 // msw_menuitem_bitmaps is used for MSW and OSX
@@ -341,6 +342,31 @@ std::vector<wxBitmapBundle*> get_extruder_color_icons(bool thin_icon/* = false*/
         return bmps;
 
     for (const std::string& color : colors)
+        bmps.emplace_back(get_solid_bmp_bundle(thin_icon ? 16 : 32, 16, color));
+
+    return bmps;
+}
+
+std::vector<std::string> get_filament_color_strings()
+{
+    Slic3r::GUI::Plater*     plater = Slic3r::GUI::wxGetApp().plater();
+    std::vector<std::string> colors = plater->get_extruder_color_strings_from_plater_config();
+
+    // The physical extruders come first, then the virtual ones.
+    const size_t physical_cnt = colors.size() - std::min(colors.size(), plater->model().virtual_extruders.size());
+    if (const auto* filament_colours = plater->config()->option<Slic3r::ConfigOptionStrings>("filament_colour")) {
+        for (size_t i = 0; i < std::min(physical_cnt, filament_colours->values.size()); ++i)
+            if (Slic3r::can_decode_color(filament_colours->values[i]))
+                colors[i] = filament_colours->values[i];
+    }
+
+    return colors;
+}
+
+std::vector<wxBitmapBundle*> get_filament_color_icons(bool thin_icon/* = false*/)
+{
+    std::vector<wxBitmapBundle*> bmps;
+    for (const std::string& color : get_filament_color_strings())
         bmps.emplace_back(get_solid_bmp_bundle(thin_icon ? 16 : 32, 16, color));
 
     return bmps;
@@ -842,6 +868,25 @@ wxString make_virtual_label(unsigned int virtual_id, bool use_full_item_name)
     return "[V] " + make_physical_label(virtual_id, use_full_item_name);
 }
 
+wxString make_filament_label(unsigned int physical_id)
+{
+    // An SLA printer keeps the last FFF filament selection, which names nothing loaded.
+    const PresetBundle* bundle = wxGetApp().preset_bundle;
+    const Preset*       preset = bundle != nullptr && bundle->printers.get_edited_preset().printer_technology() == ptFFF &&
+                                     physical_id <= bundle->extruders_filaments.size() ?
+                                     bundle->extruders_filaments[physical_id - 1].get_selected_preset() :
+                                     nullptr;
+    if (preset == nullptr) {
+        return make_physical_label(physical_id, true);
+    }
+
+    // System presets go by their alias, as in the sidebar's filament lists.
+    const std::string& name = preset->alias.empty() || (preset->vendor && preset->vendor->templates_profile) ?
+                                  preset->name :
+                                  preset->alias;
+    return wxString::Format("%u ", physical_id) + from_u8(name);
+}
+
 } // namespace
 
 wxString
@@ -860,7 +905,7 @@ format_extruder_label(int extruder_id_1based_or_0, const Model& model, bool use_
 }
 
 std::vector<ExtruderDropdownEntry>
-build_extruder_dropdown(const Model& model, bool include_default, bool use_full_item_name)
+build_extruder_dropdown(const Model& model, bool include_default, bool use_full_item_name, bool with_filament_name)
 {
     std::vector<ExtruderDropdownEntry> entries;
 
@@ -874,7 +919,7 @@ build_extruder_dropdown(const Model& model, bool include_default, bool use_full_
     }
 
     for (unsigned int i = 1; i <= num_physical; ++i) {
-        entries.push_back({make_physical_label(i, use_full_item_name), int(i)});
+        entries.push_back({with_filament_name ? make_filament_label(i) : make_physical_label(i, use_full_item_name), int(i)});
     }
 
     for (unsigned int virtual_id : virtual_ids) {
