@@ -13,6 +13,7 @@
 #include <wx/datetime.h>
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/choice.h>
 #include <wx/gbsizer.h>
 #include <wx/settings.h>
 #include <wx/sizer.h>
@@ -93,7 +94,7 @@ wxString action_text(const ExtruderPlan& row)
 {
     switch (row.action) {
     case Action::NotLoaded: return _L("No change");
-    case Action::Keep:      return format_wxstr(_L("Keeps %1%"), row.preset);
+    case Action::Keep:      return row.preset.empty() ? _L("No change") : format_wxstr(_L("Keeps %1%"), row.preset);
     case Action::Select:    return format_wxstr(_L("Selects %1%"), row.preset);
     case Action::Install:   return format_wxstr(_L("Installs and selects %1%"), row.preset);
     // TRN %1% = new preset name, %2% = the preset it is copied from
@@ -108,12 +109,13 @@ bool has_change(const ExtruderPlan& row)
     return row.action == Action::Select || row.action == Action::Install || row.action == Action::Create;
 }
 
+int swatch_size() { return int(1.6 * wxGetApp().em_unit()); }
+
 wxWindow* swatch(wxWindow* parent, const std::string& hex)
 {
-    const int size = int(1.6 * wxGetApp().em_unit());
     if (hex.empty())
         return new wxStaticText(parent, wxID_ANY, wxString::FromUTF8("–"));
-    return new wxStaticBitmap(parent, wxID_ANY, *get_solid_bmp_bundle(size, size, hex));
+    return new wxStaticBitmap(parent, wxID_ANY, *get_solid_bmp_bundle(swatch_size(), swatch_size(), hex));
 }
 
 wxStaticText* note_text(wxWindow* parent, const std::string& text, int wrap)
@@ -329,7 +331,7 @@ void sync_filaments_from_printer(wxWindow* parent)
     FilamentSyncDialog dlg(parent, plan, pp.name);
     if (dlg.ShowModal() != wxID_OK)
         return;
-    apply_plan(parent, pp.name, plan, dlg.accepted(), dlg.reset_extruder_colours());
+    apply_plan(parent, pp.name, dlg.chosen_plan(), dlg.accepted(), dlg.reset_extruder_colours());
 }
 
 FilamentSyncDialog::FilamentSyncDialog(wxWindow* parent, const Plan& plan, const std::string& printer_name)
@@ -343,25 +345,17 @@ FilamentSyncDialog::FilamentSyncDialog(wxWindow* parent, const Plan& plan, const
 
     auto* grid = new wxGridBagSizer(int(0.4 * em), em);
     int   line = 0;
-    const wxString headings[] = {"", _L("Extruder"), _L("In the printer"), _L("Preset"), _L("Preset color")};
-    for (int c = 0; c < 5; ++c) {
+    const wxString headings[] = {_L("Extruder"), _L("In the printer"), _L("Preset"), _L("Preset color")};
+    for (int c = 0; c < 4; ++c) {
         auto* h = new wxStaticText(this, wxID_ANY, headings[c]);
         h->SetFont(wxGetApp().bold_font());
         grid->Add(h, wxGBPosition(line, c), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
     }
     ++line;
 
-    for (const ExtruderPlan& row : m_plan.extruders) {
-        wxCheckBox* check = nullptr;
-        if (has_change(row)) {
-            check = new wxCheckBox(this, wxID_ANY, wxEmptyString);
-            check->SetValue(true);
-            check->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { update_apply_enabled(); });
-            grid->Add(check, wxGBPosition(line, 0), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
-        }
-        m_checks.push_back(check);
-
-        grid->Add(new wxStaticText(this, wxID_ANY, format_wxstr(_L("Extruder %1%"), row.idx + 1)), wxGBPosition(line, 1),
+    for (size_t i = 0; i < m_plan.extruders.size(); ++i) {
+        const ExtruderPlan& row = m_plan.extruders[i];
+        grid->Add(new wxStaticText(this, wxID_ANY, format_wxstr(_L("Extruder %1%"), row.idx + 1)), wxGBPosition(line, 0),
                   wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
 
         auto* reported = new wxBoxSizer(wxHORIZONTAL);
@@ -369,26 +363,58 @@ FilamentSyncDialog::FilamentSyncDialog(wxWindow* parent, const Plan& plan, const
             reported->Add(swatch(this, row.tool.color_hex), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, int(0.5 * em));
         }
         reported->Add(new wxStaticText(this, wxID_ANY, reported_text(row.tool)), 0, wxALIGN_CENTER_VERTICAL);
-        grid->Add(reported, wxGBPosition(line, 2), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
+        grid->Add(reported, wxGBPosition(line, 1), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
 
-        grid->Add(new wxStaticText(this, wxID_ANY, action_text(row)), wxGBPosition(line, 3), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
+        // What Apply does: the plan's own action, else one of its alternatives
+        wxChoice* choice = nullptr;
+        if (row.alternatives.empty()) {
+            grid->Add(new wxStaticText(this, wxID_ANY, action_text(row)), wxGBPosition(line, 2), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
+        } else {
+            choice = new wxChoice(this, wxID_ANY);
+            choice->Append(action_text(row));
+            for (size_t a = 0; a < row.alternatives.size(); ++a)
+                choice->Append(action_text(with_alternative(row, a)));
+            choice->SetSelection(0);
+            choice->Bind(wxEVT_CHOICE, [this, i](wxCommandEvent&) {
+                update_row(i);
+                Layout();
+                Fit();
+                update_apply_enabled();
+            });
+            grid->Add(choice, wxGBPosition(line, 2), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
+        }
+        m_choices.push_back(choice);
 
-        // The preset's filament color, which the extruder shows
-        if (row.tool.loaded && !row.preset_colour.empty())
-            grid->Add(swatch(this, row.preset_colour), wxGBPosition(line, 4), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
+        // The preset's filament color, which the extruder shows; follows the choice
+        wxStaticBitmap* colour = nullptr;
+        if (row.tool.loaded) {
+            colour = new wxStaticBitmap(this, wxID_ANY, *get_solid_bmp_bundle(swatch_size(), swatch_size(), "#000000"));
+            grid->Add(colour, wxGBPosition(line, 3), wxDefaultSpan, wxALIGN_CENTER_VERTICAL);
+        }
+        m_swatches.push_back(colour);
         ++line;
 
-        for (const std::string& note : row.notes) {
-            grid->Add(note_text(this, note, 45 * em), wxGBPosition(line, 2), wxGBSpan(1, 3), wxALIGN_CENTER_VERTICAL);
+        // The notes of the choice, one per line
+        wxStaticText* notes = nullptr;
+        if (!row.notes.empty() ||
+            std::any_of(row.alternatives.begin(), row.alternatives.end(), [](const Alternative& a) { return !a.notes.empty(); })) {
+            notes = note_text(this, "", 45 * em);
+            grid->Add(notes, wxGBPosition(line, 1), wxGBSpan(1, 3), wxALIGN_CENTER_VERTICAL);
             ++line;
         }
+        m_notes.push_back(notes);
+        update_row(i);
     }
     top->Add(grid, 0, wxLEFT | wxRIGHT, em);
 
     std::vector<std::string> footer = m_plan.notes;
     if (std::any_of(m_plan.extruders.begin(), m_plan.extruders.end(), [](const ExtruderPlan& r) { return r.action == Action::NotLoaded; }))
         footer.push_back(_u8L("Empty extruders keep their presets; PrusaSlicer warns when a print uses one."));
-    if (std::any_of(m_plan.extruders.begin(), m_plan.extruders.end(), [](const ExtruderPlan& r) { return r.action == Action::Create; }))
+    const auto creates = [](const ExtruderPlan& r) {
+        return r.action == Action::Create ||
+               std::any_of(r.alternatives.begin(), r.alternatives.end(), [](const Alternative& a) { return a.action == Action::Create; });
+    };
+    if (std::any_of(m_plan.extruders.begin(), m_plan.extruders.end(), creates))
         footer.push_back(_u8L("New presets are saved as user presets on this computer."));
     for (const std::string& note : footer)
         top->Add(note_text(this, note, 60 * em), 0, wxLEFT | wxRIGHT | wxTOP, em);
@@ -424,11 +450,20 @@ FilamentSyncDialog::FilamentSyncDialog(wxWindow* parent, const Plan& plan, const
     CenterOnParent();
 }
 
+Plan FilamentSyncDialog::chosen_plan() const
+{
+    Plan out = m_plan;
+    for (size_t i = 0; i < m_choices.size(); ++i)
+        if (m_choices[i] && m_choices[i]->GetSelection() > 0)
+            out.extruders[i] = with_alternative(m_plan.extruders[i], size_t(m_choices[i]->GetSelection() - 1));
+    return out;
+}
+
 std::vector<bool> FilamentSyncDialog::accepted() const
 {
     std::vector<bool> out;
-    for (const wxCheckBox* check : m_checks)
-        out.push_back(check && check->GetValue());
+    for (const ExtruderPlan& row : chosen_plan().extruders)
+        out.push_back(has_change(row));
     return out;
 }
 
@@ -436,10 +471,29 @@ bool FilamentSyncDialog::reset_extruder_colours() const { return m_reset_colours
 
 void FilamentSyncDialog::update_apply_enabled()
 {
-    const bool any = std::any_of(m_checks.begin(), m_checks.end(), [](const wxCheckBox* c) { return c && c->GetValue(); }) ||
-                     reset_extruder_colours();
+    const std::vector<bool> changes = accepted();
+    const bool              any     = std::find(changes.begin(), changes.end(), true) != changes.end() || reset_extruder_colours();
     if (auto* ok = FindWindow(wxID_OK))
         ok->Enable(any);
+}
+
+void FilamentSyncDialog::update_row(size_t i)
+{
+    const int          choice = m_choices[i] ? m_choices[i]->GetSelection() : 0;
+    const ExtruderPlan row    = choice > 0 ? with_alternative(m_plan.extruders[i], size_t(choice - 1)) : m_plan.extruders[i];
+    if (m_swatches[i]) {
+        if (!row.preset_colour.empty())
+            m_swatches[i]->SetBitmap(*get_solid_bmp_bundle(swatch_size(), swatch_size(), row.preset_colour));
+        m_swatches[i]->Show(!row.preset_colour.empty());
+    }
+    if (m_notes[i]) {
+        std::string text;
+        for (const std::string& note : row.notes)
+            text += (text.empty() ? "" : "\n") + note;
+        m_notes[i]->SetLabel(from_u8(text));
+        m_notes[i]->Wrap(45 * wxGetApp().em_unit());
+        m_notes[i]->Show(!text.empty());
+    }
 }
 
 } // namespace GUI

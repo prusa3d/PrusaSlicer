@@ -85,14 +85,17 @@ The **Preset** column says what Apply does for each extruder:
 - **No preset to select**: no preset of that material fits the extruder and none could be made. A
   note says why, and the extruder keeps its preset.
 
-Untick a row to keep that extruder's preset.
+Each loaded tool's **Preset** is a list with the suggestion first. Pick something else from it to
+override the suggestion: a new preset in the tool's color, another preset of that material, or
+keeping the extruder's preset.
 
 ### New colors get their own preset
 
 When the printer names a vendor and no preset of that vendor and material fits, or only ones named
 for another color do, PrusaSlicer creates one named `<vendor> <material> <color>`, such as
 `Overture PETG Green`. A preset with no color in its name, such as `Overture PETG`, counts as a fit
-and is selected instead. The new preset is a copy of the extruder's current preset when that preset
+and is selected instead, unless it's one of your own presets whose filament color is clearly
+another: for a white spool, `PolyLite PLA Teal` is another color. The new preset is a copy of the extruder's current preset when that preset
 is the same material, so your settings carry over; otherwise it starts from another preset of that
 material, Generic first. Either way it gets the printer's vendor and color. New presets are saved
 as user presets on this computer; they aren't added to Filament DB.

@@ -42,6 +42,9 @@ struct Candidate
     std::string type;
     /// filament_colour, "#rrggbb" in either case, or empty.
     std::string colour;
+    /// For a user preset saved from a system preset, the parent's filament_colour; empty
+    /// otherwise.
+    std::string parent_colour;
     bool        is_system     = false;
     bool        is_visible    = true;
     /// Compatible with this extruder of the printer profile.
@@ -77,6 +80,21 @@ enum class Action {
     NoMatch,
 };
 
+/// Something the preview offers for a loaded tool instead of its plan's own action. The fields
+/// are those of ExtruderPlan.
+struct Alternative
+{
+    /// Keep (leave the extruder's preset), Select, Install or Create
+    Action      action = Action::Keep;
+    std::string preset;
+    std::string template_preset;
+    std::string vendor;
+    std::string preset_colour;
+    /// The row's notes with this choice: the tool's, and warnings about this preset: abrasive
+    /// filament, or another color than the tool's and why no preset of its color can be made.
+    std::vector<std::string> notes;
+};
+
 struct ExtruderPlan
 {
     int                      idx = 0;
@@ -93,6 +111,12 @@ struct ExtruderPlan
     /// tool's color), which it shows once its extruder color is reset; empty when unknown.
     std::string              preset_colour;
     std::vector<std::string> notes;
+    /// For a loaded tool, what the preview offers instead, in order: a new preset of the tool's
+    /// vendor, material and color, unless the plan creates one; the extruder's other presets of
+    /// that material, the tool's vendor's first, then that vendor's system presets that aren't
+    /// installed, then other vendors', each best first; and keeping the extruder's preset when
+    /// the plan changes it and it isn't offered yet.
+    std::vector<Alternative> alternatives;
 };
 
 struct Plan
@@ -122,6 +146,10 @@ Plan make_plan(const PrinterTools                &tools,
                const std::vector<ExtruderState>  &extruders,
                const std::set<std::string>       &taken_names,
                const std::string                 &name_tag);
+
+/// The row with alternatives[i] in place of its own action, preset, color and notes (the row as it
+/// is when i is out of range).
+ExtruderPlan with_alternative(const ExtruderPlan &row, size_t i);
 
 /// The extruders of the edited printer preset and the filaments each of them can use.
 std::vector<ExtruderState> collect_extruder_states(const PresetBundle &bundle);

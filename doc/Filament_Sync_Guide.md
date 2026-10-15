@@ -44,7 +44,10 @@ For a short walkthrough with screenshots of the printer and slicer screens, see 
    - **Preset**: what happens to the extruder's filament preset: *Keeps*, *Selects*, *Installs
      and selects*, *Creates … from …*, or *No change* for an empty tool.
    - **Preset color**: the filament color of that preset, which is what the extruder shows.
-4. Untick any row you don't want, then click **Apply**.
+4. For a loaded tool, **Preset** is a list: the suggestion first, then a new preset in the
+   tool's color, the extruder's other presets of that material (the tool's vendor's first, then
+   that vendor's system presets you haven't installed, then other vendors'), and *Keeps …* or
+   *No change* to leave the extruder as it is. Pick what you want for each, then click **Apply**.
 
 Tool N is always extruder N. A dock that isn't calibrated isn't reported, and its extruder is
 left alone; the other tools don't shift down to fill the gap.
@@ -76,6 +79,10 @@ For each loaded tool, among the filament presets compatible with that extruder:
      `Polymaker PETG Clear` made for a user color are other colors. In a system preset those
      words name a variant the printer can't tell apart (`Prusament PETG Carbon Fiber`), and so
      they do in a copy you saved from one under its name (`Prusament PLA Blend Tuned`).
+     The filament color of one of your own presets counts as well, whatever its name: for a
+     white tool, `PolyLite PLA Teal` is another color. Shades the printer's color names lump
+     together, such as white and off-white, are the same color, and a color your preset still
+     shares with the system preset it was saved from doesn't count.
    - Then the preset whose name says the least beyond vendor, material and color:
      `Overture PLA White` before `Overture PLA Silk White`.
    - Then the closest filament color, then your own presets before system ones.

@@ -579,10 +579,43 @@ TEST_CASE("A filament whose presets are all another color gets its own", "[Filam
     CHECK(red.notes.empty());
 
     CHECK(plan_one(tool(1, "Polymaker", "PETG", "Black", "#000000"), c, "Polymaker PETG Black").action == Action::Keep);
-    // A preset without a color in its name still fits
+    // A preset without a color in its name still fits when its color is still its parent's ...
     std::vector<Candidate> plain = c;
-    plain.push_back(cand("Polymaker PETG", "Polymaker", "PETG", "#000000"));
+    Candidate polymaker     = cand("Polymaker PETG", "Polymaker", "PETG", "#FF8000");
+    polymaker.parent        = "Generic PETG";
+    polymaker.parent_colour = "#ff8000";
+    plain.push_back(polymaker);
     CHECK(plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), plain, "Polymaker PETG Black").preset == "Polymaker PETG");
+    // ... but not when its own color is another one
+    plain.back().colour = "#000000";
+    CHECK(plan_one(tool(1, "Polymaker", "PETG", "Red", "#FF0000"), plain, "Polymaker PETG Black").preset == "Polymaker PETG Red");
+}
+
+TEST_CASE("A user preset's own color counts, whatever its name says", "[FilamentSync]")
+{
+    // Filament DB presets, named for the vendor's product lines
+    const std::vector<Candidate> c = {cand("PolyLite PLA Teal", "Polymaker", "PLA", "#48B9C2"),
+                                      cand("PolyTerra PLA Red", "Polymaker", "PLA", "#C0392B"),
+                                      sys("Generic PLA @SYNC", "Generic", "PLA")};
+    const ExtruderPlan white = plan_one(tool(4, "Polymaker", "PLA", "White", "#FFFFFF"), c, "PolyLite PLA Teal");
+    CHECK(white.action == Action::Create);
+    CHECK(white.preset == "Polymaker PLA White");
+    CHECK(white.template_preset == "PolyLite PLA Teal");
+    // A teal spool keeps it
+    CHECK(plan_one(tool(4, "Polymaker", "PLA", "Teal", "#48B9C2"), c, "PolyLite PLA Teal").action == Action::Keep);
+
+    // A shade the printer's color names lump together is the same color
+    std::vector<Candidate> cotton = c;
+    cotton.push_back(cand("PolyLite PLA Cotton", "Polymaker", "PLA", "#E6DEDE"));
+    CHECK(plan_one(tool(4, "Polymaker", "PLA", "White", "#FFFFFF"), cotton, "PolyLite PLA Teal").preset == "PolyLite PLA Cotton");
+
+    // A system preset's color is a placeholder
+    std::vector<Candidate> system = c;
+    system.push_back(sys("Polymaker PolyLite PLA @SYNC", "Polymaker", "PLA", "#48B9C2"));
+    CHECK(plan_one(tool(4, "Polymaker", "PLA", "White", "#FFFFFF"), system, "PolyLite PLA Teal").preset == "Polymaker PolyLite PLA @SYNC");
+
+    // Without a vendor, the current preset stays whatever its color
+    CHECK(plan_one(tool(4, "", "PLA", "White", "#FFFFFF"), c, "PolyLite PLA Teal").action == Action::Keep);
 }
 
 TEST_CASE("A system preset's variant name isn't a color", "[FilamentSync]")
@@ -599,8 +632,9 @@ TEST_CASE("A system preset's variant name isn't a color", "[FilamentSync]")
     CHECK(plan_one(tool(1, "Prusament", "PLA", "Gray", "#808080"), pla, "Prusament PLA Blend @SYNC").action == Action::Keep);
     // ... and neither is it in the user's tuned copy saved from the preset
     std::vector<Candidate> tuned = pla;
-    Candidate copy = cand("Prusament PLA Blend Tuned", "Prusa Polymers", "PLA", "#FF8000");
-    copy.parent    = "Prusament PLA Blend";
+    Candidate copy     = cand("Prusament PLA Blend Tuned", "Prusa Polymers", "PLA", "#FF8000");
+    copy.parent        = "Prusament PLA Blend";
+    copy.parent_colour = "#FF8000";
     tuned.push_back(copy);
     CHECK(plan_one(tool(1, "Prusament", "PLA", "Gray", "#808080"), tuned, copy.name).action == Action::Keep);
     // A preset of the user's own with a color the printer named is still another color: not kept
@@ -774,6 +808,163 @@ TEST_CASE("A new color isn't started from a copy of a variant its name continues
     CHECK(plan_one(tool(1, "Spectrum", "PETG", "Matt Olive", "#556B2F"), {matt, black}, black.name).template_preset == black.name);
 }
 
+TEST_CASE("The preview offers a new preset and the extruder's other presets", "[FilamentSync]")
+{
+    Candidate hidden  = sys("Overture PLA @SYNC", "Overture", "PLA");
+    hidden.is_visible = false;
+    const std::vector<Candidate> c = {cand("Overture PLA Black", "Overture", "PLA", "#000000"),
+                                      cand("Overture PLA White", "Overture", "PLA", "#FFFFFF"),
+                                      sys("Generic PLA @SYNC", "Generic", "PLA", "#FF8000"), hidden,
+                                      cand("Overture PETG Black", "Overture", "PETG", "#000000")};
+    const ExtruderPlan black = plan_one(tool(1, "Overture", "PLA", "Black", "#000000"), c, "Overture PLA Black",
+                                        {"overture pla black", "overture pla white"});
+    REQUIRE(black.action == Action::Keep);
+    REQUIRE(black.alternatives.size() == 4);
+    // A new preset of the tool's color, from the extruder's own
+    CHECK(black.alternatives[0].action == Action::Create);
+    CHECK(black.alternatives[0].preset == "Overture PLA Black @INDX");
+    CHECK(black.alternatives[0].template_preset == "Overture PLA Black");
+    CHECK(black.alternatives[0].vendor == "Overture");
+    CHECK(black.alternatives[0].preset_colour == "#000000");
+    // The vendor's other presets of the material, then its system ones to install, then others'
+    CHECK(black.alternatives[1].action == Action::Select);
+    CHECK(black.alternatives[1].preset == "Overture PLA White");
+    CHECK(black.alternatives[1].preset_colour == "#FFFFFF");
+    CHECK(black.alternatives[2].action == Action::Install);
+    CHECK(black.alternatives[2].preset == "Overture PLA @SYNC");
+    CHECK(black.alternatives[3].action == Action::Select);
+    CHECK(black.alternatives[3].preset == "Generic PLA @SYNC");
+
+    // A row that creates offers keeping the extruder's preset among the others, closest color first
+    const std::vector<Candidate> poly = {cand("PolyLite PLA Teal", "Polymaker", "PLA", "#48B9C2"),
+                                         cand("PolyTerra PLA Red", "Polymaker", "PLA", "#C0392B"),
+                                         sys("Generic PLA @SYNC", "Generic", "PLA")};
+    const ExtruderPlan white = plan_one(tool(4, "Polymaker", "PLA", "White", "#FFFFFF"), poly, "PolyLite PLA Teal");
+    REQUIRE(white.action == Action::Create);
+    REQUIRE(white.alternatives.size() == 3);
+    CHECK(white.alternatives[0].action == Action::Keep);
+    CHECK(white.alternatives[0].preset == "PolyLite PLA Teal");
+    CHECK(white.alternatives[1].preset == "PolyTerra PLA Red");
+    CHECK(white.alternatives[2].preset == "Generic PLA @SYNC");
+    const ExtruderPlan kept = with_alternative(white, 0);
+    CHECK(kept.action == Action::Keep);
+    CHECK(kept.preset == "PolyLite PLA Teal");
+    CHECK(kept.preset_colour == "#48B9C2");
+    CHECK(kept.template_preset.empty());
+    CHECK(with_alternative(white, 3).action == Action::Create);
+
+    // Keeping a preset of another material comes last
+    const ExtruderPlan petg = plan_one(tool(1, "Overture", "PETG", "Black", "#000000"), c, "Overture PLA White", {"overture petg black"});
+    REQUIRE(petg.action == Action::Select);
+    REQUIRE(!petg.alternatives.empty());
+    CHECK(petg.alternatives.front().action == Action::Create);
+    CHECK(petg.alternatives.back().action == Action::Keep);
+    CHECK(petg.alternatives.back().preset == "Overture PLA White");
+    CHECK(petg.alternatives.back().preset_colour == "#FFFFFF");
+
+    // Without a vendor nothing is made or installed, and every preset of the material is offered
+    const ExtruderPlan unnamed = plan_one(tool(1, "", "PLA", "Black", "#000000"), c, "Overture PLA Black");
+    REQUIRE(unnamed.action == Action::Keep);
+    REQUIRE(unnamed.alternatives.size() == 2);
+    for (const Alternative &a : unnamed.alternatives)
+        CHECK(a.action == Action::Select);
+}
+
+TEST_CASE("Each alternative comes with its own notes", "[FilamentSync]")
+{
+    // A 0.6 mm nozzle that isn't hardened, on a 0.4 mm profile
+    PrinterTool t     = tool(1, "Overture", "PETG", "Black", "#000000");
+    t.nozzle_diameter = 0.6;
+    Candidate cf      = cand("Overture PETG CF Black", "Overture", "PETG", "#000000");
+    cf.is_abrasive    = true;
+    const Candidate plain   = cand("Overture PETG Black", "Overture", "PETG", "#000000");
+    const Candidate generic = sys("Generic PETG @SYNC", "Generic", "PETG");
+    const auto      has     = [](const std::vector<std::string> &notes, const std::string &part) {
+        return std::any_of(notes.begin(), notes.end(), [&](const std::string &n) { return n.find(part) != std::string::npos; });
+    };
+    const auto find = [](const ExtruderPlan &row, const std::string &preset) {
+        const auto it = std::find_if(row.alternatives.begin(), row.alternatives.end(), [&](const Alternative &a) { return a.preset == preset; });
+        REQUIRE(it != row.alternatives.end());
+        return size_t(it - row.alternatives.begin());
+    };
+
+    // Picking the abrasive preset instead warns about it
+    const ExtruderPlan safe = plan_one(t, {plain, cf, generic}, plain.name, {"overture petg black"});
+    REQUIRE(safe.action == Action::Keep);
+    CHECK_FALSE(has(safe.notes, "abrasive"));
+    const ExtruderPlan risky = with_alternative(safe, find(safe, cf.name));
+    CHECK(risky.preset == cf.name);
+    CHECK(has(risky.notes, "Overture PETG CF Black is abrasive"));
+    CHECK(has(risky.notes, "0.60 mm nozzle"));
+
+    // ... and picking a safe one instead of an abrasive pick drops the warning, not the nozzle's
+    const ExtruderPlan pick = plan_one(t, {cf, generic}, cf.name, {"overture petg black"});
+    REQUIRE(pick.preset == cf.name);
+    CHECK(has(pick.notes, "abrasive"));
+    for (const std::string preset : {std::string("Overture PETG Black @INDX"), generic.name}) {
+        const ExtruderPlan other = with_alternative(pick, find(pick, preset));
+        CHECK_FALSE(has(other.notes, "abrasive"));
+        CHECK(has(other.notes, "0.60 mm nozzle"));
+    }
+}
+
+TEST_CASE("An alternative of another color says so", "[FilamentSync]")
+{
+    const auto has = [](const std::vector<std::string> &notes, const std::string &part) {
+        return std::any_of(notes.begin(), notes.end(), [&](const std::string &n) { return n.find(part) != std::string::npos; });
+    };
+    const std::vector<Candidate> poly = {cand("PolyLite PLA Teal", "Polymaker", "PLA", "#48B9C2"),
+                                         cand("PolyTerra PLA Red", "Polymaker", "PLA", "#C0392B"),
+                                         sys("Generic PLA @SYNC", "Generic", "PLA")};
+    const ExtruderPlan white = plan_one(tool(1, "Polymaker", "PLA", "White", "#FFFFFF"), poly, "PolyLite PLA Teal");
+    REQUIRE(white.action == Action::Create);
+    REQUIRE(white.alternatives.size() == 3);
+    CHECK(has(white.alternatives[0].notes, "Tool 1 has White filament; PolyLite PLA Teal is another color."));
+    CHECK(has(white.alternatives[1].notes, "PolyTerra PLA Red is another color"));
+    // Generic names no color
+    CHECK(white.alternatives[2].notes.empty());
+
+    // When no preset of the tool's color can be made, every other color says why
+    Candidate teal = cand("PolyLite PLA-CF Teal", "Polymaker", "PLA", "#48B9C2"), red = cand("PolyTerra PLA-CF Red", "Polymaker", "PLA", "#C0392B");
+    teal.is_abrasive = red.is_abrasive = true;
+    const ExtruderPlan only = plan_one(tool(1, "Polymaker", "PLA", "White", "#FFFFFF"), {teal, red}, teal.name);
+    REQUIRE(only.action == Action::Keep);
+    CHECK(has(only.notes, "The only PLA presets are abrasive"));
+    REQUIRE(only.alternatives.size() == 1);
+    CHECK(has(only.alternatives[0].notes, "The only PLA presets are abrasive"));
+    CHECK(has(only.alternatives[0].notes, "PolyTerra PLA-CF Red is abrasive"));
+    CHECK(has(only.alternatives[0].notes, "PolyTerra PLA-CF Red is another color"));
+}
+
+TEST_CASE("Offered new presets share planned ones and don't take their names", "[FilamentSync]")
+{
+    // Extruder 1 keeps a preset whose color is still its parent's; extruder 2 can only start from Generic
+    Candidate polymaker     = cand("Polymaker PETG", "Polymaker", "PETG", "#FF8000");
+    polymaker.parent        = "Generic PETG";
+    polymaker.parent_colour = "#FF8000";
+    const Candidate generic = sys("Generic PETG @SYNC", "Generic", "PETG");
+    Candidate       other   = polymaker;
+    other.is_compatible     = false;
+
+    PrinterTools tools;
+    tools.tools     = {tool(1, "Polymaker", "PETG", "Red", "#C00000"), tool(2, "Polymaker", "PETG", "Red", "#FF0000"),
+                       tool(3, "Polymaker", "PETG", "Red", "#FF0000")};
+    const Plan plan = make_plan(tools, {extruder(0, {polymaker, generic}, polymaker.name), extruder(1, {other, generic}),
+                                        extruder(2, {polymaker, generic}, polymaker.name)}, {}, "INDX");
+    REQUIRE(plan.extruders.size() == 3);
+    // The plan's new preset keeps the plain name; the one offered for another red is scoped
+    REQUIRE(plan.extruders[1].action == Action::Create);
+    CHECK(plan.extruders[1].preset == "Polymaker PETG Red");
+    REQUIRE(plan.extruders[0].action == Action::Keep);
+    REQUIRE(!plan.extruders[0].alternatives.empty());
+    CHECK(plan.extruders[0].alternatives[0].preset == "Polymaker PETG Red @INDX");
+    // The same red is offered the planned preset
+    REQUIRE(plan.extruders[2].action == Action::Keep);
+    CHECK(plan.extruders[2].alternatives[0].action == Action::Create);
+    CHECK(plan.extruders[2].alternatives[0].preset == "Polymaker PETG Red");
+    CHECK(plan.extruders[2].alternatives[0].template_preset == generic.name);
+}
+
 TEST_CASE("Empty tools and uncalibrated docks are unavailable, and a print using them is warned", "[FilamentSync]")
 {
     PrinterTools tools;
@@ -913,11 +1104,13 @@ TEST_CASE("A preset made from a system preset names it as its parent", "[Filamen
                                    [](const Candidate &c) { return c.name == "Polymaker PETG Black"; });
     REQUIRE(made != exs[0].candidates.end());
     CHECK(made->parent == "Generic PETG");
+    CHECK(made->parent_colour == "#FF8000");
     // System presets have none
     const auto generic = std::find_if(exs[0].candidates.begin(), exs[0].candidates.end(),
                                       [](const Candidate &c) { return c.name == "Generic PETG @SYNC"; });
     REQUIRE(generic != exs[0].candidates.end());
     CHECK(generic->parent.empty());
+    CHECK(generic->parent_colour.empty());
 }
 
 TEST_CASE("A preset made for a color that starts like a variant's name isn't a copy of the variant", "[FilamentSync]")
@@ -943,4 +1136,26 @@ TEST_CASE("A preset made for a color that starts like a variant's name isn't a c
     plan        = f.plan_for(tools);
     CHECK(plan.extruders[0].action == Action::Create);
     CHECK(plan.extruders[0].preset == "Spectrum PETG Red");
+}
+
+TEST_CASE("An offered preset is applied like a planned one", "[FilamentSync]")
+{
+    Fixture      f;
+    PrinterTools tools;
+    // My PLA is white: kept, with a new preset offered instead
+    tools.tools = {tool(2, "Acme", "PLA", "White", "#FFFFFF")};
+    Plan plan   = f.plan_for(tools);
+    REQUIRE(plan.extruders[0].action == Action::Keep);
+    REQUIRE(!plan.extruders[0].alternatives.empty());
+    REQUIRE(plan.extruders[0].alternatives[0].action == Action::Create);
+    plan.extruders[0] = with_alternative(plan.extruders[0], 0);
+    REQUIRE(plan.extruders[0].preset == "Acme PLA White");
+
+    const ApplyResult r = apply_presets(f.bundle, &f.app, plan, {true});
+    REQUIRE(r.errors.empty());
+    CHECK(r.created == std::vector<std::string>{"Acme PLA White"});
+    CHECK(f.bundle.extruders_filaments[1].get_selected_preset_name() == "Acme PLA White");
+    const Preset *made = f.bundle.filaments.find_preset("Acme PLA White", false, false);
+    REQUIRE(made != nullptr);
+    CHECK(made->config.opt_string("filament_colour", 0u) == "#FFFFFF");
 }
