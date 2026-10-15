@@ -265,6 +265,13 @@ static std::optional<Biz::Slicing::Error> check_extruders(
         }
     }
 
+    for (const Domain::MacroOverridesFDM& macro : config.macro_overrides | std::views::values) {
+        const auto macro_extruder{macro.overrides.get("extruder")};
+        if (macro_extruder && !accepts_extruder(*macro_extruder, 0)) {
+            result.push_back("extruder");
+        }
+    }
+
     for (const char* key : {"perimeter_extruder", "infill_extruder", "solid_infill_extruder"}) {
         if (!accepts_extruder(config.print.items.opt(key), 1)) {
             result.push_back(key);
@@ -291,6 +298,12 @@ static std::optional<Biz::Slicing::Error> check_extruders(
                 }
             }
         }
+        for (const Domain::MacroOverridesFDM& macro : config.macro_overrides | std::views::values) {
+            const auto macro_extruder{macro.overrides.get(key)};
+            if (macro_extruder && !accepts_extruder(*macro_extruder, 1)) {
+                result.push_back(key);
+            }
+        }
     }
 
     check_virtual_extruder_roles(model, config, result);
@@ -306,6 +319,18 @@ static std::optional<Biz::Slicing::Error> check_extruders(
         for (const Domain::ModelObject* object : model.objects) {
             const auto object_extruder{object->object_settings.overrides.get(key)};
             if (object_extruder && !in_range(*object_extruder, 0, slot_count)) {
+                result.push_back(key);
+            }
+        }
+    }
+
+    for (const char* key : {"wipe_tower_extruder",
+                            "support_material_extruder",
+                            "support_material_interface_extruder"})
+    {
+        for (const Domain::MacroOverridesFDM& macro : config.macro_overrides | std::views::values) {
+            const auto macro_extruder{macro.overrides.get(key)};
+            if (macro_extruder && !in_range(*macro_extruder, 0, slot_count)) {
                 result.push_back(key);
             }
         }
