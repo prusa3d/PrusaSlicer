@@ -14,11 +14,11 @@ namespace Slic3r::App::Lua {
 
 enum class PluginType
 {
-    ProjectPlugin
+    ProjectPlugin,
+    PrintMode
 };
 
 tl::expected<PluginType, std::string> parse_plugin_type(std::string_view s);
-std::string to_string(PluginType type);
 
 using PluginParamValue = std::variant<bool, int, double, std::string>;
 using PluginParamValueMap = std::map<std::string, PluginParamValue>;
@@ -50,7 +50,7 @@ public:
     PluginMeta& meta() { return m_meta; }
     const std::string& path() const { return m_path; }
 
-    void execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap& params) const;
+    sol::object execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap& params) const;
 
     using ParseResult = tl::expected<Plugin, std::string>;
     static ParseResult

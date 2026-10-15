@@ -1,0 +1,12 @@
+{
+	"id": "com.prusa3d.slicer.printmodes",
+	"name": "Print modes",
+	"license": "AGPL-3.0-only",
+	"min_slicer_version": "3.0.0",
+	"version": "1.0.0",
+	"author": "prusa3d",
+	"description": "Built-in print modes",
+	"required_apis": {
+		"print_mode": "1.0.0"
+	}
+}

@@ -2279,6 +2279,10 @@ void MenuCommandRegistrar::register_main_menu_plugin_commands(Lua::PluginSystem&
 {
     bool any_plugin = false;
     for (auto& plugin : plugin_system.plugins() | std::views::values) {
+        if (plugin.meta().type == Lua::PluginType::PrintMode) {
+            continue;
+        }
+
         any_plugin = true;
         std::vector<UniversalMenuItemName> path;
         if (plugin.meta().menu.empty()) {

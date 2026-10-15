@@ -79,7 +79,7 @@ void PluginRegistry::scan(const std::string& path)
                     plugin_path,
                     it->second.path()
                 );
-            } else {
+            } else if (!it->second.meta().menu.empty()) {
                 auto menu_item = fmt::to_string(fmt::join(it->second.meta().menu, "/"));
                 plugin_menu_items[menu_item].emplace_back(bundle.meta().id, &it->second);
             }

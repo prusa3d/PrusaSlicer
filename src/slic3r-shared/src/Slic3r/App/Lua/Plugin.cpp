@@ -15,7 +15,8 @@ namespace fs = boost::filesystem;
 
 namespace {
 const std::unordered_map<PluginType, std::string> PLUGIN_TYPE_NAMES = {
-    {PluginType::ProjectPlugin, "project.plugin"}
+    {PluginType::ProjectPlugin, "project.plugin"},
+    {PluginType::PrintMode, "print_mode"}
 };
 }
 
@@ -28,14 +29,6 @@ tl::expected<PluginType, std::string> parse_plugin_type(std::string_view s)
     }
     return it.base()->first;
 }
-
-std::string to_string(PluginType type)
-{
-    const auto it = PLUGIN_TYPE_NAMES.find(type);
-    ASSERT(it != PLUGIN_TYPE_NAMES.end());
-    return it->second;
-}
-
 
 bool is_path_in_sandbox(
     const boost::filesystem::path& sandbox_path,
@@ -114,10 +107,6 @@ Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std:
     meta.type = type_result.value();
     meta.title = info.get<std::optional<std::string>>("title");
 
-    if (meta.type != PluginType::ProjectPlugin) {
-        return tl::unexpected{fmt::format("Unsupported plugin type '{}'", to_string(meta.type))};
-    }
-
     if (info["menu"].valid()) {
         std::vector<std::string> menu_items;
         std::string menu = info["menu"];
@@ -149,7 +138,7 @@ Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std:
 Plugin::Plugin(std::string path, PluginMeta meta) : m_path(std::move(path)), m_meta(std::move(meta))
 {}
 
-void Plugin::execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap& params) const
+sol::object Plugin::execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap& params) const
 {
     SafeFileResolver resolver{m_path};
     lua.set_path_resolver(resolver);
@@ -167,14 +156,19 @@ void Plugin::execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap& params
         opts[name] = value;
     }
     sol::protected_function fn = lua.state()["execute"];
+    sol::object result;
     if (const sol::protected_function_result ret = fn(opts); !ret.valid()) {
         const sol::error err = ret;
         SPDLOG_ERROR("Error executing script {}: {}", m_path, err.what());
+    } else {
+        result = ret;
     }
 
     lua.set_path_resolver(nullptr);
 
     Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
+
+    return result;
 }
 
 }
