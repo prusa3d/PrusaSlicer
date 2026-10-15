@@ -272,8 +272,9 @@ void sla_config_init_fn(ConfigDefinitions& defs)
     def = defs.add("material_colour", typeid(std::string));
     def->location = Material;
     def->label = L("Color");
-    def->option_group = ConfigItemDef::OptionGroup::Filament_MaterialTemperatures_MaterialProperty;
-    def->category = ConfigItemDef::Category::Filament_MaterialTemperatures;
+    // Hidden from the UI as filament_colour is. It is only the fallback of the project level
+    // resin_colour, and once that is set, editing the material color has no visible effect.
+    def->category = ConfigItemDef::Category::Hidden;
     def->gui_type = ConfigItemDef::GUIType::color;
     def->tooltip = L("This is only used in the Slic3r interface as a visual help.");
     def->init_fn = init_with("#29B2B2");

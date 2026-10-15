@@ -48,3 +48,16 @@ TEST_CASE("Every per-object override has an option group", "[ConfigDefs]")
     SECTION("FFF") { check_object_override_option_groups(get_defs_fdm()); }
     SECTION("SLA") { check_object_override_option_groups(get_defs_sla()); }
 }
+
+TEST_CASE("Material preset colors are hidden", "[ConfigDefs]")
+{
+    // The color is set at the project level, the preset color is only its fallback.
+    const auto check_hidden = [](const ConfigDefinitions& defs, const std::string& name) {
+        INFO(name);
+        const auto it{std::ranges::find(defs.defs(), name, &ConfigItemDef::name)};
+        REQUIRE(it != defs.defs().end());
+        CHECK(it->category == ConfigItemDef::Category::Hidden);
+    };
+    SECTION("FFF") { check_hidden(get_defs_fdm(), "filament_colour"); }
+    SECTION("SLA") { check_hidden(get_defs_sla(), "material_colour"); }
+}
