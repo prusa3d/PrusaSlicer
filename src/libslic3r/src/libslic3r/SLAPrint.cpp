@@ -927,7 +927,11 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     }
 
     InvalidatedSteps invalidated_steps;
+    // Nothing to slice, as in FFF: the result would be empty, with nothing to export.
+    bool empty{false};
     Biz::Slicing::with_limited_instances(model, bed.model_instances, [&](){
+        // The limited model has only the printable instances of the bed.
+        empty = model.objects.empty();
         const InstanceTransformations original_transformations{
             transform_instances(model, bed.transformation.get_matrix().inverse())
         };
@@ -942,7 +946,7 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
     });
     const bool changed{!invalidated_steps.empty()};
     if (!changed) {
-        return ApplyStatus::Unchanged{};
+        return empty ? ApplyStatus::Status{ApplyStatus::Empty{}} : ApplyStatus::Unchanged{};
     }
 
     m_on_sla_result({});
@@ -967,6 +971,9 @@ Biz::Slicing::ApplyStatus::Status SLAPrint::update(
         }
     }
 
+    if (empty) {
+        return ApplyStatus::Empty{};
+    }
     return ApplyStatus::Changed{};
 }
 

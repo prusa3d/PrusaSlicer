@@ -561,6 +561,32 @@ TEST_CASE_METHOD(SlicingFixture, "SLA bed with a pad but no supports ends as inv
     }));
 }
 
+TEST_CASE_METHOD(SlicingFixture, "SLA bed without printable objects is empty", "[slicing][slicing-interactor][timeout]") {
+    using namespace std::chrono_literals;
+
+    // An empty bed must not be sliced, there would be no result to export.
+    ModelOnBed bed{get_cubes_model(1, 5, Slic3r::Domain::PrinterTechnology::SLA)};
+    SECTION("No objects") {
+        bed.model.clear_objects();
+        bed.bed_instance.model_instances.clear();
+    }
+    SECTION("Not printable instance") {
+        bed.model.objects.front()->instances.front()->printable = false;
+    }
+
+    slicing.update_process(
+        bed.model,
+        bed.project_metadata,
+        bed.preset_metadata,
+        bed.config,
+        bed.bed_instance
+    );
+
+    CHECK(wait_for_status(dispatcher, status_listener, 30s, [](const StatusEvents& events) {
+        return !events.empty() && events.back().status_code == StatusCode::Empty;
+    }));
+}
+
 TEST_CASE_METHOD(SlicingFixture, "SLA slicing uses the user modified support points as they are", "[slicing][slicing-interactor][timeout]") {
     using namespace std::chrono_literals;
     using Slic3r::Domain::SLA::PointsStatus;
