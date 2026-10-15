@@ -101,6 +101,9 @@ ObjectListWindow::ObjectListWindow(Biz::ProjectInteractor& project_interactor, b
 
         m_used_material_for_flush_row = add_row(space + _u8L("flush"), &m_used_material_for_flush);
 
+        m_used_material_for_supports_row =
+            add_row(space + _u8L("supports and pad"), &m_used_material_for_supports);
+
         m_material_cost_row = add_row(_u8L("Cost"), &m_material_cost);
         m_material_cost_row->set_visible(false);
 
@@ -174,6 +177,7 @@ void ObjectListWindow::update_sliced_info()
             print_statistics.total_used_filament_for_flush_cm3
         ));
         m_used_material_for_flush_row->set_visible(has_flush);
+        m_used_material_for_supports_row->set_visible(false);
 
         const float cost{print_statistics.total_filament_cost};
         m_material_cost->set_text(format("%1%", cost));
@@ -195,12 +199,21 @@ void ObjectListWindow::update_sliced_info()
     const Domain::SLA::PrintStatistics& print_statistics =
         *sla_result->get().export_data->print_statistics;
 
-    float used_material_total =
-        print_statistics.objects_used_material + print_statistics.support_used_material;
+    // Resin is measured in ml, the statistics are in mm3.
+    const auto format_ml = [](const double volume_mm3) {
+        return format("%1$.2f ml", volume_mm3 / 1000.);
+    };
+    const double objects_volume{print_statistics.objects_used_material};
+    const double supports_volume{print_statistics.support_used_material};
+    const bool has_supports{supports_volume > 0.};
 
-    const std::string used_material =
-        format("%1$.2f g  %2$.0f mm3", print_statistics.total_weight, used_material_total);
-    m_used_material_total->set_text(used_material);
+    m_used_material_total->set_text(format_ml(objects_volume + supports_volume));
+    m_used_material_for_objects->set_text(format_ml(objects_volume));
+    m_used_material_for_objects_row->set_visible(has_supports);
+    m_used_material_for_supports->set_text(format_ml(supports_volume));
+    m_used_material_for_supports_row->set_visible(has_supports);
+    m_used_material_for_wipe_tower_row->set_visible(false);
+    m_used_material_for_flush_row->set_visible(false);
 
     m_material_cost->set_text(format("%1%", print_statistics.total_cost));
 
