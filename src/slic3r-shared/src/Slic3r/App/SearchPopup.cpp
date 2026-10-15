@@ -55,44 +55,59 @@ SearchPopup::SearchPopup(
     callbacks().closed = [this] { m_results_list_view->set_enabled(false); };
 }
 
+// The index of the checked result among the list items. Not index_of(): results removed by a
+// list reset stay children until the next frame.
+template<typename ListViewT>
+static std::optional<size_t> checked_index(const ListViewT& list_view, const AbstractButton* checked)
+{
+    for (size_t index = 0; index < list_view.list_item_count(); ++index) {
+        if (list_view.item_at(index) == checked) {
+            return index;
+        }
+    }
+    return std::nullopt;
+}
+
 void SearchPopup::navigate_down()
 {
-    if (!m_results_list_view->object_count()) {
+    const size_t count{m_results_list_view->list_item_count()};
+    if (count == 0) {
         return;
     }
 
-    AbstractButton* checked     = m_button_group->checked_button();
-    std::optional<size_t> index = m_results_list_view->index_of(checked);
-    ASSERT(index.has_value());
-    m_results_list_view->item_at(++index.value() % m_results_list_view->object_count())
-        ->set_checked(true);
+    const std::optional<size_t> index{
+        checked_index(*m_results_list_view, m_button_group->checked_button())
+    };
+    m_results_list_view->item_at(index ? (*index + 1) % count : 0)->set_checked(true);
 }
 
 void SearchPopup::navigate_up()
 {
-    if (!m_results_list_view->object_count()) {
+    const size_t count{m_results_list_view->list_item_count()};
+    if (count == 0) {
         return;
     }
 
-    AbstractButton* checked     = m_button_group->checked_button();
-    std::optional<size_t> index = m_results_list_view->index_of(checked);
-    ASSERT(index.has_value());
-    m_results_list_view
-        ->item_at(
-            static_cast<int>(index.value()) - 1 < 0 ? m_results_list_view->object_count() - 1 :
-                                                      index.value() - 1
-        )
-        ->set_checked(true);
+    const std::optional<size_t> index{
+        checked_index(*m_results_list_view, m_button_group->checked_button())
+    };
+    m_results_list_view->item_at(index && *index > 0 ? *index - 1 : count - 1)->set_checked(true);
 }
 
 void SearchPopup::open_selected()
 {
+    if (m_results_list_view->list_item_count() == 0) {
+        return;
+    }
+
     AbstractButton* checked_button = m_button_group->checked_button();
     if (!checked_button) {
         return;
     }
 
-    std::optional<size_t> index = m_results_list_view->index_of(checked_button);
+    const std::optional<size_t> index{
+        checked_index(*m_results_list_view, checked_button)
+    };
     ASSERT(index.has_value());
 
     m_navigator.navigate_to_item(&m_search_observable_list.lock()->at(index.value()));
