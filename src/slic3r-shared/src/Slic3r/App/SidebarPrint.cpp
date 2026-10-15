@@ -31,6 +31,7 @@ namespace Slic3r::App {
 SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator& navigator) :
     Window("SidebarPrint"),
     m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this),
+    m_macro_overrides_listener_scope(project_interactor.preset_interactor(), *this),
     m_project_interactor(project_interactor),
     m_navigator(navigator)
 {
@@ -141,13 +142,7 @@ SidebarPrint::SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator
     m_print_mode_dialog->attach_to_item(this, Position::Left, 20);
     m_print_mode_dialog->callbacks().opened = [this] { m_print_mode_btn->set_checked(true); };
     m_print_mode_dialog->callbacks().closed = [this] { m_print_mode_btn->set_checked(false); };
-    m_print_mode_dialog->mode_active_changed = [this](bool active)
-    {
-        m_print_mode_btn->set_label_color(m_theme->color_imgui(
-            active ? Platform::Color::AccentTertiary : Platform::Color::Text
-        ));
-    };
-    m_print_mode_dialog->mode_active_changed(m_print_mode_dialog->is_mode_active());
+    refresh_print_mode_button();
 
     add_separator();
 
@@ -224,6 +219,16 @@ void SidebarPrint::refresh_print_combobox_label_color()
                                   ->is_dirty_print();
     m_combo_print->set_label_color(m_theme->color_imgui(
         is_modified_preset ? Platform::Color::AccentTertiary : Platform::Color::Text
+    ));
+}
+
+void SidebarPrint::refresh_print_mode_button()
+{
+    const auto* overrides{std::get_if<Domain::MacroOverridesMapFDM>(
+        &m_project_interactor.preset_interactor().selected_printer_preset().macro_overrides)};
+    const bool active{overrides && !overrides->empty()};
+    m_print_mode_btn->set_label_color(m_theme->color_imgui(
+        active ? Platform::Color::AccentTertiary : Platform::Color::Text
     ));
 }
 
@@ -325,7 +330,13 @@ void SidebarPrint::on_config_container_selection_changed(
     {
         update_tools_visibility();
         update_tool_to_feature_row_visibility();
+        refresh_print_mode_button();
     }
+}
+
+void SidebarPrint::on_macro_overrides_changed()
+{
+    refresh_print_mode_button();
 }
 
 } // namespace Slic3r::App

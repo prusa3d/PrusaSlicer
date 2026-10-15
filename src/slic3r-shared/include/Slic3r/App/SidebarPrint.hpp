@@ -3,6 +3,7 @@
 #include "Slic3r/App/Yoga/Window.hpp"
 #include "Slic3r/App/Yoga/ButtonGroup.hpp"
 #include "Slic3r/App/Yoga/ComboBoxListViewSelection.hpp"
+#include "Slic3r/Biz/Preset/IMacroOverridesChangedListener.hpp"
 #include "Slic3r/Biz/Preset/PresetInteractor.hpp"
 #include "Slic3r/App/SidebarToolHeadRow.hpp"
 #include "Slic3r/App/Yoga/ListView.hpp"
@@ -26,7 +27,10 @@ class ComboBox;
 class ScrollArea;
 } // namespace Yoga
 
-class SidebarPrint : public Yoga::Window, public Biz::Preset::IPresetChangedListener
+class SidebarPrint :
+    public Yoga::Window,
+    public Biz::Preset::IPresetChangedListener,
+    public Biz::Preset::IMacroOverridesChangedListener
 {
 public:
     explicit SidebarPrint(Biz::ProjectInteractor& project_interactor, Navigator& navigator);
@@ -54,8 +58,11 @@ public:
         Domain::SelectionId config_container_id
     ) override;
 
+    void on_macro_overrides_changed() override;
+
 private:
     void add_separator();
+    void refresh_print_mode_button();
 
     void create_tool_to_feature_row();
     void create_favorite_params();
@@ -79,6 +86,11 @@ private:
         Biz::Preset::PresetInteractor,
         SidebarPrint>
         m_preset_changed_listener_scope;
+    Biz::ListenerScope<
+        Biz::Preset::IMacroOverridesChangedListener,
+        Biz::Preset::PresetInteractor,
+        SidebarPrint>
+        m_macro_overrides_listener_scope;
 
     Biz::ProjectInteractor& m_project_interactor;
     Navigator& m_navigator;
