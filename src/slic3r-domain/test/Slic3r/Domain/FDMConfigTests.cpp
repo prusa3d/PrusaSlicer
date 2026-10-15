@@ -535,7 +535,7 @@ TEST_CASE_METHOD(
 {
     config_pack.print.items.opt("perimeters").set(3);
     config_pack.tool.at(0).overrides.set("perimeters", 2);
-    config_pack.macro_overrides[MacroOverridesLayerFDM::SpiralVase].overrides.set("perimeters", 1);
+    config_pack.macro_overrides[vase_mode_layer()].overrides.set("perimeters", 1);
 
     const FullConfigFDM full_config{config_pack, extruder_candidates, hw_config};
     const EffectiveValueMap& effective_values{full_config.effective_values()};

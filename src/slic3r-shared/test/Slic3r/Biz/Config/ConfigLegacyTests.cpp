@@ -410,9 +410,9 @@ TEST_CASE("Legacy spiral_vase is converted to the vase mode layer", "[config]")
     const Domain::ConfigPack cfg{Biz::load_config_from_legacy_file(tmp_file.get_path())};
     const auto& fdm{std::get<Domain::ConfigPackFDM>(cfg)};
     CHECK_FALSE(fdm.print.items.opt("spiral_vase").get<bool>());
-    REQUIRE(fdm.macro_overrides.contains(Domain::MacroOverridesLayerFDM::SpiralVase));
+    REQUIRE(fdm.macro_overrides.contains(Domain::vase_mode_layer()));
     const Domain::MacroOverridesFDM& layer{
-        fdm.macro_overrides.at(Domain::MacroOverridesLayerFDM::SpiralVase)};
+        fdm.macro_overrides.at(Domain::vase_mode_layer())};
     CHECK(layer.overrides.get("spiral_vase"));
     CHECK(layer == Domain::make_vase_mode_overrides());
 }

@@ -59,7 +59,7 @@ void PrintModeDialog::toggle_vase_mode()
         overrides = Domain::make_vase_mode_overrides();
     }
     m_project_interactor.preset_interactor().set_macro_overrides(
-        Domain::MacroOverridesLayerFDM::SpiralVase, std::move(overrides)
+        Domain::vase_mode_layer(), std::move(overrides)
     );
 }
 
@@ -70,7 +70,7 @@ bool PrintModeDialog::is_mode_active() const
     const auto* fdm_overrides{
         std::get_if<Domain::MacroOverridesMapFDM>(&selected_preset.macro_overrides)};
     return fdm_overrides != nullptr
-        && fdm_overrides->contains(Domain::MacroOverridesLayerFDM::SpiralVase);
+        && fdm_overrides->contains(Domain::vase_mode_layer());
 }
 
 void PrintModeDialog::refresh_vase_mode_button()

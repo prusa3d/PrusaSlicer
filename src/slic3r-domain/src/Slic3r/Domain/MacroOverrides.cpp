@@ -3,7 +3,6 @@
 #include "Slic3r/Domain/ConfigDefsFDM.hpp"
 #include "Slic3r/Domain/ConfigDefsSLA.hpp"
 #include "Slic3r/Domain/Percentage.hpp"
-#include "Slic3r/Assert.hpp"
 
 namespace Slic3r::Domain {
 
@@ -21,20 +20,9 @@ to_refs(const Domain::MacroOverridesMapFDM& macro_overrides)
     return result;
 }
 
-std::string to_string(MacroOverridesLayerFDM layer)
+MacroOverridesLayer vase_mode_layer()
 {
-    switch (layer) {
-    case MacroOverridesLayerFDM::SpiralVase: return "vase_mode";
-    }
-    PANIC("Unknown macro overrides layer");
-}
-
-std::optional<MacroOverridesLayerFDM> macro_overrides_layer_fdm_from_string(std::string_view name)
-{
-    if (name == "vase_mode") {
-        return MacroOverridesLayerFDM::SpiralVase;
-    }
-    return std::nullopt;
+    return {"com.prusa3d.slicer.printmodes.vase_mode", "Vase mode"};
 }
 
 MacroOverridesFDM make_vase_mode_overrides()

@@ -17,7 +17,7 @@ using Slic3r::Biz::Config::LoadResult;
 using Slic3r::Domain::Preset::HwPrinterConfig;
 using Slic3r::Domain::PrinterTechnology;
 using Slic3r::Domain::MacroOverridesFDM;
-using Slic3r::Domain::MacroOverridesLayerFDM;
+using Slic3r::Domain::vase_mode_layer;
 
 TEST_CASE("Default fdm config pack roundtrip", "[ConfigRoundtrip]")
 {
@@ -53,14 +53,15 @@ TEST_CASE("Fdm config pack with macro overrides roundtrip", "[ConfigRoundtrip]")
     MacroOverridesFDM vase_mode;
     vase_mode.overrides.set("perimeters", 1);
     vase_mode.overrides.set("thin_walls", false);
-    config.macro_overrides.insert_or_assign(MacroOverridesLayerFDM::SpiralVase, vase_mode);
+    config.macro_overrides.insert_or_assign(vase_mode_layer(), vase_mode);
 
     const ordered_json json = as_boxes(config);
+    const std::string layer_id{vase_mode_layer().id};
     REQUIRE(json.contains("macro_overrides"));
-    REQUIRE(json["macro_overrides"].contains("vase_mode"));
-    CHECK(json["macro_overrides"]["vase_mode"]["perimeters"] == 1);
-    CHECK(json["macro_overrides"]["vase_mode"]["thin_walls"] == false);
-    CHECK(json["macro_overrides"]["vase_mode"].size() == 2);
+    REQUIRE(json["macro_overrides"].contains(layer_id));
+    CHECK(json["macro_overrides"][layer_id]["perimeters"] == 1);
+    CHECK(json["macro_overrides"][layer_id]["thin_walls"] == false);
+    CHECK(json["macro_overrides"][layer_id].size() == 2);
 
     const auto result{load(json, hw_config)};
     REQUIRE(result);
@@ -70,17 +71,18 @@ TEST_CASE("Fdm config pack with macro overrides roundtrip", "[ConfigRoundtrip]")
     CHECK(config == result_config_pack);
 }
 
-TEST_CASE("Unknown macro overrides layer is reported", "[ConfigRoundtrip]")
+TEST_CASE("Any macro overrides layer is loaded", "[ConfigRoundtrip]")
 {
     const HwPrinterConfig hw_config{.technology = PrinterTechnology::FFF};
     const ConfigPackFDM config;
     ordered_json json = as_boxes(config);
-    json["macro_overrides"]["unknown_layer"]["perimeters"] = 1;
+    json["macro_overrides"]["some_plugin_layer"]["perimeters"] = 1;
 
     const auto result{load(json, hw_config)};
     REQUIRE(result);
     const LoadResult& load_result{result.value()};
-    CHECK(std::get<ConfigPackFDM>(load_result.config).macro_overrides.empty());
-    REQUIRE(load_result.issues.size() == 1);
-    CHECK(load_result.issues.contains(Slic3r::Domain::FDMConfigLocation::MacroOverrides));
+    CHECK(load_result.issues.empty());
+    const auto& macro_overrides{std::get<ConfigPackFDM>(load_result.config).macro_overrides};
+    REQUIRE(macro_overrides.contains(Slic3r::Domain::MacroOverridesLayer{"some_plugin_layer"}));
+    CHECK(macro_overrides.begin()->second.overrides.get("perimeters")->get<int>() == 1);
 }

@@ -508,13 +508,10 @@ std::string EffectiveValuesDialog::macro_override_label(const std::string& key) 
 
     if (const auto* fdm{std::get_if<Domain::MacroOverridesMapFDM>(&macro_overrides)}) {
         for (const auto& [layer, box] : *fdm) {
-            if (!box.overrides.get(key).has_value()) {
+            if (!box.overrides.get(key).has_value() || layer.name.empty()) {
                 continue;
             }
-            switch (layer) {
-            case Domain::MacroOverridesLayerFDM::SpiralVase:
-                return Biz::_u8L("Spiral vase");
-            }
+            return layer.name;
         }
     }
     return Biz::_u8L("mode override");

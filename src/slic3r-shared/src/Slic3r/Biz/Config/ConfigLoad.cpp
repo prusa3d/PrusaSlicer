@@ -288,16 +288,15 @@ load_fdm(const ordered_json& json, const Domain::Preset::HwPrinterConfig& hw_con
     BoxIssues macro_overrides_issues;
     if (is_object(macro_overrides_location_name, json)) {
         for (const auto& [name, layer_json] : json[macro_overrides_location_name].items()) {
-            const std::optional<Domain::MacroOverridesLayerFDM> layer{
-                Domain::macro_overrides_layer_fdm_from_string(name)};
-            if (!layer.has_value() || !layer_json.is_object()) {
+            if (!layer_json.is_object()) {
                 macro_overrides_issues[name] = {ItemParsingIssueType::ExtraKey};
                 continue;
             }
             Domain::MacroOverridesFDM box;
             BoxIssues issues{load_box(layer_json, box)};
             macro_overrides_issues.merge(issues);
-            macro_overrides.insert_or_assign(*layer, std::move(box));
+            macro_overrides.insert_or_assign(
+                Domain::MacroOverridesLayer{name, ""}, std::move(box));
         }
     }
 

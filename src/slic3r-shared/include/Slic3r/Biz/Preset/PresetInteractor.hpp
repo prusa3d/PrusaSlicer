@@ -308,7 +308,7 @@ public:
     void set_item_override(const Domain::ConfigItem& item, bool enable, size_t index = 0) override;
 
     void set_macro_overrides(
-        Domain::MacroOverridesLayerFDM layer,
+        Domain::MacroOverridesLayer layer,
         std::optional<Domain::MacroOverridesFDM> overrides
     );
 

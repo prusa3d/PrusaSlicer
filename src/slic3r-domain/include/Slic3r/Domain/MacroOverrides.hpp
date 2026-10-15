@@ -10,10 +10,20 @@
 
 namespace Slic3r::Domain {
 
-// Order matters, higher value layers are applied last.
-enum class MacroOverridesLayerFDM
+struct MacroOverridesLayer
 {
-    SpiralVase
+    std::string id;
+    std::string name;
+
+    std::strong_ordering operator<=>(const MacroOverridesLayer& other) const
+    {
+        return id <=> other.id;
+    }
+
+    bool operator==(const MacroOverridesLayer& other) const
+    {
+        return id == other.id;
+    }
 };
 
 enum class MacroOverridesLayerSLA
@@ -32,15 +42,13 @@ public:
     MacroOverridesSLA();
 };
 
-using MacroOverridesMapFDM = std::map<MacroOverridesLayerFDM, MacroOverridesFDM>;
-using MacroOverridesMapSLA = std::map<MacroOverridesLayerSLA, MacroOverridesSLA>;
+using MacroOverridesMapFDM = std::map<MacroOverridesLayer, MacroOverridesFDM>;
+using MacroOverridesMapSLA = std::map<MacroOverridesLayer, MacroOverridesSLA>;
 using MacroOverridesMap    = std::variant<MacroOverridesMapFDM, MacroOverridesMapSLA>;
 
 Domain::BoxOrBoxesVector to_refs(const Domain::MacroOverridesMapFDM& macro_overrides);
 
-/// Serialization name of the layer (key in the "macro_overrides" object).
-std::string to_string(MacroOverridesLayerFDM layer);
-std::optional<MacroOverridesLayerFDM> macro_overrides_layer_fdm_from_string(std::string_view name);
+MacroOverridesLayer vase_mode_layer();
 
 /// The overrides applied by the SpiralVase layer (vase mode).
 MacroOverridesFDM make_vase_mode_overrides();

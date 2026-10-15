@@ -2778,7 +2778,7 @@ void PresetInteractor::set_item_override(const Domain::ConfigItem& item, bool en
 }
 
 void PresetInteractor::set_macro_overrides(
-    Domain::MacroOverridesLayerFDM layer,
+    Domain::MacroOverridesLayer layer,
     std::optional<Domain::MacroOverridesFDM> overrides
 )
 {
@@ -2787,7 +2787,9 @@ void PresetInteractor::set_macro_overrides(
     ASSERT(fdm_overrides != nullptr);
 
     if (overrides.has_value()) {
-        fdm_overrides->insert_or_assign(layer, std::move(*overrides));
+        // The key carries the name, so it has to be replaced as well.
+        fdm_overrides->erase(layer);
+        fdm_overrides->emplace(layer, std::move(*overrides));
     } else {
         fdm_overrides->erase(layer);
     }
