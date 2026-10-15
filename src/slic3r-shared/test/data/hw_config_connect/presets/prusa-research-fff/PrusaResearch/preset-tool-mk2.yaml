@@ -1,0 +1,6 @@
+kind: tool_print
+id: common MK2
+variants:
+- condition: printer.model == "MK2S"
+  name: no tool
+  id: KNAbmpJiQdCg3v1KB5HEdg

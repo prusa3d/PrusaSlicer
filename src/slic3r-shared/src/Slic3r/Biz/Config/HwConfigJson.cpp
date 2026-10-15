@@ -732,4 +732,16 @@ tl::expected<HwPrinterConfig, std::string> load_hw_config(const ordered_json& js
     return result;
 }
 
+tl::expected<HwModel, std::string> load_hw_model(const ordered_json& json)
+{
+    HwModel result;
+    try {
+        json.at("model").get_to(result.model);
+        json.at("base_model").get_to(result.base_model);
+    } catch (nlohmann::ordered_json::exception const& e) {
+        return tl::unexpected{e.what()};
+    }
+    return result;
+}
+
 } // namespace Slic3r::Biz::Config

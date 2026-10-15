@@ -23,7 +23,6 @@
 #include "Slic3r/Biz/ObservableListWithSelection.hpp"
 #include "Slic3r/Biz/Preset/ProjectPresetView.hpp"
 #include "Slic3r/Biz/IConfigBoxSetter.hpp"
-#include "Slic3r/Biz/PhysicalPrinter/IPhysicalPrinterChangedListener.hpp"
 
 namespace Slic3r::Biz {
 class BackupStore;
@@ -99,7 +98,6 @@ struct SelectedPresetIds
 class PresetInteractor final :
     public ISelectedProjectChangedListener,
     public ISelectedConfigContainerChangedListener,
-    public PhysicalPrinter::IPhysicalPrinterChangedListener,
     public WithListeners<
         IPresetChangedListener,
         ISlicingInputChangedListener,
@@ -157,6 +155,11 @@ public:
     const Domain::Preset::HwPrinterConfig& current_printer_config() const;
     const Domain::Preset::EvaluatedPrinterPreset::Preset& current_printer_preset() const;
     const Domain::Preset::SelectedPreset& selected_printer_preset() const;
+
+    PresetItemObservableList& printer_configs()
+    {
+        return m_printer_configs;
+    }
 
     PresetItemObservableList& printer_presets()
     {
@@ -226,6 +229,10 @@ public:
         return m_object_settings_interactor;
     }
 
+    void select_printer_config(
+        const std::string& printer_hw_config_id
+    );
+
     /**
      * @param user - set this to true if action came from user (e.g. clicking a button)
      * so this would invalidate Project in a BackupStore
@@ -292,9 +299,14 @@ public:
         Domain::SelectionId container_id
     ) override;
 
-    void on_selected_physical_printer_changed(
-        const PhysicalPrinter::PhysicalPrinterConfig& printer
-    ) override;
+    /**
+     * @brief Find or create appropriate full hw config for given external one and select it
+     * @param printer External hw config
+     * @return void or error message why full hw config creation failed.
+     */
+    tl::expected<void, std::string> select_external_printer_config(
+        const Domain::Preset::HwPrinterConfig& printer
+    );
 
     ConfigBoxInteractor& printer_cbi();
     PrintToolConfigBoxInteractor& print_tool_cbi();
@@ -937,6 +949,11 @@ private:
         ListenerInvokeLaterBag& bag
     );
 
+    void select_printer_config_internal(
+        const std::string& printer_hw_config_id,
+        bool no_data_update,
+        ListenerInvokeLaterBag& bag
+    );
     void select_printer_preset_internal(
         const std::string& printer_hw_config_id,
         const std::string printer_preset_id,
@@ -966,6 +983,7 @@ private:
     bool tool_print_has_unsaved_changes(size_t tool_index) const;
     bool material_has_unsaved_changes(size_t tool_index) const;
 
+    void fill_printer_configs(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_printer_presets(bool no_data_update, ListenerInvokeLaterBag& bag);
     void fill_print_presets(
         const Domain::Preset::SelectedPreset& selected_preset,
@@ -1028,6 +1046,7 @@ private:
     BackupStore& m_backup_store;
     IO::BundlePaths m_bundle_paths;
 
+    PresetItemObservableList m_printer_configs;
     PresetItemObservableList m_printer_presets;
     PresetItemObservableList m_print_presets;
     PresetItemCompoundObservableList::WriteAccessor m_tool_print_presets_writer;

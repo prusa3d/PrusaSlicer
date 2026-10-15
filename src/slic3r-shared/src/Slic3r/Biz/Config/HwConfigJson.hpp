@@ -13,4 +13,6 @@ namespace Slic3r::Biz::Config {
 tl::expected<Domain::Preset::HwPrinterConfig, std::string> load_hw_config(
     const nlohmann::ordered_json& json
 );
+tl::expected<Domain::Preset::HwModel, std::string>
+load_hw_model(const nlohmann::ordered_json& json);
 } // namespace Slic3r::Biz::Config

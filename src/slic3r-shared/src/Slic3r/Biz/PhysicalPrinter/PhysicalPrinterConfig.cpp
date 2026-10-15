@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/PhysicalPrinter/PhysicalPrinterConfig.hpp"
 
 #include "Slic3r/Biz/ConnectPrinter/ConnectPrinter.hpp"
+#include "Slic3r/Biz/Preset/IO/HwConfigConnectJson.hpp"
 
 namespace Slic3r::Biz::PhysicalPrinter {
 
@@ -32,7 +33,18 @@ PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinte
         {},
         printer.name.empty() ? printer.model : printer.name,
         printer.uuid,
+        hw_config_from_connect_json(printer.json)
     };
+}
+
+std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::string_view json)
+{
+    auto result = Preset::IO::load_external_hw_config(json);
+    if (!result.has_value()) {
+        SPDLOG_ERROR("Failed load external hw_config from json: {}", result.error());
+        return std::nullopt;
+    }
+    return result.value();
 }
 
 bool is_physical_printer_compatible(
@@ -40,10 +52,15 @@ bool is_physical_printer_compatible(
     const Domain::Preset::HwPrinterConfig& hw_config
 )
 {
-    bool compatible = physical_config.hw_config.technology == hw_config.technology
-        && physical_config.hw_config.model == hw_config.model
-        && physical_config.hw_config.tool_count == hw_config.tool_count
-        && physical_config.hw_config.tools == hw_config.tools
+    if (!physical_config.hw_config.has_value()) {
+        return false;
+    }
+
+    const auto& phy_hw_config = physical_config.hw_config.value();
+    bool compatible = phy_hw_config.technology == hw_config.technology
+        && phy_hw_config.model == hw_config.model
+        && phy_hw_config.tool_count == hw_config.tool_count
+        && phy_hw_config.tools == hw_config.tools
         ;
     return compatible;
 }

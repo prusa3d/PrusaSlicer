@@ -1,0 +1,902 @@
+id: '*default_print_MK4*'
+kind: printer
+variants:
+# 0.25
+- condition: tool.nozzle_diameter == 0.25
+  id: potugjeVSFOmtopS96Q9aw
+  values:
+    default_print: 0.12mm SPEED
+# 0.3
+- condition: tool.nozzle_diameter == 0.3
+  id: FtD5mJjUQoqk5pIYLF9Xfw
+  values:
+    default_print: 0.15mm SPEED
+# 0.4
+- condition: tool.nozzle_diameter == 0.4
+  id: ue3ClFsSS1yEtcLlRZXx5g
+  values:
+    default_print: 0.20mm SPEED
+# 0.5
+- condition: tool.nozzle_diameter == 0.5
+  id: GF09izfUTw2ui5+eCHRg/g
+  values:
+    default_print: 0.20mm SPEED
+  variants:
+  - condition: tool.nozzle_high_flow
+    id: XXluuD3sRnGks5ko8f+L8w
+    values:
+      default_print: 0.25mm SPEED
+# 0.6
+- condition: tool.nozzle_diameter == 0.6
+  id: ZUM3v1/zR/WTq2dGnDn1kA
+  values:
+    default_print: 0.25mm SPEED
+  variants:
+  - condition: tool.nozzle_high_flow
+    id: L33KGB0qSFyErE+zb7KsEw
+    values:
+      default_print: 0.25mm SPEED
+# 0.8
+- condition: tool.nozzle_diameter == 0.8
+  id: hVWZVHBQQMqJHPG6Leqydw
+  values:
+    default_print: 0.40mm QUALITY
+  variants:
+  - condition: tool.nozzle_high_flow
+    id: S8HoIvmNR46eLCEMkHN9NQ
+    values:
+      default_print: 0.40mm SPEED
+---
+id: iTdBKPPOQeaxwd5slYDppg
+kind: printer
+inherits:
+- '*default_print_MK4*'
+variants:
+- condition: printer.base_model == "MK4"
+  id: 2SjSwcEZSUKeNdw+2IkE5w
+  values:
+    bed_shape:
+    - '0x0'
+    - 250x0
+    - 250x210
+    - '0x210'
+    before_layer_gcode: |
+      ;BEFORE_LAYER_CHANGE
+      G92 E0.0
+      ;[layer_z]
+      M201 X{interpolate_table(extruded_weight_total, (0,4000), (1400,2500), (20000,2500))} Y{interpolate_table(extruded_weight_total, (0,4000), (1400,2500), (20000,2500))}
+    binary_gcode: 1
+    stuck_filament_detection: 1
+    enable_pressure_advance_during_ramming: false
+    color_change_gcode: "M600\nG1 E0.3 F1500 ; prime after color change"
+    end_gcode: |-
+      {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+      M104 S0 ; turn off temperature
+      M140 S0 ; turn off heatbed
+      M107 ; turn off fan
+      G1 X241 Y170 F3600 ; park
+      {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+      G4 ; wait
+      M572 S0 ; reset PA
+      M593 X T2 F0 ; disable IS
+      M593 Y T2 F0 ; disable IS
+      M84 X Y E ; disable motors
+      ; max_layer_z = [max_layer_z]
+    extruder_offset: ['0x0']
+    gcode_flavor: marlin2
+    high_current_on_filament_swap: 0
+    layer_gcode: |
+      ;AFTER_LAYER_CHANGE
+      ;[layer_z]
+      {if ! spiral_vase}M74 W[extruded_weight_total]{endif}
+    machine_limits_usage: emit_to_gcode
+    machine_max_acceleration_e: [2500, 2500]
+    machine_max_acceleration_extruding: [4000, 2500]
+    machine_max_acceleration_retracting: [2500, 2500]
+    machine_max_acceleration_travel: [4000, 2500]
+    machine_max_acceleration_x: [4000, 2500]
+    machine_max_acceleration_y: [4000, 2500]
+    machine_max_acceleration_z: [200, 200]
+    machine_max_feedrate_e: [100, 100]
+    machine_max_feedrate_x: [300, 160]
+    machine_max_feedrate_y: [300, 160]
+    machine_max_feedrate_z: [40, 40]
+    machine_max_jerk_e: [10, 10]
+    machine_max_jerk_x: [8, 8]
+    machine_max_jerk_y: [8, 8]
+    machine_max_jerk_z: [2, 2]
+    machine_max_junction_deviation: [0.01, 0.01]
+    machine_min_extruding_rate: [0, 0]
+    machine_min_travel_rate: [0, 0]
+    max_print_height: 220
+    printer_technology: FFF
+    remaining_times: 1
+    silent_mode: 1
+    single_extruder_multi_material: 0
+    filament_change_time: 0
+    thumbnails: [16x16/QOI, 313x173/QOI, 480x240/QOI, 380x285/PNG]
+    use_firmware_retraction: 0
+    use_relative_e_distances: 1
+    use_volumetric_e: 0
+    variable_layer_height: 1
+    z_offset: 0
+    cooling_tube_retraction: '45'
+    cooling_tube_length: '20'
+    parking_pos_retraction: '84'
+    extra_loading_move: '-52'
+    multimaterial_purging: '80'
+    start_gcode: |-
+      M17 ; enable steppers
+      M862.1 P[nozzle_diameter] A{(filament_abrasive[0] ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+      M862.3 P "MK4" ; printer model check
+      M862.5 P2 ; g-code level check
+      M862.6 P"Input shaper" ; FW feature check
+      M115 U6.4.0+11974
+
+      M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+      G90 ; use absolute coordinates
+      M83 ; extruder relative mode
+
+      M140 S[first_layer_bed_temperature] ; set bed temp
+      M104 T0 S{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+      M109 T0 R{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+      M84 E ; turn off E motor
+
+      G28 ; home all without mesh bed level
+
+      G1 X42 Y-4 Z5 F4800
+
+      M302 S155 ; lower cold extrusion limit to 155C
+
+      {if filament_type[initial_tool]=="FLEX"}
+      G1 E-4 F2400 ; retraction
+      {else}
+      G1 E-2 F2400 ; retraction
+      {endif}
+
+      M84 E ; turn off E motor
+
+      G29 P9 X10 Y-4 W32 H4
+
+      {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+      G0 Z40 F10000
+
+      M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+      M107
+
+      ;
+      ; MBL
+      ;
+      M84 E ; turn off E motor
+      G29 P1 ; invalidate mbl & probe print area
+      G29 P1 X0 Y0 W50 H20 C ; probe near purge place
+      G29 P3.2 ; interpolate mbl probes
+      G29 P3.13 ; extrapolate mbl outside probe area
+      G29 A ; activate mbl
+
+      ; prepare for purge
+      M104 S{first_layer_temperature[0]}
+      G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+      M109 S{first_layer_temperature[0]}
+
+      G92 E0
+      M569 S0 E ; set spreadcycle mode for extruder
+
+      ;
+      ; Extrude purge line
+      ;
+      G92 E0 ; reset extruder position
+      G1 E{(filament_type[0] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+      G0 E7 X15 Z0.2 F500 ; purge
+      G0 X25 E4 F500 ; purge
+      G0 X35 E4 F650 ; purge
+      G0 X45 E4 F800 ; purge
+      G0 X48 Z0.05 F8000 ; wipe, move close to the bed
+      G0 X51 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+      G92 E0
+      M221 S100 ; set flow to 100%
+  variants:
+  - condition: printer.model == "MK4"
+    name: Original Prusa MK4
+    id: GtlHE0eqQMmC85e+fe4mXA
+    values:
+      machine_max_acceleration_extruding: [4000.0, 2500.0]
+      machine_max_acceleration_x: [4000.0, 2500.0]
+      machine_max_acceleration_y: [4000.0, 2500.0]
+      printer_model: MK4
+    variants:
+    - condition: feeder.base_model == "MMU3" and ! feeder.single_mode
+      id: Sed1dIxCR4egdk5hstw/wQ
+      values:
+        single_extruder_multi_material: 1
+        enable_pressure_advance_during_ramming: true
+        filament_change_time: 19
+        start_gcode: |-
+          M17 ; enable steppers
+          M862.1 P[nozzle_diameter] A{((is_extruder_used[0] and filament_abrasive[0]) ? 1 : (is_extruder_used[1] and filament_abrasive[1]) ? 1 : (is_extruder_used[2] and filament_abrasive[2]) ? 1 : (is_extruder_used[3] and filament_abrasive[3]) ? 1 : (is_extruder_used[4] and filament_abrasive[4]) ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+          M862.3 P "MK4" ; printer model check
+          M862.5 P2 ; g-code level check
+          M862.6 P "Input shaper" ; FW feature check
+          M862.6 P "MMU3" ; FW feature check
+          M115 U6.4.0+11974
+
+          ; setup MMU
+          M708 A0x0b X5   ; extra load distance
+          M708 A0x0d X140 ; unload feeedrate
+          M708 A0x11 X140 ; load feedrate
+          M708 A0x14 X50  ; slow feedrate
+          M708 A0x1e X12  ; Pulley current to ~200mA
+          M708 A0x12 X90  ; selector feedrate mm/s
+          M708 A0x13 X400 ; idler feedrate deg/s
+          M708 A0x0f X400 ; selector acceleration mm/s2
+
+          M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+          G90 ; use absolute coordinates
+          M83 ; extruder relative mode
+
+          M140 S[first_layer_bed_temperature] ; set bed temp
+          M104 S{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+          M109 R{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+          M84 E ; turn off E motor
+
+          G28 ; home all without mesh bed level
+
+          G1 X42 Y-4 Z5 F4800
+
+          M302 S155 ; lower cold extrusion limit to 155C
+
+          {if filament_type[initial_tool]=="FLEX"}
+          G1 E-4 F2400 ; retraction
+          {else}
+          G1 E-2 F2400 ; retraction
+          {endif}
+
+          M84 E ; turn off E motor
+
+          G29 P9 X10 Y-4 W32 H4
+
+          {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+          G0 Z40 F10000
+
+          M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+          M107
+
+          ;
+          ; MBL
+          ;
+          M84 E ; turn off E motor
+          G29 P1 ; invalidate mbl & probe print area
+          G29 P1 X0 Y0 W130 H20 C ; probe near purge place
+          G29 P3.2 ; interpolate mbl probes
+          G29 P3.13 ; extrapolate mbl outside probe area
+          G29 A ; activate mbl
+
+          ; prepare for purge
+          M104 S{first_layer_temperature[initial_tool]}
+          G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+          M109 S{first_layer_temperature[initial_tool]}
+
+          G92 E0
+          M569 S0 E ; set spreadcycle mode for extruder
+
+          T[initial_tool]
+          G1 E{parking_pos_retraction + extra_loading_move - 15} F1000 ; load to the nozzle
+
+          ;
+          ; Extrude purge line
+          ;
+          G92 E0 ; reset extruder position
+          G1 E{(filament_type[initial_tool] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+          G0 E7 X15 Z0.2 F500 ; purge
+          G0 X105 E36 F500 ; purge
+          G0 X115 E4 F650 ; purge
+          G0 X125 E4 F800 ; purge
+          G0 X128 Z0.05 F8000 ; wipe, move close to the bed
+          G0 X131 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+          G92 E0
+          M221 S100 ; set flow to 100%
+        end_gcode: |-
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+          M104 S0 ; turn off temperature
+          M140 S0 ; turn off heatbed
+          M107 ; turn off fan
+          G1 X241 Y170 F3600 ; park
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+          M702 ; unload the current filament
+          G4 ; wait
+          M572 S0 ; reset PA
+          M593 X T2 F0 ; disable IS
+          M593 Y T2 F0 ; disable IS
+          M84 X Y E ; disable motors
+          ; max_layer_z = [max_layer_z]
+
+          # variants:
+            # - condition: 'tool.nozzle_high_flow'     ;;;;; needs to be specified in preset-tool
+              # values:
+                # multimaterial_purging: '240'
+  - condition: printer.model == "MK4S"
+    name: Original Prusa MK4S
+    id: TDsUrDxOQlCYG6xiqVozSQ
+    values:
+      machine_max_acceleration_extruding: [4000, 2500]
+      machine_max_acceleration_x: [4000, 2500]
+      machine_max_acceleration_y: [4000, 2500]
+      printer_model: MK4S
+      start_gcode: |-
+        M17 ; enable steppers
+        M862.1 P[nozzle_diameter] A{(filament_abrasive[0] ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+        M862.3 P "MK4S" ; printer model check
+        M862.5 P2 ; g-code level check
+        M862.6 P"Input shaper" ; FW feature check
+        M115 U6.4.0+11974
+
+        M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+        G90 ; use absolute coordinates
+        M83 ; extruder relative mode
+
+        M140 S[first_layer_bed_temperature] ; set bed temp
+        M104 T0 S{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+        M109 T0 R{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+        M84 E ; turn off E motor
+
+        G28 ; home all without mesh bed level
+
+        G1 X42 Y-4 Z5 F4800
+
+        M302 S155 ; lower cold extrusion limit to 155C
+
+        {if filament_type[initial_tool]=="FLEX"}
+        G1 E-4 F2400 ; retraction
+        {else}
+        G1 E-2 F2400 ; retraction
+        {endif}
+
+        M84 E ; turn off E motor
+
+        G29 P9 X10 Y-4 W32 H4
+
+        {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+        G0 Z40 F10000
+
+        M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+        M107
+
+        ;
+        ; MBL
+        ;
+        M84 E ; turn off E motor
+        G29 P1 ; invalidate mbl & probe print area
+        G29 P1 X0 Y0 W50 H20 C ; probe near purge place
+        G29 P3.2 ; interpolate mbl probes
+        G29 P3.13 ; extrapolate mbl outside probe area
+        G29 A ; activate mbl
+
+        ; prepare for purge
+        M104 S{first_layer_temperature[0]}
+        G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+        M109 S{first_layer_temperature[0]}
+
+        G92 E0
+        M569 S0 E ; set spreadcycle mode for extruder
+
+        ;
+        ; Extrude purge line
+        ;
+        G92 E0 ; reset extruder position
+        G1 E{(filament_type[0] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+        G0 E7 X15 Z0.2 F500 ; purge
+        G0 X25 E4 F500 ; purge
+        G0 X35 E4 F650 ; purge
+        G0 X45 E4 F800 ; purge
+        G0 X48 Z0.05 F8000 ; wipe, move close to the bed
+        G0 X51 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+        G92 E0
+        M221 S100 ; set flow to 100%
+    variants:
+    - condition: feeder.base_model == "MMU3" and ! feeder.single_mode
+      id: sDaINpExS2qxgbDnvceoEA
+      values:
+        single_extruder_multi_material: 1
+        filament_change_time: 19
+        start_gcode: |-
+          M17 ; enable steppers
+          M862.1 P[nozzle_diameter] A{((is_extruder_used[0] and filament_abrasive[0]) ? 1 : (is_extruder_used[1] and filament_abrasive[1]) ? 1 : (is_extruder_used[2] and filament_abrasive[2]) ? 1 : (is_extruder_used[3] and filament_abrasive[3]) ? 1 : (is_extruder_used[4] and filament_abrasive[4]) ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+          M862.3 P "MK4S" ; printer model check
+          M862.5 P2 ; g-code level check
+          M862.6 P "Input shaper" ; FW feature check
+          M862.6 P "MMU3" ; FW feature check
+          M115 U6.4.0+11974
+
+          ; setup MMU
+          M708 A0x0b X5   ; extra load distance
+          M708 A0x0d X140 ; unload feeedrate
+          M708 A0x11 X140 ; load feedrate
+          M708 A0x14 X50  ; slow feedrate
+          M708 A0x1e X12  ; Pulley current to ~200mA
+          M708 A0x12 X90  ; selector feedrate mm/s
+          M708 A0x13 X400 ; idler feedrate deg/s
+          M708 A0x0f X400 ; selector acceleration mm/s2
+
+          M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+          G90 ; use absolute coordinates
+          M83 ; extruder relative mode
+
+          M140 S[first_layer_bed_temperature] ; set bed temp
+          M104 S{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+          M109 R{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+          M84 E ; turn off E motor
+
+          G28 ; home all without mesh bed level
+
+          G1 X42 Y-4 Z5 F4800
+
+          M302 S155 ; lower cold extrusion limit to 155C
+
+          {if filament_type[initial_tool]=="FLEX"}
+          G1 E-4 F2400 ; retraction
+          {else}
+          G1 E-2 F2400 ; retraction
+          {endif}
+
+          M84 E ; turn off E motor
+
+          G29 P9 X10 Y-4 W32 H4
+
+          {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+          G0 Z40 F10000
+
+          M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+          M107
+
+          ;
+          ; MBL
+          ;
+          M84 E ; turn off E motor
+          G29 P1 ; invalidate mbl & probe print area
+          G29 P1 X0 Y0 W130 H20 C ; probe near purge place
+          G29 P3.2 ; interpolate mbl probes
+          G29 P3.13 ; extrapolate mbl outside probe area
+          G29 A ; activate mbl
+
+          ; prepare for purge
+          M104 S{first_layer_temperature[initial_tool]}
+          G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+          M109 S{first_layer_temperature[initial_tool]}
+
+          G92 E0
+          M569 S0 E ; set spreadcycle mode for extruder
+
+          T[initial_tool]
+          G1 E{parking_pos_retraction + extra_loading_move - 15} F1000 ; load to the nozzle
+
+          ;
+          ; Extrude purge line
+          ;
+          G92 E0 ; reset extruder position
+          G1 E{(filament_type[initial_tool] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+          G0 E7 X15 Z0.2 F500 ; purge
+          G0 X105 E36 F500 ; purge
+          G0 X115 E4 F650 ; purge
+          G0 X125 E4 F800 ; purge
+          G0 X128 Z0.05 F8000 ; wipe, move close to the bed
+          G0 X131 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+          G92 E0
+          M221 S100 ; set flow to 100%
+        end_gcode: |-
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+          M104 S0 ; turn off temperature
+          M140 S0 ; turn off heatbed
+          M107 ; turn off fan
+          G1 X241 Y170 F3600 ; park
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+          M702 ; unload the current filament
+          G4 ; wait
+          M572 S0 ; reset PA
+          M593 X T2 F0 ; disable IS
+          M593 Y T2 F0 ; disable IS
+          M84 X Y E ; disable motors
+          ; max_layer_z = [max_layer_z]
+  - condition: printer.model == "MK3.9"
+    name: Original Prusa MK3.9
+    id: aJsZBN9UQIejzj3iRcH6WA
+    values:
+      machine_max_acceleration_extruding: [4000, 2500]
+      machine_max_acceleration_x: [4000, 2500]
+      machine_max_acceleration_y: [4000, 2500]
+      printer_model: MK3.9
+      start_gcode: |-
+        M17 ; enable steppers
+        M862.1 P[nozzle_diameter] A{(filament_abrasive[0] ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+        M862.3 P "MK3.9" ; printer model check
+        M862.5 P2 ; g-code level check
+        M862.6 P"Input shaper" ; FW feature check
+        M115 U6.4.0+11974
+
+        M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+        G90 ; use absolute coordinates
+        M83 ; extruder relative mode
+
+        M140 S[first_layer_bed_temperature] ; set bed temp
+        M104 T0 S{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+        M109 T0 R{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+        M84 E ; turn off E motor
+
+        G28 ; home all without mesh bed level
+
+        G1 X42 Y-4 Z5 F4800
+
+        M302 S155 ; lower cold extrusion limit to 155C
+
+        {if filament_type[initial_tool]=="FLEX"}
+        G1 E-4 F2400 ; retraction
+        {else}
+        G1 E-2 F2400 ; retraction
+        {endif}
+
+        M84 E ; turn off E motor
+
+        G29 P9 X10 Y-4 W32 H4
+
+        {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+        G0 Z40 F10000
+
+        M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+        M107
+
+        ;
+        ; MBL
+        ;
+        M84 E ; turn off E motor
+        G29 P1 ; invalidate mbl & probe print area
+        G29 P1 X0 Y0 W50 H20 C ; probe near purge place
+        G29 P3.2 ; interpolate mbl probes
+        G29 P3.13 ; extrapolate mbl outside probe area
+        G29 A ; activate mbl
+
+        ; prepare for purge
+        M104 S{first_layer_temperature[0]}
+        G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+        M109 S{first_layer_temperature[0]}
+
+        G92 E0
+        M569 S0 E ; set spreadcycle mode for extruder
+
+        ;
+        ; Extrude purge line
+        ;
+        G92 E0 ; reset extruder position
+        G1 E{(filament_type[0] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+        G0 E7 X15 Z0.2 F500 ; purge
+        G0 X25 E4 F500 ; purge
+        G0 X35 E4 F650 ; purge
+        G0 X45 E4 F800 ; purge
+        G0 X48 Z0.05 F8000 ; wipe, move close to the bed
+        G0 X51 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+        G92 E0
+        M221 S100 ; set flow to 100%
+    variants:
+    - condition: feeder.base_model == "MMU3" and ! feeder.single_mode
+      id: rsVS1tgtQyKf7pWb54FcZA
+      values:
+        single_extruder_multi_material: 1
+        filament_change_time: 19
+        start_gcode: |-
+          M17 ; enable steppers
+          M862.1 P[nozzle_diameter] A{((is_extruder_used[0] and filament_abrasive[0]) ? 1 : (is_extruder_used[1] and filament_abrasive[1]) ? 1 : (is_extruder_used[2] and filament_abrasive[2]) ? 1 : (is_extruder_used[3] and filament_abrasive[3]) ? 1 : (is_extruder_used[4] and filament_abrasive[4]) ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+          M862.3 P "MK3.9" ; printer model check
+          M862.5 P2 ; g-code level check
+          M862.6 P "Input shaper" ; FW feature check
+          M862.6 P "MMU3" ; FW feature check
+          M115 U6.4.0+11974
+
+          ; setup MMU
+          M708 A0x0b X5   ; extra load distance
+          M708 A0x0d X140 ; unload feeedrate
+          M708 A0x11 X140 ; load feedrate
+          M708 A0x14 X50  ; slow feedrate
+          M708 A0x1e X12  ; Pulley current to ~200mA
+          M708 A0x12 X90  ; selector feedrate mm/s
+          M708 A0x13 X400 ; idler feedrate deg/s
+          M708 A0x0f X400 ; selector acceleration mm/s2
+
+          M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+          G90 ; use absolute coordinates
+          M83 ; extruder relative mode
+
+          M140 S[first_layer_bed_temperature] ; set bed temp
+          M104 S{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+          M109 R{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+          M84 E ; turn off E motor
+
+          G28 ; home all without mesh bed level
+
+          G1 X42 Y-4 Z5 F4800
+
+          M302 S155 ; lower cold extrusion limit to 155C
+
+          {if filament_type[initial_tool]=="FLEX"}
+          G1 E-4 F2400 ; retraction
+          {else}
+          G1 E-2 F2400 ; retraction
+          {endif}
+
+          M84 E ; turn off E motor
+
+          G29 P9 X10 Y-4 W32 H4
+
+          {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+          G0 Z40 F10000
+
+          M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+          M107
+
+          ;
+          ; MBL
+          ;
+          M84 E ; turn off E motor
+          G29 P1 ; invalidate mbl & probe print area
+          G29 P1 X0 Y0 W130 H20 C ; probe near purge place
+          G29 P3.2 ; interpolate mbl probes
+          G29 P3.13 ; extrapolate mbl outside probe area
+          G29 A ; activate mbl
+
+          ; prepare for purge
+          M104 S{first_layer_temperature[initial_tool]}
+          G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+          M109 S{first_layer_temperature[initial_tool]}
+
+          G92 E0
+          M569 S0 E ; set spreadcycle mode for extruder
+
+          T[initial_tool]
+          G1 E{parking_pos_retraction + extra_loading_move - 15} F1000 ; load to the nozzle
+
+          ;
+          ; Extrude purge line
+          ;
+          G92 E0 ; reset extruder position
+          G1 E{(filament_type[initial_tool] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+          G0 E7 X15 Z0.2 F500 ; purge
+          G0 X105 E36 F500 ; purge
+          G0 X115 E4 F650 ; purge
+          G0 X125 E4 F800 ; purge
+          G0 X128 Z0.05 F8000 ; wipe, move close to the bed
+          G0 X131 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+          G92 E0
+          M221 S100 ; set flow to 100%
+        end_gcode: |-
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+          M104 S0 ; turn off temperature
+          M140 S0 ; turn off heatbed
+          M107 ; turn off fan
+          G1 X241 Y170 F3600 ; park
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+          M702 ; unload the current filament
+          G4 ; wait
+          M572 S0 ; reset PA
+          M593 X T2 F0 ; disable IS
+          M593 Y T2 F0 ; disable IS
+          M84 X Y E ; disable motors
+          ; max_layer_z = [max_layer_z]
+  - condition: printer.model == "MK3.9S"
+    name: Original Prusa MK3.9S
+    id: KVsBP75bS9elqgyrVBgTRw
+    values:
+      machine_max_acceleration_extruding: [4000, 2500]
+      machine_max_acceleration_x: [4000, 2500]
+      machine_max_acceleration_y: [4000, 2500]
+      printer_model: MK3.9S
+      start_gcode: |-
+        M17 ; enable steppers
+        M862.1 P[nozzle_diameter] A{(filament_abrasive[0] ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+        M862.3 P "MK3.9S" ; printer model check
+        M862.5 P2 ; g-code level check
+        M862.6 P"Input shaper" ; FW feature check
+        M115 U6.4.0+11974
+
+        M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+        G90 ; use absolute coordinates
+        M83 ; extruder relative mode
+
+        M140 S[first_layer_bed_temperature] ; set bed temp
+        M104 T0 S{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+        M109 T0 R{((filament_notes[0]=~/.*MBL160.*/) ? 160 : (filament_notes[0]=~/.*HT_MBL10.*/) ? (first_layer_temperature[0] - 10) : (filament_type[0] == "PC" or filament_type[0] == "PA") ? (first_layer_temperature[0] - 25) : (filament_type[0]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[0]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+        M84 E ; turn off E motor
+
+        G28 ; home all without mesh bed level
+
+        G1 X42 Y-4 Z5 F4800
+
+        M302 S155 ; lower cold extrusion limit to 155C
+
+        {if filament_type[initial_tool]=="FLEX"}
+        G1 E-4 F2400 ; retraction
+        {else}
+        G1 E-2 F2400 ; retraction
+        {endif}
+
+        M84 E ; turn off E motor
+
+        G29 P9 X10 Y-4 W32 H4
+
+        {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+        G0 Z40 F10000
+
+        M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+        M107
+
+        ;
+        ; MBL
+        ;
+        M84 E ; turn off E motor
+        G29 P1 ; invalidate mbl & probe print area
+        G29 P1 X0 Y0 W50 H20 C ; probe near purge place
+        G29 P3.2 ; interpolate mbl probes
+        G29 P3.13 ; extrapolate mbl outside probe area
+        G29 A ; activate mbl
+
+        ; prepare for purge
+        M104 S{first_layer_temperature[0]}
+        G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+        M109 S{first_layer_temperature[0]}
+
+        G92 E0
+        M569 S0 E ; set spreadcycle mode for extruder
+
+        ;
+        ; Extrude purge line
+        ;
+        G92 E0 ; reset extruder position
+        G1 E{(filament_type[0] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+        G0 E7 X15 Z0.2 F500 ; purge
+        G0 X25 E4 F500 ; purge
+        G0 X35 E4 F650 ; purge
+        G0 X45 E4 F800 ; purge
+        G0 X48 Z0.05 F8000 ; wipe, move close to the bed
+        G0 X51 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+        G92 E0
+        M221 S100 ; set flow to 100%
+    variants:
+    - condition: feeder.base_model == "MMU3" and ! feeder.single_mode
+      id: bm/SkJ2ST6Gc8KfAom+pwA
+      values:
+        single_extruder_multi_material: 1
+        filament_change_time: 19
+        start_gcode: |-
+          M17 ; enable steppers
+          M862.1 P[nozzle_diameter] A{((is_extruder_used[0] and filament_abrasive[0]) ? 1 : (is_extruder_used[1] and filament_abrasive[1]) ? 1 : (is_extruder_used[2] and filament_abrasive[2]) ? 1 : (is_extruder_used[3] and filament_abrasive[3]) ? 1 : (is_extruder_used[4] and filament_abrasive[4]) ? 1 : 0)} F{(nozzle_high_flow[0] ? 1 : 0)} ; nozzle check
+          M862.3 P "MK3.9S" ; printer model check
+          M862.5 P2 ; g-code level check
+          M862.6 P "Input shaper" ; FW feature check
+          M862.6 P "MMU3" ; FW feature check
+          M115 U6.4.0+11974
+
+          ; setup MMU
+          M708 A0x0b X5   ; extra load distance
+          M708 A0x0d X140 ; unload feeedrate
+          M708 A0x11 X140 ; load feedrate
+          M708 A0x14 X50  ; slow feedrate
+          M708 A0x1e X12  ; Pulley current to ~200mA
+          M708 A0x12 X90  ; selector feedrate mm/s
+          M708 A0x13 X400 ; idler feedrate deg/s
+          M708 A0x0f X400 ; selector acceleration mm/s2
+
+          M555 X{(min(print_bed_max[0], first_layer_print_min[0] + 32) - 32)} Y{(max(0, first_layer_print_min[1]) - 4)} W{((min(print_bed_max[0], max(first_layer_print_min[0] + 32, first_layer_print_max[0])))) - ((min(print_bed_max[0], first_layer_print_min[0] + 32) - 32))} H{((first_layer_print_max[1])) - ((max(0, first_layer_print_min[1]) - 4))}
+
+          G90 ; use absolute coordinates
+          M83 ; extruder relative mode
+
+          M140 S[first_layer_bed_temperature] ; set bed temp
+          M104 S{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; set extruder temp for bed leveling
+          M109 R{((filament_notes[initial_tool]=~/.*MBL160.*/) ? 160 : (filament_notes[initial_tool]=~/.*HT_MBL10.*/) ? (first_layer_temperature[initial_tool] - 10) : (filament_type[initial_tool] == "PC" or filament_type[initial_tool] == "PA") ? (first_layer_temperature[initial_tool] - 25) : (filament_type[initial_tool]=~/(FLEX|TPU|TPE)/) ? 210 : (filament_type[initial_tool]=~/.*PET.*/) ? 175 : 170)} ; wait for temp
+
+          M84 E ; turn off E motor
+
+          G28 ; home all without mesh bed level
+
+          G1 X42 Y-4 Z5 F4800
+
+          M302 S155 ; lower cold extrusion limit to 155C
+
+          {if filament_type[initial_tool]=="FLEX"}
+          G1 E-4 F2400 ; retraction
+          {else}
+          G1 E-2 F2400 ; retraction
+          {endif}
+
+          M84 E ; turn off E motor
+
+          G29 P9 X10 Y-4 W32 H4
+
+          {if first_layer_bed_temperature[initial_tool]<=60}M106 S100{endif}
+
+          G0 Z40 F10000
+
+          M190 S[first_layer_bed_temperature] ; wait for bed temp
+
+          M107
+
+          ;
+          ; MBL
+          ;
+          M84 E ; turn off E motor
+          G29 P1 ; invalidate mbl & probe print area
+          G29 P1 X0 Y0 W130 H20 C ; probe near purge place
+          G29 P3.2 ; interpolate mbl probes
+          G29 P3.13 ; extrapolate mbl outside probe area
+          G29 A ; activate mbl
+
+          ; prepare for purge
+          M104 S{first_layer_temperature[initial_tool]}
+          G0 X0 Y-4 Z15 F4800 ; move away and ready for the purge
+          M109 S{first_layer_temperature[initial_tool]}
+
+          G92 E0
+          M569 S0 E ; set spreadcycle mode for extruder
+
+          T[initial_tool]
+          G1 E{parking_pos_retraction + extra_loading_move - 15} F1000 ; load to the nozzle
+
+          ;
+          ; Extrude purge line
+          ;
+          G92 E0 ; reset extruder position
+          G1 E{(filament_type[initial_tool] == "FLEX" ? 4 : 2)} F2400 ; deretraction after the initial one before nozzle cleaning
+          G0 E7 X15 Z0.2 F500 ; purge
+          G0 X105 E36 F500 ; purge
+          G0 X115 E4 F650 ; purge
+          G0 X125 E4 F800 ; purge
+          G0 X128 Z0.05 F8000 ; wipe, move close to the bed
+          G0 X131 Z0.2 F8000 ; wipe, move quickly away from the bed
+
+          G92 E0
+          M221 S100 ; set flow to 100%
+        end_gcode: |-
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+1, max_print_height)} F720 ; Move print head up{endif}
+          M104 S0 ; turn off temperature
+          M140 S0 ; turn off heatbed
+          M107 ; turn off fan
+          G1 X241 Y170 F3600 ; park
+          {if layer_z < max_print_height}G1 Z{z_offset+min(max_layer_z+23, max_print_height)} F300 ; Move print head up{endif}
+          M702 ; unload the current filament
+          G4 ; wait
+          M572 S0 ; reset PA
+          M593 X T2 F0 ; disable IS
+          M593 Y T2 F0 ; disable IS
+          M84 X Y E ; disable motors
+          ; max_layer_z = [max_layer_z]

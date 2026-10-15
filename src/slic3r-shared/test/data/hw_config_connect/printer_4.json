@@ -1,0 +1,216 @@
+{
+  "base_model" : "XL",
+  "connect_state" : "READY",
+  "legacy_printer_model" : "XL5IS",
+  "model" : "XL",
+  "name" : "XL_5T_input-shaper_STABLE",
+  "supported_printer_models" : [ "XL", "XL2", "XL5", "XLIS", "XL2IS" ],
+  "tool_count" : 5,
+  "tools" : {
+    "0" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : false,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : null,
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "1" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : false,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 0.0
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "brand" : {
+              "name" : "Prusament",
+              "uuid" : "ae5ff34e-298e-50c9-8f77-92a97fb30b09"
+            },
+            "certifications" : [ "ul_2904" ],
+            "class" : "FFF",
+            "name" : "PLA Azure Blue",
+            "photos" : [ {
+              "type" : "unspecified",
+              "url" : "https://files.openprinttag.org/prusament/prusament-pla-azure-blue/1b1e4c32def6.png"
+            } ],
+            "primary_color" : {
+              "color_lab" : [ 50.9991, -19.7067, -30.4867 ],
+              "color_rgba" : "#008fbeff"
+            },
+            "secondary_colors" : [ ],
+            "tags" : [ "industrially_compostable" ],
+            "transmission_distance" : 5.5,
+            "type" : "PLA",
+            "uuid" : "f7bf0baf-0419-51ee-89ec-f6fc6020f7b6"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "2" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : false,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 0.0
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "brand" : {
+              "name" : "Prusament",
+              "uuid" : "ae5ff34e-298e-50c9-8f77-92a97fb30b09"
+            },
+            "certifications" : [ "ul_2904" ],
+            "class" : "FFF",
+            "name" : "PLA Galaxy Purple",
+            "photos" : [ {
+              "type" : "unspecified",
+              "url" : "https://files.openprinttag.org/prusament/prusament-pla-galaxy-purple/38e5bdcb8b5b.png"
+            } ],
+            "primary_color" : {
+              "color_lab" : [ 28.362, 20.2233, -28.8667 ],
+              "color_rgba" : "#563b7cff"
+            },
+            "secondary_colors" : [ ],
+            "tags" : [ "glitter", "industrially_compostable" ],
+            "transmission_distance" : 4.7,
+            "type" : "PLA",
+            "uuid" : "62d10d20-319b-5c8e-9758-63278e17cc9e"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "3" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : false,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 0.0
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PETG",
+            "brand" : {
+              "name" : "Prusament",
+              "uuid" : "ae5ff34e-298e-50c9-8f77-92a97fb30b09"
+            },
+            "certifications" : [ "ul_2904" ],
+            "class" : "FFF",
+            "name" : "PETG Ocean Blue",
+            "photos" : [ {
+              "type" : "unspecified",
+              "url" : "https://files.openprinttag.org/prusament/prusament-petg-ocean-blue/6ab58ee59090.png"
+            } ],
+            "primary_color" : {
+              "color_rgba" : "#194c55ff"
+            },
+            "secondary_colors" : [ ],
+            "tags" : [ ],
+            "transmission_distance" : 3.0,
+            "type" : "PETG",
+            "uuid" : "421e0d10-0ec7-50c9-927c-7a585e8a15c2"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    },
+    "4" : {
+      "class" : "FFF",
+      "features" : {
+        "nozzle_diameter" : 0.4,
+        "nozzle_hardened" : false,
+        "nozzle_high_flow" : true
+      },
+      "material_package_instance" : {
+        "class" : "FFF",
+        "dynamic_data" : {
+          "consumed_weight" : 0.0
+        },
+        "is_from_nfc" : false,
+        "package" : {
+          "class" : "FFF",
+          "filament_diameter" : 1750,
+          "material" : {
+            "abbreviation" : "PLA",
+            "brand" : {
+              "name" : "Prusament",
+              "uuid" : "ae5ff34e-298e-50c9-8f77-92a97fb30b09"
+            },
+            "certifications" : [ ],
+            "class" : "FFF",
+            "name" : "PLA Noctua Beige",
+            "photos" : [ {
+              "type" : "unspecified",
+              "url" : "https://files.openprinttag.org/prusament/prusament-pla-noctua-beige/prusament-pla-noctua-beige-0-c91da9fa.jpg"
+            } ],
+            "primary_color" : {
+              "color_lab" : [ 82.3831, 5.7633, 12.8333 ],
+              "color_rgba" : "#f0d6bfff"
+            },
+            "secondary_colors" : [ ],
+            "tags" : [ "industrially_compostable" ],
+            "type" : "PLA",
+            "uuid" : "9e305265-3ac2-5708-8098-6114901bf340"
+          },
+          "nominal_netto_full_weight" : 1000
+        }
+      },
+      "telemetry" : {
+        "active" : false,
+        "odometer_e" : 0
+      },
+      "type" : "PRINT_HEAD"
+    }
+  },
+  "uuid" : "00000000-0000-0000-0000-000000000000"
+}

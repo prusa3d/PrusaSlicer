@@ -1,0 +1,42 @@
+{
+  "base_model": "COREONE",
+  "connect_state": "FINISHED",
+  "legacy_printer_model": "COREONEL",
+  "model": "COREONEL",
+  "name": "CORE1L_HF0.4n_STABLE",
+  "supported_printer_models": [],
+  "tool_count": 1,
+  "tools": {
+    "0": {
+      "class": "FFF",
+      "features": {
+        "nozzle_diameter": 0.4,
+        "nozzle_hardened": false,
+        "nozzle_high_flow": true
+      },
+      "material_package_instance": {
+        "class": "FFF",
+        "dynamic_data": {
+          "consumed_weight": 68.22641690575925
+        },
+        "is_from_nfc": false,
+        "package": {
+          "class": "FFF",
+          "filament_diameter": 1750,
+          "material": {
+            "abbreviation": "PLA",
+            "class": "FFF",
+            "type": "PLA"
+          },
+          "nominal_netto_full_weight": 1000
+        }
+      },
+      "telemetry": {
+        "active": false,
+        "odometer_e": 0
+      },
+      "type": "PRINT_HEAD"
+    }
+  },
+  "uuid" : "00000000-0000-0000-0000-000000000000"
+}

@@ -54,7 +54,7 @@ public:
     reference operator*() const { return m_it->second; }
     pointer operator->() const { return &m_it->second; }
 
-    bool is_valid() const { return m_it != m_container.end(); }
+    bool is_valid() const { return m_it != m_container->end(); }
 
     ConfigIterator begin() const
     {
@@ -76,17 +76,17 @@ private:
     friend class HwConfigEvaluator;
 
     ConfigIterator(const Container& container, const Expr::Eval& eval, Expr::ValueMap&& values)
-        : m_vars(std::move(values)), m_eval(eval), m_container(container), m_it(m_container.begin())
+        : m_vars(std::move(values)), m_eval(&eval), m_container(&container), m_it(m_container->begin())
     {
         ensure_condition_met();
     }
 
     void reset()
     {
-        m_it = m_container.begin();
+        m_it = m_container->begin();
         ensure_condition_met();
     }
-    void invalidate() { m_it = m_container.end(); }
+    void invalidate() { m_it = m_container->end(); }
 
     void advance()
     {
@@ -110,7 +110,7 @@ private:
             if (!el.condition.has_value()) {
                 return;
             }
-            const auto result = m_eval.eval(el.condition.value().value, m_vars);
+            const auto result = m_eval->eval(el.condition.value().value, m_vars);
             if (boost::get<bool>(result)) {
                 return;
             }
@@ -119,8 +119,8 @@ private:
     }
 private:
     Expr::ValueMap m_vars;
-    const Expr::Eval& m_eval;
-    const Container& m_container;
+    const Expr::Eval* m_eval;
+    const Container* m_container;
     typename Container::const_iterator m_it;
 };
 

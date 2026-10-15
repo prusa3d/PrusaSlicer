@@ -13,12 +13,15 @@
 
 namespace Slic3r::Biz::Preset {
 
+template <typename T>
+using PresetViewElement = std::pair<std::reference_wrapper<const T>, bool>;
+
 namespace Details {
 template <typename T, bool second_value>
 auto view_pack_as_pair()
 {
     return ranges::views::transform(
-        [](const T& v) -> std::pair<std::reference_wrapper<const T>, bool>
+        [](const T& v) -> PresetViewElement<T>
         { return {v, second_value}; }
     );
 }

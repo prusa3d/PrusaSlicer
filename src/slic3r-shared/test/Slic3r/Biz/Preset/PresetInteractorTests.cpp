@@ -236,7 +236,7 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Preset Interactor Tests", "[Pr
 {
     project_interactor.new_project();
     auto& preset_interactor = project_interactor.preset_interactor();
-    const auto& printer_items = preset_interactor.printer_presets();
+    const auto& printer_items = preset_interactor.printer_configs();
     REQUIRE(printer_items.items().size() > 0);
 
     auto switch_printer_and_verify = [&](const std::string& printer_name)     {
@@ -250,7 +250,7 @@ TEST_CASE_METHOD(LoadedProjectInteractorFixture, "Preset Interactor Tests", "[Pr
         }
         REQUIRE(printer_idx.has_value() == true);
         const auto& selected_printer = printer_items.items().at(printer_idx.value());
-        preset_interactor.select_printer_preset(selected_printer.hw_printer_config_id, selected_printer.id);
+        preset_interactor.select_printer_config(selected_printer.hw_printer_config_id);
 
         const auto selected_printer_idx = printer_items.selected_index();
         REQUIRE(selected_printer_idx != Slic3r::Domain::INVALID_ID);

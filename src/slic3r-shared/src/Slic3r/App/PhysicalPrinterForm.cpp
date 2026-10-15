@@ -139,26 +139,31 @@ void PhysicalPrinterForm::set_printer_config(
 
     m_loading = true;
 
-    Biz::Preset::PresetInteractor::SheetItems sheet_items =
-        m_project_interactor.preset_interactor().get_sheet_items(m_config.hw_config);
-    m_sheet_observable_list->items().set_items(sheet_items.sheet_defs);
-    if (!sheet_items.sheet_defs.empty()) { // SLA doesn't yet have sheets specified
-        m_sheet_observable_list->set_selected_index(sheet_items.selected_sheet);
-    }
-
-    Biz::Preset::PresetInteractor::ToolItems tool_items =
-        m_project_interactor.preset_interactor().get_tool_items(m_config.hw_config);
-
-    const std::vector<Domain::Preset::HwToolConfigDef>& items{tool_items.tool_defs};
-
+    Biz::Preset::PresetInteractor::SheetItems sheet_items;
     std::vector<Biz::Preset::ToolConfigItemObservableList> result;
-    result.reserve(tool_items.selected_tools.size());
-    for (std::size_t i{}; i < tool_items.selected_tools.size(); ++i) {
-        const std::size_t& selected_index{tool_items.selected_tools[i]};
 
-        Biz::Preset::ToolConfigItemObservableList& item = result.emplace_back();
-        item.items().set_items(items);
-        item.set_selected_index(selected_index);
+    if (m_config.hw_config.has_value()) {
+        sheet_items =
+            m_project_interactor.preset_interactor().get_sheet_items(m_config.hw_config.value());
+        m_sheet_observable_list->items().set_items(sheet_items.sheet_defs);
+        if (!sheet_items.sheet_defs.empty()) { // SLA doesn't yet have sheets specified
+            m_sheet_observable_list->set_selected_index(sheet_items.selected_sheet);
+        }
+
+        Biz::Preset::PresetInteractor::ToolItems tool_items =
+            m_project_interactor.preset_interactor().get_tool_items(m_config.hw_config.value());
+
+        const std::vector<Domain::Preset::HwToolConfigDef>& items{tool_items.tool_defs};
+
+
+        result.reserve(tool_items.selected_tools.size());
+        for (std::size_t i{}; i < tool_items.selected_tools.size(); ++i) {
+            const std::size_t& selected_index{tool_items.selected_tools[i]};
+
+            Biz::Preset::ToolConfigItemObservableList& item = result.emplace_back();
+            item.items().set_items(items);
+            item.set_selected_index(selected_index);
+        }
     }
     m_tool_observable_list->set_items(std::move(result));
 

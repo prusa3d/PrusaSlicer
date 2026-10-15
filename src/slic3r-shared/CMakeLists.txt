@@ -921,6 +921,10 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Preset/IO/PresetMetadataLegacyLoader.cpp
         include/Slic3r/Biz/Preset/IO/BundleLoader.hpp
         src/Slic3r/Biz/Preset/IO/BundleLoader.cpp
+        include/Slic3r/Biz/Preset/IO/HwConfigConnectJson.hpp
+        src/Slic3r/Biz/Preset/IO/HwConfigConnectJson.cpp
+        include/Slic3r/Biz/Preset/HwBundleEvaluator.hpp
+        src/Slic3r/Biz/Preset/HwBundleEvaluator.cpp
         include/Slic3r/Biz/CerealUtils.hpp
         src/Slic3r/Biz/Yaml/Yaml.hpp
         src/Slic3r/Biz/Yaml/Yaml.cpp
@@ -1716,9 +1720,13 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/Preset/IO/HwConfigDefLoaderTests.cpp
             test/Slic3r/Biz/Preset/IO/PresetLoaderTests.cpp
             test/Slic3r/Biz/Preset/IO/PresetMetadataLegacyLoaderTests.cpp
+            test/Slic3r/Biz/Preset/IO/HwConfigConnectJsonTests.cpp
             test/Slic3r/Biz/Preset/PresetCollectionEvaluatorTests.cpp
             test/Slic3r/Biz/Preset/PresetEvaluatorTests.cpp
             test/Slic3r/Biz/Preset/HwConfigEvaluatorTests.cpp
+            test/Slic3r/Biz/Preset/ConnectJsonTestUtils.cpp
+            test/Slic3r/Biz/Preset/ConnectJsonTestUtils.hpp
+            test/Slic3r/Biz/Preset/HwBundleEvaluatorTests.cpp
             test/Slic3r/Biz/Preset/ProjectPresetViewTests.cpp
             test/Slic3r/Biz/Preset/PresetInteractorTests.cpp
             test/Slic3r/Biz/Preset/PresetNameValidatorTests.cpp

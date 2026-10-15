@@ -41,10 +41,17 @@ struct PhysicalPrinterConfig
     std::string host;
     std::string name;
     std::string uuid;
-    Domain::Preset::HwPrinterConfig hw_config;
+    std::optional<Domain::Preset::HwPrinterConfig> hw_config;
 };
 
 PhysicalPrinterConfig connect_printer_config(const ConnectPrinter::ConnectPrinter& printer);
+
+/**
+ * @brief Load external hw config from Connect JSON
+ * @param json Connect JSON describing the printer
+ * @return External hw config (containing only info available in Connect JSON).
+ */
+std::optional<Domain::Preset::HwPrinterConfig> hw_config_from_connect_json(std::string_view json);
 
 std::string physical_printer_type_to_string(const PhysicalPrinterConfig& data);
 

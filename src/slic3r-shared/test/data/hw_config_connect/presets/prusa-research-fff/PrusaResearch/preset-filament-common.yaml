@@ -1,0 +1,386 @@
+kind: filament
+id: '*mmu specific*'
+variants:
+- condition: printer.base_model=~/(COREONE|MK4)/ and feeder.base_model == "MMU3"
+  id: A++ekkDgRNOp9NnJX6EBNQ
+  values:
+    filament_ramming_temperature_delta: -20
+    filament_ramming_initial_delay: 1.5
+---
+kind: filament
+inherits:
+- '*mmu specific*'
+condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and (feeder.base_model!~/.*MMU.*/ or (feeder.base_model=~/.*MMU.*/ and feeder.single_mode))
+# condition: printer.base_model=~/(COREONE|MK4|MK3.5|MK2|XL|MK3|MK2.5|MINI)/ and feeder.base_model!~/.*MMU.*/
+id: '*common*'
+values:
+  pressure_advance: enabled
+variants:
+- condition: printer.base_model == "COREONE_INDX"
+  id: tUS5QsccRf6+M1mi3/Ch/Q
+  values:
+    pressure_advance: automatic_calibration
+---
+### Chamber temperatures
+kind: filament
+id: '*chamber_PLA*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1/C1L
+- condition: printer.base_model=="COREONE"
+  id: Y1ZRimqYTziSFsAoxwhx4A
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 20
+# C1/C1L
+- condition: printer.base_model=="COREONE_INDX"
+  id: ILPn9oT8T2Ocr1jyJ5fvRg
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 20
+---
+kind: filament
+id: '*chamber_PVA*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+---
+kind: filament
+id: '*chamber_PVB*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1/C1L
+- condition: printer.base_model=="COREONE"
+  id: gx5fFPDlTIO2Fprc5AJICw
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 20
+---
+kind: filament
+id: '*chamber_PEBA*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1/C1L
+- condition: printer.base_model=="COREONE_INDX"
+  id: MxlFq1deT+a7zV6i5n3okA
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 20
+---
+kind: filament
+id: '*chamber_PET*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1/C1L
+- condition: printer.base_model=="COREONE"
+  id: AT+PgaHiSZmXXY6vMlAfMQ
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 35
+# C1/C1L INDX
+- condition: printer.base_model=="COREONE_INDX"
+  id: WGri00FMQeSDk/3hqZRBdg
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 35
+---
+kind: filament
+id: '*chamber_ABS*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1
+- condition: printer.base_model=="COREONE"
+  id: tpF5CW4HSgq1RUQji2ae/A
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L
+  variants:
+  - condition: printer.model=="COREONEL"
+    id: jZWmgWi+SKy3ZxL68JaFUw
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+# C1 INDX
+- condition: printer.base_model=="COREONE_INDX"
+  id: yM7LA9YmTTGuxp5heQQ5AA
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L INDX
+  variants:
+  - condition: printer.model=="COREONEL_INDX"
+    id: JXZpQhkkQmqFOnpuhsy1jQ
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+---
+kind: filament
+id: '*chamber_ASA*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1
+- condition: printer.base_model=="COREONE"
+  id: UTqPXgp0Rm6CuAjtDRzqAw
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L
+  variants:
+  - condition: printer.model=="COREONEL"
+    id: CE9bTo8oRAS1DWnBFeSIMg
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+# C1 INDX
+- condition: printer.base_model=="COREONE_INDX"
+  id: sp4fFdZpRn2gfpKDKmk/xQ
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L INDX
+  variants:
+  - condition: printer.model=="COREONEL_INDX"
+    id: CFpnaalxQz2owRriPUNgCA
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+---
+kind: filament
+id: '*chamber_PC*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1
+- condition: printer.base_model=="COREONE"
+  id: f1WPRARwQ5q1WIVZERVI3A
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L
+  variants:
+  - condition: printer.model=="COREONEL"
+    id: soH1XJeYSyC2R/oD1ITN3w
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+# C1 INDX
+- condition: printer.base_model=="COREONE_INDX"
+  id: 3DARZFweQvKecc9F4QEIaA
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L INDX
+  variants:
+  - condition: printer.model=="COREONEL_INDX"
+    id: qJER4VHLSSyhKDkiXOn3Ag
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+---
+kind: filament
+id: '*chamber_PA*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1
+- condition: printer.base_model=="COREONE"
+  id: JM++IG8MSxaE49n1C/Qs+Q
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L
+  variants:
+  - condition: printer.model=="COREONEL"
+    id: cRYPnjuCQuiqsexKFJ+aQA
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+# C1 INDX
+- condition: printer.base_model=="COREONE_INDX"
+  id: SLmxG2qFQPKp7MEfpLnxZg
+  values:
+    chamber_minimal_temperature: 40
+    chamber_temperature: 55
+# C1L INDX
+  variants:
+  - condition: printer.model=="COREONEL_INDX"
+    id: ZNdX4nJXRAiFdXUskuDebQ
+    values:
+      chamber_minimal_temperature: 50
+      chamber_temperature: 60
+---
+kind: filament
+id: '*chamber_FLEX*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+variants:
+# C1/C1L
+- condition: printer.base_model=="COREONE"
+  id: BtIRn4vXTeKADG9/TfQWAA
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 30
+# C1/C1L INDX
+- condition: printer.base_model=="COREONE_INDX"
+  id: OahjuInRSVaoTlXFH4ZO1A
+  values:
+    chamber_minimal_temperature: 0
+    chamber_temperature: 30
+---
+kind: filament
+id: '*chamber_PP*'
+values:
+  chamber_minimal_temperature: 0
+  chamber_temperature: 0
+---
+### Shrinkage compensations
+kind: filament
+id: '*shrinkage_ABS*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: g8s4RIlqRyGqTib/kPjTMQ
+  values:
+    filament_shrinkage_compensation_xy: 0.22%
+    filament_shrinkage_compensation_z: 0.22%
+---
+kind: filament
+id: '*shrinkage_ASA*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: U3HXEJz7Q7uGyZXjNM8UuA
+  values:
+    filament_shrinkage_compensation_xy: 0.22%
+    filament_shrinkage_compensation_z: 0.22%
+---
+kind: filament
+id: '*shrinkage_PC*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: lipWQ8QDQp69otAhCSFg4Q
+  values:
+    filament_shrinkage_compensation_xy: 0.18%
+    filament_shrinkage_compensation_z: 0.18%
+---
+kind: filament
+id: '*shrinkage_PCCF*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: r/SJo1+4Rpy3GWZlng3zuA
+  values:
+    filament_shrinkage_compensation_xy: 0%
+    filament_shrinkage_compensation_z: 0.18%
+---
+kind: filament
+id: '*shrinkage_PA6*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: khGV+qsIRXOpqs7kEe0Eeg
+  values:
+    filament_shrinkage_compensation_xy: 0.24%
+    filament_shrinkage_compensation_z: 0.24%
+---
+kind: filament
+id: '*shrinkage_PA11*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: W1HleQDgTnGsOxD3CtC2nw
+  values:
+    filament_shrinkage_compensation_xy: 0.28%
+    filament_shrinkage_compensation_z: 0.28%
+---
+kind: filament
+id: '*shrinkage_PA11CF*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: Fnh3NrgdSyOcA8L5U2zbQA
+  values:
+    filament_shrinkage_compensation_xy: 0%
+    filament_shrinkage_compensation_z: 0.28%
+---
+kind: filament
+id: '*shrinkage_PA6CF*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: uS5vldVGQLSP/TyXPm1xiw
+  values:
+    filament_shrinkage_compensation_xy: 0%
+    filament_shrinkage_compensation_z: 0.24%
+---
+kind: filament
+id: '*shrinkage_PP*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: GCHcabDWRAyYZfFZ5iRLCg
+  values:
+    filament_shrinkage_compensation_xy: 0%
+    filament_shrinkage_compensation_z: 0%
+    # filament_shrinkage_compensation_xy: 0.33%
+    # filament_shrinkage_compensation_z: 0.33%
+---
+kind: filament
+id: '*shrinkage_PPCF*'
+values:
+  filament_shrinkage_compensation_xy: 0%
+  filament_shrinkage_compensation_z: 0%
+variants:
+# CORE ONE / INDX
+- condition: printer.base_model=~/(COREONE|COREONE_INDX)/
+  id: ThxfU9FISS6IMiP5FTHxFQ
+  values:
+    filament_shrinkage_compensation_xy: 0%
+    filament_shrinkage_compensation_z: 0%
+    # filament_shrinkage_compensation_xy: 0%
+    # filament_shrinkage_compensation_z: 0.33%
+

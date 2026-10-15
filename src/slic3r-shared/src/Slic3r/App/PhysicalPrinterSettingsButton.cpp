@@ -72,7 +72,7 @@ void PhysicalPrinterSettingsButton::update_btns_visibility()
 void PhysicalPrinterSettingsButton::update()
 {
     std::string service_name = Biz::PhysicalPrinter::physical_printer_type_to_string(*m_state);
-    std::string model        = m_state->hw_config.name;
+    std::string model        = m_state->hw_config.has_value() ? m_state->hw_config.value().name : "";
     std::string preset_name  = fmt::format("{} - {}", service_name, model);
     set_preset_name(preset_name);
     set_printer_name(m_state->name);
@@ -90,10 +90,10 @@ void PhysicalPrinterSettingsButton::update()
                 set_visible_bin(false);
             } else if constexpr (std::is_same_v<T, Slic3r::Biz::PhysicalPrinter::PrinterUpload>) {
                 // Reuse the picture of the linked logical printer; fall back to the generic icon.
-                if (m_state->hw_config.visual.thumbnail.has_value()) {
+                if (m_state->hw_config.has_value() && m_state->hw_config->visual.thumbnail.has_value()) {
                     set_image(
-                        m_state->hw_config.relative_path_to_assets()
-                        + m_state->hw_config.visual.thumbnail.value()
+                        m_state->hw_config->relative_path_to_assets()
+                        + m_state->hw_config->visual.thumbnail.value()
                     );
                 } else {
                     set_icon(Render::Icon::PhysicalPrinterIcon);
