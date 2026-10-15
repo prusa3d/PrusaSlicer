@@ -2778,20 +2778,18 @@ void PresetInteractor::set_item_override(const Domain::ConfigItem& item, bool en
 }
 
 void PresetInteractor::set_macro_overrides(
-    Domain::MacroOverridesLayer layer,
-    std::optional<Domain::MacroOverridesFDM> overrides
+    const std::string& id,
+    std::optional<Domain::MacroOverridesLayerFDM> layer
 )
 {
     Domain::Preset::SelectedPreset& selected_preset{mutable_selected_printer_preset()};
     auto* fdm_overrides{std::get_if<Domain::MacroOverridesMapFDM>(&selected_preset.macro_overrides)};
     ASSERT(fdm_overrides != nullptr);
 
-    if (overrides.has_value()) {
-        // The key carries the name, so it has to be replaced as well.
-        fdm_overrides->erase(layer);
-        fdm_overrides->emplace(layer, std::move(*overrides));
+    if (layer.has_value()) {
+        fdm_overrides->insert_or_assign(id, std::move(*layer));
     } else {
-        fdm_overrides->erase(layer);
+        fdm_overrides->erase(id);
     }
 
     m_backup_store.invalidate_backup(m_selected_project_id);

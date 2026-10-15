@@ -286,7 +286,7 @@ TEST_CASE_METHOD(
     CHECK(extruders == std::vector<unsigned>{0});
 
     Slic3r::Domain::MacroOverridesFDM& soluble{
-        config.macro_overrides[{"some_layer"}]};
+        config.macro_overrides["some_layer"].overrides};
     soluble.overrides.set("support_material", SupportMode::Everywhere);
     soluble.overrides.set("support_material_extruder", 4);
 

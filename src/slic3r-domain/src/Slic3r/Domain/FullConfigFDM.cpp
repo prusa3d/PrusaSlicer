@@ -32,8 +32,8 @@ BoxOrBoxesVector as_boxes(const ConfigPackFDM& config_pack) {
     result.push_back(convert_to_box_refs(config_pack.filament));
     result.push_back(config_pack.project);
     NamedBoxRefs macro_overrides;
-    for (const auto& [layer, value] : config_pack.macro_overrides) {
-        macro_overrides.emplace_back(layer.id, value);
+    for (const auto& [id, layer] : config_pack.macro_overrides) {
+        macro_overrides.emplace_back(id, layer.overrides);
     }
     result.push_back(std::move(macro_overrides));
     return result;
@@ -47,8 +47,8 @@ MutBoxOrBoxesVector as_mut_boxes(ConfigPackFDM& config_pack) {
     result.push_back(convert_to_mut_box_refs(config_pack.filament));
     result.push_back(config_pack.project);
     MutNamedBoxRefs macro_overrides;
-    for (auto& [layer, value] : config_pack.macro_overrides) {
-        macro_overrides.emplace_back(layer.id, value);
+    for (auto& [id, layer] : config_pack.macro_overrides) {
+        macro_overrides.emplace_back(id, layer.overrides);
     }
     result.push_back(std::move(macro_overrides));
     return result;

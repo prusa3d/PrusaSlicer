@@ -3,32 +3,13 @@
 #include "Slic3r/Domain/Config.hpp"
 
 #include <map>
-#include <optional>
 #include <string>
-#include <string_view>
 #include <variant>
 
 namespace Slic3r::Domain {
 
-struct MacroOverridesLayer
-{
-    std::string id;
-    std::string name;
-
-    std::strong_ordering operator<=>(const MacroOverridesLayer& other) const
-    {
-        return id <=> other.id;
-    }
-
-    bool operator==(const MacroOverridesLayer& other) const
-    {
-        return id == other.id;
-    }
-};
-
-enum class MacroOverridesLayerSLA
-{
-};
+using PrintModeParam  = std::variant<bool, int, double, std::string>;
+using PrintModeParams = std::map<std::string, PrintModeParam>;
 
 class MacroOverridesFDM : public ConfigBox
 {
@@ -42,15 +23,36 @@ public:
     MacroOverridesSLA();
 };
 
-using MacroOverridesMapFDM = std::map<MacroOverridesLayer, MacroOverridesFDM>;
-using MacroOverridesMapSLA = std::map<MacroOverridesLayer, MacroOverridesSLA>;
-using MacroOverridesMap    = std::variant<MacroOverridesMapFDM, MacroOverridesMapSLA>;
+/// One layer of macro overrides, keyed in the map by the id of the print mode that produced it.
+struct MacroOverridesLayerFDM
+{
+    /// Display name, kept so a layer can be shown even when its print mode plugin is missing.
+    std::string name;
+    /// Print mode parameters the overrides were evaluated from.
+    PrintModeParams params;
+    MacroOverridesFDM overrides;
+
+    bool operator==(const MacroOverridesLayerFDM&) const = default;
+};
+using MacroOverridesMapFDM = std::map<std::string, MacroOverridesLayerFDM>;
+
+struct MacroOverridesLayerSLA
+{
+    std::string name;
+    PrintModeParams params;
+    MacroOverridesSLA overrides;
+
+    bool operator==(const MacroOverridesLayerSLA&) const = default;
+};
+using MacroOverridesMapSLA = std::map<std::string, MacroOverridesLayerSLA>;
+
+using MacroOverridesMap = std::variant<MacroOverridesMapFDM, MacroOverridesMapSLA>;
 
 Domain::BoxOrBoxesVector to_refs(const Domain::MacroOverridesMapFDM& macro_overrides);
 
-MacroOverridesLayer vase_mode_layer();
+std::string vase_mode_layer_id();
 
-/// The overrides applied by the SpiralVase layer (vase mode).
-MacroOverridesFDM make_vase_mode_overrides();
+/// The layer applied by vase mode (spiral vase).
+MacroOverridesLayerFDM make_vase_mode_layer();
 
 } // namespace Slic3r::Domain

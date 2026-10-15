@@ -265,8 +265,8 @@ static std::optional<Biz::Slicing::Error> check_extruders(
         }
     }
 
-    for (const Domain::MacroOverridesFDM& macro : config.macro_overrides | std::views::values) {
-        const auto macro_extruder{macro.overrides.get("extruder")};
+    for (const Domain::MacroOverridesLayerFDM& macro : config.macro_overrides | std::views::values) {
+        const auto macro_extruder{macro.overrides.overrides.get("extruder")};
         if (macro_extruder && !accepts_extruder(*macro_extruder, 0)) {
             result.push_back("extruder");
         }
@@ -298,8 +298,8 @@ static std::optional<Biz::Slicing::Error> check_extruders(
                 }
             }
         }
-        for (const Domain::MacroOverridesFDM& macro : config.macro_overrides | std::views::values) {
-            const auto macro_extruder{macro.overrides.get(key)};
+        for (const Domain::MacroOverridesLayerFDM& macro : config.macro_overrides | std::views::values) {
+            const auto macro_extruder{macro.overrides.overrides.get(key)};
             if (macro_extruder && !accepts_extruder(*macro_extruder, 1)) {
                 result.push_back(key);
             }
@@ -328,8 +328,8 @@ static std::optional<Biz::Slicing::Error> check_extruders(
                             "support_material_extruder",
                             "support_material_interface_extruder"})
     {
-        for (const Domain::MacroOverridesFDM& macro : config.macro_overrides | std::views::values) {
-            const auto macro_extruder{macro.overrides.get(key)};
+        for (const Domain::MacroOverridesLayerFDM& macro : config.macro_overrides | std::views::values) {
+            const auto macro_extruder{macro.overrides.overrides.get(key)};
             if (macro_extruder && !in_range(*macro_extruder, 0, slot_count)) {
                 result.push_back(key);
             }

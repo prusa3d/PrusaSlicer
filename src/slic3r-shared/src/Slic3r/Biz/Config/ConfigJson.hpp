@@ -2,9 +2,12 @@
 
 #include <nlohmann/json.hpp>
 #include <tl/expected.hpp>
+#include "Slic3r/Domain/MacroOverrides.hpp"
 #include "Slic3r/Domain/TemplateUtils.hpp"
 #include "Slic3r/Domain/Types.hpp"
 #include "Slic3r/Domain/Percentage.hpp"
+
+#include <optional>
 
 namespace Slic3r::Domain::Advanced {
 [[maybe_unused]] void from_json(const nlohmann::ordered_json& json_value, Vec2d& vec2d);
@@ -24,6 +27,11 @@ namespace Slic3r::Domain {
 } // namespace Slic3r::Domain
 
 namespace Slic3r::Biz::Config {
+
+// PrintModeParam is a plain std::variant alias, so ADL cannot find a to_json for it.
+nlohmann::ordered_json print_mode_param_to_json(const Domain::PrintModeParam& param);
+/// Empty when the JSON value is not a bool, number or string.
+std::optional<Domain::PrintModeParam> print_mode_param_from_json(const nlohmann::ordered_json& json_value);
 
 template <typename T>
 tl::expected<void, std::string> is_valid(const nlohmann::ordered_json& json_value) = delete;

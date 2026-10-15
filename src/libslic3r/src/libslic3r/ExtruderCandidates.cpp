@@ -64,8 +64,8 @@ static std::optional<Domain::ConfigItem> macro_override(
 )
 {
     std::optional<Domain::ConfigItem> result;
-    for (const auto& [layer, box] : macro_overrides) {
-        if (std::optional<Domain::ConfigItem> item{box.overrides.get(key)}) {
+    for (const auto& [id, layer] : macro_overrides) {
+        if (std::optional<Domain::ConfigItem> item{layer.overrides.overrides.get(key)}) {
             result = std::move(item);
         }
     }

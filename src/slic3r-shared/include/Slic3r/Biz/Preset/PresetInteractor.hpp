@@ -307,9 +307,10 @@ public:
 
     void set_item_override(const Domain::ConfigItem& item, bool enable, size_t index = 0) override;
 
+    /// Replaces the macro overrides layer of the given id, or removes it when `layer` is empty.
     void set_macro_overrides(
-        Domain::MacroOverridesLayer layer,
-        std::optional<Domain::MacroOverridesFDM> overrides
+        const std::string& id,
+        std::optional<Domain::MacroOverridesLayerFDM> layer
     );
 
     template <typename T>

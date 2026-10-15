@@ -141,3 +141,29 @@ tl::expected<void, std::string> is_valid<Percentage>(const ordered_json& json_va
 }
 
 } // namespace Slic3r::Biz::Config
+
+namespace Slic3r::Biz::Config {
+
+ordered_json print_mode_param_to_json(const Domain::PrintModeParam& param)
+{
+    return std::visit([](const auto& value) { return ordered_json(value); }, param);
+}
+
+std::optional<Domain::PrintModeParam> print_mode_param_from_json(const ordered_json& json_value)
+{
+    if (json_value.is_boolean()) {
+        return json_value.get<bool>();
+    }
+    if (json_value.is_number_integer()) {
+        return json_value.get<int>();
+    }
+    if (json_value.is_number_float()) {
+        return json_value.get<double>();
+    }
+    if (json_value.is_string()) {
+        return json_value.get<std::string>();
+    }
+    return std::nullopt;
+}
+
+} // namespace Slic3r::Biz::Config

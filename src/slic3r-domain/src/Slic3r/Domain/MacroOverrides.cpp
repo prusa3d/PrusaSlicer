@@ -14,30 +14,32 @@ Domain::BoxOrBoxesVector
 to_refs(const Domain::MacroOverridesMapFDM& macro_overrides)
 {
     Domain::BoxOrBoxesVector result;
-    for (const auto& [layer, macro_override] : macro_overrides) {
-        result.push_back(macro_override);
+    for (const auto& [_, macro_override] : macro_overrides) {
+        result.push_back(macro_override.overrides);
     }
     return result;
 }
 
-MacroOverridesLayer vase_mode_layer()
+std::string vase_mode_layer_id()
 {
-    return {"com.prusa3d.slicer.printmodes.vase_mode", "Vase mode"};
+    return "com.prusa3d.slicer.printmodes.vase_mode";
 }
 
-MacroOverridesFDM make_vase_mode_overrides()
+MacroOverridesLayerFDM make_vase_mode_layer()
 {
-    MacroOverridesFDM overrides;
-    overrides.overrides.set("spiral_vase", true);
-    overrides.overrides.set("perimeters", 1);
-    overrides.overrides.set("top_solid_layers", 0);
-    overrides.overrides.set("fill_density", Percentage{0});
-    overrides.overrides.set("support_material", SupportMode::None);
-    overrides.overrides.set("support_material_enforce_layers", 0);
-    overrides.overrides.set("thin_walls", false);
-    overrides.overrides.set("retract_layer_change", false);
-    overrides.overrides.set("avoid_crossing_perimeters", false);
-    return overrides;
+    MacroOverridesLayerFDM layer;
+    layer.name = "Vase mode";
+    ConfigOverrides& overrides{layer.overrides.overrides};
+    overrides.set("spiral_vase", true);
+    overrides.set("perimeters", 1);
+    overrides.set("top_solid_layers", 0);
+    overrides.set("fill_density", Percentage{0});
+    overrides.set("support_material", SupportMode::None);
+    overrides.set("support_material_enforce_layers", 0);
+    overrides.set("thin_walls", false);
+    overrides.set("retract_layer_change", false);
+    overrides.set("avoid_crossing_perimeters", false);
+    return layer;
 }
 
 } // namespace Slic3r::Domain

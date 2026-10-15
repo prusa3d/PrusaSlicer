@@ -507,8 +507,8 @@ std::string EffectiveValuesDialog::macro_override_label(const std::string& key) 
         m_project_interactor.selected_config_container().selected_preset().macro_overrides};
 
     if (const auto* fdm{std::get_if<Domain::MacroOverridesMapFDM>(&macro_overrides)}) {
-        for (const auto& [layer, box] : *fdm) {
-            if (!box.overrides.get(key).has_value() || layer.name.empty()) {
+        for (const auto& [id, layer] : *fdm) {
+            if (!layer.overrides.overrides.get(key).has_value() || layer.name.empty()) {
                 continue;
             }
             return layer.name;
