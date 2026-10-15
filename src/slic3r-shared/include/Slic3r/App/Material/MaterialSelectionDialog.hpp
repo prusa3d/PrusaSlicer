@@ -116,6 +116,7 @@ private:
     size_t m_material_index = Domain::INVALID_ID;
     Yoga::ButtonGroup m_material_type_button_group;
     std::map<std::string, Yoga::LayoutButton*> m_type_filter_buttons;
+    Yoga::Item* m_type_filters = nullptr;
 
     Yoga::StackLayout* m_stack_layout = nullptr;
 

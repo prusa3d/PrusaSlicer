@@ -197,8 +197,17 @@ void MaterialSelectionDialog::on_tab_selected(int current_index)
     );
 }
 
+static bool has_filament_types(const Biz::ProjectInteractor& project_interactor)
+{
+    // The type filter buttons are filament types, SLA materials have none.
+    return project_interactor.preset_interactor().selected_printer_preset().technology()
+        == Domain::PrinterTechnology::FFF;
+}
+
 void MaterialSelectionDialog::update_preset_list()
 {
+    m_type_filters->set_visible(has_filament_types(m_project_interactor));
+
     if (m_preset_list) {
         m_preset_list->remove_listener<Biz::IListSelectionChangedListener>(this);
         m_preset_list = nullptr;
@@ -217,15 +226,15 @@ void MaterialSelectionDialog::update_preset_list()
 
 void MaterialSelectionDialog::create_page_presets()
 {
-    Item* filters_wrap = m_page_presets->emplace_back<Item>();
-    filters_wrap->set_orientation(Orientation::Horizontal);
-    filters_wrap->set_gap(5_fpx);
-    filters_wrap->set_flex_grow(1.f);
+    m_type_filters = m_page_presets->emplace_back<Item>();
+    m_type_filters->set_orientation(Orientation::Horizontal);
+    m_type_filters->set_gap(5_fpx);
+    m_type_filters->set_flex_grow(1.f);
 
     for (const std::string& filter_btn_name :
          std::initializer_list<std::string>{_u8L("All"), "PLA", "PETG", "ASA"})
     {
-        LayoutButton* btn = filters_wrap->emplace_back<LayoutButton>(filter_btn_name);
+        LayoutButton* btn = m_type_filters->emplace_back<LayoutButton>(filter_btn_name);
         btn->set_checkable(true);
         btn->set_flex_grow(1.f);
         m_type_filter_buttons[filter_btn_name] = btn;
@@ -244,7 +253,7 @@ void MaterialSelectionDialog::create_page_presets()
         {
             const std::string& type_filter =
                 m_current_context.type_filter.empty() ? _u8L("All") : m_current_context.type_filter;
-            if (type_filter != _u8L("All")) {
+            if (type_filter != _u8L("All") && has_filament_types(m_project_interactor)) {
                 const auto& selected_preset =
                     m_project_interactor.preset_interactor().selected_printer_preset();
                 const auto& config = m_project_interactor.preset_interactor()
