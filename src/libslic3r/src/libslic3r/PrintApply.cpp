@@ -1512,19 +1512,6 @@ InvalidatedSteps invalidate_for_virtual_extruders_change(const PrintObjectPtrs& 
     return result;
 }
 
-static void erase_trivial_entries(Domain::EffectiveValueMap& effective_values)
-{
-    std::erase_if(
-        effective_values,
-        [](const auto& pair)
-        {
-            const Domain::EffectiveValue& value{pair.second};
-            return value.modifications.size() == 1
-                && std::holds_alternative<Domain::EffectiveValue::SetBy>(
-                       value.modifications.front().payload);
-        });
-}
-
 static Domain::EffectiveValues collect_effective_values(
     const PrintConfigView& print_config,
     const PrintObjectPtrs& objects,
@@ -1533,13 +1520,9 @@ static Domain::EffectiveValues collect_effective_values(
 {
     Domain::EffectiveValues out;
     out.print = print_config.effective_values();
-    erase_trivial_entries(out.print);
 
     for (const PrintObject* object : objects) {
-        const auto it{
-            out.objects.emplace(object->model_object()->id(), object->config().effective_values())
-                .first};
-        erase_trivial_entries(it->second);
+        out.objects.emplace(object->model_object()->id(), object->config().effective_values());
 
         for (const Domain::ModelVolume* volume : object->model_object()->volumes) {
             const Domain::PartialConfig
@@ -1548,8 +1531,7 @@ static Domain::EffectiveValues collect_effective_values(
                 view{full_config, object->config().object_settings(), {volume_partial}};
             view.add_override(macro_overrides);
             view.finalize();
-            const auto it{out.volumes.emplace(volume->id(), view.effective_values()).first};
-            erase_trivial_entries(it->second);
+            out.volumes.emplace(volume->id(), view.effective_values());
         }
     }
 
