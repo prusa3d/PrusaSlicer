@@ -146,6 +146,7 @@ PlaterRenderModule::PlaterRenderModule(
         project_interactor,
         *m_font_manager
     ),
+    m_print_mode_plugins(m_plugin_system, project_interactor.print_mode_interactor()),
     m_thumbnail_store(thumbnail_store),
     m_thumbnail_store_updater(thumbnail_store_updater),
     m_thumbnail_image_generator(thumbnail_image_generator),

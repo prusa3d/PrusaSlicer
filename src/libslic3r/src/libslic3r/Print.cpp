@@ -265,13 +265,6 @@ static std::optional<Biz::Slicing::Error> check_extruders(
         }
     }
 
-    for (const Domain::MacroOverridesLayerFDM& macro : config.macro_overrides | std::views::values) {
-        const auto macro_extruder{macro.overrides.overrides.get("extruder")};
-        if (macro_extruder && !accepts_extruder(*macro_extruder, 0)) {
-            result.push_back("extruder");
-        }
-    }
-
     for (const char* key : {"perimeter_extruder", "infill_extruder", "solid_infill_extruder"}) {
         if (!accepts_extruder(config.print.items.opt(key), 1)) {
             result.push_back(key);

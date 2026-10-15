@@ -924,6 +924,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/Yaml/YamlSlic3rTypes.cpp
         src/Slic3r/Biz/Preset/IO/PresetYamlDesc.hpp
 
+        include/Slic3r/Biz/PrintModeInteractor.hpp
+        src/Slic3r/Biz/PrintModeInteractor.cpp
         include/Slic3r/Biz/Preset/PresetEvaluator.hpp
         src/Slic3r/Biz/Preset/PresetEvaluator.cpp
         src/Slic3r/Biz/Preset/PresetCollectionEvaluator.hpp
@@ -1313,6 +1315,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/App/Lua/PluginRegistry.cpp
         include/Slic3r/App/Lua/PluginSystem.hpp
         src/Slic3r/App/Lua/PluginSystem.cpp
+        include/Slic3r/App/Lua/PrintModePlugins.hpp
+        src/Slic3r/App/Lua/PrintModePlugins.cpp
         include/Slic3r/App/Lua/PluginDialog.hpp
         src/Slic3r/App/Lua/PluginDialog.cpp
         include/Slic3r/App/Lua/IPluginRescanListener.hpp

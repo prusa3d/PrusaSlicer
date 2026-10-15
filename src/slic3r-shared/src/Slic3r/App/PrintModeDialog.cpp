@@ -2,49 +2,297 @@
 
 #include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/ProjectInteractor.hpp"
-#include "Slic3r/Domain/ConfigDefsFDM.hpp"
-#include "Slic3r/Domain/MacroOverrides.hpp"
 
+#include "Slic3r/App/Config/ConfigItemUtils.hpp"
 #include "Slic3r/App/Navigator.hpp"
+#include "Slic3r/App/Yoga/InputTextWithSpin.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
+#include "Slic3r/App/Yoga/Rectangle.hpp"
+#include "Slic3r/App/Yoga/RectangleButton.hpp"
+#include "Slic3r/App/Yoga/ScrollArea.hpp"
+#include "Slic3r/App/Yoga/Text.hpp"
+#include "Slic3r/App/Yoga/Validator.hpp"
+
+#include <fmt/format.h>
+
+#include <optional>
 
 using namespace Slic3r::App::Yoga;
 
 namespace Slic3r::App {
 
+namespace {
+
+std::string param_to_string(const Domain::PrintModeParam& param)
+{
+    return std::visit(
+        Domain::overloaded{
+            [](bool v) { return std::string{v ? "true" : "false"}; },
+            [](const std::string& v) { return v; },
+            [](const auto& v) { return fmt::format("{}", v); },
+        },
+        param);
+}
+
+/// Hidden items are internal, the user cannot relate them to anything in the settings.
+std::vector<std::reference_wrapper<const Domain::ConfigItem>> visible_items(
+    const Domain::MacroOverridesFDM& overrides)
+{
+    std::vector<std::reference_wrapper<const Domain::ConfigItem>> items;
+    for (const Domain::ConfigItem& item : overrides.overrides.overridden_items()) {
+        if (item.def().category != Domain::ConfigItemDef::Category::Hidden) {
+            items.emplace_back(item);
+        }
+    }
+    return items;
+}
+
+class PrintModeCard : public Item
+{
+public:
+    PrintModeCard(
+        Biz::PrintModeInteractor& interactor,
+        const std::string& id,
+        const std::string& info,
+        const Domain::MacroOverridesLayerFDM& layer,
+        const bool active,
+        const bool params_editable
+    ) :
+        m_interactor(interactor), m_id(id), m_params(layer.params), m_params_editable(params_editable)
+    {
+        set_orientation(Orientation::Vertical);
+        set_align_items(YGAlignStretch);
+        set_flex_shrink(0);
+
+        m_block = emplace_back<Rectangle>();
+        m_block->set_orientation(Orientation::Vertical);
+        m_block->set_align_items(YGAlignStretch);
+        m_block->set_flex_shrink(0);
+        m_block->set_fill(m_theme->color_imgui(Platform::Color::Transparent));
+        m_block->set_border_width(2);
+        m_block->set_rounding(4);
+        m_block->set_padding(2_fpx);
+
+        m_button = m_block->emplace_back<RectangleButton>();
+        m_button->set_checkable(true);
+        m_button->set_allow_overlap(true);
+        m_button->set_content_orientation(Orientation::Vertical);
+        m_button->set_content_align_items(YGAlignStretch);
+        m_button->set_content_padding({16_fpx, 12_fpx});
+        m_button->set_content_gap(8_fpx);
+        m_button->set_rounding(4);
+        m_button->set_checked(active);
+        // The button follows the preset. The click asks for the change, the dialog reloads
+        // once the preset confirms it, so the button's own toggle is undone here.
+        m_button->callbacks().action = [this, active] {
+            m_button->set_checked(active);
+            m_interactor.set_active(m_id, !active);
+        };
+        m_block->set_border_color(m_theme->color_imgui(
+            active ? Platform::Color::Button : Platform::Color::Transparent,
+            Platform::ColorGroup::Active));
+
+        build_header(layer.name, info);
+        build_param_rows();
+        build_panel(layer.overrides);
+    }
+
+private:
+    void build_header(const std::string& name, const std::string& info)
+    {
+        const ImColor dim{
+            m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)};
+
+        auto top{m_button->emplace_back<Item>()};
+        top->set_orientation(Orientation::Horizontal);
+        top->set_align_items(YGAlignCenter);
+        top->set_gap(12_fpx);
+
+        auto texts{top->emplace_back<Item>()};
+        texts->set_orientation(Orientation::Vertical);
+        texts->set_gap(2_fpx);
+        texts->set_flex_grow(1);
+        auto title{texts->emplace_back<Text>(name, Render::ImguiFontType::Bold)};
+        title->set_font_size(15_fpx);
+        m_info = texts->emplace_back<Text>(info);
+        m_info->set_text_color(dim);
+        m_info->set_wrap_mode(Text::WrapMode::WrapElide);
+
+        m_cog = top->emplace_back<LayoutButton>(std::string{}, Render::Icon::Cog);
+        m_cog->set_checkable(true);
+        m_cog->set_width(24_fpx);
+        m_cog->set_height(24_fpx);
+        m_cog->set_background_color(Platform::Color::ButtonTransparent);
+        m_cog->callbacks().action = [this] {
+            const bool expanded{!m_panel->is_self_visible()};
+            m_panel->set_visible(expanded);
+            m_button->set_draw_flags(
+                expanded ? ImDrawFlags_RoundCornersTop : ImDrawFlags_RoundCornersAll);
+        };
+    }
+
+    void build_param_rows()
+    {
+        for (const auto& [name, value] : m_params) {
+            auto row{m_button->emplace_back<Item>()};
+            row->set_orientation(Orientation::Horizontal);
+            row->set_align_items(YGAlignCenter);
+            row->set_gap(12_fpx);
+            row->set_padding({28_fpx, 0_fpx, 0_fpx, 0_fpx});
+            auto label{row->emplace_back<Text>(name)};
+            label->set_flex_grow(1);
+            // Orphans have no plugin to re-evaluate them with, so their values are only shown.
+            if (m_params_editable && std::holds_alternative<int>(value)) {
+                auto input{
+                    row->emplace_back<InputTextWithSpin>(std::make_unique<IntValidator>())};
+                input->set_width(168_fpx);
+                input->set_text(param_to_string(value));
+                input->callbacks().text_edited = [this, name, input] {
+                    m_params[name] = dynamic_cast<IntValidator*>(input->validator())->value();
+                    m_interactor.set_mode_params(m_id, m_params);
+                };
+            } else {
+                auto text{
+                    row->emplace_back<Text>(param_to_string(value), Render::ImguiFontType::Bold)};
+                text->set_width(168_fpx);
+            }
+        }
+    }
+
+    void build_panel(const Domain::MacroOverridesFDM& overrides)
+    {
+        const ImColor dim{
+            m_theme->color_imgui(Platform::Color::Text, Platform::ColorGroup::Disabled)};
+
+        m_panel = m_block->emplace_back<Rectangle>();
+        m_panel->set_visible(false);
+        m_panel->set_orientation(Orientation::Vertical);
+        m_panel->set_fill(m_theme->color_imgui(Platform::Color::WindowBgAlternate));
+        m_panel->set_rounding(4);
+        m_panel->set_flags(ImDrawFlags_RoundCornersBottom);
+        m_panel->set_padding({32_fpx, 12_fpx, 16_fpx, 16_fpx});
+        m_panel->set_gap(4_fpx);
+        m_panel->set_flex_shrink(0);
+        m_panel->set_align_items(YGAlignStretch);
+
+        auto header{m_panel->emplace_back<Item>()};
+        header->set_orientation(Orientation::Horizontal);
+        header->set_gap(12_fpx);
+        auto title{header->emplace_back<Text>(Biz::_u8L("Overridden settings"))};
+        title->set_flex_grow(1);
+        title->set_text_color(dim);
+        auto column{header->emplace_back<Text>(Biz::_u8L("Mode override"))};
+        column->set_width(180_fpx);
+        column->set_text_color(dim);
+
+        m_table = m_panel->emplace_back<Item>();
+        m_table->set_orientation(Orientation::Vertical);
+        m_table->set_align_items(YGAlignStretch);
+        m_table->set_gap(3_fpx);
+
+        std::vector<std::reference_wrapper<const Domain::ConfigItem>> items{
+            visible_items(overrides)};
+        std::ranges::sort(items, {}, [](const Domain::ConfigItem& item) {
+            return std::tuple{item.def().category, item.def().option_group, item.def().order};
+        });
+
+        // The label alone is ambiguous (e.g. "Perimeters" exists in several groups), so each
+        // run of items from the same category and group gets a dim heading in its own row.
+        std::optional<std::pair<Domain::ConfigItemDef::Category, Domain::ConfigItemDef::OptionGroup>>
+            last_group;
+        for (const Domain::ConfigItem& item : items) {
+            const std::pair group{item.def().category, item.def().option_group};
+            if (last_group != group) {
+                last_group = group;
+                auto heading{m_table->emplace_back<Text>(fmt::format(
+                    "{} · {}",
+                    Biz::_u8(Domain::ConfigItemDef::translate_category(
+                        group.first, Domain::PrinterTechnology::FFF)),
+                    Biz::_u8(Domain::ConfigItemDef::translate_option_group(group.second))))};
+                heading->set_text_color(dim);
+                heading->set_wrap_mode(Text::WrapMode::WrapElide);
+                heading->set_padding({0_fpx, 8_fpx, 0_fpx, 2_fpx});
+                heading->set_flex_shrink(0);
+            }
+            auto row{m_table->emplace_back<Item>()};
+            row->set_orientation(Orientation::Horizontal);
+            row->set_gap(12_fpx);
+            row->set_padding({12_fpx, 5_fpx, 0_fpx, 5_fpx});
+            row->set_flex_shrink(0);
+            auto label{row->emplace_back<Text>(Biz::_u8(item.def().label))};
+            label->set_flex_grow(1);
+            label->set_flex_shrink(1);
+            label->set_wrap_mode(Text::WrapMode::WrapElide);
+            const std::string value{
+                item.value().holds_alternative<bool>()
+                    ? (item.get<bool>() ? Biz::_u8L("On") : Biz::_u8L("Off"))
+                    : ConfigItemUtils::config_item_to_string(item)};
+            auto cell{row->emplace_back<Text>(value, Render::ImguiFontType::Bold)};
+            cell->set_width(168_fpx);
+        }
+    }
+
+    Biz::PrintModeInteractor& m_interactor;
+    std::string m_id;
+    Domain::PrintModeParams m_params;
+    bool m_params_editable{true};
+
+    Rectangle* m_block{nullptr};
+    RectangleButton* m_button{nullptr};
+    Text* m_info{nullptr};
+    LayoutButton* m_cog{nullptr};
+    Rectangle* m_panel{nullptr};
+    Item* m_table{nullptr};
+};
+
+
+std::string mode_info(const Biz::PrintMode& mode)
+{
+    if (mode.error) {
+        // The reason is in the log, it is a script error and too long for the card.
+        return Biz::_u8L("Cannot be applied with the current settings");
+    }
+    return fmt::format(
+        fmt::runtime(Biz::_u8L("Changes {} settings · {} adjustable")),
+        visible_items(mode.layer.overrides).size(),
+        mode.layer.params.size());
+}
+
+} // namespace
+
 PrintModeDialog::PrintModeDialog(Biz::ProjectInteractor& project_interactor, Navigator& navigator) :
     Dialog({Biz::_u8L("Print mode")}, "PrintModeDialog"),
     m_project_interactor(project_interactor),
     m_navigator(navigator),
-    m_macro_overrides_listener_scope(project_interactor.preset_interactor(), *this),
-    m_preset_changed_listener_scope(project_interactor.preset_interactor(), *this)
+    m_print_mode_listener_scope(project_interactor.print_mode_interactor(), *this),
+    m_preset_interactor_listener_scope(project_interactor.preset_interactor(), *this),
+    m_selected_project_listener_scope(project_interactor, *this)
 {
-    content_item()->set_width(300_fpx);
-    content_item()->set_height(200_fpx);
+    content_item()->set_width(620_fpx);
+    content_item()->set_height(640_fpx);
+    content()->set_align_items(YGAlignStretch);
 
-    m_vase_mode_btn = content()->emplace_back<LayoutButton>(Biz::_u8L("Vase mode"));
-    m_vase_mode_btn->set_flex_shrink(0);
-    m_vase_mode_btn->set_checkable(true);
-    m_vase_mode_btn->callbacks().action = [this] { toggle_vase_mode(); };
+    m_list = content()->emplace_back<ScrollArea>();
+    m_list->set_orientation(Orientation::Vertical);
+    m_list->set_align_items(YGAlignStretch);
+    m_list->set_flex_grow(1);
+    m_list->set_gap(12_fpx);
+    m_list->set_padding({12_fpx, 4_fpx});
 
-    m_vase_mode_btn->set_label_size(60_fpx, 60_fpx);
-    m_vase_mode_btn->set_text_wrap_mode(Yoga::Text::WrapMode::WrapElide);
-    m_vase_mode_btn->set_label_align({AlignH::Center, AlignV::Center});
-
-    refresh_vase_mode_button();
+    reload();
 }
 
-void PrintModeDialog::on_macro_overrides_changed()
-{
-    refresh_vase_mode_button();
+void PrintModeDialog::on_print_modes_changed() {
+    m_reload_pending = true;
 }
 
-void PrintModeDialog::on_config_container_selection_changed(
-    Domain::SelectionId /*project_id*/,
-    Domain::SelectionId /*config_container_id*/
-)
-{
-    refresh_vase_mode_button();
+void PrintModeDialog::on_macro_overrides_changed() {
+    m_reload_pending = true;
+}
+
+void PrintModeDialog::on_selected_project_changed_final(size_t) {
+    // The active flags follow the selected preset, which changes with the project.
+    m_reload_pending = true;
 }
 
 void PrintModeDialog::close_action()
@@ -52,39 +300,40 @@ void PrintModeDialog::close_action()
     m_navigator.set_opened_dialog(nullptr);
 }
 
-void PrintModeDialog::toggle_vase_mode()
+void PrintModeDialog::render(const Yoga::Vec2f& pos, const Yoga::Vec2f& size)
 {
-    std::optional<Domain::MacroOverridesLayerFDM> layer;
-    if (!is_mode_active()) {
-        layer = Domain::make_vase_mode_layer();
+    if (m_reload_pending) {
+        m_reload_pending = false;
+        reload();
     }
-    m_project_interactor.preset_interactor().set_macro_overrides(
-        Domain::vase_mode_layer_id(), std::move(layer)
-    );
+    Dialog::render(pos, size);
 }
 
-bool PrintModeDialog::is_mode_active() const
-{
-    const Domain::Preset::SelectedPreset& selected_preset{
-        m_project_interactor.preset_interactor().selected_printer_preset()};
-    const auto* fdm_overrides{
-        std::get_if<Domain::MacroOverridesMapFDM>(&selected_preset.macro_overrides)};
-    return fdm_overrides != nullptr
-        && fdm_overrides->contains(Domain::vase_mode_layer_id());
-}
+void PrintModeDialog::reload() {
+    while (!m_list->items().empty()) {
+        m_list->remove(m_list->items().back());
+    }
+    // A mode is active when its layer is applied in the selected preset.
+    const Domain::MacroOverridesMapFDM* applied{nullptr};
+    if (m_project_interactor.selected_project_id() != Domain::INVALID_ID) {
+        applied = std::get_if<Domain::MacroOverridesMapFDM>(
+            &m_project_interactor.preset_interactor().selected_printer_preset().macro_overrides);
+    }
+    const auto is_active{[&](const std::string& id) { return applied && applied->contains(id); }};
 
-void PrintModeDialog::refresh_vase_mode_button()
-{
-    const Domain::Preset::SelectedPreset& selected_preset{
-        m_project_interactor.preset_interactor().selected_printer_preset()};
-
-    const bool is_fdm{
-        std::holds_alternative<Domain::MacroOverridesMapFDM>(selected_preset.macro_overrides)};
-    m_vase_mode_btn->set_visible(is_fdm);
-    m_vase_mode_btn->set_checked(is_mode_active());
-
-    if (mode_active_changed) {
-        mode_active_changed(is_mode_active());
+    Biz::PrintModeInteractor& interactor{m_project_interactor.print_mode_interactor()};
+    for (const auto& [id, mode] : interactor.modes()) {
+        m_list->emplace_back<PrintModeCard>(
+            interactor, id, mode_info(mode), mode.layer, is_active(id), true);
+    }
+    for (const auto& [id, layer] : interactor.orphaned_modes()) {
+        m_list->emplace_back<PrintModeCard>(
+            interactor,
+            id,
+            Biz::_u8L("Loaded from the project, the plugin is not installed"),
+            layer,
+            is_active(id),
+            false);
     }
 }
 

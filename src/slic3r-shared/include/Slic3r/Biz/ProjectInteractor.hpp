@@ -5,6 +5,7 @@
 #include "Slic3r/Biz/FDMResultCache.hpp"
 #include "Slic3r/Biz/GeneratedSupportPointsCache.hpp"
 #include "Slic3r/Biz/IMdb.hpp"
+#include "Slic3r/Biz/PrintModeInteractor.hpp"
 #include "Slic3r/Biz/ProjectSettingsInteractor.hpp"
 #include "Slic3r/Biz/VirtualExtruderInteractor.hpp"
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
@@ -106,6 +107,7 @@ public:
         m_backup_store(*this),
         m_slicing_interactor(dispatcher, thumbnail_image_generator),
         m_preset_interactor(workbench, m_scene_interactor, m_backup_store, m_slicing_interactor),
+        m_print_mode_interactor(*this),
         m_arrange_interactor(m_scene_interactor, workbench),
         m_clipboard_interactor(m_scene_interactor, m_arrange_interactor, workbench),
         m_matdb_interactor(m_workbench, *this),
@@ -134,6 +136,8 @@ public:
         m_preset_interactor.add_listener<Preset::IPresetChangedListener>(&m_scene_interactor);
         m_preset_interactor.add_listener<Preset::IPresetChangedListener>(&m_project_settings_interactor);
         m_preset_interactor.add_listener<Preset::IPresetChangedListener>(&m_virtual_extruder_interactor);
+        m_preset_interactor.add_listener<Preset::IPresetChangedListener>(&m_print_mode_interactor);
+        m_slicing_interactor.add_listener<Slicing::IBackgroundProcessStateListener>(&m_print_mode_interactor);
         m_project_settings_interactor.add_listener<IColorsChangedListener>(this);
         m_project_settings_interactor.add_listener<ISlicingInputChangedListener>(this);
         m_virtual_extruder_interactor.add_listener<IVirtualExtrudersChangedListener>(this);
@@ -366,6 +370,12 @@ public:
     const Slicing::SlicingInteractor& slicing_interactor() const
     {
         return m_slicing_interactor;
+    }
+
+
+    PrintModeInteractor& print_mode_interactor()
+    {
+        return m_print_mode_interactor;
     }
 
     FDMResultCache& fdm_result_cache()
@@ -728,6 +738,7 @@ private:
     BackupStore m_backup_store;
     Slicing::SlicingInteractor m_slicing_interactor;
     Preset::PresetInteractor m_preset_interactor;
+    PrintModeInteractor m_print_mode_interactor;
     ArrangeInteractor m_arrange_interactor;
     ClipboardInteractor m_clipboard_interactor;
     MatDb::MatDbInteractor m_matdb_interactor;

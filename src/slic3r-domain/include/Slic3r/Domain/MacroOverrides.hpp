@@ -23,12 +23,9 @@ public:
     MacroOverridesSLA();
 };
 
-/// One layer of macro overrides, keyed in the map by the id of the print mode that produced it.
 struct MacroOverridesLayerFDM
 {
-    /// Display name, kept so a layer can be shown even when its print mode plugin is missing.
     std::string name;
-    /// Print mode parameters the overrides were evaluated from.
     PrintModeParams params;
     MacroOverridesFDM overrides;
 

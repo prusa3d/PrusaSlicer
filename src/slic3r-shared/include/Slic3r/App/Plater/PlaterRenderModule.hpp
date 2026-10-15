@@ -14,6 +14,7 @@
 #include "Slic3r/App/Yoga/Item.hpp"
 #include "Slic3r/App/DialogNavigation.hpp"
 #include "Slic3r/App/Lua/PluginSystem.hpp"
+#include "Slic3r/App/Lua/PrintModePlugins.hpp"
 #include "Slic3r/App/Scene/GizmoManager.hpp"
 #include "Slic3r/App/Scene/ModelGeometryProvider.hpp"
 #include "Slic3r/App/Plater/ContextMenuGizmo.hpp"
@@ -201,6 +202,7 @@ private:
     // We need these to outlive the TopBar bellow
     std::unique_ptr<Biz::Emboss::IFontManager> m_font_manager = nullptr;
     Lua::PluginSystem m_plugin_system;
+    Lua::PrintModePlugins m_print_mode_plugins;
 
     // main window layout
     std::unique_ptr<PlaterRenderLayout> m_layout;

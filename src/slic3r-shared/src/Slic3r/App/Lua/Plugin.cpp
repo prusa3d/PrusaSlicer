@@ -157,14 +157,13 @@ sol::object Plugin::execute(Biz::Lua::LuaEngine& lua, const PluginParamValueMap&
     }
     sol::protected_function fn = lua.state()["execute"];
     sol::object result;
-    if (const sol::protected_function_result ret = fn(opts); !ret.valid()) {
-        const sol::error err = ret;
-        SPDLOG_ERROR("Error executing script {}: {}", m_path, err.what());
-    } else {
-        result = ret;
-    }
-
+    const sol::protected_function_result ret = fn(opts);
     lua.set_path_resolver(nullptr);
+    if (!ret.valid()) {
+        const sol::error err = ret;
+        throw Biz::Lua::LuaException{err.what(), m_path};
+    }
+    result = ret;
 
     Biz::Platform::PlatformServices::instance().render_request_handler().request_render();
 

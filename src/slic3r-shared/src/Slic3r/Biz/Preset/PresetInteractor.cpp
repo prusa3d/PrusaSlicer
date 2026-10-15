@@ -2787,9 +2787,9 @@ void PresetInteractor::set_macro_overrides(
     ASSERT(fdm_overrides != nullptr);
 
     if (layer.has_value()) {
-        fdm_overrides->insert_or_assign(id, std::move(*layer));
+        *fdm_overrides ={std::pair{id, *layer}};
     } else {
-        fdm_overrides->erase(id);
+        *fdm_overrides = {};
     }
 
     m_backup_store.invalidate_backup(m_selected_project_id);
