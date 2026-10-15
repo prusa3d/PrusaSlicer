@@ -129,23 +129,22 @@ bool Mouse3DSpacenavReader::connect_daemon()
         return false;
     }
 
-    // The older protocol does not report the connected devices.
-    if (spnav_protocol() < 1) {
-        spnav_close();
-        log_unavailability(
-            "spacenavd older than 1.0 is not supported, the 3D mouse is read through hidapi"
-        );
-        return false;
-    }
+    const int protocol = spnav_protocol();
+    SPDLOG_INFO("Connected to spacenavd, protocol {}", protocol);
 
-    if (spnav_evmask(SPNAV_EVMASK_MOTION | SPNAV_EVMASK_DEV) == -1) {
-        SPDLOG_WARN("Selection of the spacenavd events failed");
-    }
-
-    SPDLOG_INFO("Connected to spacenavd");
     m_daemon_connected      = true;
     m_unavailability_logged = false;
-    set_device(query_device_name());
+    if (protocol < 1) {
+        // spacenavd older than 1.0 does not report the devices, the device is assumed to be
+        // provided and is reported as connected by its first motion.
+        m_device_provided_callback(true);
+    } else {
+        if (spnav_evmask(SPNAV_EVMASK_MOTION | SPNAV_EVMASK_DEV) == -1) {
+            SPDLOG_WARN("Selection of the spacenavd events failed");
+        }
+
+        set_device(query_device_name());
+    }
 
     return true;
 }

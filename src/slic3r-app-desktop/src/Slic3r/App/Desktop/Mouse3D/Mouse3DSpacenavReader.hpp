@@ -29,6 +29,9 @@ public:
     /**
      * @brief Called from the worker thread before the device is reported as connected and after
      * it is reported as disconnected, possibly repeatedly with the same value.
+     *
+     * @note With spacenavd older than 1.0 it is called right after connecting to the daemon, even
+     * if no device is ever reported.
      */
     using DeviceProvidedCallback = std::function<void(bool device_provided)>;
 
