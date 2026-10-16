@@ -166,12 +166,12 @@ std::optional<int> ExtruderIdButtonGroup::selected_extruder_id() const
 {
     AbstractButton* checked = m_button_group->checked_button();
     if (!checked) {
-        if (checked == m_auto_button) {
-            return 0;
-        }
         return std::nullopt;
     }
 
+    if (checked == m_auto_button) {
+        return 0;
+    }
     return static_cast<ExtruderIdButton*>(checked)->extruder_id();
 }
 
