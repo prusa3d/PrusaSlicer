@@ -22,28 +22,6 @@ namespace Slic3r::App::ObjectList {
 
 using namespace Yoga;
 
-/**
- * @brief All connector-volume ElementRefs of the given object (on its first instance),
- * matching ObjectListOld::render_connectors_node's selection payload.
- */
-static Domain::ElementRefs
-connector_element_refs(Biz::ProjectInteractor& project_interactor, size_t object_id)
-{
-    Domain::ElementRefs refs;
-    const Domain::ModelObject* object =
-        project_interactor.selected_project().find_object_by_id(object_id);
-    if (!object || object->instances.empty()) {
-        return refs;
-    }
-    const size_t instance_id = object->instances.front()->id().id;
-    for (const Domain::ModelVolume* volume : object->volumes) {
-        if (volume->is_cut_connector()) {
-            refs.push_back({object_id, instance_id, volume->id().id});
-        }
-    }
-    return refs;
-}
-
 ObjectButton::ObjectButton(CollapsibleArea* collapsible_item, bool is_printable) :
     TreeNodeButton(NodeLevel::Object, collapsible_item)
 {
@@ -88,6 +66,9 @@ ObjectButton::ObjectButton(CollapsibleArea* collapsible_item, bool is_printable)
     extruder_icon_wrapper->set_width(20_fpx);
     extruder_icon_wrapper->set_height(20_fpx);
     m_extruder_icon = add_extruder_icon(extruder_icon_wrapper);
+
+    // Shown when only a part of the object is selected.
+    set_background_color_border(background_color_checked());
 }
 
 void ObjectButton::set_name(const std::string& name)
@@ -103,49 +84,49 @@ void ObjectButton::set_printable(bool printable)
 void ObjectButton::set_callbacks(
     Biz::ProjectInteractor& project_interactor,
     ContextMenuRequester& context_menu_requester,
-    std::function<Biz::Scene::ObjectSelection()> get_selection
+    std::function<Biz::ObjectList::ListRow()> get_row
 )
 {
     Biz::Scene::SceneInteractor& scene_interactor = project_interactor.scene_interactor();
 
-    m_on_printable_toggled = [&scene_interactor, get_selection, this](bool printable)
-    {
-        const Biz::Scene::ObjectSelection::ElementRefs& elements = get_selection().elements;
-        if (!elements.empty()) {
-            scene_interactor.set_printable(elements.front(), printable);
-        }
-    };
+    m_on_printable_toggled = [&scene_interactor, get_row, this](bool printable)
+    { scene_interactor.set_printable(Domain::ElementRef{get_row().object_id}, printable); };
 
-    m_name_editing->callbacks().text_edited = [this, &scene_interactor, get_selection]()
+    m_name_editing->callbacks().text_edited = [this, &scene_interactor, get_row]()
     {
         if (m_name_editing->text() != m_name->text()) {
-            const Biz::Scene::ObjectSelection::ElementRefs& elements = get_selection().elements;
-            if (!elements.empty()) {
-                scene_interactor.edit_name(elements.front(), m_name_editing->text());
-            }
+            scene_interactor.edit_name(
+                Domain::ElementRef{get_row().object_id},
+                m_name_editing->text()
+            );
         }
     };
     m_name_editing->callbacks().focus_lost = [this]() { finish_renaming(); };
 
-    callbacks().action = [&project_interactor, get_selection]()
-    { select_elements(project_interactor, get_selection()); };
+    callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
     callbacks().secondary_action =
-        [this, &project_interactor, &context_menu_requester, get_selection]()
+        [this, &project_interactor, &context_menu_requester, get_row]()
     {
+        // A partially selected object keeps its selection as well.
         request_context_menu(
             project_interactor,
             context_menu_requester,
-            checked(),
-            get_selection()
+            m_selection_state != Biz::ObjectList::ObjectSelectionState::None,
+            get_row()
         );
     };
 
     m_name_editing->callbacks().hovered_changed = [this](bool) { update_printable_visibility(); };
 }
 
-void ObjectButton::set_selected(bool selected)
+void ObjectButton::set_selection_state(Biz::ObjectList::ObjectSelectionState state)
 {
-    set_checked(selected);
+    using Biz::ObjectList::ObjectSelectionState;
+
+    m_selection_state = state;
+    set_checked(state == ObjectSelectionState::Full);
+    set_background_border_width(state == ObjectSelectionState::Partial ? (3_fpx).value : 0.f);
 }
 
 void ObjectButton::set_extruder_context(
@@ -234,11 +215,11 @@ void ConnectorsButton::set_selected(bool selected)
 
 void ConnectorsButton::set_callbacks(
     Biz::ProjectInteractor& project_interactor,
-    std::function<Biz::Scene::ObjectSelection()> get_selection
+    std::function<Biz::ObjectList::ListRow()> get_row
 )
 {
-    callbacks().action = [&project_interactor, get_selection]()
-    { select_elements(project_interactor, get_selection()); };
+    callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
 }
 
 ObjectItem::ObjectItem(
@@ -262,24 +243,24 @@ ObjectItem::ObjectItem(
             || m_instances->has_visible_content();
     };
 
+    using Kind = Biz::ObjectList::ListRow::Kind;
+
     m_connectors_button = m_collapsible_item->emplace_back<ConnectorsButton>();
     m_connectors_button->set_callbacks(
         project_interactor,
-        [this, &project_interactor]() -> Biz::Scene::ObjectSelection
-        {
-            return {
-                Biz::Scene::SelectionMode::Volume,
-                connector_element_refs(project_interactor, this->state()->id)
-            };
-        }
+        [this]() { return row(Kind::Connectors); }
     );
 
-    m_volumes =
-        m_collapsible_item->emplace_back<VolumesItem>(project_interactor, context_menu_requester);
+    m_volumes = m_collapsible_item->emplace_back<VolumesItem>(
+        project_interactor,
+        context_menu_requester,
+        [this]() { return row(Kind::Volumes); }
+    );
     m_instances = m_collapsible_item->emplace_back<InstancesItem>(
         state.id,
         project_interactor,
-        context_menu_requester
+        context_menu_requester,
+        [this]() { return row(Kind::Instances); }
     );
 
     m_object_button = emplace<ObjectButton>(0, m_collapsible_item, state.printable);
@@ -287,8 +268,7 @@ ObjectItem::ObjectItem(
     m_object_button->set_callbacks(
         project_interactor,
         context_menu_requester,
-        [this]() -> Biz::Scene::ObjectSelection
-        { return {Biz::Scene::SelectionMode::Instance, {Domain::ElementRef{this->state()->id}}}; }
+        [this]() { return row(Kind::Object); }
     );
     m_object_button->set_extruder_context(
         project_interactor,
@@ -296,7 +276,7 @@ ObjectItem::ObjectItem(
         [this]() { return this->state()->id; }
     );
 
-    m_object_button->set_selected(state.selected);
+    m_object_button->set_selection_state(state.selection_state);
     m_connectors_button->set_selected(state.connectors_selected);
 }
 
@@ -320,7 +300,7 @@ void ObjectItem::on_data_update()
 {
     m_object_button->set_name(state()->name);
     m_object_button->set_printable(state()->printable);
-    m_object_button->set_selected(state()->selected);
+    m_object_button->set_selection_state(state()->selection_state);
 
     m_connectors_button->set_visible(state()->has_connectors);
     m_connectors_button->set_selected(state()->connectors_selected);
@@ -330,6 +310,11 @@ void ObjectItem::on_data_update()
 
     m_object_button->update_state();
     m_object_button->refresh_extruder(state()->config_container_id);
+}
+
+Biz::ObjectList::ListRow ObjectItem::row(Biz::ObjectList::ListRow::Kind kind) const
+{
+    return {kind, state()->bed_id, state()->id};
 }
 
 } // namespace Slic3r::App::ObjectList

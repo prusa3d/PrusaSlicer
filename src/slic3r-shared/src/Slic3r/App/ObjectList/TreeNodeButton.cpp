@@ -9,11 +9,8 @@
 
 #include "Slic3r/Biz/ProjectInteractor.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
+#include "Slic3r/Biz/ObjectList/ObjectListInteractor.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
-
-#include "Slic3r/Domain/ModelObject.hpp"
-#include "Slic3r/Domain/ModelInstance.hpp"
-#include "Slic3r/Domain/ModelVolume.hpp"
 
 #include <imgui/imgui.h>
 
@@ -200,176 +197,41 @@ ExtruderIcon* add_extruder_icon(Item* parent, Unit size)
     return icon;
 }
 
-namespace {
-
-/**
- * @brief Ordered set of elements that a Shift+click range may span between `anchor` and
- * `target`, or empty if the two aren't part of any recognized rangeable sibling set (different
- * objects, mismatched element "shape", wipe tower involved, ...).
- */
-Domain::ElementRefs range_siblings(
-    Biz::ProjectInteractor& project_interactor,
-    const Domain::ElementRef& anchor,
-    const Domain::ElementRef& target
-)
+void select_row(Biz::ProjectInteractor& project_interactor, const Biz::ObjectList::ListRow& row)
 {
-    if (anchor.is_wipe_tower() || target.is_wipe_tower()) {
-        return {};
-    }
+    using Biz::ObjectList::ClickModifier;
 
-    // Whole-object rows use volume_id == 0 && instance_id == 0 (mode Volume, no sub-element).
-    if (anchor.instance_id == 0
-        && anchor.volume_id == 0
-        && target.instance_id == 0
-        && target.volume_id == 0)
-    {
-        Domain::ElementRefs siblings;
-        for (const Domain::ModelObject* object :
-             project_interactor.selected_project().model().objects)
-        {
-            siblings.emplace_back(object->id().id);
-        }
-        return siblings;
-    }
-
-    if (anchor.object_id != target.object_id) {
-        return {};
-    }
-    const Domain::ModelObject* object =
-        project_interactor.selected_project().find_object_by_id(anchor.object_id);
-    if (!object) {
-        return {};
-    }
-
-    // Instance rows: volume_id == 0, instance_id != 0.
-    if (anchor.volume_id == 0 && target.volume_id == 0) {
-        Domain::ElementRefs siblings;
-        for (const Domain::ModelInstance* instance : object->instances) {
-            siblings.emplace_back(anchor.object_id, instance->id().id);
-        }
-        return siblings;
-    }
-
-    // Volume rows: volume_id != 0 on both ends (excludes cut connectors, matching
-    // VolumeObservableList's own filter - connectors aren't a rangeable list).
-    if (anchor.instance_id == 0
-        && target.instance_id == 0
-        && anchor.volume_id != 0
-        && target.volume_id != 0)
-    {
-        Domain::ElementRefs siblings;
-        for (const Domain::ModelVolume* volume : object->volumes) {
-            if (!volume->is_cut_connector()) {
-                siblings.emplace_back(anchor.object_id, 0, volume->id().id);
-            }
-        }
-        return siblings;
-    }
-
-    return {};
-}
-
-/**
- * @brief The contiguous sub-range of `siblings` spanning [anchor, target] (order-independent,
- * inclusive), or empty if either endpoint isn't found in `siblings`.
- */
-Domain::ElementRefs extract_range(
-    const Domain::ElementRefs& siblings,
-    const Domain::ElementRef& anchor,
-    const Domain::ElementRef& target
-)
-{
-    const auto anchor_it = std::find(siblings.begin(), siblings.end(), anchor);
-    const auto target_it = std::find(siblings.begin(), siblings.end(), target);
-    if (anchor_it == siblings.end() || target_it == siblings.end()) {
-        return {};
-    }
-    const auto [from, to] =
-        anchor_it <= target_it ? std::pair{anchor_it, target_it} : std::pair{target_it, anchor_it};
-    return Domain::ElementRefs(from, to + 1);
-}
-
-} // namespace
-
-void
-select_elements(Biz::ProjectInteractor& project_interactor, Biz::Scene::ObjectSelection selection)
-{
-    Biz::Scene::SceneInteractor& scene_interactor = project_interactor.scene_interactor();
-
-    Domain::ElementRefs& elements = selection.elements;
-    if (elements.empty()) {
-        return;
-    }
-
-    ImGuiIO& io = ImGui::GetIO();
-
-    if (io.KeyShift && !io.KeyCtrl) {
-        Biz::Scene::ObjectSelection old_selection = scene_interactor.object_selection();
-        if (old_selection.anchor && (old_selection.empty() || selection.mode == old_selection.mode))
-        {
-            const Domain::ElementRefs siblings =
-                range_siblings(project_interactor, *old_selection.anchor, elements.front());
-            const Domain::ElementRefs range =
-                extract_range(siblings, *old_selection.anchor, elements.front());
-            if (!range.empty()) {
-                Biz::Scene::ObjectSelection new_selection{selection.mode, range};
-                new_selection.anchor = old_selection.anchor;
-                scene_interactor.set_object_selection(new_selection);
-                return;
-            }
-        }
-        // No usable anchor, mode mismatch, or anchor/target not part of the same rangeable
-        // sibling set - fall through to plain-click behavior below.
-    }
-
-    if (io.KeyCtrl) {
-        Biz::Scene::ObjectSelection old_selection = scene_interactor.object_selection();
-        if (!old_selection.empty()) {
-            if (selection.mode != old_selection.mode) {
-                return;
-            }
-            if (old_selection.mode == Biz::Scene::SelectionMode::Volume) {
-                size_t obj_id  = old_selection.elements.front().object_id;
-                size_t inst_id = old_selection.elements.front().instance_id;
-                for (Domain::ElementRef& element : elements) {
-                    if (element.object_id != obj_id)
-                        return;
-                    element.instance_id = inst_id;
-                }
-            }
-        }
-        for (const Domain::ElementRef& element : elements) {
-            if (!old_selection.remove(element)) {
-                old_selection.elements.push_back(element);
-            }
-        }
-        old_selection.anchor = elements.back();
-        scene_interactor.set_object_selection(old_selection);
-    } else {
-        selection.anchor = elements.front();
-        scene_interactor.set_object_selection(selection);
-    }
+    const ImGuiIO& io = ImGui::GetIO();
+    const ClickModifier modifier = io.KeyCtrl ?
+        ClickModifier::Ctrl :
+        (io.KeyShift ? ClickModifier::Shift : ClickModifier::None);
+    project_interactor.scene_interactor().object_list_interactor().select_row(row, modifier);
 }
 
 void request_context_menu(
     Biz::ProjectInteractor& project_interactor,
     ContextMenuRequester& context_menu_requester,
     bool row_checked,
-    Biz::Scene::ObjectSelection selection
+    const Biz::ObjectList::ListRow& row
 )
 {
+    using Kind = Biz::ObjectList::ListRow::Kind;
     Biz::Scene::SceneInteractor& scene_interactor = project_interactor.scene_interactor();
 
     // A checked row can also mean "a child of this row is selected" (e.g. a volume of the object),
     // so the current selection is kept only when it is in the same mode as the row's selection.
+    const Biz::Scene::SelectionMode row_mode =
+        row.kind == Kind::Volume || row.kind == Kind::Volumes || row.kind == Kind::Connectors ?
+        Biz::Scene::SelectionMode::Volume :
+        Biz::Scene::SelectionMode::Instance;
     const bool keep_selection =
-        row_checked && scene_interactor.object_selection().mode == selection.mode;
+        row_checked && scene_interactor.object_selection().mode == row_mode;
     if (!keep_selection) {
-        if (selection.elements.empty()) {
+        scene_interactor.object_list_interactor()
+            .select_row(row, Biz::ObjectList::ClickModifier::None);
+        if (scene_interactor.object_selection().empty()) {
             return;
         }
-        selection.anchor = selection.elements.front();
-        scene_interactor.set_object_selection(selection);
     }
 
     const ImVec2 mouse_pos = ImGui::GetMousePos();

@@ -81,7 +81,8 @@ void InstanceObservableList::update_data()
                     instance_ordinal_id++,
                     m_object_id,
                     instance->printable,
-                    selected
+                    selected,
+                    m_bed_id
                 );
             }
         }

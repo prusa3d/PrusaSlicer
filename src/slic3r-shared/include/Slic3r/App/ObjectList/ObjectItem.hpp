@@ -9,6 +9,7 @@
 
 #include "Slic3r/Biz/DataObserver.hpp"
 #include "Slic3r/Biz/ObjectList/ObjectObservableList.hpp"
+#include "Slic3r/Biz/ObjectList/ObjectListSelection.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 
 namespace Slic3r::Biz {
@@ -43,9 +44,13 @@ public:
     void set_callbacks(
         Biz::ProjectInteractor& project_interactor,
         ContextMenuRequester& context_menu_requester,
-        std::function<Biz::Scene::ObjectSelection()> get_selection
+        std::function<Biz::ObjectList::ListRow()> get_row
     );
-    void set_selected(bool selected);
+    /**
+     * @brief Highlights the button when the whole object is selected, borders it when only some
+     * of its instances or volumes are.
+     */
+    void set_selection_state(Biz::ObjectList::ObjectSelectionState state);
     void set_extruder_context(
         Biz::ProjectInteractor& project_interactor,
         std::optional<size_t> config_container_id,
@@ -70,6 +75,9 @@ private:
     std::function<void(bool)> m_on_printable_toggled;
     ExtruderMarkerReactor m_extruder_marker_reactor;
     std::optional<size_t> m_config_container_id;
+    Biz::ObjectList::ObjectSelectionState m_selection_state{
+        Biz::ObjectList::ObjectSelectionState::None
+    };
 };
 
 class ConnectorsButton : public LeafButton
@@ -80,7 +88,7 @@ public:
     void set_selected(bool selected);
     void set_callbacks(
         Biz::ProjectInteractor& project_interactor,
-        std::function<Biz::Scene::ObjectSelection()> get_selection
+        std::function<Biz::ObjectList::ListRow()> get_row
     );
 };
 
@@ -105,6 +113,9 @@ public:
 
 private:
     void on_data_update() override;
+
+    /** @brief This object's row of kind @p kind (the object itself or one of its group rows). */
+    Biz::ObjectList::ListRow row(Biz::ObjectList::ListRow::Kind kind) const;
 
     ObjectButton* m_object_button{nullptr};
     CollapsibleArea* m_collapsible_item{nullptr};

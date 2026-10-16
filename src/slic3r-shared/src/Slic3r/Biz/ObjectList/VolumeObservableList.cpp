@@ -13,12 +13,14 @@ VolumeObservableList::VolumeObservableList(
     Biz::ProjectInteractor& project_interactor,
     size_t project_id,
     size_t object_id,
-    std::optional<size_t> config_container_id
+    std::optional<size_t> config_container_id,
+    std::optional<size_t> bed_id
 ) :
     m_project_interactor(project_interactor),
     m_project_id(project_id),
     m_object_id(object_id),
-    m_config_container_id(config_container_id)
+    m_config_container_id(config_container_id),
+    m_bed_id(bed_id)
 {
     update_data();
 }
@@ -63,7 +65,8 @@ void VolumeObservableList::update_data()
                 volume->is_text(),
                 volume->is_svg(),
                 selected,
-                m_config_container_id
+                m_config_container_id,
+                m_bed_id
             );
         }
     }

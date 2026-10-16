@@ -6,6 +6,7 @@
 #include "Slic3r/App/ObjectList/ObjectItem.hpp"
 
 #include "Slic3r/Biz/ObjectList/ConfigContainerBedObservableList.hpp"
+#include "Slic3r/Biz/ObjectList/ObjectListSelection.hpp"
 #include "Slic3r/Biz/DataObserver.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 
@@ -71,9 +72,9 @@ public:
     void set_remove_button_visible(bool visible);
     void set_selected(bool selected);
     void set_selection_callbacks(
-        Biz::Scene::SceneInteractor& scene_interactor,
+        Biz::ProjectInteractor& project_interactor,
         ContextMenuRequester& context_menu_requester,
-        std::function<Domain::BedRef()> get_bed_ref
+        std::function<Biz::ObjectList::ListRow()> get_row
     );
     void set_thumbnail(Render::TexturePtr texture);
 
@@ -107,7 +108,7 @@ public:
     void set_selected(bool selected);
     void set_callbacks(
         Biz::ProjectInteractor& project_interactor,
-        std::function<Biz::Scene::ObjectSelection()> get_selection
+        std::function<Biz::ObjectList::ListRow()> get_row
     );
 
 private:

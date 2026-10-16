@@ -15,6 +15,17 @@ class ProjectInteractor;
 
 namespace Slic3r::Biz::ObjectList {
 
+/** @brief How much of an object the current selection covers. */
+enum class ObjectSelectionState
+{
+    /** @brief Nothing of the object is selected. */
+    None,
+    /** @brief Some of its instances or some of its volumes are selected. */
+    Partial,
+    /** @brief The whole object, all its instances (on every bed), is selected. */
+    Full,
+};
+
 struct Object
 {
     std::string name;
@@ -24,7 +35,7 @@ struct Object
     Biz::UnsharedPointer<VolumeObservableList> volumes_list;
     Biz::UnsharedPointer<InstanceObservableList> instances_list;
 
-    bool selected{false};
+    ObjectSelectionState selection_state{ObjectSelectionState::None};
     bool connectors_selected{false};
     std::optional<size_t> config_container_id;
     std::optional<size_t> bed_id;

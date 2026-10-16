@@ -72,24 +72,26 @@ VolumeButton::VolumeButton(
     };
     m_name_editing->callbacks().focus_lost = [this]() { finish_renaming(); };
 
-    auto get_selection = [this]() -> Biz::Scene::ObjectSelection
+    auto get_row = [this]() -> Biz::ObjectList::ListRow
     {
         return {
-            Biz::Scene::SelectionMode::Volume,
-            {{this->state()->obj_id, 0, this->state()->vol_id}}
+            .kind      = Biz::ObjectList::ListRow::Kind::Volume,
+            .bed_id    = this->state()->bed_id,
+            .object_id = this->state()->obj_id,
+            .volume_id = this->state()->vol_id
         };
     };
 
-    callbacks().action = [this, &project_interactor, get_selection]()
-    { select_elements(project_interactor, get_selection()); };
+    callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
     callbacks().secondary_action =
-        [this, &project_interactor, &context_menu_requester, get_selection]()
+        [this, &project_interactor, &context_menu_requester, get_row]()
     {
         request_context_menu(
             project_interactor,
             context_menu_requester,
             checked(),
-            get_selection()
+            get_row()
         );
     };
 
@@ -286,7 +288,8 @@ void VolumeButton::update_drop_line(const Vec2f& pos, const Vec2f& size)
 
 VolumesItem::VolumesItem(
     Biz::ProjectInteractor& project_interactor,
-    ContextMenuRequester& context_menu_requester
+    ContextMenuRequester& context_menu_requester,
+    std::function<Biz::ObjectList::ListRow()> get_row
 ) :
     m_project_interactor(project_interactor)
 {
@@ -300,6 +303,8 @@ VolumesItem::VolumesItem(
     { return m_volumes_list_view->list_item_count() > 0; };
 
     m_volumes_button = emplace<VolumesButton>(0, m_volumes_list_view);
+    m_volumes_button->callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
 }
 
 bool VolumesItem::has_visible_content() const

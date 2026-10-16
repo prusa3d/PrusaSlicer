@@ -63,6 +63,20 @@ ObjectListInteractor::out_of_bed_objects(Domain::SelectionId project_id)
     return context(project_id).out_of_bed_objects.get();
 }
 
+void ObjectListInteractor::select_row(const ListRow& row, ClickModifier modifier)
+{
+    ASSERT(m_project_interactor);
+    const Domain::SelectionId project_id = m_project_interactor->selected_project_id();
+    ObjectListProjectContext& ctx        = context(project_id);
+    ObjectListSelector(
+        *m_project_interactor,
+        project_id,
+        *ctx.printer_groups.operator->(),
+        *ctx.out_of_bed_objects.operator->()
+    )
+        .select(row, modifier, ctx.selection_anchor);
+}
+
 void ObjectListInteractor::on_config_container_list_changed(Domain::SelectionId project_id)
 {
     refresh(project_id);

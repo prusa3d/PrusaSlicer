@@ -6,6 +6,7 @@
 #include "Slic3r/App/ObjectList/ExtruderMarkerReactor.hpp"
 
 #include "Slic3r/Biz/ObjectList/VolumeObservableList.hpp"
+#include "Slic3r/Biz/ObjectList/ObjectListSelection.hpp"
 #include "Slic3r/Biz/DataObserver.hpp"
 
 namespace Slic3r::Biz {
@@ -108,9 +109,11 @@ private:
 class VolumesItem : public Yoga::Item
 {
 public:
+    /** @param get_row The row of the "Volumes" group (selects all the listed volumes). */
     VolumesItem(
         Biz::ProjectInteractor& project_interactor,
-        ContextMenuRequester& context_menu_requester
+        ContextMenuRequester& context_menu_requester,
+        std::function<Biz::ObjectList::ListRow()> get_row
     );
     bool has_visible_content() const;
 

@@ -140,13 +140,36 @@ void ObjectObservableList::on_volume_transformed(
     update_from_changes(project_id, bed_tracking_changes);
 }
 
-static bool is_selected(size_t object_id, const Biz::Scene::ObjectSelection& sel)
+static ObjectSelectionState
+selection_state(const Domain::ModelObject& object, const Biz::Scene::ObjectSelection& sel)
 {
-    return std::any_of(
+    const size_t object_id = object.id().id;
+    const bool any_selected = std::any_of(
         sel.elements.begin(),
         sel.elements.end(),
         [object_id](const Domain::ElementRef& el) { return el.object_id == object_id; }
     );
+    if (!any_selected) {
+        return ObjectSelectionState::None;
+    }
+    if (sel.mode != Biz::Scene::SelectionMode::Instance) {
+        return ObjectSelectionState::Partial;
+    }
+
+    const bool all_instances_selected = std::all_of(
+        object.instances.begin(),
+        object.instances.end(),
+        [object_id, &sel](const Domain::ModelInstance* instance)
+        {
+            return std::any_of(
+                sel.elements.begin(),
+                sel.elements.end(),
+                [object_id, instance_id = instance->id().id](const Domain::ElementRef& el)
+                { return el.object_id == object_id && el.instance_id == instance_id; }
+            );
+        }
+    );
+    return all_instances_selected ? ObjectSelectionState::Full : ObjectSelectionState::Partial;
 }
 
 static bool is_connectors_selected(size_t object_id, const Biz::Scene::ObjectSelection& sel)
@@ -262,7 +285,7 @@ void ObjectObservableList::on_scene_selection_changed(
             m_volumes_lists.at(object_id)->update_data();
             m_instances_lists.at(object_id)->update_data();
 
-            obj_it->selected            = is_selected(object_id, sel);
+            obj_it->selection_state     = selection_state(*object, sel);
             obj_it->connectors_selected = is_connectors_selected(object_id, sel);
 
             const IndexRange index_range(std::distance(m_items.begin(), obj_it));
@@ -340,7 +363,8 @@ void ObjectObservableList::update_data()
                                 m_project_interactor,
                                 m_project_id,
                                 object_id,
-                                m_config_container_id
+                                m_config_container_id,
+                                m_bed_id
                             )
                         )
                         .first;
@@ -366,7 +390,7 @@ void ObjectObservableList::update_data()
                 iit->second->update_data();
             }
 
-            const bool selected            = is_selected(object_id, sel);
+            const ObjectSelectionState object_selection_state = selection_state(*object, sel);
             const bool connectors_selected = is_connectors_selected(object_id, sel);
 
             if (obj_it == m_items.end()) {
@@ -377,7 +401,7 @@ void ObjectObservableList::update_data()
                     has_connectors,
                     vit->second,
                     iit->second,
-                    selected,
+                    object_selection_state,
                     connectors_selected,
                     m_config_container_id,
                     m_bed_id
@@ -390,7 +414,7 @@ void ObjectObservableList::update_data()
                 obj_it->printable           = is_printable;
                 obj_it->connectors_selected = connectors_selected;
                 obj_it->has_connectors      = has_connectors;
-                obj_it->selected            = selected;
+                obj_it->selection_state     = object_selection_state;
 
                 this->invoke_listeners<IListObserver<Object>>(
                     [index_range](auto* l) { l->on_updated(index_range); }

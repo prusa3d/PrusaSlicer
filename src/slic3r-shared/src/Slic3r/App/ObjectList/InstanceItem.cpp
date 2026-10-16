@@ -63,23 +63,25 @@ InstanceButton::InstanceButton(
         [this]() { update_printable_visibility(); }
     );
 
-    auto get_selection = [this]() -> Biz::Scene::ObjectSelection
+    auto get_row = [this]() -> Biz::ObjectList::ListRow
     {
         return {
-            Biz::Scene::SelectionMode::Instance,
-            {{this->state()->object_id, this->state()->id}}
+            Biz::ObjectList::ListRow::Kind::Instance,
+            this->state()->bed_id,
+            this->state()->object_id,
+            this->state()->id
         };
     };
-    callbacks().action = [&project_interactor, get_selection]()
-    { select_elements(project_interactor, get_selection()); };
+    callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
     callbacks().secondary_action =
-        [this, &project_interactor, &context_menu_requester, get_selection]()
+        [this, &project_interactor, &context_menu_requester, get_row]()
     {
         request_context_menu(
             project_interactor,
             context_menu_requester,
             checked(),
-            get_selection()
+            get_row()
         );
     };
 
@@ -109,7 +111,8 @@ void InstanceButton::update_printable_visibility()
 InstancesItem::InstancesItem(
     size_t object_id,
     Biz::ProjectInteractor& project_interactor,
-    ContextMenuRequester& context_menu_requester
+    ContextMenuRequester& context_menu_requester,
+    std::function<Biz::ObjectList::ListRow()> get_row
 ) :
     m_object_id(object_id),
     m_project_interactor(project_interactor)
@@ -124,6 +127,8 @@ InstancesItem::InstancesItem(
     { return m_instances_list_view->list_item_count() > 0; };
 
     m_instances_button = emplace<InstancesButton>(0, m_instances_list_view);
+    m_instances_button->callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
 }
 
 bool InstancesItem::has_visible_content() const

@@ -15,6 +15,8 @@ struct Instance
     size_t object_id;
     bool printable;
     bool selected{false};
+    /** @brief Bed whose object row lists this instance, nullopt for "Out of bed". */
+    std::optional<size_t> bed_id;
 };
 
 class InstanceObservableList : public Biz::IObservableList<Instance>

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <optional>
 #include <vector>
 
 #include "Slic3r/Domain/BedRef.hpp"
@@ -38,13 +37,6 @@ struct ObjectSelection
 
     SelectionMode mode{SelectionMode::Instance};
     ElementRefs elements;
-
-    /**
-     * @brief The element a plain or Ctrl click most recently landed on, used as the range
-     * start for a subsequent Shift+click (see TreeNodeButton::select_elements). Left untouched
-     * by Shift+click itself, so repeated Shift+clicks keep ranging from the same point.
-     */
-    std::optional<Domain::ElementRef> anchor;
 
     [[nodiscard]] SelectionState state() const;
 

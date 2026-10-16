@@ -366,7 +366,7 @@ void SceneInteractor::set_object_selection(
     normalize_object_selection(selection);
 
     auto& project_context = it->second;
-    ObjectSelection sel{.mode = selection.mode, .anchor = selection.anchor};
+    ObjectSelection sel{.mode = selection.mode};
     for (const auto& e : selection.elements) {
         if (e.has_instance() || e.is_wipe_tower()) {
             sel.elements.push_back(e);

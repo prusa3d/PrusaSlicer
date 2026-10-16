@@ -962,6 +962,8 @@ set(SLIC3R_SHARED_FILES
         src/Slic3r/Biz/ObjectList/InstanceObservableList.cpp
         include/Slic3r/Biz/ObjectList/ObjectListInteractor.hpp
         src/Slic3r/Biz/ObjectList/ObjectListInteractor.cpp
+        include/Slic3r/Biz/ObjectList/ObjectListSelection.hpp
+        src/Slic3r/Biz/ObjectList/ObjectListSelection.cpp
 
         include/Slic3r/Biz/Expr/Parser.hpp
         src/Slic3r/Biz/Expr/Parser.cpp
@@ -1720,6 +1722,7 @@ if(SLIC3R_BUILD_TESTS)
             test/Slic3r/Biz/Scene/SceneInteractorTests.cpp
             test/Slic3r/Biz/SlaPointsOperationsTests.cpp
             test/Slic3r/Biz/Scene/VirtualBedPreviewTests.cpp
+            test/Slic3r/Biz/ObjectList/ObjectListSelectionTests.cpp
             test/Slic3r/Biz/WeakerPointerTests.cpp
             test/Slic3r/Biz/FileDownloader/FileDownloaderJobTests.cpp
             test/Slic3r/Biz/ObservableListSortFilterTests.cpp

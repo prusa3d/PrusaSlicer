@@ -5,6 +5,7 @@
 #include "Slic3r/App/ObjectList/TreeNodeButton.hpp"
 
 #include "Slic3r/Biz/ObjectList/InstanceObservableList.hpp"
+#include "Slic3r/Biz/ObjectList/ObjectListSelection.hpp"
 #include "Slic3r/Biz/DataObserver.hpp"
 #include "Slic3r/Biz/Scene/SceneInteractor.hpp"
 
@@ -55,10 +56,12 @@ private:
 class InstancesItem : public Yoga::Item
 {
 public:
+    /** @param get_row The row of the "Instances" group (selects all the listed instances). */
     InstancesItem(
         size_t object_id,
         Biz::ProjectInteractor& project_interactor,
-        ContextMenuRequester& context_menu_requester
+        ContextMenuRequester& context_menu_requester,
+        std::function<Biz::ObjectList::ListRow()> get_row
     );
     bool has_visible_content() const;
 

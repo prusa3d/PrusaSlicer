@@ -6,6 +6,7 @@
 #include "Slic3r/App/ContextMenu.hpp"
 
 #include "Slic3r/Biz/ProjectInteractor.hpp"
+#include "Slic3r/Biz/ObjectList/ObjectListInteractor.hpp"
 #include "Slic3r/Biz/I18N/I18N.hpp"
 
 #include <Slic3r/App/Render/Texture.hpp>
@@ -103,18 +104,20 @@ void CCBedButton::set_selected(bool selected)
 }
 
 void CCBedButton::set_selection_callbacks(
-    Biz::Scene::SceneInteractor& scene_interactor,
+    Biz::ProjectInteractor& project_interactor,
     ContextMenuRequester& context_menu_requester,
-    std::function<Domain::BedRef()> get_bed_ref
+    std::function<Biz::ObjectList::ListRow()> get_row
 )
 {
     callbacks().secondary_action =
-        [this, &scene_interactor, &context_menu_requester, get_bed_ref]()
+        [this, &project_interactor, &context_menu_requester, get_row]()
     {
         // A bed which is part of the current selection keeps the selection.
         if (!checked()) {
-            scene_interactor.bed_selection()
-                .select_one(get_bed_ref(), Biz::Scene::CameraActionOnBedSelection::CenterOnBed);
+            project_interactor.scene_interactor().object_list_interactor().select_row(
+                get_row(),
+                Biz::ObjectList::ClickModifier::None
+            );
         }
         const ImVec2 mouse_pos = ImGui::GetMousePos();
         context_menu_requester.request_context_menu(
@@ -123,16 +126,8 @@ void CCBedButton::set_selection_callbacks(
         );
     };
 
-    callbacks().action = [&scene_interactor, get_bed_ref]()
-    {
-        if (ImGui::GetIO().KeyCtrl) {
-            scene_interactor.bed_selection()
-                .toggle(get_bed_ref(), Biz::Scene::CameraActionOnBedSelection::CenterOnBed);
-        } else {
-            scene_interactor.bed_selection()
-                .select_one(get_bed_ref(), Biz::Scene::CameraActionOnBedSelection::CenterOnBed);
-        }
-    };
+    callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
 }
 
 SlicingStateMarker::SlicingStateMarker()
@@ -233,11 +228,11 @@ void WipeTowerButton::set_selected(bool selected)
 
 void WipeTowerButton::set_callbacks(
     Biz::ProjectInteractor& project_interactor,
-    std::function<Biz::Scene::ObjectSelection()> get_selection
+    std::function<Biz::ObjectList::ListRow()> get_row
 )
 {
-    callbacks().action = [&project_interactor, get_selection]()
-    { select_elements(project_interactor, get_selection()); };
+    callbacks().action = [&project_interactor, get_row]()
+    { select_row(project_interactor, get_row()); };
 }
 
 ConfigContainerBedItem::ConfigContainerBedItem(
@@ -262,26 +257,19 @@ ConfigContainerBedItem::ConfigContainerBedItem(
     m_collapsible_content->callbacks().has_content = [this]() -> bool
     { return this->state()->objects_list->size() > 0; };
 
-    m_wipe_tower_button = m_collapsible_content->emplace_back<WipeTowerButton>();
-    m_wipe_tower_button->set_callbacks(
-        project_interactor,
-        [this]() -> Biz::Scene::ObjectSelection
-        {
-            return {
-                Biz::Scene::SelectionMode::Instance,
-                {Domain::ElementRef(
-                    Domain::SlicingId{m_project_interactor.selected_project_id(), this->state()->id}
-                )}
-            };
-        }
-    );
-
     m_objects_list_view = m_collapsible_content->emplace_back<ObjectListView>(
         ObjectListViewFactory(project_interactor, context_menu_requester)
     );
     m_objects_list_view->set_object_name("ObjectListView");
     m_objects_list_view->set_orientation(Orientation::Vertical);
     m_objects_list_view->set_source_list(state.objects_list.get());
+
+    m_wipe_tower_button = emplace_back<WipeTowerButton>();
+    m_wipe_tower_button->set_callbacks(
+        project_interactor,
+        [this]() -> Biz::ObjectList::ListRow
+        { return {Biz::ObjectList::ListRow::Kind::WipeTower, this->state()->id}; }
+    );
 
     m_cc_bed_button = emplace<CCBedButton>(
         0,
@@ -296,9 +284,10 @@ ConfigContainerBedItem::ConfigContainerBedItem(
     );
     m_cc_bed_button->set_name(state.name);
     m_cc_bed_button->set_selection_callbacks(
-        project_interactor.scene_interactor(),
+        project_interactor,
         context_menu_requester,
-        [this]() { return Domain::BedRef{this->state()->config_container_id, this->state()->id}; }
+        [this]() -> Biz::ObjectList::ListRow
+        { return {Biz::ObjectList::ListRow::Kind::Bed, this->state()->id}; }
     );
 
     m_cc_bed_button->slicing_state_marker()->set_callbacks(

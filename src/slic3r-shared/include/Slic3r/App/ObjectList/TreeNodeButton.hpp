@@ -7,9 +7,9 @@ namespace Slic3r::Biz {
 class ProjectInteractor;
 } // namespace Slic3r::Biz
 
-namespace Slic3r::Biz::Scene {
-struct ObjectSelection;
-} // namespace Slic3r::Biz::Scene
+namespace Slic3r::Biz::ObjectList {
+struct ListRow;
+} // namespace Slic3r::Biz::ObjectList
 
 namespace Slic3r::App {
 
@@ -117,31 +117,24 @@ Yoga::Icon* add_icon(Yoga::Item* parent, Render::Icon render_icon, Yoga::Unit si
 ExtruderIcon* add_extruder_icon(Yoga::Item* parent, Yoga::Unit size = Yoga::Unit(18.f));
 
 /**
- * @brief Ctrl+click merges the given elements into the current selection; Shift+click selects
- * the contiguous range between the last plain/Ctrl-clicked element (the "anchor", see
- * ObjectSelection::anchor) and this click's element, provided both live in the same rangeable
- * sibling set (same object, same mode - Instance range within one object's instances, Volume
- * range within one object's volumes, or Object range across the project's objects) - otherwise
- * Shift+click degrades to a plain click. A plain click (no modifier) replaces the selection with
- * just these elements and becomes the new anchor (matches ObjectListOld).
- * @param selection Exactly the clicked row's own selection payload (mode + one element).
+ * @brief Left click on @p row: applies it to the selection with the Ctrl/Shift modifier currently
+ * held, see Biz::ObjectList::ObjectListSelector for the rules.
  */
-void select_elements(Biz::ProjectInteractor& project_interactor, Biz::Scene::ObjectSelection selection);
+void select_row(Biz::ProjectInteractor& project_interactor, const Biz::ObjectList::ListRow& row);
 
 /**
  * @brief Right-click on a row: a checked row whose selection mode matches the current selection
  * keeps the selection (so the menu applies to a whole multi-selection), otherwise the selection
  * is replaced by just this row (no Ctrl/Shift handling). Then the context menu matching the
  * resulting selection is requested at the mouse position.
- * @param row_checked Whether the clicked row is highlighted as selected (which is also the case
- * when only a child of the row is selected, e.g. a volume of the object).
- * @param selection Exactly the clicked row's own selection payload (mode + one element).
+ * @param row_checked Whether the clicked row is shown as selected, highlighted or bordered (which
+ * is also the case when only a part of the row is selected, e.g. a volume of the object).
  */
 void request_context_menu(
     Biz::ProjectInteractor& project_interactor,
     ContextMenuRequester& context_menu_requester,
     bool row_checked,
-    Biz::Scene::ObjectSelection selection
+    const Biz::ObjectList::ListRow& row
 );
 
 } // namespace ObjectList

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Slic3r/Biz/ObjectList/ConfigContainerObservableList.hpp"
+#include "Slic3r/Biz/ObjectList/ObjectListSelection.hpp"
 
 #include "Slic3r/Biz/IConfigContainerListChangedListener.hpp"
 #include "Slic3r/Biz/ProjectScoped.hpp"
@@ -31,6 +32,8 @@ struct ObjectListProjectContext
 {
     Biz::UnsharedPointer<ConfigContainerObservableList> printer_groups;
     Biz::UnsharedPointer<ObjectObservableList> out_of_bed_objects;
+    /** @brief The row a Shift+click in the list ranges from, see ObjectListSelector. */
+    std::optional<ListRow> selection_anchor;
 
     void ensure(Biz::ProjectInteractor& project_interactor, Domain::SelectionId project_id);
 };
@@ -64,6 +67,12 @@ public:
 
     std::weak_ptr<ConfigContainerObservableList> printer_groups(Domain::SelectionId project_id);
     std::weak_ptr<ObjectObservableList> out_of_bed_objects(Domain::SelectionId project_id);
+
+    /**
+     * @brief Applies a click on @p row of the selected project's list to its bed and object
+     * selections, see ObjectListSelector for the rules.
+     */
+    void select_row(const ListRow& row, ClickModifier modifier);
 
     // IConfigContainerListChangedListener
     void on_config_container_list_changed(Domain::SelectionId project_id) override;
