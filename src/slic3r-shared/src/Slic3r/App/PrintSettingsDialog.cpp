@@ -149,10 +149,10 @@ PrintSettingsDialog::PrintSettingsDialog(
         &m_project_interactor.preset_interactor().tool_items()
     );
 
-    Text* extruders_label =
+    m_extruders_label =
         left_column->emplace_back<Text>(Biz::_u8L("Extruders"), Render::ImguiFontType::Bold);
-    extruders_label->set_margin({5, 0});
-    extruders_label->set_flex_shrink(0);
+    m_extruders_label->set_margin({5, 0});
+    m_extruders_label->set_flex_shrink(0);
 
     m_extruder_page_list_view =
         left_column->emplace_back<PageListView>(std::move(factory_extruder));
@@ -291,6 +291,22 @@ void PrintSettingsDialog::update_dirty_state()
     m_dirty_tool_print_categorizer->invalidate();
 }
 
+void PrintSettingsDialog::update_extruders_visibility()
+{
+    bool has_extruder_section =
+        m_project_interactor.preset_interactor().selected_printer_preset().technology()
+        == Domain::PrinterTechnology::FFF;
+    m_extruders_label->set_visible(has_extruder_section);
+    m_extruder_page_list_view->set_visible(has_extruder_section);
+
+    // An extruder page can't stay shown without its list, fall back to the first category page.
+    if (!has_extruder_section && m_content_stack_layout->current_index() == 1
+        && m_category_stack_list_view->object_count() > 0)
+    {
+        select_page_entry(0, true);
+    }
+}
+
 void PrintSettingsDialog::navigate_to_item(const Domain::ConfigItem* config_item)
 {
     clear_navigation();
@@ -329,6 +345,21 @@ void PrintSettingsDialog::on_preset_selection_changed(
         || type == Biz::Preset::PresetItemType::ToolPrintPreset)
     {
         update_dirty_state();
+    }
+    if (type == Biz::Preset::PresetItemType::PrinterPreset) {
+        update_extruders_visibility();
+    }
+}
+
+void PrintSettingsDialog::on_config_container_selection_changed(
+    Domain::SelectionId project_id,
+    Domain::SelectionId config_container_id
+)
+{
+    if (m_project_interactor.selected_project_id() == project_id
+        && m_project_interactor.selected_config_container_id() == config_container_id)
+    {
+        update_extruders_visibility();
     }
 }
 
@@ -369,6 +400,7 @@ void PrintSettingsDialog::on_preset_value_changed(
 void PrintSettingsDialog::on_preset_bundles_loaded()
 {
     update_dirty_state();
+    update_extruders_visibility();
     ASSERT(m_tool_print_transformer->size() > 1);
     m_tool_print_transformer->on_updated({0, m_tool_print_transformer->size()-1});
 }
