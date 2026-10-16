@@ -31,8 +31,6 @@ class MultiMaterialPaintingGizmo :
     public Biz::IVirtualExtrudersChangedListener
 {
 public:
-    static constexpr float CursorRadiusMin = 0.1f;
-
     MultiMaterialPaintingGizmo() = delete;
 
     MultiMaterialPaintingGizmo(
@@ -43,8 +41,6 @@ public:
     );
 
     ~MultiMaterialPaintingGizmo() override;
-
-    float get_cursor_radius_min() const override;
 
     float get_cursor_edge_limit() const override;
 

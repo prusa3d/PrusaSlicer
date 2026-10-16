@@ -56,7 +56,7 @@ public:
     static constexpr float SmartFillGapArea  = 0.02f;
     static constexpr float BucketFillGapArea = 0.02f;
 
-    static constexpr float CursorRadiusMin  = 0.4f;
+    static constexpr float CursorRadiusMin  = 0.1f;
     static constexpr float CursorRadiusMax  = 8.f;
     static constexpr float CursorRadiusStep = 0.2f;
 

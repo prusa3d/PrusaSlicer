@@ -109,11 +109,6 @@ MultiMaterialPaintingGizmo::~MultiMaterialPaintingGizmo()
         .remove_listener<IVirtualExtrudersChangedListener>(this);
 }
 
-float MultiMaterialPaintingGizmo::get_cursor_radius_min() const
-{
-    return MultiMaterialPaintingGizmo::CursorRadiusMin;
-}
-
 float MultiMaterialPaintingGizmo::get_cursor_edge_limit() const
 {
     return this->get_cursor_radius_min() / 5.f;
