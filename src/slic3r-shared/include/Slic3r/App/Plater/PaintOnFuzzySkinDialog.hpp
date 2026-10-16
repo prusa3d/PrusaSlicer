@@ -22,6 +22,7 @@ public:
             [](Biz::Algorithms::TriangleSelector::CursorType) {};
         std::function<void(double)> brush_radius_changed           = [](double) {};
         std::function<void(double)> smart_fill_angle_changed       = [](double) {};
+        std::function<void(double)> height_range_changed           = [](double) {};
         std::function<void(bool)> split_triangles_value_changed    = [](bool) {};
         std::function<void(double)> clipping_of_view_value_changed = [](double) {};
         std::function<void()> clipping_of_view_reset_direction     = []() {};
@@ -40,6 +41,8 @@ public:
 
     void set_smart_fill_angle(double smart_fill_angle);
 
+    void set_height_range(double height_range);
+
     void set_clipping_of_view_value(double clipping_of_view_value);
 
 private:
@@ -49,8 +52,9 @@ private:
     Biz::Algorithms::TriangleSelector::CursorType m_selected_brush_type =
         Biz::Algorithms::TriangleSelector::CursorType::SPHERE;
 
-    Yoga::LayoutButton* m_brush_button      = nullptr;
-    Yoga::LayoutButton* m_smart_fill_button = nullptr;
+    Yoga::LayoutButton* m_brush_button        = nullptr;
+    Yoga::LayoutButton* m_smart_fill_button   = nullptr;
+    Yoga::LayoutButton* m_height_range_button = nullptr;
     Yoga::ButtonGroup m_tool_type_group;
 
     Yoga::LayoutButton* m_sphere_brush_button   = nullptr;
@@ -60,6 +64,7 @@ private:
 
     Yoga::SliderWithInput* m_brush_radius_slider     = nullptr;
     Yoga::SliderWithInput* m_smart_fill_angle_slider = nullptr;
+    Yoga::SliderWithInput* m_height_range_slider     = nullptr;
     Yoga::SliderWithInput* m_clipping_of_view_slider = nullptr;
 
     Yoga::ToggleButton* m_split_triangles_toggle = nullptr;
@@ -69,6 +74,7 @@ private:
     Yoga::Item* m_brush_shape_row      = nullptr;
     Yoga::Item* m_brush_radius_row     = nullptr;
     Yoga::Item* m_smart_fill_angle_row = nullptr;
+    Yoga::Item* m_height_range_row     = nullptr;
 
     Callbacks m_callbacks;
 };

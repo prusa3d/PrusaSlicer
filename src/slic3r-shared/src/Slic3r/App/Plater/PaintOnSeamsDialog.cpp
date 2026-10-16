@@ -30,13 +30,42 @@ PaintOnSeamsDialog::PaintOnSeamsDialog() : GizmoWindow()
     };
     revert_button()->set_tooltip(_u8L("Remove all selection"));
 
+    std::unique_ptr<Item> tool_type_buttons = std::make_unique<Item>();
+    tool_type_buttons->set_gap(5.f);
+
+    m_brush_button =
+        add_icon_button(tool_type_buttons.get(), Render::Icon::PaintBrush, _u8L("Brush"));
+    m_height_range_button = add_icon_button(
+        tool_type_buttons.get(),
+        Render::Icon::LineHeight,
+        _u8L("Height range fill")
+    );
+
+    this->add_new_row(_u8L("Tool"), std::move(tool_type_buttons));
+    m_tool_type_group.set_buttons({m_brush_button, m_height_range_button});
+    m_tool_type_group.callbacks().checked_changed =
+        [this](AbstractButton* current_checked, AbstractButton* last_checked)
+    {
+        if (current_checked == m_brush_button) {
+            m_selected_tool_type = PaintOnGizmoBase::ToolType::BRUSH;
+        } else if (current_checked == m_height_range_button) {
+            m_selected_tool_type = PaintOnGizmoBase::ToolType::HEIGHT_RANGE;
+        } else {
+            ASSERT(false);
+            return;
+        }
+
+        this->update_visibility();
+        m_callbacks.tool_type_changed(m_selected_tool_type);
+    };
+
     std::unique_ptr<Item> brush_shape_buttons = std::make_unique<Item>();
     brush_shape_buttons->set_gap(5.f);
 
     m_sphere_brush_button = add_icon_button(brush_shape_buttons.get(), Render::Icon::Sphere);
     m_circle_brush_button = add_icon_button(brush_shape_buttons.get(), Render::Icon::Circle);
 
-    add_new_row(_u8L("Shape"), std::move(brush_shape_buttons))->parent_item();
+    m_brush_shape_row = this->add_new_row(_u8L("Shape"), std::move(brush_shape_buttons));
     m_brush_shape_group.set_buttons({m_sphere_brush_button, m_circle_brush_button});
     m_brush_shape_group.callbacks().checked_changed =
         [this](AbstractButton* current_checked, AbstractButton* last_checked)
@@ -52,13 +81,25 @@ PaintOnSeamsDialog::PaintOnSeamsDialog() : GizmoWindow()
 
     constexpr float slider_text_size = 50;
 
-    add_row_with_slider(content(), &m_brush_radius_slider, _u8L("Brush size"), _u8L("mm"));
+    m_brush_radius_row =
+        add_row_with_slider(content(), &m_brush_radius_slider, _u8L("Brush size"), _u8L("mm"))
+            ->parent_item();
     m_brush_radius_slider->set_begin_value(PaintOnSeamsGizmo::CursorRadiusMin);
     m_brush_radius_slider->set_end_value(PaintOnSeamsGizmo::CursorRadiusMax);
     m_brush_radius_slider->set_step(0.01);
     m_brush_radius_slider->set_input_width(slider_text_size);
     m_brush_radius_slider->callbacks().value_changed = [this](double value)
     { m_callbacks.brush_radius_changed(value); };
+
+    m_height_range_row =
+        add_row_with_slider(content(), &m_height_range_slider, _u8L("Height range"), _u8L("mm"))
+            ->parent_item();
+    m_height_range_slider->set_begin_value(PaintOnSeamsGizmo::HeightRangeZRangeMin);
+    m_height_range_slider->set_end_value(PaintOnSeamsGizmo::HeightRangeZRangeMax);
+    m_height_range_slider->set_step(PaintOnSeamsGizmo::HeightRangeZRangeStep);
+    m_height_range_slider->set_input_width(slider_text_size);
+    m_height_range_slider->callbacks().value_changed = [this](double value)
+    { m_callbacks.height_range_changed(value); };
 
     this->add_separator(this->content());
 
@@ -90,10 +131,8 @@ PaintOnSeamsDialog::PaintOnSeamsDialog() : GizmoWindow()
     m_help_factory.init(add_non_shrinked_wrap(content(), Orientation::Vertical, gap_size()));
     m_help_factory.add_item({GizmoHelpFactory::HelpIcon{Render::Icon::MouseLeft}}, _u8L("Paint"));
     m_help_factory.add_item({GizmoHelpFactory::HelpIcon{Render::Icon::MouseRight}}, _u8L("Block"));
-    m_help_factory.add_item(
-        {{"SHIFT"}, GizmoHelpFactory::HelpIcon{Render::Icon::MouseLeft}},
-        _u8L("Remove")
-    );
+    m_help_factory
+        .add_item({{"SHIFT"}, GizmoHelpFactory::HelpIcon{Render::Icon::MouseLeft}}, _u8L("Remove"));
 }
 
 void PaintOnSeamsDialog::set_brush_radius(const double brush_radius)
@@ -101,14 +140,34 @@ void PaintOnSeamsDialog::set_brush_radius(const double brush_radius)
     m_brush_radius_slider->set_value(brush_radius);
 }
 
+void PaintOnSeamsDialog::set_height_range(const double height_range)
+{
+    m_height_range_slider->set_value(height_range);
+}
+
 void PaintOnSeamsDialog::set_clipping_of_view_value(const double clipping_of_view_value)
 {
     m_clipping_of_view_slider->set_value(clipping_of_view_value);
 }
 
-void PaintOnSeamsDialog::set_brush_type(
-    const Biz::Algorithms::TriangleSelector::CursorType& brush_type
-)
+void PaintOnSeamsDialog::set_tool_type(const PaintOnGizmoBase::ToolType& tool_type)
+{
+    switch (tool_type) {
+    case PaintOnGizmoBase::ToolType::BRUSH:
+        m_brush_button->set_checked(true);
+        break;
+    case PaintOnGizmoBase::ToolType::HEIGHT_RANGE:
+        m_height_range_button->set_checked(true);
+        break;
+    default:
+        ASSERT(false);
+        break;
+    }
+
+    this->update_visibility();
+}
+
+void PaintOnSeamsDialog::set_brush_type(const Algorithms::TriangleSelector::CursorType& brush_type)
 {
     using namespace Slic3r::Biz::Algorithms;
 
@@ -123,6 +182,16 @@ void PaintOnSeamsDialog::set_brush_type(
         ASSERT(false);
         break;
     }
+}
+
+void PaintOnSeamsDialog::update_visibility()
+{
+    const bool is_brush        = m_selected_tool_type == PaintOnGizmoBase::ToolType::BRUSH;
+    const bool is_height_range = m_selected_tool_type == PaintOnGizmoBase::ToolType::HEIGHT_RANGE;
+
+    m_brush_shape_row->set_visible(is_brush);
+    m_brush_radius_row->set_visible(is_brush);
+    m_height_range_row->set_visible(is_height_range);
 }
 
 } // namespace Slic3r::App::Plater

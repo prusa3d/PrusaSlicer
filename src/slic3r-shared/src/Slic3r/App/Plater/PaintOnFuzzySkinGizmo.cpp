@@ -27,6 +27,7 @@ PaintOnFuzzySkinGizmo::PaintOnFuzzySkinGizmo(
     m_dialog->set_brush_type(m_cursor_type);
     m_dialog->set_brush_radius(m_cursor_radius);
     m_dialog->set_smart_fill_angle(m_smart_fill_angle);
+    m_dialog->set_height_range(m_height_range_z_range);
     m_dialog->set_clipping_of_view_value(0.);
     m_dialog->set_split_triangles_value(m_triangle_splitting_enabled);
 
@@ -42,6 +43,9 @@ PaintOnFuzzySkinGizmo::PaintOnFuzzySkinGizmo(
 
     m_dialog->callbacks().smart_fill_angle_changed = [this](const double value)
     { m_smart_fill_angle = static_cast<float>(value); };
+
+    m_dialog->callbacks().height_range_changed = [this](const double value)
+    { m_height_range_z_range = static_cast<float>(value); };
 
     m_dialog->callbacks().split_triangles_value_changed = [this](const bool value)
     { m_triangle_splitting_enabled = value; };
@@ -117,6 +121,11 @@ void PaintOnFuzzySkinGizmo::on_cursor_radius_changed(float value)
 void PaintOnFuzzySkinGizmo::on_smart_fill_angle_changed(float value)
 {
     m_dialog->set_smart_fill_angle(static_cast<double>(value));
+}
+
+void PaintOnFuzzySkinGizmo::on_height_range_z_range_changed(float value)
+{
+    m_dialog->set_height_range(static_cast<double>(value));
 }
 
 void PaintOnFuzzySkinGizmo::on_clipping_of_view_changed(double value)

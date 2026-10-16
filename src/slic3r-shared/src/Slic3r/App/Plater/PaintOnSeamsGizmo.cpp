@@ -23,9 +23,14 @@ PaintOnSeamsGizmo::PaintOnSeamsGizmo(
     PaintOnGizmoBase(device, data_factory, project_interactor, scene_presenter)
 {
     m_dialog = std::make_unique<PaintOnSeamsDialog>();
+    m_dialog->set_tool_type(m_tool_type);
     m_dialog->set_brush_type(m_cursor_type);
     m_dialog->set_brush_radius(m_cursor_radius);
+    m_dialog->set_height_range(m_height_range_z_range);
     m_dialog->set_clipping_of_view_value(0.);
+
+    m_dialog->callbacks().tool_type_changed = [this](const PaintOnGizmoBase::ToolType tool_type)
+    { this->set_tool_type(tool_type); };
 
     m_dialog->callbacks().brush_shape_changed =
         [this](const Biz::Algorithms::TriangleSelector::CursorType cursor_type)
@@ -33,6 +38,9 @@ PaintOnSeamsGizmo::PaintOnSeamsGizmo(
 
     m_dialog->callbacks().brush_radius_changed = [this](const double value)
     { m_cursor_radius = static_cast<float>(value); };
+
+    m_dialog->callbacks().height_range_changed = [this](const double value)
+    { m_height_range_z_range = static_cast<float>(value); };
 
     m_dialog->callbacks().clipping_of_view_value_changed = [this](double value)
     {
@@ -96,6 +104,11 @@ Domain::TriangleSelector::TriangleStateType PaintOnSeamsGizmo::get_right_button_
 void PaintOnSeamsGizmo::on_cursor_radius_changed(float value)
 {
     m_dialog->set_brush_radius(static_cast<double>(value));
+}
+
+void PaintOnSeamsGizmo::on_height_range_z_range_changed(float value)
+{
+    m_dialog->set_height_range(static_cast<double>(value));
 }
 
 void PaintOnSeamsGizmo::on_clipping_of_view_changed(double value)

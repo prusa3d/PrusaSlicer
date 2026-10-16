@@ -36,11 +36,21 @@ PaintOnFuzzySkinDialog::PaintOnFuzzySkinDialog() : GizmoWindow()
     std::unique_ptr<Item> tool_type_buttons = std::make_unique<Item>();
     tool_type_buttons->set_gap(this->gap_size());
 
-    m_brush_button      = add_icon_button(tool_type_buttons.get(), Render::Icon::PaintBrush);
-    m_smart_fill_button = add_icon_button(tool_type_buttons.get(), Render::Icon::WandMagicSparkles);
+    m_brush_button =
+        add_icon_button(tool_type_buttons.get(), Render::Icon::PaintBrush, _u8L("Brush"));
+    m_smart_fill_button = add_icon_button(
+        tool_type_buttons.get(),
+        Render::Icon::WandMagicSparkles,
+        _u8L("Smart fill")
+    );
+    m_height_range_button = add_icon_button(
+        tool_type_buttons.get(),
+        Render::Icon::LineHeight,
+        _u8L("Height range fill")
+    );
 
     this->add_new_row(_u8L("Tool"), std::move(tool_type_buttons));
-    m_tool_type_group.set_buttons({m_brush_button, m_smart_fill_button});
+    m_tool_type_group.set_buttons({m_brush_button, m_smart_fill_button, m_height_range_button});
     m_tool_type_group.callbacks().checked_changed =
         [this](AbstractButton* current_checked, AbstractButton* last_checked)
     {
@@ -48,6 +58,8 @@ PaintOnFuzzySkinDialog::PaintOnFuzzySkinDialog() : GizmoWindow()
             m_selected_tool_type = PaintOnGizmoBase::ToolType::BRUSH;
         } else if (current_checked == m_smart_fill_button) {
             m_selected_tool_type = PaintOnGizmoBase::ToolType::SMART_FILL;
+        } else if (current_checked == m_height_range_button) {
+            m_selected_tool_type = PaintOnGizmoBase::ToolType::HEIGHT_RANGE;
         } else {
             ASSERT(false);
             return;
@@ -104,6 +116,15 @@ PaintOnFuzzySkinDialog::PaintOnFuzzySkinDialog() : GizmoWindow()
     m_smart_fill_angle_slider->set_step(PaintOnFuzzySkinGizmo::SmartFillAngleStep);
     m_smart_fill_angle_slider->callbacks().value_changed = [this](double value)
     { m_callbacks.smart_fill_angle_changed(value); };
+
+    m_height_range_row =
+        add_row_with_slider(content(), &m_height_range_slider, _u8L("Height range"), _u8L("mm"))
+            ->parent_item();
+    m_height_range_slider->set_begin_value(PaintOnFuzzySkinGizmo::HeightRangeZRangeMin);
+    m_height_range_slider->set_end_value(PaintOnFuzzySkinGizmo::HeightRangeZRangeMax);
+    m_height_range_slider->set_step(PaintOnFuzzySkinGizmo::HeightRangeZRangeStep);
+    m_height_range_slider->callbacks().value_changed = [this](double value)
+    { m_callbacks.height_range_changed(value); };
 
     this->add_separator(this->content());
 
@@ -162,6 +183,11 @@ void PaintOnFuzzySkinDialog::set_smart_fill_angle(const double smart_fill_angle)
     m_smart_fill_angle_slider->set_value(smart_fill_angle);
 }
 
+void PaintOnFuzzySkinDialog::set_height_range(const double height_range)
+{
+    m_height_range_slider->set_value(height_range);
+}
+
 void PaintOnFuzzySkinDialog::set_split_triangles_value(const bool split_triangles)
 {
     m_split_triangles_toggle->set_checked(split_triangles);
@@ -175,6 +201,9 @@ void PaintOnFuzzySkinDialog::set_tool_type(const PaintOnGizmoBase::ToolType& too
         break;
     case PaintOnGizmoBase::ToolType::SMART_FILL:
         m_smart_fill_button->set_checked(true);
+        break;
+    case PaintOnGizmoBase::ToolType::HEIGHT_RANGE:
+        m_height_range_button->set_checked(true);
         break;
     default:
         ASSERT(false);
@@ -210,24 +239,23 @@ void PaintOnFuzzySkinDialog::set_brush_type(
 
 void PaintOnFuzzySkinDialog::update_visibility()
 {
+    m_brush_shape_row->set_visible(false);
+    m_brush_radius_row->set_visible(false);
+    m_split_triangles_toggle->set_visible(false);
+    m_smart_fill_angle_row->set_visible(false);
+    m_height_range_row->set_visible(false);
+
     if (m_selected_tool_type == PaintOnGizmoBase::ToolType::BRUSH) {
         m_brush_shape_row->set_visible(true);
 
-        if (m_selected_brush_type == TriangleSelector::CursorType::POINTER) {
-            m_brush_radius_row->set_visible(false);
-            m_split_triangles_toggle->set_visible(false);
-        } else {
+        if (m_selected_brush_type != TriangleSelector::CursorType::POINTER) {
             m_brush_radius_row->set_visible(true);
             m_split_triangles_toggle->set_visible(true);
         }
-
-        m_smart_fill_angle_row->set_visible(false);
     } else if (m_selected_tool_type == PaintOnGizmoBase::ToolType::SMART_FILL) {
-        m_brush_shape_row->set_visible(false);
-        m_brush_radius_row->set_visible(false);
-        m_split_triangles_toggle->set_visible(false);
-
         m_smart_fill_angle_row->set_visible(true);
+    } else if (m_selected_tool_type == PaintOnGizmoBase::ToolType::HEIGHT_RANGE) {
+        m_height_range_row->set_visible(true);
     }
 }
 

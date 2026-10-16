@@ -52,6 +52,7 @@ protected:
     ) const override;
 
     void on_cursor_radius_changed(float value) override;
+    void on_height_range_z_range_changed(float value) override;
     void on_clipping_of_view_changed(double value) override;
 
 private:

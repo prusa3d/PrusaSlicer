@@ -35,8 +35,13 @@ PaintOnSupportsDialog::PaintOnSupportsDialog() : GizmoWindow()
     std::unique_ptr<Item> tool_type_buttons = std::make_unique<Item>();
     tool_type_buttons->set_gap(5.f);
 
-    m_brush_button      = add_icon_button(tool_type_buttons.get(), Render::Icon::PaintBrush);
-    m_smart_fill_button = add_icon_button(tool_type_buttons.get(), Render::Icon::WandMagicSparkles);
+    m_brush_button =
+        add_icon_button(tool_type_buttons.get(), Render::Icon::PaintBrush, _u8L("Brush"));
+    m_smart_fill_button = add_icon_button(
+        tool_type_buttons.get(),
+        Render::Icon::WandMagicSparkles,
+        _u8L("Smart fill")
+    );
 
     this->add_new_row(_u8L("Tool"), std::move(tool_type_buttons));
     m_tool_type_group.set_buttons({m_brush_button, m_smart_fill_button});
@@ -275,23 +280,19 @@ void PaintOnSupportsDialog::set_automatic_painting_running(const bool running)
 
 void PaintOnSupportsDialog::update_visibility()
 {
+    m_brush_shape_row->set_visible(false);
+    m_brush_radius_row->set_visible(false);
+    m_split_triangles_toggle->set_visible(false);
+    m_smart_fill_angle_row->set_visible(false);
+
     if (m_selected_tool_type == PaintOnGizmoBase::ToolType::BRUSH) {
         m_brush_shape_row->set_visible(true);
 
-        if (m_selected_brush_type == TriangleSelector::CursorType::POINTER) {
-            m_brush_radius_row->set_visible(false);
-            m_split_triangles_toggle->set_visible(false);
-        } else {
+        if (m_selected_brush_type != TriangleSelector::CursorType::POINTER) {
             m_brush_radius_row->set_visible(true);
             m_split_triangles_toggle->set_visible(true);
         }
-
-        m_smart_fill_angle_row->set_visible(false);
     } else if (m_selected_tool_type == PaintOnGizmoBase::ToolType::SMART_FILL) {
-        m_brush_shape_row->set_visible(false);
-        m_brush_radius_row->set_visible(false);
-        m_split_triangles_toggle->set_visible(false);
-
         m_smart_fill_angle_row->set_visible(true);
     }
 }
