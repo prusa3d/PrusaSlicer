@@ -19,7 +19,7 @@ class ScrollArea;
 
 namespace Slic3r::App {
 class WarningPanel;
-}
+} // namespace Slic3r::App
 
 namespace Slic3r::App::Plater {
 
@@ -60,6 +60,19 @@ protected:
     Yoga::LayoutButton* revert_button() const;
     Yoga::Item* top_bar() const;
     Yoga::Item* bottom_bar() const;
+
+    /**
+     * @brief Adds a primary (accent colored) button to the bottom bar and shows the bar.
+     *
+     * @param parent Item inside the bottom bar to add the button to, the bottom bar if nullptr.
+     * @return Pointer to the created LayoutButton.
+     */
+    Yoga::LayoutButton* add_bottom_bar_button(
+        const std::string& label,
+        const std::string& tooltip = std::string{},
+        Render::Icon icon          = Render::Icon::None,
+        Yoga::Item* parent         = nullptr
+    );
 
     /**
      * @brief Adds a revert button to the given parent item.

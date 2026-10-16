@@ -282,23 +282,10 @@ ArrangeDialog::ArrangeDialog(
     help_section->set_flex_shrink(0);
     help_section->append(help());
 
-    // empty item - stretch spacer
-    content()->emplace_back<Item>()->set_flex_grow(1);
-    add_separator(content());
-
-    bottom_bar()->set_flex_shrink(0);
-    bottom_bar()->set_padding(Yoga::Paddings{ 20_fpx });
-    m_arrange_button = bottom_bar()->emplace_back<LayoutButton>(m_arrange_all_label);
-    m_arrange_button->set_content_padding(Yoga::Paddings{10_fpx});
+    m_arrange_button = add_bottom_bar_button(m_arrange_all_label);
     m_arrange_button->callbacks().action = [this]() {
         m_on_arrange(static_cast<ArrangeMode>(m_mode->selected_index()));
     };
-
-    m_arrange_button->set_flex_grow(1);
-
-    constexpr ImColor color_primary{223, 93, 45};
-    m_arrange_button->set_background_color(color_primary);
-    m_arrange_button->set_label_font_type(Render::ImguiFontType::Bold);
 }
 
 void ArrangeDialog::update_segments_visibility() {

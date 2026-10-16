@@ -87,14 +87,6 @@ SlaSupportPointsDialog::SlaSupportPointsDialog() : GizmoWindow()
     m_lock_islands_toggle->callbacks().checked_changed = [this](bool checked)
     { m_callbacks.lock_islands_changed(checked); };
 
-    add_row_with_button(
-        content(),
-        &m_apply_button,
-        _u8L("Apply"),
-        _u8L("Send the edited points to slicing. Closing the tool applies them too.")
-    );
-    m_apply_button->callbacks().action = [this]() { m_callbacks.apply(); };
-
     this->add_separator(this->content());
 
     Item* clipping_row = add_row_with_slider(
@@ -138,6 +130,17 @@ SlaSupportPointsDialog::SlaSupportPointsDialog() : GizmoWindow()
     m_help_factory.add_item({{"CTRL"}, {"A"}}, _u8L("Select all points"));
     m_help_factory.add_item({{"DEL"}}, _u8L("Remove selected points"));
     m_help_factory.add_item({{"ENTER"}}, _u8L("Apply"));
+
+    m_apply_button = add_bottom_bar_button(
+        _u8L("Apply"),
+        _u8L("Send the edited points to slicing. Closing the tool applies them too.")
+    );
+    m_apply_button->callbacks().action = [this]()
+    {
+        if (m_callbacks.apply) {
+            m_callbacks.apply();
+        }
+    };
 
     this->set_input_enabled(false);
 }

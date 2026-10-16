@@ -1,4 +1,3 @@
-
 #include "Slic3r/App/Plater/GizmoWindow.hpp"
 
 #include "Slic3r/App/Yoga/Item.hpp"
@@ -113,6 +112,12 @@ GizmoWindow::GizmoWindow() : Window("GizmoWindow")
     m_warning_panel->set_visible(false);
 
     m_bottom_bar = column->emplace_back<Item>();
+    m_bottom_bar->set_orientation(Orientation::Vertical);
+    m_bottom_bar->set_flex_shrink(0);
+    m_bottom_bar->set_padding({20_fpx, 0, 20_fpx, 20_fpx});
+    m_bottom_bar->set_gap(20_fpx);
+    m_bottom_bar->emplace_back<Separator>(Orientation::Horizontal)->set_margin(Margins(-20_fpx, 0));
+    m_bottom_bar->set_visible(false);
 }
 
 void GizmoWindow::set_title(const std::string& title)
@@ -144,10 +149,12 @@ Separator* GizmoWindow::add_separator(Item* item)
     float margin_end{0.f};
     Item* parent_item = item;
     while (parent_item != this) {
-        margin_begin += item->orientation() == Orientation::Vertical ? parent_item->padding().left :
-                                                                       parent_item->padding().top;
-        margin_end += item->orientation() == Orientation::Vertical ? parent_item->padding().right :
-                                                                     parent_item->padding().bottom;
+        margin_begin += item->orientation() == Orientation::Vertical ?
+            parent_item->padding().left :
+            parent_item->padding().top;
+        margin_end += item->orientation() == Orientation::Vertical ?
+            parent_item->padding().right :
+            parent_item->padding().bottom;
         parent_item = parent_item->parent_item();
     }
 
@@ -197,6 +204,24 @@ Item* GizmoWindow::top_bar() const
 Item* GizmoWindow::bottom_bar() const
 {
     return m_bottom_bar;
+}
+
+Yoga::LayoutButton* GizmoWindow::add_bottom_bar_button(
+    const std::string& label,
+    const std::string& tooltip,
+    Render::Icon icon,
+    Item* parent
+)
+{
+    m_bottom_bar->set_visible(true);
+
+    Item* button_parent  = parent ? parent : m_bottom_bar;
+    LayoutButton* button = button_parent->emplace_back<LayoutButton>(label, icon, tooltip);
+    button->set_background_color(m_theme->color_imgui(Platform::Color::AccentPrimary));
+    button->set_content_padding(10_fpx);
+    button->set_label_font_type(Render::ImguiFontType::Bold);
+    button->set_flex_grow(1.f);
+    return button;
 }
 
 LayoutButton* GizmoWindow::close_button() const

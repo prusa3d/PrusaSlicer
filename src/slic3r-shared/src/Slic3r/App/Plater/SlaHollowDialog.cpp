@@ -135,15 +135,6 @@ SlaHollowDialog::SlaHollowDialog() : GizmoWindow()
     add_row_with_button(content(), &m_remove_all_button, _u8L("Remove all holes"));
     m_remove_all_button->callbacks().action = [this]() { m_callbacks.remove_all(); };
 
-    add_row_with_button(
-        content(),
-        &m_apply_button,
-        _u8L("Apply"),
-        _u8L("Send the edited holes to slicing and show the drilled object. Closing the tool "
-             "applies them too.")
-    );
-    m_apply_button->callbacks().action = [this]() { m_callbacks.apply(); };
-
     this->add_separator(this->content());
 
     Item* clipping_row = add_row_with_slider(
@@ -187,6 +178,18 @@ SlaHollowDialog::SlaHollowDialog() : GizmoWindow()
     m_help_factory.add_item({{"CTRL"}, {"A"}}, _u8L("Select all holes"));
     m_help_factory.add_item({{"DEL"}}, _u8L("Remove selected holes"));
     m_help_factory.add_item({{"ENTER"}}, _u8L("Apply"));
+
+    m_apply_button = add_bottom_bar_button(
+        _u8L("Apply"),
+        _u8L("Send the edited holes to slicing and show the drilled object. Closing the tool "
+             "applies them too.")
+    );
+    m_apply_button->callbacks().action = [this]()
+    {
+        if (m_callbacks.apply) {
+            m_callbacks.apply();
+        }
+    };
 
     this->set_input_enabled(false);
 }
