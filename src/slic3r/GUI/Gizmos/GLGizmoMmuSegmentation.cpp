@@ -235,6 +235,7 @@ void GLGizmoMmuSegmentation::render_triangles(const Selection &selection) const
 static void render_extruders_combo(const std::string& label,
                                    const std::vector<std::string>& extruders,
                                    const std::vector<ColorRGBA>& extruders_colors,
+                                   const std::vector<bool>& hidden,
                                    size_t& selection_idx)
 {
     assert(!extruders_colors.empty());
@@ -246,6 +247,8 @@ static void render_extruders_combo(const std::string& label,
     ImVec2 combo_pos = ImGui::GetCursorScreenPos();
     if (ImGui::BeginCombo(label.c_str(), "")) {
         for (size_t extruder_idx = 0; extruder_idx < std::min(extruders.size(), GLGizmoMmuSegmentation::EXTRUDERS_LIMIT); ++extruder_idx) {
+            if (extruder_idx != selection_idx && extruder_idx < hidden.size() && hidden[extruder_idx])
+                continue;
             ImGui::PushID(int(extruder_idx));
             ImVec2 start_position = ImGui::GetCursorScreenPos();
 
@@ -382,7 +385,24 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImGuiPureWrap::text(m_desc.at("first_color"));
     ImGui::SameLine(combo_label_width);
     ImGui::PushItemWidth(window_width - combo_label_width - color_button_width);
-    render_extruders_combo("##first_color_combo", m_original_extruders_names, m_extruders_filament_colors, m_first_selected_extruder_idx);
+    // The lists leave out the extruders the printer reported empty or uncalibrated at the last sync.
+    std::vector<bool> hidden_extruders(m_original_extruders_names.size());
+    for (size_t idx = 0; idx < hidden_extruders.size(); ++idx)
+        hidden_extruders[idx] = is_extruder_hidden_in_pickers(int(idx + 1));
+    // The colors start on the first two extruders, which may be left out: move them to listed ones.
+    const auto first_listed = [&hidden_extruders](size_t other) -> std::optional<size_t> {
+        for (size_t idx = 0; idx < std::min(hidden_extruders.size(), GLGizmoMmuSegmentation::EXTRUDERS_LIMIT); ++idx)
+            if (!hidden_extruders[idx] && idx != other)
+                return idx;
+        return std::nullopt;
+    };
+    if (m_first_selected_extruder_idx < hidden_extruders.size() && hidden_extruders[m_first_selected_extruder_idx])
+        if (const std::optional<size_t> idx = first_listed(m_second_selected_extruder_idx))
+            m_first_selected_extruder_idx = *idx;
+    if (m_second_selected_extruder_idx < hidden_extruders.size() && hidden_extruders[m_second_selected_extruder_idx])
+        if (const std::optional<size_t> idx = first_listed(m_first_selected_extruder_idx))
+            m_second_selected_extruder_idx = *idx;
+    render_extruders_combo("##first_color_combo", m_original_extruders_names, m_extruders_filament_colors, hidden_extruders, m_first_selected_extruder_idx);
     ImGui::SameLine();
 
     const ColorRGBA& select_first_color = m_modified_extruders_colors[m_first_selected_extruder_idx];
@@ -399,7 +419,7 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImGuiPureWrap::text(m_desc.at("second_color"));
     ImGui::SameLine(combo_label_width);
     ImGui::PushItemWidth(window_width - combo_label_width - color_button_width);
-    render_extruders_combo("##second_color_combo", m_original_extruders_names, m_extruders_filament_colors, m_second_selected_extruder_idx);
+    render_extruders_combo("##second_color_combo", m_original_extruders_names, m_extruders_filament_colors, hidden_extruders, m_second_selected_extruder_idx);
     ImGui::SameLine();
 
     const ColorRGBA& select_second_color = m_modified_extruders_colors[m_second_selected_extruder_idx];

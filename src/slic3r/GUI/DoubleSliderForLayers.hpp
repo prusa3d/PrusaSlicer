@@ -115,6 +115,10 @@ public:
     void    set_callback_on_get_extruder_label(std::function<std::string(int)> cb)
             { m_cb_get_extruder_label = cb; }
 
+    /// Whether the extruder menus leave out a 1-based extruder that the print doesn't use.
+    void    set_callback_on_is_extruder_hidden(std::function<bool(int)> cb)
+            { m_cb_is_extruder_hidden = cb; }
+
     void    set_callback_on_get_print (std::function<const Slic3r::Print& ()> cb)
             { m_cb_get_print = cb; }
 
@@ -223,6 +227,7 @@ private:
     std::function<void()>                       m_cb_ticks_changed              { nullptr };
     std::function<std::vector<std::string>()>   m_cb_get_extruder_colors        { nullptr };
     std::function<std::string(int)>             m_cb_get_extruder_label         { nullptr };
+    std::function<bool(int)>                    m_cb_is_extruder_hidden         { nullptr };
     std::function<const Slic3r::Print&()>       m_cb_get_print                  { nullptr };
     std::function<void(const std::string&, const std::string&)> m_cb_change_app_config  { nullptr };
 };

@@ -83,7 +83,19 @@ struct ExtruderDropdownEntry
 {
     wxString label;
     int extruder_id;
+    // Index into the extruder color lists (get_filament_color_icons() and the like): physical
+    // extruders first, then virtual ones. -1 for "default".
+    int color_idx = -1;
 };
+
+/// Whether the extruder pickers leave out this physical extruder (1-based): the sidebar hides its
+/// filament list, since the printer reported the tool empty or its dock uncalibrated at the last
+/// filament sync.
+bool is_extruder_hidden_in_pickers(int extruder_id);
+
+/// Removes the entries of the extruders the pickers leave out, except keep_extruder_id: the one an
+/// item already uses stays, so the picker can show it.
+void drop_hidden_extruders(std::vector<ExtruderDropdownEntry>& entries, int keep_extruder_id = -1);
 
 wxString format_extruder_label(
     int extruder_id_1based_or_0,
@@ -127,12 +139,15 @@ size_t get_extruder_color_idx(
 } // namespace GUI
 } // namespace Slic3r
 
-void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
+/// Fills the combo with the extruders, leaving out the ones the pickers do (except keep_extruder_id).
+/// Returns the extruders it lists after first_item, in order.
+std::vector<Slic3r::GUI::ExtruderDropdownEntry> apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
                              wxWindow* parent,
                              const std::string& first_item = "",
                              wxPoint pos = wxDefaultPosition,
                              wxSize size = wxDefaultSize,
-                             bool use_thin_icon = false);
+                             bool use_thin_icon = false,
+                             int keep_extruder_id = -1);
 
 inline wxSize get_preferred_size(const wxBitmapBundle& bmp, wxWindow* parent)
 {

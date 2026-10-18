@@ -20,6 +20,7 @@
 #include "I18N.hpp"
 #include "OptionsGroup.hpp"
 #include "MainFrame.hpp"
+#include "Plater.hpp"
 #include "BitmapComboBox.hpp"
 
 #include "Widgets/CheckBox.hpp"
@@ -32,6 +33,14 @@ ExtruderSequenceDialog::ExtruderSequenceDialog(const DoubleSlider::ExtrudersSequ
         wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
     m_sequence(sequence)
 {
+    // Steps on the tools the last filament sync found empty are left out, unless every step is on one.
+    std::vector<size_t> listed_steps;
+    for (const size_t step : m_sequence.extruders)
+        if (!is_extruder_hidden_in_pickers(int(step) + 1))
+            listed_steps.push_back(step);
+    if (!listed_steps.empty())
+        m_sequence.extruders = std::move(listed_steps);
+
 #ifdef _WIN32
     wxGetApp().UpdateDarkUI(this);
 #else
@@ -218,15 +227,30 @@ void ExtruderSequenceDialog::apply_extruder_sequence()
 {
     m_extruders_grid_sizer->Clear(true);
 
+    // The add button cycles through the extruders the pickers list, without any step's own.
+    std::vector<size_t> addable;
+    {
+        std::vector<ExtruderDropdownEntry> entries = build_extruder_dropdown(wxGetApp().plater()->model(), false, true, true);
+        drop_hidden_extruders(entries);
+        for (const ExtruderDropdownEntry& entry : entries)
+            addable.push_back(size_t(entry.color_idx));
+    }
+
     for (size_t extruder=0; extruder < m_sequence.extruders.size(); ++extruder)
     {
         BitmapComboBox* extruder_selector = nullptr;
-        apply_extruder_selector(&extruder_selector, this, "", wxDefaultPosition, wxSize(15*wxGetApp().em_unit(), -1));
-        extruder_selector->SetSelection(m_sequence.extruders[extruder]);
+        // A sequence step stores an extruder's color_idx. The step's own extruder stays listed.
+        const int step_extruder = int(m_sequence.extruders[extruder]);
+        const std::vector<ExtruderDropdownEntry> listed =
+            apply_extruder_selector(&extruder_selector, this, "", wxDefaultPosition, wxSize(15*wxGetApp().em_unit(), -1), false, step_extruder + 1);
+        const auto step_it = std::find_if(listed.begin(), listed.end(), [step_extruder](const ExtruderDropdownEntry& e) { return e.color_idx == step_extruder; });
+        extruder_selector->SetSelection(step_it == listed.end() ? 0 : int(step_it - listed.begin()));
 
-        extruder_selector->Bind(wxEVT_COMBOBOX, [this, extruder_selector, extruder](wxCommandEvent& evt)
+        extruder_selector->Bind(wxEVT_COMBOBOX, [this, extruder_selector, extruder, listed](wxCommandEvent& evt)
         {
-            m_sequence.extruders[extruder] = extruder_selector->GetSelection();
+            const int selection = extruder_selector->GetSelection();
+            if (selection >= 0 && size_t(selection) < listed.size())
+                m_sequence.extruders[extruder] = size_t(listed[selection].color_idx);
             evt.StopPropagation();
         });
 
@@ -243,11 +267,13 @@ void ExtruderSequenceDialog::apply_extruder_sequence()
         auto add_btn = new ScalableButton(this, wxID_ANY, m_bmp_add);
         add_btn->SetToolTip(_(L("Add extruder to sequence")));
 
-        add_btn->Bind(wxEVT_BUTTON, [this, extruder, extruder_selector](wxEvent&) {
-            size_t extr_cnt = (size_t)extruder_selector->GetCount();
+        add_btn->Bind(wxEVT_BUTTON, [this, extruder, addable](wxEvent&) {
+            if (addable.empty())
+                return;
+            size_t extr_cnt = addable.size();
             size_t seq_extr_cnt = m_sequence.extruders.size();
             size_t extr_id = seq_extr_cnt - size_t(seq_extr_cnt / extr_cnt) * extr_cnt;
-            m_sequence.add_extruder(extruder, std::min(extr_id, extr_cnt-1));
+            m_sequence.add_extruder(extruder, addable[std::min(extr_id, extr_cnt-1)]);
             apply_extruder_sequence();
         });
 

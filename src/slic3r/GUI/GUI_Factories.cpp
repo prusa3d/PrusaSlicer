@@ -956,8 +956,8 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
         return;
     }
 
-    const std::vector<ExtruderDropdownEntry> entries =
-        build_extruder_dropdown(p->model(), true, true, true);
+    std::vector<ExtruderDropdownEntry> entries = build_extruder_dropdown(p->model(), true, true, true);
+    drop_hidden_extruders(entries, initial_extruder);
 
     // The swatch of "default" is the extruder the items fall back to: the object's for a part, the
     // first for an object. Modifiers, and items falling back to different extruders, get none.
@@ -974,7 +974,7 @@ void MenuFactory::append_menu_item_change_extruder(wxMenu* menu)
         // Filament names may contain '&', which a menu label would take for a mnemonic.
         item_name.Replace("&", "&&");
 
-        const int       icon_idx = i == 0 ? default_icon_idx : int(i) - 1;
+        const int       icon_idx = entry.extruder_id == 0 ? default_icon_idx : entry.color_idx;
         wxBitmapBundle* icon     = icon_idx >= 0 && size_t(icon_idx) < icons.size() ? icons[icon_idx] : nullptr;
 
         const int captured_id = entry.extruder_id;

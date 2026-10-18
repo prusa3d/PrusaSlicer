@@ -21,6 +21,7 @@
 #include "I18N.hpp"
 #include "GUI_Utils.hpp"
 #include "Plater.hpp"
+#include "Sidebar.hpp"
 #include "../Utils/MacDarkMode.hpp"
 #include "BitmapComboBox.hpp"
 #include "libslic3r/Utils.hpp"
@@ -375,12 +376,13 @@ std::vector<wxBitmapBundle*> get_filament_color_icons(bool thin_icon/* = false*/
 }
 
 
-void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl, 
+std::vector<Slic3r::GUI::ExtruderDropdownEntry> apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl, 
                              wxWindow* parent,
                              const std::string& first_item/* = ""*/, 
                              wxPoint pos/* = wxDefaultPosition*/,
                              wxSize size/* = wxDefaultSize*/,
-                             bool use_thin_icon/* = false*/)
+                             bool use_thin_icon/* = false*/,
+                             int keep_extruder_id/* = -1*/)
 {
     std::vector<wxBitmapBundle*> icons = get_filament_color_icons(use_thin_icon);
 
@@ -400,7 +402,7 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
 
     if (icons.empty() && !first_item.empty()) {
         (*ctrl)->Append(_(first_item), wxNullBitmap);
-        return;
+        return {};
     }
 
     // For ObjectList, virtual extruders go by their short name ("[V] 5")
@@ -409,25 +411,28 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
     Slic3r::GUI::Plater* plater = Slic3r::GUI::wxGetApp().plater();
     if (plater == nullptr) {
         (*ctrl)->Append(_(first_item.empty() ? "default" : first_item), wxNullBitmap);
-        return;
+        return {};
     }
-    const std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
+    std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
         Slic3r::GUI::build_extruder_dropdown(plater->model(), false, use_full_item_name, true);
+    Slic3r::GUI::drop_hidden_extruders(entries, keep_extruder_id);
+    entries.erase(std::remove_if(entries.begin(), entries.end(),
+                                 [&icons](const auto& e) { return e.color_idx < 0 || size_t(e.color_idx) >= icons.size(); }),
+                  entries.end());
 
     if (!first_item.empty()) {
         const int def_id = (!icons.empty()) ? 0 : -1;
         (*ctrl)->Append(_(first_item), def_id >= 0 ? *icons[def_id] : wxNullBitmap);
     }
 
-    for (size_t entry_idx = 0; entry_idx < entries.size() && entry_idx < icons.size(); ++entry_idx)
-    {
-        (*ctrl)->Append(entries[entry_idx].label, *icons[entry_idx]);
-    }
+    for (const Slic3r::GUI::ExtruderDropdownEntry& entry : entries)
+        (*ctrl)->Append(entry.label, *icons[entry.color_idx]);
     // The filament names can be wider than the control. Set once there are items, which GTK needs to
     // size the list.
     (*ctrl)->GetDropDown().SetUseContentWidth(true);
 
     (*ctrl)->SetSelection(0);
+    return entries;
 }
 
 
@@ -951,14 +956,30 @@ build_extruder_dropdown(const Model& model, bool include_default, bool use_full_
     }
 
     for (unsigned int i = 1; i <= num_physical; ++i) {
-        entries.push_back({with_filament_name ? make_filament_label(i) : make_physical_label(i, use_full_item_name), int(i)});
+        entries.push_back({with_filament_name ? make_filament_label(i) : make_physical_label(i, use_full_item_name), int(i), int(i - 1)});
     }
 
-    for (unsigned int virtual_id : virtual_ids) {
-        entries.push_back({make_virtual_label(virtual_id, use_full_item_name), int(virtual_id)});
+    for (size_t k = 0; k < virtual_ids.size(); ++k) {
+        entries.push_back({make_virtual_label(virtual_ids[k], use_full_item_name), int(virtual_ids[k]), int(num_physical + k)});
     }
 
     return entries;
+}
+
+bool is_extruder_hidden_in_pickers(int extruder_id)
+{
+    Plater* plater = wxGetApp().plater();
+    return plater != nullptr && extruder_id >= 1 && extruder_id <= wxGetApp().extruders_edited_cnt() &&
+           plater->sidebar().is_filament_list_hidden(size_t(extruder_id - 1));
+}
+
+void drop_hidden_extruders(std::vector<ExtruderDropdownEntry>& entries, int keep_extruder_id)
+{
+    entries.erase(std::remove_if(entries.begin(), entries.end(),
+                                 [keep_extruder_id](const ExtruderDropdownEntry& e) {
+                                     return e.extruder_id != keep_extruder_id && is_extruder_hidden_in_pickers(e.extruder_id);
+                                 }),
+                  entries.end());
 }
 
 size_t

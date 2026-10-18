@@ -1099,11 +1099,19 @@ void ObjectList::extruder_editing()
     wxSize size = rect.GetSize();
     size.SetWidth(size.GetWidth() + 8);
 
-    apply_extruder_selector(&m_extruder_editor, this, L("default"), pos, size);
+    const int current = m_objects_model->GetExtruderNumber(item);
+    const std::vector<ExtruderDropdownEntry> listed = apply_extruder_selector(&m_extruder_editor, this, L("default"), pos, size, false, current);
 
     // The selector's items, labeled as the cell shows them: by the extruder alone, without its filament.
-    const std::vector<ExtruderDropdownEntry> entries = build_extruder_dropdown(wxGetApp().plater()->model(), true, false);
-    m_extruder_editor->SetSelection(int(find_extruder_dropdown_position(m_objects_model->GetExtruderNumber(item), entries)));
+    std::vector<ExtruderDropdownEntry> entries = build_extruder_dropdown(wxGetApp().plater()->model(), true, false);
+    entries.erase(std::remove_if(entries.begin(), entries.end(),
+                                 [&listed](const ExtruderDropdownEntry& e) {
+                                     return e.extruder_id != 0 && std::none_of(listed.begin(), listed.end(), [&e](const ExtruderDropdownEntry& l) {
+                                                return l.extruder_id == e.extruder_id;
+                                            });
+                                 }),
+                  entries.end());
+    m_extruder_editor->SetSelection(int(find_extruder_dropdown_position(current, entries)));
     m_extruder_editor->Show();
 
     auto set_extruder = [this, entries]()

@@ -845,6 +845,28 @@ void Sidebar::set_hidden_filament_extruders(std::vector<int> hidden)
     m_scrolled_panel->Refresh();
 }
 
+std::vector<bool> Sidebar::hidden_filament_lists() const
+{
+    const size_t n = m_combos_filament.size();
+    std::vector<bool> hidden(n, false);
+    // With SLA the whole filament area is hidden and shown again by show_preset_comboboxes()
+    if (!wxGetApp().preset_bundle || wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptFFF)
+        return hidden;
+    for (const int e : m_hidden_filament_extruders)
+        if (e >= 0 && size_t(e) < n)
+            hidden[e] = true;
+    // Never hide every list
+    if (std::all_of(hidden.begin(), hidden.end(), [](bool h) { return h; }))
+        hidden.assign(n, false);
+    return hidden;
+}
+
+bool Sidebar::is_filament_list_hidden(size_t extruder_idx) const
+{
+    const std::vector<bool> hidden = hidden_filament_lists();
+    return extruder_idx < hidden.size() && hidden[extruder_idx];
+}
+
 void Sidebar::apply_filament_visibility()
 {
     if (!m_filaments_sizer)
@@ -852,15 +874,8 @@ void Sidebar::apply_filament_visibility()
     const bool fff = wxGetApp().preset_bundle &&
                      wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF;
     const size_t n = m_combos_filament.size();
-    std::vector<bool> hidden(n, false);
-    for (const int e : m_hidden_filament_extruders)
-        if (e >= 0 && size_t(e) < n)
-            hidden[e] = true;
-    // Never hide every list
-    if (std::all_of(hidden.begin(), hidden.end(), [](bool h) { return h; }))
-        hidden.assign(n, false);
-    // With SLA the whole filament area is hidden and shown again by show_preset_comboboxes()
-    const bool filter = fff && std::any_of(hidden.begin(), hidden.end(), [](bool h) { return h; });
+    const std::vector<bool> hidden = hidden_filament_lists();
+    const bool filter = std::any_of(hidden.begin(), hidden.end(), [](bool h) { return h; });
 
     // Showing the filament area shows every window in it, the numbers included: always set them
     for (size_t i = 0; i < m_filament_numbers.size(); ++i)

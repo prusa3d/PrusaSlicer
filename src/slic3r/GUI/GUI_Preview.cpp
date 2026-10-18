@@ -457,6 +457,11 @@ void Preview::create_sliders()
             return get_filament_color_strings();
         });
 
+        // Like the sidebar, the extruder menus leave out the tools the last filament sync found empty.
+        m_layers_slider->set_callback_on_is_extruder_hidden([](int extruder)   -> bool {
+            return is_extruder_hidden_in_pickers(extruder);
+        });
+
         m_layers_slider->set_callback_on_get_print([]()                         -> const Print& {
             return GUI::wxGetApp().plater()->active_fff_print();
         });

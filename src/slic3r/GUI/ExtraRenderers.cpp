@@ -346,33 +346,26 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
         return c_editor;
     }
 
-    const std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
+    wxString cell_text = data.GetText();
+    if (cell_text.StartsWith("[V] ")) {
+        cell_text = cell_text.Mid(4);
+    }
+    const int target_id = atoi(cell_text.utf8_str());
+
+    std::vector<Slic3r::GUI::ExtruderDropdownEntry> entries =
         Slic3r::GUI::build_extruder_dropdown(plater->model(), true, false, true);
+    Slic3r::GUI::drop_hidden_extruders(entries, target_id);
 
     const int def_id = get_default_extruder_idx ? get_default_extruder_idx() : 0;
-    for (size_t i = 0; i < entries.size(); ++i) {
-        wxBitmapBundle* bmp = nullptr;
-        if (i == 0) {
-            bmp = (def_id < 0 || size_t(def_id) >= icons.size()) ? nullptr : icons[def_id];
-        } else {
-            const size_t icon_idx = i - 1;
-            bmp                   = (icon_idx < icons.size()) ? icons[icon_idx] : nullptr;
-        }
+    for (const Slic3r::GUI::ExtruderDropdownEntry& entry : entries) {
+        const int       icon_idx = entry.extruder_id == 0 ? def_id : entry.color_idx;
+        wxBitmapBundle* bmp      = icon_idx >= 0 && size_t(icon_idx) < icons.size() ? icons[icon_idx] : nullptr;
 
-        c_editor->Append(entries[i].label, bmp ? *bmp : wxNullBitmap);
-        m_editor_cell_texts.push_back(Slic3r::GUI::format_extruder_label(entries[i].extruder_id, plater->model()));
+        c_editor->Append(entry.label, bmp ? *bmp : wxNullBitmap);
+        m_editor_cell_texts.push_back(Slic3r::GUI::format_extruder_label(entry.extruder_id, plater->model()));
     }
 
-    {
-        wxString cell_text = data.GetText();
-        if (cell_text.StartsWith("[V] ")) {
-            cell_text = cell_text.Mid(4);
-        }
-
-        const int target_id = atoi(cell_text.utf8_str());
-        const size_t pos    = Slic3r::GUI::find_extruder_dropdown_position(target_id, entries);
-        c_editor->SetSelection(int(pos));
-    }
+    c_editor->SetSelection(int(Slic3r::GUI::find_extruder_dropdown_position(target_id, entries)));
 
     
 #ifdef __linux__

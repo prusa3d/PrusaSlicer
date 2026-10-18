@@ -704,6 +704,8 @@ bool DSForLayers::render_multi_extruders_menu(bool switch_current_code/* = false
                 std::array<int, 2> active_extruders = m_ticks.get_active_extruders_for_tick(tick, m_mode);
                 for (int i = 1; i <= extruders_cnt; i++) {
                     const bool is_active_extruder = i == active_extruders[0] || i == active_extruders[1];
+                    if (!is_active_extruder && m_cb_is_extruder_hidden && m_cb_is_extruder_hidden(i))
+                        continue;
                     std::string item_name = get_extruder_label(i);
                     if (is_active_extruder)
                         item_name += " (" + _u8L("active") + ")";
@@ -726,6 +728,8 @@ bool DSForLayers::render_multi_extruders_menu(bool switch_current_code/* = false
             for (int i = 1; i <= extruders_cnt; i++) {
                 const bool is_used_extruder = used_extruders_for_tick.empty() ? true : // #ys_FIXME till used_extruders_for_tick doesn't filled correct for mmMultiExtruder
                     used_extruders_for_tick.find(i) != used_extruders_for_tick.end();
+                if (m_cb_is_extruder_hidden && m_cb_is_extruder_hidden(i) && used_extruders_for_tick.find(i) == used_extruders_for_tick.end())
+                    continue;
                 std::string item_name = get_extruder_label(i);
                 if (is_used_extruder)
                     item_name += " (" + _u8L("used") + ")";

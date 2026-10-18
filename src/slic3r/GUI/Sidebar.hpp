@@ -116,6 +116,8 @@ class Sidebar : public wxPanel
     void remove_unused_filament_combos(const size_t current_extruder_count);
     wxStaticText* make_filament_number(int extr_idx);
     void apply_filament_visibility();
+    // One entry per filament list: whether it is hidden. All false while none is.
+    std::vector<bool> hidden_filament_lists() const;
     void update_all_preset_comboboxes();
     void update_reslice_btn_tooltip();
     void init_workflow_combo(int margin_5);
@@ -168,6 +170,8 @@ public:
     void update_filament_sync_button();
     // Hides the filament lists of these extruders (0-based), and numbers the others; empty shows all.
     void set_hidden_filament_extruders(std::vector<int> hidden);
+    // Whether the filament list of this extruder (0-based) is hidden.
+    bool is_filament_list_hidden(size_t extruder_idx) const;
 
     void update_mode();
     void update_ui_from_settings();
