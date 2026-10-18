@@ -33,6 +33,7 @@ function execute(opts)
     bed:print_presets():set("first_layer_height", layer_height)
     bed:print_presets():set("layer_height", layer_height)
     bed:material_presets(0):set("filament_max_volumetric_speed", 0)
+    bed:material_presets(0):set("slowdown_below_layer_time", 0)
 
     local rounded_step_depth = math.floor(opts.step_depth / layer_height) * layer_height
     local depth = rounded_step_depth * opts.steps
@@ -47,12 +48,10 @@ function execute(opts)
     bed:print_presets():set("brim_type", opts.enable_brim and "outer_only" or "none")
     bed:print_presets():set("brim_width", opts.enable_brim and 5 or 0)
 
-    local min_speed = flow_rate_to_speed(opts.min_flow_rate, extrusion_width, layer_height)
-    local max_speed = flow_rate_to_speed(opts.max_flow_rate, extrusion_width, layer_height)
-
     for i = 1, opts.steps do
         local f = (i - 1) / (opts.steps - 1)
-        local speed = min_speed * (1 - f) + max_speed * f
+        local current_flow_rate = opts.min_flow_rate * (1 - f ) + opts.max_flow_rate * f
+        local speed = flow_rate_to_speed(current_flow_rate, extrusion_width, layer_height)
         table.insert(other_volumes, {
             mesh = api.make_cube(bb.max_x - bb.min_x, bb.max_y - bb.min_y,  mod_depth),
             translate = {
@@ -66,6 +65,8 @@ function execute(opts)
             }
         })
         if opts.enable_ticks and i > 1 then
+            local tick_extrusion_width = extrusion_width * 1.5
+            local tick_speed = flow_rate_to_speed(current_flow_rate, tick_extrusion_width, layer_height)
             table.insert(other_volumes, {
                 mesh = api.make_cube(
                     bb.max_x - bb.min_x,
@@ -79,7 +80,9 @@ function execute(opts)
                 },
                 type = VolumeType.Modifier,
                 params = {
-                    external_perimeter_extrusion_width = extrusion_width *  1.5
+                    external_perimeter_extrusion_width = tick_extrusion_width,
+                    perimeter_speed = tick_speed,
+                    external_perimeter_speed = tick_speed
                 }
             })
 --             for k, v in pairs(other_volumes[#other_volumes].translate) do
