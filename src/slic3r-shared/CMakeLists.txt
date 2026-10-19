@@ -1693,6 +1693,7 @@ if(SLIC3R_BUILD_TESTS)
 
             test/Slic3r/Biz/ArrangeInteractorTests.cpp
             test/Slic3r/Biz/ProjectSettingsInteractorTests.cpp
+            test/Slic3r/Biz/VolumeReloadLogicTests.cpp
 
             test/Slic3r/Biz/PresetUpdater/PresetUpdaterStageTests.cpp
             test/Slic3r/Biz/PresetUpdater/PresetUpdaterActionTests.cpp

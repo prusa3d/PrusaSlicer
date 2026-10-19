@@ -36,6 +36,8 @@
 #include <algorithm>
 #include <fmt/format.h>
 
+using Slic3r::Biz::Algorithms::ModelObject::add_volume;
+
 namespace Slic3r::Biz::FileLoadingLogic {
 
 static constexpr const double volume_threshold_inches = 9.0; // 9 = 3*3*3;
@@ -48,7 +50,9 @@ struct ReturnData
     boost::filesystem::path file_path;
     std::optional<Domain::TriangleMesh> mesh;
     std::optional<Domain::Model> model;
-    bool geometry_only_3mf = false;
+    bool geometry_only_3mf        = false;
+    bool is_converted_from_inches = false;
+    bool is_converted_from_meters = false;
 };
 
 struct FileLoadError
@@ -193,13 +197,14 @@ struct StepLoadingMultiple
 };
 
 static void process_mesh(
-    TriangleMesh& mesh,
-    const std::string& input_file,
+    ReturnData& file_data,
     Answer* answer_convert_from_meters,
     Answer* answer_convert_from_imperial_units,
     IMessageDialogProvider* dialog_provider
 )
 {
+    TriangleMesh& mesh             = file_data.mesh.value();
+    const std::string& input_file  = file_data.file_name;
     const TriangleMeshStats& stats = mesh.stats();
 
     if (looks_like_saved_in_meters(stats)) {
@@ -226,10 +231,10 @@ static void process_mesh(
                 );
             }
         }
+
         if (answer == Answer::Yes) {
             convert_from_meters(mesh);
-            // TODO: How to put this information?
-            // volume->source.is_converted_from_meters = true;
+            file_data.is_converted_from_meters = true;
         }
     } else if (looks_like_imperial_units(stats)) {
         Answer answer = answer_convert_from_imperial_units ? *answer_convert_from_imperial_units :
@@ -258,10 +263,10 @@ static void process_mesh(
                 );
             }
         }
+
         if (answer == Answer::Yes) {
             convert_from_imperial_units(mesh);
-            // TODO: How to put this information?
-            // volume->source.is_converted_from_inches = true;
+            file_data.is_converted_from_inches = true;
         }
     }
 }
@@ -860,8 +865,7 @@ static tl::expected<ReturnData, FileLoadError> read_and_process_file(
             ));
         }
         process_mesh(
-            mesh,
-            file_name,
+            data.value(),
             answer_convert_from_meters,
             answer_convert_from_imperial_units,
             dialog_provider
@@ -929,7 +933,10 @@ static std::vector<ReturnData> import_files(
                 ModelObject* new_object = extra_model->add_object();
                 new_object->name        = path.filename().string();
                 new_object->input_file  = path.string();
-                Algorithms::ModelObject::add_volume(new_object, data.value().mesh.value());
+
+                ModelVolume* new_volume = add_volume(new_object, data.value().mesh.value());
+                new_volume->source.is_converted_from_inches = data.value().is_converted_from_inches;
+                new_volume->source.is_converted_from_meters = data.value().is_converted_from_meters;
             } else {
                 ret.emplace_back(data.value());
             }
@@ -966,10 +973,14 @@ static std::vector<ReturnData> import_files(
         if (!convert) {
             // Otherwise we need to return the separate meshes
             for (const ModelObject* object : extra_model->objects) {
+                const ModelVolume& volume = *object->volumes.front();
+
                 ReturnData data;
-                data.file_name = object->name;
-                data.file_path = object->input_file;
-                data.mesh      = object->volumes.front()->mesh();
+                data.file_name                = object->name;
+                data.file_path                = object->input_file;
+                data.mesh                     = volume.mesh();
+                data.is_converted_from_inches = volume.source.is_converted_from_inches;
+                data.is_converted_from_meters = volume.source.is_converted_from_meters;
                 ret.emplace_back(data);
             }
         }
@@ -1096,13 +1107,19 @@ Domain::Project load_file_as_project(
 }
 
 namespace {
-std::optional<ModelVolume::Source> volume_source_from_path(const boost::filesystem::path& file_path)
+std::optional<ModelVolume::Source> volume_source_from_file_data(const ReturnData& file_data)
 {
-    if (file_path.empty()) {
+    if (file_data.file_path.empty()) {
         return std::nullopt;
     }
 
-    return ModelVolume::Source{.input_file = file_path.string(), .object_idx = 0, .volume_idx = 0};
+    return ModelVolume::Source{
+        .input_file               = file_data.file_path.string(),
+        .object_idx               = 0,
+        .volume_idx               = 0,
+        .is_converted_from_inches = file_data.is_converted_from_inches,
+        .is_converted_from_meters = file_data.is_converted_from_meters
+    };
 }
 } // namespace
 
@@ -1129,7 +1146,7 @@ ImportToSceneResult import_files_and_add_to_scene(
             new_instances = scene_interactor.new_object_from_mesh(
                 std::move(file_data.mesh.value()),
                 file_data.file_name,
-                volume_source_from_path(file_data.file_path)
+                volume_source_from_file_data(file_data)
             );
         } else if (file_data.model) {
             Domain::Model& model = file_data.model.value();
@@ -1181,7 +1198,7 @@ void import_volumes_into_selected_object(
                 volume_type,
                 file_data.file_name,
                 SquareMatrix4d::Identity(),
-                volume_source_from_path(file_data.file_path)
+                volume_source_from_file_data(file_data)
             );
         } else if (file_data.model) {
             Domain::Model& model = file_data.model.value();
@@ -1233,13 +1250,22 @@ read_model_from_file(const std::string& input_file, IMessageDialogProvider* dial
         ModelVolume* new_volume =
             Algorithms::ModelObject::add_volume(new_object, processed_file.value().mesh.value());
         new_volume->name   = input_file_path.filename().string();
-        new_volume->source = volume_source_from_path(input_file_path).value();
+        new_volume->source = volume_source_from_file_data(processed_file.value()).value();
         model.add_default_instances();
     } else {
         return tl::make_unexpected(_u8L("There is no data for either the mesh or the model."));
     }
 
     return model;
+}
+
+void apply_unit_conversion_from_source(TriangleMesh& mesh, const ModelVolume::Source& source)
+{
+    if (source.is_converted_from_meters) {
+        convert_from_meters(mesh);
+    } else if (source.is_converted_from_inches) {
+        convert_from_imperial_units(mesh);
+    }
 }
 
 const std::vector<std::string>& get_import_extensions()

@@ -82,6 +82,14 @@ tl::expected<Domain::Model, std::string>
 read_model_from_file(const std::string& input_file, IMessageDialogProvider* dialog_provider);
 
 /**
+ * @brief Scales the mesh to millimeters the same way as during the original import of its source.
+ */
+void apply_unit_conversion_from_source(
+    Domain::TriangleMesh& mesh,
+    const Domain::ModelVolume::Source& source
+);
+
+/**
  * Returns all file extensions that the slicer can import (projects and models).
  *
  * Extensions are lowercase and dot-prefixed (e.g. ".stl", ".3mf").

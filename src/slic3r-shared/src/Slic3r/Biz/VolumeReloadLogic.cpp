@@ -27,6 +27,7 @@ using Slic3r::Domain::ModelObject;
 using Slic3r::Domain::ModelVolume;
 using Slic3r::Domain::Project;
 using Slic3r::Domain::SquareMatrix4d;
+using Slic3r::Domain::TriangleMesh;
 
 namespace Slic3r::Biz::VolumeReloadLogic {
 
@@ -56,15 +57,20 @@ tl::expected<void, std::string> replace_volume_from_file(
         return tl::make_unexpected(_u8L("Volume to replace was not found"));
     }
 
-    const ModelVolume& new_volume  = *loaded_model->objects.front()->volumes.front();
-    ModelVolume::Source new_source = new_volume.source;
-    new_source.input_file          = new_file_path.string();
-    new_source.object_idx          = 0;
-    new_source.volume_idx          = 0;
+    const ModelVolume& new_volume = *loaded_model->objects.front()->volumes.front();
+    TriangleMesh new_mesh         = new_volume.mesh();
+    FileLoadingLogic::apply_unit_conversion_from_source(new_mesh, old_volume->source);
+
+    ModelVolume::Source new_source      = new_volume.source;
+    new_source.input_file               = new_file_path.string();
+    new_source.object_idx               = 0;
+    new_source.volume_idx               = 0;
+    new_source.is_converted_from_inches = old_volume->source.is_converted_from_inches;
+    new_source.is_converted_from_meters = old_volume->source.is_converted_from_meters;
 
     SceneInteractor::VolumeMeshReplacement replacement = {
         .element            = volume_element,
-        .mesh               = new_volume.mesh(),
+        .mesh               = std::move(new_mesh),
         .new_source         = std::move(new_source),
         .new_transformation = old_volume->get_matrix()
             * Domain::translation_transform(
@@ -380,13 +386,18 @@ ReloadFromDiskResult reload_selection(
                 continue;
             }
 
-            ModelVolume::Source new_source = new_volume->source;
-            new_source.object_idx          = old_source.object_idx;
-            new_source.volume_idx          = old_source.volume_idx;
+            TriangleMesh new_mesh = new_volume->mesh();
+            FileLoadingLogic::apply_unit_conversion_from_source(new_mesh, old_source);
+
+            ModelVolume::Source new_source      = new_volume->source;
+            new_source.object_idx               = old_source.object_idx;
+            new_source.volume_idx               = old_source.volume_idx;
+            new_source.is_converted_from_inches = old_source.is_converted_from_inches;
+            new_source.is_converted_from_meters = old_source.is_converted_from_meters;
 
             SceneInteractor::VolumeMeshReplacement replacement = {
                 .element            = reloadable_volume.element,
-                .mesh               = new_volume->mesh(),
+                .mesh               = std::move(new_mesh),
                 .new_source         = std::move(new_source),
                 .new_transformation = old_volume->get_matrix()
                     * old_source.transform.get_matrix_no_offset()
