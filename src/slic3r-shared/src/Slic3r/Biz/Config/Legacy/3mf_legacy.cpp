@@ -22,6 +22,7 @@
 #include <boost/filesystem.hpp>
 
 #include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/spirit/include/qi_int.hpp>
@@ -568,6 +569,8 @@ namespace Slic3rLegacy {
         void clear_errors() { m_errors.clear(); }
 
     public:
+        const std::vector<std::string>& errors() const { return m_errors; }
+
         void log_errors()
         {
             for (const std::string& error : m_errors)
@@ -4808,7 +4811,8 @@ bool load_3mf_legacy(
     boost::optional<Semver> &prusaslicer_generator_version,
     Slic3r::Domain::WipeTowersOnBeds& wipe_towers,
     Slic3r::Domain::CustomGCodesOnBeds& custom_gcodes,
-    VirtualExtrudersConfig& out_virtual_extruders_config
+    VirtualExtrudersConfig& out_virtual_extruders_config,
+    std::string* error_message
 )
 {
     // This is set here for the legacy loading. It used to be an argument.
@@ -4822,6 +4826,8 @@ bool load_3mf_legacy(
     Slic3rLegacy::_3MF_Importer         importer;
     bool res = importer.load_model_from_file(path, *model, config, preset_metadata, config_substitutions, check_version, wipe_towers, custom_gcodes, out_virtual_extruders_config);
     importer.log_errors();
+    if (!res && error_message != nullptr)
+        *error_message = boost::algorithm::join(importer.errors(), "\n");
     prusaslicer_generator_version = importer.prusaslicer_generator_version();
 
     return res;

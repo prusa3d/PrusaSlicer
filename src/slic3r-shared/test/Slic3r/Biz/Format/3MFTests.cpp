@@ -1,6 +1,7 @@
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleSelector.hpp"
 #include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
+#include "Slic3r/Biz/FileLoadingLogic.hpp"
 #include "Slic3r/Biz/Format/3mf.hpp"
 #include "Slic3r/Biz/Slicing/TestUtils.hpp"
 #include "Slic3r/Domain/Model.hpp"
@@ -10,6 +11,7 @@
 
 #include <boost/filesystem.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <optional>
 #include <sstream>
@@ -456,4 +458,120 @@ TEST_CASE("3MF without PrusaSlicer metadata is not handed over to the legacy loa
     fs::remove_all(temp_dir, cleanup_error);
 
     CHECK_FALSE(fatal_issue.has_value());
+}
+
+namespace {
+
+// Writes a 3mf whose root model file is not well-formed XML: an unescaped '&' in the "Title"
+// metadata, as PrusaSlicer 2.3.0-rc1 wrote object names (#5577). The "Application" metadata
+// is written either before or after the broken line.
+void write_3mf_with_invalid_xml(const fs::path& file_path, bool application_first)
+{
+    const std::string content_types =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n"
+        "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n"
+        "<Default Extension=\"model\" ContentType=\"application/vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n"
+        "</Types>\n";
+    const std::string relationships =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n"
+        "<Relationship Target=\"/3D/3dmodel.model\" Id=\"rel-1\" "
+        "Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel\"/>\n"
+        "</Relationships>\n";
+    const std::string application = "<metadata name=\"Application\">PrusaSlicer-2.3.0-rc1+win64</metadata>\n";
+    const std::string title = "<metadata name=\"Title\">Michael & Leah</metadata>\n";
+    const std::string model =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<model unit=\"millimeter\" xml:lang=\"en-US\" "
+        "xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\" "
+        "xmlns:slic3rpe=\"http://schemas.slic3r.org/3mf/2017/06\">\n" +
+        (application_first ? application + title : title + application) +
+        "<resources>\n</resources>\n<build>\n</build>\n</model>\n";
+
+    Algorithms::ZipArchive archive = Algorithms::ZipArchive::open(file_path.string(), Algorithms::ZipArchive::Mode::Write);
+    REQUIRE(archive.is_open());
+    REQUIRE(archive.add_entry("[Content_Types].xml", content_types.data(), content_types.size()));
+    REQUIRE(archive.add_entry("_rels/.rels", relationships.data(), relationships.size()));
+    REQUIRE(archive.add_entry("3D/3dmodel.model", model.data(), model.size()));
+    REQUIRE(archive.close());
+}
+
+} // namespace
+
+TEST_CASE("3MF with invalid XML in the root model reports the parse error", "[3mf]")
+{
+    // The parse error used to be dropped, the file was loaded as an empty generic 3mf
+    // and the user only learned that the project is empty.
+    const fs::path temp_dir = fs::temp_directory_path() / fs::unique_path("slic3r-3mf-invalid-xml-%%%%-%%%%");
+    fs::create_directories(temp_dir);
+    const fs::path file_path = temp_dir / "invalid_xml.3mf";
+    write_3mf_with_invalid_xml(file_path, false);
+
+    std::optional<Read3mfIssue> fatal_issue;
+    try {
+        load_3mf(file_path.string());
+    } catch (const Loaded3MFException& e) {
+        fatal_issue = e.issue;
+    }
+    const tl::expected<Domain::Model, std::string> imported =
+        FileLoadingLogic::read_model_from_file(file_path.string(), nullptr);
+
+    boost::system::error_code cleanup_error;
+    fs::remove_all(temp_dir, cleanup_error);
+
+    REQUIRE(fatal_issue.has_value());
+    CHECK(fatal_issue->type == Read3mfIssueType::expat_parse_error);
+    CHECK_THAT(fatal_issue->msg, Catch::Matchers::ContainsSubstring("3D/3dmodel.model"));
+    CHECK_THAT(fatal_issue->msg, Catch::Matchers::ContainsSubstring("at line 3"));
+
+    REQUIRE_FALSE(imported.has_value());
+    CHECK_THAT(imported.error(), Catch::Matchers::ContainsSubstring("at line 3"));
+}
+
+TEST_CASE("3MF failing in the legacy loader reports the reason", "[3mf]")
+{
+    // The new loader hands the file over to the legacy one once it reads the "Application"
+    // metadata. The parse error found by the legacy loader used to be only logged.
+    const fs::path temp_dir = fs::temp_directory_path() / fs::unique_path("slic3r-3mf-invalid-xml-%%%%-%%%%");
+    fs::create_directories(temp_dir);
+    const fs::path file_path = temp_dir / "invalid_xml_legacy.3mf";
+    write_3mf_with_invalid_xml(file_path, true);
+
+    const std::optional<Read3mfIssueType> fatal_issue = load_3mf_fatal_issue(file_path);
+
+    Domain::Model legacy_model;
+    Domain::ConfigPack cfg;
+    Biz::LegacyPresetMetadata preset_metadata;
+    boost::optional<Slic3r::Semver> generator_version;
+    Domain::WipeTowersOnBeds wipe_towers;
+    Domain::CustomGCodesOnBeds custom_gcodes;
+    Biz::VirtualExtrudersConfig virtual_extruders_config;
+    std::string legacy_error;
+    const bool legacy_loaded_ok = Slic3rLegacy::load_3mf_legacy(
+        file_path.string().c_str(),
+        cfg,
+        preset_metadata,
+        &legacy_model,
+        false,
+        generator_version,
+        wipe_towers,
+        custom_gcodes,
+        virtual_extruders_config,
+        &legacy_error
+    );
+    const tl::expected<Domain::Model, std::string> imported =
+        FileLoadingLogic::read_model_from_file(file_path.string(), nullptr);
+
+    boost::system::error_code cleanup_error;
+    fs::remove_all(temp_dir, cleanup_error);
+
+    REQUIRE(fatal_issue.has_value());
+    CHECK(*fatal_issue == Read3mfIssueType::legacy_loader_required);
+
+    CHECK_FALSE(legacy_loaded_ok);
+    CHECK_THAT(legacy_error, Catch::Matchers::ContainsSubstring("3D/3dmodel.model' at line 4"));
+
+    REQUIRE_FALSE(imported.has_value());
+    CHECK_THAT(imported.error(), Catch::Matchers::ContainsSubstring("at line 4"));
 }

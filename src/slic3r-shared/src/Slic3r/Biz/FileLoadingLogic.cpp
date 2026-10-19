@@ -600,6 +600,7 @@ static Loaded3MF load_legacy_project(const std::string& file_path, OptionalPrese
 
     auto& config_pack = loaded_3mf.config_containers_data.back().config_pack;
     LegacyPresetMetadata hw_printer;
+    std::string error_message;
     if (!Slic3rLegacy::load_3mf_legacy(
             file_path.c_str(),
             config_pack,
@@ -609,11 +610,13 @@ static Loaded3MF load_legacy_project(const std::string& file_path, OptionalPrese
             loaded_3mf.version,
             loaded_3mf.config_containers_data.back().wipe_towers,
             loaded_3mf.config_containers_data.back().custom_gcodes,
-            loaded_3mf.config_containers_data.back().virtual_extruders_config
+            loaded_3mf.config_containers_data.back().virtual_extruders_config,
+            &error_message
         ))
-        throw Loaded3MFException(
-            Read3mfIssue(Read3mfIssueType::legacy_loader_failed, "Loading of legacy 3MF failed.")
-        );
+        throw Loaded3MFException(Read3mfIssue(
+            Read3mfIssueType::legacy_loader_failed,
+            error_message.empty() ? _u8L("Loading of legacy 3MF failed.") : error_message
+        ));
 
     // The old slicer did not store HW configuration in the current sense. We must heuristically
     // construct a meaningful SelectedPresetMetadata here by doing something like

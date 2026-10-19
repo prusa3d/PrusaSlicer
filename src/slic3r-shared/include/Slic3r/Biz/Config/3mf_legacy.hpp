@@ -11,6 +11,7 @@
 #include "Slic3r/Semver.hpp"
 #include <optional>
 #include <map>
+#include <string>
 
 namespace Slic3r {
 namespace Biz {
@@ -62,6 +63,7 @@ namespace Slic3rLegacy {
     extern std::pair<bool, std::optional<Slic3r::Semver>> is_project_3mf(const std::string&);
 
     // Load the content of a 3mf file into the given model and preset bundle.
+    // On failure, the errors reported by the importer are stored into error_message (if not null).
     extern bool load_3mf_legacy(
         const char* path,
         Slic3r::Domain::ConfigPack& config,
@@ -71,7 +73,8 @@ namespace Slic3rLegacy {
         boost::optional<Slic3r::Semver> &prusaslicer_generator_version,
         Slic3r::Domain::WipeTowersOnBeds& wipe_towers,
         Slic3r::Domain::CustomGCodesOnBeds& custom_gcodes,
-        Slic3r::Biz::VirtualExtrudersConfig& out_virtual_extruders_config
+        Slic3r::Biz::VirtualExtrudersConfig& out_virtual_extruders_config,
+        std::string* error_message = nullptr
     );
 
     // Save the given model and the config data contained in the given Print into a 3mf file.

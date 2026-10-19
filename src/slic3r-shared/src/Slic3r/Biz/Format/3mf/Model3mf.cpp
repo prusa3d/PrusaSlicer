@@ -9,6 +9,7 @@
 #include <boost/uuid/uuid_io.hpp> // uuid to stream
 #include <boost/algorithm/string.hpp>
 #include <expat.h>
+#include <fmt/format.h>
 #include "Slic3r/Biz/Format/Metadata.hpp"
 #include "Relations.hpp"
 #include "Slic3r/Domain/Constants.hpp"
@@ -16,6 +17,7 @@
 #include "Slic3r/Biz/Algorithms/TriangleMesh.hpp"
 #include "Slic3r/Biz/Algorithms/Geometry/Geometry.hpp"
 #include "Slic3r/Biz/Format/ResultLoad3mf.hpp"
+#include "Slic3r/Biz/I18N/I18N.hpp"
 #include "Slic3r/Biz/Utils/XmlEscape.hpp"
 #include "Slic3r/Biz/Format/3mf/LegacyPaintingCompat.hpp"
 
@@ -1054,8 +1056,11 @@ tl::expected<LoadedModelFile, Read3mfIssue> read_modelfile(ZipArchive &archive, 
             std::string error_code_str = std::to_string(static_cast<int>(error_code));
             std::string error_message = XML_ErrorString(error_code);
             return tl::make_unexpected(Read3mfIssue(
-                Read3mfIssueType::expat_parse_error, std::nullopt, error_message + " (" + error_code_str + ")", line_number)
-            );
+                Read3mfIssueType::expat_parse_error,
+                fmt::format("{} at line {}", error_message, line_number),
+                error_message + " (" + error_code_str + ")",
+                line_number
+            ));
         }
     } while (!done);
 
@@ -1131,9 +1136,15 @@ LoadedModel Slic3r::read_model3mf(ZipArchive &archive, const char * root_file_pa
 
     tl::expected<LoadedModelFile, Read3mfIssue> root_model = read_modelfile(archive, root_model_file_index, collected_issues);
 
+    if (!root_model) {
+        // Without the root model there is nothing to load (e.g. its XML is not well-formed).
+        Read3mfIssue issue = root_model.error();
+        issue.msg = fmt::vformat(Biz::_u8L("Unable to read '{}': {}."), fmt::make_format_args(root_file_path, issue.msg));
+        throw Slic3r::Loaded3MFException(issue);
+    }
+
     LoadedModel result;
-    if (root_model)
-        result.model = std::move(*root_model.value().model);
+    result.model = std::move(root_model.value().model);
     result.used_files = std::vector<bool>(archive.get_num_files(), {false});
     result.used_files[root_model_file_index] = true;
 
