@@ -69,10 +69,16 @@ public:
     void on_model_reloaded(Domain::SelectionId project_id) override;
     void on_element_renamed(Domain::SelectionId project_id, const Domain::ElementRef& id) override;
 
-    void
-    on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes) override;
-    void
-    on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes) override;
+    void on_volume_added(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes
+    ) override;
+    void on_volume_removed(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes
+    ) override;
     void on_volume_transformed(
         Domain::SelectionId project_id,
         const Domain::ElementRefs& elements,
@@ -81,7 +87,8 @@ public:
     ) override;
     void on_volume_type_changed(
         Domain::SelectionId project_id,
-        const Domain::ElementRefs& volumes
+        const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes
     ) override;
     void on_volume_reordered(
         Domain::SelectionId project_id,
@@ -99,11 +106,21 @@ public:
 private:
     const Domain::ModelInstanceList* get_bed_model_instances();
 
-    void update_from_changes(
+    /** @return true if this list was updated, i.e. it is affected by @p bed_tracking_changes. */
+    bool update_from_changes(
         Domain::SelectionId project_id,
         const Biz::BedTrackingChanges& bed_tracking_changes
     );
     void update_volumes(Domain::SelectionId project_id, size_t object_id);
+    /**
+     * @brief Updates the objects of this list if their bed placement was changed by changed
+     * @p volumes, otherwise only the volumes of their object.
+     */
+    void update_volumes_and_bed_placement(
+        Domain::SelectionId project_id,
+        const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes
+    );
 
     std::vector<Object> m_items;
     std::unordered_map<size_t, Biz::UnsharedPointer<VolumeObservableList>> m_volumes_lists;

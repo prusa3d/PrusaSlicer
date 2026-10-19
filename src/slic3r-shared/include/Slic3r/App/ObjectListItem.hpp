@@ -59,8 +59,10 @@ public:
 
 private:
     void update_visibility();
+    void on_inserted(const Biz::ObjectList::Object& data, size_t index) override;
     void on_updated(const Biz::IndexRange& index_range) override;
     void on_removed(const Biz::IndexRange& index_range) override;
+    void on_reset() override;
 
     using ObjectListViewFactory = Yoga::ViewFactory<
         ObjectItem,

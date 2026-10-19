@@ -1388,7 +1388,8 @@ void PlaterScenePresenter::on_instance_transformed(Domain::SelectionId project_i
     sinking_contours.set_selection(elements);
 }
 
-void PlaterScenePresenter::on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+void PlaterScenePresenter::on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& /*bed_tracking_changes*/)
 {
     // find all instances of given object id and insert the volume node as child
     DEBUG_ASSERT(volumes.size() > 0);
@@ -1423,7 +1424,8 @@ void PlaterScenePresenter::on_volume_added(Domain::SelectionId project_id, const
     project_context().sinking_contours().update_scene(m_device, project, scn, volumes);
 }
 
-void PlaterScenePresenter::on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+void PlaterScenePresenter::on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& /*bed_tracking_changes*/)
 {
     remove_children<SceneNodeTag, Domain::ElementRef>(
         scene(),
@@ -1476,7 +1478,11 @@ void PlaterScenePresenter::on_volume_transformed(Domain::SelectionId project_id,
 }
 
 void
-PlaterScenePresenter::on_volume_type_changed(SelectionId project_id, const ElementRefs& volumes)
+PlaterScenePresenter::on_volume_type_changed(
+    SelectionId project_id,
+    const ElementRefs& volumes,
+    const Biz::BedTrackingChanges& /*bed_tracking_changes*/
+)
 {
     this->refresh_volume_nodes(project_id, &volumes);
 }

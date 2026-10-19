@@ -200,28 +200,31 @@ void ObjectObservableList::
     );
 }
 
-void ObjectObservableList::
-    on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+void ObjectObservableList::on_volume_added(
+    Domain::SelectionId project_id,
+    const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& bed_tracking_changes
+)
 {
-    if (!volumes.empty()) {
-        update_volumes(project_id, volumes.front().object_id);
-    }
+    update_volumes_and_bed_placement(project_id, volumes, bed_tracking_changes);
 }
 
-void ObjectObservableList::
-    on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+void ObjectObservableList::on_volume_removed(
+    Domain::SelectionId project_id,
+    const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& bed_tracking_changes
+)
 {
-    if (!volumes.empty()) {
-        update_volumes(project_id, volumes.front().object_id);
-    }
+    update_volumes_and_bed_placement(project_id, volumes, bed_tracking_changes);
 }
 
-void ObjectObservableList::
-    on_volume_type_changed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes)
+void ObjectObservableList::on_volume_type_changed(
+    Domain::SelectionId project_id,
+    const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& bed_tracking_changes
+)
 {
-    if (!volumes.empty()) {
-        update_volumes(project_id, volumes.front().object_id);
-    }
+    update_volumes_and_bed_placement(project_id, volumes, bed_tracking_changes);
 }
 
 void ObjectObservableList::
@@ -397,7 +400,7 @@ void ObjectObservableList::update_data()
     }
 }
 
-void ObjectObservableList::update_from_changes(
+bool ObjectObservableList::update_from_changes(
     Domain::SelectionId project_id,
     const Biz::BedTrackingChanges& bed_tracking_changes
 )
@@ -407,6 +410,20 @@ void ObjectObservableList::update_from_changes(
             || bed_tracking_changes.updated_beds.contains({*m_config_container_id, *m_bed_id})))
     {
         update_data();
+        return true;
+    }
+    return false;
+}
+
+void ObjectObservableList::update_volumes_and_bed_placement(
+    Domain::SelectionId project_id,
+    const Domain::ElementRefs& volumes,
+    const Biz::BedTrackingChanges& bed_tracking_changes
+)
+{
+    // update_data() refreshes the volumes too
+    if (!update_from_changes(project_id, bed_tracking_changes) && !volumes.empty()) {
+        update_volumes(project_id, volumes.front().object_id);
     }
 }
 

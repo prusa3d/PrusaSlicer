@@ -77,12 +77,22 @@ void OutOfBedsItem::update_visibility()
     set_visible(m_objects_list_view->list_item_count() > 0);
 }
 
+void OutOfBedsItem::on_inserted(const Biz::ObjectList::Object& data, size_t index)
+{
+    update_visibility();
+}
+
 void OutOfBedsItem::on_updated(const Biz::IndexRange& index_range)
 {
     update_visibility();
 }
 
 void OutOfBedsItem::on_removed(const Biz::IndexRange& index_range)
+{
+    update_visibility();
+}
+
+void OutOfBedsItem::on_reset()
 {
     update_visibility();
 }

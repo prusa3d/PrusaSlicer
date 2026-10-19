@@ -194,13 +194,16 @@ private:
     void on_instance_transformed(Domain::SelectionId project_id, const Domain::ElementRefs& elements, Biz::Scene::TransformState state,
         const Biz::BedTrackingChanges& bed_tracking_changes) override;
 
-    void on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes) override;
-    void on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes) override;
+    void on_volume_added(Domain::SelectionId project_id, const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes) override;
+    void on_volume_removed(Domain::SelectionId project_id, const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes) override;
     void on_volume_transformed(Domain::SelectionId project_id, const Domain::ElementRefs& elements, Biz::Scene::TransformState state,
         const Biz::BedTrackingChanges& bed_tracking_changes) override;
     void on_volume_type_changed(
         Domain::SelectionId project_id,
-        const Domain::ElementRefs& volumes
+        const Domain::ElementRefs& volumes,
+        const Biz::BedTrackingChanges& bed_tracking_changes
     ) override;
     void on_volume_facets_annotations_changed(
         Domain::SelectionId project_id,
