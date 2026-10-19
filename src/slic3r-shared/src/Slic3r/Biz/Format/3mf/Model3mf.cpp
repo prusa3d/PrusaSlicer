@@ -927,6 +927,17 @@ bool is_old_stored_version(const ModelMetadata &meta) {
     return true;
 }
 
+// PrusaSlicer < 2.3 did not store the "Application" metadata, only "slic3rpe:Version3mf".
+// Such 3mf has to be loaded by the "legacy" parser as well.
+bool is_stored_without_application_metadata(const format_3MF::Model &model) {
+    auto has_metadata = [&model](ModelMetadataNames name) {
+        return std::any_of(model.metadata.begin(), model.metadata.end(), [name](const ModelMetadata &m) {
+            return std::holds_alternative<ModelMetadataNames>(m.name) && std::get<ModelMetadataNames>(m.name) == name;
+        });
+    };
+    return has_metadata(ModelMetadataNames::Slic3r_version) && !has_metadata(ModelMetadataNames::Application);
+}
+
 void process_xml_characters(LoadContext& context) {
     const std::string& text = context.xml_characters;
 
@@ -1125,6 +1136,9 @@ LoadedModel Slic3r::read_model3mf(ZipArchive &archive, const char * root_file_pa
         result.model = std::move(*root_model.value().model);
     result.used_files = std::vector<bool>(archive.get_num_files(), {false});
     result.used_files[root_model_file_index] = true;
+
+    if (result.model.has_value() && is_stored_without_application_metadata(*result.model))
+        collected_issues.add_issue(Read3mfIssue(Read3mfIssueType::legacy_loader_required));
 
     if (!result.model.has_value() || collected_issues.has_issue(Read3mfIssueType::legacy_loader_required))
         return result;

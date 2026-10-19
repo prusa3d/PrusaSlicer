@@ -1,5 +1,6 @@
 #include "Slic3r/Biz/Algorithms/ModelObject.hpp"
 #include "Slic3r/Biz/Algorithms/TriangleSelector.hpp"
+#include "Slic3r/Biz/Algorithms/ZipArchive.hpp"
 #include "Slic3r/Biz/Format/3mf.hpp"
 #include "Slic3r/Biz/Slicing/TestUtils.hpp"
 #include "Slic3r/Domain/Model.hpp"
@@ -9,6 +10,9 @@
 
 #include <boost/filesystem.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <optional>
+#include <sstream>
 
 using namespace Slic3r;
 using namespace Slic3r::Biz;
@@ -322,4 +326,134 @@ TEST_CASE("3MF round trip keeps support points user modified", "[3mf]")
     const Domain::ModelObject& loaded_generated = *loaded.model.objects.back();
     CHECK(loaded_generated.sla_points_status == PointsStatus::NoPoints);
     CHECK(loaded_generated.volumes.front()->sla_support_points.empty());
+}
+
+namespace {
+
+// Appends an axis aligned box as 8 vertices and 12 triangles to the 3mf mesh streams.
+void append_box(std::ostream& vertices, std::ostream& triangles, int first_vertex_id, const Vec3d& min, const Vec3d& max)
+{
+    for (int i = 0; i < 8; ++i) {
+        const Vec3d v{(i & 1) ? max.x() : min.x(), (i & 2) ? max.y() : min.y(), (i & 4) ? max.z() : min.z()};
+        vertices << "<vertex x=\"" << v.x() << "\" y=\"" << v.y() << "\" z=\"" << v.z() << "\"/>\n";
+    }
+    static constexpr int faces[12][3] = {
+        {0, 2, 3}, {0, 3, 1}, {4, 5, 7}, {4, 7, 6}, {0, 1, 5}, {0, 5, 4},
+        {2, 6, 7}, {2, 7, 3}, {0, 4, 6}, {0, 6, 2}, {1, 3, 7}, {1, 7, 5}};
+    for (const auto& f : faces)
+        triangles << "<triangle v1=\"" << first_vertex_id + f[0] << "\" v2=\"" << first_vertex_id + f[1]
+                  << "\" v3=\"" << first_vertex_id + f[2] << "\"/>\n";
+}
+
+// Writes a 3mf with a single object made of a part and a modifier, laid out the way
+// PrusaSlicer < 2.3 stored it: only "slic3rpe:Version3mf" (no "Application") metadata
+// in the model file, volume types in Metadata/Slic3r_PE_model.config.
+// With prusaslicer_data == false, only a plain 3mf with the same geometry is written.
+void write_pre_2_3_3mf(const fs::path& file_path, bool prusaslicer_data)
+{
+    std::ostringstream vertices, triangles;
+    append_box(vertices, triangles, 0, Vec3d{0., 0., 0.}, Vec3d{20., 20., 20.});
+    append_box(vertices, triangles, 8, Vec3d{5., 5., 5.}, Vec3d{15., 15., 25.});
+
+    const std::string content_types =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n"
+        "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n"
+        "<Default Extension=\"model\" ContentType=\"application/vnd.ms-package.3dmanufacturing-3dmodel+xml\"/>\n"
+        "</Types>\n";
+    const std::string relationships =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n"
+        "<Relationship Target=\"/3D/3dmodel.model\" Id=\"rel-1\" "
+        "Type=\"http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel\"/>\n"
+        "</Relationships>\n";
+    const std::string model =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<model unit=\"millimeter\" xml:lang=\"en-US\" "
+        "xmlns=\"http://schemas.microsoft.com/3dmanufacturing/core/2015/02\" "
+        "xmlns:slic3rpe=\"http://schemas.slic3r.org/3mf/2017/06\">\n" +
+        std::string(prusaslicer_data ? "<metadata name=\"slic3rpe:Version3mf\">1</metadata>\n" : "") +
+        "<resources>\n<object id=\"1\" type=\"model\">\n<mesh>\n"
+        "<vertices>\n" + vertices.str() + "</vertices>\n"
+        "<triangles>\n" + triangles.str() + "</triangles>\n"
+        "</mesh>\n</object>\n</resources>\n"
+        "<build>\n<item objectid=\"1\" transform=\"1 0 0 0 1 0 0 0 1 100 100 10\"/>\n</build>\n"
+        "</model>\n";
+    const std::string model_config =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<config>\n"
+        "<object id=\"1\" instances_count=\"1\">\n"
+        "<metadata type=\"object\" key=\"name\" value=\"box\"/>\n"
+        "<volume firstid=\"0\" lastid=\"11\">\n"
+        "<metadata type=\"volume\" key=\"name\" value=\"box\"/>\n"
+        "</volume>\n"
+        "<volume firstid=\"12\" lastid=\"23\">\n"
+        "<metadata type=\"volume\" key=\"name\" value=\"modifier\"/>\n"
+        "<metadata type=\"volume\" key=\"modifier\" value=\"1\"/>\n"
+        "</volume>\n"
+        "</object>\n"
+        "</config>\n";
+
+    Algorithms::ZipArchive archive = Algorithms::ZipArchive::open(file_path.string(), Algorithms::ZipArchive::Mode::Write);
+    REQUIRE(archive.is_open());
+    REQUIRE(archive.add_entry("[Content_Types].xml", content_types.data(), content_types.size()));
+    REQUIRE(archive.add_entry("_rels/.rels", relationships.data(), relationships.size()));
+    REQUIRE(archive.add_entry("3D/3dmodel.model", model.data(), model.size()));
+    if (prusaslicer_data)
+        REQUIRE(archive.add_entry("Metadata/Slic3r_PE_model.config", model_config.data(), model_config.size()));
+    REQUIRE(archive.close());
+}
+
+// Returns the type of the fatal issue thrown by load_3mf(), std::nullopt if it did not throw.
+std::optional<Read3mfIssueType> load_3mf_fatal_issue(const fs::path& file_path)
+{
+    try {
+        load_3mf(file_path.string());
+    } catch (const Loaded3MFException& e) {
+        return e.issue.type;
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+TEST_CASE("3MF saved by PrusaSlicer < 2.3 is loaded by the legacy loader with modifiers kept", "[3mf]")
+{
+    // PrusaSlicer < 2.3 did not store the "Application" metadata, which the new loader used
+    // to detect old PrusaSlicer 3mfs. These were then loaded as generic 3mfs, ignoring
+    // the volume types stored in Metadata/Slic3r_PE_model.config (PD-603).
+    const fs::path temp_dir = fs::temp_directory_path() / fs::unique_path("slic3r-3mf-pre-2-3-%%%%-%%%%");
+    fs::create_directories(temp_dir);
+    const fs::path file_path = temp_dir / "pre_2_3.3mf";
+    write_pre_2_3_3mf(file_path, true);
+
+    // The new loader must hand the file over to the legacy one (see load_from_project()).
+    const std::optional<Read3mfIssueType> fatal_issue = load_3mf_fatal_issue(file_path);
+    const Domain::Model legacy_model = load_with_legacy_importer(file_path);
+
+    boost::system::error_code cleanup_error;
+    fs::remove_all(temp_dir, cleanup_error);
+
+    REQUIRE(fatal_issue.has_value());
+    CHECK(*fatal_issue == Read3mfIssueType::legacy_loader_required);
+
+    REQUIRE(legacy_model.objects.size() == 1);
+    REQUIRE(legacy_model.objects[0]->volumes.size() == 2);
+    CHECK(legacy_model.objects[0]->volumes[0]->is_model_part());
+    CHECK(legacy_model.objects[0]->volumes[1]->is_modifier());
+}
+
+TEST_CASE("3MF without PrusaSlicer metadata is not handed over to the legacy loader", "[3mf]")
+{
+    const fs::path temp_dir = fs::temp_directory_path() / fs::unique_path("slic3r-3mf-generic-%%%%-%%%%");
+    fs::create_directories(temp_dir);
+    const fs::path file_path = temp_dir / "generic.3mf";
+    write_pre_2_3_3mf(file_path, false);
+
+    const std::optional<Read3mfIssueType> fatal_issue = load_3mf_fatal_issue(file_path);
+
+    boost::system::error_code cleanup_error;
+    fs::remove_all(temp_dir, cleanup_error);
+
+    CHECK_FALSE(fatal_issue.has_value());
 }
