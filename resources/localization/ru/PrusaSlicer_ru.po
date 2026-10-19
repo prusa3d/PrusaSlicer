@@ -4525,6 +4525,24 @@ msgstr "Расширение первого слоя"
 msgid "Expansion of the support first layer to improve adhesion to print bed."
 msgstr ""
 
+#: src/slic3r-domain/src/Slic3r/Domain/ConfigDefsFDM.cpp:4082
+msgid "Support base expansion"
+msgstr "Расширение основания поддержки"
+
+#: src/slic3r-domain/src/Slic3r/Domain/ConfigDefsFDM.cpp:4087
+msgid ""
+"Expand the support base in the XY plane, so it extends slightly beyond the "
+"object contour instead of ending strictly at the object silhouette. This "
+"improves the support stability and makes the support easier to remove. The "
+"support is still trimmed by the object, so it does not collide with the "
+"model. Set to zero to keep the default behaviour."
+msgstr ""
+"Расширяет основание поддержки в плоскости XY, так что оно немного выходит за "
+"контур модели, а не заканчивается строго по её силуэту. Это повышает "
+"устойчивость поддержки и облегчает её удаление. Поддержка по-прежнему "
+"обрезается моделью, поэтому она не пересекается с ней. Значение 0 сохраняет "
+"поведение по умолчанию."
+
 #: src/slic3r-domain/src/Slic3r/Domain/ConfigBoxesFDM.cpp:3916
 msgid "Interface loops"
 msgstr "Связующий слой петлями"
