@@ -67,6 +67,7 @@ public:
     ) override;
 
     void on_view_will_be_reset() override;
+    void on_view_will_be_removed() override;
 
     void on_preset_selection_changed(
         Domain::SelectionId project_id,
