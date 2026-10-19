@@ -2780,7 +2780,6 @@ LayerResult GCodeGenerator::process_layer(
     if (this->line_distancer_is_required(layer_tools.extruders, instances_to_print) && this->m_layer != nullptr && this->m_layer->lower_layer != nullptr)
         m_travel_obstacle_tracker.init_layer(layer, layers);
 
-    m_object_layer_over_raft = false;
     if (!first_layer && ! print.config().get<std::string>("layer_gcode").empty()) {
         ParserConfig config;
         config.set("layer_num", m_layer_index);
@@ -2854,6 +2853,10 @@ LayerResult GCodeGenerator::process_layer(
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (const ExtruderExtrusions &extruder_extrusions : extrusions)
     {
+        // The object extrusions of the previous extruder may have set it,
+        // the skirt must not be printed at the speed and acceleration over raft.
+        m_object_layer_over_raft = false;
+
         gcode += uses_wipe_tower ?
             m_wipe_tower->tool_change(
                 *this,
