@@ -25,6 +25,8 @@ constexpr Yoga::Unit lead_slot_width{52, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit action_slot_width{110, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit status_width{150, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit name_width{140, Yoga::Unit::Type::FigmaPixel};
+/// How far the vendor name may be squeezed on a narrow window before the row overflows instead.
+constexpr Yoga::Unit name_min_width{60, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit change_width{160, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit source_row_height{40, Yoga::Unit::Type::FigmaPixel};
 constexpr Yoga::Unit vendor_row_height{36, Yoga::Unit::Type::FigmaPixel};
