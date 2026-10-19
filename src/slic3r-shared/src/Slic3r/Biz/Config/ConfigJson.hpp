@@ -28,9 +28,9 @@ namespace Slic3r::Domain {
 
 namespace Slic3r::Biz::Config {
 
-// PrintModeParam is a plain std::variant alias, so ADL cannot find a to_json for it.
+/// An object with "label" and "value".
 nlohmann::ordered_json print_mode_param_to_json(const Domain::PrintModeParam& param);
-/// Empty when the JSON value is not a bool, number or string.
+/// Empty when it is not such an object or the value is not a bool, number or string.
 std::optional<Domain::PrintModeParam> print_mode_param_from_json(const nlohmann::ordered_json& json_value);
 
 template <typename T>

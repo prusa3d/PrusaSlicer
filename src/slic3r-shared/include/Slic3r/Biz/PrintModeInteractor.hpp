@@ -5,6 +5,7 @@
 #include "Slic3r/Biz/Preset/IPresetChangedListener.hpp"
 #include "Slic3r/Biz/Slicing/SlicingInteractor.hpp"
 #include "Slic3r/Domain/MacroOverrides.hpp"
+#include "Slic3r/Domain/Preset/HwConfig.hpp"
 
 #include <map>
 #include <string>
@@ -24,12 +25,23 @@ struct PrintMode
 
 using PrintModes = std::map<std::string, PrintMode>;
 
+/// A mode known to the provider and whether it is compatible with a printer.
+struct PrintModeAvailability
+{
+    std::string id;
+    bool compatible{false};
+};
+
+using PrintModeAvailabilities = std::vector<PrintModeAvailability>;
+
 class IPrintModesProvider
 {
 public:
     virtual ~IPrintModesProvider() = default;
 
-    virtual std::vector<std::string> modes() const = 0;
+    /// All known modes with their compatibility with the given printer.
+    virtual PrintModeAvailabilities modes(const Domain::Preset::HwPrinterConfig& hw_config
+    ) const = 0;
 
     virtual PrintMode evaluate(
         const std::string& id,
@@ -41,7 +53,7 @@ public:
 class NoopPrintModesProvider : public IPrintModesProvider
 {
 public:
-    std::vector<std::string> modes() const override
+    PrintModeAvailabilities modes(const Domain::Preset::HwPrinterConfig&) const override
     {
         return {};
     }
@@ -84,6 +96,16 @@ public:
         Domain::SelectionId project_id,
         Domain::SelectionId config_container_id
     ) override;
+    void on_preset_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        Preset::PresetItemType type
+    ) override;
+    void on_hw_item_selection_changed(
+        Domain::SelectionId project_id,
+        Domain::SelectionId config_container_id,
+        Preset::HwItemType type
+    ) override;
     void on_background_process_state_changed(Domain::SlicingId id) override;
 
     const PrintModes& modes() const
@@ -94,8 +116,15 @@ public:
     const Domain::MacroOverridesMapFDM& orphaned_modes() const;
 
 private:
+    /// Reloads everything the modes depend on and re-evaluates when anything changed.
+    void reload_all();
     void reevaluate();
     void apply_evaluated();
+    /// The provider's modes for the selected printer. A config container must be selected.
+    PrintModeAvailabilities provider_modes() const;
+    /// Removes the applied modes the provider knows but which are incompatible with the selected
+    /// printer. Unknown ones are kept as orphans.
+    bool remove_incompatible_modes();
     bool reload_config_values();
     bool reload_mode_params();
     bool reload_orphaned_modes();

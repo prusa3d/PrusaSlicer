@@ -14,7 +14,8 @@ public:
     PrintModePlugins(PluginSystem& plugin_system, Biz::PrintModeInteractor& interactor);
     ~PrintModePlugins() override;
 
-    std::vector<std::string> modes() const override;
+    Biz::PrintModeAvailabilities modes(const Domain::Preset::HwPrinterConfig& hw_config
+    ) const override;
 
     Biz::PrintMode evaluate(
         const std::string& id,

@@ -305,7 +305,7 @@ load_fdm(const ordered_json& json, const Domain::Preset::HwPrinterConfig& hw_con
                     } else {
                         macro_overrides_issues[id + "." + name] = {
                             ItemParsingIssueType::InvalidFormat,
-                            "Not a bool, number or string!"};
+                            "Not a labeled bool, number or string!"};
                     }
                 }
             }

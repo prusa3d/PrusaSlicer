@@ -53,7 +53,10 @@ TEST_CASE("Fdm config pack with macro overrides roundtrip", "[ConfigRoundtrip]")
     MacroOverridesLayerFDM vase_mode;
     vase_mode.name = "Vase mode";
     vase_mode.params = {
-        {"flag", true}, {"count", 2}, {"ratio", 0.5}, {"text", std::string{"abc"}}};
+        {"flag", {"Flag", true}},
+        {"count", {"Count", 2}},
+        {"ratio", {"Ratio", 0.5}},
+        {"text", {"Text", std::string{"abc"}}}};
     vase_mode.overrides.overrides.set("perimeters", 1);
     vase_mode.overrides.overrides.set("thin_walls", false);
     config.macro_overrides.insert_or_assign(vase_mode_layer_id(), vase_mode);
@@ -63,10 +66,12 @@ TEST_CASE("Fdm config pack with macro overrides roundtrip", "[ConfigRoundtrip]")
     REQUIRE(json["macro_overrides"].contains(vase_mode_layer_id()));
     const ordered_json& layer{json["macro_overrides"][vase_mode_layer_id()]};
     CHECK(layer["name"] == "Vase mode");
-    CHECK(layer["params"]["flag"] == true);
-    CHECK(layer["params"]["count"] == 2);
-    CHECK(layer["params"]["ratio"] == 0.5);
-    CHECK(layer["params"]["text"] == "abc");
+    CHECK(layer["params"]["flag"]["label"] == "Flag");
+    CHECK(layer["params"]["flag"]["value"] == true);
+    CHECK(layer["params"]["count"]["label"] == "Count");
+    CHECK(layer["params"]["count"]["value"] == 2);
+    CHECK(layer["params"]["ratio"]["value"] == 0.5);
+    CHECK(layer["params"]["text"]["value"] == "abc");
     CHECK(layer["overrides"]["perimeters"] == 1);
     CHECK(layer["overrides"]["thin_walls"] == false);
     CHECK(layer["overrides"].size() == 2);

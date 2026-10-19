@@ -9,6 +9,7 @@
 #include <tl/expected.hpp>
 
 #include "Slic3r/Biz/Lua/LuaEngine.hpp"
+#include "Slic3r/Domain/Expr/ExprAst.hpp"
 
 namespace Slic3r::App::Lua {
 
@@ -40,6 +41,9 @@ struct PluginMeta
     std::optional<std::string> title;
     std::vector<std::string> menu;
     PluginParamDefs params;
+    /// Printer compatibility, in the preset condition language over `printer.*`, `feeder.*` and
+    /// `sheet.*` variables. No condition means compatible with every printer.
+    std::optional<Domain::Expr::ExprAst> condition;
 };
 
 

@@ -144,12 +144,10 @@ tl::expected<void, std::string> is_valid<Percentage>(const ordered_json& json_va
 
 namespace Slic3r::Biz::Config {
 
-ordered_json print_mode_param_to_json(const Domain::PrintModeParam& param)
-{
-    return std::visit([](const auto& value) { return ordered_json(value); }, param);
-}
+namespace {
 
-std::optional<Domain::PrintModeParam> print_mode_param_from_json(const ordered_json& json_value)
+std::optional<Domain::PrintModeParamValue> print_mode_param_value_from_json(
+    const ordered_json& json_value)
 {
     if (json_value.is_boolean()) {
         return json_value.get<bool>();
@@ -164,6 +162,30 @@ std::optional<Domain::PrintModeParam> print_mode_param_from_json(const ordered_j
         return json_value.get<std::string>();
     }
     return std::nullopt;
+}
+
+} // namespace
+
+ordered_json print_mode_param_to_json(const Domain::PrintModeParam& param)
+{
+    ordered_json json = ordered_json::object();
+    json["label"] = param.label;
+    json["value"] = std::visit([](const auto& value) { return ordered_json(value); }, param.value);
+    return json;
+}
+
+std::optional<Domain::PrintModeParam> print_mode_param_from_json(const ordered_json& json_value)
+{
+    if (!json_value.is_object() || !json_value.contains("label") || !json_value.contains("value")
+        || !json_value["label"].is_string()) {
+        return std::nullopt;
+    }
+    const std::optional<Domain::PrintModeParamValue> value{
+        print_mode_param_value_from_json(json_value["value"])};
+    if (!value) {
+        return std::nullopt;
+    }
+    return Domain::PrintModeParam{.label = json_value["label"].get<std::string>(), .value = *value};
 }
 
 } // namespace Slic3r::Biz::Config

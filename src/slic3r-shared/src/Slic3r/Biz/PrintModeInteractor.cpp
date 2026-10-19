@@ -22,6 +22,9 @@ void PrintModeInteractor::set_provider(const IPrintModesProvider* provider)
 
 void PrintModeInteractor::reload_provider()
 {
+    if (m_project_interactor.selected_config_container_id() != Domain::INVALID_ID) {
+        remove_incompatible_modes();
+    }
     reevaluate();
     reload_orphaned_modes();
     invoke_listeners<IPrintModesChangedListener>(
@@ -110,15 +113,47 @@ void PrintModeInteractor::reevaluate()
 
     const ModeParams& mode_params{
         m_mode_params[m_project_interactor.selected_config_container_id()]};
-    for (const std::string& id : m_provider->modes()) {
+    for (const PrintModeAvailability& mode : provider_modes()) {
+        if (!mode.compatible) {
+            continue;
+        }
         Domain::PrintModeParams params;
-        const auto it{mode_params.find(id)};
+        const auto it{mode_params.find(mode.id)};
         if (it != mode_params.end()) {
             params = it->second;
         }
-        m_modes[id] = m_provider->evaluate(id, m_config_values, params);
+        m_modes[mode.id] = m_provider->evaluate(mode.id, m_config_values, params);
     }
     apply_evaluated();
+}
+
+PrintModeAvailabilities PrintModeInteractor::provider_modes() const
+{
+    ASSERT(m_project_interactor.selected_config_container_id() != Domain::INVALID_ID);
+    return m_provider->modes(
+        m_project_interactor.preset_interactor().selected_printer_preset().hw_config);
+}
+
+bool PrintModeInteractor::remove_incompatible_modes()
+{
+    Preset::PresetInteractor& preset_interactor{m_project_interactor.preset_interactor()};
+    const Domain::MacroOverridesMapFDM* applied{std::get_if<Domain::MacroOverridesMapFDM>(
+        &preset_interactor.selected_printer_preset().macro_overrides)};
+    if (!applied || applied->empty()) {
+        return false;
+    }
+
+    std::vector<std::string> incompatible;
+    for (const PrintModeAvailability& mode : provider_modes()) {
+        if (!mode.compatible && applied->contains(mode.id)) {
+            incompatible.push_back(mode.id);
+        }
+    }
+    for (const std::string& id : incompatible) {
+        SPDLOG_INFO("Print mode '{}' is not compatible with the selected printer, removing", id);
+        preset_interactor.set_macro_overrides(id, std::nullopt);
+    }
+    return !incompatible.empty();
 }
 
 void PrintModeInteractor::apply_evaluated()
@@ -197,8 +232,10 @@ bool PrintModeInteractor::reload_orphaned_modes()
         return false;
     }
 
-    const std::vector<std::string> mode_ids{m_provider->modes()};
-    std::set<std::string> mode_ids_set{mode_ids.begin(), mode_ids.end()};
+    std::set<std::string> mode_ids_set;
+    for (const PrintModeAvailability& mode : provider_modes()) {
+        mode_ids_set.insert(mode.id);
+    }
 
     Domain::MacroOverridesMapFDM new_modes;
     auto it{m_orphaned_modes.find(config_container_id)};
@@ -212,7 +249,7 @@ bool PrintModeInteractor::reload_orphaned_modes()
         }
     }
     // Orphans are additive, erase anything tham might have been an orphan before, but is loaded now.
-    for (const std::string& id : mode_ids) {
+    for (const std::string& id : mode_ids_set) {
         new_modes.erase(id);
     }
 
@@ -223,17 +260,42 @@ bool PrintModeInteractor::reload_orphaned_modes()
     return false;
 }
 
-void
-PrintModeInteractor::on_config_container_selection_changed(Domain::SelectionId, Domain::SelectionId)
+void PrintModeInteractor::reload_all()
 {
+    bool removed_incompatible{false};
+    if (m_project_interactor.selected_config_container_id() != Domain::INVALID_ID) {
+        removed_incompatible = remove_incompatible_modes();
+    }
     const bool reloaded_config_values{reload_config_values()};
     const bool reloaded_mode_params{reload_mode_params()};
     const bool reloaded_orphaned_modes{reload_orphaned_modes()};
-    if (reloaded_config_values || reloaded_mode_params || reloaded_orphaned_modes) {
+    if (removed_incompatible || reloaded_config_values || reloaded_mode_params
+        || reloaded_orphaned_modes) {
         reevaluate();
         invoke_listeners<IPrintModesChangedListener>(
             [](auto* listener) { listener->on_print_modes_changed(); });
     }
+}
+
+void
+PrintModeInteractor::on_config_container_selection_changed(Domain::SelectionId, Domain::SelectionId)
+{
+    reload_all();
+}
+
+void PrintModeInteractor::on_preset_selection_changed(
+    Domain::SelectionId, Domain::SelectionId, const Preset::PresetItemType type)
+{
+    // The printer decides which modes are available and the orphans.
+    if (type == Preset::PresetItemType::PrinterPreset) {
+        reload_all();
+    }
+}
+
+void PrintModeInteractor::on_hw_item_selection_changed(
+    Domain::SelectionId, Domain::SelectionId, Preset::HwItemType)
+{
+    reload_all();
 }
 
 void PrintModeInteractor::on_background_process_state_changed(const Domain::SlicingId id)

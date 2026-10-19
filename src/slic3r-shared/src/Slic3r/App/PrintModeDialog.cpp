@@ -5,6 +5,7 @@
 
 #include "Slic3r/App/Config/ConfigItemUtils.hpp"
 #include "Slic3r/App/Navigator.hpp"
+#include "Slic3r/App/WarningPanel.hpp"
 #include "Slic3r/App/Yoga/InputTextWithSpin.hpp"
 #include "Slic3r/App/Yoga/LayoutButton.hpp"
 #include "Slic3r/App/Yoga/Rectangle.hpp"
@@ -16,6 +17,7 @@
 #include <fmt/format.h>
 
 #include <optional>
+#include <set>
 
 using namespace Slic3r::App::Yoga;
 
@@ -23,7 +25,7 @@ namespace Slic3r::App {
 
 namespace {
 
-std::string param_to_string(const Domain::PrintModeParam& param)
+std::string param_to_string(const Domain::PrintModeParamValue& value)
 {
     return std::visit(
         Domain::overloaded{
@@ -31,7 +33,7 @@ std::string param_to_string(const Domain::PrintModeParam& param)
             [](const std::string& v) { return v; },
             [](const auto& v) { return fmt::format("{}", v); },
         },
-        param);
+        value);
 }
 
 /// Hidden items are internal, the user cannot relate them to anything in the settings.
@@ -54,11 +56,17 @@ public:
         Biz::PrintModeInteractor& interactor,
         const std::string& id,
         const std::string& info,
+        const std::optional<std::string>& error,
         const Domain::MacroOverridesLayerFDM& layer,
         const bool active,
-        const bool params_editable
+        const bool params_editable,
+        std::set<std::string>& expanded_ids
     ) :
-        m_interactor(interactor), m_id(id), m_params(layer.params), m_params_editable(params_editable)
+        m_interactor(interactor),
+        m_id(id),
+        m_params(layer.params),
+        m_params_editable(params_editable),
+        m_expanded_ids(expanded_ids)
     {
         set_orientation(Orientation::Vertical);
         set_align_items(YGAlignStretch);
@@ -93,8 +101,13 @@ public:
             Platform::ColorGroup::Active));
 
         build_header(layer.name, info);
+        if (error) {
+            build_error();
+        }
         build_param_rows();
         build_panel(layer.overrides);
+        // The cards are rebuilt on every change, so the expanded state outlives them in the dialog.
+        set_expanded(m_expanded_ids.contains(m_id));
     }
 
 private:
@@ -117,43 +130,61 @@ private:
         m_info = texts->emplace_back<Text>(info);
         m_info->set_text_color(dim);
         m_info->set_wrap_mode(Text::WrapMode::WrapElide);
+        m_info->set_visible(!info.empty());
 
         m_cog = top->emplace_back<LayoutButton>(std::string{}, Render::Icon::Cog);
         m_cog->set_checkable(true);
         m_cog->set_width(24_fpx);
         m_cog->set_height(24_fpx);
         m_cog->set_background_color(Platform::Color::ButtonTransparent);
-        m_cog->callbacks().action = [this] {
-            const bool expanded{!m_panel->is_self_visible()};
-            m_panel->set_visible(expanded);
-            m_button->set_draw_flags(
-                expanded ? ImDrawFlags_RoundCornersTop : ImDrawFlags_RoundCornersAll);
-        };
+        m_cog->callbacks().action = [this] { set_expanded(!m_panel->is_self_visible()); };
+    }
+
+    void set_expanded(const bool expanded)
+    {
+        if (expanded) {
+            m_expanded_ids.insert(m_id);
+        } else {
+            m_expanded_ids.erase(m_id);
+        }
+        m_cog->set_checked(expanded);
+        m_panel->set_visible(expanded);
+        m_button->set_draw_flags(
+            expanded ? ImDrawFlags_RoundCornersTop : ImDrawFlags_RoundCornersAll);
+    }
+
+    void build_error()
+    {
+        auto panel{m_button->emplace_back<WarningPanel>(Platform::Color::Error)};
+        panel->set_rounding(4);
+        panel->set_flex_shrink(0);
+        panel->set_warning(Biz::_u8L("Cannot be applied."), "Maybe your parameters are invlaid?");
     }
 
     void build_param_rows()
     {
-        for (const auto& [name, value] : m_params) {
+        for (const auto& [name, param] : m_params) {
             auto row{m_button->emplace_back<Item>()};
             row->set_orientation(Orientation::Horizontal);
             row->set_align_items(YGAlignCenter);
             row->set_gap(12_fpx);
             row->set_padding({28_fpx, 0_fpx, 0_fpx, 0_fpx});
-            auto label{row->emplace_back<Text>(name)};
+            auto label{row->emplace_back<Text>(param.label)};
             label->set_flex_grow(1);
+            label->set_wrap_mode(Text::WrapMode::WrapElide);
             // Orphans have no plugin to re-evaluate them with, so their values are only shown.
-            if (m_params_editable && std::holds_alternative<int>(value)) {
+            if (m_params_editable && std::holds_alternative<int>(param.value)) {
                 auto input{
                     row->emplace_back<InputTextWithSpin>(std::make_unique<IntValidator>())};
                 input->set_width(168_fpx);
-                input->set_text(param_to_string(value));
+                input->set_text(param_to_string(param.value));
                 input->callbacks().text_edited = [this, name, input] {
-                    m_params[name] = dynamic_cast<IntValidator*>(input->validator())->value();
+                    m_params[name].value = dynamic_cast<IntValidator*>(input->validator())->value();
                     m_interactor.set_mode_params(m_id, m_params);
                 };
             } else {
-                auto text{
-                    row->emplace_back<Text>(param_to_string(value), Render::ImguiFontType::Bold)};
+                auto text{row->emplace_back<Text>(
+                    param_to_string(param.value), Render::ImguiFontType::Bold)};
                 text->set_width(168_fpx);
             }
         }
@@ -236,6 +267,7 @@ private:
     std::string m_id;
     Domain::PrintModeParams m_params;
     bool m_params_editable{true};
+    std::set<std::string>& m_expanded_ids;
 
     Rectangle* m_block{nullptr};
     RectangleButton* m_button{nullptr};
@@ -249,8 +281,8 @@ private:
 std::string mode_info(const Biz::PrintMode& mode)
 {
     if (mode.error) {
-        // The reason is in the log, it is a script error and too long for the card.
-        return Biz::_u8L("Cannot be applied with the current settings");
+        // The card shows the error itself instead.
+        return {};
     }
     return fmt::format(
         fmt::runtime(Biz::_u8L("Changes {} settings · {} adjustable")),
@@ -266,7 +298,10 @@ PrintModeDialog::PrintModeDialog(Biz::ProjectInteractor& project_interactor, Nav
     m_navigator(navigator),
     m_print_mode_listener_scope(project_interactor.print_mode_interactor(), *this),
     m_preset_interactor_listener_scope(project_interactor.preset_interactor(), *this),
-    m_selected_project_listener_scope(project_interactor, *this)
+    m_selected_project_listener_scope(project_interactor, *this),
+    m_selected_config_container_listener_scope(project_interactor, *this),
+    m_config_container_list_listener_scope(project_interactor, *this),
+    m_projects_listener_scope(project_interactor, *this)
 {
     content_item()->set_width(620_fpx);
     content_item()->set_height(640_fpx);
@@ -295,6 +330,34 @@ void PrintModeDialog::on_selected_project_changed_final(size_t) {
     m_reload_pending = true;
 }
 
+void PrintModeDialog::on_selected_config_container_changed(Domain::SelectionId, Domain::SelectionId)
+{
+    // The expanded state is per config container, and the print modes may not report a change.
+    m_reload_pending = true;
+}
+
+void PrintModeDialog::on_config_container_list_changed(Domain::SelectionId)
+{
+    prune_expanded_ids();
+}
+
+void PrintModeDialog::on_project_removed(Domain::SelectionId)
+{
+    prune_expanded_ids();
+}
+
+void PrintModeDialog::prune_expanded_ids()
+{
+    // The notifications do not say which container went away, so keep only the existing ones.
+    std::set<Domain::SelectionId> existing;
+    for (const auto& [project_id, project] : m_project_interactor.workbench().projects()) {
+        for (const auto& container : project.config_containers()) {
+            existing.insert(container->id().id);
+        }
+    }
+    std::erase_if(m_expanded_ids, [&](const auto& entry) { return !existing.contains(entry.first); });
+}
+
 void PrintModeDialog::close_action()
 {
     m_navigator.set_opened_dialog(nullptr);
@@ -321,19 +384,30 @@ void PrintModeDialog::reload() {
     }
     const auto is_active{[&](const std::string& id) { return applied && applied->contains(id); }};
 
+    std::set<std::string>& expanded_ids{
+        m_expanded_ids[m_project_interactor.selected_config_container_id()]};
     Biz::PrintModeInteractor& interactor{m_project_interactor.print_mode_interactor()};
     for (const auto& [id, mode] : interactor.modes()) {
         m_list->emplace_back<PrintModeCard>(
-            interactor, id, mode_info(mode), mode.layer, is_active(id), true);
+            interactor,
+            id,
+            mode_info(mode),
+            mode.error,
+            mode.layer,
+            is_active(id),
+            true,
+            expanded_ids);
     }
     for (const auto& [id, layer] : interactor.orphaned_modes()) {
         m_list->emplace_back<PrintModeCard>(
             interactor,
             id,
             Biz::_u8L("Loaded from the project, the plugin is not installed"),
+            std::nullopt,
             layer,
             is_active(id),
-            false);
+            false,
+            expanded_ids);
     }
 }
 

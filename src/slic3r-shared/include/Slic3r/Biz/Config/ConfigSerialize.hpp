@@ -17,7 +17,7 @@ namespace Slic3r::Biz::Config {
 
 /// The project file form of a config pack. It is as_boxes(), except that each macro overrides
 /// layer is an object with "name", "params" and "overrides", so the print mode that produced the
-/// layer can be restored. Loaded back by load().
+/// layer can be restored. Each param is an object with "label" and "value". Loaded back by load().
 nlohmann::ordered_json to_json(const Domain::ConfigPackFDM& config_pack);
 nlohmann::ordered_json to_json(const Domain::ConfigPackSLA& config_pack);
 

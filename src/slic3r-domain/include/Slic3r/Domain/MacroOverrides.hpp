@@ -8,7 +8,16 @@
 
 namespace Slic3r::Domain {
 
-using PrintModeParam  = std::variant<bool, int, double, std::string>;
+using PrintModeParamValue = std::variant<bool, int, double, std::string>;
+
+/// A print mode parameter as the plugin declared it: the label is what the user sees for it.
+struct PrintModeParam
+{
+    std::string label;
+    PrintModeParamValue value;
+
+    bool operator==(const PrintModeParam&) const = default;
+};
 using PrintModeParams = std::map<std::string, PrintModeParam>;
 
 class MacroOverridesFDM : public ConfigBox

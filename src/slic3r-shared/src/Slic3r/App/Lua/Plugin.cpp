@@ -2,6 +2,7 @@
 
 #include "Slic3r/Biz/Platform/PlatformServices.hpp"
 #include "Slic3r/Biz/Lua/LuaException.hpp"
+#include "Slic3r/Biz/Expr/Parser.hpp"
 #include "Slic3r/Log.hpp"
 
 #include <fmt/format.h>
@@ -126,6 +127,17 @@ Plugin::parse(Biz::Lua::LuaEngine& lua, const std::string& id_prefix, const std:
             auto value = p.get<PluginParamValue>("default");
             meta.params.emplace_back(name, label, type, value);
         });
+    }
+
+    if (info["condition"].valid()) {
+        if (!info["condition"].is<std::string>()) {
+            return tl::unexpected{"The condition must be a string"};
+        }
+        try {
+            meta.condition = Biz::Expr::Parser().parse(info["condition"].get<std::string>());
+        } catch (const Biz::Expr::ParseError& e) {
+            return tl::unexpected{fmt::format("Invalid condition: {}", e.what())};
+        }
     }
 
     if (!state["execute"].is<sol::function>()) {

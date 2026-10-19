@@ -3,6 +3,8 @@
 #include "Slic3r/App/Lua/PluginSystem.hpp"
 #include "Slic3r/Biz/Lua/LuaEngine.hpp"
 #include "Slic3r/Biz/Lua/LuaException.hpp"
+#include "Slic3r/Biz/Expr/Eval.hpp"
+#include "Slic3r/Biz/Preset/ValueMapBuilder.hpp"
 #include "Slic3r/Log.hpp"
 
 #include <fmt/format.h>
@@ -49,7 +51,7 @@ sol::object to_lua(sol::state& lua, const Domain::ConfigValue& value)
     });
 }
 
-Domain::PrintModeParam default_value(const PluginParamDef& def)
+Domain::PrintModeParamValue default_value(const PluginParamDef& def)
 {
     if (def.default_value) {
         return *def.default_value;
@@ -66,25 +68,40 @@ Domain::PrintModeParam default_value(const PluginParamDef& def)
     return 0;
 }
 
-/// Every parameter the plugin declares: the given value when present and of the declared type,
-/// the manifest default otherwise. An int is accepted for a double parameter.
+/// Every parameter the plugin declares, labeled as in the manifest: the given value when present
+/// and of the declared type, the manifest default otherwise. An int is accepted for a double
+/// parameter.
 Domain::PrintModeParams complete_params(const PluginMeta& meta, const Domain::PrintModeParams& given)
 {
     Domain::PrintModeParams result;
     for (const PluginParamDef& def : meta.params) {
-        Domain::PrintModeParam value{default_value(def)};
+        Domain::PrintModeParamValue value{default_value(def)};
         if (const auto it{given.find(def.name)}; it != given.end()) {
-            if (it->second.index() == value.index()) {
-                value = it->second;
-            } else if (std::holds_alternative<double>(value) && std::holds_alternative<int>(it->second)) {
-                value = static_cast<double>(std::get<int>(it->second));
+            const Domain::PrintModeParamValue& given_value{it->second.value};
+            if (given_value.index() == value.index()) {
+                value = given_value;
+            } else if (std::holds_alternative<double>(value) && std::holds_alternative<int>(given_value)) {
+                value = static_cast<double>(std::get<int>(given_value));
             } else {
                 SPDLOG_WARN(
                     "Print mode '{}' parameter '{}' has a wrong type, using the default",
                     meta.id, def.name);
             }
         }
-        result.insert_or_assign(def.name, std::move(value));
+        result.insert_or_assign(
+            def.name,
+            Domain::PrintModeParam{
+                .label = def.label.empty() ? def.name : def.label, .value = std::move(value)});
+    }
+    return result;
+}
+
+PluginParamValueMap param_values(const Domain::PrintModeParams& params)
+{
+    PluginParamValueMap result;
+    for (const auto& [name, param] : params) {
+        // PluginParamValue and Domain::PrintModeParamValue are the same variant.
+        result.insert_or_assign(name, param.value);
     }
     return result;
 }
@@ -128,13 +145,30 @@ PrintModePlugins::~PrintModePlugins()
     m_interactor.set_provider(nullptr);
 }
 
-std::vector<std::string> PrintModePlugins::modes() const
+Biz::PrintModeAvailabilities
+PrintModePlugins::modes(const Domain::Preset::HwPrinterConfig& hw_config) const
 {
-    std::vector<std::string> result;
+    Biz::Expr::ValueMap printer_values;
+    Biz::Preset::append_printer_values(printer_values, hw_config);
+    const Biz::Expr::Eval eval;
+
+    Biz::PrintModeAvailabilities result;
     for (const Plugin& plugin : m_plugin_system.plugins() | std::views::values) {
-        if (plugin.meta().type == PluginType::PrintMode) {
-            result.push_back(plugin.meta().id);
+        const PluginMeta& meta{plugin.meta()};
+        if (meta.type != PluginType::PrintMode) {
+            continue;
         }
+        bool compatible{true};
+        if (meta.condition) {
+            try {
+                compatible = boost::get<bool>(eval.eval(*meta.condition, printer_values));
+            } catch (const std::exception& e) {
+                // EvalError, or boost::bad_get when the condition is not boolean.
+                SPDLOG_ERROR("Print mode '{}' condition failed: {}", meta.id, e.what());
+                compatible = false;
+            }
+        }
+        result.push_back({.id = meta.id, .compatible = compatible});
     }
     return result;
 }
@@ -171,8 +205,7 @@ Biz::PrintMode PrintModePlugins::evaluate(
     mode.layer.params = complete_params(meta, params);
 
     try {
-        // PluginParamValueMap and Domain::PrintModeParams are the same variant map.
-        const sol::object result{it->second.execute(lua, mode.layer.params)};
+        const sol::object result{it->second.execute(lua, param_values(mode.layer.params))};
         if (!result.is<sol::table>()) {
             mode.error = "The print mode did not return a table";
         } else {
@@ -185,7 +218,6 @@ Biz::PrintMode PrintModePlugins::evaluate(
         mode.error = e.what();
     }
     if (mode.error) {
-        SPDLOG_ERROR("Print mode '{}' failed: {}", id, *mode.error);
         mode.layer.overrides = {};
     }
     return mode;

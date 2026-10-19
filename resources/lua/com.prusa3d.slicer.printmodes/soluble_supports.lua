@@ -2,6 +2,7 @@ info = {
     id = "soluble_supports",
     type = "print_mode",
     title = "Soluble supports",
+    condition = "printer.tool_count > 1 or feeder.base_model =~ /.*MMU.*/",
     params = {
         {name = "extruder", label = "Support extruder", type = "int", default = 2}
     }
