@@ -319,6 +319,13 @@ JobId PresetUpdaterInteractor::sync_indices_and_reconfiguration_check(
                 return JobState::Canceled;
             }
 
+            std::set<std::string> known_repo_ids;
+            for (const SharedPresetUpdaterRepositoryInfo& info :
+                 repo_database.get_all_repositories()) {
+                known_repo_ids.insert(info.descriptor.id);
+            }
+            archive_sync.remove_unknown_sources(known_repo_ids, &process_status);
+
             PresetUpdaterReconfigurationList reconfigurations =
                 PresetUpdater::check_reconfigurations(repos, &process_status);
             if (process_status.has_error()) {

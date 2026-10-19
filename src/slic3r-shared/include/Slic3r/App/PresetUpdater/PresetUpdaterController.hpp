@@ -745,6 +745,22 @@ public:
      */
     void on_online_allowed_changed();
 
+    /**
+     * @brief A user has logged in, so the server may list sources it withheld until now.
+     *
+     * Checks at once. A check already running is superseded, as it may have been asked without
+     * the account. Announced only when the check finds an offer the user has not been shown.
+     */
+    void on_logged_in();
+
+    /**
+     * @brief The user has logged out, so sources only they could read now offer nothing.
+     *
+     * Checks at once, so what those sources staged is dropped without waiting for the
+     * periodic check. Never announced: logging out can only take offers away.
+     */
+    void on_logged_out();
+
     void set_show_dialog_callback(std::function<void()> callback);
     void set_presets_installed_callback(std::function<void()> callback);
 
@@ -861,6 +877,20 @@ private:
         Reported
     };
 
+    /**
+     * @brief What a finished check may say through the updates-available notification.
+     *
+     * Always re-announces whatever is pending. OnChange announces only an offer that was not
+     * part of the last announcement, so a check that merely confirms what the user has already
+     * seen stays quiet. Nothing never announces, for a check that can only take offers away.
+     */
+    enum class CheckAnnouncement
+    {
+        Always,
+        OnChange,
+        Nothing
+    };
+
     /// Publishes and notifies once, however many changes were made inside it, however nested.
     class Transaction
     {
@@ -878,11 +908,17 @@ private:
     JobId submit(JobKind kind, const std::function<JobId()>& operation, std::string subject = {});
 
     void start_listing();
-    void start_check(Biz::PresetUpdater::SourceListSync source_list, CheckReporting reporting);
+    void start_check(
+        Biz::PresetUpdater::SourceListSync source_list,
+        CheckReporting reporting,
+        CheckAnnouncement announcement = CheckAnnouncement::Always
+    );
     void start_install(const std::vector<VendorKey>& keys);
     void commit_selection();
 
     void cancel_check();
+
+    void recheck_sources_silently(CheckAnnouncement announcement);
 
     SourceStore::Locks current_locks() const;
 
@@ -930,6 +966,11 @@ private:
     std::optional<Snapshot> m_published;
     bool m_shut_down{false};
     bool m_offline_check_pending{false};
+
+    /// What the newest check may announce. A superseding check brings its own answer.
+    CheckAnnouncement m_check_announcement{CheckAnnouncement::Always};
+    /// The offers of the last announcement, which is what OnChange measures change against.
+    std::set<std::string> m_announced_offers;
 };
 
 } // namespace Slic3r::App::PresetUpdater

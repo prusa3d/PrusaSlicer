@@ -97,6 +97,13 @@ bool updates_notification_shown()
     );
 }
 
+void close_updates_notification()
+{
+    AppServices::instance().pop_notification_center().close_notifications_of_type(
+        Slic3r::App::PopNotification::PopNotificationType::PresetUpdateAvailable
+    );
+}
+
 /// Member order matters: the controller is destroyed before the services it reports through.
 struct ControllerFixture : Fixture
 {
@@ -273,6 +280,121 @@ TEST_CASE("PresetUpdaterController checks periodically only while it may work on
 
     REQUIRE(fx.settle());
     REQUIRE(fx.pump(checking));
+}
+
+TEST_CASE("PresetUpdaterController checks again when the user logs in", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+
+    fx.controller->on_logged_in();
+    REQUIRE(fx.controller->activity() == ControllerActivity::Checking);
+
+    REQUIRE(fx.settle());
+    CHECK(updates_notification_shown());
+}
+
+TEST_CASE("PresetUpdaterController supersedes a check running when the user logs in", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.controller->activity() == ControllerActivity::Checking);
+
+    fx.controller->on_logged_in();
+    REQUIRE(fx.controller->activity() == ControllerActivity::Checking);
+
+    REQUIRE(fx.settle());
+    CHECK_FALSE(fx.controller->warned());
+    CHECK(updates_notification_shown());
+}
+
+TEST_CASE("PresetUpdaterController does not check on login while it may not work online", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.online = false;
+    fx.put_server("100");
+
+    fx.controller->on_logged_in();
+    CHECK(fx.controller->activity() == ControllerActivity::None);
+}
+
+TEST_CASE("PresetUpdaterController checks again when the user logs out", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+
+    fx.controller->on_logged_out();
+    REQUIRE(fx.controller->activity() == ControllerActivity::Checking);
+    REQUIRE(fx.settle());
+}
+
+TEST_CASE("PresetUpdaterController announces nothing for the check a logout starts", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+    REQUIRE(updates_notification_shown());
+    close_updates_notification();
+
+    fx.controller->on_logged_out();
+    REQUIRE(fx.settle());
+    CHECK_FALSE(updates_notification_shown());
+}
+
+TEST_CASE("PresetUpdaterController stays quiet when a login brings nothing new", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+    REQUIRE(updates_notification_shown());
+    close_updates_notification();
+
+    fx.controller->on_logged_in();
+    REQUIRE(fx.settle());
+    CHECK_FALSE(updates_notification_shown());
+}
+
+TEST_CASE("PresetUpdaterController announces what appeared with the login", "[preset_updater][controller]")
+{
+    ControllerFixture fx;
+    fx.online = false;
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+    REQUIRE_FALSE(updates_notification_shown());
+
+    fx.online = true;
+    fx.controller->on_logged_in();
+    REQUIRE(fx.settle());
+    CHECK(updates_notification_shown());
+}
+
+TEST_CASE("PresetUpdaterController announces pending offers again at the periodic check", "[preset_updater][controller]")
+{
+    ControllerFixture fx(true, 50ms);
+    fx.put_server("100");
+
+    fx.controller->start_background_check();
+    REQUIRE(fx.settle());
+    REQUIRE(updates_notification_shown());
+    close_updates_notification();
+
+    REQUIRE(fx.pump([&fx]() { return fx.controller->activity() == ControllerActivity::Checking; }));
+    REQUIRE(fx.settle());
+    CHECK(updates_notification_shown());
 }
 
 TEST_CASE("PresetUpdaterController narrates a check the user asked for", "[preset_updater][controller]")

@@ -2,6 +2,7 @@
 
 #include "Slic3r/Semver.hpp"
 
+#include <set>
 #include <vector>
 #include <string>
 
@@ -39,10 +40,26 @@ public:
      * @param online_allowed when false, nothing is fetched and what is staged for online
      * repositories is replaced by the indices the installation carries, so an index an earlier
      * online check staged cannot outlive it. Local repositories are staged as usual.
+     *
+     * A private repository gets the same replacement while nobody is logged in: its offer is
+     * known to be empty, so nothing is fetched, nothing is staged and nothing is reported.
+     * What is installed from it keeps working and stays removable, from its installed indices.
      */
     void sync_indices(
         const SharedRepositoryVector& repositories,
         bool online_allowed,
+        PresetUpdaterProcessStatus* process_status
+    ) const;
+
+    /**
+     * @brief Drops staged files of sources the database no longer knows.
+     *
+     * They accumulate when a source disappears from the server or another application version
+     * staged for sources this one has never heard of. No job of any instance can be using them,
+     * because every job works on sources its database knows.
+     */
+    void remove_unknown_sources(
+        const std::set<std::string>& known_repo_ids,
         PresetUpdaterProcessStatus* process_status
     ) const;
 

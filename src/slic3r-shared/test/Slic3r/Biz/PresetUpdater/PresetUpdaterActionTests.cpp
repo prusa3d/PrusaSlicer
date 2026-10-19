@@ -545,6 +545,89 @@ TEST_CASE("PresetUpdater drops what a source staged once it is switched off", "[
     CHECK(listener.reconfigurations()->removals().front().vendor_id == k_vendor_name);
 }
 
+TEST_CASE("PresetUpdater drops the staged index of a vendor its source stopped offering", "[preset_updater]")
+{
+    Fixture fx;
+    CaptureListener listener(fx.interactor());
+
+    fx.put_server("100");
+    fs::create_directories(fx.staged_path / k_repo_name);
+    fs::copy_file(
+        fx.resources_profile_path / "resource100" / k_repo_name / (k_vendor_name + ".idx"),
+        fx.staged_path / k_repo_name / "GhostVendor.idx"
+    );
+
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        true, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE_FALSE(listener.got_error());
+
+    CHECK_FALSE(fs::exists(fx.staged_path / k_repo_name / "GhostVendor.idx"));
+    CHECK(fs::exists(fx.staged_path / k_repo_name / (k_vendor_name + ".idx")));
+    REQUIRE(listener.reconfigurations().has_value());
+    CHECK(listener.reconfigurations()->new_vendors().size() == 1);
+}
+
+TEST_CASE("PresetUpdater leaves a private source alone while nobody is logged in", "[preset_updater]")
+{
+    Fixture fx;
+    CaptureListener listener(fx.interactor());
+
+    fx.put_server("100");
+    add_source_to_manifest(
+        fx.shared_runtime_path / "RepositoryManifest.json", "secret_repo", "developer"
+    );
+    fx.put_installed_as("secret_repo", "100");
+    fs::create_directories(fx.staged_path / "secret_repo");
+    fs::copy_file(
+        fx.resources_profile_path / "resource100" / k_repo_name / (k_vendor_name + ".idx"),
+        fx.staged_path / "secret_repo" / (k_vendor_name + ".idx")
+    );
+
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        true, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE_FALSE(listener.got_error());
+
+    CHECK_FALSE(fs::exists(fx.staged_path / "secret_repo"));
+    CHECK(listener.warnings().empty());
+    REQUIRE(listener.reconfigurations().has_value());
+
+    const auto& up_to_date = listener.reconfigurations()->up_to_date();
+    REQUIRE(up_to_date.size() == 1);
+    CHECK(up_to_date.front().vendor_id == k_vendor_name);
+    CHECK(up_to_date.front().vendor_repo_id == "secret_repo");
+
+    for (const PresetUpdater::VendorReconfiguration& offered :
+         listener.reconfigurations()->new_vendors()) {
+        CHECK(offered.vendor_repo_id != "secret_repo");
+    }
+}
+
+TEST_CASE("PresetUpdater drops staged files of sources it does not know", "[preset_updater]")
+{
+    Fixture fx;
+    CaptureListener listener(fx.interactor());
+
+    fx.put_server("100");
+    fs::create_directories(fx.staged_path / "vanished_repo");
+    fs::copy_file(
+        fx.resources_profile_path / "resource100" / k_repo_name / (k_vendor_name + ".idx"),
+        fx.staged_path / "vanished_repo" / (k_vendor_name + ".idx")
+    );
+
+    fx.interactor().sync_indices_and_reconfiguration_check(
+        true, PresetUpdater::VerboseStyle::NoProgress
+    );
+    REQUIRE(fx.wait(listener));
+    REQUIRE_FALSE(listener.got_error());
+
+    CHECK_FALSE(fs::exists(fx.staged_path / "vanished_repo"));
+    CHECK(fs::exists(fx.staged_path / k_repo_name / (k_vendor_name + ".idx")));
+}
+
 
 TEST_CASE("PresetUpdater cleans up staged files and keeps installed profiles", "[preset_updater]")
 {

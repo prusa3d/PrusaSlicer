@@ -749,6 +749,20 @@ void MainFrame::on_user_account_enabled_state_changed(bool is_enabled)
     ensure_slicing_page_selected();
 }
 
+void MainFrame::on_user_account_id_success(bool is_refresh, const std::string& username)
+{
+    if (!is_refresh && AppServices::instance().has_preset_updater_controller()) {
+        AppServices::instance().preset_updater_controller().on_logged_in();
+    }
+}
+
+void MainFrame::on_user_account_logged_out()
+{
+    if (AppServices::instance().has_preset_updater_controller()) {
+        AppServices::instance().preset_updater_controller().on_logged_out();
+    }
+}
+
 void MainFrame::on_selected_physical_printer_changed() 
 {
     ASSERT(m_left_bar);

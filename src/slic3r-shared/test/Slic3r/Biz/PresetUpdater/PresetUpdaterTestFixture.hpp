@@ -143,8 +143,10 @@ inline void deselect_every_source(const fs::path& manifest_path)
 }
 
 /// Adds a source the offline check will accept the id of. Nothing is served for it, which is all
-/// a check that only reads the data dir needs.
-inline void add_source_to_manifest(const fs::path& manifest_path, const std::string& id)
+/// a check that only reads the data dir needs. A non-empty visibility makes it a private source.
+inline void add_source_to_manifest(
+    const fs::path& manifest_path, const std::string& id, const std::string& visibility = ""
+)
 {
     nlohmann::json manifest = nlohmann::json::parse(read_file(manifest_path));
     manifest.push_back(
@@ -156,7 +158,7 @@ inline void add_source_to_manifest(const fs::path& manifest_path, const std::str
             {"selected", true},
             {"url", k_server_addr + id + "/"},
             {"uuid", "uuid-" + id},
-            {"visibility", ""}
+            {"visibility", visibility}
         }
     );
 
